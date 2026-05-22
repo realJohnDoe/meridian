@@ -103,7 +103,6 @@ let curView='agenda', prevView='agenda';
 let calMonth=new Date(TODAY.getFullYear(),TODAY.getMonth(),1);
 let dvDate=new Date(TODAY);
 let nsFilterVal='all', nextId=200;
-let entry={item:null,scheduled:null,duration:'',tracked:true,repeat:null,done:false,tags:[],priority:null};
 let rdType=null,rdWdays=[false,false,false,false,false,false,false],rdMonthly='first-weekday',rdEndType='never',rdEndVal='',rdInterval='1 day';
 
 // ── UTILS ──────────────────────────────────────────────────────
@@ -146,7 +145,7 @@ function navTo(name,btn){
   document.getElementById('tbDay').style.display='none';
   curView=name;
 }
-function pushView(name){
+export function pushView(name){
   prevView=curView;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
@@ -695,188 +694,69 @@ function filterNS(){buildNS(nsFilterVal);}
 function setNSF(f,btn){document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('on'));btn.classList.add('on');buildNS(f);}
 
 // ── ENTRY EDITOR ──────────────────────────────────────────────
-function openEntry(item){
-  openEntryDirect(item, item&&item.recur?'single':'all');
-}
-function closeSeriesEditSheet(){}
+function openEntry(item){ (window as any).openEntry(item) }
 
-function openEntryDirect(item, editScope='all'){
-  entry.item=item?{...item, _editScope:editScope}:null;
-  entry.scheduled=null;entry.duration='';entry.tracked=true;entry.repeat=null;entry.done=false;entry.tags=[];entry.priority=null;
-  if(item){
-    const root=item._node||item;
-    document.getElementById('entryTitle').value=item.title||root.title||'';
-    entry.duration=item.duration||root.duration||'';
-    entry.tracked=(item.done!==undefined)||(root.done!==undefined);
-    entry.done=item.done||false;
-    entry.tags=[...(item.tags||root.tags||[])];
-    entry.priority=item.priority||root.priority||null;
-    document.getElementById('entryFname').textContent=((root.id||item.title||'untitled')+'.md').toLowerCase().replace(/\s+/g,'-');
-    renderBodyContent(item.body||root.body||'');
-    applyScopeToFields(editScope);
-  } else {
-    document.getElementById('entryTitle').value='';
-    document.getElementById('entryFname').textContent='untitled.md';
-    document.getElementById('entryBody').innerHTML='';
-    entry.scheduled={date:fmtISO(TODAY),time:''};
-  }
-  autoResize(document.getElementById('entryTitle'));
-  document.getElementById('deleteBtn').style.display=item?'flex':'none';
-  const isRecur=!!(item&&(item.recur||item._node?.repeat||item.repeat));
-  const scopeRow=document.getElementById('scopeRow');
-  scopeRow.style.display=isRecur?'flex':'none';
-  if(isRecur){
-    document.getElementById('scopeSelect').value=editScope;
-  }
-  refreshEntryUI();
-  pushView('entry');
-  setTimeout(()=>ic(),80);
-}
-
-function applyScopeToFields(scope){
-  if(!entry.item)return;
-  const item=entry.item;
+export function applyScope(item, scope){
   const root=item._node||item;
   const occDate=item.date||root.date||null;
   const occTime=item.time||root.time||null;
   const rootDate=root.date||null;
   const rootTime=root.time||null;
-
-  if(scope==='single'){
-    entry.scheduled=occDate?{date:occDate,time:occTime||''}:null;
-    entry.repeat=null;
-  } else if(scope==='future'){
-    entry.scheduled=occDate?{date:occDate,time:occTime||''}:null;
-    entry.repeat=root.repeat||null;
-  } else {
-    entry.scheduled=rootDate?{date:rootDate,time:rootTime||''}:null;
-    entry.repeat=root.repeat||null;
-  }
+  if(scope==='single') return {scheduled:occDate?{date:occDate,time:occTime||''}:null, repeat:null};
+  if(scope==='future') return {scheduled:occDate?{date:occDate,time:occTime||''}:null, repeat:root.repeat||null};
+  return {scheduled:rootDate?{date:rootDate,time:rootTime||''}:null, repeat:root.repeat||null};
 }
 
-function renderBodyContent(text){
-  const body=document.getElementById('entryBody');
-  const html=text.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,(m,ref,label)=>{
-    const target=NODES.find(n=>n.title.toLowerCase()===ref.toLowerCase());
-    return `<span class="${target?'wl':'wl-broken'}" data-ref="${ref}">[[${label||ref}]]</span>`;
-  }).replace(/\n/g,'<br>');
-  body.innerHTML=html;
-}
-function closeEntry(){popView();}
-
-function refreshEntryUI(){
-  const chk=document.getElementById('echk');
-  chk.classList.toggle('show',entry.tracked);chk.classList.toggle('on',entry.done);
-
-  const cs=document.getElementById('cSched');
-  cs.classList.toggle('on',!!entry.scheduled);
-  document.getElementById('sumSched').textContent=entry.scheduled
-    ?entry.scheduled.date.slice(5).replace('-','/'):'';
-
-  const ct=document.getElementById('cTime');
-  const hasDate=!!entry.scheduled;
-  const hasTime=!!(entry.scheduled?.time);
-  ct.classList.toggle('hidden',!hasDate);
-  ct.classList.toggle('on',hasTime);
-  document.getElementById('sumTime').textContent=hasTime?entry.scheduled.time:'';
-
-  const cd=document.getElementById('cDur');
-  cd.classList.toggle('hidden',!hasDate);
-  cd.classList.toggle('on',!!entry.duration);
-  document.getElementById('sumDur').textContent=entry.duration||'';
-
-  const ctr=document.getElementById('cTrack');
-  ctr.classList.toggle('on',entry.tracked);ctr.classList.toggle('tc',entry.tracked);
-
-  const cp=document.getElementById('cPriority');
-  const pLabels={high:'High',medium:'Medium',low:'Low'};
-  const pClass={high:'p1',medium:'p2',low:'p3'};
-  cp.classList.toggle('hidden',!entry.tracked);
-  cp.classList.toggle('on',!!entry.priority);
-  cp.className=cp.className.replace(/\bp[123]\b/g,'').trim();
-  if(entry.priority)cp.classList.add(pClass[entry.priority]);
-  document.getElementById('sumPriority').textContent=entry.priority?pLabels[entry.priority]:'';
-
-  const scope=entry.item?._editScope;
-  const isSingleScope=scope==='single';
-  const showRep=(hasDate||entry.tracked)&&!isSingleScope;
-  document.getElementById('cRepeat').classList.toggle('hidden',!showRep);
-  document.getElementById('cRepeat').classList.toggle('on',!!entry.repeat);
-  document.getElementById('sumRepeat').textContent=entry.repeat
-    ?(entry.repeat.type==='after_completion'?'after ✓':entry.repeat.type||''):'';
-
-  const tr=document.getElementById('entry.tags');tr.innerHTML='';
-  entry.tags.forEach(t=>{const s=document.createElement('span');s.className='etag';s.textContent=t;tr.appendChild(s);});
-  const add=document.createElement('span');add.className='etag etag-add';add.innerHTML='<i data-lucide="plus"></i> tag';add.onclick=addTag;tr.appendChild(add);
-  ic();
+export function buildBodyHtml(text){
+  return text
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,(m,ref,label)=>{
+      const target=NODES.find(n=>n.title.toLowerCase()===ref.toLowerCase());
+      return `<span class="${target?'wl':'wl-broken'}" data-ref="${ref}">[[${label||ref}]]</span>`;
+    })
+    .replace(/\n/g,'<br>');
 }
 
-function setScope(scope){
-  if(entry.item)entry.item._editScope=scope;
-  applyScopeToFields(scope);
-  refreshEntryUI();
-}
+export function closeEntry(){popView();}
 
-function toggleDoneEntry(){entry.done=!entry.done;document.getElementById('echk').classList.toggle('on',entry.done);}
-function setPriority(p){entry.priority=p;closeDlg('dlgPriority');refreshEntryUI();}
-function toggleTrack(){entry.tracked=!entry.tracked;if(!entry.tracked)entry.priority=null;refreshEntryUI();}
-function addTag(){const t=prompt('Tag:');if(t){entry.tags.push(t.trim());refreshEntryUI();}}
-
-function buildFields(){
-  const f={
-    title:document.getElementById('entryTitle').value.trim(),
-    tags:[...entry.tags],
-    body:document.getElementById('entryBody').innerText.trim()||undefined
-  };
-  if(entry.tracked){f.done=entry.done;if(entry.priority)f.priority=entry.priority;}
-  if(entry.scheduled&&entry.scheduled.date){
-    f.date=entry.scheduled.date;
-    f.time=entry.scheduled.time||undefined;
-    f.duration=entry.duration||undefined;
-  }
-  if(entry.repeat)f.repeat=entry.repeat;
-  return f;
-}
-
-function saveEntry(){
-  const title=document.getElementById('entryTitle').value.trim();if(!title)return;
-  const scope=entry.item?._editScope||'all';
-  const rootNode=entry.item?(entry.item._node||entry.item):null;
+export function saveNode(item, editScope, fields){
+  const {title,tags,body,tracked,done,priority,scheduled,duration,repeat}=fields;
+  if(!title)return;
+  const rootNode=item?(item._node||item):null;
   const existingIdx=rootNode?NODES.findIndex(n=>n===rootNode||(n.id&&n.id===rootNode.id)):-1;
   const isNew=existingIdx<0;
 
+  const f={title,tags,body:body||undefined};
+  if(tracked){f.done=done;if(priority)f.priority=priority;}
+  if(scheduled?.date){f.date=scheduled.date;f.time=scheduled.time||undefined;f.duration=duration||undefined;}
+  if(repeat)f.repeat=repeat;
+
   if(isNew){
-    const f=buildFields();
     const node={id:'node-'+nextId++, ...f};
-    if(!entry.tracked)delete node.done;
-    if(!entry.scheduled){delete node.date;delete node.time;delete node.duration;}
-    node.repeat=entry.repeat||undefined;
+    if(!tracked)delete node.done;
+    if(!scheduled){delete node.date;delete node.time;delete node.duration;}
+    node.repeat=repeat||undefined;
     NODES.push(node);
     writeEntityToCache(node);
-    buildAgenda();buildMonth();
-    closeEntry();
+    buildAgenda();buildMonth();closeEntry();
     return;
   }
 
   const node=NODES[existingIdx];
 
-  if(scope==='all'||!node.repeat){
-    const f=buildFields();
-    Object.assign(node, f);
-    if(!entry.tracked)delete node.done;
-    if(!entry.scheduled){delete node.date;delete node.time;delete node.duration;}
-    if(entry.repeat)node.repeat=entry.repeat; else delete node.repeat;
+  if(editScope==='all'||!node.repeat){
+    Object.assign(node,f);
+    if(!tracked)delete node.done;
+    if(!scheduled){delete node.date;delete node.time;delete node.duration;}
+    if(repeat)node.repeat=repeat; else delete node.repeat;
     if(node.tags&&node.tags.length===0)delete node.tags;
     writeEntityToCache(node);
 
-  } else if(scope==='single'){
-    const occDate=entry.item.date;
-    const occTime=entry.item.time||undefined;
-    const f=buildFields();
+  } else if(editScope==='single'){
+    const occDate=item.date;
+    const occTime=item.time||undefined;
     const newDate=f.date;
     const newTime=f.time||undefined;
     const isRescheduled=newDate!==occDate||(newTime&&newTime!==occTime);
-
     if(!node.instances)node.instances=[];
     if(isRescheduled){
       let excl=node.instances.find(i=>i.date===occDate&&(!i.time||i.time===occTime));
@@ -888,8 +768,8 @@ function saveEntry(){
       if(f.body!==node.body)newInst.body=f.body;
       if(f.tags?.length&&JSON.stringify(f.tags)!==JSON.stringify(node.tags))newInst.tags=f.tags;
       if(f.duration!==node.duration)newInst.duration=f.duration;
-      if(entry.tracked&&f.done!==undefined)newInst.done=f.done;
-      if(entry.tracked&&f.priority!==node.priority)newInst.priority=f.priority||undefined;
+      if(tracked&&f.done!==undefined)newInst.done=f.done;
+      if(tracked&&f.priority!==node.priority)newInst.priority=f.priority||undefined;
       node.instances.push(newInst);
     } else {
       let inst=node.instances.find(i=>i.date===occDate&&(!i.time||i.time===occTime));
@@ -898,13 +778,13 @@ function saveEntry(){
       if(f.body!==node.body)inst.body=f.body; else delete inst.body;
       if(f.tags?.length&&JSON.stringify(f.tags)!==JSON.stringify(node.tags))inst.tags=f.tags; else delete inst.tags;
       if(f.duration!==node.duration)inst.duration=f.duration; else delete inst.duration;
-      if(entry.tracked&&f.done!==undefined)inst.done=f.done; else delete inst.done;
-      if(entry.tracked&&f.priority!==node.priority)inst.priority=f.priority||undefined; else delete inst.priority;
+      if(tracked&&f.done!==undefined)inst.done=f.done; else delete inst.done;
+      if(tracked&&f.priority!==node.priority)inst.priority=f.priority||undefined; else delete inst.priority;
     }
     writeEntityToCache(node);
 
-  } else if(scope==='future'){
-    const occDate=entry.item.date;
+  } else if(editScope==='future'){
+    const occDate=item.date;
     const occJsDate=parseDateString(occDate);
     const untilDate=new Date(occJsDate);untilDate.setDate(untilDate.getDate()-1);
     if(!node.repeat.scheduled)node.repeat.scheduled={};
@@ -915,35 +795,33 @@ function saveEntry(){
         return !t||t<occJsDate;
       });
     }
-    const f=buildFields();
     const newChild={date:f.date||occDate};
     if(f.time)newChild.time=f.time;
     if(f.title!==node.title)newChild.title=f.title;
     if(JSON.stringify(f.tags)!==JSON.stringify(node.tags))newChild.tags=f.tags;
     if(f.duration!==node.duration)newChild.duration=f.duration;
     if(f.body!==node.body)newChild.body=f.body;
-    if(entry.repeat)newChild.repeat=entry.repeat;
-    if(entry.tracked&&f.done!==undefined)newChild.done=f.done;
+    if(repeat)newChild.repeat=repeat;
+    if(tracked&&f.done!==undefined)newChild.done=f.done;
     Object.keys(newChild).forEach(k=>{if(newChild[k]===undefined)delete newChild[k];});
     if(!node.instances)node.instances=[];
     node.instances.push(newChild);
     writeEntityToCache(node);
   }
 
-  buildAgenda();buildMonth();
-  closeEntry();
+  buildAgenda();buildMonth();closeEntry();
 }
 
-function deleteEntry(){
-  if(!entry.item)return;
-  const node=entry.item._node||entry.item;
+export function deleteNode(item){
+  if(!item)return;
+  const node=item._node||item;
   const nodeId=node.id;
   if(node.repeat){
     const sheet=document.getElementById('seriesSheet');
     document.getElementById('seriesSheetTitle').textContent=`Delete "${node.title}"`;
     document.getElementById('seriesOpt1').onclick=()=>{
       if(!node.instances)node.instances=[];
-      const occDate=entry.item.date||node.date;
+      const occDate=item.date||node.date;
       let inst=node.instances.find(i=>i.date===occDate);
       if(inst){inst.excluded=true;}
       else{node.instances.push({date:occDate,excluded:true});}
@@ -963,52 +841,43 @@ function deleteEntry(){
     buildAgenda();buildMonth();closeEntry();
   }
 }
-function closeSeriesSheet(){document.getElementById('seriesSheet').classList.remove('open');}
+export function closeSeriesSheet(){document.getElementById('seriesSheet').classList.remove('open');}
 
 // ── DIALOGS ──────────────────────────────────────────────────
-function openDlg(id){
-  if(id==='dlgSched'){document.getElementById('dlgDate').value=entry.scheduled?.date||fmtISO(TODAY);}
-  if(id==='dlgTime'){document.getElementById('dlgTimeVal').value=entry.scheduled?.time||'';}
-  if(id==='dlgDur'){document.getElementById('dlgDurVal').value=entry.duration||'';}
+export function openDlg(id, scheduled, duration){
+  if(id==='dlgSched'){document.getElementById('dlgDate').value=scheduled?.date||fmtISO(TODAY);}
+  if(id==='dlgTime'){document.getElementById('dlgTimeVal').value=scheduled?.time||'';}
+  if(id==='dlgDur'){document.getElementById('dlgDurVal').value=duration||'';}
   document.getElementById(id).classList.add('open');ic();
 }
-function closeDlg(id){document.getElementById(id).classList.remove('open');}
-function closeDlgOv(id,e){if(e.target===document.getElementById(id))closeDlg(id);}
-function confirmSched(){
-  const d=document.getElementById('dlgDate').value;
-  if(!d)return;
-  entry.scheduled={date:d, time:entry.scheduled?.time||''};
-  closeDlg('dlgSched');refreshEntryUI();
-}
-function removeSched(){
-  entry.scheduled=null;entry.duration='';
-  closeDlg('dlgSched');refreshEntryUI();
-}
-function confirmTime(){
-  const t=document.getElementById('dlgTimeVal').value;
-  if(entry.scheduled)entry.scheduled.time=t;
-  closeDlg('dlgTime');refreshEntryUI();
-}
-function removeTime(){
-  if(entry.scheduled)entry.scheduled.time='';
-  closeDlg('dlgTime');refreshEntryUI();
-}
-function confirmDur(){entry.duration=document.getElementById('dlgDurVal').value.trim();closeDlg('dlgDur');refreshEntryUI();}
-function removeDur(){entry.duration='';closeDlg('dlgDur');refreshEntryUI();}
+export function closeDlg(id){document.getElementById(id).classList.remove('open');}
+export function closeDlgOv(id,e){if(e.target===document.getElementById(id))closeDlg(id);}
 
-function openRepeatDlg(){
-  const hasSched=!!entry.scheduled,hasTrk=entry.tracked;
+export function openRepeatDlg({scheduled,tracked,repeat}){
+  const hasSched=!!scheduled,hasTrk=tracked;
   const hint=document.getElementById('repeatHintText'),hintBox=document.getElementById('repeatHint');
   if(hasSched&&hasTrk){hint.textContent='Both Schedule and Track Completion are on. Choose a schedule pattern, or "After completion" to repeat when you check this done.';hintBox.style.display='flex';}
   else if(hasTrk&&!hasSched){hint.textContent='"After completion" repeats whenever you mark this done.';hintBox.style.display='flex';rdType='after_completion';}
   else{hint.textContent='Choose how often this scheduled item repeats.';hintBox.style.display='flex';if(rdType==='after_completion')rdType='weekly';}
-  if(!entry.repeat&&entry.scheduled?.date){
-    const jsDay=parseDateString(entry.scheduled.date)?.getDay()??1;
+  if(!repeat&&scheduled?.date){
+    const jsDay=parseDateString(scheduled.date)?.getDay()??1;
     const monFirst=(jsDay+6)%7;
     rdWdays=[false,false,false,false,false,false,false];
     rdWdays[monFirst]=true;
   }
-  buildRepeatDlg(hasSched,hasTrk);openDlg('dlgRepeat');
+  buildRepeatDlg(hasSched,hasTrk);openDlg('dlgRepeat',scheduled,'');
+}
+
+export function buildRepeatValue(){
+  const iv=document.getElementById('rdIv');if(iv)rdInterval=iv.value;
+  const ed=document.getElementById('endD');if(ed)rdEndVal=ed.value;
+  const ec=document.getElementById('endC');if(ec)rdEndVal=ec.value;
+  const sched={freq:rdType==='daily'?'daily':rdType==='weekly'?'weekly':rdType==='monthly'?'monthly':'yearly'};
+  if(rdType==='weekly'){const wdMap=['mo','tu','we','th','fr','sa','su'];sched.byweekday=wdMap.filter((_,i)=>rdWdays[i]);}
+  if(rdType==='monthly'&&rdMonthly==='first-weekday'){sched.byweekday=['mo','tu','we','th','fr'];sched.bysetpos=1;}
+  if(rdEndType==='until'&&rdEndVal)sched.end={type:'until',time:rdEndVal};
+  if(rdEndType==='count'&&rdEndVal)sched.end={type:'count',occurrences:parseInt(rdEndVal)};
+  return rdType==='after_completion'?{type:'after_completion',interval:rdInterval}:{type:'schedule',scheduled:sched};
 }
 function buildRepeatDlg(hasSched,hasTrk){
   const grid=document.getElementById('recurGrid');grid.innerHTML='';
@@ -1040,19 +909,6 @@ function buildRepeatConfig(){
 }
 function setEnd(type,btn){rdEndType=type;document.querySelectorAll('.eopt').forEach(b=>b.classList.remove('on'));btn.classList.add('on');buildEndVal();}
 function buildEndVal(){const row=document.getElementById('endValRow');if(!row)return;if(rdEndType==='until')row.innerHTML=`<input class="dlg-in" style="width:100%;margin-top:6px" type="date" id="endD" value="${rdEndVal}">`;else if(rdEndType==='count')row.innerHTML=`<input class="dlg-in" style="width:100%;margin-top:6px" type="number" id="endC" placeholder="occurrences" value="${rdEndVal}">`;else row.innerHTML='';}
-function confirmRepeat(){
-  const iv=document.getElementById('rdIv');if(iv)rdInterval=iv.value;
-  const ed=document.getElementById('endD');if(ed)rdEndVal=ed.value;
-  const ec=document.getElementById('endC');if(ec)rdEndVal=ec.value;
-  const sched={freq:rdType==='daily'?'daily':rdType==='weekly'?'weekly':rdType==='monthly'?'monthly':'yearly'};
-  if(rdType==='weekly'){const wdMap=['mo','tu','we','th','fr','sa','su'];sched.byweekday=wdMap.filter((_,i)=>rdWdays[i]);}
-  if(rdType==='monthly'&&rdMonthly==='first-weekday'){sched.byweekday=['mo','tu','we','th','fr'];sched.bysetpos=1;}
-  if(rdEndType==='until'&&rdEndVal)sched.end={type:'until',time:rdEndVal};
-  if(rdEndType==='count'&&rdEndVal)sched.end={type:'count',occurrences:parseInt(rdEndVal)};
-  entry.repeat=rdType==='after_completion'?{type:'after_completion',interval:rdInterval}:{type:'schedule',scheduled:sched};
-  closeDlg('dlgRepeat');refreshEntryUI();
-}
-function removeRepeat(){entry.repeat=null;closeDlg('dlgRepeat');refreshEntryUI();}
 
 // ── WIKILINK AUTOCOMPLETE ─────────────────────────────────────
 let wlFocusIdx=-1;
@@ -1394,22 +1250,13 @@ export function initApp(){
   },200);
 }
 
-// Expose all UI functions for JSX onClick handlers in App.tsx
+// Only functions called from vanilla JS inline onclick strings need window exposure
 Object.assign(window as any, {
-  setEnd,
+  setEnd,   // used in buildRepeatConfig innerHTML onclick strings
+  autoResize,
   openSidebar, closeSidebar, sidebarNav,
   closeDayView, dvNav,
   syncToDirectory, pickDirectory, goToday, openSearch, closeSearch,
   chMonth,
   filterNS, setNSF,
-  openEntry, closeEntry, saveEntry, deleteEntry,
-  toggleDoneEntry, autoResize, setScope,
-  openDlg, closeDlg, closeDlgOv,
-  toggleTrack, openRepeatDlg, addTag,
-  removeSched, confirmSched,
-  removeTime, confirmTime,
-  removeDur, confirmDur,
-  removeRepeat, confirmRepeat,
-  setPriority,
-  closeSeriesSheet,
 });
