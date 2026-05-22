@@ -21,12 +21,7 @@ export default function App() {
         <header className="topbar" id="mainTop">
           <div className="tb-l" id="tbDefault">
             <button className="ib" onClick={() => (window as any).openSidebar()} title="Menu"><i data-lucide="menu"></i></button>
-            <svg width="26" height="26" viewBox="0 0 28 28">
-              <defs><linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#818cf8"/><stop offset="100%" stopColor="#38bdf8"/></linearGradient></defs>
-              <circle cx="14" cy="14" r="11" fill="none" stroke="url(#lg)" strokeWidth="2" strokeDasharray="52 18"/>
-              <text x="14" y="19" textAnchor="middle" fontFamily="Georgia,serif" fontSize="13" fill="#f5f0e8">M</text>
-              <circle cx="14" cy="3.5" r="2" fill="#818cf8"/>
-            </svg>
+            <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{borderRadius:5}} alt="Meridian" />
             <span className="vault-name">Meridian</span>
           </div>
           <div className="tb-l" id="tbDay" style={{display:'none',flex:1,gap:4,overflow:'hidden'}}>
@@ -124,12 +119,7 @@ export default function App() {
         <div className="sidebar-ov" id="sidebarOv" onClick={() => (window as any).closeSidebar()}></div>
         <div className="sidebar" id="sidebar">
           <div className="sidebar-head">
-            <svg width="26" height="26" viewBox="0 0 28 28">
-              <defs><linearGradient id="lg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#818cf8"/><stop offset="100%" stopColor="#38bdf8"/></linearGradient></defs>
-              <circle cx="14" cy="14" r="11" fill="none" stroke="url(#lg2)" strokeWidth="2" strokeDasharray="52 18"/>
-              <text x="14" y="19" textAnchor="middle" fontFamily="Georgia,serif" fontSize="13" fill="#f5f0e8">M</text>
-              <circle cx="14" cy="3.5" r="2" fill="#818cf8"/>
-            </svg>
+            <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{borderRadius:5}} alt="Meridian" />
             <span className="sidebar-title">Meridian</span>
           </div>
           <div className="sidebar-body">
