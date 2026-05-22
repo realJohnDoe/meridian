@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
+  Menu, FolderSync, FolderOpen, CalendarCheck2, Search,
+  ArrowLeft, ChevronLeft, ChevronRight,
+  AlignLeft, CalendarDays, CalendarClock,
+  Plus, Calendar, Clock, Timer, X, Info, Flag,
+} from 'lucide-react'
+import {
   initApp, wikilinkInputHandler, wikilinkKeydownHandler, wikilinkClickHandler,
   applyScope, buildBodyHtml,
   saveNode, deleteNode, closeEntry, pushView,
@@ -133,21 +139,21 @@ export default function App() {
 
         <header className="topbar" id="mainTop">
           <div className="tb-l" id="tbDefault">
-            <button className="ib" onClick={() => (window as any).openSidebar()} title="Menu"><i data-lucide="menu"></i></button>
+            <button className="ib" onClick={() => (window as any).openSidebar()} title="Menu"><Menu /></button>
             <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{borderRadius:5}} alt="Meridian" />
             <span className="vault-name">Meridian</span>
           </div>
           <div className="tb-l" id="tbDay" style={{display:'none',flex:1,gap:4,overflow:'hidden'}}>
-            <button className="ib" onClick={() => (window as any).closeDayView()}><i data-lucide="arrow-left"></i></button>
+            <button className="ib" onClick={() => (window as any).closeDayView()}><ArrowLeft /></button>
             <span id="dvTitle" style={{flex:1,fontFamily:'var(--disp)',fontStyle:'italic',fontSize:15,color:'var(--t0)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}></span>
-            <button className="ib" onClick={() => (window as any).dvNav(-1)}><i data-lucide="chevron-left"></i></button>
-            <button className="ib" onClick={() => (window as any).dvNav(1)}><i data-lucide="chevron-right"></i></button>
+            <button className="ib" onClick={() => (window as any).dvNav(-1)}><ChevronLeft /></button>
+            <button className="ib" onClick={() => (window as any).dvNav(1)}><ChevronRight /></button>
           </div>
           <div className="tb-r">
-            <button className="ib" id="syncBtn" onClick={() => (window as any).syncToDirectory()} title="Sync"><i data-lucide="folder-sync"></i></button>
-            <button className="ib" onClick={() => (window as any).pickDirectory()} title="Open vault"><i data-lucide="folder-open"></i></button>
-            <button className="ib" onClick={() => (window as any).goToday()} title="Today"><i data-lucide="calendar-check-2"></i></button>
-            <button className="ib" onClick={() => (window as any).openSearch()} title="Search"><i data-lucide="search"></i></button>
+            <button className="ib" id="syncBtn" onClick={() => (window as any).syncToDirectory()} title="Sync"><FolderSync /></button>
+            <button className="ib" onClick={() => (window as any).pickDirectory()} title="Open vault"><FolderOpen /></button>
+            <button className="ib" onClick={() => (window as any).goToday()} title="Today"><CalendarCheck2 /></button>
+            <button className="ib" onClick={() => (window as any).openSearch()} title="Search"><Search /></button>
           </div>
         </header>
 
@@ -162,8 +168,8 @@ export default function App() {
             <div className="cal-hdr">
               <div className="cal-mt" id="mTitle"></div>
               <div className="mnav">
-                <button className="mnb" onClick={() => (window as any).chMonth(-1)}><i data-lucide="chevron-left"></i></button>
-                <button className="mnb" onClick={() => (window as any).chMonth(1)}><i data-lucide="chevron-right"></i></button>
+                <button className="mnb" onClick={() => (window as any).chMonth(-1)}><ChevronLeft /></button>
+                <button className="mnb" onClick={() => (window as any).chMonth(1)}><ChevronRight /></button>
               </div>
             </div>
             <div className="dow-row" id="dowRow"></div>
@@ -180,10 +186,10 @@ export default function App() {
         {/* SEARCH */}
         <section className="view" id="view-search">
           <div className="entry-top">
-            <button className="ib" onClick={() => (window as any).closeSearch()}><i data-lucide="arrow-left"></i></button>
+            <button className="ib" onClick={() => (window as any).closeSearch()}><ArrowLeft /></button>
             <span className="entry-fname">Search</span>
           </div>
-          <div className="ns-bar"><i data-lucide="search"></i><input id="nsIn" type="text" placeholder="Search notes, tasks, events…" onInput={() => (window as any).filterNS()} /></div>
+          <div className="ns-bar"><Search /><input id="nsIn" type="text" placeholder="Search notes, tasks, events…" onInput={() => (window as any).filterNS()} /></div>
           <div className="ns-filters">
             <button className="fchip on" onClick={(e) => (window as any).setNSF('all', e.currentTarget)}>All</button>
             <button className="fchip" onClick={(e) => (window as any).setNSF('event', e.currentTarget)}>Events</button>
@@ -214,15 +220,15 @@ export default function App() {
             <span className="sidebar-title">Meridian</span>
           </div>
           <div className="sidebar-body">
-            <button className="sni active" id="sni-agenda" onClick={(e) => (window as any).sidebarNav('agenda', e.currentTarget)}><i data-lucide="align-left"></i>Agenda</button>
-            <button className="sni" id="sni-calendar" onClick={(e) => (window as any).sidebarNav('calendar', e.currentTarget)}><i data-lucide="calendar-days"></i>Month</button>
-            <button className="sni" id="sni-day" onClick={(e) => (window as any).sidebarNav('day', e.currentTarget)}><i data-lucide="calendar-clock"></i>Day</button>
+            <button className="sni active" id="sni-agenda" onClick={(e) => (window as any).sidebarNav('agenda', e.currentTarget)}><AlignLeft />Agenda</button>
+            <button className="sni" id="sni-calendar" onClick={(e) => (window as any).sidebarNav('calendar', e.currentTarget)}><CalendarDays />Month</button>
+            <button className="sni" id="sni-day" onClick={(e) => (window as any).sidebarNav('day', e.currentTarget)}><CalendarClock />Day</button>
           </div>
         </div>
 
         {/* FAB */}
         <div className="bottom-float" id="bottomFloat">
-          <button className="fab" id="fab" onClick={() => (window as any).openEntry(null)} style={{marginLeft:'auto',pointerEvents:'all'}}><i data-lucide="plus"></i></button>
+          <button className="fab" id="fab" onClick={() => (window as any).openEntry(null)} style={{marginLeft:'auto',pointerEvents:'all'}}><Plus /></button>
         </div>
 
       </div>{/* end #app */}
@@ -230,9 +236,9 @@ export default function App() {
       {/* DATE DLG */}
       <div className="dlg-ov" id="dlgSched" onClick={(e) => closeDlgOv('dlgSched', e.nativeEvent)}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Date</div><div className="dlg-body">
-          <div className="dlg-row"><span className="dlg-lbl"><i data-lucide="calendar"></i>Date</span><input className="dlg-in" type="date" id="dlgDate" /></div>
+          <div className="dlg-row"><span className="dlg-lbl"><Calendar />Date</span><input className="dlg-in" type="date" id="dlgDate" /></div>
           <div className="dlg-actions">
-            <button className="dlg-rm" onClick={removeSched}><i data-lucide="x"></i>Remove</button>
+            <button className="dlg-rm" onClick={removeSched}><X />Remove</button>
             <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgSched')}>Cancel</button><button className="dlg-ok" onClick={confirmSched}>Set</button></div>
           </div>
         </div></div>
@@ -242,10 +248,10 @@ export default function App() {
       <div className="dlg-ov" id="dlgPriority" onClick={(e) => closeDlgOv('dlgPriority', e.nativeEvent)}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Priority</div><div className="dlg-body">
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            <button className="dlg-ok" style={{background:'rgba(248,113,113,.15)',color:'var(--p1)',border:'1px solid var(--p1)'}} onClick={() => setPriority('high')}><i data-lucide="flag"></i> High</button>
-            <button className="dlg-ok" style={{background:'rgba(251,146,60,.15)',color:'var(--p2)',border:'1px solid var(--p2)'}} onClick={() => setPriority('medium')}><i data-lucide="flag"></i> Medium</button>
-            <button className="dlg-ok" style={{background:'rgba(250,204,21,.15)',color:'var(--p3)',border:'1px solid var(--p3)'}} onClick={() => setPriority('low')}><i data-lucide="flag"></i> Low</button>
-            <button className="dlg-rm" onClick={() => setPriority(null)}><i data-lucide="x"></i> None</button>
+            <button className="dlg-ok" style={{background:'rgba(248,113,113,.15)',color:'var(--p1)',border:'1px solid var(--p1)'}} onClick={() => setPriority('high')}><Flag /> High</button>
+            <button className="dlg-ok" style={{background:'rgba(251,146,60,.15)',color:'var(--p2)',border:'1px solid var(--p2)'}} onClick={() => setPriority('medium')}><Flag /> Medium</button>
+            <button className="dlg-ok" style={{background:'rgba(250,204,21,.15)',color:'var(--p3)',border:'1px solid var(--p3)'}} onClick={() => setPriority('low')}><Flag /> Low</button>
+            <button className="dlg-rm" onClick={() => setPriority(null)}><X /> None</button>
           </div>
         </div></div>
       </div>
@@ -253,9 +259,9 @@ export default function App() {
       {/* TIME DLG */}
       <div className="dlg-ov" id="dlgTime" onClick={(e) => closeDlgOv('dlgTime', e.nativeEvent)}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Time</div><div className="dlg-body">
-          <div className="dlg-row"><span className="dlg-lbl"><i data-lucide="clock"></i>Time</span><input className="dlg-in" type="time" id="dlgTimeVal" /></div>
+          <div className="dlg-row"><span className="dlg-lbl"><Clock />Time</span><input className="dlg-in" type="time" id="dlgTimeVal" /></div>
           <div className="dlg-actions">
-            <button className="dlg-rm" onClick={removeTime}><i data-lucide="x"></i>Remove</button>
+            <button className="dlg-rm" onClick={removeTime}><X />Remove</button>
             <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgTime')}>Cancel</button><button className="dlg-ok" onClick={confirmTime}>Set</button></div>
           </div>
         </div></div>
@@ -264,9 +270,9 @@ export default function App() {
       {/* DURATION DLG */}
       <div className="dlg-ov" id="dlgDur" onClick={(e) => closeDlgOv('dlgDur', e.nativeEvent)}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Duration</div><div className="dlg-body">
-          <div className="dlg-row"><span className="dlg-lbl"><i data-lucide="timer"></i>Duration</span><input className="dlg-in" type="text" id="dlgDurVal" placeholder="e.g. 1h 30m" style={{width:120}} /></div>
+          <div className="dlg-row"><span className="dlg-lbl"><Timer />Duration</span><input className="dlg-in" type="text" id="dlgDurVal" placeholder="e.g. 1h 30m" style={{width:120}} /></div>
           <div className="dlg-actions">
-            <button className="dlg-rm" onClick={removeDur}><i data-lucide="x"></i>Remove</button>
+            <button className="dlg-rm" onClick={removeDur}><X />Remove</button>
             <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgDur')}>Cancel</button><button className="dlg-ok" onClick={confirmDur}>Set</button></div>
           </div>
         </div></div>
@@ -275,12 +281,12 @@ export default function App() {
       {/* REPEAT DLG */}
       <div className="dlg-ov" id="dlgRepeat" onClick={(e) => closeDlgOv('dlgRepeat', e.nativeEvent)}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Repeat</div><div className="dlg-body">
-          <div className="dlg-hint" id="repeatHint"><i data-lucide="info"></i><span id="repeatHintText"></span></div>
+          <div className="dlg-hint" id="repeatHint"><Info /><span id="repeatHintText"></span></div>
           <div className="recur-grid" id="recurGrid"></div>
           <div id="recurConfig"></div>
           <div className="end-sec" id="endSec" style={{display:'none'}}></div>
           <div className="dlg-actions">
-            <button className="dlg-rm" onClick={removeRepeat}><i data-lucide="x"></i>Remove</button>
+            <button className="dlg-rm" onClick={removeRepeat}><X />Remove</button>
             <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgRepeat')}>Cancel</button><button className="dlg-ok" onClick={confirmRepeat}>Set</button></div>
           </div>
         </div></div>
