@@ -1,8 +1,50 @@
-import { useEffect } from 'react'
-import { initApp, wikilinkInputHandler, wikilinkKeydownHandler, wikilinkClickHandler } from './meridian'
+import { useState, useEffect, useCallback } from 'react'
+import {
+  initApp, wikilinkInputHandler, wikilinkKeydownHandler, wikilinkClickHandler,
+  applyScope, buildBodyHtml,
+  saveNode, deleteNode, closeEntry, pushView,
+  openDlg, closeDlg, closeDlgOv,
+  openRepeatDlg, buildRepeatValue,
+  closeSeriesSheet,
+} from './meridian'
+import EntryEditor, { EntryState, ENTRY_DEFAULT } from './components/EntryEditor'
+
+const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
+function fmtISO(d: Date) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+}
+
+function entryFromItem(item: any, editScope: string): EntryState {
+  if (!item) {
+    return { ...ENTRY_DEFAULT, scheduled: { date: fmtISO(TODAY), time: '' } }
+  }
+  const root = item._node || item
+  const { scheduled, repeat } = applyScope(item, editScope)
+  return {
+    item: { ...item, _editScope: editScope },
+    title: item.title || root.title || '',
+    bodyHtml: buildBodyHtml(item.body || root.body || ''),
+    scheduled,
+    repeat,
+    duration: item.duration || root.duration || '',
+    tracked: item.done !== undefined || root.done !== undefined,
+    done: item.done || false,
+    tags: [...(item.tags || root.tags || [])],
+    priority: item.priority || root.priority || null,
+    editScope,
+  }
+}
 
 export default function App() {
+  const [entry, setEntry] = useState<EntryState>(ENTRY_DEFAULT)
+
   useEffect(() => {
+    // ONE global: lets vanilla JS agenda/search rows open the editor
+    ;(window as any).openEntry = (item: any, scope?: string) => {
+      const editScope = scope ?? (item?.recur ? 'single' : 'all')
+      setEntry(entryFromItem(item, editScope))
+      pushView('entry')
+    }
     document.addEventListener('input', wikilinkInputHandler as EventListener)
     document.addEventListener('keydown', wikilinkKeydownHandler as EventListener)
     document.addEventListener('click', wikilinkClickHandler as EventListener)
@@ -12,6 +54,77 @@ export default function App() {
       document.removeEventListener('keydown', wikilinkKeydownHandler as EventListener)
       document.removeEventListener('click', wikilinkClickHandler as EventListener)
     }
+  }, [])
+
+  const handleSave = useCallback((body: string) => {
+    saveNode(entry.item, entry.editScope, { ...entry, body })
+  }, [entry])
+
+  const handleDelete = useCallback(() => {
+    deleteNode(entry.item)
+  }, [entry.item])
+
+  const handleClose = useCallback(() => {
+    closeEntry()
+  }, [])
+
+  const handleOpenDlg = useCallback((id: string) => {
+    openDlg(id, entry.scheduled, entry.duration)
+  }, [entry.scheduled, entry.duration])
+
+  const handleOpenRepeatDlg = useCallback(() => {
+    openRepeatDlg({ scheduled: entry.scheduled, tracked: entry.tracked, repeat: entry.repeat })
+  }, [entry.scheduled, entry.tracked, entry.repeat])
+
+  // Dialog confirm handlers — update entry state directly, no globals needed
+  const confirmSched = useCallback(() => {
+    const d = (document.getElementById('dlgDate') as HTMLInputElement).value
+    if (!d) return
+    setEntry(prev => ({ ...prev, scheduled: { date: d, time: prev.scheduled?.time || '' } }))
+    closeDlg('dlgSched')
+  }, [])
+
+  const removeSched = useCallback(() => {
+    setEntry(prev => ({ ...prev, scheduled: null, duration: '' }))
+    closeDlg('dlgSched')
+  }, [])
+
+  const confirmTime = useCallback(() => {
+    const t = (document.getElementById('dlgTimeVal') as HTMLInputElement).value
+    setEntry(prev => prev.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: t } } : prev)
+    closeDlg('dlgTime')
+  }, [])
+
+  const removeTime = useCallback(() => {
+    setEntry(prev => prev.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: '' } } : prev)
+    closeDlg('dlgTime')
+  }, [])
+
+  const confirmDur = useCallback(() => {
+    const d = (document.getElementById('dlgDurVal') as HTMLInputElement).value.trim()
+    setEntry(prev => ({ ...prev, duration: d }))
+    closeDlg('dlgDur')
+  }, [])
+
+  const removeDur = useCallback(() => {
+    setEntry(prev => ({ ...prev, duration: '' }))
+    closeDlg('dlgDur')
+  }, [])
+
+  const confirmRepeat = useCallback(() => {
+    const repeat = buildRepeatValue()
+    setEntry(prev => ({ ...prev, repeat }))
+    closeDlg('dlgRepeat')
+  }, [])
+
+  const removeRepeat = useCallback(() => {
+    setEntry(prev => ({ ...prev, repeat: null }))
+    closeDlg('dlgRepeat')
+  }, [])
+
+  const setPriority = useCallback((p: string | null) => {
+    setEntry(prev => ({ ...prev, priority: p }))
+    closeDlg('dlgPriority')
   }, [])
 
   return (
@@ -82,37 +195,15 @@ export default function App() {
 
         {/* ENTRY */}
         <section className="view" id="view-entry">
-          <div className="entry-top">
-            <button className="ib" onClick={() => (window as any).closeEntry()}><i data-lucide="arrow-left"></i></button>
-            <span className="entry-fname" id="entryFname">untitled.md</span>
-            <button className="ib" id="deleteBtn" onClick={() => (window as any).deleteEntry()} title="Delete" style={{color:'var(--ros)',display:'none'}}><i data-lucide="trash-2"></i></button>
-            <button className="save-btn" onClick={() => (window as any).saveEntry()}>Save</button>
-          </div>
-          <div className="entry-sc"><div className="entry-pad">
-            <div className="entry-title-row">
-              <div className="echk" id="echk" onClick={() => (window as any).toggleDoneEntry()}><i data-lucide="check"></i></div>
-              <textarea className="entry-title-in" id="entryTitle" placeholder="Title" rows={1} onInput={(e) => (window as any).autoResize(e.currentTarget)}></textarea>
-            </div>
-            <div className="scope-row" id="scopeRow" style={{display:'none'}}>
-              <span className="scope-lbl">Edit</span>
-              <select className="scope-select" id="scopeSelect" onChange={(e) => (window as any).setScope(e.currentTarget.value)}>
-                <option value="single">This event</option>
-                <option value="future">This and following events</option>
-                <option value="all">All events</option>
-              </select>
-            </div>
-            <div className="prop-chips" id="propChips">
-              <button className="pchip" id="cSched" onClick={() => (window as any).openDlg('dlgSched')}><i data-lucide="calendar"></i>Date<span className="pchip-sum" id="sumSched"></span></button>
-              <button className="pchip hidden" id="cTime" onClick={() => (window as any).openDlg('dlgTime')}><i data-lucide="clock"></i>Time<span className="pchip-sum" id="sumTime"></span></button>
-              <button className="pchip hidden" id="cDur" onClick={() => (window as any).openDlg('dlgDur')}><i data-lucide="timer"></i>Duration<span className="pchip-sum" id="sumDur"></span></button>
-              <button className="pchip" id="cTrack" onClick={() => (window as any).toggleTrack()}><i data-lucide="circle-check"></i>Track Completion</button>
-              <button className="pchip hidden" id="cPriority" onClick={() => (window as any).openDlg('dlgPriority')}><i data-lucide="flag"></i>Priority<span className="pchip-sum" id="sumPriority"></span></button>
-              <button className="pchip hidden" id="cRepeat" onClick={() => (window as any).openRepeatDlg()}><i data-lucide="repeat"></i>Repeat<span className="pchip-sum" id="sumRepeat"></span></button>
-            </div>
-            <div className="entry-tags" id="entryTags"><span className="etag etag-add" onClick={() => (window as any).addTag()}><i data-lucide="plus"></i> tag</span></div>
-            <div className="entry-divider"></div>
-            <div className="entry-body" id="entryBody" contentEditable="true" suppressContentEditableWarning spellCheck={false}></div>
-          </div></div>
+          <EntryEditor
+            entry={entry}
+            onChange={setEntry}
+            onSave={handleSave}
+            onDelete={handleDelete}
+            onClose={handleClose}
+            onOpenDlg={handleOpenDlg}
+            onOpenRepeatDlg={handleOpenRepeatDlg}
+          />
         </section>
 
         {/* SIDEBAR */}
@@ -137,70 +228,70 @@ export default function App() {
       </div>{/* end #app */}
 
       {/* DATE DLG */}
-      <div className="dlg-ov" id="dlgSched" onClick={(e) => (window as any).closeDlgOv('dlgSched', e.nativeEvent)}>
+      <div className="dlg-ov" id="dlgSched" onClick={(e) => closeDlgOv('dlgSched', e.nativeEvent)}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Date</div><div className="dlg-body">
           <div className="dlg-row"><span className="dlg-lbl"><i data-lucide="calendar"></i>Date</span><input className="dlg-in" type="date" id="dlgDate" /></div>
           <div className="dlg-actions">
-            <button className="dlg-rm" onClick={() => (window as any).removeSched()}><i data-lucide="x"></i>Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => (window as any).closeDlg('dlgSched')}>Cancel</button><button className="dlg-ok" onClick={() => (window as any).confirmSched()}>Set</button></div>
+            <button className="dlg-rm" onClick={removeSched}><i data-lucide="x"></i>Remove</button>
+            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgSched')}>Cancel</button><button className="dlg-ok" onClick={confirmSched}>Set</button></div>
           </div>
         </div></div>
       </div>
 
       {/* PRIORITY DLG */}
-      <div className="dlg-ov" id="dlgPriority" onClick={(e) => (window as any).closeDlgOv('dlgPriority', e.nativeEvent)}>
+      <div className="dlg-ov" id="dlgPriority" onClick={(e) => closeDlgOv('dlgPriority', e.nativeEvent)}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Priority</div><div className="dlg-body">
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            <button className="dlg-ok" style={{background:'rgba(248,113,113,.15)',color:'var(--p1)',border:'1px solid var(--p1)'}} onClick={() => (window as any).setPriority('high')}><i data-lucide="flag"></i> High</button>
-            <button className="dlg-ok" style={{background:'rgba(251,146,60,.15)',color:'var(--p2)',border:'1px solid var(--p2)'}} onClick={() => (window as any).setPriority('medium')}><i data-lucide="flag"></i> Medium</button>
-            <button className="dlg-ok" style={{background:'rgba(250,204,21,.15)',color:'var(--p3)',border:'1px solid var(--p3)'}} onClick={() => (window as any).setPriority('low')}><i data-lucide="flag"></i> Low</button>
-            <button className="dlg-rm" onClick={() => (window as any).setPriority(null)}><i data-lucide="x"></i> None</button>
+            <button className="dlg-ok" style={{background:'rgba(248,113,113,.15)',color:'var(--p1)',border:'1px solid var(--p1)'}} onClick={() => setPriority('high')}><i data-lucide="flag"></i> High</button>
+            <button className="dlg-ok" style={{background:'rgba(251,146,60,.15)',color:'var(--p2)',border:'1px solid var(--p2)'}} onClick={() => setPriority('medium')}><i data-lucide="flag"></i> Medium</button>
+            <button className="dlg-ok" style={{background:'rgba(250,204,21,.15)',color:'var(--p3)',border:'1px solid var(--p3)'}} onClick={() => setPriority('low')}><i data-lucide="flag"></i> Low</button>
+            <button className="dlg-rm" onClick={() => setPriority(null)}><i data-lucide="x"></i> None</button>
           </div>
         </div></div>
       </div>
 
       {/* TIME DLG */}
-      <div className="dlg-ov" id="dlgTime" onClick={(e) => (window as any).closeDlgOv('dlgTime', e.nativeEvent)}>
+      <div className="dlg-ov" id="dlgTime" onClick={(e) => closeDlgOv('dlgTime', e.nativeEvent)}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Time</div><div className="dlg-body">
           <div className="dlg-row"><span className="dlg-lbl"><i data-lucide="clock"></i>Time</span><input className="dlg-in" type="time" id="dlgTimeVal" /></div>
           <div className="dlg-actions">
-            <button className="dlg-rm" onClick={() => (window as any).removeTime()}><i data-lucide="x"></i>Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => (window as any).closeDlg('dlgTime')}>Cancel</button><button className="dlg-ok" onClick={() => (window as any).confirmTime()}>Set</button></div>
+            <button className="dlg-rm" onClick={removeTime}><i data-lucide="x"></i>Remove</button>
+            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgTime')}>Cancel</button><button className="dlg-ok" onClick={confirmTime}>Set</button></div>
           </div>
         </div></div>
       </div>
 
       {/* DURATION DLG */}
-      <div className="dlg-ov" id="dlgDur" onClick={(e) => (window as any).closeDlgOv('dlgDur', e.nativeEvent)}>
+      <div className="dlg-ov" id="dlgDur" onClick={(e) => closeDlgOv('dlgDur', e.nativeEvent)}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Duration</div><div className="dlg-body">
           <div className="dlg-row"><span className="dlg-lbl"><i data-lucide="timer"></i>Duration</span><input className="dlg-in" type="text" id="dlgDurVal" placeholder="e.g. 1h 30m" style={{width:120}} /></div>
           <div className="dlg-actions">
-            <button className="dlg-rm" onClick={() => (window as any).removeDur()}><i data-lucide="x"></i>Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => (window as any).closeDlg('dlgDur')}>Cancel</button><button className="dlg-ok" onClick={() => (window as any).confirmDur()}>Set</button></div>
+            <button className="dlg-rm" onClick={removeDur}><i data-lucide="x"></i>Remove</button>
+            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgDur')}>Cancel</button><button className="dlg-ok" onClick={confirmDur}>Set</button></div>
           </div>
         </div></div>
       </div>
 
       {/* REPEAT DLG */}
-      <div className="dlg-ov" id="dlgRepeat" onClick={(e) => (window as any).closeDlgOv('dlgRepeat', e.nativeEvent)}>
+      <div className="dlg-ov" id="dlgRepeat" onClick={(e) => closeDlgOv('dlgRepeat', e.nativeEvent)}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Repeat</div><div className="dlg-body">
           <div className="dlg-hint" id="repeatHint"><i data-lucide="info"></i><span id="repeatHintText"></span></div>
           <div className="recur-grid" id="recurGrid"></div>
           <div id="recurConfig"></div>
           <div className="end-sec" id="endSec" style={{display:'none'}}></div>
           <div className="dlg-actions">
-            <button className="dlg-rm" onClick={() => (window as any).removeRepeat()}><i data-lucide="x"></i>Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => (window as any).closeDlg('dlgRepeat')}>Cancel</button><button className="dlg-ok" onClick={() => (window as any).confirmRepeat()}>Set</button></div>
+            <button className="dlg-rm" onClick={removeRepeat}><i data-lucide="x"></i>Remove</button>
+            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgRepeat')}>Cancel</button><button className="dlg-ok" onClick={confirmRepeat}>Set</button></div>
           </div>
         </div></div>
       </div>
 
       {/* SERIES DELETE SHEET */}
-      <div className="dlg-ov" id="seriesSheet" onClick={(e) => { if (e.target === e.currentTarget) (window as any).closeSeriesSheet() }}>
+      <div className="dlg-ov" id="seriesSheet" onClick={(e) => { if (e.target === e.currentTarget) closeSeriesSheet() }}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title" id="seriesSheetTitle">Delete event</div><div className="dlg-body">
           <button className="sheet-opt" id="seriesOpt1"><i data-lucide="calendar"></i><div><div className="sopt-t">This occurrence</div><div className="sopt-s">Remove only this instance</div></div></button>
           <button className="sheet-opt" id="seriesOpt2"><i data-lucide="calendar-range"></i><div><div className="sopt-t">All events in series</div><div className="sopt-s">Remove every occurrence</div></div></button>
-          <button className="sheet-opt" onClick={() => (window as any).closeSeriesSheet()} style={{color:'var(--t3)'}}><i data-lucide="x"></i><div><div className="sopt-t">Cancel</div></div></button>
+          <button className="sheet-opt" onClick={closeSeriesSheet} style={{color:'var(--t3)'}}><i data-lucide="x"></i><div><div className="sopt-t">Cancel</div></div></button>
         </div></div>
       </div>
 
