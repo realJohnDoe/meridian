@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react'
+import { ArrowLeft, Trash2, Check, Calendar, Clock, Timer, CircleCheck, Flag, Repeat, Plus } from 'lucide-react'
 
 export interface Scheduled { date: string; time: string }
 
@@ -56,12 +57,6 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
 
-  useEffect(() => {
-    if (typeof (window as any).lucide !== 'undefined') {
-      (window as any).lucide.createIcons()
-    }
-  })
-
   const { item, title, bodyHtml, scheduled, duration, tracked, repeat, done, tags, priority, editScope } = entry
 
   const isRecur = !!(item && (item.recur || item._node?.repeat || item.repeat))
@@ -79,11 +74,11 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   return (
     <>
       <div className="entry-top">
-        <button className="ib" onClick={onClose}><i data-lucide="arrow-left"></i></button>
+        <button className="ib" onClick={onClose}><ArrowLeft /></button>
         <span className="entry-fname">{fname}</span>
         {item && (
           <button className="ib" onClick={onDelete} title="Delete" style={{ color: 'var(--ros)' }}>
-            <i data-lucide="trash-2"></i>
+            <Trash2 />
           </button>
         )}
         <button className="save-btn" onClick={() => onSave(bodyRef.current?.innerText?.trim() ?? '')}>Save</button>
@@ -96,7 +91,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
             className={['echk', tracked ? 'show' : '', done ? 'on' : ''].filter(Boolean).join(' ')}
             onClick={() => onChange(prev => ({ ...prev, done: !prev.done }))}
           >
-            <i data-lucide="check"></i>
+            <Check />
           </div>
           <textarea
             ref={titleRef}
@@ -121,26 +116,26 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
         <div className="prop-chips">
           <button className={`pchip${scheduled ? ' on' : ''}`} onClick={() => onOpenDlg('dlgSched')}>
-            <i data-lucide="calendar"></i>Date
+            <Calendar />Date
             <span className="pchip-sum">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
           </button>
           <button className={`pchip${!hasDate ? ' hidden' : ''}${hasTime ? ' on' : ''}`} onClick={() => onOpenDlg('dlgTime')}>
-            <i data-lucide="clock"></i>Time
+            <Clock />Time
             <span className="pchip-sum">{hasTime ? scheduled!.time : ''}</span>
           </button>
           <button className={`pchip${!hasDate ? ' hidden' : ''}${duration ? ' on' : ''}`} onClick={() => onOpenDlg('dlgDur')}>
-            <i data-lucide="timer"></i>Duration
+            <Timer />Duration
             <span className="pchip-sum">{duration}</span>
           </button>
           <button className={`pchip${tracked ? ' on tc' : ''}`} onClick={() => onChange(prev => ({ ...prev, tracked: !prev.tracked, priority: prev.tracked ? null : prev.priority }))}>
-            <i data-lucide="circle-check"></i>Track Completion
+            <CircleCheck />Track Completion
           </button>
           <button className={priorityChipClass} onClick={() => onOpenDlg('dlgPriority')}>
-            <i data-lucide="flag"></i>Priority
+            <Flag />Priority
             <span className="pchip-sum">{priority ? PRIORITY_LABELS[priority] : ''}</span>
           </button>
           <button className={`pchip${!showRepeat ? ' hidden' : ''}${repeat ? ' on' : ''}`} onClick={onOpenRepeatDlg}>
-            <i data-lucide="repeat"></i>Repeat
+            <Repeat />Repeat
             <span className="pchip-sum">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
           </button>
         </div>
@@ -153,7 +148,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
             const t = prompt('Tag:')
             if (t) onChange(prev => ({ ...prev, tags: [...prev.tags, t.trim()] }))
           }}>
-            <i data-lucide="plus"></i> tag
+            <Plus /> tag
           </span>
         </div>
 

@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar } from 'lucide'
 import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './recurrence'
 import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode, titleToSlug } from './yaml'
 
@@ -112,7 +113,7 @@ const fmtLong=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'
 const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
-function ic(){if(typeof lucide!=='undefined')lucide.createIcons();}
+function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar}});}
 
 // ── NAVIGATION ──────────────────────────────────────────────────
 function openSidebar(){
