@@ -2,6 +2,9 @@
 import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar } from 'lucide'
 import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './recurrence'
 import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode, titleToSlug } from './yaml'
+// Type-only imports — used in exported function signatures so consumers get full type safety.
+// @ts-nocheck suppresses the internal DOM-manipulation errors; a follow-up PR will address those.
+import type { Node, Occurrence, Repeat, Scheduled } from './types'
 
 // ── CONSTANTS ─────────────────────────────────────────────────
 const TODAY=new Date();TODAY.setHours(0,0,0,0);
@@ -146,7 +149,7 @@ function navTo(name,btn){
   document.getElementById('tbDay').style.display='none';
   curView=name;
 }
-export function pushView(name){
+export function pushView(name: string): void {
   prevView=curView;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
@@ -697,7 +700,7 @@ function setNSF(f,btn){document.querySelectorAll('.fchip').forEach(c=>c.classLis
 // ── ENTRY EDITOR ──────────────────────────────────────────────
 function openEntry(item){ (window as any).openEntry(item) }
 
-export function applyScope(item, scope){
+export function applyScope(item: Occurrence, scope: string): { scheduled: Scheduled|null; repeat: Repeat|null } {
   const root=item._node||item;
   const occDate=item.date||root.date||null;
   const occTime=item.time||root.time||null;
@@ -708,7 +711,7 @@ export function applyScope(item, scope){
   return {scheduled:rootDate?{date:rootDate,time:rootTime||''}:null, repeat:root.repeat||null};
 }
 
-export function buildBodyHtml(text){
+export function buildBodyHtml(text: string): string {
   return text
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,(m,ref,label)=>{
       const target=NODES.find(n=>n.title.toLowerCase()===ref.toLowerCase());
@@ -717,9 +720,9 @@ export function buildBodyHtml(text){
     .replace(/\n/g,'<br>');
 }
 
-export function closeEntry(){popView();}
+export function closeEntry(): void {popView();}
 
-export function saveNode(item, editScope, fields){
+export function saveNode(item: Occurrence|null, editScope: string, fields: any): void {
   const {title,tags,body,tracked,done,priority,scheduled,duration,repeat}=fields;
   if(!title)return;
   const rootNode=item?(item._node||item):null;
@@ -813,7 +816,7 @@ export function saveNode(item, editScope, fields){
   buildAgenda();buildMonth();closeEntry();
 }
 
-export function deleteNode(item, onShowSeries?, onHideSeries?){
+export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHideSeries?: ()=>void): void {
   if(!item)return;
   const node=item._node||item;
   const nodeId=node.id;
@@ -846,7 +849,7 @@ export function deleteNode(item, onShowSeries?, onHideSeries?){
 }
 
 // ── DIALOGS ──────────────────────────────────────────────────
-export function openRepeatDlg({scheduled,tracked,repeat}){
+export function openRepeatDlg({scheduled,tracked,repeat}: {scheduled: Scheduled|null; tracked: boolean; repeat: Repeat|null}): void {
   const hasSched=!!scheduled,hasTrk=tracked;
   const hint=document.getElementById('repeatHintText'),hintBox=document.getElementById('repeatHint');
   if(hasSched&&hasTrk){hint.textContent='Both Schedule and Track Completion are on. Choose a schedule pattern, or "After completion" to repeat when you check this done.';hintBox.style.display='flex';}
@@ -861,7 +864,7 @@ export function openRepeatDlg({scheduled,tracked,repeat}){
   buildRepeatDlg(hasSched,hasTrk);
 }
 
-export function buildRepeatValue(){
+export function buildRepeatValue(): Repeat {
   const iv=document.getElementById('rdIv');if(iv)rdInterval=iv.value;
   const ed=document.getElementById('endD');if(ed)rdEndVal=ed.value;
   const ec=document.getElementById('endC');if(ec)rdEndVal=ec.value;
@@ -906,7 +909,7 @@ function buildEndVal(){const row=document.getElementById('endValRow');if(!row)re
 // ── WIKILINK AUTOCOMPLETE ─────────────────────────────────────
 let wlFocusIdx=-1;
 
-export function wikilinkInputHandler(e){
+export function wikilinkInputHandler(e: Event): void {
   if(!e.target.closest('#entryBody'))return;
   const sel=window.getSelection();if(!sel.rangeCount)return;
   const range=sel.getRangeAt(0);
@@ -940,7 +943,7 @@ export function wikilinkInputHandler(e){
   popup.classList.remove('show');
 }
 
-export function wikilinkKeydownHandler(e){
+export function wikilinkKeydownHandler(e: Event): void {
   const popup=document.getElementById('wlPopup');
   if(popup.classList.contains('show')){
     const items=popup.querySelectorAll('.wl-item');
@@ -952,7 +955,7 @@ export function wikilinkKeydownHandler(e){
   if(e.key==='Escape')document.querySelectorAll('.dlg-ov.open').forEach(d=>d.classList.remove('open'));
 }
 
-export function wikilinkClickHandler(e){
+export function wikilinkClickHandler(e: Event): void {
   const p=document.getElementById('wlPopup');
   if(p&&!p.contains(e.target)&&!e.target.closest('#entryBody'))p.classList.remove('show');
 }
@@ -1231,7 +1234,7 @@ async function loadFromDirectory(){
 async function initDexie(){return cacheInit();}
 
 // ── INIT ──────────────────────────────────────────────────────
-export function initApp(){
+export function initApp(): void {
   ic();
   buildAgenda();
   buildMonth();
