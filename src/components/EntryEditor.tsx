@@ -1,19 +1,20 @@
 import { useRef, useEffect } from 'react'
 import { ArrowLeft, Trash2, Check, Calendar, Clock, Timer, CircleCheck, Flag, Repeat, Plus } from 'lucide-react'
+import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue } from '../types'
 
-export interface Scheduled { date: string; time: string }
+export type { Scheduled }
 
 export interface EntryState {
-  item: any
+  item: Occurrence | null
   title: string
   bodyHtml: string
   scheduled: Scheduled | null
   duration: string
   tracked: boolean
-  repeat: any
+  repeat: RepeatValue | null
   done: boolean
   tags: string[]
-  priority: string | null
+  priority: Priority | null
   editScope: string
 }
 
