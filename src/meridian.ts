@@ -474,17 +474,87 @@ function toggleOccDone(o, rowEl){
     const bar=rowEl.querySelector('.occ-bar');
     if(bar)bar.className='occ-bar '+barClass(o);
     const daySection=rowEl.closest('.day-section');
-    if(node.repeat?.type==='after_completion'&&newDone){
-      // Marking done may generate a new pending occurrence — rebuild after
-      // a short delay so the checkbox animation completes first.
+    if(node.repeat?.type==='after_completion'){
+      // Surgically add/remove the next pending occurrence without reflashing
+      // the whole agenda — handles repeated done/undone toggles correctly.
       if(daySection)flipResortSection(daySection);
-      setTimeout(()=>{buildAgenda();buildMonth();},350);
+      setTimeout(()=>{
+        const nextJsTime=addInterval(o.jsTime,node.repeat.interval||'1 day');
+        const agFrom=addDays(TODAY,-7),agTo=addDays(TODAY,90);
+        const spec=jsDateToSpec(nextJsTime);
+        if(newDone){
+          // Insert the next pending occurrence if not already in the DOM
+          if(nextJsTime>=agFrom&&nextJsTime<=agTo&&!findOccWrapInAgenda(node.id,spec.date)){
+            insertOccIntoAgenda({
+              title:node.title,date:spec.date,time:spec.time||node.time||null,
+              timezone:node.timezone,jsTime:nextJsTime,done:false,
+              tags:node.tags||[],type:'task',priority:node.priority,
+              body:node.body,recur:true,_nodeId:node.id,_node:node
+            });
+          }
+        } else {
+          // Remove the next pending occurrence that was previously inserted
+          const existing=findOccWrapInAgenda(node.id,spec.date);
+          if(existing)removeOccWrapFromAgenda(existing);
+        }
+        buildMonth();
+      },350);
     } else {
       if(daySection)flipResortSection(daySection);
     }
   } else {
     buildAgenda();buildMonth();ic();
   }
+}
+
+// Find the .swipe-wrap for a specific node occurrence by nodeId + date string.
+function findOccWrapInAgenda(nodeId,date){
+  const agContent=document.getElementById('agContent');
+  if(!agContent)return null;
+  for(const wrap of agContent.querySelectorAll('.swipe-wrap')){
+    const row=(wrap as any).querySelector('.swipe-row');
+    if(row?._occ?._nodeId===nodeId&&row._occ.date===date)return wrap;
+  }
+  return null;
+}
+
+// Remove a .swipe-wrap from the agenda; also removes its day-section if empty.
+function removeOccWrapFromAgenda(wrap){
+  const sec=wrap.closest('.day-section');
+  wrap.remove();
+  if(sec&&!sec.querySelector('.swipe-wrap'))sec.remove();
+}
+
+// Insert a single occurrence row into the agenda without rebuilding everything.
+// Finds or creates the target day-section, appends the row, then FLIPs the
+// section to sort it into place. Used by after_completion done-toggle.
+function insertOccIntoAgenda(occ){
+  const agContent=document.getElementById('agContent');
+  if(!agContent)return;
+  const k=dayKey(occ.jsTime);
+  let sec=agContent.querySelector(`.day-section[data-key="${k}"]`);
+  if(!sec){
+    const isT=sameDay(occ.jsTime,TODAY);
+    sec=document.createElement('div');
+    sec.className='day-section';
+    (sec as HTMLElement).dataset.key=k;
+    const lbl=document.createElement('div');
+    lbl.className=`day-lbl${isT?' tl':''}`;
+    lbl.textContent=isT?'Today':sameDay(occ.jsTime,addDays(TODAY,1))?'Tomorrow':fmtLong(occ.jsTime);
+    sec.appendChild(lbl);
+    // Insert in chronological key order
+    const sections=[...agContent.querySelectorAll('.day-section')] as HTMLElement[];
+    let inserted=false;
+    for(const s of sections){
+      if(s.dataset.key>k){agContent.insertBefore(sec,s);inserted=true;break;}
+    }
+    if(!inserted)agContent.appendChild(sec);
+  }
+  const existingWraps=sec.querySelectorAll('.swipe-wrap');
+  const newWrap=makeOccRow(occ,existingWraps.length);
+  sec.appendChild(newWrap);
+  flipResortSection(sec);
+  ic();
 }
 
 function flipResortSection(section){
