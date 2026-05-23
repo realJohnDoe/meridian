@@ -1,6 +1,6 @@
 // @ts-nocheck
 import Dexie from 'dexie'
-import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar } from 'lucide'
+import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar, Plus } from 'lucide'
 import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './recurrence'
 import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode, titleToSlug } from './yaml'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
@@ -136,7 +136,28 @@ export const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeri
 export const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 function escapeHtml(s:string):string{return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar}});}
+function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar,Plus}});}
+
+// ── FUZZY FILTER ─────────────────────────────────────────────────
+function fuzzyMatch(query:string,text:string):boolean{
+  if(!query)return true;
+  const q=query.toLowerCase(),t=text.toLowerCase();
+  let qi=0;
+  for(let i=0;i<t.length&&qi<q.length;i++){if(t[i]===q[qi])qi++;}
+  return qi===q.length;
+}
+function fuzzyScore(query:string,text:string):number{
+  const q=query.toLowerCase(),t=text.toLowerCase();
+  let score=0,qi=0,cons=0;
+  for(let i=0;i<t.length&&qi<q.length;i++){
+    if(t[i]===q[qi]){qi++;cons++;score+=cons;}
+    else{cons=0;}
+  }
+  if(t.startsWith(q))score+=100;
+  return score;
+}
+
+let _globalFilter='';
 
 // ── NAVIGATION ──────────────────────────────────────────────────
 function openSidebar(){
@@ -168,11 +189,17 @@ function navTo(name,btn){
   document.getElementById('tbDefault').style.display='';
   document.getElementById('tbDay').style.display='none';
   setCurView(name);
+  applyGlobalFilter(_globalFilter);
 }
 export function pushView(name: string): void {
   setPrevView(getCurView());
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
+  // Hide filter overlay when leaving filterable views
+  const overlay=document.getElementById('filterOverlay');
+  if(name==='entry'||name==='search'){
+    if(overlay)overlay.style.display='none';
+  }
   if(name==='entry'){
     hideChrome();
   } else if(name==='day'){
@@ -186,6 +213,10 @@ export function pushView(name: string): void {
     document.getElementById('bottomFloat').style.display='none';
   }
   setCurView(name);
+  // Re-apply filter when pushing day view (e.g. from calendar cell click)
+  if(name==='day'&&_globalFilter){
+    setTimeout(()=>applyGlobalFilter(_globalFilter),0);
+  }
 }
 function popView(){
   document.getElementById('tbDefault').style.display='';
@@ -195,6 +226,7 @@ function popView(){
   document.getElementById('view-'+getPrevView()).classList.add('active');
   setSidebarActive(getPrevView());
   setCurView(getPrevView());
+  applyGlobalFilter(_globalFilter);
 }
 function showChrome(){
   document.getElementById('mainTop').style.display='';
@@ -222,7 +254,7 @@ function openSearch(){setPrevView(getCurView());pushView('search');buildNS();set
 function closeSearch(){popView();}
 function openLastDay(){setDvDate(new Date(TODAY));buildDayView();pushView('day');}
 function closeDayView(){popView();}
-function dvNav(d){setDvDate(addDays(getDvDate(),d));buildDayView();}
+function dvNav(d){setDvDate(addDays(getDvDate(),d));buildDayView();if(_globalFilter)applyGlobalFilter(_globalFilter);}
 
 // ── SHARED OCCURRENCE SORT ────────────────────────────────────
 const _prioOrder={high:0,medium:1,low:2};
@@ -247,6 +279,7 @@ export function sortOccs(arr){
 // findOccWrapInAgenda(), removeOccWrapFromAgenda() are deleted.
 // AgendaView (src/components/AgendaView.tsx) subscribes to the Zustand store
 // and re-renders automatically whenever nodes change.
+// Filtering is handled via useStore's filterQuery field.
 
 export function occState(o){
   if(o.done)return 'done';
@@ -341,6 +374,53 @@ function dvBlkClass(o){
 // makeOccRow, toggleOccDone (DOM), findOccWrapInAgenda, removeOccWrapFromAgenda,
 // insertOccIntoAgenda, flipResortSection all deleted.
 // AgendaView + OccurrenceRow handle rendering and animations in React.
+
+// ── FILTER OVERLAY ──────────────────────────────────────────────
+function buildFilteredAgenda(query:string){
+  const overlay=document.getElementById('filterOverlay');
+  if(!overlay)return;
+  overlay.innerHTML='';
+  if(!query){overlay.style.display='none';return;}
+  overlay.style.display='';
+
+  // "Create" row at top
+  const createRow=document.createElement('div');
+  createRow.className='occ-create-row';
+  createRow.innerHTML=`<i data-lucide="plus"></i><span>Create "<strong>${escapeHtml(query)}</strong>"</span>`;
+  createRow.onclick=()=>(window as any).openEntry(null,undefined,query);
+  overlay.appendChild(createRow);
+
+  const from=addDays(TODAY,-7),to=addDays(TODAY,90);
+  const occs=_expandRange(NODES,from,to);
+  const filtered=occs
+    .filter(o=>fuzzyMatch(query,o.title))
+    .map(o=>({occ:o,score:fuzzyScore(query,o.title)}))
+    .sort((a,b)=>b.score-a.score||(a.occ.jsTime as any)-(b.occ.jsTime as any))
+    .map(x=>x.occ);
+
+  if(!filtered.length){
+    const empty=document.createElement('div');
+    empty.style.cssText='padding:40px 14px;text-align:center;color:var(--t3);font-size:13px';
+    empty.textContent='No matches';
+    overlay.appendChild(empty);
+    ic();return;
+  }
+  filtered.forEach((o,i)=>overlay.appendChild(makeOccRow(o,i)));
+  ic();
+}
+
+function applyGlobalFilter(q:string){
+  _globalFilter=q;
+  const overlay=document.getElementById('filterOverlay');
+  const cv=getCurView();
+  if(q){
+    buildFilteredAgenda(q);
+  } else {
+    if(overlay)overlay.style.display='none';
+    if(cv==='day')buildDayView();
+    // agenda + calendar views are React components; they re-render from the store automatically
+  }
+}
 
 // ── MONTH ──────────────────────────────────────────────────────
 // buildMonth, makeCalCell, chMonth deleted.
@@ -1108,4 +1188,5 @@ Object.assign(window as any, {
   closeDayView, dvNav,
   syncToDirectory, pickDirectory, goToday, openSearch, closeSearch,
   filterNS, setNSF,
+  applyGlobalFilter,
 });

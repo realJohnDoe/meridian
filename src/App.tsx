@@ -49,12 +49,19 @@ export default function App() {
   const [dlgDateVal, setDlgDateVal] = useState('')
   const [dlgTimeVal, setDlgTimeVal] = useState('')
   const [dlgDurVal, setDlgDurVal] = useState('')
+  const [filterQuery, setFilterQuery] = useState('')
+
+  // Wire filterQuery changes to the active view
+  useEffect(() => {
+    ;(window as any).applyGlobalFilter?.(filterQuery)
+  }, [filterQuery])
 
   useEffect(() => {
     // ONE global: lets vanilla JS agenda/search rows open the editor
-    ;(window as any).openEntry = (item: any, scope?: string) => {
+    ;(window as any).openEntry = (item: any, scope?: string, prefillTitle?: string) => {
       const editScope = scope ?? (item ? 'single' : 'all')
-      setEntry(entryFromItem(item, editScope))
+      const state = entryFromItem(item, editScope)
+      setEntry(prefillTitle && !item ? { ...state, title: prefillTitle } : state)
       pushView('entry')
     }
     document.addEventListener('input', wikilinkInputHandler as EventListener)
@@ -248,9 +255,41 @@ export default function App() {
           </div>
         </div>
 
-        {/* FAB */}
+        {/* FILTER OVERLAY — sits above views, below topbar and search bar */}
+        <div id="filterOverlay" className="filter-overlay" style={{display:'none'}} />
+
+        {/* SEARCH BAR (replaces FAB) */}
         <div className="bottom-float" id="bottomFloat">
-          <button className="fab" id="fab" onClick={() => (window as any).openEntry(null)} style={{marginLeft:'auto',pointerEvents:'all'}}><Plus /></button>
+          <div className="search-bar-wrap">
+            <Search size={15} className="search-bar-icon" />
+            <input
+              id="filterInput"
+              className="search-bar-input"
+              placeholder="Search or create…"
+              value={filterQuery}
+              onChange={e => setFilterQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && filterQuery) {
+                  ;(window as any).openEntry(null, undefined, filterQuery)
+                  setFilterQuery('')
+                }
+              }}
+            />
+            {filterQuery && (
+              <button className="search-bar-clear" onClick={() => setFilterQuery('')}>
+                <X size={13} />
+              </button>
+            )}
+            <button
+              className="search-bar-add"
+              onClick={() => {
+                ;(window as any).openEntry(null, undefined, filterQuery || undefined)
+                if (filterQuery) setFilterQuery('')
+              }}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
         </div>
 
       </div>{/* end #app */}
