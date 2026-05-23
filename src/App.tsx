@@ -9,9 +9,7 @@ import {
   initApp, wikilinkInputHandler, wikilinkKeydownHandler, wikilinkClickHandler,
   applyScope, buildBodyHtml,
   saveNode, deleteNode, closeEntry, pushView,
-  openDlg, closeDlg, closeDlgOv,
   openRepeatDlg, buildRepeatValue,
-  closeSeriesSheet,
 } from './meridian'
 import EntryEditor, { EntryState, ENTRY_DEFAULT } from './components/EntryEditor'
 
@@ -43,6 +41,10 @@ function entryFromItem(item: any, editScope: string): EntryState {
 
 export default function App() {
   const [entry, setEntry] = useState<EntryState>(ENTRY_DEFAULT)
+  const [activeDialog, setActiveDialog] = useState<string | null>(null)
+  const [dlgDateVal, setDlgDateVal] = useState('')
+  const [dlgTimeVal, setDlgTimeVal] = useState('')
+  const [dlgDurVal, setDlgDurVal] = useState('')
 
   useEffect(() => {
     // ONE global: lets vanilla JS agenda/search rows open the editor
@@ -67,7 +69,7 @@ export default function App() {
   }, [entry])
 
   const handleDelete = useCallback(() => {
-    deleteNode(entry.item)
+    deleteNode(entry.item, () => setActiveDialog('seriesSheet'), () => setActiveDialog(null))
   }, [entry.item])
 
   const handleClose = useCallback(() => {
@@ -75,63 +77,69 @@ export default function App() {
   }, [])
 
   const handleOpenDlg = useCallback((id: string) => {
-    openDlg(id, entry.scheduled, entry.duration)
+    if (id === 'dlgSched') setDlgDateVal(entry.scheduled?.date || fmtISO(TODAY))
+    if (id === 'dlgTime') setDlgTimeVal(entry.scheduled?.time || '')
+    if (id === 'dlgDur') setDlgDurVal(entry.duration || '')
+    setActiveDialog(id)
   }, [entry.scheduled, entry.duration])
 
   const handleOpenRepeatDlg = useCallback(() => {
     openRepeatDlg({ scheduled: entry.scheduled, tracked: entry.tracked, repeat: entry.repeat })
+    setActiveDialog('dlgRepeat')
   }, [entry.scheduled, entry.tracked, entry.repeat])
 
-  // Dialog confirm handlers — update entry state directly, no globals needed
+  const closeDialog = useCallback(() => setActiveDialog(null), [])
+
+  // Dialog confirm handlers
   const confirmSched = useCallback(() => {
-    const d = (document.getElementById('dlgDate') as HTMLInputElement).value
-    if (!d) return
-    setEntry(prev => ({ ...prev, scheduled: { date: d, time: prev.scheduled?.time || '' } }))
-    closeDlg('dlgSched')
-  }, [])
+    if (!dlgDateVal) return
+    setEntry(prev => ({ ...prev, scheduled: { date: dlgDateVal, time: prev.scheduled?.time || '' } }))
+    setActiveDialog(null)
+  }, [dlgDateVal])
 
   const removeSched = useCallback(() => {
     setEntry(prev => ({ ...prev, scheduled: null, duration: '' }))
-    closeDlg('dlgSched')
+    setActiveDialog(null)
   }, [])
 
   const confirmTime = useCallback(() => {
-    const t = (document.getElementById('dlgTimeVal') as HTMLInputElement).value
-    setEntry(prev => prev.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: t } } : prev)
-    closeDlg('dlgTime')
-  }, [])
+    setEntry(prev => prev.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: dlgTimeVal } } : prev)
+    setActiveDialog(null)
+  }, [dlgTimeVal])
 
   const removeTime = useCallback(() => {
     setEntry(prev => prev.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: '' } } : prev)
-    closeDlg('dlgTime')
+    setActiveDialog(null)
   }, [])
 
   const confirmDur = useCallback(() => {
-    const d = (document.getElementById('dlgDurVal') as HTMLInputElement).value.trim()
-    setEntry(prev => ({ ...prev, duration: d }))
-    closeDlg('dlgDur')
-  }, [])
+    setEntry(prev => ({ ...prev, duration: dlgDurVal.trim() }))
+    setActiveDialog(null)
+  }, [dlgDurVal])
 
   const removeDur = useCallback(() => {
     setEntry(prev => ({ ...prev, duration: '' }))
-    closeDlg('dlgDur')
+    setActiveDialog(null)
   }, [])
 
   const confirmRepeat = useCallback(() => {
     const repeat = buildRepeatValue()
     setEntry(prev => ({ ...prev, repeat }))
-    closeDlg('dlgRepeat')
+    setActiveDialog(null)
   }, [])
 
   const removeRepeat = useCallback(() => {
     setEntry(prev => ({ ...prev, repeat: null }))
-    closeDlg('dlgRepeat')
+    setActiveDialog(null)
   }, [])
 
   const setPriority = useCallback((p: string | null) => {
     setEntry(prev => ({ ...prev, priority: p }))
-    closeDlg('dlgPriority')
+    setActiveDialog(null)
   }, [])
+
+  const dlgOvClass = (id: string) => activeDialog === id ? 'dlg-ov open' : 'dlg-ov'
+  const closeDlgOv = (e: React.MouseEvent) => { if (e.target === e.currentTarget) setActiveDialog(null) }
 
   return (
     <>
@@ -234,18 +242,18 @@ export default function App() {
       </div>{/* end #app */}
 
       {/* DATE DLG */}
-      <div className="dlg-ov" id="dlgSched" onClick={(e) => closeDlgOv('dlgSched', e.nativeEvent)}>
+      <div className={dlgOvClass('dlgSched')} id="dlgSched" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Date</div><div className="dlg-body">
-          <div className="dlg-row"><span className="dlg-lbl"><Calendar />Date</span><input className="dlg-in" type="date" id="dlgDate" /></div>
+          <div className="dlg-row"><span className="dlg-lbl"><Calendar />Date</span><input className="dlg-in" type="date" id="dlgDate" value={dlgDateVal} onChange={e => setDlgDateVal(e.target.value)} /></div>
           <div className="dlg-actions">
             <button className="dlg-rm" onClick={removeSched}><X />Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgSched')}>Cancel</button><button className="dlg-ok" onClick={confirmSched}>Set</button></div>
+            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmSched}>Set</button></div>
           </div>
         </div></div>
       </div>
 
       {/* PRIORITY DLG */}
-      <div className="dlg-ov" id="dlgPriority" onClick={(e) => closeDlgOv('dlgPriority', e.nativeEvent)}>
+      <div className={dlgOvClass('dlgPriority')} id="dlgPriority" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Priority</div><div className="dlg-body">
           <div style={{display:'flex',flexDirection:'column',gap:8}}>
             <button className="dlg-ok" style={{background:'rgba(248,113,113,.15)',color:'var(--p1)',border:'1px solid var(--p1)'}} onClick={() => setPriority('high')}><Flag /> High</button>
@@ -257,29 +265,29 @@ export default function App() {
       </div>
 
       {/* TIME DLG */}
-      <div className="dlg-ov" id="dlgTime" onClick={(e) => closeDlgOv('dlgTime', e.nativeEvent)}>
+      <div className={dlgOvClass('dlgTime')} id="dlgTime" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Time</div><div className="dlg-body">
-          <div className="dlg-row"><span className="dlg-lbl"><Clock />Time</span><input className="dlg-in" type="time" id="dlgTimeVal" /></div>
+          <div className="dlg-row"><span className="dlg-lbl"><Clock />Time</span><input className="dlg-in" type="time" id="dlgTimeVal" value={dlgTimeVal} onChange={e => setDlgTimeVal(e.target.value)} /></div>
           <div className="dlg-actions">
             <button className="dlg-rm" onClick={removeTime}><X />Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgTime')}>Cancel</button><button className="dlg-ok" onClick={confirmTime}>Set</button></div>
+            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmTime}>Set</button></div>
           </div>
         </div></div>
       </div>
 
       {/* DURATION DLG */}
-      <div className="dlg-ov" id="dlgDur" onClick={(e) => closeDlgOv('dlgDur', e.nativeEvent)}>
+      <div className={dlgOvClass('dlgDur')} id="dlgDur" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Duration</div><div className="dlg-body">
-          <div className="dlg-row"><span className="dlg-lbl"><Timer />Duration</span><input className="dlg-in" type="text" id="dlgDurVal" placeholder="e.g. 1h 30m" style={{width:120}} /></div>
+          <div className="dlg-row"><span className="dlg-lbl"><Timer />Duration</span><input className="dlg-in" type="text" id="dlgDurVal" value={dlgDurVal} onChange={e => setDlgDurVal(e.target.value)} placeholder="e.g. 1h 30m" style={{width:120}} /></div>
           <div className="dlg-actions">
             <button className="dlg-rm" onClick={removeDur}><X />Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgDur')}>Cancel</button><button className="dlg-ok" onClick={confirmDur}>Set</button></div>
+            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmDur}>Set</button></div>
           </div>
         </div></div>
       </div>
 
       {/* REPEAT DLG */}
-      <div className="dlg-ov" id="dlgRepeat" onClick={(e) => closeDlgOv('dlgRepeat', e.nativeEvent)}>
+      <div className={dlgOvClass('dlgRepeat')} id="dlgRepeat" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Repeat</div><div className="dlg-body">
           <div className="dlg-hint" id="repeatHint"><Info /><span id="repeatHintText"></span></div>
           <div className="recur-grid" id="recurGrid"></div>
@@ -287,17 +295,17 @@ export default function App() {
           <div className="end-sec" id="endSec" style={{display:'none'}}></div>
           <div className="dlg-actions">
             <button className="dlg-rm" onClick={removeRepeat}><X />Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={() => closeDlg('dlgRepeat')}>Cancel</button><button className="dlg-ok" onClick={confirmRepeat}>Set</button></div>
+            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmRepeat}>Set</button></div>
           </div>
         </div></div>
       </div>
 
       {/* SERIES DELETE SHEET */}
-      <div className="dlg-ov" id="seriesSheet" onClick={(e) => { if (e.target === e.currentTarget) closeSeriesSheet() }}>
+      <div className={dlgOvClass('seriesSheet')} id="seriesSheet" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title" id="seriesSheetTitle">Delete event</div><div className="dlg-body">
           <button className="sheet-opt" id="seriesOpt1"><i data-lucide="calendar"></i><div><div className="sopt-t">This occurrence</div><div className="sopt-s">Remove only this instance</div></div></button>
           <button className="sheet-opt" id="seriesOpt2"><i data-lucide="calendar-range"></i><div><div className="sopt-t">All events in series</div><div className="sopt-s">Remove every occurrence</div></div></button>
-          <button className="sheet-opt" onClick={closeSeriesSheet} style={{color:'var(--t3)'}}><i data-lucide="x"></i><div><div className="sopt-t">Cancel</div></div></button>
+          <button className="sheet-opt" onClick={closeDialog} style={{color:'var(--t3)'}}><i data-lucide="x"></i><div><div className="sopt-t">Cancel</div></div></button>
         </div></div>
       </div>
 

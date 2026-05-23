@@ -813,12 +813,11 @@ export function saveNode(item, editScope, fields){
   buildAgenda();buildMonth();closeEntry();
 }
 
-export function deleteNode(item){
+export function deleteNode(item, onShowSeries?, onHideSeries?){
   if(!item)return;
   const node=item._node||item;
   const nodeId=node.id;
   if(node.repeat){
-    const sheet=document.getElementById('seriesSheet');
     document.getElementById('seriesSheetTitle').textContent=`Delete "${node.title}"`;
     document.getElementById('seriesOpt1').onclick=()=>{
       if(!node.instances)node.instances=[];
@@ -827,14 +826,17 @@ export function deleteNode(item){
       if(inst){inst.excluded=true;}
       else{node.instances.push({date:occDate,excluded:true});}
       writeEntityToCache(node);
-      closeSeriesSheet();buildAgenda();buildMonth();closeEntry();
+      if(onHideSeries)onHideSeries();else document.getElementById('seriesSheet').classList.remove('open');
+      buildAgenda();buildMonth();closeEntry();
     };
     document.getElementById('seriesOpt2').onclick=()=>{
       NODES=NODES.filter(n=>n.id!==nodeId);
       deleteNodeFromDisk(node);
-      closeSeriesSheet();buildAgenda();buildMonth();closeEntry();
+      if(onHideSeries)onHideSeries();else document.getElementById('seriesSheet').classList.remove('open');
+      buildAgenda();buildMonth();closeEntry();
     };
-    sheet.classList.add('open');ic();
+    if(onShowSeries)onShowSeries();else document.getElementById('seriesSheet').classList.add('open');
+    ic();
   } else {
     if(!confirm(`Delete "${node.title}"?`))return;
     NODES=NODES.filter(n=>n.id!==nodeId);
@@ -842,18 +844,8 @@ export function deleteNode(item){
     buildAgenda();buildMonth();closeEntry();
   }
 }
-export function closeSeriesSheet(){document.getElementById('seriesSheet').classList.remove('open');}
 
 // ── DIALOGS ──────────────────────────────────────────────────
-export function openDlg(id, scheduled, duration){
-  if(id==='dlgSched'){document.getElementById('dlgDate').value=scheduled?.date||fmtISO(TODAY);}
-  if(id==='dlgTime'){document.getElementById('dlgTimeVal').value=scheduled?.time||'';}
-  if(id==='dlgDur'){document.getElementById('dlgDurVal').value=duration||'';}
-  document.getElementById(id).classList.add('open');ic();
-}
-export function closeDlg(id){document.getElementById(id).classList.remove('open');}
-export function closeDlgOv(id,e){if(e.target===document.getElementById(id))closeDlg(id);}
-
 export function openRepeatDlg({scheduled,tracked,repeat}){
   const hasSched=!!scheduled,hasTrk=tracked;
   const hint=document.getElementById('repeatHintText'),hintBox=document.getElementById('repeatHint');
@@ -866,7 +858,7 @@ export function openRepeatDlg({scheduled,tracked,repeat}){
     rdWdays=[false,false,false,false,false,false,false];
     rdWdays[monFirst]=true;
   }
-  buildRepeatDlg(hasSched,hasTrk);openDlg('dlgRepeat',scheduled,'');
+  buildRepeatDlg(hasSched,hasTrk);
 }
 
 export function buildRepeatValue(){
