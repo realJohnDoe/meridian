@@ -464,7 +464,8 @@ function toggleOccDone(o, rowEl){
   }
   writeEntityToCache(node);
 
-  if(rowEl&&node.repeat?.type!=='after_completion'){
+  // Update row in place and FLIP — works for all repeat types
+  if(rowEl){
     rowEl.classList.toggle('is-done', newDone);
     const chk=rowEl.querySelector('.occ-chk');
     if(chk)chk.classList.toggle('done', newDone);
@@ -473,7 +474,14 @@ function toggleOccDone(o, rowEl){
     const bar=rowEl.querySelector('.occ-bar');
     if(bar)bar.className='occ-bar '+barClass(o);
     const daySection=rowEl.closest('.day-section');
-    if(daySection)flipResortSection(daySection);
+    if(node.repeat?.type==='after_completion'&&newDone){
+      // Marking done may generate a new pending occurrence — rebuild after
+      // a short delay so the checkbox animation completes first.
+      if(daySection)flipResortSection(daySection);
+      setTimeout(()=>{buildAgenda();buildMonth();},350);
+    } else {
+      if(daySection)flipResortSection(daySection);
+    }
   } else {
     buildAgenda();buildMonth();ic();
   }
