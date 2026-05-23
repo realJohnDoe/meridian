@@ -12,6 +12,7 @@ import {
   openRepeatDlg, buildRepeatValue,
 } from './meridian'
 import EntryEditor, { EntryState, ENTRY_DEFAULT } from './components/EntryEditor'
+import type { Priority } from './types'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 function fmtISO(d: Date) {
@@ -69,8 +70,8 @@ export default function App() {
   }, [entry])
 
   const handleDelete = useCallback(() => {
-    deleteNode(entry.item, entry.editScope, () => setActiveDialog('seriesSheet'), () => setActiveDialog(null))
-  }, [entry.item, entry.editScope])
+    deleteNode(entry.item, () => setActiveDialog('seriesSheet'), () => setActiveDialog(null))
+  }, [entry.item])
 
   const handleClose = useCallback(() => {
     closeEntry()
@@ -141,7 +142,7 @@ export default function App() {
     setActiveDialog(null)
   }, [])
 
-  const setPriority = useCallback((p: string | null) => {
+  const setPriority = useCallback((p: Priority | null) => {
     setEntry(prev => ({ ...prev, priority: p }))
     setActiveDialog(null)
   }, [])

@@ -1,19 +1,20 @@
 import { useRef, useEffect } from 'react'
 import { ArrowLeft, Trash2, Check, Calendar, Clock, Timer, CircleCheck, Flag, Repeat, Plus } from 'lucide-react'
+import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue } from '../types'
 
-export interface Scheduled { date: string; time: string }
+export type { Scheduled }
 
 export interface EntryState {
-  item: any
+  item: Occurrence | null
   title: string
   bodyHtml: string
   scheduled: Scheduled | null
   duration: string
   tracked: boolean
-  repeat: any
+  repeat: RepeatValue | null
   done: boolean
   tags: string[]
-  priority: string | null
+  priority: Priority | null
   editScope: string
 }
 
@@ -61,7 +62,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const { item, title, bodyHtml, scheduled, duration, tracked, repeat, done, tags, priority, editScope } = entry
 
   const isRecur = !!(item && (item.recur || item._node?.repeat || item.repeat))
-  const isScheduled = !!(item && (item._node?.repeat?.type === 'scheduled' || item.repeat?.type === 'scheduled'))
+  const isScheduled = !!(item && (item._node?.repeat?.type === 'schedule' || item.repeat?.type === 'schedule'))
   const isAfterCompletion = !!(item && (item._node?.repeat?.type === 'after_completion' || item.repeat?.type === 'after_completion'))
   const hasSched = !!(item && (item.date || item._node?.date))
   const fname = item
