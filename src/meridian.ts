@@ -6,6 +6,27 @@ import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode
 // Type-only imports — used in exported function signatures so consumers get full type safety.
 // @ts-nocheck suppresses the internal DOM-manipulation errors; a follow-up PR will address those.
 import type { Node, Occurrence, Repeat, Scheduled } from './types'
+import { useStore } from './store'
+
+// ── STORE ACCESSORS ────────────────────────────────────────────
+// Thin wrappers that give vanilla-JS functions synchronous access to
+// the Zustand store. Once views are converted to React components
+// they will read the store directly via useStore().
+const getNodes    = (): Node[]  => useStore.getState().nodes
+const setNodes    = (n: Node[]) => useStore.setState({ nodes: n })
+const bumpId      = (): number  => useStore.getState().bumpId()
+const getCurView  = (): string  => useStore.getState().curView
+const getPrevView = (): string  => useStore.getState().prevView
+const setCurView  = (v: string) => useStore.setState({ curView: v })
+const setPrevView = (v: string) => useStore.setState({ prevView: v })
+const getCalMonth = (): Date    => useStore.getState().calMonth
+const setCalMonth = (d: Date)   => useStore.setState({ calMonth: d })
+const getDvDate   = (): Date    => useStore.getState().dvDate
+const setDvDate   = (d: Date)   => useStore.setState({ dvDate: d })
+const getNsFilter = (): string  => useStore.getState().nsFilterVal
+const setNsFilter = (f: string) => useStore.setState({ nsFilterVal: f })
+const getDirHandle = ()         => useStore.getState().dirHandle
+const setDirHandle = (h: any)   => useStore.setState({ dirHandle: h })
 
 // ── CONSTANTS ─────────────────────────────────────────────────
 const TODAY=new Date();TODAY.setHours(0,0,0,0);
@@ -13,8 +34,8 @@ const DAYS=['Mo','Tu','We','Th','Fr','Sa','Su'];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const D=(y,m,d,h=0,mi=0)=>new Date(y,m-1,d,h,mi);
 
-// ── SPEC-COMPLIANT NODE STORE (v0.9) ──────────────────────────
-let NODES = [
+// ── SEED DATA (used by initApp when no vault is loaded) ───────
+const SEED_NODES: Node[] = [
   {id:'standup', title:'Weekly Standup', tags:['work'],
    date:'2026-04-06', time:'09:00', duration:'30m',
    repeat:{type:'schedule', scheduled:{freq:'weekly', byweekday:['mo']}},
@@ -104,10 +125,7 @@ const NOTES_DATA=[
   {title:'Ideas',preview:'Offline-first sync, plugin system, graph view.',date:'May 9',tags:['ideas'],type:'note'},
 ];
 
-let curView='agenda', prevView='agenda';
-let calMonth=new Date(TODAY.getFullYear(),TODAY.getMonth(),1);
-let dvDate=new Date(TODAY);
-let nsFilterVal='all', nextId=200;
+// curView, prevView, calMonth, dvDate, nsFilterVal, nextId → useStore
 let rdType=null,rdWdays=[false,false,false,false,false,false,false],rdMonthly='first-weekday',rdEndType='never',rdEndVal='',rdInterval='1 day';
 
 // ── UTILS ──────────────────────────────────────────────────────
@@ -149,10 +167,10 @@ function navTo(name,btn){
   showChrome();
   document.getElementById('tbDefault').style.display='';
   document.getElementById('tbDay').style.display='none';
-  curView=name;
+  setCurView(name);
 }
 export function pushView(name: string): void {
-  prevView=curView;
+  setPrevView(getCurView());
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   if(name==='entry'){
@@ -167,16 +185,16 @@ export function pushView(name: string): void {
     document.getElementById('mainTop').style.display='none';
     document.getElementById('bottomFloat').style.display='none';
   }
-  curView=name;
+  setCurView(name);
 }
 function popView(){
   document.getElementById('tbDefault').style.display='';
   document.getElementById('tbDay').style.display='none';
   showChrome();
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+prevView).classList.add('active');
-  setSidebarActive(prevView);
-  curView=prevView;
+  document.getElementById('view-'+getPrevView()).classList.add('active');
+  setSidebarActive(getPrevView());
+  setCurView(getPrevView());
 }
 function showChrome(){
   document.getElementById('mainTop').style.display='';
@@ -188,10 +206,10 @@ function hideChrome(){
 }
 
 function goToday(){
-  if(curView==='day'){
-    dvDate=new Date(TODAY);buildDayView();
-  } else if(curView==='calendar'){
-    calMonth=new Date(TODAY.getFullYear(),TODAY.getMonth(),1);buildMonth();
+  if(getCurView()==='day'){
+    setDvDate(new Date(TODAY));buildDayView();
+  } else if(getCurView()==='calendar'){
+    setCalMonth(new Date(TODAY.getFullYear(),TODAY.getMonth(),1));buildMonth();
   } else {
     setSidebarActive('agenda');navTo('agenda',null);
     setTimeout(()=>{
@@ -200,11 +218,11 @@ function goToday(){
     },60);
   }
 }
-function openSearch(){prevView=curView;pushView('search');buildNS();setTimeout(()=>{document.getElementById('nsIn').focus();ic();},100);}
+function openSearch(){setPrevView(getCurView());pushView('search');buildNS();setTimeout(()=>{document.getElementById('nsIn').focus();ic();},100);}
 function closeSearch(){popView();}
-function openLastDay(){dvDate=new Date(TODAY);buildDayView();pushView('day');}
+function openLastDay(){setDvDate(new Date(TODAY));buildDayView();pushView('day');}
 function closeDayView(){popView();}
-function dvNav(d){dvDate=addDays(dvDate,d);buildDayView();}
+function dvNav(d){setDvDate(addDays(getDvDate(),d));buildDayView();}
 
 // ── SHARED OCCURRENCE SORT ────────────────────────────────────
 const _prioOrder={high:0,medium:1,low:2};
@@ -227,7 +245,7 @@ function sortOccs(arr){
 // ── AGENDA ──────────────────────────────────────────────────────
 function buildAgenda(){
   const from=addDays(TODAY,-7),to=addDays(TODAY,90);
-  const occs=_expandRange(NODES,from,to);
+  const occs=_expandRange(getNodes(),from,to);
   const el=document.getElementById('agContent');el.innerHTML='';
   // Always seed today so scroll-to-today finds a section even on event-free days.
   const groups:{[k:string]:{date:Date,items:any[]}}={};
@@ -435,14 +453,13 @@ function makeOccRow(o,idx){
         }
       );
     } else {
-      NODES=NODES.filter(n=>n.id!==nodeId);
+      setNodes(getNodes().filter(n=>n.id!==nodeId));
       buildAgenda();buildMonth();
 
       showDeleteToast(title,
         ()=>{ deleteNodeFromDisk(node); },
         ()=>{
-          NODES.push(node);
-          NODES.sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0));
+          setNodes([...getNodes(), node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
           buildAgenda();buildMonth();
         }
       );
@@ -471,6 +488,7 @@ function toggleOccDone(o, rowEl){
     node.done=newDone;
   }
   writeEntityToCache(node);
+  setNodes([...getNodes()]); // notify store (node mutated in place)
 
   // Update row in place and FLIP — works for all repeat types
   if(rowEl){
@@ -614,7 +632,7 @@ function flipResortSection(section){
 
 // ── MONTH ──────────────────────────────────────────────────────
 function buildMonth(){
-  const m=calMonth.getMonth(),y=calMonth.getFullYear();
+  const m=getCalMonth().getMonth(),y=getCalMonth().getFullYear();
   document.getElementById('mTitle').innerHTML=`<em>${MONTHS[m]}</em> ${y}`;
   document.getElementById('dowRow').innerHTML=DAYS.map(d=>`<div class="dow-c">${d}</div>`).join('');
   const grid=document.getElementById('calGrid');grid.innerHTML='';
@@ -623,7 +641,7 @@ function buildMonth(){
   const dim=new Date(y,m+1,0).getDate(),prev=new Date(y,m,0).getDate();
 
   const from=new Date(y,m,1),to=new Date(y,m+1,0,23,59,59);
-  const occs=_expandRange(NODES,from,to);
+  const occs=_expandRange(getNodes(),from,to);
 
   for(let i=first-1;i>=0;i--)grid.appendChild(makeCalCell(new Date(y,m-1,prev-i),true,occs));
   for(let d=1;d<=dim;d++)grid.appendChild(makeCalCell(new Date(y,m,d),false,occs));
@@ -644,17 +662,17 @@ function makeCalCell(date,other,occs){
   });
   if(dayOccs.length>4)bars+=`<div class="cc-more">+${dayOccs.length-4}</div>`;
   cell.innerHTML=`<span class="ccn">${date.getDate()}</span><div class="cc-bars">${bars}</div>`;
-  cell.onclick=()=>{dvDate=date;buildDayView();pushView('day');};
+  cell.onclick=()=>{setDvDate(date);buildDayView();pushView('day');};
   return cell;
 }
-function chMonth(d){calMonth.setMonth(calMonth.getMonth()+d);buildMonth();}
+function chMonth(d){const m=getCalMonth();setCalMonth(new Date(m.getFullYear(),m.getMonth()+d,1));buildMonth();}
 
 // ── DAY VIEW ──────────────────────────────────────────────────
 function buildDayView(){
-  document.getElementById('dvTitle').textContent=fmtLong(dvDate);
-  const from=new Date(dvDate);from.setHours(0,0,0,0);
-  const to=new Date(dvDate);to.setHours(23,59,59);
-  const occs=_expandRange(NODES,from,to);
+  document.getElementById('dvTitle').textContent=fmtLong(getDvDate());
+  const from=new Date(getDvDate());from.setHours(0,0,0,0);
+  const to=new Date(getDvDate());to.setHours(23,59,59);
+  const occs=_expandRange(getNodes(),from,to);
   const allday=occs.filter(o=>!fmtT(o.time)||o.multiday);
   const timed=occs.filter(o=>!!fmtT(o.time)&&!o.multiday);
 
@@ -686,7 +704,7 @@ function buildDayView(){
     row.innerHTML=`<span class="dv-hlbl">${h<12?h+'am':h===12?'12pm':(h-12)+'pm'}</span><div class="dv-hline"></div>`;
     tl.appendChild(row);
   }
-  if(sameDay(dvDate,TODAY)){
+  if(sameDay(getDvDate(),TODAY)){
     const now=new Date(),nh=now.getHours()+now.getMinutes()/60;
     if(nh>=SH&&nh<=EH){
       const nl=document.createElement('div');nl.className='now-line';nl.style.top=((nh-SH)*HP)+'px';nl.innerHTML='<div class="now-dot"></div>';tl.appendChild(nl);
@@ -748,10 +766,10 @@ function buildDayView(){
 
 // ── SEARCH ──────────────────────────────────────────────────────
 function buildNS(filter,q=''){
-  if(filter!==undefined)nsFilterVal=filter;
+  if(filter!==undefined)setNsFilter(filter);
   const list=document.getElementById('nsList');list.innerHTML='';
   const q2=(q||document.getElementById('nsIn')?.value||'').toLowerCase();
-  const occs=_expandRange(NODES,addDays(TODAY,-30),addDays(TODAY,90));
+  const occs=_expandRange(getNodes(),addDays(TODAY,-30),addDays(TODAY,90));
   const seen=new Set();
   const allItems=[
     ...NOTES_DATA,
@@ -759,17 +777,17 @@ function buildNS(filter,q=''){
       .map(o=>({title:o.title,preview:o.body||'',date:fmtShort(o.jsTime),tags:o.tags||[],type:o.type,_node:o._node||o}))
   ];
   const filtered=allItems.filter(it=>{
-    if(nsFilterVal!=='all'&&it.type!==nsFilterVal)return false;
+    if(getNsFilter()!=='all'&&it.type!==getNsFilter())return false;
     if(q2&&!it.title.toLowerCase().includes(q2)&&!it.preview.toLowerCase().includes(q2)&&!it.tags.some(t=>t.includes(q2)))return false;
     return true;
   });
   if(!filtered.length){list.innerHTML=`<div style="padding:40px 14px;text-align:center;color:var(--t3);font-size:13px">No results</div>`;return;}
   const grps={event:[],task:[],note:[]};
   filtered.forEach(it=>{if(grps[it.type])grps[it.type].push(it);});
-  const order=nsFilterVal==='all'?['event','task','note']:[nsFilterVal];
+  const order=getNsFilter()==='all'?['event','task','note']:[getNsFilter()];
   order.forEach(t=>{
     const items=grps[t]||[];if(!items.length)return;
-    if(nsFilterVal==='all'){const l=document.createElement('div');l.className='ns-sec';l.textContent=t==='event'?'Events':t==='task'?'Tasks':'Notes';list.appendChild(l);}
+    if(getNsFilter()==='all'){const l=document.createElement('div');l.className='ns-sec';l.textContent=t==='event'?'Events':t==='task'?'Tasks':'Notes';list.appendChild(l);}
     items.forEach(it=>{
       const row=document.createElement('div');row.className='note-row';
       row.innerHTML=`<div class="nr-t">${escapeHtml(it.title)}</div><div class="nr-p">${escapeHtml(it.preview||'')}</div><div class="nr-m"><span class="nr-d">${it.date}</span>${(it.tags||[]).slice(0,2).map(t=>`<span class="otag">${escapeHtml(t)}</span>`).join('')}</div>`;
@@ -777,7 +795,7 @@ function buildNS(filter,q=''){
     });
   });
 }
-function filterNS(){buildNS(nsFilterVal);}
+function filterNS(){buildNS(getNsFilter());}
 function setNSF(f,btn){document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('on'));btn.classList.add('on');buildNS(f);}
 
 // ── ENTRY EDITOR ──────────────────────────────────────────────
@@ -798,7 +816,7 @@ export function applyScope(item: Occurrence, scope: string): { scheduled: Schedu
 export function buildBodyHtml(text: string): string {
   return text
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,(m,ref,label)=>{
-      const target=NODES.find(n=>n.title.toLowerCase()===ref.toLowerCase());
+      const target=getNodes().find(n=>n.title.toLowerCase()===ref.toLowerCase());
       return `<span class="${target?'wl':'wl-broken'}" data-ref="${ref}">[[${label||ref}]]</span>`;
     })
     .replace(/\n/g,'<br>');
@@ -810,7 +828,8 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
   const {title,tags,body,tracked,done,priority,scheduled,duration,repeat}=fields;
   if(!title)return;
   const rootNode=item?(item._node||item):null;
-  const existingIdx=rootNode?NODES.findIndex(n=>n===rootNode||(n.id&&n.id===rootNode.id)):-1;
+  const nodes=getNodes();
+  const existingIdx=rootNode?nodes.findIndex(n=>n===rootNode||(n.id&&n.id===rootNode.id)):-1;
   const isNew=existingIdx<0;
 
   const f={title,tags,body:body||undefined};
@@ -819,17 +838,17 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
   if(repeat)f.repeat=repeat;
 
   if(isNew){
-    const node={id:'node-'+nextId++, ...f};
+    const node={id:'node-'+bumpId(), ...f};
     if(!tracked)delete node.done;
     if(!scheduled){delete node.date;delete node.time;delete node.duration;}
     node.repeat=repeat||undefined;
-    NODES.push(node);
+    setNodes([...nodes, node]);
     writeEntityToCache(node);
     buildAgenda();buildMonth();closeEntry();
     return;
   }
 
-  const node=NODES[existingIdx];
+  const node=nodes[existingIdx];
 
   if(editScope==='add'){
     // Add a one-off occurrence to the series (or to a non-recurring node)
@@ -924,6 +943,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     writeEntityToCache(node);
   }
 
+  setNodes([...nodes]); // notify store (node mutated in place)
   buildAgenda();buildMonth();closeEntry();
 }
 
@@ -949,7 +969,7 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
     hideSheet();buildAgenda();buildMonth();closeEntry();
   }
   function deleteAll(){
-    NODES=NODES.filter(n=>n.id!==nodeId);
+    setNodes(getNodes().filter(n=>n.id!==nodeId));
     deleteNodeFromDisk(node);
     hideSheet();buildAgenda();buildMonth();closeEntry();
   }
@@ -971,7 +991,7 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
   if(!node.repeat&&!hasMultiple){
     // Single occurrence — plain confirm, no sheet needed
     if(!confirm(`Delete "${node.title}"?`))return;
-    NODES=NODES.filter(n=>n.id!==nodeId);
+    setNodes(getNodes().filter(n=>n.id!==nodeId));
     deleteNodeFromDisk(node);
     buildAgenda();buildMonth();closeEntry();
     return;
@@ -1082,12 +1102,12 @@ export function wikilinkInputHandler(e: Event): void {
   if(m){
     const q=m[1].toLowerCase();
     if(!q){popup.classList.remove('show');return;}
-    const allTitles=[...new Set([...NODES,...NOTES_DATA].map(o=>o.title))];
+    const allTitles=[...new Set([...getNodes(),...NOTES_DATA].map(o=>o.title))];
     const matches=allTitles.filter(t=>t.toLowerCase().includes(q)).slice(0,8);
     if(matches.length){
       wlFocusIdx=-1;
       popup.innerHTML=matches.map(t=>{
-        const o=NODES.find(n=>n.title===t)||NOTES_DATA.find(n=>n.title===t);
+        const o=getNodes().find(n=>n.title===t)||NOTES_DATA.find(n=>n.title===t);
         const icon=o?.done!==undefined?'check-square':o?.time?'calendar':'file-text';
         return `<div class="wl-item" data-title="${escapeHtml(t)}"><i data-lucide="${icon}"></i>${escapeHtml(t)}</div>`;
       }).join('');
@@ -1193,7 +1213,7 @@ function addSwipe(el,onLeft,onRight){
 function nodeToPath(node){
   if(node._path)return node._path;
   const slug=titleToSlug(node.title);
-  const collision=NODES.some(n=>{
+  const collision=getNodes().some(n=>{
     if(n===node||n.id===node.id)return false;
     const otherSlug=n._path?n._path.replace(/\.md$/,''):titleToSlug(n.title);
     return otherSlug===slug;
@@ -1249,14 +1269,14 @@ async function cacheDirtyCount(){
   catch(e){return 0;}
 }
 
-let dirHandle=null;
+// dirHandle → useStore
 
 async function diskPickDirectory(){
   if(!window.showDirectoryPicker){
     throw new Error('Your browser does not support folder access. Use Chrome or Edge, and open this file directly (not in a preview).');
   }
   try{
-    dirHandle=await window.showDirectoryPicker({mode:'readwrite'});
+    setDirHandle(await window.showDirectoryPicker({mode:'readwrite'}));
   }catch(e){
     if(e.name==='AbortError')throw e;
     if(e.name==='SecurityError'){
@@ -1264,13 +1284,13 @@ async function diskPickDirectory(){
     }
     throw e;
   }
-  return dirHandle;
+  return getDirHandle();
 }
 
 async function diskReadAll(){
-  if(!dirHandle)return [];
+  if(!getDirHandle())return [];
   const results=[];
-  for await(const [name, fh] of dirHandle.entries()){
+  for await(const [name, fh] of getDirHandle().entries()){
     if(!name.endsWith('.md')&&!name.endsWith('.yaml')&&!name.endsWith('.yml'))continue;
     try{
       const file=await fh.getFile();
@@ -1282,21 +1302,21 @@ async function diskReadAll(){
 }
 
 async function diskWrite(path, content){
-  if(!dirHandle)throw new Error('No vault folder connected');
-  const perm=await dirHandle.queryPermission({mode:'readwrite'});
+  if(!getDirHandle())throw new Error('No vault folder connected');
+  const perm=await getDirHandle().queryPermission({mode:'readwrite'});
   if(perm!=='granted'){
-    const ask=await dirHandle.requestPermission({mode:'readwrite'});
+    const ask=await getDirHandle().requestPermission({mode:'readwrite'});
     if(ask!=='granted')throw new Error('Write permission denied');
   }
-  const fh=await dirHandle.getFileHandle(path,{create:true});
+  const fh=await getDirHandle().getFileHandle(path,{create:true});
   const w=await fh.createWritable();
   await w.write(content);
   await w.close();
 }
 
 async function diskDelete(path){
-  if(!dirHandle)return;
-  try{await dirHandle.removeEntry(path);}catch(e){}
+  if(!getDirHandle())return;
+  try{await getDirHandle().removeEntry(path);}catch(e){}
 }
 
 async function writeEntityToCache(node){
@@ -1323,7 +1343,7 @@ async function deleteNodeFromDisk(node){
 
 async function syncToDirectory(){
   try{
-    if(!dirHandle){alert('No vault folder connected. Click the folder icon first.');return;}
+    if(!getDirHandle()){alert('No vault folder connected. Click the folder icon first.');return;}
     const dirty=await cacheGetDirty();
     if(!dirty.length){updateSyncUI();return;}
     for(const f of dirty){
@@ -1349,7 +1369,7 @@ async function pickDirectory(){
       await cacheWriteClean(path, content);
       try{const node=fileToNode(path, content);if(node.title)loaded.push(node);}catch(e){console.warn('[storage] parse failed for', path, e);}
     }
-    NODES=loaded;
+    setNodes(loaded);
     buildAgenda();buildMonth();updateSyncUI();
     setTimeout(()=>goToday(),100);
   }catch(e){
@@ -1367,7 +1387,7 @@ function updateSyncUI(){
     btn.style.color=n>0?'var(--amb)':'var(--t2)';
     btn.title=n>0
       ? `${n} unsaved change${n>1?'s':''} — click to sync`
-      : dirHandle?'All synced':'Click folder icon to open vault';
+      : getDirHandle()?'All synced':'Click folder icon to open vault';
   }).catch(()=>{});
 }
 
@@ -1379,13 +1399,14 @@ async function loadFromDirectory(){
     await cacheWriteClean(path, content);
     try{const node=fileToNode(path, content);if(node.title)loaded.push(node);}catch(e){}
   }
-  NODES=loaded;
+  setNodes(loaded);
   buildAgenda();buildMonth();
 }
 async function initDexie(){return cacheInit();}
 
 // ── INIT ──────────────────────────────────────────────────────
 export function initApp(): void {
+  setNodes(SEED_NODES);
   ic();
   buildAgenda();
   buildMonth();
