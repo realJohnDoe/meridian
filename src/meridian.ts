@@ -1,4 +1,5 @@
 // @ts-nocheck
+import Dexie from 'dexie'
 import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar } from 'lucide'
 import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './recurrence'
 import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode, titleToSlug } from './yaml'
@@ -114,8 +115,9 @@ const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMont
 const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r};
 const fmtLong=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+function escapeHtml(s:string):string{return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar}});}
 
 // ── NAVIGATION ──────────────────────────────────────────────────
@@ -257,7 +259,7 @@ function buildAgenda(){
     g.items.filter(o=>o.multiday).forEach(o=>{
       if(mdSeen.has(o._nodeId))return;mdSeen.add(o._nodeId);
       const b=document.createElement('div');b.className='multiday-banner';
-      b.innerHTML=`<i data-lucide="calendar-range"></i>${o.title} <span style="opacity:.55;font-size:10px;margin-left:4px">${fmtShort(parseDateString(o.multiday.start))}–${fmtShort(parseDateString(o.multiday.end))}</span>`;
+      b.innerHTML=`<i data-lucide="calendar-range"></i>${escapeHtml(o.title)} <span style="opacity:.55;font-size:10px;margin-left:4px">${fmtShort(parseDateString(o.multiday.start))}–${fmtShort(parseDateString(o.multiday.end))}</span>`;
       b.onclick=()=>openEntry(o);sec.appendChild(b);
     });
 
@@ -324,18 +326,18 @@ function makeOccRow(o,idx){
   row.innerHTML=
     `<div class="occ-left">`+
       `<span class="occ-time${t?' timed':''}">${t||''}</span>`+
-      (o.duration&&t?`<span class="occ-dur-small">${o.duration}</span>`:'')+
+      (o.duration&&t?`<span class="occ-dur-small">${escapeHtml(o.duration)}</span>`:'')+
     `</div>`+
     `<span class="occ-bar ${barClass(o)}"></span>`+
     `<div class="occ-body">`+
       `<div class="occ-tr">`+
         (hasTrack?`<div class="occ-chk${o.done?' done':''}" style="flex-shrink:0"><i data-lucide="check"></i></div>`:'')+
-        `<span class="occ-title${o.done?' done-t':''}">${o.title}</span>`+
+        `<span class="occ-title${o.done?' done-t':''}">${escapeHtml(o.title)}</span>`+
         (o.recur?`<span class="orecur"><i data-lucide="repeat-2"></i></span>`:'')+
       `</div>`+
       ((o.tags||[]).length?
         `<div class="occ-meta">`+
-          (o.tags||[]).slice(0,2).map(tg=>`<span class="otag${o.type==='event'?' ev':''}">${tg}</span>`).join('')+
+          (o.tags||[]).slice(0,2).map(tg=>`<span class="otag${o.type==='event'?' ev':''}">${escapeHtml(tg)}</span>`).join('')+
         `</div>`
       :'')+
     `</div>`;
@@ -637,8 +639,8 @@ function makeCalCell(date,other,occs){
   cell.className=`cal-cell${other?' other':''}${isT?' istoday':''}`;
   const seen=new Set();let bars='';
   dayOccs.slice(0,4).forEach(o=>{
-    if(o.multiday){if(seen.has(o._nodeId))return;seen.add(o._nodeId);bars+=`<div class="cc-bar multiday">${o.title}</div>`;}
-    else bars+=`<div class="cc-bar ${ccBarClass(o)}">${o.title}</div>`;
+    if(o.multiday){if(seen.has(o._nodeId))return;seen.add(o._nodeId);bars+=`<div class="cc-bar multiday">${escapeHtml(o.title)}</div>`;}
+    else bars+=`<div class="cc-bar ${ccBarClass(o)}">${escapeHtml(o.title)}</div>`;
   });
   if(dayOccs.length>4)bars+=`<div class="cc-more">+${dayOccs.length-4}</div>`;
   cell.innerHTML=`<span class="ccn">${date.getDate()}</span><div class="cc-bars">${bars}</div>`;
@@ -671,7 +673,7 @@ function buildDayView(){
       const it=document.createElement('div');
       it.className=`dv-aditem ${o.multiday?'multiday':dvBlkClass(o)}`;
       const chkHtml=hasTrack?`<div class="dv-chk${o.done?' done':''}"><i data-lucide="check"></i></div>`:'';
-      it.innerHTML=chkHtml+`<span>${o.title}</span>`;
+      it.innerHTML=chkHtml+`<span>${escapeHtml(o.title)}</span>`;
       it.onclick=()=>openEntry(o);
       ad.appendChild(it);
     });
@@ -723,7 +725,7 @@ function buildDayView(){
       blk.dataset.totalCols=totalCols;
       const hasTrack=o.done!==undefined;
       const chkHtml=hasTrack?`<div class="dv-blk-chk${o.done?' done':''}"><i data-lucide="check"></i></div>`:'';
-      blk.innerHTML=`<div class="dv-et">${chkHtml}${o.title}</div><div class="dv-em">${fmtT(o.time)}${o.duration?' · '+o.duration:''}</div>`;
+      blk.innerHTML=`<div class="dv-et">${chkHtml}${escapeHtml(o.title)}</div><div class="dv-em">${fmtT(o.time)}${o.duration?' · '+escapeHtml(o.duration):''}</div>`;
       blk.onclick=()=>openEntry(o);
       tl.appendChild(blk);
     });
@@ -770,7 +772,7 @@ function buildNS(filter,q=''){
     if(nsFilterVal==='all'){const l=document.createElement('div');l.className='ns-sec';l.textContent=t==='event'?'Events':t==='task'?'Tasks':'Notes';list.appendChild(l);}
     items.forEach(it=>{
       const row=document.createElement('div');row.className='note-row';
-      row.innerHTML=`<div class="nr-t">${it.title}</div><div class="nr-p">${it.preview||''}</div><div class="nr-m"><span class="nr-d">${it.date}</span>${(it.tags||[]).slice(0,2).map(t=>`<span class="otag">${t}</span>`).join('')}</div>`;
+      row.innerHTML=`<div class="nr-t">${escapeHtml(it.title)}</div><div class="nr-p">${escapeHtml(it.preview||'')}</div><div class="nr-m"><span class="nr-d">${it.date}</span>${(it.tags||[]).slice(0,2).map(t=>`<span class="otag">${escapeHtml(t)}</span>`).join('')}</div>`;
       row.onclick=()=>openEntry(it._node?it:it);list.appendChild(row);
     });
   });
@@ -980,12 +982,12 @@ function buildRepeatConfig(){
     cfg.appendChild(row);
   }
   else if(rdType==='monthly'){const w=document.createElement('div');w.className='monthly-opts';[['first-weekday','First weekday of month'],['last-weekday','Last weekday of month'],['same-day','Same day of month']].forEach(([v,l])=>{const b=document.createElement('button');b.className=`mopt${rdMonthly===v?' on':''}`;b.textContent=l;b.onclick=()=>{rdMonthly=v;buildRepeatConfig();};w.appendChild(b);});cfg.appendChild(w);}
-  else if(rdType==='after_completion'){const row=document.createElement('div');row.className='interval-row';row.innerHTML=`<span>Every</span><input class="dlg-in" id="rdIv" value="${rdInterval}" style="width:130px" placeholder="e.g. 2 days">`;cfg.appendChild(row);}
+  else if(rdType==='after_completion'){const row=document.createElement('div');row.className='interval-row';row.innerHTML=`<span>Every</span><input class="dlg-in" id="rdIv" value="${escapeHtml(rdInterval)}" style="width:130px" placeholder="e.g. 2 days">`;cfg.appendChild(row);}
   if(rdType&&rdType!=='after_completion'){end.style.display='block';end.innerHTML=`<div class="end-lbl">Ends</div><div class="end-opts"><button class="eopt${rdEndType==='never'?' on':''}" onclick="setEnd('never',this)">Never</button><button class="eopt${rdEndType==='until'?' on':''}" onclick="setEnd('until',this)">On date</button><button class="eopt${rdEndType==='count'?' on':''}" onclick="setEnd('count',this)">After N</button></div><div id="endValRow"></div>`;buildEndVal();}
   else end.style.display='none';
 }
 function setEnd(type,btn){rdEndType=type;document.querySelectorAll('.eopt').forEach(b=>b.classList.remove('on'));btn.classList.add('on');buildEndVal();}
-function buildEndVal(){const row=document.getElementById('endValRow');if(!row)return;if(rdEndType==='until')row.innerHTML=`<input class="dlg-in" style="width:100%;margin-top:6px" type="date" id="endD" value="${rdEndVal}">`;else if(rdEndType==='count')row.innerHTML=`<input class="dlg-in" style="width:100%;margin-top:6px" type="number" id="endC" placeholder="occurrences" value="${rdEndVal}">`;else row.innerHTML='';}
+function buildEndVal(){const row=document.getElementById('endValRow');if(!row)return;if(rdEndType==='until')row.innerHTML=`<input class="dlg-in" style="width:100%;margin-top:6px" type="date" id="endD" value="${escapeHtml(rdEndVal)}">`;else if(rdEndType==='count')row.innerHTML=`<input class="dlg-in" style="width:100%;margin-top:6px" type="number" id="endC" placeholder="occurrences" value="${escapeHtml(rdEndVal)}">`;else row.innerHTML='';}
 
 // ── WIKILINK AUTOCOMPLETE ─────────────────────────────────────
 let wlFocusIdx=-1;
@@ -1011,7 +1013,7 @@ export function wikilinkInputHandler(e: Event): void {
       popup.innerHTML=matches.map(t=>{
         const o=NODES.find(n=>n.title===t)||NOTES_DATA.find(n=>n.title===t);
         const icon=o?.done!==undefined?'check-square':o?.time?'calendar':'file-text';
-        return `<div class="wl-item" data-title="${t}"><i data-lucide="${icon}"></i>${t}</div>`;
+        return `<div class="wl-item" data-title="${escapeHtml(t)}"><i data-lucide="${icon}"></i>${escapeHtml(t)}</div>`;
       }).join('');
       popup.classList.add('show');
       const rect=range.getBoundingClientRect();
@@ -1072,7 +1074,7 @@ function showDeleteToast(title, commitFn, undoFn){
   const toast=document.createElement('div');
   toast.className='undo-toast';
   toast.innerHTML=
-    `<span class="undo-toast-msg">Deleted: <strong>${title}</strong></span>`+
+    `<span class="undo-toast-msg">Deleted: <strong>${escapeHtml(title)}</strong></span>`+
     `<button class="undo-btn">Undo</button>`;
   const float=document.getElementById('bottomFloat');
   float.insertBefore(toast, float.firstChild);
@@ -1132,14 +1134,6 @@ async function cacheInit(){
   if(db)return db;
   if(_cacheInitPromise)return _cacheInitPromise;
   _cacheInitPromise=(async()=>{
-    if(typeof Dexie==='undefined'){
-      await new Promise((res,rej)=>{
-        const s=document.createElement('script');
-        s.src='https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js';
-        s.onload=res;s.onerror=rej;
-        document.head.appendChild(s);
-      });
-    }
     db=new Dexie('meridian_v2');
     db.version(1).stores({files:'path,dirty,updatedAt'});
     await db.open();
