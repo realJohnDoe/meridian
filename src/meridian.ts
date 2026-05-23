@@ -227,7 +227,10 @@ function buildAgenda(){
   const from=addDays(TODAY,-7),to=addDays(TODAY,90);
   const occs=_expandRange(NODES,from,to);
   const el=document.getElementById('agContent');el.innerHTML='';
-  const groups={};
+  // Always seed today so scroll-to-today finds a section even on event-free days.
+  const groups:{[k:string]:{date:Date,items:any[]}}={};
+  const _tk=dayKey(TODAY);
+  groups[_tk]={date:new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()),items:[]};
   occs.forEach(o=>{
     if(o.multiday&&!sameDay(o.jsTime,new Date(o.multiday.start)))return;
     const k=dayKey(o.jsTime);
