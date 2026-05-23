@@ -47,9 +47,10 @@ interface Props {
   onClose: () => void
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: () => void
+  onScopeChange?: (scope: string) => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange }: Props) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -60,6 +61,9 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const { item, title, bodyHtml, scheduled, duration, tracked, repeat, done, tags, priority, editScope } = entry
 
   const isRecur = !!(item && (item.recur || item._node?.repeat || item.repeat))
+  const isScheduled = !!(item && (item._node?.repeat?.type === 'scheduled' || item.repeat?.type === 'scheduled'))
+  const isAfterCompletion = !!(item && (item._node?.repeat?.type === 'after_completion' || item.repeat?.type === 'after_completion'))
+  const hasSched = !!(item && (item.date || item._node?.date))
   const fname = item
     ? ((item._node?.id || item._nodeId || item.id || item.title || 'untitled') + '.md').toLowerCase().replace(/\s+/g, '-')
     : 'untitled.md'
@@ -70,6 +74,13 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const showRepeat = (hasDate || tracked) && !isSingleScope
   const priorityChipClass = ['pchip', !tracked ? 'hidden' : '', priority ? 'on' : '', priority ? PRIORITY_CLASS[priority] : ''].filter(Boolean).join(' ')
   const bodyKey = item ? `${item._nodeId || item.id || 'item'}-${item.date || ''}-${editScope}` : 'new'
+
+  const showScopeRow = isRecur || hasSched
+
+  function handleScopeChange(scope: string) {
+    onChange(prev => ({ ...prev, editScope: scope }))
+    onScopeChange?.(scope)
+  }
 
   return (
     <>
@@ -103,13 +114,13 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           />
         </div>
 
-        {isRecur && (
+        {showScopeRow && (
           <div className="scope-row">
-            <span className="scope-lbl">Edit</span>
-            <select className="scope-select" value={editScope} onChange={e => onChange(prev => ({ ...prev, editScope: e.target.value }))}>
-              <option value="single">This event</option>
-              <option value="future">This and following events</option>
-              <option value="all">All events</option>
+            <select className="scope-select" value={editScope} onChange={e => handleScopeChange(e.target.value)}>
+              <option value="add">Add new occurrence</option>
+              <option value="single">Edit this occurrence</option>
+              {isScheduled && <option value="future">Edit this and all following occurrences</option>}
+              {(isScheduled || isAfterCompletion) && <option value="all">Edit repeat pattern</option>}
             </select>
           </div>
         )}

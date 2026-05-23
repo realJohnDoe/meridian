@@ -49,7 +49,7 @@ export default function App() {
   useEffect(() => {
     // ONE global: lets vanilla JS agenda/search rows open the editor
     ;(window as any).openEntry = (item: any, scope?: string) => {
-      const editScope = scope ?? (item?.recur ? 'single' : 'all')
+      const editScope = scope ?? (item ? 'single' : 'all')
       setEntry(entryFromItem(item, editScope))
       pushView('entry')
     }
@@ -69,11 +69,19 @@ export default function App() {
   }, [entry])
 
   const handleDelete = useCallback(() => {
-    deleteNode(entry.item, () => setActiveDialog('seriesSheet'), () => setActiveDialog(null))
-  }, [entry.item])
+    deleteNode(entry.item, entry.editScope, () => setActiveDialog('seriesSheet'), () => setActiveDialog(null))
+  }, [entry.item, entry.editScope])
 
   const handleClose = useCallback(() => {
     closeEntry()
+  }, [])
+
+  const handleScopeChange = useCallback((scope: string) => {
+    setEntry(prev => {
+      if (!prev.item) return prev
+      const { scheduled, repeat } = applyScope(prev.item, scope)
+      return { ...prev, editScope: scope, scheduled, repeat }
+    })
   }, [])
 
   const handleOpenDlg = useCallback((id: string) => {
@@ -217,6 +225,7 @@ export default function App() {
             onClose={handleClose}
             onOpenDlg={handleOpenDlg}
             onOpenRepeatDlg={handleOpenRepeatDlg}
+            onScopeChange={handleScopeChange}
           />
         </section>
 
@@ -303,8 +312,9 @@ export default function App() {
       {/* SERIES DELETE SHEET */}
       <div className={dlgOvClass('seriesSheet')} id="seriesSheet" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title" id="seriesSheetTitle">Delete event</div><div className="dlg-body">
-          <button className="sheet-opt" id="seriesOpt1"><i data-lucide="calendar"></i><div><div className="sopt-t">This occurrence</div><div className="sopt-s">Remove only this instance</div></div></button>
-          <button className="sheet-opt" id="seriesOpt2"><i data-lucide="calendar-range"></i><div><div className="sopt-t">All events in series</div><div className="sopt-s">Remove every occurrence</div></div></button>
+          <button className="sheet-opt" id="seriesOpt1"><i data-lucide="calendar"></i><div><div className="sopt-t">This occurrence</div><div className="sopt-s">Remove only this occurrence</div></div></button>
+          <button className="sheet-opt" id="seriesOpt2"><i data-lucide="calendar-range"></i><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
+          <button className="sheet-opt" id="seriesOpt3" style={{display:'none'}}><i data-lucide="calendar-range"></i><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
           <button className="sheet-opt" onClick={closeDialog} style={{color:'var(--t3)'}}><i data-lucide="x"></i><div><div className="sopt-t">Cancel</div></div></button>
         </div></div>
       </div>

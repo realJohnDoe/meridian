@@ -349,9 +349,30 @@ export function expandRange(nodes, from, to){
     } else if(node.repeat){
       all.push(...expandNode(node,from,to));
     } else {
-      const t=nodeDateTime(node);
-      if(t&&t>=from&&t<=to){
-        all.push({...node,jsTime:t,_nodeId:node.id,_node:node,recur:false});
+      const liveInstances=(node.instances||[]).filter(i=>!i.excluded&&!i.repeat);
+      if(liveInstances.length>0){
+        // Multi-occurrence non-recurring: root date is metadata only; all calendar items come from instances
+        for(const inst of liveInstances){
+          const it=nodeDateTime(inst)||parseDateString(inst.date);
+          if(!it||it<from||it>to)continue;
+          const eff=mergeNode(node,inst);
+          if(!eff.excluded){
+            all.push({
+              ...eff,
+              date:inst.date||jsDateToSpec(it).date,
+              jsTime:it,
+              _nodeId:node.id,
+              _node:node,
+              recur:true,  // enables per-instance swipe-delete (exclude, not full node delete)
+            });
+          }
+        }
+      } else {
+        // Single occurrence: emit root date
+        const t=nodeDateTime(node);
+        if(t&&t>=from&&t<=to){
+          all.push({...node,jsTime:t,_nodeId:node.id,_node:node,recur:false});
+        }
       }
     }
   }

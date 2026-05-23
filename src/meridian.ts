@@ -705,6 +705,7 @@ export function applyScope(item, scope){
   const rootTime=root.time||null;
   if(scope==='single') return {scheduled:occDate?{date:occDate,time:occTime||''}:null, repeat:null};
   if(scope==='future') return {scheduled:occDate?{date:occDate,time:occTime||''}:null, repeat:root.repeat||null};
+  if(scope==='add') return {scheduled:{date:fmtISO(TODAY), time:occTime||''}, repeat:null};
   return {scheduled:rootDate?{date:rootDate,time:rootTime||''}:null, repeat:root.repeat||null};
 }
 
@@ -743,6 +744,33 @@ export function saveNode(item, editScope, fields){
   }
 
   const node=NODES[existingIdx];
+
+  if(editScope==='add'){
+    // Add a one-off occurrence to the series (or to a non-recurring node)
+    if(!f.date){alert('Please set a date for the new occurrence.');return;}
+    if(!node.instances)node.instances=[];
+    // For non-recurring nodes: migrate root date into instances so all occurrences
+    // are explicit in the YAML (root node.date stays as metadata)
+    if(!node.repeat&&node.date){
+      const alreadyCovered=node.instances.some(i=>i.date===node.date&&!i.excluded);
+      if(!alreadyCovered){
+        const rootInst:any={date:node.date};
+        if(node.time)rootInst.time=node.time;
+        node.instances.unshift(rootInst);
+      }
+    }
+    const newInst:any={date:f.date};
+    if(f.time)newInst.time=f.time;
+    if(f.duration&&f.duration!==node.duration)newInst.duration=f.duration;
+    if(f.title!==node.title)newInst.title=f.title;
+    if(f.body&&f.body!==node.body)newInst.body=f.body;
+    if(tracked&&f.done!==undefined)newInst.done=f.done;
+    if(tracked&&f.priority&&f.priority!==node.priority)newInst.priority=f.priority;
+    node.instances.push(newInst);
+    writeEntityToCache(node);
+    buildAgenda();buildMonth();closeEntry();
+    return;
+  }
 
   if(editScope==='all'||!node.repeat){
     Object.assign(node,f);
@@ -813,36 +841,84 @@ export function saveNode(item, editScope, fields){
   buildAgenda();buildMonth();closeEntry();
 }
 
-export function deleteNode(item, onShowSeries?, onHideSeries?){
+export function deleteNode(item, editScope, onShowSeries?, onHideSeries?){
   if(!item)return;
   const node=item._node||item;
   const nodeId=node.id;
-  if(node.repeat){
-    document.getElementById('seriesSheetTitle').textContent=`Delete "${node.title}"`;
-    document.getElementById('seriesOpt1').onclick=()=>{
-      if(!node.instances)node.instances=[];
-      const occDate=item.date||node.date;
-      let inst=node.instances.find(i=>i.date===occDate);
-      if(inst){inst.excluded=true;}
-      else{node.instances.push({date:occDate,excluded:true});}
-      writeEntityToCache(node);
-      if(onHideSeries)onHideSeries();else document.getElementById('seriesSheet').classList.remove('open');
-      buildAgenda();buildMonth();closeEntry();
-    };
-    document.getElementById('seriesOpt2').onclick=()=>{
-      NODES=NODES.filter(n=>n.id!==nodeId);
-      deleteNodeFromDisk(node);
-      if(onHideSeries)onHideSeries();else document.getElementById('seriesSheet').classList.remove('open');
-      buildAgenda();buildMonth();closeEntry();
-    };
-    if(onShowSeries)onShowSeries();else document.getElementById('seriesSheet').classList.add('open');
-    ic();
-  } else {
+  const occDate=item.date||node.date;
+
+  const isScheduled=node.repeat?.type==='scheduled';
+  const hasMultiple=!node.repeat&&(node.instances||[]).some(i=>!i.excluded);
+
+  function hideSheet(){
+    if(onHideSeries)onHideSeries();
+    else document.getElementById('seriesSheet').classList.remove('open');
+  }
+  function excludeThis(){
+    if(!node.instances)node.instances=[];
+    let inst=node.instances.find(i=>i.date===occDate&&!i.time);
+    if(inst){inst.excluded=true;}
+    else{node.instances.push({date:occDate,excluded:true});}
+    writeEntityToCache(node);
+    hideSheet();buildAgenda();buildMonth();closeEntry();
+  }
+  function deleteAll(){
+    NODES=NODES.filter(n=>n.id!==nodeId);
+    deleteNodeFromDisk(node);
+    hideSheet();buildAgenda();buildMonth();closeEntry();
+  }
+  function deleteAllFuture(){
+    // Cap the series at the day before occDate; exclude any future manual instances
+    const occJsDate=parseDateString(occDate);
+    const untilDate=new Date(occJsDate);untilDate.setDate(untilDate.getDate()-1);
+    if(!node.repeat.scheduled)node.repeat.scheduled={};
+    node.repeat.scheduled.end={type:'until',date:fmtISO(untilDate)};
+    if(node.instances){
+      node.instances.forEach(i=>{if(i.date&&i.date>=occDate&&!i.excluded)i.excluded=true;});
+    }
+    writeEntityToCache(node);
+    hideSheet();buildAgenda();buildMonth();closeEntry();
+  }
+
+  const opt3=document.getElementById('seriesOpt3') as HTMLElement|null;
+
+  if(!node.repeat&&!hasMultiple){
+    // Single occurrence — plain confirm, no sheet needed
     if(!confirm(`Delete "${node.title}"?`))return;
     NODES=NODES.filter(n=>n.id!==nodeId);
     deleteNodeFromDisk(node);
     buildAgenda();buildMonth();closeEntry();
+    return;
   }
+
+  // All other cases: show the series sheet
+  document.getElementById('seriesSheetTitle').textContent=`Delete "${node.title}"`;
+  document.getElementById('seriesOpt1').onclick=excludeThis;
+
+  if(isScheduled){
+    // 3-button layout: This / This+following / All
+    const opt2=document.getElementById('seriesOpt2');
+    opt2.onclick=deleteAllFuture;
+    opt2.querySelector('.sopt-t').textContent='This and all following';
+    opt2.querySelector('.sopt-s').textContent='Remove this and all future occurrences';
+    if(opt3){
+      opt3.style.display='';
+      opt3.onclick=deleteAll;
+      opt3.querySelector('.sopt-t').textContent='All occurrences';
+      opt3.querySelector('.sopt-s').textContent='Remove all occurrences';
+    }
+  } else {
+    // 2-button layout: This / All
+    const opt2=document.getElementById('seriesOpt2');
+    opt2.onclick=deleteAll;
+    opt2.querySelector('.sopt-t').textContent='All occurrences';
+    opt2.querySelector('.sopt-s').textContent='Remove all occurrences';
+    if(opt3)opt3.style.display='none';
+  }
+
+  if(onShowSeries)onShowSeries();
+  else document.getElementById('seriesSheet').classList.add('open');
+  ic();
 }
 
 // ── DIALOGS ──────────────────────────────────────────────────
