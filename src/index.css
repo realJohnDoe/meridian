@@ -245,6 +245,13 @@ input,textarea,select{font-family:inherit}
 .pchip.on.p3{background:rgba(250,204,21,.15);border-color:var(--p3);color:var(--p3)}
 .pchip.hidden{display:none}
 .pchip-sum{font-size:11px;font-family:var(--mono);opacity:.8;margin-left:1px}
+.type-chip-row{display:flex;gap:3px;margin-bottom:16px;background:var(--bg3);border-radius:22px;padding:3px;border:1px solid var(--bdr2);width:fit-content}
+.type-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:18px;font-size:12px;font-weight:500;color:var(--t3);cursor:pointer;transition:all .15s;white-space:nowrap;text-transform:capitalize}
+.type-chip svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
+.type-chip.active{background:var(--bg1);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.type-chip-task.active{color:var(--grn)}
+.type-chip-event.active{color:var(--ind)}
+.type-chip-note.active{color:var(--amb)}
 .entry-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;align-items:center}
 .etag{background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--t2)}
 .etag-add{color:var(--ind);border-color:var(--ind);background:var(--ab);cursor:pointer;display:inline-flex;align-items:center;gap:4px}

@@ -14,7 +14,7 @@ import {
   addDays, fmtLong,
 } from './meridian'
 import { useStore } from './store'
-import EntryEditor, { EntryState, ENTRY_DEFAULT } from './components/EntryEditor'
+import EntryEditor, { EntryState, ENTRY_DEFAULT, ItemType } from './components/EntryEditor'
 import AgendaView from './components/AgendaView'
 import MonthView from './components/MonthView'
 import DayView from './components/DayView'
@@ -33,6 +33,8 @@ function entryFromItem(item: any, editScope: string): EntryState {
   }
   const root = item._node || item
   const { scheduled, repeat } = applyScope(item, editScope)
+  const tracked = item.done !== undefined || root.done !== undefined
+  const itemType: ItemType = tracked ? 'task' : scheduled ? 'event' : 'note'
   return {
     item: { ...item, _editScope: editScope },
     title: item.title || root.title || '',
@@ -40,7 +42,8 @@ function entryFromItem(item: any, editScope: string): EntryState {
     scheduled,
     repeat,
     duration: item.duration || root.duration || '',
-    tracked: item.done !== undefined || root.done !== undefined,
+    tracked,
+    itemType,
     done: item.done || false,
     tags: [...(item.tags || root.tags || [])],
     priority: item.priority || root.priority || null,
@@ -110,8 +113,8 @@ export default function App() {
     setActiveDialog(id)
   }, [entry.scheduled, entry.duration])
 
-  const handleOpenRepeatDlg = useCallback(() => {
-    openRepeatDlg({ scheduled: entry.scheduled, tracked: entry.tracked, repeat: entry.repeat })
+  const handleOpenRepeatDlg = useCallback((itemType?: string) => {
+    openRepeatDlg({ scheduled: entry.scheduled, tracked: entry.tracked, repeat: entry.repeat, itemType })
     setActiveDialog('dlgRepeat')
   }, [entry.scheduled, entry.tracked, entry.repeat])
 
