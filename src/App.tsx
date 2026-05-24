@@ -113,8 +113,8 @@ export default function App() {
     setActiveDialog(id)
   }, [entry.scheduled, entry.duration])
 
-  const handleOpenRepeatDlg = useCallback(() => {
-    openRepeatDlg({ scheduled: entry.scheduled, tracked: entry.tracked, repeat: entry.repeat })
+  const handleOpenRepeatDlg = useCallback((itemType?: string) => {
+    openRepeatDlg({ scheduled: entry.scheduled, tracked: entry.tracked, repeat: entry.repeat, itemType })
     setActiveDialog('dlgRepeat')
   }, [entry.scheduled, entry.tracked, entry.repeat])
 

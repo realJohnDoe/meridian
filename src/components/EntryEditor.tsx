@@ -51,7 +51,7 @@ interface Props {
   onDelete: () => void
   onClose: () => void
   onOpenDlg: (id: string) => void
-  onOpenRepeatDlg: () => void
+  onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: string) => void
 }
 
@@ -76,7 +76,10 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const hasDate = !!scheduled
   const hasTime = !!(scheduled?.time)
   const isSingleScope = editScope === 'single'
-  const showRepeat = (hasDate || tracked) && !isSingleScope
+  const isNote = itemType === 'note'
+  // notes: no scheduling chips; events: date/time/duration + repeat (schedule only); tasks: everything
+  const showDateChip = !isNote
+  const showRepeat = !isNote && (hasDate || tracked) && !isSingleScope
   const priorityChipClass = ['pchip', !tracked ? 'hidden' : '', priority ? 'on' : '', priority ? PRIORITY_CLASS[priority] : ''].filter(Boolean).join(' ')
   const bodyKey = item ? `${item._nodeId || item.id || 'item'}-${item.date || ''}-${editScope}` : 'new'
 
@@ -157,26 +160,34 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         )}
 
         <div className="prop-chips">
-          <button className={`pchip${scheduled ? ' on' : ''}`} onClick={() => onOpenDlg('dlgSched')}>
-            <Calendar />Date
-            <span className="pchip-sum">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
-          </button>
-          <button className={`pchip${!hasDate ? ' hidden' : ''}${hasTime ? ' on' : ''}`} onClick={() => onOpenDlg('dlgTime')}>
-            <Clock />Time
-            <span className="pchip-sum">{hasTime ? scheduled!.time : ''}</span>
-          </button>
-          <button className={`pchip${!hasDate ? ' hidden' : ''}${duration ? ' on' : ''}`} onClick={() => onOpenDlg('dlgDur')}>
-            <Timer />Duration
-            <span className="pchip-sum">{duration}</span>
-          </button>
+          {showDateChip && (
+            <button className={`pchip${scheduled ? ' on' : ''}`} onClick={() => onOpenDlg('dlgSched')}>
+              <Calendar />Date
+              <span className="pchip-sum">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
+            </button>
+          )}
+          {showDateChip && (
+            <button className={`pchip${!hasDate ? ' hidden' : ''}${hasTime ? ' on' : ''}`} onClick={() => onOpenDlg('dlgTime')}>
+              <Clock />Time
+              <span className="pchip-sum">{hasTime ? scheduled!.time : ''}</span>
+            </button>
+          )}
+          {showDateChip && (
+            <button className={`pchip${!hasDate ? ' hidden' : ''}${duration ? ' on' : ''}`} onClick={() => onOpenDlg('dlgDur')}>
+              <Timer />Duration
+              <span className="pchip-sum">{duration}</span>
+            </button>
+          )}
           <button className={priorityChipClass} onClick={() => onOpenDlg('dlgPriority')}>
             <Flag />Priority
             <span className="pchip-sum">{priority ? PRIORITY_LABELS[priority] : ''}</span>
           </button>
-          <button className={`pchip${!showRepeat ? ' hidden' : ''}${repeat ? ' on' : ''}`} onClick={onOpenRepeatDlg}>
-            <Repeat />Repeat
-            <span className="pchip-sum">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
-          </button>
+          {showRepeat && (
+            <button className={`pchip${repeat ? ' on' : ''}`} onClick={() => onOpenRepeatDlg(itemType)}>
+              <Repeat />Repeat
+              <span className="pchip-sum">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
+            </button>
+          )}
         </div>
 
         <div className="entry-tags">

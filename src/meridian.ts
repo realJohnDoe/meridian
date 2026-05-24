@@ -575,8 +575,8 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
 }
 
 // ── DIALOGS ──────────────────────────────────────────────────
-export function openRepeatDlg({scheduled,tracked,repeat}: {scheduled: Scheduled|null; tracked: boolean; repeat: Repeat|null}): void {
-  const hasSched=!!scheduled,hasTrk=tracked;
+export function openRepeatDlg({scheduled,tracked,repeat,itemType}: {scheduled: Scheduled|null; tracked: boolean; repeat: Repeat|null; itemType?: string}): void {
+  const hasSched=!!scheduled,hasTrk=tracked&&itemType!=='event';
   const hint=document.getElementById('repeatHintText'),hintBox=document.getElementById('repeatHint');
   if(hasSched&&hasTrk){hint.textContent='Both Schedule and Track Completion are on. Choose a schedule pattern, or "After completion" to repeat when you check this done.';hintBox.style.display='flex';}
   else if(hasTrk&&!hasSched){hint.textContent='"After completion" repeats whenever you mark this done.';hintBox.style.display='flex';rdType='after_completion';}
