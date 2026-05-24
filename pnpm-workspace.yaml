@@ -1,7 +1,15 @@
 # pnpm 11+ project settings
+
+# ── Supply-chain protection ───────────────────────────────────────────────────
 #
-# allowBuilds: explicit allowlist for packages permitted to run install-time scripts.
-# Only add packages here after reviewing what the build script does.
+# minimumReleaseAge (minutes): pnpm refuses to install any package version
+# published less than N minutes ago. The pnpm 11 default is 1440 (24 h).
+# 4320 min = 3 days — gives the ecosystem time to flag hijacked releases before
+# they can land in this project.
+minimumReleaseAge: 4320
+
+# allowBuilds: explicit allowlist for packages permitted to run install-time
+# build scripts. Only add packages here after reviewing what the script does.
 # esbuild  – compiles its Go-based JS bundler binary; required for Vite
 # sharp    – compiles its libvips native image-processing binary; required for PWA icon gen
 allowBuilds:
