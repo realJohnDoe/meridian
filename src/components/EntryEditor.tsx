@@ -1,8 +1,10 @@
 import { useRef, useEffect } from 'react'
-import { ArrowLeft, Trash2, Check, Calendar, Clock, Timer, CircleCheck, Flag, Repeat, Plus } from 'lucide-react'
+import { ArrowLeft, Trash2, Check, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue } from '../types'
 
 export type { Scheduled }
+
+export type ItemType = 'task' | 'event' | 'note'
 
 export interface EntryState {
   item: Occurrence | null
@@ -11,6 +13,7 @@ export interface EntryState {
   scheduled: Scheduled | null
   duration: string
   tracked: boolean
+  itemType: ItemType
   repeat: RepeatValue | null
   done: boolean
   tags: string[]
@@ -25,6 +28,7 @@ export const ENTRY_DEFAULT: EntryState = {
   scheduled: null,
   duration: '',
   tracked: true,
+  itemType: 'task',
   repeat: null,
   done: false,
   tags: [],
@@ -59,7 +63,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
 
-  const { item, title, bodyHtml, scheduled, duration, tracked, repeat, done, tags, priority, editScope } = entry
+  const { item, title, bodyHtml, scheduled, duration, tracked, itemType, repeat, done, tags, priority, editScope } = entry
 
   const isRecur = !!(item && (item.recur || item._node?.repeat || item.repeat))
   const isScheduled = !!(item && (item._node?.repeat?.type === 'schedule' || item.repeat?.type === 'schedule'))
@@ -77,6 +81,15 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const bodyKey = item ? `${item._nodeId || item.id || 'item'}-${item.date || ''}-${editScope}` : 'new'
 
   const showScopeRow = isRecur || hasSched
+
+  function handleTypeChange(t: ItemType) {
+    onChange(prev => ({
+      ...prev,
+      itemType: t,
+      tracked: t === 'task',
+      priority: t !== 'task' ? null : prev.priority,
+    }))
+  }
 
   function handleScopeChange(scope: string) {
     onChange(prev => ({ ...prev, editScope: scope }))
@@ -99,12 +112,14 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       <div className="entry-sc"><div className="entry-pad">
 
         <div className="entry-title-row">
-          <div
-            className={['echk', tracked ? 'show' : '', done ? 'on' : ''].filter(Boolean).join(' ')}
-            onClick={() => onChange(prev => ({ ...prev, done: !prev.done }))}
-          >
-            <Check />
-          </div>
+          {tracked && (
+            <div
+              className={['echk', 'show', done ? 'on' : ''].filter(Boolean).join(' ')}
+              onClick={() => onChange(prev => ({ ...prev, done: !prev.done }))}
+            >
+              <Check />
+            </div>
+          )}
           <textarea
             ref={titleRef}
             className="entry-title-in"
@@ -113,6 +128,21 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
             value={title}
             onChange={e => { onChange(prev => ({ ...prev, title: e.target.value })); autoResize(e.target) }}
           />
+        </div>
+
+        <div className="type-chip-row">
+          {(['task', 'event', 'note'] as ItemType[]).map(t => (
+            <button
+              key={t}
+              className={`type-chip type-chip-${t}${itemType === t ? ' active' : ''}`}
+              onClick={() => handleTypeChange(t)}
+            >
+              {t === 'task' && <CheckSquare size={13} />}
+              {t === 'event' && <CalendarDays size={13} />}
+              {t === 'note' && <FileText size={13} />}
+              {t}
+            </button>
+          ))}
         </div>
 
         {showScopeRow && (
@@ -138,9 +168,6 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           <button className={`pchip${!hasDate ? ' hidden' : ''}${duration ? ' on' : ''}`} onClick={() => onOpenDlg('dlgDur')}>
             <Timer />Duration
             <span className="pchip-sum">{duration}</span>
-          </button>
-          <button className={`pchip${tracked ? ' on tc' : ''}`} onClick={() => onChange(prev => ({ ...prev, tracked: !prev.tracked, priority: prev.tracked ? null : prev.priority }))}>
-            <CircleCheck />Track Completion
           </button>
           <button className={priorityChipClass} onClick={() => onOpenDlg('dlgPriority')}>
             <Flag />Priority
