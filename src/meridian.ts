@@ -209,7 +209,7 @@ function goToday(){
   if(getCurView()==='day'){
     setDvDate(new Date(TODAY));buildDayView();
   } else if(getCurView()==='calendar'){
-    setCalMonth(new Date(TODAY.getFullYear(),TODAY.getMonth(),1));buildMonth();
+    setCalMonth(new Date(TODAY.getFullYear(),TODAY.getMonth(),1));
   } else {
     setSidebarActive('agenda');navTo('agenda',null);
     setTimeout(()=>{
@@ -284,7 +284,6 @@ export function toggleOccDone(o): void {
   }
   writeEntityToCache(node);
   setNodes([...getNodes()]);
-  buildMonth();
 }
 
 // ── SWIPE DELETE (exported for React components) ──────────────
@@ -300,29 +299,26 @@ export function swipeDeleteOcc(o): void {
     if(inst){inst.excluded=true;}
     else{node.instances.push({date:occDate,excluded:true});}
     setNodes([...getNodes()]);
-    buildMonth();
     showDeleteToast(title,
       ()=>{ writeEntityToCache(node); },
       ()=>{
         if(inst){delete inst.excluded;}
         else{node.instances=node.instances.filter(i=>!(i.date===occDate&&i.excluded&&!i.time));}
-        setNodes([...getNodes()]);buildMonth();
+        setNodes([...getNodes()]);
       }
     );
   } else {
     setNodes(getNodes().filter(n=>n.id!==nodeId));
-    buildMonth();
     showDeleteToast(title,
       ()=>{ deleteNodeFromDisk(node); },
       ()=>{
         setNodes([...getNodes(), node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
-        buildMonth();
       }
     );
   }
 }
 
-function ccBarClass(o){
+export function ccBarClass(o){
   if(o.multiday)return 'multiday';
   const s=occState(o);
   if(s==='done'||s==='event-past')return 'done';
@@ -347,41 +343,16 @@ function dvBlkClass(o){
 // AgendaView + OccurrenceRow handle rendering and animations in React.
 
 // ── MONTH ──────────────────────────────────────────────────────
-function buildMonth(){
-  const m=getCalMonth().getMonth(),y=getCalMonth().getFullYear();
-  document.getElementById('mTitle').innerHTML=`<em>${MONTHS[m]}</em> ${y}`;
-  document.getElementById('dowRow').innerHTML=DAYS.map(d=>`<div class="dow-c">${d}</div>`).join('');
-  const grid=document.getElementById('calGrid');grid.innerHTML='';
-  const rawFirst=new Date(y,m,1).getDay();
-  const first=(rawFirst+6)%7;
-  const dim=new Date(y,m+1,0).getDate(),prev=new Date(y,m,0).getDate();
+// buildMonth, makeCalCell, chMonth deleted.
+// MonthView (src/components/MonthView.tsx) subscribes to calMonth + nodes
+// and re-renders automatically — no manual DOM updates needed.
 
-  const from=new Date(y,m,1),to=new Date(y,m+1,0,23,59,59);
-  const occs=_expandRange(getNodes(),from,to);
-
-  for(let i=first-1;i>=0;i--)grid.appendChild(makeCalCell(new Date(y,m-1,prev-i),true,occs));
-  for(let d=1;d<=dim;d++)grid.appendChild(makeCalCell(new Date(y,m,d),false,occs));
-  const nc=(7-(first+dim)%7)%7;
-  for(let d=1;d<=nc;d++)grid.appendChild(makeCalCell(new Date(y,m+1,d),true,occs));
-  ic();
+/** Open the day view for a specific date. Called from MonthView cell clicks. */
+export function openDayViewForDate(date: Date): void {
+  setDvDate(date);
+  buildDayView();
+  pushView('day');
 }
-
-function makeCalCell(date,other,occs){
-  const isT=sameDay(date,TODAY);
-  const dayOccs=sortOccs((occs||[]).filter(o=>sameDay(o.jsTime,date)));
-  const cell=document.createElement('div');
-  cell.className=`cal-cell${other?' other':''}${isT?' istoday':''}`;
-  const seen=new Set();let bars='';
-  dayOccs.slice(0,4).forEach(o=>{
-    if(o.multiday){if(seen.has(o._nodeId))return;seen.add(o._nodeId);bars+=`<div class="cc-bar multiday">${escapeHtml(o.title)}</div>`;}
-    else bars+=`<div class="cc-bar ${ccBarClass(o)}">${escapeHtml(o.title)}</div>`;
-  });
-  if(dayOccs.length>4)bars+=`<div class="cc-more">+${dayOccs.length-4}</div>`;
-  cell.innerHTML=`<span class="ccn">${date.getDate()}</span><div class="cc-bars">${bars}</div>`;
-  cell.onclick=()=>{setDvDate(date);buildDayView();pushView('day');};
-  return cell;
-}
-function chMonth(d){const m=getCalMonth();setCalMonth(new Date(m.getFullYear(),m.getMonth()+d,1));buildMonth();}
 
 // ── DAY VIEW ──────────────────────────────────────────────────
 function buildDayView(){
@@ -560,7 +531,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     node.repeat=repeat||undefined;
     setNodes([...nodes, node]);
     writeEntityToCache(node);
-    buildMonth();closeEntry();
+    closeEntry();
     return;
   }
 
@@ -589,7 +560,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     if(tracked&&f.priority&&f.priority!==node.priority)newInst.priority=f.priority;
     node.instances.push(newInst);
     writeEntityToCache(node);
-    buildMonth();closeEntry();
+    closeEntry();
     return;
   }
 
@@ -660,7 +631,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
   }
 
   setNodes([...nodes]); // notify store (node mutated in place)
-  buildMonth();closeEntry();
+  closeEntry();
 }
 
 export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHideSeries?: ()=>void): void {
@@ -682,12 +653,12 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
     if(inst){inst.excluded=true;}
     else{node.instances.push({date:occDate,excluded:true});}
     writeEntityToCache(node);
-    hideSheet();buildMonth();closeEntry();
+    hideSheet();closeEntry();
   }
   function deleteAll(){
     setNodes(getNodes().filter(n=>n.id!==nodeId));
     deleteNodeFromDisk(node);
-    hideSheet();buildMonth();closeEntry();
+    hideSheet();closeEntry();
   }
   function deleteAllFuture(){
     // Cap the series at the day before occDate; exclude any future manual instances
@@ -699,7 +670,7 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
       node.instances.forEach(i=>{if(i.date&&i.date>=occDate&&!i.excluded)i.excluded=true;});
     }
     writeEntityToCache(node);
-    hideSheet();buildMonth();closeEntry();
+    hideSheet();closeEntry();
   }
 
   const opt3=document.getElementById('seriesOpt3') as HTMLElement|null;
@@ -709,7 +680,7 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
     if(!confirm(`Delete "${node.title}"?`))return;
     setNodes(getNodes().filter(n=>n.id!==nodeId));
     deleteNodeFromDisk(node);
-    buildMonth();closeEntry();
+    closeEntry();
     return;
   }
 
@@ -1086,7 +1057,7 @@ async function pickDirectory(){
       try{const node=fileToNode(path, content);if(node.title)loaded.push(node);}catch(e){console.warn('[storage] parse failed for', path, e);}
     }
     setNodes(loaded);
-    buildMonth();updateSyncUI();
+    updateSyncUI();
     setTimeout(()=>goToday(),100);
   }catch(e){
     if(e.name==='AbortError')return;
@@ -1116,7 +1087,6 @@ async function loadFromDirectory(){
     try{const node=fileToNode(path, content);if(node.title)loaded.push(node);}catch(e){}
   }
   setNodes(loaded);
-  buildMonth();
 }
 async function initDexie(){return cacheInit();}
 
@@ -1124,8 +1094,8 @@ async function initDexie(){return cacheInit();}
 export function initApp(): void {
   setNodes(SEED_NODES);
   ic();
-  buildMonth();
-  addSwipe(document.getElementById('view-calendar'),()=>chMonth(1),()=>chMonth(-1));
+  // Month calendar navigation is now handled by MonthView (React).
+  // Swipe on the day-view timeline still needs vanilla handling.
   addSwipe(document.getElementById('dvTl'),()=>dvNav(1),()=>dvNav(-1));
   // Scroll-to-today in the agenda is handled by AgendaView on mount.
 }
@@ -1137,6 +1107,5 @@ Object.assign(window as any, {
   openSidebar, closeSidebar, sidebarNav,
   closeDayView, dvNav,
   syncToDirectory, pickDirectory, goToday, openSearch, closeSearch,
-  chMonth,
   filterNS, setNSF,
 });

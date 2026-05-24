@@ -10,9 +10,11 @@ import {
   applyScope, buildBodyHtml,
   saveNode, deleteNode, closeEntry, pushView,
   openRepeatDlg, buildRepeatValue,
+  openDayViewForDate,
 } from './meridian'
 import EntryEditor, { EntryState, ENTRY_DEFAULT } from './components/EntryEditor'
 import AgendaView from './components/AgendaView'
+import MonthView from './components/MonthView'
 import type { Occurrence, Priority } from './types'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
@@ -193,17 +195,7 @@ export default function App() {
 
         {/* MONTH */}
         <section className="view" id="view-calendar">
-          <div className="cal-wrap">
-            <div className="cal-hdr">
-              <div className="cal-mt" id="mTitle"></div>
-              <div className="mnav">
-                <button className="mnb" onClick={() => (window as any).chMonth(-1)}><ChevronLeft /></button>
-                <button className="mnb" onClick={() => (window as any).chMonth(1)}><ChevronRight /></button>
-              </div>
-            </div>
-            <div className="dow-row" id="dowRow"></div>
-            <div className="cal-grid-wrap"><div className="cal-grid" id="calGrid"></div></div>
-          </div>
+          <MonthView onDayClick={openDayViewForDate} />
         </section>
 
         {/* DAY */}
