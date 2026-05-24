@@ -1,0 +1,9 @@
+# pnpm 11+ project settings
+#
+# allowBuilds: explicit allowlist for packages permitted to run install-time scripts.
+# Only add packages here after reviewing what the build script does.
+# esbuild  – compiles its Go-based JS bundler binary; required for Vite
+# sharp    – compiles its libvips native image-processing binary; required for PWA icon gen
+allowBuilds:
+  esbuild: true
+  sharp: true
