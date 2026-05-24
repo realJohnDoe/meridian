@@ -4,7 +4,7 @@
     {
       "name": "meridian",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev", "--", "--host"],
       "port": 5173
     }
   ]
