@@ -13,7 +13,8 @@
   --p1:#f87171;--p2:#fb923c;--p3:#facc15;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden;background:var(--bg0)}
+html{height:var(--app-h,100%);overflow:hidden;background:var(--bg0)}
+body{height:100%;overflow:hidden;background:var(--bg0)}
 body{color:var(--t0);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,textarea,select{font-family:inherit}
@@ -72,7 +73,8 @@ input,textarea,select{font-family:inherit}
 .sni:hover{background:var(--bg3)}
 
 /* ── SEARCH BAR (replaces FAB) ── */
-.search-bar-wrap{flex:1;display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:24px;padding:0 6px 0 14px;height:46px;box-shadow:0 4px 24px rgba(0,0,0,.4);pointer-events:all}
+.search-bar-wrap{flex:1;display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid rgba(148,163,184,.18);border-radius:26px;padding:0 6px 0 14px;height:48px;box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 40px rgba(99,102,241,.18),0 0 0 1px rgba(129,140,248,.06);pointer-events:all;transition:box-shadow .2s,border-color .2s}
+.search-bar-wrap:focus-within{border-color:rgba(129,140,248,.35);box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 44px rgba(99,102,241,.3),0 0 0 1px rgba(129,140,248,.18)}
 .search-bar-icon{width:15px;height:15px;stroke:var(--t3);fill:none;stroke-width:2;flex-shrink:0}
 .search-bar-input{flex:1;background:none;border:none;outline:none;color:var(--t0);font-size:14px;min-width:0}
 .search-bar-input::placeholder{color:var(--t3)}
