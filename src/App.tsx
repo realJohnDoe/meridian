@@ -10,9 +10,16 @@ import {
   applyScope, buildBodyHtml,
   saveNode, deleteNode, closeEntry, pushView,
   openRepeatDlg, buildRepeatValue,
+  openDayViewForDate,
+  addDays, fmtLong,
 } from './meridian'
+import { useStore } from './store'
 import EntryEditor, { EntryState, ENTRY_DEFAULT } from './components/EntryEditor'
 import AgendaView from './components/AgendaView'
+import MonthView from './components/MonthView'
+import DayView from './components/DayView'
+import SearchView from './components/SearchView'
+import FilterOverlay from './components/FilterOverlay'
 import type { Occurrence, Priority } from './types'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
@@ -47,12 +54,17 @@ export default function App() {
   const [dlgDateVal, setDlgDateVal] = useState('')
   const [dlgTimeVal, setDlgTimeVal] = useState('')
   const [dlgDurVal, setDlgDurVal] = useState('')
+  const [filterQuery, setFilterQuery] = useState('')
+
+  const dvDate    = useStore(s => s.dvDate)
+  const setDvDate = useStore(s => s.setDvDate)
 
   useEffect(() => {
     // ONE global: lets vanilla JS agenda/search rows open the editor
-    ;(window as any).openEntry = (item: any, scope?: string) => {
+    ;(window as any).openEntry = (item: any, scope?: string, prefillTitle?: string) => {
       const editScope = scope ?? (item ? 'single' : 'all')
-      setEntry(entryFromItem(item, editScope))
+      const state = entryFromItem(item, editScope)
+      setEntry(prefillTitle && !item ? { ...state, title: prefillTitle } : state)
       pushView('entry')
     }
     document.addEventListener('input', wikilinkInputHandler as EventListener)
@@ -168,9 +180,9 @@ export default function App() {
           </div>
           <div className="tb-l" id="tbDay" style={{display:'none',flex:1,gap:4,overflow:'hidden'}}>
             <button className="ib" onClick={() => (window as any).closeDayView()}><ArrowLeft /></button>
-            <span id="dvTitle" style={{flex:1,fontFamily:'var(--disp)',fontStyle:'italic',fontSize:15,color:'var(--t0)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}></span>
-            <button className="ib" onClick={() => (window as any).dvNav(-1)}><ChevronLeft /></button>
-            <button className="ib" onClick={() => (window as any).dvNav(1)}><ChevronRight /></button>
+            <span style={{flex:1,fontFamily:'var(--disp)',fontStyle:'italic',fontSize:15,color:'var(--t0)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{fmtLong(dvDate)}</span>
+            <button className="ib" onClick={() => setDvDate(addDays(dvDate, -1))}><ChevronLeft /></button>
+            <button className="ib" onClick={() => setDvDate(addDays(dvDate, 1))}><ChevronRight /></button>
           </div>
           <div className="tb-r">
             <button className="ib" id="syncBtn" onClick={() => (window as any).syncToDirectory()} title="Sync"><FolderSync /></button>
@@ -193,39 +205,28 @@ export default function App() {
 
         {/* MONTH */}
         <section className="view" id="view-calendar">
-          <div className="cal-wrap">
-            <div className="cal-hdr">
-              <div className="cal-mt" id="mTitle"></div>
-              <div className="mnav">
-                <button className="mnb" onClick={() => (window as any).chMonth(-1)}><ChevronLeft /></button>
-                <button className="mnb" onClick={() => (window as any).chMonth(1)}><ChevronRight /></button>
-              </div>
-            </div>
-            <div className="dow-row" id="dowRow"></div>
-            <div className="cal-grid-wrap"><div className="cal-grid" id="calGrid"></div></div>
-          </div>
+          <MonthView onDayClick={openDayViewForDate} />
         </section>
 
         {/* DAY */}
         <section className="view" id="view-day">
-          <div className="dv-allday" id="dvAllDay" style={{display:'none'}}></div>
-          <div className="dv-sc" id="dvSc"><div className="dv-tl" id="dvTl"></div></div>
+          <DayView onOpen={(occ: Occurrence, scope?: string) => {
+            const editScope = scope ?? 'single'
+            setEntry(entryFromItem(occ, editScope))
+            pushView('entry')
+          }} />
         </section>
 
         {/* SEARCH */}
         <section className="view" id="view-search">
-          <div className="entry-top">
-            <button className="ib" onClick={() => (window as any).closeSearch()}><ArrowLeft /></button>
-            <span className="entry-fname">Search</span>
-          </div>
-          <div className="ns-bar"><Search /><input id="nsIn" type="text" placeholder="Search notes, tasks, events…" onInput={() => (window as any).filterNS()} /></div>
-          <div className="ns-filters">
-            <button className="fchip on" onClick={(e) => (window as any).setNSF('all', e.currentTarget)}>All</button>
-            <button className="fchip" onClick={(e) => (window as any).setNSF('event', e.currentTarget)}>Events</button>
-            <button className="fchip" onClick={(e) => (window as any).setNSF('task', e.currentTarget)}>Tasks</button>
-            <button className="fchip" onClick={(e) => (window as any).setNSF('note', e.currentTarget)}>Notes</button>
-          </div>
-          <div className="ns-sc"><div className="ns-pad" id="nsList"></div></div>
+          <SearchView
+            onOpen={(item: any, scope?: string) => {
+              const editScope = scope ?? (item?._node ? 'single' : 'all')
+              setEntry(entryFromItem(item, editScope))
+              pushView('entry')
+            }}
+            onClose={() => (window as any).closeSearch()}
+          />
         </section>
 
         {/* ENTRY */}
@@ -256,9 +257,51 @@ export default function App() {
           </div>
         </div>
 
-        {/* FAB */}
+        {/* FILTER OVERLAY — sits above views, below topbar and search bar */}
+        <FilterOverlay
+          query={filterQuery}
+          onOpen={(occ: Occurrence) => {
+            setEntry(entryFromItem(occ, 'single'))
+            pushView('entry')
+          }}
+          onCreate={(title: string) => {
+            ;(window as any).openEntry(null, undefined, title)
+            setFilterQuery('')
+          }}
+        />
+
+        {/* SEARCH BAR (replaces FAB) */}
         <div className="bottom-float" id="bottomFloat">
-          <button className="fab" id="fab" onClick={() => (window as any).openEntry(null)} style={{marginLeft:'auto',pointerEvents:'all'}}><Plus /></button>
+          <div className="search-bar-wrap">
+            <Search size={15} className="search-bar-icon" />
+            <input
+              id="filterInput"
+              className="search-bar-input"
+              placeholder="Search or create…"
+              value={filterQuery}
+              onChange={e => setFilterQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && filterQuery) {
+                  ;(window as any).openEntry(null, undefined, filterQuery)
+                  setFilterQuery('')
+                }
+              }}
+            />
+            {filterQuery && (
+              <button className="search-bar-clear" onClick={() => setFilterQuery('')}>
+                <X size={13} />
+              </button>
+            )}
+            <button
+              className="search-bar-add"
+              onClick={() => {
+                ;(window as any).openEntry(null, undefined, filterQuery || undefined)
+                if (filterQuery) setFilterQuery('')
+              }}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
         </div>
 
       </div>{/* end #app */}

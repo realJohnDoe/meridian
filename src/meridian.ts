@@ -1,6 +1,6 @@
 // @ts-nocheck
 import Dexie from 'dexie'
-import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar } from 'lucide'
+import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar, Plus } from 'lucide'
 import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './recurrence'
 import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode, titleToSlug } from './yaml'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
@@ -117,7 +117,7 @@ const SEED_NODES: Node[] = [
   {id:'q3-plan',        title:'Q3 Planning',           tags:['work'],          date:'2026-07-20', done:false},
 ];
 
-const NOTES_DATA=[
+export const NOTES_DATA=[
   {title:'Project Alpha',preview:'Core objectives for Q3. Launch by end of July.',date:'May 12',tags:['work'],type:'note'},
   {title:'Reading List',preview:'Books: SICP, TAOCP vol 1.',date:'May 10',tags:['personal'],type:'note'},
   {title:'Spec: Instance Recurrence',preview:'v0.8 — Draft. Human-readable YAML-native recurrence model.',date:'May 13',tags:['project'],type:'note'},
@@ -136,7 +136,8 @@ export const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeri
 export const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 function escapeHtml(s:string):string{return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar}});}
+function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar,Plus}});}
+
 
 // ── NAVIGATION ──────────────────────────────────────────────────
 function openSidebar(){
@@ -179,7 +180,7 @@ export function pushView(name: string): void {
     document.getElementById('tbDefault').style.display='none';
     document.getElementById('tbDay').style.display='flex';
     document.getElementById('mainTop').style.display='';
-    document.getElementById('bottomFloat').style.display='none';
+    document.getElementById('bottomFloat').style.display='';
     setSidebarActive('calendar');
   } else {
     document.getElementById('mainTop').style.display='none';
@@ -207,9 +208,9 @@ function hideChrome(){
 
 function goToday(){
   if(getCurView()==='day'){
-    setDvDate(new Date(TODAY));buildDayView();
+    setDvDate(new Date(TODAY));
   } else if(getCurView()==='calendar'){
-    setCalMonth(new Date(TODAY.getFullYear(),TODAY.getMonth(),1));buildMonth();
+    setCalMonth(new Date(TODAY.getFullYear(),TODAY.getMonth(),1));
   } else {
     setSidebarActive('agenda');navTo('agenda',null);
     setTimeout(()=>{
@@ -218,11 +219,11 @@ function goToday(){
     },60);
   }
 }
-function openSearch(){setPrevView(getCurView());pushView('search');buildNS();setTimeout(()=>{document.getElementById('nsIn').focus();ic();},100);}
+function openSearch(){setPrevView(getCurView());pushView('search');setTimeout(()=>{(window as any)._focusSearch?.();},50);}
 function closeSearch(){popView();}
-function openLastDay(){setDvDate(new Date(TODAY));buildDayView();pushView('day');}
+function openLastDay(){setDvDate(new Date(TODAY));pushView('day');}
 function closeDayView(){popView();}
-function dvNav(d){setDvDate(addDays(getDvDate(),d));buildDayView();}
+function dvNav(d){setDvDate(addDays(getDvDate(),d));}
 
 // ── SHARED OCCURRENCE SORT ────────────────────────────────────
 const _prioOrder={high:0,medium:1,low:2};
@@ -247,6 +248,7 @@ export function sortOccs(arr){
 // findOccWrapInAgenda(), removeOccWrapFromAgenda() are deleted.
 // AgendaView (src/components/AgendaView.tsx) subscribes to the Zustand store
 // and re-renders automatically whenever nodes change.
+// Filtering is handled via useStore's filterQuery field.
 
 export function occState(o){
   if(o.done)return 'done';
@@ -284,7 +286,6 @@ export function toggleOccDone(o): void {
   }
   writeEntityToCache(node);
   setNodes([...getNodes()]);
-  buildMonth();
 }
 
 // ── SWIPE DELETE (exported for React components) ──────────────
@@ -300,29 +301,26 @@ export function swipeDeleteOcc(o): void {
     if(inst){inst.excluded=true;}
     else{node.instances.push({date:occDate,excluded:true});}
     setNodes([...getNodes()]);
-    buildMonth();
     showDeleteToast(title,
       ()=>{ writeEntityToCache(node); },
       ()=>{
         if(inst){delete inst.excluded;}
         else{node.instances=node.instances.filter(i=>!(i.date===occDate&&i.excluded&&!i.time));}
-        setNodes([...getNodes()]);buildMonth();
+        setNodes([...getNodes()]);
       }
     );
   } else {
     setNodes(getNodes().filter(n=>n.id!==nodeId));
-    buildMonth();
     showDeleteToast(title,
       ()=>{ deleteNodeFromDisk(node); },
       ()=>{
         setNodes([...getNodes(), node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
-        buildMonth();
       }
     );
   }
 }
 
-function ccBarClass(o){
+export function ccBarClass(o){
   if(o.multiday)return 'multiday';
   const s=occState(o);
   if(s==='done'||s==='event-past')return 'done';
@@ -332,187 +330,20 @@ function ccBarClass(o){
   if(s==='task-p3')return 'task-p3';
   return 'event';
 }
-function dvBlkClass(o){
-  const s=occState(o);
-  if(s==='done'||s==='event-past')return 'past';
-  if(s==='task-open')return 'task';
-  if(s==='task-p1')return 'task-p1';
-  if(s==='task-p2')return 'task-p2';
-  if(s==='task-p3')return 'task-p3';
-  return 'event';
-}
-
 // makeOccRow, toggleOccDone (DOM), findOccWrapInAgenda, removeOccWrapFromAgenda,
 // insertOccIntoAgenda, flipResortSection all deleted.
 // AgendaView + OccurrenceRow handle rendering and animations in React.
 
 // ── MONTH ──────────────────────────────────────────────────────
-function buildMonth(){
-  const m=getCalMonth().getMonth(),y=getCalMonth().getFullYear();
-  document.getElementById('mTitle').innerHTML=`<em>${MONTHS[m]}</em> ${y}`;
-  document.getElementById('dowRow').innerHTML=DAYS.map(d=>`<div class="dow-c">${d}</div>`).join('');
-  const grid=document.getElementById('calGrid');grid.innerHTML='';
-  const rawFirst=new Date(y,m,1).getDay();
-  const first=(rawFirst+6)%7;
-  const dim=new Date(y,m+1,0).getDate(),prev=new Date(y,m,0).getDate();
+// buildMonth, makeCalCell, chMonth deleted.
+// MonthView (src/components/MonthView.tsx) subscribes to calMonth + nodes
+// and re-renders automatically — no manual DOM updates needed.
 
-  const from=new Date(y,m,1),to=new Date(y,m+1,0,23,59,59);
-  const occs=_expandRange(getNodes(),from,to);
-
-  for(let i=first-1;i>=0;i--)grid.appendChild(makeCalCell(new Date(y,m-1,prev-i),true,occs));
-  for(let d=1;d<=dim;d++)grid.appendChild(makeCalCell(new Date(y,m,d),false,occs));
-  const nc=(7-(first+dim)%7)%7;
-  for(let d=1;d<=nc;d++)grid.appendChild(makeCalCell(new Date(y,m+1,d),true,occs));
-  ic();
+/** Open the day view for a specific date. Called from MonthView cell clicks. */
+export function openDayViewForDate(date: Date): void {
+  setDvDate(date);
+  pushView('day');
 }
-
-function makeCalCell(date,other,occs){
-  const isT=sameDay(date,TODAY);
-  const dayOccs=sortOccs((occs||[]).filter(o=>sameDay(o.jsTime,date)));
-  const cell=document.createElement('div');
-  cell.className=`cal-cell${other?' other':''}${isT?' istoday':''}`;
-  const seen=new Set();let bars='';
-  dayOccs.slice(0,4).forEach(o=>{
-    if(o.multiday){if(seen.has(o._nodeId))return;seen.add(o._nodeId);bars+=`<div class="cc-bar multiday">${escapeHtml(o.title)}</div>`;}
-    else bars+=`<div class="cc-bar ${ccBarClass(o)}">${escapeHtml(o.title)}</div>`;
-  });
-  if(dayOccs.length>4)bars+=`<div class="cc-more">+${dayOccs.length-4}</div>`;
-  cell.innerHTML=`<span class="ccn">${date.getDate()}</span><div class="cc-bars">${bars}</div>`;
-  cell.onclick=()=>{setDvDate(date);buildDayView();pushView('day');};
-  return cell;
-}
-function chMonth(d){const m=getCalMonth();setCalMonth(new Date(m.getFullYear(),m.getMonth()+d,1));buildMonth();}
-
-// ── DAY VIEW ──────────────────────────────────────────────────
-function buildDayView(){
-  document.getElementById('dvTitle').textContent=fmtLong(getDvDate());
-  const from=new Date(getDvDate());from.setHours(0,0,0,0);
-  const to=new Date(getDvDate());to.setHours(23,59,59);
-  const occs=_expandRange(getNodes(),from,to);
-  const allday=occs.filter(o=>!fmtT(o.time)||o.multiday);
-  const timed=occs.filter(o=>!!fmtT(o.time)&&!o.multiday);
-
-  sortOccs(allday);
-  sortOccs(timed);
-
-  const ad=document.getElementById('dvAllDay');
-  if(allday.length){
-    ad.style.display='';
-    const seen=new Set();
-    ad.innerHTML=`<div class="dv-adlbl">All day</div>`;
-    allday.forEach(o=>{
-      if(o.multiday&&seen.has(o._nodeId))return;
-      if(o.multiday)seen.add(o._nodeId);
-      const hasTrack=o.done!==undefined;
-      const it=document.createElement('div');
-      it.className=`dv-aditem ${o.multiday?'multiday':dvBlkClass(o)}`;
-      const chkHtml=hasTrack?`<div class="dv-chk${o.done?' done':''}"><i data-lucide="check"></i></div>`:'';
-      it.innerHTML=chkHtml+`<span>${escapeHtml(o.title)}</span>`;
-      it.onclick=()=>openEntry(o);
-      ad.appendChild(it);
-    });
-  } else {ad.style.display='none';}
-
-  const tl=document.getElementById('dvTl');tl.innerHTML='';
-  const SH=7,EH=22,HP=56;
-  for(let h=SH;h<=EH;h++){
-    const row=document.createElement('div');row.className='dv-hr';
-    row.innerHTML=`<span class="dv-hlbl">${h<12?h+'am':h===12?'12pm':(h-12)+'pm'}</span><div class="dv-hline"></div>`;
-    tl.appendChild(row);
-  }
-  if(sameDay(getDvDate(),TODAY)){
-    const now=new Date(),nh=now.getHours()+now.getMinutes()/60;
-    if(nh>=SH&&nh<=EH){
-      const nl=document.createElement('div');nl.className='now-line';nl.style.top=((nh-SH)*HP)+'px';nl.innerHTML='<div class="now-dot"></div>';tl.appendChild(nl);
-    }
-  }
-
-  function computeColumns(events){
-    const sorted=[...events].sort((a,b)=>a.jsTime-b.jsTime);
-    const cols=[];
-    for(const ev of sorted){
-      const dh=parseDurationHours(ev.duration);
-      const endMs=ev.jsTime.getTime()+dh*3600000;
-      ev._dh=dh;ev._endMs=endMs;
-      let placed=false;
-      for(const col of cols){
-        const last=col[col.length-1];
-        if(ev.jsTime.getTime()>=last._endMs){col.push(ev);placed=true;break;}
-      }
-      if(!placed)cols.push([ev]);
-    }
-    return cols;
-  }
-
-  const cols=computeColumns(timed);
-  const totalCols=Math.max(cols.length,1);
-  const tlLeft=50;
-  cols.forEach((col,ci)=>{
-    col.forEach(o=>{
-      const h=o.jsTime.getHours()+o.jsTime.getMinutes()/60;
-      if(h<SH||h>EH)return;
-      const blk=document.createElement('div');
-      blk.className=`dv-eblk ${dvBlkClass(o)}`;
-      blk.style.top=((h-SH)*HP+1)+'px';
-      blk.style.height=Math.max(o._dh*HP-4,28)+'px';
-      blk.dataset.col=ci;
-      blk.dataset.totalCols=totalCols;
-      const hasTrack=o.done!==undefined;
-      const chkHtml=hasTrack?`<div class="dv-blk-chk${o.done?' done':''}"><i data-lucide="check"></i></div>`:'';
-      blk.innerHTML=`<div class="dv-et">${chkHtml}${escapeHtml(o.title)}</div><div class="dv-em">${fmtT(o.time)}${o.duration?' · '+escapeHtml(o.duration):''}</div>`;
-      blk.onclick=()=>openEntry(o);
-      tl.appendChild(blk);
-    });
-  });
-  requestAnimationFrame(()=>{
-    const tlW=tl.getBoundingClientRect().width||380;
-    const avail=tlW-tlLeft-6;
-    tl.querySelectorAll('.dv-eblk').forEach(blk=>{
-      const ci=parseInt(blk.dataset.col||0);
-      const tc=parseInt(blk.dataset.totalCols||1);
-      blk.style.left=(tlLeft+ci*Math.floor(avail/tc))+'px';
-      blk.style.right='';
-      blk.style.width=(Math.floor(avail/tc)-3)+'px';
-    });
-    ic();
-  });
-  setTimeout(()=>document.getElementById('dvSc').scrollTo({top:(8-SH)*HP,behavior:'instant'}),50);
-  ic();
-}
-
-// ── SEARCH ──────────────────────────────────────────────────────
-function buildNS(filter,q=''){
-  if(filter!==undefined)setNsFilter(filter);
-  const list=document.getElementById('nsList');list.innerHTML='';
-  const q2=(q||document.getElementById('nsIn')?.value||'').toLowerCase();
-  const occs=_expandRange(getNodes(),addDays(TODAY,-30),addDays(TODAY,90));
-  const seen=new Set();
-  const allItems=[
-    ...NOTES_DATA,
-    ...occs.filter(o=>{if(seen.has(o._nodeId||o.title))return false;seen.add(o._nodeId||o.title);return true;})
-      .map(o=>({title:o.title,preview:o.body||'',date:fmtShort(o.jsTime),tags:o.tags||[],type:o.type,_node:o._node||o}))
-  ];
-  const filtered=allItems.filter(it=>{
-    if(getNsFilter()!=='all'&&it.type!==getNsFilter())return false;
-    if(q2&&!it.title.toLowerCase().includes(q2)&&!it.preview.toLowerCase().includes(q2)&&!it.tags.some(t=>t.includes(q2)))return false;
-    return true;
-  });
-  if(!filtered.length){list.innerHTML=`<div style="padding:40px 14px;text-align:center;color:var(--t3);font-size:13px">No results</div>`;return;}
-  const grps={event:[],task:[],note:[]};
-  filtered.forEach(it=>{if(grps[it.type])grps[it.type].push(it);});
-  const order=getNsFilter()==='all'?['event','task','note']:[getNsFilter()];
-  order.forEach(t=>{
-    const items=grps[t]||[];if(!items.length)return;
-    if(getNsFilter()==='all'){const l=document.createElement('div');l.className='ns-sec';l.textContent=t==='event'?'Events':t==='task'?'Tasks':'Notes';list.appendChild(l);}
-    items.forEach(it=>{
-      const row=document.createElement('div');row.className='note-row';
-      row.innerHTML=`<div class="nr-t">${escapeHtml(it.title)}</div><div class="nr-p">${escapeHtml(it.preview||'')}</div><div class="nr-m"><span class="nr-d">${it.date}</span>${(it.tags||[]).slice(0,2).map(t=>`<span class="otag">${escapeHtml(t)}</span>`).join('')}</div>`;
-      row.onclick=()=>openEntry(it._node?it:it);list.appendChild(row);
-    });
-  });
-}
-function filterNS(){buildNS(getNsFilter());}
-function setNSF(f,btn){document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('on'));btn.classList.add('on');buildNS(f);}
 
 // ── ENTRY EDITOR ──────────────────────────────────────────────
 function openEntry(item){ (window as any).openEntry(item) }
@@ -560,7 +391,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     node.repeat=repeat||undefined;
     setNodes([...nodes, node]);
     writeEntityToCache(node);
-    buildMonth();closeEntry();
+    closeEntry();
     return;
   }
 
@@ -589,7 +420,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     if(tracked&&f.priority&&f.priority!==node.priority)newInst.priority=f.priority;
     node.instances.push(newInst);
     writeEntityToCache(node);
-    buildMonth();closeEntry();
+    closeEntry();
     return;
   }
 
@@ -660,7 +491,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
   }
 
   setNodes([...nodes]); // notify store (node mutated in place)
-  buildMonth();closeEntry();
+  closeEntry();
 }
 
 export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHideSeries?: ()=>void): void {
@@ -682,12 +513,12 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
     if(inst){inst.excluded=true;}
     else{node.instances.push({date:occDate,excluded:true});}
     writeEntityToCache(node);
-    hideSheet();buildMonth();closeEntry();
+    hideSheet();closeEntry();
   }
   function deleteAll(){
     setNodes(getNodes().filter(n=>n.id!==nodeId));
     deleteNodeFromDisk(node);
-    hideSheet();buildMonth();closeEntry();
+    hideSheet();closeEntry();
   }
   function deleteAllFuture(){
     // Cap the series at the day before occDate; exclude any future manual instances
@@ -699,7 +530,7 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
       node.instances.forEach(i=>{if(i.date&&i.date>=occDate&&!i.excluded)i.excluded=true;});
     }
     writeEntityToCache(node);
-    hideSheet();buildMonth();closeEntry();
+    hideSheet();closeEntry();
   }
 
   const opt3=document.getElementById('seriesOpt3') as HTMLElement|null;
@@ -709,7 +540,7 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
     if(!confirm(`Delete "${node.title}"?`))return;
     setNodes(getNodes().filter(n=>n.id!==nodeId));
     deleteNodeFromDisk(node);
-    buildMonth();closeEntry();
+    closeEntry();
     return;
   }
 
@@ -1086,7 +917,7 @@ async function pickDirectory(){
       try{const node=fileToNode(path, content);if(node.title)loaded.push(node);}catch(e){console.warn('[storage] parse failed for', path, e);}
     }
     setNodes(loaded);
-    buildMonth();updateSyncUI();
+    updateSyncUI();
     setTimeout(()=>goToday(),100);
   }catch(e){
     if(e.name==='AbortError')return;
@@ -1116,7 +947,6 @@ async function loadFromDirectory(){
     try{const node=fileToNode(path, content);if(node.title)loaded.push(node);}catch(e){}
   }
   setNodes(loaded);
-  buildMonth();
 }
 async function initDexie(){return cacheInit();}
 
@@ -1124,9 +954,7 @@ async function initDexie(){return cacheInit();}
 export function initApp(): void {
   setNodes(SEED_NODES);
   ic();
-  buildMonth();
-  addSwipe(document.getElementById('view-calendar'),()=>chMonth(1),()=>chMonth(-1));
-  addSwipe(document.getElementById('dvTl'),()=>dvNav(1),()=>dvNav(-1));
+  // Month calendar, Day view, Search, and Filter overlay are all React components.
   // Scroll-to-today in the agenda is handled by AgendaView on mount.
 }
 
@@ -1137,6 +965,4 @@ Object.assign(window as any, {
   openSidebar, closeSidebar, sidebarNav,
   closeDayView, dvNav,
   syncToDirectory, pickDirectory, goToday, openSearch, closeSearch,
-  chMonth,
-  filterNS, setNSF,
 });
