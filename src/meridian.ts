@@ -206,7 +206,7 @@ export function pushView(name: string): void {
     document.getElementById('tbDefault').style.display='none';
     document.getElementById('tbDay').style.display='flex';
     document.getElementById('mainTop').style.display='';
-    document.getElementById('bottomFloat').style.display='none';
+    document.getElementById('bottomFloat').style.display='';
     setSidebarActive('calendar');
   } else {
     document.getElementById('mainTop').style.display='none';
@@ -391,7 +391,7 @@ function buildFilteredAgenda(query:string){
   overlay.appendChild(createRow);
 
   const from=addDays(TODAY,-7),to=addDays(TODAY,90);
-  const occs=_expandRange(NODES,from,to);
+  const occs=_expandRange(getNodes(),from,to);
   const filtered=occs
     .filter(o=>fuzzyMatch(query,o.title))
     .map(o=>({occ:o,score:fuzzyScore(query,o.title)}))
