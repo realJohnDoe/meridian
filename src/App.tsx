@@ -12,7 +12,8 @@ import {
   openRepeatDlg, buildRepeatValue,
 } from './meridian'
 import EntryEditor, { EntryState, ENTRY_DEFAULT } from './components/EntryEditor'
-import type { Priority } from './types'
+import AgendaView from './components/AgendaView'
+import type { Occurrence, Priority } from './types'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 function fmtISO(d: Date) {
@@ -58,6 +59,11 @@ export default function App() {
     document.addEventListener('keydown', wikilinkKeydownHandler as EventListener)
     document.addEventListener('click', wikilinkClickHandler as EventListener)
     initApp()
+    // Scroll agenda to today after AgendaView has rendered its sections.
+    setTimeout(() => {
+      const sec = document.querySelector(`.day-section[data-key="${TODAY.getFullYear()}-${String(TODAY.getMonth()+1).padStart(2,'0')}-${String(TODAY.getDate()).padStart(2,'0')}"]`)
+      if (sec) sec.scrollIntoView({ behavior: 'instant', block: 'start' })
+    }, 200)
     return () => {
       document.removeEventListener('input', wikilinkInputHandler as EventListener)
       document.removeEventListener('keydown', wikilinkKeydownHandler as EventListener)
@@ -176,7 +182,13 @@ export default function App() {
 
         {/* AGENDA */}
         <section className="view active" id="view-agenda">
-          <div className="ag-sc" id="agSc"><div className="ag-pad" id="agContent"></div></div>
+          <div className="ag-sc" id="agSc">
+            <AgendaView onOpen={(occ: Occurrence, scope?: string) => {
+              const editScope = scope ?? 'single'
+              setEntry(entryFromItem(occ, editScope))
+              pushView('entry')
+            }} />
+          </div>
         </section>
 
         {/* MONTH */}

@@ -129,11 +129,11 @@ const NOTES_DATA=[
 let rdType=null,rdWdays=[false,false,false,false,false,false,false],rdMonthly='first-weekday',rdEndType='never',rdEndVal='',rdInterval='1 day';
 
 // ── UTILS ──────────────────────────────────────────────────────
-const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
-const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r};
-const fmtLong=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
-const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+export const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+export const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r};
+export const fmtLong=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+export const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+export const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 function escapeHtml(s:string):string{return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar}});}
@@ -231,7 +231,7 @@ function _sortKey(o){
   return(o.done?8:0)+(t?0:2)+(ev?0:1);
 }
 function _prioKey(o){return o.priority?_prioOrder[o.priority]??3:3;}
-function sortOccs(arr){
+export function sortOccs(arr){
   return arr.sort((a,b)=>{
     const sd=_sortKey(a)-_sortKey(b);if(sd)return sd;
     const pd=_prioKey(a)-_prioKey(b);if(pd)return pd;
@@ -243,53 +243,12 @@ function sortOccs(arr){
 }
 
 // ── AGENDA ──────────────────────────────────────────────────────
-function buildAgenda(){
-  const from=addDays(TODAY,-7),to=addDays(TODAY,90);
-  const occs=_expandRange(getNodes(),from,to);
-  const el=document.getElementById('agContent');el.innerHTML='';
-  // Always seed today so scroll-to-today finds a section even on event-free days.
-  const groups:{[k:string]:{date:Date,items:any[]}}={};
-  const _tk=dayKey(TODAY);
-  groups[_tk]={date:new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()),items:[]};
-  occs.forEach(o=>{
-    if(o.multiday&&!sameDay(o.jsTime,new Date(o.multiday.start)))return;
-    const k=dayKey(o.jsTime);
-    if(!groups[k])groups[k]={date:new Date(o.jsTime.getFullYear(),o.jsTime.getMonth(),o.jsTime.getDate()),items:[]};
-    groups[k].items.push(o);
-  });
-  occs.filter(o=>o.multiday).forEach(o=>{
-    const k=dayKey(new Date(o.multiday.start));
-    if(!groups[k])groups[k]={date:new Date(o.multiday.start),items:[]};
-    if(!groups[k].items.find(x=>x._nodeId===o._nodeId&&x.multiday))groups[k].items.push({...o,_isBanner:true});
-  });
+// buildAgenda(), makeOccRow(), flipResortSection(), insertOccIntoAgenda(),
+// findOccWrapInAgenda(), removeOccWrapFromAgenda() are deleted.
+// AgendaView (src/components/AgendaView.tsx) subscribes to the Zustand store
+// and re-renders automatically whenever nodes change.
 
-  Object.keys(groups).sort().forEach(k=>{
-    const g=groups[k];
-    const isT=sameDay(g.date,TODAY);
-    const sec=document.createElement('div');
-    sec.className='day-section';sec.dataset.key=k;
-    const lbl=document.createElement('div');
-    lbl.className=`day-lbl${isT?' tl':''}`;
-    lbl.textContent=isT?'Today':sameDay(g.date,addDays(TODAY,1))?'Tomorrow':fmtLong(g.date);
-    sec.appendChild(lbl);
-
-    const mdSeen=new Set();
-    g.items.filter(o=>o.multiday).forEach(o=>{
-      if(mdSeen.has(o._nodeId))return;mdSeen.add(o._nodeId);
-      const b=document.createElement('div');b.className='multiday-banner';
-      b.innerHTML=`<i data-lucide="calendar-range"></i>${escapeHtml(o.title)} <span style="opacity:.55;font-size:10px;margin-left:4px">${fmtShort(parseDateString(o.multiday.start))}–${fmtShort(parseDateString(o.multiday.end))}</span>`;
-      b.onclick=()=>openEntry(o);sec.appendChild(b);
-    });
-
-    const nonMd=g.items.filter(o=>!o.multiday);
-    sortOccs(nonMd);
-    nonMd.forEach((o,i)=>sec.appendChild(makeOccRow(o,i)));
-    el.appendChild(sec);
-  });
-  ic();
-}
-
-function occState(o){
+export function occState(o){
   if(o.done)return 'done';
   if(o.type==='task'||o.done!==undefined){
     const p=o.priority;
@@ -303,7 +262,66 @@ function occState(o){
   if(o.jsTime<now)return 'event-past';
   return 'event-future';
 }
-function barClass(o){return occState(o);}
+export function barClass(o){return occState(o);}
+
+// ── TOGGLE DONE (data-only, exported for React components) ────
+export function toggleOccDone(o): void {
+  const newDone=!o.done;
+  o.done=newDone;
+  const node=o._node;
+  if(!node)return;
+  if(!node.instances)node.instances=[];
+  const jsT=o.jsTime;
+  if(node.repeat){
+    let inst=node.instances.find(i=>{
+      const t=nodeDateTime(i)||parseDateString(i.date);
+      return t&&Math.abs(t.getTime()-jsT.getTime())<60000;
+    });
+    if(inst){inst.done=newDone;}
+    else{node.instances.push({date:o.date, done:newDone});}
+  } else {
+    node.done=newDone;
+  }
+  writeEntityToCache(node);
+  setNodes([...getNodes()]);
+  buildMonth();
+}
+
+// ── SWIPE DELETE (exported for React components) ──────────────
+export function swipeDeleteOcc(o): void {
+  const node=o._node||o;
+  const nodeId=node.id;
+  const title=node.title;
+
+  if(o.recur){
+    if(!node.instances)node.instances=[];
+    const occDate=o.date;
+    let inst=node.instances.find(i=>i.date===occDate&&!i.time);
+    if(inst){inst.excluded=true;}
+    else{node.instances.push({date:occDate,excluded:true});}
+    setNodes([...getNodes()]);
+    buildMonth();
+    showDeleteToast(title,
+      ()=>{ writeEntityToCache(node); },
+      ()=>{
+        if(inst){delete inst.excluded;}
+        else{node.instances=node.instances.filter(i=>!(i.date===occDate&&i.excluded&&!i.time));}
+        setNodes([...getNodes()]);buildMonth();
+      }
+    );
+  } else {
+    setNodes(getNodes().filter(n=>n.id!==nodeId));
+    buildMonth();
+    showDeleteToast(title,
+      ()=>{ deleteNodeFromDisk(node); },
+      ()=>{
+        setNodes([...getNodes(), node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
+        buildMonth();
+      }
+    );
+  }
+}
+
 function ccBarClass(o){
   if(o.multiday)return 'multiday';
   const s=occState(o);
@@ -324,311 +342,9 @@ function dvBlkClass(o){
   return 'event';
 }
 
-function makeOccRow(o,idx){
-  const wrap=document.createElement('div');
-  wrap.className='swipe-wrap';
-  wrap.style.animationDelay=(idx*.025)+'s';
-  wrap.style.animation='fadeUp .16s ease both';
-
-  const hintL=document.createElement('div');
-  hintL.className='swipe-hint left';
-  hintL.style.display='none';
-  hintL.innerHTML=`<i data-lucide="trash-2"></i><span>Delete</span>`;
-  wrap.appendChild(hintL);
-
-  const row=document.createElement('div');
-  row.className=`swipe-row occ-row${o.done?' is-done':''}`;
-  row._occ=o;
-  const t=fmtT(o.time);
-  const hasTrack=o.done!==undefined;
-  row.innerHTML=
-    `<div class="occ-left">`+
-      `<span class="occ-time${t?' timed':''}">${t||''}</span>`+
-      (o.duration&&t?`<span class="occ-dur-small">${escapeHtml(o.duration)}</span>`:'')+
-    `</div>`+
-    `<span class="occ-bar ${barClass(o)}"></span>`+
-    `<div class="occ-body">`+
-      `<div class="occ-tr">`+
-        (hasTrack?`<div class="occ-chk${o.done?' done':''}" style="flex-shrink:0"><i data-lucide="check"></i></div>`:'')+
-        `<span class="occ-title${o.done?' done-t':''}">${escapeHtml(o.title)}</span>`+
-        (o.recur?`<span class="orecur"><i data-lucide="repeat-2"></i></span>`:'')+
-      `</div>`+
-      ((o.tags||[]).length?
-        `<div class="occ-meta">`+
-          (o.tags||[]).slice(0,2).map(tg=>`<span class="otag${o.type==='event'?' ev':''}">${escapeHtml(tg)}</span>`).join('')+
-        `</div>`
-      :'')+
-    `</div>`;
-
-  const chk=row.querySelector('.occ-chk');
-  if(chk)chk.addEventListener('click',e=>{e.stopPropagation();toggleOccDone(o,row);});
-  row.addEventListener('click',e=>{if(!e.target.closest('.occ-chk'))openEntry(o);});
-
-  const THRESHOLD=72;
-  const FULL_FRAC=0.5;
-  let sx=0,sy=0,tracking=false,blocked=false;
-
-  row.addEventListener('touchstart',e=>{
-    sx=e.touches[0].clientX;sy=e.touches[0].clientY;
-    tracking=false;blocked=false;
-    row.style.animation='none';
-    row.style.transition='none';
-  },{passive:true});
-
-  row.addEventListener('touchmove',e=>{
-    const dx=e.touches[0].clientX-sx;
-    const dy=e.touches[0].clientY-sy;
-    if(!tracking){
-      if(Math.abs(dy)>Math.abs(dx)){blocked=true;return;}
-      if(dx>0){blocked=true;return;}
-      tracking=true;
-    }
-    if(blocked)return;
-    e.preventDefault();
-    const rowW=wrap.offsetWidth||320;
-    const absDx=Math.abs(dx);
-    const clamped=Math.max(dx,-rowW);
-    row.style.transform=`translateX(${clamped}px)`;
-    if(dx<-8){
-      hintL.style.display='flex';
-      const fullPx=rowW*FULL_FRAC;
-      const prog=Math.min(absDx/fullPx,1);
-      const isFullReady=absDx>=fullPx;
-      hintL.style.filter=`saturate(${0.3+prog*0.7})`;
-      hintL.style.opacity=String(0.4+prog*0.6);
-      const iconEl=hintL.querySelector('svg');
-      if(iconEl)iconEl.style.transform=isFullReady?'scale(1.3)':'scale('+(0.7+prog*0.3)+')';
-    } else {
-      hintL.style.display='none';
-    }
-  },{passive:false});
-
-  row.addEventListener('touchend',e=>{
-    if(blocked||!tracking){
-      row.style.transition='';row.style.transform='';
-      hintL.style.display='none';
-      return;
-    }
-    const dx=e.changedTouches[0].clientX-sx;
-    const rowW=wrap.offsetWidth||320;
-    const isFull=Math.abs(dx)/rowW>=FULL_FRAC;
-    hintL.style.display='none';
-    hintL.style.filter='';hintL.style.opacity='';
-    row.style.transition='transform .28s cubic-bezier(.4,0,.2,1)';
-    if(dx<=-THRESHOLD&&isFull){
-      row.style.transform=`translateX(-${rowW}px)`;
-      setTimeout(()=>{
-        wrap.style.height=wrap.offsetHeight+'px';
-        wrap.style.overflow='hidden';
-        requestAnimationFrame(()=>{
-          wrap.style.transition='height .2s ease,opacity .2s ease';
-          wrap.style.height='0';wrap.style.opacity='0';
-        });
-        setTimeout(doDelete,220);
-      },260);
-    } else {
-      row.style.transform='';
-    }
-  },{passive:true});
-
-  function doDelete(){
-    const node=o._node||o;
-    const nodeId=node.id;
-    const title=node.title;
-
-    if(o.recur){
-      if(!node.instances)node.instances=[];
-      const occDate=o.date;
-      let inst=node.instances.find(i=>i.date===occDate&&!i.time);
-      if(inst){inst.excluded=true;}
-      else{node.instances.push({date:occDate,excluded:true});}
-      buildAgenda();buildMonth();
-
-      showDeleteToast(title,
-        ()=>{ writeEntityToCache(node); },
-        ()=>{
-          if(inst){delete inst.excluded;}
-          else{node.instances=node.instances.filter(i=>!(i.date===occDate&&i.excluded&&!i.time));}
-          buildAgenda();buildMonth();
-        }
-      );
-    } else {
-      setNodes(getNodes().filter(n=>n.id!==nodeId));
-      buildAgenda();buildMonth();
-
-      showDeleteToast(title,
-        ()=>{ deleteNodeFromDisk(node); },
-        ()=>{
-          setNodes([...getNodes(), node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
-          buildAgenda();buildMonth();
-        }
-      );
-    }
-  }
-
-  wrap.appendChild(row);
-  return wrap;
-}
-
-function toggleOccDone(o, rowEl){
-  const newDone=!o.done;
-  o.done=newDone;
-  const node=o._node;
-  if(!node)return;
-  if(!node.instances)node.instances=[];
-  const jsT=o.jsTime;
-  if(node.repeat){
-    let inst=node.instances.find(i=>{
-      const t=nodeDateTime(i)||parseDateString(i.date);
-      return t&&Math.abs(t.getTime()-jsT.getTime())<60000;
-    });
-    if(inst){inst.done=newDone;}
-    else{node.instances.push({date:o.date, done:newDone});}
-  } else {
-    node.done=newDone;
-  }
-  writeEntityToCache(node);
-  setNodes([...getNodes()]); // notify store (node mutated in place)
-
-  // Update row in place and FLIP — works for all repeat types
-  if(rowEl){
-    rowEl.classList.toggle('is-done', newDone);
-    const chk=rowEl.querySelector('.occ-chk');
-    if(chk)chk.classList.toggle('done', newDone);
-    const title=rowEl.querySelector('.occ-title');
-    if(title)title.classList.toggle('done-t', newDone);
-    const bar=rowEl.querySelector('.occ-bar');
-    if(bar)bar.className='occ-bar '+barClass(o);
-    const daySection=rowEl.closest('.day-section');
-    if(node.repeat?.type==='after_completion'){
-      // Surgically add/remove the next pending occurrence without reflashing
-      // the whole agenda — handles repeated done/undone toggles correctly.
-      if(daySection)flipResortSection(daySection);
-      setTimeout(()=>{
-        const nextJsTime=addInterval(o.jsTime,node.repeat.interval||'1 day');
-        const agFrom=addDays(TODAY,-7),agTo=addDays(TODAY,90);
-        const spec=jsDateToSpec(nextJsTime);
-        if(newDone){
-          // Insert the next pending occurrence if not already in the DOM
-          if(nextJsTime>=agFrom&&nextJsTime<=agTo&&!findOccWrapInAgenda(node.id,spec.date)){
-            insertOccIntoAgenda({
-              title:node.title,date:spec.date,time:spec.time||node.time||null,
-              timezone:node.timezone,jsTime:nextJsTime,done:false,
-              tags:node.tags||[],type:'task',priority:node.priority,
-              body:node.body,recur:true,_nodeId:node.id,_node:node
-            });
-          }
-        } else {
-          // Remove the next pending occurrence that was previously inserted
-          const existing=findOccWrapInAgenda(node.id,spec.date);
-          if(existing)removeOccWrapFromAgenda(existing);
-        }
-        buildMonth();
-      },350);
-    } else {
-      if(daySection)flipResortSection(daySection);
-    }
-  } else {
-    buildAgenda();buildMonth();ic();
-  }
-}
-
-// Find the .swipe-wrap for a specific node occurrence by nodeId + date string.
-function findOccWrapInAgenda(nodeId,date){
-  const agContent=document.getElementById('agContent');
-  if(!agContent)return null;
-  for(const wrap of agContent.querySelectorAll('.swipe-wrap')){
-    const row=(wrap as any).querySelector('.swipe-row');
-    if(row?._occ?._nodeId===nodeId&&row._occ.date===date)return wrap;
-  }
-  return null;
-}
-
-// Remove a .swipe-wrap from the agenda; also removes its day-section if empty.
-function removeOccWrapFromAgenda(wrap){
-  const sec=wrap.closest('.day-section');
-  wrap.remove();
-  if(sec&&!sec.querySelector('.swipe-wrap'))sec.remove();
-}
-
-// Insert a single occurrence row into the agenda without rebuilding everything.
-// Finds or creates the target day-section, appends the row, then FLIPs the
-// section to sort it into place. Used by after_completion done-toggle.
-function insertOccIntoAgenda(occ){
-  const agContent=document.getElementById('agContent');
-  if(!agContent)return;
-  const k=dayKey(occ.jsTime);
-  let sec=agContent.querySelector(`.day-section[data-key="${k}"]`);
-  if(!sec){
-    const isT=sameDay(occ.jsTime,TODAY);
-    sec=document.createElement('div');
-    sec.className='day-section';
-    (sec as HTMLElement).dataset.key=k;
-    const lbl=document.createElement('div');
-    lbl.className=`day-lbl${isT?' tl':''}`;
-    lbl.textContent=isT?'Today':sameDay(occ.jsTime,addDays(TODAY,1))?'Tomorrow':fmtLong(occ.jsTime);
-    sec.appendChild(lbl);
-    // Insert in chronological key order
-    const sections=[...agContent.querySelectorAll('.day-section')] as HTMLElement[];
-    let inserted=false;
-    for(const s of sections){
-      if(s.dataset.key>k){agContent.insertBefore(sec,s);inserted=true;break;}
-    }
-    if(!inserted)agContent.appendChild(sec);
-  }
-  const existingWraps=sec.querySelectorAll('.swipe-wrap');
-  const newWrap=makeOccRow(occ,existingWraps.length);
-  sec.appendChild(newWrap);
-  flipResortSection(sec);
-  ic();
-}
-
-function flipResortSection(section){
-  const wraps=[...section.querySelectorAll('.swipe-wrap')];
-  if(wraps.length<2)return;
-
-  wraps.forEach(w=>{
-    w.style.animation='none';
-    const row=w.querySelector('.swipe-row');
-    if(row){row.style.animation='none';row.style.transform='';}
-  });
-
-  const firsts=new Map();
-  wraps.forEach(w=>firsts.set(w,w.getBoundingClientRect().top));
-
-  const pairs=wraps.map(w=>{
-    const row=w.querySelector('.swipe-row');
-    const occ=row?._occ;
-    return{w,occ,key:occ?_sortKey(occ):0,i:0};
-  });
-  pairs.forEach((p,i)=>p.i=i);
-  pairs.sort((a,b)=>{
-    if(a.key!==b.key)return a.key-b.key;
-    const pd=_prioKey(a.occ??{})-_prioKey(b.occ??{});if(pd)return pd;
-    if(a.occ&&b.occ)return(a.occ.title||'').localeCompare(b.occ.title||'');
-    return a.i-b.i;
-  });
-  const parent=wraps[0].parentNode;
-  pairs.forEach(({w})=>parent.appendChild(w));
-
-  wraps.forEach(w=>{
-    const dy=firsts.get(w)-w.getBoundingClientRect().top;
-    if(Math.abs(dy)<1)return;
-    w.style.transition='none';
-    w.style.transform=`translateY(${dy}px)`;
-  });
-
-  section.offsetHeight;
-
-  requestAnimationFrame(()=>{
-    wraps.forEach(w=>{
-      if(!w.style.transform)return;
-      w.style.transition='transform .35s cubic-bezier(.4,0,.2,1)';
-      w.style.transform='';
-      w.addEventListener('transitionend',()=>{w.style.transition='';},{once:true});
-    });
-  });
-}
+// makeOccRow, toggleOccDone (DOM), findOccWrapInAgenda, removeOccWrapFromAgenda,
+// insertOccIntoAgenda, flipResortSection all deleted.
+// AgendaView + OccurrenceRow handle rendering and animations in React.
 
 // ── MONTH ──────────────────────────────────────────────────────
 function buildMonth(){
@@ -844,7 +560,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     node.repeat=repeat||undefined;
     setNodes([...nodes, node]);
     writeEntityToCache(node);
-    buildAgenda();buildMonth();closeEntry();
+    buildMonth();closeEntry();
     return;
   }
 
@@ -873,7 +589,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     if(tracked&&f.priority&&f.priority!==node.priority)newInst.priority=f.priority;
     node.instances.push(newInst);
     writeEntityToCache(node);
-    buildAgenda();buildMonth();closeEntry();
+    buildMonth();closeEntry();
     return;
   }
 
@@ -944,7 +660,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
   }
 
   setNodes([...nodes]); // notify store (node mutated in place)
-  buildAgenda();buildMonth();closeEntry();
+  buildMonth();closeEntry();
 }
 
 export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHideSeries?: ()=>void): void {
@@ -966,12 +682,12 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
     if(inst){inst.excluded=true;}
     else{node.instances.push({date:occDate,excluded:true});}
     writeEntityToCache(node);
-    hideSheet();buildAgenda();buildMonth();closeEntry();
+    hideSheet();buildMonth();closeEntry();
   }
   function deleteAll(){
     setNodes(getNodes().filter(n=>n.id!==nodeId));
     deleteNodeFromDisk(node);
-    hideSheet();buildAgenda();buildMonth();closeEntry();
+    hideSheet();buildMonth();closeEntry();
   }
   function deleteAllFuture(){
     // Cap the series at the day before occDate; exclude any future manual instances
@@ -983,7 +699,7 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
       node.instances.forEach(i=>{if(i.date&&i.date>=occDate&&!i.excluded)i.excluded=true;});
     }
     writeEntityToCache(node);
-    hideSheet();buildAgenda();buildMonth();closeEntry();
+    hideSheet();buildMonth();closeEntry();
   }
 
   const opt3=document.getElementById('seriesOpt3') as HTMLElement|null;
@@ -993,7 +709,7 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
     if(!confirm(`Delete "${node.title}"?`))return;
     setNodes(getNodes().filter(n=>n.id!==nodeId));
     deleteNodeFromDisk(node);
-    buildAgenda();buildMonth();closeEntry();
+    buildMonth();closeEntry();
     return;
   }
 
@@ -1370,7 +1086,7 @@ async function pickDirectory(){
       try{const node=fileToNode(path, content);if(node.title)loaded.push(node);}catch(e){console.warn('[storage] parse failed for', path, e);}
     }
     setNodes(loaded);
-    buildAgenda();buildMonth();updateSyncUI();
+    buildMonth();updateSyncUI();
     setTimeout(()=>goToday(),100);
   }catch(e){
     if(e.name==='AbortError')return;
@@ -1400,7 +1116,7 @@ async function loadFromDirectory(){
     try{const node=fileToNode(path, content);if(node.title)loaded.push(node);}catch(e){}
   }
   setNodes(loaded);
-  buildAgenda();buildMonth();
+  buildMonth();
 }
 async function initDexie(){return cacheInit();}
 
@@ -1408,14 +1124,10 @@ async function initDexie(){return cacheInit();}
 export function initApp(): void {
   setNodes(SEED_NODES);
   ic();
-  buildAgenda();
   buildMonth();
   addSwipe(document.getElementById('view-calendar'),()=>chMonth(1),()=>chMonth(-1));
   addSwipe(document.getElementById('dvTl'),()=>dvNav(1),()=>dvNav(-1));
-  setTimeout(()=>{
-    const sec=document.querySelector(`.day-section[data-key="${dayKey(TODAY)}"]`);
-    if(sec)sec.scrollIntoView({behavior:'instant',block:'start'});
-  },200);
+  // Scroll-to-today in the agenda is handled by AgendaView on mount.
 }
 
 // Only functions called from vanilla JS inline onclick strings need window exposure
