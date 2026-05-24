@@ -117,7 +117,7 @@ const SEED_NODES: Node[] = [
   {id:'q3-plan',        title:'Q3 Planning',           tags:['work'],          date:'2026-07-20', done:false},
 ];
 
-const NOTES_DATA=[
+export const NOTES_DATA=[
   {title:'Project Alpha',preview:'Core objectives for Q3. Launch by end of July.',date:'May 12',tags:['work'],type:'note'},
   {title:'Reading List',preview:'Books: SICP, TAOCP vol 1.',date:'May 10',tags:['personal'],type:'note'},
   {title:'Spec: Instance Recurrence',preview:'v0.8 — Draft. Human-readable YAML-native recurrence model.',date:'May 13',tags:['project'],type:'note'},
@@ -138,26 +138,6 @@ function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'
 function escapeHtml(s:string):string{return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar,Plus}});}
 
-// ── FUZZY FILTER ─────────────────────────────────────────────────
-function fuzzyMatch(query:string,text:string):boolean{
-  if(!query)return true;
-  const q=query.toLowerCase(),t=text.toLowerCase();
-  let qi=0;
-  for(let i=0;i<t.length&&qi<q.length;i++){if(t[i]===q[qi])qi++;}
-  return qi===q.length;
-}
-function fuzzyScore(query:string,text:string):number{
-  const q=query.toLowerCase(),t=text.toLowerCase();
-  let score=0,qi=0,cons=0;
-  for(let i=0;i<t.length&&qi<q.length;i++){
-    if(t[i]===q[qi]){qi++;cons++;score+=cons;}
-    else{cons=0;}
-  }
-  if(t.startsWith(q))score+=100;
-  return score;
-}
-
-let _globalFilter='';
 
 // ── NAVIGATION ──────────────────────────────────────────────────
 function openSidebar(){
@@ -189,17 +169,11 @@ function navTo(name,btn){
   document.getElementById('tbDefault').style.display='';
   document.getElementById('tbDay').style.display='none';
   setCurView(name);
-  applyGlobalFilter(_globalFilter);
 }
 export function pushView(name: string): void {
   setPrevView(getCurView());
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
-  // Hide filter overlay when leaving filterable views
-  const overlay=document.getElementById('filterOverlay');
-  if(name==='entry'||name==='search'){
-    if(overlay)overlay.style.display='none';
-  }
   if(name==='entry'){
     hideChrome();
   } else if(name==='day'){
@@ -213,10 +187,6 @@ export function pushView(name: string): void {
     document.getElementById('bottomFloat').style.display='none';
   }
   setCurView(name);
-  // Re-apply filter when pushing day view (e.g. from calendar cell click)
-  if(name==='day'&&_globalFilter){
-    setTimeout(()=>applyGlobalFilter(_globalFilter),0);
-  }
 }
 function popView(){
   document.getElementById('tbDefault').style.display='';
@@ -226,7 +196,6 @@ function popView(){
   document.getElementById('view-'+getPrevView()).classList.add('active');
   setSidebarActive(getPrevView());
   setCurView(getPrevView());
-  applyGlobalFilter(_globalFilter);
 }
 function showChrome(){
   document.getElementById('mainTop').style.display='';
@@ -239,7 +208,7 @@ function hideChrome(){
 
 function goToday(){
   if(getCurView()==='day'){
-    setDvDate(new Date(TODAY));buildDayView();
+    setDvDate(new Date(TODAY));
   } else if(getCurView()==='calendar'){
     setCalMonth(new Date(TODAY.getFullYear(),TODAY.getMonth(),1));
   } else {
@@ -250,11 +219,11 @@ function goToday(){
     },60);
   }
 }
-function openSearch(){setPrevView(getCurView());pushView('search');buildNS();setTimeout(()=>{document.getElementById('nsIn').focus();ic();},100);}
+function openSearch(){setPrevView(getCurView());pushView('search');setTimeout(()=>{(window as any)._focusSearch?.();},50);}
 function closeSearch(){popView();}
-function openLastDay(){setDvDate(new Date(TODAY));buildDayView();pushView('day');}
+function openLastDay(){setDvDate(new Date(TODAY));pushView('day');}
 function closeDayView(){popView();}
-function dvNav(d){setDvDate(addDays(getDvDate(),d));buildDayView();if(_globalFilter)applyGlobalFilter(_globalFilter);}
+function dvNav(d){setDvDate(addDays(getDvDate(),d));}
 
 // ── SHARED OCCURRENCE SORT ────────────────────────────────────
 const _prioOrder={high:0,medium:1,low:2};
@@ -361,90 +330,9 @@ export function ccBarClass(o){
   if(s==='task-p3')return 'task-p3';
   return 'event';
 }
-function dvBlkClass(o){
-  const s=occState(o);
-  if(s==='done'||s==='event-past')return 'past';
-  if(s==='task-open')return 'task';
-  if(s==='task-p1')return 'task-p1';
-  if(s==='task-p2')return 'task-p2';
-  if(s==='task-p3')return 'task-p3';
-  return 'event';
-}
-
 // makeOccRow, toggleOccDone (DOM), findOccWrapInAgenda, removeOccWrapFromAgenda,
 // insertOccIntoAgenda, flipResortSection all deleted.
 // AgendaView + OccurrenceRow handle rendering and animations in React.
-
-// ── FILTER OVERLAY ──────────────────────────────────────────────
-function buildFilteredAgenda(query:string){
-  const overlay=document.getElementById('filterOverlay');
-  if(!overlay)return;
-  overlay.innerHTML='';
-  if(!query){overlay.style.display='none';return;}
-  overlay.style.display='';
-
-  // "Create" row at top
-  const createRow=document.createElement('div');
-  createRow.className='occ-create-row';
-  createRow.innerHTML=`<i data-lucide="plus"></i><span>Create "<strong>${escapeHtml(query)}</strong>"</span>`;
-  createRow.onclick=()=>(window as any).openEntry(null,undefined,query);
-  overlay.appendChild(createRow);
-
-  const from=addDays(TODAY,-7),to=addDays(TODAY,90);
-  const occs=_expandRange(getNodes(),from,to);
-  const filtered=occs
-    .filter(o=>fuzzyMatch(query,o.title))
-    .map(o=>({occ:o,score:fuzzyScore(query,o.title)}))
-    .sort((a,b)=>b.score-a.score||(a.occ.jsTime as any)-(b.occ.jsTime as any))
-    .map(x=>x.occ);
-
-  if(!filtered.length){
-    const empty=document.createElement('div');
-    empty.style.cssText='padding:40px 14px;text-align:center;color:var(--t3);font-size:13px';
-    empty.textContent='No matches';
-    overlay.appendChild(empty);
-    ic();return;
-  }
-  filtered.forEach((o,i)=>{
-    const wrap=document.createElement('div');
-    wrap.className='swipe-wrap';
-    wrap.style.cssText=`animation:fadeUp .16s ease both;animation-delay:${i*.025}s`;
-    const row=document.createElement('div');
-    const bc=occState(o);
-    const isDone=!!o.done;
-    row.className=`swipe-row occ-row${isDone?' is-done':''}`;
-    row.onclick=()=>openEntry(o);
-    const t=fmtT(o.time);
-    const hasTrack=o.done!==undefined;
-    const chkHtml=hasTrack?`<div class="occ-chk${isDone?' done':''}"><i data-lucide="check"></i></div>`:'';
-    const tagHtml=(o.tags||[]).slice(0,2).map((tg:string)=>`<span class="otag${o.type==='event'?' ev':''}">${escapeHtml(tg)}</span>`).join('');
-    const recurHtml=o.recur?`<span class="orecur"><i data-lucide="repeat-2"></i></span>`:'';
-    const dateStr=`<span style="opacity:.5;font-size:10px;margin-left:4px">${fmtShort(o.jsTime)}</span>`;
-    row.innerHTML=`
-      <div class="occ-left"><span class="occ-time${t?' timed':''}">${t||''}</span></div>
-      <span class="occ-bar ${bc}"></span>
-      <div class="occ-body">
-        <div class="occ-tr">${chkHtml}<span class="occ-title${isDone?' done-t':''}">${escapeHtml(o.title)}</span>${recurHtml}${dateStr}</div>
-        ${tagHtml?`<div class="occ-meta">${tagHtml}</div>`:''}
-      </div>`;
-    wrap.appendChild(row);
-    overlay.appendChild(wrap);
-  });
-  ic();
-}
-
-function applyGlobalFilter(q:string){
-  _globalFilter=q;
-  const overlay=document.getElementById('filterOverlay');
-  const cv=getCurView();
-  if(q){
-    buildFilteredAgenda(q);
-  } else {
-    if(overlay)overlay.style.display='none';
-    if(cv==='day')buildDayView();
-    // agenda + calendar views are React components; they re-render from the store automatically
-  }
-}
 
 // ── MONTH ──────────────────────────────────────────────────────
 // buildMonth, makeCalCell, chMonth deleted.
@@ -454,140 +342,8 @@ function applyGlobalFilter(q:string){
 /** Open the day view for a specific date. Called from MonthView cell clicks. */
 export function openDayViewForDate(date: Date): void {
   setDvDate(date);
-  buildDayView();
   pushView('day');
 }
-
-// ── DAY VIEW ──────────────────────────────────────────────────
-function buildDayView(){
-  document.getElementById('dvTitle').textContent=fmtLong(getDvDate());
-  const from=new Date(getDvDate());from.setHours(0,0,0,0);
-  const to=new Date(getDvDate());to.setHours(23,59,59);
-  const occs=_expandRange(getNodes(),from,to);
-  const allday=occs.filter(o=>!fmtT(o.time)||o.multiday);
-  const timed=occs.filter(o=>!!fmtT(o.time)&&!o.multiday);
-
-  sortOccs(allday);
-  sortOccs(timed);
-
-  const ad=document.getElementById('dvAllDay');
-  if(allday.length){
-    ad.style.display='';
-    const seen=new Set();
-    ad.innerHTML=`<div class="dv-adlbl">All day</div>`;
-    allday.forEach(o=>{
-      if(o.multiday&&seen.has(o._nodeId))return;
-      if(o.multiday)seen.add(o._nodeId);
-      const hasTrack=o.done!==undefined;
-      const it=document.createElement('div');
-      it.className=`dv-aditem ${o.multiday?'multiday':dvBlkClass(o)}`;
-      const chkHtml=hasTrack?`<div class="dv-chk${o.done?' done':''}"><i data-lucide="check"></i></div>`:'';
-      it.innerHTML=chkHtml+`<span>${escapeHtml(o.title)}</span>`;
-      it.onclick=()=>openEntry(o);
-      ad.appendChild(it);
-    });
-  } else {ad.style.display='none';}
-
-  const tl=document.getElementById('dvTl');tl.innerHTML='';
-  const SH=7,EH=22,HP=56;
-  for(let h=SH;h<=EH;h++){
-    const row=document.createElement('div');row.className='dv-hr';
-    row.innerHTML=`<span class="dv-hlbl">${h<12?h+'am':h===12?'12pm':(h-12)+'pm'}</span><div class="dv-hline"></div>`;
-    tl.appendChild(row);
-  }
-  if(sameDay(getDvDate(),TODAY)){
-    const now=new Date(),nh=now.getHours()+now.getMinutes()/60;
-    if(nh>=SH&&nh<=EH){
-      const nl=document.createElement('div');nl.className='now-line';nl.style.top=((nh-SH)*HP)+'px';nl.innerHTML='<div class="now-dot"></div>';tl.appendChild(nl);
-    }
-  }
-
-  function computeColumns(events){
-    const sorted=[...events].sort((a,b)=>a.jsTime-b.jsTime);
-    const cols=[];
-    for(const ev of sorted){
-      const dh=parseDurationHours(ev.duration);
-      const endMs=ev.jsTime.getTime()+dh*3600000;
-      ev._dh=dh;ev._endMs=endMs;
-      let placed=false;
-      for(const col of cols){
-        const last=col[col.length-1];
-        if(ev.jsTime.getTime()>=last._endMs){col.push(ev);placed=true;break;}
-      }
-      if(!placed)cols.push([ev]);
-    }
-    return cols;
-  }
-
-  const cols=computeColumns(timed);
-  const totalCols=Math.max(cols.length,1);
-  const tlLeft=50;
-  cols.forEach((col,ci)=>{
-    col.forEach(o=>{
-      const h=o.jsTime.getHours()+o.jsTime.getMinutes()/60;
-      if(h<SH||h>EH)return;
-      const blk=document.createElement('div');
-      blk.className=`dv-eblk ${dvBlkClass(o)}`;
-      blk.style.top=((h-SH)*HP+1)+'px';
-      blk.style.height=Math.max(o._dh*HP-4,28)+'px';
-      blk.dataset.col=ci;
-      blk.dataset.totalCols=totalCols;
-      const hasTrack=o.done!==undefined;
-      const chkHtml=hasTrack?`<div class="dv-blk-chk${o.done?' done':''}"><i data-lucide="check"></i></div>`:'';
-      blk.innerHTML=`<div class="dv-et">${chkHtml}${escapeHtml(o.title)}</div><div class="dv-em">${fmtT(o.time)}${o.duration?' · '+escapeHtml(o.duration):''}</div>`;
-      blk.onclick=()=>openEntry(o);
-      tl.appendChild(blk);
-    });
-  });
-  requestAnimationFrame(()=>{
-    const tlW=tl.getBoundingClientRect().width||380;
-    const avail=tlW-tlLeft-6;
-    tl.querySelectorAll('.dv-eblk').forEach(blk=>{
-      const ci=parseInt(blk.dataset.col||0);
-      const tc=parseInt(blk.dataset.totalCols||1);
-      blk.style.left=(tlLeft+ci*Math.floor(avail/tc))+'px';
-      blk.style.right='';
-      blk.style.width=(Math.floor(avail/tc)-3)+'px';
-    });
-    ic();
-  });
-  setTimeout(()=>document.getElementById('dvSc').scrollTo({top:(8-SH)*HP,behavior:'instant'}),50);
-  ic();
-}
-
-// ── SEARCH ──────────────────────────────────────────────────────
-function buildNS(filter,q=''){
-  if(filter!==undefined)setNsFilter(filter);
-  const list=document.getElementById('nsList');list.innerHTML='';
-  const q2=(q||document.getElementById('nsIn')?.value||'').toLowerCase();
-  const occs=_expandRange(getNodes(),addDays(TODAY,-30),addDays(TODAY,90));
-  const seen=new Set();
-  const allItems=[
-    ...NOTES_DATA,
-    ...occs.filter(o=>{if(seen.has(o._nodeId||o.title))return false;seen.add(o._nodeId||o.title);return true;})
-      .map(o=>({title:o.title,preview:o.body||'',date:fmtShort(o.jsTime),tags:o.tags||[],type:o.type,_node:o._node||o}))
-  ];
-  const filtered=allItems.filter(it=>{
-    if(getNsFilter()!=='all'&&it.type!==getNsFilter())return false;
-    if(q2&&!it.title.toLowerCase().includes(q2)&&!it.preview.toLowerCase().includes(q2)&&!it.tags.some(t=>t.includes(q2)))return false;
-    return true;
-  });
-  if(!filtered.length){list.innerHTML=`<div style="padding:40px 14px;text-align:center;color:var(--t3);font-size:13px">No results</div>`;return;}
-  const grps={event:[],task:[],note:[]};
-  filtered.forEach(it=>{if(grps[it.type])grps[it.type].push(it);});
-  const order=getNsFilter()==='all'?['event','task','note']:[getNsFilter()];
-  order.forEach(t=>{
-    const items=grps[t]||[];if(!items.length)return;
-    if(getNsFilter()==='all'){const l=document.createElement('div');l.className='ns-sec';l.textContent=t==='event'?'Events':t==='task'?'Tasks':'Notes';list.appendChild(l);}
-    items.forEach(it=>{
-      const row=document.createElement('div');row.className='note-row';
-      row.innerHTML=`<div class="nr-t">${escapeHtml(it.title)}</div><div class="nr-p">${escapeHtml(it.preview||'')}</div><div class="nr-m"><span class="nr-d">${it.date}</span>${(it.tags||[]).slice(0,2).map(t=>`<span class="otag">${escapeHtml(t)}</span>`).join('')}</div>`;
-      row.onclick=()=>openEntry(it._node?it:it);list.appendChild(row);
-    });
-  });
-}
-function filterNS(){buildNS(getNsFilter());}
-function setNSF(f,btn){document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('on'));btn.classList.add('on');buildNS(f);}
 
 // ── ENTRY EDITOR ──────────────────────────────────────────────
 function openEntry(item){ (window as any).openEntry(item) }
@@ -1198,9 +954,7 @@ async function initDexie(){return cacheInit();}
 export function initApp(): void {
   setNodes(SEED_NODES);
   ic();
-  // Month calendar navigation is now handled by MonthView (React).
-  // Swipe on the day-view timeline still needs vanilla handling.
-  addSwipe(document.getElementById('dvTl'),()=>dvNav(1),()=>dvNav(-1));
+  // Month calendar, Day view, Search, and Filter overlay are all React components.
   // Scroll-to-today in the agenda is handled by AgendaView on mount.
 }
 
@@ -1211,6 +965,4 @@ Object.assign(window as any, {
   openSidebar, closeSidebar, sidebarNav,
   closeDayView, dvNav,
   syncToDirectory, pickDirectory, goToday, openSearch, closeSearch,
-  filterNS, setNSF,
-  applyGlobalFilter,
 });
