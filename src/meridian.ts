@@ -405,7 +405,31 @@ function buildFilteredAgenda(query:string){
     overlay.appendChild(empty);
     ic();return;
   }
-  filtered.forEach((o,i)=>overlay.appendChild(makeOccRow(o,i)));
+  filtered.forEach((o,i)=>{
+    const wrap=document.createElement('div');
+    wrap.className='swipe-wrap';
+    wrap.style.cssText=`animation:fadeUp .16s ease both;animation-delay:${i*.025}s`;
+    const row=document.createElement('div');
+    const bc=occState(o);
+    const isDone=!!o.done;
+    row.className=`swipe-row occ-row${isDone?' is-done':''}`;
+    row.onclick=()=>openEntry(o);
+    const t=fmtT(o.time);
+    const hasTrack=o.done!==undefined;
+    const chkHtml=hasTrack?`<div class="occ-chk${isDone?' done':''}"><i data-lucide="check"></i></div>`:'';
+    const tagHtml=(o.tags||[]).slice(0,2).map((tg:string)=>`<span class="otag${o.type==='event'?' ev':''}">${escapeHtml(tg)}</span>`).join('');
+    const recurHtml=o.recur?`<span class="orecur"><i data-lucide="repeat-2"></i></span>`:'';
+    const dateStr=`<span style="opacity:.5;font-size:10px;margin-left:4px">${fmtShort(o.jsTime)}</span>`;
+    row.innerHTML=`
+      <div class="occ-left"><span class="occ-time${t?' timed':''}">${t||''}</span></div>
+      <span class="occ-bar ${bc}"></span>
+      <div class="occ-body">
+        <div class="occ-tr">${chkHtml}<span class="occ-title${isDone?' done-t':''}">${escapeHtml(o.title)}</span>${recurHtml}${dateStr}</div>
+        ${tagHtml?`<div class="occ-meta">${tagHtml}</div>`:''}
+      </div>`;
+    wrap.appendChild(row);
+    overlay.appendChild(wrap);
+  });
   ic();
 }
 
