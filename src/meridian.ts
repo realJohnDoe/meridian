@@ -125,7 +125,6 @@ export const NOTES_DATA=[
 ];
 
 // curView, prevView, calMonth, dvDate, nsFilterVal, nextId → useStore
-let rdType=null,rdWdays=[false,false,false,false,false,false,false],rdMonthly='first-weekday',rdEndType='never',rdEndVal='',rdInterval='1 day';
 
 // ── UTILS ──────────────────────────────────────────────────────
 export const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
@@ -517,64 +516,6 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
   ic();
 }
 
-// ── DIALOGS ──────────────────────────────────────────────────
-export function openRepeatDlg({scheduled,tracked,repeat,itemType}: {scheduled: Scheduled|null; tracked: boolean; repeat: Repeat|null; itemType?: string}): void {
-  const hasSched=!!scheduled,hasTrk=tracked&&itemType!=='event';
-  const hint=document.getElementById('repeatHintText'),hintBox=document.getElementById('repeatHint');
-  if(hasSched&&hasTrk){hint.textContent='Both Schedule and Track Completion are on. Choose a schedule pattern, or "After completion" to repeat when you check this done.';hintBox.style.display='flex';}
-  else if(hasTrk&&!hasSched){hint.textContent='"After completion" repeats whenever you mark this done.';hintBox.style.display='flex';rdType='after_completion';}
-  else{hint.textContent='Choose how often this scheduled item repeats.';hintBox.style.display='flex';if(rdType==='after_completion')rdType='weekly';}
-  if(!repeat&&scheduled?.date){
-    const jsDay=parseDateString(scheduled.date)?.getDay()??1;
-    const monFirst=(jsDay+6)%7;
-    rdWdays=[false,false,false,false,false,false,false];
-    rdWdays[monFirst]=true;
-  }
-  buildRepeatDlg(hasSched,hasTrk);
-}
-
-export function buildRepeatValue(): Repeat {
-  const iv=document.getElementById('rdIv');if(iv)rdInterval=iv.value;
-  const ed=document.getElementById('endD');if(ed)rdEndVal=ed.value;
-  const ec=document.getElementById('endC');if(ec)rdEndVal=ec.value;
-  const sched={freq:rdType==='daily'?'daily':rdType==='weekly'?'weekly':rdType==='monthly'?'monthly':'yearly'};
-  if(rdType==='weekly'){const wdMap=['mo','tu','we','th','fr','sa','su'];sched.byweekday=wdMap.filter((_,i)=>rdWdays[i]);}
-  if(rdType==='monthly'&&rdMonthly==='first-weekday'){sched.byweekday=['mo','tu','we','th','fr'];sched.bysetpos=1;}
-  if(rdEndType==='until'&&rdEndVal)sched.end={type:'until',time:rdEndVal};
-  if(rdEndType==='count'&&rdEndVal)sched.end={type:'count',occurrences:parseInt(rdEndVal)};
-  return rdType==='after_completion'?{type:'after_completion',interval:rdInterval}:{type:'schedule',scheduled:sched};
-}
-function buildRepeatDlg(hasSched,hasTrk){
-  const grid=document.getElementById('recurGrid');grid.innerHTML='';
-  const opts=[];
-  if(hasSched)opts.push({id:'daily',label:'Daily'},{id:'weekly',label:'Weekly'},{id:'monthly',label:'Monthly'},{id:'yearly',label:'Yearly'});
-  if(hasTrk)opts.push({id:'after_completion',label:'After ✓'});
-  if(!rdType)rdType=opts[0]?.id;
-  opts.forEach(o=>{const btn=document.createElement('button');btn.className=`ro${rdType===o.id?' on':''}`;btn.textContent=o.label;btn.onclick=()=>{rdType=o.id;buildRepeatDlg(hasSched,hasTrk);};grid.appendChild(btn);});
-  buildRepeatConfig();
-}
-function buildRepeatConfig(){
-  const cfg=document.getElementById('recurConfig');cfg.innerHTML='';
-  const end=document.getElementById('endSec');end.innerHTML='';
-  if(rdType==='weekly'){
-    const row=document.createElement('div');row.className='wd-row';
-    ['Mo','Tu','We','Th','Fr','Sa','Su'].forEach((d,i)=>{
-      const b=document.createElement('button');
-      b.className=`wd${rdWdays[i]?' on':''}`;
-      b.textContent=d;
-      b.onclick=()=>{rdWdays[i]=!rdWdays[i];buildRepeatConfig();};
-      row.appendChild(b);
-    });
-    cfg.appendChild(row);
-  }
-  else if(rdType==='monthly'){const w=document.createElement('div');w.className='monthly-opts';[['first-weekday','First weekday of month'],['last-weekday','Last weekday of month'],['same-day','Same day of month']].forEach(([v,l])=>{const b=document.createElement('button');b.className=`mopt${rdMonthly===v?' on':''}`;b.textContent=l;b.onclick=()=>{rdMonthly=v;buildRepeatConfig();};w.appendChild(b);});cfg.appendChild(w);}
-  else if(rdType==='after_completion'){const row=document.createElement('div');row.className='interval-row';row.innerHTML=`<span>Every</span><input class="dlg-in" id="rdIv" value="${escapeHtml(rdInterval)}" style="width:130px" placeholder="e.g. 2 days">`;cfg.appendChild(row);}
-  if(rdType&&rdType!=='after_completion'){end.style.display='block';end.innerHTML=`<div class="end-lbl">Ends</div><div class="end-opts"><button class="eopt${rdEndType==='never'?' on':''}" onclick="setEnd('never',this)">Never</button><button class="eopt${rdEndType==='until'?' on':''}" onclick="setEnd('until',this)">On date</button><button class="eopt${rdEndType==='count'?' on':''}" onclick="setEnd('count',this)">After N</button></div><div id="endValRow"></div>`;buildEndVal();}
-  else end.style.display='none';
-}
-function setEnd(type,btn){rdEndType=type;document.querySelectorAll('.eopt').forEach(b=>b.classList.remove('on'));btn.classList.add('on');buildEndVal();}
-function buildEndVal(){const row=document.getElementById('endValRow');if(!row)return;if(rdEndType==='until')row.innerHTML=`<input class="dlg-in" style="width:100%;margin-top:6px" type="date" id="endD" value="${escapeHtml(rdEndVal)}">`;else if(rdEndType==='count')row.innerHTML=`<input class="dlg-in" style="width:100%;margin-top:6px" type="number" id="endC" placeholder="occurrences" value="${escapeHtml(rdEndVal)}">`;else row.innerHTML='';}
-
 // ── WIKILINK AUTOCOMPLETE ─────────────────────────────────────
 let wlFocusIdx=-1;
 
@@ -904,7 +845,6 @@ export function initApp(): void {
 // Only functions called from vanilla-JS innerHTML onclick strings need window exposure.
 // Navigation is now handled in React (App.tsx); only the repeat-dialog helpers remain.
 Object.assign(window as any, {
-  setEnd,      // used in buildRepeatConfig innerHTML onclick strings
   autoResize,
   syncToDirectory, pickDirectory,
 });
