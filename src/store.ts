@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 import type { Node } from './types'
-
-// Stable today reference (matches the one in meridian.ts)
-const _today = new Date(); _today.setHours(0, 0, 0, 0)
+import { TODAY as _today } from './constants'
 
 export type PrimaryView = 'agenda' | 'calendar' | 'day'
 export type OverlayView = 'entry' | 'search'

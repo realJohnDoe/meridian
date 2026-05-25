@@ -10,8 +10,11 @@ import {
   applyScope, buildBodyHtml,
   saveNode, deleteNode, closeEntry, pushOverlay,
   openDayViewForDate, goToday, openSearch,
+  syncToDirectory, pickDirectory,
   addDays, fmtLong,
 } from './meridian'
+import { fmtISO } from './recurrence'
+import { TODAY } from './constants'
 import { useStore } from './store'
 import type { PrimaryView } from './store'
 import EntryEditor, { EntryState, ENTRY_DEFAULT, ItemType } from './components/EntryEditor'
@@ -23,10 +26,6 @@ import SearchView from './components/SearchView'
 import FilterOverlay from './components/FilterOverlay'
 import type { Occurrence, Priority } from './types'
 
-const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
-function fmtISO(d: Date) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
-}
 
 function entryFromItem(item: any, editScope: string): EntryState {
   if (!item) {
@@ -219,8 +218,8 @@ export default function App() {
               </div>
             )}
             <div className="tb-r">
-              <button className="ib" id="syncBtn" onClick={() => (window as any).syncToDirectory()} title="Sync"><FolderSync /></button>
-              <button className="ib" onClick={() => (window as any).pickDirectory()} title="Open vault"><FolderOpen /></button>
+              <button className="ib" id="syncBtn" onClick={syncToDirectory} title="Sync"><FolderSync /></button>
+              <button className="ib" onClick={pickDirectory} title="Open vault"><FolderOpen /></button>
               <button className="ib" onClick={goToday} title="Today"><CalendarCheck2 /></button>
               <button className="ib" onClick={openSearch} title="Search"><Search /></button>
             </div>

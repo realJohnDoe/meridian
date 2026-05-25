@@ -7,10 +7,7 @@ import {
   toggleOccDone, swipeDeleteOcc,
 } from '../meridian'
 import DaySection from './DaySection'
-
-// Stable today reference — computed once at module load, same as meridian.ts / store.ts.
-const TODAY = new Date()
-TODAY.setHours(0, 0, 0, 0)
+import { TODAY } from '../constants'
 
 interface Props {
   onOpen: (occ: Occurrence, scope?: string) => void
