@@ -3,19 +3,19 @@ import {
   Menu, FolderSync, FolderOpen, CalendarCheck2, Search,
   ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
-  Plus, Calendar, Clock, Timer, X, Info, Flag,
+  Plus, Calendar, Clock, Timer, X, Flag,
 } from 'lucide-react'
 import {
   initApp, wikilinkInputHandler, wikilinkKeydownHandler, wikilinkClickHandler,
   applyScope, buildBodyHtml,
   saveNode, deleteNode, closeEntry, pushOverlay,
-  openRepeatDlg, buildRepeatValue,
   openDayViewForDate, goToday, openSearch,
   addDays, fmtLong,
 } from './meridian'
 import { useStore } from './store'
 import type { PrimaryView } from './store'
 import EntryEditor, { EntryState, ENTRY_DEFAULT, ItemType } from './components/EntryEditor'
+import RepeatDialog from './components/RepeatDialog'
 import AgendaView from './components/AgendaView'
 import MonthView from './components/MonthView'
 import DayView from './components/DayView'
@@ -141,10 +141,9 @@ export default function App() {
     setActiveDialog(id)
   }, [entry.scheduled, entry.duration])
 
-  const handleOpenRepeatDlg = useCallback((itemType?: string) => {
-    openRepeatDlg({ scheduled: entry.scheduled, tracked: entry.tracked, repeat: entry.repeat, itemType })
+  const handleOpenRepeatDlg = useCallback((_itemType?: string) => {
     setActiveDialog('dlgRepeat')
-  }, [entry.scheduled, entry.tracked, entry.repeat])
+  }, [])
 
   const closeDialog = useCallback(() => setActiveDialog(null), [])
 
@@ -179,16 +178,6 @@ export default function App() {
     setActiveDialog(null)
   }, [])
 
-  const confirmRepeat = useCallback(() => {
-    const repeat = buildRepeatValue()
-    setEntry(prev => ({ ...prev, repeat }))
-    setActiveDialog(null)
-  }, [])
-
-  const removeRepeat = useCallback(() => {
-    setEntry(prev => ({ ...prev, repeat: null }))
-    setActiveDialog(null)
-  }, [])
 
   const setPriority = useCallback((p: Priority | null) => {
     setEntry(prev => ({ ...prev, priority: p }))
@@ -411,19 +400,17 @@ export default function App() {
         </div></div>
       </div>
 
-      {/* REPEAT */}
-      <div className={dlgOvClass('dlgRepeat')} id="dlgRepeat" onClick={closeDlgOv}>
-        <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Repeat</div><div className="dlg-body">
-          <div className="dlg-hint" id="repeatHint"><Info /><span id="repeatHintText"></span></div>
-          <div className="recur-grid" id="recurGrid"></div>
-          <div id="recurConfig"></div>
-          <div className="end-sec" id="endSec" style={{ display: 'none' }}></div>
-          <div className="dlg-actions">
-            <button className="dlg-rm" onClick={removeRepeat}><X />Remove</button>
-            <div style={{ display: 'flex', gap: 8 }}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmRepeat}>Set</button></div>
-          </div>
-        </div></div>
-      </div>
+      {/* REPEAT DLG */}
+      <RepeatDialog
+        open={activeDialog === 'dlgRepeat'}
+        scheduled={entry.scheduled}
+        tracked={entry.tracked}
+        itemType={entry.itemType}
+        repeat={entry.repeat}
+        onConfirm={repeat => { setEntry(prev => ({ ...prev, repeat })); setActiveDialog(null) }}
+        onRemove={() => { setEntry(prev => ({ ...prev, repeat: null })); setActiveDialog(null) }}
+        onClose={() => setActiveDialog(null)}
+      />
 
       {/* SERIES DELETE SHEET */}
       <div className={dlgOvClass('seriesSheet')} id="seriesSheet" onClick={closeDlgOv}>
