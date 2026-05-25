@@ -4,6 +4,9 @@ import type { Node } from './types'
 // Stable today reference (matches the one in meridian.ts)
 const _today = new Date(); _today.setHours(0, 0, 0, 0)
 
+export type PrimaryView = 'agenda' | 'calendar' | 'day'
+export type OverlayView = 'entry' | 'search'
+
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
   nodes: Node[]
@@ -14,10 +17,18 @@ interface MeridianStore {
   bumpId: () => number
 
   // ── Navigation ──────────────────────────────────────────────────
-  curView: string
-  prevView: string
-  setCurView: (view: string) => void
-  setPrevView: (view: string) => void
+  /** The active primary tab — always visible behind any overlay. */
+  primaryView: PrimaryView
+  setPrimaryView: (v: PrimaryView) => void
+
+  /**
+   * Overlay stack — last entry is the topmost visible view.
+   * Only 'entry' and 'search' are overlay views; they slide over primary views.
+   */
+  overlayStack: OverlayView[]
+  pushOverlay: (v: OverlayView) => void
+  /** Pop the top overlay. No-op if the stack is empty. */
+  popOverlay: () => void
 
   // ── Calendar cursor ─────────────────────────────────────────────
   calMonth: Date
@@ -49,10 +60,12 @@ export const useStore = create<MeridianStore>((set, get) => ({
     return id
   },
 
-  curView: 'agenda',
-  prevView: 'agenda',
-  setCurView: (curView) => set({ curView }),
-  setPrevView: (prevView) => set({ prevView }),
+  primaryView: 'agenda',
+  setPrimaryView: (primaryView) => set({ primaryView }),
+
+  overlayStack: [],
+  pushOverlay: (v) => set(s => ({ overlayStack: [...s.overlayStack, v] })),
+  popOverlay:  ()  => set(s => ({ overlayStack: s.overlayStack.slice(0, -1) })),
 
   calMonth: new Date(_today.getFullYear(), _today.getMonth(), 1),
   setCalMonth: (calMonth) => set({ calMonth }),
