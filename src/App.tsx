@@ -1,19 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Menu, FolderSync, FolderOpen, CalendarCheck2, Search,
-  ArrowLeft, ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
   Plus, Calendar, Clock, Timer, X, Info, Flag,
 } from 'lucide-react'
 import {
   initApp, wikilinkInputHandler, wikilinkKeydownHandler, wikilinkClickHandler,
   applyScope, buildBodyHtml,
-  saveNode, deleteNode, closeEntry, pushView,
+  saveNode, deleteNode, closeEntry, pushOverlay,
   openRepeatDlg, buildRepeatValue,
-  openDayViewForDate,
+  openDayViewForDate, goToday, openSearch,
   addDays, fmtLong,
 } from './meridian'
 import { useStore } from './store'
+import type { PrimaryView } from './store'
 import EntryEditor, { EntryState, ENTRY_DEFAULT, ItemType } from './components/EntryEditor'
 import AgendaView from './components/AgendaView'
 import MonthView from './components/MonthView'
@@ -58,17 +59,37 @@ export default function App() {
   const [dlgTimeVal, setDlgTimeVal] = useState('')
   const [dlgDurVal, setDlgDurVal] = useState('')
   const [filterQuery, setFilterQuery] = useState('')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // ── Navigation state (source of truth) ───────────────────────
+  const primaryView  = useStore(s => s.primaryView)
+  const setPrimary   = useStore(s => s.setPrimaryView)
+  const overlayStack = useStore(s => s.overlayStack)
+  const popOverlay   = useStore(s => s.popOverlay)
+  const topOverlay   = overlayStack[overlayStack.length - 1] // 'entry' | 'search' | undefined
 
   const dvDate    = useStore(s => s.dvDate)
   const setDvDate = useStore(s => s.setDvDate)
 
+  // Derive CSS class for each section — only one is 'active' at a time
+  const viewCls = (name: string) => {
+    const active = topOverlay ? name === topOverlay : name === primaryView
+    return active ? 'view active' : 'view'
+  }
+
+  // Topbar is hidden while an overlay is open (each has its own header)
+  const showTopbar     = topOverlay === undefined
+  const showDayHeader  = showTopbar && primaryView === 'day'
+  // Bottom search bar: hidden inside overlays
+  const showBottomFloat = topOverlay === undefined
+
   useEffect(() => {
-    // ONE global: lets vanilla JS agenda/search rows open the editor
+    // Global openEntry hook — lets vanilla-JS agenda/search rows open the editor
     ;(window as any).openEntry = (item: any, scope?: string, prefillTitle?: string) => {
       const editScope = scope ?? (item ? 'single' : 'all')
       const state = entryFromItem(item, editScope)
       setEntry(prefillTitle && !item ? { ...state, title: prefillTitle } : state)
-      pushView('entry')
+      pushOverlay('entry')
     }
     document.addEventListener('input', wikilinkInputHandler as EventListener)
     document.addEventListener('keydown', wikilinkKeydownHandler as EventListener)
@@ -84,6 +105,13 @@ export default function App() {
       document.removeEventListener('keydown', wikilinkKeydownHandler as EventListener)
       document.removeEventListener('click', wikilinkClickHandler as EventListener)
     }
+  }, [])
+
+  const openEntry = useCallback((item: any, scope?: string, prefillTitle?: string) => {
+    const editScope = scope ?? (item ? 'single' : 'all')
+    const state = entryFromItem(item, editScope)
+    setEntry(prefillTitle && !item ? { ...state, title: prefillTitle } : state)
+    pushOverlay('entry')
   }, [])
 
   const handleSave = useCallback((body: string) => {
@@ -120,7 +148,6 @@ export default function App() {
 
   const closeDialog = useCallback(() => setActiveDialog(null), [])
 
-  // Dialog confirm handlers
   const confirmSched = useCallback(() => {
     if (!dlgDateVal) return
     setEntry(prev => ({ ...prev, scheduled: { date: dlgDateVal, time: prev.scheduled?.time || '' } }))
@@ -171,69 +198,76 @@ export default function App() {
   const dlgOvClass = (id: string) => activeDialog === id ? 'dlg-ov open' : 'dlg-ov'
   const closeDlgOv = (e: React.MouseEvent) => { if (e.target === e.currentTarget) setActiveDialog(null) }
 
+  // Sidebar nav: switch primary view and close the panel
+  const navTo = (v: PrimaryView) => {
+    setSidebarOpen(false)
+    setPrimary(v)
+  }
+
   return (
     <>
       <div id="app">
 
-        <header className="topbar" id="mainTop">
-          <div className="tb-l" id="tbDefault">
-            <button className="ib" onClick={() => (window as any).openSidebar()} title="Menu"><Menu /></button>
-            <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{borderRadius:5}} alt="Meridian" />
-            <span className="vault-name">Meridian</span>
-          </div>
-          <div className="tb-l" id="tbDay" style={{display:'none',flex:1,gap:4,overflow:'hidden'}}>
-            <button className="ib" onClick={() => (window as any).closeDayView()}><ArrowLeft /></button>
-            <span style={{flex:1,fontFamily:'var(--disp)',fontStyle:'italic',fontSize:15,color:'var(--t0)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{fmtLong(dvDate)}</span>
-            <button className="ib" onClick={() => setDvDate(addDays(dvDate, -1))}><ChevronLeft /></button>
-            <button className="ib" onClick={() => setDvDate(addDays(dvDate, 1))}><ChevronRight /></button>
-          </div>
-          <div className="tb-r">
-            <button className="ib" id="syncBtn" onClick={() => (window as any).syncToDirectory()} title="Sync"><FolderSync /></button>
-            <button className="ib" onClick={() => (window as any).pickDirectory()} title="Open vault"><FolderOpen /></button>
-            <button className="ib" onClick={() => (window as any).goToday()} title="Today"><CalendarCheck2 /></button>
-            <button className="ib" onClick={() => (window as any).openSearch()} title="Search"><Search /></button>
-          </div>
-        </header>
+        {/* ── TOPBAR ── visible only when no overlay is active */}
+        {showTopbar && (
+          <header className="topbar" id="mainTop">
+            {showDayHeader ? (
+              /* Day-view header: date title + prev/next navigation */
+              <div className="tb-l" style={{ flex: 1, gap: 4, overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
+                <button className="ib" onClick={() => setSidebarOpen(true)} title="Menu"><Menu /></button>
+                <span style={{ flex: 1, fontFamily: 'var(--disp)', fontStyle: 'italic', fontSize: 15, color: 'var(--t0)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {fmtLong(dvDate)}
+                </span>
+                <button className="ib" onClick={() => setDvDate(addDays(dvDate, -1))}><ChevronLeft /></button>
+                <button className="ib" onClick={() => setDvDate(addDays(dvDate, 1))}><ChevronRight /></button>
+              </div>
+            ) : (
+              /* Default header: logo + app name */
+              <div className="tb-l" id="tbDefault">
+                <button className="ib" onClick={() => setSidebarOpen(true)} title="Menu"><Menu /></button>
+                <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{ borderRadius: 5 }} alt="Meridian" />
+                <span className="vault-name">Meridian</span>
+              </div>
+            )}
+            <div className="tb-r">
+              <button className="ib" id="syncBtn" onClick={() => (window as any).syncToDirectory()} title="Sync"><FolderSync /></button>
+              <button className="ib" onClick={() => (window as any).pickDirectory()} title="Open vault"><FolderOpen /></button>
+              <button className="ib" onClick={goToday} title="Today"><CalendarCheck2 /></button>
+              <button className="ib" onClick={openSearch} title="Search"><Search /></button>
+            </div>
+          </header>
+        )}
 
-        {/* AGENDA */}
-        <section className="view active" id="view-agenda">
+        {/* ── PRIMARY VIEWS ── */}
+        <section className={viewCls('agenda')} id="view-agenda">
           <div className="ag-sc" id="agSc">
             <AgendaView onOpen={(occ: Occurrence, scope?: string) => {
-              const editScope = scope ?? 'single'
-              setEntry(entryFromItem(occ, editScope))
-              pushView('entry')
+              openEntry(occ, scope ?? 'single')
             }} />
           </div>
         </section>
 
-        {/* MONTH */}
-        <section className="view" id="view-calendar">
+        <section className={viewCls('calendar')} id="view-calendar">
           <MonthView onDayClick={openDayViewForDate} />
         </section>
 
-        {/* DAY */}
-        <section className="view" id="view-day">
+        <section className={viewCls('day')} id="view-day">
           <DayView onOpen={(occ: Occurrence, scope?: string) => {
-            const editScope = scope ?? 'single'
-            setEntry(entryFromItem(occ, editScope))
-            pushView('entry')
+            openEntry(occ, scope ?? 'single')
           }} />
         </section>
 
-        {/* SEARCH */}
-        <section className="view" id="view-search">
+        {/* ── OVERLAY VIEWS ── */}
+        <section className={viewCls('search')} id="view-search">
           <SearchView
             onOpen={(item: any, scope?: string) => {
-              const editScope = scope ?? (item?._node ? 'single' : 'all')
-              setEntry(entryFromItem(item, editScope))
-              pushView('entry')
+              openEntry(item, scope ?? (item?._node ? 'single' : 'all'))
             }}
-            onClose={() => (window as any).closeSearch()}
+            onClose={popOverlay}
           />
         </section>
 
-        {/* ENTRY */}
-        <section className="view" id="view-entry">
+        <section className={viewCls('entry')} id="view-entry">
           <EntryEditor
             entry={entry}
             onChange={setEntry}
@@ -246,124 +280,147 @@ export default function App() {
           />
         </section>
 
-        {/* SIDEBAR */}
-        <div className="sidebar-ov" id="sidebarOv" onClick={() => (window as any).closeSidebar()}></div>
-        <div className="sidebar" id="sidebar">
+        {/* ── SIDEBAR ── */}
+        <div
+          className={`sidebar-ov${sidebarOpen ? ' open' : ''}`}
+          onClick={() => setSidebarOpen(false)}
+        />
+        <div className={`sidebar${sidebarOpen ? ' open' : ''}`}>
           <div className="sidebar-head">
-            <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{borderRadius:5}} alt="Meridian" />
+            <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{ borderRadius: 5 }} alt="Meridian" />
             <span className="sidebar-title">Meridian</span>
           </div>
           <div className="sidebar-body">
-            <button className="sni active" id="sni-agenda" onClick={(e) => (window as any).sidebarNav('agenda', e.currentTarget)}><AlignLeft />Agenda</button>
-            <button className="sni" id="sni-calendar" onClick={(e) => (window as any).sidebarNav('calendar', e.currentTarget)}><CalendarDays />Month</button>
-            <button className="sni" id="sni-day" onClick={(e) => (window as any).sidebarNav('day', e.currentTarget)}><CalendarClock />Day</button>
-          </div>
-        </div>
-
-        {/* FILTER OVERLAY — sits above views, below topbar and search bar */}
-        <FilterOverlay
-          query={filterQuery}
-          onOpen={(occ: Occurrence) => {
-            setEntry(entryFromItem(occ, 'single'))
-            pushView('entry')
-          }}
-          onCreate={(title: string) => {
-            ;(window as any).openEntry(null, undefined, title)
-            setFilterQuery('')
-          }}
-        />
-
-        {/* SEARCH BAR (replaces FAB) */}
-        <div className="bottom-float" id="bottomFloat">
-          <div className="search-bar-wrap">
-            <Search size={15} className="search-bar-icon" />
-            <input
-              id="filterInput"
-              className="search-bar-input"
-              placeholder="Search or create…"
-              value={filterQuery}
-              onChange={e => setFilterQuery(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && filterQuery) {
-                  ;(window as any).openEntry(null, undefined, filterQuery)
-                  setFilterQuery('')
-                }
-              }}
-            />
-            {filterQuery && (
-              <button className="search-bar-clear" onClick={() => setFilterQuery('')}>
-                <X size={13} />
-              </button>
-            )}
             <button
-              className="search-bar-add"
-              onClick={() => {
-                ;(window as any).openEntry(null, undefined, filterQuery || undefined)
-                if (filterQuery) setFilterQuery('')
-              }}
+              className={`sni${primaryView === 'agenda' && !topOverlay ? ' active' : ''}`}
+              onClick={() => navTo('agenda')}
             >
-              <Plus size={16} />
+              <AlignLeft />Agenda
+            </button>
+            <button
+              className={`sni${primaryView === 'calendar' && !topOverlay ? ' active' : ''}`}
+              onClick={() => navTo('calendar')}
+            >
+              <CalendarDays />Month
+            </button>
+            <button
+              className={`sni${primaryView === 'day' && !topOverlay ? ' active' : ''}`}
+              onClick={() => navTo('day')}
+            >
+              <CalendarClock />Day
             </button>
           </div>
         </div>
 
+        {/* ── FILTER OVERLAY ── sits above views, below topbar and search bar */}
+        {showBottomFloat && (
+          <FilterOverlay
+            query={filterQuery}
+            onOpen={(occ: Occurrence) => {
+              openEntry(occ, 'single')
+            }}
+            onCreate={(title: string) => {
+              openEntry(null, undefined, title)
+              setFilterQuery('')
+            }}
+          />
+        )}
+
+        {/* ── BOTTOM SEARCH BAR ── */}
+        {showBottomFloat && (
+          <div className="bottom-float" id="bottomFloat">
+            <div className="search-bar-wrap">
+              <Search size={15} className="search-bar-icon" />
+              <input
+                id="filterInput"
+                className="search-bar-input"
+                placeholder="Search or create…"
+                value={filterQuery}
+                onChange={e => setFilterQuery(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && filterQuery) {
+                    openEntry(null, undefined, filterQuery)
+                    setFilterQuery('')
+                  }
+                }}
+              />
+              {filterQuery && (
+                <button className="search-bar-clear" onClick={() => setFilterQuery('')}>
+                  <X size={13} />
+                </button>
+              )}
+              <button
+                className="search-bar-add"
+                onClick={() => {
+                  openEntry(null, undefined, filterQuery || undefined)
+                  if (filterQuery) setFilterQuery('')
+                }}
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>{/* end #app */}
 
-      {/* DATE DLG */}
+      {/* ── DIALOGS ── */}
+
+      {/* DATE */}
       <div className={dlgOvClass('dlgSched')} id="dlgSched" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Date</div><div className="dlg-body">
           <div className="dlg-row"><span className="dlg-lbl"><Calendar />Date</span><input className="dlg-in" type="date" id="dlgDate" value={dlgDateVal} onChange={e => setDlgDateVal(e.target.value)} /></div>
           <div className="dlg-actions">
             <button className="dlg-rm" onClick={removeSched}><X />Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmSched}>Set</button></div>
+            <div style={{ display: 'flex', gap: 8 }}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmSched}>Set</button></div>
           </div>
         </div></div>
       </div>
 
-      {/* PRIORITY DLG */}
+      {/* PRIORITY */}
       <div className={dlgOvClass('dlgPriority')} id="dlgPriority" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Priority</div><div className="dlg-body">
-          <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            <button className="dlg-ok" style={{background:'rgba(248,113,113,.15)',color:'var(--p1)',border:'1px solid var(--p1)'}} onClick={() => setPriority('high')}><Flag /> High</button>
-            <button className="dlg-ok" style={{background:'rgba(251,146,60,.15)',color:'var(--p2)',border:'1px solid var(--p2)'}} onClick={() => setPriority('medium')}><Flag /> Medium</button>
-            <button className="dlg-ok" style={{background:'rgba(250,204,21,.15)',color:'var(--p3)',border:'1px solid var(--p3)'}} onClick={() => setPriority('low')}><Flag /> Low</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button className="dlg-ok" style={{ background: 'rgba(248,113,113,.15)', color: 'var(--p1)', border: '1px solid var(--p1)' }} onClick={() => setPriority('high')}><Flag /> High</button>
+            <button className="dlg-ok" style={{ background: 'rgba(251,146,60,.15)', color: 'var(--p2)', border: '1px solid var(--p2)' }} onClick={() => setPriority('medium')}><Flag /> Medium</button>
+            <button className="dlg-ok" style={{ background: 'rgba(250,204,21,.15)', color: 'var(--p3)', border: '1px solid var(--p3)' }} onClick={() => setPriority('low')}><Flag /> Low</button>
             <button className="dlg-rm" onClick={() => setPriority(null)}><X /> None</button>
           </div>
         </div></div>
       </div>
 
-      {/* TIME DLG */}
+      {/* TIME */}
       <div className={dlgOvClass('dlgTime')} id="dlgTime" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Time</div><div className="dlg-body">
           <div className="dlg-row"><span className="dlg-lbl"><Clock />Time</span><input className="dlg-in" type="time" id="dlgTimeVal" value={dlgTimeVal} onChange={e => setDlgTimeVal(e.target.value)} /></div>
           <div className="dlg-actions">
             <button className="dlg-rm" onClick={removeTime}><X />Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmTime}>Set</button></div>
+            <div style={{ display: 'flex', gap: 8 }}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmTime}>Set</button></div>
           </div>
         </div></div>
       </div>
 
-      {/* DURATION DLG */}
+      {/* DURATION */}
       <div className={dlgOvClass('dlgDur')} id="dlgDur" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Duration</div><div className="dlg-body">
-          <div className="dlg-row"><span className="dlg-lbl"><Timer />Duration</span><input className="dlg-in" type="text" id="dlgDurVal" value={dlgDurVal} onChange={e => setDlgDurVal(e.target.value)} placeholder="e.g. 1h 30m" style={{width:120}} /></div>
+          <div className="dlg-row"><span className="dlg-lbl"><Timer />Duration</span><input className="dlg-in" type="text" id="dlgDurVal" value={dlgDurVal} onChange={e => setDlgDurVal(e.target.value)} placeholder="e.g. 1h 30m" style={{ width: 120 }} /></div>
           <div className="dlg-actions">
             <button className="dlg-rm" onClick={removeDur}><X />Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmDur}>Set</button></div>
+            <div style={{ display: 'flex', gap: 8 }}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmDur}>Set</button></div>
           </div>
         </div></div>
       </div>
 
-      {/* REPEAT DLG */}
+      {/* REPEAT */}
       <div className={dlgOvClass('dlgRepeat')} id="dlgRepeat" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Repeat</div><div className="dlg-body">
           <div className="dlg-hint" id="repeatHint"><Info /><span id="repeatHintText"></span></div>
           <div className="recur-grid" id="recurGrid"></div>
           <div id="recurConfig"></div>
-          <div className="end-sec" id="endSec" style={{display:'none'}}></div>
+          <div className="end-sec" id="endSec" style={{ display: 'none' }}></div>
           <div className="dlg-actions">
             <button className="dlg-rm" onClick={removeRepeat}><X />Remove</button>
-            <div style={{display:'flex',gap:8}}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmRepeat}>Set</button></div>
+            <div style={{ display: 'flex', gap: 8 }}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmRepeat}>Set</button></div>
           </div>
         </div></div>
       </div>
@@ -373,8 +430,8 @@ export default function App() {
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title" id="seriesSheetTitle">Delete event</div><div className="dlg-body">
           <button className="sheet-opt" id="seriesOpt1"><i data-lucide="calendar"></i><div><div className="sopt-t">This occurrence</div><div className="sopt-s">Remove only this occurrence</div></div></button>
           <button className="sheet-opt" id="seriesOpt2"><i data-lucide="calendar-range"></i><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
-          <button className="sheet-opt" id="seriesOpt3" style={{display:'none'}}><i data-lucide="calendar-range"></i><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
-          <button className="sheet-opt" onClick={closeDialog} style={{color:'var(--t3)'}}><i data-lucide="x"></i><div><div className="sopt-t">Cancel</div></div></button>
+          <button className="sheet-opt" id="seriesOpt3" style={{ display: 'none' }}><i data-lucide="calendar-range"></i><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
+          <button className="sheet-opt" onClick={closeDialog} style={{ color: 'var(--t3)' }}><i data-lucide="x"></i><div><div className="sopt-t">Cancel</div></div></button>
         </div></div>
       </div>
 

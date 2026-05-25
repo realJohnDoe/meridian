@@ -10,23 +10,22 @@ import { useStore } from './store'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
 // Thin wrappers that give vanilla-JS functions synchronous access to
-// the Zustand store. Once views are converted to React components
-// they will read the store directly via useStore().
-const getNodes    = (): Node[]  => useStore.getState().nodes
-const setNodes    = (n: Node[]) => useStore.setState({ nodes: n })
-const bumpId      = (): number  => useStore.getState().bumpId()
-const getCurView  = (): string  => useStore.getState().curView
-const getPrevView = (): string  => useStore.getState().prevView
-const setCurView  = (v: string) => useStore.setState({ curView: v })
-const setPrevView = (v: string) => useStore.setState({ prevView: v })
-const getCalMonth = (): Date    => useStore.getState().calMonth
-const setCalMonth = (d: Date)   => useStore.setState({ calMonth: d })
-const getDvDate   = (): Date    => useStore.getState().dvDate
-const setDvDate   = (d: Date)   => useStore.setState({ dvDate: d })
-const getNsFilter = (): string  => useStore.getState().nsFilterVal
-const setNsFilter = (f: string) => useStore.setState({ nsFilterVal: f })
-const getDirHandle = ()         => useStore.getState().dirHandle
-const setDirHandle = (h: any)   => useStore.setState({ dirHandle: h })
+// the Zustand store.
+const getNodes      = (): Node[]  => useStore.getState().nodes
+const setNodes      = (n: Node[]) => useStore.setState({ nodes: n })
+const bumpId        = (): number  => useStore.getState().bumpId()
+const getPrimary    = ()          => useStore.getState().primaryView
+const setPrimary    = (v: string) => useStore.getState().setPrimaryView(v as any)
+const pushOverlayFn = (v: string) => useStore.getState().pushOverlay(v as any)
+const popOverlayFn  = ()          => useStore.getState().popOverlay()
+const getCalMonth   = (): Date    => useStore.getState().calMonth
+const setCalMonth   = (d: Date)   => useStore.setState({ calMonth: d })
+const getDvDate     = (): Date    => useStore.getState().dvDate
+const setDvDate     = (d: Date)   => useStore.setState({ dvDate: d })
+const getNsFilter   = (): string  => useStore.getState().nsFilterVal
+const setNsFilter   = (f: string) => useStore.setState({ nsFilterVal: f })
+const getDirHandle  = ()          => useStore.getState().dirHandle
+const setDirHandle  = (h: any)    => useStore.setState({ dirHandle: h })
 
 // ── CONSTANTS ─────────────────────────────────────────────────
 const TODAY=new Date();TODAY.setHours(0,0,0,0);
@@ -140,90 +139,34 @@ function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,Ch
 
 
 // ── NAVIGATION ──────────────────────────────────────────────────
-function openSidebar(){
-  document.getElementById('sidebar').classList.add('open');
-  document.getElementById('sidebarOv').classList.add('open');
-  ic();
-}
-function closeSidebar(){
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('sidebarOv').classList.remove('open');
-}
-function sidebarNav(name, btn){
-  closeSidebar();
-  if(name==='day'){openLastDay();return;}
-  document.querySelectorAll('.sni').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  navTo(name, btn);
-}
-function setSidebarActive(name){
-  document.querySelectorAll('.sni').forEach(b=>b.classList.remove('active'));
-  const el=document.getElementById('sni-'+name);
-  if(el)el.classList.add('active');
-}
-function navTo(name,btn){
-  setSidebarActive(name);
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+name).classList.add('active');
-  showChrome();
-  document.getElementById('tbDefault').style.display='';
-  document.getElementById('tbDay').style.display='none';
-  setCurView(name);
-}
-export function pushView(name: string): void {
-  setPrevView(getCurView());
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+name).classList.add('active');
-  if(name==='entry'){
-    hideChrome();
-  } else if(name==='day'){
-    document.getElementById('tbDefault').style.display='none';
-    document.getElementById('tbDay').style.display='flex';
-    document.getElementById('mainTop').style.display='';
-    document.getElementById('bottomFloat').style.display='';
-    setSidebarActive('calendar');
+// All view switching is pure store mutations — no DOM class/style manipulation.
+// App.tsx derives the active view and topbar content from the store reactively.
+
+/** Push an overlay view (entry or search) on top of the current primary view. */
+export function pushOverlay(name: 'entry' | 'search'): void { pushOverlayFn(name); }
+/** Pop the topmost overlay, returning to the primary view (or the overlay below). */
+export function popOverlay(): void { popOverlayFn(); }
+
+export function goToday(): void {
+  const primary = getPrimary();
+  if (primary === 'day') {
+    setDvDate(new Date(TODAY));
+  } else if (primary === 'calendar') {
+    setCalMonth(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
   } else {
-    document.getElementById('mainTop').style.display='none';
-    document.getElementById('bottomFloat').style.display='none';
+    setPrimary('agenda');
+    setTimeout(() => {
+      const sec = document.querySelector(`.day-section[data-key="${dayKey(TODAY)}"]`);
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
   }
-  setCurView(name);
-}
-function popView(){
-  document.getElementById('tbDefault').style.display='';
-  document.getElementById('tbDay').style.display='none';
-  showChrome();
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+getPrevView()).classList.add('active');
-  setSidebarActive(getPrevView());
-  setCurView(getPrevView());
-}
-function showChrome(){
-  document.getElementById('mainTop').style.display='';
-  document.getElementById('bottomFloat').style.display='';
-}
-function hideChrome(){
-  document.getElementById('mainTop').style.display='none';
-  document.getElementById('bottomFloat').style.display='none';
 }
 
-function goToday(){
-  if(getCurView()==='day'){
-    setDvDate(new Date(TODAY));
-  } else if(getCurView()==='calendar'){
-    setCalMonth(new Date(TODAY.getFullYear(),TODAY.getMonth(),1));
-  } else {
-    setSidebarActive('agenda');navTo('agenda',null);
-    setTimeout(()=>{
-      const sec=document.querySelector(`.day-section[data-key="${dayKey(TODAY)}"]`);
-      if(sec)sec.scrollIntoView({behavior:'smooth',block:'start'});
-    },60);
-  }
+export function openSearch(): void {
+  pushOverlayFn('search');
+  setTimeout(() => { (window as any)._focusSearch?.(); }, 50);
 }
-function openSearch(){setPrevView(getCurView());pushView('search');setTimeout(()=>{(window as any)._focusSearch?.();},50);}
-function closeSearch(){popView();}
-function openLastDay(){setDvDate(new Date(TODAY));pushView('day');}
-function closeDayView(){popView();}
-function dvNav(d){setDvDate(addDays(getDvDate(),d));}
+export function closeSearch(): void { popOverlayFn(); }
 
 // ── SHARED OCCURRENCE SORT ────────────────────────────────────
 const _prioOrder={high:0,medium:1,low:2};
@@ -339,10 +282,10 @@ export function ccBarClass(o){
 // MonthView (src/components/MonthView.tsx) subscribes to calMonth + nodes
 // and re-renders automatically — no manual DOM updates needed.
 
-/** Open the day view for a specific date. Called from MonthView cell clicks. */
+/** Navigate to the day view for a specific date. Called from MonthView cell clicks. */
 export function openDayViewForDate(date: Date): void {
   setDvDate(date);
-  pushView('day');
+  setPrimary('day');
 }
 
 // ── ENTRY EDITOR ──────────────────────────────────────────────
@@ -369,7 +312,7 @@ export function buildBodyHtml(text: string): string {
     .replace(/\n/g,'<br>');
 }
 
-export function closeEntry(): void {popView();}
+export function closeEntry(): void { popOverlayFn(); }
 
 export function saveNode(item: Occurrence|null, editScope: string, fields: any): void {
   const {title,tags,body,tracked,done,priority,scheduled,duration,repeat}=fields;
@@ -958,11 +901,10 @@ export function initApp(): void {
   // Scroll-to-today in the agenda is handled by AgendaView on mount.
 }
 
-// Only functions called from vanilla JS inline onclick strings need window exposure
+// Only functions called from vanilla-JS innerHTML onclick strings need window exposure.
+// Navigation is now handled in React (App.tsx); only the repeat-dialog helpers remain.
 Object.assign(window as any, {
-  setEnd,   // used in buildRepeatConfig innerHTML onclick strings
+  setEnd,      // used in buildRepeatConfig innerHTML onclick strings
   autoResize,
-  openSidebar, closeSidebar, sidebarNav,
-  closeDayView, dvNav,
-  syncToDirectory, pickDirectory, goToday, openSearch, closeSearch,
+  syncToDirectory, pickDirectory,
 });
