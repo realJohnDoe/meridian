@@ -5,7 +5,7 @@ import type { Occurrence } from '../types'
 import { expandRange, fmtT, parseDurationHours } from '../recurrence'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
 
-const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
+import { TODAY } from '../constants'
 const SH = 7    // start hour on timeline
 const EH = 22   // end hour on timeline
 const HP = 56   // pixels per hour

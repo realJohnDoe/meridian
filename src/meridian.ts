@@ -7,6 +7,7 @@ import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode
 // @ts-nocheck suppresses the internal DOM-manipulation errors; a follow-up PR will address those.
 import type { Node, Occurrence, Repeat, Scheduled } from './types'
 import { useStore } from './store'
+import { TODAY } from './constants'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
 // Thin wrappers that give vanilla-JS functions synchronous access to
@@ -28,10 +29,7 @@ const getDirHandle  = ()          => useStore.getState().dirHandle
 const setDirHandle  = (h: any)    => useStore.setState({ dirHandle: h })
 
 // ── CONSTANTS ─────────────────────────────────────────────────
-const TODAY=new Date();TODAY.setHours(0,0,0,0);
-const DAYS=['Mo','Tu','We','Th','Fr','Sa','Su'];
-const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-const D=(y,m,d,h=0,mi=0)=>new Date(y,m-1,d,h,mi);
+// TODAY is imported from ./constants
 
 // ── SEED DATA (used by initApp when no vault is loaded) ───────
 const SEED_NODES: Node[] = [
@@ -132,7 +130,6 @@ export const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return
 export const fmtLong=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 export const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 export const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-function autoResize(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 function escapeHtml(s:string):string{return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar,Plus}});}
 
@@ -772,7 +769,7 @@ async function deleteNodeFromDisk(node){
   }
 }
 
-async function syncToDirectory(){
+export async function syncToDirectory(){
   try{
     if(!getDirHandle()){alert('No vault folder connected. Click the folder icon first.');return;}
     const dirty=await cacheGetDirty();
@@ -790,7 +787,7 @@ async function syncToDirectory(){
   }
 }
 
-async function pickDirectory(){
+export async function pickDirectory(){
   try{
     await cacheInit();
     await diskPickDirectory();
@@ -822,17 +819,6 @@ function updateSyncUI(){
   }).catch(()=>{});
 }
 
-const entityToFile=nodeToFile;
-async function loadFromDirectory(){
-  const files=await diskReadAll();
-  const loaded=[];
-  for(const {path, content} of files){
-    await cacheWriteClean(path, content);
-    try{const node=fileToNode(path, content);if(node.title)loaded.push(node);}catch(e){}
-  }
-  setNodes(loaded);
-}
-async function initDexie(){return cacheInit();}
 
 // ── INIT ──────────────────────────────────────────────────────
 export function initApp(): void {
@@ -842,9 +828,4 @@ export function initApp(): void {
   // Scroll-to-today in the agenda is handled by AgendaView on mount.
 }
 
-// Only functions called from vanilla-JS innerHTML onclick strings need window exposure.
-// Navigation is now handled in React (App.tsx); only the repeat-dialog helpers remain.
-Object.assign(window as any, {
-  autoResize,
-  syncToDirectory, pickDirectory,
-});
+// syncToDirectory and pickDirectory are exported and called directly from App.tsx.
