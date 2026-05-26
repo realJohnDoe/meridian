@@ -5,7 +5,15 @@
       "name": "meridian",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--host"],
-      "port": 5173
+      "port": 5173,
+      "autoPort": true
+    },
+    {
+      "name": "meridian-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--host"],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }
