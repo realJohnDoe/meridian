@@ -43,6 +43,10 @@ interface MeridianStore {
   // ── File system ─────────────────────────────────────────────────
   dirHandle: FileSystemDirectoryHandle | null
   setDirHandle: (h: FileSystemDirectoryHandle | null) => void
+
+  // ── Undo toast ──────────────────────────────────────────────────
+  toast: { title: string; onUndo: () => void } | null
+  setToast: (t: { title: string; onUndo: () => void } | null) => void
 }
 
 export const useStore = create<MeridianStore>((set, get) => ({
@@ -76,4 +80,7 @@ export const useStore = create<MeridianStore>((set, get) => ({
 
   dirHandle: null,
   setDirHandle: (dirHandle) => set({ dirHandle }),
+
+  toast: null,
+  setToast: (toast) => set({ toast }),
 }))

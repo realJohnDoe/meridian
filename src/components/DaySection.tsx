@@ -14,7 +14,7 @@ interface Props {
   items: Occurrence[]         // non-multiday, pre-sorted
   onOpen: (occ: Occurrence) => void
   onToggleDone: (occ: Occurrence) => void
-  onSwipeDelete: (occ: Occurrence) => void
+  onSwipeDelete: (occ: Occurrence) => (() => void)
 }
 
 function DaySection({
@@ -25,15 +25,24 @@ function DaySection({
   const sectionRef = useRef<HTMLDivElement>(null)
   // Stores the section-relative top of each row from the previous render.
   const prevTops = useRef<Record<string, number>>({})
+  // Tracks item count so we can distinguish reorders from deletions.
+  const prevItemCount = useRef(items.length)
 
   // FLIP re-sort animation.
   // After React commits the new order, compare each row's current top (relative
   // to the section element, so scroll position is irrelevant) with the top it
   // had in the previous render. Apply an inverse translate then animate it away
   // so items appear to glide into their new positions.
+  //
+  // FLIP only runs on reorders (same item count). On deletions the swipe CSS
+  // animation already moved the surviving items into place; running FLIP on top
+  // of that would make them slide up a second time.
   useLayoutEffect(() => {
     const section = sectionRef.current
     if (!section) return
+
+    const wasReorder = items.length === prevItemCount.current
+    prevItemCount.current = items.length
 
     // Anchor all measurements to the section so that page scroll between renders
     // doesn't produce false deltas for sections that didn't actually reorder.
@@ -45,20 +54,22 @@ function DaySection({
     wraps.forEach(wrap => {
       const key = wrap.getAttribute('data-occ-key')!
       const curr = wrap.getBoundingClientRect().top - sectionTop   // section-relative
-      const prev = prevTops.current[key]
 
-      if (prev !== undefined) {
-        const dy = prev - curr
-        if (Math.abs(dy) > 1) {
-          wrap.style.transition = 'none'
-          wrap.style.transform = `translateY(${dy}px)`
-          // Force reflow so the browser registers the translate before we remove it.
-          void wrap.offsetHeight
-          requestAnimationFrame(() => {
-            wrap.style.transition = 'transform .35s cubic-bezier(.4,0,.2,1)'
-            wrap.style.transform = ''
-            wrap.addEventListener('transitionend', () => { wrap.style.transition = '' }, { once: true })
-          })
+      if (wasReorder) {
+        const prev = prevTops.current[key]
+        if (prev !== undefined) {
+          const dy = prev - curr
+          if (Math.abs(dy) > 1) {
+            wrap.style.transition = 'none'
+            wrap.style.transform = `translateY(${dy}px)`
+            // Force reflow so the browser registers the translate before we remove it.
+            void wrap.offsetHeight
+            requestAnimationFrame(() => {
+              wrap.style.transition = 'transform .35s cubic-bezier(.4,0,.2,1)'
+              wrap.style.transform = ''
+              wrap.addEventListener('transitionend', () => { wrap.style.transition = '' }, { once: true })
+            })
+          }
         }
       }
 

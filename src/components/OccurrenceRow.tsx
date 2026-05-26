@@ -9,7 +9,7 @@ interface Props {
   index: number
   onOpen: () => void
   onToggleDone: () => void
-  onSwipeDelete: () => void
+  onSwipeDelete: () => (() => void)
 }
 
 export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete }: Props) {
@@ -96,22 +96,24 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       hintL.style.display = 'none'
       hintL.style.filter = ''
       hintL.style.opacity = ''
-      row.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1)'
       if (dx <= -THRESHOLD && isFull) {
+        // Phase 1: show toast immediately (before animation completes).
+        // beginSwipeDelete() returns applyDelete — the function that actually
+        // removes the item from the store once the exit animation is done.
+        const applyDelete = onSwipeDeleteRef.current()
+        // Kick off slide + collapse simultaneously.
+        wrap.style.height = wrap.offsetHeight + 'px'
+        wrap.style.overflow = 'hidden'
+        void wrap.offsetHeight  // force reflow so the fixed height is registered
+        row.style.transition = 'transform .22s cubic-bezier(.4,0,.2,1)'
         row.style.transform = `translateX(-${rowW}px)`
-        setTimeout(() => {
-          wrap.style.height = wrap.offsetHeight + 'px'
-          wrap.style.overflow = 'hidden'
-          requestAnimationFrame(() => {
-            wrap.style.transition = 'height .2s ease,opacity .2s ease'
-            wrap.style.height = '0'
-            wrap.style.opacity = '0'
-          })
-          // Data deletion fires after the collapse animation completes.
-          // By then the element is invisible so React removing it is seamless.
-          setTimeout(() => onSwipeDeleteRef.current(), 220)
-        }, 260)
+        wrap.style.transition = 'height .22s ease, opacity .22s ease'
+        wrap.style.height = '0'
+        wrap.style.opacity = '0'
+        // Phase 2: remove from store after animation so React unmounts cleanly.
+        setTimeout(() => applyDelete(), 230)
       } else {
+        row.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1)'
         row.style.transform = ''
       }
     }

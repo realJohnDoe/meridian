@@ -245,10 +245,19 @@ export function toggleOccDone(o): void {
 }
 
 // ── SWIPE DELETE (exported for React components) ──────────────
-export function swipeDeleteOcc(o): void {
+// Two-phase delete so the toast can appear at the moment the user lifts their
+// finger, while the exit animation is still playing.
+//
+// Phase 1 — call beginSwipeDelete() on touchend:
+//   Shows the toast immediately.  Returns an applyDelete() function.
+// Phase 2 — call applyDelete() after the exit animation completes (~230 ms):
+//   Removes the item from the Zustand store so React unmounts it.
+//   applyDelete() is a no-op if the user already pressed Undo.
+export function beginSwipeDelete(o): ()=>void {
   const node=o._node||o;
   const nodeId=node.id;
   const title=node.title;
+  let cancelled=false;
 
   if(o.recur){
     const original=cloneNode(node); // snapshot for undo
@@ -258,19 +267,30 @@ export function swipeDeleteOcc(o): void {
     const inst=updated.instances.find(i=>i.date===occDate&&!i.time);
     if(inst){inst.excluded=true;}
     else{updated.instances.push({date:occDate,excluded:true});}
-    setNodes(replaceNode(getNodes(), nodeId, updated));
+    // Apply mutation to `updated` now so commitFn (writeEntityToCache) always
+    // sees the correct state even if a second delete fires before applyDelete.
     showDeleteToast(title,
       ()=>{ writeEntityToCache(updated); },
-      ()=>{ setNodes(replaceNode(getNodes(), nodeId, original)); }
+      ()=>{
+        cancelled=true;
+        setNodes(replaceNode(getNodes(), nodeId, original));
+      }
     );
+    // applyDelete: swap updated node into the store (triggers React re-render).
+    return ()=>{ if(!cancelled) setNodes(replaceNode(getNodes(), nodeId, updated)); };
   } else {
-    setNodes(getNodes().filter(n=>n.id!==nodeId));
     showDeleteToast(title,
       ()=>{ deleteNodeFromDisk(node); },
       ()=>{
-        setNodes([...getNodes(), node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
+        cancelled=true;
+        // Only restore if applyDelete already removed the node.
+        if(!getNodes().find(n=>n.id===nodeId)){
+          setNodes([...getNodes(),node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
+        }
       }
     );
+    // applyDelete: filter the node out of the store.
+    return ()=>{ if(!cancelled) setNodes(getNodes().filter(n=>n.id!==nodeId)); };
   }
 }
 
@@ -621,42 +641,33 @@ function insertWikilink(title){
 }
 
 // ── UNDO TOAST MANAGER ───────────────────────────────────────
-let _toastTimer=null, _toastEl=null, _pendingDelete=null;
+// Timer lives in module scope so it survives across React renders.
+let _toastTimer=null;
+let _pendingCommit=null;
 const TOAST_MS=4000;
 
 function showDeleteToast(title, commitFn, undoFn){
-  if(_toastTimer){commitToast();}
-  _pendingDelete={commitFn, undoFn};
-  const toast=document.createElement('div');
-  toast.className='undo-toast';
-  toast.innerHTML=
-    `<span class="undo-toast-msg">Deleted: <strong>${escapeHtml(title)}</strong></span>`+
-    `<button class="undo-btn">Undo</button>`;
-  const float=document.getElementById('bottomFloat');
-  float.insertBefore(toast, float.firstChild);
-  _toastEl=toast;
-  toast.querySelector('.undo-btn').onclick=()=>{undoToast();};
-  _toastTimer=setTimeout(()=>commitToast(), TOAST_MS);
-}
+  // Commit any previous pending delete before showing the new one.
+  if(_toastTimer){ clearTimeout(_toastTimer); _toastTimer=null; }
+  if(_pendingCommit){ _pendingCommit(); _pendingCommit=null; }
 
-function commitToast(){
-  if(!_toastTimer)return;
-  clearTimeout(_toastTimer);_toastTimer=null;
-  if(_pendingDelete){_pendingDelete.commitFn();_pendingDelete=null;}
-  dismissToast();
-}
-
-function undoToast(){
-  clearTimeout(_toastTimer);_toastTimer=null;
-  if(_pendingDelete){_pendingDelete.undoFn();_pendingDelete=null;}
-  dismissToast();
-}
-
-function dismissToast(){
-  if(!_toastEl)return;
-  const el=_toastEl;_toastEl=null;
-  el.classList.add('hiding');
-  setTimeout(()=>el.remove(),280);
+  _pendingCommit=commitFn;
+  useStore.setState({
+    toast:{
+      title,
+      onUndo:()=>{
+        clearTimeout(_toastTimer); _toastTimer=null;
+        _pendingCommit=null;
+        undoFn();
+        useStore.setState({toast:null});
+      },
+    },
+  });
+  _toastTimer=setTimeout(()=>{
+    _toastTimer=null;
+    if(_pendingCommit){ _pendingCommit(); _pendingCommit=null; }
+    useStore.setState({toast:null});
+  }, TOAST_MS);
 }
 
 function addSwipe(el,onLeft,onRight){
