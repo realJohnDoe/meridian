@@ -18,7 +18,6 @@ export default function AgendaView({ onOpen }: Props) {
 
   // Expand occurrences and group them by day — same window as buildAgenda().
   const groups = useMemo(() => {
-    console.log('[toast] AgendaView useMemo re-running (nodes changed)', performance.now().toFixed(1))
     const from = addDays(TODAY, -7)
     const to = addDays(TODAY, 90)
     const occs = expandRange(nodes, from, to) as Occurrence[]

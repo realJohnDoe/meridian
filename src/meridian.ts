@@ -229,7 +229,6 @@ export function toggleOccDone(o): void {
 
 // ── SWIPE DELETE (exported for React components) ──────────────
 export function swipeDeleteOcc(o): void {
-  console.log('[toast] swipeDeleteOcc called', performance.now().toFixed(1));
   const node=o._node||o;
   const nodeId=node.id;
   const title=node.title;
@@ -604,7 +603,6 @@ function showDeleteToast(title, commitFn, undoFn, extraState={}){
   if(_pendingCommit){ _pendingCommit(); _pendingCommit=null; }
 
   _pendingCommit=commitFn;
-  console.log(`[toast] T+0 showDeleteToast called, extraState keys: ${Object.keys(extraState).join(',') || '(none)'}`, performance.now().toFixed(1));
   // Merge extraState (e.g. updated nodes) into the same setState call so that
   // the agenda update and the toast appearance happen in a single React render.
   useStore.setState({

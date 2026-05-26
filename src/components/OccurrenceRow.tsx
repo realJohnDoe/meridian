@@ -109,10 +109,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
         wrap.style.transition = 'height .22s ease, opacity .22s ease'
         wrap.style.height = '0'
         wrap.style.opacity = '0'
-        setTimeout(() => {
-          console.log('[toast] swipe timeout fired → calling onSwipeDelete', performance.now().toFixed(1))
-          onSwipeDeleteRef.current()
-        }, 230)
+        setTimeout(() => onSwipeDeleteRef.current(), 230)
       } else {
         row.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1)'
         row.style.transform = ''
