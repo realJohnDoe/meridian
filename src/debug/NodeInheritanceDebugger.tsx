@@ -148,7 +148,7 @@ export default function NodeInheritanceDebugger() {
 
     const validation = RawNodeSchema.safeParse(parsed)
     if (!validation.success) {
-      setZodErrors(validation.error.errors.map(e => `${e.path.join('.')}: ${e.message}`))
+      setZodErrors(validation.error.issues.map(e => `${e.path.join('.')}: ${e.message}`))
       return
     }
 
