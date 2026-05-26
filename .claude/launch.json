@@ -7,13 +7,6 @@
       "runtimeArgs": ["dev", "--", "--host"],
       "port": 5173,
       "autoPort": true
-    },
-    {
-      "name": "meridian-dev",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev", "--", "--host"],
-      "port": 5173,
-      "autoPort": true
     }
   ]
 }
