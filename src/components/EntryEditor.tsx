@@ -1,6 +1,8 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { ArrowLeft, Trash2, Check, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue } from '../types'
+import { useStore } from '../store'
+import { NOTES_DATA } from '../meridian'
 
 export type { Scheduled }
 
@@ -62,6 +64,95 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const [tagInputVal, setTagInputVal] = useState('')
   const [showTagInput, setShowTagInput] = useState(false)
 
+  // ── Wikilink autocomplete state ───────────────────────────────
+  const nodes = useStore(s => s.nodes)
+  const [wlMatches, setWlMatches] = useState<string[]>([])
+  const [wlFocusIdx, setWlFocusIdx] = useState(-1)
+  const [wlPopupPos, setWlPopupPos] = useState<{ top: number; left: number } | null>(null)
+  const wlOpen = wlMatches.length > 0 && wlPopupPos !== null
+
+  const closeWlPopup = useCallback(() => {
+    setWlMatches([])
+    setWlPopupPos(null)
+  }, [])
+
+  // Close popup when clicking outside the body editor.
+  useEffect(() => {
+    if (!wlOpen) return
+    const handler = (e: MouseEvent) => {
+      if (!bodyRef.current?.contains(e.target as Node)) closeWlPopup()
+    }
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  }, [wlOpen, closeWlPopup])
+
+  const insertWikilink = useCallback((title: string) => {
+    closeWlPopup()
+    const sel = window.getSelection()
+    if (!sel?.rangeCount || !bodyRef.current) return
+    const range = sel.getRangeAt(0)
+    const preRange = document.createRange()
+    preRange.setStart(bodyRef.current, 0)
+    try { preRange.setEnd(range.startContainer, range.startOffset) } catch { return }
+    const before = preRange.toString()
+    if (before.lastIndexOf('[[') === -1) return
+    const textNode = range.startContainer
+    const pos = range.startOffset
+    const fullText = textNode.textContent ?? ''
+    const localOpen = fullText.lastIndexOf('[[', pos - 1)
+    if (localOpen === -1) return
+    textNode.textContent = fullText.slice(0, localOpen) + '[[' + title + ']]' + fullText.slice(pos)
+    const newPos = localOpen + title.length + 4
+    const newRange = document.createRange()
+    newRange.setStart(textNode, Math.min(newPos, (textNode.textContent ?? '').length))
+    newRange.collapse(true)
+    sel.removeAllRanges()
+    sel.addRange(newRange)
+  }, [closeWlPopup])
+
+  function handleBodyInput() {
+    if (!bodyRef.current) return
+    const sel = window.getSelection()
+    if (!sel?.rangeCount) { closeWlPopup(); return }
+    const range = sel.getRangeAt(0)
+    if (!bodyRef.current.contains(range.startContainer)) { closeWlPopup(); return }
+    const preRange = document.createRange()
+    preRange.setStart(bodyRef.current, 0)
+    try { preRange.setEnd(range.startContainer, range.startOffset) } catch { closeWlPopup(); return }
+    const before = preRange.toString()
+    const m = before.match(/\[\[([^\]\n]*)$/)
+    if (m) {
+      const q = m[1].toLowerCase()
+      if (!q) { closeWlPopup(); return }
+      const allTitles = [...new Set([...nodes, ...NOTES_DATA].map(o => o.title))]
+      const matches = allTitles.filter(t => t.toLowerCase().includes(q)).slice(0, 8)
+      if (matches.length) {
+        setWlMatches(matches)
+        setWlFocusIdx(-1)
+        const rect = range.getBoundingClientRect()
+        setWlPopupPos({ top: rect.bottom + 6, left: Math.max(8, rect.left) })
+        return
+      }
+    }
+    closeWlPopup()
+  }
+
+  function handleBodyKeyDown(e: React.KeyboardEvent) {
+    if (!wlOpen) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setWlFocusIdx(i => Math.min(i + 1, wlMatches.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setWlFocusIdx(i => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter' && wlFocusIdx >= 0) {
+      e.preventDefault()
+      insertWikilink(wlMatches[wlFocusIdx])
+    } else if (e.key === 'Escape') {
+      closeWlPopup()
+    }
+  }
+
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
@@ -97,6 +188,12 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const showRepeat = !isNote && (hasDate || tracked) && !isSingleScope
   const priorityChipClass = ['pchip', !tracked ? 'hidden' : '', priority ? 'on' : '', priority ? PRIORITY_CLASS[priority] : ''].filter(Boolean).join(' ')
   const bodyKey = item ? `${item._nodeId || item.id || 'item'}-${item.date || ''}-${editScope}` : 'new'
+
+  // Set body HTML imperatively so React never touches innerHTML during re-renders
+  // triggered by wikilink state updates. bodyKey changes when a new entry is opened
+  // or the edit scope changes, remounting the div via key= and re-running this effect.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (bodyRef.current) bodyRef.current.innerHTML = bodyHtml }, [bodyKey])
 
   const showScopeRow = isRecur || hasSched
 
@@ -238,10 +335,33 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           contentEditable
           suppressContentEditableWarning
           spellCheck={false}
-          dangerouslySetInnerHTML={{ __html: bodyHtml }}
+          onInput={handleBodyInput}
+          onKeyDown={handleBodyKeyDown}
         />
 
       </div></div>
+
+      {/* ── WIKILINK AUTOCOMPLETE POPUP ── */}
+      {wlOpen && wlPopupPos && (
+        <div className="wl-popup show" style={{ top: wlPopupPos.top, left: wlPopupPos.left }}>
+          {wlMatches.map((t, i) => {
+            const match = nodes.find(n => n.title === t) ?? NOTES_DATA.find(n => n.title === t)
+            const Icon = (match && 'done' in match && match.done !== undefined) ? CheckSquare
+              : (match && 'time' in match && (match as { time?: string }).time) ? Calendar
+              : FileText
+            return (
+              <div
+                key={t}
+                className={`wl-item${i === wlFocusIdx ? ' focused' : ''}`}
+                onMouseDown={e => { e.preventDefault(); insertWikilink(t) }}
+              >
+                <Icon size={13} />
+                {t}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </>
   )
 }

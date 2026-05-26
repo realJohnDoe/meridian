@@ -1,6 +1,5 @@
 // @ts-nocheck
 import Dexie from 'dexie'
-import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar, Plus, X } from 'lucide'
 import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './recurrence'
 import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode, titleToSlug } from './yaml'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
@@ -143,8 +142,6 @@ export const fmtLong=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long
 export const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 export const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 function escapeHtml(s:string):string{return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar,Plus,X}});}
-
 
 // ── NAVIGATION ──────────────────────────────────────────────────
 // All view switching is pure store mutations — no DOM class/style manipulation.
@@ -579,83 +576,11 @@ export function deleteNode(
 
   if(onShowSeries)onShowSeries();
   else document.getElementById('seriesSheet').classList.add('open');
-  ic();
 }
 
 // ── WIKILINK AUTOCOMPLETE ─────────────────────────────────────
-let wlFocusIdx=-1;
-
-export function wikilinkInputHandler(e: Event): void {
-  if(!e.target.closest('#entryBody'))return;
-  const sel=window.getSelection();if(!sel.rangeCount)return;
-  const range=sel.getRangeAt(0);
-  const bodyEl=document.getElementById('entryBody');
-  const preRange=document.createRange();
-  preRange.setStart(bodyEl,0);
-  try{preRange.setEnd(range.startContainer,range.startOffset);}catch(err){return;}
-  const before=preRange.toString();
-  const m=before.match(/\[\[([^\]\n]*)$/);
-  const popup=document.getElementById('wlPopup');
-  if(m){
-    const q=m[1].toLowerCase();
-    if(!q){popup.classList.remove('show');return;}
-    const allTitles=[...new Set([...getNodes(),...NOTES_DATA].map(o=>o.title))];
-    const matches=allTitles.filter(t=>t.toLowerCase().includes(q)).slice(0,8);
-    if(matches.length){
-      wlFocusIdx=-1;
-      popup.innerHTML=matches.map(t=>{
-        const o=getNodes().find(n=>n.title===t)||NOTES_DATA.find(n=>n.title===t);
-        const icon=o?.done!==undefined?'check-square':o?.time?'calendar':'file-text';
-        return `<div class="wl-item" data-title="${escapeHtml(t)}"><i data-lucide="${icon}"></i>${escapeHtml(t)}</div>`;
-      }).join('');
-      popup.classList.add('show');
-      const rect=range.getBoundingClientRect();
-      popup.style.top=(rect.bottom+6)+'px';
-      popup.style.left=Math.max(8,rect.left)+'px';
-      popup.querySelectorAll('.wl-item').forEach(item=>{item.onmousedown=ev=>{ev.preventDefault();insertWikilink(item.dataset.title);};});
-      ic();return;
-    }
-  }
-  popup.classList.remove('show');
-}
-
-export function wikilinkKeydownHandler(e: Event): void {
-  const popup=document.getElementById('wlPopup');
-  if(popup.classList.contains('show')){
-    const items=popup.querySelectorAll('.wl-item');
-    if(e.key==='ArrowDown'){e.preventDefault();wlFocusIdx=Math.min(wlFocusIdx+1,items.length-1);items.forEach((it,i)=>it.classList.toggle('focused',i===wlFocusIdx));return;}
-    if(e.key==='ArrowUp'){e.preventDefault();wlFocusIdx=Math.max(wlFocusIdx-1,0);items.forEach((it,i)=>it.classList.toggle('focused',i===wlFocusIdx));return;}
-    if(e.key==='Enter'&&wlFocusIdx>=0){e.preventDefault();insertWikilink(items[wlFocusIdx].dataset.title);return;}
-    if(e.key==='Escape'){popup.classList.remove('show');return;}
-  }
-  if(e.key==='Escape')document.querySelectorAll('.dlg-ov.open').forEach(d=>d.classList.remove('open'));
-}
-
-export function wikilinkClickHandler(e: Event): void {
-  const p=document.getElementById('wlPopup');
-  if(p&&!p.contains(e.target)&&!e.target.closest('#entryBody'))p.classList.remove('show');
-}
-
-function insertWikilink(title){
-  const popup=document.getElementById('wlPopup');popup.classList.remove('show');
-  const sel=window.getSelection();if(!sel.rangeCount)return;
-  const range=sel.getRangeAt(0);
-  const bodyEl=document.getElementById('entryBody');
-  const preRange=document.createRange();preRange.setStart(bodyEl,0);
-  try{preRange.setEnd(range.startContainer,range.startOffset);}catch(err){return;}
-  const before=preRange.toString();
-  const openBracket=before.lastIndexOf('[[');if(openBracket===-1)return;
-  const node=range.startContainer;
-  const pos=range.startOffset;
-  const fullText=node.textContent;
-  const localOpenBracket=fullText.lastIndexOf('[[',pos-1);
-  if(localOpenBracket===-1)return;
-  node.textContent=fullText.slice(0,localOpenBracket)+'[['+title+']]'+fullText.slice(pos);
-  const newPos=localOpenBracket+title.length+4;
-  const newRange=document.createRange();
-  newRange.setStart(node,Math.min(newPos,node.textContent.length));
-  newRange.collapse(true);sel.removeAllRanges();sel.addRange(newRange);
-}
+// Fully migrated to EntryEditor.tsx (React state + component-local handlers).
+// wikilinkInputHandler, wikilinkKeydownHandler, wikilinkClickHandler, insertWikilink deleted.
 
 // ── UNDO TOAST MANAGER ───────────────────────────────────────
 // Timer lives in module scope so it survives across React renders.
@@ -868,7 +793,6 @@ function updateSyncUI(){
 // ── INIT ──────────────────────────────────────────────────────
 export function initApp(): void {
   setNodes(SEED_NODES);
-  ic();
   // Month calendar, Day view, Search, and Filter overlay are all React components.
   // Scroll-to-today in the agenda is handled by AgendaView on mount.
 }
