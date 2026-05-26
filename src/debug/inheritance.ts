@@ -281,6 +281,21 @@ function valueLines(v: unknown, indent: number): string[] {
   return [inlineVal(v) ?? String(v)]
 }
 
+/**
+ * Serialize a RawNode directly to YAML frontmatter, preserving its structure
+ * (defaults, instances) without any collapse optimisation.
+ */
+export function serializeRawNode(node: RawNode, body = ''): string {
+  const rootFields = Object.fromEntries(
+    Object.entries(node).filter(([k]) => k !== 'defaults' && k !== 'instances'),
+  )
+  const defaults  = (node.defaults  as Record<string, unknown>) ?? {}
+  const instances = Array.isArray(node.instances)
+    ? (node.instances as Record<string, unknown>[])
+    : []
+  return yamlFrontmatter(rootFields, defaults, instances, body)
+}
+
 function yamlFrontmatter(
   rootFields: Record<string, unknown>,
   defaults:   Record<string, unknown>,
