@@ -19,6 +19,7 @@ import { useStore } from './store'
 import type { PrimaryView } from './store'
 import EntryEditor, { EntryState, ENTRY_DEFAULT, ItemType } from './components/EntryEditor'
 import RepeatDialog from './components/RepeatDialog'
+import UndoToast from './components/UndoToast'
 import AgendaView from './components/AgendaView'
 import MonthView from './components/MonthView'
 import DayView from './components/DayView'
@@ -314,9 +315,10 @@ export default function App() {
           />
         )}
 
-        {/* ── BOTTOM SEARCH BAR ── */}
+        {/* ── BOTTOM FLOAT: toast (above) + search bar (below) ── */}
         {showBottomFloat && (
-          <div className="bottom-float" id="bottomFloat">
+          <div className="bottom-float">
+            <UndoToast />
             <div className="search-bar-wrap">
               <Search size={15} className="search-bar-icon" />
               <input

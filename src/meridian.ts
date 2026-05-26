@@ -589,42 +589,33 @@ function insertWikilink(title){
 }
 
 // ── UNDO TOAST MANAGER ───────────────────────────────────────
-let _toastTimer=null, _toastEl=null, _pendingDelete=null;
+// Timer lives in module scope so it survives across React renders.
+let _toastTimer=null;
+let _pendingCommit=null;
 const TOAST_MS=4000;
 
 function showDeleteToast(title, commitFn, undoFn){
-  if(_toastTimer){commitToast();}
-  _pendingDelete={commitFn, undoFn};
-  const toast=document.createElement('div');
-  toast.className='undo-toast';
-  toast.innerHTML=
-    `<span class="undo-toast-msg">Deleted: <strong>${escapeHtml(title)}</strong></span>`+
-    `<button class="undo-btn">Undo</button>`;
-  const float=document.getElementById('bottomFloat');
-  float.insertBefore(toast, float.firstChild);
-  _toastEl=toast;
-  toast.querySelector('.undo-btn').onclick=()=>{undoToast();};
-  _toastTimer=setTimeout(()=>commitToast(), TOAST_MS);
-}
+  // Commit any previous pending delete before showing the new one.
+  if(_toastTimer){ clearTimeout(_toastTimer); _toastTimer=null; }
+  if(_pendingCommit){ _pendingCommit(); _pendingCommit=null; }
 
-function commitToast(){
-  if(!_toastTimer)return;
-  clearTimeout(_toastTimer);_toastTimer=null;
-  if(_pendingDelete){_pendingDelete.commitFn();_pendingDelete=null;}
-  dismissToast();
-}
-
-function undoToast(){
-  clearTimeout(_toastTimer);_toastTimer=null;
-  if(_pendingDelete){_pendingDelete.undoFn();_pendingDelete=null;}
-  dismissToast();
-}
-
-function dismissToast(){
-  if(!_toastEl)return;
-  const el=_toastEl;_toastEl=null;
-  el.classList.add('hiding');
-  setTimeout(()=>el.remove(),280);
+  _pendingCommit=commitFn;
+  useStore.setState({
+    toast:{
+      title,
+      onUndo:()=>{
+        clearTimeout(_toastTimer); _toastTimer=null;
+        _pendingCommit=null;
+        undoFn();
+        useStore.setState({toast:null});
+      },
+    },
+  });
+  _toastTimer=setTimeout(()=>{
+    _toastTimer=null;
+    if(_pendingCommit){ _pendingCommit(); _pendingCommit=null; }
+    useStore.setState({toast:null});
+  }, TOAST_MS);
 }
 
 function addSwipe(el,onLeft,onRight){

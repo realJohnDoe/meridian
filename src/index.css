@@ -36,26 +36,28 @@ input,textarea,select{font-family:inherit}
 .view{flex:1;overflow:hidden;display:none;flex-direction:column}
 .view.active{display:flex}
 
-/* ── UNDO TOAST + FAB FLOAT ROW ── */
+/* ── UNDO TOAST + SEARCH BAR COLUMN ── */
 .bottom-float{
   position:absolute;
   bottom:calc(var(--nh) + 14px);
   left:14px;right:14px;
-  display:flex;align-items:center;gap:10px;
+  display:flex;flex-direction:column;gap:8px;
   pointer-events:none;
   z-index:50;
 }
+/* Toast is a compact notification chip — visually secondary to the search bar */
 .undo-toast{
-  flex:1;min-width:0;
-  background:var(--bg3);border:1px solid var(--bdr2);border-radius:var(--r);
-  padding:10px 14px;display:flex;align-items:center;gap:10px;
-  box-shadow:0 4px 20px rgba(0,0,0,.4);
+  width:100%;
+  background:rgba(36,48,73,.88);backdrop-filter:blur(8px);
+  border:1px solid var(--bdr2);border-radius:20px;
+  padding:8px 10px 8px 14px;display:flex;align-items:center;gap:8px;
+  box-shadow:0 2px 12px rgba(0,0,0,.3);
   pointer-events:all;
   transition:opacity .25s ease,transform .25s ease;
 }
-.undo-toast.hiding{opacity:0;transform:translateY(8px)}
-.undo-toast-msg{flex:1;font-size:13px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.undo-btn{font-size:12px;font-weight:700;color:var(--ind);padding:4px 10px;border-radius:20px;background:var(--ab);flex-shrink:0;cursor:pointer}
+.undo-toast.hiding{opacity:0;transform:translateY(6px)}
+.undo-toast-msg{flex:1;font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.undo-btn{font-size:11px;font-weight:700;color:var(--ind);padding:3px 10px;border-radius:20px;background:var(--ab);flex-shrink:0;cursor:pointer}
 .undo-btn:hover{background:var(--ab2)}
 
 /* ── SIDEBAR ── */
@@ -73,7 +75,8 @@ input,textarea,select{font-family:inherit}
 .sni:hover{background:var(--bg3)}
 
 /* ── SEARCH BAR (replaces FAB) ── */
-.search-bar-wrap{flex:1;display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid rgba(148,163,184,.18);border-radius:26px;padding:0 6px 0 14px;height:48px;box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 40px rgba(99,102,241,.18),0 0 0 1px rgba(129,140,248,.06);pointer-events:all;transition:box-shadow .2s,border-color .2s}
+/* flex:none so the column-direction flex-basis doesn't fight the explicit height */
+.search-bar-wrap{flex:none;display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid rgba(148,163,184,.18);border-radius:26px;padding:0 6px 0 14px;height:52px;box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 40px rgba(99,102,241,.18),0 0 0 1px rgba(129,140,248,.06);pointer-events:all;transition:box-shadow .2s,border-color .2s}
 .search-bar-wrap:focus-within{border-color:rgba(129,140,248,.35);box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 44px rgba(99,102,241,.3),0 0 0 1px rgba(129,140,248,.18)}
 .search-bar-icon{width:15px;height:15px;stroke:var(--t3);fill:none;stroke-width:2;flex-shrink:0}
 .search-bar-input{flex:1;background:none;border:none;outline:none;color:var(--t0);font-size:14px;min-width:0}
