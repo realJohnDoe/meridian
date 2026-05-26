@@ -56,40 +56,32 @@ const depthColour   = (d: number) => DEPTH_COLOURS[d % DEPTH_COLOURS.length]
 
 type ActionKind = 'add' | 'edit-occurrence' | 'edit-pattern' | 'edit-following'
 
-// ── Raw-node action functions ─────────────────────────────────────────────────
+// ── Sub-node navigation ───────────────────────────────────────────────────────
 
-function doAddOccurrence(node: RawNode, date: string, time: string, done: boolean): RawNode {
-  const inst: Record<string, unknown> = { date }
-  if (time) inst.time = time
-  inst.done = done
-  return { ...node, instances: [...((node.instances as RawNode[]) ?? []), inst as RawNode] }
+/** Navigate to the sub-node at the given instance-index path. */
+function getSubNode(node: RawNode, path: number[]): RawNode {
+  let cur = node
+  for (const i of path) cur = ((cur.instances as RawNode[]) ?? [])[i]
+  return cur
 }
 
-function doEditOccurrence(
-  node: RawNode, occDate: string, date: string, time: string, done: boolean,
-): RawNode {
-  const instances = [...((node.instances as RawNode[]) ?? [])]
-  const idx = instances.findIndex(i => String((i as Record<string, unknown>).date) === occDate)
-  const updated: Record<string, unknown> = { date }
-  if (time) updated.time = time
-  updated.done = done
-  if (idx >= 0) {
-    instances[idx] = { ...instances[idx], ...updated } as RawNode
-  } else {
-    instances.push(updated as RawNode)
-  }
-  return { ...node, instances }
+/** Immutably replace the sub-node at the given path and return the updated root. */
+function setSubNode(root: RawNode, path: number[], updated: RawNode): RawNode {
+  if (path.length === 0) return updated
+  const [head, ...tail] = path
+  const instances = [...((root.instances as RawNode[]) ?? [])]
+  instances[head] = setSubNode(instances[head], tail, updated)
+  return { ...root, instances }
 }
 
-function doEditPattern(node: RawNode, newRepeat: Record<string, unknown>): RawNode {
-  return { ...node, repeat: newRepeat }
-}
-
-function doEditFollowing(node: RawNode, occDate: string): RawNode {
+/**
+ * Split a single repeat-bearing node at `occDate` into two series.
+ * series1 ends the day before occDate; series2 starts at occDate with same pattern.
+ */
+function splitNode(node: RawNode, occDate: string): [RawNode, RawNode] {
   const originalRepeat = ((node.repeat ?? {}) as Record<string, unknown>)
   const allInstances   = ((node.instances ?? []) as RawNode[])
 
-  // First series: original start → day before occDate
   const series1: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(node)) {
     if (k === 'instances' || k === 'defaults' || k === 'repeat') continue
@@ -99,7 +91,6 @@ function doEditFollowing(node: RawNode, occDate: string): RawNode {
   const instsBefore = allInstances.filter(i => String((i as Record<string, unknown>).date) < occDate)
   if (instsBefore.length > 0) series1.instances = instsBefore
 
-  // Second series: occDate → open end (same pattern, user can edit)
   const repeatNoEnd = Object.fromEntries(Object.entries(originalRepeat).filter(([k]) => k !== 'end'))
   const series2: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(node)) {
@@ -111,14 +102,66 @@ function doEditFollowing(node: RawNode, occDate: string): RawNode {
   const instsFrom = allInstances.filter(i => String((i as Record<string, unknown>).date) >= occDate)
   if (instsFrom.length > 0) series2.instances = instsFrom
 
-  // Container root: shared non-temporal fields + defaults
-  const container: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(node)) {
-    if (['date', 'time', 'repeat', 'instances'].includes(k)) continue
-    container[k] = v   // includes title, tags, priority, defaults, …
+  return [series1 as RawNode, series2 as RawNode]
+}
+
+// ── Raw-node action functions ─────────────────────────────────────────────────
+
+function doAddOccurrence(node: RawNode, ownerPath: number[], date: string, time: string, done: boolean): RawNode {
+  const sub  = getSubNode(node, ownerPath)
+  const inst: Record<string, unknown> = { date }
+  if (time) inst.time = time
+  inst.done = done
+  return setSubNode(node, ownerPath, {
+    ...sub,
+    instances: [...((sub.instances as RawNode[]) ?? []), inst as RawNode],
+  })
+}
+
+function doEditOccurrence(
+  node: RawNode, ownerPath: number[], occDate: string, date: string, time: string, done: boolean,
+): RawNode {
+  const sub       = getSubNode(node, ownerPath)
+  const instances = [...((sub.instances as RawNode[]) ?? [])]
+  const idx       = instances.findIndex(i => String((i as Record<string, unknown>).date) === occDate)
+  const updated: Record<string, unknown> = { date }
+  if (time) updated.time = time
+  updated.done = done
+  if (idx >= 0) {
+    instances[idx] = { ...instances[idx], ...updated } as RawNode
+  } else {
+    instances.push(updated as RawNode)
   }
-  container.instances = [series1, series2]
-  return container as RawNode
+  return setSubNode(node, ownerPath, { ...sub, instances })
+}
+
+function doEditPattern(node: RawNode, ownerPath: number[], newRepeat: Record<string, unknown>): RawNode {
+  const sub = getSubNode(node, ownerPath)
+  return setSubNode(node, ownerPath, { ...sub, repeat: newRepeat })
+}
+
+function doEditFollowing(node: RawNode, ownerPath: number[], occDate: string): RawNode {
+  if (ownerPath.length === 0) {
+    // Root has repeat — wrap into a container with two child series
+    const [series1, series2] = splitNode(node, occDate)
+    const container: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(node)) {
+      if (['date', 'time', 'repeat', 'instances'].includes(k)) continue
+      container[k] = v
+    }
+    container.instances = [series1, series2]
+    return container as RawNode
+  }
+
+  // Child has repeat — split and flatten back into parent's instances array
+  const parentPath = ownerPath.slice(0, -1)
+  const childIdx   = ownerPath[ownerPath.length - 1]
+  const parent     = getSubNode(node, parentPath)
+  const sub        = ((parent.instances as RawNode[]) ?? [])[childIdx]
+  const [series1, series2] = splitNode(sub, occDate)
+  const newInstances = [...((parent.instances as RawNode[]) ?? [])]
+  newInstances.splice(childIdx, 1, series1, series2)
+  return setSubNode(node, parentPath, { ...parent, instances: newInstances })
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -514,12 +557,17 @@ export default function NodeInheritanceDebugger() {
     return collectAllOccurrences(results, expandEndDate)
   }, [results, nodeHasRepeat, expandEndDate])
 
-  const selectedOcc     = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
-  const canEditPattern  = selectedOcc?.source === 'generated'
-  // canEditFollowing needs a repeat on the root or (for container roots) on
-  // the root-level instance that owns this occurrence — check via hasRepeat(results)
-  // as a proxy; for nested series, the action targets the root node anyway.
-  const canEditFollowing = selectedOcc !== null && nodeHasRepeat
+  const selectedOcc = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
+
+  // Repeat object on the owning sub-node (used by Edit pattern form)
+  const selectedOwnerRepeat = useMemo<Record<string, unknown> | null>(() => {
+    if (!selectedOcc || !rawNode) return null
+    const sub = getSubNode(rawNode, selectedOcc.ownerPath)
+    return sub?.repeat ? (sub.repeat as Record<string, unknown>) : null
+  }, [selectedOcc, rawNode])
+
+  const canEditPattern   = selectedOcc?.source === 'generated'
+  const canEditFollowing = selectedOcc !== null && selectedOwnerRepeat !== null
 
   function toggleAction(kind: ActionKind) {
     setActiveAction(a => a === kind ? null : kind)
@@ -700,24 +748,24 @@ export default function NodeInheritanceDebugger() {
                   </div>
 
                   {/* Forms */}
-                  {activeAction === 'add' && rawNode && (
+                  {activeAction === 'add' && rawNode && selectedOcc && (
                     <AddOccurrenceForm
-                      onApply={(date, time, done) => applyRawNode(doAddOccurrence(rawNode, date, time, done))}
+                      onApply={(date, time, done) => applyRawNode(doAddOccurrence(rawNode, selectedOcc.ownerPath, date, time, done))}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'edit-occurrence' && rawNode && selectedOcc && (
                     <EditOccurrenceForm occ={selectedOcc}
-                      onApply={(date, time, done) => applyRawNode(doEditOccurrence(rawNode, selectedOcc.date, date, time, done))}
+                      onApply={(date, time, done) => applyRawNode(doEditOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc.date, date, time, done))}
                       onCancel={() => setActiveAction(null)} />
                   )}
-                  {activeAction === 'edit-pattern' && rawNode?.repeat && selectedOcc && (
-                    <EditPatternForm initialRepeat={rawNode.repeat as Record<string, unknown>}
-                      onApply={repeat => applyRawNode(doEditPattern(rawNode, repeat))}
+                  {activeAction === 'edit-pattern' && rawNode && selectedOcc && selectedOwnerRepeat && (
+                    <EditPatternForm initialRepeat={selectedOwnerRepeat}
+                      onApply={repeat => applyRawNode(doEditPattern(rawNode, selectedOcc.ownerPath, repeat))}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'edit-following' && rawNode && selectedOcc && (
                     <EditFollowingForm occ={selectedOcc}
-                      onApply={() => applyRawNode(doEditFollowing(rawNode, selectedOcc.date))}
+                      onApply={() => applyRawNode(doEditFollowing(rawNode, selectedOcc.ownerPath, selectedOcc.date))}
                       onCancel={() => setActiveAction(null)} />
                   )}
                 </>

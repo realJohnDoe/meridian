@@ -23,6 +23,14 @@ export interface OccurrenceEntry {
    * 'explicit'  — comes from a standalone instance not on the schedule.
    */
   source: 'generated' | 'explicit'
+  /**
+   * Path of instance indices from the root EffectiveNode to the node whose
+   * `repeat` field produced this occurrence.
+   * [] = root itself has `repeat`.
+   * [1] = root.instances[1] has `repeat`.
+   * [1, 0] = root.instances[1].instances[0] has `repeat`, etc.
+   */
+  ownerPath: number[]
 }
 
 // ── Format normaliser ─────────────────────────────────────────────────────────
@@ -78,9 +86,9 @@ export function treeHasRepeat(node: EffectiveNode): boolean {
 
 /**
  * Expand the repeat schedule of an effective node up to `endDateStr` (YYYY-MM-DD).
- * Each occurrence is tagged with its source: 'generated' or 'explicit'.
+ * Each occurrence is tagged with its source and the given ownerPath.
  */
-export function expandRepeat(node: EffectiveNode, endDateStr: string): OccurrenceEntry[] {
+export function expandRepeat(node: EffectiveNode, endDateStr: string, ownerPath: number[] = []): OccurrenceEntry[] {
   const expandable = toExpandable(node)
   const from = new Date(0)
   const to   = new Date(`${endDateStr}T23:59:59`)
@@ -92,11 +100,12 @@ export function expandRepeat(node: EffectiveNode, endDateStr: string): Occurrenc
   const raw = expandNode(expandable as any, from, to) as Record<string, unknown>[]
 
   return raw.map(occ => ({
-    date:   String(occ.date  ?? ''),
-    time:   occ.time  ? String(occ.time)  : null,
-    title:  occ.title ? String(occ.title) : null,
-    done:   occ.done as boolean | undefined,
-    source: genDates.has(String(occ.date ?? '')) ? 'generated' : 'explicit',
+    date:      String(occ.date  ?? ''),
+    time:      occ.time  ? String(occ.time)  : null,
+    title:     occ.title ? String(occ.title) : null,
+    done:      occ.done as boolean | undefined,
+    source:    genDates.has(String(occ.date ?? '')) ? 'generated' : 'explicit',
+    ownerPath,
   }))
 }
 
@@ -110,16 +119,16 @@ export function expandRepeat(node: EffectiveNode, endDateStr: string): Occurrenc
 export function collectAllOccurrences(node: EffectiveNode, endDateStr: string): OccurrenceEntry[] {
   const results: OccurrenceEntry[] = []
 
-  function walk(n: EffectiveNode) {
+  function walk(n: EffectiveNode, path: number[]) {
     if (hasRepeat(n)) {
-      results.push(...expandRepeat(n, endDateStr))
+      results.push(...expandRepeat(n, endDateStr, path))
     } else {
       // Container node — recurse into children
-      n.instances.forEach(walk)
+      n.instances.forEach((child, i) => walk(child, [...path, i]))
     }
   }
 
-  walk(node)
+  walk(node, [])
 
   // Sort by date (then time) so all series appear in chronological order
   results.sort((a, b) => {
