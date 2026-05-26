@@ -259,6 +259,8 @@ input,textarea,select{font-family:inherit}
 .etag{background:var(--bg3);border:1px solid var(--bdr2);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--t2)}
 .etag-add{color:var(--ind);border-color:var(--ind);background:var(--ab);cursor:pointer;display:inline-flex;align-items:center;gap:4px}
 .etag-add svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5}
+.etag-input{background:var(--bg3);border:1px solid var(--ind);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--t0);outline:none;width:90px;font-family:inherit}
+.etag-input::placeholder{color:var(--t3)}
 .entry-divider{height:1px;background:var(--bdr);margin-bottom:14px}
 .entry-body{min-height:160px;color:var(--t1);font-size:14px;line-height:1.85;outline:none;caret-color:var(--ind);white-space:pre-wrap;word-break:break-word;position:relative}
 .entry-body .wl{color:var(--ind);border-bottom:1px solid rgba(129,140,248,.35);cursor:pointer}
@@ -270,6 +272,13 @@ input,textarea,select{font-family:inherit}
 .wl-item{padding:9px 14px;cursor:pointer;font-size:13px;color:var(--t1);transition:background .1s;display:flex;align-items:center;gap:8px}
 .wl-item:hover,.wl-item.focused{background:var(--bg3)}
 .wl-item svg{width:13px;height:13px;stroke:var(--t3);fill:none;stroke-width:1.8;flex-shrink:0}
+
+/* ── ERROR NOTIFICATION BANNER ── */
+.error-banner{position:fixed;top:calc(var(--th) + 8px);left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:402px;background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.35);border-radius:var(--r);padding:10px 12px;display:flex;align-items:center;gap:10px;z-index:300;box-shadow:0 4px 16px rgba(0,0,0,.3);animation:banner-in .2s ease}
+@keyframes banner-in{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.error-banner-msg{flex:1;font-size:13px;color:var(--ros);line-height:1.4}
+.error-banner-close{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ros);opacity:.7;flex-shrink:0;transition:opacity .12s}
+.error-banner-close:hover{opacity:1}
 
 /* ── DIALOGS ── */
 .dlg-ov{position:fixed;inset:0;background:rgba(9,17,31,.82);z-index:200;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}

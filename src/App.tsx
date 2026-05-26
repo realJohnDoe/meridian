@@ -3,7 +3,7 @@ import {
   Menu, FolderSync, FolderOpen, CalendarCheck2, Search,
   ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
-  Plus, Calendar, Clock, Timer, X, Flag,
+  Plus, Calendar, Clock, Timer, X, Flag, Trash2,
 } from 'lucide-react'
 import {
   initApp, wikilinkInputHandler, wikilinkKeydownHandler, wikilinkClickHandler,
@@ -60,6 +60,7 @@ export default function App() {
   const [dlgDurVal, setDlgDurVal] = useState('')
   const [filterQuery, setFilterQuery] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void } | null>(null)
 
   // ── Navigation state (source of truth) ───────────────────────
   const primaryView  = useStore(s => s.primaryView)
@@ -70,6 +71,22 @@ export default function App() {
 
   const dvDate    = useStore(s => s.dvDate)
   const setDvDate = useStore(s => s.setDvDate)
+
+  const syncDirtyCount   = useStore(s => s.syncDirtyCount)
+  const syncFlash        = useStore(s => s.syncFlash)
+  const dirHandle        = useStore(s => s.dirHandle)
+  const errorNotification = useStore(s => s.errorNotification)
+  const setErrorNotification = useStore(s => s.setErrorNotification)
+
+  // Derive sync-button appearance from store state (replaces updateSyncUI DOM writes)
+  const syncColor = syncFlash
+    ? 'var(--grn)'
+    : !dirHandle ? 'var(--t3)' : syncDirtyCount > 0 ? 'var(--amb)' : 'var(--t2)'
+  const syncTitle = !dirHandle
+    ? 'Click folder icon to open vault'
+    : syncDirtyCount > 0
+      ? `${syncDirtyCount} unsaved change${syncDirtyCount > 1 ? 's' : ''} — click to sync`
+      : 'All synced'
 
   // Derive CSS class for each section — only one is 'active' at a time
   const viewCls = (name: string) => {
@@ -119,7 +136,12 @@ export default function App() {
   }, [entry])
 
   const handleDelete = useCallback(() => {
-    deleteNode(entry.item, () => setActiveDialog('seriesSheet'), () => setActiveDialog(null))
+    deleteNode(
+      entry.item,
+      () => setActiveDialog('seriesSheet'),
+      () => setActiveDialog(null),
+      (title, onConfirm) => setPendingDelete({ title, onConfirm }),
+    )
   }, [entry.item])
 
   const handleClose = useCallback(() => {
@@ -219,7 +241,7 @@ export default function App() {
               </div>
             )}
             <div className="tb-r">
-              <button className="ib" id="syncBtn" onClick={syncToDirectory} title="Sync"><FolderSync /></button>
+              <button className="ib" onClick={syncToDirectory} title={syncTitle} style={{ color: syncColor }}><FolderSync /></button>
               <button className="ib" onClick={pickDirectory} title="Open vault"><FolderOpen /></button>
               <button className="ib" onClick={goToday} title="Today"><CalendarCheck2 /></button>
               <button className="ib" onClick={openSearch} title="Search"><Search /></button>
@@ -424,6 +446,33 @@ export default function App() {
       </div>
 
       <div className="wl-popup" id="wlPopup"></div>
+
+      {/* ── ERROR NOTIFICATION BANNER ── */}
+      {errorNotification && (
+        <div className="error-banner" role="alert">
+          <span className="error-banner-msg">{errorNotification}</span>
+          <button className="error-banner-close" onClick={() => setErrorNotification(null)}><X size={13} /></button>
+        </div>
+      )}
+
+      {/* ── SINGLE-ITEM DELETE CONFIRM ── */}
+      <div className={pendingDelete ? 'dlg-ov open' : 'dlg-ov'} onClick={e => { if (e.target === e.currentTarget) setPendingDelete(null) }}>
+        <div className="dlg">
+          <div className="dlg-handle" />
+          <div className="dlg-title">Delete</div>
+          <div className="dlg-body">
+            <p style={{ fontSize: 14, color: 'var(--t1)', marginBottom: 16 }}>
+              Delete &ldquo;{pendingDelete?.title}&rdquo;? This cannot be undone.
+            </p>
+            <div className="dlg-actions">
+              <button className="dlg-rm" onClick={() => { pendingDelete?.onConfirm(); setPendingDelete(null) }}>
+                <Trash2 size={13} />Delete
+              </button>
+              <button className="dlg-cancel" onClick={() => setPendingDelete(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   )
 }
