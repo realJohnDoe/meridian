@@ -1,97 +1,89 @@
 /**
  * Repeat expansion bridge for the Node Inheritance Debugger.
  *
- * expandNode() in recurrence.ts expects the NESTED repeat format:
- *   { type: 'schedule', scheduled: { freq, byweekday, ... } }
+ * Accepts an EffectiveNode (post-inheritance) and expands its repeat schedule
+ * into a flat list of concrete occurrences.
  *
- * Raw YAML nodes use the FLAT format:
- *   { type: 'schedule', freq: 'weekly', byweekday: ['mo'] }
+ * NOTE: This is a temporary bridge that delegates to the existing expandNode()
+ * in recurrence.ts via a duck-typed adapter. It will be replaced by the full
+ * per-pattern pipeline (extractRepeatSeries / expandPattern / mergeAllPools)
+ * once that architecture is implemented.
  *
- * This module normalises flat → nested before delegating to expandNode.
+ * Key format difference handled here:
+ *   Raw YAML (flat):   repeat: { type: schedule, freq: weekly, byweekday: [mo] }
+ *   expandNode expects: repeat: { type: schedule, scheduled: { freq, byweekday, ... } }
  */
 
 import { expandNode } from '../recurrence'
-import type { RawNode } from './nodeSchema'
+import type { EffectiveNode } from './inheritance'
+
+// ── Public types ──────────────────────────────────────────────────────────────
 
 export interface OccurrenceEntry {
-  date: string
-  time: string | null
+  date:  string
+  time:  string | null
   title: string | null
-  done: boolean | undefined
-  /** True for the first occurrence (the anchor / node's own date). */
-  isAnchor: boolean
+  done:  boolean | undefined
 }
 
 // ── Format normaliser ─────────────────────────────────────────────────────────
 
 /**
- * Convert a flat `repeat` dict to the nested format expected by expandNode.
+ * Convert flat repeat format to the nested format expected by expandNode.
  *
- * Flat  (raw YAML):   { type: 'schedule', freq: 'weekly', byweekday: ['mo'] }
- * Nested (required):  { type: 'schedule', scheduled: { freq: 'weekly', byweekday: ['mo'] } }
+ * Flat  (raw YAML):    { type: 'schedule', freq: 'weekly', byweekday: ['mo'] }
+ * Nested (required):   { type: 'schedule', scheduled: { freq: 'weekly', byweekday: ['mo'] } }
  */
 function normalizeRepeat(repeat: Record<string, unknown>): Record<string, unknown> {
   if (repeat.type !== 'schedule') return repeat
-  if (repeat.scheduled)          return repeat   // already nested
-
+  if (repeat.scheduled)           return repeat   // already nested
   const { type, ...schedFields } = repeat
   return { type, scheduled: schedFields }
 }
 
 /**
- * Return a shallow copy of the node with the repeat field normalised (if needed).
- * All other fields, including `instances`, are preserved for expandNode.
+ * Build a duck-typed node suitable for expandNode() from an EffectiveNode.
+ * Reconstructs a shallow `instances` array from the effective children.
  */
-function normalizeNode(node: RawNode): Record<string, unknown> {
-  const n: Record<string, unknown> = { ...node }
-  const repeat = n.repeat
-  if (
-    repeat &&
-    typeof repeat === 'object' &&
-    !Array.isArray(repeat) &&
-    (repeat as Record<string, unknown>).type === 'schedule' &&
-    !(repeat as Record<string, unknown>).scheduled
-  ) {
-    n.repeat = normalizeRepeat(repeat as Record<string, unknown>)
+function toExpandable(node: EffectiveNode): Record<string, unknown> {
+  const fields = { ...node.fields }
+
+  // Normalise the repeat field if present
+  if (fields.repeat && typeof fields.repeat === 'object' && !Array.isArray(fields.repeat)) {
+    fields.repeat = normalizeRepeat(fields.repeat as Record<string, unknown>)
   }
-  return n
+
+  // Shallow instances — expandNode only needs date/time/excluded/done on children
+  fields.instances = node.instances.map(child => ({ ...child.fields }))
+
+  return fields
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/**
- * Expand the repeat schedule of a raw node up to `endDateStr` (YYYY-MM-DD).
- *
- * Returns an empty array when:
- *  - `endDateStr` is not a valid date
- *  - the node has no `date` field (no anchor)
- *  - the node has no `repeat` field (caller should detect this separately)
- */
-export function expandRepeat(
-  node: RawNode,
-  endDateStr: string,
-): OccurrenceEntry[] {
-  const normalized = normalizeNode(node)
+/** True if the effective node has a `repeat` field. */
+export function hasRepeat(node: EffectiveNode): boolean {
+  return node.fields.repeat !== undefined && node.fields.repeat !== null
+}
 
-  // Use epoch as the lower bound so the anchor is always included
+/**
+ * Expand the repeat schedule of an effective node up to `endDateStr` (YYYY-MM-DD).
+ * Returns an empty array when the node has no `date`, or `endDateStr` is invalid.
+ */
+export function expandRepeat(node: EffectiveNode, endDateStr: string): OccurrenceEntry[] {
+  const expandable = toExpandable(node)
+
   const from = new Date(0)
   const to   = new Date(`${endDateStr}T23:59:59`)
   if (isNaN(to.getTime())) return []
 
-  // expandNode is @ts-nocheck duck-typed — cast accordingly
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw = expandNode(normalized as any, from, to) as Record<string, unknown>[]
+  const raw = expandNode(expandable as any, from, to) as Record<string, unknown>[]
 
-  return raw.map((occ, i) => ({
-    date:     String(occ.date ?? ''),
-    time:     occ.time  ? String(occ.time)  : null,
-    title:    occ.title ? String(occ.title) : null,
-    done:     occ.done as boolean | undefined,
-    isAnchor: i === 0,
+  return raw.map(occ => ({
+    date:  String(occ.date  ?? ''),
+    time:  occ.time  ? String(occ.time)  : null,
+    title: occ.title ? String(occ.title) : null,
+    done:  occ.done as boolean | undefined,
   }))
-}
-
-/** True if the node has a `repeat` field at all. */
-export function hasRepeat(node: RawNode): boolean {
-  return node.repeat !== undefined && node.repeat !== null
 }
