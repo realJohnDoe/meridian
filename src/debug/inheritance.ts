@@ -251,3 +251,238 @@ export function displayValue(v: unknown, indent = 0): string {
   }
   return String(v)
 }
+
+// ── Collapse direction ────────────────────────────────────────────────────────
+
+/** Structural equality for YAML values. */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if ((a as unknown[]).length !== (b as unknown[]).length) return false
+    return (a as unknown[]).every((v, i) => deepEqual(v, (b as unknown[])[i]))
+  }
+  if (
+    typeof a === 'object' && a !== null && !Array.isArray(a) &&
+    typeof b === 'object' && b !== null && !Array.isArray(b)
+  ) {
+    const ak = Object.keys(a as object).sort()
+    const bk = Object.keys(b as object).sort()
+    if (ak.length !== bk.length || !ak.every((k, i) => k === bk[i])) return false
+    return ak.every(k =>
+      deepEqual(
+        (a as Record<string, unknown>)[k],
+        (b as Record<string, unknown>)[k],
+      ),
+    )
+  }
+  return false
+}
+
+/**
+ * Given the full expansion results, compute the most compact YAML
+ * representation: field values that are identical across ALL depth-1
+ * instances become `defaults:`, each instance keeps only its unique overrides.
+ *
+ * Root own fields (outside `defaults`/`instances`) are preserved as-is.
+ * Nested instances inside each direct child are preserved from its rawNode.
+ *
+ * @param results       Output of flattenEffectiveNodes (includes root at index 0)
+ * @param originalBody  Markdown body from the original file (preserved verbatim)
+ */
+export function collapseToYaml(
+  results: EffectiveNodeResult[],
+  originalBody = '',
+): string {
+  const root = results[0]
+  if (!root) return ''
+
+  const directChildren = results.filter(r => r.depth === 1)
+
+  if (directChildren.length === 0) {
+    // No instances — serialise root as-is
+    return yamlFrontmatter(root.rawNode, {}, [], originalBody)
+  }
+
+  // ── Find fields whose value is identical across ALL direct children ────────
+  const allKeys = new Set<string>()
+  for (const child of directChildren) {
+    for (const key of Object.keys(child.fields)) allKeys.add(key)
+  }
+
+  const sharedDefaults: Record<string, unknown> = {}
+  for (const key of allKeys) {
+    const entries = directChildren.map(c => c.fields[key])
+    if (!entries.every(e => e !== undefined)) continue   // missing in some
+    const firstVal = entries[0].value
+    if (entries.every(e => deepEqual(e.value, firstVal))) {
+      sharedDefaults[key] = firstVal
+    }
+  }
+
+  // ── Build collapsed instances: only non-default fields remain ─────────────
+  const collapsedInstances = directChildren.map(child => {
+    const inst: Record<string, unknown> = {}
+    for (const [key, entry] of Object.entries(child.fields)) {
+      if (key in sharedDefaults && deepEqual(entry.value, sharedDefaults[key])) continue
+      inst[key] = entry.value
+    }
+    // Preserve the child's own nested instances and defaults from its rawNode
+    if (child.rawNode.instances !== undefined) inst.instances = child.rawNode.instances
+    if (child.rawNode.defaults  !== undefined) inst.defaults  = child.rawNode.defaults
+    return inst
+  })
+
+  return yamlFrontmatter(root.rawNode, sharedDefaults, collapsedInstances, originalBody)
+}
+
+// ── YAML serialiser ───────────────────────────────────────────────────────────
+
+/** Quote a string value if YAML would misparse it as another type. */
+function quoteStr(s: string): string {
+  if (
+    s === '' ||
+    s === 'null' || s === 'true' || s === 'false' ||
+    /^[-+]?[0-9]/.test(s) ||
+    /[:#\[\]{}&*!,|>'"\\]/.test(s) ||
+    s.includes(': ') || s.endsWith(':') ||
+    s.startsWith(' ') || s.endsWith(' ')
+  ) {
+    return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+  }
+  return s
+}
+
+/** Serialize a scalar or inline-array value to a YAML value token. */
+function inlineVal(v: unknown): string | null {
+  if (v === null || v === undefined) return 'null'
+  if (typeof v === 'boolean') return String(v)
+  if (typeof v === 'number') return String(v)
+  if (typeof v === 'string') return quoteStr(v)
+  if (Array.isArray(v)) {
+    if ((v as unknown[]).every(x => x === null || typeof x !== 'object')) {
+      return `[${(v as unknown[]).map(x => inlineVal(x)).join(', ')}]`
+    }
+    return null // needs block form
+  }
+  return null // object → needs block form
+}
+
+/**
+ * Recursively serialize a value as indented YAML lines.
+ * `indent` is the number of leading spaces for this level's keys.
+ */
+function valueLines(v: unknown, indent: number): string[] {
+  const pad = ' '.repeat(indent)
+
+  if (Array.isArray(v)) {
+    const out: string[] = []
+    for (const item of v as unknown[]) {
+      if (item === null || typeof item !== 'object') {
+        out.push(`${pad}- ${inlineVal(item)}`)
+      } else {
+        // Object list item: first key gets `- `, rest get `  `
+        const entries = Object.entries(item as Record<string, unknown>)
+        entries.forEach(([k, val], idx) => {
+          const pfx = idx === 0 ? `${pad}- ` : `${pad}  `
+          const iv = inlineVal(val)
+          if (iv !== null) {
+            out.push(`${pfx}${k}: ${iv}`)
+          } else {
+            out.push(`${pfx}${k}:`)
+            out.push(...valueLines(val, indent + 4))
+          }
+        })
+      }
+    }
+    return out
+  }
+
+  if (typeof v === 'object' && v !== null) {
+    const out: string[] = []
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      const iv = inlineVal(val)
+      if (iv !== null) {
+        out.push(`${pad}${k}: ${iv}`)
+      } else {
+        out.push(`${pad}${k}:`)
+        out.push(...valueLines(val, indent + 2))
+      }
+    }
+    return out
+  }
+
+  return [inlineVal(v) ?? String(v)]
+}
+
+/**
+ * Serialize a root node + computed defaults + collapsed instances to YAML
+ * frontmatter (with `---` delimiters) plus an optional markdown body.
+ */
+function yamlFrontmatter(
+  rootRawNode: RawNode,
+  defaults: Record<string, unknown>,
+  instances: Record<string, unknown>[],
+  body: string,
+): string {
+  const lines: string[] = ['---']
+
+  // Root own fields
+  for (const [key, value] of Object.entries(rootRawNode)) {
+    if (key === 'defaults' || key === 'instances') continue
+    const iv = inlineVal(value)
+    if (iv !== null) {
+      lines.push(`${key}: ${iv}`)
+    } else {
+      lines.push(`${key}:`)
+      lines.push(...valueLines(value, 2))
+    }
+  }
+
+  // defaults: block
+  if (Object.keys(defaults).length > 0) {
+    lines.push('defaults:')
+    for (const [key, value] of Object.entries(defaults)) {
+      const iv = inlineVal(value)
+      if (iv !== null) {
+        lines.push(`  ${key}: ${iv}`)
+      } else {
+        lines.push(`  ${key}:`)
+        lines.push(...valueLines(value, 4))
+      }
+    }
+  }
+
+  // instances: block
+  if (instances.length > 0) {
+    lines.push('instances:')
+    for (const inst of instances) {
+      const entries = Object.entries(inst)
+      if (entries.length === 0) { lines.push('  - {}'); continue }
+
+      entries.forEach(([key, value], idx) => {
+        const pfx    = idx === 0 ? '  - ' : '    '
+        const subInd = idx === 0 ? 6 : 6   // both need 6-space children
+
+        if (key === 'instances' && Array.isArray(value)) {
+          lines.push(`${pfx}instances:`)
+          lines.push(...valueLines(value, subInd))
+        } else if (key === 'defaults' && typeof value === 'object' && value !== null) {
+          lines.push(`${pfx}defaults:`)
+          lines.push(...valueLines(value, subInd))
+        } else {
+          const iv = inlineVal(value)
+          if (iv !== null) {
+            lines.push(`${pfx}${key}: ${iv}`)
+          } else {
+            lines.push(`${pfx}${key}:`)
+            lines.push(...valueLines(value, subInd))
+          }
+        }
+      })
+    }
+  }
+
+  lines.push('---')
+  if (body) lines.push('', body)
+  return lines.join('\n')
+}

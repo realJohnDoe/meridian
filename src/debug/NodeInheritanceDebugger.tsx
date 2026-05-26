@@ -1,23 +1,22 @@
 import { useState, useCallback } from 'react'
-import { Upload, FileText, ChevronRight, AlertCircle } from 'lucide-react'
+import { Upload, FileText, ChevronRight, ChevronLeft, AlertCircle, RotateCcw } from 'lucide-react'
 import { RawNodeSchema, type RawNode } from './nodeSchema'
-import { flattenEffectiveNodes, displayValue, type EffectiveNodeResult } from './inheritance'
+import { flattenEffectiveNodes, collapseToYaml, displayValue, type EffectiveNodeResult } from './inheritance'
 import { yamlParse } from '../yaml'
 
 // ── Frontmatter extractor ─────────────────────────────────────────────────────
 
-function extractFrontmatter(content: string): { fm: string; ok: boolean } {
-  const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
-  if (m) return { fm: m[1], ok: true }
-  // .yaml / .yml files — entire content is the mapping
-  return { fm: content, ok: true }
+function extractFrontmatter(content: string): { fm: string; body: string } {
+  const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
+  if (m) return { fm: m[1], body: m[2].trim() }
+  // .yaml / .yml — entire content is the mapping, no body
+  return { fm: content, body: '' }
 }
 
 // ── Path label helper ─────────────────────────────────────────────────────────
 
 function pathLabel(path: string[]): string {
   if (path.length === 0) return 'root'
-  // ['instances','0','instances','1'] → 'instances[0] › instances[1]'
   const parts: string[] = []
   for (let i = 0; i < path.length; i += 2) {
     parts.push(`instances[${path[i + 1]}]`)
@@ -77,20 +76,15 @@ function NodeCard({ result }: { result: EffectiveNodeResult }) {
                 inherited ? 'opacity-50' : ''
               }`}
             >
-              {/* Key */}
               <span className="text-sky-300 shrink-0 w-28 truncate" title={key}>
                 {key}
               </span>
-
-              {/* Value */}
               <span
                 className="text-white/80 flex-1 whitespace-pre-wrap break-all"
                 title={JSON.stringify(value)}
               >
                 {displayValue(value)}
               </span>
-
-              {/* Origin badge */}
               <span
                 className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-sans ${
                   inherited
@@ -111,16 +105,20 @@ function NodeCard({ result }: { result: EffectiveNodeResult }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function NodeInheritanceDebugger() {
-  const [rawContent, setRawContent] = useState<string>('')
-  const [fileName, setFileName]     = useState<string>('')
-  const [zodErrors, setZodErrors]   = useState<string[]>([])
-  const [results, setResults]       = useState<EffectiveNodeResult[] | null>(null)
+  const [displayContent, setDisplayContent] = useState<string>('')
+  const [fileName, setFileName]             = useState<string>('')
+  const [originalContent, setOriginalContent] = useState<string>('')
+  const [isCollapsed, setIsCollapsed]       = useState(false)
+  const [zodErrors, setZodErrors]           = useState<string[]>([])
+  const [results, setResults]               = useState<EffectiveNodeResult[] | null>(null)
 
+  // ── Parse + expand a YAML/MD string ────────────────────────────────────────
   const processContent = useCallback((content: string, name: string) => {
-    setRawContent(content)
+    setDisplayContent(content)
     setFileName(name)
     setZodErrors([])
     setResults(null)
+    setIsCollapsed(false)
 
     const { fm } = extractFrontmatter(content)
     let parsed: unknown
@@ -137,17 +135,44 @@ export default function NodeInheritanceDebugger() {
       return
     }
 
-    const node = validation.data as RawNode
-    setResults(flattenEffectiveNodes(node))
+    setResults(flattenEffectiveNodes(validation.data as RawNode))
   }, [])
 
+  // ── Collapse effective nodes back to YAML ──────────────────────────────────
+  const handleCollapse = useCallback(() => {
+    if (!results) return
+    const { body } = extractFrontmatter(originalContent || displayContent)
+    const collapsed = collapseToYaml(results, body)
+    setDisplayContent(collapsed)
+    setIsCollapsed(true)
+
+    // Re-expand so the right panel reflects the new structure
+    const { fm } = extractFrontmatter(collapsed)
+    try {
+      const parsed = yamlParse(fm)
+      const validation = RawNodeSchema.safeParse(parsed)
+      if (validation.success) {
+        setResults(flattenEffectiveNodes(validation.data as RawNode))
+        setZodErrors([])
+      }
+    } catch {
+      // keep existing results if re-parse fails
+    }
+  }, [results, originalContent, displayContent])
+
+  // ── Reset to original file ─────────────────────────────────────────────────
+  const handleReset = useCallback(() => {
+    if (originalContent) processContent(originalContent, fileName)
+  }, [originalContent, fileName, processContent])
+
+  // ── File input ─────────────────────────────────────────────────────────────
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
       if (!file) return
       const text = await file.text()
+      setOriginalContent(text)
       processContent(text, file.name)
-      // Reset input so the same file can be reloaded
       e.target.value = ''
     },
     [processContent],
@@ -159,12 +184,16 @@ export default function NodeInheritanceDebugger() {
       const file = e.dataTransfer.files[0]
       if (!file) return
       const text = await file.text()
+      setOriginalContent(text)
       processContent(text, file.name)
     },
     [processContent],
   )
 
-  const isEmpty = !rawContent
+  // Only show non-root cards (root is just the file itself, not an "instance")
+  const visibleCards = results?.filter(r => r.depth > 0) ?? []
+  const canCollapse  = visibleCards.length > 0
+  const isEmpty      = !displayContent
 
   return (
     <div
@@ -187,9 +216,24 @@ export default function NodeInheritanceDebugger() {
           <>
             <ChevronRight size={14} className="text-white/30" />
             <span className="text-sm font-mono text-white/70">{fileName}</span>
+            {isCollapsed && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">
+                collapsed
+              </span>
+            )}
           </>
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {isCollapsed && (
+            <button
+              onClick={handleReset}
+              title="Reset to original file"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-xs text-white/60 transition-colors"
+            >
+              <RotateCcw size={12} />
+              Original
+            </button>
+          )}
           <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-xs text-white/80 transition-colors">
             <Upload size={13} />
             Load file
@@ -206,10 +250,10 @@ export default function NodeInheritanceDebugger() {
       {/* ── Body ── */}
       <div className="flex flex-1 min-h-0">
 
-        {/* ── LEFT: raw content ── */}
+        {/* ── LEFT: source / collapsed YAML ── */}
         <div className="w-2/5 flex flex-col border-r border-white/10 min-h-0">
           <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0">
-            Source
+            {isCollapsed ? 'Collapsed YAML' : 'Source'}
           </div>
           <div className="flex-1 overflow-auto">
             {isEmpty ? (
@@ -223,19 +267,35 @@ export default function NodeInheritanceDebugger() {
                 className="p-4 text-xs leading-5 text-white/70 whitespace-pre-wrap break-all"
                 style={{ fontFamily: 'DM Mono, monospace' }}
               >
-                {rawContent}
+                {displayContent}
               </pre>
             )}
           </div>
+        </div>
+
+        {/* ── DIVIDER with collapse arrow ── */}
+        <div className="flex flex-col items-center justify-center w-8 shrink-0 border-r border-white/10 bg-white/[0.02] gap-2">
+          <button
+            onClick={handleCollapse}
+            disabled={!canCollapse}
+            title={canCollapse ? 'Collapse effective nodes → compact YAML' : 'Load a file first'}
+            className={`flex items-center justify-center w-6 h-6 rounded transition-colors ${
+              canCollapse
+                ? 'text-white/50 hover:text-white hover:bg-white/10 cursor-pointer'
+                : 'text-white/15 cursor-not-allowed'
+            }`}
+          >
+            <ChevronLeft size={14} />
+          </button>
         </div>
 
         {/* ── RIGHT: effective nodes ── */}
         <div className="flex-1 flex flex-col min-h-0">
           <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
             Effective nodes
-            {results && (
+            {visibleCards.length > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 font-mono normal-case tracking-normal">
-                {results.length}
+                {visibleCards.length}
               </span>
             )}
           </div>
@@ -257,34 +317,42 @@ export default function NodeInheritanceDebugger() {
             )}
 
             {/* Empty state */}
-            {!rawContent && zodErrors.length === 0 && (
+            {!displayContent && zodErrors.length === 0 && (
               <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">
                 Load a file to see effective nodes
               </div>
             )}
 
-            {/* Node cards */}
-            {results && results.map((r, i) => (
+            {/* Node cards — root excluded */}
+            {visibleCards.map((r, i) => (
               <NodeCard key={i} result={r} />
             ))}
+
+            {/* No instances message */}
+            {results && visibleCards.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full gap-2 text-white/20 text-sm select-none">
+                <span>No instances defined</span>
+                <span className="text-xs">Add an <code className="font-mono text-white/30">instances:</code> list to the root node</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* ── Legend ── */}
-      {results && (
+      {results && visibleCards.length > 0 && (
         <footer className="flex items-center gap-4 px-4 py-2 border-t border-white/10 text-[10px] text-white/30 shrink-0">
           <span className="flex items-center gap-1">
             <span className="px-1.5 py-0.5 rounded bg-white/10 text-white/40 font-mono">own</span>
-            field defined on this node
+            defined on this node
           </span>
           <span className="flex items-center gap-1">
             <span className="px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 font-mono">↓ def</span>
             inherited from ancestor defaults
           </span>
-          <span className="flex items-center gap-1">
-            <span className="px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 font-mono">defaults ↓</span>
-            node carries a defaults block
+          <span className="ml-auto flex items-center gap-1 text-white/20">
+            <ChevronLeft size={10} />
+            collapse to compact YAML
           </span>
         </footer>
       )}
