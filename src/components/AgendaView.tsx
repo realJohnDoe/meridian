@@ -4,7 +4,7 @@ import type { Occurrence } from '../types'
 import { expandRange } from '../recurrence'
 import {
   sameDay, addDays, dayKey, sortOccs,
-  toggleOccDone, swipeDeleteOcc,
+  toggleOccDone, beginSwipeDelete,
 } from '../meridian'
 import DaySection from './DaySection'
 import { TODAY } from '../constants'
@@ -62,7 +62,7 @@ export default function AgendaView({ onOpen }: Props) {
   // Stable references so DaySection's memo comparator isn't short-circuited
   // by new function identities on every AgendaView render.
   const handleToggleDone = useCallback((occ: Occurrence) => toggleOccDone(occ), [])
-  const handleSwipeDelete = useCallback((occ: Occurrence) => swipeDeleteOcc(occ), [])
+  const handleSwipeDelete = useCallback((occ: Occurrence) => beginSwipeDelete(occ), [])
 
   return (
     <div className="ag-pad">

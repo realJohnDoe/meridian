@@ -14,7 +14,7 @@ interface Props {
   items: Occurrence[]         // non-multiday, pre-sorted
   onOpen: (occ: Occurrence) => void
   onToggleDone: (occ: Occurrence) => void
-  onSwipeDelete: (occ: Occurrence) => void
+  onSwipeDelete: (occ: Occurrence) => (() => void)
 }
 
 function DaySection({

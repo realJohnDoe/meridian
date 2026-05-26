@@ -228,37 +228,54 @@ export function toggleOccDone(o): void {
 }
 
 // ── SWIPE DELETE (exported for React components) ──────────────
-export function swipeDeleteOcc(o): void {
+// Two-phase delete so the toast can appear at the moment the user lifts their
+// finger, while the exit animation is still playing.
+//
+// Phase 1 — call beginSwipeDelete() on touchend:
+//   Shows the toast immediately.  Returns an applyDelete() function.
+// Phase 2 — call applyDelete() after the exit animation completes (~230 ms):
+//   Removes the item from the Zustand store so React unmounts it.
+//   applyDelete() is a no-op if the user already pressed Undo.
+export function beginSwipeDelete(o): ()=>void {
   const node=o._node||o;
   const nodeId=node.id;
   const title=node.title;
+  let cancelled=false;
 
   if(o.recur){
     if(!node.instances)node.instances=[];
     const occDate=o.date;
-    let inst=node.instances.find(i=>i.date===occDate&&!i.time);
+    const inst=node.instances.find(i=>i.date===occDate&&!i.time);
+    // Apply the exclusion mutation now so that if a second swipe-delete
+    // triggers showDeleteToast (which immediately calls the previous commitFn),
+    // writeEntityToCache sees the correct state.
     if(inst){inst.excluded=true;}
     else{node.instances.push({date:occDate,excluded:true});}
-    // Pass the updated nodes array as extraState so nodes + toast update in one render.
     showDeleteToast(title,
       ()=>{ writeEntityToCache(node); },
       ()=>{
+        cancelled=true;
+        // Reverse the exclusion whether or not applyDelete has run.
         if(inst){delete inst.excluded;}
         else{node.instances=node.instances.filter(i=>!(i.date===occDate&&i.excluded&&!i.time));}
         setNodes([...getNodes()]);
-      },
-      { nodes: [...getNodes()] }
+      }
     );
+    // applyDelete: just trigger a re-render; mutation already applied above.
+    return ()=>{ if(!cancelled) setNodes([...getNodes()]); };
   } else {
-    const newNodes=getNodes().filter(n=>n.id!==nodeId);
-    // Pass the filtered nodes array as extraState so nodes + toast update in one render.
     showDeleteToast(title,
       ()=>{ deleteNodeFromDisk(node); },
       ()=>{
-        setNodes([...getNodes(), node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
-      },
-      { nodes: newNodes }
+        cancelled=true;
+        // Only restore if applyDelete already removed the node.
+        if(!getNodes().find(n=>n.id===nodeId)){
+          setNodes([...getNodes(),node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
+        }
+      }
     );
+    // applyDelete: filter the node out of the store.
+    return ()=>{ if(!cancelled) setNodes(getNodes().filter(n=>n.id!==nodeId)); };
   }
 }
 
@@ -597,16 +614,13 @@ let _toastTimer=null;
 let _pendingCommit=null;
 const TOAST_MS=4000;
 
-function showDeleteToast(title, commitFn, undoFn, extraState={}){
+function showDeleteToast(title, commitFn, undoFn){
   // Commit any previous pending delete before showing the new one.
   if(_toastTimer){ clearTimeout(_toastTimer); _toastTimer=null; }
   if(_pendingCommit){ _pendingCommit(); _pendingCommit=null; }
 
   _pendingCommit=commitFn;
-  // Merge extraState (e.g. updated nodes) into the same setState call so that
-  // the agenda update and the toast appearance happen in a single React render.
   useStore.setState({
-    ...extraState,
     toast:{
       title,
       onUndo:()=>{

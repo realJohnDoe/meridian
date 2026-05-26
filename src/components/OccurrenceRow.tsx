@@ -9,7 +9,7 @@ interface Props {
   index: number
   onOpen: () => void
   onToggleDone: () => void
-  onSwipeDelete: () => void
+  onSwipeDelete: () => (() => void)
 }
 
 export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete }: Props) {
@@ -97,10 +97,11 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       hintL.style.filter = ''
       hintL.style.opacity = ''
       if (dx <= -THRESHOLD && isFull) {
-        // Fix height before starting transitions so the collapse has a concrete
-        // value to animate from, then kick off slide + collapse simultaneously.
-        // Sequential (old): 260ms + 220ms = 480ms before toast appears.
-        // Concurrent (new): ~220ms total.
+        // Phase 1: show toast immediately (before animation completes).
+        // beginSwipeDelete() returns applyDelete — the function that actually
+        // removes the item from the store once the exit animation is done.
+        const applyDelete = onSwipeDeleteRef.current()
+        // Kick off slide + collapse simultaneously.
         wrap.style.height = wrap.offsetHeight + 'px'
         wrap.style.overflow = 'hidden'
         void wrap.offsetHeight  // force reflow so the fixed height is registered
@@ -109,7 +110,8 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
         wrap.style.transition = 'height .22s ease, opacity .22s ease'
         wrap.style.height = '0'
         wrap.style.opacity = '0'
-        setTimeout(() => onSwipeDeleteRef.current(), 230)
+        // Phase 2: remove from store after animation so React unmounts cleanly.
+        setTimeout(() => applyDelete(), 230)
       } else {
         row.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1)'
         row.style.transform = ''
