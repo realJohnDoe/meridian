@@ -190,8 +190,11 @@ export default function NodeInheritanceDebugger() {
     [processContent],
   )
 
-  // Only show non-root cards (root is just the file itself, not an "instance")
+  // Instance cards: all non-root results
   const visibleCards = results?.filter(r => r.depth > 0) ?? []
+  // Root card: shown only when there are no instances (lets user verify parsed fields)
+  const rootCard     = results?.[0] ?? null
+  const showRootCard = rootCard !== null && visibleCards.length === 0
   const canCollapse  = visibleCards.length > 0
   const isEmpty      = !displayContent
 
@@ -278,7 +281,7 @@ export default function NodeInheritanceDebugger() {
           <button
             onClick={handleCollapse}
             disabled={!canCollapse}
-            title={canCollapse ? 'Collapse effective nodes → compact YAML' : 'Load a file first'}
+            title={canCollapse ? 'Collapse effective nodes → compact YAML' : results ? 'No instances to collapse' : 'Load a file first'}
             className={`flex items-center justify-center w-6 h-6 rounded transition-colors ${
               canCollapse
                 ? 'text-white/50 hover:text-white hover:bg-white/10 cursor-pointer'
@@ -292,7 +295,7 @@ export default function NodeInheritanceDebugger() {
         {/* ── RIGHT: effective nodes ── */}
         <div className="flex-1 flex flex-col min-h-0">
           <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
-            Effective nodes
+            {showRootCard ? 'Parsed node' : 'Effective nodes'}
             {visibleCards.length > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 font-mono normal-case tracking-normal">
                 {visibleCards.length}
@@ -323,18 +326,15 @@ export default function NodeInheritanceDebugger() {
               </div>
             )}
 
-            {/* Node cards — root excluded */}
+            {/* Root card — only when there are no instances */}
+            {showRootCard && rootCard && (
+              <NodeCard key="root" result={rootCard} />
+            )}
+
+            {/* Instance cards — root excluded */}
             {visibleCards.map((r, i) => (
               <NodeCard key={i} result={r} />
             ))}
-
-            {/* No instances message */}
-            {results && visibleCards.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full gap-2 text-white/20 text-sm select-none">
-                <span>No instances defined</span>
-                <span className="text-xs">Add an <code className="font-mono text-white/30">instances:</code> list to the root node</span>
-              </div>
-            )}
           </div>
         </div>
       </div>
