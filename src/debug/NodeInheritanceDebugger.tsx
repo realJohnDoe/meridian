@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import {
   Upload, FileText, ChevronRight, ChevronLeft, AlertCircle, RotateCcw,
-  CalendarDays, Plus, Pencil, Repeat, ChevronsRight,
+  CalendarDays, Plus, Pencil, Repeat, ChevronsRight, Trash2,
 } from 'lucide-react'
 import { RawNodeSchema, type RawNode } from './nodeSchema'
 import {
@@ -54,7 +54,9 @@ const depthColour   = (d: number) => DEPTH_COLOURS[d % DEPTH_COLOURS.length]
 
 // ── Action types ──────────────────────────────────────────────────────────────
 
-type ActionKind = 'add' | 'edit-occurrence' | 'edit-pattern' | 'edit-following'
+type ActionKind =
+  | 'add' | 'edit-occurrence' | 'edit-pattern' | 'edit-following'
+  | 'delete-occurrence' | 'delete-following' | 'delete-all'
 
 // ── Sub-node navigation ───────────────────────────────────────────────────────
 
@@ -162,6 +164,43 @@ function doEditFollowing(node: RawNode, ownerPath: number[], occDate: string): R
   const newInstances = [...((parent.instances as RawNode[]) ?? [])]
   newInstances.splice(childIdx, 1, series1, series2)
   return setSubNode(node, parentPath, { ...parent, instances: newInstances })
+}
+
+function doDeleteOccurrence(node: RawNode, ownerPath: number[], occ: OccurrenceEntry): RawNode {
+  const sub = getSubNode(node, ownerPath)
+  if (occ.source === 'generated') {
+    // Mark as excluded (preserves any other overrides on this date)
+    const instances = [...((sub.instances as RawNode[]) ?? [])]
+    const idx = instances.findIndex(i => String((i as Record<string, unknown>).date) === occ.date)
+    const excl: Record<string, unknown> = { date: occ.date, excluded: true }
+    if (idx >= 0) {
+      instances[idx] = { ...instances[idx], ...excl } as RawNode
+    } else {
+      instances.push(excl as RawNode)
+    }
+    return setSubNode(node, ownerPath, { ...sub, instances })
+  } else {
+    // Remove the explicit instance entry entirely
+    const instances = ((sub.instances as RawNode[]) ?? []).filter(
+      i => String((i as Record<string, unknown>).date) !== occ.date,
+    )
+    const updated = { ...sub, instances } as RawNode
+    if (instances.length === 0) delete (updated as Record<string, unknown>).instances
+    return setSubNode(node, ownerPath, updated)
+  }
+}
+
+function doDeleteFollowing(node: RawNode, ownerPath: number[], occDate: string): RawNode {
+  const sub           = getSubNode(node, ownerPath)
+  const originalRepeat = ((sub.repeat ?? {}) as Record<string, unknown>)
+  const newRepeat     = { ...originalRepeat, end: { type: 'until', date: dayBefore(occDate) } }
+  const instances     = ((sub.instances as RawNode[]) ?? []).filter(
+    i => String((i as Record<string, unknown>).date) < occDate,
+  )
+  const updated: Record<string, unknown> = { ...sub, repeat: newRepeat }
+  if (instances.length > 0) updated.instances = instances
+  else delete updated.instances
+  return setSubNode(node, ownerPath, updated as RawNode)
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -464,6 +503,23 @@ function EditFollowingForm({ occ, onApply, onCancel }: {
   )
 }
 
+function DeleteConfirmForm({ message, label, onApply, onCancel }: {
+  message: string; label: string; onApply: () => void; onCancel: () => void
+}) {
+  return (
+    <div className="p-3 space-y-2 border-t border-white/5">
+      <p className="text-[11px] text-white/50 leading-relaxed">{message}</p>
+      <div className="flex gap-2">
+        <button onClick={onApply}
+          className="px-3 py-1 text-xs rounded bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors">
+          {label}
+        </button>
+        <button onClick={onCancel} className={btnCancel}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function NodeInheritanceDebugger() {
@@ -528,6 +584,19 @@ export default function NodeInheritanceDebugger() {
     if (originalContent) processContent(originalContent, fileName)
   }, [originalContent, fileName, processContent])
 
+  // ── Delete all ───────────────────────────────────────────────────────────
+  const handleDeleteAll = useCallback(() => {
+    setDisplayContent('')
+    setFileName('')
+    setOriginalContent('')
+    setResults(null)
+    setRawNode(null)
+    setZodErrors([])
+    setIsCollapsed(false)
+    setSelectedIdx(null)
+    setActiveAction(null)
+  }, [])
+
   // ── File input ────────────────────────────────────────────────────────────
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
@@ -566,8 +635,15 @@ export default function NodeInheritanceDebugger() {
     return sub?.repeat ? (sub.repeat as Record<string, unknown>) : null
   }, [selectedOcc, rawNode])
 
-  const canEditPattern   = selectedOcc?.source === 'generated'
-  const canEditFollowing = selectedOcc !== null && selectedOwnerRepeat !== null
+  const canEditPattern    = selectedOcc?.source === 'generated'
+  const canEditFollowing  = selectedOcc !== null && selectedOwnerRepeat !== null
+  // "Delete occurrence" (single) only makes sense when there are multiple occurrences;
+  // when there is only one, "Delete all" (labeled "Delete occurrence") covers it.
+  const totalOccurrences  = occurrences?.length ?? 0
+  const canDeleteSingle   = selectedOcc !== null && totalOccurrences > 1
+  const canDeleteFollowing = canEditFollowing  // same gate as edit-following
+  // "Delete all" is always available once a file is loaded; label changes when only 1 occ.
+  const deleteAllLabel    = totalOccurrences <= 1 ? 'Delete occurrence' : 'Delete all'
 
   function toggleAction(kind: ActionKind) {
     setActiveAction(a => a === kind ? null : kind)
@@ -727,8 +803,8 @@ export default function NodeInheritanceDebugger() {
                 </div>
               ) : (
                 <>
-                  {/* Buttons row */}
-                  <div className="flex flex-wrap gap-1 px-3 py-2">
+                  {/* Edit actions row */}
+                  <div className="flex flex-wrap gap-1 px-3 pt-2 pb-1">
                     <ActionBtn label="Add occurrence"   icon={<Plus size={11} />}
                       active={activeAction === 'add'}
                       onClick={() => toggleAction('add')} />
@@ -745,6 +821,23 @@ export default function NodeInheritanceDebugger() {
                       disabled={!canEditFollowing}
                       title={!canEditFollowing ? 'Requires a repeat field' : undefined}
                       onClick={() => toggleAction('edit-following')} />
+                  </div>
+
+                  {/* Delete actions row */}
+                  <div className="flex flex-wrap gap-1 px-3 pb-2">
+                    <ActionBtn label="Delete occurrence" icon={<Trash2 size={11} />}
+                      active={activeAction === 'delete-occurrence'}
+                      disabled={!canDeleteSingle}
+                      title={!canDeleteSingle ? 'Only one occurrence — use Delete all' : undefined}
+                      onClick={() => toggleAction('delete-occurrence')} />
+                    <ActionBtn label="Delete following"  icon={<Trash2 size={11} />}
+                      active={activeAction === 'delete-following'}
+                      disabled={!canDeleteFollowing}
+                      title={!canDeleteFollowing ? 'Requires a repeat field' : undefined}
+                      onClick={() => toggleAction('delete-following')} />
+                    <ActionBtn label={deleteAllLabel} icon={<Trash2 size={11} />}
+                      active={activeAction === 'delete-all'}
+                      onClick={() => toggleAction('delete-all')} />
                   </div>
 
                   {/* Forms */}
@@ -766,6 +859,29 @@ export default function NodeInheritanceDebugger() {
                   {activeAction === 'edit-following' && rawNode && selectedOcc && (
                     <EditFollowingForm occ={selectedOcc}
                       onApply={() => applyRawNode(doEditFollowing(rawNode, selectedOcc.ownerPath, selectedOcc.date))}
+                      onCancel={() => setActiveAction(null)} />
+                  )}
+                  {activeAction === 'delete-occurrence' && rawNode && selectedOcc && (
+                    <DeleteConfirmForm
+                      message={selectedOcc.source === 'generated'
+                        ? `Mark ${selectedOcc.date} as excluded — it will be hidden from the schedule.`
+                        : `Remove the explicit instance on ${selectedOcc.date} entirely.`}
+                      label="Delete occurrence"
+                      onApply={() => applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc))}
+                      onCancel={() => setActiveAction(null)} />
+                  )}
+                  {activeAction === 'delete-following' && rawNode && selectedOcc && (
+                    <DeleteConfirmForm
+                      message={`End the series on ${dayBefore(selectedOcc.date)}. Occurrences from ${selectedOcc.date} onwards will be removed.`}
+                      label="Delete this & following"
+                      onApply={() => applyRawNode(doDeleteFollowing(rawNode, selectedOcc.ownerPath, selectedOcc.date))}
+                      onCancel={() => setActiveAction(null)} />
+                  )}
+                  {activeAction === 'delete-all' && (
+                    <DeleteConfirmForm
+                      message="Delete the entire node. This clears all occurrences and cannot be undone (use Original to restore the loaded file)."
+                      label={deleteAllLabel}
+                      onApply={handleDeleteAll}
                       onCancel={() => setActiveAction(null)} />
                   )}
                 </>
