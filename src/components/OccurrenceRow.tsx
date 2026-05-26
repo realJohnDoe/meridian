@@ -17,6 +17,8 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   const rowRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
   const [isDone, setIsDone] = useState(!!occ.done)
+  // Lock the stagger delay at first mount so reordering never restarts the entry animation.
+  const staggerRef = useRef(index)
 
   // Keep a stable ref to the callback so the touch-listener closure never goes stale.
   const onSwipeDeleteRef = useRef(onSwipeDelete)
@@ -139,7 +141,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       className="swipe-wrap"
       ref={wrapRef}
       data-occ-key={`${occ._nodeId}-${occ.date}`}
-      style={{ animationDelay: `${index * 0.025}s`, animation: 'fadeUp .16s ease both' }}
+      style={{ '--stagger': `${staggerRef.current * 0.025}s` } as React.CSSProperties}
     >
       {/* Left swipe hint */}
       <div className="swipe-hint left" ref={hintRef} style={{ display: 'none' }}>
