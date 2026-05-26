@@ -8,7 +8,7 @@ import {
   buildEffectiveTree, collapseToYaml, serializeRawNode, displayValue,
   type EffectiveNode,
 } from './inheritance'
-import { expandRepeat, hasRepeat, type OccurrenceEntry } from './repeatExpander'
+import { collectAllOccurrences, treeHasRepeat, hasRepeat, type OccurrenceEntry } from './repeatExpander'
 import { yamlParse } from '../yaml'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
@@ -508,14 +508,17 @@ export default function NodeInheritanceDebugger() {
   const canCollapse  = results !== null
   const isEmpty      = !displayContent
 
-  const nodeHasRepeat = results ? hasRepeat(results) : false
+  const nodeHasRepeat = results ? treeHasRepeat(results) : false
   const occurrences   = useMemo<OccurrenceEntry[] | null>(() => {
     if (!results || !nodeHasRepeat) return null
-    return expandRepeat(results, expandEndDate)
+    return collectAllOccurrences(results, expandEndDate)
   }, [results, nodeHasRepeat, expandEndDate])
 
   const selectedOcc     = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
   const canEditPattern  = selectedOcc?.source === 'generated'
+  // canEditFollowing needs a repeat on the root or (for container roots) on
+  // the root-level instance that owns this occurrence — check via hasRepeat(results)
+  // as a proxy; for nested series, the action targets the root node anyway.
   const canEditFollowing = selectedOcc !== null && nodeHasRepeat
 
   function toggleAction(kind: ActionKind) {

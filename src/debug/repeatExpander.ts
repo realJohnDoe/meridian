@@ -65,9 +65,15 @@ function generatedDateSet(expandable: Record<string, unknown>, from: Date, to: D
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/** True if the effective node has a `repeat` field. */
+/** True if the effective node itself has a `repeat` field. */
 export function hasRepeat(node: EffectiveNode): boolean {
   return node.fields.repeat !== undefined && node.fields.repeat !== null
+}
+
+/** True if any node in the effective tree has a `repeat` field. */
+export function treeHasRepeat(node: EffectiveNode): boolean {
+  if (hasRepeat(node)) return true
+  return node.instances.some(treeHasRepeat)
 }
 
 /**
@@ -92,4 +98,35 @@ export function expandRepeat(node: EffectiveNode, endDateStr: string): Occurrenc
     done:   occ.done as boolean | undefined,
     source: genDates.has(String(occ.date ?? '')) ? 'generated' : 'explicit',
   }))
+}
+
+/**
+ * Walk the entire effective tree and collect occurrences from every node
+ * that has a `repeat` field. Results are merged and sorted by date.
+ *
+ * This handles container roots (produced by "Edit this & following") where
+ * `repeat` lives on child instances rather than the root itself.
+ */
+export function collectAllOccurrences(node: EffectiveNode, endDateStr: string): OccurrenceEntry[] {
+  const results: OccurrenceEntry[] = []
+
+  function walk(n: EffectiveNode) {
+    if (hasRepeat(n)) {
+      results.push(...expandRepeat(n, endDateStr))
+    } else {
+      // Container node — recurse into children
+      n.instances.forEach(walk)
+    }
+  }
+
+  walk(node)
+
+  // Sort by date (then time) so all series appear in chronological order
+  results.sort((a, b) => {
+    const d = a.date.localeCompare(b.date)
+    if (d !== 0) return d
+    return (a.time ?? '').localeCompare(b.time ?? '')
+  })
+
+  return results
 }
