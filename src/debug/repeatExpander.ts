@@ -84,6 +84,12 @@ export function treeHasRepeat(node: EffectiveNode): boolean {
   return node.instances.some(treeHasRepeat)
 }
 
+/** True if any node in the effective tree would produce at least one occurrence. */
+export function treeHasOccurrences(node: EffectiveNode): boolean {
+  if (hasRepeat(node) || node.fields.date !== undefined) return true
+  return node.instances.some(treeHasOccurrences)
+}
+
 /**
  * Expand the repeat schedule of an effective node up to `endDateStr` (YYYY-MM-DD).
  * Each occurrence is tagged with its source and the given ownerPath.
@@ -119,11 +125,27 @@ export function expandRepeat(node: EffectiveNode, endDateStr: string, ownerPath:
 export function collectAllOccurrences(node: EffectiveNode, endDateStr: string): OccurrenceEntry[] {
   const results: OccurrenceEntry[] = []
 
+  const to = new Date(`${endDateStr}T23:59:59`)
+
   function walk(n: EffectiveNode, path: number[]) {
     if (hasRepeat(n)) {
       results.push(...expandRepeat(n, endDateStr, path))
+    } else if (n.fields.date !== undefined) {
+      // Single occurrence — emit as one explicit entry (if within the window)
+      const dateStr = String(n.fields.date)
+      const d = new Date(`${dateStr}T00:00:00`)
+      if (!isNaN(d.getTime()) && d <= to) {
+        results.push({
+          date:      dateStr,
+          time:      n.fields.time  ? String(n.fields.time)  : null,
+          title:     n.fields.title ? String(n.fields.title) : null,
+          done:      n.fields.done as boolean | undefined,
+          source:    'explicit' as const,
+          ownerPath: path,
+        })
+      }
     } else {
-      // Container node — recurse into children
+      // Pure container — recurse into children
       n.instances.forEach((child, i) => walk(child, [...path, i]))
     }
   }

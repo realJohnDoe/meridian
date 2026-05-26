@@ -8,7 +8,7 @@ import {
   buildEffectiveTree, collapseToYaml, serializeRawNode, displayValue,
   type EffectiveNode,
 } from './inheritance'
-import { collectAllOccurrences, treeHasRepeat, hasRepeat, type OccurrenceEntry } from './repeatExpander'
+import { collectAllOccurrences, treeHasOccurrences, hasRepeat, type OccurrenceEntry } from './repeatExpander'
 import { yamlParse } from '../yaml'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
@@ -620,8 +620,8 @@ export default function NodeInheritanceDebugger() {
   const canCollapse  = results !== null
   const isEmpty      = !displayContent
 
-  const nodeHasRepeat = results ? treeHasRepeat(results) : false
-  const occurrences   = useMemo<OccurrenceEntry[] | null>(() => {
+  const nodeHasRepeat      = results ? treeHasOccurrences(results) : false
+  const occurrences        = useMemo<OccurrenceEntry[] | null>(() => {
     if (!results || !nodeHasRepeat) return null
     return collectAllOccurrences(results, expandEndDate)
   }, [results, nodeHasRepeat, expandEndDate])
@@ -777,7 +777,7 @@ export default function NodeInheritanceDebugger() {
             {displayContent && !nodeHasRepeat && zodErrors.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-white/20 select-none">
                 <CalendarDays size={28} strokeWidth={1.2} />
-                <span className="text-sm">No <span className="font-mono">repeat:</span> field defined</span>
+                <span className="text-sm">No <span className="font-mono">date:</span> or <span className="font-mono">repeat:</span> found</span>
               </div>
             )}
             {occurrences !== null && (
