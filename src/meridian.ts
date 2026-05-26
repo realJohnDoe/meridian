@@ -1,6 +1,6 @@
 // @ts-nocheck
 import Dexie from 'dexie'
-import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar, Plus } from 'lucide'
+import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar, Plus, X } from 'lucide'
 import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './recurrence'
 import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode, titleToSlug } from './yaml'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
@@ -131,7 +131,7 @@ export const fmtLong=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long
 export const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 export const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 function escapeHtml(s:string):string{return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar,Plus}});}
+function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar,Plus,X}});}
 
 
 // ── NAVIGATION ──────────────────────────────────────────────────
