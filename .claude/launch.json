@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "meridian",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--host"],
-      "port": 5173
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev", "--", "--host"],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }
