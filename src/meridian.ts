@@ -229,6 +229,7 @@ export function toggleOccDone(o): void {
 
 // ── SWIPE DELETE (exported for React components) ──────────────
 export function swipeDeleteOcc(o): void {
+  console.log('[toast] swipeDeleteOcc called', performance.now().toFixed(1));
   const node=o._node||o;
   const nodeId=node.id;
   const title=node.title;
@@ -239,22 +240,25 @@ export function swipeDeleteOcc(o): void {
     let inst=node.instances.find(i=>i.date===occDate&&!i.time);
     if(inst){inst.excluded=true;}
     else{node.instances.push({date:occDate,excluded:true});}
-    setNodes([...getNodes()]);
+    // Pass the updated nodes array as extraState so nodes + toast update in one render.
     showDeleteToast(title,
       ()=>{ writeEntityToCache(node); },
       ()=>{
         if(inst){delete inst.excluded;}
         else{node.instances=node.instances.filter(i=>!(i.date===occDate&&i.excluded&&!i.time));}
         setNodes([...getNodes()]);
-      }
+      },
+      { nodes: [...getNodes()] }
     );
   } else {
-    setNodes(getNodes().filter(n=>n.id!==nodeId));
+    const newNodes=getNodes().filter(n=>n.id!==nodeId);
+    // Pass the filtered nodes array as extraState so nodes + toast update in one render.
     showDeleteToast(title,
       ()=>{ deleteNodeFromDisk(node); },
       ()=>{
         setNodes([...getNodes(), node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
-      }
+      },
+      { nodes: newNodes }
     );
   }
 }
@@ -594,13 +598,17 @@ let _toastTimer=null;
 let _pendingCommit=null;
 const TOAST_MS=4000;
 
-function showDeleteToast(title, commitFn, undoFn){
+function showDeleteToast(title, commitFn, undoFn, extraState={}){
   // Commit any previous pending delete before showing the new one.
   if(_toastTimer){ clearTimeout(_toastTimer); _toastTimer=null; }
   if(_pendingCommit){ _pendingCommit(); _pendingCommit=null; }
 
   _pendingCommit=commitFn;
+  console.log(`[toast] T+0 showDeleteToast called, extraState keys: ${Object.keys(extraState).join(',') || '(none)'}`, performance.now().toFixed(1));
+  // Merge extraState (e.g. updated nodes) into the same setState call so that
+  // the agenda update and the toast appearance happen in a single React render.
   useStore.setState({
+    ...extraState,
     toast:{
       title,
       onUndo:()=>{

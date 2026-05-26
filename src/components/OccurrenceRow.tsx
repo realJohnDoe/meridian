@@ -17,6 +17,8 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   const rowRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
   const [isDone, setIsDone] = useState(!!occ.done)
+  // Lock the stagger delay at first mount so reordering never restarts the entry animation.
+  const staggerRef = useRef(index)
 
   // Keep a stable ref to the callback so the touch-listener closure never goes stale.
   const onSwipeDeleteRef = useRef(onSwipeDelete)
@@ -94,22 +96,25 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       hintL.style.display = 'none'
       hintL.style.filter = ''
       hintL.style.opacity = ''
-      row.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1)'
       if (dx <= -THRESHOLD && isFull) {
+        // Fix height before starting transitions so the collapse has a concrete
+        // value to animate from, then kick off slide + collapse simultaneously.
+        // Sequential (old): 260ms + 220ms = 480ms before toast appears.
+        // Concurrent (new): ~220ms total.
+        wrap.style.height = wrap.offsetHeight + 'px'
+        wrap.style.overflow = 'hidden'
+        void wrap.offsetHeight  // force reflow so the fixed height is registered
+        row.style.transition = 'transform .22s cubic-bezier(.4,0,.2,1)'
         row.style.transform = `translateX(-${rowW}px)`
+        wrap.style.transition = 'height .22s ease, opacity .22s ease'
+        wrap.style.height = '0'
+        wrap.style.opacity = '0'
         setTimeout(() => {
-          wrap.style.height = wrap.offsetHeight + 'px'
-          wrap.style.overflow = 'hidden'
-          requestAnimationFrame(() => {
-            wrap.style.transition = 'height .2s ease,opacity .2s ease'
-            wrap.style.height = '0'
-            wrap.style.opacity = '0'
-          })
-          // Data deletion fires after the collapse animation completes.
-          // By then the element is invisible so React removing it is seamless.
-          setTimeout(() => onSwipeDeleteRef.current(), 220)
-        }, 260)
+          console.log('[toast] swipe timeout fired → calling onSwipeDelete', performance.now().toFixed(1))
+          onSwipeDeleteRef.current()
+        }, 230)
       } else {
+        row.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1)'
         row.style.transform = ''
       }
     }
@@ -139,7 +144,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       className="swipe-wrap"
       ref={wrapRef}
       data-occ-key={`${occ._nodeId}-${occ.date}`}
-      style={{ animationDelay: `${index * 0.025}s`, animation: 'fadeUp .16s ease both' }}
+      style={{ '--stagger': `${staggerRef.current * 0.025}s` } as React.CSSProperties}
     >
       {/* Left swipe hint */}
       <div className="swipe-hint left" ref={hintRef} style={{ display: 'none' }}>

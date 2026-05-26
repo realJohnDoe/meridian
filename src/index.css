@@ -331,4 +331,4 @@ input,textarea,select{font-family:inherit}
 .swipe-hint.ready svg{transform:scale(1.3)}
 .swipe-row{position:relative;z-index:1;background:var(--bg1);touch-action:pan-y;user-select:none;-webkit-user-select:none}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-.occ-row{animation:fadeUp .16s ease both}
+.occ-row{animation:fadeUp .16s ease both;animation-delay:var(--stagger,0s)}

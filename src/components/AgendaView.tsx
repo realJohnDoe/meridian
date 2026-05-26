@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useCallback } from 'react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
 import { expandRange } from '../recurrence'
@@ -18,6 +18,7 @@ export default function AgendaView({ onOpen }: Props) {
 
   // Expand occurrences and group them by day — same window as buildAgenda().
   const groups = useMemo(() => {
+    console.log('[toast] AgendaView useMemo re-running (nodes changed)', performance.now().toFixed(1))
     const from = addDays(TODAY, -7)
     const to = addDays(TODAY, 90)
     const occs = expandRange(nodes, from, to) as Occurrence[]
@@ -59,13 +60,10 @@ export default function AgendaView({ onOpen }: Props) {
     return result
   }, [nodes])
 
-  function handleToggleDone(occ: Occurrence) {
-    toggleOccDone(occ)
-  }
-
-  function handleSwipeDelete(occ: Occurrence) {
-    swipeDeleteOcc(occ)
-  }
+  // Stable references so DaySection's memo comparator isn't short-circuited
+  // by new function identities on every AgendaView render.
+  const handleToggleDone = useCallback((occ: Occurrence) => toggleOccDone(occ), [])
+  const handleSwipeDelete = useCallback((occ: Occurrence) => swipeDeleteOcc(occ), [])
 
   return (
     <div className="ag-pad">

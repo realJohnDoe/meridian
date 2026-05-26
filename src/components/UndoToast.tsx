@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 
 /**
@@ -14,15 +14,21 @@ export default function UndoToast() {
   const [visible, setVisible] = useState(false)
   const [hiding, setHiding] = useState(false)
   const snapshotRef = useRef<{ title: string; onUndo: () => void } | null>(null)
+  // Track visible in a ref so the effect dep array only reacts to toast changes,
+  // not to the visible state it sets (which would cause a double-fire).
+  const visibleRef = useRef(false)
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) so the show-state update is batched into the
+  // same paint as the store update — useEffect would fire after the browser has
+  // already painted a frame with visible=false, causing a visible one-frame delay.
+  useLayoutEffect(() => {
     if (toast) {
-      // New toast: capture snapshot, show immediately.
       snapshotRef.current = toast
       setHiding(false)
       setVisible(true)
-    } else if (visible) {
-      // Toast cleared: fade out, then unmount.
+      visibleRef.current = true
+    } else if (visibleRef.current) {
+      visibleRef.current = false
       setHiding(true)
       const id = setTimeout(() => {
         setVisible(false)
@@ -30,7 +36,7 @@ export default function UndoToast() {
       }, 280)
       return () => clearTimeout(id)
     }
-  }, [toast]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [toast]) // only react to toast changes, not to the visible state we set
 
   if (!visible) return null
 
