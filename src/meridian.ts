@@ -205,26 +205,43 @@ export function occState(o){
 }
 export function barClass(o){return occState(o);}
 
+// ── IMMUTABLE NODE HELPERS ────────────────────────────────────
+/** Shallow-clone a node with a fresh instances array so mutations
+ *  never affect the original store object. */
+function cloneNode(node) {
+  return {
+    ...node,
+    instances: node.instances ? node.instances.map(i => ({...i})) : undefined,
+  }
+}
+/** Return a new nodes array with the node matching `id` replaced. */
+function replaceNode(nodes, id, updated) {
+  return nodes.map(n => n.id === id ? updated : n)
+}
+
 // ── TOGGLE DONE (data-only, exported for React components) ────
 export function toggleOccDone(o): void {
   const newDone=!o.done;
-  o.done=newDone;
+  o.done=newDone; // update the occurrence for optimistic UI
   const node=o._node;
   if(!node)return;
-  if(!node.instances)node.instances=[];
+  const updated=cloneNode(node);
   const jsT=o.jsTime;
   if(node.repeat){
-    let inst=node.instances.find(i=>{
+    let inst=updated.instances?.find(i=>{
       const t=nodeDateTime(i)||parseDateString(i.date);
       return t&&Math.abs(t.getTime()-jsT.getTime())<60000;
     });
     if(inst){inst.done=newDone;}
-    else{node.instances.push({date:o.date, done:newDone});}
+    else{
+      if(!updated.instances)updated.instances=[];
+      updated.instances.push({date:o.date, done:newDone});
+    }
   } else {
-    node.done=newDone;
+    updated.done=newDone;
   }
-  writeEntityToCache(node);
-  setNodes([...getNodes()]);
+  writeEntityToCache(updated);
+  setNodes(replaceNode(getNodes(), node.id, updated));
 }
 
 // ── SWIPE DELETE (exported for React components) ──────────────
@@ -234,19 +251,17 @@ export function swipeDeleteOcc(o): void {
   const title=node.title;
 
   if(o.recur){
-    if(!node.instances)node.instances=[];
+    const original=cloneNode(node); // snapshot for undo
+    const updated=cloneNode(node);
+    if(!updated.instances)updated.instances=[];
     const occDate=o.date;
-    let inst=node.instances.find(i=>i.date===occDate&&!i.time);
+    const inst=updated.instances.find(i=>i.date===occDate&&!i.time);
     if(inst){inst.excluded=true;}
-    else{node.instances.push({date:occDate,excluded:true});}
-    setNodes([...getNodes()]);
+    else{updated.instances.push({date:occDate,excluded:true});}
+    setNodes(replaceNode(getNodes(), nodeId, updated));
     showDeleteToast(title,
-      ()=>{ writeEntityToCache(node); },
-      ()=>{
-        if(inst){delete inst.excluded;}
-        else{node.instances=node.instances.filter(i=>!(i.date===occDate&&i.excluded&&!i.time));}
-        setNodes([...getNodes()]);
-      }
+      ()=>{ writeEntityToCache(updated); },
+      ()=>{ setNodes(replaceNode(getNodes(), nodeId, original)); }
     );
   } else {
     setNodes(getNodes().filter(n=>n.id!==nodeId));
@@ -339,50 +354,54 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
   if(editScope==='add'){
     // Add a one-off occurrence to the series (or to a non-recurring node)
     if(!f.date){alert('Please set a date for the new occurrence.');return;}
-    if(!node.instances)node.instances=[];
+    const updated=cloneNode(node);
+    if(!updated.instances)updated.instances=[];
     // For non-recurring nodes: migrate root date into instances so all occurrences
     // are explicit in the YAML (root node.date stays as metadata)
-    if(!node.repeat&&node.date){
-      const alreadyCovered=node.instances.some(i=>i.date===node.date&&!i.excluded);
+    if(!updated.repeat&&updated.date){
+      const alreadyCovered=updated.instances.some(i=>i.date===updated.date&&!i.excluded);
       if(!alreadyCovered){
-        const rootInst:any={date:node.date};
-        if(node.time)rootInst.time=node.time;
-        node.instances.unshift(rootInst);
+        const rootInst:any={date:updated.date};
+        if(updated.time)rootInst.time=updated.time;
+        updated.instances.unshift(rootInst);
       }
     }
     const newInst:any={date:f.date};
     if(f.time)newInst.time=f.time;
-    if(f.duration&&f.duration!==node.duration)newInst.duration=f.duration;
-    if(f.title!==node.title)newInst.title=f.title;
-    if(f.body&&f.body!==node.body)newInst.body=f.body;
+    if(f.duration&&f.duration!==updated.duration)newInst.duration=f.duration;
+    if(f.title!==updated.title)newInst.title=f.title;
+    if(f.body&&f.body!==updated.body)newInst.body=f.body;
     if(tracked&&f.done!==undefined)newInst.done=f.done;
-    if(tracked&&f.priority&&f.priority!==node.priority)newInst.priority=f.priority;
-    node.instances.push(newInst);
-    writeEntityToCache(node);
+    if(tracked&&f.priority&&f.priority!==updated.priority)newInst.priority=f.priority;
+    updated.instances.push(newInst);
+    setNodes(replaceNode(nodes, node.id, updated));
+    writeEntityToCache(updated);
     closeEntry();
     return;
   }
 
   if(editScope==='all'||!node.repeat){
-    Object.assign(node,f);
-    if(!tracked)delete node.done;
-    if(!scheduled){delete node.date;delete node.time;delete node.duration;}
-    if(repeat)node.repeat=repeat; else delete node.repeat;
-    if(node.tags&&node.tags.length===0)delete node.tags;
-    writeEntityToCache(node);
+    const updated={...cloneNode(node), ...f};
+    if(!tracked)delete updated.done;
+    if(!scheduled){delete updated.date;delete updated.time;delete updated.duration;}
+    if(repeat)updated.repeat=repeat; else delete updated.repeat;
+    if(updated.tags&&updated.tags.length===0)delete updated.tags;
+    setNodes(replaceNode(nodes, node.id, updated));
+    writeEntityToCache(updated);
 
   } else if(editScope==='single'){
+    const updated=cloneNode(node);
+    if(!updated.instances)updated.instances=[];
     const occDate=item.date;
     const occTime=item.time||undefined;
     const newDate=f.date;
     const newTime=f.time||undefined;
     const isRescheduled=newDate!==occDate||(newTime&&newTime!==occTime);
-    if(!node.instances)node.instances=[];
     if(isRescheduled){
-      let excl=node.instances.find(i=>i.date===occDate&&(!i.time||i.time===occTime));
+      let excl=updated.instances.find(i=>i.date===occDate&&(!i.time||i.time===occTime));
       if(excl){excl.excluded=true;delete excl.done;}
-      else{node.instances.push({date:occDate,excluded:true});}
-      const newInst={date:newDate};
+      else{updated.instances.push({date:occDate,excluded:true});}
+      const newInst:any={date:newDate};
       if(newTime)newInst.time=newTime;
       if(f.title!==node.title)newInst.title=f.title;
       if(f.body!==node.body)newInst.body=f.body;
@@ -390,10 +409,10 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
       if(f.duration!==node.duration)newInst.duration=f.duration;
       if(tracked&&f.done!==undefined)newInst.done=f.done;
       if(tracked&&f.priority!==node.priority)newInst.priority=f.priority||undefined;
-      node.instances.push(newInst);
+      updated.instances.push(newInst);
     } else {
-      let inst=node.instances.find(i=>i.date===occDate&&(!i.time||i.time===occTime));
-      if(!inst){inst={date:occDate};if(occTime)inst.time=occTime;node.instances.push(inst);}
+      let inst=updated.instances.find(i=>i.date===occDate&&(!i.time||i.time===occTime));
+      if(!inst){inst={date:occDate};if(occTime)inst.time=occTime;updated.instances.push(inst);}
       if(f.title!==node.title)inst.title=f.title; else delete inst.title;
       if(f.body!==node.body)inst.body=f.body; else delete inst.body;
       if(f.tags?.length&&JSON.stringify(f.tags)!==JSON.stringify(node.tags))inst.tags=f.tags; else delete inst.tags;
@@ -401,21 +420,26 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
       if(tracked&&f.done!==undefined)inst.done=f.done; else delete inst.done;
       if(tracked&&f.priority!==node.priority)inst.priority=f.priority||undefined; else delete inst.priority;
     }
-    writeEntityToCache(node);
+    setNodes(replaceNode(nodes, node.id, updated));
+    writeEntityToCache(updated);
 
   } else if(editScope==='future'){
+    const updated=cloneNode(node);
     const occDate=item.date;
     const occJsDate=parseDateString(occDate);
     const untilDate=new Date(occJsDate);untilDate.setDate(untilDate.getDate()-1);
-    if(!node.repeat.scheduled)node.repeat.scheduled={};
-    node.repeat.scheduled.end={type:'until',date:fmtISO(untilDate)};
-    if(node.instances){
-      node.instances=node.instances.filter(i=>{
+    // Build new repeat object without touching the original
+    updated.repeat={
+      ...updated.repeat,
+      scheduled:{...(updated.repeat?.scheduled||{}), end:{type:'until',date:fmtISO(untilDate)}},
+    };
+    if(updated.instances){
+      updated.instances=updated.instances.filter(i=>{
         const t=parseDateString(i.date||'9999-01-01');
         return !t||t<occJsDate;
       });
     }
-    const newChild={date:f.date||occDate};
+    const newChild:any={date:f.date||occDate};
     if(f.time)newChild.time=f.time;
     if(f.title!==node.title)newChild.title=f.title;
     if(JSON.stringify(f.tags)!==JSON.stringify(node.tags))newChild.tags=f.tags;
@@ -424,12 +448,12 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     if(repeat)newChild.repeat=repeat;
     if(tracked&&f.done!==undefined)newChild.done=f.done;
     Object.keys(newChild).forEach(k=>{if(newChild[k]===undefined)delete newChild[k];});
-    if(!node.instances)node.instances=[];
-    node.instances.push(newChild);
-    writeEntityToCache(node);
+    if(!updated.instances)updated.instances=[];
+    updated.instances.push(newChild);
+    setNodes(replaceNode(nodes, node.id, updated));
+    writeEntityToCache(updated);
   }
 
-  setNodes([...nodes]); // notify store (node mutated in place)
   closeEntry();
 }
 
@@ -447,11 +471,13 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
     else document.getElementById('seriesSheet').classList.remove('open');
   }
   function excludeThis(){
-    if(!node.instances)node.instances=[];
-    let inst=node.instances.find(i=>i.date===occDate&&!i.time);
+    const updated=cloneNode(node);
+    if(!updated.instances)updated.instances=[];
+    const inst=updated.instances.find(i=>i.date===occDate&&!i.time);
     if(inst){inst.excluded=true;}
-    else{node.instances.push({date:occDate,excluded:true});}
-    writeEntityToCache(node);
+    else{updated.instances.push({date:occDate,excluded:true});}
+    setNodes(replaceNode(getNodes(), nodeId, updated));
+    writeEntityToCache(updated);
     hideSheet();closeEntry();
   }
   function deleteAll(){
@@ -461,14 +487,20 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
   }
   function deleteAllFuture(){
     // Cap the series at the day before occDate; exclude any future manual instances
+    const updated=cloneNode(node);
     const occJsDate=parseDateString(occDate);
     const untilDate=new Date(occJsDate);untilDate.setDate(untilDate.getDate()-1);
-    if(!node.repeat.scheduled)node.repeat.scheduled={};
-    node.repeat.scheduled.end={type:'until',date:fmtISO(untilDate)};
-    if(node.instances){
-      node.instances.forEach(i=>{if(i.date&&i.date>=occDate&&!i.excluded)i.excluded=true;});
+    updated.repeat={
+      ...updated.repeat,
+      scheduled:{...(updated.repeat?.scheduled||{}), end:{type:'until',date:fmtISO(untilDate)}},
+    };
+    if(updated.instances){
+      updated.instances=updated.instances.map(i=>
+        (i.date&&i.date>=occDate&&!i.excluded) ? {...i,excluded:true} : i
+      );
     }
-    writeEntityToCache(node);
+    setNodes(replaceNode(getNodes(), nodeId, updated));
+    writeEntityToCache(updated);
     hideSheet();closeEntry();
   }
 
