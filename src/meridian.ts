@@ -28,6 +28,18 @@ const setNsFilter   = (f: string) => useStore.setState({ nsFilterVal: f })
 const getDirHandle  = ()          => useStore.getState().dirHandle
 const setDirHandle  = (h: any)    => useStore.setState({ dirHandle: h })
 
+// ── ERROR NOTIFICATION ─────────────────────────────────────────
+// Pushes a message to the store; App.tsx renders it as a dismissible banner.
+// Auto-clears after 5 s (unless the same message is already gone).
+function notify(msg: string): void {
+  useStore.setState({ errorNotification: msg });
+  setTimeout(() => {
+    if (useStore.getState().errorNotification === msg) {
+      useStore.setState({ errorNotification: null });
+    }
+  }, 5000);
+}
+
 // ── CONSTANTS ─────────────────────────────────────────────────
 // TODAY is imported from ./constants
 
@@ -373,7 +385,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
 
   if(editScope==='add'){
     // Add a one-off occurrence to the series (or to a non-recurring node)
-    if(!f.date){alert('Please set a date for the new occurrence.');return;}
+    if(!f.date){notify('Please set a date for the new occurrence.');return;}
     const updated=cloneNode(node);
     if(!updated.instances)updated.instances=[];
     // For non-recurring nodes: migrate root date into instances so all occurrences
@@ -477,7 +489,12 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
   closeEntry();
 }
 
-export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHideSeries?: ()=>void): void {
+export function deleteNode(
+  item: Occurrence|null,
+  onShowSeries?: ()=>void,
+  onHideSeries?: ()=>void,
+  onConfirmSingle?: (title: string, onConfirm: ()=>void)=>void,
+): void {
   if(!item)return;
   const node=item._node||item;
   const nodeId=node.id;
@@ -527,11 +544,11 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
   const opt3=document.getElementById('seriesOpt3') as HTMLElement|null;
 
   if(!node.repeat&&!hasMultiple){
-    // Single occurrence — plain confirm, no sheet needed
-    if(!confirm(`Delete "${node.title}"?`))return;
-    setNodes(getNodes().filter(n=>n.id!==nodeId));
-    deleteNodeFromDisk(node);
-    closeEntry();
+    // Single occurrence — ask React to show a confirm dialog, then act on confirm.
+    const doDelete = () => { setNodes(getNodes().filter(n=>n.id!==nodeId)); deleteNodeFromDisk(node); closeEntry(); };
+    if(onConfirmSingle) { onConfirmSingle(node.title, doDelete); return; }
+    // Fallback if caller doesn't provide a dialog (shouldn't happen in normal flow).
+    doDelete();
     return;
   }
 
@@ -670,15 +687,6 @@ function showDeleteToast(title, commitFn, undoFn){
   }, TOAST_MS);
 }
 
-function addSwipe(el,onLeft,onRight){
-  if(!el)return;
-  let sx=0,sy=0;
-  el.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;},{passive:true});
-  el.addEventListener('touchend',e=>{
-    const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;
-    if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)*1.5){if(dx<0)onLeft();else onRight();}
-  },{passive:true});
-}
 
 
 function nodeToPath(node){
@@ -814,19 +822,19 @@ async function deleteNodeFromDisk(node){
 
 export async function syncToDirectory(){
   try{
-    if(!getDirHandle()){alert('No vault folder connected. Click the folder icon first.');return;}
+    if(!getDirHandle()){notify('No vault folder connected. Click the folder icon first.');return;}
     const dirty=await cacheGetDirty();
     if(!dirty.length){updateSyncUI();return;}
     for(const f of dirty){
       await diskWrite(f.path, f.content);
       await cacheMarkClean(f.path);
     }
-    updateSyncUI();
-    const btn=document.getElementById('syncBtn');
-    if(btn){btn.style.color='var(--grn)';setTimeout(()=>updateSyncUI(),800);}
+    // Flash the sync button green briefly, then settle to the synced state.
+    useStore.setState({ syncDirtyCount: 0, syncFlash: true });
+    setTimeout(() => useStore.setState({ syncFlash: false }), 800);
   }catch(e){
     console.error('[storage] sync failed:', e);
-    alert('Sync failed: '+(e.message||e.name));
+    notify('Sync failed: '+((e as any).message||(e as any).name));
   }
 }
 
@@ -844,21 +852,15 @@ export async function pickDirectory(){
     updateSyncUI();
     setTimeout(()=>goToday(),100);
   }catch(e){
-    if(e.name==='AbortError')return;
+    if((e as any).name==='AbortError')return;
     console.error('[storage] pickDirectory failed:', e);
-    alert(e.message||'Could not connect vault');
+    notify((e as any).message||'Could not connect vault');
   }
 }
 
 function updateSyncUI(){
-  const btn=document.getElementById('syncBtn');
-  if(!btn)return;
   cacheDirtyCount().then(n=>{
-    if(!db){btn.style.color='var(--t3)';btn.title='No vault connected';return;}
-    btn.style.color=n>0?'var(--amb)':'var(--t2)';
-    btn.title=n>0
-      ? `${n} unsaved change${n>1?'s':''} — click to sync`
-      : getDirHandle()?'All synced':'Click folder icon to open vault';
+    useStore.setState({ syncDirtyCount: n });
   }).catch(()=>{});
 }
 
