@@ -8,7 +8,7 @@ import {
   buildEffectiveTree, collapseToYaml, serializeRawNode, displayValue,
   type EffectiveNode,
 } from './inheritance'
-import { collectAllOccurrences, treeHasOccurrences, hasRepeat, type OccurrenceEntry } from './repeatExpander'
+import { collectAllOccurrences, treeHasOccurrences, type OccurrenceEntry } from './repeatExpander'
 import { yamlParse } from '../yaml'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
