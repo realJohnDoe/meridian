@@ -3,11 +3,10 @@ import {
   Menu, FolderSync, FolderOpen, CalendarCheck2, Search,
   ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
-  Plus, Calendar, Clock, Timer, X, Flag, Trash2,
+  Plus, Calendar, CalendarRange, Clock, Timer, X, Flag, Trash2,
 } from 'lucide-react'
 import {
-  initApp, wikilinkInputHandler, wikilinkKeydownHandler, wikilinkClickHandler,
-  applyScope, buildBodyHtml,
+  initApp, applyScope, buildBodyHtml,
   saveNode, deleteNode, closeEntry, pushOverlay,
   openDayViewForDate, goToday, openSearch,
   syncToDirectory, pickDirectory,
@@ -108,20 +107,16 @@ export default function App() {
       setEntry(prefillTitle && !item ? { ...state, title: prefillTitle } : state)
       pushOverlay('entry')
     }
-    document.addEventListener('input', wikilinkInputHandler as EventListener)
-    document.addEventListener('keydown', wikilinkKeydownHandler as EventListener)
-    document.addEventListener('click', wikilinkClickHandler as EventListener)
     initApp()
     // Scroll agenda to today after AgendaView has rendered its sections.
     setTimeout(() => {
       const sec = document.querySelector(`.day-section[data-key="${TODAY.getFullYear()}-${String(TODAY.getMonth()+1).padStart(2,'0')}-${String(TODAY.getDate()).padStart(2,'0')}"]`)
       if (sec) sec.scrollIntoView({ behavior: 'instant', block: 'start' })
     }, 200)
-    return () => {
-      document.removeEventListener('input', wikilinkInputHandler as EventListener)
-      document.removeEventListener('keydown', wikilinkKeydownHandler as EventListener)
-      document.removeEventListener('click', wikilinkClickHandler as EventListener)
-    }
+    // Close the active dialog when the user presses Escape.
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setActiveDialog(null) }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
   }, [])
 
   const openEntry = useCallback((item: any, scope?: string, prefillTitle?: string) => {
@@ -438,14 +433,12 @@ export default function App() {
       {/* SERIES DELETE SHEET */}
       <div className={dlgOvClass('seriesSheet')} id="seriesSheet" onClick={closeDlgOv}>
         <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title" id="seriesSheetTitle">Delete event</div><div className="dlg-body">
-          <button className="sheet-opt" id="seriesOpt1"><i data-lucide="calendar"></i><div><div className="sopt-t">This occurrence</div><div className="sopt-s">Remove only this occurrence</div></div></button>
-          <button className="sheet-opt" id="seriesOpt2"><i data-lucide="calendar-range"></i><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
-          <button className="sheet-opt" id="seriesOpt3" style={{ display: 'none' }}><i data-lucide="calendar-range"></i><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
-          <button className="sheet-opt" onClick={closeDialog} style={{ color: 'var(--t3)' }}><i data-lucide="x"></i><div><div className="sopt-t">Cancel</div></div></button>
+          <button className="sheet-opt" id="seriesOpt1"><Calendar size={16} /><div><div className="sopt-t">This occurrence</div><div className="sopt-s">Remove only this occurrence</div></div></button>
+          <button className="sheet-opt" id="seriesOpt2"><CalendarRange size={16} /><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
+          <button className="sheet-opt" id="seriesOpt3" style={{ display: 'none' }}><CalendarRange size={16} /><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
+          <button className="sheet-opt" onClick={closeDialog} style={{ color: 'var(--t3)' }}><X size={16} /><div><div className="sopt-t">Cancel</div></div></button>
         </div></div>
       </div>
-
-      <div className="wl-popup" id="wlPopup"></div>
 
       {/* ── ERROR NOTIFICATION BANNER ── */}
       {errorNotification && (
