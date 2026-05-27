@@ -433,24 +433,22 @@ export default function App() {
       />
 
       {/* SERIES DELETE SHEET */}
-      {seriesSheetConfig && (
-        <div className="dlg-ov open" onClick={e => { if (e.target === e.currentTarget) setSeriesSheetConfig(null) }}>
-          <div className="dlg"><div className="dlg-handle"></div>
-            <div className="dlg-title">{seriesSheetConfig.title}</div>
-            <div className="dlg-body">
-              {seriesSheetConfig.options.map((opt, i) => (
-                <button key={i} className="sheet-opt" onClick={() => { opt.onClick(); setSeriesSheetConfig(null) }}>
-                  {opt.icon === 'calendar' ? <Calendar size={16} /> : <CalendarRange size={16} />}
-                  <div><div className="sopt-t">{opt.label}</div><div className="sopt-s">{opt.sublabel}</div></div>
-                </button>
-              ))}
-              <button className="sheet-opt" onClick={() => setSeriesSheetConfig(null)} style={{ color: 'var(--t3)' }}>
-                <X size={16} /><div><div className="sopt-t">Cancel</div></div>
+      <div className={seriesSheetConfig ? 'dlg-ov open' : 'dlg-ov'} onClick={e => { if (e.target === e.currentTarget) setSeriesSheetConfig(null) }}>
+        <div className="dlg"><div className="dlg-handle"></div>
+          <div className="dlg-title">{seriesSheetConfig?.title ?? ''}</div>
+          <div className="dlg-body">
+            {seriesSheetConfig?.options.map((opt, i) => (
+              <button key={i} className="sheet-opt" onClick={() => { opt.onClick(); setSeriesSheetConfig(null) }}>
+                {opt.icon === 'calendar' ? <Calendar size={16} /> : <CalendarRange size={16} />}
+                <div><div className="sopt-t">{opt.label}</div><div className="sopt-s">{opt.sublabel}</div></div>
               </button>
-            </div>
+            ))}
+            <button className="sheet-opt" onClick={() => setSeriesSheetConfig(null)} style={{ color: 'var(--t3)' }}>
+              <X size={16} /><div><div className="sopt-t">Cancel</div></div>
+            </button>
           </div>
         </div>
-      )}
+      </div>
 
       {/* ── ERROR NOTIFICATION BANNER ── */}
       {errorNotification && (
