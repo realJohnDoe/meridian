@@ -60,33 +60,27 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
   }
 
   // ── Radix primitives used directly so we can position as a bottom sheet ──
-  // forceMount keeps the portal in the DOM so CSS transitions play on close.
+  // No forceMount — when closed the portal is simply not in the DOM, so nothing
+  // can block interaction. The open (slide-up) animation still plays because Radix
+  // sets data-state="open" in a separate frame after the portal mounts.
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogPrimitive.Portal forceMount>
+      <DialogPrimitive.Portal>
 
-        {/* Backdrop — pointer-events-none by default so it never blocks the app when closed */}
+        {/* Backdrop */}
         <DialogPrimitive.Overlay
-          forceMount
-          className={cn(
-            'fixed inset-0 z-[200] bg-black/70',
-            'pointer-events-none opacity-0',
-            'transition-opacity duration-200',
-            'data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto',
-          )}
+          className="fixed inset-0 z-[200] bg-black/70 transition-opacity duration-200 data-[state=open]:opacity-100 data-[state=closed]:opacity-0"
         />
 
-        {/* Bottom-sheet panel — pointer-events-none + translated off-screen when closed */}
+        {/* Bottom-sheet panel */}
         <DialogPrimitive.Content
-          forceMount
           className={cn(
             'fixed bottom-0 left-1/2 z-[200] -translate-x-1/2',
             'w-full max-w-[430px]',
             'bg-background border-t border-border rounded-t-[24px]',
             'pt-3 pb-10 focus:outline-none',
-            'pointer-events-none translate-y-full',
-            'transition-transform duration-[280ms] ease-[cubic-bezier(.4,0,.2,1)]',
-            'data-[state=open]:translate-y-0 data-[state=open]:pointer-events-auto',
+            'translate-y-full transition-transform duration-[280ms] ease-[cubic-bezier(.4,0,.2,1)]',
+            'data-[state=open]:translate-y-0',
           )}
         >
           {/* Drag handle */}
