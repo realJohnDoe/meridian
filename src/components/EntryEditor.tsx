@@ -123,9 +123,10 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     const m = before.match(/\[\[([^\]\n]*)$/)
     if (m) {
       const q = m[1].toLowerCase()
-      if (!q) { closeWlPopup(); return }
       const allTitles = [...new Set([...nodes, ...NOTES_DATA].map(o => o.title))]
-      const matches = allTitles.filter(t => t.toLowerCase().includes(q)).slice(0, 8)
+      const matches = q
+        ? allTitles.filter(t => t.toLowerCase().includes(q)).slice(0, 8)
+        : allTitles.slice(0, 8)
       if (matches.length) {
         setWlMatches(matches)
         setWlFocusIdx(-1)
