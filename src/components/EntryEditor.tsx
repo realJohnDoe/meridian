@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { ArrowLeft, Trash2, Check, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue } from '../types'
 
@@ -58,10 +58,25 @@ interface Props {
 export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange }: Props) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
+  const tagInputRef = useRef<HTMLInputElement>(null)
+  const [tagInputVal, setTagInputVal] = useState('')
+  const [showTagInput, setShowTagInput] = useState(false)
 
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
+
+  // Focus the tag input as soon as it appears.
+  useEffect(() => {
+    if (showTagInput) tagInputRef.current?.focus()
+  }, [showTagInput])
+
+  const commitTag = useCallback(() => {
+    const t = tagInputVal.trim()
+    if (t) onChange(prev => ({ ...prev, tags: [...prev.tags, t] }))
+    setTagInputVal('')
+    setShowTagInput(false)
+  }, [tagInputVal, onChange])
 
   const { item, title, bodyHtml, scheduled, duration, tracked, itemType, repeat, done, tags, priority, editScope } = entry
 
@@ -194,12 +209,24 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           {tags.map((t, i) => (
             <span key={i} className="etag">{t}</span>
           ))}
-          <span className="etag etag-add" onClick={() => {
-            const t = prompt('Tag:')
-            if (t) onChange(prev => ({ ...prev, tags: [...prev.tags, t.trim()] }))
-          }}>
-            <Plus /> tag
-          </span>
+          {showTagInput ? (
+            <input
+              ref={tagInputRef}
+              className="etag-input"
+              value={tagInputVal}
+              placeholder="tag name"
+              onChange={e => setTagInputVal(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); commitTag() }
+                if (e.key === 'Escape') { setTagInputVal(''); setShowTagInput(false) }
+              }}
+              onBlur={commitTag}
+            />
+          ) : (
+            <span className="etag etag-add" onClick={() => setShowTagInput(true)}>
+              <Plus /> tag
+            </span>
+          )}
         </div>
 
         <div className="entry-divider"></div>

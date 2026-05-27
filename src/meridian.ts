@@ -1,6 +1,6 @@
 // @ts-nocheck
 import Dexie from 'dexie'
-import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar, Plus } from 'lucide'
+import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar, Plus, X } from 'lucide'
 import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './recurrence'
 import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode, titleToSlug } from './yaml'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
@@ -27,6 +27,18 @@ const getNsFilter   = (): string  => useStore.getState().nsFilterVal
 const setNsFilter   = (f: string) => useStore.setState({ nsFilterVal: f })
 const getDirHandle  = ()          => useStore.getState().dirHandle
 const setDirHandle  = (h: any)    => useStore.setState({ dirHandle: h })
+
+// ── ERROR NOTIFICATION ─────────────────────────────────────────
+// Pushes a message to the store; App.tsx renders it as a dismissible banner.
+// Auto-clears after 5 s (unless the same message is already gone).
+function notify(msg: string): void {
+  useStore.setState({ errorNotification: msg });
+  setTimeout(() => {
+    if (useStore.getState().errorNotification === msg) {
+      useStore.setState({ errorNotification: null });
+    }
+  }, 5000);
+}
 
 // ── CONSTANTS ─────────────────────────────────────────────────
 // TODAY is imported from ./constants
@@ -131,7 +143,7 @@ export const fmtLong=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long
 export const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 export const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 function escapeHtml(s:string):string{return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar,Plus}});}
+function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar,Plus,X}});}
 
 
 // ── NAVIGATION ──────────────────────────────────────────────────
@@ -205,57 +217,92 @@ export function occState(o){
 }
 export function barClass(o){return occState(o);}
 
+// ── IMMUTABLE NODE HELPERS ────────────────────────────────────
+/** Shallow-clone a node with a fresh instances array so mutations
+ *  never affect the original store object. */
+function cloneNode(node) {
+  return {
+    ...node,
+    instances: node.instances ? node.instances.map(i => ({...i})) : undefined,
+  }
+}
+/** Return a new nodes array with the node matching `id` replaced. */
+function replaceNode(nodes, id, updated) {
+  return nodes.map(n => n.id === id ? updated : n)
+}
+
 // ── TOGGLE DONE (data-only, exported for React components) ────
 export function toggleOccDone(o): void {
   const newDone=!o.done;
-  o.done=newDone;
+  o.done=newDone; // update the occurrence for optimistic UI
   const node=o._node;
   if(!node)return;
-  if(!node.instances)node.instances=[];
+  const updated=cloneNode(node);
   const jsT=o.jsTime;
   if(node.repeat){
-    let inst=node.instances.find(i=>{
+    let inst=updated.instances?.find(i=>{
       const t=nodeDateTime(i)||parseDateString(i.date);
       return t&&Math.abs(t.getTime()-jsT.getTime())<60000;
     });
     if(inst){inst.done=newDone;}
-    else{node.instances.push({date:o.date, done:newDone});}
+    else{
+      if(!updated.instances)updated.instances=[];
+      updated.instances.push({date:o.date, done:newDone});
+    }
   } else {
-    node.done=newDone;
+    updated.done=newDone;
   }
-  writeEntityToCache(node);
-  setNodes([...getNodes()]);
+  writeEntityToCache(updated);
+  setNodes(replaceNode(getNodes(), node.id, updated));
 }
 
 // ── SWIPE DELETE (exported for React components) ──────────────
-export function swipeDeleteOcc(o): void {
+// Two-phase delete so the toast can appear at the moment the user lifts their
+// finger, while the exit animation is still playing.
+//
+// Phase 1 — call beginSwipeDelete() on touchend:
+//   Shows the toast immediately.  Returns an applyDelete() function.
+// Phase 2 — call applyDelete() after the exit animation completes (~230 ms):
+//   Removes the item from the Zustand store so React unmounts it.
+//   applyDelete() is a no-op if the user already pressed Undo.
+export function beginSwipeDelete(o): ()=>void {
   const node=o._node||o;
   const nodeId=node.id;
   const title=node.title;
+  let cancelled=false;
 
   if(o.recur){
-    if(!node.instances)node.instances=[];
+    const original=cloneNode(node); // snapshot for undo
+    const updated=cloneNode(node);
+    if(!updated.instances)updated.instances=[];
     const occDate=o.date;
-    let inst=node.instances.find(i=>i.date===occDate&&!i.time);
+    const inst=updated.instances.find(i=>i.date===occDate&&!i.time);
     if(inst){inst.excluded=true;}
-    else{node.instances.push({date:occDate,excluded:true});}
-    setNodes([...getNodes()]);
+    else{updated.instances.push({date:occDate,excluded:true});}
+    // Apply mutation to `updated` now so commitFn (writeEntityToCache) always
+    // sees the correct state even if a second delete fires before applyDelete.
     showDeleteToast(title,
-      ()=>{ writeEntityToCache(node); },
+      ()=>{ writeEntityToCache(updated); },
       ()=>{
-        if(inst){delete inst.excluded;}
-        else{node.instances=node.instances.filter(i=>!(i.date===occDate&&i.excluded&&!i.time));}
-        setNodes([...getNodes()]);
+        cancelled=true;
+        setNodes(replaceNode(getNodes(), nodeId, original));
       }
     );
+    // applyDelete: swap updated node into the store (triggers React re-render).
+    return ()=>{ if(!cancelled) setNodes(replaceNode(getNodes(), nodeId, updated)); };
   } else {
-    setNodes(getNodes().filter(n=>n.id!==nodeId));
     showDeleteToast(title,
       ()=>{ deleteNodeFromDisk(node); },
       ()=>{
-        setNodes([...getNodes(), node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
+        cancelled=true;
+        // Only restore if applyDelete already removed the node.
+        if(!getNodes().find(n=>n.id===nodeId)){
+          setNodes([...getNodes(),node].sort((a,b)=>(parseDateString(a.date)||0)-(parseDateString(b.date)||0)));
+        }
       }
     );
+    // applyDelete: filter the node out of the store.
+    return ()=>{ if(!cancelled) setNodes(getNodes().filter(n=>n.id!==nodeId)); };
   }
 }
 
@@ -338,51 +385,55 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
 
   if(editScope==='add'){
     // Add a one-off occurrence to the series (or to a non-recurring node)
-    if(!f.date){alert('Please set a date for the new occurrence.');return;}
-    if(!node.instances)node.instances=[];
+    if(!f.date){notify('Please set a date for the new occurrence.');return;}
+    const updated=cloneNode(node);
+    if(!updated.instances)updated.instances=[];
     // For non-recurring nodes: migrate root date into instances so all occurrences
     // are explicit in the YAML (root node.date stays as metadata)
-    if(!node.repeat&&node.date){
-      const alreadyCovered=node.instances.some(i=>i.date===node.date&&!i.excluded);
+    if(!updated.repeat&&updated.date){
+      const alreadyCovered=updated.instances.some(i=>i.date===updated.date&&!i.excluded);
       if(!alreadyCovered){
-        const rootInst:any={date:node.date};
-        if(node.time)rootInst.time=node.time;
-        node.instances.unshift(rootInst);
+        const rootInst:any={date:updated.date};
+        if(updated.time)rootInst.time=updated.time;
+        updated.instances.unshift(rootInst);
       }
     }
     const newInst:any={date:f.date};
     if(f.time)newInst.time=f.time;
-    if(f.duration&&f.duration!==node.duration)newInst.duration=f.duration;
-    if(f.title!==node.title)newInst.title=f.title;
-    if(f.body&&f.body!==node.body)newInst.body=f.body;
+    if(f.duration&&f.duration!==updated.duration)newInst.duration=f.duration;
+    if(f.title!==updated.title)newInst.title=f.title;
+    if(f.body&&f.body!==updated.body)newInst.body=f.body;
     if(tracked&&f.done!==undefined)newInst.done=f.done;
-    if(tracked&&f.priority&&f.priority!==node.priority)newInst.priority=f.priority;
-    node.instances.push(newInst);
-    writeEntityToCache(node);
+    if(tracked&&f.priority&&f.priority!==updated.priority)newInst.priority=f.priority;
+    updated.instances.push(newInst);
+    setNodes(replaceNode(nodes, node.id, updated));
+    writeEntityToCache(updated);
     closeEntry();
     return;
   }
 
   if(editScope==='all'||!node.repeat){
-    Object.assign(node,f);
-    if(!tracked)delete node.done;
-    if(!scheduled){delete node.date;delete node.time;delete node.duration;}
-    if(repeat)node.repeat=repeat; else delete node.repeat;
-    if(node.tags&&node.tags.length===0)delete node.tags;
-    writeEntityToCache(node);
+    const updated={...cloneNode(node), ...f};
+    if(!tracked)delete updated.done;
+    if(!scheduled){delete updated.date;delete updated.time;delete updated.duration;}
+    if(repeat)updated.repeat=repeat; else delete updated.repeat;
+    if(updated.tags&&updated.tags.length===0)delete updated.tags;
+    setNodes(replaceNode(nodes, node.id, updated));
+    writeEntityToCache(updated);
 
   } else if(editScope==='single'){
+    const updated=cloneNode(node);
+    if(!updated.instances)updated.instances=[];
     const occDate=item.date;
     const occTime=item.time||undefined;
     const newDate=f.date;
     const newTime=f.time||undefined;
     const isRescheduled=newDate!==occDate||(newTime&&newTime!==occTime);
-    if(!node.instances)node.instances=[];
     if(isRescheduled){
-      let excl=node.instances.find(i=>i.date===occDate&&(!i.time||i.time===occTime));
+      let excl=updated.instances.find(i=>i.date===occDate&&(!i.time||i.time===occTime));
       if(excl){excl.excluded=true;delete excl.done;}
-      else{node.instances.push({date:occDate,excluded:true});}
-      const newInst={date:newDate};
+      else{updated.instances.push({date:occDate,excluded:true});}
+      const newInst:any={date:newDate};
       if(newTime)newInst.time=newTime;
       if(f.title!==node.title)newInst.title=f.title;
       if(f.body!==node.body)newInst.body=f.body;
@@ -390,10 +441,10 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
       if(f.duration!==node.duration)newInst.duration=f.duration;
       if(tracked&&f.done!==undefined)newInst.done=f.done;
       if(tracked&&f.priority!==node.priority)newInst.priority=f.priority||undefined;
-      node.instances.push(newInst);
+      updated.instances.push(newInst);
     } else {
-      let inst=node.instances.find(i=>i.date===occDate&&(!i.time||i.time===occTime));
-      if(!inst){inst={date:occDate};if(occTime)inst.time=occTime;node.instances.push(inst);}
+      let inst=updated.instances.find(i=>i.date===occDate&&(!i.time||i.time===occTime));
+      if(!inst){inst={date:occDate};if(occTime)inst.time=occTime;updated.instances.push(inst);}
       if(f.title!==node.title)inst.title=f.title; else delete inst.title;
       if(f.body!==node.body)inst.body=f.body; else delete inst.body;
       if(f.tags?.length&&JSON.stringify(f.tags)!==JSON.stringify(node.tags))inst.tags=f.tags; else delete inst.tags;
@@ -401,21 +452,26 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
       if(tracked&&f.done!==undefined)inst.done=f.done; else delete inst.done;
       if(tracked&&f.priority!==node.priority)inst.priority=f.priority||undefined; else delete inst.priority;
     }
-    writeEntityToCache(node);
+    setNodes(replaceNode(nodes, node.id, updated));
+    writeEntityToCache(updated);
 
   } else if(editScope==='future'){
+    const updated=cloneNode(node);
     const occDate=item.date;
     const occJsDate=parseDateString(occDate);
     const untilDate=new Date(occJsDate);untilDate.setDate(untilDate.getDate()-1);
-    if(!node.repeat.scheduled)node.repeat.scheduled={};
-    node.repeat.scheduled.end={type:'until',date:fmtISO(untilDate)};
-    if(node.instances){
-      node.instances=node.instances.filter(i=>{
+    // Build new repeat object without touching the original
+    updated.repeat={
+      ...updated.repeat,
+      scheduled:{...(updated.repeat?.scheduled||{}), end:{type:'until',date:fmtISO(untilDate)}},
+    };
+    if(updated.instances){
+      updated.instances=updated.instances.filter(i=>{
         const t=parseDateString(i.date||'9999-01-01');
         return !t||t<occJsDate;
       });
     }
-    const newChild={date:f.date||occDate};
+    const newChild:any={date:f.date||occDate};
     if(f.time)newChild.time=f.time;
     if(f.title!==node.title)newChild.title=f.title;
     if(JSON.stringify(f.tags)!==JSON.stringify(node.tags))newChild.tags=f.tags;
@@ -424,16 +480,21 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     if(repeat)newChild.repeat=repeat;
     if(tracked&&f.done!==undefined)newChild.done=f.done;
     Object.keys(newChild).forEach(k=>{if(newChild[k]===undefined)delete newChild[k];});
-    if(!node.instances)node.instances=[];
-    node.instances.push(newChild);
-    writeEntityToCache(node);
+    if(!updated.instances)updated.instances=[];
+    updated.instances.push(newChild);
+    setNodes(replaceNode(nodes, node.id, updated));
+    writeEntityToCache(updated);
   }
 
-  setNodes([...nodes]); // notify store (node mutated in place)
   closeEntry();
 }
 
-export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHideSeries?: ()=>void): void {
+export function deleteNode(
+  item: Occurrence|null,
+  onShowSeries?: ()=>void,
+  onHideSeries?: ()=>void,
+  onConfirmSingle?: (title: string, onConfirm: ()=>void)=>void,
+): void {
   if(!item)return;
   const node=item._node||item;
   const nodeId=node.id;
@@ -447,11 +508,13 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
     else document.getElementById('seriesSheet').classList.remove('open');
   }
   function excludeThis(){
-    if(!node.instances)node.instances=[];
-    let inst=node.instances.find(i=>i.date===occDate&&!i.time);
+    const updated=cloneNode(node);
+    if(!updated.instances)updated.instances=[];
+    const inst=updated.instances.find(i=>i.date===occDate&&!i.time);
     if(inst){inst.excluded=true;}
-    else{node.instances.push({date:occDate,excluded:true});}
-    writeEntityToCache(node);
+    else{updated.instances.push({date:occDate,excluded:true});}
+    setNodes(replaceNode(getNodes(), nodeId, updated));
+    writeEntityToCache(updated);
     hideSheet();closeEntry();
   }
   function deleteAll(){
@@ -461,25 +524,31 @@ export function deleteNode(item: Occurrence|null, onShowSeries?: ()=>void, onHid
   }
   function deleteAllFuture(){
     // Cap the series at the day before occDate; exclude any future manual instances
+    const updated=cloneNode(node);
     const occJsDate=parseDateString(occDate);
     const untilDate=new Date(occJsDate);untilDate.setDate(untilDate.getDate()-1);
-    if(!node.repeat.scheduled)node.repeat.scheduled={};
-    node.repeat.scheduled.end={type:'until',date:fmtISO(untilDate)};
-    if(node.instances){
-      node.instances.forEach(i=>{if(i.date&&i.date>=occDate&&!i.excluded)i.excluded=true;});
+    updated.repeat={
+      ...updated.repeat,
+      scheduled:{...(updated.repeat?.scheduled||{}), end:{type:'until',date:fmtISO(untilDate)}},
+    };
+    if(updated.instances){
+      updated.instances=updated.instances.map(i=>
+        (i.date&&i.date>=occDate&&!i.excluded) ? {...i,excluded:true} : i
+      );
     }
-    writeEntityToCache(node);
+    setNodes(replaceNode(getNodes(), nodeId, updated));
+    writeEntityToCache(updated);
     hideSheet();closeEntry();
   }
 
   const opt3=document.getElementById('seriesOpt3') as HTMLElement|null;
 
   if(!node.repeat&&!hasMultiple){
-    // Single occurrence — plain confirm, no sheet needed
-    if(!confirm(`Delete "${node.title}"?`))return;
-    setNodes(getNodes().filter(n=>n.id!==nodeId));
-    deleteNodeFromDisk(node);
-    closeEntry();
+    // Single occurrence — ask React to show a confirm dialog, then act on confirm.
+    const doDelete = () => { setNodes(getNodes().filter(n=>n.id!==nodeId)); deleteNodeFromDisk(node); closeEntry(); };
+    if(onConfirmSingle) { onConfirmSingle(node.title, doDelete); return; }
+    // Fallback if caller doesn't provide a dialog (shouldn't happen in normal flow).
+    doDelete();
     return;
   }
 
@@ -589,53 +658,35 @@ function insertWikilink(title){
 }
 
 // ── UNDO TOAST MANAGER ───────────────────────────────────────
-let _toastTimer=null, _toastEl=null, _pendingDelete=null;
+// Timer lives in module scope so it survives across React renders.
+let _toastTimer=null;
+let _pendingCommit=null;
 const TOAST_MS=4000;
 
 function showDeleteToast(title, commitFn, undoFn){
-  if(_toastTimer){commitToast();}
-  _pendingDelete={commitFn, undoFn};
-  const toast=document.createElement('div');
-  toast.className='undo-toast';
-  toast.innerHTML=
-    `<span class="undo-toast-msg">Deleted: <strong>${escapeHtml(title)}</strong></span>`+
-    `<button class="undo-btn">Undo</button>`;
-  const float=document.getElementById('bottomFloat');
-  float.insertBefore(toast, float.firstChild);
-  _toastEl=toast;
-  toast.querySelector('.undo-btn').onclick=()=>{undoToast();};
-  _toastTimer=setTimeout(()=>commitToast(), TOAST_MS);
+  // Commit any previous pending delete before showing the new one.
+  if(_toastTimer){ clearTimeout(_toastTimer); _toastTimer=null; }
+  if(_pendingCommit){ _pendingCommit(); _pendingCommit=null; }
+
+  _pendingCommit=commitFn;
+  useStore.setState({
+    toast:{
+      title,
+      onUndo:()=>{
+        clearTimeout(_toastTimer); _toastTimer=null;
+        _pendingCommit=null;
+        undoFn();
+        useStore.setState({toast:null});
+      },
+    },
+  });
+  _toastTimer=setTimeout(()=>{
+    _toastTimer=null;
+    if(_pendingCommit){ _pendingCommit(); _pendingCommit=null; }
+    useStore.setState({toast:null});
+  }, TOAST_MS);
 }
 
-function commitToast(){
-  if(!_toastTimer)return;
-  clearTimeout(_toastTimer);_toastTimer=null;
-  if(_pendingDelete){_pendingDelete.commitFn();_pendingDelete=null;}
-  dismissToast();
-}
-
-function undoToast(){
-  clearTimeout(_toastTimer);_toastTimer=null;
-  if(_pendingDelete){_pendingDelete.undoFn();_pendingDelete=null;}
-  dismissToast();
-}
-
-function dismissToast(){
-  if(!_toastEl)return;
-  const el=_toastEl;_toastEl=null;
-  el.classList.add('hiding');
-  setTimeout(()=>el.remove(),280);
-}
-
-function addSwipe(el,onLeft,onRight){
-  if(!el)return;
-  let sx=0,sy=0;
-  el.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;},{passive:true});
-  el.addEventListener('touchend',e=>{
-    const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;
-    if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)*1.5){if(dx<0)onLeft();else onRight();}
-  },{passive:true});
-}
 
 
 function nodeToPath(node){
@@ -771,19 +822,19 @@ async function deleteNodeFromDisk(node){
 
 export async function syncToDirectory(){
   try{
-    if(!getDirHandle()){alert('No vault folder connected. Click the folder icon first.');return;}
+    if(!getDirHandle()){notify('No vault folder connected. Click the folder icon first.');return;}
     const dirty=await cacheGetDirty();
     if(!dirty.length){updateSyncUI();return;}
     for(const f of dirty){
       await diskWrite(f.path, f.content);
       await cacheMarkClean(f.path);
     }
-    updateSyncUI();
-    const btn=document.getElementById('syncBtn');
-    if(btn){btn.style.color='var(--grn)';setTimeout(()=>updateSyncUI(),800);}
+    // Flash the sync button green briefly, then settle to the synced state.
+    useStore.setState({ syncDirtyCount: 0, syncFlash: true });
+    setTimeout(() => useStore.setState({ syncFlash: false }), 800);
   }catch(e){
     console.error('[storage] sync failed:', e);
-    alert('Sync failed: '+(e.message||e.name));
+    notify('Sync failed: '+((e as any).message||(e as any).name));
   }
 }
 
@@ -801,21 +852,15 @@ export async function pickDirectory(){
     updateSyncUI();
     setTimeout(()=>goToday(),100);
   }catch(e){
-    if(e.name==='AbortError')return;
+    if((e as any).name==='AbortError')return;
     console.error('[storage] pickDirectory failed:', e);
-    alert(e.message||'Could not connect vault');
+    notify((e as any).message||'Could not connect vault');
   }
 }
 
 function updateSyncUI(){
-  const btn=document.getElementById('syncBtn');
-  if(!btn)return;
   cacheDirtyCount().then(n=>{
-    if(!db){btn.style.color='var(--t3)';btn.title='No vault connected';return;}
-    btn.style.color=n>0?'var(--amb)':'var(--t2)';
-    btn.title=n>0
-      ? `${n} unsaved change${n>1?'s':''} — click to sync`
-      : getDirHandle()?'All synced':'Click folder icon to open vault';
+    useStore.setState({ syncDirtyCount: n });
   }).catch(()=>{});
 }
 

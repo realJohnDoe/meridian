@@ -43,6 +43,23 @@ interface MeridianStore {
   // ── File system ─────────────────────────────────────────────────
   dirHandle: FileSystemDirectoryHandle | null
   setDirHandle: (h: FileSystemDirectoryHandle | null) => void
+
+  // ── Undo toast ──────────────────────────────────────────────────
+  toast: { title: string; onUndo: () => void } | null
+  setToast: (t: { title: string; onUndo: () => void } | null) => void
+
+  // ── Sync status ─────────────────────────────────────────────────
+  /** Number of dirty (unsynced) files in the IndexedDB cache. */
+  syncDirtyCount: number
+  setSyncDirtyCount: (n: number) => void
+  /** Briefly true after a successful sync (drives the green flash). */
+  syncFlash: boolean
+  setSyncFlash: (v: boolean) => void
+
+  // ── Error notification ──────────────────────────────────────────
+  /** Non-null while an error banner is visible. */
+  errorNotification: string | null
+  setErrorNotification: (msg: string | null) => void
 }
 
 export const useStore = create<MeridianStore>((set, get) => ({
@@ -76,4 +93,15 @@ export const useStore = create<MeridianStore>((set, get) => ({
 
   dirHandle: null,
   setDirHandle: (dirHandle) => set({ dirHandle }),
+
+  toast: null,
+  setToast: (toast) => set({ toast }),
+
+  syncDirtyCount: 0,
+  setSyncDirtyCount: (syncDirtyCount) => set({ syncDirtyCount }),
+  syncFlash: false,
+  setSyncFlash: (syncFlash) => set({ syncFlash }),
+
+  errorNotification: null,
+  setErrorNotification: (errorNotification) => set({ errorNotification }),
 }))
