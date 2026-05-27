@@ -9,6 +9,16 @@ import type { Node, Occurrence, Repeat, Scheduled } from './types'
 import { useStore } from './store'
 import { TODAY } from './constants'
 
+// ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
+// Passed from deleteNode → App so the sheet is driven by React state only.
+export type SeriesSheetOption = {
+  icon: 'calendar' | 'calendar-range'
+  label: string
+  sublabel: string
+  onClick: () => void
+}
+export type SeriesSheetConfig = { title: string; options: SeriesSheetOption[] }
+
 // ── STORE ACCESSORS ────────────────────────────────────────────
 // Thin wrappers that give vanilla-JS functions synchronous access to
 // the Zustand store.
@@ -143,8 +153,6 @@ export const fmtLong=d=>d.toLocaleDateString('en-US',{weekday:'long',month:'long
 export const fmtShort=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 export const dayKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 function escapeHtml(s:string):string{return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function ic(){createIcons({icons:{CalendarRange,Trash2,Check,Repeat2,FileText,CheckSquare,Calendar,Plus,X}});}
-
 
 // ── NAVIGATION ──────────────────────────────────────────────────
 // All view switching is pure store mutations — no DOM class/style manipulation.
@@ -491,7 +499,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
 
 export function deleteNode(
   item: Occurrence|null,
-  onShowSeries?: ()=>void,
+  onShowSeries?: (config: SeriesSheetConfig)=>void,
   onHideSeries?: ()=>void,
   onConfirmSingle?: (title: string, onConfirm: ()=>void)=>void,
 ): void {
@@ -505,7 +513,6 @@ export function deleteNode(
 
   function hideSheet(){
     if(onHideSeries)onHideSeries();
-    else document.getElementById('seriesSheet').classList.remove('open');
   }
   function excludeThis(){
     const updated=cloneNode(node);
@@ -541,8 +548,6 @@ export function deleteNode(
     hideSheet();closeEntry();
   }
 
-  const opt3=document.getElementById('seriesOpt3') as HTMLElement|null;
-
   if(!node.repeat&&!hasMultiple){
     // Single occurrence — ask React to show a confirm dialog, then act on confirm.
     const doDelete = () => { setNodes(getNodes().filter(n=>n.id!==nodeId)); deleteNodeFromDisk(node); closeEntry(); };
@@ -552,110 +557,23 @@ export function deleteNode(
     return;
   }
 
-  // All other cases: show the series sheet
-  document.getElementById('seriesSheetTitle').textContent=`Delete "${node.title}"`;
-  document.getElementById('seriesOpt1').onclick=excludeThis;
-
+  // Build config and hand off to React; no DOM manipulation.
+  const options: SeriesSheetOption[] = [
+    { icon: 'calendar', label: 'This occurrence', sublabel: 'Remove only this occurrence', onClick: excludeThis },
+  ];
   if(isScheduled){
-    // 3-button layout: This / This+following / All
-    const opt2=document.getElementById('seriesOpt2');
-    opt2.onclick=deleteAllFuture;
-    opt2.querySelector('.sopt-t').textContent='This and all following';
-    opt2.querySelector('.sopt-s').textContent='Remove this and all future occurrences';
-    if(opt3){
-      opt3.style.display='';
-      opt3.onclick=deleteAll;
-      opt3.querySelector('.sopt-t').textContent='All occurrences';
-      opt3.querySelector('.sopt-s').textContent='Remove all occurrences';
-    }
+    options.push({ icon: 'calendar-range', label: 'This and all following', sublabel: 'Remove this and all future occurrences', onClick: deleteAllFuture });
+    options.push({ icon: 'calendar-range', label: 'All occurrences', sublabel: 'Remove all occurrences', onClick: deleteAll });
   } else {
-    // 2-button layout: This / All
-    const opt2=document.getElementById('seriesOpt2');
-    opt2.onclick=deleteAll;
-    opt2.querySelector('.sopt-t').textContent='All occurrences';
-    opt2.querySelector('.sopt-s').textContent='Remove all occurrences';
-    if(opt3)opt3.style.display='none';
+    options.push({ icon: 'calendar-range', label: 'All occurrences', sublabel: 'Remove all occurrences', onClick: deleteAll });
   }
 
-  if(onShowSeries)onShowSeries();
-  else document.getElementById('seriesSheet').classList.add('open');
-  ic();
+  if(onShowSeries)onShowSeries({ title: `Delete "${node.title}"`, options });
 }
 
 // ── WIKILINK AUTOCOMPLETE ─────────────────────────────────────
-let wlFocusIdx=-1;
-
-export function wikilinkInputHandler(e: Event): void {
-  if(!e.target.closest('#entryBody'))return;
-  const sel=window.getSelection();if(!sel.rangeCount)return;
-  const range=sel.getRangeAt(0);
-  const bodyEl=document.getElementById('entryBody');
-  const preRange=document.createRange();
-  preRange.setStart(bodyEl,0);
-  try{preRange.setEnd(range.startContainer,range.startOffset);}catch(err){return;}
-  const before=preRange.toString();
-  const m=before.match(/\[\[([^\]\n]*)$/);
-  const popup=document.getElementById('wlPopup');
-  if(m){
-    const q=m[1].toLowerCase();
-    if(!q){popup.classList.remove('show');return;}
-    const allTitles=[...new Set([...getNodes(),...NOTES_DATA].map(o=>o.title))];
-    const matches=allTitles.filter(t=>t.toLowerCase().includes(q)).slice(0,8);
-    if(matches.length){
-      wlFocusIdx=-1;
-      popup.innerHTML=matches.map(t=>{
-        const o=getNodes().find(n=>n.title===t)||NOTES_DATA.find(n=>n.title===t);
-        const icon=o?.done!==undefined?'check-square':o?.time?'calendar':'file-text';
-        return `<div class="wl-item" data-title="${escapeHtml(t)}"><i data-lucide="${icon}"></i>${escapeHtml(t)}</div>`;
-      }).join('');
-      popup.classList.add('show');
-      const rect=range.getBoundingClientRect();
-      popup.style.top=(rect.bottom+6)+'px';
-      popup.style.left=Math.max(8,rect.left)+'px';
-      popup.querySelectorAll('.wl-item').forEach(item=>{item.onmousedown=ev=>{ev.preventDefault();insertWikilink(item.dataset.title);};});
-      ic();return;
-    }
-  }
-  popup.classList.remove('show');
-}
-
-export function wikilinkKeydownHandler(e: Event): void {
-  const popup=document.getElementById('wlPopup');
-  if(popup.classList.contains('show')){
-    const items=popup.querySelectorAll('.wl-item');
-    if(e.key==='ArrowDown'){e.preventDefault();wlFocusIdx=Math.min(wlFocusIdx+1,items.length-1);items.forEach((it,i)=>it.classList.toggle('focused',i===wlFocusIdx));return;}
-    if(e.key==='ArrowUp'){e.preventDefault();wlFocusIdx=Math.max(wlFocusIdx-1,0);items.forEach((it,i)=>it.classList.toggle('focused',i===wlFocusIdx));return;}
-    if(e.key==='Enter'&&wlFocusIdx>=0){e.preventDefault();insertWikilink(items[wlFocusIdx].dataset.title);return;}
-    if(e.key==='Escape'){popup.classList.remove('show');return;}
-  }
-  if(e.key==='Escape')document.querySelectorAll('.dlg-ov.open').forEach(d=>d.classList.remove('open'));
-}
-
-export function wikilinkClickHandler(e: Event): void {
-  const p=document.getElementById('wlPopup');
-  if(p&&!p.contains(e.target)&&!e.target.closest('#entryBody'))p.classList.remove('show');
-}
-
-function insertWikilink(title){
-  const popup=document.getElementById('wlPopup');popup.classList.remove('show');
-  const sel=window.getSelection();if(!sel.rangeCount)return;
-  const range=sel.getRangeAt(0);
-  const bodyEl=document.getElementById('entryBody');
-  const preRange=document.createRange();preRange.setStart(bodyEl,0);
-  try{preRange.setEnd(range.startContainer,range.startOffset);}catch(err){return;}
-  const before=preRange.toString();
-  const openBracket=before.lastIndexOf('[[');if(openBracket===-1)return;
-  const node=range.startContainer;
-  const pos=range.startOffset;
-  const fullText=node.textContent;
-  const localOpenBracket=fullText.lastIndexOf('[[',pos-1);
-  if(localOpenBracket===-1)return;
-  node.textContent=fullText.slice(0,localOpenBracket)+'[['+title+']]'+fullText.slice(pos);
-  const newPos=localOpenBracket+title.length+4;
-  const newRange=document.createRange();
-  newRange.setStart(node,Math.min(newPos,node.textContent.length));
-  newRange.collapse(true);sel.removeAllRanges();sel.addRange(newRange);
-}
+// Fully migrated to EntryEditor.tsx (React state + component-local handlers).
+// wikilinkInputHandler, wikilinkKeydownHandler, wikilinkClickHandler, insertWikilink deleted.
 
 // ── UNDO TOAST MANAGER ───────────────────────────────────────
 // Timer lives in module scope so it survives across React renders.
@@ -868,7 +786,6 @@ function updateSyncUI(){
 // ── INIT ──────────────────────────────────────────────────────
 export function initApp(): void {
   setNodes(SEED_NODES);
-  ic();
   // Month calendar, Day view, Search, and Filter overlay are all React components.
   // Scroll-to-today in the agenda is handled by AgendaView on mount.
 }
