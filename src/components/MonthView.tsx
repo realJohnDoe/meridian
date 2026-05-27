@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import type { Occurrence } from '../types'
 import { expandRange } from '../recurrence'
 import { sameDay, sortOccs, ccBarClass } from '../meridian'
+import { cn } from '../lib/utils'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 
@@ -30,11 +31,19 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
 
   return (
     <div
-      className={`cal-cell${other ? ' other' : ''}${isToday ? ' istoday' : ''}`}
+      className={cn(
+        'flex flex-col p-[3px] pb-0.5 rounded-[10px] cursor-pointer transition-colors overflow-hidden min-h-0 hover:bg-bg3',
+        other && 'opacity-25',
+      )}
       onClick={() => onDayClick(date)}
     >
-      <span className="ccn">{date.getDate()}</span>
-      <div className="cc-bars">
+      <span className={cn(
+        'text-[11px] font-medium text-t2 size-5 flex items-center justify-center rounded-full shrink-0 mb-px',
+        isToday && 'bg-ind text-white font-bold',
+      )}>
+        {date.getDate()}
+      </span>
+      <div className="flex flex-col gap-px flex-1 overflow-hidden">
         {(() => {
           const seen = new Set<string>()
           const bars: React.ReactNode[] = []
@@ -48,7 +57,7 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
             }
           })
           if (dayOccs.length > 4) bars.push(
-            <div key="more" className="cc-more">+{dayOccs.length - 4}</div>
+            <div key="more" className="text-[8px] text-t3 px-0.5">+{dayOccs.length - 4}</div>
           )
           return bars
         })()}
@@ -63,26 +72,22 @@ interface Props {
 }
 
 export default function MonthView({ onDayClick }: Props) {
-  const calMonth   = useStore(s => s.calMonth)
-  const nodes      = useStore(s => s.nodes)
+  const calMonth    = useStore(s => s.calMonth)
+  const nodes       = useStore(s => s.nodes)
   const setCalMonth = useStore(s => s.setCalMonth)
 
   const m = calMonth.getMonth()
   const y = calMonth.getFullYear()
 
-  // Keep a ref so swipe handlers always navigate relative to the current month
-  // without needing to re-attach listeners on every render.
   const calMonthRef = useRef(calMonth)
   useEffect(() => { calMonthRef.current = calMonth }, [calMonth])
 
-  // Derive the full grid (trailing prev-month cells + current month + leading
-  // next-month cells) and expand occurrences — both memoised on nodes + month.
   const { cells, occs } = useMemo(() => {
     const rawFirst = new Date(y, m, 1).getDay()
-    const first    = (rawFirst + 6) % 7          // Monday-first offset
+    const first    = (rawFirst + 6) % 7
     const dim      = new Date(y, m + 1, 0).getDate()
     const prev     = new Date(y, m, 0).getDate()
-    const nc       = (7 - (first + dim) % 7) % 7 // trailing cells
+    const nc       = (7 - (first + dim) % 7) % 7
 
     const cells: Array<{ date: Date; other: boolean }> = []
     for (let i = first - 1; i >= 0; i--)  cells.push({ date: new Date(y, m - 1, prev - i), other: true })
@@ -105,7 +110,6 @@ export default function MonthView({ onDayClick }: Props) {
     setCalMonth(new Date(d.getFullYear(), d.getMonth() + 1, 1))
   }
 
-  // Swipe left/right to navigate months (replaces the addSwipe() call in initApp).
   const wrapRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = wrapRef.current
@@ -128,21 +132,40 @@ export default function MonthView({ onDayClick }: Props) {
   }, []) // stable — reads latest month via calMonthRef
 
   return (
-    <div className="cal-wrap" ref={wrapRef}>
-      <div className="cal-hdr">
-        <div className="cal-mt"><em>{MONTHS[m]}</em> {y}</div>
-        <div className="mnav">
-          <button className="mnb" onClick={prevMonth}><ChevronLeft /></button>
-          <button className="mnb" onClick={nextMonth}><ChevronRight /></button>
+    <div className="flex-1 flex flex-col overflow-hidden" ref={wrapRef}>
+      {/* Month header */}
+      <div className="px-3.5 pt-3 pb-2 flex items-center justify-between shrink-0">
+        <div className="font-display text-[20px] font-light text-t0 [&_em]:italic [&_em]:text-ind">
+          <em>{MONTHS[m]}</em> {y}
+        </div>
+        <div className="flex items-center gap-0.5">
+          <button
+            className="size-8 rounded-full flex items-center justify-center text-t2 transition-colors hover:bg-bg3"
+            onClick={prevMonth}
+          >
+            <ChevronLeft size={16} strokeWidth={2} />
+          </button>
+          <button
+            className="size-8 rounded-full flex items-center justify-center text-t2 transition-colors hover:bg-bg3"
+            onClick={nextMonth}
+          >
+            <ChevronRight size={16} strokeWidth={2} />
+          </button>
         </div>
       </div>
 
-      <div className="dow-row">
-        {DAYS.map(d => <div key={d} className="dow-c">{d}</div>)}
+      {/* Day-of-week header */}
+      <div className="grid grid-cols-7 px-1 shrink-0">
+        {DAYS.map(d => (
+          <div key={d} className="text-center text-[10px] font-semibold tracking-[.06em] uppercase text-t3 py-[3px]">
+            {d}
+          </div>
+        ))}
       </div>
 
-      <div className="cal-grid-wrap">
-        <div className="cal-grid">
+      {/* Calendar grid */}
+      <div className="flex-1 overflow-hidden px-1 pb-1 flex flex-col">
+        <div className="grid grid-cols-7 gap-0.5 flex-1">
           {cells.map(({ date, other }) => (
             <CalCell
               key={`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`}

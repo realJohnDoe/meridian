@@ -3,6 +3,7 @@ import { Check, Repeat2, Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
 import { fmtT } from '../recurrence'
 import { barClass } from '../meridian'
+import { cn } from '../lib/utils'
 
 interface Props {
   occ: Occurrence
@@ -17,42 +18,31 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   const rowRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
   const [isDone, setIsDone] = useState(!!occ.done)
-  // Lock the stagger delay at first mount so reordering never restarts the entry animation.
   const staggerRef = useRef(index)
 
-  // Keep a stable ref to the callback so the touch-listener closure never goes stale.
   const onSwipeDeleteRef = useRef(onSwipeDelete)
   useEffect(() => { onSwipeDeleteRef.current = onSwipeDelete }, [onSwipeDelete])
 
-  // Sync optimistic state when the store settles.
   useEffect(() => { setIsDone(!!occ.done) }, [occ.done])
 
   const t = fmtT(occ.time)
   const hasTrack = occ.done !== undefined
 
-  // Swipe-to-delete: touchmove must call preventDefault() to block scroll while
-  // the user is swiping horizontally. JSX onTouchMove cannot do that (passive by
-  // default in modern browsers), so we use raw addEventListener with passive:false.
+  // Swipe-to-delete: raw addEventListener with passive:false to call preventDefault.
   useEffect(() => {
-    // Guard: should never be null when mounted, but required for type safety.
     if (!wrapRef.current || !rowRef.current || !hintRef.current) return
-    // Non-null assertions: narrowing doesn't carry into nested closure functions,
-    // so we re-bind as non-nullable types here.
-    const wrap = wrapRef.current as HTMLDivElement
-    const row  = rowRef.current  as HTMLDivElement
-    const hintL = hintRef.current as HTMLDivElement
+    const wrap  = wrapRef.current  as HTMLDivElement
+    const row   = rowRef.current   as HTMLDivElement
+    const hintL = hintRef.current  as HTMLDivElement
 
     const THRESHOLD = 72
     const FULL_FRAC = 0.5
     let sx = 0, sy = 0, tracking = false, blocked = false
 
     function onTouchStart(e: TouchEvent) {
-      sx = e.touches[0].clientX
-      sy = e.touches[0].clientY
-      tracking = false
-      blocked = false
-      row.style.animation = 'none'
-      row.style.transition = 'none'
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY
+      tracking = false; blocked = false
+      row.style.animation = 'none'; row.style.transition = 'none'
     }
 
     function onTouchMove(e: TouchEvent) {
@@ -85,32 +75,21 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
 
     function onTouchEnd(e: TouchEvent) {
       if (blocked || !tracking) {
-        row.style.transition = ''
-        row.style.transform = ''
-        hintL.style.display = 'none'
-        return
+        row.style.transition = ''; row.style.transform = ''
+        hintL.style.display = 'none'; return
       }
       const dx = e.changedTouches[0].clientX - sx
       const rowW = wrap.offsetWidth || 320
       const isFull = Math.abs(dx) / rowW >= FULL_FRAC
-      hintL.style.display = 'none'
-      hintL.style.filter = ''
-      hintL.style.opacity = ''
+      hintL.style.display = ''; hintL.style.filter = ''; hintL.style.opacity = ''
       if (dx <= -THRESHOLD && isFull) {
-        // Phase 1: show toast immediately (before animation completes).
-        // beginSwipeDelete() returns applyDelete — the function that actually
-        // removes the item from the store once the exit animation is done.
         const applyDelete = onSwipeDeleteRef.current()
-        // Kick off slide + collapse simultaneously.
-        wrap.style.height = wrap.offsetHeight + 'px'
-        wrap.style.overflow = 'hidden'
-        void wrap.offsetHeight  // force reflow so the fixed height is registered
+        wrap.style.height = wrap.offsetHeight + 'px'; wrap.style.overflow = 'hidden'
+        void wrap.offsetHeight
         row.style.transition = 'transform .22s cubic-bezier(.4,0,.2,1)'
         row.style.transform = `translateX(-${rowW}px)`
         wrap.style.transition = 'height .22s ease, opacity .22s ease'
-        wrap.style.height = '0'
-        wrap.style.opacity = '0'
-        // Phase 2: remove from store after animation so React unmounts cleanly.
+        wrap.style.height = '0'; wrap.style.opacity = '0'
         setTimeout(() => applyDelete(), 230)
       } else {
         row.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1)'
@@ -126,15 +105,14 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       row.removeEventListener('touchmove', onTouchMove)
       row.removeEventListener('touchend', onTouchEnd)
     }
-  }, []) // listeners are stable; callback accessed via ref
+  }, [])
 
   function handleCheckClick(e: React.MouseEvent) {
     e.stopPropagation()
-    setIsDone(prev => !prev) // optimistic — store will confirm via occ.done effect
+    setIsDone(prev => !prev)
     onToggleDone()
   }
 
-  // Compute bar class with optimistic done value so the colour changes instantly.
   const effectiveDone = hasTrack ? isDone : (occ.done as boolean | undefined)
   const currentBarClass = barClass({ ...occ, done: effectiveDone })
 
@@ -145,44 +123,67 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       data-occ-key={`${occ._nodeId}-${occ.date}`}
       style={{ '--stagger': `${staggerRef.current * 0.025}s` } as React.CSSProperties}
     >
-      {/* Left swipe hint */}
+      {/* Left swipe hint — swipe-hint CSS stays in index.css */}
       <div className="swipe-hint left" ref={hintRef} style={{ display: 'none' }}>
         <Trash2 size={18} />
         <span>Delete</span>
       </div>
 
-      {/* Main row */}
+      {/* Main row — swipe-row + occ-row CSS stays in index.css */}
       <div
-        className={`swipe-row occ-row${isDone ? ' is-done' : ''}`}
+        className={cn('swipe-row occ-row', isDone && 'opacity-50')}
         ref={rowRef}
         onClick={e => { if (!(e.target as HTMLElement).closest('.occ-chk')) onOpen() }}
       >
-        <div className="occ-left">
-          <span className={`occ-time${t ? ' timed' : ''}`}>{t || ''}</span>
-          {occ.duration && t && <span className="occ-dur-small">{occ.duration}</span>}
+        {/* Time column */}
+        <div className="w-12 shrink-0 flex flex-col items-end gap-px pt-[3px]">
+          <span className={cn('text-[11px] font-mono tracking-[.02em] leading-[1.2]', t ? 'text-cyn' : 'text-t3')}>
+            {t || ''}
+          </span>
+          {occ.duration && t && (
+            <span className="text-[9px] font-mono text-t3 opacity-75">{occ.duration}</span>
+          )}
         </div>
 
+        {/* State bar — .occ-bar variants stay in index.css */}
         <span className={`occ-bar ${currentBarClass}`} />
 
-        <div className="occ-body">
-          <div className="occ-tr">
+        {/* Body */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
             {hasTrack && (
               <div
-                className={`occ-chk${isDone ? ' done' : ''}`}
-                style={{ flexShrink: 0 }}
+                className={cn(
+                  'size-5 rounded-full border-[1.5px] border-bg4 flex items-center justify-center shrink-0 mt-px transition-colors',
+                  isDone && 'bg-grn border-grn',
+                )}
                 onClick={handleCheckClick}
               >
-                <Check size={14} />
+                <Check size={10} className={cn('stroke-white fill-none', isDone ? 'opacity-100' : 'opacity-0')} strokeWidth={2.5} />
               </div>
             )}
-            <span className={`occ-title${isDone ? ' done-t' : ''}`}>{occ.title}</span>
-            {occ.recur && <span className="orecur"><Repeat2 size={12} /></span>}
+            <span className={cn('text-[14px] font-medium text-t0 truncate flex-1', isDone && 'line-through text-t3')}>
+              {occ.title}
+            </span>
+            {occ.recur && (
+              <span className="inline-flex items-center ml-1 opacity-45 shrink-0 align-middle">
+                <Repeat2 size={11} />
+              </span>
+            )}
           </div>
 
           {(occ.tags || []).length > 0 && (
-            <div className="occ-meta">
+            <div className="flex items-center gap-[5px] mt-0.5 flex-wrap">
               {(occ.tags || []).slice(0, 2).map(tg => (
-                <span key={tg} className={`otag${occ.type === 'event' ? ' ev' : ''}`}>{tg}</span>
+                <span
+                  key={tg}
+                  className={cn(
+                    'text-[10px] px-1.5 py-px rounded-[8px]',
+                    occ.type === 'event' ? 'bg-ab text-ind' : 'bg-bg3 text-t3',
+                  )}
+                >
+                  {tg}
+                </span>
               ))}
             </div>
           )}

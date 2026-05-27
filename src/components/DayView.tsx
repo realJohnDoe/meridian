@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import type { Occurrence } from '../types'
 import { expandRange, fmtT, parseDurationHours } from '../recurrence'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
+import { cn } from '../lib/utils'
 
 import { TODAY } from '../constants'
 const SH = 7    // start hour on timeline
@@ -21,12 +22,11 @@ function dvBlkClass(o: Occurrence): string {
 }
 
 function formatHour(h: number): string {
-  if (h < 12)  return `${h}am`
+  if (h < 12)   return `${h}am`
   if (h === 12) return '12pm'
   return `${h - 12}pm`
 }
 
-/** Greedy column-packing: returns an array of columns, each a list of events. */
 function computeColumns(events: Occurrence[]): Occurrence[][] {
   const sorted = [...events].sort((a, b) => +a.jsTime - +b.jsTime)
   const cols: Occurrence[][] = []
@@ -56,7 +56,18 @@ function AllDayItem({ o, onOpen }: AllDayItemProps) {
       className={`dv-aditem ${o.multiday ? 'multiday' : dvBlkClass(o)}`}
       onClick={() => onOpen(o)}
     >
-      {hasTrack && <div className={`dv-chk${o.done ? ' done' : ''}`}><Check size={12} /></div>}
+      {hasTrack && (
+        <div className={cn(
+          'size-3.5 rounded-full border-[1.5px] border-current flex items-center justify-center shrink-0 opacity-70',
+          o.done && 'bg-grn border-grn opacity-100',
+        )}>
+          <Check
+            size={8}
+            className={cn('stroke-white fill-none', o.done ? 'opacity-100' : 'opacity-0')}
+            strokeWidth={2.5}
+          />
+        </div>
+      )}
       <span>{o.title}</span>
     </div>
   )
@@ -69,14 +80,12 @@ interface EventBlockProps {
   onOpen: (o: Occurrence) => void
 }
 function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
-  const h   = o.jsTime.getHours() + o.jsTime.getMinutes() / 60
-  const dh  = (o as any)._dh as number
-  const top = (h - SH) * HP + 1
+  const h      = o.jsTime.getHours() + o.jsTime.getMinutes() / 60
+  const dh     = (o as any)._dh as number
+  const top    = (h - SH) * HP + 1
   const height = Math.max(dh * HP - 4, 28)
   const hasTrack = o.done !== undefined
 
-  // Use CSS calc() for column layout — avoids a rAF measurement pass.
-  // avail = 100% - 50px (time label) - 6px (right pad) = 100% - 56px
   const left  = `calc(50px + ${colIndex} * (100% - 56px) / ${totalCols})`
   const width = `calc((100% - 56px) / ${totalCols} - 3px)`
 
@@ -86,11 +95,15 @@ function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
       style={{ top, height, left, width }}
       onClick={() => onOpen(o)}
     >
-      <div className="dv-et">
-        {hasTrack && <div className={`dv-blk-chk${o.done ? ' done' : ''}`}><Check size={11} /></div>}
+      <div className="font-semibold whitespace-nowrap overflow-hidden text-ellipsis flex items-center gap-[5px]">
+        {hasTrack && (
+          <div className={cn('size-3 rounded-full border-[1.5px] border-current flex items-center justify-center shrink-0', o.done && 'bg-grn border-grn')}>
+            <Check size={7} className={cn(o.done ? 'opacity-100' : 'opacity-0')} strokeWidth={2.5} />
+          </div>
+        )}
         {o.title}
       </div>
-      <div className="dv-em">
+      <div className="text-[10px] font-mono opacity-70 mt-px">
         {fmtT(o.time)}{o.duration ? ` · ${o.duration}` : ''}
       </div>
     </div>
@@ -117,13 +130,11 @@ export default function DayView({ onOpen }: Props) {
     return { allDay, cols: computeColumns(timed) }
   }, [dvDate, nodes])
 
-  // Scroll timeline to 8 am whenever the date changes.
   const scRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     setTimeout(() => scRef.current?.scrollTo({ top: (8 - SH) * HP, behavior: 'instant' }), 50)
   }, [dvDate])
 
-  // Swipe left/right on the timeline to navigate days (replaces addSwipe in initApp).
   const dvDateRef = useRef(dvDate)
   useEffect(() => { dvDateRef.current = dvDate }, [dvDate])
 
@@ -148,7 +159,6 @@ export default function DayView({ onOpen }: Props) {
     }
   }, [setDvDate])
 
-  // Deduplicate multiday events in all-day strip.
   const seen = new Set<string>()
   const allDayDeduped = allDay.filter(o => {
     if (!o.multiday) return true
@@ -163,8 +173,8 @@ export default function DayView({ onOpen }: Props) {
     <>
       {/* All-day / multiday strip */}
       {allDayDeduped.length > 0 && (
-        <div className="dv-allday" id="dvAllDay">
-          <div className="dv-adlbl">All day</div>
+        <div className="px-3 py-1.5 border-b border-bdr2 bg-bg2 shrink-0" id="dvAllDay">
+          <div className="text-[10px] font-semibold tracking-[.07em] uppercase text-t3 mb-1">All day</div>
           {allDayDeduped.map((o, i) => (
             <AllDayItem key={`${o._nodeId}-${o.date}-${i}`} o={o} onOpen={onOpen} />
           ))}
@@ -172,14 +182,16 @@ export default function DayView({ onOpen }: Props) {
       )}
 
       {/* Scrollable timeline */}
-      <div className="dv-sc" id="dvSc" ref={scRef}>
-        <div className="dv-tl" id="dvTl" ref={tlRef}>
+      <div className="flex-1 overflow-y-auto relative" id="dvSc" ref={scRef}>
+        <div className="relative pb-[60px] min-h-[900px]" id="dvTl" ref={tlRef}>
 
           {/* Hour rows */}
           {Array.from({ length: EH - SH + 1 }, (_, i) => SH + i).map(h => (
-            <div key={h} className="dv-hr">
-              <span className="dv-hlbl">{formatHour(h)}</span>
-              <div className="dv-hline" />
+            <div key={h} className="flex items-start h-14 relative">
+              <span className="w-[46px] text-[10px] font-mono text-t3 text-right pr-[10px] shrink-0 -mt-[6px]">
+                {formatHour(h)}
+              </span>
+              <div className="flex-1 border-t border-bdr relative" />
             </div>
           ))}
 
@@ -189,8 +201,8 @@ export default function DayView({ onOpen }: Props) {
             const nh  = now.getHours() + now.getMinutes() / 60
             if (nh < SH || nh > EH) return null
             return (
-              <div className="now-line" style={{ top: (nh - SH) * HP }}>
-                <div className="now-dot" />
+              <div className="absolute left-[46px] right-0 h-0.5 bg-ros z-[5] rounded-[1px]" style={{ top: (nh - SH) * HP }}>
+                <div className="absolute -left-[5px] -top-1 size-[10px] rounded-full bg-ros" />
               </div>
             )
           })()}
@@ -218,5 +230,4 @@ export default function DayView({ onOpen }: Props) {
   )
 }
 
-/** Exported so App.tsx toolbar can render the current date title reactively. */
 export { fmtLong }

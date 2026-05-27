@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { cn } from '../lib/utils'
 
 /**
  * Renders the undo-delete toast driven by store.toast.
@@ -9,18 +10,11 @@ export default function UndoToast() {
   const toast = useStore(s => s.toast)
   const setToast = useStore(s => s.setToast)
 
-  // Keep a snapshot of the last non-null toast so we can still render
-  // its text while the fade-out animation plays.
   const [visible, setVisible] = useState(false)
   const [hiding, setHiding] = useState(false)
   const snapshotRef = useRef<{ title: string; onUndo: () => void } | null>(null)
-  // Track visible in a ref so the effect dep array only reacts to toast changes,
-  // not to the visible state it sets (which would cause a double-fire).
   const visibleRef = useRef(false)
 
-  // useLayoutEffect (not useEffect) so the show-state update is batched into the
-  // same paint as the store update — useEffect would fire after the browser has
-  // already painted a frame with visible=false, causing a visible one-frame delay.
   useLayoutEffect(() => {
     if (toast) {
       snapshotRef.current = toast
@@ -36,23 +30,26 @@ export default function UndoToast() {
       }, 280)
       return () => clearTimeout(id)
     }
-  }, [toast]) // only react to toast changes, not to the visible state we set
+  }, [toast])
 
   if (!visible) return null
 
   const snap = snapshotRef.current!
 
   return (
-    <div className={`undo-toast${hiding ? ' hiding' : ''}`}>
-      <span className="undo-toast-msg">
+    <div className={cn(
+      'w-full bg-[rgba(36,48,73,.88)] backdrop-blur-[8px] border border-bdr2 rounded-[20px]',
+      'px-3.5 py-2 pr-[10px] flex items-center gap-2',
+      'shadow-[0_2px_12px_rgba(0,0,0,.3)] pointer-events-auto',
+      'transition-[opacity,transform] duration-[250ms] ease-in-out',
+      hiding && 'opacity-0 translate-y-[6px]',
+    )}>
+      <span className="flex-1 text-[12px] text-t2 whitespace-nowrap overflow-hidden text-ellipsis">
         Deleted: <strong>{snap.title}</strong>
       </span>
       <button
-        className="undo-btn"
-        onClick={() => {
-          snap.onUndo()
-          setToast(null)
-        }}
+        className="text-[11px] font-bold text-ind px-[10px] py-[3px] rounded-[20px] bg-ab hover:bg-ab2"
+        onClick={() => { snap.onUndo(); setToast(null) }}
       >
         Undo
       </button>

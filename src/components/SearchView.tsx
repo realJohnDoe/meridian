@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import type { Occurrence } from '../types'
 import { expandRange } from '../recurrence'
 import { addDays, fmtShort, NOTES_DATA } from '../meridian'
+import { cn } from '../lib/utils'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 
@@ -22,15 +23,12 @@ interface Props {
 }
 
 export default function SearchView({ onOpen, onClose }: Props) {
-  const nodes        = useStore(s => s.nodes)
-  const nsFilterVal  = useStore(s => s.nsFilterVal)
-  const setNsFilter  = useStore(s => s.setNsFilterVal)
-  const [q, setQ]    = useState('')
-  const inputRef     = useRef<HTMLInputElement>(null)
+  const nodes       = useStore(s => s.nodes)
+  const nsFilterVal = useStore(s => s.nsFilterVal)
+  const setNsFilter = useStore(s => s.setNsFilterVal)
+  const [q, setQ]   = useState('')
+  const inputRef    = useRef<HTMLInputElement>(null)
 
-  // Focus input when this view mounts (it's always in DOM, so focus on demand
-  // is triggered by the parent calling inputRef focus via the exported ref).
-  // Exposing focus externally so openSearch() can still focus on push.
   useEffect(() => {
     ;(window as any)._focusSearch = () => setTimeout(() => inputRef.current?.focus(), 100)
     return () => { delete (window as any)._focusSearch }
@@ -71,7 +69,6 @@ export default function SearchView({ onOpen, onClose }: Props) {
     })
   }, [items, nsFilterVal, q])
 
-  // Group by type when showing all, or flat list for a specific type.
   const groups: { label: string; items: SearchItem[] }[] = useMemo(() => {
     if (nsFilterVal !== 'all') return [{ label: '', items: filtered }]
     const byType: Record<string, SearchItem[]> = { event: [], task: [], note: [] }
@@ -82,21 +79,28 @@ export default function SearchView({ onOpen, onClose }: Props) {
   }, [filtered, nsFilterVal])
 
   const chips: { label: string; value: string }[] = [
-    { label: 'All',    value: 'all' },
+    { label: 'All',    value: 'all'   },
     { label: 'Events', value: 'event' },
-    { label: 'Tasks',  value: 'task' },
-    { label: 'Notes',  value: 'note' },
+    { label: 'Tasks',  value: 'task'  },
+    { label: 'Notes',  value: 'note'  },
   ]
 
   return (
     <>
-      <div className="entry-top">
-        <button className="ib" onClick={onClose}><ArrowLeft /></button>
-        <span className="entry-fname">Search</span>
+      {/* Header — shared style with EntryEditor */}
+      <div className="h-[var(--th)] flex items-center gap-2 px-3 border-b border-bdr shrink-0 bg-bg1">
+        <button
+          className="size-[34px] rounded-full flex items-center justify-center text-t2 transition-colors hover:bg-bg3 hover:text-t0 shrink-0"
+          onClick={onClose}
+        >
+          <ArrowLeft size={18} strokeWidth={1.8} />
+        </button>
+        <span className="flex-1 font-mono text-[11px] text-t3 overflow-hidden text-ellipsis whitespace-nowrap">Search</span>
       </div>
 
-      <div className="ns-bar">
-        <Search size={16} />
+      {/* Search input */}
+      <div className="flex items-center gap-[9px] bg-bg2 border border-bdr2 rounded-[10px] px-[13px] py-[9px] m-3">
+        <Search size={16} className="stroke-t3 fill-none shrink-0" strokeWidth={2} />
         <input
           id="nsIn"
           ref={inputRef}
@@ -104,14 +108,21 @@ export default function SearchView({ onOpen, onClose }: Props) {
           placeholder="Search notes, tasks, events…"
           value={q}
           onChange={e => setQ(e.target.value)}
+          className="flex-1 bg-transparent border-0 outline-none text-t0 text-[14px] placeholder:text-t3"
         />
       </div>
 
-      <div className="ns-filters">
+      {/* Type filter chips */}
+      <div className="flex gap-[5px] px-3 pb-[10px] overflow-x-auto [scrollbar-width:none]">
         {chips.map(c => (
           <button
             key={c.value}
-            className={`fchip${nsFilterVal === c.value ? ' on' : ''}`}
+            className={cn(
+              'px-3 py-[5px] rounded-[20px] text-[12px] font-medium border cursor-pointer whitespace-nowrap transition-all duration-[120ms] shrink-0',
+              nsFilterVal === c.value
+                ? 'bg-ab2 text-ind border-ind'
+                : 'bg-bg3 text-t2 border-bdr2',
+            )}
             onClick={() => setNsFilter(c.value)}
           >
             {c.label}
@@ -119,24 +130,31 @@ export default function SearchView({ onOpen, onClose }: Props) {
         ))}
       </div>
 
-      <div className="ns-sc">
-        <div className="ns-pad" id="nsList">
+      {/* Results */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="pb-[80px]" id="nsList">
           {filtered.length === 0 ? (
-            <div style={{ padding: '40px 14px', textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>
-              No results
-            </div>
+            <div className="py-10 px-3.5 text-center text-t3 text-[13px]">No results</div>
           ) : (
             groups.map(g => (
               <div key={g.label}>
-                {g.label && <div className="ns-sec">{g.label}</div>}
+                {g.label && (
+                  <div className="px-3.5 pt-[10px] pb-[3px] text-[10px] font-bold tracking-[.08em] uppercase text-t3">
+                    {g.label}
+                  </div>
+                )}
                 {g.items.map((it, i) => (
-                  <div key={i} className="note-row" onClick={() => onOpen(it._node ?? it)}>
-                    <div className="nr-t">{it.title}</div>
-                    <div className="nr-p">{it.preview || ''}</div>
-                    <div className="nr-m">
-                      <span className="nr-d">{it.date}</span>
+                  <div
+                    key={i}
+                    className="px-3.5 py-3 cursor-pointer transition-colors border-b border-bdr hover:bg-bg2"
+                    onClick={() => onOpen(it._node ?? it)}
+                  >
+                    <div className="text-[14px] font-medium text-t0 mb-[3px]">{it.title}</div>
+                    <div className="text-[12px] text-t3 leading-[1.5] line-clamp-2">{it.preview || ''}</div>
+                    <div className="flex gap-[5px] mt-1 items-center">
+                      <span className="text-[11px] text-t3 font-mono">{it.date}</span>
                       {it.tags.slice(0, 2).map(tg => (
-                        <span key={tg} className="otag">{tg}</span>
+                        <span key={tg} className="text-[10px] px-1.5 py-px rounded-[8px] bg-bg3 text-t3">{tg}</span>
                       ))}
                     </div>
                   </div>

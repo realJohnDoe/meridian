@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import type { Occurrence } from '../types'
 import { expandRange, fmtT } from '../recurrence'
 import { addDays, fmtShort, barClass } from '../meridian'
+import { cn } from '../lib/utils'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 
@@ -49,17 +50,21 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
   if (!query) return null
 
   return (
-    <div id="filterOverlay" className="filter-overlay">
-      {/* "Create" row */}
-      <div className="occ-create-row" onClick={() => onCreate(query)}>
+    <div
+      id="filterOverlay"
+      className="absolute top-[var(--th)] bottom-0 left-0 right-0 bg-bg1 z-[45] overflow-y-auto pb-[80px]"
+    >
+      {/* Create row */}
+      <div
+        className="flex items-center gap-[10px] px-3.5 py-3 cursor-pointer border-b border-bdr transition-colors hover:bg-bg2 text-ind"
+        onClick={() => onCreate(query)}
+      >
         <Plus size={14} />
-        <span>Create "<strong>{query}</strong>"</span>
+        <span>Create "<strong className="font-semibold">{query}</strong>"</span>
       </div>
 
       {results.length === 0 && (
-        <div style={{ padding: '40px 14px', textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>
-          No matches
-        </div>
+        <div className="py-10 px-3.5 text-center text-t3 text-[13px]">No matches</div>
       )}
 
       {results.map((o, i) => {
@@ -74,28 +79,45 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
             style={{ animation: 'fadeUp .16s ease both', animationDelay: `${i * 0.025}s` }}
           >
             <div
-              className={`swipe-row occ-row${isDone ? ' is-done' : ''}`}
+              className={cn('swipe-row occ-row', isDone && 'opacity-50')}
               onClick={() => onOpen(o)}
             >
-              <div className="occ-left">
-                <span className={`occ-time${t ? ' timed' : ''}`}>{t || ''}</span>
+              <div className="w-12 shrink-0 flex flex-col items-end gap-px pt-[3px]">
+                <span className={cn('text-[11px] font-mono tracking-[.02em] leading-[1.2]', t ? 'text-cyn' : 'text-t3')}>
+                  {t || ''}
+                </span>
               </div>
+
               <span className={`occ-bar ${barClass(o)}`} />
-              <div className="occ-body">
-                <div className="occ-tr">
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
                   {hasTrack && (
-                    <div className={`occ-chk${isDone ? ' done' : ''}`} style={{ flexShrink: 0 }}>
-                      <Check size={14} />
+                    <div className={cn(
+                      'size-5 rounded-full border-[1.5px] border-bg4 flex items-center justify-center shrink-0',
+                      isDone && 'bg-grn border-grn',
+                    )}>
+                      <Check size={10} className={cn('stroke-white fill-none', isDone ? 'opacity-100' : 'opacity-0')} strokeWidth={2.5} />
                     </div>
                   )}
-                  <span className={`occ-title${isDone ? ' done-t' : ''}`}>{o.title}</span>
-                  {o.recur && <span className="orecur"><Repeat2 size={12} /></span>}
-                  <span style={{ opacity: 0.5, fontSize: 10, marginLeft: 4 }}>{fmtShort(o.jsTime)}</span>
+                  <span className={cn('text-[14px] font-medium text-t0 truncate flex-1', isDone && 'line-through text-t3')}>
+                    {o.title}
+                  </span>
+                  {o.recur && <span className="inline-flex items-center ml-1 opacity-45 shrink-0"><Repeat2 size={11} /></span>}
+                  <span className="opacity-50 text-[10px] ml-1">{fmtShort(o.jsTime)}</span>
                 </div>
                 {(o.tags || []).length > 0 && (
-                  <div className="occ-meta">
+                  <div className="flex items-center gap-[5px] mt-0.5 flex-wrap">
                     {(o.tags || []).slice(0, 2).map(tg => (
-                      <span key={tg} className={`otag${o.type === 'event' ? ' ev' : ''}`}>{tg}</span>
+                      <span
+                        key={tg}
+                        className={cn(
+                          'text-[10px] px-1.5 py-px rounded-[8px]',
+                          o.type === 'event' ? 'bg-ab text-ind' : 'bg-bg3 text-t3',
+                        )}
+                      >
+                        {tg}
+                      </span>
                     ))}
                   </div>
                 )}

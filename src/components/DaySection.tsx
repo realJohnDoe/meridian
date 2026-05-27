@@ -3,6 +3,7 @@ import { CalendarRange } from 'lucide-react'
 import type { Occurrence } from '../types'
 import { parseDateString } from '../recurrence'
 import { fmtShort, fmtLong } from '../meridian'
+import { cn } from '../lib/utils'
 import OccurrenceRow from './OccurrenceRow'
 
 interface Props {
@@ -11,7 +12,7 @@ interface Props {
   isToday: boolean
   isTomorrow: boolean
   multidayBanners: Occurrence[]
-  items: Occurrence[]         // non-multiday, pre-sorted
+  items: Occurrence[]
   onOpen: (occ: Occurrence) => void
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
@@ -23,20 +24,10 @@ function DaySection({
   onOpen, onToggleDone, onSwipeDelete,
 }: Props) {
   const sectionRef = useRef<HTMLDivElement>(null)
-  // Stores the section-relative top of each row from the previous render.
   const prevTops = useRef<Record<string, number>>({})
-  // Tracks item count so we can distinguish reorders from deletions.
   const prevItemCount = useRef(items.length)
 
-  // FLIP re-sort animation.
-  // After React commits the new order, compare each row's current top (relative
-  // to the section element, so scroll position is irrelevant) with the top it
-  // had in the previous render. Apply an inverse translate then animate it away
-  // so items appear to glide into their new positions.
-  //
-  // FLIP only runs on reorders (same item count). On deletions the swipe CSS
-  // animation already moved the surviving items into place; running FLIP on top
-  // of that would make them slide up a second time.
+  // FLIP re-sort animation — unchanged logic, only class names migrated.
   useLayoutEffect(() => {
     const section = sectionRef.current
     if (!section) return
@@ -44,16 +35,13 @@ function DaySection({
     const wasReorder = items.length === prevItemCount.current
     prevItemCount.current = items.length
 
-    // Anchor all measurements to the section so that page scroll between renders
-    // doesn't produce false deltas for sections that didn't actually reorder.
     const sectionTop = section.getBoundingClientRect().top
-
     const wraps = section.querySelectorAll<HTMLElement>('.swipe-wrap[data-occ-key]')
     const newTops: Record<string, number> = {}
 
     wraps.forEach(wrap => {
       const key = wrap.getAttribute('data-occ-key')!
-      const curr = wrap.getBoundingClientRect().top - sectionTop   // section-relative
+      const curr = wrap.getBoundingClientRect().top - sectionTop
 
       if (wasReorder) {
         const prev = prevTops.current[key]
@@ -62,7 +50,6 @@ function DaySection({
           if (Math.abs(dy) > 1) {
             wrap.style.transition = 'none'
             wrap.style.transform = `translateY(${dy}px)`
-            // Force reflow so the browser registers the translate before we remove it.
             void wrap.offsetHeight
             requestAnimationFrame(() => {
               wrap.style.transition = 'transform .35s cubic-bezier(.4,0,.2,1)'
@@ -77,26 +64,36 @@ function DaySection({
     })
 
     prevTops.current = newTops
-  }, [items]) // re-run whenever items order/content changes
+  }, [items])
 
   const label = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : fmtLong(date)
 
   return (
-    <div className="day-section" data-key={dateKey} ref={sectionRef}>
-      <div className={`day-lbl${isToday ? ' tl' : ''}`}>{label}</div>
+    <div className="[scroll-margin-top:8px]" data-key={dateKey} ref={sectionRef}>
 
-      {/* Multiday banners */}
+      {/* .day-lbl::after (separator line) lives in index.css; class name kept */}
+      <div className={cn(
+        'day-lbl px-3.5 pt-3.5 pb-[5px] text-[11px] font-bold tracking-[.08em] uppercase',
+        'flex items-center gap-2 sticky top-0 bg-bg1 z-[3]',
+        isToday ? 'text-ind' : 'text-t3',
+      )}>
+        {label}
+      </div>
+
       {multidayBanners.map(o => (
-        <div key={o._nodeId} className="multiday-banner" onClick={() => onOpen(o)}>
+        <div
+          key={o._nodeId}
+          className="mx-3.5 my-0.5 bg-[rgba(129,140,248,.18)] border border-[rgba(129,140,248,.3)] rounded-[6px] px-[10px] py-[5px] text-[12px] text-ind flex items-center gap-1.5 cursor-pointer"
+          onClick={() => onOpen(o)}
+        >
           <CalendarRange size={14} />
           {o.title}
-          <span style={{ opacity: 0.55, fontSize: 10, marginLeft: 4 }}>
-            {fmtShort(parseDateString(o.multiday!.start))}–{fmtShort(parseDateString(o.multiday!.end))}
+          <span className="opacity-55 text-[10px] ml-1">
+            {fmtShort(parseDateString(o.multiday!.start)!)}–{fmtShort(parseDateString(o.multiday!.end)!)}
           </span>
         </div>
       ))}
 
-      {/* Regular occurrence rows */}
       {items.map((o, i) => (
         <OccurrenceRow
           key={`${o._nodeId}-${o.date}-${o.time ?? ''}`}
@@ -111,9 +108,6 @@ function DaySection({
   )
 }
 
-// Only re-render when items actually change order or content.
-// This prevents every DaySection from re-rendering (and running the FLIP
-// useLayoutEffect) on every store update — only the affected section does.
 function propsAreEqual(prev: Props, next: Props): boolean {
   if (prev.isToday !== next.isToday || prev.isTomorrow !== next.isTomorrow) return false
   if (prev.items.length !== next.items.length) return false
