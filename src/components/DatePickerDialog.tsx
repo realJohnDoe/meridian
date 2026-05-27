@@ -69,7 +69,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
 
         <DrawerTitle>Date</DrawerTitle>
 
-        <div className="px-4">
+        <div className="px-4 pt-1">
 
           {/* Calendar — fixedWeeks keeps 6 rows always, so height never jumps */}
           <Calendar
