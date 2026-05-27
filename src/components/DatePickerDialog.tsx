@@ -78,7 +78,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
             'fixed bottom-0 left-1/2 z-[200] -translate-x-1/2',
             'w-full max-w-[430px]',
             'bg-background border-t border-border rounded-t-[24px]',
-            'pt-3 pb-10 focus:outline-none',
+            'pt-3 pb-6 focus:outline-none',
             'translate-y-full transition-transform duration-[280ms] ease-[cubic-bezier(.4,0,.2,1)]',
             'data-[state=open]:translate-y-0',
           )}
@@ -87,47 +87,47 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           <div className="w-8 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-3" />
 
           {/* Title */}
-          <DialogPrimitive.Title className="text-[11px] font-bold tracking-[.07em] uppercase text-muted-foreground px-[18px] pb-2.5 border-b border-border mb-2">
+          <DialogPrimitive.Title className="text-[11px] font-bold tracking-[.07em] uppercase text-muted-foreground px-[18px] pb-2 border-b border-border mb-0">
             Date
           </DialogPrimitive.Title>
 
           <div className="px-4">
 
-            {/* Quick-select row */}
-            <div className="flex gap-2 pt-1 mb-3">
+            {/* Quick-select pills */}
+            <div className="flex gap-2 py-2">
               <button
-                className="flex-1 py-2 text-sm rounded-lg bg-accent text-accent-foreground hover:bg-accent/70 transition-colors"
+                className="flex-1 py-1.5 text-xs font-medium rounded-full bg-accent text-accent-foreground hover:bg-accent/70 transition-colors"
                 onClick={() => quickSelect(today)}
               >
                 Today
               </button>
               <button
-                className="flex-1 py-2 text-sm rounded-lg bg-accent text-accent-foreground hover:bg-accent/70 transition-colors"
+                className="flex-1 py-1.5 text-xs font-medium rounded-full bg-accent text-accent-foreground hover:bg-accent/70 transition-colors"
                 onClick={() => quickSelect(tomorrow)}
               >
                 Tomorrow
               </button>
             </div>
 
-            {/* Calendar */}
+            {/* Calendar — compact cell size */}
             <Calendar
               mode="single"
               selected={selected}
               onSelect={setSelected}
               month={month}
               onMonthChange={setMonth}
-              className="w-full"
+              className="w-full [--cell-size:2.25rem]"
             />
 
             {/* Action row */}
-            <div className="flex justify-between items-center mt-3 pt-3 border-t border-border">
+            <div className="flex justify-between items-center pt-2 border-t border-border">
               <button
                 className="text-xs text-destructive px-3 py-2 rounded-full hover:bg-destructive/10 transition-colors"
                 onClick={() => { onRemove(); onClose() }}
               >
                 Remove
               </button>
-              <div className="flex gap-2">
+              <div className="flex gap-1">
                 <button
                   className="text-sm text-muted-foreground px-3.5 py-2 rounded-full hover:bg-accent transition-colors"
                   onClick={onClose}
