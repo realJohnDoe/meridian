@@ -1,5 +1,57 @@
 @import "tailwindcss";
 
+/* ── SHADCN THEME ─────────────────────────────────────────────── */
+/* Maps CSS custom-properties to Tailwind utility classes (bg-background, text-foreground, etc.) */
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* Meridian is always dark — map shadcn tokens to the app's own palette */
+@layer base {
+  :root {
+    --background: var(--bg2);              /* dialog / card surface */
+    --foreground: var(--t0);               /* primary text */
+    --card: var(--bg3);
+    --card-foreground: var(--t0);
+    --popover: var(--bg2);
+    --popover-foreground: var(--t0);
+    --primary: var(--ind);                 /* indigo — Set button, selected day */
+    --primary-foreground: #fff;
+    --secondary: var(--bg3);
+    --secondary-foreground: var(--t1);
+    --muted: var(--bg3);
+    --muted-foreground: var(--t3);         /* dim text — "Date" title, weekday labels */
+    --accent: var(--bg3);
+    --accent-foreground: var(--t0);
+    --destructive: var(--ros);             /* rose — Remove button */
+    --border: var(--bdr);
+    --input: var(--bdr2);
+    --ring: var(--ind);
+    --radius: 0.625rem;
+  }
+}
+
 /* ── MERIDIAN APP STYLES ───────────────────────────────────────── */
 :root {
   --bg0:#09111f;--bg1:#0f172a;--bg2:#1a2236;--bg3:#243049;--bg4:#2d3a57;
@@ -12,13 +64,17 @@
   --nh:0px;--th:54px;--r:10px;--rl:16px;--rx:24px;
   --p1:#f87171;--p2:#fb923c;--p3:#facc15;
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{height:var(--app-h,100%);overflow:hidden;background:var(--bg0)}
-body{height:100%;overflow:hidden;background:var(--bg0)}
-body{color:var(--t0);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
-input,textarea,select{font-family:inherit}
-::-webkit-scrollbar{width:0;height:0}
+/* Element resets live in @layer base so that Tailwind @layer utilities can override them.
+   (Unlayered CSS beats every Tailwind utility regardless of specificity.) */
+@layer base {
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{height:var(--app-h,100%);overflow:hidden;background:var(--bg0)}
+  body{height:100%;overflow:hidden;background:var(--bg0)}
+  body{color:var(--t0);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,textarea,select{font-family:inherit}
+  ::-webkit-scrollbar{width:0;height:0}
+}
 
 #root{height:100%}
 #app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:var(--bg1);position:relative}
