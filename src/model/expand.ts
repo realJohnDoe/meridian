@@ -82,6 +82,18 @@ export function expandRange(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       all.push(...(_expandNode(node as any, from, to) as unknown[]))
     } else {
+      // Container node: instances that carry their own `repeat` (debugger split pattern).
+      // Each such child is merged with the parent and expanded independently.
+      const repeatInstances = ((node.instances as unknown[]) || []).filter(
+        (i: unknown) => !!(i as Record<string, unknown>).repeat && !(i as Record<string, unknown>).excluded,
+      )
+      for (const inst of repeatInstances) {
+        const effChild = _mergeNode(node, inst) as Record<string, unknown>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        all.push(...(_expandNode({ ...effChild, instances: [] } as any, from, to) as unknown[]))
+      }
+
+      // Non-recurring instances (standard multi-occurrence or single-date node)
       const liveInstances = ((node.instances as unknown[]) || []).filter(
         (i: unknown) => !(i as Record<string, unknown>).excluded && !(i as Record<string, unknown>).repeat,
       )
@@ -101,7 +113,8 @@ export function expandRange(
             })
           }
         }
-      } else {
+      } else if (repeatInstances.length === 0) {
+        // Pure single-date node with no instances at all
         const t = _nodeDateTime(node)
         if (t && t >= from && t <= to) {
           all.push({ ...node, jsTime: t, _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false })
