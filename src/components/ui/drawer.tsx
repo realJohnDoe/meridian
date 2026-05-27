@@ -55,7 +55,7 @@ DrawerHeader.displayName = 'DrawerHeader'
 
 const DrawerFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn('flex items-center justify-between border-t border-border', className)}
+    className={cn('flex items-center justify-between px-4 pt-4', className)}
     {...props}
   />
 )
@@ -70,7 +70,7 @@ const DrawerTitle = React.forwardRef<
     ref={ref}
     className={cn(
       'text-[11px] font-bold tracking-[.07em] uppercase text-muted-foreground',
-      'px-[18px] pt-1 pb-2 border-b border-border',
+      'px-[18px] pt-1 pb-2',
       className,
     )}
     {...props}

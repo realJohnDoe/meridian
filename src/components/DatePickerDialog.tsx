@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Drawer, DrawerContent, DrawerTitle, DrawerFooter } from './ui/drawer'
+import { Separator } from './ui/separator'
 import { Calendar } from './ui/calendar'
 import { Button } from './ui/button'
 
@@ -63,15 +64,23 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
   const isToday    = !!selected && dateToIso(selected) === dateToIso(today)
   const isTomorrow = !!selected && dateToIso(selected) === dateToIso(tomorrow)
 
+  // ── Spacing contract ────────────────────────────────────────────
+  // DrawerTitle  owns: text-to-separator gap (pb-2)
+  // Separator    owns: nothing — it is a pure 1 px line
+  // Content div  owns: gap below separator (pt-4) and gap above next separator (pb-4)
+  // DrawerFooter owns: gap below separator (pt-4, built into component) and px-4
   return (
     <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
       <DrawerContent className="pt-3 pb-6">
 
         <DrawerTitle>Date</DrawerTitle>
+        <Separator />
 
-        <div className="px-4 pt-1">
-
-          {/* Calendar — fixedWeeks keeps 6 rows always, so height never jumps */}
+        {/* pt-4: gap from separator to first content (calendar)
+            pb-4: gap from last content (Today/Tomorrow) to next separator   */}
+        <div className="px-4 pt-4 pb-4">
+          {/* pt-0 cancels Calendar's built-in p-3 top — separator-to-calendar
+              gap is owned entirely by the content div's pt-4 above            */}
           <Calendar
             mode="single"
             fixedWeeks
@@ -79,11 +88,13 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
             onSelect={setSelected}
             month={month}
             onMonthChange={setMonth}
-            className="w-full [--cell-size:2.25rem]"
+            className="w-full [--cell-size:2.25rem] pt-0"
           />
 
-          {/* Shortcut toggles — filled when that day is selected in the grid */}
-          <div className="flex gap-2 pb-4">
+          {/* Shortcut toggles — filled when that day is selected in the grid.
+              Calendar's pb-3 (12 px) keeps these closer to the grid than to
+              the separator below (16 px from content div pb-4).               */}
+          <div className="flex gap-2">
             <Button
               variant={isToday ? 'default' : 'outline'}
               size="sm"
@@ -101,28 +112,30 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
               Tomorrow
             </Button>
           </div>
-
-          {/* Action row */}
-          <DrawerFooter className="pt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => { onRemove(); onClose() }}
-            >
-              Remove
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleSet} disabled={!selected}>
-                Set
-              </Button>
-            </div>
-          </DrawerFooter>
-
         </div>
+
+        <Separator />
+
+        {/* DrawerFooter supplies pt-4 (gap below separator) and px-4 */}
+        <DrawerFooter>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => { onRemove(); onClose() }}
+          >
+            Remove
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSet} disabled={!selected}>
+              Set
+            </Button>
+          </div>
+        </DrawerFooter>
+
       </DrawerContent>
     </Drawer>
   )
