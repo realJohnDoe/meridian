@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Calendar } from './ui/calendar'
+import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 
 // ── Date helpers ────────────────────────────────────────────────
@@ -49,15 +50,20 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
     }
   }, [open, initialDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function quickSelect(date: Date) {
-    onConfirm(dateToIso(date))
-    onClose()
+  // Toggle Today / Tomorrow — selects in calendar, navigates month if needed
+  function selectDate(date: Date) {
+    setSelected(date)
+    setMonth(date)
   }
 
   function handleSet() {
     if (selected) onConfirm(dateToIso(selected))
     onClose()
   }
+
+  // Active state for shortcut toggles
+  const isToday    = !!selected && dateToIso(selected) === dateToIso(today)
+  const isTomorrow = !!selected && dateToIso(selected) === dateToIso(tomorrow)
 
   // ── Radix primitives used directly so we can position as a bottom sheet ──
   // No forceMount — when closed the portal is simply not in the DOM, so nothing
@@ -83,35 +89,17 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
             'data-[state=open]:translate-y-0',
           )}
         >
-          {/* Drag handle */}
-          <div className="w-8 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-3" />
-
           {/* Title */}
-          <DialogPrimitive.Title className="text-[11px] font-bold tracking-[.07em] uppercase text-muted-foreground px-[18px] pb-2 border-b border-border mb-0">
+          <DialogPrimitive.Title className="text-[11px] font-bold tracking-[.07em] uppercase text-muted-foreground px-[18px] pt-1 pb-2 border-b border-border">
             Date
           </DialogPrimitive.Title>
 
           <div className="px-4">
 
-            {/* Quick-select pills */}
-            <div className="flex gap-2 py-2">
-              <button
-                className="flex-1 py-1.5 text-xs font-medium rounded-full bg-accent text-accent-foreground hover:bg-accent/70 transition-colors"
-                onClick={() => quickSelect(today)}
-              >
-                Today
-              </button>
-              <button
-                className="flex-1 py-1.5 text-xs font-medium rounded-full bg-accent text-accent-foreground hover:bg-accent/70 transition-colors"
-                onClick={() => quickSelect(tomorrow)}
-              >
-                Tomorrow
-              </button>
-            </div>
-
-            {/* Calendar — compact cell size */}
+            {/* Calendar — fixedWeeks keeps height constant across 5- and 6-week months */}
             <Calendar
               mode="single"
+              fixedWeeks
               selected={selected}
               onSelect={setSelected}
               month={month}
@@ -119,28 +107,43 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
               className="w-full [--cell-size:2.25rem]"
             />
 
+            {/* Shortcut toggles — same shape as action buttons, filled when selected */}
+            <div className="flex gap-2 pb-3">
+              <Button
+                variant={isToday ? 'default' : 'outline'}
+                size="sm"
+                className="flex-1"
+                onClick={() => selectDate(today)}
+              >
+                Today
+              </Button>
+              <Button
+                variant={isTomorrow ? 'default' : 'outline'}
+                size="sm"
+                className="flex-1"
+                onClick={() => selectDate(tomorrow)}
+              >
+                Tomorrow
+              </Button>
+            </div>
+
             {/* Action row */}
             <div className="flex justify-between items-center pt-2 border-t border-border">
-              <button
-                className="text-xs text-destructive px-3 py-2 rounded-full hover:bg-destructive/10 transition-colors"
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
                 onClick={() => { onRemove(); onClose() }}
               >
                 Remove
-              </button>
-              <div className="flex gap-1">
-                <button
-                  className="text-sm text-muted-foreground px-3.5 py-2 rounded-full hover:bg-accent transition-colors"
-                  onClick={onClose}
-                >
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={onClose}>
                   Cancel
-                </button>
-                <button
-                  className="text-sm font-semibold text-primary-foreground bg-primary px-5 py-2 rounded-full disabled:opacity-40 transition-opacity"
-                  onClick={handleSet}
-                  disabled={!selected}
-                >
+                </Button>
+                <Button size="sm" onClick={handleSet} disabled={!selected}>
                   Set
-                </button>
+                </Button>
               </div>
             </div>
 
