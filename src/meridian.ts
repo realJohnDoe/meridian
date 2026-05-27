@@ -3,6 +3,8 @@ import Dexie from 'dexie'
 import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar, Plus, X } from 'lucide'
 import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './model/expand'
 import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode, titleToSlug } from './yaml'
+import { splitNode } from './model/nodeOps'
+import { serializeRawNode } from './model/inheritance'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
 // @ts-nocheck suppresses the internal DOM-manipulation errors; a follow-up PR will address those.
 import type { Node, Occurrence, Repeat, Scheduled } from './types'
@@ -464,32 +466,31 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     writeEntityToCache(updated);
 
   } else if(editScope==='future'){
-    const updated=cloneNode(node);
     const occDate=item.date;
-    const occJsDate=parseDateString(occDate);
-    const untilDate=new Date(occJsDate);untilDate.setDate(untilDate.getDate()-1);
-    // Build new repeat object without touching the original
-    updated.repeat={
-      ...updated.repeat,
-      end:{type:'until',date:fmtISO(untilDate)},
-    };
-    if(updated.instances){
-      updated.instances=updated.instances.filter(i=>{
-        const t=parseDateString(i.date||'9999-01-01');
-        return !t||t<occJsDate;
-      });
+    // Convert to RawNode (strips _path, id, type, etc.) so splitNode works on clean data
+    const rawNode=toRawNode(node);
+    // Split into two series at occDate
+    const [series1, series2raw]=splitNode(rawNode, occDate);
+    // Apply the user's edits to the future series (series2)
+    const series2={...series2raw};
+    if(f.date&&f.date!==occDate)series2.date=f.date;
+    if(f.time)series2.time=f.time; else delete series2.time;
+    if(f.title!==node.title)series2.title=f.title;
+    if(JSON.stringify(f.tags)!==JSON.stringify(node.tags))series2.tags=f.tags;
+    if(f.duration!==node.duration)series2.duration=f.duration;
+    if(f.body!==node.body)series2.body=f.body;
+    // If the user changed the repeat pattern, apply it; otherwise series2 inherits the original
+    if(repeat)series2.repeat=repeat;
+    if(tracked&&f.done!==undefined)series2.done=f.done;
+    // Build a container node: no root date/time/repeat, just the shared fields + instances
+    const container={};
+    for(const [k,v] of Object.entries(rawNode)){
+      if(['date','time','repeat','instances'].includes(k))continue;
+      container[k]=v;
     }
-    const newChild:any={date:f.date||occDate};
-    if(f.time)newChild.time=f.time;
-    if(f.title!==node.title)newChild.title=f.title;
-    if(JSON.stringify(f.tags)!==JSON.stringify(node.tags))newChild.tags=f.tags;
-    if(f.duration!==node.duration)newChild.duration=f.duration;
-    if(f.body!==node.body)newChild.body=f.body;
-    if(repeat)newChild.repeat=repeat;
-    if(tracked&&f.done!==undefined)newChild.done=f.done;
-    Object.keys(newChild).forEach(k=>{if(newChild[k]===undefined)delete newChild[k];});
-    if(!updated.instances)updated.instances=[];
-    updated.instances.push(newChild);
+    container.instances=[series1, series2];
+    // Restore runtime tracking fields so the store can identify this node
+    const updated={...container, id:node.id, _path:node._path};
     setNodes(replaceNode(nodes, node.id, updated));
     writeEntityToCache(updated);
   }
@@ -716,10 +717,34 @@ async function diskDelete(path){
   try{await getDirHandle().removeEntry(path);}catch(e){}
 }
 
+/** Runtime/internal fields that must not be written to YAML. */
+const _INTERNAL_FIELDS=new Set(['id','_path','_node','_nodeId','type','jsTime','recur'])
+
+/**
+ * Strip runtime fields from a Node to get a plain RawNode suitable for
+ * serialization with `serializeRawNode`.
+ */
+function toRawNode(node){
+  const result={}
+  for(const [k,v] of Object.entries(node)){
+    if(!_INTERNAL_FIELDS.has(k))result[k]=v
+  }
+  return result
+}
+
+/**
+ * A container node has no root `repeat` but has instances that carry their own
+ * `repeat` — the pattern produced by a "edit this & following" split.
+ */
+function isContainerNode(node){
+  return !node.repeat&&Array.isArray(node.instances)&&
+    node.instances.some(i=>i&&i.repeat)
+}
+
 async function writeEntityToCache(node){
   try{
     const path=nodeToPath(node);
-    const content=nodeToFile(node);
+    const content=isContainerNode(node)?serializeRawNode(toRawNode(node)):nodeToFile(node);
     await cacheWrite(path, content);
     updateSyncUI();
   }catch(e){
