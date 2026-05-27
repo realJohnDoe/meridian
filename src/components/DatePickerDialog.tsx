@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sheet, SheetContent, SheetTitle, SheetFooter } from './ui/sheet'
+import { Drawer, DrawerContent, DrawerTitle, DrawerFooter } from './ui/drawer'
 import { Calendar } from './ui/calendar'
 import { Button } from './ui/button'
 
@@ -64,10 +64,10 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
   const isTomorrow = !!selected && dateToIso(selected) === dateToIso(tomorrow)
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="bottom" className="pt-3 pb-6">
+    <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
+      <DrawerContent className="pt-3 pb-6">
 
-        <SheetTitle>Date</SheetTitle>
+        <DrawerTitle>Date</DrawerTitle>
 
         <div className="px-4">
 
@@ -103,7 +103,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           </div>
 
           {/* Action row */}
-          <SheetFooter className="pt-2">
+          <DrawerFooter className="pt-2">
             <Button
               variant="outline"
               size="sm"
@@ -120,10 +120,10 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
                 Set
               </Button>
             </div>
-          </SheetFooter>
+          </DrawerFooter>
 
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   )
 }
