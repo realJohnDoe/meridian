@@ -16,3 +16,11 @@ pnpm run build
 ```
 
 Using `npm install` will create a `package-lock.json` that must not be committed.
+
+## GitHub / Pull Requests
+
+Do **not** use the GitHub CLI (`gh`) to open pull requests. Just push the branch and leave PR creation to the user.
+
+```bash
+git push -u origin <branch-name>
+```
