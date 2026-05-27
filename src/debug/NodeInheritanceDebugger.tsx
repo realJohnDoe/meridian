@@ -93,14 +93,15 @@ function splitNode(node: RawNode, occDate: string): [RawNode, RawNode] {
   const instsBefore = allInstances.filter(i => String((i as Record<string, unknown>).date) < occDate)
   if (instsBefore.length > 0) series1.instances = instsBefore
 
-  const repeatNoEnd = Object.fromEntries(Object.entries(originalRepeat).filter(([k]) => k !== 'end'))
   const series2: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(node)) {
     if (k === 'instances' || k === 'defaults' || k === 'repeat' || k === 'date') continue
     series2[k] = v
   }
   series2.date   = occDate
-  series2.repeat = repeatNoEnd
+  // Keep the original repeat (including end date) so the new series inherits
+  // the same bounds as the original. The user can change it via Edit pattern.
+  series2.repeat = { ...originalRepeat }
   const instsFrom = allInstances.filter(i => String((i as Record<string, unknown>).date) >= occDate)
   if (instsFrom.length > 0) series2.instances = instsFrom
 
