@@ -552,7 +552,7 @@ export default function NodeInheritanceDebugger() {
     catch (e) { setZodErrors([`YAML parse error: ${String(e)}`]); return }
 
     const v = RawNodeSchema.safeParse(parsed)
-    if (!v.success) { setZodErrors(v.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)); return }
+    if (!v.success) { setZodErrors(v.error.issues.map(e => `${e.path.join('.')}: ${e.message}`)); return }
 
     const rn = v.data as RawNode
     setRawNode(rn)

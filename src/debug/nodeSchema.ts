@@ -19,7 +19,7 @@ export type RawNode = {
  */
 export const RawNodeSchema: z.ZodType<RawNode> = z.lazy(() =>
   z.object({
-    defaults:  z.record(z.unknown()).optional(),
+    defaults:  z.record(z.string(), z.unknown()).optional(),
     instances: z.array(RawNodeSchema).optional(),
   }).passthrough()
 )
