@@ -83,7 +83,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           />
 
           {/* Shortcut toggles — filled when that day is selected in the grid */}
-          <div className="flex gap-2 pb-3">
+          <div className="flex gap-2 pb-4">
             <Button
               variant={isToday ? 'default' : 'outline'}
               size="sm"
@@ -103,7 +103,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           </div>
 
           {/* Action row */}
-          <DrawerFooter className="pt-2">
+          <DrawerFooter className="pt-4">
             <Button
               variant="outline"
               size="sm"
