@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { addDays } from 'date-fns'
 import { Drawer, DrawerContent, DrawerTitle, DrawerFooter } from './ui/drawer'
 import { Separator } from './ui/separator'
 import { Calendar } from './ui/calendar'
@@ -36,7 +37,7 @@ interface Props {
 
 export default function DatePickerDialog({ open, initialDate, onConfirm, onRemove, onClose }: Props) {
   const today    = startOfToday()
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
+  const tomorrow = addDays(today, 1)
 
   const [selected, setSelected] = useState<Date | undefined>(isoToDate(initialDate))
   const [month,    setMonth]    = useState<Date>(isoToDate(initialDate) ?? today)
@@ -88,7 +89,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
             onSelect={setSelected}
             month={month}
             onMonthChange={setMonth}
-            className="w-full [--cell-size:2.25rem] pt-0"
+            className="w-full [--cell-size:2.25rem] p-0"
           />
 
           {/* Shortcut toggles — filled when that day is selected in the grid.
