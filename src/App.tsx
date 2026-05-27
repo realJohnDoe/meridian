@@ -102,13 +102,6 @@ export default function App() {
   const showBottomFloat = topOverlay === undefined
 
   useEffect(() => {
-    // Global openEntry hook — lets vanilla-JS agenda/search rows open the editor
-    ;(window as any).openEntry = (item: any, scope?: string, prefillTitle?: string) => {
-      const editScope = scope ?? (item ? 'single' : 'all')
-      const state = entryFromItem(item, editScope)
-      setEntry(prefillTitle && !item ? { ...state, title: prefillTitle } : state)
-      pushOverlay('entry')
-    }
     initApp()
     // Scroll agenda to today after AgendaView has rendered its sections.
     setTimeout(() => {
