@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Info, X } from 'lucide-react'
-import type { Repeat, Scheduled, ScheduledRepeat, Weekday } from '../types'
-import { parseDateString } from '../recurrence'
+import type { Repeat, Scheduled, Weekday } from '../types'
+import { parseDateString } from '../model/expand'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -76,8 +76,8 @@ function initState(
     }
   }
 
-  // Scheduled repeat: reverse-engineer state from the spec object
-  const s = repeat.scheduled
+  // Scheduled repeat: reverse-engineer state from the flat spec
+  const s = repeat
 
   // Determine monthly mode
   let monthly: MonthlyMode = 'same-day'
@@ -124,27 +124,27 @@ function buildRepeat(
     return { type: 'after_completion', interval }
   }
 
-  const s: ScheduledRepeat = { freq: freq as ScheduledRepeat['freq'] }
+  const r: Repeat = { type: 'schedule', freq: freq as Exclude<Repeat, { type: 'after_completion' }>['freq'] }
 
   if (freq === 'weekly') {
-    s.byweekday = WDAY_CODES.filter((_, i) => wdays[i])
+    r.byweekday = WDAY_CODES.filter((_, i) => wdays[i])
   }
 
   if (freq === 'monthly') {
     if (monthly === 'first-weekday') {
-      s.byweekday = ['mo', 'tu', 'we', 'th', 'fr']
-      s.bysetpos = 1
+      r.byweekday = ['mo', 'tu', 'we', 'th', 'fr']
+      r.bysetpos = 1
     } else if (monthly === 'last-weekday') {
-      s.byweekday = ['mo', 'tu', 'we', 'th', 'fr']
-      s.bysetpos = -1
+      r.byweekday = ['mo', 'tu', 'we', 'th', 'fr']
+      r.bysetpos = -1
     }
     // 'same-day': no byweekday, recurrence engine uses the root date's day
   }
 
-  if (endType === 'until' && endVal)  s.end = { type: 'until', date: endVal }
-  if (endType === 'count' && endVal)  s.end = { type: 'count', occurrences: parseInt(endVal, 10) }
+  if (endType === 'until' && endVal)  r.end = { type: 'until', date: endVal }
+  if (endType === 'count' && endVal)  r.end = { type: 'count', occurrences: parseInt(endVal, 10) }
 
-  return { type: 'schedule', scheduled: s }
+  return r
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────

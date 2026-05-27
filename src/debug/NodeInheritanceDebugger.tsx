@@ -3,12 +3,15 @@ import {
   Upload, FileText, ChevronRight, ChevronLeft, AlertCircle, RotateCcw,
   CalendarDays, Plus, Pencil, Repeat, ChevronsRight, Trash2,
 } from 'lucide-react'
-import { RawNodeSchema, type RawNode } from './nodeSchema'
+import { RawNodeSchema, type RawNode } from '../model/nodeSchema'
 import {
   buildEffectiveTree, collapseToYaml, serializeRawNode, displayValue,
   type EffectiveNode,
-} from './inheritance'
-import { collectAllOccurrences, treeHasOccurrences, type OccurrenceEntry } from './repeatExpander'
+} from '../model/inheritance'
+import { collectAllOccurrences, treeHasOccurrences, type OccurrenceEntry } from '../model/repeatExpander'
+import {
+  dayBefore, getSubNode, setSubNode, doEditFollowing,
+} from '../model/nodeOps'
 import { yamlParse } from '../yaml'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
@@ -25,13 +28,10 @@ function defaultEndDate(): string {
   return d.toISOString().slice(0, 10)
 }
 
-function dayBefore(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00`)
-  d.setDate(d.getDate() - 1)
-  return d.toISOString().slice(0, 10)
-}
-
 // ── Tree display helpers ──────────────────────────────────────────────────────
+
+// Note: getSubNode, setSubNode, splitNode, doEditFollowing are imported from
+// '../model/nodeOps' — see imports above.
 
 interface CardItem {
   label:         string
@@ -57,56 +57,6 @@ const depthColour   = (d: number) => DEPTH_COLOURS[d % DEPTH_COLOURS.length]
 type ActionKind =
   | 'add' | 'edit-occurrence' | 'edit-pattern' | 'edit-following'
   | 'delete-occurrence' | 'delete-following' | 'delete-all'
-
-// ── Sub-node navigation ───────────────────────────────────────────────────────
-
-/** Navigate to the sub-node at the given instance-index path. */
-function getSubNode(node: RawNode, path: number[]): RawNode {
-  let cur = node
-  for (const i of path) cur = ((cur.instances as RawNode[]) ?? [])[i]
-  return cur
-}
-
-/** Immutably replace the sub-node at the given path and return the updated root. */
-function setSubNode(root: RawNode, path: number[], updated: RawNode): RawNode {
-  if (path.length === 0) return updated
-  const [head, ...tail] = path
-  const instances = [...((root.instances as RawNode[]) ?? [])]
-  instances[head] = setSubNode(instances[head], tail, updated)
-  return { ...root, instances }
-}
-
-/**
- * Split a single repeat-bearing node at `occDate` into two series.
- * series1 ends the day before occDate; series2 starts at occDate with same pattern.
- */
-function splitNode(node: RawNode, occDate: string): [RawNode, RawNode] {
-  const originalRepeat = ((node.repeat ?? {}) as Record<string, unknown>)
-  const allInstances   = ((node.instances ?? []) as RawNode[])
-
-  const series1: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(node)) {
-    if (k === 'instances' || k === 'defaults' || k === 'repeat') continue
-    series1[k] = v
-  }
-  series1.repeat = { ...originalRepeat, end: { type: 'until', date: dayBefore(occDate) } }
-  const instsBefore = allInstances.filter(i => String((i as Record<string, unknown>).date) < occDate)
-  if (instsBefore.length > 0) series1.instances = instsBefore
-
-  const series2: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(node)) {
-    if (k === 'instances' || k === 'defaults' || k === 'repeat' || k === 'date') continue
-    series2[k] = v
-  }
-  series2.date   = occDate
-  // Keep the original repeat (including end date) so the new series inherits
-  // the same bounds as the original. The user can change it via Edit pattern.
-  series2.repeat = { ...originalRepeat }
-  const instsFrom = allInstances.filter(i => String((i as Record<string, unknown>).date) >= occDate)
-  if (instsFrom.length > 0) series2.instances = instsFrom
-
-  return [series1 as RawNode, series2 as RawNode]
-}
 
 // ── Raw-node action functions ─────────────────────────────────────────────────
 
@@ -141,30 +91,6 @@ function doEditOccurrence(
 function doEditPattern(node: RawNode, ownerPath: number[], newRepeat: Record<string, unknown>): RawNode {
   const sub = getSubNode(node, ownerPath)
   return setSubNode(node, ownerPath, { ...sub, repeat: newRepeat })
-}
-
-function doEditFollowing(node: RawNode, ownerPath: number[], occDate: string): RawNode {
-  if (ownerPath.length === 0) {
-    // Root has repeat — wrap into a container with two child series
-    const [series1, series2] = splitNode(node, occDate)
-    const container: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(node)) {
-      if (['date', 'time', 'repeat', 'instances'].includes(k)) continue
-      container[k] = v
-    }
-    container.instances = [series1, series2]
-    return container as RawNode
-  }
-
-  // Child has repeat — split and flatten back into parent's instances array
-  const parentPath = ownerPath.slice(0, -1)
-  const childIdx   = ownerPath[ownerPath.length - 1]
-  const parent     = getSubNode(node, parentPath)
-  const sub        = ((parent.instances as RawNode[]) ?? [])[childIdx]
-  const [series1, series2] = splitNode(sub, occDate)
-  const newInstances = [...((parent.instances as RawNode[]) ?? [])]
-  newInstances.splice(childIdx, 1, series1, series2)
-  return setSubNode(node, parentPath, { ...parent, instances: newInstances })
 }
 
 function doDeleteOccurrence(node: RawNode, ownerPath: number[], occ: OccurrenceEntry): RawNode {

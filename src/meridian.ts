@@ -1,6 +1,8 @@
 import Dexie from 'dexie'
-import { fmtISO, fmtT, nodeDateTime, parseDateString } from './recurrence'
+import { fmtISO, fmtT, nodeDateTime, parseDateString } from './model/expand'
 import { nodeToFile, fileToNode, titleToSlug } from './yaml'
+import { splitNode } from './model/nodeOps'
+import { serializeRawNode } from './model/inheritance'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
 import type { Node, Occurrence, Repeat, Scheduled, Instance } from './types'
 import { useStore } from './store'
@@ -64,7 +66,7 @@ function notify(msg: string): void {
 const SEED_NODES: Node[] = [
   {id:'standup', title:'Weekly Standup', tags:['work'],
    date:'2026-04-06', time:'09:00', duration:'30m',
-   repeat:{type:'schedule', scheduled:{freq:'weekly', byweekday:['mo']}},
+   repeat:{type:'schedule', freq:'weekly', byweekday:['mo']},
    body:'Quick sync. Agenda:\n- [[project-alpha]] status\n- Blockers\n- [[weekly-log]] updates',
    instances:[
      {date:'2026-04-13', done:true},
@@ -73,7 +75,7 @@ const SEED_NODES: Node[] = [
   },
   {id:'exercise', title:'Exercise', tags:['health'],
    date:'2026-04-06', done:false,
-   repeat:{type:'schedule', scheduled:{freq:'weekly', byweekday:['mo','we','fr']}},
+   repeat:{type:'schedule', freq:'weekly', byweekday:['mo','we','fr']},
    body:'30 min run or gym. Part of [[health-habits]] tracking.',
    instances:[
      {date:'2026-04-06', done:true},
@@ -92,7 +94,7 @@ const SEED_NODES: Node[] = [
   },
   {id:'monthly-review', title:'Monthly Review', tags:['work'],
    date:'2026-04-07', time:'14:00', duration:'2h',
-   repeat:{type:'schedule', scheduled:{freq:'monthly', byweekday:['mo'], bysetpos:1}},
+   repeat:{type:'schedule', freq:'monthly', byweekday:['mo'], bysetpos:1},
    body:'## Agenda\n\n- Review [[project-alpha]] milestones\n- Budget check\n- Team velocity\n- Next month planning',
    instances:[
      {date:'2026-04-07', done:true},
@@ -100,7 +102,7 @@ const SEED_NODES: Node[] = [
   },
   {id:'pay-rent', title:'Pay Rent', tags:['personal'],
    date:'2026-04-01', done:false,
-   repeat:{type:'schedule', scheduled:{freq:'monthly', bymonthday:[1]}},
+   repeat:{type:'schedule', freq:'monthly', bymonthday:[1]},
    instances:[
      {date:'2026-04-01', done:true},
      {date:'2026-05-01', done:true},
@@ -476,32 +478,31 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
     writeEntityToCache(updated)
 
   } else if (editScope === 'future') {
-    const updated = cloneNode(node)
     const occDate = item!.date
-    const occJsDate = parseDateString(occDate)!
-    const untilDate = new Date(occJsDate); untilDate.setDate(untilDate.getDate() - 1)
-    // Build new repeat object without touching the original
-    updated.repeat = {
-      ...updated.repeat,
-      scheduled: { ...((updated.repeat as any)?.scheduled || {}), end: { type: 'until', date: fmtISO(untilDate) } },
-    } as Repeat
-    if (updated.instances) {
-      updated.instances = updated.instances.filter((i: Instance) => {
-        const t = parseDateString(i.date || '9999-01-01')
-        return !t || t < occJsDate
-      })
+    // Convert to RawNode (strips _path, id, type, etc.) so splitNode works on clean data
+    const rawNode = toRawNode(node)
+    // Split into two series at occDate
+    const [series1, series2raw] = splitNode(rawNode, occDate)
+    // Apply the user's edits to the future series (series2)
+    const series2: Record<string, unknown> = { ...series2raw }
+    if (f.date && f.date !== occDate) series2.date = f.date
+    if (f.time) series2.time = f.time; else delete series2.time
+    if (f.title !== node.title) series2.title = f.title
+    if (JSON.stringify(f.tags) !== JSON.stringify(node.tags)) series2.tags = f.tags
+    if (f.duration !== node.duration) series2.duration = f.duration
+    if (f.body !== node.body) series2.body = f.body
+    // If the user changed the repeat pattern, apply it; otherwise series2 inherits the original
+    if (repeat) series2.repeat = repeat
+    if (tracked && f.done !== undefined) series2.done = f.done
+    // Build a container node: no root date/time/repeat, just the shared fields + instances
+    const container: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(rawNode)) {
+      if (['date', 'time', 'repeat', 'instances'].includes(k)) continue
+      container[k] = v
     }
-    const newChild: any = { date: f.date || occDate }
-    if (f.time) newChild.time = f.time
-    if (f.title !== node.title) newChild.title = f.title
-    if (JSON.stringify(f.tags) !== JSON.stringify(node.tags)) newChild.tags = f.tags
-    if (f.duration !== node.duration) newChild.duration = f.duration
-    if (f.body !== node.body) newChild.body = f.body
-    if (repeat) newChild.repeat = repeat
-    if (tracked && f.done !== undefined) newChild.done = f.done
-    Object.keys(newChild).forEach(k => { if (newChild[k] === undefined) delete newChild[k] })
-    if (!updated.instances) updated.instances = []
-    updated.instances.push(newChild)
+    container.instances = [series1, series2]
+    // Restore runtime tracking fields so the store can identify this node
+    const updated = { ...container, id: node.id, _path: node._path } as Node
     setNodes(replaceNode(nodes, node.id, updated))
     writeEntityToCache(updated)
   }
@@ -548,7 +549,7 @@ export function deleteNode(
     const untilDate = new Date(occJsDate); untilDate.setDate(untilDate.getDate() - 1)
     updated.repeat = {
       ...updated.repeat,
-      scheduled: { ...((updated.repeat as any)?.scheduled || {}), end: { type: 'until', date: fmtISO(untilDate) } },
+      end: { type: 'until', date: fmtISO(untilDate) },
     } as Repeat
     if (updated.instances) {
       updated.instances = updated.instances.map((i: Instance) =>
@@ -744,10 +745,30 @@ async function diskDelete(path: string): Promise<void> {
   try { await dh.removeEntry(path) } catch { }
 }
 
+/** Runtime/internal fields that must not be written to YAML. */
+const _INTERNAL_FIELDS = new Set(['id', '_path', '_node', '_nodeId', 'type', 'jsTime', 'recur'])
+
+/** Strip runtime fields from a Node to get a plain RawNode suitable for serializeRawNode. */
+function toRawNode(node: Node): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(node)) {
+    if (!_INTERNAL_FIELDS.has(k)) result[k] = v
+  }
+  return result
+}
+
+/** A container node has no root repeat but has instances that carry their own repeat. */
+function isContainerNode(node: Node): boolean {
+  return !node.repeat && Array.isArray(node.instances) &&
+    (node.instances as any[]).some(i => i && i.repeat)
+}
+
 async function writeEntityToCache(node: Node): Promise<void> {
   try {
     const path = nodeToPath(node)
-    const content = nodeToFile(node)
+    const content = isContainerNode(node)
+      ? serializeRawNode(toRawNode(node) as any)
+      : nodeToFile(node)
     await cacheWrite(path, content)
     updateSyncUI()
   } catch (e) {

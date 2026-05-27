@@ -14,12 +14,16 @@ export type RawNode = {
 
 /**
  * Recursive Zod schema for a raw node.
- * Uses z.lazy for the recursive `instances` reference.
- * passthrough() preserves unknown domain fields (spec §4 — open schema).
+ * Only the fields the model layer reads are declared; everything else passes
+ * through via passthrough() so domain fields don't need to be enumerated here.
  */
 export const RawNodeSchema: z.ZodType<RawNode> = z.lazy(() =>
   z.object({
+    // Used by inheritance resolution
     defaults:  z.record(z.string(), z.unknown()).optional(),
     instances: z.array(RawNodeSchema).optional(),
+    // Used by expansion (repeat detection + single-date emission)
+    repeat: z.record(z.string(), z.unknown()).optional(),
+    date:   z.string().optional(),
   }).passthrough()
 )
