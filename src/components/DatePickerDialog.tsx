@@ -65,18 +65,18 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogPrimitive.Portal forceMount>
 
-        {/* Backdrop */}
+        {/* Backdrop — pointer-events-none by default so it never blocks the app when closed */}
         <DialogPrimitive.Overlay
           forceMount
           className={cn(
             'fixed inset-0 z-[200] bg-black/70',
+            'pointer-events-none opacity-0',
             'transition-opacity duration-200',
-            'data-[state=open]:opacity-100',
-            'data-[state=closed]:opacity-0 data-[state=closed]:pointer-events-none',
+            'data-[state=open]:opacity-100 data-[state=open]:pointer-events-auto',
           )}
         />
 
-        {/* Bottom-sheet panel */}
+        {/* Bottom-sheet panel — pointer-events-none + translated off-screen when closed */}
         <DialogPrimitive.Content
           forceMount
           className={cn(
@@ -84,9 +84,9 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
             'w-full max-w-[430px]',
             'bg-background border-t border-border rounded-t-[24px]',
             'pt-3 pb-10 focus:outline-none',
+            'pointer-events-none translate-y-full',
             'transition-transform duration-[280ms] ease-[cubic-bezier(.4,0,.2,1)]',
-            'data-[state=open]:translate-y-0',
-            'data-[state=closed]:translate-y-full',
+            'data-[state=open]:translate-y-0 data-[state=open]:pointer-events-auto',
           )}
         >
           {/* Drag handle */}
