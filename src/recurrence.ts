@@ -328,62 +328,6 @@ export function expandNode(node, from, to){
   return occurrences;
 }
 
-export function expandRange(nodes, from, to){
-  const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r};
-  const all=[];
-  for(const node of nodes){
-    if(node.multiday){
-      let d=parseDateString(node.multiday.start||node.date);
-      if(!d)continue;
-      d=new Date(d);d.setHours(0,0,0,0);
-      const endD=parseDateString(node.multiday.end);
-      if(!endD)continue;
-      const endDt=new Date(endD);endDt.setHours(23,59,59);
-      while(d<=endDt){
-        if(d>=from&&d<=to){
-          const spec=jsDateToSpec(d);
-          all.push({...node,date:spec.date,time:null,jsTime:new Date(d),_nodeId:node.id,_node:node,recur:false});
-        }
-        d=addDays(d,1);
-      }
-    } else if(node.repeat){
-      all.push(...expandNode(node,from,to));
-    } else {
-      const liveInstances=(node.instances||[]).filter(i=>!i.excluded&&!i.repeat);
-      if(liveInstances.length>0){
-        // Multi-occurrence non-recurring: root date is metadata only; all calendar items come from instances
-        for(const inst of liveInstances){
-          const it=nodeDateTime(inst)||parseDateString(inst.date);
-          if(!it||it<from||it>to)continue;
-          const eff=mergeNode(node,inst);
-          if(!eff.excluded){
-            all.push({
-              ...eff,
-              date:inst.date||jsDateToSpec(it).date,
-              jsTime:it,
-              _nodeId:node.id,
-              _node:node,
-              recur:true,  // enables per-instance swipe-delete (exclude, not full node delete)
-            });
-          }
-        }
-      } else {
-        // Single occurrence: emit root date
-        const t=nodeDateTime(node);
-        if(t&&t>=from&&t<=to){
-          all.push({...node,jsTime:t,_nodeId:node.id,_node:node,recur:false});
-        }
-      }
-    }
-  }
-  const seen=new Set();
-  return all.filter(o=>{
-    if(!o.jsTime)return false;
-    const k=`${o._nodeId||o.title}|${o.jsTime.getTime()}`;
-    if(seen.has(k))return false;seen.add(k);return true;
-  }).sort((a,b)=>a.jsTime-b.jsTime);
-}
-
 export function parseDurationHours(dur){
   if(!dur)return 0.75;
   const s=String(dur).toLowerCase().trim();

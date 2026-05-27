@@ -1,5 +1,5 @@
 import Dexie from 'dexie'
-import { fmtISO, fmtT, nodeDateTime, parseDateString, expandRange as _expandRange } from './model/expand'
+import { fmtISO, fmtT, nodeDateTime, parseDateString } from './model/expand'
 import { nodeToFile, fileToNode, titleToSlug } from './yaml'
 import { splitNode } from './model/nodeOps'
 import { serializeRawNode } from './model/inheritance'
