@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { Check, Repeat2, Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { fmtT } from '../recurrence'
+import { fmtT } from '../model/expand'
 import { barClass } from '../meridian'
 
 interface Props {

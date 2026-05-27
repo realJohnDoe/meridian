@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { fmtISO, fmtT } from './recurrence'
+import { fmtISO, fmtT } from './model/expand'
 
 // ── YAML PARSER ───────────────────────────────────────────────
 export function yamlParseScalar(v){
@@ -138,7 +138,7 @@ export function nodeToFile(node){
     lines.push('repeat:');
     lines.push(`  type: ${node.repeat.type}`);
     if(node.repeat.type==='schedule'){
-      const s=node.repeat.scheduled||node.repeat;
+      const s=node.repeat;
       if(s.freq)lines.push(`  freq: ${s.freq}`);
       if(s.byweekday&&s.byweekday.length)lines.push(`  byweekday: [${s.byweekday.join(', ')}]`);
       if(s.bymonthday&&s.bymonthday.length)lines.push(`  bymonthday: [${s.bymonthday.join(', ')}]`);
@@ -214,20 +214,18 @@ export function fileToNode(path, content){
     if(r.type==='after_completion'){
       if(r.interval)node.repeat.interval=String(r.interval);
     } else if(r.type==='schedule'){
-      const src=r.scheduled||r;
-      const sched={};
-      if(src.freq)sched.freq=String(src.freq);
-      if(src.byweekday)sched.byweekday=Array.isArray(src.byweekday)?src.byweekday.map(String):[String(src.byweekday)];
-      if(src.bymonthday)sched.bymonthday=Array.isArray(src.bymonthday)?src.bymonthday.map(Number):[Number(src.bymonthday)];
-      if(src.bysetpos!==undefined)sched.bysetpos=Number(src.bysetpos);
-      if(src.interval)sched.interval=Number(src.interval);
-      if(src.end&&typeof src.end==='object'){
-        sched.end={type:String(src.end.type)};
-        if(src.end.date)sched.end.date=String(src.end.date);
-        else if(src.end.time)sched.end.date=String(src.end.time).split('T')[0];
-        if(src.end.occurrences)sched.end.occurrences=Number(src.end.occurrences);
+      if(r.freq)node.repeat.freq=String(r.freq);
+      if(r.byweekday)node.repeat.byweekday=Array.isArray(r.byweekday)?r.byweekday.map(String):[String(r.byweekday)];
+      if(r.bymonthday)node.repeat.bymonthday=Array.isArray(r.bymonthday)?r.bymonthday.map(Number):[Number(r.bymonthday)];
+      if(r.bysetpos!==undefined)node.repeat.bysetpos=Number(r.bysetpos);
+      if(r.interval)node.repeat.interval=Number(r.interval);
+      if(r.end&&typeof r.end==='object'){
+        const end={type:String(r.end.type)};
+        if(r.end.date)end.date=String(r.end.date);
+        else if(r.end.time)end.date=String(r.end.time).split('T')[0];
+        if(r.end.occurrences)end.occurrences=Number(r.end.occurrences);
+        node.repeat.end=end;
       }
-      node.repeat.scheduled=sched;
     }
   }
 

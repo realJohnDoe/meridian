@@ -3,12 +3,12 @@ import {
   Upload, FileText, ChevronRight, ChevronLeft, AlertCircle, RotateCcw,
   CalendarDays, Plus, Pencil, Repeat, ChevronsRight, Trash2,
 } from 'lucide-react'
-import { RawNodeSchema, type RawNode } from './nodeSchema'
+import { RawNodeSchema, type RawNode } from '../model/nodeSchema'
 import {
   buildEffectiveTree, collapseToYaml, serializeRawNode, displayValue,
   type EffectiveNode,
-} from './inheritance'
-import { collectAllOccurrences, treeHasOccurrences, hasRepeat, type OccurrenceEntry } from './repeatExpander'
+} from '../model/inheritance'
+import { collectAllOccurrences, treeHasOccurrences, type OccurrenceEntry } from '../model/repeatExpander'
 import { yamlParse } from '../yaml'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────

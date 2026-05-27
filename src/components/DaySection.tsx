@@ -1,7 +1,7 @@
 import { memo, useRef, useLayoutEffect } from 'react'
 import { CalendarRange } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { parseDateString } from '../recurrence'
+import { parseDateString } from '../model/expand'
 import { fmtShort, fmtLong } from '../meridian'
 import OccurrenceRow from './OccurrenceRow'
 

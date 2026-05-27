@@ -230,7 +230,7 @@ export function expandNode(node, from, to){
   if(!node.repeat)return occurrences;
 
   if(node.repeat.type==='schedule'){
-    const sched=node.repeat.scheduled||{};
+    const sched=node.repeat;
     const generated=generateScheduledDates(anchor, node.time, sched, from, to);
     const generatedMs=new Set(generated.map(d=>d.getTime()));
     generatedMs.add(anchor.getTime());

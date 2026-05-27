@@ -2,7 +2,7 @@ import { useMemo, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { expandRange } from '../recurrence'
+import { expandRange } from '../model/expand'
 import { sameDay, sortOccs, ccBarClass } from '../meridian'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)

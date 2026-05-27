@@ -1,7 +1,7 @@
 // @ts-nocheck
 import Dexie from 'dexie'
 import { createIcons, CalendarRange, Trash2, Check, Repeat2, FileText, CheckSquare, Calendar, Plus, X } from 'lucide'
-import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './recurrence'
+import { fmtISO, fmtT, nodeDateTime, jsDateToSpec, parseDateString, toDate, addInterval, mergeNode, expandNode, expandRange as _expandRange, parseDurationHours } from './model/expand'
 import { yamlParse, yamlParseScalar, yamlSerializeScalar, nodeToFile, fileToNode, titleToSlug } from './yaml'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
 // @ts-nocheck suppresses the internal DOM-manipulation errors; a follow-up PR will address those.
@@ -47,7 +47,7 @@ function notify(msg: string): void {
 const SEED_NODES: Node[] = [
   {id:'standup', title:'Weekly Standup', tags:['work'],
    date:'2026-04-06', time:'09:00', duration:'30m',
-   repeat:{type:'schedule', scheduled:{freq:'weekly', byweekday:['mo']}},
+   repeat:{type:'schedule', freq:'weekly', byweekday:['mo']},
    body:'Quick sync. Agenda:\n- [[project-alpha]] status\n- Blockers\n- [[weekly-log]] updates',
    instances:[
      {date:'2026-04-13', done:true},
@@ -56,7 +56,7 @@ const SEED_NODES: Node[] = [
   },
   {id:'exercise', title:'Exercise', tags:['health'],
    date:'2026-04-06', done:false,
-   repeat:{type:'schedule', scheduled:{freq:'weekly', byweekday:['mo','we','fr']}},
+   repeat:{type:'schedule', freq:'weekly', byweekday:['mo','we','fr']},
    body:'30 min run or gym. Part of [[health-habits]] tracking.',
    instances:[
      {date:'2026-04-06', done:true},
@@ -75,7 +75,7 @@ const SEED_NODES: Node[] = [
   },
   {id:'monthly-review', title:'Monthly Review', tags:['work'],
    date:'2026-04-07', time:'14:00', duration:'2h',
-   repeat:{type:'schedule', scheduled:{freq:'monthly', byweekday:['mo'], bysetpos:1}},
+   repeat:{type:'schedule', freq:'monthly', byweekday:['mo'], bysetpos:1},
    body:'## Agenda\n\n- Review [[project-alpha]] milestones\n- Budget check\n- Team velocity\n- Next month planning',
    instances:[
      {date:'2026-04-07', done:true},
@@ -83,7 +83,7 @@ const SEED_NODES: Node[] = [
   },
   {id:'pay-rent', title:'Pay Rent', tags:['personal'],
    date:'2026-04-01', done:false,
-   repeat:{type:'schedule', scheduled:{freq:'monthly', bymonthday:[1]}},
+   repeat:{type:'schedule', freq:'monthly', bymonthday:[1]},
    instances:[
      {date:'2026-04-01', done:true},
      {date:'2026-05-01', done:true},
@@ -463,7 +463,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
     // Build new repeat object without touching the original
     updated.repeat={
       ...updated.repeat,
-      scheduled:{...(updated.repeat?.scheduled||{}), end:{type:'until',date:fmtISO(untilDate)}},
+      end:{type:'until',date:fmtISO(untilDate)},
     };
     if(updated.instances){
       updated.instances=updated.instances.filter(i=>{
@@ -529,7 +529,7 @@ export function deleteNode(
     const untilDate=new Date(occJsDate);untilDate.setDate(untilDate.getDate()-1);
     updated.repeat={
       ...updated.repeat,
-      scheduled:{...(updated.repeat?.scheduled||{}), end:{type:'until',date:fmtISO(untilDate)}},
+      end:{type:'until',date:fmtISO(untilDate)},
     };
     if(updated.instances){
       updated.instances=updated.instances.map(i=>

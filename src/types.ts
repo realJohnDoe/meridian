@@ -10,18 +10,9 @@ export type RepeatEnd =
   | { type: 'until'; date?: string; time?: string }
   | { type: 'count'; occurrences: number }
 
-export interface ScheduledRepeat {
-  freq: 'daily' | 'weekly' | 'monthly' | 'yearly'
-  byweekday?: Weekday[]
-  bymonthday?: number[]
-  bysetpos?: number
-  interval?: number
-  end?: RepeatEnd
-}
-
 export type Repeat =
-  | { type: 'schedule'; scheduled: ScheduledRepeat }
-  | { type: 'after_completion'; interval: string }
+  | { type: 'schedule'; freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; byweekday?: Weekday[]; bymonthday?: number[]; bysetpos?: number; interval?: number; end?: RepeatEnd }
+  | { type: 'after_completion'; interval: string; end?: RepeatEnd }
 
 // ── Node ─────────────────────────────────────────────────────────────────────
 

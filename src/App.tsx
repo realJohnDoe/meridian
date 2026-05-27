@@ -13,7 +13,7 @@ import {
   syncToDirectory, pickDirectory,
   addDays, fmtLong,
 } from './meridian'
-import { fmtISO } from './recurrence'
+import { fmtISO } from './model/expand'
 import { TODAY } from './constants'
 import { useStore } from './store'
 import type { PrimaryView } from './store'

@@ -1,11 +1,10 @@
 /**
- * Repeat expansion bridge for the Node Inheritance Debugger.
+ * Repeat expansion bridge for the Node Inheritance model.
  *
  * Accepts an EffectiveNode (post-inheritance) and expands its repeat schedule
  * into a flat list of concrete occurrences.
  *
- * NOTE: Temporary bridge delegating to the existing expandNode() in recurrence.ts.
- * Will be replaced by the full per-pattern pipeline once that architecture lands.
+ * Delegates to the existing expandNode() in recurrence.ts.
  */
 
 import { expandNode } from '../recurrence'
@@ -33,27 +32,12 @@ export interface OccurrenceEntry {
   ownerPath: number[]
 }
 
-// ── Format normaliser ─────────────────────────────────────────────────────────
-
-/**
- * Convert flat repeat format to the nested format expected by expandNode.
- *
- * Flat  (raw YAML):   { type: 'schedule', freq: 'weekly', byweekday: ['mo'] }
- * Nested (required):  { type: 'schedule', scheduled: { freq, byweekday, ... } }
- */
-function normalizeRepeat(repeat: Record<string, unknown>): Record<string, unknown> {
-  if (repeat.type !== 'schedule') return repeat
-  if (repeat.scheduled)           return repeat
-  const { type, ...schedFields } = repeat
-  return { type, scheduled: schedFields }
-}
+// ── Expandable builder ────────────────────────────────────────────────────────
 
 /** Build a duck-typed node suitable for expandNode() from an EffectiveNode. */
 function toExpandable(node: EffectiveNode): Record<string, unknown> {
   const fields = { ...node.fields }
-  if (fields.repeat && typeof fields.repeat === 'object' && !Array.isArray(fields.repeat)) {
-    fields.repeat = normalizeRepeat(fields.repeat as Record<string, unknown>)
-  }
+  // repeat is already in flat format — no normalisation needed
   fields.instances = node.instances.map(child => ({ ...child.fields }))
   return fields
 }
