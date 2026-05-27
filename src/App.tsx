@@ -19,6 +19,7 @@ import { useStore } from './store'
 import type { PrimaryView } from './store'
 import EntryEditor, { EntryState, ENTRY_DEFAULT, ItemType } from './components/EntryEditor'
 import RepeatDialog from './components/RepeatDialog'
+import DatePickerDialog from './components/DatePickerDialog'
 import UndoToast from './components/UndoToast'
 import AgendaView from './components/AgendaView'
 import MonthView from './components/MonthView'
@@ -55,7 +56,6 @@ function entryFromItem(item: any, editScope: string): EntryState {
 export default function App() {
   const [entry, setEntry] = useState<EntryState>(ENTRY_DEFAULT)
   const [activeDialog, setActiveDialog] = useState<string | null>(null)
-  const [dlgDateVal, setDlgDateVal] = useState('')
   const [dlgTimeVal, setDlgTimeVal] = useState('')
   const [dlgDurVal, setDlgDurVal] = useState('')
   const [filterQuery, setFilterQuery] = useState('')
@@ -154,7 +154,6 @@ export default function App() {
   }, [])
 
   const handleOpenDlg = useCallback((id: string) => {
-    if (id === 'dlgSched') setDlgDateVal(entry.scheduled?.date || fmtISO(TODAY))
     if (id === 'dlgTime') setDlgTimeVal(entry.scheduled?.time || '')
     if (id === 'dlgDur') setDlgDurVal(entry.duration || '')
     setActiveDialog(id)
@@ -166,13 +165,12 @@ export default function App() {
 
   const closeDialog = useCallback(() => setActiveDialog(null), [])
 
-  const confirmSched = useCallback(() => {
-    if (!dlgDateVal) return
-    setEntry(prev => ({ ...prev, scheduled: { date: dlgDateVal, time: prev.scheduled?.time || '' } }))
+  const handleDateConfirm = useCallback((dateStr: string) => {
+    setEntry(prev => ({ ...prev, scheduled: { date: dateStr, time: prev.scheduled?.time || '' } }))
     setActiveDialog(null)
-  }, [dlgDateVal])
+  }, [])
 
-  const removeSched = useCallback(() => {
+  const handleDateRemove = useCallback(() => {
     setEntry(prev => ({ ...prev, scheduled: null, duration: '' }))
     setActiveDialog(null)
   }, [])
@@ -375,16 +373,14 @@ export default function App() {
 
       {/* ── DIALOGS ── */}
 
-      {/* DATE */}
-      <div className={dlgOvClass('dlgSched')} id="dlgSched" onClick={closeDlgOv}>
-        <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Date</div><div className="dlg-body">
-          <div className="dlg-row"><span className="dlg-lbl"><Calendar />Date</span><input className="dlg-in" type="date" id="dlgDate" value={dlgDateVal} onChange={e => setDlgDateVal(e.target.value)} /></div>
-          <div className="dlg-actions">
-            <button className="dlg-rm" onClick={removeSched}><X />Remove</button>
-            <div style={{ display: 'flex', gap: 8 }}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmSched}>Set</button></div>
-          </div>
-        </div></div>
-      </div>
+      {/* DATE — shadcn Dialog + react-day-picker Calendar */}
+      <DatePickerDialog
+        open={activeDialog === 'dlgSched'}
+        initialDate={entry.scheduled?.date || fmtISO(TODAY)}
+        onConfirm={handleDateConfirm}
+        onRemove={handleDateRemove}
+        onClose={closeDialog}
+      />
 
       {/* PRIORITY */}
       <div className={dlgOvClass('dlgPriority')} id="dlgPriority" onClick={closeDlgOv}>
