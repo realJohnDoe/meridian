@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from 'react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { expandRange } from '../recurrence'
+import { expandRange } from '../model/expand'
 import {
   sameDay, addDays, dayKey, sortOccs,
   toggleOccDone, beginSwipeDelete,

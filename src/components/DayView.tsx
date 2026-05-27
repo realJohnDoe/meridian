@@ -2,7 +2,7 @@ import { useMemo, useEffect, useRef } from 'react'
 import { Check } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { expandRange, fmtT, parseDurationHours } from '../recurrence'
+import { expandRange, fmtT, parseDurationHours } from '../model/expand'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
 
 import { TODAY } from '../constants'

@@ -67,6 +67,13 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        // Do not redirect debug.html navigations to index.html.
+        // Without this, the NavigationRoute catches all navigations and serves
+        // the main app instead of the debug page.
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/meridian\/debug(\.html)?$/],
+      },
       manifest: {
         name: 'Meridian',
         short_name: 'Meridian',
