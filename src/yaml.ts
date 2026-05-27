@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { fmtISO, fmtT } from './recurrence'
+import { fmtISO, fmtT } from './model/expand'
 
 // ── YAML PARSER ───────────────────────────────────────────────
 export function yamlParseScalar(v){
@@ -138,7 +138,7 @@ export function nodeToFile(node){
     lines.push('repeat:');
     lines.push(`  type: ${node.repeat.type}`);
     if(node.repeat.type==='schedule'){
-      const s=node.repeat.scheduled||node.repeat;
+      const s=node.repeat;
       if(s.freq)lines.push(`  freq: ${s.freq}`);
       if(s.byweekday&&s.byweekday.length)lines.push(`  byweekday: [${s.byweekday.join(', ')}]`);
       if(s.bymonthday&&s.bymonthday.length)lines.push(`  bymonthday: [${s.bymonthday.join(', ')}]`);
@@ -169,6 +169,26 @@ export function nodeToFile(node){
       if(inst.tags)lines.push(`    tags: ${yamlSerializeScalar(inst.tags)}`);
       if(inst.duration)lines.push(`    duration: ${inst.duration}`);
       if(inst.body)lines.push(`    body: ${yamlSerializeScalar(inst.body)}`);
+      if(inst.repeat){
+        lines.push(`    repeat:`);
+        lines.push(`      type: ${inst.repeat.type}`);
+        if(inst.repeat.type==='schedule'){
+          const s=inst.repeat;
+          if(s.freq)lines.push(`      freq: ${s.freq}`);
+          if(s.byweekday&&s.byweekday.length)lines.push(`      byweekday: [${s.byweekday.join(', ')}]`);
+          if(s.bymonthday&&s.bymonthday.length)lines.push(`      bymonthday: [${s.bymonthday.join(', ')}]`);
+          if(s.bysetpos!==undefined)lines.push(`      bysetpos: ${s.bysetpos}`);
+          if(s.interval&&s.interval!==1)lines.push(`      interval: ${s.interval}`);
+          if(s.end){
+            lines.push(`      end:`);
+            lines.push(`        type: ${s.end.type}`);
+            if(s.end.date)lines.push(`        date: ${s.end.date}`);
+            if(s.end.occurrences)lines.push(`        occurrences: ${s.end.occurrences}`);
+          }
+        } else if(inst.repeat.type==='after_completion'){
+          if(inst.repeat.interval)lines.push(`      interval: ${inst.repeat.interval}`);
+        }
+      }
     }
   }
   return `---\n${lines.join('\n')}\n---\n\n${node.body||''}`;
@@ -214,20 +234,18 @@ export function fileToNode(path, content){
     if(r.type==='after_completion'){
       if(r.interval)node.repeat.interval=String(r.interval);
     } else if(r.type==='schedule'){
-      const src=r.scheduled||r;
-      const sched={};
-      if(src.freq)sched.freq=String(src.freq);
-      if(src.byweekday)sched.byweekday=Array.isArray(src.byweekday)?src.byweekday.map(String):[String(src.byweekday)];
-      if(src.bymonthday)sched.bymonthday=Array.isArray(src.bymonthday)?src.bymonthday.map(Number):[Number(src.bymonthday)];
-      if(src.bysetpos!==undefined)sched.bysetpos=Number(src.bysetpos);
-      if(src.interval)sched.interval=Number(src.interval);
-      if(src.end&&typeof src.end==='object'){
-        sched.end={type:String(src.end.type)};
-        if(src.end.date)sched.end.date=String(src.end.date);
-        else if(src.end.time)sched.end.date=String(src.end.time).split('T')[0];
-        if(src.end.occurrences)sched.end.occurrences=Number(src.end.occurrences);
+      if(r.freq)node.repeat.freq=String(r.freq);
+      if(r.byweekday)node.repeat.byweekday=Array.isArray(r.byweekday)?r.byweekday.map(String):[String(r.byweekday)];
+      if(r.bymonthday)node.repeat.bymonthday=Array.isArray(r.bymonthday)?r.bymonthday.map(Number):[Number(r.bymonthday)];
+      if(r.bysetpos!==undefined)node.repeat.bysetpos=Number(r.bysetpos);
+      if(r.interval)node.repeat.interval=Number(r.interval);
+      if(r.end&&typeof r.end==='object'){
+        const end={type:String(r.end.type)};
+        if(r.end.date)end.date=String(r.end.date);
+        else if(r.end.time)end.date=String(r.end.time).split('T')[0];
+        if(r.end.occurrences)end.occurrences=Number(r.end.occurrences);
+        node.repeat.end=end;
       }
-      node.repeat.scheduled=sched;
     }
   }
 
@@ -255,6 +273,27 @@ export function fileToNode(path, content){
       if(inst.tags)r.tags=Array.isArray(inst.tags)?inst.tags:[String(inst.tags)];
       if(inst.duration)r.duration=String(inst.duration);
       if(inst.body)r.body=String(inst.body);
+      if(inst.repeat&&typeof inst.repeat==='object'){
+        const ir=inst.repeat;
+        const rep={type:String(ir.type)};
+        if(ir.type==='after_completion'){
+          if(ir.interval)rep.interval=String(ir.interval);
+        } else if(ir.type==='schedule'){
+          if(ir.freq)rep.freq=String(ir.freq);
+          if(ir.byweekday)rep.byweekday=Array.isArray(ir.byweekday)?ir.byweekday.map(String):[String(ir.byweekday)];
+          if(ir.bymonthday)rep.bymonthday=Array.isArray(ir.bymonthday)?ir.bymonthday.map(Number):[Number(ir.bymonthday)];
+          if(ir.bysetpos!==undefined)rep.bysetpos=Number(ir.bysetpos);
+          if(ir.interval)rep.interval=Number(ir.interval);
+          if(ir.end&&typeof ir.end==='object'){
+            const end={type:String(ir.end.type)};
+            if(ir.end.date)end.date=String(ir.end.date);
+            else if(ir.end.time)end.date=String(ir.end.time).split('T')[0];
+            if(ir.end.occurrences)end.occurrences=Number(ir.end.occurrences);
+            rep.end=end;
+          }
+        }
+        r.repeat=rep;
+      }
       return r;
     }).filter(Boolean);
   }

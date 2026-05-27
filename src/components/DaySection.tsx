@@ -1,7 +1,7 @@
 import { memo, useRef, useLayoutEffect } from 'react'
 import { CalendarRange } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { parseDateString } from '../recurrence'
+import { parseDateString } from '../model/expand'
 import { fmtShort, fmtLong } from '../meridian'
 import OccurrenceRow from './OccurrenceRow'
 
@@ -91,7 +91,7 @@ function DaySection({
           <CalendarRange size={14} />
           {o.title}
           <span style={{ opacity: 0.55, fontSize: 10, marginLeft: 4 }}>
-            {fmtShort(parseDateString(o.multiday!.start))}–{fmtShort(parseDateString(o.multiday!.end))}
+            {fmtShort(parseDateString(o.multiday!.start)!)}–{fmtShort(parseDateString(o.multiday!.end)!)}
           </span>
         </div>
       ))}
