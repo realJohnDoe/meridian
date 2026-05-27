@@ -8,6 +8,16 @@ import type { Node, Occurrence, Repeat, Scheduled } from './types'
 import { useStore } from './store'
 import { TODAY } from './constants'
 
+// ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
+// Passed from deleteNode → App so the sheet is driven by React state only.
+export type SeriesSheetOption = {
+  icon: 'calendar' | 'calendar-range'
+  label: string
+  sublabel: string
+  onClick: () => void
+}
+export type SeriesSheetConfig = { title: string; options: SeriesSheetOption[] }
+
 // ── STORE ACCESSORS ────────────────────────────────────────────
 // Thin wrappers that give vanilla-JS functions synchronous access to
 // the Zustand store.
@@ -488,7 +498,7 @@ export function saveNode(item: Occurrence|null, editScope: string, fields: any):
 
 export function deleteNode(
   item: Occurrence|null,
-  onShowSeries?: ()=>void,
+  onShowSeries?: (config: SeriesSheetConfig)=>void,
   onHideSeries?: ()=>void,
   onConfirmSingle?: (title: string, onConfirm: ()=>void)=>void,
 ): void {
@@ -502,7 +512,6 @@ export function deleteNode(
 
   function hideSheet(){
     if(onHideSeries)onHideSeries();
-    else document.getElementById('seriesSheet').classList.remove('open');
   }
   function excludeThis(){
     const updated=cloneNode(node);
@@ -538,8 +547,6 @@ export function deleteNode(
     hideSheet();closeEntry();
   }
 
-  const opt3=document.getElementById('seriesOpt3') as HTMLElement|null;
-
   if(!node.repeat&&!hasMultiple){
     // Single occurrence — ask React to show a confirm dialog, then act on confirm.
     const doDelete = () => { setNodes(getNodes().filter(n=>n.id!==nodeId)); deleteNodeFromDisk(node); closeEntry(); };
@@ -549,33 +556,18 @@ export function deleteNode(
     return;
   }
 
-  // All other cases: show the series sheet
-  document.getElementById('seriesSheetTitle').textContent=`Delete "${node.title}"`;
-  document.getElementById('seriesOpt1').onclick=excludeThis;
-
+  // Build config and hand off to React; no DOM manipulation.
+  const options: SeriesSheetOption[] = [
+    { icon: 'calendar', label: 'This occurrence', sublabel: 'Remove only this occurrence', onClick: excludeThis },
+  ];
   if(isScheduled){
-    // 3-button layout: This / This+following / All
-    const opt2=document.getElementById('seriesOpt2');
-    opt2.onclick=deleteAllFuture;
-    opt2.querySelector('.sopt-t').textContent='This and all following';
-    opt2.querySelector('.sopt-s').textContent='Remove this and all future occurrences';
-    if(opt3){
-      opt3.style.display='';
-      opt3.onclick=deleteAll;
-      opt3.querySelector('.sopt-t').textContent='All occurrences';
-      opt3.querySelector('.sopt-s').textContent='Remove all occurrences';
-    }
+    options.push({ icon: 'calendar-range', label: 'This and all following', sublabel: 'Remove this and all future occurrences', onClick: deleteAllFuture });
+    options.push({ icon: 'calendar-range', label: 'All occurrences', sublabel: 'Remove all occurrences', onClick: deleteAll });
   } else {
-    // 2-button layout: This / All
-    const opt2=document.getElementById('seriesOpt2');
-    opt2.onclick=deleteAll;
-    opt2.querySelector('.sopt-t').textContent='All occurrences';
-    opt2.querySelector('.sopt-s').textContent='Remove all occurrences';
-    if(opt3)opt3.style.display='none';
+    options.push({ icon: 'calendar-range', label: 'All occurrences', sublabel: 'Remove all occurrences', onClick: deleteAll });
   }
 
-  if(onShowSeries)onShowSeries();
-  else document.getElementById('seriesSheet').classList.add('open');
+  if(onShowSeries)onShowSeries({ title: `Delete "${node.title}"`, options });
 }
 
 // ── WIKILINK AUTOCOMPLETE ─────────────────────────────────────

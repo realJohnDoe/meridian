@@ -12,6 +12,7 @@ import {
   syncToDirectory, pickDirectory,
   addDays, fmtLong,
 } from './meridian'
+import type { SeriesSheetConfig } from './meridian'
 import { fmtISO } from './recurrence'
 import { TODAY } from './constants'
 import { useStore } from './store'
@@ -60,6 +61,7 @@ export default function App() {
   const [filterQuery, setFilterQuery] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void } | null>(null)
+  const [seriesSheetConfig, setSeriesSheetConfig] = useState<SeriesSheetConfig | null>(null)
 
   // ── Navigation state (source of truth) ───────────────────────
   const primaryView  = useStore(s => s.primaryView)
@@ -133,8 +135,8 @@ export default function App() {
   const handleDelete = useCallback(() => {
     deleteNode(
       entry.item,
-      () => setActiveDialog('seriesSheet'),
-      () => setActiveDialog(null),
+      (config) => setSeriesSheetConfig(config),
+      () => setSeriesSheetConfig(null),
       (title, onConfirm) => setPendingDelete({ title, onConfirm }),
     )
   }, [entry.item])
@@ -431,13 +433,21 @@ export default function App() {
       />
 
       {/* SERIES DELETE SHEET */}
-      <div className={dlgOvClass('seriesSheet')} id="seriesSheet" onClick={closeDlgOv}>
-        <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title" id="seriesSheetTitle">Delete event</div><div className="dlg-body">
-          <button className="sheet-opt" id="seriesOpt1"><Calendar size={16} /><div><div className="sopt-t">This occurrence</div><div className="sopt-s">Remove only this occurrence</div></div></button>
-          <button className="sheet-opt" id="seriesOpt2"><CalendarRange size={16} /><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
-          <button className="sheet-opt" id="seriesOpt3" style={{ display: 'none' }}><CalendarRange size={16} /><div><div className="sopt-t">All occurrences</div><div className="sopt-s">Remove all occurrences</div></div></button>
-          <button className="sheet-opt" onClick={closeDialog} style={{ color: 'var(--t3)' }}><X size={16} /><div><div className="sopt-t">Cancel</div></div></button>
-        </div></div>
+      <div className={seriesSheetConfig ? 'dlg-ov open' : 'dlg-ov'} onClick={e => { if (e.target === e.currentTarget) setSeriesSheetConfig(null) }}>
+        <div className="dlg"><div className="dlg-handle"></div>
+          <div className="dlg-title">{seriesSheetConfig?.title ?? ''}</div>
+          <div className="dlg-body">
+            {seriesSheetConfig?.options.map((opt, i) => (
+              <button key={i} className="sheet-opt" onClick={() => { opt.onClick(); setSeriesSheetConfig(null) }}>
+                {opt.icon === 'calendar' ? <Calendar size={16} /> : <CalendarRange size={16} />}
+                <div><div className="sopt-t">{opt.label}</div><div className="sopt-s">{opt.sublabel}</div></div>
+              </button>
+            ))}
+            <button className="sheet-opt" onClick={() => setSeriesSheetConfig(null)} style={{ color: 'var(--t3)' }}>
+              <X size={16} /><div><div className="sopt-t">Cancel</div></div>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ── ERROR NOTIFICATION BANNER ── */}
