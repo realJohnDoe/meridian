@@ -226,7 +226,7 @@ function quoteStr(s: string): string {
 }
 
 function inlineVal(v: unknown): string | null {
-  if (v === null || v === undefined) return 'null'
+  if (v === null || v === undefined) return null
   if (typeof v === 'boolean') return String(v)
   if (typeof v === 'number')  return String(v)
   if (typeof v === 'string')  return quoteStr(v)
@@ -267,6 +267,8 @@ function valueLines(v: unknown, indent: number): string[] {
   if (typeof v === 'object' && v !== null) {
     const out: string[] = []
     for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (val === null || val === undefined) continue
+      if (Array.isArray(val) && val.length === 0) continue
       const iv = inlineVal(val)
       if (iv !== null) {
         out.push(`${pad}${k}: ${iv}`)
@@ -306,6 +308,8 @@ function yamlFrontmatter(
 
   // Root fields
   for (const [key, value] of Object.entries(rootFields)) {
+    if (value === null || value === undefined) continue
+    if (Array.isArray(value) && value.length === 0) continue
     const iv = inlineVal(value)
     if (iv !== null) {
       lines.push(`${key}: ${iv}`)
@@ -319,6 +323,8 @@ function yamlFrontmatter(
   if (Object.keys(defaults).length > 0) {
     lines.push('defaults:')
     for (const [key, value] of Object.entries(defaults)) {
+      if (value === null || value === undefined) continue
+      if (Array.isArray(value) && value.length === 0) continue
       const iv = inlineVal(value)
       if (iv !== null) {
         lines.push(`  ${key}: ${iv}`)
@@ -337,6 +343,8 @@ function yamlFrontmatter(
       if (entries.length === 0) { lines.push('  - {}'); continue }
 
       entries.forEach(([key, value], idx) => {
+        if (value === null || value === undefined) return
+        if (Array.isArray(value) && value.length === 0) return
         const pfx    = idx === 0 ? '  - ' : '    '
         const subInd = 6
 
