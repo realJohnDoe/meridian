@@ -18,28 +18,54 @@ interface Props<T extends string | number> {
 export function ScrollColumn<T extends string | number>({
   items, value, onChange, format, className,
 }: Props<T>) {
-  const ref = useRef<HTMLDivElement>(null)
+  const ref        = useRef<HTMLDivElement>(null)
+  const touching   = useRef(false)
+  const timer      = useRef<ReturnType<typeof setTimeout>>()
 
-  // Scroll to the item that matches `value` without animation (used on open)
+  // Keep stable refs so commitScroll never goes stale
+  const itemsRef   = useRef(items)
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { itemsRef.current   = items   }, [items])
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
+
+  // Read current scroll position and fire onChange with the snapped item
+  const commitScroll = useCallback(() => {
+    if (!ref.current) return
+    const idx     = Math.round(ref.current.scrollTop / ITEM_H)
+    const clamped = Math.max(0, Math.min(idx, itemsRef.current.length - 1))
+    onChangeRef.current(itemsRef.current[clamped])
+  }, [])
+
+  // Scroll to a specific item
   const scrollToValue = useCallback((v: T, behavior: ScrollBehavior = 'instant') => {
     const idx = items.indexOf(v)
     if (idx < 0 || !ref.current) return
     ref.current.scrollTo({ top: idx * ITEM_H, behavior })
   }, [items])
 
-  // Sync scroll whenever value changes externally (e.g. parent sets initial value)
+  // Sync scroll position when value changes externally (e.g. on open)
   useEffect(() => {
     scrollToValue(value)
   }, [value, scrollToValue])
 
-  // Snap to nearest item after scrolling stops
+  // ── Touch: commit only after finger lifts + snap settles ─────────────────
+  const handleTouchStart = useCallback(() => {
+    touching.current = true
+    clearTimeout(timer.current)
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    touching.current = false
+    // Brief delay lets the CSS snap animation reach its final position
+    timer.current = setTimeout(commitScroll, 150)
+  }, [commitScroll])
+
+  // ── Mouse / trackpad: debounce ────────────────────────────────────────────
   const handleScroll = useCallback(() => {
-    if (!ref.current) return
-    const idx = Math.round(ref.current.scrollTop / ITEM_H)
-    const clamped = Math.max(0, Math.min(idx, items.length - 1))
-    const next = items[clamped]
-    if (next !== value) onChange(next)
-  }, [items, value, onChange])
+    if (touching.current) return   // touch path handles it on finger-up
+    clearTimeout(timer.current)
+    timer.current = setTimeout(commitScroll, 150)
+  }, [commitScroll])
 
   return (
     <div className={cn('relative h-[132px] overflow-hidden', className)}>
@@ -52,12 +78,12 @@ export function ScrollColumn<T extends string | number>({
 
       <div
         ref={ref}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         onScroll={handleScroll}
-        // padding-block lets first/last item scroll to the centre of the window
         style={{ paddingBlock: ITEM_H }}
         className={cn(
           'h-full overflow-y-scroll snap-y snap-mandatory',
-          // hide native scrollbar
           '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         )}
       >
