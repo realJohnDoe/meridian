@@ -93,6 +93,7 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
             items={[...UNITS]}
             value={unit}
             onChange={handleUnitChange as (v: string | number) => void}
+            format={(u) => n === 1 ? (u as string).replace(/s$/, '') : u as string}
             className="w-28"
           />
         </div>
