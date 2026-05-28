@@ -43,15 +43,6 @@ function serialise(n: number, unit: Unit): string {
   return `${n} ${label}`
 }
 
-/** Convert a number from one unit to the nearest valid value in another unit */
-function convertNumber(n: number, from: Unit, to: Unit): number {
-  const toMinutes: Record<Unit, number> = {
-    minutes: 1, hours: 60, days: 1440, weeks: 10080, months: 43200, years: 525960,
-  }
-  const converted = Math.round((n * toMinutes[from]) / toMinutes[to])
-  return nearest(UNIT_ITEMS[to], converted)
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 interface Props {
   open: boolean
@@ -76,7 +67,7 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
   }, [open, value])
 
   function handleUnitChange(next: Unit) {
-    setN(prev => convertNumber(prev, unit, next))
+    setN(UNIT_ITEMS[next][0])
     setUnit(next)
   }
 
