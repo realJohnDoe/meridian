@@ -3,7 +3,7 @@ import {
   Menu, FolderSync, FolderOpen, CalendarCheck2, Search,
   ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
-  Plus, Calendar, CalendarRange, Clock, Timer, X, Flag, Trash2,
+  Plus, X,
 } from 'lucide-react'
 import {
   initApp, applyScope, buildBodyHtml,
@@ -20,6 +20,11 @@ import type { PrimaryView } from './store'
 import EntryEditor, { EntryState, ENTRY_DEFAULT, ItemType } from './components/EntryEditor'
 import RepeatDialog from './components/RepeatDialog'
 import DatePickerDialog from './components/DatePickerDialog'
+import DeleteDialog from './components/DeleteDialog'
+import SeriesDeleteDialog from './components/SeriesDeleteDialog'
+import PriorityDrawer from './components/PriorityDrawer'
+import TimePickerDialog from './components/TimePickerDialog'
+import DurationDialog from './components/DurationDialog'
 import UndoToast from './components/UndoToast'
 import AgendaView from './components/AgendaView'
 import MonthView from './components/MonthView'
@@ -56,8 +61,6 @@ function entryFromItem(item: any, editScope: string): EntryState {
 export default function App() {
   const [entry, setEntry] = useState<EntryState>(ENTRY_DEFAULT)
   const [activeDialog, setActiveDialog] = useState<string | null>(null)
-  const [dlgTimeVal, setDlgTimeVal] = useState('')
-  const [dlgDurVal, setDlgDurVal] = useState('')
   const [filterQuery, setFilterQuery] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void } | null>(null)
@@ -147,10 +150,8 @@ export default function App() {
   }, [])
 
   const handleOpenDlg = useCallback((id: string) => {
-    if (id === 'dlgTime') setDlgTimeVal(entry.scheduled?.time || '')
-    if (id === 'dlgDur') setDlgDurVal(entry.duration || '')
     setActiveDialog(id)
-  }, [entry.scheduled, entry.duration])
+  }, [])
 
   const handleOpenRepeatDlg = useCallback((_itemType?: string) => {
     setActiveDialog('dlgRepeat')
@@ -168,24 +169,20 @@ export default function App() {
     setActiveDialog(null)
   }, [])
 
-  const confirmTime = useCallback(() => {
-    setEntry(prev => prev.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: dlgTimeVal } } : prev)
-    setActiveDialog(null)
-  }, [dlgTimeVal])
+  const confirmTime = useCallback((hhmm: string) => {
+    setEntry(prev => prev.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: hhmm } } : prev)
+  }, [])
 
   const removeTime = useCallback(() => {
     setEntry(prev => prev.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: '' } } : prev)
-    setActiveDialog(null)
   }, [])
 
-  const confirmDur = useCallback(() => {
-    setEntry(prev => ({ ...prev, duration: dlgDurVal.trim() }))
-    setActiveDialog(null)
-  }, [dlgDurVal])
+  const confirmDur = useCallback((dur: string) => {
+    setEntry(prev => ({ ...prev, duration: dur }))
+  }, [])
 
   const removeDur = useCallback(() => {
     setEntry(prev => ({ ...prev, duration: '' }))
-    setActiveDialog(null)
   }, [])
 
 
@@ -193,9 +190,6 @@ export default function App() {
     setEntry(prev => ({ ...prev, priority: p }))
     setActiveDialog(null)
   }, [])
-
-  const dlgOvClass = (id: string) => activeDialog === id ? 'dlg-ov open' : 'dlg-ov'
-  const closeDlgOv = (e: React.MouseEvent) => { if (e.target === e.currentTarget) setActiveDialog(null) }
 
   // Sidebar nav: switch primary view and close the panel
   const navTo = (v: PrimaryView) => {
@@ -376,38 +370,30 @@ export default function App() {
       />
 
       {/* PRIORITY */}
-      <div className={dlgOvClass('dlgPriority')} id="dlgPriority" onClick={closeDlgOv}>
-        <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Priority</div><div className="dlg-body">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button className="dlg-ok" style={{ background: 'rgba(248,113,113,.15)', color: 'var(--p1)', border: '1px solid var(--p1)' }} onClick={() => setPriority('high')}><Flag /> High</button>
-            <button className="dlg-ok" style={{ background: 'rgba(251,146,60,.15)', color: 'var(--p2)', border: '1px solid var(--p2)' }} onClick={() => setPriority('medium')}><Flag /> Medium</button>
-            <button className="dlg-ok" style={{ background: 'rgba(250,204,21,.15)', color: 'var(--p3)', border: '1px solid var(--p3)' }} onClick={() => setPriority('low')}><Flag /> Low</button>
-            <button className="dlg-rm" onClick={() => setPriority(null)}><X /> None</button>
-          </div>
-        </div></div>
-      </div>
+      <PriorityDrawer
+        open={activeDialog === 'dlgPriority'}
+        value={entry.priority}
+        onSelect={setPriority}
+        onClose={closeDialog}
+      />
 
       {/* TIME */}
-      <div className={dlgOvClass('dlgTime')} id="dlgTime" onClick={closeDlgOv}>
-        <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Time</div><div className="dlg-body">
-          <div className="dlg-row"><span className="dlg-lbl"><Clock />Time</span><input className="dlg-in" type="time" id="dlgTimeVal" value={dlgTimeVal} onChange={e => setDlgTimeVal(e.target.value)} /></div>
-          <div className="dlg-actions">
-            <button className="dlg-rm" onClick={removeTime}><X />Remove</button>
-            <div style={{ display: 'flex', gap: 8 }}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmTime}>Set</button></div>
-          </div>
-        </div></div>
-      </div>
+      <TimePickerDialog
+        open={activeDialog === 'dlgTime'}
+        value={entry.scheduled?.time || ''}
+        onConfirm={confirmTime}
+        onRemove={removeTime}
+        onClose={closeDialog}
+      />
 
       {/* DURATION */}
-      <div className={dlgOvClass('dlgDur')} id="dlgDur" onClick={closeDlgOv}>
-        <div className="dlg"><div className="dlg-handle"></div><div className="dlg-title">Duration</div><div className="dlg-body">
-          <div className="dlg-row"><span className="dlg-lbl"><Timer />Duration</span><input className="dlg-in" type="text" id="dlgDurVal" value={dlgDurVal} onChange={e => setDlgDurVal(e.target.value)} placeholder="e.g. 1h 30m" style={{ width: 120 }} /></div>
-          <div className="dlg-actions">
-            <button className="dlg-rm" onClick={removeDur}><X />Remove</button>
-            <div style={{ display: 'flex', gap: 8 }}><button className="dlg-cancel" onClick={closeDialog}>Cancel</button><button className="dlg-ok" onClick={confirmDur}>Set</button></div>
-          </div>
-        </div></div>
-      </div>
+      <DurationDialog
+        open={activeDialog === 'dlgDur'}
+        value={entry.duration || ''}
+        onConfirm={confirmDur}
+        onRemove={removeDur}
+        onClose={closeDialog}
+      />
 
       {/* REPEAT DLG */}
       <RepeatDialog
@@ -421,23 +407,11 @@ export default function App() {
         onClose={() => setActiveDialog(null)}
       />
 
-      {/* SERIES DELETE SHEET */}
-      <div className={seriesSheetConfig ? 'dlg-ov open' : 'dlg-ov'} onClick={e => { if (e.target === e.currentTarget) setSeriesSheetConfig(null) }}>
-        <div className="dlg"><div className="dlg-handle"></div>
-          <div className="dlg-title">{seriesSheetConfig?.title ?? ''}</div>
-          <div className="dlg-body">
-            {seriesSheetConfig?.options.map((opt, i) => (
-              <button key={i} className="sheet-opt" onClick={() => { opt.onClick(); setSeriesSheetConfig(null) }}>
-                {opt.icon === 'calendar' ? <Calendar size={16} /> : <CalendarRange size={16} />}
-                <div><div className="sopt-t">{opt.label}</div><div className="sopt-s">{opt.sublabel}</div></div>
-              </button>
-            ))}
-            <button className="sheet-opt" onClick={() => setSeriesSheetConfig(null)} style={{ color: 'var(--t3)' }}>
-              <X size={16} /><div><div className="sopt-t">Cancel</div></div>
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* SERIES DELETE */}
+      <SeriesDeleteDialog
+        config={seriesSheetConfig}
+        onClose={() => setSeriesSheetConfig(null)}
+      />
 
       {/* ── ERROR NOTIFICATION BANNER ── */}
       {errorNotification && (
@@ -447,24 +421,13 @@ export default function App() {
         </div>
       )}
 
-      {/* ── SINGLE-ITEM DELETE CONFIRM ── */}
-      <div className={pendingDelete ? 'dlg-ov open' : 'dlg-ov'} onClick={e => { if (e.target === e.currentTarget) setPendingDelete(null) }}>
-        <div className="dlg">
-          <div className="dlg-handle" />
-          <div className="dlg-title">Delete</div>
-          <div className="dlg-body">
-            <p style={{ fontSize: 14, color: 'var(--t1)', marginBottom: 16 }}>
-              Delete &ldquo;{pendingDelete?.title}&rdquo;? This cannot be undone.
-            </p>
-            <div className="dlg-actions">
-              <button className="dlg-rm" onClick={() => { pendingDelete?.onConfirm(); setPendingDelete(null) }}>
-                <Trash2 size={13} />Delete
-              </button>
-              <button className="dlg-cancel" onClick={() => setPendingDelete(null)}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* DELETE CONFIRM */}
+      <DeleteDialog
+        open={!!pendingDelete}
+        title={pendingDelete?.title ?? ''}
+        onConfirm={() => pendingDelete?.onConfirm()}
+        onClose={() => setPendingDelete(null)}
+      />
     </>
   )
 }
