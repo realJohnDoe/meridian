@@ -766,8 +766,11 @@ function isContainerNode(node: Node): boolean {
 async function writeEntityToCache(node: Node): Promise<void> {
   try {
     const path = nodeToPath(node)
+    const rawNode = toRawNode(node) as any
+    const body = rawNode.body || ''
+    delete rawNode.body
     const content = isContainerNode(node)
-      ? serializeRawNode(toRawNode(node) as any)
+      ? serializeRawNode(rawNode, body)
       : nodeToFile(node)
     await cacheWrite(path, content)
     updateSyncUI()

@@ -201,18 +201,10 @@ export function expandNode(node, from, to){
       ? instOverride.child.date
       : jsDateToSpec(jsDate).date;
     return {
-      title:eff.title||node.title,
+      ...eff,
       date:occDate,
       time:occTimeStr,
-      timezone:eff.timezone||node.timezone,
       jsTime:jsDate,
-      duration:eff.duration||node.duration,
-      done:eff.done,
-      priority:eff.priority||node.priority,
-      tags:eff.tags||[],
-      type:eff.type||(eff.done!==undefined?'task':'event'),
-      body:eff.body,
-      multiday:eff.multiday,
       recur:true,
       _nodeId:node.id,
       _node:node,
@@ -259,17 +251,12 @@ export function expandNode(node, from, to){
         const eff=mergeNode(node,inst);
         if(!eff.excluded){
           occurrences.push({
-            title:eff.title||node.title,
+            ...eff,
             date:inst.date||jsDateToSpec(t).date,
-            time:eff.time||node.time||null,
-            timezone:eff.timezone||node.timezone,
             jsTime:t,
-            duration:eff.duration||node.duration,
-            done:inst.done,
-            tags:eff.tags||node.tags||[],
-            type:eff.type||(eff.done!==undefined?'task':'event'),
-            body:eff.body||node.body,
-            recur:true,_nodeId:node.id,_node:node,
+            recur:true,
+            _nodeId:node.id,
+            _node:node,
           });
         }
       }
@@ -295,10 +282,15 @@ export function expandNode(node, from, to){
       if(entry.jsTime>=from&&entry.jsTime<=to){
         const spec=jsDateToSpec(entry.jsTime);
         occurrences.push({
-          title:node.title, date:spec.date, time:spec.time||node.time||null,
-          timezone:node.timezone, jsTime:entry.jsTime, done:entry.done,
-          tags:node.tags||[], type:'task', priority:entry.priority, body:node.body,
-          recur:true, _nodeId:node.id, _node:node
+          ...node,
+          date:spec.date,
+          time:spec.time||node.time||null,
+          jsTime:entry.jsTime,
+          done:entry.done,
+          priority:entry.priority,
+          recur:true,
+          _nodeId:node.id,
+          _node:node,
         });
       }
     }
@@ -309,10 +301,14 @@ export function expandNode(node, from, to){
       if(!alreadyExists&&nextJsTime>=from&&nextJsTime<=to){
         const spec=jsDateToSpec(nextJsTime);
         occurrences.push({
-          title:node.title, date:spec.date, time:spec.time||node.time||null,
-          timezone:node.timezone, jsTime:nextJsTime, done:false,
-          tags:node.tags||[], type:'task', priority:node.priority, body:node.body,
-          recur:true, _nodeId:node.id, _node:node
+          ...node,
+          date:spec.date,
+          time:spec.time||node.time||null,
+          jsTime:nextJsTime,
+          done:false,
+          recur:true,
+          _nodeId:node.id,
+          _node:node,
         });
       }
     }
