@@ -18,55 +18,67 @@ interface Props<T extends string | number> {
 export function ScrollColumn<T extends string | number>({
   items, value, onChange, format, className,
 }: Props<T>) {
-  const ref        = useRef<HTMLDivElement>(null)
-  const touching   = useRef(false)
-  const timer      = useRef<ReturnType<typeof setTimeout>>()
+  const ref      = useRef<HTMLDivElement>(null)
+  const touching = useRef(false)
+  const snapping = useRef(false)   // true while our own smooth-scroll animation runs
+  const timer    = useRef<ReturnType<typeof setTimeout>>()
 
-  // Keep stable refs so commitScroll never goes stale
-  const itemsRef   = useRef(items)
+  // Stable refs so callbacks never go stale
+  const itemsRef    = useRef(items)
   const onChangeRef = useRef(onChange)
-  useEffect(() => { itemsRef.current   = items   }, [items])
+  useEffect(() => { itemsRef.current    = items   }, [items])
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
 
-  // Read current scroll position and fire onChange with the snapped item
-  const commitScroll = useCallback(() => {
+  // ── Snap to a specific index ──────────────────────────────────────────────
+  const snapToIndex = useCallback((idx: number, behavior: ScrollBehavior = 'smooth') => {
     if (!ref.current) return
-    const idx     = Math.round(ref.current.scrollTop / ITEM_H)
-    const clamped = Math.max(0, Math.min(idx, itemsRef.current.length - 1))
-    onChangeRef.current(itemsRef.current[clamped])
+    snapping.current = true
+    ref.current.scrollTo({ top: idx * ITEM_H, behavior })
+    clearTimeout(timer.current)
+    // Clear flag after animation — 'instant' resolves immediately, 'smooth' ~300 ms
+    timer.current = setTimeout(() => { snapping.current = false }, behavior === 'instant' ? 0 : 350)
   }, [])
 
-  // Scroll to a specific item
   const scrollToValue = useCallback((v: T, behavior: ScrollBehavior = 'instant') => {
-    const idx = items.indexOf(v)
-    if (idx < 0 || !ref.current) return
-    ref.current.scrollTo({ top: idx * ITEM_H, behavior })
-  }, [items])
+    const idx = itemsRef.current.indexOf(v)
+    if (idx >= 0) snapToIndex(idx, behavior)
+  }, [snapToIndex])
 
-  // Sync scroll position when value changes externally (e.g. on open)
+  // External value changes (e.g. dialog opens): sync scroll position
+  // Guard: don't interrupt an animation we started ourselves
   useEffect(() => {
+    if (snapping.current) return
     scrollToValue(value)
   }, [value, scrollToValue])
 
-  // ── Touch: commit only after finger lifts + snap settles ─────────────────
+  // ── Touch: snap to nearest on finger lift ────────────────────────────────
   const handleTouchStart = useCallback(() => {
     touching.current = true
     clearTimeout(timer.current)
+    snapping.current = false
   }, [])
 
   const handleTouchEnd = useCallback(() => {
     touching.current = false
-    // Math.round(scrollTop / ITEM_H) predicts the snap destination immediately —
-    // same rounding CSS snap-to-nearest uses — so no delay needed.
-    commitScroll()
-  }, [commitScroll])
+    if (!ref.current) return
+    const idx     = Math.round(ref.current.scrollTop / ITEM_H)
+    const clamped = Math.max(0, Math.min(idx, itemsRef.current.length - 1))
+    snapToIndex(clamped, 'smooth')          // animate to snap point
+    onChangeRef.current(itemsRef.current[clamped])  // commit value immediately
+  }, [snapToIndex])
 
-  // ── Mouse / trackpad: debounce ────────────────────────────────────────────
+  // ── Mouse / trackpad: debounce + snap ────────────────────────────────────
   const handleScroll = useCallback(() => {
-    if (touching.current) return   // touch path handles it on finger-up
+    if (touching.current || snapping.current) return
     clearTimeout(timer.current)
-    timer.current = setTimeout(commitScroll, 150)
-  }, [commitScroll])
+    timer.current = setTimeout(() => {
+      if (!ref.current) return
+      const idx     = Math.round(ref.current.scrollTop / ITEM_H)
+      const clamped = Math.max(0, Math.min(idx, itemsRef.current.length - 1))
+      snapToIndex(clamped, 'smooth')
+      onChangeRef.current(itemsRef.current[clamped])
+    }, 150)
+  }, [snapToIndex])
 
   return (
     <div className={cn('relative h-[132px] overflow-hidden', className)}>
@@ -84,7 +96,8 @@ export function ScrollColumn<T extends string | number>({
         onScroll={handleScroll}
         style={{ paddingBlock: ITEM_H }}
         className={cn(
-          'h-full overflow-y-scroll snap-y snap-mandatory',
+          'h-full overflow-y-scroll',
+          // No CSS snap — we handle all snapping in JS for full control
           '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         )}
       >
@@ -92,7 +105,7 @@ export function ScrollColumn<T extends string | number>({
           <div
             key={i}
             className={cn(
-              'h-11 snap-center flex items-center justify-center',
+              'h-11 flex items-center justify-center',
               'text-xl font-mono select-none cursor-pointer',
               item === value ? 'text-foreground' : 'text-muted-foreground',
             )}
