@@ -30,9 +30,9 @@ function nearest(items: number[], target: number): number {
 
 /** "2 hours" → { n: 2, unit: 'hours' }. Falls back to { 30, 'minutes' }. */
 function parseDuration(s: string): { n: number; unit: Unit } {
-  if (!s) return { n: 30, unit: 'minutes' }
+  if (!s) return { n: 1, unit: 'hours' }
   const match = s.match(/^(\d+)\s*(minutes?|hours?|days?|weeks?|months?|years?)$/i)
-  if (!match) return { n: 30, unit: 'minutes' }
+  if (!match) return { n: 1, unit: 'hours' }
   const raw  = match[2].toLowerCase()
   const unit = (UNITS.find(u => raw.startsWith(u.slice(0, -1)) || raw === u) ?? 'minutes') as Unit
   return { n: nearest(UNIT_ITEMS[unit], parseInt(match[1], 10)), unit }
