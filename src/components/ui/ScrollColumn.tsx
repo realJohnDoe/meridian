@@ -56,8 +56,9 @@ export function ScrollColumn<T extends string | number>({
 
   const handleTouchEnd = useCallback(() => {
     touching.current = false
-    // Brief delay lets the CSS snap animation reach its final position
-    timer.current = setTimeout(commitScroll, 150)
+    // Math.round(scrollTop / ITEM_H) predicts the snap destination immediately —
+    // same rounding CSS snap-to-nearest uses — so no delay needed.
+    commitScroll()
   }, [commitScroll])
 
   // ── Mouse / trackpad: debounce ────────────────────────────────────────────
