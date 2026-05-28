@@ -10,7 +10,6 @@ import {
   AlertDialogTitle,
 } from './ui/alert-dialog'
 import { RadioGroup, RadioGroupItem } from './ui/radio-group'
-import { cn } from '@/lib/utils'
 import type { SeriesSheetConfig } from '../meridian'
 
 interface Props {
@@ -46,12 +45,9 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
             <label
               key={i}
               htmlFor={`series-opt-${i}`}
-              className={cn(
-                'flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-colors border',
-                selected === String(i)
-                  ? 'bg-destructive/10 border-destructive/30'
-                  : 'border-transparent hover:bg-white/5',
-              )}
+              className="flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-colors border
+                         border-transparent hover:bg-white/5
+                         has-data-[state=checked]:bg-destructive/10 has-data-[state=checked]:border-destructive/30"
             >
               <RadioGroupItem
                 id={`series-opt-${i}`}
