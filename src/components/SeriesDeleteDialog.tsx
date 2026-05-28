@@ -9,7 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog'
-import { cn } from '@/lib/utils'
+import { RadioGroup, RadioGroupItem } from './ui/radio-group'
 import type { SeriesSheetConfig } from '../meridian'
 
 interface Props {
@@ -18,15 +18,15 @@ interface Props {
 }
 
 export default function SeriesDeleteDialog({ config, onClose }: Props) {
-  const [selectedIdx, setSelectedIdx] = useState(0)
+  const [selected, setSelected] = useState('0')
 
   // Default to first option whenever the dialog opens
   useEffect(() => {
-    if (config) setSelectedIdx(0)
+    if (config) setSelected('0')
   }, [config])
 
   function handleDelete() {
-    config?.options[selectedIdx]?.onClick()
+    config?.options[Number(selected)]?.onClick()
     onClose()
   }
 
@@ -40,30 +40,20 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {/* Selectable option rows */}
-        <div className="flex flex-col gap-1 -mx-1">
+        <RadioGroup value={selected} onValueChange={setSelected} className="gap-1 -mx-1">
           {config?.options.map((opt, i) => (
-            <button
+            <label
               key={i}
-              onClick={() => setSelectedIdx(i)}
-              className={cn(
-                'flex items-center gap-3 px-3 py-3 rounded-xl text-left w-full transition-colors border',
-                selectedIdx === i
-                  ? 'bg-destructive/10 border-destructive/30'
-                  : 'border-transparent hover:bg-white/5',
-              )}
+              htmlFor={`series-opt-${i}`}
+              className="flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-colors border
+                         border-transparent hover:bg-white/5
+                         has-data-[state=checked]:bg-destructive/10 has-data-[state=checked]:border-destructive/30"
             >
-              {/* Radio indicator */}
-              <div className={cn(
-                'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors',
-                selectedIdx === i ? 'border-destructive' : 'border-muted-foreground/50',
-              )}>
-                {selectedIdx === i && (
-                  <div className="w-2 h-2 rounded-full bg-destructive" />
-                )}
-              </div>
-
-              {/* Label + sublabel */}
+              <RadioGroupItem
+                id={`series-opt-${i}`}
+                value={String(i)}
+                className="border-muted-foreground/50 text-destructive data-[state=checked]:border-destructive shrink-0"
+              />
               <div className="min-w-0">
                 <div className="text-sm font-medium text-foreground leading-snug">
                   {opt.label}
@@ -72,9 +62,9 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
                   {opt.sublabel}
                 </div>
               </div>
-            </button>
+            </label>
           ))}
-        </div>
+        </RadioGroup>
 
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
