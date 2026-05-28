@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from './ui/alert-dialog'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog'
 import { Button } from './ui/button'
 import { ScrollColumn } from './ui/ScrollColumn'
 
@@ -72,14 +72,14 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-xs">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Duration</AlertDialogTitle>
-          <AlertDialogDescription className="sr-only">
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-xs">
+        <DialogHeader>
+          <DialogTitle>Duration</DialogTitle>
+          <DialogDescription className="sr-only">
             Select a duration using the scroll wheels
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
 
         {/* Scroll wheels */}
         <div className="flex items-center justify-center gap-4 py-2">
@@ -117,7 +117,7 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
           </div>
         </div>
 
-      </AlertDialogContent>
-    </AlertDialog>
+      </DialogContent>
+    </Dialog>
   )
 }

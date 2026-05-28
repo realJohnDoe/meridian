@@ -21,7 +21,7 @@ export function ScrollColumn<T extends string | number>({
   const ref      = useRef<HTMLDivElement>(null)
   const touching = useRef(false)
   const snapping = useRef(false)   // true while our own smooth-scroll animation runs
-  const timer    = useRef<ReturnType<typeof setTimeout>>()
+  const timer    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Stable refs so callbacks never go stale
   const itemsRef    = useRef(items)
