@@ -21,7 +21,7 @@ import EntryEditor, { EntryState, ENTRY_DEFAULT, ItemType } from './components/E
 import RepeatDialog from './components/RepeatDialog'
 import DatePickerDialog from './components/DatePickerDialog'
 import DeleteDialog from './components/DeleteDialog'
-import SeriesScopeDrawer from './components/SeriesScopeDrawer'
+import SeriesDeleteDialog from './components/SeriesDeleteDialog'
 import PriorityDrawer from './components/PriorityDrawer'
 import TimePickerDrawer from './components/TimePickerDrawer'
 import DurationDrawer from './components/DurationDrawer'
@@ -407,8 +407,8 @@ export default function App() {
         onClose={() => setActiveDialog(null)}
       />
 
-      {/* SERIES SCOPE */}
-      <SeriesScopeDrawer
+      {/* SERIES DELETE */}
+      <SeriesDeleteDialog
         config={seriesSheetConfig}
         onClose={() => setSeriesSheetConfig(null)}
       />
