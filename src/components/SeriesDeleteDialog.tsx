@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Calendar, CalendarRange } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,13 +62,6 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
                   <div className="w-2 h-2 rounded-full bg-destructive" />
                 )}
               </div>
-
-              {/* Icon */}
-              <span className="text-muted-foreground shrink-0">
-                {opt.icon === 'calendar'
-                  ? <Calendar size={16} />
-                  : <CalendarRange size={16} />}
-              </span>
 
               {/* Label + sublabel */}
               <div className="min-w-0">
