@@ -23,8 +23,8 @@ import DatePickerDialog from './components/DatePickerDialog'
 import DeleteDialog from './components/DeleteDialog'
 import SeriesDeleteDialog from './components/SeriesDeleteDialog'
 import PriorityDrawer from './components/PriorityDrawer'
-import TimePickerDrawer from './components/TimePickerDrawer'
-import DurationDrawer from './components/DurationDrawer'
+import TimePickerDialog from './components/TimePickerDialog'
+import DurationDialog from './components/DurationDialog'
 import UndoToast from './components/UndoToast'
 import AgendaView from './components/AgendaView'
 import MonthView from './components/MonthView'
@@ -378,7 +378,7 @@ export default function App() {
       />
 
       {/* TIME */}
-      <TimePickerDrawer
+      <TimePickerDialog
         open={activeDialog === 'dlgTime'}
         value={entry.scheduled?.time || ''}
         onConfirm={confirmTime}
@@ -387,7 +387,7 @@ export default function App() {
       />
 
       {/* DURATION */}
-      <DurationDrawer
+      <DurationDialog
         open={activeDialog === 'dlgDur'}
         value={entry.duration || ''}
         onConfirm={confirmDur}
