@@ -268,6 +268,7 @@ function valueLines(v: unknown, indent: number): string[] {
     const out: string[] = []
     for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
       if (val === null || val === undefined) continue
+      if (Array.isArray(val) && val.length === 0) continue
       const iv = inlineVal(val)
       if (iv !== null) {
         out.push(`${pad}${k}: ${iv}`)
@@ -308,6 +309,7 @@ function yamlFrontmatter(
   // Root fields
   for (const [key, value] of Object.entries(rootFields)) {
     if (value === null || value === undefined) continue
+    if (Array.isArray(value) && value.length === 0) continue
     const iv = inlineVal(value)
     if (iv !== null) {
       lines.push(`${key}: ${iv}`)
@@ -322,6 +324,7 @@ function yamlFrontmatter(
     lines.push('defaults:')
     for (const [key, value] of Object.entries(defaults)) {
       if (value === null || value === undefined) continue
+      if (Array.isArray(value) && value.length === 0) continue
       const iv = inlineVal(value)
       if (iv !== null) {
         lines.push(`  ${key}: ${iv}`)
@@ -341,6 +344,7 @@ function yamlFrontmatter(
 
       entries.forEach(([key, value], idx) => {
         if (value === null || value === undefined) return
+        if (Array.isArray(value) && value.length === 0) return
         const pfx    = idx === 0 ? '  - ' : '    '
         const subInd = 6
 

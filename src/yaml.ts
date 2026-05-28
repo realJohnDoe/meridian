@@ -166,7 +166,7 @@ export function nodeToFile(node){
       if(inst.priority)lines.push(`    priority: ${inst.priority}`);
       if(inst.excluded)lines.push(`    excluded: true`);
       if(inst.title)lines.push(`    title: ${yamlSerializeScalar(inst.title)}`);
-      if(inst.tags)lines.push(`    tags: ${yamlSerializeScalar(inst.tags)}`);
+      if(inst.tags&&inst.tags.length)lines.push(`    tags: ${yamlSerializeScalar(inst.tags)}`);
       if(inst.duration)lines.push(`    duration: ${inst.duration}`);
       if(inst.repeat){
         lines.push(`    repeat:`);
