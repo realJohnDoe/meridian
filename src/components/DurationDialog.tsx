@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Button } from './ui/button'
-import { ScrollColumn } from './ui/ScrollColumn'
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 const UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
@@ -66,40 +65,40 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
     }
   }, [open, value])
 
-  function handleUnitChange(next: Unit) {
-    setN(UNIT_ITEMS[next][0])
-    setUnit(next)
-  }
-
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-xs">
+      <DialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-xs p-5">
         <DialogHeader>
           <DialogTitle>Duration</DialogTitle>
           <DialogDescription className="sr-only">
-            Select a duration using the scroll wheels
+            Select a duration using the number input and unit select dropdown
           </DialogDescription>
         </DialogHeader>
 
-        {/* Scroll wheels */}
-        <div className="flex items-center justify-center gap-4 py-2">
-          <ScrollColumn
-            items={UNIT_ITEMS[unit]}
+        {/* Number input + unit selector */}
+        <div className="flex gap-2 py-3">
+          <input
+            type="number"
+            min={1}
+            className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-mono text-foreground transition-colors"
             value={n}
-            onChange={setN}
-            className="w-16"
+            onChange={(e) => setN(Math.max(1, parseInt(e.target.value, 10) || 1))}
           />
-          <ScrollColumn
-            items={[...UNITS]}
+          <select
+            className="flex-1 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-semibold text-primary cursor-pointer transition-colors"
             value={unit}
-            onChange={handleUnitChange as (v: string | number) => void}
-            format={(u) => n === 1 ? (u as string).replace(/s$/, '') : u as string}
-            className="w-28"
-          />
+            onChange={(e) => setUnit(e.target.value as Unit)}
+          >
+            {UNITS.map(u => (
+              <option key={u} value={u}>
+                {n === 1 ? u.replace(/s$/, '') : u}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Footer: Remove on left, Cancel + Set on right */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between pt-3 border-t border-border/50">
           <Button
             variant="outline"
             size="sm"
