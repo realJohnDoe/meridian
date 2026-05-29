@@ -2,12 +2,30 @@ import { useState, useEffect } from 'react'
 import { Info, X } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '../types'
 import { parseDateString } from '../model/expand'
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+} from './ui/drawer'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog'
+import { Separator } from './ui/separator'
+import { Button } from './ui/button'
+import { Calendar } from './ui/calendar'
+import { cn } from '../lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Freq = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'after_completion'
 type EndType = 'never' | 'until' | 'count'
-type MonthlyMode = 'first-weekday' | 'last-weekday' | 'same-day'
+type MonthlyMode = 'same-day' | 'weekday-pattern'
 
 interface DialogState {
   freq: Freq
@@ -16,6 +34,7 @@ interface DialogState {
   endType: EndType
   endVal: string
   interval: string
+  intervalNum: number
 }
 
 interface Props {
@@ -33,6 +52,84 @@ interface Props {
 
 const WDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 const WDAY_CODES: Weekday[] = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su']
+const WDAY_CODES_SUN_FIRST: Weekday[] = ['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa']
+const WDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function startOfToday(): Date {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function isoToDate(iso: string): Date | undefined {
+  if (!iso) return undefined
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)   // local time, avoids UTC-offset day shift
+}
+
+function dateToIso(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function parseCompletionInterval(s: string): { n: number; unit: string } {
+  if (!s) return { n: 1, unit: 'days' }
+  const match = s.trim().match(/^(\d+)\s*(day|week|month|year)s?$/i)
+  if (!match) return { n: 1, unit: 'days' }
+  const unit = match[2].toLowerCase() + 's' // standardize to plural
+  return { n: parseInt(match[1], 10), unit }
+}
+
+function serialiseCompletionInterval(n: number, unit: string): string {
+  const label = n === 1 ? unit.replace(/s$/, '') : unit
+  return `${n} ${label}`
+}
+
+// ── Dropdown options and calculations ─────────────────────────────────────────
+
+function getOrdinalSuffix(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function getMonthlyWeekdaySpec(jsDate: Date) {
+  const jsDay = jsDate.getDay();
+  const wdayCode = WDAY_CODES_SUN_FIRST[jsDay];
+  const wdayLabel = WDAY_NAMES[jsDay]; // e.g. "Friday"
+  
+  const year = jsDate.getFullYear();
+  const month = jsDate.getMonth();
+  const candidates: number[] = [];
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  for (let day = 1; day <= daysInMonth; day++) {
+    const candidate = new Date(year, month, day);
+    if (candidate.getDay() === jsDay) {
+      candidates.push(day);
+    }
+  }
+  
+  const index = candidates.indexOf(jsDate.getDate());
+  const isLast = (index === candidates.length - 1);
+  
+  let bysetpos = index + 1;
+  let ordinal = ['first', 'second', 'third', 'fourth', 'fifth'][index];
+  
+  if (isLast) {
+    bysetpos = -1;
+    ordinal = 'last';
+  }
+  
+  return {
+    byweekday: [wdayCode],
+    bysetpos,
+    label: `Every ${ordinal} ${wdayLabel} of the month`
+  };
+}
 
 // ── State helpers ─────────────────────────────────────────────────────────────
 
@@ -58,10 +155,11 @@ function initState(
     return {
       freq: defaultFreq,
       wdays: defaultWdays(scheduled?.date),
-      monthly: 'first-weekday',
+      monthly: 'same-day',
       endType: 'never',
       endVal: '',
       interval: '1 day',
+      intervalNum: 1,
     }
   }
 
@@ -69,10 +167,11 @@ function initState(
     return {
       freq: 'after_completion',
       wdays: defaultWdays(scheduled?.date),
-      monthly: 'first-weekday',
+      monthly: 'same-day',
       endType: 'never',
       endVal: '',
       interval: repeat.interval ?? '1 day',
+      intervalNum: 1,
     }
   }
 
@@ -81,8 +180,7 @@ function initState(
 
   // Determine monthly mode
   let monthly: MonthlyMode = 'same-day'
-  if (s.byweekday && s.bysetpos === 1)  monthly = 'first-weekday'
-  if (s.byweekday && s.bysetpos === -1) monthly = 'last-weekday'
+  if (s.byweekday && s.bysetpos !== undefined) monthly = 'weekday-pattern'
 
   // Determine weekday booleans
   const wdays = [false, false, false, false, false, false, false]
@@ -108,6 +206,7 @@ function initState(
     endType,
     endVal,
     interval: '1 day',
+    intervalNum: s.interval ?? 1,
   }
 }
 
@@ -119,26 +218,34 @@ function buildRepeat(
   endType: EndType,
   endVal: string,
   interval: string,
+  intervalNum: number,
+  scheduledDate?: string | null,
 ): Repeat {
   if (freq === 'after_completion') {
     return { type: 'after_completion', interval }
   }
 
-  const r: Repeat = { type: 'schedule', freq: freq as Exclude<Repeat, { type: 'after_completion' }>['freq'] }
+  const r: Repeat = { 
+    type: 'schedule', 
+    freq: freq as Exclude<Repeat, { type: 'after_completion' }>['freq'],
+    interval: intervalNum,
+  }
 
   if (freq === 'weekly') {
     r.byweekday = WDAY_CODES.filter((_, i) => wdays[i])
   }
 
   if (freq === 'monthly') {
-    if (monthly === 'first-weekday') {
-      r.byweekday = ['mo', 'tu', 'we', 'th', 'fr']
-      r.bysetpos = 1
-    } else if (monthly === 'last-weekday') {
-      r.byweekday = ['mo', 'tu', 'we', 'th', 'fr']
-      r.bysetpos = -1
+    const d = parseDateString(scheduledDate ?? '')
+    if (d) {
+      if (monthly === 'same-day') {
+        r.bymonthday = [d.getDate()]
+      } else {
+        const spec = getMonthlyWeekdaySpec(d)
+        r.byweekday = spec.byweekday
+        r.bysetpos = spec.bysetpos
+      }
     }
-    // 'same-day': no byweekday, recurrence engine uses the root date's day
   }
 
   if (endType === 'until' && endVal)  r.end = { type: 'until', date: endVal }
@@ -162,12 +269,16 @@ export default function RepeatDialog({
   const hasSched = !!scheduled
   const hasTrk   = tracked && itemType !== 'event'
 
-  const [freq,     setFreq]     = useState<Freq>('weekly')
-  const [wdays,    setWdays]    = useState<boolean[]>([false, false, false, false, false, false, false])
-  const [monthly,  setMonthly]  = useState<MonthlyMode>('first-weekday')
-  const [endType,  setEndType]  = useState<EndType>('never')
-  const [endVal,   setEndVal]   = useState('')
-  const [interval, setInterval] = useState('1 day')
+  const [freq,           setFreq]           = useState<Freq>('weekly')
+  const [wdays,          setWdays]          = useState<boolean[]>([false, false, false, false, false, false, false])
+  const [monthly,        setMonthly]        = useState<MonthlyMode>('same-day')
+  const [endType,        setEndType]        = useState<EndType>('never')
+  const [endVal,         setEndVal]         = useState('')
+  const [intervalNum,    setIntervalNum]    = useState<number>(1)
+  const [completionNum,  setCompletionNum]  = useState<number>(1)
+  const [completionUnit, setCompletionUnit] = useState<string>('days')
+  const [endCalOpen,     setEndCalOpen]     = useState(false)
+  const [endCalMonth,    setEndCalMonth]    = useState<Date>(new Date())
 
   // Re-initialise whenever the dialog opens (so stale state never leaks between opens)
   useEffect(() => {
@@ -178,8 +289,19 @@ export default function RepeatDialog({
     setMonthly(s.monthly)
     setEndType(s.endType)
     setEndVal(s.endVal)
-    setInterval(s.interval)
+    setIntervalNum(s.intervalNum)
+    
+    const parsed = parseCompletionInterval(s.interval)
+    setCompletionNum(parsed.n)
+    setCompletionUnit(parsed.unit)
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Synchronize calendar grid month page whenever the end date calendar dialog opens
+  useEffect(() => {
+    if (endCalOpen) {
+      setEndCalMonth(isoToDate(endVal) ?? startOfToday())
+    }
+  }, [endCalOpen, endVal])
 
   const hintText =
     hasSched && hasTrk
@@ -188,152 +310,322 @@ export default function RepeatDialog({
       ? '"After completion" repeats whenever you mark this done.'
       : 'Choose how often this scheduled item repeats.'
 
-  const freqOpts: { id: Freq; label: string }[] = [
-    ...(hasSched ? [
-      { id: 'daily'   as Freq, label: 'Daily'   },
-      { id: 'weekly'  as Freq, label: 'Weekly'  },
-      { id: 'monthly' as Freq, label: 'Monthly' },
-      { id: 'yearly'  as Freq, label: 'Yearly'  },
-    ] : []),
-    ...(hasTrk ? [{ id: 'after_completion' as Freq, label: 'After ✓' }] : []),
-  ]
-
   function toggleWday(i: number) {
     setWdays(prev => { const next = [...prev]; next[i] = !next[i]; return next })
   }
 
   function handleConfirm() {
-    onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, interval))
+    const finalInterval = serialiseCompletionInterval(completionNum, completionUnit)
+    onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, finalInterval, intervalNum, scheduled?.date))
   }
 
   return (
-    <div
-      className={`dlg-ov${open ? ' open' : ''}`}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="dlg">
-        <div className="dlg-handle" />
-        <div className="dlg-title">Repeat</div>
-        <div className="dlg-body">
+    <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
+      <DrawerContent className="pt-3 pb-6">
+        <DrawerTitle>Repeat</DrawerTitle>
+        <DrawerDescription className="sr-only">
+          Configure repeat patterns for this entry
+        </DrawerDescription>
+        <Separator />
 
+        <div className="px-4 pt-4 pb-4 flex flex-col gap-4">
           {/* Hint */}
-          <div className="dlg-hint">
-            <Info size={13} />
+          <div className="flex gap-2 items-start bg-accent/40 rounded-lg p-3 text-xs text-muted-foreground">
+            <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
             <span>{hintText}</span>
           </div>
 
-          {/* Frequency grid */}
-          <div className="recur-grid">
-            {freqOpts.map(o => (
-              <button
-                key={o.id}
-                className={`ro${freq === o.id ? ' on' : ''}`}
-                onClick={() => setFreq(o.id)}
-              >
-                {o.label}
-              </button>
-            ))}
+          {/* Topmost Dropdown for Repeat Type */}
+          <div className="flex flex-col gap-1.5">
+            <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">Repeat Type</div>
+            <select
+              className="w-full bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary cursor-pointer transition-colors disabled:cursor-not-allowed disabled:text-muted-foreground/70"
+              disabled={!hasSched || !hasTrk}
+              value={freq === 'after_completion' ? 'after_completion' : 'schedule'}
+              onChange={(e) => {
+                const val = e.target.value as 'schedule' | 'after_completion'
+                if (val === 'after_completion') {
+                  setFreq('after_completion')
+                } else {
+                  // Switch to schedule, defaulting to computed frequency or weekly
+                  const s = initState(repeat, scheduled, hasSched, hasTrk)
+                  setFreq(s.freq === 'after_completion' ? 'weekly' : s.freq)
+                }
+              }}
+            >
+              <option value="schedule">Calendar Schedule</option>
+              <option value="after_completion">After Completion</option>
+            </select>
           </div>
 
-          {/* Weekly: day-of-week picker */}
-          {freq === 'weekly' && (
-            <div className="wd-row">
-              {WDAY_LABELS.map((d, i) => (
-                <button
-                  key={d}
-                  className={`wd${wdays[i] ? ' on' : ''}`}
-                  onClick={() => toggleWday(i)}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Monthly: pattern picker */}
-          {freq === 'monthly' && (
-            <div className="monthly-opts">
-              {([
-                ['first-weekday', 'First weekday of month'],
-                ['last-weekday',  'Last weekday of month' ],
-                ['same-day',      'Same day of month'     ],
-              ] as [MonthlyMode, string][]).map(([v, label]) => (
-                <button
-                  key={v}
-                  className={`mopt${monthly === v ? ' on' : ''}`}
-                  onClick={() => setMonthly(v)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* After completion: interval input */}
-          {freq === 'after_completion' && (
-            <div className="interval-row">
-              <span>Every</span>
-              <input
-                className="dlg-in"
-                value={interval}
-                onChange={e => setInterval(e.target.value)}
-                style={{ width: 130 }}
-                placeholder="e.g. 2 days"
-              />
-            </div>
-          )}
-
-          {/* End section (hidden for after_completion) */}
-          {freq !== 'after_completion' && (
-            <div className="end-sec">
-              <div className="end-lbl">Ends</div>
-              <div className="end-opts">
-                {(['never', 'until', 'count'] as EndType[]).map(t => (
-                  <button
-                    key={t}
-                    className={`eopt${endType === t ? ' on' : ''}`}
-                    onClick={() => setEndType(t)}
+          {/* Conditional Sections */}
+          {freq !== 'after_completion' ? (
+            <div className="flex flex-col gap-4">
+              {/* Repeats every row */}
+              <div className="flex flex-col gap-1.5">
+                <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-mono text-foreground transition-colors"
+                    value={intervalNum === 0 ? '' : intervalNum}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setIntervalNum(0);
+                      } else {
+                        setIntervalNum(Math.max(1, parseInt(val, 10) || 1));
+                      }
+                    }}
+                  />
+                  <select
+                    className="flex-1 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-semibold text-primary cursor-pointer transition-colors"
+                    value={freq}
+                    onChange={(e) => setFreq(e.target.value as Freq)}
                   >
-                    {t === 'never' ? 'Never' : t === 'until' ? 'On date' : 'After N'}
-                  </button>
-                ))}
+                    <option value="daily">days</option>
+                    <option value="weekly">weeks</option>
+                    <option value="monthly">months</option>
+                    <option value="yearly">years</option>
+                  </select>
+                </div>
               </div>
 
-              {endType === 'until' && (
-                <input
-                  className="dlg-in"
-                  type="date"
-                  value={endVal}
-                  onChange={e => setEndVal(e.target.value)}
-                  style={{ width: '100%', marginTop: 6 }}
-                />
+              {/* Weekly: day-of-week picker */}
+              {freq === 'weekly' && (
+                <div className="flex gap-1 my-1">
+                  {WDAY_LABELS.map((d, i) => (
+                    <button
+                      key={d}
+                      onClick={() => toggleWday(i)}
+                      className={cn(
+                        "flex-1 py-2 rounded-lg border text-[11px] text-center transition-all cursor-pointer",
+                        wdays[i]
+                          ? "bg-primary/10 border-primary text-primary font-semibold"
+                          : "bg-secondary border-border/50 text-muted-foreground hover:bg-secondary/80"
+                      )}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
               )}
-              {endType === 'count' && (
+
+              {/* Monthly: pattern picker (Inferred Same-day and Inferred Weekday options) */}
+              {freq === 'monthly' && (
+                <div className="flex flex-col gap-1.5 my-1">
+                  {(() => {
+                    const d = parseDateString(scheduled?.date ?? '')
+                    const options: { id: MonthlyMode; label: string }[] = []
+                    if (d) {
+                      const mday = d.getDate()
+                      const mdayStr = getOrdinalSuffix(mday)
+                      options.push({ id: 'same-day', label: `Every ${mdayStr} of the month` })
+                      
+                      const spec = getMonthlyWeekdaySpec(d)
+                      options.push({ id: 'weekday-pattern', label: spec.label })
+                    } else {
+                      options.push({ id: 'same-day', label: 'Same day of month' })
+                      options.push({ id: 'weekday-pattern', label: 'First weekday of month' })
+                    }
+                    
+                    return options.map(o => (
+                      <button
+                        key={o.id}
+                        onClick={() => setMonthly(o.id)}
+                        className={cn(
+                          "px-3 py-2.5 rounded-lg border text-xs text-left transition-all cursor-pointer",
+                          monthly === o.id
+                            ? "bg-primary/10 border-primary text-primary font-semibold"
+                            : "bg-secondary border-border/50 text-muted-foreground hover:bg-secondary/80"
+                        )}
+                      >
+                        {o.label}
+                      </button>
+                    ))
+                  })()}
+                </div>
+              )}
+
+              {/* End section */}
+              <div className="pt-3 border-t border-border/50">
+                <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground mb-2">Ends</div>
+                <div className="flex gap-2 mb-2.5">
+                  {(['never', 'until', 'count'] as EndType[]).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setEndType(t)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer",
+                        endType === t
+                          ? "bg-primary/10 border-primary text-primary font-medium"
+                          : "bg-secondary border-border/50 text-muted-foreground hover:bg-secondary/80"
+                      )}
+                    >
+                      {t === 'never' ? 'Never' : t === 'until' ? 'On date' : 'After N'}
+                    </button>
+                  ))}
+                </div>
+
+                {endType === 'until' && (
+                  <button
+                    onClick={() => setEndCalOpen(true)}
+                    className="w-full flex items-center justify-between bg-secondary border border-border/50 hover:bg-secondary/80 focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary transition-colors cursor-pointer"
+                  >
+                    <span>On date</span>
+                    <span className="font-mono text-muted-foreground">
+                      {endVal ? endVal.replace(/-/g, '/') : 'Select date'}
+                    </span>
+                  </button>
+                )}
+                {endType === 'count' && (
+                  <input
+                    className="w-full bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-mono text-foreground placeholder:text-muted-foreground transition-colors"
+                    type="number"
+                    placeholder="occurrences"
+                    value={endVal}
+                    onChange={e => setEndVal(e.target.value)}
+                  />
+                )}
+              </div>
+            </div>
+          ) : (
+            /* After completion sub-form (inline number and unit select) */
+            <div className="flex flex-col gap-1.5">
+              <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
+              <div className="flex gap-2">
                 <input
-                  className="dlg-in"
                   type="number"
-                  placeholder="occurrences"
-                  value={endVal}
-                  onChange={e => setEndVal(e.target.value)}
-                  style={{ width: '100%', marginTop: 6 }}
+                  min={1}
+                  className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-mono text-foreground transition-colors"
+                  value={completionNum === 0 ? '' : completionNum}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setCompletionNum(0);
+                    } else {
+                      setCompletionNum(Math.max(1, parseInt(val, 10) || 1));
+                    }
+                  }}
                 />
-              )}
+                <select
+                  className="flex-1 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-semibold text-primary cursor-pointer transition-colors"
+                  value={completionUnit}
+                  onChange={(e) => setCompletionUnit(e.target.value)}
+                >
+                  <option value="days">{completionNum === 1 ? 'day' : 'days'}</option>
+                  <option value="weeks">{completionNum === 1 ? 'week' : 'weeks'}</option>
+                  <option value="months">{completionNum === 1 ? 'month' : 'months'}</option>
+                  <option value="years">{completionNum === 1 ? 'year' : 'years'}</option>
+                </select>
+              </div>
             </div>
           )}
-
-          {/* Actions */}
-          <div className="dlg-actions">
-            <button className="dlg-rm" onClick={onRemove}>
-              <X size={13} />Remove
-            </button>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="dlg-cancel" onClick={onClose}>Cancel</button>
-              <button className="dlg-ok" onClick={handleConfirm}>Set</button>
-            </div>
-          </div>
-
         </div>
-      </div>
-    </div>
+
+        <Separator />
+
+        {/* Footer: Remove on left, Cancel + Set on right */}
+        <DrawerFooter>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive gap-1.5"
+            onClick={() => { onRemove(); onClose() }}
+          >
+            <X className="h-3.5 w-3.5" />
+            Remove
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => {
+                const finalIntervalNum = Math.max(1, intervalNum);
+                const finalCompletionNum = Math.max(1, completionNum);
+                onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, serialiseCompletionInterval(finalCompletionNum, completionUnit), finalIntervalNum, scheduled?.date));
+                onClose();
+              }}>
+              Set
+            </Button>
+          </div>
+        </DrawerFooter>
+
+        {/* Nested Calendar Dialog for End Date selection */}
+        <Dialog open={endCalOpen} onOpenChange={(o) => !o && setEndCalOpen(false)}>
+          <DialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-xs p-5">
+            <DialogHeader>
+              <DialogTitle>End Date</DialogTitle>
+              <DialogDescription className="sr-only">
+                Select the end date for this recurrence
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex flex-col gap-4 items-center pt-2">
+              <Calendar
+                mode="single"
+                fixedWeeks
+                selected={isoToDate(endVal)}
+                onSelect={(date) => {
+                  if (date) {
+                    setEndVal(dateToIso(date))
+                  }
+                  setEndCalOpen(false)
+                }}
+                month={endCalMonth}
+                onMonthChange={setEndCalMonth}
+                className="w-full [--cell-size:2.25rem] p-0"
+              />
+
+              {/* Shortcut toggles */}
+              <div className="flex gap-2 w-full mt-2">
+                {(() => {
+                  const today = startOfToday()
+                  const tomorrow = new Date(today)
+                  tomorrow.setDate(today.getDate() + 1)
+                  
+                  const isToday = endVal === dateToIso(today)
+                  const isTomorrow = endVal === dateToIso(tomorrow)
+                  
+                  return (
+                    <>
+                      <Button
+                        variant={isToday ? 'default' : 'outline'}
+                        size="sm"
+                        className="flex-1 text-xs"
+                        onClick={() => {
+                          setEndVal(dateToIso(today))
+                          setEndCalMonth(today)
+                        }}
+                      >
+                        Today
+                      </Button>
+                      <Button
+                        variant={isTomorrow ? 'default' : 'outline'}
+                        size="sm"
+                        className="flex-1 text-xs"
+                        onClick={() => {
+                          setEndVal(dateToIso(tomorrow))
+                          setEndCalMonth(tomorrow)
+                        }}
+                      >
+                        Tomorrow
+                      </Button>
+                    </>
+                  )
+                })()}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-border/50">
+              <Button variant="outline" size="sm" onClick={() => setEndCalOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </DrawerContent>
+    </Drawer>
   )
 }
