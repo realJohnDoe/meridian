@@ -870,7 +870,7 @@ export async function tryRestoreDirectory(): Promise<void> {
   try {
     await cacheInit()
     const h = await dirHandleLoad()
-    if (!h) return
+    if (!h) { setNodes(SEED_NODES); return }
     const perm = await h.queryPermission({ mode: 'readwrite' })
     if (perm === 'granted') {
       setDirHandle(h)
@@ -880,9 +880,11 @@ export async function tryRestoreDirectory(): Promise<void> {
       useStore.setState({ pendingDirReconnect: h.name })
     } else {
       await dirHandleClear()
+      setNodes(SEED_NODES)
     }
   } catch (e) {
     console.warn('[storage] tryRestoreDirectory failed:', e)
+    setNodes(SEED_NODES)
   }
 }
 
@@ -915,9 +917,8 @@ function updateSyncUI(): void {
 
 // ── INIT ──────────────────────────────────────────────────────
 export function initApp(): void {
-  setNodes(SEED_NODES)
-  // Month calendar, Day view, Search, and Filter overlay are all React components.
-  // Scroll-to-today in the agenda is handled by AgendaView on mount.
+  // Nodes stay empty until tryRestoreDirectory() resolves — if no vault is
+  // found it will fall back to SEED_NODES, avoiding a flash of example content.
 }
 
 // syncToDirectory and pickDirectory are exported and called directly from App.tsx.
