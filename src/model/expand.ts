@@ -74,27 +74,33 @@ export function expandRange(
       while (d <= endDt) {
         if (d >= from && d <= to) {
           const spec = _jsDateToSpec(d)
-          all.push({ ...node, date: spec.date, time: null, jsTime: new Date(d), _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false })
+          all.push({ ...node, date: spec.date, time: null, jsTime: new Date(d), _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false, ownerPath: [] })
         }
         d = addDays(d, 1)
       }
     } else if (node.repeat) {
+      // Root has `repeat` — ownerPath is [] for all its occurrences
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      all.push(...(_expandNode(node as any, from, to) as unknown[]))
+      const occs = _expandNode(node as any, from, to) as Record<string, unknown>[]
+      all.push(...occs.map(o => ({ ...o, ownerPath: [] })))
     } else {
-      // Container node: instances that carry their own `repeat` (debugger split pattern).
-      // Each such child is merged with the parent and expanded independently.
-      const repeatInstances = ((node.instances as unknown[]) || []).filter(
+      // Container node: instances that carry their own `repeat` (split-series pattern).
+      // Iterate by index so each occurrence can carry the correct ownerPath.
+      const nodeInstances = (node.instances as unknown[]) || []
+      const hasRepeatInstances = nodeInstances.some(
         (i: unknown) => !!(i as Record<string, unknown>).repeat && !(i as Record<string, unknown>).excluded,
       )
-      for (const inst of repeatInstances) {
+      for (let instIdx = 0; instIdx < nodeInstances.length; instIdx++) {
+        const inst = nodeInstances[instIdx] as Record<string, unknown>
+        if (!inst.repeat || inst.excluded) continue
         const effChild = _mergeNode(node, inst) as Record<string, unknown>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        all.push(...(_expandNode({ ...effChild, instances: [] } as any, from, to) as unknown[]))
+        const occs = _expandNode({ ...effChild, instances: [] } as any, from, to) as Record<string, unknown>[]
+        all.push(...occs.map(o => ({ ...o, ownerPath: [instIdx] })))
       }
 
       // Non-recurring instances (standard multi-occurrence or single-date node)
-      const liveInstances = ((node.instances as unknown[]) || []).filter(
+      const liveInstances = nodeInstances.filter(
         (i: unknown) => !(i as Record<string, unknown>).excluded && !(i as Record<string, unknown>).repeat,
       )
       if (liveInstances.length > 0) {
@@ -110,14 +116,15 @@ export function expandRange(
               _nodeId: (rawNode as Record<string, unknown>).id,
               _node: rawNode,
               recur: true,
+              ownerPath: [],
             })
           }
         }
-      } else if (repeatInstances.length === 0) {
+      } else if (!hasRepeatInstances) {
         // Pure single-date node with no instances at all
         const t = _nodeDateTime(node)
         if (t && t >= from && t <= to) {
-          all.push({ ...node, jsTime: t, _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false })
+          all.push({ ...node, jsTime: t, _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false, ownerPath: [] })
         }
       }
     }

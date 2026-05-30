@@ -1,7 +1,7 @@
 import Dexie from 'dexie'
 import { fmtISO, fmtT, nodeDateTime, parseDateString } from './model/expand'
 import { nodeToFile, fileToNode, titleToSlug } from './yaml'
-import { splitNode } from './model/nodeOps'
+import { splitNode, doEditFollowing } from './model/nodeOps'
 import { serializeRawNode } from './model/inheritance'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
 import type { Node, Occurrence, Repeat, Scheduled, Instance } from './types'
@@ -378,6 +378,24 @@ export function buildBodyHtml(text: string): string {
 
 export function closeEntry(): void { popOverlayFn() }
 
+/** Apply the user's "future" form edits onto a raw series2 object in place. */
+function applyFutureEdits(
+  series2: Record<string, unknown>,
+  f: Partial<Node> & { title: string },
+  node: Node,
+  repeat: Repeat | undefined,
+  tracked: boolean,
+): void {
+  if (f.date && f.date !== series2.date) series2.date = f.date
+  if (f.time) series2.time = f.time; else delete series2.time
+  if (f.title !== node.title) series2.title = f.title
+  if (JSON.stringify(f.tags) !== JSON.stringify(node.tags)) series2.tags = f.tags
+  if (f.duration !== node.duration) series2.duration = f.duration
+  if (f.body !== node.body) series2.body = f.body
+  if (repeat) series2.repeat = repeat
+  if (tracked && f.done !== undefined) series2.done = f.done
+}
+
 export function saveNode(item: Occurrence | null, editScope: string, fields: any): void {
   const { title, tags, body, tracked, done, priority, scheduled, duration, repeat } = fields
   if (!title) return
@@ -479,28 +497,44 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
 
   } else if (editScope === 'future') {
     const occDate = item!.date
-    // Convert to RawNode (strips _path, id, type, etc.) so splitNode works on clean data
+    // Convert to RawNode (strips _path, id, type, etc.) so the split works on clean data
     const rawNode = toRawNode(node)
-    // Split into two series at occDate
-    const [series1, series2raw] = splitNode(rawNode, occDate)
-    // Apply the user's edits to the future series (series2)
-    const series2: Record<string, unknown> = { ...series2raw }
-    if (f.date && f.date !== occDate) series2.date = f.date
-    if (f.time) series2.time = f.time; else delete series2.time
-    if (f.title !== node.title) series2.title = f.title
-    if (JSON.stringify(f.tags) !== JSON.stringify(node.tags)) series2.tags = f.tags
-    if (f.duration !== node.duration) series2.duration = f.duration
-    if (f.body !== node.body) series2.body = f.body
-    // If the user changed the repeat pattern, apply it; otherwise series2 inherits the original
-    if (repeat) series2.repeat = repeat
-    if (tracked && f.done !== undefined) series2.done = f.done
-    // Build a container node: no root date/time/repeat, just the shared fields + instances
-    const container: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(rawNode)) {
-      if (['date', 'time', 'repeat', 'instances'].includes(k)) continue
-      container[k] = v
+    // ownerPath tells us which series in the tree owns the `repeat` for this occurrence.
+    // [] → root has the repeat (simple case); [i] → root.instances[i] has the repeat
+    // (container produced by a previous split).
+    const ownerPath: number[] = (item as any).ownerPath ?? []
+
+    let container: Record<string, unknown>
+    let series2Idx: number   // index of the future series within container.instances
+
+    if (ownerPath.length === 0) {
+      // Root has the repeat — split root into two series and wrap in a container.
+      const [series1, series2raw] = splitNode(rawNode, occDate)
+      const series2: Record<string, unknown> = { ...series2raw }
+      applyFutureEdits(series2, f, node, repeat, tracked)
+      // Build container: strip date/time/repeat/instances from root
+      const cont: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(rawNode)) {
+        if (['date', 'time', 'repeat', 'instances'].includes(k)) continue
+        cont[k] = v
+      }
+      cont.instances = [series1, series2]
+      container = cont
+      series2Idx = 1
+    } else {
+      // A child series owns the repeat — doEditFollowing splits the correct child in place.
+      // The future series ends up at index ownerPath[0] + 1 inside container.instances.
+      const splitResult = doEditFollowing(rawNode, ownerPath, occDate) as Record<string, unknown>
+      const instArr = [...(splitResult.instances as Record<string, unknown>[])]
+      const idx = ownerPath[0] + 1   // position of the new future series (depth-1)
+      const series2 = { ...instArr[idx] }
+      applyFutureEdits(series2, f, node, repeat, tracked)
+      instArr[idx] = series2
+      container = { ...splitResult, instances: instArr }
+      series2Idx = idx
     }
-    container.instances = [series1, series2]
+
+    void series2Idx  // currently unused after the split; retained for 2c (reopen editor)
     // Restore runtime tracking fields so the store can identify this node
     const updated = { ...container, id: node.id, _path: node._path } as Node
     setNodes(replaceNode(nodes, node.id, updated))
