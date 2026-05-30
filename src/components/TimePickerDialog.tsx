@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Button } from './ui/button'
-import { ScrollColumn } from './ui/ScrollColumn'
+import { WheelColumn } from './ui/WheelColumn'
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 const HOURS:   number[] = Array.from({ length: 24 }, (_, i) => i)      // 0–23
@@ -61,7 +61,7 @@ export default function TimePickerDialog({ open, value, onConfirm, onRemove, onC
 
         {/* Scroll wheels */}
         <div className="flex items-center justify-center gap-1 py-2">
-          <ScrollColumn
+          <WheelColumn
             items={HOURS}
             value={hour}
             onChange={setHour}
@@ -69,7 +69,7 @@ export default function TimePickerDialog({ open, value, onConfirm, onRemove, onC
             className="w-16"
           />
           <span className="text-2xl font-mono text-muted-foreground select-none pb-0.5">:</span>
-          <ScrollColumn
+          <WheelColumn
             items={MINUTES}
             value={minute}
             onChange={setMinute}
