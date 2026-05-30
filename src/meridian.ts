@@ -642,11 +642,19 @@ interface CacheRecord {
   updatedAt: number
 }
 
+interface MetaRecord {
+  key: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  value: any
+}
+
 class MeridianDB extends Dexie {
   files!: Dexie.Table<CacheRecord, string>
+  meta!: Dexie.Table<MetaRecord, string>
   constructor() {
     super('meridian_v2')
     this.version(1).stores({ files: 'path,dirty,updatedAt' })
+    this.version(2).stores({ files: 'path,dirty,updatedAt', meta: 'key' })
   }
 }
 
@@ -695,12 +703,33 @@ async function cacheDirtyCount(): Promise<number> {
   catch { return 0 }
 }
 
+async function dirHandleSave(h: FileSystemDirectoryHandle): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.put({ key: 'dirHandle', value: h })
+}
+
+async function dirHandleLoad(): Promise<FileSystemDirectoryHandle | null> {
+  const d = await cacheInit()
+  const record = await d.meta.get('dirHandle')
+  return (record?.value as FileSystemDirectoryHandle) ?? null
+}
+
+async function dirHandleClear(): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.delete('dirHandle')
+}
+
+// Module-level pending handle (needs user gesture before requestPermission can be called).
+let _pendingDirHandle: FileSystemDirectoryHandle | null = null
+
 async function diskPickDirectory(): Promise<void> {
   if (!window.showDirectoryPicker) {
     throw new Error('Your browser does not support folder access. Use Chrome or Edge, and open this file directly (not in a preview).')
   }
   try {
-    setDirHandle(await window.showDirectoryPicker({ mode: 'readwrite' }))
+    const h = await window.showDirectoryPicker({ mode: 'readwrite' })
+    setDirHandle(h)
+    await dirHandleSave(h)
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e
     if ((e as Error).name === 'SecurityError') {
@@ -808,26 +837,72 @@ export async function syncToDirectory(): Promise<void> {
   }
 }
 
+async function loadFilesFromDisk(): Promise<void> {
+  const files = await diskReadAll()
+  const loaded: Node[] = []
+  for (const { path, content } of files) {
+    await cacheWriteClean(path, content)
+    try {
+      const node = fileToNode(path, content) as Node
+      if (node.title) loaded.push(node)
+    } catch (e) { console.warn('[storage] parse failed for', path, e) }
+  }
+  setNodes(loaded)
+  updateSyncUI()
+  setTimeout(() => goToday(), 100)
+}
+
 export async function pickDirectory(): Promise<void> {
   try {
     await cacheInit()
     await diskPickDirectory()
-    const files = await diskReadAll()
-    const loaded: Node[] = []
-    for (const { path, content } of files) {
-      await cacheWriteClean(path, content)
-      try {
-        const node = fileToNode(path, content) as Node
-        if (node.title) loaded.push(node)
-      } catch (e) { console.warn('[storage] parse failed for', path, e) }
-    }
-    setNodes(loaded)
-    updateSyncUI()
-    setTimeout(() => goToday(), 100)
+    useStore.setState({ pendingDirReconnect: null })
+    _pendingDirHandle = null
+    await loadFilesFromDisk()
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
     console.error('[storage] pickDirectory failed:', e)
     notify((e as Error).message || 'Could not connect vault')
+  }
+}
+
+export async function tryRestoreDirectory(): Promise<void> {
+  try {
+    await cacheInit()
+    const h = await dirHandleLoad()
+    if (!h) return
+    const perm = await h.queryPermission({ mode: 'readwrite' })
+    if (perm === 'granted') {
+      setDirHandle(h)
+      await loadFilesFromDisk()
+    } else if (perm === 'prompt') {
+      _pendingDirHandle = h
+      useStore.setState({ pendingDirReconnect: h.name })
+    } else {
+      await dirHandleClear()
+    }
+  } catch (e) {
+    console.warn('[storage] tryRestoreDirectory failed:', e)
+  }
+}
+
+export async function reconnectDirectory(): Promise<void> {
+  if (!_pendingDirHandle) return
+  try {
+    const perm = await _pendingDirHandle.requestPermission({ mode: 'readwrite' })
+    if (perm === 'granted') {
+      setDirHandle(_pendingDirHandle)
+      useStore.setState({ pendingDirReconnect: null })
+      _pendingDirHandle = null
+      await loadFilesFromDisk()
+    } else {
+      await dirHandleClear()
+      useStore.setState({ pendingDirReconnect: null })
+      _pendingDirHandle = null
+    }
+  } catch (e) {
+    console.error('[storage] reconnectDirectory failed:', e)
+    notify((e as Error).message || 'Could not reconnect vault')
   }
 }
 
