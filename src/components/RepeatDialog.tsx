@@ -314,11 +314,6 @@ export default function RepeatDialog({
     setWdays(prev => { const next = [...prev]; next[i] = !next[i]; return next })
   }
 
-  function handleConfirm() {
-    const finalInterval = serialiseCompletionInterval(completionNum, completionUnit)
-    onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, finalInterval, intervalNum, scheduled?.date))
-  }
-
   return (
     <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
       <DrawerContent className="pt-3 pb-6">
