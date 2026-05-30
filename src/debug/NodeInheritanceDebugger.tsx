@@ -10,9 +10,251 @@ import {
 } from '../model/inheritance'
 import { collectAllOccurrences, treeHasOccurrences, type OccurrenceEntry } from '../model/repeatExpander'
 import {
-  dayBefore, getSubNode, setSubNode, doEditFollowing,
+  dayBefore, getSubNode, setSubNode, doEditFollowing, splitNode,
 } from '../model/nodeOps'
 import { yamlParse } from '../yaml'
+import type { Occurrence, Node, Priority } from '../types'
+import EntryEditor, { type EntryState, type ItemType } from '../components/EntryEditor'
+import RepeatDialog from '../components/RepeatDialog'
+import DatePickerDialog from '../components/DatePickerDialog'
+import TimePickerDialog from '../components/TimePickerDialog'
+import DurationDialog from '../components/DurationDialog'
+import PriorityDrawer from '../components/PriorityDrawer'
+import { applyScope } from '../meridian'
+import { fmtISO } from '../model/expand'
+
+// ── OccurrenceEntry → Occurrence bridge ───────────────────────────────────────
+
+/**
+ * Build a full Occurrence from an OccurrenceEntry + its rawNode.
+ *
+ * The OccurrenceEntry comes from collectAllOccurrences → expandRepeat, which
+ * already runs the full defaults: inheritance before expansion.  So entry.title,
+ * entry.done, etc. are the EFFECTIVE (inherited) values — use them as-is.
+ * Only fall back to rawNode root / defaults block when the field is missing
+ * from the expanded occurrence (e.g. tags, priority, body that aren't surfaced
+ * by OccurrenceEntry).
+ */
+function toOccurrence(entry: OccurrenceEntry, rawNode: RawNode): Occurrence {
+  const [y, mo, d] = entry.date.split('-').map(Number)
+  const jsTime = entry.time
+    ? new Date(y, mo - 1, d, +entry.time.slice(0, 2), +entry.time.slice(3, 5))
+    : new Date(y, mo - 1, d)
+  const ownerSub = getSubNode(rawNode, entry.ownerPath)
+  const n    = rawNode as unknown as Record<string, unknown>
+  const defs = (n.defaults as Record<string, unknown> | undefined) ?? {}
+
+  // entry.title is the fully-inherited effective title from expansion.
+  // Fall through root → defaults only when the expansion returned nothing.
+  const title = entry.title || String(n.title ?? defs.title ?? '')
+
+  // done: entry gives the effective value; fall back to root/defaults
+  const done =
+    entry.done !== undefined ? entry.done
+    : n.done   !== undefined ? (n.done   as boolean)
+    : defs.done !== undefined ? (defs.done as boolean)
+    : undefined
+
+  return {
+    title,
+    date:      entry.date,
+    time:      entry.time ?? null,
+    jsTime,
+    done,
+    // tags / priority / body are not surfaced by OccurrenceEntry;
+    // read them from root then defaults (effective expansion includes them but
+    // they're carried via _node so entryFromOccurrence can pick them up).
+    tags:     Array.isArray(n.tags)      ? (n.tags      as string[]) :
+              Array.isArray(defs.tags)   ? (defs.tags   as string[]) : [],
+    type:     done !== undefined ? 'task' : 'event',
+    _nodeId:  String(n.id ?? entry.title ?? 'debug-node'),
+    _node:    rawNode as unknown as Node,
+    ownerPath: entry.ownerPath,
+    recur:    !!(ownerSub?.repeat),
+    // repeat comes from the owning sub-node (not the container root)
+    repeat:   ownerSub?.repeat as Occurrence['repeat'],
+    body:     String(n.body ?? defs.body ?? ''),
+    priority: (n.priority ?? defs.priority) as Priority | undefined,
+    duration: String(n.duration ?? defs.duration ?? ''),
+  } as Occurrence
+}
+
+/**
+ * Build the initial EntryState when the user clicks an occurrence.
+ *
+ * Seeds every field from the effective occurrence — the user edits from here
+ * and whatever they save becomes the new series verbatim.
+ */
+function entryFromOccurrence(occ: Occurrence): EntryState {
+  const tracked = occ.done !== undefined
+  const itemType: ItemType = tracked ? 'task' : occ.date ? 'event' : 'note'
+  // repeat: use the occurrence's own repeat (ownerSub repeat), not root repeat
+  const repeat  = occ.repeat ?? null
+  const scheduled = occ.date ? { date: occ.date, time: occ.time || '' } : null
+  return {
+    item:      occ,
+    title:     occ.title || '',
+    bodyHtml:  String(occ.body || ''),
+    scheduled,
+    repeat,
+    duration:  occ.duration || '',
+    tracked,
+    itemType,
+    done:      occ.done ?? false,
+    tags:      [...(occ.tags || [])],
+    priority:  occ.priority || null,
+    editScope: 'single',
+  }
+}
+
+// ── Helpers for applyDebugSave ────────────────────────────────────────────────
+
+/**
+ * Flatten a `defaults:` block onto every instance so the rawNode can be
+ * modified without inheritance side-effects.
+ * Returns the node unchanged if there are no defaults.
+ */
+function promoteDefaultsToInstances(node: RawNode): RawNode {
+  const n    = node as Record<string, unknown>
+  const defs = n.defaults as Record<string, unknown> | undefined
+  if (!defs || Object.keys(defs).length === 0) return node
+  const instances = ((n.instances as RawNode[]) ?? []).map(inst => ({
+    ...defs,
+    ...(inst as Record<string, unknown>),
+  })) as RawNode[]
+  const { defaults: _d, ...rest } = n
+  return { ...rest, instances } as RawNode
+}
+
+/** Build a fresh series object directly from the editor values. */
+function seriesFromEntry(
+  entry: EntryState,
+  body:      string,
+  occDate:   string,
+  origRepeat: unknown,
+): Record<string, unknown> {
+  const { title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
+  const s: Record<string, unknown> = {}
+  s.date   = scheduled?.date || occDate
+  // repeat: use what the editor has; fall back to the occurrence's original repeat
+  s.repeat = repeat ?? origRepeat
+  if (!s.repeat) delete s.repeat
+  if (scheduled?.time) s.time = scheduled.time
+  if (title)    s.title = title
+  if (tags?.length)  s.tags  = tags
+  if (duration) s.duration   = duration
+  if (body)     s.body       = body
+  if (tracked) {
+    s.done = done
+    if (priority) s.priority = priority
+  }
+  return s
+}
+
+// ── Main save logic ───────────────────────────────────────────────────────────
+
+/**
+ * Apply the editor form fields to rawNode and return the updated rawNode.
+ *
+ * 'future' scope:
+ *   Promotes any defaults: block onto instances first (so inheritance doesn't
+ *   bleed into the new series), then builds series2 entirely from editor values.
+ *   No diffing — whatever is in the editor IS the new series.
+ */
+function applyDebugSave(rawNode: RawNode, entry: EntryState, body: string): RawNode {
+  const { item, editScope, title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
+  if (!item) return rawNode
+  const occ      = item as Occurrence & { ownerPath?: number[] }
+  const occDate  = occ.date
+  const ownerPath: number[] = occ.ownerPath ?? []
+  const n = rawNode as Record<string, unknown>
+
+  // ── edit whole series ────────────────────────────────────────────────────
+  if (editScope === 'all') {
+    const updated = { ...n }
+    updated.title = title
+    if (tags?.length) updated.tags = tags; else delete updated.tags
+    if (body) updated.body = body; else delete updated.body
+    if (tracked) { updated.done = done; if (priority) updated.priority = priority; else delete updated.priority }
+    else { delete updated.done; delete updated.priority }
+    if (scheduled?.date) { updated.date = scheduled.date; if (scheduled.time) updated.time = scheduled.time; else delete updated.time }
+    if (duration) updated.duration = duration; else delete updated.duration
+    if (repeat) updated.repeat = repeat as unknown; else delete updated.repeat
+    return updated as RawNode
+
+  // ── single occurrence override ───────────────────────────────────────────
+  } else if (editScope === 'single') {
+    const instances = [...((n.instances as RawNode[]) ?? [])]
+    const idx  = instances.findIndex(i => String((i as any).date) === occDate)
+    const base: Record<string, unknown> = idx >= 0 ? { ...(instances[idx] as object) } : { date: occDate }
+    const origTitle = occ.title   // effective/inherited title — don't write if unchanged
+    if (title !== origTitle) base.title = title; else delete base.title
+    if (scheduled?.time) base.time = scheduled.time; else delete base.time
+    const origDur = occ.duration
+    if (duration !== origDur) base.duration = duration; else delete base.duration
+    if (tracked) { base.done = done; if (priority) base.priority = priority; else delete base.priority }
+    else { delete base.done; delete base.priority }
+    if (body !== String((rawNode as any).body || '')) base.body = body; else delete base.body
+    if (idx >= 0) instances[idx] = base as RawNode; else instances.push(base as RawNode)
+    return { ...rawNode, instances } as RawNode
+
+  // ── split: this & all following ──────────────────────────────────────────
+  } else if (editScope === 'future') {
+    // Flatten defaults: onto instances so the split/replace produces a
+    // self-contained structure with no hidden inheritance.
+    const flat = promoteDefaultsToInstances(rawNode)
+    const fn   = flat as Record<string, unknown>
+
+    // Get the original repeat from the owning sub-node before any mutation.
+    const origRepeat = (getSubNode(rawNode, ownerPath) as Record<string, unknown> | undefined)?.repeat
+
+    // Build the future series entirely from what the editor contains.
+    const series2 = seriesFromEntry(entry, body, occDate, origRepeat)
+
+    if (ownerPath.length === 0) {
+      // Root owned the repeat — split it and wrap in a container.
+      const [series1] = splitNode(flat, occDate)
+      const cont: Record<string, unknown> = {}
+      // Container root: keep identity / display fields; drop scheduling & task state.
+      for (const [k, v] of Object.entries(flat as Record<string, unknown>)) {
+        if (['date', 'time', 'repeat', 'instances', 'done', 'priority'].includes(k)) continue
+        cont[k] = v
+      }
+      cont.instances = [series1, series2]
+      return cont as RawNode
+    } else {
+      // A child instance owned the repeat.
+      const sub     = getSubNode(flat, ownerPath) as Record<string, unknown>
+      const subDate = String(sub.date || '')
+
+      if (occDate <= subDate) {
+        // occDate is at or before the series start → replace the whole series.
+        const instArr = [...((fn.instances as Record<string, unknown>[]) ?? [])]
+        instArr[ownerPath[0]] = series2
+        return { ...flat, instances: instArr } as RawNode
+      } else {
+        // occDate is mid-series → split and replace the future half.
+        const splitResult = doEditFollowing(flat, ownerPath, occDate) as Record<string, unknown>
+        const instArr     = [...(splitResult.instances as Record<string, unknown>[])]
+        instArr[ownerPath[0] + 1] = series2
+        return { ...splitResult, instances: instArr } as RawNode
+      }
+    }
+
+  // ── add a new occurrence ─────────────────────────────────────────────────
+  } else if (editScope === 'add') {
+    const instances = [...((n.instances as RawNode[]) ?? [])]
+    const newInst: Record<string, unknown> = { date: scheduled?.date || occDate }
+    if (scheduled?.time) newInst.time = scheduled.time
+    if (title) newInst.title = title
+    if (duration) newInst.duration = duration
+    if (tracked) { newInst.done = done; if (priority) newInst.priority = priority }
+    instances.push(newInst as RawNode)
+    return { ...rawNode, instances } as RawNode
+  }
+
+  return rawNode
+}
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
 
@@ -461,6 +703,10 @@ export default function NodeInheritanceDebugger() {
   const [selectedIdx,     setSelectedIdx]     = useState<number | null>(null)
   const [activeAction,    setActiveAction]    = useState<ActionKind | null>(null)
 
+  // ── 4th-column EntryEditor state ─────────────────────────────────────────
+  const [debugEntry,       setDebugEntry]      = useState<EntryState | null>(null)
+  const [debugDialog,      setDebugDialog]     = useState<string | null>(null)
+
   // ── Parse ────────────────────────────────────────────────────────────────
   const processContent = useCallback((content: string, name: string) => {
     setDisplayContent(content)
@@ -483,6 +729,7 @@ export default function NodeInheritanceDebugger() {
     const rn = v.data as RawNode
     setRawNode(rn)
     setResults(buildEffectiveTree(rn))
+    setDebugEntry(null)
   }, [])
 
   // ── Apply a raw-node mutation ────────────────────────────────────────────
@@ -522,6 +769,7 @@ export default function NodeInheritanceDebugger() {
     setIsCollapsed(false)
     setSelectedIdx(null)
     setActiveAction(null)
+    setDebugEntry(null)
   }, [])
 
   // ── File input ────────────────────────────────────────────────────────────
@@ -536,12 +784,6 @@ export default function NodeInheritanceDebugger() {
     const text = await file.text(); setOriginalContent(text); processContent(text, file.name)
   }, [processContent])
 
-  // ── Selection ─────────────────────────────────────────────────────────────
-  const handleSelectOccurrence = useCallback((idx: number) => {
-    if (selectedIdx === idx) { setSelectedIdx(null); setActiveAction(null) }
-    else { setSelectedIdx(idx); setActiveAction(null) }
-  }, [selectedIdx])
-
   // ── Derived state ─────────────────────────────────────────────────────────
   const displayItems = useMemo(() => results ? flattenForDisplay(results) : [], [results])
   const canCollapse  = results !== null
@@ -553,7 +795,84 @@ export default function NodeInheritanceDebugger() {
     return collectAllOccurrences(results, expandEndDate)
   }, [results, nodeHasRepeat, expandEndDate])
 
+  // ── Selection / 4th-column open ───────────────────────────────────────────
+  const handleSelectOccurrence = useCallback((idx: number) => {
+    if (selectedIdx === idx) {
+      setSelectedIdx(null)
+      setActiveAction(null)
+      setDebugEntry(null)
+    } else {
+      setSelectedIdx(idx)
+      setActiveAction(null)
+      if (rawNode) {
+        const occEntry = (occurrences ?? [])[idx]
+        if (occEntry) setDebugEntry(entryFromOccurrence(toOccurrence(occEntry, rawNode)))
+      }
+    }
+  }, [selectedIdx, rawNode, occurrences])
+
+  // ── EntryEditor handlers (4th column) ─────────────────────────────────────
+  const handleDebugSave = useCallback((body: string) => {
+    if (!debugEntry || !rawNode) return
+    const updated = applyDebugSave(rawNode, debugEntry, body)
+
+    // Always collapse to canonical form after save:
+    //   shared fields → defaults:, unique fields stay on each series.
+    // This is the reverse of loading (yml → occurrences) — on save we go
+    // occurrences → series → infer defaults.
+    const { body: origBody } = extractFrontmatter(displayContent)
+    const effectiveTree = buildEffectiveTree(updated)
+    const collapsed = collapseToYaml(effectiveTree, origBody)
+    const { fm } = extractFrontmatter(collapsed)
+    try {
+      const v = RawNodeSchema.safeParse(yamlParse(fm))
+      if (v.success) {
+        const rn = v.data as RawNode
+        setDisplayContent(collapsed)
+        setRawNode(rn)
+        setResults(buildEffectiveTree(rn))
+        setZodErrors([])
+        setIsCollapsed(true)
+        setSelectedIdx(null)
+        setDebugEntry(null)
+        return
+      }
+    } catch { /* parse failed — fall back to the raw applyRawNode path */ }
+
+    applyRawNode(updated)
+    setSelectedIdx(null)
+    setDebugEntry(null)
+  }, [debugEntry, rawNode, applyRawNode, displayContent])
+
+  const handleDebugClose = useCallback(() => {
+    setSelectedIdx(null)
+    setDebugEntry(null)
+  }, [])
+
+  const handleDebugScopeChange = useCallback((scope: string) => {
+    setDebugEntry(prev => {
+      if (!prev?.item) return prev
+      const occ = prev.item as Occurrence
+      const { scheduled } = applyScope(occ, scope)
+      // applyScope reads root.repeat, which is null for collapsed containers
+      // (repeat lives on sub-instances there).  Use the occurrence's own repeat instead.
+      const repeat =
+        scope === 'future' || scope === 'all'
+          ? (occ.repeat ?? null)
+          : null
+      return { ...prev, editScope: scope, scheduled, repeat }
+    })
+  }, [])
+
   const selectedOcc = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
+
+  const handleDebugDelete = useCallback(() => {
+    if (!rawNode || !selectedOcc) return
+    const updated = doDeleteOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc)
+    applyRawNode(updated)
+    setSelectedIdx(null)
+    setDebugEntry(null)
+  }, [rawNode, selectedOcc, applyRawNode])
 
   // Repeat object on the owning sub-node (used by Edit pattern form)
   const selectedOwnerRepeat = useMemo<Record<string, unknown> | null>(() => {
@@ -612,7 +931,7 @@ export default function NodeInheritanceDebugger() {
       <div className="flex flex-1 min-h-0">
 
         {/* LEFT: source */}
-        <div className="w-[28%] flex flex-col border-r border-white/10 min-h-0">
+        <div className="w-[20%] flex flex-col border-r border-white/10 min-h-0">
           <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0">
             {isCollapsed ? 'Collapsed YAML' : 'Source'}
           </div>
@@ -642,7 +961,7 @@ export default function NodeInheritanceDebugger() {
         </div>
 
         {/* MIDDLE: effective tree */}
-        <div className="w-[30%] flex flex-col border-r border-white/10 min-h-0">
+        <div className="w-[24%] flex flex-col border-r border-white/10 min-h-0">
           <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
             Effective tree
             {displayItems.length > 0 && (
@@ -676,19 +995,18 @@ export default function NodeInheritanceDebugger() {
           </div>
         </div>
 
-        {/* RIGHT: repeat expansion + actions */}
-        <div className="flex-1 flex flex-col min-h-0">
+        {/* 3RD COLUMN: repeat expansion */}
+        <div className="w-[22%] flex flex-col min-h-0 border-r border-white/10">
           {/* Header */}
           <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
             <CalendarDays size={12} className="text-white/30" />
-            <span>Repeat expansion</span>
+            <span>Occurrences</span>
             {occurrences && occurrences.length > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 font-mono normal-case tracking-normal">
                 {occurrences.length}
               </span>
             )}
             <div className="ml-auto flex items-center gap-1.5">
-              <span className="text-[10px] text-white/25 normal-case tracking-normal">until</span>
               <input type="date" value={expandEndDate} onChange={e => setExpandEndDate(e.target.value)}
                 className="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-[11px] font-mono text-white/60 focus:outline-none focus:border-white/25 normal-case tracking-normal" />
             </div>
@@ -698,13 +1016,13 @@ export default function NodeInheritanceDebugger() {
           <div className="flex-1 overflow-auto">
             {!displayContent && (
               <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">
-                Load a file to see repeat expansion
+                Load a file
               </div>
             )}
             {displayContent && !nodeHasRepeat && zodErrors.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-white/20 select-none">
                 <CalendarDays size={28} strokeWidth={1.2} />
-                <span className="text-sm">No <span className="font-mono">date:</span> or <span className="font-mono">repeat:</span> found</span>
+                <span className="text-sm text-center px-2">No <span className="font-mono">date:</span> or <span className="font-mono">repeat:</span> found</span>
               </div>
             )}
             {occurrences !== null && (
@@ -719,7 +1037,7 @@ export default function NodeInheritanceDebugger() {
             )}
           </div>
 
-          {/* Action panel */}
+          {/* Raw-manipulation action panel (debug-only operations) */}
           {displayContent && zodErrors.length === 0 && (
             <div className="shrink-0 border-t border-white/10 bg-[#0d1015]">
               {selectedOcc === null ? (
@@ -816,6 +1134,73 @@ export default function NodeInheritanceDebugger() {
             </div>
           )}
         </div>
+
+        {/* 4TH COLUMN: EntryEditor */}
+        <div className="flex-1 flex flex-col min-h-0 bg-[#0f1318]">
+          {debugEntry ? (
+            <>
+              <EntryEditor
+                entry={debugEntry}
+                onChange={setDebugEntry as any}
+                onSave={handleDebugSave}
+                onDelete={handleDebugDelete}
+                onClose={handleDebugClose}
+                onOpenDlg={setDebugDialog}
+                onOpenRepeatDlg={() => setDebugDialog('dlgRepeat')}
+                onScopeChange={handleDebugScopeChange}
+              />
+
+              {/* Dialogs */}
+              <DatePickerDialog
+                open={debugDialog === 'dlgSched'}
+                initialDate={debugEntry.scheduled?.date || fmtISO(new Date())}
+                onConfirm={date => { setDebugEntry(prev => prev ? { ...prev, scheduled: { date, time: prev.scheduled?.time || '' } } : prev); setDebugDialog(null) }}
+                onRemove={() => { setDebugEntry(prev => prev ? { ...prev, scheduled: null, duration: '' } : prev); setDebugDialog(null) }}
+                onClose={() => setDebugDialog(null)}
+              />
+              <TimePickerDialog
+                open={debugDialog === 'dlgTime'}
+                value={debugEntry.scheduled?.time || ''}
+                onConfirm={time => { setDebugEntry(prev => prev?.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time } } : prev); setDebugDialog(null) }}
+                onRemove={() => { setDebugEntry(prev => prev?.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: '' } } : prev); setDebugDialog(null) }}
+                onClose={() => setDebugDialog(null)}
+              />
+              <DurationDialog
+                open={debugDialog === 'dlgDur'}
+                value={debugEntry.duration || ''}
+                onConfirm={dur => { setDebugEntry(prev => prev ? { ...prev, duration: dur } : prev); setDebugDialog(null) }}
+                onRemove={() => { setDebugEntry(prev => prev ? { ...prev, duration: '' } : prev); setDebugDialog(null) }}
+                onClose={() => setDebugDialog(null)}
+              />
+              <PriorityDrawer
+                open={debugDialog === 'dlgPriority'}
+                value={debugEntry.priority}
+                onSelect={p => { setDebugEntry(prev => prev ? { ...prev, priority: p } : prev); setDebugDialog(null) }}
+                onClose={() => setDebugDialog(null)}
+              />
+              <RepeatDialog
+                open={debugDialog === 'dlgRepeat'}
+                scheduled={debugEntry.scheduled}
+                tracked={debugEntry.tracked}
+                itemType={debugEntry.itemType}
+                repeat={debugEntry.repeat}
+                onConfirm={r => { setDebugEntry(prev => prev ? { ...prev, repeat: r } : prev); setDebugDialog(null) }}
+                onRemove={() => { setDebugEntry(prev => prev ? { ...prev, repeat: null } : prev); setDebugDialog(null) }}
+                onClose={() => setDebugDialog(null)}
+              />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-white/20 select-none">
+              <CalendarDays size={32} strokeWidth={1.2} />
+              <span className="text-sm">
+                {occurrences && occurrences.length > 0
+                  ? 'Select an occurrence to edit'
+                  : displayContent ? '' : 'Load a file to begin'}
+              </span>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   )

@@ -34,11 +34,53 @@ export interface OccurrenceEntry {
 
 // ── Expandable builder ────────────────────────────────────────────────────────
 
-/** Build a duck-typed node suitable for expandNode() from an EffectiveNode. */
+// Fields that belong to scheduling structure and must not be lifted from children.
+const SCHEDULING_FIELDS = new Set(['date', 'time', 'repeat', 'instances', 'excluded', 'defaults'])
+
+/**
+ * Build a duck-typed node suitable for expandNode() from an EffectiveNode.
+ *
+ * Extra step: lift fields that are shared by ALL child instances but absent
+ * from the parent's own fields.  This handles the case where a series node
+ * stores properties like title/priority/tags inside a `defaults:` block (for
+ * its override instances) rather than as direct fields.  Generated occurrences
+ * are semantically equivalent to child instances without explicit overrides, so
+ * they should inherit those shared defaults too.
+ *
+ * Special rule for `done`: if any child carries a `done` field but the parent
+ * does not, the series is a repeating task — default generated occurrences to
+ * done: false.
+ */
 function toExpandable(node: EffectiveNode): Record<string, unknown> {
   const fields = { ...node.fields }
-  // repeat is already in flat format — no normalisation needed
   fields.instances = node.instances.map(child => ({ ...child.fields }))
+
+  if (node.instances.length > 0) {
+    // Collect every key seen across all child instances
+    const allKeys = new Set<string>()
+    for (const child of node.instances) {
+      for (const key of Object.keys(child.fields)) allKeys.add(key)
+    }
+
+    for (const key of allKeys) {
+      if (SCHEDULING_FIELDS.has(key) || key in fields) continue
+
+      if (key === 'done') {
+        // done varies (true / false / undefined) — don't lift value, but if
+        // children have it at all the series is a task; default to false.
+        if (!('done' in fields)) fields.done = false
+        continue
+      }
+
+      // Lift the field only when ALL children carry the same value.
+      const values = node.instances.map(c => c.fields[key])
+      if (!values.every(v => v !== undefined)) continue
+      const first = values[0]
+      const allSame = values.every(v => JSON.stringify(v) === JSON.stringify(first))
+      if (allSame) fields[key] = first
+    }
+  }
+
   return fields
 }
 
