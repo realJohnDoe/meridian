@@ -197,3 +197,101 @@ export {
   CarouselPrevious,
   CarouselNext,
 }
+
+// ── WheelColumn ───────────────────────────────────────────────────────────────
+// A vertical scroll-wheel picker built on embla-carousel.
+// Viewport shows 3 items (h-11 each); the selected item snaps to the centre.
+// Uses loop:true + align:'center' so every item — including first and last —
+// can be centred without spacer slides or containScroll hacks.
+
+const WHEEL_ITEM_H = 44 // px — h-11
+
+interface WheelColumnProps<T extends string | number> {
+  items: readonly T[]
+  value: T
+  onChange: (v: T) => void
+  /** Optional display formatter, e.g. pad "9" → "09" */
+  format?: (v: T) => string
+  className?: string
+}
+
+export function WheelColumn<T extends string | number>({
+  items, value, onChange, format, className,
+}: WheelColumnProps<T>) {
+  const initialIdx = Math.max(0, items.indexOf(value))
+  const [selectedIdx, setSelectedIdx] = React.useState(initialIdx)
+
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    axis: 'y',
+    loop: true,
+    startIndex: initialIdx,
+    align: 'center',
+    dragFree: false,
+  })
+
+  // Stable refs so event callbacks never go stale
+  const onChangeRef = React.useRef(onChange)
+  const itemsRef   = React.useRef(items)
+  React.useEffect(() => { onChangeRef.current = onChange }, [onChange])
+  React.useEffect(() => { itemsRef.current    = items   }, [items])
+
+  // Highlight during scroll; commit value when scroll settles
+  React.useEffect(() => {
+    if (!emblaApi) return
+    const onSelect = () => setSelectedIdx(emblaApi.selectedScrollSnap())
+    const onSettle = () => {
+      const idx = emblaApi.selectedScrollSnap()
+      setSelectedIdx(idx)
+      onChangeRef.current(itemsRef.current[idx])
+    }
+    emblaApi.on('select', onSelect)
+    emblaApi.on('settle', onSettle)
+    return () => {
+      emblaApi.off('select', onSelect)
+      emblaApi.off('settle', onSettle)
+    }
+  }, [emblaApi])
+
+  // Sync carousel position when the external value changes (e.g. dialog re-opens)
+  React.useEffect(() => {
+    if (!emblaApi) return
+    const idx = items.indexOf(value)
+    if (idx >= 0 && emblaApi.selectedScrollSnap() !== idx) {
+      emblaApi.scrollTo(idx, true) // instant — no settle fires for jump scrolls
+      setSelectedIdx(idx)
+    }
+  }, [value, items, emblaApi])
+
+  return (
+    <div className={cn('relative h-[132px] overflow-hidden', className)}>
+      {/* top fade */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-11 z-10 bg-gradient-to-b from-background to-transparent" />
+      {/* selection highlight band */}
+      <div className="pointer-events-none absolute inset-x-0 top-[44px] h-11 rounded-lg bg-white/5 border border-white/10 z-10" />
+      {/* bottom fade */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-11 z-10 bg-gradient-to-t from-background to-transparent" />
+
+      <div ref={emblaRef} className="h-full overflow-hidden">
+        <div className="flex flex-col">
+          {items.map((item, i) => (
+            <div
+              key={i}
+              style={{ flex: `0 0 ${WHEEL_ITEM_H}px` }}
+              className={cn(
+                'flex items-center justify-center text-xl font-mono select-none cursor-pointer',
+                i === selectedIdx ? 'text-foreground' : 'text-muted-foreground',
+              )}
+              onClick={() => {
+                emblaApi?.scrollTo(i)
+                setSelectedIdx(i)
+                onChange(items[i])
+              }}
+            >
+              {format ? format(item) : String(item)}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}

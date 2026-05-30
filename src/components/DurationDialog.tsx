@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Button } from './ui/button'
-import { WheelColumn } from './ui/WheelColumn'
+import { WheelColumn } from './ui/carousel'
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 const ALL_UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const

@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Button } from './ui/button'
-import { WheelColumn } from './ui/WheelColumn'
+import { WheelColumn } from './ui/carousel'
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 const HOURS:   number[] = Array.from({ length: 24 }, (_, i) => i)      // 0–23
