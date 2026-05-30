@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Node } from './types'
 import { TODAY as _today } from './constants'
 
-export type PrimaryView = 'agenda' | 'calendar' | 'day'
+export type PrimaryView = 'agenda' | 'calendar' | 'day' | 'debug'
 export type OverlayView = 'entry' | 'search'
 
 interface MeridianStore {

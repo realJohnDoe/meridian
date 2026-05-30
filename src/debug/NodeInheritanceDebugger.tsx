@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import {
   Upload, FileText, ChevronRight, ChevronLeft, AlertCircle, RotateCcw,
-  CalendarDays, Plus, Pencil, Repeat, ChevronsRight, Trash2,
+  CalendarDays, Plus, Pencil, Repeat, ChevronsRight, Trash2, X,
 } from 'lucide-react'
 import { RawNodeSchema, type RawNode } from '../model/nodeSchema'
 import {
@@ -13,6 +13,39 @@ import {
   dayBefore, getSubNode, setSubNode, doEditFollowing,
 } from '../model/nodeOps'
 import { yamlParse } from '../yaml'
+import type { Occurrence, Node, Priority } from '../types'
+
+// ── OccurrenceEntry → Occurrence bridge ───────────────────────────────────────
+
+/**
+ * Lift a debug OccurrenceEntry into a full Occurrence so the main-app
+ * EntryEditor and saveNode() can handle it just like any calendar occurrence.
+ */
+function toOccurrence(entry: OccurrenceEntry, rawNode: RawNode): Occurrence {
+  const [y, mo, d] = entry.date.split('-').map(Number)
+  const jsTime = entry.time
+    ? new Date(y, mo - 1, d, +entry.time.slice(0, 2), +entry.time.slice(3, 5))
+    : new Date(y, mo - 1, d)
+  const ownerSub = getSubNode(rawNode, entry.ownerPath)
+  const n = rawNode as unknown as Record<string, unknown>
+  return {
+    title:    entry.title ?? String(n.title ?? '') ?? 'untitled',
+    date:     entry.date,
+    time:     entry.time ?? null,
+    jsTime,
+    done:     entry.done,
+    tags:     Array.isArray(n.tags) ? (n.tags as string[]) : [],
+    type:     n.done !== undefined ? 'task' : 'event',
+    _nodeId:  String(n.id ?? entry.title ?? 'debug-node'),
+    _node:    rawNode as unknown as Node,
+    ownerPath: entry.ownerPath,
+    recur:    !!(ownerSub?.repeat),
+    repeat:   ownerSub?.repeat as Occurrence['repeat'],
+    body:     String(n.body ?? ''),
+    priority: (n.priority as Priority) ?? undefined,
+    duration: String(n.duration ?? ''),
+  } as Occurrence
+}
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
 
@@ -449,7 +482,22 @@ function DeleteConfirmForm({ message, label, onApply, onCancel }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function NodeInheritanceDebugger() {
+interface DebuggerProps {
+  /**
+   * When provided, clicking an occurrence calls this with a full Occurrence
+   * object instead of selecting for the inline action panel.  Pass the main
+   * app's `openEntry` here to have the EntryEditor pop up.
+   */
+  onOpenEntry?: (occ: Occurrence) => void
+  /**
+   * When provided, renders a × button in the top-right of the header so the
+   * user can close/leave the debugger view.  Pass the main app's navigation
+   * callback here (e.g. `() => setPrimary('agenda')`).
+   */
+  onClose?: () => void
+}
+
+export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: DebuggerProps = {}) {
   const [displayContent,  setDisplayContent]  = useState<string>('')
   const [fileName,        setFileName]        = useState<string>('')
   const [originalContent, setOriginalContent] = useState<string>('')
@@ -536,12 +584,6 @@ export default function NodeInheritanceDebugger() {
     const text = await file.text(); setOriginalContent(text); processContent(text, file.name)
   }, [processContent])
 
-  // ── Selection ─────────────────────────────────────────────────────────────
-  const handleSelectOccurrence = useCallback((idx: number) => {
-    if (selectedIdx === idx) { setSelectedIdx(null); setActiveAction(null) }
-    else { setSelectedIdx(idx); setActiveAction(null) }
-  }, [selectedIdx])
-
   // ── Derived state ─────────────────────────────────────────────────────────
   const displayItems = useMemo(() => results ? flattenForDisplay(results) : [], [results])
   const canCollapse  = results !== null
@@ -552,6 +594,21 @@ export default function NodeInheritanceDebugger() {
     if (!results || !nodeHasRepeat) return null
     return collectAllOccurrences(results, expandEndDate)
   }, [results, nodeHasRepeat, expandEndDate])
+
+  // ── Selection ─────────────────────────────────────────────────────────────
+  const handleSelectOccurrence = useCallback((idx: number) => {
+    if (selectedIdx === idx) { setSelectedIdx(null); setActiveAction(null) }
+    else {
+      setSelectedIdx(idx)
+      setActiveAction(null)
+      // When running inside the main app, delegate to the real EntryEditor
+      // instead of the inline debug action panel.
+      if (onOpenEntry && rawNode) {
+        const entry = (occurrences ?? [])[idx]
+        if (entry) onOpenEntry(toOccurrence(entry, rawNode))
+      }
+    }
+  }, [selectedIdx, onOpenEntry, rawNode, occurrences])
 
   const selectedOcc = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
 
@@ -605,6 +662,12 @@ export default function NodeInheritanceDebugger() {
             <Upload size={13} /> Load file
             <input type="file" accept=".md,.yaml,.yml" className="hidden" onChange={handleFileChange} />
           </label>
+          {onClose && (
+            <button onClick={onClose} title="Close debugger"
+              className="flex items-center justify-center w-7 h-7 rounded-full text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors">
+              <X size={14} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -719,8 +782,8 @@ export default function NodeInheritanceDebugger() {
             )}
           </div>
 
-          {/* Action panel */}
-          {displayContent && zodErrors.length === 0 && (
+          {/* Action panel — shown only in standalone mode; main-app uses EntryEditor */}
+          {displayContent && zodErrors.length === 0 && !onOpenEntry && (
             <div className="shrink-0 border-t border-white/10 bg-[#0d1015]">
               {selectedOcc === null ? (
                 <div className="px-3 py-2.5 text-[11px] text-white/20 select-none">
