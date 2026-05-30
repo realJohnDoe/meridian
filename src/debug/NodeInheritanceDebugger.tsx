@@ -25,127 +25,230 @@ import { fmtISO } from '../model/expand'
 
 // ── OccurrenceEntry → Occurrence bridge ───────────────────────────────────────
 
+/**
+ * Build a full Occurrence from an OccurrenceEntry + its rawNode.
+ *
+ * The OccurrenceEntry comes from collectAllOccurrences → expandRepeat, which
+ * already runs the full defaults: inheritance before expansion.  So entry.title,
+ * entry.done, etc. are the EFFECTIVE (inherited) values — use them as-is.
+ * Only fall back to rawNode root / defaults block when the field is missing
+ * from the expanded occurrence (e.g. tags, priority, body that aren't surfaced
+ * by OccurrenceEntry).
+ */
 function toOccurrence(entry: OccurrenceEntry, rawNode: RawNode): Occurrence {
   const [y, mo, d] = entry.date.split('-').map(Number)
   const jsTime = entry.time
     ? new Date(y, mo - 1, d, +entry.time.slice(0, 2), +entry.time.slice(3, 5))
     : new Date(y, mo - 1, d)
   const ownerSub = getSubNode(rawNode, entry.ownerPath)
-  const n = rawNode as unknown as Record<string, unknown>
+  const n    = rawNode as unknown as Record<string, unknown>
+  const defs = (n.defaults as Record<string, unknown> | undefined) ?? {}
+
+  // entry.title is the fully-inherited effective title from expansion.
+  // Fall through root → defaults only when the expansion returned nothing.
+  const title = entry.title || String(n.title ?? defs.title ?? '')
+
+  // done: entry gives the effective value; fall back to root/defaults
+  const done =
+    entry.done !== undefined ? entry.done
+    : n.done   !== undefined ? (n.done   as boolean)
+    : defs.done !== undefined ? (defs.done as boolean)
+    : undefined
+
   return {
-    title:    (entry.title ?? String(n.title ?? '')) || 'untitled',
-    date:     entry.date,
-    time:     entry.time ?? null,
+    title,
+    date:      entry.date,
+    time:      entry.time ?? null,
     jsTime,
-    done:     entry.done,
-    tags:     Array.isArray(n.tags) ? (n.tags as string[]) : [],
-    type:     n.done !== undefined ? 'task' : 'event',
+    done,
+    // tags / priority / body are not surfaced by OccurrenceEntry;
+    // read them from root then defaults (effective expansion includes them but
+    // they're carried via _node so entryFromOccurrence can pick them up).
+    tags:     Array.isArray(n.tags)      ? (n.tags      as string[]) :
+              Array.isArray(defs.tags)   ? (defs.tags   as string[]) : [],
+    type:     done !== undefined ? 'task' : 'event',
     _nodeId:  String(n.id ?? entry.title ?? 'debug-node'),
     _node:    rawNode as unknown as Node,
     ownerPath: entry.ownerPath,
     recur:    !!(ownerSub?.repeat),
+    // repeat comes from the owning sub-node (not the container root)
     repeat:   ownerSub?.repeat as Occurrence['repeat'],
-    body:     String(n.body ?? ''),
-    priority: (n.priority as Priority) ?? undefined,
-    duration: String(n.duration ?? ''),
+    body:     String(n.body ?? defs.body ?? ''),
+    priority: (n.priority ?? defs.priority) as Priority | undefined,
+    duration: String(n.duration ?? defs.duration ?? ''),
   } as Occurrence
 }
 
-// Build an EntryState from an occurrence (mirrors entryFromItem in App.tsx)
+/**
+ * Build the initial EntryState when the user clicks an occurrence.
+ *
+ * Seeds every field from the effective occurrence — the user edits from here
+ * and whatever they save becomes the new series verbatim.
+ */
 function entryFromOccurrence(occ: Occurrence): EntryState {
-  const root = occ._node
-  const editScope = 'single'
-  const { scheduled, repeat } = applyScope(occ, editScope)
-  const tracked = occ.done !== undefined || (root as any)?.done !== undefined
-  const itemType: ItemType = tracked ? 'task' : scheduled ? 'event' : 'note'
+  const tracked = occ.done !== undefined
+  const itemType: ItemType = tracked ? 'task' : occ.date ? 'event' : 'note'
+  // repeat: use the occurrence's own repeat (ownerSub repeat), not root repeat
+  const repeat  = occ.repeat ?? null
+  const scheduled = occ.date ? { date: occ.date, time: occ.time || '' } : null
   return {
-    item: occ,
-    title: occ.title || (root as any)?.title || '',
-    bodyHtml: String((root as any)?.body || occ.body || ''),
+    item:      occ,
+    title:     occ.title || '',
+    bodyHtml:  String(occ.body || ''),
     scheduled,
     repeat,
-    duration: occ.duration || (root as any)?.duration || '',
+    duration:  occ.duration || '',
     tracked,
     itemType,
-    done: occ.done ?? false,
-    tags: [...(occ.tags || (root as any)?.tags || [])],
-    priority: occ.priority || (root as any)?.priority || null,
-    editScope,
+    done:      occ.done ?? false,
+    tags:      [...(occ.tags || [])],
+    priority:  occ.priority || null,
+    editScope: 'single',
   }
 }
 
-// Apply form fields to rawNode according to editScope, return updated rawNode
+// ── Helpers for applyDebugSave ────────────────────────────────────────────────
+
+/**
+ * Flatten a `defaults:` block onto every instance so the rawNode can be
+ * modified without inheritance side-effects.
+ * Returns the node unchanged if there are no defaults.
+ */
+function promoteDefaultsToInstances(node: RawNode): RawNode {
+  const n    = node as Record<string, unknown>
+  const defs = n.defaults as Record<string, unknown> | undefined
+  if (!defs || Object.keys(defs).length === 0) return node
+  const instances = ((n.instances as RawNode[]) ?? []).map(inst => ({
+    ...defs,
+    ...(inst as Record<string, unknown>),
+  })) as RawNode[]
+  const { defaults: _d, ...rest } = n
+  return { ...rest, instances } as RawNode
+}
+
+/** Build a fresh series object directly from the editor values. */
+function seriesFromEntry(
+  entry: EntryState,
+  body:      string,
+  occDate:   string,
+  origRepeat: unknown,
+): Record<string, unknown> {
+  const { title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
+  const s: Record<string, unknown> = {}
+  s.date   = scheduled?.date || occDate
+  // repeat: use what the editor has; fall back to the occurrence's original repeat
+  s.repeat = repeat ?? origRepeat
+  if (!s.repeat) delete s.repeat
+  if (scheduled?.time) s.time = scheduled.time
+  if (title)    s.title = title
+  if (tags?.length)  s.tags  = tags
+  if (duration) s.duration   = duration
+  if (body)     s.body       = body
+  if (tracked) {
+    s.done = done
+    if (priority) s.priority = priority
+  }
+  return s
+}
+
+// ── Main save logic ───────────────────────────────────────────────────────────
+
+/**
+ * Apply the editor form fields to rawNode and return the updated rawNode.
+ *
+ * 'future' scope:
+ *   Promotes any defaults: block onto instances first (so inheritance doesn't
+ *   bleed into the new series), then builds series2 entirely from editor values.
+ *   No diffing — whatever is in the editor IS the new series.
+ */
 function applyDebugSave(rawNode: RawNode, entry: EntryState, body: string): RawNode {
   const { item, editScope, title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
   if (!item) return rawNode
-  const occ = item as Occurrence & { ownerPath?: number[] }
-  const occDate = occ.date
+  const occ      = item as Occurrence & { ownerPath?: number[] }
+  const occDate  = occ.date
   const ownerPath: number[] = occ.ownerPath ?? []
   const n = rawNode as Record<string, unknown>
 
+  // ── edit whole series ────────────────────────────────────────────────────
   if (editScope === 'all') {
     const updated = { ...n }
     updated.title = title
     if (tags?.length) updated.tags = tags; else delete updated.tags
     if (body) updated.body = body; else delete updated.body
-    if (tracked) updated.done = done; else delete updated.done
-    if (priority && tracked) updated.priority = priority; else delete updated.priority
+    if (tracked) { updated.done = done; if (priority) updated.priority = priority; else delete updated.priority }
+    else { delete updated.done; delete updated.priority }
     if (scheduled?.date) { updated.date = scheduled.date; if (scheduled.time) updated.time = scheduled.time; else delete updated.time }
     if (duration) updated.duration = duration; else delete updated.duration
     if (repeat) updated.repeat = repeat as unknown; else delete updated.repeat
     return updated as RawNode
 
+  // ── single occurrence override ───────────────────────────────────────────
   } else if (editScope === 'single') {
     const instances = [...((n.instances as RawNode[]) ?? [])]
-    const idx = instances.findIndex(i => String((i as any).date) === occDate)
+    const idx  = instances.findIndex(i => String((i as any).date) === occDate)
     const base: Record<string, unknown> = idx >= 0 ? { ...(instances[idx] as object) } : { date: occDate }
-    if (title !== String(n.title || '')) base.title = title; else delete base.title
+    const origTitle = occ.title   // effective/inherited title — don't write if unchanged
+    if (title !== origTitle) base.title = title; else delete base.title
     if (scheduled?.time) base.time = scheduled.time; else delete base.time
-    if (duration && duration !== String(n.duration || '')) base.duration = duration; else delete base.duration
-    if (tracked) base.done = done; else delete base.done
-    if (priority && tracked) base.priority = priority; else delete base.priority
-    if (body !== String(n.body || '')) base.body = body; else delete base.body
+    const origDur = occ.duration
+    if (duration !== origDur) base.duration = duration; else delete base.duration
+    if (tracked) { base.done = done; if (priority) base.priority = priority; else delete base.priority }
+    else { delete base.done; delete base.priority }
+    if (body !== String((rawNode as any).body || '')) base.body = body; else delete base.body
     if (idx >= 0) instances[idx] = base as RawNode; else instances.push(base as RawNode)
     return { ...rawNode, instances } as RawNode
 
+  // ── split: this & all following ──────────────────────────────────────────
   } else if (editScope === 'future') {
-    let container: Record<string, unknown>
+    // Flatten defaults: onto instances so the split/replace produces a
+    // self-contained structure with no hidden inheritance.
+    const flat = promoteDefaultsToInstances(rawNode)
+    const fn   = flat as Record<string, unknown>
+
+    // Get the original repeat from the owning sub-node before any mutation.
+    const origRepeat = (getSubNode(rawNode, ownerPath) as Record<string, unknown> | undefined)?.repeat
+
+    // Build the future series entirely from what the editor contains.
+    const series2 = seriesFromEntry(entry, body, occDate, origRepeat)
+
     if (ownerPath.length === 0) {
-      const [series1, series2raw] = splitNode(rawNode, occDate)
-      const series2: Record<string, unknown> = { ...series2raw }
-      if (title !== String(n.title || '')) series2.title = title
-      if (scheduled?.time) series2.time = scheduled.time; else delete series2.time
-      if (tags?.length) series2.tags = tags
-      if (duration) series2.duration = duration
-      if (body) series2.body = body
-      if (repeat) series2.repeat = repeat as unknown
-      if (tracked && done !== undefined) series2.done = done
+      // Root owned the repeat — split it and wrap in a container.
+      const [series1] = splitNode(flat, occDate)
       const cont: Record<string, unknown> = {}
-      for (const [k, v] of Object.entries(rawNode)) {
-        if (['date', 'time', 'repeat', 'instances'].includes(k)) continue
+      // Container root: keep identity / display fields; drop scheduling & task state.
+      for (const [k, v] of Object.entries(flat as Record<string, unknown>)) {
+        if (['date', 'time', 'repeat', 'instances', 'done', 'priority'].includes(k)) continue
         cont[k] = v
       }
       cont.instances = [series1, series2]
-      container = cont
+      return cont as RawNode
     } else {
-      const splitResult = doEditFollowing(rawNode, ownerPath, occDate) as Record<string, unknown>
-      const instArr = [...(splitResult.instances as Record<string, unknown>[])]
-      const s2 = { ...instArr[ownerPath[0] + 1] }
-      if (scheduled?.time) s2.time = scheduled.time; else delete s2.time
-      if (repeat) s2.repeat = repeat as unknown
-      if (tracked && done !== undefined) s2.done = done
-      instArr[ownerPath[0] + 1] = s2
-      container = { ...splitResult, instances: instArr }
-    }
-    return container as RawNode
+      // A child instance owned the repeat.
+      const sub     = getSubNode(flat, ownerPath) as Record<string, unknown>
+      const subDate = String(sub.date || '')
 
+      if (occDate <= subDate) {
+        // occDate is at or before the series start → replace the whole series.
+        const instArr = [...((fn.instances as Record<string, unknown>[]) ?? [])]
+        instArr[ownerPath[0]] = series2
+        return { ...flat, instances: instArr } as RawNode
+      } else {
+        // occDate is mid-series → split and replace the future half.
+        const splitResult = doEditFollowing(flat, ownerPath, occDate) as Record<string, unknown>
+        const instArr     = [...(splitResult.instances as Record<string, unknown>[])]
+        instArr[ownerPath[0] + 1] = series2
+        return { ...splitResult, instances: instArr } as RawNode
+      }
+    }
+
+  // ── add a new occurrence ─────────────────────────────────────────────────
   } else if (editScope === 'add') {
     const instances = [...((n.instances as RawNode[]) ?? [])]
     const newInst: Record<string, unknown> = { date: scheduled?.date || occDate }
     if (scheduled?.time) newInst.time = scheduled.time
-    if (title !== String(n.title || '')) newInst.title = title
+    if (title) newInst.title = title
     if (duration) newInst.duration = duration
-    if (tracked && done !== undefined) newInst.done = done
+    if (tracked) { newInst.done = done; if (priority) newInst.priority = priority }
     instances.push(newInst as RawNode)
     return { ...rawNode, instances } as RawNode
   }
@@ -712,10 +815,35 @@ export default function NodeInheritanceDebugger() {
   const handleDebugSave = useCallback((body: string) => {
     if (!debugEntry || !rawNode) return
     const updated = applyDebugSave(rawNode, debugEntry, body)
+
+    // If the original rawNode used a defaults: block, collapse the result back
+    // to canonical form so shared fields are deduplicated automatically.
+    const hadDefaults = !!(rawNode as Record<string, unknown>).defaults
+    if (hadDefaults && debugEntry.editScope === 'future') {
+      const { body: origBody } = extractFrontmatter(displayContent)
+      const effectiveTree = buildEffectiveTree(updated)
+      const collapsed = collapseToYaml(effectiveTree, origBody)
+      const { fm } = extractFrontmatter(collapsed)
+      try {
+        const v = RawNodeSchema.safeParse(yamlParse(fm))
+        if (v.success) {
+          const rn = v.data as RawNode
+          setDisplayContent(collapsed)
+          setRawNode(rn)
+          setResults(buildEffectiveTree(rn))
+          setZodErrors([])
+          setIsCollapsed(true)
+          setSelectedIdx(null)
+          setDebugEntry(null)
+          return
+        }
+      } catch { /* fall through to applyRawNode */ }
+    }
+
     applyRawNode(updated)
     setSelectedIdx(null)
     setDebugEntry(null)
-  }, [debugEntry, rawNode, applyRawNode])
+  }, [debugEntry, rawNode, applyRawNode, displayContent])
 
   const handleDebugClose = useCallback(() => {
     setSelectedIdx(null)
@@ -725,7 +853,14 @@ export default function NodeInheritanceDebugger() {
   const handleDebugScopeChange = useCallback((scope: string) => {
     setDebugEntry(prev => {
       if (!prev?.item) return prev
-      const { scheduled, repeat } = applyScope(prev.item as Occurrence, scope)
+      const occ = prev.item as Occurrence
+      const { scheduled } = applyScope(occ, scope)
+      // applyScope reads root.repeat, which is null for collapsed containers
+      // (repeat lives on sub-instances there).  Use the occurrence's own repeat instead.
+      const repeat =
+        scope === 'future' || scope === 'all'
+          ? (occ.repeat ?? null)
+          : null
       return { ...prev, editScope: scope, scheduled, repeat }
     })
   }, [])
