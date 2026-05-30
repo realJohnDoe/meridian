@@ -837,6 +837,23 @@ export async function syncToDirectory(): Promise<void> {
   }
 }
 
+async function loadFilesFromCache(): Promise<boolean> {
+  const d = await cacheInit()
+  const records = await d.files.toArray()
+  const loaded: Node[] = []
+  for (const { path, content } of records) {
+    try {
+      const node = fileToNode(path, content) as Node
+      if (node.title) loaded.push(node)
+    } catch (e) { console.warn('[storage] parse failed for cached', path, e) }
+  }
+  if (loaded.length === 0) return false
+  setNodes(loaded)
+  updateSyncUI()
+  setTimeout(() => goToday(), 100)
+  return true
+}
+
 async function loadFilesFromDisk(): Promise<void> {
   const files = await diskReadAll()
   const loaded: Node[] = []
@@ -871,16 +888,20 @@ export async function tryRestoreDirectory(): Promise<void> {
     await cacheInit()
     const h = await dirHandleLoad()
     if (!h) { setNodes(SEED_NODES); return }
+
+    // Show cached content immediately — no permission needed for IndexedDB reads.
+    const hadCache = await loadFilesFromCache()
+    if (!hadCache) setNodes(SEED_NODES)
+
     const perm = await h.queryPermission({ mode: 'readwrite' })
     if (perm === 'granted') {
       setDirHandle(h)
-      await loadFilesFromDisk()
+      await loadFilesFromDisk() // refresh from disk in background
     } else if (perm === 'prompt') {
       _pendingDirHandle = h
       useStore.setState({ pendingDirReconnect: h.name })
     } else {
       await dirHandleClear()
-      setNodes(SEED_NODES)
     }
   } catch (e) {
     console.warn('[storage] tryRestoreDirectory failed:', e)
