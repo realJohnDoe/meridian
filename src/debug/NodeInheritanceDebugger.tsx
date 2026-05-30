@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import {
   Upload, FileText, ChevronRight, ChevronLeft, AlertCircle, RotateCcw,
-  CalendarDays, Plus, Pencil, Repeat, ChevronsRight, Trash2, X,
+  CalendarDays, Plus, Pencil, Repeat, ChevronsRight, Trash2,
 } from 'lucide-react'
 import { RawNodeSchema, type RawNode } from '../model/nodeSchema'
 import {
@@ -10,17 +10,21 @@ import {
 } from '../model/inheritance'
 import { collectAllOccurrences, treeHasOccurrences, type OccurrenceEntry } from '../model/repeatExpander'
 import {
-  dayBefore, getSubNode, setSubNode, doEditFollowing,
+  dayBefore, getSubNode, setSubNode, doEditFollowing, splitNode,
 } from '../model/nodeOps'
 import { yamlParse } from '../yaml'
 import type { Occurrence, Node, Priority } from '../types'
+import EntryEditor, { type EntryState, type ItemType } from '../components/EntryEditor'
+import RepeatDialog from '../components/RepeatDialog'
+import DatePickerDialog from '../components/DatePickerDialog'
+import TimePickerDialog from '../components/TimePickerDialog'
+import DurationDialog from '../components/DurationDialog'
+import PriorityDrawer from '../components/PriorityDrawer'
+import { applyScope } from '../meridian'
+import { fmtISO } from '../model/expand'
 
 // ── OccurrenceEntry → Occurrence bridge ───────────────────────────────────────
 
-/**
- * Lift a debug OccurrenceEntry into a full Occurrence so the main-app
- * EntryEditor and saveNode() can handle it just like any calendar occurrence.
- */
 function toOccurrence(entry: OccurrenceEntry, rawNode: RawNode): Occurrence {
   const [y, mo, d] = entry.date.split('-').map(Number)
   const jsTime = entry.time
@@ -29,7 +33,7 @@ function toOccurrence(entry: OccurrenceEntry, rawNode: RawNode): Occurrence {
   const ownerSub = getSubNode(rawNode, entry.ownerPath)
   const n = rawNode as unknown as Record<string, unknown>
   return {
-    title:    entry.title ?? String(n.title ?? '') ?? 'untitled',
+    title:    (entry.title ?? String(n.title ?? '')) || 'untitled',
     date:     entry.date,
     time:     entry.time ?? null,
     jsTime,
@@ -45,6 +49,108 @@ function toOccurrence(entry: OccurrenceEntry, rawNode: RawNode): Occurrence {
     priority: (n.priority as Priority) ?? undefined,
     duration: String(n.duration ?? ''),
   } as Occurrence
+}
+
+// Build an EntryState from an occurrence (mirrors entryFromItem in App.tsx)
+function entryFromOccurrence(occ: Occurrence): EntryState {
+  const root = occ._node
+  const editScope = 'single'
+  const { scheduled, repeat } = applyScope(occ, editScope)
+  const tracked = occ.done !== undefined || (root as any)?.done !== undefined
+  const itemType: ItemType = tracked ? 'task' : scheduled ? 'event' : 'note'
+  return {
+    item: occ,
+    title: occ.title || (root as any)?.title || '',
+    bodyHtml: String((root as any)?.body || occ.body || ''),
+    scheduled,
+    repeat,
+    duration: occ.duration || (root as any)?.duration || '',
+    tracked,
+    itemType,
+    done: occ.done ?? false,
+    tags: [...(occ.tags || (root as any)?.tags || [])],
+    priority: occ.priority || (root as any)?.priority || null,
+    editScope,
+  }
+}
+
+// Apply form fields to rawNode according to editScope, return updated rawNode
+function applyDebugSave(rawNode: RawNode, entry: EntryState, body: string): RawNode {
+  const { item, editScope, title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
+  if (!item) return rawNode
+  const occ = item as Occurrence & { ownerPath?: number[] }
+  const occDate = occ.date
+  const ownerPath: number[] = occ.ownerPath ?? []
+  const n = rawNode as Record<string, unknown>
+
+  if (editScope === 'all') {
+    const updated = { ...n }
+    updated.title = title
+    if (tags?.length) updated.tags = tags; else delete updated.tags
+    if (body) updated.body = body; else delete updated.body
+    if (tracked) updated.done = done; else delete updated.done
+    if (priority && tracked) updated.priority = priority; else delete updated.priority
+    if (scheduled?.date) { updated.date = scheduled.date; if (scheduled.time) updated.time = scheduled.time; else delete updated.time }
+    if (duration) updated.duration = duration; else delete updated.duration
+    if (repeat) updated.repeat = repeat as unknown; else delete updated.repeat
+    return updated as RawNode
+
+  } else if (editScope === 'single') {
+    const instances = [...((n.instances as RawNode[]) ?? [])]
+    const idx = instances.findIndex(i => String((i as any).date) === occDate)
+    const base: Record<string, unknown> = idx >= 0 ? { ...(instances[idx] as object) } : { date: occDate }
+    if (title !== String(n.title || '')) base.title = title; else delete base.title
+    if (scheduled?.time) base.time = scheduled.time; else delete base.time
+    if (duration && duration !== String(n.duration || '')) base.duration = duration; else delete base.duration
+    if (tracked) base.done = done; else delete base.done
+    if (priority && tracked) base.priority = priority; else delete base.priority
+    if (body !== String(n.body || '')) base.body = body; else delete base.body
+    if (idx >= 0) instances[idx] = base as RawNode; else instances.push(base as RawNode)
+    return { ...rawNode, instances } as RawNode
+
+  } else if (editScope === 'future') {
+    let container: Record<string, unknown>
+    if (ownerPath.length === 0) {
+      const [series1, series2raw] = splitNode(rawNode, occDate)
+      const series2: Record<string, unknown> = { ...series2raw }
+      if (title !== String(n.title || '')) series2.title = title
+      if (scheduled?.time) series2.time = scheduled.time; else delete series2.time
+      if (tags?.length) series2.tags = tags
+      if (duration) series2.duration = duration
+      if (body) series2.body = body
+      if (repeat) series2.repeat = repeat as unknown
+      if (tracked && done !== undefined) series2.done = done
+      const cont: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(rawNode)) {
+        if (['date', 'time', 'repeat', 'instances'].includes(k)) continue
+        cont[k] = v
+      }
+      cont.instances = [series1, series2]
+      container = cont
+    } else {
+      const splitResult = doEditFollowing(rawNode, ownerPath, occDate) as Record<string, unknown>
+      const instArr = [...(splitResult.instances as Record<string, unknown>[])]
+      const s2 = { ...instArr[ownerPath[0] + 1] }
+      if (scheduled?.time) s2.time = scheduled.time; else delete s2.time
+      if (repeat) s2.repeat = repeat as unknown
+      if (tracked && done !== undefined) s2.done = done
+      instArr[ownerPath[0] + 1] = s2
+      container = { ...splitResult, instances: instArr }
+    }
+    return container as RawNode
+
+  } else if (editScope === 'add') {
+    const instances = [...((n.instances as RawNode[]) ?? [])]
+    const newInst: Record<string, unknown> = { date: scheduled?.date || occDate }
+    if (scheduled?.time) newInst.time = scheduled.time
+    if (title !== String(n.title || '')) newInst.title = title
+    if (duration) newInst.duration = duration
+    if (tracked && done !== undefined) newInst.done = done
+    instances.push(newInst as RawNode)
+    return { ...rawNode, instances } as RawNode
+  }
+
+  return rawNode
 }
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
@@ -482,22 +588,7 @@ function DeleteConfirmForm({ message, label, onApply, onCancel }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-interface DebuggerProps {
-  /**
-   * When provided, clicking an occurrence calls this with a full Occurrence
-   * object instead of selecting for the inline action panel.  Pass the main
-   * app's `openEntry` here to have the EntryEditor pop up.
-   */
-  onOpenEntry?: (occ: Occurrence) => void
-  /**
-   * When provided, renders a × button in the top-right of the header so the
-   * user can close/leave the debugger view.  Pass the main app's navigation
-   * callback here (e.g. `() => setPrimary('agenda')`).
-   */
-  onClose?: () => void
-}
-
-export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: DebuggerProps = {}) {
+export default function NodeInheritanceDebugger() {
   const [displayContent,  setDisplayContent]  = useState<string>('')
   const [fileName,        setFileName]        = useState<string>('')
   const [originalContent, setOriginalContent] = useState<string>('')
@@ -508,6 +599,10 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
   const [expandEndDate,   setExpandEndDate]   = useState<string>(defaultEndDate)
   const [selectedIdx,     setSelectedIdx]     = useState<number | null>(null)
   const [activeAction,    setActiveAction]    = useState<ActionKind | null>(null)
+
+  // ── 4th-column EntryEditor state ─────────────────────────────────────────
+  const [debugEntry,       setDebugEntry]      = useState<EntryState | null>(null)
+  const [debugDialog,      setDebugDialog]     = useState<string | null>(null)
 
   // ── Parse ────────────────────────────────────────────────────────────────
   const processContent = useCallback((content: string, name: string) => {
@@ -531,6 +626,7 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
     const rn = v.data as RawNode
     setRawNode(rn)
     setResults(buildEffectiveTree(rn))
+    setDebugEntry(null)
   }, [])
 
   // ── Apply a raw-node mutation ────────────────────────────────────────────
@@ -570,6 +666,7 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
     setIsCollapsed(false)
     setSelectedIdx(null)
     setActiveAction(null)
+    setDebugEntry(null)
   }, [])
 
   // ── File input ────────────────────────────────────────────────────────────
@@ -595,22 +692,53 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
     return collectAllOccurrences(results, expandEndDate)
   }, [results, nodeHasRepeat, expandEndDate])
 
-  // ── Selection ─────────────────────────────────────────────────────────────
+  // ── Selection / 4th-column open ───────────────────────────────────────────
   const handleSelectOccurrence = useCallback((idx: number) => {
-    if (selectedIdx === idx) { setSelectedIdx(null); setActiveAction(null) }
-    else {
+    if (selectedIdx === idx) {
+      setSelectedIdx(null)
+      setActiveAction(null)
+      setDebugEntry(null)
+    } else {
       setSelectedIdx(idx)
       setActiveAction(null)
-      // When running inside the main app, delegate to the real EntryEditor
-      // instead of the inline debug action panel.
-      if (onOpenEntry && rawNode) {
-        const entry = (occurrences ?? [])[idx]
-        if (entry) onOpenEntry(toOccurrence(entry, rawNode))
+      if (rawNode) {
+        const occEntry = (occurrences ?? [])[idx]
+        if (occEntry) setDebugEntry(entryFromOccurrence(toOccurrence(occEntry, rawNode)))
       }
     }
-  }, [selectedIdx, onOpenEntry, rawNode, occurrences])
+  }, [selectedIdx, rawNode, occurrences])
+
+  // ── EntryEditor handlers (4th column) ─────────────────────────────────────
+  const handleDebugSave = useCallback((body: string) => {
+    if (!debugEntry || !rawNode) return
+    const updated = applyDebugSave(rawNode, debugEntry, body)
+    applyRawNode(updated)
+    setSelectedIdx(null)
+    setDebugEntry(null)
+  }, [debugEntry, rawNode, applyRawNode])
+
+  const handleDebugClose = useCallback(() => {
+    setSelectedIdx(null)
+    setDebugEntry(null)
+  }, [])
+
+  const handleDebugScopeChange = useCallback((scope: string) => {
+    setDebugEntry(prev => {
+      if (!prev?.item) return prev
+      const { scheduled, repeat } = applyScope(prev.item as Occurrence, scope)
+      return { ...prev, editScope: scope, scheduled, repeat }
+    })
+  }, [])
 
   const selectedOcc = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
+
+  const handleDebugDelete = useCallback(() => {
+    if (!rawNode || !selectedOcc) return
+    const updated = doDeleteOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc)
+    applyRawNode(updated)
+    setSelectedIdx(null)
+    setDebugEntry(null)
+  }, [rawNode, selectedOcc, applyRawNode])
 
   // Repeat object on the owning sub-node (used by Edit pattern form)
   const selectedOwnerRepeat = useMemo<Record<string, unknown> | null>(() => {
@@ -662,12 +790,6 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
             <Upload size={13} /> Load file
             <input type="file" accept=".md,.yaml,.yml" className="hidden" onChange={handleFileChange} />
           </label>
-          {onClose && (
-            <button onClick={onClose} title="Close debugger"
-              className="flex items-center justify-center w-7 h-7 rounded-full text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors">
-              <X size={14} />
-            </button>
-          )}
         </div>
       </header>
 
@@ -675,7 +797,7 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
       <div className="flex flex-1 min-h-0">
 
         {/* LEFT: source */}
-        <div className="w-[28%] flex flex-col border-r border-white/10 min-h-0">
+        <div className="w-[20%] flex flex-col border-r border-white/10 min-h-0">
           <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0">
             {isCollapsed ? 'Collapsed YAML' : 'Source'}
           </div>
@@ -705,7 +827,7 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
         </div>
 
         {/* MIDDLE: effective tree */}
-        <div className="w-[30%] flex flex-col border-r border-white/10 min-h-0">
+        <div className="w-[24%] flex flex-col border-r border-white/10 min-h-0">
           <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
             Effective tree
             {displayItems.length > 0 && (
@@ -739,19 +861,18 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
           </div>
         </div>
 
-        {/* RIGHT: repeat expansion + actions */}
-        <div className="flex-1 flex flex-col min-h-0">
+        {/* 3RD COLUMN: repeat expansion */}
+        <div className="w-[22%] flex flex-col min-h-0 border-r border-white/10">
           {/* Header */}
           <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
             <CalendarDays size={12} className="text-white/30" />
-            <span>Repeat expansion</span>
+            <span>Occurrences</span>
             {occurrences && occurrences.length > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 font-mono normal-case tracking-normal">
                 {occurrences.length}
               </span>
             )}
             <div className="ml-auto flex items-center gap-1.5">
-              <span className="text-[10px] text-white/25 normal-case tracking-normal">until</span>
               <input type="date" value={expandEndDate} onChange={e => setExpandEndDate(e.target.value)}
                 className="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-[11px] font-mono text-white/60 focus:outline-none focus:border-white/25 normal-case tracking-normal" />
             </div>
@@ -761,13 +882,13 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
           <div className="flex-1 overflow-auto">
             {!displayContent && (
               <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">
-                Load a file to see repeat expansion
+                Load a file
               </div>
             )}
             {displayContent && !nodeHasRepeat && zodErrors.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-white/20 select-none">
                 <CalendarDays size={28} strokeWidth={1.2} />
-                <span className="text-sm">No <span className="font-mono">date:</span> or <span className="font-mono">repeat:</span> found</span>
+                <span className="text-sm text-center px-2">No <span className="font-mono">date:</span> or <span className="font-mono">repeat:</span> found</span>
               </div>
             )}
             {occurrences !== null && (
@@ -782,8 +903,8 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
             )}
           </div>
 
-          {/* Action panel — shown only in standalone mode; main-app uses EntryEditor */}
-          {displayContent && zodErrors.length === 0 && !onOpenEntry && (
+          {/* Raw-manipulation action panel (debug-only operations) */}
+          {displayContent && zodErrors.length === 0 && (
             <div className="shrink-0 border-t border-white/10 bg-[#0d1015]">
               {selectedOcc === null ? (
                 <div className="px-3 py-2.5 text-[11px] text-white/20 select-none">
@@ -879,6 +1000,73 @@ export default function NodeInheritanceDebugger({ onOpenEntry, onClose }: Debugg
             </div>
           )}
         </div>
+
+        {/* 4TH COLUMN: EntryEditor */}
+        <div className="flex-1 flex flex-col min-h-0 bg-[#0f1318]">
+          {debugEntry ? (
+            <>
+              <EntryEditor
+                entry={debugEntry}
+                onChange={setDebugEntry as any}
+                onSave={handleDebugSave}
+                onDelete={handleDebugDelete}
+                onClose={handleDebugClose}
+                onOpenDlg={setDebugDialog}
+                onOpenRepeatDlg={() => setDebugDialog('dlgRepeat')}
+                onScopeChange={handleDebugScopeChange}
+              />
+
+              {/* Dialogs */}
+              <DatePickerDialog
+                open={debugDialog === 'dlgSched'}
+                initialDate={debugEntry.scheduled?.date || fmtISO(new Date())}
+                onConfirm={date => { setDebugEntry(prev => prev ? { ...prev, scheduled: { date, time: prev.scheduled?.time || '' } } : prev); setDebugDialog(null) }}
+                onRemove={() => { setDebugEntry(prev => prev ? { ...prev, scheduled: null, duration: '' } : prev); setDebugDialog(null) }}
+                onClose={() => setDebugDialog(null)}
+              />
+              <TimePickerDialog
+                open={debugDialog === 'dlgTime'}
+                value={debugEntry.scheduled?.time || ''}
+                onConfirm={time => { setDebugEntry(prev => prev?.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time } } : prev); setDebugDialog(null) }}
+                onRemove={() => { setDebugEntry(prev => prev?.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: '' } } : prev); setDebugDialog(null) }}
+                onClose={() => setDebugDialog(null)}
+              />
+              <DurationDialog
+                open={debugDialog === 'dlgDur'}
+                value={debugEntry.duration || ''}
+                onConfirm={dur => { setDebugEntry(prev => prev ? { ...prev, duration: dur } : prev); setDebugDialog(null) }}
+                onRemove={() => { setDebugEntry(prev => prev ? { ...prev, duration: '' } : prev); setDebugDialog(null) }}
+                onClose={() => setDebugDialog(null)}
+              />
+              <PriorityDrawer
+                open={debugDialog === 'dlgPriority'}
+                value={debugEntry.priority}
+                onSelect={p => { setDebugEntry(prev => prev ? { ...prev, priority: p } : prev); setDebugDialog(null) }}
+                onClose={() => setDebugDialog(null)}
+              />
+              <RepeatDialog
+                open={debugDialog === 'dlgRepeat'}
+                scheduled={debugEntry.scheduled}
+                tracked={debugEntry.tracked}
+                itemType={debugEntry.itemType}
+                repeat={debugEntry.repeat}
+                onConfirm={r => { setDebugEntry(prev => prev ? { ...prev, repeat: r } : prev); setDebugDialog(null) }}
+                onRemove={() => { setDebugEntry(prev => prev ? { ...prev, repeat: null } : prev); setDebugDialog(null) }}
+                onClose={() => setDebugDialog(null)}
+              />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-white/20 select-none">
+              <CalendarDays size={32} strokeWidth={1.2} />
+              <span className="text-sm">
+                {occurrences && occurrences.length > 0
+                  ? 'Select an occurrence to edit'
+                  : displayContent ? '' : 'Load a file to begin'}
+              </span>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   )

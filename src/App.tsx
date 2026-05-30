@@ -3,7 +3,7 @@ import {
   Menu, FolderSync, FolderOpen, CalendarCheck2, Search,
   ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
-  Plus, X, Bug,
+  Plus, X,
 } from 'lucide-react'
 import {
   initApp, applyScope, buildBodyHtml,
@@ -31,7 +31,6 @@ import MonthView from './components/MonthView'
 import DayView from './components/DayView'
 import SearchView from './components/SearchView'
 import FilterOverlay from './components/FilterOverlay'
-import NodeInheritanceDebugger from './debug/NodeInheritanceDebugger'
 import type { Occurrence, Priority } from './types'
 
 
@@ -100,11 +99,10 @@ export default function App() {
   }
 
   // Topbar is hidden while an overlay is open (each has its own header)
-  // Also hidden in debug view which renders its own full-screen header
-  const showTopbar     = topOverlay === undefined && primaryView !== 'debug'
+  const showTopbar     = topOverlay === undefined
   const showDayHeader  = showTopbar && primaryView === 'day'
-  // Bottom search bar: hidden inside overlays and in debug view
-  const showBottomFloat = topOverlay === undefined && primaryView !== 'debug'
+  // Bottom search bar: hidden inside overlays
+  const showBottomFloat = topOverlay === undefined
 
   useEffect(() => {
     initApp()
@@ -252,22 +250,6 @@ export default function App() {
           }} />
         </section>
 
-        {/* Debug view breaks out of the 430px mobile container to use full viewport */}
-        <section
-          className={viewCls('debug')}
-          id="view-debug"
-          style={primaryView === 'debug' && !topOverlay
-            ? { position: 'fixed', inset: 0, maxWidth: 'none', zIndex: 5 }
-            : undefined}
-        >
-          {primaryView === 'debug' && (
-            <NodeInheritanceDebugger
-              onOpenEntry={(occ: Occurrence) => openEntry(occ, 'single')}
-              onClose={() => navTo('agenda')}
-            />
-          )}
-        </section>
-
         {/* ── OVERLAY VIEWS ── */}
         <section className={viewCls('search')} id="view-search">
           <SearchView
@@ -319,12 +301,6 @@ export default function App() {
               onClick={() => navTo('day')}
             >
               <CalendarClock />Day
-            </button>
-            <button
-              className={`sni${primaryView === 'debug' && !topOverlay ? ' active' : ''}`}
-              onClick={() => navTo('debug')}
-            >
-              <Bug />Debugger
             </button>
           </div>
         </div>
