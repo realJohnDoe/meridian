@@ -10,6 +10,7 @@ import {
   saveNode, deleteNode, closeEntry, pushOverlay,
   openDayViewForDate, goToday, openSearch,
   syncToDirectory, pickDirectory,
+  tryRestoreDirectory, reconnectDirectory,
   addDays, fmtLong,
 } from './meridian'
 import type { SeriesSheetConfig } from './meridian'
@@ -79,6 +80,7 @@ export default function App() {
   const syncDirtyCount   = useStore(s => s.syncDirtyCount)
   const syncFlash        = useStore(s => s.syncFlash)
   const dirHandle        = useStore(s => s.dirHandle)
+  const pendingDirReconnect = useStore(s => s.pendingDirReconnect)
   const errorNotification = useStore(s => s.errorNotification)
   const setErrorNotification = useStore(s => s.setErrorNotification)
 
@@ -106,6 +108,7 @@ export default function App() {
 
   useEffect(() => {
     initApp()
+    tryRestoreDirectory()
     // Scroll agenda to today after AgendaView has rendered its sections.
     setTimeout(() => {
       const sec = document.querySelector(`.day-section[data-key="${TODAY.getFullYear()}-${String(TODAY.getMonth()+1).padStart(2,'0')}-${String(TODAY.getDate()).padStart(2,'0')}"]`)
@@ -224,7 +227,12 @@ export default function App() {
             )}
             <div className="tb-r">
               <button className="ib" onClick={syncToDirectory} title={syncTitle} style={{ color: syncColor }}><FolderSync /></button>
-              <button className="ib" onClick={pickDirectory} title="Open vault"><FolderOpen /></button>
+              <button
+                className="ib"
+                onClick={pendingDirReconnect && !dirHandle ? reconnectDirectory : pickDirectory}
+                title={pendingDirReconnect && !dirHandle ? `Reconnect vault "${pendingDirReconnect}"` : 'Open vault'}
+                style={pendingDirReconnect && !dirHandle ? { color: 'var(--amb)' } : undefined}
+              ><FolderOpen /></button>
               <button className="ib" onClick={goToday} title="Today"><CalendarCheck2 /></button>
               <button className="ib" onClick={openSearch} title="Search"><Search /></button>
             </div>

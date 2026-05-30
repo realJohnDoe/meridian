@@ -43,6 +43,9 @@ interface MeridianStore {
   // ── File system ─────────────────────────────────────────────────
   dirHandle: FileSystemDirectoryHandle | null
   setDirHandle: (h: FileSystemDirectoryHandle | null) => void
+  /** Non-null when a persisted handle exists but needs a user gesture to re-grant permission. */
+  pendingDirReconnect: string | null
+  setPendingDirReconnect: (name: string | null) => void
 
   // ── Undo toast ──────────────────────────────────────────────────
   toast: { title: string; onUndo: () => void } | null
@@ -93,6 +96,8 @@ export const useStore = create<MeridianStore>((set, get) => ({
 
   dirHandle: null,
   setDirHandle: (dirHandle) => set({ dirHandle }),
+  pendingDirReconnect: null,
+  setPendingDirReconnect: (pendingDirReconnect) => set({ pendingDirReconnect }),
 
   toast: null,
   setToast: (toast) => set({ toast }),
