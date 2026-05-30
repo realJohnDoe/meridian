@@ -7,10 +7,11 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Button } from './ui/button'
+import { WheelColumn } from './ui/carousel'
 
 // ── Data ──────────────────────────────────────────────────────────────────────
-const UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
-type Unit = typeof UNITS[number]
+const ALL_UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
+type Unit = typeof ALL_UNITS[number]
 
 const UNIT_ITEMS: Record<Unit, number[]> = {
   minutes: Array.from({ length: 12  }, (_, i) => (i + 1) * 5),  // 5,10,…,60
@@ -22,19 +23,20 @@ const UNIT_ITEMS: Record<Unit, number[]> = {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-/** Find the nearest value in an array */
 function nearest(items: number[], target: number): number {
   return items.reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a)
 }
 
-/** "2 hours" → { n: 2, unit: 'hours' }. Falls back to { 30, 'minutes' }. */
-function parseDuration(s: string): { n: number; unit: Unit } {
-  if (!s) return { n: 1, unit: 'hours' }
+/** "2 hours" → { n: 2, unit: 'hours' }. Falls back to { 1, 'hours' }. */
+function parseDuration(s: string, units: readonly Unit[]): { n: number; unit: Unit } {
+  const defaultUnit = units.includes('hours') ? 'hours' : units[0]
+  if (!s) return { n: 1, unit: defaultUnit }
   const match = s.match(/^(\d+)\s*(minutes?|hours?|days?|weeks?|months?|years?)$/i)
-  if (!match) return { n: 1, unit: 'hours' }
+  if (!match) return { n: 1, unit: defaultUnit }
   const raw  = match[2].toLowerCase()
-  const unit = (UNITS.find(u => raw.startsWith(u.slice(0, -1)) || raw === u) ?? 'minutes') as Unit
-  return { n: nearest(UNIT_ITEMS[unit], parseInt(match[1], 10)), unit }
+  const unit = (ALL_UNITS.find(u => raw.startsWith(u.slice(0, -1)) || raw === u) ?? defaultUnit) as Unit
+  const resolved = units.includes(unit) ? unit : defaultUnit
+  return { n: nearest(UNIT_ITEMS[resolved], parseInt(match[1], 10)), unit: resolved }
 }
 
 function serialise(n: number, unit: Unit): string {
@@ -45,68 +47,84 @@ function serialise(n: number, unit: Unit): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 interface Props {
   open: boolean
+  title?: string
   /** Serialised duration string e.g. "2 hours", "30 minutes", or "" */
   value: string
+  /** Subset of units to show. Defaults to all units. */
+  units?: readonly Unit[]
   onConfirm: (duration: string) => void
-  onRemove: () => void
+  /** If omitted the Remove button is hidden */
+  onRemove?: () => void
   onClose: () => void
 }
 
-export default function DurationDialog({ open, value, onConfirm, onRemove, onClose }: Props) {
-  const initial = parseDuration(value)
-  const [n,    setN]    = useState(initial.n)
-  const [unit, setUnit] = useState<Unit>(initial.unit)
+export default function DurationDialog({
+  open,
+  title = 'Duration',
+  value,
+  units = ALL_UNITS,
+  onConfirm,
+  onRemove,
+  onClose,
+}: Props) {
+  const [n,    setN]    = useState(() => parseDuration(value, units).n)
+  const [unit, setUnit] = useState<Unit>(() => parseDuration(value, units).unit)
 
   useEffect(() => {
     if (open) {
-      const p = parseDuration(value)
+      const p = parseDuration(value, units)
       setN(p.n)
       setUnit(p.unit)
     }
-  }, [open, value])
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleUnitChange(u: Unit) {
+    setUnit(u)
+    setN(nearest(UNIT_ITEMS[u], n))
+  }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-xs p-5">
         <DialogHeader>
-          <DialogTitle>Duration</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">
-            Select a duration using the number input and unit select dropdown
+            Select a duration using the scroll wheels
           </DialogDescription>
         </DialogHeader>
 
-        {/* Number input + unit selector */}
-        <div className="flex gap-2 py-3">
-          <input
-            type="number"
-            min={1}
-            className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-mono text-foreground transition-colors"
+        {/* Wheel pickers */}
+        <div className="flex items-center justify-center gap-2 py-2">
+          {/* Number column — remount when unit changes so embla re-initialises */}
+          <WheelColumn
+            key={unit}
+            items={UNIT_ITEMS[unit]}
             value={n}
-            onChange={(e) => setN(Math.max(1, parseInt(e.target.value, 10) || 1))}
+            onChange={setN}
+            format={(v) => String(v)}
+            className="w-16"
           />
-          <select
-            className="flex-1 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-semibold text-primary cursor-pointer transition-colors"
+          <WheelColumn
+            items={units as Unit[]}
             value={unit}
-            onChange={(e) => setUnit(e.target.value as Unit)}
-          >
-            {UNITS.map(u => (
-              <option key={u} value={u}>
-                {n === 1 ? u.replace(/s$/, '') : u}
-              </option>
-            ))}
-          </select>
+            onChange={handleUnitChange}
+            format={(u) => n === 1 ? u.replace(/s$/, '') : u}
+            className="flex-1"
+          />
         </div>
 
-        {/* Footer: Remove on left, Cancel + Set on right */}
+        {/* Footer: Remove on left (optional), Cancel + Set on right */}
         <div className="flex items-center justify-between pt-3 border-t border-border/50">
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => { onRemove(); onClose() }}
-          >
-            Remove
-          </Button>
+          {onRemove ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => { onRemove(); onClose() }}
+            >
+              Remove
+            </Button>
+          ) : <span />}
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onClose}>
               Cancel

@@ -20,6 +20,7 @@ import { Separator } from './ui/separator'
 import { Button } from './ui/button'
 import { Calendar } from './ui/calendar'
 import { cn } from '../lib/utils'
+import DurationDialog from './DurationDialog'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -277,8 +278,9 @@ export default function RepeatDialog({
   const [intervalNum,    setIntervalNum]    = useState<number>(1)
   const [completionNum,  setCompletionNum]  = useState<number>(1)
   const [completionUnit, setCompletionUnit] = useState<string>('days')
-  const [endCalOpen,     setEndCalOpen]     = useState(false)
-  const [endCalMonth,    setEndCalMonth]    = useState<Date>(new Date())
+  const [endCalOpen,        setEndCalOpen]        = useState(false)
+  const [endCalMonth,       setEndCalMonth]       = useState<Date>(new Date())
+  const [intervalDialogOpen, setIntervalDialogOpen] = useState(false)
 
   // Re-initialise whenever the dialog opens (so stale state never leaks between opens)
   useEffect(() => {
@@ -486,35 +488,18 @@ export default function RepeatDialog({
               </div>
             </div>
           ) : (
-            /* After completion sub-form (inline number and unit select) */
+            /* After completion: tap to open DurationDialog */
             <div className="flex flex-col gap-1.5">
               <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-mono text-foreground transition-colors"
-                  value={completionNum === 0 ? '' : completionNum}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '') {
-                      setCompletionNum(0);
-                    } else {
-                      setCompletionNum(Math.max(1, parseInt(val, 10) || 1));
-                    }
-                  }}
-                />
-                <select
-                  className="flex-1 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-semibold text-primary cursor-pointer transition-colors"
-                  value={completionUnit}
-                  onChange={(e) => setCompletionUnit(e.target.value)}
-                >
-                  <option value="days">{completionNum === 1 ? 'day' : 'days'}</option>
-                  <option value="weeks">{completionNum === 1 ? 'week' : 'weeks'}</option>
-                  <option value="months">{completionNum === 1 ? 'month' : 'months'}</option>
-                  <option value="years">{completionNum === 1 ? 'year' : 'years'}</option>
-                </select>
-              </div>
+              <button
+                onClick={() => setIntervalDialogOpen(true)}
+                className="w-full flex items-center justify-between bg-secondary border border-border/50 hover:bg-secondary/80 focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary transition-colors cursor-pointer"
+              >
+                <span>Interval</span>
+                <span className="font-mono text-muted-foreground">
+                  {serialiseCompletionInterval(completionNum, completionUnit)}
+                </span>
+              </button>
             </div>
           )}
         </div>
@@ -546,6 +531,20 @@ export default function RepeatDialog({
             </Button>
           </div>
         </DrawerFooter>
+
+        {/* Nested DurationDialog for after_completion interval */}
+        <DurationDialog
+          open={intervalDialogOpen}
+          title="Interval"
+          value={serialiseCompletionInterval(completionNum, completionUnit)}
+          units={['days', 'weeks', 'months', 'years']}
+          onConfirm={(s) => {
+            const p = parseCompletionInterval(s)
+            setCompletionNum(p.n)
+            setCompletionUnit(p.unit)
+          }}
+          onClose={() => setIntervalDialogOpen(false)}
+        />
 
         {/* Nested Calendar Dialog for End Date selection */}
         <Dialog open={endCalOpen} onOpenChange={(o) => !o && setEndCalOpen(false)}>
