@@ -200,9 +200,22 @@ export {
 
 // ── WheelColumn ───────────────────────────────────────────────────────────────
 // A vertical scroll-wheel picker built on embla-carousel.
-// Viewport shows 3 items (h-11 each); the selected item snaps to the centre.
-// Uses loop:true + align:'center' so every item — including first and last —
-// can be centred without spacer slides or containScroll hacks.
+//
+// Layout contract (matches the shadcn vertical-carousel example pattern):
+//   • align:'start'  — snap target is the TOP of each slide
+//   • containScroll:'trimSnaps' — removes only out-of-range snaps; no duplicates
+//   • One leading + one trailing inert spacer slide (no pointer-events)
+//
+// Snap index i  →  spacer(0) | items[0](1) … items[N-1](N) | spacer(N+1)
+//
+// With align:'start', slide i is at the TOP of the viewport when snapped.
+// The middle slot (y = 44..88) therefore shows slide i+1.
+// Because slide i+1 = items[i], the mapping is simply:
+//
+//   selectedScrollSnap() === i  ⟺  items[i] is centred and selected
+//
+// This is identical to the shadcn example's snap-index = visible-item-index
+// relationship, just with a single-item offset provided by the leading spacer.
 
 const WHEEL_ITEM_H = 44 // px — h-11
 
@@ -223,19 +236,20 @@ export function WheelColumn<T extends string | number>({
 
   const [emblaRef, emblaApi] = useEmblaCarousel({
     axis: 'y',
-    loop: true,
-    startIndex: initialIdx,
-    align: 'center',
+    loop: false,
+    startIndex: initialIdx,   // snap i → items[i] centred; see contract above
+    align: 'start',
     dragFree: false,
+    containScroll: 'trimSnaps', // trims trailing-spacer snap; no duplicate positions
   })
 
-  // Stable refs so event callbacks never go stale
+  // Stable refs so event callbacks never capture stale closures
   const onChangeRef = React.useRef(onChange)
   const itemsRef   = React.useRef(items)
   React.useEffect(() => { onChangeRef.current = onChange }, [onChange])
   React.useEffect(() => { itemsRef.current    = items   }, [items])
 
-  // Highlight during scroll; commit value when scroll settles
+  // Update highlight during scroll; commit value once scroll settles
   React.useEffect(() => {
     if (!emblaApi) return
     const onSelect = () => setSelectedIdx(emblaApi.selectedScrollSnap())
@@ -257,7 +271,7 @@ export function WheelColumn<T extends string | number>({
     if (!emblaApi) return
     const idx = items.indexOf(value)
     if (idx >= 0 && emblaApi.selectedScrollSnap() !== idx) {
-      emblaApi.scrollTo(idx, true) // instant — no settle fires for jump scrolls
+      emblaApi.scrollTo(idx, true) // instant — does not fire settle
       setSelectedIdx(idx)
     }
   }, [value, items, emblaApi])
@@ -265,20 +279,26 @@ export function WheelColumn<T extends string | number>({
   return (
     <div className={cn('relative h-[132px] overflow-hidden', className)}>
       {/* top fade */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-11 z-10 bg-gradient-to-b from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-11 z-10
+                      bg-gradient-to-b from-background to-transparent" />
       {/* selection highlight band */}
-      <div className="pointer-events-none absolute inset-x-0 top-[44px] h-11 rounded-lg bg-white/5 border border-white/10 z-10" />
+      <div className="pointer-events-none absolute inset-x-0 top-[44px] h-11 rounded-lg
+                      bg-white/5 border border-white/10 z-10" />
       {/* bottom fade */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-11 z-10 bg-gradient-to-t from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-11 z-10
+                      bg-gradient-to-t from-background to-transparent" />
 
       <div ref={emblaRef} className="h-full overflow-hidden">
         <div className="flex flex-col">
+          {/* leading spacer — snap 0 puts this at top → items[0] in centre */}
+          <div style={{ flex: `0 0 ${WHEEL_ITEM_H}px` }} className="pointer-events-none shrink-0" />
+
           {items.map((item, i) => (
             <div
               key={i}
               style={{ flex: `0 0 ${WHEEL_ITEM_H}px` }}
               className={cn(
-                'flex items-center justify-center text-xl font-mono select-none cursor-pointer',
+                'flex items-center justify-center text-xl font-mono select-none cursor-pointer shrink-0',
                 i === selectedIdx ? 'text-foreground' : 'text-muted-foreground',
               )}
               onClick={() => {
@@ -290,6 +310,10 @@ export function WheelColumn<T extends string | number>({
               {format ? format(item) : String(item)}
             </div>
           ))}
+
+          {/* trailing spacer — allows items[N-1] to reach the centre slot;
+              trimSnaps removes its own snap position so it is never "selected" */}
+          <div style={{ flex: `0 0 ${WHEEL_ITEM_H}px` }} className="pointer-events-none shrink-0" />
         </div>
       </div>
     </div>
