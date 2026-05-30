@@ -816,29 +816,28 @@ export default function NodeInheritanceDebugger() {
     if (!debugEntry || !rawNode) return
     const updated = applyDebugSave(rawNode, debugEntry, body)
 
-    // If the original rawNode used a defaults: block, collapse the result back
-    // to canonical form so shared fields are deduplicated automatically.
-    const hadDefaults = !!(rawNode as Record<string, unknown>).defaults
-    if (hadDefaults && debugEntry.editScope === 'future') {
-      const { body: origBody } = extractFrontmatter(displayContent)
-      const effectiveTree = buildEffectiveTree(updated)
-      const collapsed = collapseToYaml(effectiveTree, origBody)
-      const { fm } = extractFrontmatter(collapsed)
-      try {
-        const v = RawNodeSchema.safeParse(yamlParse(fm))
-        if (v.success) {
-          const rn = v.data as RawNode
-          setDisplayContent(collapsed)
-          setRawNode(rn)
-          setResults(buildEffectiveTree(rn))
-          setZodErrors([])
-          setIsCollapsed(true)
-          setSelectedIdx(null)
-          setDebugEntry(null)
-          return
-        }
-      } catch { /* fall through to applyRawNode */ }
-    }
+    // Always collapse to canonical form after save:
+    //   shared fields → defaults:, unique fields stay on each series.
+    // This is the reverse of loading (yml → occurrences) — on save we go
+    // occurrences → series → infer defaults.
+    const { body: origBody } = extractFrontmatter(displayContent)
+    const effectiveTree = buildEffectiveTree(updated)
+    const collapsed = collapseToYaml(effectiveTree, origBody)
+    const { fm } = extractFrontmatter(collapsed)
+    try {
+      const v = RawNodeSchema.safeParse(yamlParse(fm))
+      if (v.success) {
+        const rn = v.data as RawNode
+        setDisplayContent(collapsed)
+        setRawNode(rn)
+        setResults(buildEffectiveTree(rn))
+        setZodErrors([])
+        setIsCollapsed(true)
+        setSelectedIdx(null)
+        setDebugEntry(null)
+        return
+      }
+    } catch { /* parse failed — fall back to the raw applyRawNode path */ }
 
     applyRawNode(updated)
     setSelectedIdx(null)
