@@ -642,11 +642,7 @@ interface CacheRecord {
   updatedAt: number
 }
 
-interface MetaRecord {
-  key: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value: any
-}
+interface MetaRecord { key: string; value: unknown }
 
 class MeridianDB extends Dexie {
   files!: Dexie.Table<CacheRecord, string>
