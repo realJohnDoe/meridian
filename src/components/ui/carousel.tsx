@@ -249,32 +249,44 @@ export function WheelColumn<T extends string | number>({
   React.useEffect(() => { onChangeRef.current = onChange }, [onChange])
   React.useEffect(() => { itemsRef.current    = items   }, [items])
 
-  // Update highlight during scroll; commit value once scroll settles
+  // Guard: only fire onChange for user-initiated drags, not programmatic scrollTo calls.
+  // Without this, scrollTo(idx, true) in the sync effect can trigger settle → onChange(0)
+  // → parent resets to items[0] → sync scrolls back to 0, creating a snap-back loop.
+  const isDragging = React.useRef(false)
+
   React.useEffect(() => {
     if (!emblaApi) return
-    const onSelect = () => setSelectedIdx(emblaApi.selectedScrollSnap())
-    const onSettle = () => {
+    const onSelect      = () => setSelectedIdx(emblaApi.selectedScrollSnap())
+    const onPointerDown = () => { isDragging.current = true }
+    const onSettle      = () => {
       const idx = emblaApi.selectedScrollSnap()
       setSelectedIdx(idx)
-      onChangeRef.current(itemsRef.current[idx])
+      if (isDragging.current) {
+        isDragging.current = false
+        onChangeRef.current(itemsRef.current[idx])
+      }
     }
-    emblaApi.on('select', onSelect)
-    emblaApi.on('settle', onSettle)
+    emblaApi.on('select',      onSelect)
+    emblaApi.on('pointerDown', onPointerDown)
+    emblaApi.on('settle',      onSettle)
     return () => {
-      emblaApi.off('select', onSelect)
-      emblaApi.off('settle', onSettle)
+      emblaApi.off('select',      onSelect)
+      emblaApi.off('pointerDown', onPointerDown)
+      emblaApi.off('settle',      onSettle)
     }
   }, [emblaApi])
 
-  // Sync carousel position when the external value changes (e.g. dialog re-opens)
+  // Sync carousel position when the external value changes (e.g. dialog re-opens).
+  // Uses itemsRef so a new array reference (e.g. inline literal) doesn't re-trigger this.
   React.useEffect(() => {
     if (!emblaApi) return
-    const idx = items.indexOf(value)
+    const idx = itemsRef.current.indexOf(value)
     if (idx >= 0 && emblaApi.selectedScrollSnap() !== idx) {
-      emblaApi.scrollTo(idx, true) // instant — does not fire settle
+      emblaApi.scrollTo(idx, true) // programmatic — isDragging stays false, no onChange
       setSelectedIdx(idx)
     }
-  }, [value, items, emblaApi])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, emblaApi])
 
   return (
     <div className={cn('relative h-[132px] overflow-hidden', className)}>
