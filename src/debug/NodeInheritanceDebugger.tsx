@@ -109,46 +109,112 @@ function entryFromOccurrence(occ: Occurrence): EntryState {
 
 // ── Helpers for applyDebugSave ────────────────────────────────────────────────
 
-/**
- * Flatten a `defaults:` block onto every instance so the rawNode can be
- * modified without inheritance side-effects.
- * Returns the node unchanged if there are no defaults.
- */
-function promoteDefaultsToInstances(node: RawNode): RawNode {
-  const n    = node as Record<string, unknown>
-  const defs = n.defaults as Record<string, unknown> | undefined
-  if (!defs || Object.keys(defs).length === 0) return node
-  const instances = ((n.instances as RawNode[]) ?? []).map(inst => ({
-    ...defs,
-    ...(inst as Record<string, unknown>),
-  })) as RawNode[]
-  const { defaults: _d, ...rest } = n
-  return { ...rest, instances } as RawNode
-}
 
-/** Build a fresh series object directly from the editor values. */
-function seriesFromEntry(
-  entry: EntryState,
-  body:      string,
-  occDate:   string,
-  origRepeat: unknown,
+/**
+ * Build a new series node from editor values.
+ *
+ * @param rootDefs  The root-level defaults: block of the parent rawNode (may be
+ *                  empty for flat nodes).  Used to determine which fields the
+ *                  series already inherits and therefore doesn't need to repeat.
+ * @param useNestedDefaults  When true (parent has a defaults: block OR this
+ *                  series itself has a repeat:), occurrence-level properties
+ *                  (done, priority overrides, tag overrides, body, duration) are
+ *                  placed in a nested `defaults:` block rather than as direct
+ *                  fields.  This keeps the series node clean: it only holds
+ *                  `date`, `repeat`, optionally `title` (if different), and a
+ *                  `defaults:` block for anything the occurrences should inherit.
+ */
+function buildSeriesNode(
+  entry:             EntryState,
+  body:              string,
+  occDate:           string,
+  origRepeat:        unknown,
+  rootDefs:          Record<string, unknown>,
+  useNestedDefaults: boolean,
 ): Record<string, unknown> {
   const { title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
-  const s: Record<string, unknown> = {}
-  s.date   = scheduled?.date || occDate
-  // repeat: use what the editor has; fall back to the occurrence's original repeat
-  s.repeat = repeat ?? origRepeat
-  if (!s.repeat) delete s.repeat
-  if (scheduled?.time) s.time = scheduled.time
-  if (title)    s.title = title
-  if (tags?.length)  s.tags  = tags
-  if (duration) s.duration   = duration
-  if (body)     s.body       = body
+
+  const series: Record<string, unknown> = {}
+  series.date   = scheduled?.date || occDate
+  series.repeat = repeat ?? origRepeat
+  if (!series.repeat) delete series.repeat
+  if (scheduled?.time) series.time = scheduled.time
+
+  // title: write directly only when it differs from the inherited root default
+  const defaultTitle = String(rootDefs.title ?? '')
+  if (title && title !== defaultTitle) series.title = title
+
+  // Collect occurrence-level properties that need to be expressed on this series
+  const occFields: Record<string, unknown> = {}
+
   if (tracked) {
-    s.done = done
-    if (priority) s.priority = priority
+    occFields.done = done
+    // priority: only write if it differs from the root default
+    const defaultPriority = rootDefs.priority
+    if (priority && priority !== defaultPriority) occFields.priority = priority
   }
-  return s
+
+  const defaultTagsStr = JSON.stringify(
+    Array.isArray(rootDefs.tags) ? rootDefs.tags : [],
+  )
+  if (tags?.length && JSON.stringify(tags) !== defaultTagsStr) occFields.tags = tags
+
+  if (body)     occFields.body     = body
+  if (duration) occFields.duration = duration
+
+  if (Object.keys(occFields).length > 0) {
+    if (useNestedDefaults) {
+      // Series node: put occurrence properties in a nested defaults: block so
+      // every generated occurrence inherits them automatically.
+      series.defaults = occFields
+    } else {
+      // Flat / single-occurrence: write fields directly
+      Object.assign(series, occFields)
+    }
+  }
+
+  return series
+}
+
+// Fields that belong to the series' scheduling structure and must NEVER be
+// moved into a `defaults:` block.
+const SERIES_STRUCTURAL = new Set(['date', 'time', 'repeat', 'instances', 'defaults'])
+
+/**
+ * Restructure a raw series node so that every field except date / repeat /
+ * title / instances lives inside a nested `defaults:` block.
+ *
+ * This is applied to series1 (the existing split-off series) so it matches the
+ * canonical form used for series2 (built by buildSeriesNode).
+ *
+ * Fields already matching `rootDefs` are dropped (they will be inherited).
+ * Title is kept as a direct field when it differs from rootDefs.title.
+ */
+function canonicaliseSeriesNode(
+  raw:      Record<string, unknown>,
+  rootDefs: Record<string, unknown>,
+): Record<string, unknown> {
+  const series: Record<string, unknown> = {}
+  const nested: Record<string, unknown> = {}
+
+  for (const [k, v] of Object.entries(raw)) {
+    if (SERIES_STRUCTURAL.has(k)) {
+      series[k] = v
+      continue
+    }
+    if (k === 'title') {
+      // Keep title directly on the series only if it overrides the root default
+      if (String(v) !== String(rootDefs.title ?? '')) series.title = v
+      continue
+    }
+    // Everything else: put in nested defaults unless it matches the root default
+    if (JSON.stringify(v) !== JSON.stringify(rootDefs[k])) {
+      nested[k] = v
+    }
+  }
+
+  if (Object.keys(nested).length > 0) series.defaults = nested
+  return series
 }
 
 // ── Main save logic ───────────────────────────────────────────────────────────
@@ -156,10 +222,19 @@ function seriesFromEntry(
 /**
  * Apply the editor form fields to rawNode and return the updated rawNode.
  *
- * 'future' scope:
- *   Promotes any defaults: block onto instances first (so inheritance doesn't
- *   bleed into the new series), then builds series2 entirely from editor values.
- *   No diffing — whatever is in the editor IS the new series.
+ * 'future' scope semantics
+ * ─────────────────────────
+ * ownerPath = [] (root repeat):
+ *   Split root into two series.  Compute root-level `defaults:` from fields that
+ *   are structural identity (title, tags, …) but NOT scheduling or task-state.
+ *   Both series1 and series2 get their occurrence-state fields (done, priority,
+ *   …) placed in a nested `defaults:` block.
+ *
+ * ownerPath = [i] (child series):
+ *   The root `defaults:` is preserved exactly as-is — untouched siblings must
+ *   not receive any new explicit fields.  Only the target series is replaced /
+ *   split; it and the new future series carry their unique fields in a nested
+ *   `defaults:` block.
  */
 function applyDebugSave(rawNode: RawNode, entry: EntryState, body: string): RawNode {
   const { item, editScope, title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
@@ -200,45 +275,58 @@ function applyDebugSave(rawNode: RawNode, entry: EntryState, body: string): RawN
 
   // ── split: this & all following ──────────────────────────────────────────
   } else if (editScope === 'future') {
-    // Flatten defaults: onto instances so the split/replace produces a
-    // self-contained structure with no hidden inheritance.
-    const flat = promoteDefaultsToInstances(rawNode)
-    const fn   = flat as Record<string, unknown>
-
-    // Get the original repeat from the owning sub-node before any mutation.
+    // Original repeat for the owning series (used when user hasn't changed it).
     const origRepeat = (getSubNode(rawNode, ownerPath) as Record<string, unknown> | undefined)?.repeat
 
-    // Build the future series entirely from what the editor contains.
-    const series2 = seriesFromEntry(entry, body, occDate, origRepeat)
-
     if (ownerPath.length === 0) {
-      // Root owned the repeat — split it and wrap in a container.
-      const [series1] = splitNode(flat, occDate)
-      const cont: Record<string, unknown> = {}
-      // Container root: keep identity / display fields; drop scheduling & task state.
-      for (const [k, v] of Object.entries(flat as Record<string, unknown>)) {
-        if (['date', 'time', 'repeat', 'instances', 'done', 'priority'].includes(k)) continue
-        cont[k] = v
+      // ── Root owns the repeat ──
+      // Decide what goes to the new container's root defaults: everything that
+      // is NOT scheduling-specific and NOT task/occurrence state.
+      const OCCURRENCE_STATE = new Set(['done', 'priority', 'body', 'duration'])
+      const rootDefs: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(n)) {
+        if (SERIES_STRUCTURAL.has(k) || OCCURRENCE_STATE.has(k)) continue
+        rootDefs[k] = v   // title, tags, and any other identity fields
       }
-      cont.instances = [series1, series2]
-      return cont as RawNode
-    } else {
-      // A child instance owned the repeat.
-      const sub     = getSubNode(flat, ownerPath) as Record<string, unknown>
-      const subDate = String(sub.date || '')
 
+      // Split: series1 keeps everything up to occDate, capped.
+      const [series1raw] = splitNode(rawNode, occDate)
+      const series1 = canonicaliseSeriesNode(series1raw as Record<string, unknown>, rootDefs)
+
+      // series2 is built entirely from editor values.
+      const series2 = buildSeriesNode(entry, body, occDate, origRepeat, rootDefs, true)
+
+      return { defaults: rootDefs, instances: [series1, series2] } as unknown as RawNode
+
+    } else {
+      // ── A child series owns the repeat ──
+      // Preserve the root `defaults:` exactly.  Untouched siblings must not gain
+      // any explicit fields — we work directly on the raw node, no promotion.
+      const rootDefs = (n.defaults as Record<string, unknown> | undefined) ?? {}
+      const rawInstances = [...((n.instances as Record<string, unknown>[]) ?? [])]
+      const sub     = rawInstances[ownerPath[0]] as Record<string, unknown>
+      const subDate = String(sub?.date || '')
+
+      // series2 built from editor values, respecting root defaults.
+      const series2 = buildSeriesNode(entry, body, occDate, origRepeat, rootDefs, true)
+
+      let newInstances: Record<string, unknown>[]
       if (occDate <= subDate) {
-        // occDate is at or before the series start → replace the whole series.
-        const instArr = [...((fn.instances as Record<string, unknown>[]) ?? [])]
-        instArr[ownerPath[0]] = series2
-        return { ...flat, instances: instArr } as RawNode
+        // Editing at or before the series start → replace the whole series.
+        newInstances = [...rawInstances]
+        newInstances[ownerPath[0]] = series2
       } else {
-        // occDate is mid-series → split and replace the future half.
-        const splitResult = doEditFollowing(flat, ownerPath, occDate) as Record<string, unknown>
-        const instArr     = [...(splitResult.instances as Record<string, unknown>[])]
-        instArr[ownerPath[0] + 1] = series2
-        return { ...splitResult, instances: instArr } as RawNode
+        // Mid-series → cap the existing series and insert the new one after it.
+        const [series1raw] = splitNode(sub as RawNode, occDate)
+        // series1 keeps only structural fields — its occurrence properties are
+        // inherited from the root defaults, no need to repeat them.
+        const series1 = canonicaliseSeriesNode(series1raw as Record<string, unknown>, rootDefs)
+        newInstances = [...rawInstances]
+        newInstances.splice(ownerPath[0], 1, series1, series2)
       }
+
+      // Preserve everything at root level; only replace the instances array.
+      return { ...n, instances: newInstances } as unknown as RawNode
     }
 
   // ── add a new occurrence ─────────────────────────────────────────────────
@@ -254,6 +342,17 @@ function applyDebugSave(rawNode: RawNode, entry: EntryState, body: string): RawN
   }
 
   return rawNode
+}
+
+/**
+ * True when the save result should be auto-collapsed (shared fields hoisted to
+ * root defaults).  Only the root-split case benefits from collapse; child-split
+ * already has the correct two-level defaults structure.
+ */
+function shouldCollapse(entry: EntryState): boolean {
+  if (entry.editScope !== 'future') return true   // all/single/add → always collapse
+  const ownerPath = ((entry.item as any)?.ownerPath as number[] | undefined) ?? []
+  return ownerPath.length === 0   // root split → collapse; child split → preserve
 }
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
@@ -816,28 +915,30 @@ export default function NodeInheritanceDebugger() {
     if (!debugEntry || !rawNode) return
     const updated = applyDebugSave(rawNode, debugEntry, body)
 
-    // Always collapse to canonical form after save:
-    //   shared fields → defaults:, unique fields stay on each series.
-    // This is the reverse of loading (yml → occurrences) — on save we go
-    // occurrences → series → infer defaults.
-    const { body: origBody } = extractFrontmatter(displayContent)
-    const effectiveTree = buildEffectiveTree(updated)
-    const collapsed = collapseToYaml(effectiveTree, origBody)
-    const { fm } = extractFrontmatter(collapsed)
-    try {
-      const v = RawNodeSchema.safeParse(yamlParse(fm))
-      if (v.success) {
-        const rn = v.data as RawNode
-        setDisplayContent(collapsed)
-        setRawNode(rn)
-        setResults(buildEffectiveTree(rn))
-        setZodErrors([])
-        setIsCollapsed(true)
-        setSelectedIdx(null)
-        setDebugEntry(null)
-        return
-      }
-    } catch { /* parse failed — fall back to the raw applyRawNode path */ }
+    // For root-level splits and non-future edits: collapse to canonical form so
+    // shared fields are hoisted to root defaults:.
+    // For child-series splits: the two-level defaults structure was already built
+    // correctly by applyDebugSave; collapse would destroy nested defaults: blocks.
+    if (shouldCollapse(debugEntry)) {
+      const { body: origBody } = extractFrontmatter(displayContent)
+      const effectiveTree = buildEffectiveTree(updated)
+      const collapsed = collapseToYaml(effectiveTree, origBody)
+      const { fm } = extractFrontmatter(collapsed)
+      try {
+        const v = RawNodeSchema.safeParse(yamlParse(fm))
+        if (v.success) {
+          const rn = v.data as RawNode
+          setDisplayContent(collapsed)
+          setRawNode(rn)
+          setResults(buildEffectiveTree(rn))
+          setZodErrors([])
+          setIsCollapsed(true)
+          setSelectedIdx(null)
+          setDebugEntry(null)
+          return
+        }
+      } catch { /* fall through */ }
+    }
 
     applyRawNode(updated)
     setSelectedIdx(null)
