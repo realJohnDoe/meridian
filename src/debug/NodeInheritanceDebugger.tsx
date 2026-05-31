@@ -6,6 +6,7 @@ import {
 import { RawNodeSchema, type RawNode } from '../model/nodeSchema'
 import {
   buildEffectiveTree, collapseToYaml, serializeRawNode, displayValue,
+  canonicaliseInstance,
   type EffectiveNode,
 } from '../model/inheritance'
 import { collectAllOccurrences, treeHasOccurrences, type OccurrenceEntry } from '../model/repeatExpander'
@@ -178,43 +179,26 @@ function buildSeriesNode(
 
 // Fields that belong to the series' scheduling structure and must NEVER be
 // moved into a `defaults:` block.
-const SERIES_STRUCTURAL = new Set(['date', 'time', 'repeat', 'instances', 'defaults'])
+// ── Domain key sets (application-layer knowledge) ────────────────────────────
+// These are the only places in the UI that define *which* fields are structural
+// or "direct" for a series node.  inheritance.ts knows nothing about them.
+
+/** Fields that always stay as direct fields on a series node. */
+const SERIES_STRUCTURAL: ReadonlySet<string> =
+  new Set(['date', 'time', 'repeat', 'instances', 'defaults'])
+
+/** Fields that stay direct (not in nested defaults) when they differ from root. */
+const SERIES_DIRECT: ReadonlySet<string> = new Set(['title'])
 
 /**
- * Restructure a raw series node so that every field except date / repeat /
- * title / instances lives inside a nested `defaults:` block.
- *
- * This is applied to series1 (the existing split-off series) so it matches the
- * canonical form used for series2 (built by buildSeriesNode).
- *
- * Fields already matching `rootDefs` are dropped (they will be inherited).
- * Title is kept as a direct field when it differs from rootDefs.title.
+ * Restructure a flat series node into canonical two-level form.
+ * Delegates to canonicaliseInstance in inheritance.ts — no domain knowledge here.
  */
 function canonicaliseSeriesNode(
   raw:      Record<string, unknown>,
   rootDefs: Record<string, unknown>,
 ): Record<string, unknown> {
-  const series: Record<string, unknown> = {}
-  const nested: Record<string, unknown> = {}
-
-  for (const [k, v] of Object.entries(raw)) {
-    if (SERIES_STRUCTURAL.has(k)) {
-      series[k] = v
-      continue
-    }
-    if (k === 'title') {
-      // Keep title directly on the series only if it overrides the root default
-      if (String(v) !== String(rootDefs.title ?? '')) series.title = v
-      continue
-    }
-    // Everything else: put in nested defaults unless it matches the root default
-    if (JSON.stringify(v) !== JSON.stringify(rootDefs[k])) {
-      nested[k] = v
-    }
-  }
-
-  if (Object.keys(nested).length > 0) series.defaults = nested
-  return series
+  return canonicaliseInstance(raw, rootDefs, SERIES_STRUCTURAL, SERIES_DIRECT)
 }
 
 // ── Main save logic ───────────────────────────────────────────────────────────

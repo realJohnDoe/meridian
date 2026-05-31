@@ -42,14 +42,15 @@ const SCHEDULING_FIELDS = new Set(['date', 'time', 'repeat', 'instances', 'exclu
  *
  * Extra step: lift fields that are shared by ALL child instances but absent
  * from the parent's own fields.  This handles the case where a series node
- * stores properties like title/priority/tags inside a `defaults:` block (for
- * its override instances) rather than as direct fields.  Generated occurrences
- * are semantically equivalent to child instances without explicit overrides, so
- * they should inherit those shared defaults too.
+ * stores properties inside a `defaults:` block for its override instances
+ * rather than as direct fields.  Generated occurrences are semantically
+ * equivalent to child instances without explicit overrides and should inherit
+ * those shared defaults too.
  *
- * Special rule for `done`: if any child carries a `done` field but the parent
- * does not, the series is a repeating task — default generated occurrences to
- * done: false.
+ * Only truly-shared values (identical across every child) are lifted.
+ * Fields that vary between children (e.g. done: true on some, done: false on
+ * others) are not lifted — their variation is an occurrence-level concern, not
+ * a series-level one.
  */
 function toExpandable(node: EffectiveNode): Record<string, unknown> {
   const fields = { ...node.fields }
@@ -65,14 +66,7 @@ function toExpandable(node: EffectiveNode): Record<string, unknown> {
     for (const key of allKeys) {
       if (SCHEDULING_FIELDS.has(key) || key in fields) continue
 
-      if (key === 'done') {
-        // done varies (true / false / undefined) — don't lift value, but if
-        // children have it at all the series is a task; default to false.
-        if (!('done' in fields)) fields.done = false
-        continue
-      }
-
-      // Lift the field only when ALL children carry the same value.
+      // Lift only when ALL children carry exactly the same value.
       const values = node.instances.map(c => c.fields[key])
       if (!values.every(v => v !== undefined)) continue
       const first = values[0]
