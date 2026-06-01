@@ -14,7 +14,7 @@ import {
   addDays, fmtLong,
 } from './meridian'
 import type { SeriesSheetConfig } from './meridian'
-import { fmtISO } from './model/expand'
+import { fmtISO } from './model/expansion'
 import { TODAY } from './constants'
 import { useStore } from './store'
 import type { PrimaryView } from './store'

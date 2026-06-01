@@ -182,12 +182,12 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
   const { item, title, bodyHtml, scheduled, duration, tracked, itemType, repeat, done, tags, priority, editScope } = entry
 
-  const isRecur = !!(item && (item.recur || item._node?.repeat || item.repeat))
-  const isScheduled = !!(item && (item._node?.repeat?.type === 'schedule' || item.repeat?.type === 'schedule'))
-  const isAfterCompletion = !!(item && (item._node?.repeat?.type === 'after_completion' || item.repeat?.type === 'after_completion'))
-  const hasSched = !!(item && (item.date || item._node?.date))
+  const isRecur = !!(item && (item.metadata?.recur || item.metadata?._node?.repeat || item.metadata?.repeat))
+  const isScheduled = !!(item && (item.metadata?._node?.repeat?.type === 'schedule' || item.metadata?.repeat?.type === 'schedule'))
+  const isAfterCompletion = !!(item && (item.metadata?._node?.repeat?.type === 'after_completion' || item.metadata?.repeat?.type === 'after_completion'))
+  const hasSched = !!(item && (item.date || item.metadata?._node?.date))
   const fname = item
-    ? ((item._node?.id || item._nodeId || item.id || item.title || 'untitled') + '.md').toLowerCase().replace(/\s+/g, '-')
+    ? ((item.metadata?._node?.id || item.metadata?._nodeId || item.metadata?.id || item.metadata?.title || 'untitled') + '.md').toLowerCase().replace(/\s+/g, '-')
     : 'untitled.md'
 
   const hasDate = !!scheduled
@@ -197,7 +197,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   // notes: no scheduling chips; events: date/time/duration + repeat (schedule only); tasks: everything
   const showDateChip = !isNote
   const showRepeat = !isNote && (hasDate || tracked) && !isSingleScope
-  const bodyKey = item ? `${item._nodeId || item.id || 'item'}-${item.date || ''}-${editScope}` : 'new'
+  const bodyKey = item ? `${item.metadata?._nodeId || item.metadata?.id || 'item'}-${item.date || ''}-${editScope}` : 'new'
 
   // Set body HTML imperatively so React never touches innerHTML during re-renders
   // triggered by wikilink state updates. bodyKey changes when a new entry is opened

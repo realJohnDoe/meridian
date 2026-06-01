@@ -1,5 +1,5 @@
 import Dexie from 'dexie'
-import { fmtISO, fmtT, nodeDateTime, parseDateString } from './model/expand'
+import { fmtISO, fmtT, nodeDateTime, parseDateString } from './model/expansion'
 import { nodeToFile, fileToNode, titleToSlug } from './yaml'
 import { splitNode, doEditFollowing } from './model/nodeOps'
 import { serializeRawNode } from './model/inheritance'
@@ -197,10 +197,10 @@ export function closeSearch(): void { popOverlayFn(); }
 // ── SHARED OCCURRENCE SORT ────────────────────────────────────
 const _prioOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
 function _sortKey(o: Occurrence): number {
-  const t = !!fmtT(o.time), ev = o.type === 'event'
-  return (o.done ? 8 : 0) + (t ? 0 : 2) + (ev ? 0 : 1)
+  const t = !!fmtT(o.time), ev = o.metadata.type === 'event'
+  return (o.metadata.done ? 8 : 0) + (t ? 0 : 2) + (ev ? 0 : 1)
 }
-function _prioKey(o: Occurrence): number { return o.priority ? (_prioOrder[o.priority] ?? 3) : 3 }
+function _prioKey(o: Occurrence): number { return o.metadata.priority ? (_prioOrder[o.metadata.priority] ?? 3) : 3 }
 export function sortOccs(arr: Occurrence[]): Occurrence[] {
   return arr.sort((a: Occurrence, b: Occurrence) => {
     const sd = _sortKey(a) - _sortKey(b); if (sd) return sd
@@ -208,7 +208,7 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
     const td = (a.jsTime?.getHours() || 0) * 60 + (a.jsTime?.getMinutes() || 0)
              - (b.jsTime?.getHours() || 0) * 60 - (b.jsTime?.getMinutes() || 0)
     if (td) return td
-    return (a.title || '').localeCompare(b.title || '')
+    return (a.metadata.title || '').localeCompare(b.metadata.title || '')
   })
 }
 
@@ -220,15 +220,15 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
 // Filtering is handled via useStore's filterQuery field.
 
 export function occState(o: Occurrence): string {
-  if (o.done) return 'done'
-  if (o.type === 'task' || o.done !== undefined) {
-    const p = o.priority
+  if (o.metadata.done) return 'done'
+  if (o.metadata.type === 'task' || o.metadata.done !== undefined) {
+    const p = o.metadata.priority
     if (p === 'high') return 'task-p1'
     if (p === 'medium') return 'task-p2'
     if (p === 'low') return 'task-p3'
     return 'task-open'
   }
-  if (o.multiday) return 'event-future'
+  if (o.metadata.multiday) return 'event-future'
   const now = new Date()
   if (o.jsTime < now) return 'event-past'
   return 'event-future'
@@ -251,15 +251,15 @@ function replaceNode(nodes: Node[], id: string, updated: Node): Node[] {
 
 // ── TOGGLE DONE (data-only, exported for React components) ────
 export function toggleOccDone(o: Occurrence): void {
-  const newDone = !o.done
-  o.done = newDone // update the occurrence for optimistic UI
-  const node = o._node
+  const newDone = !o.metadata.done
+  o.metadata.done = newDone // update the occurrence for optimistic UI
+  const node = o.metadata._node
   if (!node) return
   const updated = cloneNode(node)
   const jsT = o.jsTime
   if (node.repeat) {
     const inst = updated.instances?.find((i: Instance) => {
-      const t = nodeDateTime(i) || parseDateString(i.date)
+      const t = nodeDateTime(i as unknown as Record<string, unknown>) || parseDateString(i.date)
       return t && Math.abs(t.getTime() - jsT.getTime()) < 60000
     })
     if (inst) { inst.done = newDone }
@@ -284,12 +284,12 @@ export function toggleOccDone(o: Occurrence): void {
 //   Removes the item from the Zustand store so React unmounts it.
 //   applyDelete() is a no-op if the user already pressed Undo.
 export function beginSwipeDelete(o: Occurrence): () => void {
-  const node = o._node || o
+  const node = o.metadata._node
   const nodeId = node.id
   const title = node.title
   let cancelled = false
 
-  if (o.recur) {
+  if (o.metadata.recur) {
     const original = cloneNode(node) // snapshot for undo
     const updated = cloneNode(node)
     if (!updated.instances) updated.instances = []
@@ -328,7 +328,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
 }
 
 export function ccBarClass(o: Occurrence): string {
-  if (o.multiday) return 'multiday'
+  if (o.metadata.multiday) return 'multiday'
   const s = occState(o)
   if (s === 'done' || s === 'event-past') return 'done'
   if (s === 'task-open') return 'task'
@@ -356,15 +356,15 @@ export function openDayViewForDate(date: Date): void {
 // openEntry is handled entirely by App.tsx via React state — no global bridge needed.
 
 export function applyScope(item: Occurrence, scope: string): { scheduled: Scheduled | null; repeat: Repeat | null } {
-  const root = item._node || item
+  const root = item.metadata._node
   const occDate = item.date || root.date || null
   const occTime = item.time || root.time || null
   const rootDate = root.date || null
   const rootTime = root.time || null
   if (scope === 'single') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: null }
-  if (scope === 'future') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: root.repeat || null }
+  if (scope === 'future') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: item.metadata.repeat || null }
   if (scope === 'add') return { scheduled: { date: fmtISO(TODAY), time: occTime || '' }, repeat: null }
-  return { scheduled: rootDate ? { date: rootDate, time: rootTime || '' } : null, repeat: root.repeat || null }
+  return { scheduled: rootDate ? { date: rootDate, time: rootTime || '' } : null, repeat: item.metadata.repeat || null }
 }
 
 export function buildBodyHtml(text: string): string {
@@ -399,7 +399,7 @@ function applyFutureEdits(
 export function saveNode(item: Occurrence | null, editScope: string, fields: any): void {
   const { title, tags, body, tracked, done, priority, scheduled, duration, repeat } = fields
   if (!title) return
-  const rootNode = item ? (item._node || item) : null
+  const rootNode = item ? item.metadata._node : null
   const nodes = getNodes()
   const existingIdx = rootNode ? nodes.findIndex(n => n === rootNode || (n.id && n.id === rootNode.id)) : -1
   const isNew = existingIdx < 0
@@ -551,7 +551,7 @@ export function deleteNode(
   onConfirmSingle?: (title: string, onConfirm: () => void) => void,
 ): void {
   if (!item) return
-  const node = item._node || item
+  const node = item.metadata._node
   const nodeId = node.id
   const occDate = item.date || node.date || ''
 

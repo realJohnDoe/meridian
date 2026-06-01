@@ -1,7 +1,8 @@
 import { useMemo, useCallback } from 'react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { expandRange } from '../model/expand'
+import { extractAppMetadata } from '../types'
+import { expandRange } from '../model/expansion'
 import {
   sameDay, addDays, dayKey, sortOccs,
   toggleOccDone, beginSwipeDelete,
@@ -20,7 +21,7 @@ export default function AgendaView({ onOpen }: Props) {
   const groups = useMemo(() => {
     const from = addDays(TODAY, -7)
     const to = addDays(TODAY, 90)
-    const occs = expandRange(nodes, from, to) as Occurrence[]
+    const occs = expandRange(nodes, from, to, extractAppMetadata)
 
     const result: Record<string, { date: Date; items: Occurrence[] }> = {}
 
@@ -35,7 +36,7 @@ export default function AgendaView({ onOpen }: Props) {
     // Multiday events that are NOT on their start date are skipped; they'll
     // appear only once (on the start date) as a banner.
     occs.forEach(o => {
-      if (o.multiday && !sameDay(o.jsTime, new Date(o.multiday.start))) return
+      if (o.metadata.multiday && !sameDay(o.jsTime, new Date(o.metadata.multiday.start))) return
       const k = dayKey(o.jsTime)
       if (!result[k]) {
         result[k] = {
@@ -48,11 +49,11 @@ export default function AgendaView({ onOpen }: Props) {
 
     // Second pass: ensure every multiday event has at least one banner on its
     // start date even if the start-date occurrence was filtered out above.
-    occs.filter(o => o.multiday).forEach(o => {
-      const k = dayKey(new Date(o.multiday!.start))
-      if (!result[k]) result[k] = { date: new Date(o.multiday!.start), items: [] }
-      if (!result[k].items.find(x => x._nodeId === o._nodeId && x.multiday)) {
-        result[k].items.push({ ...o, _isBanner: true })
+    occs.filter(o => o.metadata.multiday).forEach(o => {
+      const k = dayKey(new Date(o.metadata.multiday!.start))
+      if (!result[k]) result[k] = { date: new Date(o.metadata.multiday!.start), items: [] }
+      if (!result[k].items.find(x => x.metadata._nodeId === o.metadata._nodeId && x.metadata.multiday)) {
+        result[k].items.push({ ...o, metadata: { ...o.metadata, _isBanner: true } })
       }
     })
 
@@ -74,15 +75,15 @@ export default function AgendaView({ onOpen }: Props) {
         // Collect deduplicated multiday banners for this day.
         const mdSeen = new Set<string>()
         const multidayBanners: Occurrence[] = []
-        g.items.filter(o => o.multiday).forEach(o => {
-          if (!mdSeen.has(o._nodeId)) {
-            mdSeen.add(o._nodeId)
+        g.items.filter(o => o.metadata.multiday).forEach(o => {
+          if (!mdSeen.has(o.metadata._nodeId)) {
+            mdSeen.add(o.metadata._nodeId)
             multidayBanners.push(o)
           }
         })
 
         // Non-multiday items, sorted (sortOccs mutates in place and returns).
-        const nonMdItems = sortOccs([...g.items.filter(o => !o.multiday)]) as Occurrence[]
+        const nonMdItems = sortOccs([...g.items.filter(o => !o.metadata.multiday)])
 
         return (
           <DaySection

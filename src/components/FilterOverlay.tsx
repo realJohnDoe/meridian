@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { Plus, Repeat2 } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { expandRange, fmtT } from '../model/expand'
+import { extractAppMetadata } from '../types'
+import { expandRange, fmtT } from '../model/expansion'
 import { addDays, fmtShort, barClass } from '../meridian'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
@@ -40,10 +41,10 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
     if (!query) return []
     const from = addDays(TODAY, -7)
     const to   = addDays(TODAY, 90)
-    const occs = expandRange(nodes, from, to) as Occurrence[]
+    const occs = expandRange(nodes, from, to, extractAppMetadata)
     return occs
-      .filter(o => fuzzyMatch(query, o.title))
-      .map(o => ({ occ: o, score: fuzzyScore(query, o.title) }))
+      .filter(o => fuzzyMatch(query, o.metadata.title))
+      .map(o => ({ occ: o, score: fuzzyScore(query, o.metadata.title) }))
       .sort((a, b) => b.score - a.score || +a.occ.jsTime - +b.occ.jsTime)
       .map(x => x.occ)
   }, [nodes, query])
@@ -66,12 +67,12 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
 
       {results.map((o, i) => {
         const t = fmtT(o.time)
-        const hasTrack = o.done !== undefined
-        const isDone = !!o.done
+        const hasTrack = o.metadata.done !== undefined
+        const isDone = !!o.metadata.done
 
         return (
           <div
-            key={`${o._nodeId}-${o.date}`}
+            key={`${o.metadata._nodeId}-${o.date}`}
             className="swipe-wrap"
             style={{ animation: 'fadeUp .16s ease both', animationDelay: `${i * 0.025}s` }}
           >
@@ -88,13 +89,13 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
                   {hasTrack && (
                     <Checkbox checked={isDone} disabled className="size-5" />
                   )}
-                  <span className={`occ-title${isDone ? ' done-t' : ''}`}>{o.title}</span>
-                  {o.recur && <span className="orecur"><Repeat2 size={12} /></span>}
+                  <span className={`occ-title${isDone ? ' done-t' : ''}`}>{o.metadata.title}</span>
+                  {o.metadata.recur && <span className="orecur"><Repeat2 size={12} /></span>}
                   <span style={{ opacity: 0.5, fontSize: 10, marginLeft: 4 }}>{fmtShort(o.jsTime)}</span>
                 </div>
-                {(o.tags || []).length > 0 && (
+                {(o.metadata.tags || []).length > 0 && (
                   <div className="occ-meta">
-                    {(o.tags || []).slice(0, 2).map(tg => (
+                    {(o.metadata.tags || []).slice(0, 2).map(tg => (
                       <Badge key={tg} variant="tag">{tg}</Badge>
                     ))}
                   </div>
