@@ -43,11 +43,12 @@ export const ENTRY_DEFAULT: EntryState = {
 }
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
-// Tailwind classes that override the chip's default aria-pressed indigo colour
+// Tailwind classes that override the chip's default aria-pressed indigo colour.
+// Tokens are defined via @theme inline in index.css — colours stay in CSS, not JS.
 const PRIORITY_CLASS: Record<string, string> = {
-  high:   'aria-[pressed=true]:bg-red-400/15 aria-[pressed=true]:border-red-400 aria-[pressed=true]:text-red-400',
-  medium: 'aria-[pressed=true]:bg-orange-400/15 aria-[pressed=true]:border-orange-400 aria-[pressed=true]:text-orange-400',
-  low:    'aria-[pressed=true]:bg-yellow-400/15 aria-[pressed=true]:border-yellow-400 aria-[pressed=true]:text-yellow-400',
+  high:   'aria-[pressed=true]:bg-p1/15 aria-[pressed=true]:border-p1 aria-[pressed=true]:text-p1',
+  medium: 'aria-[pressed=true]:bg-p2/15 aria-[pressed=true]:border-p2 aria-[pressed=true]:text-p2',
+  low:    'aria-[pressed=true]:bg-p3/15 aria-[pressed=true]:border-p3 aria-[pressed=true]:text-p3',
 }
 
 function autoResize(el: HTMLTextAreaElement) {

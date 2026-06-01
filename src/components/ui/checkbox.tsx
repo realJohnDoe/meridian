@@ -20,8 +20,8 @@ const Checkbox = React.forwardRef<
     )}
     {...props}
   >
-    <CheckboxPrimitive.Indicator className="flex items-center justify-center">
-      <Check className="stroke-white fill-none" strokeWidth={2.5} />
+    <CheckboxPrimitive.Indicator className="flex w-full h-full items-center justify-center">
+      <Check className="size-[55%] stroke-white fill-none" strokeWidth={2.5} />
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
 ))
