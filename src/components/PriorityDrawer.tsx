@@ -53,7 +53,6 @@ export default function PriorityDrawer({ open, value, onSelect, onClose }: Props
         </div>
 
         <DrawerActions
-          removeLabel="None"
           onRemove={() => { onSelect(null); onClose() }}
           onCancel={onClose}
           onSet={() => { onSelect(pending); onClose() }}
