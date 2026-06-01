@@ -288,19 +288,19 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         <div className="prop-chips">
           {showDateChip && (
             <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}>
-              <Calendar />Date
+              <Calendar size={13} />Date
               <span className="text-[11px] font-mono opacity-80 ml-px">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
             </button>
           )}
           {showDateChip && hasDate && (
             <button className={badgeVariants({ variant: 'chip' })} aria-pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}>
-              <Clock />Time
+              <Clock size={13} />Time
               <span className="text-[11px] font-mono opacity-80 ml-px">{hasTime ? scheduled!.time : ''}</span>
             </button>
           )}
           {showDateChip && hasDate && (
             <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}>
-              <Timer />Duration
+              <Timer size={13} />Duration
               <span className="text-[11px] font-mono opacity-80 ml-px">{duration}</span>
             </button>
           )}
@@ -310,13 +310,13 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
               aria-pressed={!!priority}
               onClick={() => onOpenDlg('dlgPriority')}
             >
-              <Flag />Priority
+              <Flag size={13} />Priority
               <span className="text-[11px] font-mono opacity-80 ml-px">{priority ? PRIORITY_LABELS[priority] : ''}</span>
             </button>
           )}
           {showRepeat && (
             <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}>
-              <Repeat />Repeat
+              <Repeat size={13} />Repeat
               <span className="text-[11px] font-mono opacity-80 ml-px">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
             </button>
           )}
@@ -340,9 +340,13 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
               onBlur={commitTag}
             />
           ) : (
-            <span className="etag etag-add" onClick={() => setShowTagInput(true)}>
-              <Plus /> tag
-            </span>
+            <Badge
+              variant="tag"
+              className="cursor-pointer text-primary bg-[var(--ab)] gap-1"
+              onClick={() => setShowTagInput(true)}
+            >
+              <Plus size={9} />tag
+            </Badge>
           )}
         </div>
 

@@ -289,8 +289,6 @@
 .type-chip-event.active{color:var(--ind)}
 .type-chip-note.active{color:var(--amb)}
 .entry-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;align-items:center}
-.etag-add{color:var(--ind);border-color:var(--ind);background:var(--ab);cursor:pointer;display:inline-flex;align-items:center;gap:4px}
-.etag-add svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5}
 .etag-input{background:var(--bg3);border:1px solid var(--ind);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--t0);outline:none;width:90px;font-family:inherit}
 .etag-input::placeholder{color:var(--t3)}
 .entry-divider{height:1px;background:var(--bdr);margin-bottom:14px}
@@ -313,7 +311,7 @@
 .error-banner-close:hover{opacity:1}
 
 /* scope selector */
-.scope-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:7px 12px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r)}
+.scope-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 /* .sheet-opt / .sopt-* removed — SeriesScopeDrawer now uses Tailwind */
 
 /* ── SWIPE GESTURES ── */

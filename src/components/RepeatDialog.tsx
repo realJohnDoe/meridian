@@ -347,7 +347,7 @@ export default function RepeatDialog({
                 }
               }}
             >
-              <SelectTrigger className="w-full py-2">
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
