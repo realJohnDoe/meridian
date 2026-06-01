@@ -6,6 +6,7 @@ import { NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
 import { Checkbox } from './ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { cn } from '@/lib/utils'
 
 export type { Scheduled }
 
@@ -42,10 +43,11 @@ export const ENTRY_DEFAULT: EntryState = {
 }
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
-const PRIORITY_STYLE: Record<string, React.CSSProperties> = {
-  high:   { background: 'var(--p1-bg)', borderColor: 'var(--p1)', color: 'var(--p1)' },
-  medium: { background: 'var(--p2-bg)', borderColor: 'var(--p2)', color: 'var(--p2)' },
-  low:    { background: 'var(--p3-bg)', borderColor: 'var(--p3)', color: 'var(--p3)' },
+// Tailwind classes that override the chip's default aria-pressed indigo colour
+const PRIORITY_CLASS: Record<string, string> = {
+  high:   'aria-[pressed=true]:bg-red-400/15 aria-[pressed=true]:border-red-400 aria-[pressed=true]:text-red-400',
+  medium: 'aria-[pressed=true]:bg-orange-400/15 aria-[pressed=true]:border-orange-400 aria-[pressed=true]:text-orange-400',
+  low:    'aria-[pressed=true]:bg-yellow-400/15 aria-[pressed=true]:border-yellow-400 aria-[pressed=true]:text-yellow-400',
 }
 
 function autoResize(el: HTMLTextAreaElement) {
@@ -194,7 +196,6 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   // notes: no scheduling chips; events: date/time/duration + repeat (schedule only); tasks: everything
   const showDateChip = !isNote
   const showRepeat = !isNote && (hasDate || tracked) && !isSingleScope
-  const priorityChipStyle = priority ? PRIORITY_STYLE[priority] : undefined
   const bodyKey = item ? `${item._nodeId || item.id || 'item'}-${item.date || ''}-${editScope}` : 'new'
 
   // Set body HTML imperatively so React never touches innerHTML during re-renders
@@ -304,9 +305,8 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           )}
           {tracked && (
             <button
-              className={badgeVariants({ variant: 'chip' })}
+              className={cn(badgeVariants({ variant: 'chip' }), priority && PRIORITY_CLASS[priority])}
               aria-pressed={!!priority}
-              style={priorityChipStyle}
               onClick={() => onOpenDlg('dlgPriority')}
             >
               <Flag />Priority
