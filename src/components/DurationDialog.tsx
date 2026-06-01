@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog'
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from './ui/drawer'
 import { Button } from './ui/button'
+import { Separator } from './ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
 // ── Data ──────────────────────────────────────────────────────────────────────
@@ -23,12 +25,10 @@ const UNIT_ITEMS: Record<Unit, number[]> = {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-/** Find the nearest value in an array */
 function nearest(items: number[], target: number): number {
   return items.reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a)
 }
 
-/** "2 hours" → { n: 2, unit: 'hours' }. Falls back to { 30, 'minutes' }. */
 function parseDuration(s: string): { n: number; unit: Unit } {
   if (!s) return { n: 1, unit: 'hours' }
   const match = s.match(/^(\d+)\s*(minutes?|hours?|days?|weeks?|months?|years?)$/i)
@@ -46,7 +46,6 @@ function serialise(n: number, unit: Unit): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 interface Props {
   open: boolean
-  /** Serialised duration string e.g. "2 hours", "30 minutes", or "" */
   value: string
   onConfirm: (duration: string) => void
   onRemove: () => void
@@ -67,21 +66,22 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
   }, [open, value])
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-xs p-5">
-        <DialogHeader>
-          <DialogTitle>Duration</DialogTitle>
-          <DialogDescription className="sr-only">
-            Select a duration using the number input and unit select dropdown
-          </DialogDescription>
-        </DialogHeader>
+    <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
+      <DrawerContent>
+        <DrawerHeader className="px-4 pt-3 pb-0">
+          <DrawerTitle>Duration</DrawerTitle>
+          <DrawerDescription className="sr-only">
+            Set a duration using the number input and unit selector
+          </DrawerDescription>
+          <Separator className="mt-2" />
+        </DrawerHeader>
 
         {/* Number input + unit selector */}
-        <div className="flex gap-2 py-3">
+        <div className="flex gap-2 px-4 py-4">
           <input
             type="number"
             min={1}
-            className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-mono text-foreground transition-colors"
+            className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 text-xs font-mono text-foreground transition-colors h-7"
             value={n}
             onChange={(e) => setN(Math.max(1, parseInt(e.target.value, 10) || 1))}
           />
@@ -99,8 +99,8 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
           </Select>
         </div>
 
-        {/* Footer: Remove on left, Cancel + Set on right */}
-        <div className="flex items-center justify-between pt-3 border-t border-border/50">
+        <Separator />
+        <DrawerFooter>
           <Button
             variant="outline"
             size="sm"
@@ -110,16 +110,11 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
             Remove
           </Button>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={() => { onConfirm(serialise(n, unit)); onClose() }}>
-              Set
-            </Button>
+            <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+            <Button size="sm" onClick={() => { onConfirm(serialise(n, unit)); onClose() }}>Set</Button>
           </div>
-        </div>
-
-      </DialogContent>
-    </Dialog>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
   )
 }
