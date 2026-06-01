@@ -15,10 +15,16 @@ import type { RawNode } from './nodeSchema'
  * A node after inheritance has been fully applied.
  * The `defaults:` block is consumed — it does not appear here.
  * Each child in `instances` is already resolved with inherited values.
+ *
+ * `childDefaults` holds the accumulated defaults that were passed down to
+ * this node's children (parent accumulated + this node's own `defaults:`).
+ * The expansion engine uses this to seed generated occurrences, which are
+ * semantically equivalent to virtual children with only a date override.
  */
 export interface EffectiveNode {
-  fields:    Record<string, unknown>
-  instances: EffectiveNode[]
+  fields:        Record<string, unknown>
+  childDefaults: Record<string, unknown>
+  instances:     EffectiveNode[]
 }
 
 // ── Spec helpers ──────────────────────────────────────────────────────────────
@@ -110,7 +116,7 @@ export function buildEffectiveTree(
   const rawInstances = Array.isArray(node.instances) ? (node.instances as RawNode[]) : []
   const instances    = rawInstances.map(child => buildEffectiveTree(child, accumulated))
 
-  return { fields, instances }
+  return { fields, childDefaults: accumulated, instances }
 }
 
 // ── Value display ─────────────────────────────────────────────────────────────

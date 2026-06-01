@@ -412,29 +412,32 @@ export function treeHasOccurrences(node: EffectiveNode): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TOEXPANDABLE  (internal — lifts shared fields from all child instances)
+// TOEXPANDABLE  (internal)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SCHEDULING_FIELDS = new Set(['date', 'time', 'repeat', 'instances', 'excluded', 'defaults'])
 
+/**
+ * Build a duck-typed node suitable for expandNode() from an EffectiveNode.
+ *
+ * Generated occurrences are semantically virtual children with only a date
+ * override, so they should inherit from the node's accumulated childDefaults —
+ * the same defaults its explicit child instances inherit.  This correctly
+ * handles series that store task defaults (done, priority, …) inside a
+ * `defaults:` block rather than as direct fields.
+ */
 function toExpandable(node: EffectiveNode): Record<string, unknown> {
   const fields: Record<string, unknown> = { ...node.fields }
-  fields.instances = node.instances.map(child => ({ ...child.fields }))
 
-  if (node.instances.length > 0) {
-    const allKeys = new Set<string>()
-    for (const child of node.instances) {
-      for (const key of Object.keys(child.fields)) allKeys.add(key)
-    }
-    for (const key of allKeys) {
-      if (SCHEDULING_FIELDS.has(key) || key in fields) continue
-      const values = node.instances.map(c => c.fields[key])
-      if (!values.every(v => v !== undefined)) continue
-      const first = values[0]
-      const allSame = values.every(v => JSON.stringify(v) === JSON.stringify(first))
-      if (allSame) fields[key] = first
+  // Seed base values for generated occurrences from accumulated child defaults.
+  // Fields already on the node and scheduling-structural keys are skipped.
+  for (const [key, value] of Object.entries(node.childDefaults)) {
+    if (!SCHEDULING_FIELDS.has(key) && !(key in fields)) {
+      fields[key] = value
     }
   }
+
+  fields.instances = node.instances.map(child => ({ ...child.fields }))
   return fields
 }
 
