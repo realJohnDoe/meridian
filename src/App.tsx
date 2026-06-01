@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Menu, FolderSync, FolderOpen, CalendarCheck2, Search,
   ChevronLeft, ChevronRight,
-  AlignLeft, CalendarDays, CalendarClock,
   Plus, X,
 } from 'lucide-react'
 import {
@@ -17,7 +16,8 @@ import type { SeriesSheetConfig } from './meridian'
 import { fmtISO } from './model/expand'
 import { TODAY } from './constants'
 import { useStore } from './store'
-import type { PrimaryView } from './store'
+import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
+import { AppSidebar } from './components/AppSidebar'
 import EntryEditor, { EntryState, ENTRY_DEFAULT, ItemType } from './components/EntryEditor'
 import RepeatDialog from './components/RepeatDialog'
 import DatePickerDialog from './components/DatePickerDialog'
@@ -63,13 +63,11 @@ export default function App() {
   const [entry, setEntry] = useState<EntryState>(ENTRY_DEFAULT)
   const [activeDialog, setActiveDialog] = useState<string | null>(null)
   const [filterQuery, setFilterQuery] = useState('')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void } | null>(null)
   const [seriesSheetConfig, setSeriesSheetConfig] = useState<SeriesSheetConfig | null>(null)
 
   // ── Navigation state (source of truth) ───────────────────────
   const primaryView  = useStore(s => s.primaryView)
-  const setPrimary   = useStore(s => s.setPrimaryView)
   const overlayStack = useStore(s => s.overlayStack)
   const popOverlay   = useStore(s => s.popOverlay)
   const topOverlay   = overlayStack[overlayStack.length - 1] // 'entry' | 'search' | undefined
@@ -194,14 +192,15 @@ export default function App() {
     setActiveDialog(null)
   }, [])
 
-  // Sidebar nav: switch primary view and close the panel
-  const navTo = (v: PrimaryView) => {
-    setSidebarOpen(false)
-    setPrimary(v)
-  }
-
+  // Docs-pattern: AppSidebar and #app are siblings inside SidebarProvider.
+  // On mobile the Sidebar renders as a Sheet portal so it takes no layout space;
+  // #app (flex:1) fills the row and is constrained to 430 px wide.
   return (
-    <>
+    <SidebarProvider defaultOpen={false} className="h-full">
+
+      {/* ── SIDEBAR ── sibling to main content, as per shadcn docs */}
+      <AppSidebar />
+
       <div id="app">
 
         {/* ── TOPBAR ── visible only when no overlay is active */}
@@ -210,7 +209,7 @@ export default function App() {
             {showDayHeader ? (
               /* Day-view header: date title + prev/next navigation */
               <div className="tb-l" style={{ flex: 1, gap: 4, overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
-                <button className="ib" onClick={() => setSidebarOpen(true)} title="Menu"><Menu /></button>
+                <MenuButton />
                 <span style={{ flex: 1, fontFamily: 'var(--disp)', fontStyle: 'italic', fontSize: 15, color: 'var(--t0)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {fmtLong(dvDate)}
                 </span>
@@ -220,7 +219,7 @@ export default function App() {
             ) : (
               /* Default header: logo + app name */
               <div className="tb-l" id="tbDefault">
-                <button className="ib" onClick={() => setSidebarOpen(true)} title="Menu"><Menu /></button>
+                <MenuButton />
                 <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{ borderRadius: 5 }} alt="Meridian" />
                 <span className="vault-name">Meridian</span>
               </div>
@@ -281,38 +280,6 @@ export default function App() {
           />
         </section>
 
-        {/* ── SIDEBAR ── */}
-        <div
-          className={`sidebar-ov${sidebarOpen ? ' open' : ''}`}
-          onClick={() => setSidebarOpen(false)}
-        />
-        <div className={`sidebar${sidebarOpen ? ' open' : ''}`}>
-          <div className="sidebar-head">
-            <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{ borderRadius: 5 }} alt="Meridian" />
-            <span className="sidebar-title">Meridian</span>
-          </div>
-          <div className="sidebar-body">
-            <button
-              className={`sni${primaryView === 'agenda' && !topOverlay ? ' active' : ''}`}
-              onClick={() => navTo('agenda')}
-            >
-              <AlignLeft />Agenda
-            </button>
-            <button
-              className={`sni${primaryView === 'calendar' && !topOverlay ? ' active' : ''}`}
-              onClick={() => navTo('calendar')}
-            >
-              <CalendarDays />Month
-            </button>
-            <button
-              className={`sni${primaryView === 'day' && !topOverlay ? ' active' : ''}`}
-              onClick={() => navTo('day')}
-            >
-              <CalendarClock />Day
-            </button>
-          </div>
-        </div>
-
         {/* ── FILTER OVERLAY ── sits above views, below topbar and search bar */}
         {showBottomFloat && (
           <FilterOverlay
@@ -366,7 +333,7 @@ export default function App() {
 
       </div>{/* end #app */}
 
-      {/* ── DIALOGS ── */}
+      {/* ── DIALOGS ── all use portals so their position in the tree doesn't matter */}
 
       {/* DATE — shadcn Dialog + react-day-picker Calendar */}
       <DatePickerDialog
@@ -436,6 +403,17 @@ export default function App() {
         onConfirm={() => pendingDelete?.onConfirm()}
         onClose={() => setPendingDelete(null)}
       />
-    </>
+
+    </SidebarProvider>
+  )
+}
+
+/** Toggles the sidebar — works for both mobile (Sheet) and desktop (offcanvas) */
+function MenuButton() {
+  const { toggleSidebar } = useSidebar()
+  return (
+    <button className="ib" onClick={toggleSidebar} title="Menu">
+      <Menu />
+    </button>
   )
 }
