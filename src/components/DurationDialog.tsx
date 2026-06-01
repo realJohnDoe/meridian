@@ -3,11 +3,10 @@ import {
   Drawer,
   DrawerContent,
   DrawerDescription,
-  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
+  DrawerActions,
 } from './ui/drawer'
-import { Button } from './ui/button'
 import { Separator } from './ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
@@ -99,21 +98,11 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
           </Select>
         </div>
 
-        <Separator />
-        <DrawerFooter>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => { onRemove(); onClose() }}
-          >
-            Remove
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" onClick={() => { onConfirm(serialise(n, unit)); onClose() }}>Set</Button>
-          </div>
-        </DrawerFooter>
+        <DrawerActions
+          onRemove={() => { onRemove(); onClose() }}
+          onCancel={onClose}
+          onSet={() => { onConfirm(serialise(n, unit)); onClose() }}
+        />
       </DrawerContent>
     </Drawer>
   )

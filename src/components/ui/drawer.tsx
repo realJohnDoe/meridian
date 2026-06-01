@@ -1,6 +1,9 @@
 import * as React from 'react'
 import { Drawer as DrawerPrimitive } from 'vaul'
+import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Button } from './button'
+import { Separator } from './separator'
 
 const Drawer = DrawerPrimitive.Root
 const DrawerTrigger = DrawerPrimitive.Trigger
@@ -35,7 +38,7 @@ const DrawerContent = React.forwardRef<
         'fixed bottom-0 left-1/2 z-50 -translate-x-1/2',
         'w-full max-w-[430px]',
         'bg-background border-t border-border rounded-t-[24px]',
-        'focus:outline-none',
+        'pb-6 focus:outline-none',
         className,
       )}
       {...props}
@@ -91,6 +94,39 @@ const DrawerDescription = React.forwardRef<
 ))
 DrawerDescription.displayName = 'DrawerDescription'
 
+// ── Actions footer ───────────────────────────────────────────────
+// Renders Separator + the standard Remove / Cancel / Set row.
+// Used by every property drawer so the layout is defined once.
+interface DrawerActionsProps {
+  onRemove: () => void
+  onCancel: () => void
+  onSet: () => void
+  removeLabel?: string
+  setDisabled?: boolean
+}
+
+const DrawerActions = ({ onRemove, onCancel, onSet, removeLabel = 'Remove', setDisabled }: DrawerActionsProps) => (
+  <>
+    <Separator />
+    <DrawerFooter>
+      <Button
+        variant="outline"
+        size="sm"
+        className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+        onClick={onRemove}
+      >
+        <X size={13} />
+        {removeLabel}
+      </Button>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button size="sm" disabled={setDisabled} onClick={onSet}>Set</Button>
+      </div>
+    </DrawerFooter>
+  </>
+)
+DrawerActions.displayName = 'DrawerActions'
+
 export {
   Drawer,
   DrawerTrigger,
@@ -102,4 +138,5 @@ export {
   DrawerFooter,
   DrawerTitle,
   DrawerDescription,
+  DrawerActions,
 }

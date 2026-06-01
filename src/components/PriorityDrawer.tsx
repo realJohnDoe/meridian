@@ -1,12 +1,11 @@
-import { Flag, X } from 'lucide-react'
-import { Drawer, DrawerContent, DrawerTitle, DrawerFooter } from './ui/drawer'
+import { useState, useEffect } from 'react'
+import { Flag } from 'lucide-react'
+import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from './ui/drawer'
 import { Separator } from './ui/separator'
-import { Button } from './ui/button'
 import { badgeVariants } from './ui/badge'
 import { cn } from '../lib/utils'
 import type { Priority } from '../types'
 
-// Same token-backed classes used by the priority chip in EntryEditor
 const PRIORITY_CLASS: Record<string, string> = {
   high:   'aria-[pressed=true]:bg-p1/15 aria-[pressed=true]:border-p1 aria-[pressed=true]:text-p1',
   medium: 'aria-[pressed=true]:bg-p2/15 aria-[pressed=true]:border-p2 aria-[pressed=true]:text-p2',
@@ -27,9 +26,14 @@ interface Props {
 }
 
 export default function PriorityDrawer({ open, value, onSelect, onClose }: Props) {
+  const [pending, setPending] = useState<Priority | null>(value)
+
+  // Sync pending to current value whenever the drawer opens
+  useEffect(() => { if (open) setPending(value) }, [open, value])
+
   return (
     <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
-      <DrawerContent className="pt-3 pb-6">
+      <DrawerContent className="pt-3">
 
         <DrawerTitle>Priority</DrawerTitle>
         <Separator />
@@ -38,8 +42,8 @@ export default function PriorityDrawer({ open, value, onSelect, onClose }: Props
           {PRIORITIES.map((p) => (
             <button
               key={p.value}
-              onClick={() => onSelect(p.value)}
-              aria-pressed={value === p.value}
+              onClick={() => setPending(p.value)}
+              aria-pressed={pending === p.value}
               className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center', PRIORITY_CLASS[p.value])}
             >
               <Flag size={13} />
@@ -48,22 +52,12 @@ export default function PriorityDrawer({ open, value, onSelect, onClose }: Props
           ))}
         </div>
 
-        <Separator />
-
-        <DrawerFooter>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => onSelect(null)}
-          >
-            <X size={13} />
-            None
-          </Button>
-          <Button variant="outline" size="sm" onClick={onClose}>
-            Cancel
-          </Button>
-        </DrawerFooter>
+        <DrawerActions
+          removeLabel="None"
+          onRemove={() => { onSelect(null); onClose() }}
+          onCancel={onClose}
+          onSet={() => { onSelect(pending); onClose() }}
+        />
 
       </DrawerContent>
     </Drawer>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { addDays } from 'date-fns'
-import { Drawer, DrawerContent, DrawerTitle, DrawerFooter } from './ui/drawer'
+import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from './ui/drawer'
 import { Separator } from './ui/separator'
 import { Calendar } from './ui/calendar'
 import { Button } from './ui/button'
@@ -72,7 +72,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
   // DrawerFooter owns: gap below separator (pt-4, built into component) and px-4
   return (
     <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
-      <DrawerContent className="pt-3 pb-6">
+      <DrawerContent className="pt-3">
 
         <DrawerTitle>Date</DrawerTitle>
         <Separator />
@@ -115,27 +115,12 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           </div>
         </div>
 
-        <Separator />
-
-        {/* DrawerFooter supplies pt-4 (gap below separator) and px-4 */}
-        <DrawerFooter>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => { onRemove(); onClose() }}
-          >
-            Remove
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleSet} disabled={!selected}>
-              Set
-            </Button>
-          </div>
-        </DrawerFooter>
+        <DrawerActions
+          onRemove={() => { onRemove(); onClose() }}
+          onCancel={onClose}
+          onSet={handleSet}
+          setDisabled={!selected}
+        />
 
       </DrawerContent>
     </Drawer>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Info, X } from 'lucide-react'
+import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '../types'
 import { parseDateString } from '../model/expand'
 import {
@@ -7,7 +7,7 @@ import {
   DrawerContent,
   DrawerTitle,
   DrawerDescription,
-  DrawerFooter,
+  DrawerActions,
 } from './ui/drawer'
 import {
   Dialog,
@@ -17,7 +17,6 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Separator } from './ui/separator'
-import { Button } from './ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { badgeVariants } from './ui/badge'
 import { Calendar } from './ui/calendar'
@@ -316,6 +315,13 @@ export default function RepeatDialog({
     setWdays(prev => { const next = [...prev]; next[i] = !next[i]; return next })
   }
 
+  function handleSet() {
+    const finalIntervalNum = Math.max(1, intervalNum)
+    const finalCompletionNum = Math.max(1, completionNum)
+    onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, serialiseCompletionInterval(finalCompletionNum, completionUnit), finalIntervalNum, scheduled?.date))
+    onClose()
+  }
+
   return (
     <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
       <DrawerContent className="pt-3 pb-6">
@@ -518,33 +524,11 @@ export default function RepeatDialog({
           )}
         </div>
 
-        <Separator />
-
-        {/* Footer: Remove on left, Cancel + Set on right */}
-        <DrawerFooter>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive gap-1.5"
-            onClick={() => { onRemove(); onClose() }}
-          >
-            <X className="h-3.5 w-3.5" />
-            Remove
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={() => {
-                const finalIntervalNum = Math.max(1, intervalNum);
-                const finalCompletionNum = Math.max(1, completionNum);
-                onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, serialiseCompletionInterval(finalCompletionNum, completionUnit), finalIntervalNum, scheduled?.date));
-                onClose();
-              }}>
-              Set
-            </Button>
-          </div>
-        </DrawerFooter>
+        <DrawerActions
+          onRemove={() => { onRemove(); onClose() }}
+          onCancel={onClose}
+          onSet={handleSet}
+        />
 
         {/* Nested Calendar Dialog for End Date selection */}
         <Dialog open={endCalOpen} onOpenChange={(o) => !o && setEndCalOpen(false)}>
