@@ -2,7 +2,22 @@ import { Flag, X } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerTitle, DrawerFooter } from './ui/drawer'
 import { Separator } from './ui/separator'
 import { Button } from './ui/button'
+import { badgeVariants } from './ui/badge'
+import { cn } from '../lib/utils'
 import type { Priority } from '../types'
+
+// Same token-backed classes used by the priority chip in EntryEditor
+const PRIORITY_CLASS: Record<string, string> = {
+  high:   'aria-[pressed=true]:bg-p1/15 aria-[pressed=true]:border-p1 aria-[pressed=true]:text-p1',
+  medium: 'aria-[pressed=true]:bg-p2/15 aria-[pressed=true]:border-p2 aria-[pressed=true]:text-p2',
+  low:    'aria-[pressed=true]:bg-p3/15 aria-[pressed=true]:border-p3 aria-[pressed=true]:text-p3',
+}
+
+const PRIORITIES: { value: Priority; label: string }[] = [
+  { value: 'high',   label: 'High'   },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low',    label: 'Low'    },
+]
 
 interface Props {
   open: boolean
@@ -10,13 +25,6 @@ interface Props {
   onSelect: (p: Priority | null) => void
   onClose: () => void
 }
-
-// Priority option config — keeps JSX clean
-const PRIORITIES: { value: Priority; label: string; color: string; bg: string; border: string }[] = [
-  { value: 'high',   label: 'High',   color: 'var(--p1)', bg: 'rgba(248,113,113,.12)', border: 'rgba(248,113,113,.4)' },
-  { value: 'medium', label: 'Medium', color: 'var(--p2)', bg: 'rgba(251,146,60,.12)',  border: 'rgba(251,146,60,.4)'  },
-  { value: 'low',    label: 'Low',    color: 'var(--p3)', bg: 'rgba(250,204,21,.12)',  border: 'rgba(250,204,21,.4)'  },
-]
 
 export default function PriorityDrawer({ open, value, onSelect, onClose }: Props) {
   return (
@@ -26,21 +34,16 @@ export default function PriorityDrawer({ open, value, onSelect, onClose }: Props
         <DrawerTitle>Priority</DrawerTitle>
         <Separator />
 
-        <div className="px-4 pt-4 pb-4 flex flex-col gap-2">
+        <div className="flex gap-2 px-4 pt-4 pb-4">
           {PRIORITIES.map((p) => (
             <button
               key={p.value}
               onClick={() => onSelect(p.value)}
-              style={{ background: p.bg, color: p.color, borderColor: p.border }}
-              className="flex items-center justify-center gap-2 w-full h-11 rounded-xl
-                         text-sm font-medium border transition-opacity
-                         active:opacity-70"
+              aria-pressed={value === p.value}
+              className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center', PRIORITY_CLASS[p.value])}
             >
-              <Flag size={14} />
+              <Flag size={13} />
               {p.label}
-              {value === p.value && (
-                <span className="ml-auto mr-1 text-xs opacity-60">✓</span>
-              )}
             </button>
           ))}
         </div>
