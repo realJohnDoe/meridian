@@ -27,12 +27,17 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Priority colours — exposed as Tailwind tokens so components can use
-   bg-p1/15, border-p1, text-p1, etc. without hardcoding hex values */
+/* Shared interactive control height — used by inputs, selects, and chips */
+:root {
+  --control-h: 1.75rem; /* 28px */
+}
+
+/* Priority colours and control height exposed as Tailwind tokens */
 @theme inline {
   --color-p1: var(--p1);
   --color-p2: var(--p2);
   --color-p3: var(--p3);
+  --height-control: var(--control-h);
 }
 
 /* Meridian is always dark — map shadcn tokens to the app's own palette */

@@ -12,7 +12,7 @@ const badgeVariants = cva(
         // Interactive toggle chip — replaces .fchip and .pchip
         // Active state driven by aria-pressed; priority colors via inline style override
         chip: [
-          'px-2.5 py-1 text-xs rounded-full border border-border/50 bg-secondary text-secondary-foreground cursor-pointer',
+          'h-control px-2.5 text-xs rounded-full border border-border/50 bg-secondary text-secondary-foreground cursor-pointer',
           'aria-[pressed=true]:bg-[var(--ab2)] aria-[pressed=true]:text-primary aria-[pressed=true]:border-primary',
         ],
       },

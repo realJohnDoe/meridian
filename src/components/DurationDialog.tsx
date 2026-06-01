@@ -81,7 +81,7 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
           <input
             type="number"
             min={1}
-            className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 text-xs font-mono text-foreground transition-colors h-7"
+            className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-xs font-mono text-foreground transition-colors"
             value={n}
             onChange={(e) => setN(Math.max(1, parseInt(e.target.value, 10) || 1))}
           />
