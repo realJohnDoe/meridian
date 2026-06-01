@@ -19,6 +19,7 @@ import {
 import { Separator } from './ui/separator'
 import { Button } from './ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { badgeVariants } from './ui/badge'
 import { Calendar } from './ui/calendar'
 import { cn } from '../lib/utils'
 
@@ -399,12 +400,8 @@ export default function RepeatDialog({
                     <button
                       key={d}
                       onClick={() => toggleWday(i)}
-                      className={cn(
-                        "flex-1 py-2 rounded-lg border text-[11px] text-center transition-all cursor-pointer",
-                        wdays[i]
-                          ? "bg-primary/10 border-primary text-primary font-semibold"
-                          : "bg-secondary border-border/50 text-muted-foreground hover:bg-secondary/80"
-                      )}
+                      aria-pressed={wdays[i]}
+                      className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center')}
                     >
                       {d}
                     </button>
@@ -456,12 +453,8 @@ export default function RepeatDialog({
                     <button
                       key={t}
                       onClick={() => setEndType(t)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer",
-                        endType === t
-                          ? "bg-primary/10 border-primary text-primary font-medium"
-                          : "bg-secondary border-border/50 text-muted-foreground hover:bg-secondary/80"
-                      )}
+                      aria-pressed={endType === t}
+                      className={badgeVariants({ variant: 'chip' })}
                     >
                       {t === 'never' ? 'Never' : t === 'until' ? 'On date' : 'After N'}
                     </button>
