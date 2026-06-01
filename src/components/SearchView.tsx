@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import type { Occurrence } from '../types'
 import { expandRange } from '../model/expand'
 import { addDays, fmtShort, NOTES_DATA } from '../meridian'
+import { Badge, badgeVariants } from './ui/badge'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 
@@ -111,7 +112,8 @@ export default function SearchView({ onOpen, onClose }: Props) {
         {chips.map(c => (
           <button
             key={c.value}
-            className={`fchip${nsFilterVal === c.value ? ' on' : ''}`}
+            className={badgeVariants({ variant: 'chip' })}
+            aria-pressed={nsFilterVal === c.value}
             onClick={() => setNsFilter(c.value)}
           >
             {c.label}
@@ -136,7 +138,7 @@ export default function SearchView({ onOpen, onClose }: Props) {
                     <div className="nr-m">
                       <span className="nr-d">{it.date}</span>
                       {it.tags.slice(0, 2).map(tg => (
-                        <span key={tg} className="otag">{tg}</span>
+                        <Badge key={tg} variant="tag">{tg}</Badge>
                       ))}
                     </div>
                   </div>

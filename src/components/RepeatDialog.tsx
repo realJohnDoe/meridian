@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Info, X } from 'lucide-react'
+import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '../types'
 import { parseDateString } from '../model/expand'
 import {
@@ -7,7 +7,7 @@ import {
   DrawerContent,
   DrawerTitle,
   DrawerDescription,
-  DrawerFooter,
+  DrawerActions,
 } from './ui/drawer'
 import {
   Dialog,
@@ -18,6 +18,8 @@ import {
 } from './ui/dialog'
 import { Separator } from './ui/separator'
 import { Button } from './ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { badgeVariants } from './ui/badge'
 import { Calendar } from './ui/calendar'
 import { cn } from '../lib/utils'
 
@@ -314,6 +316,13 @@ export default function RepeatDialog({
     setWdays(prev => { const next = [...prev]; next[i] = !next[i]; return next })
   }
 
+  function handleSet() {
+    const finalIntervalNum = Math.max(1, intervalNum)
+    const finalCompletionNum = Math.max(1, completionNum)
+    onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, serialiseCompletionInterval(finalCompletionNum, completionUnit), finalIntervalNum, scheduled?.date))
+    onClose()
+  }
+
   return (
     <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
       <DrawerContent className="pt-3 pb-6">
@@ -333,12 +342,10 @@ export default function RepeatDialog({
           {/* Topmost Dropdown for Repeat Type */}
           <div className="flex flex-col gap-1.5">
             <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">Repeat Type</div>
-            <select
-              className="w-full bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary cursor-pointer transition-colors disabled:cursor-not-allowed disabled:text-muted-foreground/70"
+            <Select
               disabled={!hasSched || !hasTrk}
               value={freq === 'after_completion' ? 'after_completion' : 'schedule'}
-              onChange={(e) => {
-                const val = e.target.value as 'schedule' | 'after_completion'
+              onValueChange={(val) => {
                 if (val === 'after_completion') {
                   setFreq('after_completion')
                 } else {
@@ -348,9 +355,14 @@ export default function RepeatDialog({
                 }
               }}
             >
-              <option value="schedule">Calendar Schedule</option>
-              <option value="after_completion">After Completion</option>
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="schedule">Calendar Schedule</SelectItem>
+                <SelectItem value="after_completion">After Completion</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Conditional Sections */}
@@ -363,7 +375,7 @@ export default function RepeatDialog({
                   <input
                     type="number"
                     min={1}
-                    className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-mono text-foreground transition-colors"
+                    className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-xs font-mono text-foreground transition-colors"
                     value={intervalNum === 0 ? '' : intervalNum}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -374,16 +386,17 @@ export default function RepeatDialog({
                       }
                     }}
                   />
-                  <select
-                    className="flex-1 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-semibold text-primary cursor-pointer transition-colors"
-                    value={freq}
-                    onChange={(e) => setFreq(e.target.value as Freq)}
-                  >
-                    <option value="daily">days</option>
-                    <option value="weekly">weeks</option>
-                    <option value="monthly">months</option>
-                    <option value="yearly">years</option>
-                  </select>
+                  <Select value={freq} onValueChange={(v) => setFreq(v as Freq)}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">days</SelectItem>
+                      <SelectItem value="weekly">weeks</SelectItem>
+                      <SelectItem value="monthly">months</SelectItem>
+                      <SelectItem value="yearly">years</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -394,12 +407,8 @@ export default function RepeatDialog({
                     <button
                       key={d}
                       onClick={() => toggleWday(i)}
-                      className={cn(
-                        "flex-1 py-2 rounded-lg border text-[11px] text-center transition-all cursor-pointer",
-                        wdays[i]
-                          ? "bg-primary/10 border-primary text-primary font-semibold"
-                          : "bg-secondary border-border/50 text-muted-foreground hover:bg-secondary/80"
-                      )}
+                      aria-pressed={wdays[i]}
+                      className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center')}
                     >
                       {d}
                     </button>
@@ -451,12 +460,8 @@ export default function RepeatDialog({
                     <button
                       key={t}
                       onClick={() => setEndType(t)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer",
-                        endType === t
-                          ? "bg-primary/10 border-primary text-primary font-medium"
-                          : "bg-secondary border-border/50 text-muted-foreground hover:bg-secondary/80"
-                      )}
+                      aria-pressed={endType === t}
+                      className={badgeVariants({ variant: 'chip' })}
                     >
                       {t === 'never' ? 'Never' : t === 'until' ? 'On date' : 'After N'}
                     </button>
@@ -493,7 +498,7 @@ export default function RepeatDialog({
                 <input
                   type="number"
                   min={1}
-                  className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-mono text-foreground transition-colors"
+                  className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-xs font-mono text-foreground transition-colors"
                   value={completionNum === 0 ? '' : completionNum}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -504,48 +509,27 @@ export default function RepeatDialog({
                     }
                   }}
                 />
-                <select
-                  className="flex-1 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-semibold text-primary cursor-pointer transition-colors"
-                  value={completionUnit}
-                  onChange={(e) => setCompletionUnit(e.target.value)}
-                >
-                  <option value="days">{completionNum === 1 ? 'day' : 'days'}</option>
-                  <option value="weeks">{completionNum === 1 ? 'week' : 'weeks'}</option>
-                  <option value="months">{completionNum === 1 ? 'month' : 'months'}</option>
-                  <option value="years">{completionNum === 1 ? 'year' : 'years'}</option>
-                </select>
+                <Select value={completionUnit} onValueChange={setCompletionUnit}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">{completionNum === 1 ? 'day' : 'days'}</SelectItem>
+                    <SelectItem value="weeks">{completionNum === 1 ? 'week' : 'weeks'}</SelectItem>
+                    <SelectItem value="months">{completionNum === 1 ? 'month' : 'months'}</SelectItem>
+                    <SelectItem value="years">{completionNum === 1 ? 'year' : 'years'}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}
         </div>
 
-        <Separator />
-
-        {/* Footer: Remove on left, Cancel + Set on right */}
-        <DrawerFooter>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive gap-1.5"
-            onClick={() => { onRemove(); onClose() }}
-          >
-            <X className="h-3.5 w-3.5" />
-            Remove
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={() => {
-                const finalIntervalNum = Math.max(1, intervalNum);
-                const finalCompletionNum = Math.max(1, completionNum);
-                onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, serialiseCompletionInterval(finalCompletionNum, completionUnit), finalIntervalNum, scheduled?.date));
-                onClose();
-              }}>
-              Set
-            </Button>
-          </div>
-        </DrawerFooter>
+        <DrawerActions
+          onRemove={() => { onRemove(); onClose() }}
+          onCancel={onClose}
+          onSet={handleSet}
+        />
 
         {/* Nested Calendar Dialog for End Date selection */}
         <Dialog open={endCalOpen} onOpenChange={(o) => !o && setEndCalOpen(false)}>

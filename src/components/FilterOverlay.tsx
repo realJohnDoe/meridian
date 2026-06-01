@@ -1,9 +1,11 @@
 import { useMemo } from 'react'
-import { Plus, Check, Repeat2 } from 'lucide-react'
+import { Plus, Repeat2 } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
 import { expandRange, fmtT } from '../model/expand'
 import { addDays, fmtShort, barClass } from '../meridian'
+import { Checkbox } from './ui/checkbox'
+import { Badge } from './ui/badge'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 
@@ -84,9 +86,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
               <div className="occ-body">
                 <div className="occ-tr">
                   {hasTrack && (
-                    <div className={`occ-chk${isDone ? ' done' : ''}`} style={{ flexShrink: 0 }}>
-                      <Check size={14} />
-                    </div>
+                    <Checkbox checked={isDone} disabled className="size-5" />
                   )}
                   <span className={`occ-title${isDone ? ' done-t' : ''}`}>{o.title}</span>
                   {o.recur && <span className="orecur"><Repeat2 size={12} /></span>}
@@ -95,7 +95,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
                 {(o.tags || []).length > 0 && (
                   <div className="occ-meta">
                     {(o.tags || []).slice(0, 2).map(tg => (
-                      <span key={tg} className={`otag${o.type === 'event' ? ' ev' : ''}`}>{tg}</span>
+                      <Badge key={tg} variant="tag">{tg}</Badge>
                     ))}
                   </div>
                 )}
