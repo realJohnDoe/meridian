@@ -1,8 +1,10 @@
 import { useRef, useEffect, useState } from 'react'
-import { Check, Repeat2, Trash2 } from 'lucide-react'
+import { Repeat2, Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
 import { fmtT } from '../model/expand'
 import { barClass } from '../meridian'
+import { Checkbox } from './ui/checkbox'
+import { Badge } from './ui/badge'
 
 interface Props {
   occ: Occurrence
@@ -128,12 +130,6 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
     }
   }, []) // listeners are stable; callback accessed via ref
 
-  function handleCheckClick(e: React.MouseEvent) {
-    e.stopPropagation()
-    setIsDone(prev => !prev) // optimistic — store will confirm via occ.done effect
-    onToggleDone()
-  }
-
   // Compute bar class with optimistic done value so the colour changes instantly.
   const effectiveDone = hasTrack ? isDone : (occ.done as boolean | undefined)
   const currentBarClass = barClass({ ...occ, done: effectiveDone })
@@ -155,7 +151,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       <div
         className={`swipe-row occ-row${isDone ? ' is-done' : ''}`}
         ref={rowRef}
-        onClick={e => { if (!(e.target as HTMLElement).closest('.occ-chk')) onOpen() }}
+        onClick={e => { if (!(e.target as HTMLElement).closest('[role=checkbox]')) onOpen() }}
       >
         <div className="occ-left">
           <span className={`occ-time${t ? ' timed' : ''}`}>{t || ''}</span>
@@ -167,13 +163,12 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
         <div className="occ-body">
           <div className="occ-tr">
             {hasTrack && (
-              <div
-                className={`occ-chk${isDone ? ' done' : ''}`}
-                style={{ flexShrink: 0 }}
-                onClick={handleCheckClick}
-              >
-                <Check size={14} />
-              </div>
+              <Checkbox
+                checked={isDone}
+                onCheckedChange={() => { setIsDone(prev => !prev); onToggleDone() }}
+                onClick={e => e.stopPropagation()}
+                className="size-5 mt-px"
+              />
             )}
             <span className={`occ-title${isDone ? ' done-t' : ''}`}>{occ.title}</span>
             {occ.recur && <span className="orecur"><Repeat2 size={12} /></span>}
@@ -182,7 +177,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
           {(occ.tags || []).length > 0 && (
             <div className="occ-meta">
               {(occ.tags || []).slice(0, 2).map(tg => (
-                <span key={tg} className={`otag${occ.type === 'event' ? ' ev' : ''}`}>{tg}</span>
+                <Badge key={tg} variant="tag">{tg}</Badge>
               ))}
             </div>
           )}

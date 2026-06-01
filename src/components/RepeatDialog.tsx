@@ -18,6 +18,7 @@ import {
 } from './ui/dialog'
 import { Separator } from './ui/separator'
 import { Button } from './ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Calendar } from './ui/calendar'
 import { cn } from '../lib/utils'
 
@@ -333,12 +334,10 @@ export default function RepeatDialog({
           {/* Topmost Dropdown for Repeat Type */}
           <div className="flex flex-col gap-1.5">
             <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">Repeat Type</div>
-            <select
-              className="w-full bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary cursor-pointer transition-colors disabled:cursor-not-allowed disabled:text-muted-foreground/70"
+            <Select
               disabled={!hasSched || !hasTrk}
               value={freq === 'after_completion' ? 'after_completion' : 'schedule'}
-              onChange={(e) => {
-                const val = e.target.value as 'schedule' | 'after_completion'
+              onValueChange={(val) => {
                 if (val === 'after_completion') {
                   setFreq('after_completion')
                 } else {
@@ -348,9 +347,14 @@ export default function RepeatDialog({
                 }
               }}
             >
-              <option value="schedule">Calendar Schedule</option>
-              <option value="after_completion">After Completion</option>
-            </select>
+              <SelectTrigger className="w-full py-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="schedule">Calendar Schedule</SelectItem>
+                <SelectItem value="after_completion">After Completion</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Conditional Sections */}
@@ -374,16 +378,17 @@ export default function RepeatDialog({
                       }
                     }}
                   />
-                  <select
-                    className="flex-1 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-semibold text-primary cursor-pointer transition-colors"
-                    value={freq}
-                    onChange={(e) => setFreq(e.target.value as Freq)}
-                  >
-                    <option value="daily">days</option>
-                    <option value="weekly">weeks</option>
-                    <option value="monthly">months</option>
-                    <option value="yearly">years</option>
-                  </select>
+                  <Select value={freq} onValueChange={(v) => setFreq(v as Freq)}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">days</SelectItem>
+                      <SelectItem value="weekly">weeks</SelectItem>
+                      <SelectItem value="monthly">months</SelectItem>
+                      <SelectItem value="yearly">years</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -504,16 +509,17 @@ export default function RepeatDialog({
                     }
                   }}
                 />
-                <select
-                  className="flex-1 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-semibold text-primary cursor-pointer transition-colors"
-                  value={completionUnit}
-                  onChange={(e) => setCompletionUnit(e.target.value)}
-                >
-                  <option value="days">{completionNum === 1 ? 'day' : 'days'}</option>
-                  <option value="weeks">{completionNum === 1 ? 'week' : 'weeks'}</option>
-                  <option value="months">{completionNum === 1 ? 'month' : 'months'}</option>
-                  <option value="years">{completionNum === 1 ? 'year' : 'years'}</option>
-                </select>
+                <Select value={completionUnit} onValueChange={setCompletionUnit}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">{completionNum === 1 ? 'day' : 'days'}</SelectItem>
+                    <SelectItem value="weeks">{completionNum === 1 ? 'week' : 'weeks'}</SelectItem>
+                    <SelectItem value="months">{completionNum === 1 ? 'month' : 'months'}</SelectItem>
+                    <SelectItem value="years">{completionNum === 1 ? 'year' : 'years'}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}

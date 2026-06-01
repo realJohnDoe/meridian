@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useRef } from 'react'
-import { Check } from 'lucide-react'
 import { useStore } from '../store'
+import { Checkbox } from './ui/checkbox'
 import type { Occurrence } from '../types'
 import { expandRange, fmtT, parseDurationHours } from '../model/expand'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
@@ -56,7 +56,7 @@ function AllDayItem({ o, onOpen }: AllDayItemProps) {
       className={`dv-aditem ${o.multiday ? 'multiday' : dvBlkClass(o)}`}
       onClick={() => onOpen(o)}
     >
-      {hasTrack && <div className={`dv-chk${o.done ? ' done' : ''}`}><Check size={12} /></div>}
+      {hasTrack && <Checkbox checked={!!o.done} tabIndex={-1} aria-hidden className="size-3.5 opacity-70 pointer-events-none" />}
       <span>{o.title}</span>
     </div>
   )
@@ -87,7 +87,7 @@ function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
       onClick={() => onOpen(o)}
     >
       <div className="dv-et">
-        {hasTrack && <div className={`dv-blk-chk${o.done ? ' done' : ''}`}><Check size={11} /></div>}
+        {hasTrack && <Checkbox checked={!!o.done} tabIndex={-1} aria-hidden className="size-3 pointer-events-none" />}
         {o.title}
       </div>
       <div className="dv-em">

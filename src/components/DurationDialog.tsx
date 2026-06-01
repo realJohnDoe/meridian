@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Button } from './ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 const UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
@@ -84,17 +85,18 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
             value={n}
             onChange={(e) => setN(Math.max(1, parseInt(e.target.value, 10) || 1))}
           />
-          <select
-            className="flex-1 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-1.5 text-xs font-semibold text-primary cursor-pointer transition-colors"
-            value={unit}
-            onChange={(e) => setUnit(e.target.value as Unit)}
-          >
-            {UNITS.map(u => (
-              <option key={u} value={u}>
-                {n === 1 ? u.replace(/s$/, '') : u}
-              </option>
-            ))}
-          </select>
+          <Select value={unit} onValueChange={(v) => setUnit(v as Unit)}>
+            <SelectTrigger className="flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {UNITS.map(u => (
+                <SelectItem key={u} value={u}>
+                  {n === 1 ? u.replace(/s$/, '') : u}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Footer: Remove on left, Cancel + Set on right */}

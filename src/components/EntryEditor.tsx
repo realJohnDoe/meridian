@@ -1,8 +1,11 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
-import { ArrowLeft, Trash2, Check, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText } from 'lucide-react'
+import React, { useRef, useEffect, useState, useCallback } from 'react'
+import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue } from '../types'
 import { useStore } from '../store'
 import { NOTES_DATA } from '../meridian'
+import { Badge, badgeVariants } from './ui/badge'
+import { Checkbox } from './ui/checkbox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 
 export type { Scheduled }
 
@@ -39,7 +42,11 @@ export const ENTRY_DEFAULT: EntryState = {
 }
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
-const PRIORITY_CLASS: Record<string, string> = { high: 'p1', medium: 'p2', low: 'p3' }
+const PRIORITY_STYLE: Record<string, React.CSSProperties> = {
+  high:   { background: 'var(--p1-bg)', borderColor: 'var(--p1)', color: 'var(--p1)' },
+  medium: { background: 'var(--p2-bg)', borderColor: 'var(--p2)', color: 'var(--p2)' },
+  low:    { background: 'var(--p3-bg)', borderColor: 'var(--p3)', color: 'var(--p3)' },
+}
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto'
@@ -187,7 +194,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   // notes: no scheduling chips; events: date/time/duration + repeat (schedule only); tasks: everything
   const showDateChip = !isNote
   const showRepeat = !isNote && (hasDate || tracked) && !isSingleScope
-  const priorityChipClass = ['pchip', !tracked ? 'hidden' : '', priority ? 'on' : '', priority ? PRIORITY_CLASS[priority] : ''].filter(Boolean).join(' ')
+  const priorityChipStyle = priority ? PRIORITY_STYLE[priority] : undefined
   const bodyKey = item ? `${item._nodeId || item.id || 'item'}-${item.date || ''}-${editScope}` : 'new'
 
   // Set body HTML imperatively so React never touches innerHTML during re-renders
@@ -229,12 +236,11 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
         <div className="entry-title-row">
           {tracked && (
-            <div
-              className={['echk', 'show', done ? 'on' : ''].filter(Boolean).join(' ')}
-              onClick={() => onChange(prev => ({ ...prev, done: !prev.done }))}
-            >
-              <Check />
-            </div>
+            <Checkbox
+              checked={done}
+              onCheckedChange={() => onChange(prev => ({ ...prev, done: !prev.done }))}
+              className="size-6 mt-1"
+            />
           )}
           <textarea
             ref={titleRef}
@@ -263,49 +269,61 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
         {showScopeRow && (
           <div className="scope-row">
-            <select className="scope-select" value={editScope} onChange={e => handleScopeChange(e.target.value)}>
-              <option value="add">Add new occurrence</option>
-              <option value="single">Edit this occurrence</option>
-              {isScheduled && <option value="future">Edit this and all following occurrences</option>}
-              {(isScheduled || isAfterCompletion) && <option value="all">Edit repeat pattern</option>}
-            </select>
+            <Select value={editScope} onValueChange={handleScopeChange}>
+              <SelectTrigger className="flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="add">Add new occurrence</SelectItem>
+                <SelectItem value="single">Edit this occurrence</SelectItem>
+                {isScheduled && <SelectItem value="future">Edit this and all following occurrences</SelectItem>}
+                {(isScheduled || isAfterCompletion) && <SelectItem value="all">Edit repeat pattern</SelectItem>}
+              </SelectContent>
+            </Select>
           </div>
         )}
 
         <div className="prop-chips">
           {showDateChip && (
-            <button className={`pchip${scheduled ? ' on' : ''}`} onClick={() => onOpenDlg('dlgSched')}>
+            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}>
               <Calendar />Date
-              <span className="pchip-sum">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
+              <span className="text-[11px] font-mono opacity-80 ml-px">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
             </button>
           )}
-          {showDateChip && (
-            <button className={`pchip${!hasDate ? ' hidden' : ''}${hasTime ? ' on' : ''}`} onClick={() => onOpenDlg('dlgTime')}>
+          {showDateChip && hasDate && (
+            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}>
               <Clock />Time
-              <span className="pchip-sum">{hasTime ? scheduled!.time : ''}</span>
+              <span className="text-[11px] font-mono opacity-80 ml-px">{hasTime ? scheduled!.time : ''}</span>
             </button>
           )}
-          {showDateChip && (
-            <button className={`pchip${!hasDate ? ' hidden' : ''}${duration ? ' on' : ''}`} onClick={() => onOpenDlg('dlgDur')}>
+          {showDateChip && hasDate && (
+            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}>
               <Timer />Duration
-              <span className="pchip-sum">{duration}</span>
+              <span className="text-[11px] font-mono opacity-80 ml-px">{duration}</span>
             </button>
           )}
-          <button className={priorityChipClass} onClick={() => onOpenDlg('dlgPriority')}>
-            <Flag />Priority
-            <span className="pchip-sum">{priority ? PRIORITY_LABELS[priority] : ''}</span>
-          </button>
+          {tracked && (
+            <button
+              className={badgeVariants({ variant: 'chip' })}
+              aria-pressed={!!priority}
+              style={priorityChipStyle}
+              onClick={() => onOpenDlg('dlgPriority')}
+            >
+              <Flag />Priority
+              <span className="text-[11px] font-mono opacity-80 ml-px">{priority ? PRIORITY_LABELS[priority] : ''}</span>
+            </button>
+          )}
           {showRepeat && (
-            <button className={`pchip${repeat ? ' on' : ''}`} onClick={() => onOpenRepeatDlg(itemType)}>
+            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}>
               <Repeat />Repeat
-              <span className="pchip-sum">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
+              <span className="text-[11px] font-mono opacity-80 ml-px">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
             </button>
           )}
         </div>
 
         <div className="entry-tags">
           {tags.map((t, i) => (
-            <span key={i} className="etag">{t}</span>
+            <Badge key={i} variant="tag">{t}</Badge>
           ))}
           {showTagInput ? (
             <input
