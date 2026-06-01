@@ -34,11 +34,47 @@ export interface OccurrenceEntry {
 
 // ── Expandable builder ────────────────────────────────────────────────────────
 
-/** Build a duck-typed node suitable for expandNode() from an EffectiveNode. */
+// Fields that belong to scheduling structure and must not be lifted from children.
+const SCHEDULING_FIELDS = new Set(['date', 'time', 'repeat', 'instances', 'excluded', 'defaults'])
+
+/**
+ * Build a duck-typed node suitable for expandNode() from an EffectiveNode.
+ *
+ * Extra step: lift fields that are shared by ALL child instances but absent
+ * from the parent's own fields.  This handles the case where a series node
+ * stores properties inside a `defaults:` block for its override instances
+ * rather than as direct fields.  Generated occurrences are semantically
+ * equivalent to child instances without explicit overrides and should inherit
+ * those shared defaults too.
+ *
+ * Only truly-shared values (identical across every child) are lifted.
+ * Fields that vary between children (e.g. done: true on some, done: false on
+ * others) are not lifted — their variation is an occurrence-level concern, not
+ * a series-level one.
+ */
 function toExpandable(node: EffectiveNode): Record<string, unknown> {
   const fields = { ...node.fields }
-  // repeat is already in flat format — no normalisation needed
   fields.instances = node.instances.map(child => ({ ...child.fields }))
+
+  if (node.instances.length > 0) {
+    // Collect every key seen across all child instances
+    const allKeys = new Set<string>()
+    for (const child of node.instances) {
+      for (const key of Object.keys(child.fields)) allKeys.add(key)
+    }
+
+    for (const key of allKeys) {
+      if (SCHEDULING_FIELDS.has(key) || key in fields) continue
+
+      // Lift only when ALL children carry exactly the same value.
+      const values = node.instances.map(c => c.fields[key])
+      if (!values.every(v => v !== undefined)) continue
+      const first = values[0]
+      const allSame = values.every(v => JSON.stringify(v) === JSON.stringify(first))
+      if (allSame) fields[key] = first
+    }
+  }
+
   return fields
 }
 

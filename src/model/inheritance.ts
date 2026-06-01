@@ -200,6 +200,48 @@ function collapseInstance(
 }
 
 /**
+ * Restructure a flat raw node into two-level canonical form.
+ *
+ * The inverse of "applying defaults during loading": given a node where every
+ * field is explicit (no inheritance), produce a node where:
+ *
+ *   - `structuralKeys` (e.g. date, repeat, instances, defaults) are kept as
+ *     direct fields unconditionally.
+ *   - `directKeys` (e.g. title) are kept as direct fields only when they
+ *     differ from `parentDefaults`; otherwise omitted (will be inherited).
+ *   - All remaining fields that differ from `parentDefaults` are placed in a
+ *     nested `defaults:` block so every generated occurrence inherits them.
+ *   - Fields matching `parentDefaults` are dropped entirely.
+ *
+ * This function is field-agnostic: it never inspects field semantics.
+ * The caller decides which keys are structural or direct.
+ */
+export function canonicaliseInstance(
+  raw:            Record<string, unknown>,
+  parentDefaults: Record<string, unknown>,
+  structuralKeys: ReadonlySet<string>,
+  directKeys:     ReadonlySet<string> = new Set(),
+): Record<string, unknown> {
+  const direct: Record<string, unknown> = {}
+  const nested: Record<string, unknown> = {}
+
+  for (const [k, v] of Object.entries(raw)) {
+    if (structuralKeys.has(k)) {
+      direct[k] = v
+    } else if (directKeys.has(k)) {
+      // Keep directly only if it overrides the inherited value
+      if (!deepEqual(v, parentDefaults[k])) direct[k] = v
+    } else {
+      // Occurrence-level field: nested defaults unless it matches inheritance
+      if (!deepEqual(v, parentDefaults[k])) nested[k] = v
+    }
+  }
+
+  if (Object.keys(nested).length > 0) direct.defaults = nested
+  return direct
+}
+
+/**
  * Collapse an EffectiveNode tree back to the most compact YAML representation.
  * Fields shared across all direct instances become `defaults:`.
  */

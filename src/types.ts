@@ -82,6 +82,13 @@ export interface Occurrence {
   id?: string
   /** True when this row is a multiday banner duplicate. */
   _isBanner?: boolean
+  /**
+   * Path of instance indices from the root Node to the node whose `repeat`
+   * produced this occurrence. `[]` when the root itself has the repeat.
+   * `[1]` when `root.instances[1]` has the repeat (split series), etc.
+   * Used by "edit this & following" to split the correct series.
+   */
+  ownerPath?: number[]
   /** Computed duration in hours (set during day-view layout). */
   _dh?: number
   /** Computed end timestamp in ms (set during day-view layout). */
