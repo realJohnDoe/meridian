@@ -16,7 +16,7 @@ import {
 import {
   dayBefore, getSubNode, setSubNode, doEditFollowing,
 } from '../model/nodeOps'
-import { yamlParse } from '../yaml'
+import { yamlParse, splitFrontmatter, wrapFrontmatter } from '../fileIO'
 import type { Occurrence, Priority, Repeat as RepeatType } from '../types'
 import EntryEditor, { type EntryState } from '../components/EntryEditor'
 import RepeatDialog from '../components/RepeatDialog'
@@ -86,12 +86,6 @@ function toOccurrence(
 // applyNodeEdit and shouldCollapse are imported from '../nodeEdit'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
-
-function extractFrontmatter(content: string): { fm: string; body: string } {
-  const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
-  if (m) return { fm: m[1], body: m[2].trim() }
-  return { fm: content, body: '' }
-}
 
 function defaultEndDate(): string {
   const d = new Date()
@@ -430,7 +424,7 @@ export default function NodeInheritanceDebugger() {
     setSelectedIdx(null)
     setActiveAction(null)
 
-    const { fm } = extractFrontmatter(content)
+    const { fm } = splitFrontmatter(content)
     let parsed: unknown
     try { parsed = yamlParse(fm) }
     catch (e) { setZodErrors([`YAML parse error: ${String(e)}`]); return }
@@ -445,19 +439,19 @@ export default function NodeInheritanceDebugger() {
   }, [])
 
   const applyRawNode = useCallback((newNode: RawNode) => {
-    const { body } = extractFrontmatter(displayContent)
-    processContent(serializeRawNode(newNode, body), fileName)
+    const { body } = splitFrontmatter(displayContent)
+    processContent(wrapFrontmatter(serializeRawNode(newNode), body), fileName)
   }, [displayContent, fileName, processContent])
 
   const handleCollapse = useCallback(() => {
     if (!results) return
-    const { body } = extractFrontmatter(originalContent || displayContent)
-    const collapsed = collapseToYaml(results, body)
+    const { body } = splitFrontmatter(originalContent || displayContent)
+    const collapsed = wrapFrontmatter(collapseToYaml(results), body)
     setDisplayContent(collapsed)
     setIsCollapsed(true)
     setSelectedIdx(null)
     setActiveAction(null)
-    const { fm } = extractFrontmatter(collapsed)
+    const { fm } = splitFrontmatter(collapsed)
     try {
       const v = RawNodeSchema.safeParse(yamlParse(fm))
       if (v.success) { const rn = v.data as RawNode; setRawNode(rn); setResults(buildEffectiveTree(rn)); setZodErrors([]) }
@@ -528,10 +522,10 @@ export default function NodeInheritanceDebugger() {
     const updated = applyNodeEdit(rawNode, debugEntry, body)
 
     if (shouldCollapse(debugEntry)) {
-      const { body: origBody } = extractFrontmatter(displayContent)
+      const { body: origBody } = splitFrontmatter(displayContent)
       const effectiveTree = buildEffectiveTree(updated)
-      const collapsed = collapseToYaml(effectiveTree, origBody)
-      const { fm } = extractFrontmatter(collapsed)
+      const collapsed = wrapFrontmatter(collapseToYaml(effectiveTree), origBody)
+      const { fm } = splitFrontmatter(collapsed)
       try {
         const v = RawNodeSchema.safeParse(yamlParse(fm))
         if (v.success) {
