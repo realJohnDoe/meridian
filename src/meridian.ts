@@ -1,7 +1,14 @@
-import Dexie from 'dexie'
 import { fmtISO, fmtT, nodeDateTime, parseDateString } from './model/expansion'
-import { nodeToFile, fileToNode, titleToSlug } from './yaml'
-import { serializeRawNode } from './model/inheritance'
+import {
+  cacheWrite, cacheWriteClean, cacheDelete, cacheGetDirty,
+  cacheMarkClean, cacheDirtyCount,
+  dirHandleSave, dirHandleLoad, dirHandleClear,
+  cacheInit,
+} from './cache'
+import {
+  diskPickDirectory, diskReadAll, diskWrite, diskDelete,
+  loadFile, saveFile, titleToSlug,
+} from './fileIO'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
 import type { Node, Occurrence, Repeat, Scheduled, Instance, Priority } from './types'
 import { occKind, occIsRecur } from './types'
@@ -10,20 +17,6 @@ import type { EntryState, ItemType } from './components/EntryEditor'
 import { applyNodeEdit } from './nodeEdit'
 import { useStore } from './store'
 import { TODAY } from './constants'
-
-// ── FILE SYSTEM ACCESS API ─────────────────────────────────────
-// These methods exist in all modern browsers but aren't yet in TypeScript's
-// built-in DOM lib (as of TS 5.8). Extend the existing interfaces via merging.
-declare global {
-  interface Window {
-    showDirectoryPicker(options?: { mode?: 'read' | 'readwrite' }): Promise<FileSystemDirectoryHandle>
-  }
-  interface FileSystemDirectoryHandle {
-    entries(): AsyncIterableIterator<[string, FileSystemFileHandle]>
-    queryPermission(options?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>
-    requestPermission(options?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>
-  }
-}
 
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
 // Passed from deleteNode → App so the sheet is driven by React state only.
@@ -579,151 +572,13 @@ function nodeToPath(node: Node): string {
   return path
 }
 
-// ── DEXIE (IndexedDB cache) ───────────────────────────────────
-
-interface CacheRecord {
-  path: string
-  content: string
-  dirty: number
-  updatedAt: number
-}
-
-interface MetaRecord {
-  key: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value: any
-}
-
-class MeridianDB extends Dexie {
-  files!: Dexie.Table<CacheRecord, string>
-  meta!: Dexie.Table<MetaRecord, string>
-  constructor() {
-    super('meridian_v2')
-    this.version(1).stores({ files: 'path,dirty,updatedAt' })
-    this.version(2).stores({ files: 'path,dirty,updatedAt', meta: 'key' })
-  }
-}
-
-let db: MeridianDB | null = null
-let _cacheInitPromise: Promise<MeridianDB> | null = null
-
-async function cacheInit(): Promise<MeridianDB> {
-  if (db) return db
-  if (_cacheInitPromise) return _cacheInitPromise
-  _cacheInitPromise = (async () => {
-    db = new MeridianDB()
-    await db.open()
-    return db
-  })()
-  return _cacheInitPromise
-}
-
-async function cacheWrite(path: string, content: string): Promise<void> {
-  const d = await cacheInit()
-  await d.files.put({ path, content, dirty: 1, updatedAt: Date.now() })
-}
-
-async function cacheWriteClean(path: string, content: string): Promise<void> {
-  const d = await cacheInit()
-  await d.files.put({ path, content, dirty: 0, updatedAt: Date.now() })
-}
-
-async function cacheDelete(path: string): Promise<void> {
-  const d = await cacheInit()
-  await d.files.delete(path)
-}
-
-async function cacheGetDirty(): Promise<CacheRecord[]> {
-  const d = await cacheInit()
-  return d.files.where('dirty').equals(1).toArray()
-}
-
-async function cacheMarkClean(path: string): Promise<void> {
-  const d = await cacheInit()
-  await d.files.update(path, { dirty: 0 })
-}
-
-async function cacheDirtyCount(): Promise<number> {
-  if (!db) return 0
-  try { return await db.files.where('dirty').equals(1).count() }
-  catch { return 0 }
-}
-
-async function dirHandleSave(h: FileSystemDirectoryHandle): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.put({ key: 'dirHandle', value: h })
-}
-
-async function dirHandleLoad(): Promise<FileSystemDirectoryHandle | null> {
-  const d = await cacheInit()
-  const record = await d.meta.get('dirHandle')
-  return (record?.value as FileSystemDirectoryHandle) ?? null
-}
-
-async function dirHandleClear(): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.delete('dirHandle')
-}
-
 // Module-level pending handle (needs user gesture before requestPermission can be called).
 let _pendingDirHandle: FileSystemDirectoryHandle | null = null
-
-async function diskPickDirectory(): Promise<void> {
-  if (!window.showDirectoryPicker) {
-    throw new Error('Your browser does not support folder access. Use Chrome or Edge, and open this file directly (not in a preview).')
-  }
-  try {
-    const h = await window.showDirectoryPicker({ mode: 'readwrite' })
-    setDirHandle(h)
-    await dirHandleSave(h)
-  } catch (e) {
-    if ((e as Error).name === 'AbortError') throw e
-    if ((e as Error).name === 'SecurityError') {
-      throw new Error('Folder access is blocked here. This happens inside embedded previews. Save this HTML file and open it directly in Chrome or Edge.')
-    }
-    throw e
-  }
-}
-
-async function diskReadAll(): Promise<Array<{ path: string; content: string }>> {
-  const dh = getDirHandle()
-  if (!dh) return []
-  const results: Array<{ path: string; content: string }> = []
-  for await (const [name, fh] of dh.entries()) {
-    if (!name.endsWith('.md') && !name.endsWith('.yaml') && !name.endsWith('.yml')) continue
-    try {
-      const file = await fh.getFile()
-      const content = await file.text()
-      results.push({ path: name, content })
-    } catch (e) { console.warn('[storage] could not read', name, e) }
-  }
-  return results
-}
-
-async function diskWrite(path: string, content: string): Promise<void> {
-  const dh = getDirHandle()
-  if (!dh) throw new Error('No vault folder connected')
-  const perm = await dh.queryPermission({ mode: 'readwrite' })
-  if (perm !== 'granted') {
-    const ask = await dh.requestPermission({ mode: 'readwrite' })
-    if (ask !== 'granted') throw new Error('Write permission denied')
-  }
-  const fh = await dh.getFileHandle(path, { create: true })
-  const w = await fh.createWritable()
-  await w.write(content)
-  await w.close()
-}
-
-async function diskDelete(path: string): Promise<void> {
-  const dh = getDirHandle()
-  if (!dh) return
-  try { await dh.removeEntry(path) } catch { }
-}
 
 /** Runtime/internal fields that must not be written to YAML. */
 const _INTERNAL_FIELDS = new Set(['id', '_path'])
 
-/** Strip runtime fields from a Node to get a plain RawNode suitable for serializeRawNode. */
+/** Strip runtime fields from a Node to get a plain object suitable for saveFile. */
 function toRawNode(node: Node): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(node)) {
@@ -732,21 +587,129 @@ function toRawNode(node: Node): Record<string, unknown> {
   return result
 }
 
-/** A container node has no root repeat but has instances that carry their own repeat. */
-function isContainerNode(node: Node): boolean {
-  return !node.repeat && Array.isArray(node.instances) &&
-    (node.instances as any[]).some(i => i && i.repeat)
+/**
+ * Construct a typed Node from a raw parsed object + body.
+ * Handles date/time unification, type coercion, and instance normalisation.
+ */
+function rawToNode(path: string, raw: Record<string, unknown>, body: string): Node | null {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fm: any = raw
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const node: any = {}
+  node.id    = fm.id || path.replace(/\.(md|yaml|yml)$/, '')
+  node.title = fm.title || node.id
+
+  if (fm.date) {
+    node.date = String(fm.date)
+  } else if (fm.time) {
+    const unified = String(fm.time)
+    const tMatch  = unified.match(/^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?/)
+    if (tMatch) { node.date = tMatch[1]; if (tMatch[2]) node.time = tMatch[2] }
+    else node.date = unified
+  }
+  if (fm.date && fm.time !== undefined) {
+    if (typeof fm.time === 'string' && fm.time.match(/^\d{1,2}:\d{2}/)) {
+      node.time = fm.time.slice(0, 5)
+    } else if (typeof fm.time === 'number') {
+      const h = Math.floor(fm.time / 60), mn = fm.time % 60
+      node.time = String(h).padStart(2, '0') + ':' + String(mn).padStart(2, '0')
+    }
+  }
+  if (fm.timezone) node.timezone = String(fm.timezone)
+  if (fm.duration) node.duration = String(fm.duration)
+  if (fm.done !== undefined) node.done = fm.done
+  if (fm.priority) node.priority = String(fm.priority)
+  if (fm.tags) node.tags = Array.isArray(fm.tags) ? fm.tags : [String(fm.tags)]
+  if (body) node.body = body
+
+  if (fm.repeat && typeof fm.repeat === 'object') {
+    const r = fm.repeat
+    node.repeat = { type: String(r.type) }
+    if (r.type === 'after_completion') {
+      if (r.interval) node.repeat.interval = String(r.interval)
+    } else if (r.type === 'schedule') {
+      if (r.freq) node.repeat.freq = String(r.freq)
+      if (r.byweekday) node.repeat.byweekday = Array.isArray(r.byweekday) ? r.byweekday.map(String) : [String(r.byweekday)]
+      if (r.bymonthday) node.repeat.bymonthday = Array.isArray(r.bymonthday) ? r.bymonthday.map(Number) : [Number(r.bymonthday)]
+      if (r.bysetpos !== undefined) node.repeat.bysetpos = Number(r.bysetpos)
+      if (r.interval) node.repeat.interval = Number(r.interval)
+      if (r.end && typeof r.end === 'object') {
+        const end: Record<string, unknown> = { type: String(r.end.type) }
+        if (r.end.date) end.date = String(r.end.date)
+        else if (r.end.time) end.date = String(r.end.time).split('T')[0]
+        if (r.end.occurrences) end.occurrences = Number(r.end.occurrences)
+        node.repeat.end = end
+      }
+    }
+  }
+
+  if (Array.isArray(fm.instances)) {
+    node.instances = fm.instances.map((inst: any) => {
+      const r: any = {}
+      if (inst.date) {
+        r.date = String(inst.date)
+      } else if (inst.time) {
+        const unified = String(inst.time)
+        const tMatch  = unified.match(/^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?/)
+        if (tMatch) { r.date = tMatch[1]; if (tMatch[2]) r.time = tMatch[2] }
+        else r.date = unified
+      }
+      if (!r.date) return null
+      if (inst.date && inst.time !== undefined) {
+        if (typeof inst.time === 'string' && inst.time.match(/^\d{1,2}:\d{2}/)) r.time = inst.time.slice(0, 5)
+        else if (typeof inst.time === 'number') {
+          const h = Math.floor(inst.time / 60), mn = inst.time % 60
+          r.time = String(h).padStart(2, '0') + ':' + String(mn).padStart(2, '0')
+        }
+      }
+      if (inst.timezone) r.timezone = String(inst.timezone)
+      if (inst.done !== undefined) r.done = inst.done
+      if (inst.priority) r.priority = String(inst.priority)
+      if (inst.excluded) r.excluded = true
+      if (inst.title) r.title = String(inst.title)
+      if (inst.tags) r.tags = Array.isArray(inst.tags) ? inst.tags : [String(inst.tags)]
+      if (inst.duration) r.duration = String(inst.duration)
+      if (inst.body) r.body = String(inst.body)
+      if (inst.repeat && typeof inst.repeat === 'object') {
+        const ir = inst.repeat
+        const rep: any = { type: String(ir.type) }
+        if (ir.type === 'after_completion') {
+          if (ir.interval) rep.interval = String(ir.interval)
+        } else if (ir.type === 'schedule') {
+          if (ir.freq) rep.freq = String(ir.freq)
+          if (ir.byweekday) rep.byweekday = Array.isArray(ir.byweekday) ? ir.byweekday.map(String) : [String(ir.byweekday)]
+          if (ir.bymonthday) rep.bymonthday = Array.isArray(ir.bymonthday) ? ir.bymonthday.map(Number) : [Number(ir.bymonthday)]
+          if (ir.bysetpos !== undefined) rep.bysetpos = Number(ir.bysetpos)
+          if (ir.interval) rep.interval = Number(ir.interval)
+          if (ir.end && typeof ir.end === 'object') {
+            const end: Record<string, unknown> = { type: String(ir.end.type) }
+            if (ir.end.date) end.date = String(ir.end.date)
+            else if (ir.end.time) end.date = String(ir.end.time).split('T')[0]
+            if (ir.end.occurrences) end.occurrences = Number(ir.end.occurrences)
+            rep.end = end
+          }
+        }
+        r.repeat = rep
+      }
+      return r
+    }).filter(Boolean)
+  }
+
+  // multiday and any other pass-through fields
+  if (fm.multiday && typeof fm.multiday === 'object') node.multiday = fm.multiday
+
+  node.type  = node.done !== undefined ? 'task' : 'event'
+  node._path = path
+  return node as Node
 }
 
 async function writeEntityToCache(node: Node): Promise<void> {
   try {
-    const path = nodeToPath(node)
-    const rawNode = toRawNode(node) as any
-    const body = rawNode.body || ''
+    const path    = nodeToPath(node)
+    const rawNode = toRawNode(node) as Record<string, unknown>
+    const body    = (rawNode.body as string) || ''
     delete rawNode.body
-    const content = isContainerNode(node)
-      ? serializeRawNode(rawNode, body)
-      : nodeToFile(node)
+    const content = saveFile(rawNode, body)
     await cacheWrite(path, content)
     updateSyncUI()
   } catch (e) {
@@ -756,9 +719,10 @@ async function writeEntityToCache(node: Node): Promise<void> {
 
 async function deleteNodeFromDisk(node: Node): Promise<void> {
   try {
+    const dh   = getDirHandle()
     const path = nodeToPath(node)
     await cacheDelete(path)
-    await diskDelete(path)
+    if (dh) await diskDelete(dh, path)
     updateSyncUI()
   } catch (e) {
     console.error('[storage] deleteNodeFromDisk failed:', e)
@@ -767,11 +731,12 @@ async function deleteNodeFromDisk(node: Node): Promise<void> {
 
 export async function syncToDirectory(): Promise<void> {
   try {
-    if (!getDirHandle()) { notify('No vault folder connected. Click the folder icon first.'); return }
+    const dh = getDirHandle()
+    if (!dh) { notify('No vault folder connected. Click the folder icon first.'); return }
     const dirty = await cacheGetDirty()
     if (!dirty.length) { updateSyncUI(); return }
     for (const f of dirty) {
-      await diskWrite(f.path, f.content)
+      await diskWrite(dh, f.path, f.content)
       await cacheMarkClean(f.path)
     }
     // Flash the sync button green briefly, then settle to the synced state.
@@ -784,13 +749,16 @@ export async function syncToDirectory(): Promise<void> {
 }
 
 async function loadFilesFromDisk(): Promise<void> {
-  const files = await diskReadAll()
+  const dh = getDirHandle()
+  if (!dh) return
+  const files = await diskReadAll(dh)
   const loaded: Node[] = []
   for (const { path, content } of files) {
     await cacheWriteClean(path, content)
     try {
-      const node = fileToNode(path, content) as Node
-      if (node.title) loaded.push(node)
+      const { rawNode, body } = loadFile(path, content)
+      const node = rawToNode(path, rawNode, body)
+      if (node?.title) loaded.push(node)
     } catch (e) { console.warn('[storage] parse failed for', path, e) }
   }
   setNodes(loaded)
@@ -801,7 +769,9 @@ async function loadFilesFromDisk(): Promise<void> {
 export async function pickDirectory(): Promise<void> {
   try {
     await cacheInit()
-    await diskPickDirectory()
+    const h = await diskPickDirectory()
+    setDirHandle(h)
+    await dirHandleSave(h)
     useStore.setState({ pendingDirReconnect: null })
     _pendingDirHandle = null
     await loadFilesFromDisk()

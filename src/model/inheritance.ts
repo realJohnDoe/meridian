@@ -248,13 +248,14 @@ export function canonicaliseInstance(
 }
 
 /**
- * Collapse an EffectiveNode tree back to the most compact YAML representation.
+ * Collapse an EffectiveNode tree back to compact YAML fields.
  * Fields shared across all direct instances become `defaults:`.
+ * Returns only the inner YAML content — wrap with `wrapFrontmatter` from fileIO.ts.
  */
-export function collapseToYaml(root: EffectiveNode, body = ''): string {
+export function collapseToYaml(root: EffectiveNode): string {
   const shared    = computeSharedDefaults(root.instances)
   const instances = root.instances.map(child => collapseInstance(child, shared))
-  return yamlFrontmatter(root.fields, shared, instances, body)
+  return yamlFrontmatter(root.fields, shared, instances)
 }
 
 // ── YAML serialiser ───────────────────────────────────────────────────────────
@@ -332,10 +333,11 @@ function valueLines(v: unknown, indent: number): string[] {
 }
 
 /**
- * Serialize a RawNode directly to YAML frontmatter, preserving its structure
+ * Serialize a RawNode to YAML fields, preserving its structure
  * (defaults, instances) without any collapse optimisation.
+ * Returns only the inner YAML content — wrap with `wrapFrontmatter` from fileIO.ts.
  */
-export function serializeRawNode(node: RawNode, body = ''): string {
+export function serializeRawNode(node: RawNode): string {
   const rootFields = Object.fromEntries(
     Object.entries(node).filter(([k]) => k !== 'defaults' && k !== 'instances'),
   )
@@ -343,16 +345,15 @@ export function serializeRawNode(node: RawNode, body = ''): string {
   const instances = Array.isArray(node.instances)
     ? (node.instances as Record<string, unknown>[])
     : []
-  return yamlFrontmatter(rootFields, defaults, instances, body)
+  return yamlFrontmatter(rootFields, defaults, instances)
 }
 
 function yamlFrontmatter(
   rootFields: Record<string, unknown>,
   defaults:   Record<string, unknown>,
   instances:  Record<string, unknown>[],
-  body:       string,
 ): string {
-  const lines: string[] = ['---']
+  const lines: string[] = []
 
   // Root fields
   for (const [key, value] of Object.entries(rootFields)) {
@@ -415,7 +416,5 @@ function yamlFrontmatter(
     }
   }
 
-  lines.push('---')
-  if (body) lines.push('', body)
   return lines.join('\n')
 }
