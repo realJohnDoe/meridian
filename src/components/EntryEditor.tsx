@@ -4,6 +4,7 @@ import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue } from '../
 import { useStore } from '../store'
 import { NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
+import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { Checkbox } from './ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { cn } from '@/lib/utils'
@@ -254,20 +255,25 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           />
         </div>
 
-        <div className="type-chip-row">
+        <ToggleGroup
+          type="single"
+          value={itemType}
+          onValueChange={(v) => { if (v) handleTypeChange(v as ItemType) }}
+          className="type-chip-row"
+        >
           {(['task', 'event', 'note'] as ItemType[]).map(t => (
-            <button
+            <ToggleGroupItem
               key={t}
-              className={`type-chip type-chip-${t}${itemType === t ? ' active' : ''}`}
-              onClick={() => handleTypeChange(t)}
+              value={t}
+              className={cn('type-chip', `type-chip-${t}`, 'h-auto min-w-0')}
             >
               {t === 'task' && <CheckSquare size={13} />}
               {t === 'event' && <CalendarDays size={13} />}
               {t === 'note' && <FileText size={13} />}
               {t}
-            </button>
+            </ToggleGroupItem>
           ))}
-        </div>
+        </ToggleGroup>
 
         {showScopeRow && (
           <div className="scope-row">

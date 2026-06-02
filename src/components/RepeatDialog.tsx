@@ -20,6 +20,7 @@ import { Separator } from './ui/separator'
 import { Button } from './ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { badgeVariants } from './ui/badge'
+import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { Calendar } from './ui/calendar'
 import { cn } from '../lib/utils'
 
@@ -312,10 +313,6 @@ export default function RepeatDialog({
       ? '"After completion" repeats whenever you mark this done.'
       : 'Choose how often this scheduled item repeats.'
 
-  function toggleWday(i: number) {
-    setWdays(prev => { const next = [...prev]; next[i] = !next[i]; return next })
-  }
-
   function handleSet() {
     const finalIntervalNum = Math.max(1, intervalNum)
     const finalCompletionNum = Math.max(1, completionNum)
@@ -402,18 +399,26 @@ export default function RepeatDialog({
 
               {/* Weekly: day-of-week picker */}
               {freq === 'weekly' && (
-                <div className="flex gap-1 my-1">
+                <ToggleGroup
+                  type="multiple"
+                  value={wdays.reduce<string[]>((acc, on, i) => on ? [...acc, String(i)] : acc, [])}
+                  onValueChange={(vals) => {
+                    const next = [false, false, false, false, false, false, false]
+                    vals.forEach(v => { next[parseInt(v)] = true })
+                    setWdays(next)
+                  }}
+                  className="my-1"
+                >
                   {WDAY_LABELS.map((d, i) => (
-                    <button
+                    <ToggleGroupItem
                       key={d}
-                      onClick={() => toggleWday(i)}
-                      aria-pressed={wdays[i]}
+                      value={String(i)}
                       className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center')}
                     >
                       {d}
-                    </button>
+                    </ToggleGroupItem>
                   ))}
-                </div>
+                </ToggleGroup>
               )}
 
               {/* Monthly: pattern picker (Inferred Same-day and Inferred Weekday options) */}
@@ -455,18 +460,22 @@ export default function RepeatDialog({
               {/* End section */}
               <div className="pt-3 border-t border-border/50">
                 <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground mb-2">Ends</div>
-                <div className="flex gap-2 mb-2.5">
+                <ToggleGroup
+                  type="single"
+                  value={endType}
+                  onValueChange={(v) => { if (v) setEndType(v as EndType) }}
+                  className="justify-start gap-2 mb-2.5"
+                >
                   {(['never', 'until', 'count'] as EndType[]).map(t => (
-                    <button
+                    <ToggleGroupItem
                       key={t}
-                      onClick={() => setEndType(t)}
-                      aria-pressed={endType === t}
+                      value={t}
                       className={badgeVariants({ variant: 'chip' })}
                     >
                       {t === 'never' ? 'Never' : t === 'until' ? 'On date' : 'After N'}
-                    </button>
+                    </ToggleGroupItem>
                   ))}
-                </div>
+                </ToggleGroup>
 
                 {endType === 'until' && (
                   <button
