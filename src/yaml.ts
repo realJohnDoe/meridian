@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { fmtISO, fmtT } from './model/expand'
+import { fmtISO, fmtT } from './model/expansion'
 
 // ── YAML PARSER ───────────────────────────────────────────────
 export function yamlParseScalar(v){

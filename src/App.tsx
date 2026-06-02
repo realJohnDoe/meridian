@@ -6,7 +6,7 @@ import {
   Plus, X,
 } from 'lucide-react'
 import {
-  initApp, applyScope, buildBodyHtml,
+  initApp, applyScope, buildBodyHtml, entryFromOccurrence,
   saveNode, deleteNode, closeEntry, pushOverlay,
   openDayViewForDate, goToday, openSearch,
   syncToDirectory, pickDirectory,
@@ -14,11 +14,11 @@ import {
   addDays, fmtLong,
 } from './meridian'
 import type { SeriesSheetConfig } from './meridian'
-import { fmtISO } from './model/expand'
+import { fmtISO } from './model/expansion'
 import { TODAY } from './constants'
 import { useStore } from './store'
 import type { PrimaryView } from './store'
-import EntryEditor, { EntryState, ENTRY_DEFAULT, ItemType } from './components/EntryEditor'
+import EntryEditor, { EntryState, ENTRY_DEFAULT } from './components/EntryEditor'
 import RepeatDialog from './components/RepeatDialog'
 import DatePickerDialog from './components/DatePickerDialog'
 import DeleteDialog from './components/DeleteDialog'
@@ -40,24 +40,7 @@ function entryFromItem(item: any, editScope: string): EntryState {
   if (!item) {
     return { ...ENTRY_DEFAULT, scheduled: { date: fmtISO(TODAY), time: '' } }
   }
-  const root = item._node || item
-  const { scheduled, repeat } = applyScope(item, editScope)
-  const tracked = item.done !== undefined || root.done !== undefined
-  const itemType: ItemType = tracked ? 'task' : scheduled ? 'event' : 'note'
-  return {
-    item: { ...item, _editScope: editScope },
-    title: item.title || root.title || '',
-    bodyHtml: buildBodyHtml(item.body || root.body || ''),
-    scheduled,
-    repeat,
-    duration: item.duration || root.duration || '',
-    tracked,
-    itemType,
-    done: item.done || false,
-    tags: [...(item.tags || root.tags || [])],
-    priority: item.priority || root.priority || null,
-    editScope,
-  }
+  return entryFromOccurrence(item, editScope, buildBodyHtml)
 }
 
 export default function App() {

@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { Repeat2, Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { fmtT } from '../model/expand'
+import { fmtT } from '../model/expansion'
 import { barClass } from '../meridian'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
@@ -18,7 +18,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   const wrapRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
-  const [isDone, setIsDone] = useState(!!occ.done)
+  const [isDone, setIsDone] = useState(!!occ.metadata.done)
   // Lock the stagger delay at first mount so reordering never restarts the entry animation.
   const staggerRef = useRef(index)
 
@@ -27,10 +27,10 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   useEffect(() => { onSwipeDeleteRef.current = onSwipeDelete }, [onSwipeDelete])
 
   // Sync optimistic state when the store settles.
-  useEffect(() => { setIsDone(!!occ.done) }, [occ.done])
+  useEffect(() => { setIsDone(!!occ.metadata.done) }, [occ.metadata.done])
 
   const t = fmtT(occ.time)
-  const hasTrack = occ.done !== undefined
+  const hasTrack = occ.metadata.done !== undefined
 
   // Swipe-to-delete: touchmove must call preventDefault() to block scroll while
   // the user is swiping horizontally. JSX onTouchMove cannot do that (passive by
@@ -131,14 +131,14 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   }, []) // listeners are stable; callback accessed via ref
 
   // Compute bar class with optimistic done value so the colour changes instantly.
-  const effectiveDone = hasTrack ? isDone : (occ.done as boolean | undefined)
-  const currentBarClass = barClass({ ...occ, done: effectiveDone })
+  const effectiveDone = hasTrack ? isDone : (occ.metadata.done as boolean | undefined)
+  const currentBarClass = barClass({ ...occ, metadata: { ...occ.metadata, done: effectiveDone } })
 
   return (
     <div
       className="swipe-wrap"
       ref={wrapRef}
-      data-occ-key={`${occ._nodeId}-${occ.date}`}
+      data-occ-key={`${occ.metadata._nodeId}-${occ.date}`}
       style={{ '--stagger': `${staggerRef.current * 0.025}s` } as React.CSSProperties}
     >
       {/* Left swipe hint */}
@@ -155,7 +155,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       >
         <div className="occ-left">
           <span className={`occ-time${t ? ' timed' : ''}`}>{t || ''}</span>
-          {occ.duration && t && <span className="occ-dur-small">{occ.duration}</span>}
+          {occ.metadata.duration && t && <span className="occ-dur-small">{occ.metadata.duration}</span>}
         </div>
 
         <span className={`occ-bar ${currentBarClass}`} />
@@ -170,13 +170,13 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
                 className="size-5 mt-px"
               />
             )}
-            <span className={`occ-title${isDone ? ' done-t' : ''}`}>{occ.title}</span>
-            {occ.recur && <span className="orecur"><Repeat2 size={12} /></span>}
+            <span className={`occ-title${isDone ? ' done-t' : ''}`}>{occ.metadata.title}</span>
+            {occ.metadata.recur && <span className="orecur"><Repeat2 size={12} /></span>}
           </div>
 
-          {(occ.tags || []).length > 0 && (
+          {(occ.metadata.tags || []).length > 0 && (
             <div className="occ-meta">
-              {(occ.tags || []).slice(0, 2).map(tg => (
+              {(occ.metadata.tags || []).slice(0, 2).map(tg => (
                 <Badge key={tg} variant="tag">{tg}</Badge>
               ))}
             </div>

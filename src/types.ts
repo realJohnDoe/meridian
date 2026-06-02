@@ -55,45 +55,66 @@ export interface Node {
   _path?: string
 }
 
-// ── Occurrence ───────────────────────────────────────────────────────────────
+// ── AppMetadata ───────────────────────────────────────────────────────────────
 
 /**
- * An expanded occurrence produced by expandNode / expandRange.
- * Flat view of a single instance of a Node on a specific date.
+ * Content and tracking metadata for a main-app occurrence.
+ * Lives inside OccurrenceEntry<AppMetadata>.metadata.
  */
-export interface Occurrence {
-  title: string
-  date: string
-  time?: string | null
-  timezone?: string
-  jsTime: Date
-  duration?: string
-  done?: boolean
+export interface AppMetadata {
+  title:     string
+  done?:     boolean
+  tags:      string[]
   priority?: Priority
-  tags: string[]
-  type: 'event' | 'task' | 'note'
-  body?: string
+  body?:     string
+  duration?: string
+  repeat?:   Repeat
+  type:      'event' | 'task' | 'note'
   multiday?: Multiday
-  recur?: boolean
-  repeat?: Repeat
-  _nodeId: string
-  _node: Node
-  /** Fallback id, mirrors _node.id for convenience. */
-  id?: string
-  /** True when this row is a multiday banner duplicate. */
+  timezone?: string
+  // Internal tracking fields (set by expandNode / expandRange)
+  _nodeId:   string
+  _node:     Node
+  recur?:    boolean
+  id?:       string
+  // Layout fields (set post-expansion by DayView)
   _isBanner?: boolean
-  /**
-   * Path of instance indices from the root Node to the node whose `repeat`
-   * produced this occurrence. `[]` when the root itself has the repeat.
-   * `[1]` when `root.instances[1]` has the repeat (split series), etc.
-   * Used by "edit this & following" to split the correct series.
-   */
-  ownerPath?: number[]
-  /** Computed duration in hours (set during day-view layout). */
-  _dh?: number
-  /** Computed end timestamp in ms (set during day-view layout). */
-  _endMs?: number
+  _dh?:       number
+  _endMs?:    number
 }
+
+/** Extract AppMetadata from the raw fields of an expanded occurrence. */
+export function extractAppMetadata(fields: Record<string, unknown>): AppMetadata {
+  const done = fields.done as boolean | undefined
+  const type: 'event' | 'task' | 'note' =
+    done !== undefined ? 'task' : 'event'
+  return {
+    title:     fields.title    ? String(fields.title)    : '',
+    done,
+    tags:      Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
+    priority:  fields.priority as Priority | undefined,
+    body:      fields.body     ? String(fields.body)     : undefined,
+    duration:  fields.duration ? String(fields.duration) : undefined,
+    repeat:    fields.repeat   as Repeat    | undefined,
+    type,
+    multiday:  fields.multiday as Multiday  | undefined,
+    timezone:  fields.timezone ? String(fields.timezone) : undefined,
+    _nodeId:   String(fields._nodeId ?? ''),
+    _node:     fields._node    as Node,
+    recur:     fields.recur    as boolean   | undefined,
+    id:        fields.id       ? String(fields.id) : undefined,
+  }
+}
+
+// ── Occurrence ───────────────────────────────────────────────────────────────
+
+import type { OccurrenceEntry } from './model/expansion'
+
+/**
+ * An expanded occurrence produced by expandRange.
+ * Alias for OccurrenceEntry<AppMetadata>.
+ */
+export type Occurrence = OccurrenceEntry<AppMetadata>
 
 // ── Dialog / Editor helpers ───────────────────────────────────────────────────
 

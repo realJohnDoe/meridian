@@ -2,7 +2,8 @@ import { useMemo, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { expandRange } from '../model/expand'
+import { extractAppMetadata } from '../types'
+import { expandRange } from '../model/expansion'
 import { sameDay, sortOccs, ccBarClass } from '../meridian'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
@@ -24,7 +25,7 @@ interface CalCellProps {
 function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
   const isToday = sameDay(date, TODAY)
   const dayOccs = useMemo(
-    () => sortOccs(occs.filter(o => sameDay(o.jsTime, date))) as Occurrence[],
+    () => sortOccs(occs.filter(o => sameDay(o.jsTime, date))),
     [occs, date],
   )
 
@@ -39,12 +40,12 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
           const seen = new Set<string>()
           const bars: React.ReactNode[] = []
           dayOccs.slice(0, 4).forEach((o, i) => {
-            if (o.multiday) {
-              if (seen.has(o._nodeId)) return
-              seen.add(o._nodeId)
-              bars.push(<div key={i} className="cc-bar multiday">{o.title}</div>)
+            if (o.metadata.multiday) {
+              if (seen.has(o.metadata._nodeId)) return
+              seen.add(o.metadata._nodeId)
+              bars.push(<div key={i} className="cc-bar multiday">{o.metadata.title}</div>)
             } else {
-              bars.push(<div key={i} className={`cc-bar ${ccBarClass(o)}`}>{o.title}</div>)
+              bars.push(<div key={i} className={`cc-bar ${ccBarClass(o)}`}>{o.metadata.title}</div>)
             }
           })
           if (dayOccs.length > 4) bars.push(
@@ -70,19 +71,15 @@ export default function MonthView({ onDayClick }: Props) {
   const m = calMonth.getMonth()
   const y = calMonth.getFullYear()
 
-  // Keep a ref so swipe handlers always navigate relative to the current month
-  // without needing to re-attach listeners on every render.
   const calMonthRef = useRef(calMonth)
   useEffect(() => { calMonthRef.current = calMonth }, [calMonth])
 
-  // Derive the full grid (trailing prev-month cells + current month + leading
-  // next-month cells) and expand occurrences — both memoised on nodes + month.
   const { cells, occs } = useMemo(() => {
     const rawFirst = new Date(y, m, 1).getDay()
-    const first    = (rawFirst + 6) % 7          // Monday-first offset
+    const first    = (rawFirst + 6) % 7
     const dim      = new Date(y, m + 1, 0).getDate()
     const prev     = new Date(y, m, 0).getDate()
-    const nc       = (7 - (first + dim) % 7) % 7 // trailing cells
+    const nc       = (7 - (first + dim) % 7) % 7
 
     const cells: Array<{ date: Date; other: boolean }> = []
     for (let i = first - 1; i >= 0; i--)  cells.push({ date: new Date(y, m - 1, prev - i), other: true })
@@ -91,7 +88,7 @@ export default function MonthView({ onDayClick }: Props) {
 
     const from = new Date(y, m, 1)
     const to   = new Date(y, m + 1, 0, 23, 59, 59)
-    const occs = expandRange(nodes, from, to) as Occurrence[]
+    const occs = expandRange(nodes, from, to, extractAppMetadata)
 
     return { cells, occs }
   }, [nodes, y, m])
@@ -105,7 +102,6 @@ export default function MonthView({ onDayClick }: Props) {
     setCalMonth(new Date(d.getFullYear(), d.getMonth() + 1, 1))
   }
 
-  // Swipe left/right to navigate months (replaces the addSwipe() call in initApp).
   const wrapRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = wrapRef.current
@@ -125,7 +121,7 @@ export default function MonthView({ onDayClick }: Props) {
       el.removeEventListener('touchstart', onStart)
       el.removeEventListener('touchend',   onEnd)
     }
-  }, []) // stable — reads latest month via calMonthRef
+  }, [])
 
   return (
     <div className="cal-wrap" ref={wrapRef}>

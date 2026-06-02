@@ -2,7 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { ArrowLeft, Search } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { expandRange } from '../model/expand'
+import { extractAppMetadata } from '../types'
+import { expandRange } from '../model/expansion'
 import { addDays, fmtShort, NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
 
@@ -14,10 +15,12 @@ interface SearchItem {
   date: string
   tags: string[]
   type: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   _node?: any
 }
 
 interface Props {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onOpen: (item: any, scope?: string) => void
   onClose: () => void
 }
@@ -29,34 +32,33 @@ export default function SearchView({ onOpen, onClose }: Props) {
   const [q, setQ]    = useState('')
   const inputRef     = useRef<HTMLInputElement>(null)
 
-  // Focus input when this view mounts (it's always in DOM, so focus on demand
-  // is triggered by the parent calling inputRef focus via the exported ref).
-  // Exposing focus externally so openSearch() can still focus on push.
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(window as any)._focusSearch = () => setTimeout(() => inputRef.current?.focus(), 100)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return () => { delete (window as any)._focusSearch }
   }, [])
 
   const items = useMemo<SearchItem[]>(() => {
     const from = addDays(TODAY, -30)
     const to   = addDays(TODAY, 90)
-    const occs = expandRange(nodes, from, to) as Occurrence[]
+    const occs: Occurrence[] = expandRange(nodes, from, to, extractAppMetadata)
     const seen = new Set<string>()
     return [
       ...(NOTES_DATA as SearchItem[]),
       ...occs
         .filter(o => {
-          const key = o._nodeId || o.title
+          const key = o.metadata._nodeId || o.metadata.title
           if (seen.has(key)) return false
           seen.add(key); return true
         })
         .map(o => ({
-          title:   o.title,
-          preview: o.body || '',
+          title:   o.metadata.title,
+          preview: o.metadata.body || '',
           date:    fmtShort(o.jsTime),
-          tags:    o.tags || [],
-          type:    o.type,
-          _node:   o._node || o,
+          tags:    o.metadata.tags || [],
+          type:    o.metadata.type,
+          _node:   o.metadata._node,
         })),
     ]
   }, [nodes])
@@ -72,7 +74,6 @@ export default function SearchView({ onOpen, onClose }: Props) {
     })
   }, [items, nsFilterVal, q])
 
-  // Group by type when showing all, or flat list for a specific type.
   const groups: { label: string; items: SearchItem[] }[] = useMemo(() => {
     if (nsFilterVal !== 'all') return [{ label: '', items: filtered }]
     const byType: Record<string, SearchItem[]> = { event: [], task: [], note: [] }

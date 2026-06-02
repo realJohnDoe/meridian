@@ -9,179 +9,87 @@ import {
   canonicaliseInstance,
   type EffectiveNode,
 } from '../model/inheritance'
-import { collectAllOccurrences, treeHasOccurrences, type OccurrenceEntry } from '../model/repeatExpander'
+import {
+  collectAllOccurrences, collectRepeatPatterns, treeHasOccurrences,
+  fmtISO,
+  type OccurrenceEntry, type RepeatPattern,
+} from '../model/expansion'
 import {
   dayBefore, getSubNode, setSubNode, doEditFollowing, splitNode,
 } from '../model/nodeOps'
 import { yamlParse } from '../yaml'
-import type { Occurrence, Node, Priority } from '../types'
-import EntryEditor, { type EntryState, type ItemType } from '../components/EntryEditor'
+import type { Occurrence, Node, Priority, Repeat as RepeatType } from '../types'
+import EntryEditor, { type EntryState } from '../components/EntryEditor'
 import RepeatDialog from '../components/RepeatDialog'
 import DatePickerDialog from '../components/DatePickerDialog'
 import TimePickerDialog from '../components/TimePickerDialog'
 import DurationDialog from '../components/DurationDialog'
 import PriorityDrawer from '../components/PriorityDrawer'
-import { applyScope } from '../meridian'
-import { fmtISO } from '../model/expand'
+import { applyScope, entryFromOccurrence } from '../meridian'
+
+// ── Debug metadata type ───────────────────────────────────────────────────────
+
+interface DebugMetadata {
+  title:     string
+  done?:     boolean
+  tags:      string[]
+  priority?: Priority
+  body:      string
+  duration:  string
+}
+
+const extractDebugMetadata = (fields: Record<string, unknown>): DebugMetadata => ({
+  title:    fields.title    ? String(fields.title)    : '',
+  done:     fields.done     as boolean | undefined,
+  tags:     Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
+  priority: fields.priority as Priority | undefined,
+  body:     fields.body     ? String(fields.body)     : '',
+  duration: fields.duration ? String(fields.duration) : '',
+})
+
+type DebugOccurrence = OccurrenceEntry<DebugMetadata>
+type DebugPattern    = RepeatPattern<DebugMetadata>
 
 // ── OccurrenceEntry → Occurrence bridge ───────────────────────────────────────
 
-/**
- * Build a full Occurrence from an OccurrenceEntry + its rawNode.
- *
- * The OccurrenceEntry comes from collectAllOccurrences → expandRepeat, which
- * already runs the full defaults: inheritance before expansion.  So entry.title,
- * entry.done, etc. are the EFFECTIVE (inherited) values — use them as-is.
- * Only fall back to rawNode root / defaults block when the field is missing
- * from the expanded occurrence (e.g. tags, priority, body that aren't surfaced
- * by OccurrenceEntry).
- */
-function toOccurrence(entry: OccurrenceEntry, rawNode: RawNode): Occurrence {
+function toOccurrence(
+  entry:    DebugOccurrence,
+  rawNode:  RawNode,
+  pattern?: DebugPattern,
+): Occurrence {
+  const m = entry.metadata
   const [y, mo, d] = entry.date.split('-').map(Number)
   const jsTime = entry.time
     ? new Date(y, mo - 1, d, +entry.time.slice(0, 2), +entry.time.slice(3, 5))
     : new Date(y, mo - 1, d)
-  const ownerSub = getSubNode(rawNode, entry.ownerPath)
-  const n    = rawNode as unknown as Record<string, unknown>
-  const defs = (n.defaults as Record<string, unknown> | undefined) ?? {}
-
-  // entry.title is the fully-inherited effective title from expansion.
-  // Fall through root → defaults only when the expansion returned nothing.
-  const title = entry.title || String(n.title ?? defs.title ?? '')
-
-  // done: entry gives the effective value; fall back to root/defaults
-  const done =
-    entry.done !== undefined ? entry.done
-    : n.done   !== undefined ? (n.done   as boolean)
-    : defs.done !== undefined ? (defs.done as boolean)
-    : undefined
-
+  // Use the raw series sub-node (not the container root) so that applyScope
+  // can find the series start date via _node.date — matching what expandRange
+  // does in the main app.
+  const seriesNode = getSubNode(rawNode, entry.ownerPath)
   return {
-    title,
     date:      entry.date,
     time:      entry.time ?? null,
     jsTime,
-    done,
-    // tags / priority / body are not surfaced by OccurrenceEntry;
-    // read them from root then defaults (effective expansion includes them but
-    // they're carried via _node so entryFromOccurrence can pick them up).
-    tags:     Array.isArray(n.tags)      ? (n.tags      as string[]) :
-              Array.isArray(defs.tags)   ? (defs.tags   as string[]) : [],
-    type:     done !== undefined ? 'task' : 'event',
-    _nodeId:  String(n.id ?? entry.title ?? 'debug-node'),
-    _node:    rawNode as unknown as Node,
+    source:    entry.source,
     ownerPath: entry.ownerPath,
-    recur:    !!(ownerSub?.repeat),
-    // repeat comes from the owning sub-node (not the container root)
-    repeat:   ownerSub?.repeat as Occurrence['repeat'],
-    body:     String(n.body ?? defs.body ?? ''),
-    priority: (n.priority ?? defs.priority) as Priority | undefined,
-    duration: String(n.duration ?? defs.duration ?? ''),
+    metadata: {
+      title:    m.title,
+      done:     m.done,
+      tags:     m.tags,
+      priority: m.priority,
+      body:     m.body,
+      duration: m.duration,
+      type:     m.done !== undefined ? 'task' : 'event',
+      repeat:   pattern?.repeat,
+      recur:    entry.source === 'generated',
+      _nodeId:  String((seriesNode as Record<string, unknown>).id ?? 'debug-node'),
+      _node:    seriesNode as unknown as Node,
+    },
   } as Occurrence
 }
 
-/**
- * Build the initial EntryState when the user clicks an occurrence.
- *
- * Seeds every field from the effective occurrence — the user edits from here
- * and whatever they save becomes the new series verbatim.
- */
-function entryFromOccurrence(occ: Occurrence): EntryState {
-  const tracked = occ.done !== undefined
-  const itemType: ItemType = tracked ? 'task' : occ.date ? 'event' : 'note'
-  // repeat: use the occurrence's own repeat (ownerSub repeat), not root repeat
-  const repeat  = occ.repeat ?? null
-  const scheduled = occ.date ? { date: occ.date, time: occ.time || '' } : null
-  return {
-    item:      occ,
-    title:     occ.title || '',
-    bodyHtml:  String(occ.body || ''),
-    scheduled,
-    repeat,
-    duration:  occ.duration || '',
-    tracked,
-    itemType,
-    done:      occ.done ?? false,
-    tags:      [...(occ.tags || [])],
-    priority:  occ.priority || null,
-    editScope: 'single',
-  }
-}
 
 // ── Helpers for applyDebugSave ────────────────────────────────────────────────
-
-
-/**
- * Build a new series node from editor values.
- *
- * @param rootDefs  The root-level defaults: block of the parent rawNode (may be
- *                  empty for flat nodes).  Used to determine which fields the
- *                  series already inherits and therefore doesn't need to repeat.
- * @param useNestedDefaults  When true (parent has a defaults: block OR this
- *                  series itself has a repeat:), occurrence-level properties
- *                  (done, priority overrides, tag overrides, body, duration) are
- *                  placed in a nested `defaults:` block rather than as direct
- *                  fields.  This keeps the series node clean: it only holds
- *                  `date`, `repeat`, optionally `title` (if different), and a
- *                  `defaults:` block for anything the occurrences should inherit.
- */
-function buildSeriesNode(
-  entry:             EntryState,
-  body:              string,
-  occDate:           string,
-  origRepeat:        unknown,
-  rootDefs:          Record<string, unknown>,
-  useNestedDefaults: boolean,
-): Record<string, unknown> {
-  const { title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
-
-  const series: Record<string, unknown> = {}
-  series.date   = scheduled?.date || occDate
-  series.repeat = repeat ?? origRepeat
-  if (!series.repeat) delete series.repeat
-  if (scheduled?.time) series.time = scheduled.time
-
-  // title: write directly only when it differs from the inherited root default
-  const defaultTitle = String(rootDefs.title ?? '')
-  if (title && title !== defaultTitle) series.title = title
-
-  // Collect occurrence-level properties that need to be expressed on this series
-  const occFields: Record<string, unknown> = {}
-
-  if (tracked) {
-    occFields.done = done
-    // priority: only write if it differs from the root default
-    const defaultPriority = rootDefs.priority
-    if (priority && priority !== defaultPriority) occFields.priority = priority
-  }
-
-  const defaultTagsStr = JSON.stringify(
-    Array.isArray(rootDefs.tags) ? rootDefs.tags : [],
-  )
-  if (tags?.length && JSON.stringify(tags) !== defaultTagsStr) occFields.tags = tags
-
-  if (body)     occFields.body     = body
-  if (duration) occFields.duration = duration
-
-  if (Object.keys(occFields).length > 0) {
-    if (useNestedDefaults) {
-      // Series node: put occurrence properties in a nested defaults: block so
-      // every generated occurrence inherits them automatically.
-      series.defaults = occFields
-    } else {
-      // Flat / single-occurrence: write fields directly
-      Object.assign(series, occFields)
-    }
-  }
-
-  return series
-}
-
-// Fields that belong to the series' scheduling structure and must NEVER be
-// moved into a `defaults:` block.
-// ── Domain key sets (application-layer knowledge) ────────────────────────────
-// These are the only places in the UI that define *which* fields are structural
-// or "direct" for a series node.  inheritance.ts knows nothing about them.
 
 /** Fields that always stay as direct fields on a series node. */
 const SERIES_STRUCTURAL: ReadonlySet<string> =
@@ -191,39 +99,12 @@ const SERIES_STRUCTURAL: ReadonlySet<string> =
 const SERIES_DIRECT: ReadonlySet<string> = new Set(['title'])
 
 /**
- * Restructure a flat series node into canonical two-level form.
- * Delegates to canonicaliseInstance in inheritance.ts — no domain knowledge here.
- */
-function canonicaliseSeriesNode(
-  raw:      Record<string, unknown>,
-  rootDefs: Record<string, unknown>,
-): Record<string, unknown> {
-  return canonicaliseInstance(raw, rootDefs, SERIES_STRUCTURAL, SERIES_DIRECT)
-}
-
-// ── Main save logic ───────────────────────────────────────────────────────────
-
-/**
  * Apply the editor form fields to rawNode and return the updated rawNode.
- *
- * 'future' scope semantics
- * ─────────────────────────
- * ownerPath = [] (root repeat):
- *   Split root into two series.  Compute root-level `defaults:` from fields that
- *   are structural identity (title, tags, …) but NOT scheduling or task-state.
- *   Both series1 and series2 get their occurrence-state fields (done, priority,
- *   …) placed in a nested `defaults:` block.
- *
- * ownerPath = [i] (child series):
- *   The root `defaults:` is preserved exactly as-is — untouched siblings must
- *   not receive any new explicit fields.  Only the target series is replaced /
- *   split; it and the new future series carry their unique fields in a nested
- *   `defaults:` block.
  */
 function applyDebugSave(rawNode: RawNode, entry: EntryState, body: string): RawNode {
   const { item, editScope, title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
   if (!item) return rawNode
-  const occ      = item as Occurrence & { ownerPath?: number[] }
+  const occ      = item as Occurrence
   const occDate  = occ.date
   const ownerPath: number[] = occ.ownerPath ?? []
   const n = rawNode as Record<string, unknown>
@@ -244,72 +125,83 @@ function applyDebugSave(rawNode: RawNode, entry: EntryState, body: string): RawN
   // ── single occurrence override ───────────────────────────────────────────
   } else if (editScope === 'single') {
     const instances = [...((n.instances as RawNode[]) ?? [])]
-    const idx  = instances.findIndex(i => String((i as any).date) === occDate)
+    const idx  = instances.findIndex(i => String((i as Record<string, unknown>).date) === occDate)
     const base: Record<string, unknown> = idx >= 0 ? { ...(instances[idx] as object) } : { date: occDate }
-    const origTitle = occ.title   // effective/inherited title — don't write if unchanged
-    if (title !== origTitle) base.title = title; else delete base.title
     if (scheduled?.time) base.time = scheduled.time; else delete base.time
-    const origDur = occ.duration
+
+    // Compare against effective inherited values from occ.metadata
+    const origTitle = occ.metadata.title
+    if (title !== origTitle) base.title = title; else delete base.title
+
+    const origDur = occ.metadata.duration
     if (duration !== origDur) base.duration = duration; else delete base.duration
-    if (tracked) { base.done = done; if (priority) base.priority = priority; else delete base.priority }
-    else { delete base.done; delete base.priority }
-    if (body !== String((rawNode as any).body || '')) base.body = body; else delete base.body
+
+    const origBody = occ.metadata.body || ''
+    if (body !== origBody) base.body = body; else delete base.body
+
+    const origTagsStr = JSON.stringify(occ.metadata.tags ?? [])
+    if (tags?.length && JSON.stringify(tags) !== origTagsStr) base.tags = tags
+    else delete base.tags
+
+    if (tracked) {
+      base.done = done
+      if (priority && priority !== occ.metadata.priority) base.priority = priority
+      else delete base.priority
+    } else {
+      delete base.done
+      delete base.priority
+    }
+
     if (idx >= 0) instances[idx] = base as RawNode; else instances.push(base as RawNode)
     return { ...rawNode, instances } as RawNode
 
   // ── split: this & all following ──────────────────────────────────────────
   } else if (editScope === 'future') {
-    // Original repeat for the owning series (used when user hasn't changed it).
     const origRepeat = (getSubNode(rawNode, ownerPath) as Record<string, unknown> | undefined)?.repeat
 
+    function buildSeries(rootDefs: Record<string, unknown>): Record<string, unknown> {
+      const flatSeries: Record<string, unknown> = {
+        date:  scheduled?.date || occDate,
+        ...(scheduled?.time ? { time: scheduled.time } : {}),
+        ...((repeat ?? origRepeat) ? { repeat: repeat ?? origRepeat } : {}),
+        title,
+        ...(tags?.length ? { tags } : {}),
+        ...(tracked ? { done, ...(priority ? { priority } : {}) } : {}),
+        ...(body ? { body } : {}),
+        ...(duration ? { duration } : {}),
+      }
+      return canonicaliseInstance(flatSeries, rootDefs, SERIES_STRUCTURAL, SERIES_DIRECT)
+    }
+
     if (ownerPath.length === 0) {
-      // ── Root owns the repeat ──
-      // Decide what goes to the new container's root defaults: everything that
-      // is NOT scheduling-specific and NOT task/occurrence state.
       const OCCURRENCE_STATE = new Set(['done', 'priority', 'body', 'duration'])
       const rootDefs: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(n)) {
         if (SERIES_STRUCTURAL.has(k) || OCCURRENCE_STATE.has(k)) continue
-        rootDefs[k] = v   // title, tags, and any other identity fields
+        rootDefs[k] = v
       }
-
-      // Split: series1 keeps everything up to occDate, capped.
       const [series1raw] = splitNode(rawNode, occDate)
-      const series1 = canonicaliseSeriesNode(series1raw as Record<string, unknown>, rootDefs)
-
-      // series2 is built entirely from editor values.
-      const series2 = buildSeriesNode(entry, body, occDate, origRepeat, rootDefs, true)
-
+      const series1 = canonicaliseInstance(series1raw as Record<string, unknown>, rootDefs, SERIES_STRUCTURAL, SERIES_DIRECT)
+      const series2 = buildSeries(rootDefs)
       return { defaults: rootDefs, instances: [series1, series2] } as unknown as RawNode
 
     } else {
-      // ── A child series owns the repeat ──
-      // Preserve the root `defaults:` exactly.  Untouched siblings must not gain
-      // any explicit fields — we work directly on the raw node, no promotion.
       const rootDefs = (n.defaults as Record<string, unknown> | undefined) ?? {}
       const rawInstances = [...((n.instances as Record<string, unknown>[]) ?? [])]
       const sub     = rawInstances[ownerPath[0]] as Record<string, unknown>
       const subDate = String(sub?.date || '')
-
-      // series2 built from editor values, respecting root defaults.
-      const series2 = buildSeriesNode(entry, body, occDate, origRepeat, rootDefs, true)
+      const series2 = buildSeries(rootDefs)
 
       let newInstances: Record<string, unknown>[]
       if (occDate <= subDate) {
-        // Editing at or before the series start → replace the whole series.
         newInstances = [...rawInstances]
         newInstances[ownerPath[0]] = series2
       } else {
-        // Mid-series → cap the existing series and insert the new one after it.
         const [series1raw] = splitNode(sub as RawNode, occDate)
-        // series1 keeps only structural fields — its occurrence properties are
-        // inherited from the root defaults, no need to repeat them.
-        const series1 = canonicaliseSeriesNode(series1raw as Record<string, unknown>, rootDefs)
+        const series1 = canonicaliseInstance(series1raw as Record<string, unknown>, rootDefs, SERIES_STRUCTURAL, SERIES_DIRECT)
         newInstances = [...rawInstances]
         newInstances.splice(ownerPath[0], 1, series1, series2)
       }
-
-      // Preserve everything at root level; only replace the instances array.
       return { ...n, instances: newInstances } as unknown as RawNode
     }
 
@@ -328,15 +220,10 @@ function applyDebugSave(rawNode: RawNode, entry: EntryState, body: string): RawN
   return rawNode
 }
 
-/**
- * True when the save result should be auto-collapsed (shared fields hoisted to
- * root defaults).  Only the root-split case benefits from collapse; child-split
- * already has the correct two-level defaults structure.
- */
 function shouldCollapse(entry: EntryState): boolean {
-  if (entry.editScope !== 'future') return true   // all/single/add → always collapse
-  const ownerPath = ((entry.item as any)?.ownerPath as number[] | undefined) ?? []
-  return ownerPath.length === 0   // root split → collapse; child split → preserve
+  if (entry.editScope !== 'future') return true
+  const ownerPath = ((entry.item as Occurrence)?.ownerPath as number[] | undefined) ?? []
+  return ownerPath.length === 0
 }
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
@@ -354,9 +241,6 @@ function defaultEndDate(): string {
 }
 
 // ── Tree display helpers ──────────────────────────────────────────────────────
-
-// Note: getSubNode, setSubNode, splitNode, doEditFollowing are imported from
-// '../model/nodeOps' — see imports above.
 
 interface CardItem {
   label:         string
@@ -413,15 +297,14 @@ function doEditOccurrence(
   return setSubNode(node, ownerPath, { ...sub, instances })
 }
 
-function doEditPattern(node: RawNode, ownerPath: number[], newRepeat: Record<string, unknown>): RawNode {
+function doEditPattern(node: RawNode, ownerPath: number[], newRepeat: RepeatType): RawNode {
   const sub = getSubNode(node, ownerPath)
   return setSubNode(node, ownerPath, { ...sub, repeat: newRepeat })
 }
 
-function doDeleteOccurrence(node: RawNode, ownerPath: number[], occ: OccurrenceEntry): RawNode {
+function doDeleteOccurrence(node: RawNode, ownerPath: number[], occ: DebugOccurrence): RawNode {
   const sub = getSubNode(node, ownerPath)
   if (occ.source === 'generated') {
-    // Mark as excluded (preserves any other overrides on this date)
     const instances = [...((sub.instances as RawNode[]) ?? [])]
     const idx = instances.findIndex(i => String((i as Record<string, unknown>).date) === occ.date)
     const excl: Record<string, unknown> = { date: occ.date, excluded: true }
@@ -432,7 +315,6 @@ function doDeleteOccurrence(node: RawNode, ownerPath: number[], occ: OccurrenceE
     }
     return setSubNode(node, ownerPath, { ...sub, instances })
   } else {
-    // Remove the explicit instance entry entirely
     const instances = ((sub.instances as RawNode[]) ?? []).filter(
       i => String((i as Record<string, unknown>).date) !== occ.date,
     )
@@ -505,7 +387,7 @@ function NodeCard({ item, isLast }: { item: CardItem; isLast: boolean }) {
 function OccurrenceRow({
   occ, isSelected, onClick,
 }: {
-  occ: OccurrenceEntry
+  occ: DebugOccurrence
   isSelected: boolean
   onClick: () => void
 }) {
@@ -516,11 +398,13 @@ function OccurrenceRow({
         isSelected
           ? 'bg-blue-500/10 border-l-2 border-l-blue-500/60'
           : 'hover:bg-white/[0.03]'
-      } ${occ.done ? 'opacity-40' : ''}`}
+      } ${occ.metadata.done ? 'opacity-40' : ''}`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${occ.source === 'generated' ? 'bg-white/30' : 'bg-amber-400/60'}`}
-        title={occ.source === 'generated' ? 'generated by schedule' : 'explicit instance'} />
-      <span className={`shrink-0 ${occ.done ? 'line-through' : ''} text-white/80`}>{occ.date}</span>
+      <span
+        className={`w-1.5 h-1.5 rounded-full shrink-0 ${occ.source === 'generated' ? 'bg-white/30' : 'bg-amber-400/60'}`}
+        title={occ.source === 'generated' ? 'generated by schedule' : 'explicit instance'}
+      />
+      <span className={`shrink-0 ${occ.metadata.done ? 'line-through' : ''} text-white/80`}>{occ.date}</span>
       {occ.time
         ? <span className="text-white/40 shrink-0">{occ.time}</span>
         : <span className="text-white/15 shrink-0">—</span>}
@@ -529,7 +413,7 @@ function OccurrenceRow({
       }`}>
         {occ.source === 'generated' ? 'sched' : 'explicit'}
       </span>
-      {occ.done && (
+      {occ.metadata.done && (
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-sans">done</span>
       )}
     </div>
@@ -564,7 +448,7 @@ function ActionBtn({
 
 const inputCls = 'bg-white/5 border border-white/10 rounded px-2 py-1 text-[11px] font-mono text-white/70 focus:outline-none focus:border-white/30'
 const btnApply = 'px-3 py-1 text-xs rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition-colors disabled:opacity-40'
-const btnCancel= 'px-3 py-1 text-xs rounded bg-white/5 text-white/40 hover:bg-white/10 transition-colors'
+const btnCancel = 'px-3 py-1 text-xs rounded bg-white/5 text-white/40 hover:bg-white/10 transition-colors'
 
 function AddOccurrenceForm({ onApply, onCancel }: {
   onApply: (date: string, time: string, done: boolean) => void
@@ -592,13 +476,13 @@ function AddOccurrenceForm({ onApply, onCancel }: {
 }
 
 function EditOccurrenceForm({ occ, onApply, onCancel }: {
-  occ: OccurrenceEntry
+  occ: DebugOccurrence
   onApply: (date: string, time: string, done: boolean) => void
   onCancel: () => void
 }) {
   const [date, setDate] = useState(occ.date)
   const [time, setTime] = useState(occ.time ?? '')
-  const [done, setDone] = useState(occ.done ?? false)
+  const [done, setDone] = useState(occ.metadata.done ?? false)
   return (
     <div className="p-3 space-y-2 border-t border-white/5">
       <div className="flex flex-wrap gap-2 items-center">
@@ -617,123 +501,8 @@ function EditOccurrenceForm({ occ, onApply, onCancel }: {
   )
 }
 
-const DAYS       = ['mo','tu','we','th','fr','sa','su']
-const DAY_LABELS = ['Mo','Tu','We','Th','Fr','Sa','Su']
-
-function EditPatternForm({ initialRepeat, onApply, onCancel }: {
-  initialRepeat: Record<string, unknown>
-  onApply: (repeat: Record<string, unknown>) => void
-  onCancel: () => void
-}) {
-  const endRaw = ((initialRepeat.end ?? {}) as Record<string, unknown>)
-  const [repeatType, setRepeatType] = useState(String(initialRepeat.type ?? 'schedule'))
-  const [freq,       setFreq]       = useState(String(initialRepeat.freq ?? initialRepeat.scheduled
-    ? String((initialRepeat.scheduled as Record<string,unknown>)?.freq ?? 'weekly') : 'weekly'))
-  const [interval,   setInterval]   = useState(String(initialRepeat.interval ?? 1))
-  const [byweekday,  setByweekday]  = useState<string[]>(
-    Array.isArray(initialRepeat.byweekday) ? (initialRepeat.byweekday as string[]) : [],
-  )
-  const [endType,  setEndType]  = useState<'none'|'until'|'count'>(
-    endRaw.type === 'count' ? 'count' : endRaw.type === 'until' ? 'until' : 'none',
-  )
-  const [endDate,  setEndDate]  = useState(String(endRaw.date ?? ''))
-  const [endCount, setEndCount] = useState(String(endRaw.occurrences ?? '1'))
-
-  function handleApply() {
-    const repeat: Record<string, unknown> = { type: repeatType }
-    if (repeatType === 'schedule') {
-      repeat.freq = freq
-      const iv = parseInt(interval)
-      if (iv > 1) repeat.interval = iv
-      if (freq === 'weekly' && byweekday.length > 0) repeat.byweekday = byweekday
-    } else {
-      // after_completion — interval is a duration-like value
-      repeat.interval = parseInt(interval)
-    }
-    if (endType === 'until' && endDate)  repeat.end = { type: 'until', date: endDate }
-    if (endType === 'count' && endCount) repeat.end = { type: 'count', occurrences: parseInt(endCount) }
-    onApply(repeat)
-  }
-
-  return (
-    <div className="p-3 space-y-2 border-t border-white/5">
-      <div className="flex flex-wrap gap-2 items-center">
-        <label className="text-[11px] text-white/30 w-8">type</label>
-        <select value={repeatType} onChange={e => setRepeatType(e.target.value)} className={inputCls}>
-          <option value="schedule">schedule</option>
-          <option value="after_completion">after_completion</option>
-        </select>
-      </div>
-
-      {repeatType === 'schedule' && (
-        <div className="flex flex-wrap gap-2 items-center">
-          <label className="text-[11px] text-white/30 w-8">freq</label>
-          <select value={freq} onChange={e => setFreq(e.target.value)} className={inputCls}>
-            {['daily','weekly','monthly','yearly'].map(f => <option key={f} value={f}>{f}</option>)}
-          </select>
-          <label className="text-[11px] text-white/30">every</label>
-          <input type="number" min="1" value={interval} onChange={e => setInterval(e.target.value)}
-            className={`${inputCls} w-14`} />
-        </div>
-      )}
-
-      {repeatType === 'after_completion' && (
-        <div className="flex flex-wrap gap-2 items-center">
-          <label className="text-[11px] text-white/30 w-8">days</label>
-          <input type="number" min="1" value={interval} onChange={e => setInterval(e.target.value)}
-            className={`${inputCls} w-20`} />
-          <span className="text-[11px] text-white/30">after completion</span>
-        </div>
-      )}
-
-      {repeatType === 'schedule' && freq === 'weekly' && (
-        <div className="flex gap-2 items-center flex-wrap">
-          <label className="text-[11px] text-white/30 w-8">days</label>
-          <div className="flex gap-1">
-            {DAYS.map((d, i) => (
-              <button key={d}
-                onClick={() => setByweekday(p => p.includes(d) ? p.filter(x => x !== d) : [...p, d])}
-                className={`text-[11px] px-1.5 py-0.5 rounded font-mono transition-colors ${
-                  byweekday.includes(d)
-                    ? 'bg-blue-500/30 text-blue-300 border border-blue-500/40'
-                    : 'bg-white/5 text-white/40 border border-white/10'
-                }`}
-              >
-                {DAY_LABELS[i]}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2 items-center">
-        <label className="text-[11px] text-white/30 w-8">end</label>
-        {(['none','until','count'] as const).map(t => (
-          <button key={t} onClick={() => setEndType(t)}
-            className={`text-[11px] px-2 py-0.5 rounded transition-colors ${
-              endType === t ? 'bg-white/15 text-white/80' : 'text-white/30 hover:text-white/60'
-            }`}
-          >{t}</button>
-        ))}
-        {endType === 'until' && (
-          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className={inputCls} />
-        )}
-        {endType === 'count' && (
-          <input type="number" min="1" value={endCount} onChange={e => setEndCount(e.target.value)}
-            className={`${inputCls} w-20`} />
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        <button onClick={handleApply} className={btnApply}>Apply</button>
-        <button onClick={onCancel} className={btnCancel}>Cancel</button>
-      </div>
-    </div>
-  )
-}
-
 function EditFollowingForm({ occ, onApply, onCancel }: {
-  occ: OccurrenceEntry
+  occ: DebugOccurrence
   onApply: () => void
   onCancel: () => void
 }) {
@@ -787,8 +556,9 @@ export default function NodeInheritanceDebugger() {
   const [activeAction,    setActiveAction]    = useState<ActionKind | null>(null)
 
   // ── 4th-column EntryEditor state ─────────────────────────────────────────
-  const [debugEntry,       setDebugEntry]      = useState<EntryState | null>(null)
-  const [debugDialog,      setDebugDialog]     = useState<string | null>(null)
+  const [debugEntry,        setDebugEntry]        = useState<EntryState | null>(null)
+  const [debugDialog,       setDebugDialog]       = useState<string | null>(null)
+  const [patternDialogOpen, setPatternDialogOpen] = useState(false)
 
   // ── Parse ────────────────────────────────────────────────────────────────
   const processContent = useCallback((content: string, name: string) => {
@@ -815,13 +585,11 @@ export default function NodeInheritanceDebugger() {
     setDebugEntry(null)
   }, [])
 
-  // ── Apply a raw-node mutation ────────────────────────────────────────────
   const applyRawNode = useCallback((newNode: RawNode) => {
     const { body } = extractFrontmatter(displayContent)
     processContent(serializeRawNode(newNode, body), fileName)
   }, [displayContent, fileName, processContent])
 
-  // ── Collapse ─────────────────────────────────────────────────────────────
   const handleCollapse = useCallback(() => {
     if (!results) return
     const { body } = extractFrontmatter(originalContent || displayContent)
@@ -841,21 +609,12 @@ export default function NodeInheritanceDebugger() {
     if (originalContent) processContent(originalContent, fileName)
   }, [originalContent, fileName, processContent])
 
-  // ── Delete all ───────────────────────────────────────────────────────────
   const handleDeleteAll = useCallback(() => {
-    setDisplayContent('')
-    setFileName('')
-    setOriginalContent('')
-    setResults(null)
-    setRawNode(null)
-    setZodErrors([])
-    setIsCollapsed(false)
-    setSelectedIdx(null)
-    setActiveAction(null)
-    setDebugEntry(null)
+    setDisplayContent(''); setFileName(''); setOriginalContent('')
+    setResults(null); setRawNode(null); setZodErrors([])
+    setIsCollapsed(false); setSelectedIdx(null); setActiveAction(null); setDebugEntry(null)
   }, [])
 
-  // ── File input ────────────────────────────────────────────────────────────
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
     const text = await file.text(); setOriginalContent(text); processContent(text, file.name); e.target.value = ''
@@ -868,41 +627,47 @@ export default function NodeInheritanceDebugger() {
   }, [processContent])
 
   // ── Derived state ─────────────────────────────────────────────────────────
-  const displayItems = useMemo(() => results ? flattenForDisplay(results) : [], [results])
-  const canCollapse  = results !== null
-  const isEmpty      = !displayContent
+  const displayItems  = useMemo(() => results ? flattenForDisplay(results) : [], [results])
+  const canCollapse   = results !== null
+  const isEmpty       = !displayContent
+  const nodeHasRepeat = results ? treeHasOccurrences(results) : false
 
-  const nodeHasRepeat      = results ? treeHasOccurrences(results) : false
-  const occurrences        = useMemo<OccurrenceEntry[] | null>(() => {
+  const occurrences = useMemo<DebugOccurrence[] | null>(() => {
     if (!results || !nodeHasRepeat) return null
-    return collectAllOccurrences(results, expandEndDate)
+    return collectAllOccurrences(results, expandEndDate, extractDebugMetadata)
   }, [results, nodeHasRepeat, expandEndDate])
 
-  // ── Selection / 4th-column open ───────────────────────────────────────────
+  const patterns = useMemo<DebugPattern[]>(
+    () => results ? collectRepeatPatterns(results, extractDebugMetadata) : [],
+    [results],
+  )
+
+  const findPattern = useCallback((ownerPath: number[]): DebugPattern | undefined => {
+    const key = JSON.stringify(ownerPath)
+    return patterns.find(p => JSON.stringify(p.ownerPath) === key)
+  }, [patterns])
+
+  // ── Selection ────────────────────────────────────────────────────────────
   const handleSelectOccurrence = useCallback((idx: number) => {
     if (selectedIdx === idx) {
-      setSelectedIdx(null)
-      setActiveAction(null)
-      setDebugEntry(null)
+      setSelectedIdx(null); setActiveAction(null); setDebugEntry(null)
     } else {
-      setSelectedIdx(idx)
-      setActiveAction(null)
+      setSelectedIdx(idx); setActiveAction(null)
       if (rawNode) {
         const occEntry = (occurrences ?? [])[idx]
-        if (occEntry) setDebugEntry(entryFromOccurrence(toOccurrence(occEntry, rawNode)))
+        if (occEntry) {
+          const pattern = findPattern(occEntry.ownerPath)
+          setDebugEntry(entryFromOccurrence(toOccurrence(occEntry, rawNode, pattern), 'single'))
+        }
       }
     }
-  }, [selectedIdx, rawNode, occurrences])
+  }, [selectedIdx, rawNode, occurrences, findPattern])
 
-  // ── EntryEditor handlers (4th column) ─────────────────────────────────────
+  // ── EntryEditor handlers ─────────────────────────────────────────────────
   const handleDebugSave = useCallback((body: string) => {
     if (!debugEntry || !rawNode) return
     const updated = applyDebugSave(rawNode, debugEntry, body)
 
-    // For root-level splits and non-future edits: collapse to canonical form so
-    // shared fields are hoisted to root defaults:.
-    // For child-series splits: the two-level defaults structure was already built
-    // correctly by applyDebugSave; collapse would destroy nested defaults: blocks.
     if (shouldCollapse(debugEntry)) {
       const { body: origBody } = extractFrontmatter(displayContent)
       const effectiveTree = buildEffectiveTree(updated)
@@ -912,26 +677,19 @@ export default function NodeInheritanceDebugger() {
         const v = RawNodeSchema.safeParse(yamlParse(fm))
         if (v.success) {
           const rn = v.data as RawNode
-          setDisplayContent(collapsed)
-          setRawNode(rn)
-          setResults(buildEffectiveTree(rn))
-          setZodErrors([])
-          setIsCollapsed(true)
-          setSelectedIdx(null)
-          setDebugEntry(null)
+          setDisplayContent(collapsed); setRawNode(rn); setResults(buildEffectiveTree(rn))
+          setZodErrors([]); setIsCollapsed(true); setSelectedIdx(null); setDebugEntry(null)
           return
         }
       } catch { /* fall through */ }
     }
 
     applyRawNode(updated)
-    setSelectedIdx(null)
-    setDebugEntry(null)
+    setSelectedIdx(null); setDebugEntry(null)
   }, [debugEntry, rawNode, applyRawNode, displayContent])
 
   const handleDebugClose = useCallback(() => {
-    setSelectedIdx(null)
-    setDebugEntry(null)
+    setSelectedIdx(null); setDebugEntry(null)
   }, [])
 
   const handleDebugScopeChange = useCallback((scope: string) => {
@@ -939,42 +697,45 @@ export default function NodeInheritanceDebugger() {
       if (!prev?.item) return prev
       const occ = prev.item as Occurrence
       const { scheduled } = applyScope(occ, scope)
-      // applyScope reads root.repeat, which is null for collapsed containers
-      // (repeat lives on sub-instances there).  Use the occurrence's own repeat instead.
-      const repeat =
-        scope === 'future' || scope === 'all'
-          ? (occ.repeat ?? null)
-          : null
-      return { ...prev, editScope: scope, scheduled, repeat }
+
+      if (scope === 'future' || scope === 'all') {
+        const pattern = findPattern(occ.ownerPath ?? [])
+        const repeat = pattern?.repeat ?? null
+        const pm = pattern?.metadata
+        return {
+          ...prev, editScope: scope, scheduled, repeat,
+          title:    pm?.title    ?? prev.title,
+          tags:     pm?.tags     ? [...pm.tags] : prev.tags,
+          priority: pm?.priority ?? prev.priority ?? null,
+          bodyHtml: pm?.body     ?? prev.bodyHtml,
+          duration: pm?.duration ?? prev.duration,
+          tracked:  prev.tracked,
+          done:     pm?.done ?? prev.done,
+        }
+      }
+      return { ...prev, editScope: scope, scheduled, repeat: null }
     })
-  }, [])
+  }, [findPattern])
 
   const selectedOcc = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
 
   const handleDebugDelete = useCallback(() => {
     if (!rawNode || !selectedOcc) return
-    const updated = doDeleteOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc)
-    applyRawNode(updated)
-    setSelectedIdx(null)
-    setDebugEntry(null)
+    applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc))
+    setSelectedIdx(null); setDebugEntry(null)
   }, [rawNode, selectedOcc, applyRawNode])
 
-  // Repeat object on the owning sub-node (used by Edit pattern form)
-  const selectedOwnerRepeat = useMemo<Record<string, unknown> | null>(() => {
-    if (!selectedOcc || !rawNode) return null
-    const sub = getSubNode(rawNode, selectedOcc.ownerPath)
-    return sub?.repeat ? (sub.repeat as Record<string, unknown>) : null
-  }, [selectedOcc, rawNode])
+  const selectedPattern = useMemo<DebugPattern | null>(
+    () => selectedOcc ? findPattern(selectedOcc.ownerPath) ?? null : null,
+    [selectedOcc, findPattern],
+  )
 
-  const canEditPattern    = selectedOcc?.source === 'generated'
-  const canEditFollowing  = selectedOcc !== null && selectedOwnerRepeat !== null
-  // "Delete occurrence" (single) only makes sense when there are multiple occurrences;
-  // when there is only one, "Delete all" (labeled "Delete occurrence") covers it.
-  const totalOccurrences  = occurrences?.length ?? 0
-  const canDeleteSingle   = selectedOcc !== null && totalOccurrences > 1
-  const canDeleteFollowing = canEditFollowing  // same gate as edit-following
-  // "Delete all" is always available once a file is loaded; label changes when only 1 occ.
-  const deleteAllLabel    = totalOccurrences <= 1 ? 'Delete occurrence' : 'Delete all'
+  const canEditPattern     = selectedOcc?.source === 'generated'
+  const canEditFollowing   = selectedOcc !== null && selectedPattern !== null
+  const totalOccurrences   = occurrences?.length ?? 0
+  const canDeleteSingle    = selectedOcc !== null && totalOccurrences > 1
+  const canDeleteFollowing = canEditFollowing
+  const deleteAllLabel     = totalOccurrences <= 1 ? 'Delete occurrence' : 'Delete all'
 
   function toggleAction(kind: ActionKind) {
     setActiveAction(a => a === kind ? null : kind)
@@ -1080,9 +841,8 @@ export default function NodeInheritanceDebugger() {
           </div>
         </div>
 
-        {/* 3RD COLUMN: repeat expansion */}
+        {/* 3RD COLUMN: occurrences */}
         <div className="w-[22%] flex flex-col min-h-0 border-r border-white/10">
-          {/* Header */}
           <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
             <CalendarDays size={12} className="text-white/30" />
             <span>Occurrences</span>
@@ -1097,12 +857,9 @@ export default function NodeInheritanceDebugger() {
             </div>
           </div>
 
-          {/* Occurrence list */}
           <div className="flex-1 overflow-auto">
             {!displayContent && (
-              <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">
-                Load a file
-              </div>
+              <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">Load a file</div>
             )}
             {displayContent && !nodeHasRepeat && zodErrors.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-white/20 select-none">
@@ -1112,104 +869,73 @@ export default function NodeInheritanceDebugger() {
             )}
             {occurrences !== null && (
               occurrences.length === 0
-                ? <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">
-                    No occurrences before {expandEndDate}
-                  </div>
+                ? <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">No occurrences before {expandEndDate}</div>
                 : occurrences.map((occ, i) => (
-                    <OccurrenceRow key={i} occ={occ} isSelected={selectedIdx === i}
-                      onClick={() => handleSelectOccurrence(i)} />
+                    <OccurrenceRow key={i} occ={occ} isSelected={selectedIdx === i} onClick={() => handleSelectOccurrence(i)} />
                   ))
             )}
           </div>
 
-          {/* Raw-manipulation action panel (debug-only operations) */}
           {displayContent && zodErrors.length === 0 && (
             <div className="shrink-0 border-t border-white/10 bg-[#0d1015]">
               {selectedOcc === null ? (
                 <div className="px-3 py-2.5 text-[11px] text-white/20 select-none">
-                  {occurrences && occurrences.length > 0
-                    ? 'Select an occurrence to apply actions'
-                    : nodeHasRepeat ? '' : 'Add occurrences below'}
+                  {occurrences && occurrences.length > 0 ? 'Select an occurrence to apply actions' : nodeHasRepeat ? '' : 'Add occurrences below'}
                 </div>
               ) : (
                 <>
-                  {/* Edit actions row */}
                   <div className="flex flex-wrap gap-1 px-3 pt-2 pb-1">
-                    <ActionBtn label="Add occurrence"   icon={<Plus size={11} />}
-                      active={activeAction === 'add'}
-                      onClick={() => toggleAction('add')} />
-                    <ActionBtn label="Edit occurrence"  icon={<Pencil size={11} />}
-                      active={activeAction === 'edit-occurrence'}
-                      onClick={() => toggleAction('edit-occurrence')} />
-                    <ActionBtn label="Edit pattern"     icon={<Repeat size={11} />}
-                      active={activeAction === 'edit-pattern'}
-                      disabled={!canEditPattern}
-                      title={!canEditPattern ? 'Only available for schedule-generated occurrences' : undefined}
-                      onClick={() => toggleAction('edit-pattern')} />
-                    <ActionBtn label="This & following" icon={<ChevronsRight size={11} />}
-                      active={activeAction === 'edit-following'}
-                      disabled={!canEditFollowing}
-                      title={!canEditFollowing ? 'Requires a repeat field' : undefined}
+                    <ActionBtn label="Add occurrence"   icon={<Plus size={11} />}       active={activeAction === 'add'}            onClick={() => toggleAction('add')} />
+                    <ActionBtn label="Edit occurrence"  icon={<Pencil size={11} />}     active={activeAction === 'edit-occurrence'} onClick={() => toggleAction('edit-occurrence')} />
+                    <ActionBtn label="Edit pattern"     icon={<Repeat size={11} />}     active={activeAction === 'edit-pattern'}
+                      disabled={!canEditPattern} title={!canEditPattern ? 'Only available for schedule-generated occurrences' : undefined}
+                      onClick={() => { toggleAction('edit-pattern'); setPatternDialogOpen(true) }} />
+                    <ActionBtn label="This & following" icon={<ChevronsRight size={11} />} active={activeAction === 'edit-following'}
+                      disabled={!canEditFollowing} title={!canEditFollowing ? 'Requires a repeat field' : undefined}
                       onClick={() => toggleAction('edit-following')} />
                   </div>
-
-                  {/* Delete actions row */}
                   <div className="flex flex-wrap gap-1 px-3 pb-2">
-                    <ActionBtn label="Delete occurrence" icon={<Trash2 size={11} />}
-                      active={activeAction === 'delete-occurrence'}
-                      disabled={!canDeleteSingle}
-                      title={!canDeleteSingle ? 'Only one occurrence — use Delete all' : undefined}
+                    <ActionBtn label="Delete occurrence" icon={<Trash2 size={11} />} active={activeAction === 'delete-occurrence'}
+                      disabled={!canDeleteSingle} title={!canDeleteSingle ? 'Only one occurrence — use Delete all' : undefined}
                       onClick={() => toggleAction('delete-occurrence')} />
-                    <ActionBtn label="Delete following"  icon={<Trash2 size={11} />}
-                      active={activeAction === 'delete-following'}
-                      disabled={!canDeleteFollowing}
-                      title={!canDeleteFollowing ? 'Requires a repeat field' : undefined}
+                    <ActionBtn label="Delete following"  icon={<Trash2 size={11} />} active={activeAction === 'delete-following'}
+                      disabled={!canDeleteFollowing} title={!canDeleteFollowing ? 'Requires a repeat field' : undefined}
                       onClick={() => toggleAction('delete-following')} />
-                    <ActionBtn label={deleteAllLabel} icon={<Trash2 size={11} />}
-                      active={activeAction === 'delete-all'}
-                      onClick={() => toggleAction('delete-all')} />
+                    <ActionBtn label={deleteAllLabel}    icon={<Trash2 size={11} />} active={activeAction === 'delete-all'} onClick={() => toggleAction('delete-all')} />
                   </div>
 
-                  {/* Forms */}
                   {activeAction === 'add' && rawNode && selectedOcc && (
                     <AddOccurrenceForm
-                      onApply={(date, time, done) => applyRawNode(doAddOccurrence(rawNode, selectedOcc.ownerPath, date, time, done))}
+                      onApply={(date, time, done) => { applyRawNode(doAddOccurrence(rawNode, selectedOcc.ownerPath, date, time, done)); setActiveAction(null) }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'edit-occurrence' && rawNode && selectedOcc && (
                     <EditOccurrenceForm occ={selectedOcc}
-                      onApply={(date, time, done) => applyRawNode(doEditOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc.date, date, time, done))}
-                      onCancel={() => setActiveAction(null)} />
-                  )}
-                  {activeAction === 'edit-pattern' && rawNode && selectedOcc && selectedOwnerRepeat && (
-                    <EditPatternForm initialRepeat={selectedOwnerRepeat}
-                      onApply={repeat => applyRawNode(doEditPattern(rawNode, selectedOcc.ownerPath, repeat))}
+                      onApply={(date, time, done) => { applyRawNode(doEditOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc.date, date, time, done)); setActiveAction(null) }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'edit-following' && rawNode && selectedOcc && (
                     <EditFollowingForm occ={selectedOcc}
-                      onApply={() => applyRawNode(doEditFollowing(rawNode, selectedOcc.ownerPath, selectedOcc.date))}
+                      onApply={() => { applyRawNode(doEditFollowing(rawNode, selectedOcc.ownerPath, selectedOcc.date)); setActiveAction(null) }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'delete-occurrence' && rawNode && selectedOcc && (
                     <DeleteConfirmForm
-                      message={selectedOcc.source === 'generated'
-                        ? `Mark ${selectedOcc.date} as excluded — it will be hidden from the schedule.`
-                        : `Remove the explicit instance on ${selectedOcc.date} entirely.`}
+                      message={selectedOcc.source === 'generated' ? `Mark ${selectedOcc.date} as excluded.` : `Remove explicit instance on ${selectedOcc.date}.`}
                       label="Delete occurrence"
-                      onApply={() => applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc))}
+                      onApply={() => { applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc)); setActiveAction(null) }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'delete-following' && rawNode && selectedOcc && (
                     <DeleteConfirmForm
                       message={`End the series on ${dayBefore(selectedOcc.date)}. Occurrences from ${selectedOcc.date} onwards will be removed.`}
                       label="Delete this & following"
-                      onApply={() => applyRawNode(doDeleteFollowing(rawNode, selectedOcc.ownerPath, selectedOcc.date))}
+                      onApply={() => { applyRawNode(doDeleteFollowing(rawNode, selectedOcc.ownerPath, selectedOcc.date)); setActiveAction(null) }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'delete-all' && (
                     <DeleteConfirmForm
-                      message="Delete the entire node. This clears all occurrences and cannot be undone (use Original to restore the loaded file)."
+                      message="Delete the entire node. Use Original to restore the loaded file."
                       label={deleteAllLabel}
                       onApply={handleDeleteAll}
                       onCancel={() => setActiveAction(null)} />
@@ -1226,7 +952,7 @@ export default function NodeInheritanceDebugger() {
             <>
               <EntryEditor
                 entry={debugEntry}
-                onChange={setDebugEntry as any}
+                onChange={(updater) => setDebugEntry(prev => prev ? updater(prev) : prev)}
                 onSave={handleDebugSave}
                 onDelete={handleDebugDelete}
                 onClose={handleDebugClose}
@@ -1234,8 +960,6 @@ export default function NodeInheritanceDebugger() {
                 onOpenRepeatDlg={() => setDebugDialog('dlgRepeat')}
                 onScopeChange={handleDebugScopeChange}
               />
-
-              {/* Dialogs */}
               <DatePickerDialog
                 open={debugDialog === 'dlgSched'}
                 initialDate={debugEntry.scheduled?.date || fmtISO(new Date())}
@@ -1278,15 +1002,25 @@ export default function NodeInheritanceDebugger() {
             <div className="flex flex-col items-center justify-center h-full gap-3 text-white/20 select-none">
               <CalendarDays size={32} strokeWidth={1.2} />
               <span className="text-sm">
-                {occurrences && occurrences.length > 0
-                  ? 'Select an occurrence to edit'
-                  : displayContent ? '' : 'Load a file to begin'}
+                {occurrences && occurrences.length > 0 ? 'Select an occurrence to edit' : displayContent ? '' : 'Load a file to begin'}
               </span>
             </div>
           )}
         </div>
-
       </div>
+
+      {/* RepeatDialog for "Edit pattern" action (3rd column) */}
+      {rawNode && selectedOcc && (
+        <RepeatDialog
+          open={patternDialogOpen}
+          scheduled={{ date: selectedOcc.date, time: selectedOcc.time || '' }}
+          tracked={selectedOcc.metadata.done !== undefined}
+          repeat={selectedPattern?.repeat ?? null}
+          onConfirm={r => { applyRawNode(doEditPattern(rawNode, selectedOcc.ownerPath, r)); setPatternDialogOpen(false); setActiveAction(null) }}
+          onRemove={() => setPatternDialogOpen(false)}
+          onClose={() => { setPatternDialogOpen(false); setActiveAction(null) }}
+        />
+      )}
     </div>
   )
 }
