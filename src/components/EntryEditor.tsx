@@ -196,7 +196,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const isNote = itemType === 'note'
   // notes: no scheduling chips; events: date/time/duration + repeat (schedule only); tasks: everything
   const showDateChip = !isNote
-  const showRepeat = !isNote && (hasDate || tracked) && !isSingleScope
+  const showRepeat = !isNote && (hasDate || tracked) && (!isSingleScope || !isRecur)
   const bodyKey = item ? `${item.metadata?._nodeId || item.metadata?.id || 'item'}-${item.date || ''}-${editScope}` : 'new'
 
   // Set body HTML imperatively so React never touches innerHTML during re-renders
