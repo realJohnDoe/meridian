@@ -6,7 +6,7 @@ import {
   Plus, X,
 } from 'lucide-react'
 import {
-  initApp, applyScope, buildBodyHtml,
+  initApp, applyScope, buildBodyHtml, entryFromOccurrence,
   saveNode, deleteNode, closeEntry, pushOverlay,
   openDayViewForDate, goToday, openSearch,
   syncToDirectory, pickDirectory,
@@ -39,24 +39,7 @@ function entryFromItem(item: any, editScope: string): EntryState {
   if (!item) {
     return { ...ENTRY_DEFAULT, scheduled: { date: fmtISO(TODAY), time: '' } }
   }
-  const root = item._node || item
-  const { scheduled, repeat } = applyScope(item, editScope)
-  const tracked = item.done !== undefined || root.done !== undefined
-  const itemType: ItemType = tracked ? 'task' : scheduled ? 'event' : 'note'
-  return {
-    item: { ...item, _editScope: editScope },
-    title: item.title || root.title || '',
-    bodyHtml: buildBodyHtml(item.body || root.body || ''),
-    scheduled,
-    repeat,
-    duration: item.duration || root.duration || '',
-    tracked,
-    itemType,
-    done: item.done || false,
-    tags: [...(item.tags || root.tags || [])],
-    priority: item.priority || root.priority || null,
-    editScope,
-  }
+  return entryFromOccurrence(item, editScope, buildBodyHtml)
 }
 
 export default function App() {

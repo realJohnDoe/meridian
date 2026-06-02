@@ -25,7 +25,7 @@ import DatePickerDialog from '../components/DatePickerDialog'
 import TimePickerDialog from '../components/TimePickerDialog'
 import DurationDialog from '../components/DurationDialog'
 import PriorityDrawer from '../components/PriorityDrawer'
-import { applyScope } from '../meridian'
+import { applyScope, entryFromOccurrence } from '../meridian'
 
 // ── Debug metadata type ───────────────────────────────────────────────────────
 
@@ -62,8 +62,10 @@ function toOccurrence(
   const jsTime = entry.time
     ? new Date(y, mo - 1, d, +entry.time.slice(0, 2), +entry.time.slice(3, 5))
     : new Date(y, mo - 1, d)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const n = rawNode as unknown as Record<string, any>
+  // Use the raw series sub-node (not the container root) so that applyScope
+  // can find the series start date via _node.date — matching what expandRange
+  // does in the main app.
+  const seriesNode = getSubNode(rawNode, entry.ownerPath)
   return {
     date:      entry.date,
     time:      entry.time ?? null,
@@ -80,37 +82,12 @@ function toOccurrence(
       type:     m.done !== undefined ? 'task' : 'event',
       repeat:   pattern?.repeat,
       recur:    entry.source === 'generated',
-      _nodeId:  String(n.id ?? 'debug-node'),
-      _node:    rawNode as unknown as Node,
+      _nodeId:  String((seriesNode as Record<string, unknown>).id ?? 'debug-node'),
+      _node:    seriesNode as unknown as Node,
     },
   } as Occurrence
 }
 
-/**
- * Build the initial EntryState when the user clicks an occurrence.
- * Seeds every field from the effective occurrence.
- */
-function entryFromOccurrence(occ: Occurrence): EntryState {
-  const m = occ.metadata
-  const tracked   = m.done !== undefined
-  const itemType: ItemType = tracked ? 'task' : occ.date ? 'event' : 'note'
-  const repeat    = m.repeat ?? null
-  const scheduled = occ.date ? { date: occ.date, time: occ.time || '' } : null
-  return {
-    item:      occ,
-    title:     m.title || '',
-    bodyHtml:  m.body || '',
-    scheduled,
-    repeat,
-    duration:  m.duration || '',
-    tracked,
-    itemType,
-    done:      m.done ?? false,
-    tags:      [...(m.tags || [])],
-    priority:  m.priority || null,
-    editScope: 'single',
-  }
-}
 
 // ── Helpers for applyDebugSave ────────────────────────────────────────────────
 
@@ -680,7 +657,7 @@ export default function NodeInheritanceDebugger() {
         const occEntry = (occurrences ?? [])[idx]
         if (occEntry) {
           const pattern = findPattern(occEntry.ownerPath)
-          setDebugEntry(entryFromOccurrence(toOccurrence(occEntry, rawNode, pattern)))
+          setDebugEntry(entryFromOccurrence(toOccurrence(occEntry, rawNode, pattern), 'single'))
         }
       }
     }
@@ -722,7 +699,6 @@ export default function NodeInheritanceDebugger() {
       const { scheduled } = applyScope(occ, scope)
 
       if (scope === 'future' || scope === 'all') {
-        // Re-seed from the series pattern so occurrence-level state doesn't contaminate
         const pattern = findPattern(occ.ownerPath ?? [])
         const repeat = pattern?.repeat ?? null
         const pm = pattern?.metadata
@@ -733,7 +709,7 @@ export default function NodeInheritanceDebugger() {
           priority: pm?.priority ?? prev.priority ?? null,
           bodyHtml: pm?.body     ?? prev.bodyHtml,
           duration: pm?.duration ?? prev.duration,
-          tracked:  pm !== undefined ? pm.done !== undefined : prev.tracked,
+          tracked:  prev.tracked,
           done:     pm?.done ?? prev.done,
         }
       }

@@ -4,7 +4,8 @@ import { nodeToFile, fileToNode, titleToSlug } from './yaml'
 import { splitNode, doEditFollowing } from './model/nodeOps'
 import { serializeRawNode } from './model/inheritance'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
-import type { Node, Occurrence, Repeat, Scheduled, Instance } from './types'
+import type { Node, Occurrence, Repeat, Scheduled, Instance, Priority } from './types'
+import type { EntryState, ItemType } from './components/EntryEditor'
 import { useStore } from './store'
 import { TODAY } from './constants'
 
@@ -365,6 +366,36 @@ export function applyScope(item: Occurrence, scope: string): { scheduled: Schedu
   if (scope === 'future') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: item.metadata.repeat || null }
   if (scope === 'add') return { scheduled: { date: fmtISO(TODAY), time: occTime || '' }, repeat: null }
   return { scheduled: rootDate ? { date: rootDate, time: rootTime || '' } : null, repeat: item.metadata.repeat || null }
+}
+
+/**
+ * Seed an EntryState from a concrete occurrence.
+ * `bodyTransform` converts raw body text to HTML (pass `buildBodyHtml` in the
+ * main app; omit or pass identity in contexts that don't render wikilinks).
+ */
+export function entryFromOccurrence(
+  item:          Occurrence,
+  editScope:     string,
+  bodyTransform: (body: string) => string = b => b,
+): EntryState {
+  const m = item.metadata
+  const { scheduled, repeat } = applyScope(item, editScope)
+  const tracked  = m.done !== undefined
+  const itemType: ItemType = tracked ? 'task' : scheduled ? 'event' : 'note'
+  return {
+    item,
+    title:     m.title    || '',
+    bodyHtml:  bodyTransform(m.body || ''),
+    scheduled,
+    repeat,
+    duration:  m.duration || '',
+    tracked,
+    itemType,
+    done:      m.done     ?? false,
+    tags:      [...(m.tags     || [])],
+    priority:  (m.priority || null) as Priority | null,
+    editScope,
+  }
 }
 
 export function buildBodyHtml(text: string): string {
