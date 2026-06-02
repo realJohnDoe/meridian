@@ -366,7 +366,6 @@ export const METADATA_EXCLUDE = new Set([
   'date', 'time', 'jsTime', 'ownerPath',   // top-level on OccurrenceEntry
   'instances', 'defaults',                  // structural tree fields
   'excluded',                               // exclusion sentinel
-  '_isGenerated',                           // internal source-tagging field
 ])
 
 /**
@@ -614,13 +613,7 @@ export function expandRange<T = Record<string, unknown>>(
     } else if (node.repeat) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const occs = expandNode(node as any, from, to) as Record<string, unknown>[]
-      // Two-pass: determine which dates are schedule-generated vs. explicit instances.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const genDates = generatedDateSet(node as any, from, to)
-      all.push(...occs.map(o => ({
-        ...o, ownerPath: [],
-        _isGenerated: genDates.has(String(o.date ?? '')),
-      })))
+      all.push(...occs.map(o => ({ ...o, ownerPath: [] })))
     } else {
       const nodeInstances = (node.instances as unknown[]) || []
       const hasRepeatInstances = nodeInstances.some(
@@ -630,15 +623,9 @@ export function expandRange<T = Record<string, unknown>>(
         const inst = nodeInstances[instIdx] as Record<string, unknown>
         if (!inst.repeat || inst.excluded) continue
         const effChild = mergeNode(node, inst) as Record<string, unknown>
-        const effNoInst = { ...effChild, instances: [] }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const occs = expandNode({ ...effChild, instances: [] } as any, from, to) as Record<string, unknown>[]
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const genDates = generatedDateSet(effNoInst as any, from, to)
-        all.push(...occs.map(o => ({
-          ...o, ownerPath: [instIdx],
-          _isGenerated: genDates.has(String(o.date ?? '')),
-        })))
+        all.push(...occs.map(o => ({ ...o, ownerPath: [instIdx] })))
       }
 
       const liveInstances = nodeInstances.filter(
@@ -689,9 +676,7 @@ export function expandRange<T = Record<string, unknown>>(
       date:      String(occ.date ?? ''),
       time:      occ.time ? String(occ.time) : null,
       jsTime:    occ.jsTime as Date,
-      source:    occ._isGenerated !== undefined
-                   ? (occ._isGenerated ? 'generated' : 'explicit')
-                   : (occ.recur !== false ? 'generated' : 'explicit'),
+      source:    occ.recur === false ? 'explicit' : 'generated',
       ownerPath: (occ.ownerPath as number[]) ?? [],
       metadata:  extractMetadata(metaFields),
     }

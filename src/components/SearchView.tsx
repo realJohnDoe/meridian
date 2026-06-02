@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { ArrowLeft, Search } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { extractAppMetadata, occKind } from '../types'
+import { extractAppMetadata } from '../types'
 import { expandRange } from '../model/expansion'
 import { addDays, fmtShort, NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
@@ -15,7 +15,8 @@ interface SearchItem {
   date: string
   tags: string[]
   type: string
-  occurrence: Occurrence
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _node?: any
 }
 
 interface Props {
@@ -47,17 +48,17 @@ export default function SearchView({ onOpen, onClose }: Props) {
       ...(NOTES_DATA as SearchItem[]),
       ...occs
         .filter(o => {
-          const key = o.metadata.nodeId || o.metadata.title
+          const key = o.metadata._nodeId || o.metadata.title
           if (seen.has(key)) return false
           seen.add(key); return true
         })
         .map(o => ({
-          title:      o.metadata.title,
-          preview:    o.metadata.body || '',
-          date:       fmtShort(o.jsTime),
-          tags:       o.metadata.tags || [],
-          type:       occKind(o),
-          occurrence: o,
+          title:   o.metadata.title,
+          preview: o.metadata.body || '',
+          date:    fmtShort(o.jsTime),
+          tags:    o.metadata.tags || [],
+          type:    o.metadata.type,
+          _node:   o.metadata._node,
         })),
     ]
   }, [nodes])
@@ -130,7 +131,7 @@ export default function SearchView({ onOpen, onClose }: Props) {
               <div key={g.label}>
                 {g.label && <div className="ns-sec">{g.label}</div>}
                 {g.items.map((it, i) => (
-                  <div key={i} className="note-row" onClick={() => onOpen(it.occurrence ?? it)}>
+                  <div key={i} className="note-row" onClick={() => onOpen(it._node ?? it)}>
                     <div className="nr-t">{it.title}</div>
                     <div className="nr-p">{it.preview || ''}</div>
                     <div className="nr-m">

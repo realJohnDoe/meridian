@@ -41,8 +41,8 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
           const bars: React.ReactNode[] = []
           dayOccs.slice(0, 4).forEach((o, i) => {
             if (o.metadata.multiday) {
-              if (seen.has(o.metadata.nodeId)) return
-              seen.add(o.metadata.nodeId)
+              if (seen.has(o.metadata._nodeId)) return
+              seen.add(o.metadata._nodeId)
               bars.push(<div key={i} className="cc-bar multiday">{o.metadata.title}</div>)
             } else {
               bars.push(<div key={i} className={`cc-bar ${ccBarClass(o)}`}>{o.metadata.title}</div>)
