@@ -69,41 +69,41 @@ export interface AppMetadata {
   body?:     string
   duration?: string
   repeat?:   Repeat
-  type:      'event' | 'task' | 'note'
   multiday?: Multiday
   timezone?: string
-  // Internal tracking fields (set by expandNode / expandRange)
-  _nodeId:   string
-  _node:     Node
-  recur?:    boolean
-  id?:       string
-  // Layout fields (set post-expansion by DayView)
-  _isBanner?: boolean
-  _dh?:       number
-  _endMs?:    number
+  /** Source node ID — use for store lookups during edits. */
+  nodeId:    string
+  /** Layout fields set post-expansion by DayView. */
+  _dh?:      number
+  _endMs?:   number
 }
 
 /** Extract AppMetadata from the raw fields of an expanded occurrence. */
 export function extractAppMetadata(fields: Record<string, unknown>): AppMetadata {
-  const done = fields.done as boolean | undefined
-  const type: 'event' | 'task' | 'note' =
-    done !== undefined ? 'task' : 'event'
   return {
-    title:     fields.title    ? String(fields.title)    : '',
-    done,
-    tags:      Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
-    priority:  fields.priority as Priority | undefined,
-    body:      fields.body     ? String(fields.body)     : undefined,
-    duration:  fields.duration ? String(fields.duration) : undefined,
-    repeat:    fields.repeat   as Repeat    | undefined,
-    type,
-    multiday:  fields.multiday as Multiday  | undefined,
-    timezone:  fields.timezone ? String(fields.timezone) : undefined,
-    _nodeId:   String(fields._nodeId ?? ''),
-    _node:     fields._node    as Node,
-    recur:     fields.recur    as boolean   | undefined,
-    id:        fields.id       ? String(fields.id) : undefined,
+    title:    fields.title    ? String(fields.title)    : '',
+    done:     fields.done     as boolean  | undefined,
+    tags:     Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
+    priority: fields.priority as Priority | undefined,
+    body:     fields.body     ? String(fields.body)     : undefined,
+    duration: fields.duration ? String(fields.duration) : undefined,
+    repeat:   fields.repeat   as Repeat   | undefined,
+    multiday: fields.multiday as Multiday | undefined,
+    timezone: fields.timezone ? String(fields.timezone) : undefined,
+    nodeId:   String(fields._nodeId ?? fields.id ?? ''),
   }
+}
+
+// ── Occurrence helpers ────────────────────────────────────────────────────────
+
+/** Derive the display kind from occurrence data. */
+export function occKind(occ: Occurrence): 'event' | 'task' | 'note' {
+  return occ.metadata.done !== undefined ? 'task' : occ.date ? 'event' : 'note'
+}
+
+/** True when the occurrence belongs to a recurring series. */
+export function occIsRecur(occ: Occurrence): boolean {
+  return !!occ.metadata.repeat
 }
 
 // ── Occurrence ───────────────────────────────────────────────────────────────

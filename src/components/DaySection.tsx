@@ -74,7 +74,7 @@ function DaySection({
 
       {/* Multiday banners */}
       {multidayBanners.map(o => (
-        <div key={o.metadata._nodeId} className="multiday-banner" onClick={() => onOpen(o)}>
+        <div key={o.metadata.nodeId} className="multiday-banner" onClick={() => onOpen(o)}>
           <CalendarRange size={14} />
           {o.metadata.title}
           <span className="opacity-55 text-[10px] ml-1">
@@ -86,7 +86,7 @@ function DaySection({
       {/* Regular occurrence rows */}
       {items.map((o, i) => (
         <OccurrenceRow
-          key={`${o.metadata._nodeId}-${o.date}-${o.time ?? ''}`}
+          key={`${o.metadata.nodeId}-${o.date}-${o.time ?? ''}`}
           occ={o}
           index={i}
           onOpen={() => onOpen(o)}
@@ -104,11 +104,11 @@ function propsAreEqual(prev: Props, next: Props): boolean {
   if (prev.multidayBanners.length !== next.multidayBanners.length) return false
   if (!prev.items.every((o, i) => {
     const n = next.items[i]
-    return o.metadata._nodeId === n.metadata._nodeId && o.date === n.date && o.time === n.time
+    return o.metadata.nodeId === n.metadata.nodeId && o.date === n.date && o.time === n.time
         && o.metadata.done === n.metadata.done && o.metadata.title === n.metadata.title
         && o.metadata.priority === n.metadata.priority
   })) return false
-  if (!prev.multidayBanners.every((o, i) => o.metadata._nodeId === next.multidayBanners[i].metadata._nodeId)) return false
+  if (!prev.multidayBanners.every((o, i) => o.metadata.nodeId === next.multidayBanners[i].metadata.nodeId)) return false
   return true
 }
 

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Plus, Repeat2 } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { extractAppMetadata } from '../types'
+import { extractAppMetadata, occIsRecur } from '../types'
 import { expandRange, fmtT } from '../model/expansion'
 import { addDays, fmtShort, barClass } from '../meridian'
 import { Checkbox } from './ui/checkbox'
@@ -70,7 +70,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
 
         return (
           <div
-            key={`${o.metadata._nodeId}-${o.date}`}
+            key={`${o.metadata.nodeId}-${o.date}`}
             className="swipe-wrap"
             style={{ animation: 'fadeUp .16s ease both', animationDelay: `${i * 0.025}s` }}
           >
@@ -88,7 +88,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
                     <Checkbox checked={isDone} disabled className="size-5" />
                   )}
                   <span className={`occ-title${isDone ? ' done-t' : ''}`}>{o.metadata.title}</span>
-                  {o.metadata.recur && <span className="orecur"><Repeat2 size={12} /></span>}
+                  {occIsRecur(o) && <span className="orecur"><Repeat2 size={12} /></span>}
                   <span style={{ opacity: 0.5, fontSize: 10, marginLeft: 4 }}>{fmtShort(o.jsTime)}</span>
                 </div>
                 {(o.metadata.tags || []).length > 0 && (

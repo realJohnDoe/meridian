@@ -6,7 +6,6 @@ import {
 import { RawNodeSchema, type RawNode } from '../model/nodeSchema'
 import {
   buildEffectiveTree, collapseToYaml, serializeRawNode, displayValue,
-  canonicaliseInstance,
   type EffectiveNode,
 } from '../model/inheritance'
 import {
@@ -15,10 +14,10 @@ import {
   type OccurrenceEntry, type RepeatPattern,
 } from '../model/expansion'
 import {
-  dayBefore, getSubNode, setSubNode, doEditFollowing, splitNode,
+  dayBefore, getSubNode, setSubNode, doEditFollowing,
 } from '../model/nodeOps'
 import { yamlParse } from '../yaml'
-import type { Occurrence, Node, Priority, Repeat as RepeatType } from '../types'
+import type { Occurrence, Priority, Repeat as RepeatType } from '../types'
 import EntryEditor, { type EntryState } from '../components/EntryEditor'
 import RepeatDialog from '../components/RepeatDialog'
 import DatePickerDialog from '../components/DatePickerDialog'
@@ -26,6 +25,7 @@ import TimePickerDialog from '../components/TimePickerDialog'
 import DurationDialog from '../components/DurationDialog'
 import PriorityDrawer from '../components/PriorityDrawer'
 import { applyScope, entryFromOccurrence } from '../meridian'
+import { applyNodeEdit, shouldCollapse } from '../nodeEdit'
 
 // ── Debug metadata type ───────────────────────────────────────────────────────
 
@@ -62,10 +62,7 @@ function toOccurrence(
   const jsTime = entry.time
     ? new Date(y, mo - 1, d, +entry.time.slice(0, 2), +entry.time.slice(3, 5))
     : new Date(y, mo - 1, d)
-  // Use the raw series sub-node (not the container root) so that applyScope
-  // can find the series start date via _node.date — matching what expandRange
-  // does in the main app.
-  const seriesNode = getSubNode(rawNode, entry.ownerPath)
+  const seriesNode = getSubNode(rawNode, entry.ownerPath) as Record<string, unknown>
   return {
     date:      entry.date,
     time:      entry.time ?? null,
@@ -79,152 +76,14 @@ function toOccurrence(
       priority: m.priority,
       body:     m.body,
       duration: m.duration,
-      type:     m.done !== undefined ? 'task' : 'event',
       repeat:   pattern?.repeat,
-      recur:    entry.source === 'generated',
-      _nodeId:  String((seriesNode as Record<string, unknown>).id ?? 'debug-node'),
-      _node:    seriesNode as unknown as Node,
+      nodeId:   String(seriesNode.id ?? 'debug-node'),
     },
   } as Occurrence
 }
 
 
-// ── Helpers for applyDebugSave ────────────────────────────────────────────────
-
-/** Fields that always stay as direct fields on a series node. */
-const SERIES_STRUCTURAL: ReadonlySet<string> =
-  new Set(['date', 'time', 'repeat', 'instances', 'defaults'])
-
-/** Fields that stay direct (not in nested defaults) when they differ from root. */
-const SERIES_DIRECT: ReadonlySet<string> = new Set(['title'])
-
-/**
- * Apply the editor form fields to rawNode and return the updated rawNode.
- */
-function applyDebugSave(rawNode: RawNode, entry: EntryState, body: string): RawNode {
-  const { item, editScope, title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
-  if (!item) return rawNode
-  const occ      = item as Occurrence
-  const occDate  = occ.date
-  const ownerPath: number[] = occ.ownerPath ?? []
-  const n = rawNode as Record<string, unknown>
-
-  // ── edit whole series ────────────────────────────────────────────────────
-  if (editScope === 'all') {
-    const updated = { ...n }
-    updated.title = title
-    if (tags?.length) updated.tags = tags; else delete updated.tags
-    if (body) updated.body = body; else delete updated.body
-    if (tracked) { updated.done = done; if (priority) updated.priority = priority; else delete updated.priority }
-    else { delete updated.done; delete updated.priority }
-    if (scheduled?.date) { updated.date = scheduled.date; if (scheduled.time) updated.time = scheduled.time; else delete updated.time }
-    if (duration) updated.duration = duration; else delete updated.duration
-    if (repeat) updated.repeat = repeat as unknown; else delete updated.repeat
-    return updated as RawNode
-
-  // ── single occurrence override ───────────────────────────────────────────
-  } else if (editScope === 'single') {
-    const instances = [...((n.instances as RawNode[]) ?? [])]
-    const idx  = instances.findIndex(i => String((i as Record<string, unknown>).date) === occDate)
-    const base: Record<string, unknown> = idx >= 0 ? { ...(instances[idx] as object) } : { date: occDate }
-    if (scheduled?.time) base.time = scheduled.time; else delete base.time
-
-    // Compare against effective inherited values from occ.metadata
-    const origTitle = occ.metadata.title
-    if (title !== origTitle) base.title = title; else delete base.title
-
-    const origDur = occ.metadata.duration
-    if (duration !== origDur) base.duration = duration; else delete base.duration
-
-    const origBody = occ.metadata.body || ''
-    if (body !== origBody) base.body = body; else delete base.body
-
-    const origTagsStr = JSON.stringify(occ.metadata.tags ?? [])
-    if (tags?.length && JSON.stringify(tags) !== origTagsStr) base.tags = tags
-    else delete base.tags
-
-    if (tracked) {
-      base.done = done
-      if (priority && priority !== occ.metadata.priority) base.priority = priority
-      else delete base.priority
-    } else {
-      delete base.done
-      delete base.priority
-    }
-
-    if (idx >= 0) instances[idx] = base as RawNode; else instances.push(base as RawNode)
-    return { ...rawNode, instances } as RawNode
-
-  // ── split: this & all following ──────────────────────────────────────────
-  } else if (editScope === 'future') {
-    const origRepeat = (getSubNode(rawNode, ownerPath) as Record<string, unknown> | undefined)?.repeat
-
-    function buildSeries(rootDefs: Record<string, unknown>): Record<string, unknown> {
-      const flatSeries: Record<string, unknown> = {
-        date:  scheduled?.date || occDate,
-        ...(scheduled?.time ? { time: scheduled.time } : {}),
-        ...((repeat ?? origRepeat) ? { repeat: repeat ?? origRepeat } : {}),
-        title,
-        ...(tags?.length ? { tags } : {}),
-        ...(tracked ? { done, ...(priority ? { priority } : {}) } : {}),
-        ...(body ? { body } : {}),
-        ...(duration ? { duration } : {}),
-      }
-      return canonicaliseInstance(flatSeries, rootDefs, SERIES_STRUCTURAL, SERIES_DIRECT)
-    }
-
-    if (ownerPath.length === 0) {
-      const OCCURRENCE_STATE = new Set(['done', 'priority', 'body', 'duration'])
-      const rootDefs: Record<string, unknown> = {}
-      for (const [k, v] of Object.entries(n)) {
-        if (SERIES_STRUCTURAL.has(k) || OCCURRENCE_STATE.has(k)) continue
-        rootDefs[k] = v
-      }
-      const [series1raw] = splitNode(rawNode, occDate)
-      const series1 = canonicaliseInstance(series1raw as Record<string, unknown>, rootDefs, SERIES_STRUCTURAL, SERIES_DIRECT)
-      const series2 = buildSeries(rootDefs)
-      return { defaults: rootDefs, instances: [series1, series2] } as unknown as RawNode
-
-    } else {
-      const rootDefs = (n.defaults as Record<string, unknown> | undefined) ?? {}
-      const rawInstances = [...((n.instances as Record<string, unknown>[]) ?? [])]
-      const sub     = rawInstances[ownerPath[0]] as Record<string, unknown>
-      const subDate = String(sub?.date || '')
-      const series2 = buildSeries(rootDefs)
-
-      let newInstances: Record<string, unknown>[]
-      if (occDate <= subDate) {
-        newInstances = [...rawInstances]
-        newInstances[ownerPath[0]] = series2
-      } else {
-        const [series1raw] = splitNode(sub as RawNode, occDate)
-        const series1 = canonicaliseInstance(series1raw as Record<string, unknown>, rootDefs, SERIES_STRUCTURAL, SERIES_DIRECT)
-        newInstances = [...rawInstances]
-        newInstances.splice(ownerPath[0], 1, series1, series2)
-      }
-      return { ...n, instances: newInstances } as unknown as RawNode
-    }
-
-  // ── add a new occurrence ─────────────────────────────────────────────────
-  } else if (editScope === 'add') {
-    const instances = [...((n.instances as RawNode[]) ?? [])]
-    const newInst: Record<string, unknown> = { date: scheduled?.date || occDate }
-    if (scheduled?.time) newInst.time = scheduled.time
-    if (title) newInst.title = title
-    if (duration) newInst.duration = duration
-    if (tracked) { newInst.done = done; if (priority) newInst.priority = priority }
-    instances.push(newInst as RawNode)
-    return { ...rawNode, instances } as RawNode
-  }
-
-  return rawNode
-}
-
-function shouldCollapse(entry: EntryState): boolean {
-  if (entry.editScope !== 'future') return true
-  const ownerPath = ((entry.item as Occurrence)?.ownerPath as number[] | undefined) ?? []
-  return ownerPath.length === 0
-}
+// applyNodeEdit and shouldCollapse are imported from '../nodeEdit'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
 
@@ -666,7 +525,7 @@ export default function NodeInheritanceDebugger() {
   // ── EntryEditor handlers ─────────────────────────────────────────────────
   const handleDebugSave = useCallback((body: string) => {
     if (!debugEntry || !rawNode) return
-    const updated = applyDebugSave(rawNode, debugEntry, body)
+    const updated = applyNodeEdit(rawNode, debugEntry, body)
 
     if (shouldCollapse(debugEntry)) {
       const { body: origBody } = extractFrontmatter(displayContent)

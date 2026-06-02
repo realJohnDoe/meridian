@@ -52,8 +52,8 @@ export default function AgendaView({ onOpen }: Props) {
     occs.filter(o => o.metadata.multiday).forEach(o => {
       const k = dayKey(new Date(o.metadata.multiday!.start))
       if (!result[k]) result[k] = { date: new Date(o.metadata.multiday!.start), items: [] }
-      if (!result[k].items.find(x => x.metadata._nodeId === o.metadata._nodeId && x.metadata.multiday)) {
-        result[k].items.push({ ...o, metadata: { ...o.metadata, _isBanner: true } })
+      if (!result[k].items.find(x => x.metadata.nodeId === o.metadata.nodeId && x.metadata.multiday)) {
+        result[k].items.push(o)
       }
     })
 
@@ -76,8 +76,8 @@ export default function AgendaView({ onOpen }: Props) {
         const mdSeen = new Set<string>()
         const multidayBanners: Occurrence[] = []
         g.items.filter(o => o.metadata.multiday).forEach(o => {
-          if (!mdSeen.has(o.metadata._nodeId)) {
-            mdSeen.add(o.metadata._nodeId)
+          if (!mdSeen.has(o.metadata.nodeId)) {
+            mdSeen.add(o.metadata.nodeId)
             multidayBanners.push(o)
           }
         })

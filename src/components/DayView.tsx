@@ -149,8 +149,8 @@ export default function DayView({ onOpen }: Props) {
   const seen = new Set<string>()
   const allDayDeduped = allDay.filter(o => {
     if (!o.metadata.multiday) return true
-    if (seen.has(o.metadata._nodeId)) return false
-    seen.add(o.metadata._nodeId); return true
+    if (seen.has(o.metadata.nodeId)) return false
+    seen.add(o.metadata.nodeId); return true
   })
 
   const totalCols = Math.max(cols.length, 1)
@@ -163,7 +163,7 @@ export default function DayView({ onOpen }: Props) {
         <div className="dv-allday" id="dvAllDay">
           <div className="dv-adlbl">All day</div>
           {allDayDeduped.map((o, i) => (
-            <AllDayItem key={`${o.metadata._nodeId}-${o.date}-${i}`} o={o} onOpen={onOpen} />
+            <AllDayItem key={`${o.metadata.nodeId}-${o.date}-${i}`} o={o} onOpen={onOpen} />
           ))}
         </div>
       )}
@@ -201,7 +201,7 @@ export default function DayView({ onOpen }: Props) {
               })
               .map(o => (
                 <EventBlock
-                  key={`${o.metadata._nodeId}-${o.date}-${o.time ?? ''}`}
+                  key={`${o.metadata.nodeId}-${o.date}-${o.time ?? ''}`}
                   o={o}
                   colIndex={ci}
                   totalCols={totalCols}

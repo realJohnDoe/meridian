@@ -1,11 +1,13 @@
 import Dexie from 'dexie'
 import { fmtISO, fmtT, nodeDateTime, parseDateString } from './model/expansion'
 import { nodeToFile, fileToNode, titleToSlug } from './yaml'
-import { splitNode, doEditFollowing } from './model/nodeOps'
 import { serializeRawNode } from './model/inheritance'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
 import type { Node, Occurrence, Repeat, Scheduled, Instance, Priority } from './types'
+import { occKind, occIsRecur } from './types'
+export { occKind, occIsRecur }
 import type { EntryState, ItemType } from './components/EntryEditor'
+import { applyNodeEdit } from './nodeEdit'
 import { useStore } from './store'
 import { TODAY } from './constants'
 
@@ -198,7 +200,7 @@ export function closeSearch(): void { popOverlayFn(); }
 // ── SHARED OCCURRENCE SORT ────────────────────────────────────
 const _prioOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
 function _sortKey(o: Occurrence): number {
-  const t = !!fmtT(o.time), ev = o.metadata.type === 'event'
+  const t = !!fmtT(o.time), ev = occKind(o) === 'event'
   return (o.metadata.done ? 8 : 0) + (t ? 0 : 2) + (ev ? 0 : 1)
 }
 function _prioKey(o: Occurrence): number { return o.metadata.priority ? (_prioOrder[o.metadata.priority] ?? 3) : 3 }
@@ -222,7 +224,7 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
 
 export function occState(o: Occurrence): string {
   if (o.metadata.done) return 'done'
-  if (o.metadata.type === 'task' || o.metadata.done !== undefined) {
+  if (occKind(o) === 'task' || o.metadata.done !== undefined) {
     const p = o.metadata.priority
     if (p === 'high') return 'task-p1'
     if (p === 'medium') return 'task-p2'
@@ -254,7 +256,7 @@ function replaceNode(nodes: Node[], id: string, updated: Node): Node[] {
 export function toggleOccDone(o: Occurrence): void {
   const newDone = !o.metadata.done
   o.metadata.done = newDone // update the occurrence for optimistic UI
-  const node = o.metadata._node
+  const node = getNodes().find(n => n.id === o.metadata.nodeId)
   if (!node) return
   const updated = cloneNode(node)
   const jsT = o.jsTime
@@ -285,12 +287,13 @@ export function toggleOccDone(o: Occurrence): void {
 //   Removes the item from the Zustand store so React unmounts it.
 //   applyDelete() is a no-op if the user already pressed Undo.
 export function beginSwipeDelete(o: Occurrence): () => void {
-  const node = o.metadata._node
+  const node = getNodes().find(n => n.id === o.metadata.nodeId)
+  if (!node) return () => {}
   const nodeId = node.id
   const title = node.title
   let cancelled = false
 
-  if (o.metadata.recur) {
+  if (occIsRecur(o)) {
     const original = cloneNode(node) // snapshot for undo
     const updated = cloneNode(node)
     if (!updated.instances) updated.instances = []
@@ -357,11 +360,11 @@ export function openDayViewForDate(date: Date): void {
 // openEntry is handled entirely by App.tsx via React state — no global bridge needed.
 
 export function applyScope(item: Occurrence, scope: string): { scheduled: Scheduled | null; repeat: Repeat | null } {
-  const root = item.metadata._node
-  const occDate = item.date || root.date || null
-  const occTime = item.time || root.time || null
-  const rootDate = root.date || null
-  const rootTime = root.time || null
+  const root = getNodes().find(n => n.id === item.metadata.nodeId)
+  const occDate = item.date || root?.date || null
+  const occTime = item.time || root?.time || null
+  const rootDate = root?.date || null
+  const rootTime = root?.time || null
   if (scope === 'single') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: null }
   if (scope === 'future') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: item.metadata.repeat || null }
   if (scope === 'add') return { scheduled: { date: fmtISO(TODAY), time: occTime || '' }, repeat: null }
@@ -409,39 +412,20 @@ export function buildBodyHtml(text: string): string {
 
 export function closeEntry(): void { popOverlayFn() }
 
-/** Apply the user's "future" form edits onto a raw series2 object in place. */
-function applyFutureEdits(
-  series2: Record<string, unknown>,
-  f: Partial<Node> & { title: string },
-  node: Node,
-  repeat: Repeat | undefined,
-  tracked: boolean,
-): void {
-  if (f.date && f.date !== series2.date) series2.date = f.date
-  if (f.time) series2.time = f.time; else delete series2.time
-  if (f.title !== node.title) series2.title = f.title
-  if (JSON.stringify(f.tags) !== JSON.stringify(node.tags)) series2.tags = f.tags
-  if (f.duration !== node.duration) series2.duration = f.duration
-  if (f.body !== node.body) series2.body = f.body
-  if (repeat) series2.repeat = repeat
-  if (tracked && f.done !== undefined) series2.done = f.done
-}
-
 export function saveNode(item: Occurrence | null, editScope: string, fields: any): void {
-  const { title, tags, body, tracked, done, priority, scheduled, duration, repeat } = fields
+  const { title } = fields
   if (!title) return
-  const rootNode = item ? item.metadata._node : null
+
   const nodes = getNodes()
-  const existingIdx = rootNode ? nodes.findIndex(n => n === rootNode || (n.id && n.id === rootNode.id)) : -1
+  const nodeId = item?.metadata.nodeId
+  const existingIdx = nodeId ? nodes.findIndex(n => n.id === nodeId) : -1
   const isNew = existingIdx < 0
 
-  // Build the field accumulator with all possible Node properties.
-  const f: Partial<Node> & { title: string } = { title, tags, body: body || undefined }
-  if (tracked) { f.done = done; if (priority) f.priority = priority }
-  if (scheduled?.date) { f.date = scheduled.date; f.time = scheduled.time || undefined; f.duration = duration || undefined }
-  if (repeat) f.repeat = repeat
-
   if (isNew) {
+    const { tags, body, tracked, done, priority, scheduled, duration, repeat } = fields
+    const f: Partial<Node> & { title: string } = { title, tags, body: body || undefined }
+    if (tracked) { f.done = done; if (priority) f.priority = priority }
+    if (scheduled?.date) { f.date = scheduled.date; f.time = scheduled.time || undefined; f.duration = duration || undefined }
     const node: Partial<Node> & { id: string } = { id: 'node-' + bumpId(), ...f }
     if (!tracked) delete node.done
     if (!scheduled) { delete node.date; delete node.time; delete node.duration }
@@ -454,124 +438,19 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
 
   const node = nodes[existingIdx]
 
-  if (editScope === 'add') {
-    // Add a one-off occurrence to the series (or to a non-recurring node)
-    if (!f.date) { notify('Please set a date for the new occurrence.'); return }
-    const updated = cloneNode(node)
-    if (!updated.instances) updated.instances = []
-    // For non-recurring nodes: migrate root date into instances so all occurrences
-    // are explicit in the YAML (root node.date stays as metadata)
-    if (!updated.repeat && updated.date) {
-      const alreadyCovered = updated.instances.some((i: Instance) => i.date === updated.date && !i.excluded)
-      if (!alreadyCovered) {
-        const rootInst: Instance = { date: updated.date }
-        if (updated.time) rootInst.time = updated.time
-        updated.instances.unshift(rootInst)
-      }
-    }
-    const newInst: any = { date: f.date }
-    if (f.time) newInst.time = f.time
-    if (f.duration && f.duration !== updated.duration) newInst.duration = f.duration
-    if (f.title !== updated.title) newInst.title = f.title
-    if (f.body && f.body !== updated.body) newInst.body = f.body
-    if (tracked && f.done !== undefined) newInst.done = f.done
-    if (tracked && f.priority && f.priority !== updated.priority) newInst.priority = f.priority
-    updated.instances.push(newInst)
-    setNodes(replaceNode(nodes, node.id, updated))
-    writeEntityToCache(updated)
-    closeEntry()
+  if (editScope === 'add' && !fields.scheduled?.date) {
+    notify('Please set a date for the new occurrence.')
     return
   }
 
-  if (editScope === 'all' || !node.repeat) {
-    const updated: Node = { ...cloneNode(node), ...f }
-    if (!tracked) delete updated.done
-    if (!scheduled) { delete updated.date; delete updated.time; delete updated.duration }
-    if (repeat) updated.repeat = repeat; else delete updated.repeat
-    if (updated.tags && updated.tags.length === 0) delete updated.tags
-    setNodes(replaceNode(nodes, node.id, updated))
-    writeEntityToCache(updated)
-
-  } else if (editScope === 'single') {
-    const updated = cloneNode(node)
-    if (!updated.instances) updated.instances = []
-    const occDate = item!.date
-    const occTime = item!.time || undefined
-    const newDate = f.date
-    const newTime = f.time || undefined
-    const isRescheduled = newDate !== occDate || (newTime && newTime !== occTime)
-    if (isRescheduled) {
-      let excl = updated.instances.find((i: Instance) => i.date === occDate && (!i.time || i.time === occTime))
-      if (excl) { excl.excluded = true; delete excl.done }
-      else { updated.instances.push({ date: occDate, excluded: true }) }
-      const newInst: any = { date: newDate }
-      if (newTime) newInst.time = newTime
-      if (f.title !== node.title) newInst.title = f.title
-      if (f.body !== node.body) newInst.body = f.body
-      if (f.tags?.length && JSON.stringify(f.tags) !== JSON.stringify(node.tags)) newInst.tags = f.tags
-      if (f.duration !== node.duration) newInst.duration = f.duration
-      if (tracked && f.done !== undefined) newInst.done = f.done
-      if (tracked && f.priority !== node.priority) newInst.priority = f.priority || undefined
-      updated.instances.push(newInst)
-    } else {
-      let inst = updated.instances.find((i: Instance) => i.date === occDate && (!i.time || i.time === occTime))
-      if (!inst) { inst = { date: occDate }; if (occTime) inst.time = occTime; updated.instances.push(inst) }
-      if (f.title !== node.title) inst.title = f.title; else delete inst.title
-      if (f.body !== node.body) inst.body = f.body; else delete inst.body
-      if (f.tags?.length && JSON.stringify(f.tags) !== JSON.stringify(node.tags)) inst.tags = f.tags; else delete inst.tags
-      if (f.duration !== node.duration) inst.duration = f.duration; else delete inst.duration
-      if (tracked && f.done !== undefined) inst.done = f.done; else delete inst.done
-      if (tracked && f.priority !== node.priority) inst.priority = f.priority || undefined; else delete inst.priority
-    }
-    setNodes(replaceNode(nodes, node.id, updated))
-    writeEntityToCache(updated)
-
-  } else if (editScope === 'future') {
-    const occDate = item!.date
-    // Convert to RawNode (strips _path, id, type, etc.) so the split works on clean data
-    const rawNode = toRawNode(node)
-    // ownerPath tells us which series in the tree owns the `repeat` for this occurrence.
-    // [] → root has the repeat (simple case); [i] → root.instances[i] has the repeat
-    // (container produced by a previous split).
-    const ownerPath: number[] = (item as any).ownerPath ?? []
-
-    let container: Record<string, unknown>
-    let series2Idx: number   // index of the future series within container.instances
-
-    if (ownerPath.length === 0) {
-      // Root has the repeat — split root into two series and wrap in a container.
-      const [series1, series2raw] = splitNode(rawNode, occDate)
-      const series2: Record<string, unknown> = { ...series2raw }
-      applyFutureEdits(series2, f, node, repeat, tracked)
-      // Build container: strip date/time/repeat/instances from root
-      const cont: Record<string, unknown> = {}
-      for (const [k, v] of Object.entries(rawNode)) {
-        if (['date', 'time', 'repeat', 'instances'].includes(k)) continue
-        cont[k] = v
-      }
-      cont.instances = [series1, series2]
-      container = cont
-      series2Idx = 1
-    } else {
-      // A child series owns the repeat — doEditFollowing splits the correct child in place.
-      // The future series ends up at index ownerPath[0] + 1 inside container.instances.
-      const splitResult = doEditFollowing(rawNode, ownerPath, occDate) as Record<string, unknown>
-      const instArr = [...(splitResult.instances as Record<string, unknown>[])]
-      const idx = ownerPath[0] + 1   // position of the new future series (depth-1)
-      const series2 = { ...instArr[idx] }
-      applyFutureEdits(series2, f, node, repeat, tracked)
-      instArr[idx] = series2
-      container = { ...splitResult, instances: instArr }
-      series2Idx = idx
-    }
-
-    void series2Idx  // currently unused after the split; retained for 2c (reopen editor)
-    // Restore runtime tracking fields so the store can identify this node
-    const updated = { ...container, id: node.id, _path: node._path } as Node
-    setNodes(replaceNode(nodes, node.id, updated))
-    writeEntityToCache(updated)
-  }
-
+  // Delegate all edit logic to the shared pure function.
+  // Build an EntryState-compatible object from the flat fields.
+  const entryForEdit = { item, editScope, ...fields } as any
+  const rawNode = toRawNode(node)
+  const updatedRaw = applyNodeEdit(rawNode, entryForEdit, fields.body ?? '')
+  const updated = { ...updatedRaw, id: node.id, _path: node._path } as Node
+  setNodes(replaceNode(nodes, node.id, updated))
+  writeEntityToCache(updated)
   closeEntry()
 }
 
@@ -582,7 +461,9 @@ export function deleteNode(
   onConfirmSingle?: (title: string, onConfirm: () => void) => void,
 ): void {
   if (!item) return
-  const node = item.metadata._node
+  const _nodeOrUndef = getNodes().find(n => n.id === item.metadata.nodeId)
+  if (!_nodeOrUndef) return
+  const node: Node = _nodeOrUndef  // narrow to Node for closures below
   const nodeId = node.id
   const occDate = item.date || node.date || ''
 
@@ -840,7 +721,7 @@ async function diskDelete(path: string): Promise<void> {
 }
 
 /** Runtime/internal fields that must not be written to YAML. */
-const _INTERNAL_FIELDS = new Set(['id', '_path', '_node', '_nodeId', 'type', 'jsTime', 'recur'])
+const _INTERNAL_FIELDS = new Set(['id', '_path'])
 
 /** Strip runtime fields from a Node to get a plain RawNode suitable for serializeRawNode. */
 function toRawNode(node: Node): Record<string, unknown> {
