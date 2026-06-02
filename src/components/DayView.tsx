@@ -2,7 +2,8 @@ import { useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { Checkbox } from './ui/checkbox'
 import type { Occurrence } from '../types'
-import { expandRange, fmtT, parseDurationHours } from '../model/expand'
+import { extractAppMetadata } from '../types'
+import { expandRange, fmtT, parseDurationHours } from '../model/expansion'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
 
 import { TODAY } from '../constants'
@@ -31,13 +32,13 @@ function computeColumns(events: Occurrence[]): Occurrence[][] {
   const sorted = [...events].sort((a, b) => +a.jsTime - +b.jsTime)
   const cols: Occurrence[][] = []
   for (const ev of sorted) {
-    const dh = parseDurationHours(ev.duration)
+    const dh = parseDurationHours(ev.metadata.duration)
     const endMs = ev.jsTime.getTime() + dh * 3_600_000
-    ;(ev as any)._dh    = dh
-    ;(ev as any)._endMs = endMs
+    ev.metadata._dh    = dh
+    ev.metadata._endMs = endMs
     let placed = false
     for (const col of cols) {
-      if (ev.jsTime.getTime() >= (col[col.length - 1] as any)._endMs) {
+      if (ev.jsTime.getTime() >= col[col.length - 1].metadata._endMs!) {
         col.push(ev); placed = true; break
       }
     }
@@ -50,14 +51,14 @@ function computeColumns(events: Occurrence[]): Occurrence[][] {
 
 interface AllDayItemProps { o: Occurrence; onOpen: (o: Occurrence) => void }
 function AllDayItem({ o, onOpen }: AllDayItemProps) {
-  const hasTrack = o.done !== undefined
+  const hasTrack = o.metadata.done !== undefined
   return (
     <div
-      className={`dv-aditem ${o.multiday ? 'multiday' : dvBlkClass(o)}`}
+      className={`dv-aditem ${o.metadata.multiday ? 'multiday' : dvBlkClass(o)}`}
       onClick={() => onOpen(o)}
     >
-      {hasTrack && <Checkbox checked={!!o.done} tabIndex={-1} aria-hidden className="size-3.5 opacity-70 pointer-events-none" />}
-      <span>{o.title}</span>
+      {hasTrack && <Checkbox checked={!!o.metadata.done} tabIndex={-1} aria-hidden className="size-3.5 opacity-70 pointer-events-none" />}
+      <span>{o.metadata.title}</span>
     </div>
   )
 }
@@ -70,13 +71,11 @@ interface EventBlockProps {
 }
 function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
   const h   = o.jsTime.getHours() + o.jsTime.getMinutes() / 60
-  const dh  = (o as any)._dh as number
+  const dh  = o.metadata._dh as number
   const top = (h - SH) * HP + 1
   const height = Math.max(dh * HP - 4, 28)
-  const hasTrack = o.done !== undefined
+  const hasTrack = o.metadata.done !== undefined
 
-  // Use CSS calc() for column layout — avoids a rAF measurement pass.
-  // avail = 100% - 50px (time label) - 6px (right pad) = 100% - 56px
   const left  = `calc(50px + ${colIndex} * (100% - 56px) / ${totalCols})`
   const width = `calc((100% - 56px) / ${totalCols} - 3px)`
 
@@ -87,11 +86,11 @@ function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
       onClick={() => onOpen(o)}
     >
       <div className="dv-et">
-        {hasTrack && <Checkbox checked={!!o.done} tabIndex={-1} aria-hidden className="size-3 pointer-events-none" />}
-        {o.title}
+        {hasTrack && <Checkbox checked={!!o.metadata.done} tabIndex={-1} aria-hidden className="size-3 pointer-events-none" />}
+        {o.metadata.title}
       </div>
       <div className="dv-em">
-        {fmtT(o.time)}{o.duration ? ` · ${o.duration}` : ''}
+        {fmtT(o.time)}{o.metadata.duration ? ` · ${o.metadata.duration}` : ''}
       </div>
     </div>
   )
@@ -111,19 +110,17 @@ export default function DayView({ onOpen }: Props) {
   const { allDay, cols } = useMemo(() => {
     const from = new Date(dvDate); from.setHours(0, 0, 0, 0)
     const to   = new Date(dvDate); to.setHours(23, 59, 59)
-    const occs  = expandRange(nodes, from, to) as Occurrence[]
-    const allDay = sortOccs(occs.filter(o => !fmtT(o.time) || o.multiday)) as Occurrence[]
-    const timed  = sortOccs(occs.filter(o => !!fmtT(o.time) && !o.multiday)) as Occurrence[]
+    const occs  = expandRange(nodes, from, to, extractAppMetadata)
+    const allDay = sortOccs(occs.filter(o => !fmtT(o.time) || o.metadata.multiday))
+    const timed  = sortOccs(occs.filter(o => !!fmtT(o.time) && !o.metadata.multiday))
     return { allDay, cols: computeColumns(timed) }
   }, [dvDate, nodes])
 
-  // Scroll timeline to 8 am whenever the date changes.
   const scRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     setTimeout(() => scRef.current?.scrollTo({ top: (8 - SH) * HP, behavior: 'instant' }), 50)
   }, [dvDate])
 
-  // Swipe left/right on the timeline to navigate days (replaces addSwipe in initApp).
   const dvDateRef = useRef(dvDate)
   useEffect(() => { dvDateRef.current = dvDate }, [dvDate])
 
@@ -151,9 +148,9 @@ export default function DayView({ onOpen }: Props) {
   // Deduplicate multiday events in all-day strip.
   const seen = new Set<string>()
   const allDayDeduped = allDay.filter(o => {
-    if (!o.multiday) return true
-    if (seen.has(o._nodeId)) return false
-    seen.add(o._nodeId); return true
+    if (!o.metadata.multiday) return true
+    if (seen.has(o.metadata._nodeId)) return false
+    seen.add(o.metadata._nodeId); return true
   })
 
   const totalCols = Math.max(cols.length, 1)
@@ -166,7 +163,7 @@ export default function DayView({ onOpen }: Props) {
         <div className="dv-allday" id="dvAllDay">
           <div className="dv-adlbl">All day</div>
           {allDayDeduped.map((o, i) => (
-            <AllDayItem key={`${o._nodeId}-${o.date}-${i}`} o={o} onOpen={onOpen} />
+            <AllDayItem key={`${o.metadata._nodeId}-${o.date}-${i}`} o={o} onOpen={onOpen} />
           ))}
         </div>
       )}
@@ -204,7 +201,7 @@ export default function DayView({ onOpen }: Props) {
               })
               .map(o => (
                 <EventBlock
-                  key={`${o._nodeId}-${o.date}-${o.time ?? ''}`}
+                  key={`${o.metadata._nodeId}-${o.date}-${o.time ?? ''}`}
                   o={o}
                   colIndex={ci}
                   totalCols={totalCols}
