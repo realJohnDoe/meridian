@@ -14,6 +14,7 @@ const badgeVariants = cva(
         chip: [
           'h-control px-2.5 text-xs rounded-full border border-border/50 bg-secondary text-secondary-foreground cursor-pointer',
           'aria-[pressed=true]:bg-[var(--ab2)] aria-[pressed=true]:text-primary aria-[pressed=true]:border-primary',
+          'data-[state=on]:bg-[var(--ab2)] data-[state=on]:text-primary data-[state=on]:border-primary',
         ],
       },
     },
