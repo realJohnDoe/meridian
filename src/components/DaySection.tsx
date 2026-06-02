@@ -77,7 +77,7 @@ function DaySection({
         <div key={o.metadata._nodeId} className="multiday-banner" onClick={() => onOpen(o)}>
           <CalendarRange size={14} />
           {o.metadata.title}
-          <span style={{ opacity: 0.55, fontSize: 10, marginLeft: 4 }}>
+          <span className="opacity-55 text-[10px] ml-1">
             {fmtShort(parseDateString(o.metadata.multiday!.start)!)}–{fmtShort(parseDateString(o.metadata.multiday!.end)!)}
           </span>
         </div>

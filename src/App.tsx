@@ -33,6 +33,7 @@ import DayView from './components/DayView'
 import SearchView from './components/SearchView'
 import FilterOverlay from './components/FilterOverlay'
 import type { Occurrence, Priority } from './types'
+import { cn } from './lib/utils'
 
 
 function entryFromItem(item: any, editScope: string): EntryState {
@@ -192,9 +193,9 @@ export default function App() {
           <header className="topbar" id="mainTop">
             {showDayHeader ? (
               /* Day-view header: date title + prev/next navigation */
-              <div className="tb-l" style={{ flex: 1, gap: 4, overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
+              <div className="tb-l tb-l--day">
                 <button className="ib" onClick={() => setSidebarOpen(true)} title="Menu"><Menu /></button>
-                <span style={{ flex: 1, fontFamily: 'var(--disp)', fontStyle: 'italic', fontSize: 15, color: 'var(--t0)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <span className="dv-date-title">
                   {fmtLong(dvDate)}
                 </span>
                 <button className="ib" onClick={() => setDvDate(addDays(dvDate, -1))}><ChevronLeft /></button>
@@ -211,10 +212,9 @@ export default function App() {
             <div className="tb-r">
               <button className="ib" onClick={syncToDirectory} title={syncTitle} style={{ color: syncColor }}><FolderSync /></button>
               <button
-                className="ib"
+                className={cn('ib', pendingDirReconnect && !dirHandle && 'text-[var(--amb)]')}
                 onClick={pendingDirReconnect && !dirHandle ? reconnectDirectory : pickDirectory}
                 title={pendingDirReconnect && !dirHandle ? `Reconnect vault "${pendingDirReconnect}"` : 'Open vault'}
-                style={pendingDirReconnect && !dirHandle ? { color: 'var(--amb)' } : undefined}
               ><FolderOpen /></button>
               <button className="ib" onClick={goToday} title="Today"><CalendarCheck2 /></button>
               <button className="ib" onClick={openSearch} title="Search"><Search /></button>

@@ -60,9 +60,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
       </div>
 
       {results.length === 0 && (
-        <div style={{ padding: '40px 14px', textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>
-          No matches
-        </div>
+        <div className="empty-state">No matches</div>
       )}
 
       {results.map((o, i) => {

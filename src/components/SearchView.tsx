@@ -125,9 +125,7 @@ export default function SearchView({ onOpen, onClose }: Props) {
       <div className="ns-sc">
         <div className="ns-pad" id="nsList">
           {filtered.length === 0 ? (
-            <div style={{ padding: '40px 14px', textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>
-              No results
-            </div>
+            <div className="empty-state">No results</div>
           ) : (
             groups.map(g => (
               <div key={g.label}>
