@@ -19,7 +19,7 @@ import {
 } from '../model/nodeOps'
 import { yamlParse } from '../yaml'
 import type { Occurrence, Node, Priority, Repeat as RepeatType } from '../types'
-import EntryEditor, { type EntryState, type ItemType } from '../components/EntryEditor'
+import EntryEditor, { type EntryState } from '../components/EntryEditor'
 import RepeatDialog from '../components/RepeatDialog'
 import DatePickerDialog from '../components/DatePickerDialog'
 import TimePickerDialog from '../components/TimePickerDialog'
