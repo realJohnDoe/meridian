@@ -564,6 +564,15 @@ export default function NodeInheritanceDebugger() {
     return patterns.find(p => JSON.stringify(p.metadata._ownerPath) === key)
   }, [patterns])
 
+  // Derived selection state — declared before all callbacks that depend on them.
+  // toOccurrence() strips _ownerPath from metadata, so callbacks must read it here.
+  const selectedOcc = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
+
+  const selectedPattern = useMemo<DebugPattern | null>(
+    () => selectedOcc ? findPattern(selectedOcc.metadata._ownerPath) ?? null : null,
+    [selectedOcc, findPattern],
+  )
+
   // ── Selection ────────────────────────────────────────────────────────────
   const handleSelectOccurrence = useCallback((idx: number) => {
     if (selectedIdx === idx) {
@@ -583,7 +592,9 @@ export default function NodeInheritanceDebugger() {
   // ── EntryEditor handlers ─────────────────────────────────────────────────
   const handleDebugSave = useCallback((body: string) => {
     if (!debugEntry || !rawNode) return
-    const selectedOccPath = (debugEntry.item as Occurrence | null)?.metadata?._ownerPath as number[] | undefined
+    // Use selectedOcc._ownerPath — debugEntry.item is a converted Occurrence that
+    // has _ownerPath stripped by toOccurrence(), so reading it from there gives undefined.
+    const selectedOccPath = selectedOcc?.metadata._ownerPath
     const updated = applyNodeEdit(rawNode, debugEntry, body, selectedOccPath)
 
     if (shouldCollapse(debugEntry, selectedOccPath)) {
@@ -604,7 +615,7 @@ export default function NodeInheritanceDebugger() {
 
     applyRawNode(updated)
     setSelectedIdx(null); setDebugEntry(null)
-  }, [debugEntry, rawNode, applyRawNode, displayContent])
+  }, [debugEntry, rawNode, applyRawNode, displayContent, selectedOcc])
 
   const handleDebugClose = useCallback(() => {
     setSelectedIdx(null); setDebugEntry(null)
@@ -617,10 +628,10 @@ export default function NodeInheritanceDebugger() {
       const { scheduled } = applyScope(occ, scope)
 
       if (scope === 'future' || scope === 'all') {
-        const occPath = (occ.metadata as DebugMetadata)._ownerPath ?? []
-        const pattern = findPattern(occPath)
-        const repeat = pattern?.repeat ?? null
-        const pm = pattern?.metadata
+        // selectedPattern is derived from selectedOcc which retains the original _ownerPath.
+        // We cannot use occ.metadata._ownerPath because toOccurrence() strips it.
+        const repeat = selectedPattern?.repeat ?? null
+        const pm = selectedPattern?.metadata
         return {
           ...prev, editScope: scope, scheduled, repeat,
           title:    pm?.title    ?? prev.title,
@@ -634,20 +645,13 @@ export default function NodeInheritanceDebugger() {
       }
       return { ...prev, editScope: scope, scheduled, repeat: null }
     })
-  }, [findPattern])
-
-  const selectedOcc = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
+  }, [selectedPattern])
 
   const handleDebugDelete = useCallback(() => {
     if (!rawNode || !selectedOcc) return
     applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.metadata._ownerPath, selectedOcc))
     setSelectedIdx(null); setDebugEntry(null)
   }, [rawNode, selectedOcc, applyRawNode])
-
-  const selectedPattern = useMemo<DebugPattern | null>(
-    () => selectedOcc ? findPattern(selectedOcc.metadata._ownerPath) ?? null : null,
-    [selectedOcc, findPattern],
-  )
 
   const canEditPattern     = selectedOcc?.source === 'generated'
   const canEditFollowing   = selectedOcc !== null && selectedPattern !== null

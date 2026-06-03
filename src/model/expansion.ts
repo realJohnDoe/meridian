@@ -381,6 +381,7 @@ export interface OccurrenceEntry<T = Record<string, unknown>> {
   fileSlug:  string                    // identifies source file (= node.id)
   id:        string                    // own UUID; stable across promotion to RepeatPattern
   ownerId?:  string                    // UUID of parent RepeatPattern (undefined for standalone)
+  excluded?: boolean                   // exclusion override: suppresses a generated occurrence
   metadata:  T
 }
 
