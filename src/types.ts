@@ -14,45 +14,9 @@ export type Repeat =
   | { type: 'schedule'; freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; byweekday?: Weekday[]; bymonthday?: number[]; bysetpos?: number; interval?: number; end?: RepeatEnd }
   | { type: 'after_completion'; interval: string; end?: RepeatEnd }
 
-// ── Node ─────────────────────────────────────────────────────────────────────
-
-/** Per-occurrence override stored inside a Node's `instances` array. */
-export interface Instance {
-  date: string
-  time?: string
-  done?: boolean
-  excluded?: boolean
-  title?: string
-  body?: string
-  tags?: string[]
-  duration?: string
-  priority?: Priority
-  /** Used for 'future' scope child node that starts a new series. */
-  repeat?: Repeat
-}
-
 export interface Multiday {
   start: string
   end: string
-}
-
-/** Canonical data structure — maps 1:1 to a YAML file on disk. */
-export interface Node {
-  id: string
-  title: string
-  body?: string
-  date?: string
-  time?: string
-  duration?: string
-  done?: boolean
-  tags?: string[]
-  priority?: Priority
-  repeat?: Repeat
-  instances?: Instance[]
-  multiday?: Multiday
-  timezone?: string
-  /** Runtime-cached resolved file path — not persisted to YAML. */
-  _path?: string
 }
 
 // ── Metadata types ────────────────────────────────────────────────────────────
@@ -71,8 +35,7 @@ export interface InlineMetadata {
 export interface ExtendedMetadata {
   jsTime?:   Date      // computed from date+time; undefined in raw store items
   body?:     string    // markdown body (not frontmatter)
-  multiday?: Multiday  // TODO: replace with helper
-  repeat?:   Repeat    // runtime hint: parent series repeat type (used when store lookup unavailable, e.g. debug view)
+  multiday?: Multiday
   _dh?:      number    // DayView layout
   _endMs?:   number    // DayView layout
 }

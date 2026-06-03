@@ -40,8 +40,10 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     }
 
     // Series with explicit instances
-    const sharedDefaults = computeSharedFields(children.map(c => c.metadata))
+    const nonExcluded = children.filter(c => !c.excluded)
+    const sharedDefaults = computeSharedFields(nonExcluded.map(c => c.metadata))
     const instances = children.map(c => {
+      if (c.excluded) return { date: c.date, excluded: true }
       const diff = diffMetadata(c.metadata, sharedDefaults)
       const inst: Record<string, unknown> = { date: c.date }
       if (c.time) inst.time = c.time
@@ -75,12 +77,14 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
   // ── Multiple items — build container with root defaults + instances ────────
 
   // Collect per-series default blocks (step 1)
-  const seriesBlocks: Array<{ series: StoreItem; defaults: Partial<InlineMetadata>; instances: Array<{ date: string; time?: string | null; diff: Partial<InlineMetadata> }> }> = series.map(s => {
+  const seriesBlocks: Array<{ series: StoreItem; defaults: Partial<InlineMetadata>; instances: Array<{ date: string; time?: string | null; diff: Partial<InlineMetadata>; excluded?: boolean }> }> = series.map(s => {
     const children = items.filter(i => !isSeries(i) && (i as { ownerId?: string }).ownerId === s.id)
-    const shared = children.length > 0 ? computeSharedFields(children.map(c => c.metadata)) : {} as Partial<InlineMetadata>
+    const nonExcluded = children.filter(c => !(c as { excluded?: boolean }).excluded)
+    const shared = nonExcluded.length > 0 ? computeSharedFields(nonExcluded.map(c => c.metadata)) : {} as Partial<InlineMetadata>
     const childInsts = children.map(c => ({
       date: c.date,
       time: c.time,
+      excluded: (c as { excluded?: boolean }).excluded,
       diff: diffMetadata(c.metadata, shared) as Partial<InlineMetadata>,
     }))
     return { series: s, defaults: shared, instances: childInsts }
@@ -115,6 +119,7 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     }
     if (block.instances.length > 0) {
       inst.instances = block.instances.map(ci => {
+        if (ci.excluded) return { date: ci.date, excluded: true }
         const child: Record<string, unknown> = { date: ci.date }
         if (ci.time) child.time = ci.time
         Object.assign(child, metadataToYaml(ci.diff))

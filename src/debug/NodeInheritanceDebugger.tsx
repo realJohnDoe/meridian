@@ -9,7 +9,7 @@ import {
   type EffectiveNode,
 } from '../model/inheritance'
 import {
-  collectAllOccurrences, collectRepeatPatterns, treeHasOccurrences,
+  collectAllOccurrences, treeHasOccurrences,
   fmtISO,
   type OccurrenceEntry, type RepeatPattern,
 } from '../model/expansion'

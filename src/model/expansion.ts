@@ -22,9 +22,7 @@ import {
 } from 'date-fns'
 import type { Repeat, StoreItem, AppMetadata } from '../types'
 import { isSeries } from '../types'
-import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
-import type { RawNode } from './nodeSchema'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DATE HELPERS
