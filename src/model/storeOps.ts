@@ -47,12 +47,17 @@ export function upsertOverride(
   patch: Partial<OccurrenceEntry<AppMetadata>>,
 ): StoreItem[] {
   if (!occ.ownerId) {
-    // Standalone — update by id.
-    return items.map(i =>
-      i.id === occ.id
-        ? { ...i, ...patch, metadata: { ...i.metadata, ...(patch.metadata ?? {}) } }
-        : i,
-    )
+    // Standalone — match by fileSlug + date.
+    // Expanded occurrences get a fresh random id each render (expansion.ts line ~684),
+    // so occ.id never matches a store item id. Use (fileSlug, date) instead.
+    return items.map(i => {
+      if (isSeries(i)) return i
+      const io = i as OccurrenceEntry<AppMetadata>
+      if (io.ownerId) return i   // skip child overrides of a series
+      return io.fileSlug === occ.fileSlug && io.date === occ.date
+        ? { ...io, ...patch, metadata: { ...io.metadata, ...(patch.metadata ?? {}) } }
+        : io
+    })
   }
   // Recurring — upsert override child.
   const existing = items.find(
@@ -83,9 +88,10 @@ export function upsertOverride(
 // ── Edit operations ───────────────────────────────────────────────────────────
 
 export interface EditFields {
-  title:     string
-  tags:      string[]
-  body:      string
+  title:        string
+  tags:         string[]
+  participants: string[]
+  body:         string
   tracked:   boolean
   done:      boolean
   priority:  string | null
@@ -109,17 +115,18 @@ export function applyEdit(
   scope: string,
   fields: EditFields,
 ): StoreItem[] {
-  const { title, tags, body, tracked, done, priority, scheduled, duration, repeat } = fields
+  const { title, tags, participants, body, tracked, done, priority, scheduled, duration, repeat } = fields
 
   const newMeta = (): AppMetadata => ({
     title,
     tags,
-    body:     body || undefined,
-    duration: duration || undefined,
-    priority: (priority as AppMetadata['priority']) ?? undefined,
-    done:     tracked ? done : undefined,
-    multiday: undefined,
-    timezone: undefined,
+    participants: participants?.length ? participants : undefined,
+    body:         body || undefined,
+    duration:     duration || undefined,
+    priority:     (priority as AppMetadata['priority']) ?? undefined,
+    done:         tracked ? done : undefined,
+    multiday:     undefined,
+    timezone:     undefined,
   })
 
   // ── New item ───────────────────────────────────────────────────────────────
@@ -151,17 +158,22 @@ export function applyEdit(
 
   // ── edit all (series or standalone) ───────────────────────────────────────
   if (scope === 'all') {
-    const targetId = occ.ownerId ?? occ.id
+    // For a series: match by the stable series UUID (occ.ownerId).
+    // For a standalone: occ.id is a random expansion UUID — match by fileSlug instead.
+    const matchItem = occ.ownerId
+      ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
+      : (i: StoreItem) => !isSeries(i) && !(i as OccurrenceEntry<AppMetadata>).ownerId && i.fileSlug === occ.fileSlug && i.date === occ.date
     return items.map(i => {
-      if (i.id !== targetId) return i
+      if (!matchItem(i)) return i
       const meta: AppMetadata = {
         ...i.metadata,
         title,
         tags,
-        body:     body || undefined,
-        duration: duration || undefined,
-        priority: (priority as AppMetadata['priority']) ?? undefined,
-        done:     tracked ? done : undefined,
+        participants: participants?.length ? participants : undefined,
+        body:         body || undefined,
+        duration:     duration || undefined,
+        priority:     (priority as AppMetadata['priority']) ?? undefined,
+        done:         tracked ? done : undefined,
       }
       if (isSeries(i)) {
         return { ...i, metadata: meta, repeat: repeat ?? i.repeat,
@@ -178,6 +190,7 @@ export function applyEdit(
       ...(findSeries(items, occ)?.metadata ?? occ.metadata),
       title,
       tags,
+      participants: participants?.length ? participants : undefined,
       body:     body || undefined,
       duration: duration || undefined,
       priority: (priority as AppMetadata['priority']) ?? undefined,
@@ -205,6 +218,7 @@ export function applyEdit(
       ...series.metadata,
       title,
       tags,
+      participants: participants?.length ? participants : undefined,
       body:     body || undefined,
       duration: duration || undefined,
       priority: (priority as AppMetadata['priority']) ?? undefined,
@@ -250,6 +264,7 @@ export function applyEdit(
         ...(series?.metadata ?? occ.metadata),
         title,
         tags,
+        participants: participants?.length ? participants : undefined,
         body:     body || undefined,
         duration: duration || undefined,
         priority: (priority as AppMetadata['priority']) ?? undefined,

@@ -159,6 +159,7 @@ function metadataToYaml(m: Partial<InlineMetadata>): Record<string, unknown> {
   if (m.title !== undefined)    result.title    = m.title
   if (m.done  !== undefined)    result.done     = m.done
   if (m.tags  !== undefined && m.tags.length > 0) result.tags = m.tags
+  if (m.participants !== undefined && m.participants.length > 0) result.participants = m.participants
   if (m.priority !== undefined) result.priority = m.priority
   if (m.duration !== undefined) result.duration = m.duration
   if (m.timezone !== undefined) result.timezone = m.timezone
@@ -168,14 +169,14 @@ function metadataToYaml(m: Partial<InlineMetadata>): Record<string, unknown> {
 /** Find fields that have the same value across all metadata objects. */
 function computeSharedFields(metas: Partial<InlineMetadata>[]): Partial<InlineMetadata> {
   if (metas.length === 0) return {}
-  const keys: (keyof InlineMetadata)[] = ['title', 'done', 'tags', 'priority', 'duration', 'timezone']
+  const keys: (keyof InlineMetadata)[] = ['title', 'done', 'tags', 'participants', 'priority', 'duration', 'timezone']
   const shared: Partial<InlineMetadata> = {}
   for (const key of keys) {
     const first = metas[0][key]
     if (first === undefined) continue
     const allSame = metas.every(m => {
       const v = m[key]
-      if (key === 'tags') return JSON.stringify(v) === JSON.stringify(first)
+      if (key === 'tags' || key === 'participants') return JSON.stringify(v) === JSON.stringify(first)
       return v === first
     })
     if (allSame) (shared as Record<string, unknown>)[key] = first
@@ -186,12 +187,12 @@ function computeSharedFields(metas: Partial<InlineMetadata>[]): Partial<InlineMe
 /** Return fields from `meta` that differ from (or are absent from) `defaults`. */
 function diffMetadata(meta: Partial<InlineMetadata>, defaults: Partial<InlineMetadata>): Partial<InlineMetadata> {
   const diff: Partial<InlineMetadata> = {}
-  const keys: (keyof InlineMetadata)[] = ['title', 'done', 'tags', 'priority', 'duration', 'timezone']
+  const keys: (keyof InlineMetadata)[] = ['title', 'done', 'tags', 'participants', 'priority', 'duration', 'timezone']
   for (const key of keys) {
     const v = meta[key]
     if (v === undefined) continue
     const d = defaults[key]
-    if (key === 'tags') {
+    if (key === 'tags' || key === 'participants') {
       if (JSON.stringify(v) !== JSON.stringify(d)) (diff as Record<string, unknown>)[key] = v
     } else {
       if (v !== d) (diff as Record<string, unknown>)[key] = v

@@ -24,10 +24,11 @@ export interface Multiday {
 /** Fields written to YAML frontmatter; not relevant for inheritance/repeat expansion. */
 export interface InlineMetadata {
   title:     string
-  done?:     boolean
-  tags:      string[]
-  priority?: Priority
-  duration?: string
+  done?:         boolean
+  tags:          string[]
+  participants?: string[]
+  priority?:     Priority
+  duration?:     string
   timezone?: string
 }
 
@@ -72,15 +73,16 @@ export type EditScope = 'single' | 'future' | 'all' | 'add'
 /** Extract AppMetadata from the raw fields of an expanded occurrence. */
 export function extractAppMetadata(fields: Record<string, unknown>): AppMetadata {
   return {
-    title:    fields.title    ? String(fields.title)    : '',
-    done:     fields.done     as boolean  | undefined,
-    tags:     Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
-    priority: fields.priority as Priority | undefined,
-    body:     fields.body     ? String(fields.body)     : undefined,
-    duration: fields.duration ? String(fields.duration) : undefined,
-    timezone: fields.timezone ? String(fields.timezone) : undefined,
-    multiday: fields.multiday as Multiday | undefined,
-    jsTime:   fields.jsTime   as Date     | undefined,
+    title:        fields.title    ? String(fields.title)    : '',
+    done:         fields.done     as boolean  | undefined,
+    tags:         Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
+    participants: Array.isArray(fields.participants) ? (fields.participants as string[]) : undefined,
+    priority:     fields.priority as Priority | undefined,
+    body:         fields.body     ? String(fields.body)     : undefined,
+    duration:     fields.duration ? String(fields.duration) : undefined,
+    timezone:     fields.timezone ? String(fields.timezone) : undefined,
+    multiday:     fields.multiday as Multiday | undefined,
+    jsTime:       fields.jsTime   as Date     | undefined,
   }
 }
 

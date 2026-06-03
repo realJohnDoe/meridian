@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
-import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText } from 'lucide-react'
+import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText, Users } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem } from '../types'
 import { isSeries } from '../types'
 import { NOTES_DATA } from '../meridian'
@@ -24,6 +24,7 @@ export interface EntryState {
   repeat: RepeatValue | null
   done: boolean
   tags: string[]
+  participants: string[]
   priority: Priority | null
   editScope: string
 }
@@ -39,6 +40,7 @@ export const ENTRY_DEFAULT: EntryState = {
   repeat: null,
   done: false,
   tags: [],
+  participants: [],
   priority: null,
   editScope: 'all',
 }
@@ -76,6 +78,9 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const tagInputRef = useRef<HTMLInputElement>(null)
   const [tagInputVal, setTagInputVal] = useState('')
   const [showTagInput, setShowTagInput] = useState(false)
+  const [participantInputVal, setParticipantInputVal] = useState('')
+  const [showParticipantInput, setShowParticipantInput] = useState(false)
+  const participantInputRef = useRef<HTMLInputElement>(null)
 
   // ── Wikilink autocomplete state ───────────────────────────────
   const [wlMatches, setWlMatches] = useState<string[]>([])
@@ -175,6 +180,10 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     if (showTagInput) tagInputRef.current?.focus()
   }, [showTagInput])
 
+  useEffect(() => {
+    if (showParticipantInput) participantInputRef.current?.focus()
+  }, [showParticipantInput])
+
   const commitTag = useCallback(() => {
     const t = tagInputVal.trim()
     if (t) onChange(prev => ({ ...prev, tags: [...prev.tags, t] }))
@@ -182,7 +191,14 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     setShowTagInput(false)
   }, [tagInputVal, onChange])
 
-  const { item, title, bodyHtml, scheduled, duration, tracked, itemType, repeat, done, tags, priority, editScope } = entry
+  const commitParticipant = useCallback(() => {
+    const p = participantInputVal.trim()
+    if (p) onChange(prev => ({ ...prev, participants: [...prev.participants, p] }))
+    setParticipantInputVal('')
+    setShowParticipantInput(false)
+  }, [participantInputVal, onChange])
+
+  const { item, title, bodyHtml, scheduled, duration, tracked, itemType, repeat, done, tags, participants, priority, editScope } = entry
 
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)
@@ -355,6 +371,42 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
               onClick={() => setShowTagInput(true)}
             >
               <Plus size={9} />tag
+            </Badge>
+          )}
+        </div>
+
+        <div className="entry-tags">
+          <Users size={13} className="opacity-40 self-center" />
+          {participants.map((p, i) => (
+            <Badge
+              key={i}
+              variant="tag"
+              className="cursor-pointer"
+              onClick={() => onChange(prev => ({ ...prev, participants: prev.participants.filter((_, j) => j !== i) }))}
+            >
+              {p}
+            </Badge>
+          ))}
+          {showParticipantInput ? (
+            <input
+              ref={participantInputRef}
+              className="etag-input"
+              value={participantInputVal}
+              placeholder="name"
+              onChange={e => setParticipantInputVal(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); commitParticipant() }
+                if (e.key === 'Escape') { setParticipantInputVal(''); setShowParticipantInput(false) }
+              }}
+              onBlur={commitParticipant}
+            />
+          ) : (
+            <Badge
+              variant="tag"
+              className="cursor-pointer text-primary bg-[var(--ab)] gap-1"
+              onClick={() => setShowParticipantInput(true)}
+            >
+              <Plus size={9} />person
             </Badge>
           )}
         </div>
