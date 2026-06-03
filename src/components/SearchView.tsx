@@ -60,7 +60,7 @@ export default function SearchView({ onOpen, onClose }: Props) {
           occurrence: o,
         })),
     ]
-  }, [nodes])
+  }, [storeItems])
 
   const filtered = useMemo(() => {
     const ql = q.toLowerCase()
