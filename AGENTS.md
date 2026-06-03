@@ -24,3 +24,9 @@ Do **not** use the GitHub CLI (`gh`) to open pull requests. Just push the branch
 ```bash
 git push -u origin <branch-name>
 ```
+
+## Build verification
+
+Always use `pnpm run build` (which runs `tsc -b`) to verify the full project build — **not** `tsc --noEmit` alone.
+
+`tsc --noEmit` runs in single-file mode and misses unused-import errors and stricter checks that the composite project build (`tsc -b`) enforces. CI runs `pnpm run build`, so failures can show up there even if `--noEmit` is clean.
