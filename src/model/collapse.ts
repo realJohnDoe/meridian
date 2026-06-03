@@ -1,5 +1,8 @@
-import type { StoreItem, InlineMetadata } from '../types'
+import type { StoreItem, InlineMetadata, AppMetadata } from '../types'
 import { isSeries } from '../types'
+import type { OccurrenceEntry } from './expansion'
+
+type AnyOcc = OccurrenceEntry<AppMetadata>
 
 /**
  * Convert all StoreItems for one fileSlug into a YAML-serializable object.
@@ -40,9 +43,10 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     }
 
     // Series with explicit instances
-    const nonExcluded = children.filter(c => !c.excluded)
+    const occs = children as AnyOcc[]
+    const nonExcluded = occs.filter(c => !c.excluded)
     const sharedDefaults = computeSharedFields(nonExcluded.map(c => c.metadata))
-    const instances = children.map(c => {
+    const instances = occs.map(c => {
       if (c.excluded) return { date: c.date, excluded: true }
       const diff = diffMetadata(c.metadata, sharedDefaults)
       const inst: Record<string, unknown> = { date: c.date }
@@ -78,13 +82,13 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
 
   // Collect per-series default blocks (step 1)
   const seriesBlocks: Array<{ series: StoreItem; defaults: Partial<InlineMetadata>; instances: Array<{ date: string; time?: string | null; diff: Partial<InlineMetadata>; excluded?: boolean }> }> = series.map(s => {
-    const children = items.filter(i => !isSeries(i) && (i as { ownerId?: string }).ownerId === s.id)
-    const nonExcluded = children.filter(c => !(c as { excluded?: boolean }).excluded)
+    const children = items.filter(i => !isSeries(i) && (i as AnyOcc).ownerId === s.id) as AnyOcc[]
+    const nonExcluded = children.filter(c => !c.excluded)
     const shared = nonExcluded.length > 0 ? computeSharedFields(nonExcluded.map(c => c.metadata)) : {} as Partial<InlineMetadata>
     const childInsts = children.map(c => ({
       date: c.date,
       time: c.time,
-      excluded: (c as { excluded?: boolean }).excluded,
+      excluded: c.excluded,
       diff: diffMetadata(c.metadata, shared) as Partial<InlineMetadata>,
     }))
     return { series: s, defaults: shared, instances: childInsts }

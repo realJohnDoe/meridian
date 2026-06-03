@@ -13,11 +13,11 @@ import {
 import { collapseToYaml } from '../model/collapse'
 import { parseToStoreItems } from '../model/storeItems'
 import {
-  applyEdit, toggleDone, excludeOccurrence, deleteByFileSlug, deleteFollowing,
+  applyEdit, excludeOccurrence, deleteFollowing,
   findSeries, upsertOverride, dayBefore,
   type EditFields,
 } from '../model/storeOps'
-import { loadFile, saveFile, wrapFrontmatter, splitFrontmatter } from '../fileIO'
+import { loadFile, saveFile } from '../fileIO'
 import type { Occurrence, Priority, Repeat as RepeatType, StoreItem } from '../types'
 import { isSeries } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from '../model/expansion'

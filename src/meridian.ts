@@ -1,4 +1,4 @@
-import { fmtISO, fmtT, parseDateString } from './model/expansion'
+import { fmtISO, fmtT } from './model/expansion'
 import {
   cacheWrite, cacheWriteClean, cacheDelete, cacheGetDirty,
   cacheMarkClean, cacheDirtyCount,
@@ -635,16 +635,19 @@ export function deleteNode(
   function hideSheet() { onHideSeries?.() }
 
   function excludeThis() {
+    if (!item) return
     setItems(excludeOccurrence(getItems(), item))
     writeEntityToCache(item.fileSlug)
     hideSheet(); closeEntry()
   }
   function deleteAll() {
+    if (!item) return
     setItems(deleteByFileSlug(getItems(), item.fileSlug))
     deleteFileFromDisk(item.fileSlug)
     hideSheet(); closeEntry()
   }
   function deleteFuture() {
+    if (!item) return
     setItems(deleteFollowing(getItems(), item))
     writeEntityToCache(item.fileSlug)
     hideSheet(); closeEntry()
