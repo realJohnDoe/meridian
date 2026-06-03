@@ -104,7 +104,7 @@ interface Props {
 
 export default function DayView({ onOpen }: Props) {
   const dvDate    = useStore(s => s.dvDate)
-  const nodes     = useStore(s => s.nodes)  // keep for expandRange (Node[] required)
+  const items     = useStore(s => s.items)
   const setDvDate = useStore(s => s.setDvDate)
 
   const { allDay, cols } = useMemo(() => {
@@ -114,7 +114,7 @@ export default function DayView({ onOpen }: Props) {
     const allDay = sortOccs(occs.filter(o => !fmtT(o.time) || o.metadata.multiday))
     const timed  = sortOccs(occs.filter(o => !!fmtT(o.time) && !o.metadata.multiday))
     return { allDay, cols: computeColumns(timed) }
-  }, [dvDate, nodes])
+  }, [dvDate, items])
 
   const scRef = useRef<HTMLDivElement>(null)
   useEffect(() => {

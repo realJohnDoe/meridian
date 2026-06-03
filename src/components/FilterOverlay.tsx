@@ -47,7 +47,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
       .map(o => ({ occ: o, score: fuzzyScore(query, o.metadata.title) }))
       .sort((a, b) => b.score - a.score || +(a.occ.metadata.jsTime ?? 0) - +(b.occ.metadata.jsTime ?? 0))
       .map(x => x.occ)
-  }, [nodes, query])
+  }, [items, query])
 
   if (!query) return null
 

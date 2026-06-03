@@ -60,7 +60,7 @@ export default function AgendaView({ onOpen }: Props) {
     })
 
     return result
-  }, [nodes])
+  }, [items])
 
   // Stable references so DaySection's memo comparator isn't short-circuited
   // by new function identities on every AgendaView render.
