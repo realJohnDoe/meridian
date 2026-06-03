@@ -199,6 +199,8 @@
 .orecur{display:inline-flex;align-items:center;margin-left:4px;opacity:.45;flex-shrink:0;vertical-align:middle}
 .orecur svg{width:11px;height:11px;stroke:var(--t3);fill:none;stroke-width:2}
 .occ-meta{display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap}
+.occ-participants{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--t3)}
+.occ-participants svg{stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
 .multiday-banner{margin:2px 14px;background:rgba(129,140,248,.18);border:1px solid rgba(129,140,248,.3);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--ind);display:flex;align-items:center;gap:6px;cursor:pointer}
 .multiday-banner svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
 

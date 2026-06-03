@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { Repeat2, Trash2 } from 'lucide-react'
+import { Repeat2, Trash2, Users } from 'lucide-react'
 import type { Occurrence } from '../types'
 import { fmtT } from '../model/expansion'
 import { barClass } from '../meridian'
@@ -174,11 +174,18 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
             {!!occ.ownerId && <span className="orecur"><Repeat2 size={12} /></span>}
           </div>
 
-          {(occ.metadata.tags || []).length > 0 && (
+          {((occ.metadata.tags || []).length > 0 || (occ.metadata.participants || []).length > 0) && (
             <div className="occ-meta">
               {(occ.metadata.tags || []).slice(0, 2).map(tg => (
                 <Badge key={tg} variant="tag">{tg}</Badge>
               ))}
+              {(occ.metadata.participants || []).length > 0 && (
+                <span className="occ-participants">
+                  <Users size={11} />
+                  {(occ.metadata.participants || []).slice(0, 2).join(', ')}
+                  {(occ.metadata.participants || []).length > 2 && ` +${(occ.metadata.participants || []).length - 2}`}
+                </span>
+              )}
             </div>
           )}
         </div>

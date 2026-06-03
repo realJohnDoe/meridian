@@ -520,8 +520,9 @@ export function entryFromOccurrence(
     tracked,
     itemType,
     done:      m.done     ?? false,
-    tags:      [...(m.tags     || [])],
-    priority:  (m.priority || null) as Priority | null,
+    tags:         [...(m.tags         || [])],
+    participants: [...(m.participants || [])],
+    priority:     (m.priority || null) as Priority | null,
     editScope,
   }
 }
@@ -551,14 +552,15 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
 
   const next = applyEdit(getItems(), item, editScope, {
     title,
-    tags:      fields.tags      ?? [],
-    body:      fields.body      ?? '',
-    tracked:   fields.tracked   ?? false,
-    done:      fields.done      ?? false,
-    priority:  fields.priority  ?? null,
-    scheduled: fields.scheduled ?? null,
-    duration:  fields.duration  ?? '',
-    repeat:    fields.repeat    ?? null,
+    tags:         fields.tags         ?? [],
+    participants: fields.participants  ?? [],
+    body:         fields.body         ?? '',
+    tracked:      fields.tracked      ?? false,
+    done:         fields.done         ?? false,
+    priority:     fields.priority     ?? null,
+    scheduled:    fields.scheduled    ?? null,
+    duration:     fields.duration     ?? '',
+    repeat:       fields.repeat       ?? null,
   })
   setItems(next)
 
