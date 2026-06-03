@@ -101,6 +101,24 @@ export interface EditFields {
 }
 
 /**
+ * Build item metadata from editor fields, layered on top of `base` (the existing
+ * series/occurrence metadata, or `{}` for a brand-new item). Single source of the
+ * editor-fields → metadata mapping so every scope handles every field identically.
+ */
+function metaFromEditFields(base: Partial<AppMetadata>, f: EditFields): AppMetadata {
+  return {
+    ...base,
+    title:        f.title,
+    tags:         f.tags,
+    participants: f.participants?.length ? f.participants : undefined,
+    body:         f.body || undefined,
+    duration:     f.duration || undefined,
+    priority:     (f.priority as AppMetadata['priority']) ?? undefined,
+    done:         f.tracked ? f.done : undefined,
+  }
+}
+
+/**
  * Apply an editor save to the item list.
  *
  * scope 'all'    — update the series (or standalone) metadata.
@@ -115,24 +133,12 @@ export function applyEdit(
   scope: string,
   fields: EditFields,
 ): StoreItem[] {
-  const { title, tags, participants, body, tracked, done, priority, scheduled, duration, repeat } = fields
-
-  const newMeta = (): AppMetadata => ({
-    title,
-    tags,
-    participants: participants?.length ? participants : undefined,
-    body:         body || undefined,
-    duration:     duration || undefined,
-    priority:     (priority as AppMetadata['priority']) ?? undefined,
-    done:         tracked ? done : undefined,
-    multiday:     undefined,
-    timezone:     undefined,
-  })
+  const { title, scheduled, repeat } = fields
 
   // ── New item ───────────────────────────────────────────────────────────────
   if (!occ) {
     const fileSlug = titleToSlug(title) || crypto.randomUUID()
-    const meta = newMeta()
+    const meta = metaFromEditFields({}, fields)
     if (repeat) {
       const newSeries: RepeatPattern<AppMetadata> = {
         date:     scheduled?.date ?? '',
@@ -165,16 +171,7 @@ export function applyEdit(
       : (i: StoreItem) => !isSeries(i) && !(i as OccurrenceEntry<AppMetadata>).ownerId && i.fileSlug === occ.fileSlug && i.date === occ.date
     return items.map(i => {
       if (!matchItem(i)) return i
-      const meta: AppMetadata = {
-        ...i.metadata,
-        title,
-        tags,
-        participants: participants?.length ? participants : undefined,
-        body:         body || undefined,
-        duration:     duration || undefined,
-        priority:     (priority as AppMetadata['priority']) ?? undefined,
-        done:         tracked ? done : undefined,
-      }
+      const meta = metaFromEditFields(i.metadata, fields)
       if (isSeries(i)) {
         return { ...i, metadata: meta, repeat: repeat ?? i.repeat,
           ...(scheduled?.date ? { date: scheduled.date, time: scheduled.time || null } : {}) }
@@ -186,17 +183,7 @@ export function applyEdit(
 
   // ── single occurrence override ─────────────────────────────────────────────
   if (scope === 'single') {
-    const meta: AppMetadata = {
-      ...(findSeries(items, occ)?.metadata ?? occ.metadata),
-      title,
-      tags,
-      participants: participants?.length ? participants : undefined,
-      body:     body || undefined,
-      duration: duration || undefined,
-      priority: (priority as AppMetadata['priority']) ?? undefined,
-      done:     tracked ? done : undefined,
-      ...(scheduled?.time ? {} : {}),
-    }
+    const meta = metaFromEditFields(findSeries(items, occ)?.metadata ?? occ.metadata, fields)
     return upsertOverride(items, occ, {
       date:    scheduled?.date ?? occ.date,
       time:    scheduled?.time || null,
@@ -214,16 +201,7 @@ export function applyEdit(
     const occDate = occ.date
     const newSeriesId = crypto.randomUUID()
     const newRepeat = repeat ?? series.repeat
-    const newMeta2: AppMetadata = {
-      ...series.metadata,
-      title,
-      tags,
-      participants: participants?.length ? participants : undefined,
-      body:     body || undefined,
-      duration: duration || undefined,
-      priority: (priority as AppMetadata['priority']) ?? undefined,
-      done:     tracked ? done : undefined,
-    }
+    const newMeta2 = metaFromEditFields(series.metadata, fields)
 
     return items.flatMap(i => {
       // Cap the original series.
@@ -260,16 +238,7 @@ export function applyEdit(
       fileSlug: occ.fileSlug,
       id:      crypto.randomUUID(),
       ownerId: occ.ownerId,
-      metadata: {
-        ...(series?.metadata ?? occ.metadata),
-        title,
-        tags,
-        participants: participants?.length ? participants : undefined,
-        body:     body || undefined,
-        duration: duration || undefined,
-        priority: (priority as AppMetadata['priority']) ?? undefined,
-        done:     tracked ? done : undefined,
-      },
+      metadata: metaFromEditFields(series?.metadata ?? occ.metadata, fields),
     }
     return [...items, newOcc]
   }
