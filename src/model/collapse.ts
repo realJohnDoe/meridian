@@ -90,12 +90,13 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     return { series: s, defaults: shared, instances: childInsts }
   })
 
-  // Step 2: find common fields across series defaults blocks AND root-level standalones.
-  // Standalones have no children so their own metadata IS their effective leaf value.
-  // Anything not in a series' defaults is already known to vary, so only defaults are
-  // consulted for series (per the plan); standalones participate directly with their metadata.
+  // Step 2: find common fields across all series' own metadata AND root-level standalones.
+  // Fields shared by every series (e.g. title, tags) become root defaults.
+  // Using series.metadata (not b.defaults) ensures we capture the series' own fields,
+  // not just the shared fields of their override children (which is empty for series with
+  // no explicit overrides, causing title/tags to be missed).
   const allForRootDefaults: Partial<InlineMetadata>[] = [
-    ...seriesBlocks.map(b => b.defaults),
+    ...seriesBlocks.map(b => b.series.metadata),
     ...standalones.map(s => s.metadata),
   ]
   const rootDefaults = allForRootDefaults.length > 0 ? computeSharedFields(allForRootDefaults) : {} as Partial<InlineMetadata>
