@@ -55,28 +55,51 @@ export interface Node {
   _path?: string
 }
 
-// ── AppMetadata ───────────────────────────────────────────────────────────────
+// ── Metadata types ────────────────────────────────────────────────────────────
 
-/**
- * Content and tracking metadata for a main-app occurrence.
- * Lives inside OccurrenceEntry<AppMetadata>.metadata.
- */
-export interface AppMetadata {
+/** Fields written to YAML frontmatter; not relevant for inheritance/repeat expansion. */
+export interface InlineMetadata {
   title:     string
   done?:     boolean
   tags:      string[]
   priority?: Priority
-  body?:     string
   duration?: string
-  repeat?:   Repeat
-  multiday?: Multiday
   timezone?: string
-  /** Source node ID — use for store lookups during edits. */
-  nodeId:    string
-  /** Layout fields set post-expansion by DayView. */
-  _dh?:      number
-  _endMs?:   number
 }
+
+/** Fields never persisted to YAML — computed at runtime or used only by the UI. */
+export interface ExtendedMetadata {
+  jsTime?:   Date      // computed from date+time; undefined in raw store items
+  body?:     string    // markdown body (not frontmatter)
+  multiday?: Multiday  // TODO: replace with helper
+  _dh?:      number    // DayView layout
+  _endMs?:   number    // DayView layout
+}
+
+export type AppMetadata = InlineMetadata & ExtendedMetadata
+
+// ── Store types ───────────────────────────────────────────────────────────────
+
+import type { OccurrenceEntry, RepeatPattern } from './model/expansion'
+
+/** Store holds RepeatPattern (series) or OccurrenceEntry (single item or explicit override). */
+export type StoreItem = RepeatPattern<InlineMetadata> | OccurrenceEntry<InlineMetadata>
+
+export function isSeries(item: StoreItem): item is RepeatPattern<InlineMetadata> {
+  return 'repeat' in item && item.repeat !== undefined
+}
+
+// ── Occurrence ───────────────────────────────────────────────────────────────
+
+/**
+ * An expanded occurrence produced by expandRange.
+ * Alias for OccurrenceEntry<AppMetadata>.
+ */
+export type Occurrence      = OccurrenceEntry<AppMetadata>
+export type CollectedSeries = RepeatPattern<AppMetadata>
+export type EditScope = 'single' | 'future' | 'all' | 'add'
+
+// ── AppMetadata extraction ────────────────────────────────────────────────────
 
 /** Extract AppMetadata from the raw fields of an expanded occurrence. */
 export function extractAppMetadata(fields: Record<string, unknown>): AppMetadata {
@@ -87,10 +110,9 @@ export function extractAppMetadata(fields: Record<string, unknown>): AppMetadata
     priority: fields.priority as Priority | undefined,
     body:     fields.body     ? String(fields.body)     : undefined,
     duration: fields.duration ? String(fields.duration) : undefined,
-    repeat:   fields.repeat   as Repeat   | undefined,
-    multiday: fields.multiday as Multiday | undefined,
     timezone: fields.timezone ? String(fields.timezone) : undefined,
-    nodeId:   String(fields._nodeId ?? fields.id ?? ''),
+    multiday: fields.multiday as Multiday | undefined,
+    jsTime:   fields.jsTime   as Date     | undefined,
   }
 }
 
@@ -101,20 +123,12 @@ export function occKind(occ: Occurrence): 'event' | 'task' | 'note' {
   return occ.metadata.done !== undefined ? 'task' : occ.date ? 'event' : 'note'
 }
 
-/** True when the occurrence belongs to a recurring series. */
-export function occIsRecur(occ: Occurrence): boolean {
-  return !!occ.metadata.repeat
+/** True when the occurrence belongs to a recurring series (has an ownerId). */
+export function occIsRecur(occ: Occurrence, items?: StoreItem[]): boolean {
+  if (occ.ownerId) return true
+  if (items) return items.some(i => isSeries(i) && i.id === occ.ownerId)
+  return false
 }
-
-// ── Occurrence ───────────────────────────────────────────────────────────────
-
-import type { OccurrenceEntry } from './model/expansion'
-
-/**
- * An expanded occurrence produced by expandRange.
- * Alias for OccurrenceEntry<AppMetadata>.
- */
-export type Occurrence = OccurrenceEntry<AppMetadata>
 
 // ── Dialog / Editor helpers ───────────────────────────────────────────────────
 

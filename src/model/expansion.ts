@@ -363,7 +363,7 @@ export function expandNode(
  * include any of these explicitly if needed (e.g. _nodeId, _node for AppMetadata).
  */
 export const METADATA_EXCLUDE = new Set([
-  'date', 'time', 'jsTime', 'ownerPath',   // top-level on OccurrenceEntry
+  'date', 'time',                           // top-level on OccurrenceEntry
   'instances', 'defaults',                  // structural tree fields
   'excluded',                               // exclusion sentinel
   '_isGenerated',                           // internal source-tagging field
@@ -376,9 +376,10 @@ export const METADATA_EXCLUDE = new Set([
 export interface OccurrenceEntry<T = Record<string, unknown>> {
   date:      string                    // YYYY-MM-DD
   time:      string | null             // HH:mm or null
-  jsTime:    Date                      // kept top-level for sort / layout
   source:    'generated' | 'explicit'
-  ownerPath: number[]
+  fileSlug:  string                    // identifies source file (= node.id)
+  id:        string                    // own UUID; stable across promotion to RepeatPattern
+  ownerId?:  string                    // UUID of parent RepeatPattern (undefined for standalone)
   metadata:  T
 }
 
@@ -390,7 +391,9 @@ export interface RepeatPattern<T = Record<string, unknown>> {
   date:      string
   time:      string | null
   repeat:    Repeat
-  ownerPath: number[]
+  fileSlug:  string
+  id:        string                    // own UUID
+  // No ownerId — RepeatPatterns are flat siblings, never nested in the store
   metadata:  T
 }
 
@@ -461,7 +464,8 @@ export function expandRepeat<T>(
   node: EffectiveNode,
   endDateStr: string,
   extractMetadata: (fields: Record<string, unknown>) => T,
-  ownerPath: number[] = [],
+  fileSlug: string = '',
+  ownerId: string = '',
 ): OccurrenceEntry<T>[] {
   const expandable = toExpandable(node)
   const from = new Date(0)
@@ -478,14 +482,16 @@ export function expandRepeat<T>(
     const metaFields = Object.fromEntries(
       Object.entries(occ).filter(([k]) => !METADATA_EXCLUDE.has(k)),
     )
-    return {
-      date:      String(occ.date ?? ''),
-      time:      occ.time ? String(occ.time) : null,
-      jsTime:    occ.jsTime as Date,
-      source:    src,
-      ownerPath,
-      metadata:  extractMetadata(metaFields),
+    const entry: OccurrenceEntry<T> = {
+      date:     String(occ.date ?? ''),
+      time:     occ.time ? String(occ.time) : null,
+      source:   src,
+      fileSlug,
+      id:       crypto.randomUUID(),
+      metadata: extractMetadata(metaFields),
     }
+    if (ownerId) entry.ownerId = ownerId
+    return entry
   })
 }
 
@@ -497,13 +503,14 @@ export function collectAllOccurrences<T>(
   node: EffectiveNode,
   endDateStr: string,
   extractMetadata: (fields: Record<string, unknown>) => T,
+  fileSlug: string = '',
 ): OccurrenceEntry<T>[] {
   const results: OccurrenceEntry<T>[] = []
   const to = new Date(`${endDateStr}T23:59:59`)
 
-  function walk(n: EffectiveNode, path: number[]) {
+  function walk(n: EffectiveNode, ownerId: string) {
     if (hasRepeat(n)) {
-      results.push(...expandRepeat(n, endDateStr, extractMetadata, path))
+      results.push(...expandRepeat(n, endDateStr, extractMetadata, fileSlug, ownerId))
     } else if (n.fields.date !== undefined) {
       const dateStr = String(n.fields.date)
       const d = new Date(`${dateStr}T00:00:00`)
@@ -511,23 +518,23 @@ export function collectAllOccurrences<T>(
         const metaFields = Object.fromEntries(
           Object.entries(n.fields).filter(([k]) => !METADATA_EXCLUDE.has(k)),
         )
-        results.push({
-          date:      dateStr,
-          time:      n.fields.time ? String(n.fields.time) : null,
-          jsTime:    n.fields.time
-            ? new Date(`${dateStr}T${String(n.fields.time)}`)
-            : new Date(`${dateStr}T00:00:00`),
-          source:    'explicit',
-          ownerPath: path,
-          metadata:  extractMetadata(metaFields),
-        })
+        const entry: OccurrenceEntry<T> = {
+          date:     dateStr,
+          time:     n.fields.time ? String(n.fields.time) : null,
+          source:   'explicit',
+          fileSlug,
+          id:       crypto.randomUUID(),
+          metadata: extractMetadata(metaFields),
+        }
+        if (ownerId) entry.ownerId = ownerId
+        results.push(entry)
       }
     } else {
-      n.instances.forEach((child, i) => walk(child, [...path, i]))
+      n.instances.forEach(child => walk(child, ownerId))
     }
   }
 
-  walk(node, [])
+  walk(node, '')
 
   return results.sort((a, b) => {
     const d = a.date.localeCompare(b.date)
@@ -542,26 +549,28 @@ export function collectAllOccurrences<T>(
 export function collectRepeatPatterns<T>(
   node: EffectiveNode,
   extractMetadata: (fields: Record<string, unknown>) => T,
+  fileSlug: string = '',
 ): RepeatPattern<T>[] {
   const results: RepeatPattern<T>[] = []
 
-  function walk(n: EffectiveNode, path: number[]) {
+  function walk(n: EffectiveNode) {
     if (hasRepeat(n)) {
       const metaFields = Object.fromEntries(
         Object.entries(n.fields).filter(([k]) => !METADATA_EXCLUDE.has(k)),
       )
       results.push({
-        date:      String(n.fields.date ?? ''),
-        time:      n.fields.time ? String(n.fields.time) : null,
-        repeat:    n.fields.repeat as Repeat,
-        ownerPath: path,
-        metadata:  extractMetadata(metaFields),
+        date:     String(n.fields.date ?? ''),
+        time:     n.fields.time ? String(n.fields.time) : null,
+        repeat:   n.fields.repeat as Repeat,
+        fileSlug,
+        id:       crypto.randomUUID(),
+        metadata: extractMetadata(metaFields),
       })
     }
-    n.instances.forEach((child, i) => walk(child, [...path, i]))
+    n.instances.forEach(child => walk(child))
   }
 
-  walk(node, [])
+  walk(node)
   return results
 }
 
@@ -607,7 +616,7 @@ export function expandRange<T = Record<string, unknown>>(
       while (d <= endDt) {
         if (d >= from && d <= to) {
           const spec = jsDateToSpec(d)
-          all.push({ ...node, date: spec.date, time: null, jsTime: new Date(d), _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false, ownerPath: [] })
+          all.push({ ...node, date: spec.date, time: null, jsTime: new Date(d), _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false })
         }
         d = addDaysLocal(d, 1)
       }
@@ -618,7 +627,7 @@ export function expandRange<T = Record<string, unknown>>(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const genDates = generatedDateSet(node as any, from, to)
       all.push(...occs.map(o => ({
-        ...o, ownerPath: [],
+        ...o,
         _isGenerated: genDates.has(String(o.date ?? '')),
       })))
     } else {
@@ -636,7 +645,7 @@ export function expandRange<T = Record<string, unknown>>(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const genDates = generatedDateSet(effNoInst as any, from, to)
         all.push(...occs.map(o => ({
-          ...o, ownerPath: [instIdx],
+          ...o,
           _isGenerated: genDates.has(String(o.date ?? '')),
         })))
       }
@@ -657,14 +666,13 @@ export function expandRange<T = Record<string, unknown>>(
               _nodeId: (rawNode as Record<string, unknown>).id,
               _node: rawNode,
               recur: true,
-              ownerPath: [],
             })
           }
         }
       } else if (!hasRepeatInstances) {
         const t = nodeDateTime(node)
         if (t && t >= from && t <= to) {
-          all.push({ ...node, jsTime: t, _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false, ownerPath: [] })
+          all.push({ ...node, jsTime: t, _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false })
         }
       }
     }
@@ -685,15 +693,17 @@ export function expandRange<T = Record<string, unknown>>(
     const metaFields = Object.fromEntries(
       Object.entries(occ).filter(([k]) => !METADATA_EXCLUDE.has(k)),
     )
-    return {
-      date:      String(occ.date ?? ''),
-      time:      occ.time ? String(occ.time) : null,
-      jsTime:    occ.jsTime as Date,
-      source:    occ._isGenerated !== undefined
-                   ? (occ._isGenerated ? 'generated' : 'explicit')
-                   : (occ.recur !== false ? 'generated' : 'explicit'),
-      ownerPath: (occ.ownerPath as number[]) ?? [],
-      metadata:  extractMetadata(metaFields),
+    const fileSlug = String(occ._nodeId ?? '')
+    const entry: OccurrenceEntry<T> = {
+      date:     String(occ.date ?? ''),
+      time:     occ.time ? String(occ.time) : null,
+      source:   occ._isGenerated !== undefined
+                  ? (occ._isGenerated ? 'generated' : 'explicit')
+                  : (occ.recur !== false ? 'generated' : 'explicit'),
+      fileSlug,
+      id:       crypto.randomUUID(),
+      metadata: extractMetadata(metaFields),
     }
+    return entry
   })
 }

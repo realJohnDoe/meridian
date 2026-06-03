@@ -29,16 +29,16 @@ function formatHour(h: number): string {
 
 /** Greedy column-packing: returns an array of columns, each a list of events. */
 function computeColumns(events: Occurrence[]): Occurrence[][] {
-  const sorted = [...events].sort((a, b) => +a.jsTime - +b.jsTime)
+  const sorted = [...events].sort((a, b) => +(a.metadata.jsTime ?? 0) - +(b.metadata.jsTime ?? 0))
   const cols: Occurrence[][] = []
   for (const ev of sorted) {
     const dh = parseDurationHours(ev.metadata.duration)
-    const endMs = ev.jsTime.getTime() + dh * 3_600_000
+    const endMs = (ev.metadata.jsTime?.getTime() ?? 0) + dh * 3_600_000
     ev.metadata._dh    = dh
     ev.metadata._endMs = endMs
     let placed = false
     for (const col of cols) {
-      if (ev.jsTime.getTime() >= col[col.length - 1].metadata._endMs!) {
+      if ((ev.metadata.jsTime?.getTime() ?? 0) >= col[col.length - 1].metadata._endMs!) {
         col.push(ev); placed = true; break
       }
     }
@@ -70,7 +70,7 @@ interface EventBlockProps {
   onOpen: (o: Occurrence) => void
 }
 function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
-  const h   = o.jsTime.getHours() + o.jsTime.getMinutes() / 60
+  const h   = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
   const dh  = o.metadata._dh as number
   const top = (h - SH) * HP + 1
   const height = Math.max(dh * HP - 4, 28)
@@ -104,7 +104,7 @@ interface Props {
 
 export default function DayView({ onOpen }: Props) {
   const dvDate    = useStore(s => s.dvDate)
-  const nodes     = useStore(s => s.nodes)
+  const nodes     = useStore(s => s.nodes)  // keep for expandRange (Node[] required)
   const setDvDate = useStore(s => s.setDvDate)
 
   const { allDay, cols } = useMemo(() => {
@@ -149,8 +149,8 @@ export default function DayView({ onOpen }: Props) {
   const seen = new Set<string>()
   const allDayDeduped = allDay.filter(o => {
     if (!o.metadata.multiday) return true
-    if (seen.has(o.metadata.nodeId)) return false
-    seen.add(o.metadata.nodeId); return true
+    if (seen.has(o.fileSlug)) return false
+    seen.add(o.fileSlug); return true
   })
 
   const totalCols = Math.max(cols.length, 1)
@@ -163,7 +163,7 @@ export default function DayView({ onOpen }: Props) {
         <div className="dv-allday" id="dvAllDay">
           <div className="dv-adlbl">All day</div>
           {allDayDeduped.map((o, i) => (
-            <AllDayItem key={`${o.metadata.nodeId}-${o.date}-${i}`} o={o} onOpen={onOpen} />
+            <AllDayItem key={`${o.fileSlug}-${o.date}-${i}`} o={o} onOpen={onOpen} />
           ))}
         </div>
       )}
@@ -196,12 +196,12 @@ export default function DayView({ onOpen }: Props) {
           {cols.flatMap((col, ci) =>
             col
               .filter(o => {
-                const h = o.jsTime.getHours() + o.jsTime.getMinutes() / 60
+                const h = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
                 return h >= SH && h <= EH
               })
               .map(o => (
                 <EventBlock
-                  key={`${o.metadata.nodeId}-${o.date}-${o.time ?? ''}`}
+                  key={`${o.fileSlug}-${o.date}-${o.time ?? ''}`}
                   o={o}
                   colIndex={ci}
                   totalCols={totalCols}

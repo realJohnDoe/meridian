@@ -15,7 +15,7 @@ interface Props {
 }
 
 export default function AgendaView({ onOpen }: Props) {
-  const nodes = useStore(s => s.nodes)
+  const nodes = useStore(s => s.nodes)  // keep for expandRange (Node[] required)
 
   // Expand occurrences and group them by day — same window as buildAgenda().
   const groups = useMemo(() => {
@@ -36,11 +36,13 @@ export default function AgendaView({ onOpen }: Props) {
     // Multiday events that are NOT on their start date are skipped; they'll
     // appear only once (on the start date) as a banner.
     occs.forEach(o => {
-      if (o.metadata.multiday && !sameDay(o.jsTime, new Date(o.metadata.multiday.start))) return
-      const k = dayKey(o.jsTime)
+      const jsTime = o.metadata.jsTime
+      if (!jsTime) return
+      if (o.metadata.multiday && !sameDay(jsTime, new Date(o.metadata.multiday.start))) return
+      const k = dayKey(jsTime)
       if (!result[k]) {
         result[k] = {
-          date: new Date(o.jsTime.getFullYear(), o.jsTime.getMonth(), o.jsTime.getDate()),
+          date: new Date(jsTime.getFullYear(), jsTime.getMonth(), jsTime.getDate()),
           items: [],
         }
       }
@@ -52,7 +54,7 @@ export default function AgendaView({ onOpen }: Props) {
     occs.filter(o => o.metadata.multiday).forEach(o => {
       const k = dayKey(new Date(o.metadata.multiday!.start))
       if (!result[k]) result[k] = { date: new Date(o.metadata.multiday!.start), items: [] }
-      if (!result[k].items.find(x => x.metadata.nodeId === o.metadata.nodeId && x.metadata.multiday)) {
+      if (!result[k].items.find(x => x.fileSlug === o.fileSlug && x.metadata.multiday)) {
         result[k].items.push(o)
       }
     })
@@ -76,8 +78,8 @@ export default function AgendaView({ onOpen }: Props) {
         const mdSeen = new Set<string>()
         const multidayBanners: Occurrence[] = []
         g.items.filter(o => o.metadata.multiday).forEach(o => {
-          if (!mdSeen.has(o.metadata.nodeId)) {
-            mdSeen.add(o.metadata.nodeId)
+          if (!mdSeen.has(o.fileSlug)) {
+            mdSeen.add(o.fileSlug)
             multidayBanners.push(o)
           }
         })

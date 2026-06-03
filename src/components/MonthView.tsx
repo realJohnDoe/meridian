@@ -25,7 +25,7 @@ interface CalCellProps {
 function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
   const isToday = sameDay(date, TODAY)
   const dayOccs = useMemo(
-    () => sortOccs(occs.filter(o => sameDay(o.jsTime, date))),
+    () => sortOccs(occs.filter(o => o.metadata.jsTime && sameDay(o.metadata.jsTime, date))),
     [occs, date],
   )
 
@@ -41,8 +41,8 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
           const bars: React.ReactNode[] = []
           dayOccs.slice(0, 4).forEach((o, i) => {
             if (o.metadata.multiday) {
-              if (seen.has(o.metadata.nodeId)) return
-              seen.add(o.metadata.nodeId)
+              if (seen.has(o.fileSlug)) return
+              seen.add(o.fileSlug)
               bars.push(<div key={i} className="cc-bar multiday">{o.metadata.title}</div>)
             } else {
               bars.push(<div key={i} className={`cc-bar ${ccBarClass(o)}`}>{o.metadata.title}</div>)
@@ -65,7 +65,7 @@ interface Props {
 
 export default function MonthView({ onDayClick }: Props) {
   const calMonth   = useStore(s => s.calMonth)
-  const nodes      = useStore(s => s.nodes)
+  const nodes      = useStore(s => s.nodes)  // keep for expandRange (Node[] required)
   const setCalMonth = useStore(s => s.setCalMonth)
 
   const m = calMonth.getMonth()

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Node } from './types'
+import type { Node, StoreItem } from './types'
 import { TODAY as _today } from './constants'
 
 export type PrimaryView = 'agenda' | 'calendar' | 'day'
@@ -10,9 +10,8 @@ interface MeridianStore {
   nodes: Node[]
   setNodes: (nodes: Node[]) => void
 
-  nextId: number
-  /** Consume the next available id and increment the counter. */
-  bumpId: () => number
+  items: StoreItem[]
+  setItems: (items: StoreItem[]) => void
 
   // ── Navigation ──────────────────────────────────────────────────
   /** The active primary tab — always visible behind any overlay. */
@@ -65,18 +64,14 @@ interface MeridianStore {
   setErrorNotification: (msg: string | null) => void
 }
 
-export const useStore = create<MeridianStore>((set, get) => ({
+export const useStore = create<MeridianStore>((set) => ({
   // nodes starts empty; initApp() seeds it with SEED_NODES (or disk data
   // replaces it when the user opens a vault folder).
   nodes: [],
   setNodes: (nodes) => set({ nodes }),
 
-  nextId: 200,
-  bumpId: () => {
-    const id = get().nextId
-    set({ nextId: id + 1 })
-    return id
-  },
+  items: [],
+  setItems: (items) => set({ items }),
 
   primaryView: 'agenda',
   setPrimaryView: (primaryView) => set({ primaryView }),

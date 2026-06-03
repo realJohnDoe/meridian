@@ -9,9 +9,10 @@ import {
   diskPickDirectory, diskReadAll, diskWrite, diskDelete,
   loadFile, saveFile, titleToSlug,
 } from './fileIO'
+import { collapseToYaml } from './model/collapse'
 // Type-only imports — used in exported function signatures so consumers get full type safety.
-import type { Node, Occurrence, Repeat, Scheduled, Instance, Priority } from './types'
-import { occKind, occIsRecur } from './types'
+import type { Node, Occurrence, Repeat, Scheduled, Instance, Priority, StoreItem, InlineMetadata } from './types'
+import { occKind, occIsRecur, isSeries } from './types'
 export { occKind, occIsRecur }
 import type { EntryState, ItemType } from './components/EntryEditor'
 import { applyNodeEdit } from './nodeEdit'
@@ -31,10 +32,11 @@ export type SeriesSheetConfig = { title: string; options: SeriesSheetOption[] }
 // ── STORE ACCESSORS ────────────────────────────────────────────
 // Thin wrappers that give vanilla-JS functions synchronous access to
 // the Zustand store.
-const getNodes      = (): Node[]  => useStore.getState().nodes
-const setNodes      = (n: Node[]) => useStore.setState({ nodes: n })
-const bumpId        = (): number  => useStore.getState().bumpId()
-const getPrimary    = ()          => useStore.getState().primaryView
+const getNodes      = (): Node[]        => useStore.getState().nodes
+const setNodes      = (n: Node[])       => useStore.setState({ nodes: n })
+const getItems      = (): StoreItem[]   => useStore.getState().items
+const setItems      = (i: StoreItem[])  => useStore.setState({ items: i })
+const getPrimary    = ()                => useStore.getState().primaryView
 const setPrimary    = (v: string) => useStore.getState().setPrimaryView(v as any)
 const pushOverlayFn = (v: string) => useStore.getState().pushOverlay(v as any)
 const popOverlayFn  = ()          => useStore.getState().popOverlay()
@@ -149,6 +151,94 @@ export const NOTES_DATA = [
   {title:'Ideas',preview:'Offline-first sync, plugin system, graph view.',date:'May 9',tags:['ideas'],type:'note'},
 ]
 
+// ── NODE → STORE ITEMS CONVERSION ─────────────────────────────
+/**
+ * Convert a Node[] (YAML-level model) to StoreItem[] (flat store model).
+ * Each Node with a repeat becomes a RepeatPattern; its instances become
+ * OccurrenceEntry children. Non-repeating Nodes become standalone OccurrenceEntries.
+ * Excluded instances are skipped (structural YAML markers, not store items).
+ */
+export function nodesToStoreItems(nodes: Node[]): StoreItem[] {
+  const result: StoreItem[] = []
+  for (const node of nodes) {
+    const fileSlug = node.id
+    const inlineMeta: InlineMetadata = {
+      title:    node.title,
+      done:     node.done,
+      tags:     node.tags || [],
+      priority: node.priority,
+      duration: node.duration,
+      timezone: node.timezone,
+    }
+    if (node.repeat) {
+      const seriesId = crypto.randomUUID()
+      const series: StoreItem = {
+        date:     node.date || '',
+        time:     node.time || null,
+        repeat:   node.repeat,
+        fileSlug,
+        id:       seriesId,
+        metadata: inlineMeta,
+      }
+      result.push(series)
+      // Add explicit instance overrides as OccurrenceEntry children
+      for (const inst of node.instances || []) {
+        if (inst.excluded) continue
+        const instMeta: InlineMetadata = {
+          title:    inst.title ?? node.title,
+          done:     inst.done,
+          tags:     inst.tags || node.tags || [],
+          priority: inst.priority,
+          duration: inst.duration,
+          timezone: undefined,
+        }
+        const occ: StoreItem = {
+          date:     inst.date,
+          time:     inst.time || null,
+          source:   'explicit',
+          fileSlug,
+          id:       crypto.randomUUID(),
+          ownerId:  seriesId,
+          metadata: instMeta,
+        }
+        result.push(occ)
+      }
+    } else {
+      // Standalone occurrence (or multi-occurrence without a repeat)
+      const occ: StoreItem = {
+        date:    node.date || '',
+        time:    node.time || null,
+        source:  'explicit',
+        fileSlug,
+        id:      crypto.randomUUID(),
+        metadata: inlineMeta,
+      }
+      result.push(occ)
+      // Add extra explicit instances
+      for (const inst of node.instances || []) {
+        if (inst.excluded) continue
+        const instMeta: InlineMetadata = {
+          title:    inst.title ?? node.title,
+          done:     inst.done,
+          tags:     inst.tags || node.tags || [],
+          priority: inst.priority,
+          duration: inst.duration,
+          timezone: undefined,
+        }
+        result.push({
+          date:    inst.date,
+          time:    inst.time || null,
+          source:  'explicit',
+          fileSlug,
+          id:      crypto.randomUUID(),
+          metadata: instMeta,
+        })
+      }
+    }
+  }
+  return result
+}
+
 // curView, prevView, calMonth, dvDate, nsFilterVal, nextId → useStore
 
 // ── UTILS ──────────────────────────────────────────────────────
@@ -201,8 +291,8 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
   return arr.sort((a: Occurrence, b: Occurrence) => {
     const sd = _sortKey(a) - _sortKey(b); if (sd) return sd
     const pd = _prioKey(a) - _prioKey(b); if (pd) return pd
-    const td = (a.jsTime?.getHours() || 0) * 60 + (a.jsTime?.getMinutes() || 0)
-             - (b.jsTime?.getHours() || 0) * 60 - (b.jsTime?.getMinutes() || 0)
+    const td = (a.metadata.jsTime?.getHours() || 0) * 60 + (a.metadata.jsTime?.getMinutes() || 0)
+             - (b.metadata.jsTime?.getHours() || 0) * 60 - (b.metadata.jsTime?.getMinutes() || 0)
     if (td) return td
     return (a.metadata.title || '').localeCompare(b.metadata.title || '')
   })
@@ -226,7 +316,7 @@ export function occState(o: Occurrence): string {
   }
   if (o.metadata.multiday) return 'event-future'
   const now = new Date()
-  if (o.jsTime < now) return 'event-past'
+  if (o.metadata.jsTime && o.metadata.jsTime < now) return 'event-past'
   return 'event-future'
 }
 export function barClass(o: Occurrence): string { return occState(o) }
@@ -249,11 +339,11 @@ function replaceNode(nodes: Node[], id: string, updated: Node): Node[] {
 export function toggleOccDone(o: Occurrence): void {
   const newDone = !o.metadata.done
   o.metadata.done = newDone // update the occurrence for optimistic UI
-  const node = getNodes().find(n => n.id === o.metadata.nodeId)
+  const node = getNodes().find(n => n.id === o.fileSlug)
   if (!node) return
   const updated = cloneNode(node)
-  const jsT = o.jsTime
-  if (node.repeat) {
+  const jsT = o.metadata.jsTime
+  if (node.repeat && jsT) {
     const inst = updated.instances?.find((i: Instance) => {
       const t = nodeDateTime(i as unknown as Record<string, unknown>) || parseDateString(i.date)
       return t && Math.abs(t.getTime() - jsT.getTime()) < 60000
@@ -280,13 +370,13 @@ export function toggleOccDone(o: Occurrence): void {
 //   Removes the item from the Zustand store so React unmounts it.
 //   applyDelete() is a no-op if the user already pressed Undo.
 export function beginSwipeDelete(o: Occurrence): () => void {
-  const node = getNodes().find(n => n.id === o.metadata.nodeId)
+  const node = getNodes().find(n => n.id === o.fileSlug)
   if (!node) return () => {}
   const nodeId = node.id
   const title = node.title
   let cancelled = false
 
-  if (occIsRecur(o)) {
+  if (occIsRecur(o, getItems())) {
     const original = cloneNode(node) // snapshot for undo
     const updated = cloneNode(node)
     if (!updated.instances) updated.instances = []
@@ -353,15 +443,20 @@ export function openDayViewForDate(date: Date): void {
 // openEntry is handled entirely by App.tsx via React state — no global bridge needed.
 
 export function applyScope(item: Occurrence, scope: string): { scheduled: Scheduled | null; repeat: Repeat | null } {
-  const root = getNodes().find(n => n.id === item.metadata.nodeId)
+  const root = getNodes().find(n => n.id === item.fileSlug)
+  // Find parent series for repeat info
+  const parentSeries = item.ownerId
+    ? getItems().find(i => isSeries(i) && i.id === item.ownerId)
+    : null
+  const seriesRepeat = parentSeries && isSeries(parentSeries) ? parentSeries.repeat : null
   const occDate = item.date || root?.date || null
   const occTime = item.time || root?.time || null
   const rootDate = root?.date || null
   const rootTime = root?.time || null
   if (scope === 'single') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: null }
-  if (scope === 'future') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: item.metadata.repeat || null }
+  if (scope === 'future') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: seriesRepeat || null }
   if (scope === 'add') return { scheduled: { date: fmtISO(TODAY), time: occTime || '' }, repeat: null }
-  return { scheduled: rootDate ? { date: rootDate, time: rootTime || '' } : null, repeat: item.metadata.repeat || null }
+  return { scheduled: rootDate ? { date: rootDate, time: rootTime || '' } : null, repeat: seriesRepeat || null }
 }
 
 /**
@@ -397,7 +492,8 @@ export function entryFromOccurrence(
 export function buildBodyHtml(text: string): string {
   return text
     .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, ref: string, label: string) => {
-      const target = getNodes().find(n => n.title.toLowerCase() === ref.toLowerCase())
+      const nodes = getNodes()
+      const target = nodes.find(n => n.title.toLowerCase() === ref.toLowerCase())
       return `<span class="${target ? 'wl' : 'wl-broken'}" data-ref="${ref}">[[${label || ref}]]</span>`
     })
     .replace(/\n/g, '<br>')
@@ -410,8 +506,8 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
   if (!title) return
 
   const nodes = getNodes()
-  const nodeId = item?.metadata.nodeId
-  const existingIdx = nodeId ? nodes.findIndex(n => n.id === nodeId) : -1
+  const fileSlug = item?.fileSlug
+  const existingIdx = fileSlug ? nodes.findIndex(n => n.id === fileSlug) : -1
   const isNew = existingIdx < 0
 
   if (isNew) {
@@ -419,7 +515,8 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
     const f: Partial<Node> & { title: string } = { title, tags, body: body || undefined }
     if (tracked) { f.done = done; if (priority) f.priority = priority }
     if (scheduled?.date) { f.date = scheduled.date; f.time = scheduled.time || undefined; f.duration = duration || undefined }
-    const node: Partial<Node> & { id: string } = { id: 'node-' + bumpId(), ...f }
+    const newId = crypto.randomUUID()
+    const node: Partial<Node> & { id: string } = { id: newId, ...f }
     if (!tracked) delete node.done
     if (!scheduled) { delete node.date; delete node.time; delete node.duration }
     node.repeat = repeat || undefined
@@ -454,7 +551,7 @@ export function deleteNode(
   onConfirmSingle?: (title: string, onConfirm: () => void) => void,
 ): void {
   if (!item) return
-  const _nodeOrUndef = getNodes().find(n => n.id === item.metadata.nodeId)
+  const _nodeOrUndef = getNodes().find(n => n.id === item.fileSlug)
   if (!_nodeOrUndef) return
   const node: Node = _nodeOrUndef  // narrow to Node for closures below
   const nodeId = node.id
@@ -762,6 +859,7 @@ async function loadFilesFromDisk(): Promise<void> {
     } catch (e) { console.warn('[storage] parse failed for', path, e) }
   }
   setNodes(loaded)
+  setItems(nodesToStoreItems(loaded))
   updateSyncUI()
   setTimeout(() => goToday(), 100)
 }
@@ -786,7 +884,7 @@ export async function tryRestoreDirectory(): Promise<void> {
   try {
     await cacheInit()
     const h = await dirHandleLoad()
-    if (!h) { setNodes(SEED_NODES); return }
+    if (!h) { setNodes(SEED_NODES); setItems(nodesToStoreItems(SEED_NODES)); return }
     const perm = await h.queryPermission({ mode: 'readwrite' })
     if (perm === 'granted') {
       setDirHandle(h)
@@ -796,11 +894,11 @@ export async function tryRestoreDirectory(): Promise<void> {
       useStore.setState({ pendingDirReconnect: h.name })
     } else {
       await dirHandleClear()
-      setNodes(SEED_NODES)
+      setNodes(SEED_NODES); setItems(nodesToStoreItems(SEED_NODES))
     }
   } catch (e) {
     console.warn('[storage] tryRestoreDirectory failed:', e)
-    setNodes(SEED_NODES)
+    setNodes(SEED_NODES); setItems(nodesToStoreItems(SEED_NODES))
   }
 }
 

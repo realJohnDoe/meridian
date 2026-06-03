@@ -30,22 +30,83 @@ import { applyNodeEdit, shouldCollapse } from '../nodeEdit'
 // ── Debug metadata type ───────────────────────────────────────────────────────
 
 interface DebugMetadata {
-  title:     string
-  done?:     boolean
-  tags:      string[]
-  priority?: Priority
-  body:      string
-  duration:  string
+  title:      string
+  done?:      boolean
+  tags:       string[]
+  priority?:  Priority
+  body:       string
+  duration:   string
+  _ownerPath: number[]   // tree navigation path (debug-only)
 }
 
-const extractDebugMetadata = (fields: Record<string, unknown>): DebugMetadata => ({
-  title:    fields.title    ? String(fields.title)    : '',
-  done:     fields.done     as boolean | undefined,
-  tags:     Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
-  priority: fields.priority as Priority | undefined,
-  body:     fields.body     ? String(fields.body)     : '',
-  duration: fields.duration ? String(fields.duration) : '',
+const makeExtractDebugMetadata = (ownerPath: number[]) => (fields: Record<string, unknown>): DebugMetadata => ({
+  title:      fields.title    ? String(fields.title)    : '',
+  done:       fields.done     as boolean | undefined,
+  tags:       Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
+  priority:   fields.priority as Priority | undefined,
+  body:       fields.body     ? String(fields.body)     : '',
+  duration:   fields.duration ? String(fields.duration) : '',
+  _ownerPath: ownerPath,
 })
+
+// Simple wrapper that collects with ownerPath stored in metadata
+function collectAllOccurrencesWithPath(node: EffectiveNode, endDateStr: string): OccurrenceEntry<DebugMetadata>[] {
+  const results: OccurrenceEntry<DebugMetadata>[] = []
+  const to = new Date(`${endDateStr}T23:59:59`)
+
+  function walk(n: EffectiveNode, path: number[]) {
+    const extract = makeExtractDebugMetadata(path)
+    if (n.fields.repeat !== undefined && n.fields.repeat !== null) {
+      results.push(...collectAllOccurrences(n, endDateStr, extract))
+    } else if (n.fields.date !== undefined) {
+      const dateStr = String(n.fields.date)
+      const d = new Date(`${dateStr}T00:00:00`)
+      if (!isNaN(d.getTime()) && d <= to) {
+        const metaFields = Object.fromEntries(
+          Object.entries(n.fields).filter(([k]) => !['date','time','instances','defaults','excluded','_isGenerated'].includes(k)),
+        )
+        results.push({
+          date:     dateStr,
+          time:     n.fields.time ? String(n.fields.time) : null,
+          source:   'explicit',
+          fileSlug: '',
+          id:       crypto.randomUUID(),
+          metadata: extract(metaFields),
+        })
+      }
+    } else {
+      n.instances.forEach((child, i) => walk(child, [...path, i]))
+    }
+  }
+
+  walk(node, [])
+  return results.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
+}
+
+function collectRepeatPatternsWithPath(node: EffectiveNode): RepeatPattern<DebugMetadata>[] {
+  const results: RepeatPattern<DebugMetadata>[] = []
+
+  function walk(n: EffectiveNode, path: number[]) {
+    const extract = makeExtractDebugMetadata(path)
+    if (n.fields.repeat !== undefined && n.fields.repeat !== null) {
+      const metaFields = Object.fromEntries(
+        Object.entries(n.fields).filter(([k]) => !['date','time','instances','defaults','excluded','_isGenerated'].includes(k)),
+      )
+      results.push({
+        date:     String(n.fields.date ?? ''),
+        time:     n.fields.time ? String(n.fields.time) : null,
+        repeat:   n.fields.repeat as RepeatType,
+        fileSlug: '',
+        id:       crypto.randomUUID(),
+        metadata: extract(metaFields),
+      })
+    }
+    n.instances.forEach((child, i) => walk(child, [...path, i]))
+  }
+
+  walk(node, [])
+  return results
+}
 
 type DebugOccurrence = OccurrenceEntry<DebugMetadata>
 type DebugPattern    = RepeatPattern<DebugMetadata>
@@ -55,20 +116,21 @@ type DebugPattern    = RepeatPattern<DebugMetadata>
 function toOccurrence(
   entry:    DebugOccurrence,
   rawNode:  RawNode,
-  pattern?: DebugPattern,
+  _pattern?: DebugPattern,
 ): Occurrence {
   const m = entry.metadata
   const [y, mo, d] = entry.date.split('-').map(Number)
   const jsTime = entry.time
     ? new Date(y, mo - 1, d, +entry.time.slice(0, 2), +entry.time.slice(3, 5))
     : new Date(y, mo - 1, d)
-  const seriesNode = getSubNode(rawNode, entry.ownerPath) as Record<string, unknown>
+  const slug = String((rawNode as Record<string, unknown>).id ?? 'debug-node')
   return {
-    date:      entry.date,
-    time:      entry.time ?? null,
-    jsTime,
-    source:    entry.source,
-    ownerPath: entry.ownerPath,
+    date:     entry.date,
+    time:     entry.time ?? null,
+    source:   entry.source,
+    fileSlug: entry.fileSlug || slug,
+    id:       entry.id,
+    ownerId:  entry.ownerId,
     metadata: {
       title:    m.title,
       done:     m.done,
@@ -76,8 +138,7 @@ function toOccurrence(
       priority: m.priority,
       body:     m.body,
       duration: m.duration,
-      repeat:   pattern?.repeat,
-      nodeId:   String(seriesNode.id ?? 'debug-node'),
+      jsTime,
     },
   } as Occurrence
 }
@@ -487,17 +548,17 @@ export default function NodeInheritanceDebugger() {
 
   const occurrences = useMemo<DebugOccurrence[] | null>(() => {
     if (!results || !nodeHasRepeat) return null
-    return collectAllOccurrences(results, expandEndDate, extractDebugMetadata)
+    return collectAllOccurrencesWithPath(results, expandEndDate)
   }, [results, nodeHasRepeat, expandEndDate])
 
   const patterns = useMemo<DebugPattern[]>(
-    () => results ? collectRepeatPatterns(results, extractDebugMetadata) : [],
+    () => results ? collectRepeatPatternsWithPath(results) : [],
     [results],
   )
 
   const findPattern = useCallback((ownerPath: number[]): DebugPattern | undefined => {
     const key = JSON.stringify(ownerPath)
-    return patterns.find(p => JSON.stringify(p.ownerPath) === key)
+    return patterns.find(p => JSON.stringify(p.metadata._ownerPath) === key)
   }, [patterns])
 
   // ── Selection ────────────────────────────────────────────────────────────
@@ -509,7 +570,7 @@ export default function NodeInheritanceDebugger() {
       if (rawNode) {
         const occEntry = (occurrences ?? [])[idx]
         if (occEntry) {
-          const pattern = findPattern(occEntry.ownerPath)
+          const pattern = findPattern(occEntry.metadata._ownerPath)
           setDebugEntry(entryFromOccurrence(toOccurrence(occEntry, rawNode, pattern), 'single'))
         }
       }
@@ -519,9 +580,10 @@ export default function NodeInheritanceDebugger() {
   // ── EntryEditor handlers ─────────────────────────────────────────────────
   const handleDebugSave = useCallback((body: string) => {
     if (!debugEntry || !rawNode) return
-    const updated = applyNodeEdit(rawNode, debugEntry, body)
+    const selectedOccPath = (debugEntry.item as Occurrence | null)?.metadata?._ownerPath as number[] | undefined
+    const updated = applyNodeEdit(rawNode, debugEntry, body, selectedOccPath)
 
-    if (shouldCollapse(debugEntry)) {
+    if (shouldCollapse(debugEntry, selectedOccPath)) {
       const { body: origBody } = splitFrontmatter(displayContent)
       const effectiveTree = buildEffectiveTree(updated)
       const collapsed = wrapFrontmatter(collapseToYaml(effectiveTree), origBody)
@@ -552,7 +614,8 @@ export default function NodeInheritanceDebugger() {
       const { scheduled } = applyScope(occ, scope)
 
       if (scope === 'future' || scope === 'all') {
-        const pattern = findPattern(occ.ownerPath ?? [])
+        const occPath = (occ.metadata as DebugMetadata)._ownerPath ?? []
+        const pattern = findPattern(occPath)
         const repeat = pattern?.repeat ?? null
         const pm = pattern?.metadata
         return {
@@ -574,12 +637,12 @@ export default function NodeInheritanceDebugger() {
 
   const handleDebugDelete = useCallback(() => {
     if (!rawNode || !selectedOcc) return
-    applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc))
+    applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.metadata._ownerPath, selectedOcc))
     setSelectedIdx(null); setDebugEntry(null)
   }, [rawNode, selectedOcc, applyRawNode])
 
   const selectedPattern = useMemo<DebugPattern | null>(
-    () => selectedOcc ? findPattern(selectedOcc.ownerPath) ?? null : null,
+    () => selectedOcc ? findPattern(selectedOcc.metadata._ownerPath) ?? null : null,
     [selectedOcc, findPattern],
   )
 
@@ -759,31 +822,31 @@ export default function NodeInheritanceDebugger() {
 
                   {activeAction === 'add' && rawNode && selectedOcc && (
                     <AddOccurrenceForm
-                      onApply={(date, time, done) => { applyRawNode(doAddOccurrence(rawNode, selectedOcc.ownerPath, date, time, done)); setActiveAction(null) }}
+                      onApply={(date, time, done) => { applyRawNode(doAddOccurrence(rawNode, selectedOcc.metadata._ownerPath, date, time, done)); setActiveAction(null) }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'edit-occurrence' && rawNode && selectedOcc && (
                     <EditOccurrenceForm occ={selectedOcc}
-                      onApply={(date, time, done) => { applyRawNode(doEditOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc.date, date, time, done)); setActiveAction(null) }}
+                      onApply={(date, time, done) => { applyRawNode(doEditOccurrence(rawNode, selectedOcc.metadata._ownerPath, selectedOcc.date, date, time, done)); setActiveAction(null) }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'edit-following' && rawNode && selectedOcc && (
                     <EditFollowingForm occ={selectedOcc}
-                      onApply={() => { applyRawNode(doEditFollowing(rawNode, selectedOcc.ownerPath, selectedOcc.date)); setActiveAction(null) }}
+                      onApply={() => { applyRawNode(doEditFollowing(rawNode, selectedOcc.metadata._ownerPath, selectedOcc.date)); setActiveAction(null) }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'delete-occurrence' && rawNode && selectedOcc && (
                     <DeleteConfirmForm
                       message={selectedOcc.source === 'generated' ? `Mark ${selectedOcc.date} as excluded.` : `Remove explicit instance on ${selectedOcc.date}.`}
                       label="Delete occurrence"
-                      onApply={() => { applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.ownerPath, selectedOcc)); setActiveAction(null) }}
+                      onApply={() => { applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.metadata._ownerPath, selectedOcc)); setActiveAction(null) }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'delete-following' && rawNode && selectedOcc && (
                     <DeleteConfirmForm
                       message={`End the series on ${dayBefore(selectedOcc.date)}. Occurrences from ${selectedOcc.date} onwards will be removed.`}
                       label="Delete this & following"
-                      onApply={() => { applyRawNode(doDeleteFollowing(rawNode, selectedOcc.ownerPath, selectedOcc.date)); setActiveAction(null) }}
+                      onApply={() => { applyRawNode(doDeleteFollowing(rawNode, selectedOcc.metadata._ownerPath, selectedOcc.date)); setActiveAction(null) }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'delete-all' && (
@@ -869,7 +932,7 @@ export default function NodeInheritanceDebugger() {
           scheduled={{ date: selectedOcc.date, time: selectedOcc.time || '' }}
           tracked={selectedOcc.metadata.done !== undefined}
           repeat={selectedPattern?.repeat ?? null}
-          onConfirm={r => { applyRawNode(doEditPattern(rawNode, selectedOcc.ownerPath, r)); setPatternDialogOpen(false); setActiveAction(null) }}
+          onConfirm={r => { applyRawNode(doEditPattern(rawNode, selectedOcc.metadata._ownerPath, r)); setPatternDialogOpen(false); setActiveAction(null) }}
           onRemove={() => setPatternDialogOpen(false)}
           onClose={() => { setPatternDialogOpen(false); setActiveAction(null) }}
         />

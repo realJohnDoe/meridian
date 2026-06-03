@@ -25,7 +25,7 @@ interface Props {
 }
 
 export default function SearchView({ onOpen, onClose }: Props) {
-  const nodes        = useStore(s => s.nodes)
+  const nodes        = useStore(s => s.nodes)  // keep for expandRange (Node[] required)
   const nsFilterVal  = useStore(s => s.nsFilterVal)
   const setNsFilter  = useStore(s => s.setNsFilterVal)
   const [q, setQ]    = useState('')
@@ -47,14 +47,14 @@ export default function SearchView({ onOpen, onClose }: Props) {
       ...(NOTES_DATA as SearchItem[]),
       ...occs
         .filter(o => {
-          const key = o.metadata.nodeId || o.metadata.title
+          const key = o.fileSlug || o.metadata.title
           if (seen.has(key)) return false
           seen.add(key); return true
         })
         .map(o => ({
           title:      o.metadata.title,
           preview:    o.metadata.body || '',
-          date:       fmtShort(o.jsTime),
+          date:       o.metadata.jsTime ? fmtShort(o.metadata.jsTime) : o.date,
           tags:       o.metadata.tags || [],
           type:       occKind(o),
           occurrence: o,
