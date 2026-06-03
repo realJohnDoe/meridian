@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue } from '../types'
-import { occIsRecur } from '../types'
+import { isSeries } from '../types'
 import { useStore } from '../store'
 import { NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
@@ -67,9 +67,11 @@ interface Props {
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: string) => void
+  /** Override for contexts where the parent series isn't in the main store (e.g. debug view). */
+  seriesRepeat?: RepeatValue | null
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, seriesRepeat: seriesRepeatProp }: Props) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const tagInputRef = useRef<HTMLInputElement>(null)
@@ -77,7 +79,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const [showTagInput, setShowTagInput] = useState(false)
 
   // ── Wikilink autocomplete state ───────────────────────────────
-  const nodes = useStore(s => s.nodes)
+  const items = useStore(s => s.items)
   const [wlMatches, setWlMatches] = useState<string[]>([])
   const [wlFocusIdx, setWlFocusIdx] = useState(-1)
   const [wlPopupPos, setWlPopupPos] = useState<{ top: number; left: number } | null>(null)
@@ -135,7 +137,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     const m = before.match(/\[\[([^\]\n]*)$/)
     if (m) {
       const q = m[1].toLowerCase()
-      const allTitles = [...new Set([...nodes, ...NOTES_DATA].map(o => o.title))]
+      const allTitles = [...new Set([...items.map(i => i.metadata.title), ...NOTES_DATA.map(n => n.title)])]
       const matches = q
         ? allTitles.filter(t => t.toLowerCase().includes(q)).slice(0, 8)
         : allTitles.slice(0, 8)
@@ -184,12 +186,15 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
   const { item, title, bodyHtml, scheduled, duration, tracked, itemType, repeat, done, tags, priority, editScope } = entry
 
-  const isRecur = !!(item && occIsRecur(item))
-  const isScheduled = !!(item && item.metadata?.repeat?.type === 'schedule')
-  const isAfterCompletion = !!(item && item.metadata?.repeat?.type === 'after_completion')
+  const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
+  const isRecur = !!(item && item.ownerId)
+  // seriesRepeatProp is passed by callers that don't have the parent series in the main store (e.g. debug view)
+  const seriesRepeat = (parentSeries && isSeries(parentSeries) ? parentSeries.repeat : null) ?? seriesRepeatProp ?? null
+  const isScheduled = !!(item && seriesRepeat?.type === 'schedule')
+  const isAfterCompletion = !!(item && seriesRepeat?.type === 'after_completion')
   const hasSched = !!(item && item.date)
   const fname = item
-    ? ((item.metadata?.nodeId || item.metadata?.title || 'untitled') + '.md').toLowerCase().replace(/\s+/g, '-')
+    ? ((item.fileSlug || item.metadata?.title || 'untitled') + '.md').toLowerCase().replace(/\s+/g, '-')
     : 'untitled.md'
 
   const hasDate = !!scheduled
@@ -199,7 +204,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   // notes: no scheduling chips; events: date/time/duration + repeat (schedule only); tasks: everything
   const showDateChip = !isNote
   const showRepeat = !isNote && (hasDate || tracked) && (!isSingleScope || !isRecur)
-  const bodyKey = item ? `${item.metadata?.nodeId || 'item'}-${item.date || ''}-${editScope}` : 'new'
+  const bodyKey = item ? `${item.fileSlug || 'item'}-${item.date || ''}-${editScope}` : 'new'
 
   // Set body HTML imperatively so React never touches innerHTML during re-renders
   // triggered by wikilink state updates. bodyKey changes when a new entry is opened
@@ -376,9 +381,11 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       {wlOpen && wlPopupPos && (
         <div className="wl-popup show" style={{ top: wlPopupPos.top, left: wlPopupPos.left }}>
           {wlMatches.map((t, i) => {
-            const match = nodes.find(n => n.title === t) ?? NOTES_DATA.find(n => n.title === t)
-            const Icon = (match && 'done' in match && match.done !== undefined) ? CheckSquare
-              : (match && 'time' in match && (match as { time?: string }).time) ? Calendar
+            const matchItem = items.find(i => i.metadata.title === t)
+            const matchNote = NOTES_DATA.find(n => n.title === t)
+            const Icon = (matchItem && matchItem.metadata.done !== undefined) ? CheckSquare
+              : (matchItem && 'time' in matchItem && matchItem.time) ? Calendar
+              : matchNote ? FileText
               : FileText
             return (
               <div

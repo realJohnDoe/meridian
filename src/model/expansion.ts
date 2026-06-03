@@ -20,7 +20,8 @@ import {
   format, isValid, parseISO,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
-import type { Repeat } from '../types'
+import type { Repeat, StoreItem, AppMetadata } from '../types'
+import { isSeries } from '../types'
 import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import type { RawNode } from './nodeSchema'
@@ -363,7 +364,7 @@ export function expandNode(
  * include any of these explicitly if needed (e.g. _nodeId, _node for AppMetadata).
  */
 export const METADATA_EXCLUDE = new Set([
-  'date', 'time', 'jsTime', 'ownerPath',   // top-level on OccurrenceEntry
+  'date', 'time',                           // top-level on OccurrenceEntry
   'instances', 'defaults',                  // structural tree fields
   'excluded',                               // exclusion sentinel
   '_isGenerated',                           // internal source-tagging field
@@ -376,9 +377,11 @@ export const METADATA_EXCLUDE = new Set([
 export interface OccurrenceEntry<T = Record<string, unknown>> {
   date:      string                    // YYYY-MM-DD
   time:      string | null             // HH:mm or null
-  jsTime:    Date                      // kept top-level for sort / layout
   source:    'generated' | 'explicit'
-  ownerPath: number[]
+  fileSlug:  string                    // identifies source file (= node.id)
+  id:        string                    // own UUID; stable across promotion to RepeatPattern
+  ownerId?:  string                    // UUID of parent RepeatPattern (undefined for standalone)
+  excluded?: boolean                   // exclusion override: suppresses a generated occurrence
   metadata:  T
 }
 
@@ -390,7 +393,9 @@ export interface RepeatPattern<T = Record<string, unknown>> {
   date:      string
   time:      string | null
   repeat:    Repeat
-  ownerPath: number[]
+  fileSlug:  string
+  id:        string                    // own UUID
+  // No ownerId — RepeatPatterns are flat siblings, never nested in the store
   metadata:  T
 }
 
@@ -461,7 +466,8 @@ export function expandRepeat<T>(
   node: EffectiveNode,
   endDateStr: string,
   extractMetadata: (fields: Record<string, unknown>) => T,
-  ownerPath: number[] = [],
+  fileSlug: string = '',
+  ownerId: string = '',
 ): OccurrenceEntry<T>[] {
   const expandable = toExpandable(node)
   const from = new Date(0)
@@ -478,14 +484,16 @@ export function expandRepeat<T>(
     const metaFields = Object.fromEntries(
       Object.entries(occ).filter(([k]) => !METADATA_EXCLUDE.has(k)),
     )
-    return {
-      date:      String(occ.date ?? ''),
-      time:      occ.time ? String(occ.time) : null,
-      jsTime:    occ.jsTime as Date,
-      source:    src,
-      ownerPath,
-      metadata:  extractMetadata(metaFields),
+    const entry: OccurrenceEntry<T> = {
+      date:     String(occ.date ?? ''),
+      time:     occ.time ? String(occ.time) : null,
+      source:   src,
+      fileSlug,
+      id:       crypto.randomUUID(),
+      metadata: extractMetadata(metaFields),
     }
+    if (ownerId) entry.ownerId = ownerId
+    return entry
   })
 }
 
@@ -497,13 +505,14 @@ export function collectAllOccurrences<T>(
   node: EffectiveNode,
   endDateStr: string,
   extractMetadata: (fields: Record<string, unknown>) => T,
+  fileSlug: string = '',
 ): OccurrenceEntry<T>[] {
   const results: OccurrenceEntry<T>[] = []
   const to = new Date(`${endDateStr}T23:59:59`)
 
-  function walk(n: EffectiveNode, path: number[]) {
+  function walk(n: EffectiveNode, ownerId: string) {
     if (hasRepeat(n)) {
-      results.push(...expandRepeat(n, endDateStr, extractMetadata, path))
+      results.push(...expandRepeat(n, endDateStr, extractMetadata, fileSlug, ownerId))
     } else if (n.fields.date !== undefined) {
       const dateStr = String(n.fields.date)
       const d = new Date(`${dateStr}T00:00:00`)
@@ -511,23 +520,23 @@ export function collectAllOccurrences<T>(
         const metaFields = Object.fromEntries(
           Object.entries(n.fields).filter(([k]) => !METADATA_EXCLUDE.has(k)),
         )
-        results.push({
-          date:      dateStr,
-          time:      n.fields.time ? String(n.fields.time) : null,
-          jsTime:    n.fields.time
-            ? new Date(`${dateStr}T${String(n.fields.time)}`)
-            : new Date(`${dateStr}T00:00:00`),
-          source:    'explicit',
-          ownerPath: path,
-          metadata:  extractMetadata(metaFields),
-        })
+        const entry: OccurrenceEntry<T> = {
+          date:     dateStr,
+          time:     n.fields.time ? String(n.fields.time) : null,
+          source:   'explicit',
+          fileSlug,
+          id:       crypto.randomUUID(),
+          metadata: extractMetadata(metaFields),
+        }
+        if (ownerId) entry.ownerId = ownerId
+        results.push(entry)
       }
     } else {
-      n.instances.forEach((child, i) => walk(child, [...path, i]))
+      n.instances.forEach(child => walk(child, ownerId))
     }
   }
 
-  walk(node, [])
+  walk(node, '')
 
   return results.sort((a, b) => {
     const d = a.date.localeCompare(b.date)
@@ -542,158 +551,155 @@ export function collectAllOccurrences<T>(
 export function collectRepeatPatterns<T>(
   node: EffectiveNode,
   extractMetadata: (fields: Record<string, unknown>) => T,
+  fileSlug: string = '',
 ): RepeatPattern<T>[] {
   const results: RepeatPattern<T>[] = []
 
-  function walk(n: EffectiveNode, path: number[]) {
+  function walk(n: EffectiveNode) {
     if (hasRepeat(n)) {
       const metaFields = Object.fromEntries(
         Object.entries(n.fields).filter(([k]) => !METADATA_EXCLUDE.has(k)),
       )
       results.push({
-        date:      String(n.fields.date ?? ''),
-        time:      n.fields.time ? String(n.fields.time) : null,
-        repeat:    n.fields.repeat as Repeat,
-        ownerPath: path,
-        metadata:  extractMetadata(metaFields),
+        date:     String(n.fields.date ?? ''),
+        time:     n.fields.time ? String(n.fields.time) : null,
+        repeat:   n.fields.repeat as Repeat,
+        fileSlug,
+        id:       crypto.randomUUID(),
+        metadata: extractMetadata(metaFields),
       })
     }
-    n.instances.forEach((child, i) => walk(child, [...path, i]))
+    n.instances.forEach(child => walk(child))
   }
 
-  walk(node, [])
+  walk(node)
   return results
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EXPANDRANGE  (inheritance-aware, main-app entry point)
+// EXPANDRANGE  (main-app entry point — takes StoreItem[])
 // ─────────────────────────────────────────────────────────────────────────────
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
- * Expand `nodes` in the date range [from, to], applying `defaults:`-driven
- * inheritance before generating occurrences.
- *
- * Generic over `T`: supply an `extractMetadata` function to get a fully typed
- * result.  Omit it (or pass `f => f`) to get `OccurrenceEntry<Record<string, unknown>>`.
+ * Expand StoreItem[] in the date range [from, to].
+ * Series items are expanded via their repeat rule; standalone OccurrenceEntry
+ * items are emitted directly if they fall in range.
+ * Each output occurrence carries ownerId = series.id so the editor can detect
+ * recurring items and look up the parent series.
  */
-export function expandRange<T = Record<string, unknown>>(
-  nodes: unknown[],
+export function expandRange(
+  items: StoreItem[],
   from: Date,
   to: Date,
-  extractMetadata: (fields: Record<string, unknown>) => T = (f => f as unknown as T),
-): OccurrenceEntry<T>[] {
+): OccurrenceEntry<AppMetadata>[] {
   function addDaysLocal(d: Date, n: number): Date {
     const r = new Date(d); r.setDate(r.getDate() + n); return r
   }
 
-  const all: Record<string, unknown>[] = []
+  const result: OccurrenceEntry<AppMetadata>[] = []
 
-  for (const rawNode of nodes) {
-    const effective = buildEffectiveTree(rawNode as RawNode)
+  const seriesList = items.filter(isSeries)
+  // Standalone = non-series items with no ownerId (direct root-level items)
+  const standalones = items.filter(i => !isSeries(i) && !(i as OccurrenceEntry<AppMetadata>).ownerId) as OccurrenceEntry<AppMetadata>[]
 
-    const node = {
-      ...effective.fields,
-      instances: effective.instances.map(child => ({ ...child.fields })),
-    } as Record<string, unknown>
+  // ── Expand each series ────────────────────────────────────────────────────
+  for (const series of seriesList) {
+    const children = items.filter(
+      i => !isSeries(i) && (i as OccurrenceEntry<AppMetadata>).ownerId === series.id,
+    ) as OccurrenceEntry<AppMetadata>[]
 
-    if (node.multiday) {
-      const md = node.multiday as { start?: string; end?: string }
-      let d = parseDateString((md.start || node.date) as string)
+    const expandable: Record<string, any> = {
+      ...series.metadata,
+      date:     series.date,
+      time:     series.time,
+      repeat:   series.repeat,
+      instances: children.map(c => ({
+        date:     c.date,
+        time:     c.time ?? undefined,
+        excluded: c.excluded,
+        ...c.metadata,
+      })),
+    }
+
+    const genDates = generatedDateSet(expandable, from, to)
+    const raw = expandNode(expandable, from, to) as Record<string, any>[]
+
+    for (const occ of raw) {
+      const jsTime = occ.jsTime as Date | undefined
+      if (!jsTime) continue
+      const isGenerated = genDates.has(String(occ.date ?? ''))
+
+      // Find an explicit override whose date matches this occurrence
+      const override = children.find(c => {
+        const ct = nodeDateTime(c as any) || parseDateString(c.date)
+        return ct && Math.abs(ct.getTime() - jsTime.getTime()) < 60000
+      })
+
+      result.push({
+        date:    String(occ.date ?? ''),
+        time:    occ.time ? String(occ.time) : null,
+        source:  isGenerated ? 'generated' : 'explicit',
+        fileSlug: series.fileSlug,
+        id:      crypto.randomUUID(),
+        ownerId: series.id,
+        metadata: {
+          ...(override ? { ...series.metadata, ...override.metadata } : series.metadata),
+          jsTime,
+        },
+      })
+    }
+  }
+
+  // ── Emit standalone occurrences ───────────────────────────────────────────
+  for (const occ of standalones) {
+    if (occ.metadata.multiday) {
+      // Expand multiday item over the date range day-by-day
+      const md = occ.metadata.multiday
+      let d = parseDateString(md.start || occ.date)
       if (!d) continue
       d = new Date(d); d.setHours(0, 0, 0, 0)
-      const endD = parseDateString(md.end as string)
+      const endD = parseDateString(md.end)
       if (!endD) continue
       const endDt = new Date(endD); endDt.setHours(23, 59, 59)
       while (d <= endDt) {
         if (d >= from && d <= to) {
           const spec = jsDateToSpec(d)
-          all.push({ ...node, date: spec.date, time: null, jsTime: new Date(d), _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false, ownerPath: [] })
+          result.push({
+            date:    spec.date ?? '',
+            time:    null,
+            source:  'explicit',
+            fileSlug: occ.fileSlug,
+            id:      crypto.randomUUID(),
+            metadata: { ...occ.metadata, jsTime: new Date(d) },
+          })
         }
         d = addDaysLocal(d, 1)
       }
-    } else if (node.repeat) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const occs = expandNode(node as any, from, to) as Record<string, unknown>[]
-      // Two-pass: determine which dates are schedule-generated vs. explicit instances.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const genDates = generatedDateSet(node as any, from, to)
-      all.push(...occs.map(o => ({
-        ...o, ownerPath: [],
-        _isGenerated: genDates.has(String(o.date ?? '')),
-      })))
     } else {
-      const nodeInstances = (node.instances as unknown[]) || []
-      const hasRepeatInstances = nodeInstances.some(
-        (i: unknown) => !!(i as Record<string, unknown>).repeat && !(i as Record<string, unknown>).excluded,
-      )
-      for (let instIdx = 0; instIdx < nodeInstances.length; instIdx++) {
-        const inst = nodeInstances[instIdx] as Record<string, unknown>
-        if (!inst.repeat || inst.excluded) continue
-        const effChild = mergeNode(node, inst) as Record<string, unknown>
-        const effNoInst = { ...effChild, instances: [] }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const occs = expandNode({ ...effChild, instances: [] } as any, from, to) as Record<string, unknown>[]
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const genDates = generatedDateSet(effNoInst as any, from, to)
-        all.push(...occs.map(o => ({
-          ...o, ownerPath: [instIdx],
-          _isGenerated: genDates.has(String(o.date ?? '')),
-        })))
-      }
-
-      const liveInstances = nodeInstances.filter(
-        (i: unknown) => !(i as Record<string, unknown>).excluded && !(i as Record<string, unknown>).repeat,
-      )
-      if (liveInstances.length > 0) {
-        for (const inst of liveInstances) {
-          const it = nodeDateTime(inst as Record<string, unknown>) || parseDateString((inst as Record<string, unknown>).date as string)
-          if (!it || it < from || it > to) continue
-          const eff = mergeNode(node, inst as Record<string, unknown>)
-          if (!eff.excluded) {
-            all.push({
-              ...eff,
-              date: (inst as Record<string, unknown>).date || jsDateToSpec(it).date,
-              jsTime: it,
-              _nodeId: (rawNode as Record<string, unknown>).id,
-              _node: rawNode,
-              recur: true,
-              ownerPath: [],
-            })
-          }
-        }
-      } else if (!hasRepeatInstances) {
-        const t = nodeDateTime(node)
-        if (t && t >= from && t <= to) {
-          all.push({ ...node, jsTime: t, _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false, ownerPath: [] })
-        }
-      }
+      const jsTime = nodeDateTime({ date: occ.date, time: occ.time } as any)
+        ?? parseDateString(occ.date)
+      if (!jsTime || jsTime < from || jsTime > to) continue
+      result.push({
+        ...occ,
+        id:       crypto.randomUUID(),
+        metadata: { ...occ.metadata, jsTime },
+      })
     }
   }
 
-  // Deduplicate by (nodeId, jsTime)
+  // ── Deduplicate by (fileSlug, jsTime) and sort ────────────────────────────
   const seen = new Set<string>()
-  const deduped = all.filter(o => {
-    if (!o.jsTime) return false
-    const k = `${o._nodeId || o.title}|${(o.jsTime as Date).getTime()}`
-    if (seen.has(k)) return false
-    seen.add(k)
-    return true
-  }).sort((a, b) => (a.jsTime as Date).getTime() - (b.jsTime as Date).getTime())
-
-  // Map to OccurrenceEntry<T>
-  return deduped.map(occ => {
-    const metaFields = Object.fromEntries(
-      Object.entries(occ).filter(([k]) => !METADATA_EXCLUDE.has(k)),
-    )
-    return {
-      date:      String(occ.date ?? ''),
-      time:      occ.time ? String(occ.time) : null,
-      jsTime:    occ.jsTime as Date,
-      source:    occ._isGenerated !== undefined
-                   ? (occ._isGenerated ? 'generated' : 'explicit')
-                   : (occ.recur !== false ? 'generated' : 'explicit'),
-      ownerPath: (occ.ownerPath as number[]) ?? [],
-      metadata:  extractMetadata(metaFields),
-    }
-  })
+  return result
+    .filter(o => {
+      if (!o.metadata.jsTime) return false
+      const k = `${o.fileSlug}|${o.metadata.jsTime.getTime()}`
+      if (seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
+    .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
 }
+
+/* eslint-enable @typescript-eslint/no-explicit-any */

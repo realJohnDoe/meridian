@@ -34,12 +34,12 @@ export const SERIES_DIRECT: ReadonlySet<string> = new Set(['title'])
  * Uses effective (inherited) values from occ.metadata for comparisons — not root
  * node fields — so diffs are correct even when values come from a defaults: block.
  */
-export function applyNodeEdit(rawNode: RawNode, entry: EntryState, body: string): RawNode {
+export function applyNodeEdit(rawNode: RawNode, entry: EntryState, body: string, ownerPathOverride?: number[]): RawNode {
   const { item, editScope, title, tags, tracked, done, priority, scheduled, duration, repeat } = entry
   if (!item) return rawNode
   const occ      = item as Occurrence
   const occDate  = occ.date
-  const ownerPath: number[] = occ.ownerPath ?? []
+  const ownerPath: number[] = ownerPathOverride ?? []
   const n = rawNode as Record<string, unknown>
 
   // ── edit whole series ──────────────────────────────────────────────────────
@@ -173,8 +173,7 @@ export function applyNodeEdit(rawNode: RawNode, entry: EntryState, body: string)
  * True when the save result should be collapsed (shared fields hoisted to root defaults).
  * Only the root-split future case benefits; child-split already has the correct structure.
  */
-export function shouldCollapse(entry: EntryState): boolean {
+export function shouldCollapse(entry: EntryState, ownerPath: number[] = []): boolean {
   if (entry.editScope !== 'future') return true
-  const ownerPath = ((entry.item as Occurrence)?.ownerPath as number[] | undefined) ?? []
   return ownerPath.length === 0
 }

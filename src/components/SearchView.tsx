@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { ArrowLeft, Search } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { extractAppMetadata, occKind } from '../types'
+import { occKind } from '../types'
 import { expandRange } from '../model/expansion'
 import { addDays, fmtShort, NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
@@ -25,7 +25,7 @@ interface Props {
 }
 
 export default function SearchView({ onOpen, onClose }: Props) {
-  const nodes        = useStore(s => s.nodes)
+  const storeItems   = useStore(s => s.items)
   const nsFilterVal  = useStore(s => s.nsFilterVal)
   const setNsFilter  = useStore(s => s.setNsFilterVal)
   const [q, setQ]    = useState('')
@@ -41,26 +41,26 @@ export default function SearchView({ onOpen, onClose }: Props) {
   const items = useMemo<SearchItem[]>(() => {
     const from = addDays(TODAY, -30)
     const to   = addDays(TODAY, 90)
-    const occs: Occurrence[] = expandRange(nodes, from, to, extractAppMetadata)
+    const occs: Occurrence[] = expandRange(storeItems, from, to)
     const seen = new Set<string>()
     return [
       ...(NOTES_DATA as SearchItem[]),
       ...occs
         .filter(o => {
-          const key = o.metadata.nodeId || o.metadata.title
+          const key = o.fileSlug || o.metadata.title
           if (seen.has(key)) return false
           seen.add(key); return true
         })
         .map(o => ({
           title:      o.metadata.title,
           preview:    o.metadata.body || '',
-          date:       fmtShort(o.jsTime),
+          date:       o.metadata.jsTime ? fmtShort(o.metadata.jsTime) : o.date,
           tags:       o.metadata.tags || [],
           type:       occKind(o),
           occurrence: o,
         })),
     ]
-  }, [nodes])
+  }, [storeItems])
 
   const filtered = useMemo(() => {
     const ql = q.toLowerCase()

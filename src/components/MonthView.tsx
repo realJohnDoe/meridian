@@ -2,7 +2,7 @@ import { useMemo, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { extractAppMetadata } from '../types'
+
 import { expandRange } from '../model/expansion'
 import { sameDay, sortOccs, ccBarClass } from '../meridian'
 
@@ -25,7 +25,7 @@ interface CalCellProps {
 function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
   const isToday = sameDay(date, TODAY)
   const dayOccs = useMemo(
-    () => sortOccs(occs.filter(o => sameDay(o.jsTime, date))),
+    () => sortOccs(occs.filter(o => o.metadata.jsTime && sameDay(o.metadata.jsTime, date))),
     [occs, date],
   )
 
@@ -41,8 +41,8 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
           const bars: React.ReactNode[] = []
           dayOccs.slice(0, 4).forEach((o, i) => {
             if (o.metadata.multiday) {
-              if (seen.has(o.metadata.nodeId)) return
-              seen.add(o.metadata.nodeId)
+              if (seen.has(o.fileSlug)) return
+              seen.add(o.fileSlug)
               bars.push(<div key={i} className="cc-bar multiday">{o.metadata.title}</div>)
             } else {
               bars.push(<div key={i} className={`cc-bar ${ccBarClass(o)}`}>{o.metadata.title}</div>)
@@ -65,7 +65,7 @@ interface Props {
 
 export default function MonthView({ onDayClick }: Props) {
   const calMonth   = useStore(s => s.calMonth)
-  const nodes      = useStore(s => s.nodes)
+  const items      = useStore(s => s.items)
   const setCalMonth = useStore(s => s.setCalMonth)
 
   const m = calMonth.getMonth()
@@ -88,10 +88,10 @@ export default function MonthView({ onDayClick }: Props) {
 
     const from = new Date(y, m, 1)
     const to   = new Date(y, m + 1, 0, 23, 59, 59)
-    const occs = expandRange(nodes, from, to, extractAppMetadata)
+    const occs = expandRange(items, from, to)
 
     return { cells, occs }
-  }, [nodes, y, m])
+  }, [items, y, m])
 
   function prevMonth() {
     const d = calMonthRef.current

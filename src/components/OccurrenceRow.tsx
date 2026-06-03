@@ -1,7 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { Repeat2, Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { occIsRecur } from '../types'
 import { fmtT } from '../model/expansion'
 import { barClass } from '../meridian'
 import { Checkbox } from './ui/checkbox'
@@ -139,7 +138,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
     <div
       className="swipe-wrap"
       ref={wrapRef}
-      data-occ-key={`${occ.metadata.nodeId}-${occ.date}`}
+      data-occ-key={`${occ.fileSlug}-${occ.date}`}
       style={{ '--stagger': `${staggerRef.current * 0.025}s` } as React.CSSProperties}
     >
       {/* Left swipe hint */}
@@ -172,7 +171,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
               />
             )}
             <span className={`occ-title${isDone ? ' done-t' : ''}`}>{occ.metadata.title}</span>
-            {occIsRecur(occ) && <span className="orecur"><Repeat2 size={12} /></span>}
+            {!!occ.ownerId && <span className="orecur"><Repeat2 size={12} /></span>}
           </div>
 
           {(occ.metadata.tags || []).length > 0 && (

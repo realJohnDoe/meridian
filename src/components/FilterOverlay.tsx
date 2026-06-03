@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Plus, Repeat2 } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { extractAppMetadata, occIsRecur } from '../types'
+
 import { expandRange, fmtT } from '../model/expansion'
 import { addDays, fmtShort, barClass } from '../meridian'
 import { Checkbox } from './ui/checkbox'
@@ -35,19 +35,19 @@ interface Props {
 }
 
 export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
-  const nodes = useStore(s => s.nodes)
+  const items = useStore(s => s.items)
 
   const results = useMemo(() => {
     if (!query) return []
     const from = addDays(TODAY, -7)
     const to   = addDays(TODAY, 90)
-    const occs = expandRange(nodes, from, to, extractAppMetadata)
+    const occs = expandRange(items, from, to)
     return occs
       .filter(o => fuzzyMatch(query, o.metadata.title))
       .map(o => ({ occ: o, score: fuzzyScore(query, o.metadata.title) }))
-      .sort((a, b) => b.score - a.score || +a.occ.jsTime - +b.occ.jsTime)
+      .sort((a, b) => b.score - a.score || +(a.occ.metadata.jsTime ?? 0) - +(b.occ.metadata.jsTime ?? 0))
       .map(x => x.occ)
-  }, [nodes, query])
+  }, [items, query])
 
   if (!query) return null
 
@@ -70,7 +70,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
 
         return (
           <div
-            key={`${o.metadata.nodeId}-${o.date}`}
+            key={`${o.fileSlug}-${o.date}`}
             className="swipe-wrap"
             style={{ animation: 'fadeUp .16s ease both', animationDelay: `${i * 0.025}s` }}
           >
@@ -88,8 +88,8 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
                     <Checkbox checked={isDone} disabled className="size-5" />
                   )}
                   <span className={`occ-title${isDone ? ' done-t' : ''}`}>{o.metadata.title}</span>
-                  {occIsRecur(o) && <span className="orecur"><Repeat2 size={12} /></span>}
-                  <span style={{ opacity: 0.5, fontSize: 10, marginLeft: 4 }}>{fmtShort(o.jsTime)}</span>
+                  {!!o.ownerId && <span className="orecur"><Repeat2 size={12} /></span>}
+                  <span style={{ opacity: 0.5, fontSize: 10, marginLeft: 4 }}>{o.metadata.jsTime ? fmtShort(o.metadata.jsTime) : o.date}</span>
                 </div>
                 {(o.metadata.tags || []).length > 0 && (
                   <div className="occ-meta">
