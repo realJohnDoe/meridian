@@ -3,21 +3,25 @@ import {
   Upload, FileText, ChevronRight, ChevronLeft, AlertCircle, RotateCcw,
   CalendarDays, Plus, Pencil, Repeat, ChevronsRight, Trash2,
 } from 'lucide-react'
-import { RawNodeSchema, type RawNode } from '../model/nodeSchema'
 import {
-  buildEffectiveTree, collapseToYaml, serializeRawNode, displayValue,
+  buildEffectiveTree, displayValue,
   type EffectiveNode,
 } from '../model/inheritance'
 import {
-  collectAllOccurrences, treeHasOccurrences,
-  fmtISO,
-  type OccurrenceEntry, type RepeatPattern,
+  expandRange, treeHasOccurrences, fmtISO,
 } from '../model/expansion'
+import { collapseToYaml } from '../model/collapse'
+import { parseToStoreItems } from '../model/storeItems'
 import {
-  dayBefore, getSubNode, setSubNode, doEditFollowing,
-} from '../model/nodeOps'
-import { yamlParse, splitFrontmatter, wrapFrontmatter } from '../fileIO'
-import type { Occurrence, Priority, Repeat as RepeatType } from '../types'
+  applyEdit, toggleDone, excludeOccurrence, deleteByFileSlug, deleteFollowing,
+  findSeries, upsertOverride, dayBefore,
+  type EditFields,
+} from '../model/storeOps'
+import { loadFile, saveFile, wrapFrontmatter, splitFrontmatter } from '../fileIO'
+import type { Occurrence, Priority, Repeat as RepeatType, StoreItem } from '../types'
+import { isSeries } from '../types'
+import type { OccurrenceEntry, RepeatPattern } from '../model/expansion'
+import type { AppMetadata } from '../types'
 import EntryEditor, { type EntryState } from '../components/EntryEditor'
 import RepeatDialog from '../components/RepeatDialog'
 import DatePickerDialog from '../components/DatePickerDialog'
@@ -25,129 +29,6 @@ import TimePickerDialog from '../components/TimePickerDialog'
 import DurationDialog from '../components/DurationDialog'
 import PriorityDrawer from '../components/PriorityDrawer'
 import { applyScope, entryFromOccurrence } from '../meridian'
-import { applyNodeEdit, shouldCollapse } from '../nodeEdit'
-
-// ── Debug metadata type ───────────────────────────────────────────────────────
-
-interface DebugMetadata {
-  title:      string
-  done?:      boolean
-  tags:       string[]
-  priority?:  Priority
-  body:       string
-  duration:   string
-  _ownerPath: number[]   // tree navigation path (debug-only)
-}
-
-const makeExtractDebugMetadata = (ownerPath: number[]) => (fields: Record<string, unknown>): DebugMetadata => ({
-  title:      fields.title    ? String(fields.title)    : '',
-  done:       fields.done     as boolean | undefined,
-  tags:       Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
-  priority:   fields.priority as Priority | undefined,
-  body:       fields.body     ? String(fields.body)     : '',
-  duration:   fields.duration ? String(fields.duration) : '',
-  _ownerPath: ownerPath,
-})
-
-// Simple wrapper that collects with ownerPath stored in metadata
-function collectAllOccurrencesWithPath(node: EffectiveNode, endDateStr: string): OccurrenceEntry<DebugMetadata>[] {
-  const results: OccurrenceEntry<DebugMetadata>[] = []
-  const to = new Date(`${endDateStr}T23:59:59`)
-
-  function walk(n: EffectiveNode, path: number[]) {
-    const extract = makeExtractDebugMetadata(path)
-    if (n.fields.repeat !== undefined && n.fields.repeat !== null) {
-      results.push(...collectAllOccurrences(n, endDateStr, extract))
-    } else if (n.fields.date !== undefined) {
-      const dateStr = String(n.fields.date)
-      const d = new Date(`${dateStr}T00:00:00`)
-      if (!isNaN(d.getTime()) && d <= to) {
-        const metaFields = Object.fromEntries(
-          Object.entries(n.fields).filter(([k]) => !['date','time','instances','defaults','excluded','_isGenerated'].includes(k)),
-        )
-        results.push({
-          date:     dateStr,
-          time:     n.fields.time ? String(n.fields.time) : null,
-          source:   'explicit',
-          fileSlug: '',
-          id:       crypto.randomUUID(),
-          metadata: extract(metaFields),
-        })
-      }
-    } else {
-      n.instances.forEach((child, i) => walk(child, [...path, i]))
-    }
-  }
-
-  walk(node, [])
-  return results.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
-}
-
-function collectRepeatPatternsWithPath(node: EffectiveNode): RepeatPattern<DebugMetadata>[] {
-  const results: RepeatPattern<DebugMetadata>[] = []
-
-  function walk(n: EffectiveNode, path: number[]) {
-    const extract = makeExtractDebugMetadata(path)
-    if (n.fields.repeat !== undefined && n.fields.repeat !== null) {
-      const metaFields = Object.fromEntries(
-        Object.entries(n.fields).filter(([k]) => !['date','time','instances','defaults','excluded','_isGenerated'].includes(k)),
-      )
-      results.push({
-        date:     String(n.fields.date ?? ''),
-        time:     n.fields.time ? String(n.fields.time) : null,
-        repeat:   n.fields.repeat as RepeatType,
-        fileSlug: '',
-        id:       crypto.randomUUID(),
-        metadata: extract(metaFields),
-      })
-    }
-    n.instances.forEach((child, i) => walk(child, [...path, i]))
-  }
-
-  walk(node, [])
-  return results
-}
-
-type DebugOccurrence = OccurrenceEntry<DebugMetadata>
-type DebugPattern    = RepeatPattern<DebugMetadata>
-
-// ── OccurrenceEntry → Occurrence bridge ───────────────────────────────────────
-
-function toOccurrence(
-  entry:    DebugOccurrence,
-  rawNode:  RawNode,
-  pattern?: DebugPattern,
-): Occurrence {
-  const m = entry.metadata
-  const [y, mo, d] = entry.date.split('-').map(Number)
-  const jsTime = entry.time
-    ? new Date(y, mo - 1, d, +entry.time.slice(0, 2), +entry.time.slice(3, 5))
-    : new Date(y, mo - 1, d)
-  const slug = String((rawNode as Record<string, unknown>).id ?? 'debug-node')
-  // Use a synthetic ownerId so isRecur is true for recurring occurrences.
-  // The actual repeat type is passed via the seriesRepeat prop to EntryEditor.
-  const syntheticOwnerId = pattern ? `debug:${JSON.stringify(pattern.metadata._ownerPath)}` : entry.ownerId
-  return {
-    date:     entry.date,
-    time:     entry.time ?? null,
-    source:   entry.source,
-    fileSlug: entry.fileSlug || slug,
-    id:       entry.id,
-    ownerId:  syntheticOwnerId,
-    metadata: {
-      title:    m.title,
-      done:     m.done,
-      tags:     m.tags,
-      priority: m.priority,
-      body:     m.body,
-      duration: m.duration,
-      jsTime,
-    },
-  } as Occurrence
-}
-
-
-// applyNodeEdit and shouldCollapse are imported from '../nodeEdit'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
 
@@ -155,6 +36,24 @@ function defaultEndDate(): string {
   const d = new Date()
   d.setMonth(d.getMonth() + 3)
   return d.toISOString().slice(0, 10)
+}
+
+const DEBUG_FILE_SLUG = 'debug-node'
+
+/**
+ * Serialize items back to YAML content string (same path as writeEntityToCache).
+ */
+function itemsToYaml(items: StoreItem[], body: string): string {
+  if (items.length === 0) return ''
+  const frontmatter = collapseToYaml(items)
+  return saveFile(frontmatter, body)
+}
+
+/**
+ * Extract the body from items (stored on the first series or root standalone).
+ */
+function extractBody(items: StoreItem[]): string {
+  return items.find(i => isSeries(i) || !(i as OccurrenceEntry<AppMetadata>).ownerId)?.metadata.body ?? ''
 }
 
 // ── Tree display helpers ──────────────────────────────────────────────────────
@@ -183,76 +82,6 @@ const depthColour   = (d: number) => DEPTH_COLOURS[d % DEPTH_COLOURS.length]
 type ActionKind =
   | 'add' | 'edit-occurrence' | 'edit-pattern' | 'edit-following'
   | 'delete-occurrence' | 'delete-following' | 'delete-all'
-
-// ── Raw-node action functions ─────────────────────────────────────────────────
-
-function doAddOccurrence(node: RawNode, ownerPath: number[], date: string, time: string, done: boolean): RawNode {
-  const sub  = getSubNode(node, ownerPath)
-  const inst: Record<string, unknown> = { date }
-  if (time) inst.time = time
-  inst.done = done
-  return setSubNode(node, ownerPath, {
-    ...sub,
-    instances: [...((sub.instances as RawNode[]) ?? []), inst as RawNode],
-  })
-}
-
-function doEditOccurrence(
-  node: RawNode, ownerPath: number[], occDate: string, date: string, time: string, done: boolean,
-): RawNode {
-  const sub       = getSubNode(node, ownerPath)
-  const instances = [...((sub.instances as RawNode[]) ?? [])]
-  const idx       = instances.findIndex(i => String((i as Record<string, unknown>).date) === occDate)
-  const updated: Record<string, unknown> = { date }
-  if (time) updated.time = time
-  updated.done = done
-  if (idx >= 0) {
-    instances[idx] = { ...instances[idx], ...updated } as RawNode
-  } else {
-    instances.push(updated as RawNode)
-  }
-  return setSubNode(node, ownerPath, { ...sub, instances })
-}
-
-function doEditPattern(node: RawNode, ownerPath: number[], newRepeat: RepeatType): RawNode {
-  const sub = getSubNode(node, ownerPath)
-  return setSubNode(node, ownerPath, { ...sub, repeat: newRepeat })
-}
-
-function doDeleteOccurrence(node: RawNode, ownerPath: number[], occ: DebugOccurrence): RawNode {
-  const sub = getSubNode(node, ownerPath)
-  if (occ.source === 'generated') {
-    const instances = [...((sub.instances as RawNode[]) ?? [])]
-    const idx = instances.findIndex(i => String((i as Record<string, unknown>).date) === occ.date)
-    const excl: Record<string, unknown> = { date: occ.date, excluded: true }
-    if (idx >= 0) {
-      instances[idx] = { ...instances[idx], ...excl } as RawNode
-    } else {
-      instances.push(excl as RawNode)
-    }
-    return setSubNode(node, ownerPath, { ...sub, instances })
-  } else {
-    const instances = ((sub.instances as RawNode[]) ?? []).filter(
-      i => String((i as Record<string, unknown>).date) !== occ.date,
-    )
-    const updated = { ...sub, instances } as RawNode
-    if (instances.length === 0) delete (updated as Record<string, unknown>).instances
-    return setSubNode(node, ownerPath, updated)
-  }
-}
-
-function doDeleteFollowing(node: RawNode, ownerPath: number[], occDate: string): RawNode {
-  const sub           = getSubNode(node, ownerPath)
-  const originalRepeat = ((sub.repeat ?? {}) as Record<string, unknown>)
-  const newRepeat     = { ...originalRepeat, end: { type: 'until', date: dayBefore(occDate) } }
-  const instances     = ((sub.instances as RawNode[]) ?? []).filter(
-    i => String((i as Record<string, unknown>).date) < occDate,
-  )
-  const updated: Record<string, unknown> = { ...sub, repeat: newRepeat }
-  if (instances.length > 0) updated.instances = instances
-  else delete updated.instances
-  return setSubNode(node, ownerPath, updated as RawNode)
-}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -304,7 +133,7 @@ function NodeCard({ item, isLast }: { item: CardItem; isLast: boolean }) {
 function OccurrenceRow({
   occ, isSelected, onClick,
 }: {
-  occ: DebugOccurrence
+  occ: Occurrence
   isSelected: boolean
   onClick: () => void
 }) {
@@ -393,7 +222,7 @@ function AddOccurrenceForm({ onApply, onCancel }: {
 }
 
 function EditOccurrenceForm({ occ, onApply, onCancel }: {
-  occ: DebugOccurrence
+  occ: Occurrence
   onApply: (date: string, time: string, done: boolean) => void
   onCancel: () => void
 }) {
@@ -419,7 +248,7 @@ function EditOccurrenceForm({ occ, onApply, onCancel }: {
 }
 
 function EditFollowingForm({ occ, onApply, onCancel }: {
-  occ: DebugOccurrence
+  occ: Occurrence
   onApply: () => void
   onCancel: () => void
 }) {
@@ -465,9 +294,8 @@ export default function NodeInheritanceDebugger() {
   const [fileName,        setFileName]        = useState<string>('')
   const [originalContent, setOriginalContent] = useState<string>('')
   const [isCollapsed,     setIsCollapsed]     = useState(false)
-  const [zodErrors,       setZodErrors]       = useState<string[]>([])
-  const [results,         setResults]         = useState<EffectiveNode | null>(null)
-  const [rawNode,         setRawNode]         = useState<RawNode | null>(null)
+  const [parseErrors,     setParseErrors]     = useState<string[]>([])
+  const [items,           setItems]           = useState<StoreItem[]>([])
   const [expandEndDate,   setExpandEndDate]   = useState<string>(defaultEndDate)
   const [selectedIdx,     setSelectedIdx]     = useState<number | null>(null)
   const [activeAction,    setActiveAction]    = useState<ActionKind | null>(null)
@@ -477,50 +305,55 @@ export default function NodeInheritanceDebugger() {
   const [debugDialog,       setDebugDialog]       = useState<string | null>(null)
   const [patternDialogOpen, setPatternDialogOpen] = useState(false)
 
+  // ── Effective tree for viz column — re-derived from displayContent ────────
+  const results = useMemo<EffectiveNode | null>(() => {
+    if (!displayContent) return null
+    try {
+      const { rawNode } = loadFile(fileName || 'debug.md', displayContent)
+      return buildEffectiveTree(rawNode as Parameters<typeof buildEffectiveTree>[0])
+    } catch { return null }
+  }, [displayContent, fileName])
+
+  // ── Apply items → update displayContent + collapse state ─────────────────
+  const applyItems = useCallback((newItems: StoreItem[], body: string) => {
+    setItems(newItems)
+    const content = itemsToYaml(newItems, body)
+    setDisplayContent(content)
+    setIsCollapsed(true)
+    setSelectedIdx(null)
+    setDebugEntry(null)
+    setActiveAction(null)
+  }, [])
+
   // ── Parse ────────────────────────────────────────────────────────────────
   const processContent = useCallback((content: string, name: string) => {
     setDisplayContent(content)
     setFileName(name)
-    setZodErrors([])
-    setResults(null)
-    setRawNode(null)
+    setParseErrors([])
     setIsCollapsed(false)
     setSelectedIdx(null)
     setActiveAction(null)
-
-    const { fm } = splitFrontmatter(content)
-    let parsed: unknown
-    try { parsed = yamlParse(fm) }
-    catch (e) { setZodErrors([`YAML parse error: ${String(e)}`]); return }
-
-    const v = RawNodeSchema.safeParse(parsed)
-    if (!v.success) { setZodErrors(v.error.issues.map(e => `${e.path.join('.')}: ${e.message}`)); return }
-
-    const rn = v.data as RawNode
-    setRawNode(rn)
-    setResults(buildEffectiveTree(rn))
     setDebugEntry(null)
+    setItems([])
+
+    try {
+      const parsed = parseToStoreItems(name || 'debug.md', content)
+      // Assign a stable debug fileSlug so expandRange can match series↔overrides.
+      const withSlug = parsed.map(i => ({ ...i, fileSlug: i.fileSlug || DEBUG_FILE_SLUG }))
+      setItems(withSlug)
+    } catch (e) {
+      setParseErrors([`Parse error: ${String(e)}`])
+    }
   }, [])
 
-  const applyRawNode = useCallback((newNode: RawNode) => {
-    const { body } = splitFrontmatter(displayContent)
-    processContent(wrapFrontmatter(serializeRawNode(newNode), body), fileName)
-  }, [displayContent, fileName, processContent])
-
   const handleCollapse = useCallback(() => {
-    if (!results) return
-    const { body } = splitFrontmatter(originalContent || displayContent)
-    const collapsed = wrapFrontmatter(collapseToYaml(results), body)
-    setDisplayContent(collapsed)
+    const body = extractBody(items)
+    const content = itemsToYaml(items, body)
+    setDisplayContent(content)
     setIsCollapsed(true)
     setSelectedIdx(null)
     setActiveAction(null)
-    const { fm } = splitFrontmatter(collapsed)
-    try {
-      const v = RawNodeSchema.safeParse(yamlParse(fm))
-      if (v.success) { const rn = v.data as RawNode; setRawNode(rn); setResults(buildEffectiveTree(rn)); setZodErrors([]) }
-    } catch { /* keep existing results */ }
-  }, [results, originalContent, displayContent])
+  }, [items])
 
   const handleReset = useCallback(() => {
     if (originalContent) processContent(originalContent, fileName)
@@ -528,7 +361,7 @@ export default function NodeInheritanceDebugger() {
 
   const handleDeleteAll = useCallback(() => {
     setDisplayContent(''); setFileName(''); setOriginalContent('')
-    setResults(null); setRawNode(null); setZodErrors([])
+    setItems([]); setParseErrors([])
     setIsCollapsed(false); setSelectedIdx(null); setActiveAction(null); setDebugEntry(null)
   }, [])
 
@@ -544,33 +377,23 @@ export default function NodeInheritanceDebugger() {
   }, [processContent])
 
   // ── Derived state ─────────────────────────────────────────────────────────
-  const displayItems  = useMemo(() => results ? flattenForDisplay(results) : [], [results])
-  const canCollapse   = results !== null
-  const isEmpty       = !displayContent
+  const displayItems = useMemo(() => results ? flattenForDisplay(results) : [], [results])
+  const isEmpty      = !displayContent
   const nodeHasRepeat = results ? treeHasOccurrences(results) : false
 
-  const occurrences = useMemo<DebugOccurrence[] | null>(() => {
-    if (!results || !nodeHasRepeat) return null
-    return collectAllOccurrencesWithPath(results, expandEndDate)
-  }, [results, nodeHasRepeat, expandEndDate])
+  const occurrences = useMemo<Occurrence[] | null>(() => {
+    if (items.length === 0) return null
+    const from = new Date(2000, 0, 1)
+    const to   = new Date(`${expandEndDate}T23:59:59`)
+    if (isNaN(to.getTime())) return []
+    return expandRange(items, from, to)
+  }, [items, expandEndDate])
 
-  const patterns = useMemo<DebugPattern[]>(
-    () => results ? collectRepeatPatternsWithPath(results) : [],
-    [results],
-  )
-
-  const findPattern = useCallback((ownerPath: number[]): DebugPattern | undefined => {
-    const key = JSON.stringify(ownerPath)
-    return patterns.find(p => JSON.stringify(p.metadata._ownerPath) === key)
-  }, [patterns])
-
-  // Derived selection state — declared before all callbacks that depend on them.
-  // toOccurrence() strips _ownerPath from metadata, so callbacks must read it here.
-  const selectedOcc = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
-
-  const selectedPattern = useMemo<DebugPattern | null>(
-    () => selectedOcc ? findPattern(selectedOcc.metadata._ownerPath) ?? null : null,
-    [selectedOcc, findPattern],
+  // Derived selection state — before all callbacks that depend on it.
+  const selectedOcc    = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
+  const selectedSeries = useMemo<RepeatPattern<AppMetadata> | null>(
+    () => selectedOcc ? findSeries(items, selectedOcc) ?? null : null,
+    [selectedOcc, items],
   )
 
   // ── Selection ────────────────────────────────────────────────────────────
@@ -579,43 +402,31 @@ export default function NodeInheritanceDebugger() {
       setSelectedIdx(null); setActiveAction(null); setDebugEntry(null)
     } else {
       setSelectedIdx(idx); setActiveAction(null)
-      if (rawNode) {
-        const occEntry = (occurrences ?? [])[idx]
-        if (occEntry) {
-          const pattern = findPattern(occEntry.metadata._ownerPath)
-          setDebugEntry(entryFromOccurrence(toOccurrence(occEntry, rawNode, pattern), 'single'))
-        }
+      const occEntry = (occurrences ?? [])[idx]
+      if (occEntry) {
+        setDebugEntry(entryFromOccurrence(occEntry, 'single', b => b, items))
       }
     }
-  }, [selectedIdx, rawNode, occurrences, findPattern])
+  }, [selectedIdx, occurrences, items])
 
   // ── EntryEditor handlers ─────────────────────────────────────────────────
   const handleDebugSave = useCallback((body: string) => {
-    if (!debugEntry || !rawNode) return
-    // Use selectedOcc._ownerPath — debugEntry.item is a converted Occurrence that
-    // has _ownerPath stripped by toOccurrence(), so reading it from there gives undefined.
-    const selectedOccPath = selectedOcc?.metadata._ownerPath
-    const updated = applyNodeEdit(rawNode, debugEntry, body, selectedOccPath)
-
-    if (shouldCollapse(debugEntry, selectedOccPath)) {
-      const { body: origBody } = splitFrontmatter(displayContent)
-      const effectiveTree = buildEffectiveTree(updated)
-      const collapsed = wrapFrontmatter(collapseToYaml(effectiveTree), origBody)
-      const { fm } = splitFrontmatter(collapsed)
-      try {
-        const v = RawNodeSchema.safeParse(yamlParse(fm))
-        if (v.success) {
-          const rn = v.data as RawNode
-          setDisplayContent(collapsed); setRawNode(rn); setResults(buildEffectiveTree(rn))
-          setZodErrors([]); setIsCollapsed(true); setSelectedIdx(null); setDebugEntry(null)
-          return
-        }
-      } catch { /* fall through */ }
+    if (!debugEntry || !selectedOcc) return
+    const { title, tags, tracked, done, priority, scheduled, duration, repeat, editScope } = debugEntry
+    const fields: EditFields = {
+      title:    title || '',
+      tags:     tags || [],
+      body,
+      tracked:  tracked ?? false,
+      done:     done ?? false,
+      priority: priority ?? null,
+      scheduled: scheduled ?? null,
+      duration: duration || '',
+      repeat:   repeat ?? null,
     }
-
-    applyRawNode(updated)
-    setSelectedIdx(null); setDebugEntry(null)
-  }, [debugEntry, rawNode, applyRawNode, displayContent, selectedOcc])
+    const next = applyEdit(items, selectedOcc, editScope, fields)
+    applyItems(next, body)
+  }, [debugEntry, selectedOcc, items, applyItems])
 
   const handleDebugClose = useCallback(() => {
     setSelectedIdx(null); setDebugEntry(null)
@@ -625,36 +436,32 @@ export default function NodeInheritanceDebugger() {
     setDebugEntry(prev => {
       if (!prev?.item) return prev
       const occ = prev.item as Occurrence
-      const { scheduled } = applyScope(occ, scope)
-
+      const { scheduled, repeat } = applyScope(occ, scope, items)
       if (scope === 'future' || scope === 'all') {
-        // selectedPattern is derived from selectedOcc which retains the original _ownerPath.
-        // We cannot use occ.metadata._ownerPath because toOccurrence() strips it.
-        const repeat = selectedPattern?.repeat ?? null
-        const pm = selectedPattern?.metadata
+        const pm = selectedSeries?.metadata
         return {
           ...prev, editScope: scope, scheduled, repeat,
           title:    pm?.title    ?? prev.title,
           tags:     pm?.tags     ? [...pm.tags] : prev.tags,
-          priority: pm?.priority ?? prev.priority ?? null,
+          priority: (pm?.priority ?? prev.priority ?? null) as Priority | null,
           bodyHtml: pm?.body     ?? prev.bodyHtml,
           duration: pm?.duration ?? prev.duration,
           tracked:  prev.tracked,
           done:     pm?.done ?? prev.done,
         }
       }
-      return { ...prev, editScope: scope, scheduled, repeat: null }
+      return { ...prev, editScope: scope, scheduled, repeat }
     })
-  }, [selectedPattern])
+  }, [selectedSeries, items])
 
   const handleDebugDelete = useCallback(() => {
-    if (!rawNode || !selectedOcc) return
-    applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.metadata._ownerPath, selectedOcc))
-    setSelectedIdx(null); setDebugEntry(null)
-  }, [rawNode, selectedOcc, applyRawNode])
+    if (!selectedOcc) return
+    const next = excludeOccurrence(items, selectedOcc)
+    applyItems(next, extractBody(next))
+  }, [selectedOcc, items, applyItems])
 
   const canEditPattern     = selectedOcc?.source === 'generated'
-  const canEditFollowing   = selectedOcc !== null && selectedPattern !== null
+  const canEditFollowing   = selectedOcc !== null && selectedSeries !== null
   const totalOccurrences   = occurrences?.length ?? 0
   const canDeleteSingle    = selectedOcc !== null && totalOccurrences > 1
   const canDeleteFollowing = canEditFollowing
@@ -720,10 +527,10 @@ export default function NodeInheritanceDebugger() {
 
         {/* Divider with ‹ button */}
         <div className="flex flex-col items-center justify-center w-8 shrink-0 border-r border-white/10 bg-white/[0.02]">
-          <button onClick={handleCollapse} disabled={!canCollapse}
-            title={canCollapse ? 'Collapse effective nodes → compact YAML' : 'Load a file first'}
+          <button onClick={handleCollapse} disabled={items.length === 0}
+            title={items.length > 0 ? 'Collapse effective nodes → compact YAML' : 'Load a file first'}
             className={`flex items-center justify-center w-6 h-6 rounded transition-colors ${
-              canCollapse ? 'text-white/50 hover:text-white hover:bg-white/10 cursor-pointer' : 'text-white/15 cursor-not-allowed'
+              items.length > 0 ? 'text-white/50 hover:text-white hover:bg-white/10 cursor-pointer' : 'text-white/15 cursor-not-allowed'
             }`}>
             <ChevronLeft size={14} />
           </button>
@@ -740,18 +547,18 @@ export default function NodeInheritanceDebugger() {
             )}
           </div>
           <div className="flex-1 overflow-auto p-4">
-            {zodErrors.length > 0 && (
+            {parseErrors.length > 0 && (
               <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertCircle size={14} className="text-red-400" />
                   <span className="text-xs font-semibold text-red-300">Parse / validation errors</span>
                 </div>
                 <ul className="space-y-1">
-                  {zodErrors.map((err, i) => <li key={i} className="text-xs font-mono text-red-300/80">{err}</li>)}
+                  {parseErrors.map((err, i) => <li key={i} className="text-xs font-mono text-red-300/80">{err}</li>)}
                 </ul>
               </div>
             )}
-            {!displayContent && zodErrors.length === 0 && (
+            {!displayContent && parseErrors.length === 0 && (
               <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">
                 Load a file to see effective nodes
               </div>
@@ -784,7 +591,7 @@ export default function NodeInheritanceDebugger() {
             {!displayContent && (
               <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">Load a file</div>
             )}
-            {displayContent && !nodeHasRepeat && zodErrors.length === 0 && (
+            {displayContent && !nodeHasRepeat && parseErrors.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-white/20 select-none">
                 <CalendarDays size={28} strokeWidth={1.2} />
                 <span className="text-sm text-center px-2">No <span className="font-mono">date:</span> or <span className="font-mono">repeat:</span> found</span>
@@ -799,7 +606,7 @@ export default function NodeInheritanceDebugger() {
             )}
           </div>
 
-          {displayContent && zodErrors.length === 0 && (
+          {displayContent && parseErrors.length === 0 && (
             <div className="shrink-0 border-t border-white/10 bg-[#0d1015]">
               {selectedOcc === null ? (
                 <div className="px-3 py-2.5 text-[11px] text-white/20 select-none">
@@ -827,33 +634,63 @@ export default function NodeInheritanceDebugger() {
                     <ActionBtn label={deleteAllLabel}    icon={<Trash2 size={11} />} active={activeAction === 'delete-all'} onClick={() => toggleAction('delete-all')} />
                   </div>
 
-                  {activeAction === 'add' && rawNode && selectedOcc && (
+                  {activeAction === 'add' && selectedOcc && (
                     <AddOccurrenceForm
-                      onApply={(date, time, done) => { applyRawNode(doAddOccurrence(rawNode, selectedOcc.metadata._ownerPath, date, time, done)); setActiveAction(null) }}
+                      onApply={(date, time, done) => {
+                        const series = findSeries(items, selectedOcc)
+                        const newOcc: OccurrenceEntry<AppMetadata> = {
+                          date, time: time || null, source: 'explicit',
+                          fileSlug: selectedOcc.fileSlug, id: crypto.randomUUID(),
+                          ownerId: selectedOcc.ownerId,
+                          metadata: { ...(series?.metadata ?? selectedOcc.metadata), done },
+                        }
+                        const next = [...items, newOcc]
+                        applyItems(next, extractBody(next))
+                        setActiveAction(null)
+                      }}
                       onCancel={() => setActiveAction(null)} />
                   )}
-                  {activeAction === 'edit-occurrence' && rawNode && selectedOcc && (
+                  {activeAction === 'edit-occurrence' && selectedOcc && (
                     <EditOccurrenceForm occ={selectedOcc}
-                      onApply={(date, time, done) => { applyRawNode(doEditOccurrence(rawNode, selectedOcc.metadata._ownerPath, selectedOcc.date, date, time, done)); setActiveAction(null) }}
+                      onApply={(date, time, done) => {
+                        const next = upsertOverride(items, selectedOcc, {
+                          date, time: time || null,
+                          metadata: { ...selectedOcc.metadata, done },
+                        })
+                        applyItems(next, extractBody(next))
+                        setActiveAction(null)
+                      }}
                       onCancel={() => setActiveAction(null)} />
                   )}
-                  {activeAction === 'edit-following' && rawNode && selectedOcc && (
+                  {activeAction === 'edit-following' && selectedOcc && (
                     <EditFollowingForm occ={selectedOcc}
-                      onApply={() => { applyRawNode(doEditFollowing(rawNode, selectedOcc.metadata._ownerPath, selectedOcc.date)); setActiveAction(null) }}
+                      onApply={() => {
+                        const next = deleteFollowing(items, selectedOcc)
+                        applyItems(next, extractBody(next))
+                        setActiveAction(null)
+                      }}
                       onCancel={() => setActiveAction(null)} />
                   )}
-                  {activeAction === 'delete-occurrence' && rawNode && selectedOcc && (
+                  {activeAction === 'delete-occurrence' && selectedOcc && (
                     <DeleteConfirmForm
                       message={selectedOcc.source === 'generated' ? `Mark ${selectedOcc.date} as excluded.` : `Remove explicit instance on ${selectedOcc.date}.`}
                       label="Delete occurrence"
-                      onApply={() => { applyRawNode(doDeleteOccurrence(rawNode, selectedOcc.metadata._ownerPath, selectedOcc)); setActiveAction(null) }}
+                      onApply={() => {
+                        const next = excludeOccurrence(items, selectedOcc)
+                        applyItems(next, extractBody(next))
+                        setActiveAction(null)
+                      }}
                       onCancel={() => setActiveAction(null)} />
                   )}
-                  {activeAction === 'delete-following' && rawNode && selectedOcc && (
+                  {activeAction === 'delete-following' && selectedOcc && (
                     <DeleteConfirmForm
                       message={`End the series on ${dayBefore(selectedOcc.date)}. Occurrences from ${selectedOcc.date} onwards will be removed.`}
                       label="Delete this & following"
-                      onApply={() => { applyRawNode(doDeleteFollowing(rawNode, selectedOcc.metadata._ownerPath, selectedOcc.date)); setActiveAction(null) }}
+                      onApply={() => {
+                        const next = deleteFollowing(items, selectedOcc)
+                        applyItems(next, extractBody(next))
+                        setActiveAction(null)
+                      }}
                       onCancel={() => setActiveAction(null)} />
                   )}
                   {activeAction === 'delete-all' && (
@@ -882,7 +719,7 @@ export default function NodeInheritanceDebugger() {
                 onOpenDlg={setDebugDialog}
                 onOpenRepeatDlg={() => setDebugDialog('dlgRepeat')}
                 onScopeChange={handleDebugScopeChange}
-                seriesRepeat={selectedPattern?.repeat ?? null}
+                items={items}
               />
               <DatePickerDialog
                 open={debugDialog === 'dlgSched'}
@@ -934,13 +771,21 @@ export default function NodeInheritanceDebugger() {
       </div>
 
       {/* RepeatDialog for "Edit pattern" action (3rd column) */}
-      {rawNode && selectedOcc && (
+      {selectedOcc && selectedSeries && (
         <RepeatDialog
           open={patternDialogOpen}
           scheduled={{ date: selectedOcc.date, time: selectedOcc.time || '' }}
           tracked={selectedOcc.metadata.done !== undefined}
-          repeat={selectedPattern?.repeat ?? null}
-          onConfirm={r => { applyRawNode(doEditPattern(rawNode, selectedOcc.metadata._ownerPath, r)); setPatternDialogOpen(false); setActiveAction(null) }}
+          repeat={selectedSeries.repeat}
+          onConfirm={(r: RepeatType) => {
+            const next = items.map(i =>
+              i.id === selectedSeries.id
+                ? { ...i as RepeatPattern<AppMetadata>, repeat: r }
+                : i,
+            )
+            applyItems(next, extractBody(next))
+            setPatternDialogOpen(false); setActiveAction(null)
+          }}
           onRemove={() => setPatternDialogOpen(false)}
           onClose={() => { setPatternDialogOpen(false); setActiveAction(null) }}
         />
