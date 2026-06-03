@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Node, StoreItem } from './types'
+import type { StoreItem } from './types'
 import { TODAY as _today } from './constants'
 
 export type PrimaryView = 'agenda' | 'calendar' | 'day'
@@ -7,9 +7,6 @@ export type OverlayView = 'entry' | 'search'
 
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
-  nodes: Node[]
-  setNodes: (nodes: Node[]) => void
-
   items: StoreItem[]
   setItems: (items: StoreItem[]) => void
 
@@ -65,11 +62,8 @@ interface MeridianStore {
 }
 
 export const useStore = create<MeridianStore>((set) => ({
-  // nodes starts empty; initApp() seeds it with SEED_NODES (or disk data
-  // replaces it when the user opens a vault folder).
-  nodes: [],
-  setNodes: (nodes) => set({ nodes }),
-
+  // items starts empty; tryRestoreDirectory() seeds it (or disk data replaces
+  // it when the user opens a vault folder).
   items: [],
   setItems: (items) => set({ items }),
 
