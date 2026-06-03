@@ -492,8 +492,8 @@ export function applyScope(item: Occurrence, scope: string, items?: StoreItem[])
   const seriesRepeat = parentSeries && isSeries(parentSeries) ? parentSeries.repeat : null
   const occDate = item.date || null
   const occTime = item.time || null
-  const rootDate = isSeries(parentSeries as any) ? (parentSeries as any).date : occDate
-  const rootTime = isSeries(parentSeries as any) ? (parentSeries as any).time : occTime
+  const rootDate = (parentSeries && isSeries(parentSeries)) ? parentSeries.date : occDate
+  const rootTime = (parentSeries && isSeries(parentSeries)) ? parentSeries.time : occTime
   if (scope === 'single') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: null }
   if (scope === 'future') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: seriesRepeat || null }
   if (scope === 'add') return { scheduled: { date: fmtISO(TODAY), time: occTime || '' }, repeat: null }
