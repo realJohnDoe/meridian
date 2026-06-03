@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from 'react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { extractAppMetadata } from '../types'
+
 import { expandRange } from '../model/expansion'
 import {
   sameDay, addDays, dayKey, sortOccs,
@@ -15,13 +15,13 @@ interface Props {
 }
 
 export default function AgendaView({ onOpen }: Props) {
-  const nodes = useStore(s => s.nodes)  // keep for expandRange (Node[] required)
+  const items = useStore(s => s.items)
 
   // Expand occurrences and group them by day — same window as buildAgenda().
   const groups = useMemo(() => {
     const from = addDays(TODAY, -7)
     const to = addDays(TODAY, 90)
-    const occs = expandRange(nodes, from, to, extractAppMetadata)
+    const occs = expandRange(items, from, to)
 
     const result: Record<string, { date: Date; items: Occurrence[] }> = {}
 

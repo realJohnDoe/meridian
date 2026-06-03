@@ -162,76 +162,75 @@ export function nodesToStoreItems(nodes: Node[]): StoreItem[] {
   const result: StoreItem[] = []
   for (const node of nodes) {
     const fileSlug = node.id
-    const inlineMeta: InlineMetadata = {
+    const baseMeta: AppMetadata = {
       title:    node.title,
       done:     node.done,
       tags:     node.tags || [],
       priority: node.priority,
       duration: node.duration,
       timezone: node.timezone,
+      body:     node.body,
+      multiday: node.multiday,
     }
     if (node.repeat) {
       const seriesId = crypto.randomUUID()
-      const series: StoreItem = {
+      result.push({
         date:     node.date || '',
         time:     node.time || null,
         repeat:   node.repeat,
         fileSlug,
         id:       seriesId,
-        metadata: inlineMeta,
-      }
-      result.push(series)
-      // Add explicit instance overrides as OccurrenceEntry children
+        metadata: baseMeta,
+      })
+      // Explicit instance overrides
       for (const inst of node.instances || []) {
         if (inst.excluded) continue
-        const instMeta: InlineMetadata = {
-          title:    inst.title ?? node.title,
-          done:     inst.done,
-          tags:     inst.tags || node.tags || [],
-          priority: inst.priority,
-          duration: inst.duration,
-          timezone: undefined,
-        }
-        const occ: StoreItem = {
-          date:     inst.date,
-          time:     inst.time || null,
-          source:   'explicit',
-          fileSlug,
-          id:       crypto.randomUUID(),
-          ownerId:  seriesId,
-          metadata: instMeta,
-        }
-        result.push(occ)
-      }
-    } else {
-      // Standalone occurrence (or multi-occurrence without a repeat)
-      const occ: StoreItem = {
-        date:    node.date || '',
-        time:    node.time || null,
-        source:  'explicit',
-        fileSlug,
-        id:      crypto.randomUUID(),
-        metadata: inlineMeta,
-      }
-      result.push(occ)
-      // Add extra explicit instances
-      for (const inst of node.instances || []) {
-        if (inst.excluded) continue
-        const instMeta: InlineMetadata = {
-          title:    inst.title ?? node.title,
-          done:     inst.done,
-          tags:     inst.tags || node.tags || [],
-          priority: inst.priority,
-          duration: inst.duration,
-          timezone: undefined,
-        }
         result.push({
           date:    inst.date,
           time:    inst.time || null,
           source:  'explicit',
           fileSlug,
           id:      crypto.randomUUID(),
-          metadata: instMeta,
+          ownerId: seriesId,
+          metadata: {
+            ...baseMeta,
+            title:    inst.title ?? node.title,
+            done:     inst.done,
+            tags:     inst.tags || node.tags || [],
+            priority: inst.priority ?? node.priority,
+            duration: inst.duration ?? node.duration,
+            body:     (inst as { body?: string }).body ?? node.body,
+          },
+        })
+      }
+    } else {
+      const standaloneId = crypto.randomUUID()
+      result.push({
+        date:    node.date || '',
+        time:    node.time || null,
+        source:  'explicit',
+        fileSlug,
+        id:      standaloneId,
+        metadata: baseMeta,
+      })
+      // Extra explicit instances (multi-occurrence without repeat)
+      for (const inst of node.instances || []) {
+        if (inst.excluded) continue
+        result.push({
+          date:    inst.date,
+          time:    inst.time || null,
+          source:  'explicit',
+          fileSlug,
+          id:      crypto.randomUUID(),
+          ownerId: standaloneId,
+          metadata: {
+            ...baseMeta,
+            title:    inst.title ?? node.title,
+            done:     inst.done,
+            tags:     inst.tags || node.tags || [],
+            priority: inst.priority ?? node.priority,
+            duration: inst.duration ?? node.duration,
+          },
         })
       }
     }

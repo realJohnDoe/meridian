@@ -2,7 +2,7 @@ import { useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { Checkbox } from './ui/checkbox'
 import type { Occurrence } from '../types'
-import { extractAppMetadata } from '../types'
+
 import { expandRange, fmtT, parseDurationHours } from '../model/expansion'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
 
@@ -110,7 +110,7 @@ export default function DayView({ onOpen }: Props) {
   const { allDay, cols } = useMemo(() => {
     const from = new Date(dvDate); from.setHours(0, 0, 0, 0)
     const to   = new Date(dvDate); to.setHours(23, 59, 59)
-    const occs  = expandRange(nodes, from, to, extractAppMetadata)
+    const occs  = expandRange(items, from, to)
     const allDay = sortOccs(occs.filter(o => !fmtT(o.time) || o.metadata.multiday))
     const timed  = sortOccs(occs.filter(o => !!fmtT(o.time) && !o.metadata.multiday))
     return { allDay, cols: computeColumns(timed) }

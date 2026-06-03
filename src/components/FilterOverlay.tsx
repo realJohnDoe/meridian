@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Plus, Repeat2 } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { extractAppMetadata } from '../types'
+
 import { expandRange, fmtT } from '../model/expansion'
 import { addDays, fmtShort, barClass } from '../meridian'
 import { Checkbox } from './ui/checkbox'
@@ -35,13 +35,13 @@ interface Props {
 }
 
 export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
-  const nodes = useStore(s => s.nodes)  // keep for expandRange (Node[] required)
+  const items = useStore(s => s.items)
 
   const results = useMemo(() => {
     if (!query) return []
     const from = addDays(TODAY, -7)
     const to   = addDays(TODAY, 90)
-    const occs = expandRange(nodes, from, to, extractAppMetadata)
+    const occs = expandRange(items, from, to)
     return occs
       .filter(o => fuzzyMatch(query, o.metadata.title))
       .map(o => ({ occ: o, score: fuzzyScore(query, o.metadata.title) }))

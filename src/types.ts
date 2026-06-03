@@ -82,10 +82,14 @@ export type AppMetadata = InlineMetadata & ExtendedMetadata
 
 import type { OccurrenceEntry, RepeatPattern } from './model/expansion'
 
-/** Store holds RepeatPattern (series) or OccurrenceEntry (single item or explicit override). */
-export type StoreItem = RepeatPattern<InlineMetadata> | OccurrenceEntry<InlineMetadata>
+/**
+ * Store holds RepeatPattern (series) or OccurrenceEntry (single item or explicit override).
+ * Uses AppMetadata so body and multiday survive the load → edit round-trip.
+ * collapseToYaml only writes InlineMetadata fields regardless.
+ */
+export type StoreItem = RepeatPattern<AppMetadata> | OccurrenceEntry<AppMetadata>
 
-export function isSeries(item: StoreItem): item is RepeatPattern<InlineMetadata> {
+export function isSeries(item: StoreItem): item is RepeatPattern<AppMetadata> {
   return 'repeat' in item && item.repeat !== undefined
 }
 
@@ -96,7 +100,7 @@ export function isSeries(item: StoreItem): item is RepeatPattern<InlineMetadata>
  * Alias for OccurrenceEntry<AppMetadata>.
  */
 export type Occurrence      = OccurrenceEntry<AppMetadata>
-export type CollectedSeries = RepeatPattern<AppMetadata>
+export type CollectedSeries = RepeatPattern<AppMetadata>  // same as RepeatPattern<AppMetadata> in StoreItem
 export type EditScope = 'single' | 'future' | 'all' | 'add'
 
 // ── AppMetadata extraction ────────────────────────────────────────────────────

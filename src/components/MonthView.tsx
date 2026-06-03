@@ -2,7 +2,7 @@ import { useMemo, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { extractAppMetadata } from '../types'
+
 import { expandRange } from '../model/expansion'
 import { sameDay, sortOccs, ccBarClass } from '../meridian'
 
@@ -88,7 +88,7 @@ export default function MonthView({ onDayClick }: Props) {
 
     const from = new Date(y, m, 1)
     const to   = new Date(y, m + 1, 0, 23, 59, 59)
-    const occs = expandRange(nodes, from, to, extractAppMetadata)
+    const occs = expandRange(items, from, to)
 
     return { cells, occs }
   }, [nodes, y, m])

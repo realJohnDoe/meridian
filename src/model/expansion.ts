@@ -20,7 +20,8 @@ import {
   format, isValid, parseISO,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
-import type { Repeat } from '../types'
+import type { Repeat, StoreItem, AppMetadata } from '../types'
+import { isSeries } from '../types'
 import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import type { RawNode } from './nodeSchema'
@@ -575,135 +576,129 @@ export function collectRepeatPatterns<T>(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EXPANDRANGE  (inheritance-aware, main-app entry point)
+// EXPANDRANGE  (main-app entry point — takes StoreItem[])
 // ─────────────────────────────────────────────────────────────────────────────
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
- * Expand `nodes` in the date range [from, to], applying `defaults:`-driven
- * inheritance before generating occurrences.
- *
- * Generic over `T`: supply an `extractMetadata` function to get a fully typed
- * result.  Omit it (or pass `f => f`) to get `OccurrenceEntry<Record<string, unknown>>`.
+ * Expand StoreItem[] in the date range [from, to].
+ * Series items are expanded via their repeat rule; standalone OccurrenceEntry
+ * items are emitted directly if they fall in range.
+ * Each output occurrence carries ownerId = series.id so the editor can detect
+ * recurring items and look up the parent series.
  */
-export function expandRange<T = Record<string, unknown>>(
-  nodes: unknown[],
+export function expandRange(
+  items: StoreItem[],
   from: Date,
   to: Date,
-  extractMetadata: (fields: Record<string, unknown>) => T = (f => f as unknown as T),
-): OccurrenceEntry<T>[] {
+): OccurrenceEntry<AppMetadata>[] {
   function addDaysLocal(d: Date, n: number): Date {
     const r = new Date(d); r.setDate(r.getDate() + n); return r
   }
 
-  const all: Record<string, unknown>[] = []
+  const result: OccurrenceEntry<AppMetadata>[] = []
 
-  for (const rawNode of nodes) {
-    const effective = buildEffectiveTree(rawNode as RawNode)
+  const seriesList = items.filter(isSeries)
+  // Standalone = non-series items with no ownerId (direct root-level items)
+  const standalones = items.filter(i => !isSeries(i) && !(i as OccurrenceEntry<AppMetadata>).ownerId) as OccurrenceEntry<AppMetadata>[]
 
-    const node = {
-      ...effective.fields,
-      instances: effective.instances.map(child => ({ ...child.fields })),
-    } as Record<string, unknown>
+  // ── Expand each series ────────────────────────────────────────────────────
+  for (const series of seriesList) {
+    const children = items.filter(
+      i => !isSeries(i) && (i as OccurrenceEntry<AppMetadata>).ownerId === series.id,
+    ) as OccurrenceEntry<AppMetadata>[]
 
-    if (node.multiday) {
-      const md = node.multiday as { start?: string; end?: string }
-      let d = parseDateString((md.start || node.date) as string)
+    const expandable: Record<string, any> = {
+      ...series.metadata,
+      date:     series.date,
+      time:     series.time,
+      repeat:   series.repeat,
+      instances: children.map(c => ({
+        date:     c.date,
+        time:     c.time ?? undefined,
+        excluded: c.excluded,
+        ...c.metadata,
+      })),
+    }
+
+    const genDates = generatedDateSet(expandable, from, to)
+    const raw = expandNode(expandable, from, to) as Record<string, any>[]
+
+    for (const occ of raw) {
+      const jsTime = occ.jsTime as Date | undefined
+      if (!jsTime) continue
+      const isGenerated = genDates.has(String(occ.date ?? ''))
+
+      // Find an explicit override whose date matches this occurrence
+      const override = children.find(c => {
+        const ct = nodeDateTime(c as any) || parseDateString(c.date)
+        return ct && Math.abs(ct.getTime() - jsTime.getTime()) < 60000
+      })
+
+      result.push({
+        date:    String(occ.date ?? ''),
+        time:    occ.time ? String(occ.time) : null,
+        source:  isGenerated ? 'generated' : 'explicit',
+        fileSlug: series.fileSlug,
+        id:      crypto.randomUUID(),
+        ownerId: series.id,
+        metadata: {
+          ...(override ? { ...series.metadata, ...override.metadata } : series.metadata),
+          jsTime,
+        },
+      })
+    }
+  }
+
+  // ── Emit standalone occurrences ───────────────────────────────────────────
+  for (const occ of standalones) {
+    if (occ.metadata.multiday) {
+      // Expand multiday item over the date range day-by-day
+      const md = occ.metadata.multiday
+      let d = parseDateString(md.start || occ.date)
       if (!d) continue
       d = new Date(d); d.setHours(0, 0, 0, 0)
-      const endD = parseDateString(md.end as string)
+      const endD = parseDateString(md.end)
       if (!endD) continue
       const endDt = new Date(endD); endDt.setHours(23, 59, 59)
       while (d <= endDt) {
         if (d >= from && d <= to) {
           const spec = jsDateToSpec(d)
-          all.push({ ...node, date: spec.date, time: null, jsTime: new Date(d), _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false })
+          result.push({
+            date:    spec.date ?? '',
+            time:    null,
+            source:  'explicit',
+            fileSlug: occ.fileSlug,
+            id:      crypto.randomUUID(),
+            metadata: { ...occ.metadata, jsTime: new Date(d) },
+          })
         }
         d = addDaysLocal(d, 1)
       }
-    } else if (node.repeat) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const occs = expandNode(node as any, from, to) as Record<string, unknown>[]
-      // Two-pass: determine which dates are schedule-generated vs. explicit instances.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const genDates = generatedDateSet(node as any, from, to)
-      all.push(...occs.map(o => ({
-        ...o,
-        _isGenerated: genDates.has(String(o.date ?? '')),
-      })))
     } else {
-      const nodeInstances = (node.instances as unknown[]) || []
-      const hasRepeatInstances = nodeInstances.some(
-        (i: unknown) => !!(i as Record<string, unknown>).repeat && !(i as Record<string, unknown>).excluded,
-      )
-      for (let instIdx = 0; instIdx < nodeInstances.length; instIdx++) {
-        const inst = nodeInstances[instIdx] as Record<string, unknown>
-        if (!inst.repeat || inst.excluded) continue
-        const effChild = mergeNode(node, inst) as Record<string, unknown>
-        const effNoInst = { ...effChild, instances: [] }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const occs = expandNode({ ...effChild, instances: [] } as any, from, to) as Record<string, unknown>[]
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const genDates = generatedDateSet(effNoInst as any, from, to)
-        all.push(...occs.map(o => ({
-          ...o,
-          _isGenerated: genDates.has(String(o.date ?? '')),
-        })))
-      }
-
-      const liveInstances = nodeInstances.filter(
-        (i: unknown) => !(i as Record<string, unknown>).excluded && !(i as Record<string, unknown>).repeat,
-      )
-      if (liveInstances.length > 0) {
-        for (const inst of liveInstances) {
-          const it = nodeDateTime(inst as Record<string, unknown>) || parseDateString((inst as Record<string, unknown>).date as string)
-          if (!it || it < from || it > to) continue
-          const eff = mergeNode(node, inst as Record<string, unknown>)
-          if (!eff.excluded) {
-            all.push({
-              ...eff,
-              date: (inst as Record<string, unknown>).date || jsDateToSpec(it).date,
-              jsTime: it,
-              _nodeId: (rawNode as Record<string, unknown>).id,
-              _node: rawNode,
-              recur: true,
-            })
-          }
-        }
-      } else if (!hasRepeatInstances) {
-        const t = nodeDateTime(node)
-        if (t && t >= from && t <= to) {
-          all.push({ ...node, jsTime: t, _nodeId: (rawNode as Record<string, unknown>).id, _node: rawNode, recur: false })
-        }
-      }
+      const jsTime = nodeDateTime({ date: occ.date, time: occ.time } as any)
+        ?? parseDateString(occ.date)
+      if (!jsTime || jsTime < from || jsTime > to) continue
+      result.push({
+        ...occ,
+        id:       crypto.randomUUID(),
+        metadata: { ...occ.metadata, jsTime },
+      })
     }
   }
 
-  // Deduplicate by (nodeId, jsTime)
+  // ── Deduplicate by (fileSlug, jsTime) and sort ────────────────────────────
   const seen = new Set<string>()
-  const deduped = all.filter(o => {
-    if (!o.jsTime) return false
-    const k = `${o._nodeId || o.title}|${(o.jsTime as Date).getTime()}`
-    if (seen.has(k)) return false
-    seen.add(k)
-    return true
-  }).sort((a, b) => (a.jsTime as Date).getTime() - (b.jsTime as Date).getTime())
-
-  // Map to OccurrenceEntry<T>
-  return deduped.map(occ => {
-    const metaFields = Object.fromEntries(
-      Object.entries(occ).filter(([k]) => !METADATA_EXCLUDE.has(k)),
-    )
-    const fileSlug = String(occ._nodeId ?? '')
-    const entry: OccurrenceEntry<T> = {
-      date:     String(occ.date ?? ''),
-      time:     occ.time ? String(occ.time) : null,
-      source:   occ._isGenerated !== undefined
-                  ? (occ._isGenerated ? 'generated' : 'explicit')
-                  : (occ.recur !== false ? 'generated' : 'explicit'),
-      fileSlug,
-      id:       crypto.randomUUID(),
-      metadata: extractMetadata(metaFields),
-    }
-    return entry
-  })
+  return result
+    .filter(o => {
+      if (!o.metadata.jsTime) return false
+      const k = `${o.fileSlug}|${o.metadata.jsTime.getTime()}`
+      if (seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
+    .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
 }
+
+/* eslint-enable @typescript-eslint/no-explicit-any */

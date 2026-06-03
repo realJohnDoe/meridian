@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { ArrowLeft, Search } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { extractAppMetadata, occKind } from '../types'
+import { occKind } from '../types'
 import { expandRange } from '../model/expansion'
 import { addDays, fmtShort, NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
@@ -25,7 +25,7 @@ interface Props {
 }
 
 export default function SearchView({ onOpen, onClose }: Props) {
-  const nodes        = useStore(s => s.nodes)  // keep for expandRange (Node[] required)
+  const items        = useStore(s => s.items)
   const nsFilterVal  = useStore(s => s.nsFilterVal)
   const setNsFilter  = useStore(s => s.setNsFilterVal)
   const [q, setQ]    = useState('')
@@ -41,7 +41,7 @@ export default function SearchView({ onOpen, onClose }: Props) {
   const items = useMemo<SearchItem[]>(() => {
     const from = addDays(TODAY, -30)
     const to   = addDays(TODAY, 90)
-    const occs: Occurrence[] = expandRange(nodes, from, to, extractAppMetadata)
+    const occs: Occurrence[] = expandRange(items, from, to)
     const seen = new Set<string>()
     return [
       ...(NOTES_DATA as SearchItem[]),
