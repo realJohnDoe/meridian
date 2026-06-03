@@ -72,6 +72,7 @@ export interface ExtendedMetadata {
   jsTime?:   Date      // computed from date+time; undefined in raw store items
   body?:     string    // markdown body (not frontmatter)
   multiday?: Multiday  // TODO: replace with helper
+  repeat?:   Repeat    // runtime hint: parent series repeat type (used when store lookup unavailable, e.g. debug view)
   _dh?:      number    // DayView layout
   _endMs?:   number    // DayView layout
 }

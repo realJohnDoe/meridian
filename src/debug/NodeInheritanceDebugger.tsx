@@ -116,7 +116,7 @@ type DebugPattern    = RepeatPattern<DebugMetadata>
 function toOccurrence(
   entry:    DebugOccurrence,
   rawNode:  RawNode,
-  _pattern?: DebugPattern,
+  pattern?: DebugPattern,
 ): Occurrence {
   const m = entry.metadata
   const [y, mo, d] = entry.date.split('-').map(Number)
@@ -124,13 +124,16 @@ function toOccurrence(
     ? new Date(y, mo - 1, d, +entry.time.slice(0, 2), +entry.time.slice(3, 5))
     : new Date(y, mo - 1, d)
   const slug = String((rawNode as Record<string, unknown>).id ?? 'debug-node')
+  // Use a synthetic ownerId so isRecur is true for recurring occurrences.
+  // The actual repeat type is passed via the seriesRepeat prop to EntryEditor.
+  const syntheticOwnerId = pattern ? `debug:${JSON.stringify(pattern.metadata._ownerPath)}` : entry.ownerId
   return {
     date:     entry.date,
     time:     entry.time ?? null,
     source:   entry.source,
     fileSlug: entry.fileSlug || slug,
     id:       entry.id,
-    ownerId:  entry.ownerId,
+    ownerId:  syntheticOwnerId,
     metadata: {
       title:    m.title,
       done:     m.done,
@@ -875,6 +878,7 @@ export default function NodeInheritanceDebugger() {
                 onOpenDlg={setDebugDialog}
                 onOpenRepeatDlg={() => setDebugDialog('dlgRepeat')}
                 onScopeChange={handleDebugScopeChange}
+                seriesRepeat={selectedPattern?.repeat ?? null}
               />
               <DatePickerDialog
                 open={debugDialog === 'dlgSched'}

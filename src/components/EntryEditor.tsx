@@ -67,9 +67,11 @@ interface Props {
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: string) => void
+  /** Override for contexts where the parent series isn't in the main store (e.g. debug view). */
+  seriesRepeat?: RepeatValue | null
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, seriesRepeat: seriesRepeatProp }: Props) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const tagInputRef = useRef<HTMLInputElement>(null)
@@ -186,9 +188,10 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)
-  const seriesRepeatType = parentSeries && isSeries(parentSeries) ? parentSeries.repeat?.type : undefined
-  const isScheduled = !!(item && seriesRepeatType === 'schedule')
-  const isAfterCompletion = !!(item && seriesRepeatType === 'after_completion')
+  // seriesRepeatProp is passed by callers that don't have the parent series in the main store (e.g. debug view)
+  const seriesRepeat = (parentSeries && isSeries(parentSeries) ? parentSeries.repeat : null) ?? seriesRepeatProp ?? null
+  const isScheduled = !!(item && seriesRepeat?.type === 'schedule')
+  const isAfterCompletion = !!(item && seriesRepeat?.type === 'after_completion')
   const hasSched = !!(item && item.date)
   const fname = item
     ? ((item.fileSlug || item.metadata?.title || 'untitled') + '.md').toLowerCase().replace(/\s+/g, '-')
