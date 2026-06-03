@@ -1,8 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText } from 'lucide-react'
-import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue } from '../types'
+import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem } from '../types'
 import { isSeries } from '../types'
-import { useStore } from '../store'
 import { NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
@@ -67,11 +66,11 @@ interface Props {
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: string) => void
-  /** Override for contexts where the parent series isn't in the main store (e.g. debug view). */
-  seriesRepeat?: RepeatValue | null
+  /** StoreItem[] to resolve wikilinks and parent series against. App passes global items; debug passes local items. */
+  items: StoreItem[]
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, seriesRepeat: seriesRepeatProp }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items }: Props) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const tagInputRef = useRef<HTMLInputElement>(null)
@@ -79,7 +78,6 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const [showTagInput, setShowTagInput] = useState(false)
 
   // ── Wikilink autocomplete state ───────────────────────────────
-  const items = useStore(s => s.items)
   const [wlMatches, setWlMatches] = useState<string[]>([])
   const [wlFocusIdx, setWlFocusIdx] = useState(-1)
   const [wlPopupPos, setWlPopupPos] = useState<{ top: number; left: number } | null>(null)
@@ -188,8 +186,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)
-  // seriesRepeatProp is passed by callers that don't have the parent series in the main store (e.g. debug view)
-  const seriesRepeat = (parentSeries && isSeries(parentSeries) ? parentSeries.repeat : null) ?? seriesRepeatProp ?? null
+  const seriesRepeat = (parentSeries && isSeries(parentSeries)) ? parentSeries.repeat : null
   const isScheduled = !!(item && seriesRepeat?.type === 'schedule')
   const isAfterCompletion = !!(item && seriesRepeat?.type === 'after_completion')
   const hasSched = !!(item && item.date)

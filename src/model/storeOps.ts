@@ -41,7 +41,7 @@ export function findSeries(
  * Upsert an explicit OccurrenceEntry for `occ.date` within `occ.ownerId`'s children.
  * If an override already exists for that date, it's replaced; otherwise appended.
  */
-function upsertOverride(
+export function upsertOverride(
   items: StoreItem[],
   occ: Occurrence,
   patch: Partial<OccurrenceEntry<AppMetadata>>,

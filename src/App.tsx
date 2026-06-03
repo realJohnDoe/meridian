@@ -52,6 +52,7 @@ export default function App() {
   const [seriesSheetConfig, setSeriesSheetConfig] = useState<SeriesSheetConfig | null>(null)
 
   // ── Navigation state (source of truth) ───────────────────────
+  const storeItems   = useStore(s => s.items)
   const primaryView  = useStore(s => s.primaryView)
   const setPrimary   = useStore(s => s.setPrimaryView)
   const overlayStack = useStore(s => s.overlayStack)
@@ -261,6 +262,7 @@ export default function App() {
             onOpenDlg={handleOpenDlg}
             onOpenRepeatDlg={handleOpenRepeatDlg}
             onScopeChange={handleScopeChange}
+            items={storeItems}
           />
         </section>
 
