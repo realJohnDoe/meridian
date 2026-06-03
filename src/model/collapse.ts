@@ -20,7 +20,9 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
   if (items.length === 0) return {}
 
   const series = items.filter(isSeries)
-  const standalones = items.filter(i => !isSeries(i))
+  // Root-level standalones: non-series items with no ownerId (direct children of the file root).
+  // Items with ownerId are children of a specific series — they appear in seriesBlocks, not here.
+  const standalones = items.filter(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)
 
   // ── Single series with no standalones (most common case) ──────────────────
   if (series.length === 1 && standalones.length === 0) {
@@ -60,12 +62,12 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     return result
   }
 
-  // ── Single standalone occurrence ──────────────────────────────────────────
+  // ── Single standalone occurrence (no series, one root-level item) ───────────
   if (series.length === 0 && standalones.length === 1) {
     const s = standalones[0]
     return {
       ...metadataToYaml(s.metadata),
-      date:             s.date,
+      date: s.date,
       ...(s.time ? { time: s.time } : {}),
     }
   }
@@ -84,9 +86,15 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     return { series: s, defaults: shared, instances: childInsts }
   })
 
-  // Step 2: find common fields across all series defaults blocks
-  const allDefaults = seriesBlocks.map(b => b.defaults)
-  const rootDefaults = allDefaults.length > 0 ? computeSharedFields(allDefaults) : {} as Partial<InlineMetadata>
+  // Step 2: find common fields across series defaults blocks AND root-level standalones.
+  // Standalones have no children so their own metadata IS their effective leaf value.
+  // Anything not in a series' defaults is already known to vary, so only defaults are
+  // consulted for series (per the plan); standalones participate directly with their metadata.
+  const allForRootDefaults: Partial<InlineMetadata>[] = [
+    ...seriesBlocks.map(b => b.defaults),
+    ...standalones.map(s => s.metadata),
+  ]
+  const rootDefaults = allForRootDefaults.length > 0 ? computeSharedFields(allForRootDefaults) : {} as Partial<InlineMetadata>
 
   // Build instances array
   const allInstances: Record<string, unknown>[] = []
