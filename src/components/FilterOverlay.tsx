@@ -1,12 +1,11 @@
 import { useMemo } from 'react'
-import { Plus, Repeat2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
 
-import { expandRange, fmtT } from '../model/expansion'
-import { addDays, fmtShort, barClass } from '../meridian'
-import { Checkbox } from './ui/checkbox'
-import { Badge } from './ui/badge'
+import { expandRange } from '../model/expansion'
+import { addDays, barClass } from '../meridian'
+import OccurrenceCard from './OccurrenceCard'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 
@@ -63,46 +62,23 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
         <div className="empty-state">No matches</div>
       )}
 
-      {results.map((o, i) => {
-        const t = fmtT(o.time)
-        const hasTrack = o.metadata.done !== undefined
-        const isDone = !!o.metadata.done
-
-        return (
+      <div className="flex flex-col gap-1.5 px-2 pt-2">
+        {results.map((o, i) => (
           <div
             key={`${o.fileSlug}-${o.date}`}
-            className="swipe-wrap"
             style={{ animation: 'fadeUp .16s ease both', animationDelay: `${i * 0.025}s` }}
           >
-            <div
-              className={`swipe-row occ-row${isDone ? ' is-done' : ''}`}
-              onClick={() => onOpen(o)}
-            >
-              <div className="occ-left">
-                <span className={`occ-time${t ? ' timed' : ''}`}>{t || ''}</span>
-              </div>
-              <span className={`occ-bar ${barClass(o)}`} />
-              <div className="occ-body">
-                <div className="occ-tr">
-                  {hasTrack && (
-                    <Checkbox checked={isDone} disabled className="size-5" />
-                  )}
-                  <span className={`occ-title${isDone ? ' done-t' : ''}`}>{o.metadata.title}</span>
-                  {!!o.ownerId && <span className="orecur"><Repeat2 size={12} /></span>}
-                  <span style={{ opacity: 0.5, fontSize: 10, marginLeft: 4 }}>{o.metadata.jsTime ? fmtShort(o.metadata.jsTime) : o.date}</span>
-                </div>
-                {(o.metadata.tags || []).length > 0 && (
-                  <div className="occ-meta">
-                    {(o.metadata.tags || []).slice(0, 2).map(tg => (
-                      <Badge key={tg} variant="tag">{tg}</Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <OccurrenceCard
+              occ={o}
+              variant="compact"
+              isDone={!!o.metadata.done}
+              currentBarClass={barClass(o)}
+              onOpen={() => onOpen(o)}
+              onToggleDone={() => {}}
+            />
           </div>
-        )
-      })}
+        ))}
+      </div>
     </div>
   )
 }
