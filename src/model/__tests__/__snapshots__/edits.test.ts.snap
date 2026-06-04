@@ -1,0 +1,205 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`edit operations → serialized YAML > all-scope edit updates the whole series 1`] = `
+"---
+title: Team Standup
+done: false
+tags:
+  - work
+duration: 45m
+date: 2026-04-06
+time: 09:00
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday:
+    - mo
+instances:
+  - date: 2026-04-13
+    title: Weekly Standup
+    done: true
+    duration: 30m
+  - date: 2026-04-14
+    title: Weekly Standup
+    done: true
+    duration: 30m
+---
+
+Quick sync. Agenda:
+- [[project-alpha]] status
+- Blockers
+- [[weekly-log]] updates"
+`;
+
+exports[`edit operations → serialized YAML > creating a new standalone task serializes to a single file 1`] = `
+"---
+title: Buy groceries
+done: false
+tags:
+  - errand
+priority: medium
+date: 2026-06-05
+---
+
+Milk, eggs, bread"
+`;
+
+exports[`edit operations → serialized YAML > deleteFollowing caps the series end before the occurrence 1`] = `
+"---
+title: Weekly Standup
+done: false
+tags:
+  - work
+duration: 30m
+date: 2026-04-06
+time: 09:00
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday:
+    - mo
+  end:
+    type: until
+    date: 2026-04-19
+instances:
+  - date: 2026-04-13
+    done: true
+  - date: 2026-04-14
+    done: true
+---
+
+Quick sync. Agenda:
+- [[project-alpha]] status
+- Blockers
+- [[weekly-log]] updates"
+`;
+
+exports[`edit operations → serialized YAML > excludeOccurrence drops a single generated occurrence 1`] = `
+"---
+title: Weekly Standup
+done: false
+tags:
+  - work
+duration: 30m
+date: 2026-04-06
+time: 09:00
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday:
+    - mo
+instances:
+  - date: 2026-04-13
+    done: true
+  - date: 2026-04-14
+    done: true
+  - date: 2026-04-20
+    excluded: true
+---
+
+Quick sync. Agenda:
+- [[project-alpha]] status
+- Blockers
+- [[weekly-log]] updates"
+`;
+
+exports[`edit operations → serialized YAML > future-scope edit splits the series at the occurrence date 1`] = `
+"---
+defaults:
+  title: Weekly Standup
+  done: false
+  tags:
+    - work
+instances:
+  - date: 2026-04-06
+    time: 09:00
+    repeat:
+      type: schedule
+      freq: weekly
+      byweekday:
+        - mo
+      end:
+        type: until
+        date: 2026-04-19
+    duration: 30m
+    defaults:
+      done: true
+      duration: 30m
+    instances:
+      - date: 2026-04-13
+      - date: 2026-04-14
+  - date: 2026-04-20
+    time: 09:00
+    repeat:
+      type: schedule
+      freq: weekly
+      byweekday:
+        - mo
+    duration: 15m
+---
+
+Quick sync. Agenda:
+- [[project-alpha]] status
+- Blockers
+- [[weekly-log]] updates"
+`;
+
+exports[`edit operations → serialized YAML > single-scope edit overrides one occurrence (priority) without touching the series 1`] = `
+"---
+title: Weekly Standup
+done: false
+tags:
+  - work
+duration: 30m
+date: 2026-04-06
+time: 09:00
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday:
+    - mo
+instances:
+  - date: 2026-04-13
+    done: true
+  - date: 2026-04-14
+    done: true
+  - date: 2026-04-20
+    time: 09:00
+    priority: high
+---
+
+Quick sync. Agenda:
+- [[project-alpha]] status
+- Blockers
+- [[weekly-log]] updates"
+`;
+
+exports[`edit operations → serialized YAML > toggleDone on a generated occurrence adds a done override 1`] = `
+"---
+title: Weekly Standup
+done: false
+tags:
+  - work
+duration: 30m
+date: 2026-04-06
+time: 09:00
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday:
+    - mo
+instances:
+  - date: 2026-04-13
+    done: true
+  - date: 2026-04-14
+    done: true
+  - date: 2026-04-20
+    time: 09:00
+    done: true
+---
+
+Quick sync. Agenda:
+- [[project-alpha]] status
+- Blockers
+- [[weekly-log]] updates"
+`;

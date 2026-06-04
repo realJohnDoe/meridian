@@ -14,11 +14,6 @@ export type Repeat =
   | { type: 'schedule'; freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; byweekday?: Weekday[]; bymonthday?: number[]; bysetpos?: number; interval?: number; end?: RepeatEnd }
   | { type: 'after_completion'; interval: string; end?: RepeatEnd }
 
-export interface Multiday {
-  start: string
-  end: string
-}
-
 // ── Metadata types ────────────────────────────────────────────────────────────
 
 /** Fields written to YAML frontmatter; not relevant for inheritance/repeat expansion. */
@@ -36,7 +31,6 @@ export interface InlineMetadata {
 export interface ExtendedMetadata {
   jsTime?:   Date      // computed from date+time; undefined in raw store items
   body?:     string    // markdown body (not frontmatter)
-  multiday?: Multiday
   _dh?:      number    // DayView layout
   _endMs?:   number    // DayView layout
 }
@@ -49,7 +43,7 @@ import type { OccurrenceEntry, RepeatPattern } from './model/expansion'
 
 /**
  * Store holds RepeatPattern (series) or OccurrenceEntry (single item or explicit override).
- * Uses AppMetadata so body and multiday survive the load → edit round-trip.
+ * Uses AppMetadata so body survives the load → edit round-trip.
  * collapseToYaml only writes InlineMetadata fields regardless.
  */
 export type StoreItem = RepeatPattern<AppMetadata> | OccurrenceEntry<AppMetadata>
@@ -81,7 +75,7 @@ export function extractAppMetadata(fields: Record<string, unknown>): AppMetadata
     body:         fields.body     ? String(fields.body)     : undefined,
     duration:     fields.duration ? String(fields.duration) : undefined,
     timezone:     fields.timezone ? String(fields.timezone) : undefined,
-    multiday:     fields.multiday as Multiday | undefined,
+    // multiday is computed at expansion time from date + duration — never in YAML
     jsTime:       fields.jsTime   as Date     | undefined,
   }
 }

@@ -1,7 +1,7 @@
 import { memo, useRef, useLayoutEffect } from 'react'
 import { CalendarRange } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { parseDateString } from '../model/expansion'
+import { parseDateString, parseDurationDays } from '../model/expansion'
 import { fmtShort, fmtLong } from '../meridian'
 import OccurrenceRow from './OccurrenceRow'
 
@@ -73,15 +73,20 @@ function DaySection({
       <div className={`day-lbl${isToday ? ' tl' : ''}`}>{label}</div>
 
       {/* Multiday banners */}
-      {multidayBanners.map(o => (
-        <div key={o.fileSlug} className="multiday-banner" onClick={() => onOpen(o)}>
-          <CalendarRange size={14} />
-          {o.metadata.title}
-          <span className="opacity-55 text-[10px] ml-1">
-            {fmtShort(parseDateString(o.metadata.multiday!.start)!)}–{fmtShort(parseDateString(o.metadata.multiday!.end)!)}
-          </span>
-        </div>
-      ))}
+      {multidayBanners.map(o => {
+        const startD = parseDateString(o.date)!
+        const days   = parseDurationDays(o.metadata.duration) ?? 1
+        const endD   = new Date(startD.getTime() + (days - 1) * 86_400_000)
+        return (
+          <div key={o.fileSlug} className="multiday-banner" onClick={() => onOpen(o)}>
+            <CalendarRange size={14} />
+            {o.metadata.title}
+            <span className="opacity-55 text-[10px] ml-1">
+              {fmtShort(startD)}–{fmtShort(endD)}
+            </span>
+          </div>
+        )
+      })}
 
       {/* Regular occurrence rows */}
       {items.map((o, i) => (

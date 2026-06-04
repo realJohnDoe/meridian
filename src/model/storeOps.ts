@@ -125,7 +125,6 @@ export function applyEdit(
     duration:     duration || undefined,
     priority:     (priority as AppMetadata['priority']) ?? undefined,
     done:         tracked ? done : undefined,
-    multiday:     undefined,
     timezone:     undefined,
   })
 

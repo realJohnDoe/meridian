@@ -1,4 +1,4 @@
-import { fmtISO, fmtT } from './model/expansion'
+import { fmtISO, fmtT, parseDurationDays } from './model/expansion'
 import {
   cacheWrite, cacheWriteClean, cacheDelete, cacheGetDirty,
   cacheMarkClean, cacheDirtyCount,
@@ -176,9 +176,7 @@ done: true
 title: PyCon 2026
 tags: [conference]
 date: "2026-04-19"
-multiday:
-  start: "2026-04-19"
-  end: "2026-04-21"
+duration: 3d
 ---
 
 ## PyCon 2026
@@ -304,9 +302,7 @@ Post about [[spec-instance-recurrence]]. Target: dev.to + HN.
 title: Team Offsite
 tags: [work]
 date: "2026-05-16"
-multiday:
-  start: "2026-05-16"
-  end: "2026-05-18"
+duration: 3d
 ---` },
 
   { id: 'product-demo', yaml: `---
@@ -352,9 +348,7 @@ duration: 1h
 title: Craft Conf 2026
 tags: [conference]
 date: "2026-06-24"
-multiday:
-  start: "2026-06-24"
-  end: "2026-06-26"
+duration: 3d
 ---` },
 
   { id: 'beta-launch', yaml: `---
@@ -459,7 +453,7 @@ export function occState(o: Occurrence): string {
     if (p === 'low') return 'task-p3'
     return 'task-open'
   }
-  if (o.metadata.multiday) return 'event-future'
+  if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 'event-future'
   const now = new Date()
   if (o.metadata.jsTime && o.metadata.jsTime < now) return 'event-past'
   return 'event-future'
@@ -467,7 +461,7 @@ export function occState(o: Occurrence): string {
 export function barClass(o: Occurrence): string { return occState(o) }
 
 export function ccBarClass(o: Occurrence): string {
-  if (o.metadata.multiday) return 'multiday'
+  if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 'multiday'
   const s = occState(o)
   if (s === 'done' || s === 'event-past') return 'done'
   if (s === 'task-open') return 'task'

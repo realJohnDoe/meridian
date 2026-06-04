@@ -42,13 +42,17 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
       }
     }
 
-    // Series with explicit instances
+    // Series with explicit instances.
+    // Diff each instance against the SERIES metadata (not a synthesized shared
+    // `defaults:` block). Instances already inherit the series' fields on load,
+    // so a field equal to the series is redundant and dropped, while per-occurrence
+    // overrides (e.g. a single `done: true`) stay on the instance. Hoisting such
+    // per-occurrence state into `defaults:` is not round-trip stable: on reload it
+    // leaks onto the series itself and would mark the whole series done.
     const occs = children as AnyOcc[]
-    const nonExcluded = occs.filter(c => !c.excluded)
-    const sharedDefaults = computeSharedFields(nonExcluded.map(c => c.metadata))
     const instances = occs.map(c => {
       if (c.excluded) return { date: c.date, excluded: true }
-      const diff = diffMetadata(c.metadata, sharedDefaults)
+      const diff = diffMetadata(c.metadata, s.metadata)
       const inst: Record<string, unknown> = { date: c.date }
       if (c.time) inst.time = c.time
       Object.assign(inst, metadataToYaml(diff as Partial<InlineMetadata>))
@@ -60,9 +64,6 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
       date:   s.date,
       ...(s.time ? { time: s.time } : {}),
       repeat: s.repeat,
-    }
-    if (Object.keys(sharedDefaults).length > 0) {
-      result.defaults = metadataToYaml(sharedDefaults as Partial<InlineMetadata>)
     }
     if (instances.length > 0) result.instances = instances
     return result
