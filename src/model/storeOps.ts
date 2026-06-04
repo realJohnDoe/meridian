@@ -140,6 +140,14 @@ function occurrenceMetaFromFields(rootMeta: Partial<AppMetadata>, f: EditFields)
  * Update the file root (series or standalone matching occ's fileSlug) with the
  * file-level fields from `fields` (title, tags, topics, body).
  * Returns the updated items list; does not touch any other fields on the root.
+ *
+ * `title`, `tags`, and `topics` are also enforced at the expansion, storeItems,
+ * and collapse layers via FILE_LEVEL_FIELDS.
+ *
+ * `body` is included here even though it is not a YAML/frontmatter field: it
+ * lives in ExtendedMetadata and fileIO already serializes only the root item's
+ * body. Without this patch a single/add-scope edit would write the new body
+ * onto an override's metadata, where it would be silently dropped on next load.
  */
 function updateFileRoot(
   items:  StoreItem[],
