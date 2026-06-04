@@ -10,13 +10,9 @@ type AnyOcc = OccurrenceEntry<AppMetadata>
  * into a `defaults:` block so generated occurrences inherit the right base.
  *
  * Single-series algorithm:
- * - A field goes into `defaults:` if the series has a defined value for it AND
- *   at least one non-excluded instance overrides it (differs from the series).
- *   This keeps the series itself clean (not "owned" by the instance value) while
- *   ensuring generated occurrences inherit the correct default.
- * - Fields no instance touches stay at the series root level.
- * - Each instance stores only fields that differ from the series metadata,
- *   whether those fields are at root or in defaults.
+ * - All InlineMetadata fields go into `defaults:` so every generated occurrence
+ *   inherits them. Only structural fields (date, time, repeat) stay at root.
+ * - Each instance stores only fields that differ from the series metadata.
  *
  * Multi-series / multi-item algorithm (split-series pattern):
  * - Fields shared across all sibling series and standalones → file root defaults.
@@ -47,41 +43,10 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
 
     // Series with explicit instances.
     //
-    // A field on the series belongs in `defaults:` if at least one non-excluded
-    // instance overrides it. Generated occurrences inherit that default; the
-    // series itself is NOT considered "done" (or whatever value) just because it
-    // defined the default. Fields no instance touches stay at the series root.
-    //
-    // Instances are always diffed against the full series metadata, so a field
-    // that matches the series (whether series-root or defaults) is dropped from
-    // the instance — keeping each instance minimal.
-    const occs        = children as AnyOcc[]
-    const nonExcluded = occs.filter(c => !c.excluded)
-    const allKeys: (keyof InlineMetadata)[] = ['title', 'done', 'tags', 'participants', 'priority', 'duration', 'timezone']
-
-    // Keys where the series has a defined value AND some instance differs from it.
-    const overriddenKeys = new Set<keyof InlineMetadata>(
-      allKeys.filter(key => {
-        const sv = s.metadata[key]
-        if (sv === undefined) return false
-        return nonExcluded.some(c => {
-          const iv = c.metadata[key]
-          return (key === 'tags' || key === 'participants')
-            ? JSON.stringify(iv) !== JSON.stringify(sv)
-            : iv !== sv
-        })
-      }),
-    )
-
-    // Split series metadata: overridden fields → defaults:, the rest → root.
-    const rootMeta:     Partial<InlineMetadata> = {}
-    const defaultsMeta: Partial<InlineMetadata> = {}
-    for (const key of allKeys) {
-      const v = s.metadata[key]
-      if (v === undefined) continue
-      if (overriddenKeys.has(key)) (defaultsMeta as Record<string, unknown>)[key] = v
-      else                          (rootMeta     as Record<string, unknown>)[key] = v
-    }
+    // All metadata goes into `defaults:` so every generated occurrence inherits
+    // it. Only structural fields (date, time, repeat) live at the series root.
+    // Each instance stores only the fields that differ from the series metadata.
+    const occs = children as AnyOcc[]
 
     const instances = occs.map(c => {
       if (c.excluded) return { date: c.date, excluded: true }
@@ -92,14 +57,13 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
       return inst
     })
 
-    const result: Record<string, unknown> = {
-      ...metadataToYaml(rootMeta),
-      date:   s.date,
-      ...(s.time ? { time: s.time } : {}),
-      repeat: s.repeat,
-    }
-    if (overriddenKeys.size > 0) result.defaults  = metadataToYaml(defaultsMeta)
-    if (instances.length > 0)    result.instances = instances
+    const defaultsYaml = metadataToYaml(s.metadata)
+    const result: Record<string, unknown> = {}
+    if (Object.keys(defaultsYaml).length > 0) result.defaults = defaultsYaml
+    result.date   = s.date
+    if (s.time)  result.time   = s.time
+    result.repeat = s.repeat
+    if (instances.length > 0) result.instances = instances
     return result
   }
 
