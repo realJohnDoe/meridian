@@ -110,7 +110,7 @@ function metaFromEditFields(base: Partial<AppMetadata>, f: EditFields): AppMetad
     ...base,
     title:        f.title,
     tags:         f.tags,
-    participants: f.participants?.length ? f.participants : undefined,
+    participants: f.participants ?? [],
     body:         f.body || undefined,
     duration:     f.duration || undefined,
     priority:     (f.priority as AppMetadata['priority']) ?? undefined,

@@ -23,13 +23,13 @@ export interface Multiday {
 
 /** Fields written to YAML frontmatter; not relevant for inheritance/repeat expansion. */
 export interface InlineMetadata {
-  title:     string
-  done?:         boolean
-  tags:          string[]
-  participants?: string[]
-  priority?:     Priority
-  duration?:     string
-  timezone?: string
+  title:        string
+  done?:        boolean
+  tags:         string[]
+  participants: string[]
+  priority?:    Priority
+  duration?:    string
+  timezone?:    string
 }
 
 /** Fields never persisted to YAML — computed at runtime or used only by the UI. */
@@ -87,7 +87,7 @@ export const INLINE_FIELDS: readonly InlineFieldSpec[] = [
   { key: 'title',        kind: 'string',      required: true },
   { key: 'done',         kind: 'boolean' },
   { key: 'tags',         kind: 'stringArray', required: true },
-  { key: 'participants', kind: 'stringArray' },
+  { key: 'participants', kind: 'stringArray', required: true },
   { key: 'priority',     kind: 'priority' },
   { key: 'duration',     kind: 'string' },
   { key: 'timezone',     kind: 'string' },
