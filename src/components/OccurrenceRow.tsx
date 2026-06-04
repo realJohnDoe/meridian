@@ -1,10 +1,8 @@
 import { useRef, useEffect, useState } from 'react'
-import { Repeat2, Trash2, Users } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { fmtT } from '../model/expansion'
 import { barClass } from '../meridian'
-import { Checkbox } from './ui/checkbox'
-import { Badge } from './ui/badge'
+import OccurrenceCard from './OccurrenceCard'
 
 interface Props {
   occ: Occurrence
@@ -28,9 +26,6 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
 
   // Sync optimistic state when the store settles.
   useEffect(() => { setIsDone(!!occ.metadata.done) }, [occ.metadata.done])
-
-  const t = fmtT(occ.time)
-  const hasTrack = occ.metadata.done !== undefined
 
   // Swipe-to-delete: touchmove must call preventDefault() to block scroll while
   // the user is swiping horizontally. JSX onTouchMove cannot do that (passive by
@@ -131,6 +126,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   }, []) // listeners are stable; callback accessed via ref
 
   // Compute bar class with optimistic done value so the colour changes instantly.
+  const hasTrack = occ.metadata.done !== undefined
   const effectiveDone = hasTrack ? isDone : (occ.metadata.done as boolean | undefined)
   const currentBarClass = barClass({ ...occ, metadata: { ...occ.metadata, done: effectiveDone } })
 
@@ -148,47 +144,15 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       </div>
 
       {/* Main row */}
-      <div
-        className={`swipe-row occ-row${isDone ? ' is-done' : ''}`}
-        ref={rowRef}
-        onClick={e => { if (!(e.target as HTMLElement).closest('[role=checkbox]')) onOpen() }}
-      >
-        <div className="occ-left">
-          <span className={`occ-time${t ? ' timed' : ''}`}>{t || ''}</span>
-          {occ.metadata.duration && t && <span className="occ-dur-small">{occ.metadata.duration}</span>}
-        </div>
-
-        <span className={`occ-bar ${currentBarClass}`} />
-
-        <div className="occ-body">
-          <div className="occ-tr">
-            {hasTrack && (
-              <Checkbox
-                checked={isDone}
-                onCheckedChange={() => { setIsDone(prev => !prev); onToggleDone() }}
-                onClick={e => e.stopPropagation()}
-                className="size-5 mt-px"
-              />
-            )}
-            <span className={`occ-title${isDone ? ' done-t' : ''}`}>{occ.metadata.title}</span>
-            {!!occ.ownerId && <span className="orecur"><Repeat2 size={12} /></span>}
-          </div>
-
-          {((occ.metadata.tags || []).length > 0 || (occ.metadata.participants || []).length > 0) && (
-            <div className="occ-meta">
-              {(occ.metadata.tags || []).slice(0, 2).map(tg => (
-                <Badge key={tg} variant="tag">{tg}</Badge>
-              ))}
-              {(occ.metadata.participants || []).length > 0 && (
-                <span className="occ-participants">
-                  <Users size={11} />
-                  {(occ.metadata.participants || []).slice(0, 2).join(', ')}
-                  {(occ.metadata.participants || []).length > 2 && ` +${(occ.metadata.participants || []).length - 2}`}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
+      <div className="swipe-row" ref={rowRef}>
+        <OccurrenceCard
+          occ={occ}
+          variant="agenda"
+          isDone={isDone}
+          currentBarClass={currentBarClass}
+          onOpen={onOpen}
+          onToggleDone={() => { setIsDone(prev => !prev); onToggleDone() }}
+        />
       </div>
     </div>
   )
