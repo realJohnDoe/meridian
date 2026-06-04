@@ -21,6 +21,7 @@ export interface InlineMetadata {
   title:        string
   done?:        boolean
   tags:         string[]
+  topics:       string[]
   participants: string[]
   priority?:    Priority
   duration?:    string
@@ -81,11 +82,21 @@ export const INLINE_FIELDS: readonly InlineFieldSpec[] = [
   { key: 'title',        kind: 'string',      required: true },
   { key: 'done',         kind: 'boolean' },
   { key: 'tags',         kind: 'stringArray', required: true },
+  { key: 'topics',       kind: 'stringArray', required: true },
   { key: 'participants', kind: 'stringArray', required: true },
   { key: 'priority',     kind: 'priority' },
   { key: 'duration',     kind: 'string' },
   { key: 'timezone',     kind: 'string' },
 ]
+
+/**
+ * Frontmatter fields that are pinned to the file root (series/standalone root).
+ * They must never diverge per occurrence override.
+ * Note: `body` is also file-level but lives in ExtendedMetadata (not YAML),
+ * so it is enforced separately in storeOps rather than via this constant.
+ */
+export const FILE_LEVEL_FIELDS = ['title', 'tags', 'topics'] as const
+export type FileLevelField = typeof FILE_LEVEL_FIELDS[number]
 
 /** Coerce a raw YAML value to the typed value for `spec`. */
 function parseInlineField(spec: InlineFieldSpec, raw: unknown): unknown {

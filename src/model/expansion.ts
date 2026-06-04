@@ -21,7 +21,7 @@ import {
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
 import type { Repeat, StoreItem, AppMetadata } from '../types'
-import { isSeries } from '../types'
+import { isSeries, FILE_LEVEL_FIELDS } from '../types'
 import type { EffectiveNode } from './inheritance'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -668,6 +668,9 @@ export function expandRange(
         ownerId: series.id,
         metadata: {
           ...(override ? { ...series.metadata, ...override.metadata } : series.metadata),
+          // File-level fields always come from the series root, even for legacy data
+          // where an override may carry a divergent title/tags/topics.
+          ...Object.fromEntries(FILE_LEVEL_FIELDS.map(k => [k, series.metadata[k]])),
           jsTime,
         },
       })

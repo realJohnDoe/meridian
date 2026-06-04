@@ -24,6 +24,7 @@ export interface EntryState {
   repeat: RepeatValue | null
   done: boolean
   tags: string[]
+  topics: string[]
   participants: string[]
   priority: Priority | null
   editScope: string
@@ -40,6 +41,7 @@ export const ENTRY_DEFAULT: EntryState = {
   repeat: null,
   done: false,
   tags: [],
+  topics: [],
   participants: [],
   priority: null,
   editScope: 'all',

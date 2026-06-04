@@ -412,10 +412,11 @@ export default function NodeInheritanceDebugger() {
   // ── EntryEditor handlers ─────────────────────────────────────────────────
   const handleDebugSave = useCallback((body: string) => {
     if (!debugEntry || !selectedOcc) return
-    const { title, tags, participants, tracked, done, priority, scheduled, duration, repeat, editScope } = debugEntry
+    const { title, tags, topics, participants, tracked, done, priority, scheduled, duration, repeat, editScope } = debugEntry
     const fields: EditFields = {
       title:        title || '',
       tags:         tags || [],
+      topics:       topics || [],
       participants: participants || [],
       body,
       tracked:  tracked ?? false,

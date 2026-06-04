@@ -11,7 +11,7 @@ import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '../types'
-import { extractAppMetadata, isSeries } from '../types'
+import { extractAppMetadata, isSeries, FILE_LEVEL_FIELDS } from '../types'
 import type { StoreItem } from '../types'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
@@ -57,6 +57,11 @@ export function effectiveNodeToStoreItems(
       })
       for (const child of n.instances) {
         if (hasRepeat(child)) { walk(child); continue }  // nested series → flat sibling
+        // Strip file-level fields from the child's own fields so the series root
+        // always wins — normalizes any legacy data where an override diverged.
+        const childFieldsSafe = Object.fromEntries(
+          Object.entries(child.fields).filter(([k]) => !(FILE_LEVEL_FIELDS as readonly string[]).includes(k)),
+        )
         result.push({
           date:    child.fields.date ? String(child.fields.date) : '',
           time:    child.fields.time ? String(child.fields.time) : null,
@@ -65,7 +70,7 @@ export function effectiveNodeToStoreItems(
           id:      crypto.randomUUID(),
           ownerId: seriesId,
           ...(child.fields.excluded === true ? { excluded: true as const } : {}),
-          metadata: extractAppMetadata({ ...base, ...child.fields }),
+          metadata: extractAppMetadata({ ...base, ...childFieldsSafe }),
         })
       }
     } else if (n.fields.date !== undefined) {

@@ -36,7 +36,6 @@ repeat:
 instances:
   - date: 2026-05-01
     time: 14:00
-    title: Team Meeting
     done: true
 ---"
 `;
@@ -58,11 +57,9 @@ repeat:
     - mo
 instances:
   - date: 2026-04-13
-    title: Weekly Standup
     done: true
     duration: 30m
   - date: 2026-04-14
-    title: Weekly Standup
     done: true
     duration: 30m
 ---

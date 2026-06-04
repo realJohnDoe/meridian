@@ -516,6 +516,7 @@ export function entryFromOccurrence(
     itemType,
     done:      m.done     ?? false,
     tags:         [...(m.tags         || [])],
+    topics:       [...(m.topics       || [])],
     participants: [...(m.participants || [])],
     priority:     (m.priority || null) as Priority | null,
     editScope,
@@ -567,6 +568,7 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
   const next = applyEdit(getItems(), item, editScope, {
     title,
     tags:         fields.tags         ?? [],
+    topics:       fields.topics       ?? [],
     participants: fields.participants  ?? [],
     body:         fields.body         ?? '',
     tracked:      fields.tracked      ?? false,

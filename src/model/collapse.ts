@@ -1,5 +1,5 @@
 import type { StoreItem, InlineMetadata, AppMetadata } from '../types'
-import { isSeries, INLINE_FIELDS, inlineFieldEqual, inlineFieldEmpty } from '../types'
+import { isSeries, INLINE_FIELDS, inlineFieldEqual, inlineFieldEmpty, FILE_LEVEL_FIELDS } from '../types'
 import type { OccurrenceEntry } from './expansion'
 
 type AnyOcc = OccurrenceEntry<AppMetadata>
@@ -146,7 +146,11 @@ function serializeChildren(
     if (c.excluded) return { date: c.date, ...(c.time ? { time: c.time } : {}), excluded: true }
     const child: Record<string, unknown> = { date: c.date }
     if (c.time) child.time = c.time
-    Object.assign(child, metadataToYaml(diffMetadata(c.metadata, seriesMeta)))
+    const diff = diffMetadata(c.metadata, seriesMeta)
+    // File-level fields must never appear in an instance override — they belong
+    // to the file root (defaults: block) only.
+    for (const k of FILE_LEVEL_FIELDS) delete (diff as Record<string, unknown>)[k]
+    Object.assign(child, metadataToYaml(diff))
     return child
   })
 }
