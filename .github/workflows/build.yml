@@ -1,0 +1,30 @@
+name: Build & Test
+
+on:
+  workflow_call:
+
+# Only contents: read needed here — upload-pages-artifact is just a
+# compressed upload-artifact; deploy-pages (which needs pages: write
+# and id-token: write) lives in the deploy workflow, not here.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level=high
+      - run: pnpm test
+      - run: pnpm run build
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist

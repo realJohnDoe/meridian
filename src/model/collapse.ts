@@ -6,152 +6,150 @@ type AnyOcc = OccurrenceEntry<AppMetadata>
 
 /**
  * Convert all StoreItems for one fileSlug into a YAML-serializable object.
- * Implements reverse-inheritance: shared fields are hoisted to a defaults block.
+ * Implements reverse-inheritance: fields that instances override are hoisted
+ * into a `defaults:` block so generated occurrences inherit the right base.
  *
- * Algorithm (bottom-up):
- * 1. Leaf level — for each RepeatPattern, collect its explicit OccurrenceEntry
- *    children (ownerId === series.id). Find the largest common subset of
- *    InlineMetadata fields across all children → series defaults block.
- *    Each child only stores fields that differ from those defaults.
- * 2. Series level — compare only the defaults blocks computed in step 1 across
- *    all sibling RepeatPatterns. Common subset → file root defaults block.
- *    Each series only stores diverging defaults.
- * 3. Root structure: if multiple items → root is only defaults+instances, no direct
- *    date/time/repeat. If exactly one item → root represents it directly.
+ * Single-series algorithm:
+ * - All InlineMetadata fields go into `defaults:` so every generated occurrence
+ *   inherits them. Only structural fields (date, time, repeat) stay at root.
+ * - Each instance stores only fields that differ from the series metadata.
+ *
+ * Multi-series / multi-item algorithm (split-series pattern):
+ * - Fields shared across all sibling series and standalones → file root defaults.
+ * - Each series root carries only structural fields (date, time, repeat).
+ * - Series-specific metadata goes into the series' local defaults: block.
+ * - Override instances diff against the series' full metadata.
  */
 export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
   if (items.length === 0) return {}
 
-  const series = items.filter(isSeries)
-  // Root-level standalones: non-series items with no ownerId (direct children of the file root).
-  // Items with ownerId are children of a specific series — they appear in seriesBlocks, not here.
+  const series     = items.filter(isSeries)
   const standalones = items.filter(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)
 
-  // ── Single series with no standalones (most common case) ──────────────────
-  if (series.length === 1 && standalones.length === 0) {
+  // Pair each series with its override children.
+  const seriesBlocks = series.map(s => ({
+    series:   s,
+    children: items.filter(i => !isSeries(i) && (i as AnyOcc).ownerId === s.id) as AnyOcc[],
+  }))
+
+  // ── Simple flat cases (no inheritance hierarchy needed) ───────────────────
+  // A single item with no override children is emitted as a flat YAML node —
+  // all metadata at root alongside the structural fields.
+
+  if (series.length === 1 && standalones.length === 0 && seriesBlocks[0].children.length === 0) {
     const s = series[0]
-    const children = items.filter(i => !isSeries(i) && (i as { ownerId?: string }).ownerId === s.id)
+    return { ...metadataToYaml(s.metadata), date: s.date, ...(s.time ? { time: s.time } : {}), repeat: s.repeat }
+  }
 
-    if (children.length === 0) {
-      // Simple series node
-      return {
-        ...metadataToYaml(s.metadata),
-        date:   s.date,
-        ...(s.time ? { time: s.time } : {}),
-        repeat: s.repeat,
-      }
-    }
+  if (series.length === 0 && standalones.length === 1) {
+    const s = standalones[0]
+    return { ...metadataToYaml(s.metadata), date: s.date, ...(s.time ? { time: s.time } : {}) }
+  }
 
-    // Series with explicit instances
-    const occs = children as AnyOcc[]
-    const nonExcluded = occs.filter(c => !c.excluded)
-    const sharedDefaults = computeSharedFields(nonExcluded.map(c => c.metadata))
-    const instances = occs.map(c => {
-      if (c.excluded) return { date: c.date, excluded: true }
-      const diff = diffMetadata(c.metadata, sharedDefaults)
-      const inst: Record<string, unknown> = { date: c.date }
-      if (c.time) inst.time = c.time
-      Object.assign(inst, metadataToYaml(diff as Partial<InlineMetadata>))
-      return inst
-    })
+  // ── Container cases — inheritance hierarchy applies ───────────────────────
+  //
+  // hoistSharedMetadata() is the single place that decides what is shared
+  // (→ root defaults) vs what is unique to each item (→ local defaults).
+  // It is domain-agnostic: it knows nothing about dates, repeats, or YAML.
+  //
+  // Structural fields (date, time, repeat) are handled separately below:
+  //   • Single series with instances → structural fields at the file root.
+  //   • Multiple series / standalones → structural fields inside instances[].
 
-    const result: Record<string, unknown> = {
-      ...metadataToYaml(s.metadata),
-      date:   s.date,
-      ...(s.time ? { time: s.time } : {}),
-      repeat: s.repeat,
-    }
-    if (Object.keys(sharedDefaults).length > 0) {
-      result.defaults = metadataToYaml(sharedDefaults as Partial<InlineMetadata>)
-    }
+  const allMetas: Partial<InlineMetadata>[] = [
+    ...seriesBlocks.map(b => b.series.metadata),
+    ...standalones.map(s => s.metadata),
+  ]
+  const { rootDefaults, localDefaults } = hoistSharedMetadata(allMetas)
+
+  // ── Single series with instances (flat root, no outer instances wrapper) ──
+  if (series.length === 1 && standalones.length === 0) {
+    const { series: s, children } = seriesBlocks[0]
+    // localDefaults[0] is always {} here (only one item, so rootDefaults = s.metadata).
+    // We keep the call for consistency — hoistSharedMetadata owns that logic.
+    const instances = serializeChildren(children, s.metadata)
+    const result: Record<string, unknown> = {}
+    const rd = metadataToYaml(rootDefaults)
+    if (Object.keys(rd).length > 0) result.defaults = rd
+    result.date   = s.date
+    if (s.time)  result.time   = s.time
+    result.repeat = s.repeat
     if (instances.length > 0) result.instances = instances
     return result
   }
 
-  // ── Single standalone occurrence (no series, one root-level item) ───────────
-  if (series.length === 0 && standalones.length === 1) {
-    const s = standalones[0]
-    return {
-      ...metadataToYaml(s.metadata),
-      date: s.date,
-      ...(s.time ? { time: s.time } : {}),
-    }
-  }
-
-  // ── Multiple items — build container with root defaults + instances ────────
-
-  // Collect per-series default blocks (step 1)
-  const seriesBlocks: Array<{ series: StoreItem; defaults: Partial<InlineMetadata>; instances: Array<{ date: string; time?: string | null; diff: Partial<InlineMetadata>; excluded?: boolean }> }> = series.map(s => {
-    const children = items.filter(i => !isSeries(i) && (i as AnyOcc).ownerId === s.id) as AnyOcc[]
-    const nonExcluded = children.filter(c => !c.excluded)
-    const shared = nonExcluded.length > 0 ? computeSharedFields(nonExcluded.map(c => c.metadata)) : {} as Partial<InlineMetadata>
-    const childInsts = children.map(c => ({
-      date: c.date,
-      time: c.time,
-      excluded: c.excluded,
-      diff: diffMetadata(c.metadata, shared) as Partial<InlineMetadata>,
-    }))
-    return { series: s, defaults: shared, instances: childInsts }
-  })
-
-  // Step 2: find common fields across all series' own metadata AND root-level standalones.
-  // Fields shared by every series (e.g. title, tags) become root defaults.
-  // Using series.metadata (not b.defaults) ensures we capture the series' own fields,
-  // not just the shared fields of their override children (which is empty for series with
-  // no explicit overrides, causing title/tags to be missed).
-  const allForRootDefaults: Partial<InlineMetadata>[] = [
-    ...seriesBlocks.map(b => b.series.metadata),
-    ...standalones.map(s => s.metadata),
-  ]
-  const rootDefaults = allForRootDefaults.length > 0 ? computeSharedFields(allForRootDefaults) : {} as Partial<InlineMetadata>
-
-  // Build instances array
+  // ── Multiple series / standalones (container: root defaults + instances[]) ─
   const allInstances: Record<string, unknown>[] = []
 
-  for (const block of seriesBlocks) {
-    const s = block.series as (typeof series)[number]
-    const seriesDiff = diffMetadata(s.metadata, rootDefaults)
-    const seriesDefaultsDiff = diffMetadata(block.defaults, rootDefaults)
-
+  seriesBlocks.forEach(({ series: s, children }, i) => {
+    const ld = metadataToYaml(localDefaults[i])
     const inst: Record<string, unknown> = {
       date:   s.date,
       ...(s.time ? { time: s.time } : {}),
       repeat: s.repeat,
-      ...metadataToYaml(seriesDiff as Partial<InlineMetadata>),
     }
-    if (Object.keys(seriesDefaultsDiff).length > 0) {
-      inst.defaults = metadataToYaml(seriesDefaultsDiff as Partial<InlineMetadata>)
-    }
-    if (block.instances.length > 0) {
-      inst.instances = block.instances.map(ci => {
-        if (ci.excluded) return { date: ci.date, excluded: true }
-        const child: Record<string, unknown> = { date: ci.date }
-        if (ci.time) child.time = ci.time
-        Object.assign(child, metadataToYaml(ci.diff))
-        return child
-      })
-    }
+    if (Object.keys(ld).length > 0) inst.defaults = ld
+    const childInstances = serializeChildren(children, s.metadata)
+    if (childInstances.length > 0) inst.instances = childInstances
     allInstances.push(inst)
-  }
+  })
 
-  for (const s of standalones) {
-    const diff = diffMetadata(s.metadata, rootDefaults)
+  standalones.forEach((s, i) => {
+    const offset = seriesBlocks.length
+    const ld = metadataToYaml(localDefaults[offset + i])
     allInstances.push({
       date: s.date,
       ...(s.time ? { time: s.time } : {}),
-      ...metadataToYaml(diff as Partial<InlineMetadata>),
+      ...ld,
     })
-  }
+  })
 
   const result: Record<string, unknown> = {}
-  if (Object.keys(rootDefaults).length > 0) {
-    result.defaults = metadataToYaml(rootDefaults as Partial<InlineMetadata>)
-  }
+  const rd = metadataToYaml(rootDefaults)
+  if (Object.keys(rd).length > 0) result.defaults = rd
   result.instances = allInstances
   return result
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Domain-agnostic inheritance helper.
+ *
+ * Given N metadata objects, partition them into:
+ *   - `rootDefaults` — fields shared by every item (→ file-level defaults: block)
+ *   - `localDefaults` — per-item fields that diverge from the shared set
+ *                       (→ per-series local defaults: block)
+ *
+ * Knows nothing about dates, repeat schedules, or YAML structure.
+ */
+function hoistSharedMetadata(metas: Partial<InlineMetadata>[]): {
+  rootDefaults: Partial<InlineMetadata>
+  localDefaults: Partial<InlineMetadata>[]
+} {
+  const rootDefaults = computeSharedFields(metas)
+  return {
+    rootDefaults,
+    localDefaults: metas.map(m => diffMetadata(m, rootDefaults)),
+  }
+}
+
+/**
+ * Serialize the override children of a series into a YAML instances array.
+ * Each child stores only the fields that differ from the series metadata.
+ */
+function serializeChildren(
+  children: AnyOcc[],
+  seriesMeta: Partial<InlineMetadata>,
+): Record<string, unknown>[] {
+  return children.map(c => {
+    if (c.excluded) return { date: c.date, ...(c.time ? { time: c.time } : {}), excluded: true }
+    const child: Record<string, unknown> = { date: c.date }
+    if (c.time) child.time = c.time
+    Object.assign(child, metadataToYaml(diffMetadata(c.metadata, seriesMeta)))
+    return child
+  })
+}
 
 /** Convert InlineMetadata fields to a plain YAML-serializable object. */
 function metadataToYaml(m: Partial<InlineMetadata>): Record<string, unknown> {

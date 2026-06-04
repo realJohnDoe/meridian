@@ -7,6 +7,7 @@
  *  - Fields carry plain values — no origin tracking.
  */
 
+import { stringify } from 'yaml'
 import type { RawNode } from './nodeSchema'
 
 // ── Output type ───────────────────────────────────────────────────────────────
@@ -146,161 +147,45 @@ export function displayValue(v: unknown, indent = 0): string {
 
 // ── YAML serialiser ───────────────────────────────────────────────────────────
 
-function quoteStr(s: string): string {
-  if (
-    s === '' ||
-    s === 'null' || s === 'true' || s === 'false' ||
-    /^[-+]?[0-9]/.test(s) ||
-    /[:#\[\]{}&*!,|>'"\\]/.test(s) ||
-    s.includes(': ') || s.endsWith(':') ||
-    s.startsWith(' ') || s.endsWith(' ')
-  ) {
-    return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
-  }
-  return s
-}
-
-function inlineVal(v: unknown): string | null {
-  if (v === null || v === undefined) return null
-  if (typeof v === 'boolean') return String(v)
-  if (typeof v === 'number')  return String(v)
-  if (typeof v === 'string')  return quoteStr(v)
-  if (Array.isArray(v)) {
-    if ((v as unknown[]).every(x => x === null || typeof x !== 'object')) {
-      return `[${(v as unknown[]).map(x => inlineVal(x)).join(', ')}]`
-    }
-    return null
-  }
-  return null
-}
-
-function valueLines(v: unknown, indent: number): string[] {
-  const pad = ' '.repeat(indent)
-
-  if (Array.isArray(v)) {
-    const out: string[] = []
-    for (const item of v as unknown[]) {
-      if (item === null || typeof item !== 'object') {
-        out.push(`${pad}- ${inlineVal(item)}`)
-      } else {
-        const entries = Object.entries(item as Record<string, unknown>)
-        entries.forEach(([k, val], idx) => {
-          const pfx = idx === 0 ? `${pad}- ` : `${pad}  `
-          const iv  = inlineVal(val)
-          if (iv !== null) {
-            out.push(`${pfx}${k}: ${iv}`)
-          } else {
-            out.push(`${pfx}${k}:`)
-            out.push(...valueLines(val, indent + 4))
-          }
-        })
-      }
-    }
-    return out
-  }
-
-  if (typeof v === 'object' && v !== null) {
-    const out: string[] = []
+/**
+ * Recursively drop `null`/`undefined` values and empty arrays so the emitted
+ * frontmatter stays free of `key: null` / `key: []` noise — matching the
+ * behaviour callers relied on from the previous hand-rolled serialiser.
+ */
+function prune(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(prune)
+  if (v && typeof v === 'object') {
+    const out: Record<string, unknown> = {}
     for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
       if (val === null || val === undefined) continue
       if (Array.isArray(val) && val.length === 0) continue
-      const iv = inlineVal(val)
-      if (iv !== null) {
-        out.push(`${pad}${k}: ${iv}`)
-      } else {
-        out.push(`${pad}${k}:`)
-        out.push(...valueLines(val, indent + 2))
-      }
+      out[k] = prune(val)
     }
     return out
   }
-
-  return [inlineVal(v) ?? String(v)]
+  return v
 }
 
 /**
- * Serialize a RawNode to YAML fields, preserving its structure
- * (defaults, instances) without any collapse optimisation.
- * Returns only the inner YAML content — wrap with `wrapFrontmatter` from fileIO.ts.
+ * Serialize a RawNode to YAML fields, preserving its structure (defaults,
+ * instances) without any collapse optimisation. Returns only the inner YAML
+ * content — wrap with `wrapFrontmatter` from fileIO.ts.
+ *
+ * Key order is canonicalised: `defaults:` first (when present), then root
+ * fields, then `instances:`. Putting defaults first makes series files
+ * read top-to-bottom as "here are the defaults, here is the schedule".
  */
 export function serializeRawNode(node: RawNode): string {
-  const rootFields = Object.fromEntries(
-    Object.entries(node).filter(([k]) => k !== 'defaults' && k !== 'instances'),
-  )
-  const defaults  = (node.defaults  as Record<string, unknown>) ?? {}
-  const instances = Array.isArray(node.instances)
-    ? (node.instances as Record<string, unknown>[])
-    : []
-  return yamlFrontmatter(rootFields, defaults, instances)
-}
+  const { defaults, instances, ...rootFields } = node
+  const ordered: Record<string, unknown> = {}
+  if (defaults && Object.keys(defaults as object).length > 0) ordered.defaults = defaults
+  Object.assign(ordered, rootFields)
+  if (Array.isArray(instances) && instances.length > 0) ordered.instances = instances
 
-function yamlFrontmatter(
-  rootFields: Record<string, unknown>,
-  defaults:   Record<string, unknown>,
-  instances:  Record<string, unknown>[],
-): string {
-  const lines: string[] = []
-
-  // Root fields
-  for (const [key, value] of Object.entries(rootFields)) {
-    if (value === null || value === undefined) continue
-    if (Array.isArray(value) && value.length === 0) continue
-    const iv = inlineVal(value)
-    if (iv !== null) {
-      lines.push(`${key}: ${iv}`)
-    } else {
-      lines.push(`${key}:`)
-      lines.push(...valueLines(value, 2))
-    }
-  }
-
-  // defaults: block
-  if (Object.keys(defaults).length > 0) {
-    lines.push('defaults:')
-    for (const [key, value] of Object.entries(defaults)) {
-      if (value === null || value === undefined) continue
-      if (Array.isArray(value) && value.length === 0) continue
-      const iv = inlineVal(value)
-      if (iv !== null) {
-        lines.push(`  ${key}: ${iv}`)
-      } else {
-        lines.push(`  ${key}:`)
-        lines.push(...valueLines(value, 4))
-      }
-    }
-  }
-
-  // instances: block
-  if (instances.length > 0) {
-    lines.push('instances:')
-    for (const inst of instances) {
-      const entries = Object.entries(inst)
-      if (entries.length === 0) { lines.push('  - {}'); continue }
-
-      entries.forEach(([key, value], idx) => {
-        if (value === null || value === undefined) return
-        if (Array.isArray(value) && value.length === 0) return
-        const pfx    = idx === 0 ? '  - ' : '    '
-        const subInd = 6
-
-        if (key === 'instances' && Array.isArray(value)) {
-          lines.push(`${pfx}instances:`)
-          lines.push(...valueLines(value, subInd))
-        } else if (key === 'defaults' && typeof value === 'object' && value !== null) {
-          lines.push(`${pfx}defaults:`)
-          lines.push(...valueLines(value, subInd))
-        } else {
-          const iv = inlineVal(value)
-          if (iv !== null) {
-            lines.push(`${pfx}${key}: ${iv}`)
-          } else {
-            lines.push(`${pfx}${key}:`)
-            lines.push(...valueLines(value, subInd))
-          }
-        }
-      })
-    }
-  }
-
-  return lines.join('\n')
+  return stringify(prune(ordered), {
+    lineWidth: 0,            // never wrap long scalars (e.g. titles, intervals)
+    nullStr: 'null',
+    defaultStringType: 'PLAIN',
+    defaultKeyType: 'PLAIN',
+  }).trimEnd()
 }

@@ -94,6 +94,8 @@ export function parseDurationHours(dur: unknown): number {
   if (!dur) return 0.75
   const s = String(dur).toLowerCase().trim()
   let h = 0, m = 0
+  const dm = s.match(/^(\d+(?:\.\d+)?)\s*d(?:ay)?s?$/)
+  if (dm) return parseFloat(dm[1]) * 24
   const hm = s.match(/(\d+(?:\.\d+)?)\s*h/)
   const mm = s.match(/(\d+)\s*m/)
   if (hm) h = parseFloat(hm[1])
@@ -101,6 +103,32 @@ export function parseDurationHours(dur: unknown): number {
   if (!hm && !mm) { const n = parseFloat(s); if (!isNaN(n)) h = n }
   const total = h + m / 60
   return total > 0 ? total : 0.75
+}
+
+/**
+ * Returns the whole-day count if `dur` is in day format ("3d", "2 days", etc.),
+ * null otherwise. Used to determine whether an event spans multiple calendar days.
+ */
+export function parseDurationDays(dur: unknown): number | null {
+  if (!dur) return null
+  const m = String(dur).toLowerCase().trim().match(/^(\d+)\s*d(?:ay)?s?$/)
+  return m ? parseInt(m[1], 10) : null
+}
+
+/**
+ * Returns true when `occ` is a multi-day event (duration ≥ 2d) whose span
+ * includes `date`. Used by calendar views to show the event on every covered
+ * day without expanding it into multiple occurrences.
+ */
+export function multidayCoversDate(occ: OccurrenceEntry<AppMetadata>, date: Date): boolean {
+  const days = parseDurationDays(occ.metadata.duration)
+  if (!days || days < 2) return false
+  const start = parseDateString(occ.date)
+  if (!start) return false
+  const s = new Date(start); s.setHours(0, 0, 0, 0)
+  const e = new Date(s.getTime() + (days - 1) * 86_400_000); e.setHours(23, 59, 59)
+  const d = new Date(date); d.setHours(0, 0, 0, 0)
+  return d >= s && d <= e
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -592,10 +620,6 @@ export function expandRange(
   from: Date,
   to: Date,
 ): OccurrenceEntry<AppMetadata>[] {
-  function addDaysLocal(d: Date, n: number): Date {
-    const r = new Date(d); r.setDate(r.getDate() + n); return r
-  }
-
   const result: OccurrenceEntry<AppMetadata>[] = []
 
   const seriesList = items.filter(isSeries)
@@ -651,40 +675,18 @@ export function expandRange(
   }
 
   // ── Emit standalone occurrences ───────────────────────────────────────────
+  // Multi-day events emit a single occurrence on their start date, identical to
+  // any other event. The span is inferred from `duration` by callers via
+  // parseDurationDays / multidayCoversDate — nothing is stored in the model.
   for (const occ of standalones) {
-    if (occ.metadata.multiday) {
-      // Expand multiday item over the date range day-by-day
-      const md = occ.metadata.multiday
-      let d = parseDateString(md.start || occ.date)
-      if (!d) continue
-      d = new Date(d); d.setHours(0, 0, 0, 0)
-      const endD = parseDateString(md.end)
-      if (!endD) continue
-      const endDt = new Date(endD); endDt.setHours(23, 59, 59)
-      while (d <= endDt) {
-        if (d >= from && d <= to) {
-          const spec = jsDateToSpec(d)
-          result.push({
-            date:    spec.date ?? '',
-            time:    null,
-            source:  'explicit',
-            fileSlug: occ.fileSlug,
-            id:      crypto.randomUUID(),
-            metadata: { ...occ.metadata, jsTime: new Date(d) },
-          })
-        }
-        d = addDaysLocal(d, 1)
-      }
-    } else {
-      const jsTime = nodeDateTime({ date: occ.date, time: occ.time } as any)
-        ?? parseDateString(occ.date)
-      if (!jsTime || jsTime < from || jsTime > to) continue
-      result.push({
-        ...occ,
-        id:       crypto.randomUUID(),
-        metadata: { ...occ.metadata, jsTime },
-      })
-    }
+    const jsTime = nodeDateTime({ date: occ.date, time: occ.time } as any)
+      ?? parseDateString(occ.date)
+    if (!jsTime || jsTime < from || jsTime > to) continue
+    result.push({
+      ...occ,
+      id:       crypto.randomUUID(),
+      metadata: { ...occ.metadata, jsTime },
+    })
   }
 
   // ── Deduplicate by (fileSlug, jsTime) and sort ────────────────────────────

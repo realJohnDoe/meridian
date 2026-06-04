@@ -2,8 +2,8 @@ import { useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { Checkbox } from './ui/checkbox'
 import type { Occurrence } from '../types'
-
-import { expandRange, fmtT, parseDurationHours } from '../model/expansion'
+import { isSeries } from '../types'
+import { expandRange, fmtT, parseDurationHours, parseDurationDays, multidayCoversDate, parseDateString } from '../model/expansion'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
 
 import { TODAY } from '../constants'
@@ -54,7 +54,7 @@ function AllDayItem({ o, onOpen }: AllDayItemProps) {
   const hasTrack = o.metadata.done !== undefined
   return (
     <div
-      className={`dv-aditem ${o.metadata.multiday ? 'multiday' : dvBlkClass(o)}`}
+      className={`dv-aditem ${(parseDurationDays(o.metadata.duration) ?? 0) >= 2 ? 'multiday' : dvBlkClass(o)}`}
       onClick={() => onOpen(o)}
     >
       {hasTrack && <Checkbox checked={!!o.metadata.done} tabIndex={-1} aria-hidden className="size-3.5 opacity-70 pointer-events-none" />}
@@ -110,9 +110,24 @@ export default function DayView({ onOpen }: Props) {
   const { allDay, cols } = useMemo(() => {
     const from = new Date(dvDate); from.setHours(0, 0, 0, 0)
     const to   = new Date(dvDate); to.setHours(23, 59, 59)
-    const occs  = expandRange(items, from, to)
-    const allDay = sortOccs(occs.filter(o => !fmtT(o.time) || o.metadata.multiday))
-    const timed  = sortOccs(occs.filter(o => !!fmtT(o.time) && !o.metadata.multiday))
+    const occs = expandRange(items, from, to)
+
+    // Multi-day events that started before today don't appear in expandRange
+    // output (their single occurrence is on the start date). Find them by
+    // scanning store items directly and add a virtual occurrence for today.
+    const extraMultiday = (items as Occurrence[])
+      .filter(i => !isSeries(i) && !(i as Occurrence).ownerId)
+      .filter(i => {
+        const days = parseDurationDays(i.metadata.duration)
+        if (!days || days < 2) return false
+        const start = parseDateString(i.date)
+        return !!start && start < from && multidayCoversDate(i, dvDate)
+      })
+      .map(i => ({ ...i, metadata: { ...i.metadata, jsTime: new Date(from) } }))
+
+    const allOccs = [...occs, ...extraMultiday]
+    const allDay = sortOccs(allOccs.filter(o => !fmtT(o.time)))
+    const timed  = sortOccs(allOccs.filter(o =>  !!fmtT(o.time)))
     return { allDay, cols: computeColumns(timed) }
   }, [dvDate, items])
 
@@ -145,10 +160,11 @@ export default function DayView({ onOpen }: Props) {
     }
   }, [setDvDate])
 
-  // Deduplicate multiday events in all-day strip.
+  // Deduplicate: a multi-day event can appear both from expandRange (start date)
+  // and from the extraMultiday coverage scan if both land on the same day.
   const seen = new Set<string>()
   const allDayDeduped = allDay.filter(o => {
-    if (!o.metadata.multiday) return true
+    if ((parseDurationDays(o.metadata.duration) ?? 0) < 2) return true
     if (seen.has(o.fileSlug)) return false
     seen.add(o.fileSlug); return true
   })

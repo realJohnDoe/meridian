@@ -1,3 +1,4 @@
+import { parse as parseYaml } from 'yaml'
 import { serializeRawNode } from './model/inheritance'
 import type { RawNode } from './model/nodeSchema'
 
@@ -17,108 +18,19 @@ declare global {
 
 // ── YAML parser ───────────────────────────────────────────────
 
-export function yamlParseScalar(v: unknown): boolean | number | string | null | unknown[] {
-  const s = String(v).trim()
-  if (s === '') return ''
-  if (s === 'true') return true
-  if (s === 'false') return false
-  if (s === 'null' || s === '~') return null
-  if (/^-?\d+$/.test(s)) return parseInt(s, 10)
-  if (/^-?\d+\.\d+$/.test(s)) return parseFloat(s)
-  if (/^\[.*\]$/.test(s)) return s.slice(1, -1).split(',').map(x => x.trim()).filter(Boolean).map(yamlParseScalar)
-  return s.replace(/^["']|["']$/g, '')
-}
-
-function yamlIndent(line: string): number {
-  let n = 0
-  while (n < line.length && line[n] === ' ') n++
-  return n
-}
-
+/**
+ * Parse YAML frontmatter to a plain object.
+ *
+ * Backed by the `yaml` package (YAML 1.2 core schema). Bare dates/times stay
+ * strings under the core schema, matching how the rest of the app stores them.
+ * Non-mapping documents (a bare scalar or sequence) collapse to `{}` — callers
+ * always expect a mapping at the frontmatter root.
+ */
 export function yamlParse(text: string): Record<string, unknown> {
-  const lines = text.split('\n').filter(l => l.trim() !== '' && !l.trim().startsWith('#'))
-
-  function parseBlock(startIdx: number, baseIndent: number): [unknown, number] {
-    if (startIdx >= lines.length) return [null, startIdx]
-    const firstLine = lines[startIdx]
-    const indent = yamlIndent(firstLine)
-    if (indent < baseIndent) return [null, startIdx]
-
-    if (firstLine.trim().startsWith('- ')) {
-      const items: unknown[] = []
-      let i = startIdx
-      while (i < lines.length) {
-        const line = lines[i]
-        const lineIndent = yamlIndent(line)
-        if (lineIndent < indent) break
-        if (lineIndent === indent && line.trim().startsWith('- ')) {
-          const item: Record<string, unknown> = {}
-          const rest = line.trim().slice(2)
-          const m = rest.match(/^([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/)
-          if (m) {
-            const key = m[1], val = m[2]
-            if (val.trim() === '') {
-              const [v, nextI] = parseBlock(i + 1, indent + 2)
-              item[key] = v
-              i = nextI
-            } else {
-              item[key] = yamlParseScalar(val)
-              i++
-            }
-          } else {
-            i++
-          }
-          while (i < lines.length) {
-            const cl = lines[i]
-            const ci = yamlIndent(cl)
-            if (ci <= indent) break
-            const km = cl.trim().match(/^([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/)
-            if (km) {
-              const ckey = km[1], cval = km[2]
-              if (cval.trim() === '') {
-                const [v, nextI] = parseBlock(i + 1, ci + 2)
-                item[ckey] = v
-                i = nextI
-              } else {
-                item[ckey] = yamlParseScalar(cval)
-                i++
-              }
-            } else {
-              i++
-            }
-          }
-          items.push(item)
-        } else {
-          break
-        }
-      }
-      return [items, i]
-    }
-
-    const dict: Record<string, unknown> = {}
-    let i = startIdx
-    while (i < lines.length) {
-      const line = lines[i]
-      const lineIndent = yamlIndent(line)
-      if (lineIndent < indent) break
-      if (lineIndent > indent) { i++; continue }
-      const m = line.trim().match(/^([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/)
-      if (!m) { i++; continue }
-      const key = m[1], val = m[2]
-      if (val.trim() === '') {
-        const [v, nextI] = parseBlock(i + 1, indent + 2)
-        dict[key] = v
-        i = nextI
-      } else {
-        dict[key] = yamlParseScalar(val)
-        i++
-      }
-    }
-    return [dict, i]
-  }
-
-  const [result] = parseBlock(0, 0)
-  return (result as Record<string, unknown>) || {}
+  const parsed = parseYaml(text)
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : {}
 }
 
 // ── Frontmatter split / merge ─────────────────────────────────

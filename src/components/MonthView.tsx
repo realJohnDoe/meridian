@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import type { Occurrence } from '../types'
 
 import { expandRange } from '../model/expansion'
+import { parseDurationDays, multidayCoversDate } from '../model/expansion'
 import { sameDay, sortOccs, ccBarClass } from '../meridian'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
@@ -25,7 +26,10 @@ interface CalCellProps {
 function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
   const isToday = sameDay(date, TODAY)
   const dayOccs = useMemo(
-    () => sortOccs(occs.filter(o => o.metadata.jsTime && sameDay(o.metadata.jsTime, date))),
+    () => sortOccs(occs.filter(o =>
+      (o.metadata.jsTime && sameDay(o.metadata.jsTime, date)) ||
+      multidayCoversDate(o, date)
+    )),
     [occs, date],
   )
 
@@ -40,7 +44,7 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
           const seen = new Set<string>()
           const bars: React.ReactNode[] = []
           dayOccs.slice(0, 4).forEach((o, i) => {
-            if (o.metadata.multiday) {
+            if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) {
               if (seen.has(o.fileSlug)) return
               seen.add(o.fileSlug)
               bars.push(<div key={i} className="cc-bar multiday">{o.metadata.title}</div>)
