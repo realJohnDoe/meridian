@@ -66,22 +66,12 @@ export default function OccurrenceCard({
         style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
         onClick={handleClick}
       >
-        {/* Time column */}
-        <div className="w-9 shrink-0 flex flex-col items-end gap-px pt-[3px] self-start">
-          <span className={`text-[11px] font-mono tracking-[.02em] leading-[1.2] ${t ? 'text-[var(--cyn)]' : 'text-[var(--t3)]'}`}>
-            {t || ''}
-          </span>
-          {occ.metadata.duration && t && (
-            <span className="text-[9px] font-mono text-[var(--t2)]">{occ.metadata.duration}</span>
-          )}
-        </div>
-
-        {/* Priority bar — stretches with items-stretch on the parent */}
+        {/* Priority bar */}
         <span className={`occ-bar ${currentBarClass}`} />
 
         {/* Two rows stacked in a flex-col */}
         <div className="flex flex-col flex-1 min-w-0 gap-1 py-[2px]">
-          {/* Row 1: checkbox + title */}
+          {/* Row 1: checkbox + title + [recur icon + time/duration] on the right */}
           <div className="flex items-center gap-[6px]">
             {hasTrack && (
               <Checkbox
@@ -92,7 +82,19 @@ export default function OccurrenceCard({
               />
             )}
             <span className={titleCls(isDone)}>{occ.metadata.title}</span>
-            {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
+
+            {/* Right-aligned: recur icon + time on one line, duration below */}
+            {(!!occ.ownerId || !!t) && (
+              <div className="flex flex-col items-end shrink-0 ml-1 gap-px">
+                <div className="flex items-end gap-[4px]">
+                  {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
+                  {!!t && <span className="text-[11px] font-mono text-[var(--cyn)] tracking-[.02em] leading-[1.2]">{t}</span>}
+                </div>
+                {!!t && occ.metadata.duration && (
+                  <span className="text-[9px] font-mono text-[var(--t2)] leading-[1.2]">{occ.metadata.duration}</span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Row 2: tags + participants */}
