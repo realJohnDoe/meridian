@@ -1,5 +1,46 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`edit operations → serialized YAML > adding a new occurrence to an irregular-instances file keeps shared defaults 1`] = `
+"---
+defaults:
+  title: Project Review
+  tags:
+    - work
+  duration: 1h
+instances:
+  - date: 2026-04-15
+    time: 10:00
+  - date: 2026-05-20
+    time: 10:00
+  - date: 2026-06-18
+    time: 10:00
+  - date: 2026-07-10
+    time: 10:00
+---"
+`;
+
+exports[`edit operations → serialized YAML > all-scope edit on an event series preserves the absence of done 1`] = `
+"---
+defaults:
+  title: Team Meeting (renamed)
+  tags:
+    - work
+  duration: 1h
+date: 2026-05-01
+time: 14:00
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday:
+    - th
+instances:
+  - date: 2026-05-01
+    time: 14:00
+    title: Team Meeting
+    done: true
+---"
+`;
+
 exports[`edit operations → serialized YAML > all-scope edit updates the whole series 1`] = `
 "---
 defaults:
@@ -106,6 +147,48 @@ Quick sync. Agenda:
 - [[weekly-log]] updates"
 `;
 
+exports[`edit operations → serialized YAML > excludeOccurrence on a series in a mixed file leaves other series and standalone intact 1`] = `
+"---
+defaults:
+  tags:
+    - work
+instances:
+  - date: 2026-04-01
+    time: 09:00
+    repeat:
+      type: schedule
+      freq: weekly
+      byweekday:
+        - mo
+    title: Weekly Sync
+    done: false
+    duration: 30m
+    instances:
+      - date: 2026-04-08
+        excluded: true
+  - date: 2026-04-07
+    time: 10:00
+    repeat:
+      type: schedule
+      freq: monthly
+      bymonthday:
+        - 7
+    title: Monthly Retro
+    done: false
+    duration: 1h
+    defaults:
+      title: Monthly Retro
+      done: true
+      duration: 1h
+    instances:
+      - date: 2026-05-07
+        time: 10:00
+  - date: 2026-07-01
+    title: Planning Offsite
+    duration: 2d
+---"
+`;
+
 exports[`edit operations → serialized YAML > future-scope edit splits the series at the occurrence date 1`] = `
 "---
 defaults:
@@ -207,4 +290,35 @@ Quick sync. Agenda:
 - [[project-alpha]] status
 - Blockers
 - [[weekly-log]] updates"
+`;
+
+exports[`edit operations → serialized YAML > toggleDone on generated occurrence from the after_completion series targets series2 1`] = `
+"---
+defaults:
+  title: Daily Check-in
+  done: false
+  tags:
+    - work
+instances:
+  - date: 2026-04-01
+    repeat:
+      type: schedule
+      freq: daily
+      end:
+        type: until
+        date: 2026-04-09
+    defaults:
+      done: true
+    instances:
+      - date: 2026-04-05
+  - date: 2026-04-10
+    repeat:
+      type: after_completion
+      interval: 2 days
+    defaults:
+      done: true
+    instances:
+      - date: 2026-04-10
+      - date: 2026-04-12
+---"
 `;

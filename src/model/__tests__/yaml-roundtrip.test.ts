@@ -72,6 +72,109 @@ describe('structural expectations', () => {
   })
 })
 
+describe('split series (repeat-type change)', () => {
+  it('parses into two separate RepeatPattern items with the same fileSlug', () => {
+    const items = parseFixture('split-series')
+    const series = items.filter(isSeries)
+    expect(series).toHaveLength(2)
+    expect(series[0].repeat).toMatchObject({ type: 'schedule', freq: 'daily' })
+    expect(series[1].repeat).toMatchObject({ type: 'after_completion' })
+    // Both series belong to the same file
+    expect(series[0].fileSlug).toBe(series[1].fileSlug)
+  })
+
+  it('both series inherit shared metadata from the file root', () => {
+    const items = parseFixture('split-series')
+    const series = items.filter(isSeries)
+    for (const s of series) {
+      expect(s.metadata.title).toBe('Daily Check-in')
+      expect(s.metadata.done).toBe(false)
+      expect(s.metadata.tags).toEqual(['work'])
+    }
+  })
+
+  it('each series has one override with done: true', () => {
+    const items = parseFixture('split-series')
+    const overrides = items.filter(i => !isSeries(i))
+    expect(overrides).toHaveLength(2)
+    for (const o of overrides) expect(o.metadata.done).toBe(true)
+  })
+})
+
+describe('task-to-event', () => {
+  it('series has no done field; the one override instance retains done: true', () => {
+    const items = parseFixture('task-to-event')
+    const series = items.filter(isSeries)
+    const overrides = items.filter(i => !isSeries(i))
+    expect(series).toHaveLength(1)
+    expect(series[0].metadata.done).toBeUndefined()
+    expect(overrides).toHaveLength(1)
+    expect(overrides[0].metadata.done).toBe(true)
+  })
+
+  it('generates future occurrences that are events (no done)', () => {
+    const items = parseFixture('task-to-event')
+    const occs = expandRange(items, new Date('2026-05-08'), new Date('2026-05-31'))
+    // Generated occurrences inherit no `done` from the series
+    for (const o of occs) expect(o.metadata.done).toBeUndefined()
+  })
+})
+
+describe('irregular instances with shared defaults', () => {
+  it('parses into three standalone occurrences with no series', () => {
+    const items = parseFixture('irregular-instances')
+    expect(items.filter(isSeries)).toHaveLength(0)
+    expect(items).toHaveLength(3)
+  })
+
+  it('all instances inherit title, tags and duration from the file defaults', () => {
+    const items = parseFixture('irregular-instances')
+    for (const item of items) {
+      expect(item.metadata.title).toBe('Project Review')
+      expect(item.metadata.tags).toEqual(['work'])
+      expect(item.metadata.duration).toBe('1h')
+    }
+  })
+
+  it('instances are on the correct dates', () => {
+    const items = parseFixture('irregular-instances')
+    expect(items.map(i => i.date).sort()).toEqual(['2026-04-15', '2026-05-20', '2026-06-18'])
+  })
+})
+
+describe('mixed series and standalone instances', () => {
+  it('parses into two series and one standalone', () => {
+    const items = parseFixture('mixed-series-standalones')
+    const series = items.filter(isSeries)
+    const standalones = items.filter(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)
+    expect(series).toHaveLength(2)
+    expect(standalones).toHaveLength(1)
+  })
+
+  it('series have different repeat patterns', () => {
+    const items = parseFixture('mixed-series-standalones')
+    const series = items.filter(isSeries)
+    const types = series.map(s => s.repeat.type).sort()
+    expect(types).toEqual(['schedule', 'schedule'])
+    const freqs = series.map(s => (s.repeat as { freq?: string }).freq).sort()
+    expect(freqs).toEqual(['monthly', 'weekly'])
+  })
+
+  it('standalone has no ownerId and is a multi-day event', () => {
+    const items = parseFixture('mixed-series-standalones')
+    const standalone = items.find(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)!
+    expect(standalone.metadata.title).toBe('Planning Offsite')
+    expect(standalone.metadata.duration).toBe('2d')
+  })
+
+  it('all items share tags from the file root defaults', () => {
+    const items = parseFixture('mixed-series-standalones')
+    for (const item of items) {
+      expect(item.metadata.tags).toEqual(['work'])
+    }
+  })
+})
+
 describe('YAML scalar handling', () => {
   // YAML 1.2 core schema (used by the `yaml` package) treats bare dates as
   // strings, not timestamps. The app stores `date` as a string everywhere, so
