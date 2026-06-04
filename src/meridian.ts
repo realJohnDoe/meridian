@@ -595,8 +595,8 @@ function titleToSlugLocal(title: string): string {
 }
 
 export function toggleOccDone(o: Occurrence): void {
-  o.metadata.done = !o.metadata.done // optimistic UI
   const next = toggleDone(getItems(), o)
+  o.metadata.done = !o.metadata.done // optimistic UI
   setItems(next)
   writeEntityToCache(o.fileSlug)
 }
