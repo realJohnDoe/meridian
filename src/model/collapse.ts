@@ -6,18 +6,21 @@ type AnyOcc = OccurrenceEntry<AppMetadata>
 
 /**
  * Convert all StoreItems for one fileSlug into a YAML-serializable object.
- * Implements reverse-inheritance: shared fields are hoisted to a defaults block.
+ * Implements reverse-inheritance: fields that instances override are hoisted
+ * into a `defaults:` block so generated occurrences inherit the right base.
  *
- * Algorithm (bottom-up):
- * 1. Leaf level — for each RepeatPattern, collect its explicit OccurrenceEntry
- *    children (ownerId === series.id). Find the largest common subset of
- *    InlineMetadata fields across all children → series defaults block.
- *    Each child only stores fields that differ from those defaults.
- * 2. Series level — compare only the defaults blocks computed in step 1 across
- *    all sibling RepeatPatterns. Common subset → file root defaults block.
- *    Each series only stores diverging defaults.
- * 3. Root structure: if multiple items → root is only defaults+instances, no direct
- *    date/time/repeat. If exactly one item → root represents it directly.
+ * Single-series algorithm:
+ * - A field goes into `defaults:` if the series has a defined value for it AND
+ *   at least one non-excluded instance overrides it (differs from the series).
+ *   This keeps the series itself clean (not "owned" by the instance value) while
+ *   ensuring generated occurrences inherit the correct default.
+ * - Fields no instance touches stay at the series root level.
+ * - Each instance stores only fields that differ from the series metadata,
+ *   whether those fields are at root or in defaults.
+ *
+ * Multi-series / multi-item algorithm (split-series pattern):
+ * - Fields shared across all sibling series and standalones → file root defaults.
+ * - Each series only stores diverging values.
  */
 export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
   if (items.length === 0) return {}
@@ -43,13 +46,43 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     }
 
     // Series with explicit instances.
-    // Diff each instance against the SERIES metadata (not a synthesized shared
-    // `defaults:` block). Instances already inherit the series' fields on load,
-    // so a field equal to the series is redundant and dropped, while per-occurrence
-    // overrides (e.g. a single `done: true`) stay on the instance. Hoisting such
-    // per-occurrence state into `defaults:` is not round-trip stable: on reload it
-    // leaks onto the series itself and would mark the whole series done.
-    const occs = children as AnyOcc[]
+    //
+    // A field on the series belongs in `defaults:` if at least one non-excluded
+    // instance overrides it. Generated occurrences inherit that default; the
+    // series itself is NOT considered "done" (or whatever value) just because it
+    // defined the default. Fields no instance touches stay at the series root.
+    //
+    // Instances are always diffed against the full series metadata, so a field
+    // that matches the series (whether series-root or defaults) is dropped from
+    // the instance — keeping each instance minimal.
+    const occs        = children as AnyOcc[]
+    const nonExcluded = occs.filter(c => !c.excluded)
+    const allKeys: (keyof InlineMetadata)[] = ['title', 'done', 'tags', 'participants', 'priority', 'duration', 'timezone']
+
+    // Keys where the series has a defined value AND some instance differs from it.
+    const overriddenKeys = new Set<keyof InlineMetadata>(
+      allKeys.filter(key => {
+        const sv = s.metadata[key]
+        if (sv === undefined) return false
+        return nonExcluded.some(c => {
+          const iv = c.metadata[key]
+          return (key === 'tags' || key === 'participants')
+            ? JSON.stringify(iv) !== JSON.stringify(sv)
+            : iv !== sv
+        })
+      }),
+    )
+
+    // Split series metadata: overridden fields → defaults:, the rest → root.
+    const rootMeta:     Partial<InlineMetadata> = {}
+    const defaultsMeta: Partial<InlineMetadata> = {}
+    for (const key of allKeys) {
+      const v = s.metadata[key]
+      if (v === undefined) continue
+      if (overriddenKeys.has(key)) (defaultsMeta as Record<string, unknown>)[key] = v
+      else                          (rootMeta     as Record<string, unknown>)[key] = v
+    }
+
     const instances = occs.map(c => {
       if (c.excluded) return { date: c.date, excluded: true }
       const diff = diffMetadata(c.metadata, s.metadata)
@@ -60,12 +93,13 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     })
 
     const result: Record<string, unknown> = {
-      ...metadataToYaml(s.metadata),
+      ...metadataToYaml(rootMeta),
       date:   s.date,
       ...(s.time ? { time: s.time } : {}),
       repeat: s.repeat,
     }
-    if (instances.length > 0) result.instances = instances
+    if (overriddenKeys.size > 0) result.defaults  = metadataToYaml(defaultsMeta)
+    if (instances.length > 0)    result.instances = instances
     return result
   }
 

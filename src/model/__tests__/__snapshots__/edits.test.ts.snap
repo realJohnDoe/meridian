@@ -2,11 +2,8 @@
 
 exports[`edit operations → serialized YAML > all-scope edit updates the whole series 1`] = `
 "---
-title: Team Standup
-done: false
 tags:
   - work
-duration: 45m
 date: 2026-04-06
 time: 09:00
 repeat:
@@ -14,6 +11,10 @@ repeat:
   freq: weekly
   byweekday:
     - mo
+defaults:
+  title: Team Standup
+  done: false
+  duration: 45m
 instances:
   - date: 2026-04-13
     title: Weekly Standup
@@ -47,7 +48,6 @@ Milk, eggs, bread"
 exports[`edit operations → serialized YAML > deleteFollowing caps the series end before the occurrence 1`] = `
 "---
 title: Weekly Standup
-done: false
 tags:
   - work
 duration: 30m
@@ -61,6 +61,8 @@ repeat:
   end:
     type: until
     date: 2026-04-19
+defaults:
+  done: false
 instances:
   - date: 2026-04-13
     done: true
@@ -77,7 +79,6 @@ Quick sync. Agenda:
 exports[`edit operations → serialized YAML > excludeOccurrence drops a single generated occurrence 1`] = `
 "---
 title: Weekly Standup
-done: false
 tags:
   - work
 duration: 30m
@@ -88,6 +89,8 @@ repeat:
   freq: weekly
   byweekday:
     - mo
+defaults:
+  done: false
 instances:
   - date: 2026-04-13
     done: true
@@ -147,7 +150,6 @@ Quick sync. Agenda:
 exports[`edit operations → serialized YAML > single-scope edit overrides one occurrence (priority) without touching the series 1`] = `
 "---
 title: Weekly Standup
-done: false
 tags:
   - work
 duration: 30m
@@ -158,6 +160,8 @@ repeat:
   freq: weekly
   byweekday:
     - mo
+defaults:
+  done: false
 instances:
   - date: 2026-04-13
     done: true
@@ -177,7 +181,6 @@ Quick sync. Agenda:
 exports[`edit operations → serialized YAML > toggleDone on a generated occurrence adds a done override 1`] = `
 "---
 title: Weekly Standup
-done: false
 tags:
   - work
 duration: 30m
@@ -188,6 +191,8 @@ repeat:
   freq: weekly
   byweekday:
     - mo
+defaults:
+  done: false
 instances:
   - date: 2026-04-13
     done: true
