@@ -178,13 +178,7 @@
 .day-lbl{padding:14px 14px 5px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--bg1);z-index:3}
 .day-lbl.tl{color:var(--ind)}
 .day-lbl::after{content:'';flex:1;height:1px;background:var(--bdr)}
-.occ-row{display:flex;align-items:flex-start;gap:9px;padding:8px 14px;cursor:pointer;transition:background .1s}
-.occ-row:hover{background:var(--bg2)}
-.occ-row.is-done{opacity:.5}
-.occ-left{width:48px;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding-top:3px}
-.occ-time{font-size:11px;font-family:var(--mono);color:var(--t3);letter-spacing:.02em;line-height:1.2}
-.occ-time.timed{color:var(--cyn)}
-.occ-dur-small{font-size:9px;font-family:var(--mono);color:var(--t3);opacity:.75}
+/* Priority bar — kept in CSS because the colour class is a dynamic string from barClass() */
 .occ-bar{width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;min-height:20px;background:var(--bg4)}
 .occ-bar.event-future{background:linear-gradient(to bottom,var(--ind),var(--pur))}
 .occ-bar.task-open{background:var(--grn)}
@@ -192,15 +186,6 @@
 .occ-bar.task-p2{background:var(--p2)}
 .occ-bar.task-p3{background:var(--p3)}
 .occ-bar.done,.occ-bar.event-past{background:var(--bg4)}
-.occ-body{flex:1;min-width:0}
-.occ-tr{display:flex;align-items:center;gap:6px}
-.occ-title{font-size:14px;font-weight:500;color:var(--t0);@apply truncate;flex:1}
-.occ-title.done-t{text-decoration:line-through;color:var(--t3)}
-.orecur{display:inline-flex;align-items:center;margin-left:4px;opacity:.45;flex-shrink:0;vertical-align:middle}
-.orecur svg{width:11px;height:11px;stroke:var(--t3);fill:none;stroke-width:2}
-.occ-meta{display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap}
-.occ-participants{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--t3)}
-.occ-participants svg{stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
 .multiday-banner{margin:2px 14px;background:rgba(129,140,248,.18);border:1px solid rgba(129,140,248,.3);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--ind);display:flex;align-items:center;gap:6px;cursor:pointer}
 .multiday-banner svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
 
@@ -332,9 +317,6 @@
 .swipe-hint.ready svg{transform:scale(1.3)}
 .swipe-row{position:relative;z-index:1;background:var(--bg1);touch-action:pan-y;user-select:none;-webkit-user-select:none}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-/* animation lives on the inner row, not the FLIP target (.swipe-wrap).
-   --stagger is set once at mount so reordering never replays the entry animation. */
-.occ-row{animation:fadeUp .16s ease both;animation-delay:var(--stagger,0s)}
 
 /* Hide number input spinners globally for a cleaner, premium design */
 input[type="number"]::-webkit-inner-spin-button,

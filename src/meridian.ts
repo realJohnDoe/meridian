@@ -16,6 +16,7 @@ import {
   fileSlugItems, findSeries,
 } from './model/storeOps'
 import type { Occurrence, Repeat, Scheduled, Priority, StoreItem } from './types'
+import { parseWikilinks, resolveWikilink } from './wikilinks'
 import { occKind, occIsRecur, isSeries } from './types'
 export { occKind, occIsRecur }
 import type { EntryState, ItemType } from './components/EntryEditor'
@@ -521,14 +522,33 @@ export function entryFromOccurrence(
   }
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export function buildBodyHtml(text: string, items?: StoreItem[]): string {
-  return text
-    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, ref: string, label: string) => {
-      const allItems = items ?? getItems()
-      const target = allItems.find(i => i.metadata.title.toLowerCase() === ref.toLowerCase())
-      return `<span class="${target ? 'wl' : 'wl-broken'}" data-ref="${ref}">[[${label || ref}]]</span>`
-    })
-    .replace(/\n/g, '<br>')
+  const allItems = items ?? getItems()
+  const links = parseWikilinks(text)
+  if (links.length === 0) return escapeHtml(text).replace(/\n/g, '<br>')
+
+  let result = ''
+  let cursor = 0
+  for (const wl of links) {
+    result += escapeHtml(text.slice(cursor, wl.start)).replace(/\n/g, '<br>')
+    const target = resolveWikilink(wl.ref, allItems)
+    const cls = target ? 'wl' : 'wl-broken'
+    const safeRef   = escapeHtml(wl.ref)
+    const safeLabel = escapeHtml(wl.label ?? wl.ref)
+    result += `<span class="${cls}" data-ref="${safeRef}">[[${safeLabel}]]</span>`
+    cursor = wl.end
+  }
+  result += escapeHtml(text.slice(cursor)).replace(/\n/g, '<br>')
+  return result
 }
 
 export function closeEntry(): void { popOverlayFn() }
