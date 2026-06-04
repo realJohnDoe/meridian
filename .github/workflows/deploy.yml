@@ -15,20 +15,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level=high
-      - run: pnpm run build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
+    uses: ./.github/workflows/build.yml
 
   deploy:
     needs: build
