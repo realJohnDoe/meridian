@@ -584,8 +584,8 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
 }
 
 export function toggleOccDone(o: Occurrence): void {
-  o.metadata.done = !o.metadata.done // optimistic UI
   const next = toggleDone(getItems(), o)
+  o.metadata.done = !o.metadata.done // optimistic UI
   setItems(next)
   writeEntityToCache(o.fileSlug)
 }
