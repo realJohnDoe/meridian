@@ -151,25 +151,28 @@ describe('mixed series and standalone instances', () => {
     expect(standalones).toHaveLength(1)
   })
 
-  it('series have different repeat patterns', () => {
+  it('series have different schedules (mo weekly and fr weekly)', () => {
     const items = parseFixture('mixed-series-standalones')
     const series = items.filter(isSeries)
-    const types = series.map(s => s.repeat.type).sort()
-    expect(types).toEqual(['schedule', 'schedule'])
-    const freqs = series.map(s => (s.repeat as { freq?: string }).freq).sort()
-    expect(freqs).toEqual(['monthly', 'weekly'])
+    expect(series).toHaveLength(2)
+    const days = series.flatMap(s => (s.repeat as { byweekday?: string[] }).byweekday ?? []).sort()
+    expect(days).toEqual(['fr', 'mo'])
+    // First series is capped
+    expect((series[0].repeat as { end?: unknown }).end).toBeDefined()
   })
 
-  it('standalone has no ownerId and is a multi-day event', () => {
+  it('standalone has no ownerId and inherits the shared title', () => {
     const items = parseFixture('mixed-series-standalones')
     const standalone = items.find(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)!
-    expect(standalone.metadata.title).toBe('Planning Offsite')
+    expect(standalone.metadata.title).toBe('Weekly Sync')
     expect(standalone.metadata.duration).toBe('2d')
   })
 
-  it('all items share tags from the file root defaults', () => {
+  it('all items share title, done and tags from the file root defaults', () => {
     const items = parseFixture('mixed-series-standalones')
     for (const item of items) {
+      expect(item.metadata.title).toBe('Weekly Sync')
+      expect(item.metadata.done).toBe(false)
       expect(item.metadata.tags).toEqual(['work'])
     }
   })

@@ -138,10 +138,10 @@ describe('edit operations → serialized YAML', () => {
     const next = excludeOccurrence(items, occ)
     const yaml = serialize(next)
     expect(yaml).toMatchSnapshot()
-    // standalone Planning Offsite must still be present
-    expect(yaml).toContain('Planning Offsite')
-    // monthly series must still be present
-    expect(yaml).toContain('Monthly Retro')
+    // the friday series must still be present
+    expect(yaml).toContain('fr')
+    // the standalone multi-day event must still be present
+    expect(yaml).toContain('2026-07-01')
   })
 
   it('creating a new standalone task serializes to a single file', () => {
