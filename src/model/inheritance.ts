@@ -171,13 +171,15 @@ function prune(v: unknown): unknown {
  * instances) without any collapse optimisation. Returns only the inner YAML
  * content — wrap with `wrapFrontmatter` from fileIO.ts.
  *
- * Key order is canonicalised: root fields first, then `defaults:`, then
- * `instances:`, so saved files have a stable shape.
+ * Key order is canonicalised: `defaults:` first (when present), then root
+ * fields, then `instances:`. Putting defaults first makes series files
+ * read top-to-bottom as "here are the defaults, here is the schedule".
  */
 export function serializeRawNode(node: RawNode): string {
   const { defaults, instances, ...rootFields } = node
-  const ordered: Record<string, unknown> = { ...rootFields }
+  const ordered: Record<string, unknown> = {}
   if (defaults && Object.keys(defaults as object).length > 0) ordered.defaults = defaults
+  Object.assign(ordered, rootFields)
   if (Array.isArray(instances) && instances.length > 0) ordered.instances = instances
 
   return stringify(prune(ordered), {

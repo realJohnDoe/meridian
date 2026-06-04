@@ -1,19 +1,21 @@
 ---
-title: Weekly Standup
-tags: [work]
-date: "2026-04-06"
-time: "09:00"
-duration: 30m
+defaults:
+  title: Weekly Standup
+  done: false
+  tags:
+    - work
+  duration: 30m
+date: 2026-04-06
+time: 09:00
 repeat:
   type: schedule
   freq: weekly
-  byweekday: [mo]
-defaults:
-  done: false
+  byweekday:
+    - mo
 instances:
-  - date: "2026-04-13"
+  - date: 2026-04-13
     done: true
-  - date: "2026-04-14"
+  - date: 2026-04-14
     done: true
 ---
 

@@ -1,14 +1,19 @@
 ---
-title: Exercise
-tags: [health]
-date: "2026-04-06"
-done: false
+defaults:
+  title: Exercise
+  done: false
+  tags:
+    - health
+date: 2026-04-06
 repeat:
   type: schedule
   freq: weekly
-  byweekday: [mo, we, fr]
+  byweekday:
+    - mo
+    - we
+    - fr
 instances:
-  - date: "2026-04-06"
+  - date: 2026-04-06
     done: true
 ---
 
