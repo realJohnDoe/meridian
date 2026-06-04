@@ -1,86 +1,146 @@
 # src/model — Architecture boundaries
 
-## Guiding principle
+## Overview
 
-Every file in this directory is **field-agnostic**: none of them may reference
-domain field names such as `title`, `done`, `priority`, `tags`, `body`, or
-`duration`.  Field-specific knowledge lives in the application layer
-(`src/meridian.ts`, `src/debug/NodeInheritanceDebugger.tsx`, etc.).
+This directory implements the data pipeline in three conceptually independent
+stages:
+
+```
+YAML text
+  ↓  fileIO.ts  (parse / serialise text ↔ plain objects)
+  ↓  inheritance.ts  (defaults: propagation — field-agnostic)
+  ↓  storeItems.ts  (EffectiveNode tree → flat StoreItem[])
+  ↓  expansion.ts  (StoreItem[] → concrete Occurrence[] in a date window)
+                                    ↑
+                              storeOps.ts  (pure edits on StoreItem[])
+                                    ↑
+                              collapse.ts  (StoreItem[] → YAML object for saving)
+```
 
 ---
 
 ## Files and responsibilities
 
 ### `nodeSchema.ts`
-Zod schema and TypeScript type for `RawNode` — the unprocessed shape of a YAML
-file.  Pure data definition; no logic.
-
-### `nodeOps.ts`
-**Immutable tree operations** on `RawNode` trees.
-
-- `getSubNode` / `setSubNode` — navigate and replace a node at an index path.
-- `splitNode(node, occDate)` — split a repeat series at a date; returns
-  `[series1, series2]` with series1 capped before `occDate`.
-- `doEditFollowing(node, ownerPath, occDate)` — split the series that owns the
-  repeat at a given path; handles both root-repeat and child-repeat containers.
-
-No knowledge of field semantics.  No dates beyond structural splitting.
+Zod schema and TypeScript type for `RawNode` — the unprocessed shape of a
+parsed YAML file.  Pure data definition; no logic.
 
 ### `inheritance.ts`
-**Inheritance model** — the loading ↔ saving round-trip.
+**Field-agnostic inheritance engine.**
 
-*Loading direction* (YAML → effective values):
-- `buildEffectiveTree(node, parentDefaults?)` — recursively merges `defaults:`
-  blocks into child fields, producing an `EffectiveNode` tree where every node
-  carries its fully-resolved field values.
+*Loading direction* (`defaults:` propagation):
+- `buildEffectiveTree(node, parentDefaults?)` — walks a `RawNode` tree and
+  merges every `defaults:` block into its children's `fields`, producing an
+  `EffectiveNode` tree.  After this step there are no `defaults:` blocks left;
+  every node carries its fully-resolved field values.  `childDefaults` on each
+  node holds the accumulated context that will be passed to that node's own
+  children (used by the expansion engine to seed generated occurrences).
 
-*Saving direction* (effective values → canonical YAML):
-- `collapseToYaml(root, body?)` — collapses an `EffectiveNode` tree back to
-  the most compact YAML by hoisting fields shared across all direct instances
-  into a root `defaults:` block.
-- `canonicaliseInstance(raw, parentDefaults, structuralKeys, directKeys?)` —
-  restructures a **flat** raw node (all fields explicit) into two-level form:
-  - `structuralKeys` stay as direct fields unconditionally.
-  - `directKeys` stay direct only when they differ from `parentDefaults`.
-  - Everything else that differs from `parentDefaults` goes in a nested
-    `defaults:` block (for generated occurrences to inherit).
-  - Fields matching `parentDefaults` are dropped entirely.
-  The caller supplies both key sets — this function never inspects field names.
+*Saving direction* (YAML serialisation):
+- `serializeRawNode(node)` — serialises a plain `RawNode` object to a YAML
+  frontmatter string using the `yaml` library.  Key order: `defaults:` first
+  (when present), then structural root fields, then `instances:`.
 
-### `repeatExpander.ts`
-**Temporal expansion** — maps a repeat pattern + override instances onto a
-flat list of `OccurrenceEntry` values.
+This file is **field-agnostic**: it never references domain field names.
 
-- `expandRepeat(node, endDateStr, ownerPath)` — expands a single
-  `EffectiveNode` that has a `repeat` field.
-- `collectAllOccurrences(root, endDateStr)` — walks the entire effective tree
-  and collects occurrences from every node that has a `repeat`; assigns each
-  occurrence an `ownerPath` so callers know which sub-node owns the series.
-- `toExpandable(node)` — internal helper that converts an `EffectiveNode` into
-  the duck-typed shape consumed by `expandNode` (from `recurrence.ts`).  Lifts
-  fields shared by **all** child instances onto the parent when the parent
-  lacks them (covers the case where a series stores shared properties in a
-  nested `defaults:` block rather than as direct fields).
+### `storeItems.ts`
+**Tree → flat store.**
 
-This file knows about dates and repeat schedules.  It must not contain
-special-case logic for any specific field name.
+- `parseToStoreItems(path, content)` — full parse pipeline: `yamlParse` →
+  `buildEffectiveTree` → `effectiveNodeToStoreItems`.
+- `parseYamlToStoreItems(yaml, fileSlug)` — same but from a raw YAML string
+  (used for seed data).
+- `effectiveNodeToStoreItems(tree, fileSlug, body?)` — walks an `EffectiveNode`
+  tree and emits a flat `StoreItem[]`:
+  - Series node (`repeat` present) → `RepeatPattern` + child `OccurrenceEntry`
+    overrides.
+  - Node with `date` but no `repeat` → standalone `OccurrenceEntry`.
+  - Container node (no `date`, no `repeat`) → recurse into instances.
 
-### `expand.ts`
-**Inheritance-aware `expandRange` entry point** for the main application.
+Domain-aware: calls `extractAppMetadata` which maps raw fields to `AppMetadata`.
 
-Wraps `buildEffectiveTree` + `expandNode` so that a `defaults:`-driven
-container node is fully resolved before being handed to the recurrence engine.
-Also handles multi-day events and container nodes whose repeat lives on a
-child instance.
+### `expansion.ts`
+**Temporal expansion engine** — the largest module; consolidates what was
+previously several separate files.
+
+*Date helpers* (exported for UI use):
+`fmtISO`, `fmtT`, `parseDateString`, `toDate`, `nodeDateTime`, `jsDateToSpec`,
+`addInterval`, `parseDurationHours`, `parseDurationDays`, `multidayCoversDate`.
+
+*Low-level engine* (field-agnostic):
+- `expandNode(node, from, to)` — expands a single duck-typed node with a
+  `repeat` field into raw occurrence objects.
+- `mergeNode(parent, child)` — merges child fields on top of parent.
+
+*Model types*: `OccurrenceEntry<T>`, `RepeatPattern<T>`, `METADATA_EXCLUDE`.
+
+*Collectors* (generic):
+`expandRepeat`, `collectAllOccurrences`, `collectRepeatPatterns` — walk
+`EffectiveNode` trees and produce typed occurrences; callers supply an
+`extractMetadata` function.
+
+*Main-app entry point* (domain-aware):
+- `expandRange(items, from, to)` — takes a `StoreItem[]` and expands all
+  series and standalones within the date window, returning
+  `OccurrenceEntry<AppMetadata>[]` with `jsTime` and `ownerId` populated.
+- `multidayCoversDate(occ, date)` — returns true when a multi-day event
+  (duration ≥ 2d) spans the given date.  Used by calendar views to show an
+  event across all days it covers without expanding it into multiple occurrences.
+
+### `collapse.ts`
+**Reverse-inheritance: `StoreItem[]` → YAML object for saving.**
+
+- `collapseToYaml(items)` — takes all `StoreItem`s for one `fileSlug` and
+  produces the most compact `Record<string, unknown>` that round-trips back to
+  the same store state.
+
+  The inheritance algorithm is driven by `hoistSharedMetadata`:
+  - **Simple cases** (single item, no override children): flat output — metadata
+    alongside structural fields at root, no `defaults:` block.
+  - **Single series with instances**: `defaults:` carries all series metadata;
+    only structural fields (`date`, `time`, `repeat`) at root; each instance
+    stores only its diff from the series.
+  - **Multi-series / container**: `defaults:` carries metadata shared across
+    *all* series and standalones; each series root holds only structural fields;
+    series-specific metadata goes in the series' local `defaults:` block.
+
+- `hoistSharedMetadata(metas)` — pure, domain-agnostic helper.  Given N
+  `InlineMetadata` objects, returns `rootDefaults` (fields shared by all) and
+  `localDefaults` (per-item diverging fields).  Knows nothing about YAML
+  structure, dates, or series.
+
+- `serializeChildren(children, seriesMeta)` — serialises override instances,
+  diffing each against the series metadata.
+
+### `storeOps.ts`
+**Pure `StoreItem[]` edit operations.**
+
+Every function takes a `StoreItem[]` and returns a new `StoreItem[]`; no store,
+React, or file I/O dependencies.
+
+- `applyEdit(items, occ, scope, fields)` — apply an editor save across four
+  scopes: `'all'`, `'single'`, `'future'` (series split), `'add'`.
+- `toggleDone`, `excludeOccurrence`, `deleteByFileSlug`, `deleteFollowing`
+- `upsertOverride`, `findSeries`, `fileSlugItems`
+
+### `__tests__/`
+Test suite (Vitest).  See `__tests__/fixtures/` for canonical `.md` files used
+as round-trip and edit-operation golden inputs.
 
 ---
 
-## What does NOT belong here
+## Layering rules
 
 | Concern | Where it lives |
 |---|---|
-| Domain field names (title, done, priority, …) | `src/meridian.ts`, UI components |
+| Domain field names used in logic | `storeOps.ts`, `storeItems.ts`, `collapse.ts` via `INLINE_FIELDS` registry |
+| Field-agnostic tree / inheritance | `inheritance.ts`, `nodeSchema.ts` |
+| Field-agnostic low-level expansion | `expandNode`, `mergeNode` in `expansion.ts` |
 | Persistence / Dexie cache | `src/meridian.ts` |
 | React state / store mutations | `src/App.tsx`, `src/store.ts` |
-| Which keys are "structural" for a series | Call sites of `canonicaliseInstance` |
 | UI formatting, dialogs, editor state | `src/components/`, `src/debug/` |
+
+The `inheritance.ts` / `nodeSchema.ts` files remain fully field-agnostic.
+`expansion.ts` is field-agnostic at the engine level but domain-aware at the
+`expandRange` entry point.  `collapse.ts` uses the `INLINE_FIELDS` registry
+rather than hard-coding field names.
