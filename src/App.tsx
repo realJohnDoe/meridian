@@ -96,7 +96,7 @@ export default function App() {
     tryRestoreDirectory()
     // Scroll agenda to today after AgendaView has rendered its sections.
     setTimeout(() => {
-      const sec = document.querySelector(`.day-section[data-key="${TODAY.getFullYear()}-${String(TODAY.getMonth()+1).padStart(2,'0')}-${String(TODAY.getDate()).padStart(2,'0')}"]`)
+      const sec = document.querySelector(`.day-section[data-key="${fmtISO(TODAY)}"]`)
       if (sec) sec.scrollIntoView({ behavior: 'instant', block: 'start' })
     }, 200)
     // Close the active dialog when the user presses Escape.

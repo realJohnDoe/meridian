@@ -2,10 +2,10 @@ import { useMemo, useCallback } from 'react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
 
-import { expandRange } from '../model/expansion'
+import { expandRange, fmtISO } from '../model/expansion'
 import { parseDurationDays } from '../model/expansion'
 import {
-  sameDay, addDays, dayKey, sortOccs,
+  sameDay, addDays, sortOccs,
   toggleOccDone, beginSwipeDelete,
 } from '../meridian'
 import DaySection from './DaySection'
@@ -27,7 +27,7 @@ export default function AgendaView({ onOpen }: Props) {
     const result: Record<string, { date: Date; items: Occurrence[] }> = {}
 
     // Always seed today so goToday() can always find a section to scroll to.
-    const todayKey = dayKey(TODAY)
+    const todayKey = fmtISO(TODAY)
     result[todayKey] = {
       date: new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()),
       items: [],
@@ -38,7 +38,7 @@ export default function AgendaView({ onOpen }: Props) {
     occs.forEach(o => {
       const jsTime = o.metadata.jsTime
       if (!jsTime) return
-      const k = dayKey(jsTime)
+      const k = fmtISO(jsTime)
       if (!result[k]) {
         result[k] = {
           date: new Date(jsTime.getFullYear(), jsTime.getMonth(), jsTime.getDate()),

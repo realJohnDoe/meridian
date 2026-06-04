@@ -4,7 +4,7 @@ import { useStore } from '../store'
 import type { Occurrence } from '../types'
 
 import { expandRange } from '../model/expansion'
-import { addDays, barClass } from '../meridian'
+import { addDays, occState } from '../meridian'
 import OccurrenceCard from './OccurrenceCard'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
@@ -72,7 +72,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
               occ={o}
               variant="compact"
               isDone={!!o.metadata.done}
-              currentBarClass={barClass(o)}
+              currentBarClass={occState(o)}
               onOpen={() => onOpen(o)}
               onToggleDone={() => {}}
             />

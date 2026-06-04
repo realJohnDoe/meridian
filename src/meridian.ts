@@ -7,7 +7,7 @@ import {
 } from './cache'
 import {
   diskPickDirectory, diskReadAll, diskWrite, diskDelete,
-  saveFile,
+  saveFile, titleToSlug,
 } from './fileIO'
 import { collapseToYaml } from './model/collapse'
 import { parseToStoreItems, parseYamlToStoreItems } from './model/storeItems'
@@ -399,8 +399,6 @@ export const sameDay = (a: Date, b: Date): boolean =>
 export const addDays = (d: Date, n: number): Date => { const r = new Date(d); r.setDate(r.getDate() + n); return r }
 export const fmtLong = (d: Date): string => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 export const fmtShort = (d: Date): string => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-export const dayKey = (d: Date): string =>
-  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 
 // ── NAVIGATION ──────────────────────────────────────────────────
 export function pushOverlay(name: 'entry' | 'search'): void { pushOverlayFn(name) }
@@ -415,7 +413,7 @@ export function goToday(): void {
   } else {
     setPrimary('agenda')
     setTimeout(() => {
-      const sec = document.querySelector(`.day-section[data-key="${dayKey(TODAY)}"]`)
+      const sec = document.querySelector(`.day-section[data-key="${fmtISO(TODAY)}"]`)
       if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 60)
   }
@@ -459,17 +457,18 @@ export function occState(o: Occurrence): string {
   if (o.metadata.jsTime && o.metadata.jsTime < now) return 'event-past'
   return 'event-future'
 }
-export function barClass(o: Occurrence): string { return occState(o) }
-
+const _ccBarMap: Record<string, string> = {
+  'done': 'done',
+  'event-past': 'done',
+  'task-open': 'task',
+  'task-p1': 'task-p1',
+  'task-p2': 'task-p2',
+  'task-p3': 'task-p3',
+  'event-future': 'event',
+}
 export function ccBarClass(o: Occurrence): string {
   if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 'multiday'
-  const s = occState(o)
-  if (s === 'done' || s === 'event-past') return 'done'
-  if (s === 'task-open') return 'task'
-  if (s === 'task-p1') return 'task-p1'
-  if (s === 'task-p2') return 'task-p2'
-  if (s === 'task-p3') return 'task-p3'
-  return 'event'
+  return _ccBarMap[occState(o)] ?? 'event'
 }
 
 export function openDayViewForDate(date: Date): void {
@@ -579,19 +578,9 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
   setItems(next)
 
   // Determine which fileSlug to persist.
-  const fileSlug = item?.fileSlug ?? (fields.scheduled?.date ? titleToSlugLocal(title) : null)
+  const fileSlug = item?.fileSlug ?? (fields.scheduled?.date ? titleToSlug(title) : null)
   if (fileSlug) writeEntityToCache(fileSlug)
   closeEntry()
-}
-
-// Small helper — avoids importing fileIO's titleToSlug at module top just for saveNode.
-function titleToSlugLocal(title: string): string {
-  return (title || 'untitled')
-    .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 60) || 'untitled'
 }
 
 export function toggleOccDone(o: Occurrence): void {
