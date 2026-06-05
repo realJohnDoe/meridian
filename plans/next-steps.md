@@ -1,5 +1,6 @@
 ## Next steps
 
+- Fix saving of tasks without date
 - Adapt EntryEditor to have tags directly below title, then a separator, then the scope selector and then the type select, so it matches root / occurrence split
 - Fix look of multiday events. We want something like in Google Calendar: Render like a normal event but have '(Day 1/3)' suffixed.
 - Fix swiping to the right after swiping to the left
