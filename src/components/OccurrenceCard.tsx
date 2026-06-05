@@ -1,14 +1,14 @@
 import { Repeat2, Users } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { fmtT, parseDateString } from '../model/expansion'
-import { fmtShort } from '../meridian'
+import { fmtT } from '../model/expansion'
 import { Checkbox } from './ui/checkbox'
-import { Badge } from './ui/badge'
 import { Card } from './ui/card'
+import TagChip from './TagChip'
+import { unwrapRef, resolveWikilink } from '../wikilinks'
+import { useStore } from '../store'
 
 export interface OccurrenceCardProps {
   occ: Occurrence
-  variant?: 'agenda' | 'compact'
   isDone: boolean
   currentBarClass: string
   onOpen: () => void
@@ -30,9 +30,29 @@ function ParticipantsBadge({ participants }: { participants: string[] }) {
   )
 }
 
+function TagsRow({ tags, topics }: { tags: string[]; topics: string[] }) {
+  const items = useStore(s => s.items)
+
+  // Build unified, alphabetically-sorted chip list
+  type ChipItem = { label: string; isTopic: boolean; key: string }
+  const tagChips: ChipItem[] = tags.map(t => ({ label: t, isTopic: false, key: `tag:${t}` }))
+  const topicChips: ChipItem[] = topics.map(raw => {
+    const ref = unwrapRef(raw)
+    const resolved = resolveWikilink(ref, items)
+    const label = resolved?.metadata.title || ref
+    return { label, isTopic: true, key: `topic:${raw}` }
+  })
+  const all = [...tagChips, ...topicChips].sort((a, b) => a.label.localeCompare(b.label))
+  if (!all.length) return null
+  return (
+    <div className="flex flex-wrap gap-[5px]">
+      {all.map(c => <TagChip key={c.key} label={c.label} isTopic={c.isTopic} />)}
+    </div>
+  )
+}
+
 export default function OccurrenceCard({
   occ,
-  variant = 'agenda',
   isDone,
   currentBarClass,
   onOpen,
@@ -41,12 +61,8 @@ export default function OccurrenceCard({
   const t = fmtT(occ.time)
   const hasTrack = occ.metadata.done !== undefined
   const tags = occ.metadata.tags || []
+  const topics = (occ.metadata.topics as string[] | undefined) || []
   const participants = occ.metadata.participants || []
-
-  const dateBadge = (() => {
-    const d = parseDateString(occ.date)
-    return d ? fmtShort(d) : occ.date
-  })()
 
   const cardCls = [
     'cursor-pointer transition-colors shadow-none',
@@ -59,86 +75,50 @@ export default function OccurrenceCard({
     if (!(e.target as HTMLElement).closest('[role=checkbox]')) onOpen()
   }
 
-  if (variant === 'agenda') {
-    return (
-      <Card
-        className={`${cardCls} flex items-stretch gap-[9px] px-[14px] py-[8px] mx-2 mb-1.5`}
-        style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
-        onClick={handleClick}
-      >
-        {/* Priority bar */}
-        <span className={`occ-bar ${currentBarClass}`} />
+  return (
+    <Card
+      className={`${cardCls} flex items-stretch gap-[9px] px-[14px] py-[8px] mx-2 mb-1.5`}
+      style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
+      onClick={handleClick}
+    >
+      {/* Priority bar */}
+      <span className={`occ-bar ${currentBarClass}`} />
 
-        {/* Two rows stacked in a flex-col */}
-        <div className="flex flex-col flex-1 min-w-0 gap-1 py-[2px]">
-          {/* Row 1: checkbox + title + [recur icon + time/duration] on the right */}
-          <div className="flex items-center gap-[6px]">
-            {hasTrack && (
-              <Checkbox
-                checked={isDone}
-                onCheckedChange={() => onToggleDone()}
-                onClick={e => e.stopPropagation()}
-                className="size-5 shrink-0"
-              />
-            )}
-            <span className={titleCls(isDone)}>{occ.metadata.title}</span>
+      {/* Two rows stacked in a flex-col */}
+      <div className="flex flex-col flex-1 min-w-0 gap-1 py-[2px]">
+        {/* Row 1: checkbox + title + [recur icon + time/duration] on the right */}
+        <div className="flex items-center gap-[6px]">
+          {hasTrack && (
+            <Checkbox
+              checked={isDone}
+              onCheckedChange={() => onToggleDone()}
+              onClick={e => e.stopPropagation()}
+              className="size-5 shrink-0"
+            />
+          )}
+          <span className={titleCls(isDone)}>{occ.metadata.title}</span>
 
-            {/* Right-aligned: recur icon + time on one line, duration below */}
-            {(!!occ.ownerId || !!t) && (
-              <div className="flex flex-col items-end shrink-0 ml-1 gap-px">
-                <div className="flex items-end gap-[4px]">
-                  {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
-                  {!!t && <span className="text-[11px] font-mono text-[var(--cyn)] tracking-[.02em] leading-[1.2]">{t}</span>}
-                </div>
-                {!!t && occ.metadata.duration && (
-                  <span className="text-[9px] font-mono text-[var(--t2)] leading-[1.2]">{occ.metadata.duration}</span>
-                )}
+          {/* Right-aligned: recur icon + time on one line, duration below */}
+          {(!!occ.ownerId || !!t) && (
+            <div className="flex flex-col items-end shrink-0 ml-1 gap-px">
+              <div className="flex items-end gap-[4px]">
+                {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
+                {!!t && <span className="text-[11px] font-mono text-[var(--cyn)] tracking-[.02em] leading-[1.2]">{t}</span>}
               </div>
-            )}
-          </div>
-
-          {/* Row 2: tags + participants */}
-          {(tags.length > 0 || participants.length > 0) && (
-            <div className="flex flex-wrap gap-[5px]">
-              {tags.map(tg => <Badge key={tg} variant="tag">{tg}</Badge>)}
-              <ParticipantsBadge participants={participants} />
+              {!!t && occ.metadata.duration && (
+                <span className="text-[9px] font-mono text-[var(--t2)] leading-[1.2]">{occ.metadata.duration}</span>
+              )}
             </div>
           )}
         </div>
-      </Card>
-    )
-  }
 
-  // Compact variant
-  return (
-    <Card className={cardCls} onClick={handleClick}>
-      <div className="flex items-start gap-2 px-3 py-2.5">
-        <span className={`occ-bar ${currentBarClass}`} />
-
-        {/* Two rows stacked in a flex-col */}
-        <div className="flex flex-col flex-1 min-w-0 gap-1">
-          {/* Row 1: checkbox + title */}
-          <div className="flex items-center gap-[6px]">
-            {hasTrack && (
-              <Checkbox
-                checked={isDone}
-                onCheckedChange={() => onToggleDone()}
-                onClick={e => e.stopPropagation()}
-                className="size-5 shrink-0"
-              />
-            )}
-            <span className={titleCls(isDone)}>{occ.metadata.title}</span>
-            {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
-          </div>
-
-          {/* Row 2: date + time + tags + participants */}
+        {/* Row 2: tags + topics + participants */}
+        {(tags.length > 0 || topics.length > 0 || participants.length > 0) && (
           <div className="flex flex-wrap gap-[5px]">
-            <Badge variant="tag">{dateBadge}</Badge>
-            {t && <Badge variant="tag">{t}</Badge>}
-            {tags.map(tg => <Badge key={tg} variant="tag">{tg}</Badge>)}
+            <TagsRow tags={tags} topics={topics} />
             <ParticipantsBadge participants={participants} />
           </div>
-        </div>
+        )}
       </div>
     </Card>
   )

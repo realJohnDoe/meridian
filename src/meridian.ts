@@ -1,4 +1,4 @@
-import { fmtISO, fmtT, parseDurationDays } from './model/expansion'
+import { fmtISO, fmtT, parseDurationDays, expandRange } from './model/expansion'
 import {
   cacheWrite, cacheWriteClean, cacheDelete, cacheGetDirty,
   cacheMarkClean, cacheDirtyCount,
@@ -393,6 +393,53 @@ export const NOTES_DATA = [
   {title:'Ideas',preview:'Offline-first sync, plugin system, graph view.',date:'May 9',tags:['ideas'],type:'note'},
 ]
 
+// ── FILE ENTRY HELPERS ─────────────────────────────────────────
+
+/** A flat, file-granular entry for the item picker and search overlay. */
+export interface FileEntry {
+  fileSlug: string
+  title:    string
+  tags:     string[]
+  topics:   string[]
+}
+
+/**
+ * One FileEntry per file (deduped by fileSlug), for the chip picker and search bar.
+ * Root nodes are the primary source; NOTES_DATA fills gaps for demo notes.
+ */
+export function fileEntries(items: StoreItem[]): FileEntry[] {
+  const fromItems: FileEntry[] = items
+    .filter(isRootNode)
+    .map(i => ({
+      fileSlug: i.fileSlug,
+      title:    i.metadata.title || i.fileSlug,
+      tags:     (i.metadata.tags   as string[]) || [],
+      topics:   (i.metadata.topics as string[]) || [],
+    }))
+  const slugSet = new Set(fromItems.map(e => e.fileSlug))
+  const fromNotes: FileEntry[] = NOTES_DATA
+    .filter(n => !slugSet.has(titleToSlug(n.title)))
+    .map(n => ({ fileSlug: titleToSlug(n.title), title: n.title, tags: n.tags ?? [], topics: [] }))
+  return [...fromItems, ...fromNotes]
+}
+
+/**
+ * Navigate to the right occurrence for a file link.
+ *
+ * Strategy: pick the **next upcoming** occurrence (jsTime ≥ today); if none,
+ * fall back to the **last past** occurrence. Returns `null` for dateless notes.
+ */
+export function targetOccurrence(fileSlug: string, items: StoreItem[]): Occurrence | null {
+  const msDay = 86400000
+  const AHEAD = new Date(TODAY.getTime() + 365 * 3 * msDay)
+  const BACK  = new Date(TODAY.getTime() - 365 * 3 * msDay)
+  const forward = expandRange(items, TODAY, AHEAD).filter(o => o.fileSlug === fileSlug)
+  if (forward.length) return forward[0]
+  const back = expandRange(items, BACK, TODAY).filter(o => o.fileSlug === fileSlug)
+  if (back.length) return back[back.length - 1]
+  return null
+}
+
 // ── UTILS ──────────────────────────────────────────────────────
 export const sameDay = (a: Date, b: Date): boolean =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
@@ -401,7 +448,7 @@ export const fmtLong = (d: Date): string => d.toLocaleDateString('en-US', { week
 export const fmtShort = (d: Date): string => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
 // ── NAVIGATION ──────────────────────────────────────────────────
-export function pushOverlay(name: 'entry' | 'search'): void { pushOverlayFn(name) }
+export function pushOverlay(name: 'entry'): void { pushOverlayFn(name) }
 export function popOverlay(): void { popOverlayFn() }
 
 export function goToday(): void {
@@ -418,12 +465,6 @@ export function goToday(): void {
     }, 60)
   }
 }
-
-export function openSearch(): void {
-  pushOverlayFn('search')
-  setTimeout(() => { (window as any)._focusSearch?.() }, 50)
-}
-export function closeSearch(): void { popOverlayFn() }
 
 // ── SHARED OCCURRENCE SORT ────────────────────────────────────
 const _prioOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }

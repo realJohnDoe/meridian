@@ -1,12 +1,16 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
-import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText, Users } from 'lucide-react'
+import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText, Users, Tag } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem } from '../types'
 import { isSeries, isRootNode } from '../types'
-import { NOTES_DATA } from '../meridian'
+import { fileEntries, NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { Checkbox } from './ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from './ui/command'
+import TagChip from './TagChip'
+import { unwrapRef, resolveWikilink } from '../wikilinks'
 import { cn } from '@/lib/utils'
 
 export type { Scheduled }
@@ -72,19 +76,22 @@ interface Props {
   onScopeChange?: (scope: string) => void
   /** StoreItem[] to resolve wikilinks and parent series against. App passes global items; debug passes local items. */
   items: StoreItem[]
+  /** Called when the user clicks a wikilink chip or body link — navigate to that file. */
+  onOpenWikilink?: (ref: string) => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, onOpenWikilink }: Props) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
-  const tagInputRef = useRef<HTMLInputElement>(null)
-  const [tagInputVal, setTagInputVal] = useState('')
-  const [showTagInput, setShowTagInput] = useState(false)
   const [participantInputVal, setParticipantInputVal] = useState('')
   const [showParticipantInput, setShowParticipantInput] = useState(false)
   const participantInputRef = useRef<HTMLInputElement>(null)
 
-  // ── Wikilink autocomplete state ───────────────────────────────
+  // ── Tag/topic picker state ──────────────────────────────────────
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerQuery, setPickerQuery] = useState('')
+
+  // ── Wikilink autocomplete state (body editor) ───────────────────
   const [wlMatches, setWlMatches] = useState<string[]>([])
   const [wlFocusIdx, setWlFocusIdx] = useState(-1)
   const [wlPopupPos, setWlPopupPos] = useState<{ top: number; left: number } | null>(null)
@@ -177,21 +184,9 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
 
-  // Focus the tag input as soon as it appears.
-  useEffect(() => {
-    if (showTagInput) tagInputRef.current?.focus()
-  }, [showTagInput])
-
   useEffect(() => {
     if (showParticipantInput) participantInputRef.current?.focus()
   }, [showParticipantInput])
-
-  const commitTag = useCallback(() => {
-    const t = tagInputVal.trim()
-    if (t) onChange(prev => ({ ...prev, tags: [...prev.tags, t] }))
-    setTagInputVal('')
-    setShowTagInput(false)
-  }, [tagInputVal, onChange])
 
   const commitParticipant = useCallback(() => {
     const p = participantInputVal.trim()
@@ -200,7 +195,57 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     setShowParticipantInput(false)
   }, [participantInputVal, onChange])
 
-  const { item, title, bodyHtml, scheduled, duration, tracked, itemType, repeat, done, tags, participants, priority, editScope } = entry
+  // ── Tag/topic actions ───────────────────────────────────────────
+  const removeTag = useCallback((idx: number) => {
+    onChange(prev => ({ ...prev, tags: prev.tags.filter((_, i) => i !== idx) }))
+  }, [onChange])
+
+  const removeTopic = useCallback((idx: number) => {
+    onChange(prev => ({ ...prev, topics: prev.topics.filter((_, i) => i !== idx) }))
+  }, [onChange])
+
+  /**
+   * Add a plain-text tag (free text from the picker input).
+   * Rejects empty strings and duplicates.
+   */
+  const addTag = useCallback((raw: string) => {
+    const t = raw.trim()
+    if (!t) return
+    onChange(prev => prev.tags.includes(t) ? prev : { ...prev, tags: [...prev.tags, t] })
+    setPickerQuery('')
+    setPickerOpen(false)
+  }, [onChange])
+
+  /**
+   * Add a wikilink topic by fileSlug (stored as `[[fileSlug]]`).
+   * Rejects duplicates.
+   */
+  const addTopic = useCallback((fileSlug: string) => {
+    const stored = `[[${fileSlug}]]`
+    onChange(prev => prev.topics.includes(stored) ? prev : { ...prev, topics: [...prev.topics, stored] })
+    setPickerQuery('')
+    setPickerOpen(false)
+  }, [onChange])
+
+  // Build the mixed, alphabetically-sorted chip list for the tag/topic row.
+  type ChipEntry = { label: string; isTopic: boolean; idx: number; raw: string }
+  const { tags, topics } = entry
+  const tagChips: ChipEntry[] = tags.map((t, i) => ({ label: t, isTopic: false, idx: i, raw: t }))
+  const topicChips: ChipEntry[] = topics.map((raw, i) => {
+    const ref = unwrapRef(raw)
+    const resolved = resolveWikilink(ref, items)
+    const label = resolved?.metadata.title || ref
+    return { label, isTopic: true, idx: i, raw }
+  })
+  const allChips = [...tagChips, ...topicChips].sort((a, b) => a.label.localeCompare(b.label))
+
+  // File entries for the picker combobox.
+  const allFileEntries = fileEntries(items)
+  const filteredEntries = pickerQuery
+    ? allFileEntries.filter(e => e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
+    : allFileEntries
+
+  const { item, title, bodyHtml, scheduled, duration, tracked, itemType, repeat, done, participants, priority, editScope } = entry
 
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)
@@ -349,34 +394,92 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           )}
         </div>
 
+        {/* ── TAGS + TOPICS ROW (merged, alphabetically sorted) ── */}
         <div className="entry-tags">
-          {tags.map((t, i) => (
-            <Badge key={i} variant="tag">{t}</Badge>
+          {allChips.map(c => (
+            c.isTopic
+              ? <TagChip
+                  key={c.raw}
+                  label={c.label}
+                  isTopic
+                  interactive
+                  onRemove={() => removeTopic(c.idx)}
+                  onNavigate={onOpenWikilink ? () => onOpenWikilink(unwrapRef(c.raw)) : undefined}
+                />
+              : <TagChip
+                  key={`tag:${c.idx}`}
+                  label={c.label}
+                  interactive
+                  onRemove={() => removeTag(c.idx)}
+                />
           ))}
-          {showTagInput ? (
-            <input
-              ref={tagInputRef}
-              className="etag-input"
-              value={tagInputVal}
-              placeholder="tag name"
-              onChange={e => setTagInputVal(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') { e.preventDefault(); commitTag() }
-                if (e.key === 'Escape') { setTagInputVal(''); setShowTagInput(false) }
-              }}
-              onBlur={commitTag}
-            />
-          ) : (
-            <Badge
-              variant="tag"
-              className="cursor-pointer text-primary bg-[var(--ab)] gap-1"
-              onClick={() => setShowTagInput(true)}
-            >
-              <Plus size={9} />tag
-            </Badge>
-          )}
+
+          {/* Merged add affordance: combobox picker */}
+          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <PopoverTrigger asChild>
+              <Badge
+                variant="tag"
+                className="cursor-pointer text-primary bg-[var(--ab)] gap-1"
+                onClick={() => setPickerOpen(true)}
+              >
+                <Plus size={9} /><Tag size={9} />add
+              </Badge>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-0" align="start">
+              <Command shouldFilter={false}>
+                <CommandInput
+                  placeholder="Tag or link file…"
+                  value={pickerQuery}
+                  onValueChange={setPickerQuery}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && pickerQuery.trim() && filteredEntries.length === 0) {
+                      addTag(pickerQuery)
+                    }
+                  }}
+                />
+                <CommandList>
+                  {/* "Add as tag" option — always shown when there's a query */}
+                  {pickerQuery.trim() && (
+                    <CommandGroup heading="Tag">
+                      <CommandItem
+                        value={`__tag__${pickerQuery}`}
+                        onSelect={() => addTag(pickerQuery)}
+                      >
+                        <Tag size={13} className="shrink-0 opacity-60" />
+                        <span>Add <strong>"{pickerQuery.trim()}"</strong> as tag</span>
+                      </CommandItem>
+                    </CommandGroup>
+                  )}
+
+                  {/* File entries for linking */}
+                  {filteredEntries.length > 0 && (
+                    <CommandGroup heading="Link file">
+                      {filteredEntries.slice(0, 8).map(e => (
+                        <CommandItem
+                          key={e.fileSlug}
+                          value={e.fileSlug}
+                          onSelect={() => addTopic(e.fileSlug)}
+                        >
+                          <FileText size={13} className="shrink-0 opacity-60" />
+                          <span className="truncate">{e.title}</span>
+                          {e.tags[0] && (
+                            <span className="ml-auto text-[10px] text-[var(--t3)] shrink-0">{e.tags[0]}</span>
+                          )}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  )}
+
+                  {!pickerQuery && filteredEntries.length === 0 && (
+                    <CommandEmpty>No files found</CommandEmpty>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
+        {/* ── PARTICIPANTS ROW ── */}
         <div className="entry-tags">
           <Users size={13} className="opacity-40 self-center" />
           {participants.map((p, i) => (
@@ -428,7 +531,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
       </div></div>
 
-      {/* ── WIKILINK AUTOCOMPLETE POPUP ── */}
+      {/* ── WIKILINK AUTOCOMPLETE POPUP (body editor) ── */}
       {wlOpen && wlPopupPos && (
         <div className="wl-popup show" style={{ top: wlPopupPos.top, left: wlPopupPos.left }}>
           {wlMatches.map((t, i) => {
