@@ -69,7 +69,10 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     // We keep the call for consistency — hoistSharedMetadata owns that logic.
     const instances = serializeChildren(children, s.metadata)
     const result: Record<string, unknown> = {}
-    const rd = metadataToYaml(rootDefaults)
+    // File-level fields (title/tags/topics) live at the top-level root, never in
+    // defaults: — they identify the file and must stay Obsidian-visible.
+    Object.assign(result, metadataToYaml(pickFileLevel(s.metadata)))
+    const rd = metadataToYaml(omitFileLevel(rootDefaults))
     if (Object.keys(rd).length > 0) result.defaults = rd
     result.date   = s.date
     if (s.time)  result.time   = s.time
@@ -105,7 +108,9 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
   })
 
   const result: Record<string, unknown> = {}
-  const rd = metadataToYaml(rootDefaults)
+  // File-level fields at the top-level root (Obsidian-visible, not inherited).
+  Object.assign(result, metadataToYaml(pickFileLevel(rootDefaults)))
+  const rd = metadataToYaml(omitFileLevel(rootDefaults))
   if (Object.keys(rd).length > 0) result.defaults = rd
   result.instances = allInstances
   return result
@@ -153,6 +158,22 @@ function serializeChildren(
     Object.assign(child, metadataToYaml(diff))
     return child
   })
+}
+
+/** Only the file-level fields (title/tags/topics) of a metadata object. */
+function pickFileLevel(m: Partial<InlineMetadata>): Partial<InlineMetadata> {
+  const out: Partial<InlineMetadata> = {}
+  for (const k of FILE_LEVEL_FIELDS) {
+    if (m[k] !== undefined) (out as Record<string, unknown>)[k] = m[k]
+  }
+  return out
+}
+
+/** A metadata object without its file-level fields (they are emitted at root). */
+function omitFileLevel(m: Partial<InlineMetadata>): Partial<InlineMetadata> {
+  const out = { ...m }
+  for (const k of FILE_LEVEL_FIELDS) delete (out as Record<string, unknown>)[k]
+  return out
 }
 
 /** Convert InlineMetadata fields to a plain YAML-serializable object. */

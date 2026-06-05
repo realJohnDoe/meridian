@@ -114,7 +114,28 @@ export function parseToStoreItems(path: string, content: string): StoreItem[] {
   const { rawNode, body } = loadFile(path, content)
   const fileSlug = path.replace(/\.(md|yaml|yml)$/, '')
   const tree = buildEffectiveTree(rawNode as Parameters<typeof buildEffectiveTree>[0])
-  return effectiveNodeToStoreItems(tree, fileSlug, body)
+  const items = effectiveNodeToStoreItems(tree, fileSlug, body)
+  applyFileLevelFields(items, rawNode)
+  return items
+}
+
+/**
+ * File-level fields (title/tags/topics) belong to the whole file. They are
+ * written at the top-level frontmatter root and so are NOT propagated to child
+ * series by the defaults-only inheritance engine. Read them from the root node
+ * (falling back to a top-level `defaults:` block for legacy files) and force the
+ * same value onto every item — the single source of truth per file.
+ */
+function applyFileLevelFields(items: StoreItem[], rawNode: Record<string, unknown>): void {
+  if (items.length === 0) return
+  const defaults = (rawNode.defaults as Record<string, unknown> | undefined) ?? {}
+  const merged = { ...defaults, ...rawNode }
+  const coerced = extractAppMetadata(merged) as unknown as Record<string, unknown>
+  for (const it of items) {
+    for (const k of FILE_LEVEL_FIELDS) {
+      (it.metadata as unknown as Record<string, unknown>)[k] = coerced[k]
+    }
+  }
 }
 
 /**
@@ -124,7 +145,9 @@ export function parseToStoreItems(path: string, content: string): StoreItem[] {
 export function parseYamlToStoreItems(yamlWithFrontmatter: string, fileSlug: string): StoreItem[] {
   const { rawNode, body } = loadFile(fileSlug + '.md', yamlWithFrontmatter)
   const tree = buildEffectiveTree(rawNode as Parameters<typeof buildEffectiveTree>[0])
-  return effectiveNodeToStoreItems(tree, fileSlug, body)
+  const items = effectiveNodeToStoreItems(tree, fileSlug, body)
+  applyFileLevelFields(items, rawNode)
+  return items
 }
 
 // Re-export isSeries so storeOps can import it from here alongside item types.

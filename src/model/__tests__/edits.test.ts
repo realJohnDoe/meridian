@@ -209,11 +209,38 @@ describe('edit operations → serialized YAML', () => {
       scheduled: { date: '2026-04-06', time: '09:00' },
     }))
     const yaml = serialize(next)
-    // topics must appear at root (in defaults: block), not in instances
+    // topics must appear at root, not in instances
     expect(yaml).toContain('topics:')
     expect(yaml).toContain('[[project-alpha]]')
     const instancesSection = yaml.slice(yaml.indexOf('instances:'))
     expect(instancesSection).not.toMatch(/topics:/)
+  })
+
+  it('file-level fields are emitted at the top-level root, never inside defaults:', () => {
+    const items = parseFixture('weekly-series')
+    const occ = occOn(items, '2026-04-20')
+    const next = applyEdit(items, occ, 'all', editFields(occ, {
+      title: 'Weekly Standup',
+      tags: ['work'],
+      topics: ['[[project-alpha]]'],
+      scheduled: { date: '2026-04-06', time: '09:00' },
+    }))
+    const yaml = serialize(next)
+    // title/tags/topics are top-level keys (no leading whitespace) — Obsidian-visible.
+    expect(yaml).toMatch(/^title: Weekly Standup$/m)
+    expect(yaml).toMatch(/^tags:$/m)
+    expect(yaml).toMatch(/^topics:$/m)
+    // The defaults: block (up to the first top-level key after it) must NOT contain them.
+    const defaultsStart = yaml.indexOf('defaults:')
+    if (defaultsStart >= 0) {
+      // defaults block runs until the first non-indented line after it
+      const after = yaml.slice(defaultsStart + 'defaults:'.length)
+      const blockEnd = after.search(/\n\S/)
+      const defaultsBlock = blockEnd >= 0 ? after.slice(0, blockEnd) : after
+      expect(defaultsBlock).not.toMatch(/title:/)
+      expect(defaultsBlock).not.toMatch(/tags:/)
+      expect(defaultsBlock).not.toMatch(/topics:/)
+    }
   })
 
   it('load normalizes a legacy override that diverged title — root wins', () => {
