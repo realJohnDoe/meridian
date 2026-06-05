@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { parseFixture, serialize } from './helpers'
+import { parseFixture, serialize, rootMeta } from './helpers'
 import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing } from '../storeOps'
 import type { EditFields } from '../storeOps'
+import { parseToStoreItems } from '../storeItems'
 import { expandRange } from '../expansion'
-import { isSeries } from '../../types'
+import { isSeries, isRootNode } from '../../types'
 import type { Occurrence, StoreItem } from '../../types'
 
 /** Expand a fixture's items and return the occurrence on `dateISO`. */
@@ -20,6 +21,7 @@ function editFields(occ: Occurrence, over: Partial<EditFields> = {}): EditFields
   return {
     title:        m.title,
     tags:         m.tags ?? [],
+    topics:       m.topics ?? [],
     participants: m.participants ?? [],
     body:         m.body ?? '',
     tracked:      m.done !== undefined,
@@ -148,6 +150,7 @@ describe('edit operations → serialized YAML', () => {
     const next = applyEdit([], null, 'all', {
       title: 'Buy groceries',
       tags: ['errand'],
+      topics: [],
       participants: [],
       body: 'Milk, eggs, bread',
       tracked: true,
@@ -158,5 +161,120 @@ describe('edit operations → serialized YAML', () => {
       repeat: null,
     })
     expect(serialize(next)).toMatchSnapshot()
+  })
+
+  // ── File-level identity ──────────────────────────────────────────────────────
+
+  it('single-scope title/tags/topics change updates the root node, not the override', () => {
+    const items = parseFixture('weekly-series')
+    const occ = occOn(items, '2026-04-20')
+    const next = applyEdit(items, occ, 'single', editFields(occ, {
+      title: 'Team Standup Renamed',
+      tags: ['work', 'renamed'],
+      topics: ['[[project-alpha]]'],
+    }))
+    // The per-file root node carries the new title, tags, and topics.
+    expect(rootMeta(next)?.title).toBe('Team Standup Renamed')
+    expect(rootMeta(next)?.tags).toEqual(['work', 'renamed'])
+    expect(rootMeta(next)?.topics).toEqual(['[[project-alpha]]'])
+    // No series/override carries file-level fields any more.
+    for (const i of next.filter(x => !isRootNode(x))) {
+      expect(i.metadata.title).toBe('')
+      expect(i.metadata.tags).toEqual([])
+    }
+    // The override instance must NOT carry title/tags/topics in serialized YAML.
+    const yaml = serialize(next)
+    const instancesSection = yaml.slice(yaml.indexOf('instances:'))
+    expect(instancesSection).not.toMatch(/title:/)
+    expect(instancesSection).not.toMatch(/tags:/)
+    expect(instancesSection).not.toMatch(/topics:/)
+  })
+
+  it('done/priority edits in single scope stay per-occurrence, not on the root', () => {
+    const items = parseFixture('weekly-series')
+    const occ = occOn(items, '2026-04-20')
+    const next = applyEdit(items, occ, 'single', editFields(occ, { priority: 'high', done: true }))
+    const series = next.filter(isSeries)
+    // Series root priority unchanged (was undefined)
+    expect(series[0].metadata.priority).toBeUndefined()
+    // Override carries the priority
+    const overrides = next.filter(i => !isSeries(i) && !isRootNode(i))
+    const override = overrides.find(o => o.date === '2026-04-20')
+    expect(override?.metadata.priority).toBe('high')
+  })
+
+  it('topics round-trips through parse → serialize', () => {
+    const items = parseFixture('weekly-series')
+    const occ = occOn(items, '2026-04-20')
+    const next = applyEdit(items, occ, 'all', editFields(occ, {
+      title: 'Weekly Standup',
+      topics: ['[[project-alpha]]', '[[weekly-log]]'],
+      scheduled: { date: '2026-04-06', time: '09:00' },
+    }))
+    const yaml = serialize(next)
+    // topics must appear at root, not in instances
+    expect(yaml).toContain('topics:')
+    expect(yaml).toContain('[[project-alpha]]')
+    const instancesSection = yaml.slice(yaml.indexOf('instances:'))
+    expect(instancesSection).not.toMatch(/topics:/)
+  })
+
+  it('file-level fields are emitted at the top-level root, never inside defaults:', () => {
+    const items = parseFixture('weekly-series')
+    const occ = occOn(items, '2026-04-20')
+    const next = applyEdit(items, occ, 'all', editFields(occ, {
+      title: 'Weekly Standup',
+      tags: ['work'],
+      topics: ['[[project-alpha]]'],
+      scheduled: { date: '2026-04-06', time: '09:00' },
+    }))
+    const yaml = serialize(next)
+    // title/tags/topics are top-level keys (no leading whitespace) — Obsidian-visible.
+    expect(yaml).toMatch(/^title: Weekly Standup$/m)
+    expect(yaml).toMatch(/^tags:$/m)
+    expect(yaml).toMatch(/^topics:$/m)
+    // The defaults: block (up to the first top-level key after it) must NOT contain them.
+    const defaultsStart = yaml.indexOf('defaults:')
+    if (defaultsStart >= 0) {
+      // defaults block runs until the first non-indented line after it
+      const after = yaml.slice(defaultsStart + 'defaults:'.length)
+      const blockEnd = after.search(/\n\S/)
+      const defaultsBlock = blockEnd >= 0 ? after.slice(0, blockEnd) : after
+      expect(defaultsBlock).not.toMatch(/title:/)
+      expect(defaultsBlock).not.toMatch(/tags:/)
+      expect(defaultsBlock).not.toMatch(/topics:/)
+    }
+  })
+
+  it('load normalizes a legacy override that diverged title — root wins', () => {
+    // Simulate a file where an override instance had a different title (legacy data).
+    const legacy = `---
+defaults:
+  title: Original Title
+  tags: [work]
+  done: false
+date: 2026-04-06
+time: 09:00
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday:
+    - mo
+instances:
+  - date: 2026-04-13
+    title: Override Title
+    done: true
+---
+`
+    const loaded = parseToStoreItems('legacy.md', legacy)
+    // The root node holds the file title; the divergent override title is dropped.
+    expect(rootMeta(loaded)?.title).toBe('Original Title')
+    for (const i of loaded.filter(x => !isRootNode(x))) {
+      expect(i.metadata.title).toBe('')
+    }
+    // In YAML, title must not appear inside an instance.
+    const yaml = serialize(loaded)
+    const instancesSection = yaml.slice(yaml.indexOf('instances:'))
+    expect(instancesSection).not.toMatch(/title:/)
   })
 })

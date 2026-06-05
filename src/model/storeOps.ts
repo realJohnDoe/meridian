@@ -6,7 +6,7 @@
  */
 
 import type { StoreItem, Occurrence, AppMetadata, Repeat } from '../types'
-import { isSeries } from '../types'
+import { isSeries, isRootNode, makeRootNode, withoutFileLevel } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from './expansion'
 import { titleToSlug } from '../fileIO'
 
@@ -54,8 +54,9 @@ export function upsertOverride(
       if (isSeries(i)) return i
       const io = i as OccurrenceEntry<AppMetadata>
       if (io.ownerId) return i   // skip child overrides of a series
+      if (isRootNode(io)) return io   // never an override target
       return io.fileSlug === occ.fileSlug && io.date === occ.date
-        ? { ...io, ...patch, metadata: { ...io.metadata, ...(patch.metadata ?? {}) } }
+        ? { ...io, ...patch, metadata: withoutFileLevel({ ...io.metadata, ...(patch.metadata ?? {}) }) }
         : io
     })
   }
@@ -66,7 +67,7 @@ export function upsertOverride(
   if (existing) {
     return items.map(i =>
       i.id === existing.id
-        ? { ...i, ...patch, metadata: { ...i.metadata, ...(patch.metadata ?? {}) } }
+        ? { ...i, ...patch, metadata: withoutFileLevel({ ...i.metadata, ...(patch.metadata ?? {}) }) }
         : i,
     )
   }
@@ -79,7 +80,7 @@ export function upsertOverride(
     fileSlug: occ.fileSlug,
     id:      crypto.randomUUID(),
     ownerId: occ.ownerId,
-    metadata: { ...(series?.metadata ?? occ.metadata), ...(patch.metadata ?? {}) },
+    metadata: withoutFileLevel({ ...(series?.metadata ?? occ.metadata), ...(patch.metadata ?? {}) }),
     ...patch,
   }
   return [...items, newOverride]
@@ -90,6 +91,7 @@ export function upsertOverride(
 export interface EditFields {
   title:        string
   tags:         string[]
+  topics:       string[]
   participants: string[]
   body:         string
   tracked:   boolean
@@ -101,21 +103,36 @@ export interface EditFields {
 }
 
 /**
- * Build item metadata from editor fields, layered on top of `base` (the existing
- * series/occurrence metadata, or `{}` for a brand-new item). Single source of the
- * editor-fields → metadata mapping so every scope handles every field identically.
+ * Build occurrence-level metadata from editor fields. File-level fields
+ * (title/tags/topics/body) are always cleared — they live on the per-file root
+ * node, never on a series/occurrence/override.
  */
-function metaFromEditFields(base: Partial<AppMetadata>, f: EditFields): AppMetadata {
-  return {
-    ...base,
-    title:        f.title,
-    tags:         f.tags,
+function occMeta(base: Partial<AppMetadata>, f: EditFields): AppMetadata {
+  return withoutFileLevel({
+    ...(base as AppMetadata),
     participants: f.participants ?? [],
-    body:         f.body || undefined,
     duration:     f.duration || undefined,
     priority:     (f.priority as AppMetadata['priority']) ?? undefined,
     done:         f.tracked ? f.done : undefined,
-  }
+  })
+}
+
+/**
+ * Update (or create) the per-file root node for `fileSlug` with the file-level
+ * fields from `fields`. The root node is the single source of truth for a file's
+ * title/tags/topics/body, so every edit scope routes file-level changes here.
+ */
+function updateRootNode(items: StoreItem[], fileSlug: string, f: EditFields): StoreItem[] {
+  const patch = { title: f.title, tags: f.tags, topics: f.topics ?? [], body: f.body || undefined }
+  let found = false
+  const next = items.map(i => {
+    if (isRootNode(i) && i.fileSlug === fileSlug) {
+      found = true
+      return { ...i, metadata: { ...i.metadata, ...patch } }
+    }
+    return i
+  })
+  return found ? next : [...next, makeRootNode(fileSlug, patch)]
 }
 
 /**
@@ -138,7 +155,10 @@ export function applyEdit(
   // ── New item ───────────────────────────────────────────────────────────────
   if (!occ) {
     const fileSlug = titleToSlug(title) || crypto.randomUUID()
-    const meta = metaFromEditFields({}, fields)
+    const rootNode = makeRootNode(fileSlug, {
+      title, tags: fields.tags, topics: fields.topics ?? [], body: fields.body || undefined,
+    })
+    const meta = occMeta({}, fields)
     if (repeat) {
       const newSeries: RepeatPattern<AppMetadata> = {
         date:     scheduled?.date ?? '',
@@ -148,7 +168,7 @@ export function applyEdit(
         id:       crypto.randomUUID(),
         metadata: meta,
       }
-      return [...items, newSeries]
+      return [...items, rootNode, newSeries]
     } else {
       const newOcc: OccurrenceEntry<AppMetadata> = {
         date:    scheduled?.date ?? '',
@@ -158,20 +178,22 @@ export function applyEdit(
         id:      crypto.randomUUID(),
         metadata: meta,
       }
-      return [...items, newOcc]
+      return [...items, rootNode, newOcc]
     }
   }
 
   // ── edit all (series or standalone) ───────────────────────────────────────
   if (scope === 'all') {
+    // File-level fields go to the per-file root node; occurrence fields to the item.
+    const withRoot = updateRootNode(items, occ.fileSlug, fields)
     // For a series: match by the stable series UUID (occ.ownerId).
     // For a standalone: occ.id is a random expansion UUID — match by fileSlug instead.
     const matchItem = occ.ownerId
       ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
-      : (i: StoreItem) => !isSeries(i) && !(i as OccurrenceEntry<AppMetadata>).ownerId && i.fileSlug === occ.fileSlug && i.date === occ.date
-    return items.map(i => {
+      : (i: StoreItem) => !isSeries(i) && !isRootNode(i) && !(i as OccurrenceEntry<AppMetadata>).ownerId && i.fileSlug === occ.fileSlug && i.date === occ.date
+    return withRoot.map(i => {
       if (!matchItem(i)) return i
-      const meta = metaFromEditFields(i.metadata, fields)
+      const meta = occMeta(i.metadata, fields)
       if (isSeries(i)) {
         return { ...i, metadata: meta, repeat: repeat ?? i.repeat,
           ...(scheduled?.date ? { date: scheduled.date, time: scheduled.time || null } : {}) }
@@ -183,11 +205,14 @@ export function applyEdit(
 
   // ── single occurrence override ─────────────────────────────────────────────
   if (scope === 'single') {
-    const meta = metaFromEditFields(findSeries(items, occ)?.metadata ?? occ.metadata, fields)
-    return upsertOverride(items, occ, {
+    // File-level fields go to the root node; the override carries only
+    // occurrence-specific fields (done, priority, duration, scheduled, participants).
+    const withRoot = updateRootNode(items, occ.fileSlug, fields)
+    const base = findSeries(withRoot, occ)?.metadata ?? occ.metadata
+    return upsertOverride(withRoot, occ, {
       date:    scheduled?.date ?? occ.date,
       time:    scheduled?.time || null,
-      metadata: meta,
+      metadata: occMeta(base, fields),
     })
   }
 
@@ -201,9 +226,10 @@ export function applyEdit(
     const occDate = occ.date
     const newSeriesId = crypto.randomUUID()
     const newRepeat = repeat ?? series.repeat
-    const newMeta2 = metaFromEditFields(series.metadata, fields)
+    const newMeta2 = occMeta(series.metadata, fields)
+    const items2 = updateRootNode(items, occ.fileSlug, fields)
 
-    return items.flatMap(i => {
+    return items2.flatMap(i => {
       // Cap the original series.
       if (i.id === series.id) {
         const capped = { ...i as RepeatPattern<AppMetadata>,
@@ -230,7 +256,8 @@ export function applyEdit(
   // ── add: new explicit occurrence ──────────────────────────────────────────
   if (scope === 'add') {
     const newDate = scheduled?.date ?? occ.date
-    const series  = findSeries(items, occ)
+    const base = findSeries(items, occ)?.metadata ?? occ.metadata
+    const withRoot = updateRootNode(items, occ.fileSlug, fields)
     const newOcc: OccurrenceEntry<AppMetadata> = {
       date:    newDate,
       time:    scheduled?.time || null,
@@ -238,9 +265,9 @@ export function applyEdit(
       fileSlug: occ.fileSlug,
       id:      crypto.randomUUID(),
       ownerId: occ.ownerId,
-      metadata: metaFromEditFields(series?.metadata ?? occ.metadata, fields),
+      metadata: occMeta(base, fields),
     }
-    return [...items, newOcc]
+    return [...withRoot, newOcc]
   }
 
   return items

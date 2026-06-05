@@ -1,5 +1,5 @@
 import type { StoreItem, InlineMetadata, AppMetadata } from '../types'
-import { isSeries, INLINE_FIELDS, inlineFieldEqual, inlineFieldEmpty } from '../types'
+import { isSeries, isRootNode, INLINE_FIELDS, inlineFieldEqual, inlineFieldEmpty, FILE_LEVEL_FIELDS } from '../types'
 import type { OccurrenceEntry } from './expansion'
 
 type AnyOcc = OccurrenceEntry<AppMetadata>
@@ -23,27 +23,33 @@ type AnyOcc = OccurrenceEntry<AppMetadata>
 export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
   if (items.length === 0) return {}
 
-  const series     = items.filter(isSeries)
-  const standalones = items.filter(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)
+  // File-level fields (title/tags/topics) come from the explicit per-file root
+  // node and are emitted at the top-level root — never via the defaults: hoisting,
+  // which deals only with occurrence-level fields. (body is handled by fileIO.)
+  const rootNode = items.find(isRootNode)
+  const fileLevel = rootNode ? metadataToYaml(pickFileLevel(rootNode.metadata)) : {}
+
+  const series      = items.filter(isSeries)
+  const standalones = items.filter(i => !isSeries(i) && !isRootNode(i) && !(i as { ownerId?: string }).ownerId)
 
   // Pair each series with its override children.
   const seriesBlocks = series.map(s => ({
     series:   s,
-    children: items.filter(i => !isSeries(i) && (i as AnyOcc).ownerId === s.id) as AnyOcc[],
+    children: items.filter(i => !isSeries(i) && !isRootNode(i) && (i as AnyOcc).ownerId === s.id) as AnyOcc[],
   }))
 
   // ── Simple flat cases (no inheritance hierarchy needed) ───────────────────
   // A single item with no override children is emitted as a flat YAML node —
-  // all metadata at root alongside the structural fields.
+  // metadata at root alongside the structural fields.
 
   if (series.length === 1 && standalones.length === 0 && seriesBlocks[0].children.length === 0) {
     const s = series[0]
-    return { ...metadataToYaml(s.metadata), date: s.date, ...(s.time ? { time: s.time } : {}), repeat: s.repeat }
+    return { ...fileLevel, ...metadataToYaml(omitFileLevel(s.metadata)), date: s.date, ...(s.time ? { time: s.time } : {}), repeat: s.repeat }
   }
 
   if (series.length === 0 && standalones.length === 1) {
     const s = standalones[0]
-    return { ...metadataToYaml(s.metadata), date: s.date, ...(s.time ? { time: s.time } : {}) }
+    return { ...fileLevel, ...metadataToYaml(omitFileLevel(s.metadata)), date: s.date, ...(s.time ? { time: s.time } : {}) }
   }
 
   // ── Container cases — inheritance hierarchy applies ───────────────────────
@@ -57,8 +63,8 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
   //   • Multiple series / standalones → structural fields inside instances[].
 
   const allMetas: Partial<InlineMetadata>[] = [
-    ...seriesBlocks.map(b => b.series.metadata),
-    ...standalones.map(s => s.metadata),
+    ...seriesBlocks.map(b => omitFileLevel(b.series.metadata)),
+    ...standalones.map(s => omitFileLevel(s.metadata)),
   ]
   const { rootDefaults, localDefaults } = hoistSharedMetadata(allMetas)
 
@@ -69,6 +75,8 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     // We keep the call for consistency — hoistSharedMetadata owns that logic.
     const instances = serializeChildren(children, s.metadata)
     const result: Record<string, unknown> = {}
+    // File-level fields live at the top-level root (from the root node), never in defaults:.
+    Object.assign(result, fileLevel)
     const rd = metadataToYaml(rootDefaults)
     if (Object.keys(rd).length > 0) result.defaults = rd
     result.date   = s.date
@@ -105,6 +113,8 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
   })
 
   const result: Record<string, unknown> = {}
+  // File-level fields at the top-level root (from the root node), not inherited.
+  Object.assign(result, fileLevel)
   const rd = metadataToYaml(rootDefaults)
   if (Object.keys(rd).length > 0) result.defaults = rd
   result.instances = allInstances
@@ -146,9 +156,29 @@ function serializeChildren(
     if (c.excluded) return { date: c.date, ...(c.time ? { time: c.time } : {}), excluded: true }
     const child: Record<string, unknown> = { date: c.date }
     if (c.time) child.time = c.time
-    Object.assign(child, metadataToYaml(diffMetadata(c.metadata, seriesMeta)))
+    const diff = diffMetadata(c.metadata, seriesMeta)
+    // File-level fields must never appear in an instance override — they belong
+    // to the file root (defaults: block) only.
+    for (const k of FILE_LEVEL_FIELDS) delete (diff as Record<string, unknown>)[k]
+    Object.assign(child, metadataToYaml(diff))
     return child
   })
+}
+
+/** Only the file-level fields (title/tags/topics) of a metadata object. */
+function pickFileLevel(m: Partial<InlineMetadata>): Partial<InlineMetadata> {
+  const out: Partial<InlineMetadata> = {}
+  for (const k of FILE_LEVEL_FIELDS) {
+    if (m[k] !== undefined) (out as Record<string, unknown>)[k] = m[k]
+  }
+  return out
+}
+
+/** A metadata object without its file-level fields (they are emitted at root). */
+function omitFileLevel(m: Partial<InlineMetadata>): Partial<InlineMetadata> {
+  const out = { ...m }
+  for (const k of FILE_LEVEL_FIELDS) delete (out as Record<string, unknown>)[k]
+  return out
 }
 
 /** Convert InlineMetadata fields to a plain YAML-serializable object. */
