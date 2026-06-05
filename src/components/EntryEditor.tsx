@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText, Users } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem } from '../types'
-import { isSeries } from '../types'
+import { isSeries, isRootNode } from '../types'
 import { NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
@@ -142,7 +142,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     const m = before.match(/\[\[([^\]\n]*)$/)
     if (m) {
       const q = m[1].toLowerCase()
-      const allTitles = [...new Set([...items.map(i => i.metadata.title), ...NOTES_DATA.map(n => n.title)])]
+      const allTitles = [...new Set([...items.filter(isRootNode).map(i => i.metadata.title), ...NOTES_DATA.map(n => n.title)])]
       const matches = q
         ? allTitles.filter(t => t.toLowerCase().includes(q)).slice(0, 8)
         : allTitles.slice(0, 8)
@@ -432,7 +432,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       {wlOpen && wlPopupPos && (
         <div className="wl-popup show" style={{ top: wlPopupPos.top, left: wlPopupPos.left }}>
           {wlMatches.map((t, i) => {
-            const matchItem = items.find(i => i.metadata.title === t)
+            const matchItem = items.find(i => isRootNode(i) && i.metadata.title === t)
             const matchNote = NOTES_DATA.find(n => n.title === t)
             const Icon = (matchItem && matchItem.metadata.done !== undefined) ? CheckSquare
               : (matchItem && 'time' in matchItem && matchItem.time) ? Calendar

@@ -73,9 +73,9 @@ Quick sync. Agenda:
 exports[`edit operations → serialized YAML > creating a new standalone task serializes to a single file 1`] = `
 "---
 title: Buy groceries
-done: false
 tags:
   - errand
+done: false
 priority: medium
 date: 2026-06-05
 ---

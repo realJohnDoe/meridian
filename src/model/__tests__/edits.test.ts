@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { parseFixture, serialize } from './helpers'
+import { parseFixture, serialize, rootMeta } from './helpers'
 import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing } from '../storeOps'
 import type { EditFields } from '../storeOps'
 import { parseToStoreItems } from '../storeItems'
 import { expandRange } from '../expansion'
-import { isSeries } from '../../types'
+import { isSeries, isRootNode } from '../../types'
 import type { Occurrence, StoreItem } from '../../types'
 
 /** Expand a fixture's items and return the occurrence on `dateISO`. */
@@ -165,7 +165,7 @@ describe('edit operations → serialized YAML', () => {
 
   // ── File-level identity ──────────────────────────────────────────────────────
 
-  it('single-scope title/tags/topics change updates the series root, not the override', () => {
+  it('single-scope title/tags/topics change updates the root node, not the override', () => {
     const items = parseFixture('weekly-series')
     const occ = occOn(items, '2026-04-20')
     const next = applyEdit(items, occ, 'single', editFields(occ, {
@@ -173,12 +173,15 @@ describe('edit operations → serialized YAML', () => {
       tags: ['work', 'renamed'],
       topics: ['[[project-alpha]]'],
     }))
-    // The series root should carry the new title, tags, and topics.
-    const series = next.filter(isSeries)
-    expect(series).toHaveLength(1)
-    expect(series[0].metadata.title).toBe('Team Standup Renamed')
-    expect(series[0].metadata.tags).toEqual(['work', 'renamed'])
-    expect(series[0].metadata.topics).toEqual(['[[project-alpha]]'])
+    // The per-file root node carries the new title, tags, and topics.
+    expect(rootMeta(next)?.title).toBe('Team Standup Renamed')
+    expect(rootMeta(next)?.tags).toEqual(['work', 'renamed'])
+    expect(rootMeta(next)?.topics).toEqual(['[[project-alpha]]'])
+    // No series/override carries file-level fields any more.
+    for (const i of next.filter(x => !isRootNode(x))) {
+      expect(i.metadata.title).toBe('')
+      expect(i.metadata.tags).toEqual([])
+    }
     // The override instance must NOT carry title/tags/topics in serialized YAML.
     const yaml = serialize(next)
     const instancesSection = yaml.slice(yaml.indexOf('instances:'))
@@ -195,7 +198,7 @@ describe('edit operations → serialized YAML', () => {
     // Series root priority unchanged (was undefined)
     expect(series[0].metadata.priority).toBeUndefined()
     // Override carries the priority
-    const overrides = next.filter(i => !isSeries(i))
+    const overrides = next.filter(i => !isSeries(i) && !isRootNode(i))
     const override = overrides.find(o => o.date === '2026-04-20')
     expect(override?.metadata.priority).toBe('high')
   })
@@ -264,13 +267,12 @@ instances:
 ---
 `
     const loaded = parseToStoreItems('legacy.md', legacy)
-    const series = loaded.filter(isSeries)
-    const overrides = loaded.filter(i => !isSeries(i))
-    // Root title unchanged
-    expect(series[0].metadata.title).toBe('Original Title')
-    // Override inherits root title — NOT the divergent value
-    expect(overrides[0].metadata.title).toBe('Original Title')
-    // In YAML, title must not appear inside an instance
+    // The root node holds the file title; the divergent override title is dropped.
+    expect(rootMeta(loaded)?.title).toBe('Original Title')
+    for (const i of loaded.filter(x => !isRootNode(x))) {
+      expect(i.metadata.title).toBe('')
+    }
+    // In YAML, title must not appear inside an instance.
     const yaml = serialize(loaded)
     const instancesSection = yaml.slice(yaml.indexOf('instances:'))
     expect(instancesSection).not.toMatch(/title:/)

@@ -17,7 +17,7 @@ import {
 } from './model/storeOps'
 import type { Occurrence, Repeat, Scheduled, Priority, StoreItem } from './types'
 import { parseWikilinks, resolveWikilink } from './wikilinks'
-import { occKind, occIsRecur, isSeries } from './types'
+import { occKind, occIsRecur, isSeries, isRootNode } from './types'
 export { occKind, occIsRecur }
 import type { EntryState, ItemType } from './components/EntryEditor'
 import { useStore } from './store'
@@ -594,8 +594,7 @@ export function toggleOccDone(o: Occurrence): void {
 
 export function beginSwipeDelete(o: Occurrence): () => void {
   const items  = getItems()
-  const series = findSeries(items, o)
-  const title  = series?.metadata.title ?? o.metadata.title
+  const title  = o.metadata.title   // expanded occurrence already carries the file-level title
   let cancelled = false
 
   if (occIsRecur(o, items)) {
@@ -637,7 +636,7 @@ export function deleteNode(
   )
   const isRecurring = !!item.ownerId
   const isScheduled = series?.repeat?.type === 'schedule'
-  const title = series?.metadata.title ?? item.metadata.title
+  const title = item.metadata.title   // expanded occurrence already carries the file-level title
 
   function hideSheet() { onHideSeries?.() }
 
@@ -722,9 +721,8 @@ async function writeEntityToCache(fileSlug: string): Promise<void> {
     const slugItems = fileSlugItems(getItems(), fileSlug)
     if (slugItems.length === 0) { await deleteFileFromDisk(fileSlug); return }
     const frontmatter = collapseToYaml(slugItems)
-    // Body lives on the first series or root standalone.
-    const bodyItem = slugItems.find(i => isSeries(i) || !(i as any).ownerId)
-    const body = bodyItem?.metadata.body ?? ''
+    // Body (file-level) lives on the per-file root node.
+    const body = slugItems.find(isRootNode)?.metadata.body ?? ''
     const content = saveFile(frontmatter, body)
     const path = fileSlugToPath(fileSlug)
     await cacheWrite(path, content)

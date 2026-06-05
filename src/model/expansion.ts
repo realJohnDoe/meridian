@@ -20,8 +20,8 @@ import {
   format, isValid, parseISO,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
-import type { Repeat, StoreItem, AppMetadata } from '../types'
-import { isSeries, FILE_LEVEL_FIELDS } from '../types'
+import type { Repeat, StoreItem, AppMetadata, FileMetadata } from '../types'
+import { isSeries, isRootNode, toFileMetadata } from '../types'
 import type { EffectiveNode } from './inheritance'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -413,6 +413,7 @@ export interface OccurrenceEntry<T = Record<string, unknown>> {
   id:        string                    // own UUID; stable across promotion to RepeatPattern
   ownerId?:  string                    // UUID of parent RepeatPattern (undefined for standalone)
   excluded?: boolean                   // exclusion override: suppresses a generated occurrence
+  root?:     boolean                   // marks the per-file root node carrying file-level fields
   metadata:  T
 }
 
@@ -627,9 +628,22 @@ export function expandRange(
 ): OccurrenceEntry<AppMetadata>[] {
   const result: OccurrenceEntry<AppMetadata>[] = []
 
+  // Per-file root nodes carry the file-level fields (title/tags/topics/body).
+  // They are not expanded; their fields are joined onto every occurrence below.
+  const fileMetaBySlug = new Map<string, FileMetadata>()
+  for (const i of items) {
+    if (isRootNode(i)) fileMetaBySlug.set(i.fileSlug, toFileMetadata(i.metadata))
+  }
+  const joinFileMeta = (fileSlug: string, meta: AppMetadata): AppMetadata => ({
+    ...meta,
+    ...(fileMetaBySlug.get(fileSlug) ?? {}),
+  })
+
   const seriesList = items.filter(isSeries)
-  // Standalone = non-series items with no ownerId (direct root-level items)
-  const standalones = items.filter(i => !isSeries(i) && !(i as OccurrenceEntry<AppMetadata>).ownerId) as OccurrenceEntry<AppMetadata>[]
+  // Standalone = non-series, non-root items with no ownerId (direct root-level items)
+  const standalones = items.filter(
+    i => !isSeries(i) && !isRootNode(i) && !(i as OccurrenceEntry<AppMetadata>).ownerId,
+  ) as OccurrenceEntry<AppMetadata>[]
 
   // ── Expand each series ────────────────────────────────────────────────────
   for (const series of seriesList) {
@@ -672,10 +686,8 @@ export function expandRange(
         id:      crypto.randomUUID(),
         ownerId: series.id,
         metadata: {
-          ...(override ? { ...series.metadata, ...override.metadata } : series.metadata),
-          // File-level fields always come from the series root, even for legacy data
-          // where an override may carry a divergent title/tags/topics.
-          ...Object.fromEntries(FILE_LEVEL_FIELDS.map(k => [k, series.metadata[k]])),
+          ...joinFileMeta(series.fileSlug,
+            override ? { ...series.metadata, ...override.metadata } : series.metadata),
           jsTime,
         },
       })
@@ -693,7 +705,7 @@ export function expandRange(
     result.push({
       ...occ,
       id:       crypto.randomUUID(),
-      metadata: { ...occ.metadata, jsTime },
+      metadata: { ...joinFileMeta(occ.fileSlug, occ.metadata), jsTime },
     })
   }
 
