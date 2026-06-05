@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { barClass } from '../meridian'
+import { occState } from '../meridian'
 import OccurrenceCard from './OccurrenceCard'
 
 interface Props {
@@ -128,7 +128,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   // Compute bar class with optimistic done value so the colour changes instantly.
   const hasTrack = occ.metadata.done !== undefined
   const effectiveDone = hasTrack ? isDone : (occ.metadata.done as boolean | undefined)
-  const currentBarClass = barClass({ ...occ, metadata: { ...occ.metadata, done: effectiveDone } })
+  const currentBarClass = occState({ ...occ, metadata: { ...occ.metadata, done: effectiveDone } })
 
   return (
     <div

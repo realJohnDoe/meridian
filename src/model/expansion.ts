@@ -360,7 +360,12 @@ export function expandNode(
     if (lastDone) {
       const nextJsTime = addInterval(lastDone.jsTime, String(node.repeat.interval || '1 day'))
       const alreadyExists = allTimes.some(e => Math.abs(e.jsTime.getTime() - nextJsTime.getTime()) < 60000)
-      if (!alreadyExists && nextJsTime >= from && nextJsTime <= to) {
+      const isExcluded = ((node.instances || []) as Record<string, any>[]).some(inst => {
+        if (!inst.excluded) return false
+        const t = parseDateString(inst.date)
+        return t !== null && Math.abs(t.getTime() - nextJsTime.getTime()) < 60000
+      })
+      if (!alreadyExists && !isExcluded && nextJsTime >= from && nextJsTime <= to) {
         const spec = jsDateToSpec(nextJsTime)
         occurrences.push({ ...node, date: spec.date, time: spec.time || node.time || null, jsTime: nextJsTime, done: false, recur: true, _nodeId: node.id, _node: node })
       }
