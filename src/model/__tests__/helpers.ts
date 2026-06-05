@@ -4,8 +4,8 @@ import { dirname, resolve } from 'node:path'
 import { parseToStoreItems } from '../storeItems'
 import { collapseToYaml } from '../collapse'
 import { saveFile } from '../../fileIO'
-import { isSeries } from '../../types'
-import type { StoreItem } from '../../types'
+import { isSeries, isRootNode } from '../../types'
+import type { StoreItem, FileMetadata } from '../../types'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DIR = resolve(HERE, 'fixtures')
@@ -35,9 +35,19 @@ export function parseFixture(name: string): StoreItem[] {
  */
 export function serialize(items: StoreItem[]): string {
   const frontmatter = collapseToYaml(items)
-  const bodyItem = items.find(i => isSeries(i) || !(i as { ownerId?: string }).ownerId)
-  const body = bodyItem?.metadata.body ?? ''
+  const body = items.find(isRootNode)?.metadata.body ?? ''
   return saveFile(frontmatter, body)
+}
+
+/** The per-file root node's file-level metadata (title/tags/topics/body). */
+export function rootMeta(items: StoreItem[]): FileMetadata | undefined {
+  const root = items.find(isRootNode)
+  return root?.metadata as FileMetadata | undefined
+}
+
+/** Items excluding the per-file root node (i.e. series + occurrences). */
+export function occItems(items: StoreItem[]): StoreItem[] {
+  return items.filter(i => !isRootNode(i))
 }
 
 /**

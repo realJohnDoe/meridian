@@ -19,7 +19,7 @@ import {
 } from '../model/storeOps'
 import { loadFile, saveFile } from '../fileIO'
 import type { Occurrence, Priority, Repeat as RepeatType, StoreItem } from '../types'
-import { isSeries } from '../types'
+import { isRootNode } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from '../model/expansion'
 import type { AppMetadata } from '../types'
 import EntryEditor, { type EntryState } from '../components/EntryEditor'
@@ -50,10 +50,10 @@ function itemsToYaml(items: StoreItem[], body: string): string {
 }
 
 /**
- * Extract the body from items (stored on the first series or root standalone).
+ * Extract the file-level body, which lives on the per-file root node.
  */
 function extractBody(items: StoreItem[]): string {
-  return items.find(i => isSeries(i) || !(i as OccurrenceEntry<AppMetadata>).ownerId)?.metadata.body ?? ''
+  return items.find(isRootNode)?.metadata.body ?? ''
 }
 
 // ── Tree display helpers ──────────────────────────────────────────────────────
@@ -412,10 +412,11 @@ export default function NodeInheritanceDebugger() {
   // ── EntryEditor handlers ─────────────────────────────────────────────────
   const handleDebugSave = useCallback((body: string) => {
     if (!debugEntry || !selectedOcc) return
-    const { title, tags, participants, tracked, done, priority, scheduled, duration, repeat, editScope } = debugEntry
+    const { title, tags, topics, participants, tracked, done, priority, scheduled, duration, repeat, editScope } = debugEntry
     const fields: EditFields = {
       title:        title || '',
       tags:         tags || [],
+      topics:       topics || [],
       participants: participants || [],
       body,
       tracked:  tracked ?? false,
