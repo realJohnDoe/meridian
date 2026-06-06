@@ -441,6 +441,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
             const Icon = matchItem && (matchItem as { metadata?: { done?: boolean } }).metadata?.done !== undefined ? CheckSquare
               : matchItem && matchItem.time ? Calendar
               : matchNote ? FileText
+              : FileText
             return (
               <div
                 key={t}
