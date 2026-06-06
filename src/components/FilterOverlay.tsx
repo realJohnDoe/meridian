@@ -35,18 +35,19 @@ interface Props {
 
 export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
   const items = useStore(s => s.items)
+  const roots = useStore(s => s.roots)
 
   const results = useMemo(() => {
     if (!query) return []
     const from = addDays(TODAY, -7)
     const to   = addDays(TODAY, 90)
-    const occs = expandRange(items, from, to)
+    const occs = expandRange(items, roots, from, to)
     return occs
       .filter(o => fuzzyMatch(query, o.metadata.title))
       .map(o => ({ occ: o, score: fuzzyScore(query, o.metadata.title) }))
       .sort((a, b) => b.score - a.score || +(a.occ.metadata.jsTime ?? 0) - +(b.occ.metadata.jsTime ?? 0))
       .map(x => x.occ)
-  }, [items, query])
+  }, [items, roots, query])
 
   if (!query) return null
 

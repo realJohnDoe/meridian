@@ -2,9 +2,10 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { parseToStoreItems } from '../storeItems'
+import type { ParseResult } from '../storeItems'
 import { collapseToYaml } from '../collapse'
 import { saveFile } from '../../fileIO'
-import { isSeries, isRootNode } from '../../types'
+import { isSeries } from '../../types'
 import type { StoreItem, FileMetadata } from '../../types'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -23,31 +24,30 @@ export function fixtureNames(): string[] {
     .sort()
 }
 
-/** Parse a fixture into StoreItem[] using the real app load path. */
-export function parseFixture(name: string): StoreItem[] {
+/** Parse a fixture into {items, root} using the real app load path. */
+export function parseFixture(name: string): ParseResult {
   return parseToStoreItems(`${name}.md`, loadFixture(name))
 }
 
 /**
- * Serialize StoreItem[] back to file content — mirrors writeEntityToCache():
- * collapse to canonical YAML, then attach the body of the first series/standalone.
+ * Serialize StoreItem[] + FileMetadata back to file content — mirrors writeEntityToCache():
+ * collapse to canonical YAML, then attach the body.
  * This is the exact path the app uses when persisting, so tests exercise it.
  */
-export function serialize(items: StoreItem[]): string {
-  const frontmatter = collapseToYaml(items)
-  const body = items.find(isRootNode)?.metadata.body ?? ''
+export function serialize(items: StoreItem[], root?: FileMetadata): string {
+  const frontmatter = collapseToYaml(items, root)
+  const body = root?.body ?? ''
   return saveFile(frontmatter, body)
 }
 
-/** The per-file root node's file-level metadata (title/tags/topics/body). */
-export function rootMeta(items: StoreItem[]): FileMetadata | undefined {
-  const root = items.find(isRootNode)
-  return root?.metadata as FileMetadata | undefined
+/** The per-file root metadata (title/tags/topics/body). */
+export function rootMeta(result: ParseResult): FileMetadata {
+  return result.root
 }
 
-/** Items excluding the per-file root node (i.e. series + occurrences). */
-export function occItems(items: StoreItem[]): StoreItem[] {
-  return items.filter(i => !isRootNode(i))
+/** The occurrence items from a ParseResult (series + standalone occurrences). */
+export function occItems(result: ParseResult): StoreItem[] {
+  return result.items
 }
 
 /**

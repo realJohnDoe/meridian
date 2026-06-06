@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { StoreItem } from './types'
+import type { StoreItem, Roots } from './types'
 import { TODAY as _today } from './constants'
 
 export type PrimaryView = 'agenda' | 'calendar' | 'day'
@@ -8,7 +8,11 @@ export type OverlayView = 'entry' | 'search'
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
   items: StoreItem[]
+  roots: Roots
   setItems: (items: StoreItem[]) => void
+  setRoots: (roots: Roots) => void
+  /** Set items and roots together atomically. */
+  setData: (data: { items: StoreItem[]; roots: Roots }) => void
 
   // ── Navigation ──────────────────────────────────────────────────
   /** The active primary tab — always visible behind any overlay. */
@@ -62,10 +66,13 @@ interface MeridianStore {
 }
 
 export const useStore = create<MeridianStore>((set) => ({
-  // items starts empty; tryRestoreDirectory() seeds it (or disk data replaces
-  // it when the user opens a vault folder).
+  // items/roots start empty; tryRestoreDirectory() seeds them (or disk data replaces
+  // them when the user opens a vault folder).
   items: [],
+  roots: new Map(),
   setItems: (items) => set({ items }),
+  setRoots: (roots) => set({ roots }),
+  setData:  ({ items, roots }) => set({ items, roots }),
 
   primaryView: 'agenda',
   setPrimaryView: (primaryView) => set({ primaryView }),

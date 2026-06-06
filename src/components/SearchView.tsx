@@ -26,6 +26,7 @@ interface Props {
 
 export default function SearchView({ onOpen, onClose }: Props) {
   const storeItems   = useStore(s => s.items)
+  const roots        = useStore(s => s.roots)
   const nsFilterVal  = useStore(s => s.nsFilterVal)
   const setNsFilter  = useStore(s => s.setNsFilterVal)
   const [q, setQ]    = useState('')
@@ -41,7 +42,7 @@ export default function SearchView({ onOpen, onClose }: Props) {
   const items = useMemo<SearchItem[]>(() => {
     const from = addDays(TODAY, -30)
     const to   = addDays(TODAY, 90)
-    const occs: Occurrence[] = expandRange(storeItems, from, to)
+    const occs: Occurrence[] = expandRange(storeItems, roots, from, to)
     const seen = new Set<string>()
     return [
       ...(NOTES_DATA as SearchItem[]),
@@ -60,7 +61,7 @@ export default function SearchView({ onOpen, onClose }: Props) {
           occurrence: o,
         })),
     ]
-  }, [storeItems])
+  }, [storeItems, roots])
 
   const filtered = useMemo(() => {
     const ql = q.toLowerCase()

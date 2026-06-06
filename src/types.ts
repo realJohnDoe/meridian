@@ -16,12 +16,24 @@ export type Repeat =
 
 // ── Metadata types ────────────────────────────────────────────────────────────
 
-/** Fields written to YAML frontmatter; not relevant for inheritance/repeat expansion. */
-export interface InlineMetadata {
-  title:        string
+/**
+ * File-level fields — persisted at the frontmatter root; shared by all
+ * occurrences in the file. `body` is markdown, not YAML frontmatter.
+ * Stored in the roots map (Map<fileSlug, FileMetadata>), not on StoreItems.
+ */
+export interface FileMetadata {
+  title:  string
+  tags:   string[]
+  topics: string[]
+  body?:  string
+}
+
+/**
+ * Occurrence-level fields — persisted per series or occurrence.
+ * Raw store items (StoreItem) carry this type; it has no file-level fields.
+ */
+export interface OccurrenceMetadata {
   done?:        boolean
-  tags:         string[]
-  topics:       string[]
   participants: string[]
   priority?:    Priority
   duration?:    string
@@ -30,133 +42,78 @@ export interface InlineMetadata {
 
 /** Fields never persisted to YAML — computed at runtime or used only by the UI. */
 export interface ExtendedMetadata {
-  jsTime?:   Date      // computed from date+time; undefined in raw store items
-  body?:     string    // markdown body (not frontmatter)
-  _dh?:      number    // DayView layout
-  _endMs?:   number    // DayView layout
+  jsTime?: Date    // computed from date+time; undefined in raw store items
+  _dh?:   number  // DayView layout
+  _endMs?: number // DayView layout
 }
 
-export type AppMetadata = InlineMetadata & ExtendedMetadata
+/**
+ * Full metadata on an EXPANDED occurrence (file-level joined back from roots).
+ * Raw store items carry OccurrenceMetadata only; AppMetadata only appears after
+ * expandRange has joined the file-level fields.
+ */
+export type AppMetadata = OccurrenceMetadata & FileMetadata & ExtendedMetadata
 
 // ── Store types ───────────────────────────────────────────────────────────────
 
 import type { OccurrenceEntry, RepeatPattern } from './model/expansion'
 
 /**
- * Store holds RepeatPattern (series) or OccurrenceEntry (single item or explicit override).
- * Uses AppMetadata so body survives the load → edit round-trip.
- * collapseToYaml only writes InlineMetadata fields regardless.
+ * Raw store items carry OccurrenceMetadata (no file-level fields).
+ * File-level identity (title/tags/topics/body) lives in the roots map.
  */
-export type StoreItem = RepeatPattern<AppMetadata> | OccurrenceEntry<AppMetadata>
+export type StoreSeries = RepeatPattern<OccurrenceMetadata>
+export type StoreOcc    = OccurrenceEntry<OccurrenceMetadata>
+export type StoreItem   = StoreSeries | StoreOcc
 
-export function isSeries(item: StoreItem): item is RepeatPattern<AppMetadata> {
+/** keyed by fileSlug */
+export type Roots = Map<string, FileMetadata>
+
+export function isSeries(item: StoreItem): item is StoreSeries {
   return 'repeat' in item && item.repeat !== undefined
-}
-
-/**
- * The per-file root node — an OccurrenceEntry flagged `root: true` that carries the
- * file-level fields (title/tags/topics/body) for its `fileSlug`. It is never
- * expanded into an occurrence; it is the single source of truth for file identity.
- * Modelled as a flagged OccurrenceEntry (not a third StoreItem variant) so the
- * existing union and all structural `.date`/`.time` accesses stay valid.
- */
-export function isRootNode(item: StoreItem): boolean {
-  return !isSeries(item) && (item as OccurrenceEntry<AppMetadata>).root === true
-}
-
-/** A non-root occurrence/series (excludes the per-file root node). */
-export function isOccurrenceOrSeries(item: StoreItem): boolean {
-  return !isRootNode(item)
 }
 
 // ── Occurrence ───────────────────────────────────────────────────────────────
 
 /**
  * An expanded occurrence produced by expandRange.
- * Alias for OccurrenceEntry<AppMetadata>.
+ * Carries AppMetadata (OccurrenceMetadata + FileMetadata joined in).
  */
 export type Occurrence      = OccurrenceEntry<AppMetadata>
-export type CollectedSeries = RepeatPattern<AppMetadata>  // same as RepeatPattern<AppMetadata> in StoreItem
+export type CollectedSeries = RepeatPattern<AppMetadata>
 export type EditScope = 'single' | 'future' | 'all' | 'add'
 
 // ── Inline-field registry ─────────────────────────────────────────────────────
-// Single source of truth for the persisted (frontmatter) metadata fields.
-// Drives extraction, YAML serialization, default-hoisting, and diffing so that
-// adding a field is a one-line change here instead of editing several parallel
-// key lists that silently drift out of sync.
+// Single source of truth for all persisted (frontmatter) metadata fields.
+// `level` distinguishes file-level fields (on the root, shared by all
+// occurrences) from occurrence-level fields (per series/occurrence).
 
 export type InlineFieldKind = 'string' | 'boolean' | 'priority' | 'stringArray'
 
 interface InlineFieldSpec {
-  key:       keyof InlineMetadata
-  kind:      InlineFieldKind
+  key:    keyof (FileMetadata & OccurrenceMetadata)
+  kind:   InlineFieldKind
+  level:  'file' | 'occurrence'
   /** Required fields get a non-undefined default ('' or []) when absent from raw. */
   required?: boolean
 }
 
 export const INLINE_FIELDS: readonly InlineFieldSpec[] = [
-  { key: 'title',        kind: 'string',      required: true },
-  { key: 'done',         kind: 'boolean' },
-  { key: 'tags',         kind: 'stringArray', required: true },
-  { key: 'topics',       kind: 'stringArray', required: true },
-  { key: 'participants', kind: 'stringArray', required: true },
-  { key: 'priority',     kind: 'priority' },
-  { key: 'duration',     kind: 'string' },
-  { key: 'timezone',     kind: 'string' },
+  { key: 'title',        kind: 'string',      level: 'file',       required: true },
+  { key: 'tags',         kind: 'stringArray', level: 'file',       required: true },
+  { key: 'topics',       kind: 'stringArray', level: 'file',       required: true },
+  { key: 'done',         kind: 'boolean',     level: 'occurrence' },
+  { key: 'participants', kind: 'stringArray', level: 'occurrence', required: true },
+  { key: 'priority',     kind: 'priority',    level: 'occurrence' },
+  { key: 'duration',     kind: 'string',      level: 'occurrence' },
+  { key: 'timezone',     kind: 'string',      level: 'occurrence' },
 ]
 
-/**
- * Frontmatter fields that are pinned to the file root (series/standalone root).
- * They must never diverge per occurrence override.
- * Note: `body` is also file-level but lives in ExtendedMetadata (not YAML),
- * so it is enforced separately in storeOps rather than via this constant.
- */
-export const FILE_LEVEL_FIELDS = ['title', 'tags', 'topics'] as const
-export type FileLevelField = typeof FILE_LEVEL_FIELDS[number]
+/** Occurrence-level inline field specs only (used by collapse/storeOps). */
+export const OCCURRENCE_FIELDS = INLINE_FIELDS.filter(s => s.level === 'occurrence')
 
-/** The file-level fields carried by a per-file root node. `body` is file-level
- *  too (markdown body, not frontmatter) and lives here as well. */
-export interface FileMetadata {
-  title:  string
-  tags:   string[]
-  topics: string[]
-  body?:  string
-}
-
-/** Extract the file-level fields from any metadata object. */
-export function toFileMetadata(m: Partial<AppMetadata>): FileMetadata {
-  return {
-    title:  m.title ?? '',
-    tags:   [...(m.tags ?? [])],
-    topics: [...(m.topics ?? [])],
-    body:   m.body || undefined,
-  }
-}
-
-/** Build a per-file root node (a flagged OccurrenceEntry) from file-level fields. */
-export function makeRootNode(fileSlug: string, meta: Partial<AppMetadata>): OccurrenceEntry<AppMetadata> {
-  const fm = toFileMetadata(meta)
-  return {
-    date: '', time: null, source: 'explicit', fileSlug,
-    id: crypto.randomUUID(), root: true,
-    metadata: { title: fm.title, tags: fm.tags, topics: fm.topics, participants: [], body: fm.body } as AppMetadata,
-  }
-}
-
-/** Return a copy of `m` with file-level fields cleared (they live on the root node). */
-export function withoutFileLevel(m: AppMetadata): AppMetadata {
-  return { ...m, title: '', tags: [], topics: [], body: undefined }
-}
-
-/** Coerce a raw YAML value to the typed value for `spec`. */
-function parseInlineField(spec: InlineFieldSpec, raw: unknown): unknown {
-  switch (spec.kind) {
-    case 'boolean':     return raw as boolean | undefined
-    case 'priority':    return raw as Priority | undefined
-    case 'stringArray': return Array.isArray(raw) ? (raw as string[]) : (spec.required ? [] : undefined)
-    case 'string':      return raw ? String(raw) : (spec.required ? '' : undefined)
-  }
-}
+/** File-level inline field specs (derived from level; replaces FILE_LEVEL_FIELDS). */
+export const FILE_LEVEL_SPECS = INLINE_FIELDS.filter(s => s.level === 'file')
 
 /** Value equality for an inline field, comparing array fields structurally. */
 export function inlineFieldEqual(kind: InlineFieldKind, a: unknown, b: unknown): boolean {
@@ -169,20 +126,55 @@ export function inlineFieldEmpty(kind: InlineFieldKind, v: unknown): boolean {
   return kind === 'stringArray' ? !Array.isArray(v) || v.length === 0 : false
 }
 
-// ── AppMetadata extraction ────────────────────────────────────────────────────
+// ── Metadata extraction ───────────────────────────────────────────────────────
+
+/** Coerce a raw YAML value to the typed value for `spec`. */
+function parseInlineField(spec: InlineFieldSpec, raw: unknown): unknown {
+  switch (spec.kind) {
+    case 'boolean':     return raw as boolean | undefined
+    case 'priority':    return raw as Priority | undefined
+    case 'stringArray': return Array.isArray(raw) ? (raw as string[]) : (spec.required ? [] : undefined)
+    case 'string':      return raw ? String(raw) : (spec.required ? '' : undefined)
+  }
+}
+
+/** Extract file-level metadata from raw YAML fields. */
+export function extractFileMetadata(fields: Record<string, unknown>): FileMetadata {
+  return {
+    title:  (fields.title ? String(fields.title) : '') as string,
+    tags:   Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
+    topics: Array.isArray(fields.topics) ? (fields.topics as string[]) : [],
+    body:   fields.body ? String(fields.body) : undefined,
+  }
+}
+
+/** Extract occurrence-level metadata from the raw fields of a node or occurrence. */
+export function extractOccurrenceMetadata(fields: Record<string, unknown>): OccurrenceMetadata {
+  const meta = {} as OccurrenceMetadata
+  const sink = meta as unknown as Record<string, unknown>
+  for (const spec of OCCURRENCE_FIELDS) {
+    sink[spec.key] = parseInlineField(spec, fields[spec.key])
+  }
+  return meta
+}
 
 /** Extract AppMetadata from the raw fields of an expanded occurrence. */
 export function extractAppMetadata(fields: Record<string, unknown>): AppMetadata {
-  const meta = {} as AppMetadata
-  const sink = meta as unknown as Record<string, unknown>
-  for (const spec of INLINE_FIELDS) {
-    sink[spec.key] = parseInlineField(spec, fields[spec.key])
+  return {
+    ...extractFileMetadata(fields),
+    ...extractOccurrenceMetadata(fields),
+    jsTime: fields.jsTime as Date | undefined,
   }
-  // Extended (non-persisted) fields — runtime/UI only.
-  // multiday is computed from duration at expansion time; never read from YAML.
-  meta.body   = fields.body   ? String(fields.body) : undefined
-  meta.jsTime = fields.jsTime as Date | undefined
-  return meta
+}
+
+/** Build a FileMetadata from a partial AppMetadata (e.g. for roots map). */
+export function toFileMetadata(m: Partial<AppMetadata>): FileMetadata {
+  return {
+    title:  m.title ?? '',
+    tags:   [...(m.tags ?? [])],
+    topics: [...(m.topics ?? [])],
+    body:   m.body || undefined,
+  }
 }
 
 // ── Occurrence helpers ────────────────────────────────────────────────────────

@@ -20,8 +20,8 @@ import {
   format, isValid, parseISO,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
-import type { Repeat, StoreItem, AppMetadata, FileMetadata } from '../types'
-import { isSeries, isRootNode, toFileMetadata } from '../types'
+import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots } from '../types'
+import { isSeries } from '../types'
 import type { EffectiveNode } from './inheritance'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -413,7 +413,6 @@ export interface OccurrenceEntry<T = Record<string, unknown>> {
   id:        string                    // own UUID; stable across promotion to RepeatPattern
   ownerId?:  string                    // UUID of parent RepeatPattern (undefined for standalone)
   excluded?: boolean                   // exclusion override: suppresses a generated occurrence
-  root?:     boolean                   // marks the per-file root node carrying file-level fields
   metadata:  T
 }
 
@@ -620,36 +619,32 @@ export function collectRepeatPatterns<T>(
  * items are emitted directly if they fall in range.
  * Each output occurrence carries ownerId = series.id so the editor can detect
  * recurring items and look up the parent series.
+ * File-level fields (title/tags/topics/body) are joined from `roots`.
  */
 export function expandRange(
   items: StoreItem[],
+  roots: Roots,
   from: Date,
   to: Date,
 ): OccurrenceEntry<AppMetadata>[] {
   const result: OccurrenceEntry<AppMetadata>[] = []
 
-  // Per-file root nodes carry the file-level fields (title/tags/topics/body).
-  // They are not expanded; their fields are joined onto every occurrence below.
-  const fileMetaBySlug = new Map<string, FileMetadata>()
-  for (const i of items) {
-    if (isRootNode(i)) fileMetaBySlug.set(i.fileSlug, toFileMetadata(i.metadata))
-  }
-  const joinFileMeta = (fileSlug: string, meta: AppMetadata): AppMetadata => ({
+  const joinFileMeta = (fileSlug: string, meta: OccurrenceMetadata): AppMetadata => ({
+    ...(roots.get(fileSlug) ?? { title: '', tags: [], topics: [] }),
     ...meta,
-    ...(fileMetaBySlug.get(fileSlug) ?? {}),
   })
 
-  const seriesList = items.filter(isSeries)
-  // Standalone = non-series, non-root items with no ownerId (direct root-level items)
+  const seriesList = items.filter(isSeries) as StoreSeries[]
+  // Standalone = non-series items with no ownerId
   const standalones = items.filter(
-    i => !isSeries(i) && !isRootNode(i) && !(i as OccurrenceEntry<AppMetadata>).ownerId,
-  ) as OccurrenceEntry<AppMetadata>[]
+    i => !isSeries(i) && !(i as StoreOcc).ownerId,
+  ) as StoreOcc[]
 
   // ── Expand each series ────────────────────────────────────────────────────
   for (const series of seriesList) {
     const children = items.filter(
-      i => !isSeries(i) && (i as OccurrenceEntry<AppMetadata>).ownerId === series.id,
-    ) as OccurrenceEntry<AppMetadata>[]
+      i => !isSeries(i) && (i as StoreOcc).ownerId === series.id,
+    ) as StoreOcc[]
 
     const expandable: Record<string, any> = {
       ...series.metadata,
@@ -678,6 +673,9 @@ export function expandRange(
         return ct && Math.abs(ct.getTime() - jsTime.getTime()) < 60000
       })
 
+      const occMeta: OccurrenceMetadata = override
+        ? { ...series.metadata, ...override.metadata }
+        : series.metadata
       result.push({
         date:    String(occ.date ?? ''),
         time:    occ.time ? String(occ.time) : null,
@@ -685,11 +683,7 @@ export function expandRange(
         fileSlug: series.fileSlug,
         id:      crypto.randomUUID(),
         ownerId: series.id,
-        metadata: {
-          ...joinFileMeta(series.fileSlug,
-            override ? { ...series.metadata, ...override.metadata } : series.metadata),
-          jsTime,
-        },
+        metadata: { ...joinFileMeta(series.fileSlug, occMeta), jsTime },
       })
     }
   }
@@ -703,8 +697,12 @@ export function expandRange(
       ?? parseDateString(occ.date)
     if (!jsTime || jsTime < from || jsTime > to) continue
     result.push({
-      ...occ,
-      id:       crypto.randomUUID(),
+      date:    occ.date,
+      time:    occ.time,
+      source:  occ.source,
+      fileSlug: occ.fileSlug,
+      id:      crypto.randomUUID(),
+      excluded: occ.excluded,
       metadata: { ...joinFileMeta(occ.fileSlug, occ.metadata), jsTime },
     })
   }
