@@ -4,7 +4,8 @@ import { Checkbox } from './ui/checkbox'
 import type { Occurrence } from '../types'
 import { isStandaloneOcc } from '../types'
 import { expandRange, fmtT, parseDurationHours, parseDurationDays, multidayCoversDate, parseDateString } from '../model/expansion'
-import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
+import { sameDay, addDays, fmtLong, sortOccs, occState, toggleOccDone } from '../meridian'
+import OccurrenceCard from './OccurrenceCard'
 
 import { TODAY } from '../constants'
 const SH = 7    // start hour on timeline
@@ -177,15 +178,37 @@ export default function DayView({ onOpen }: Props) {
   const totalCols = Math.max(cols.length, 1)
   const isToday   = sameDay(dvDate, TODAY)
 
+  const dvMidnight = new Date(dvDate)
+  dvMidnight.setHours(0, 0, 0, 0)
+
   return (
     <>
       {/* All-day / multiday strip */}
       {allDayDeduped.length > 0 && (
         <div className="dv-allday" id="dvAllDay">
           <div className="dv-adlbl">All day</div>
-          {allDayDeduped.map((o, i) => (
-            <AllDayItem key={`${o.fileSlug}-${o.date}-${i}`} o={o} onOpen={onOpen} />
-          ))}
+          {allDayDeduped.map((o, i) => {
+            const days = parseDurationDays(o.metadata.duration) ?? 0
+            if (days >= 2) {
+              const startD = parseDateString(o.date)
+              const dayIdx = startD
+                ? Math.round((dvMidnight.getTime() - startD.getTime()) / 86_400_000) + 1
+                : 1
+              const displayOcc = { ...o, metadata: { ...o.metadata, title: `${o.metadata.title} (Day ${dayIdx}/${days})` } }
+              return (
+                <OccurrenceCard
+                  key={`${o.fileSlug}-${o.date}-${i}`}
+                  occ={displayOcc}
+                  variant="agenda"
+                  isDone={!!o.metadata.done}
+                  currentBarClass={occState(displayOcc)}
+                  onOpen={() => onOpen(o)}
+                  onToggleDone={() => toggleOccDone(o)}
+                />
+              )
+            }
+            return <AllDayItem key={`${o.fileSlug}-${o.date}-${i}`} o={o} onOpen={onOpen} />
+          })}
         </div>
       )}
 

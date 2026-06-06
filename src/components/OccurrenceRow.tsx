@@ -10,9 +10,10 @@ interface Props {
   onOpen: () => void
   onToggleDone: () => void
   onSwipeDelete: () => (() => void)
+  displayTitle?: string
 }
 
-export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete }: Props) {
+export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete, displayTitle }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
@@ -152,6 +153,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
           currentBarClass={currentBarClass}
           onOpen={onOpen}
           onToggleDone={() => { setIsDone(prev => !prev); onToggleDone() }}
+          displayTitle={displayTitle}
         />
       </div>
     </div>

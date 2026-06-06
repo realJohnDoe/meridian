@@ -15,6 +15,7 @@ export interface OccurrenceCardProps {
   onOpen: () => void
   onToggleDone: () => void
   showTypeIcon?: boolean
+  displayTitle?: string
 }
 
 const titleCls = (isDone: boolean) =>
@@ -47,11 +48,13 @@ export default function OccurrenceCard({
   onOpen,
   onToggleDone,
   showTypeIcon = false,
+  displayTitle,
 }: OccurrenceCardProps) {
   const t = fmtT(occ.time)
   const hasTrack = occ.metadata.done !== undefined
   const tags = occ.metadata.tags || []
   const participants = occ.metadata.participants || []
+  const title = displayTitle ?? occ.metadata.title
 
   const dateBadge = (() => {
     const d = parseDateString(occ.date)
@@ -91,7 +94,7 @@ export default function OccurrenceCard({
                 className="size-5 shrink-0"
               />
             )}
-            <span className={titleCls(isDone)}>{occ.metadata.title}</span>
+            <span className={titleCls(isDone)}>{title}</span>
 
             {/* Right-aligned: recur icon + time on one line, duration below */}
             {(!!occ.ownerId || !!t) && (
@@ -138,7 +141,7 @@ export default function OccurrenceCard({
                 className="size-5 shrink-0"
               />
             )}
-            <span className={titleCls(isDone)}>{occ.metadata.title}</span>
+            <span className={titleCls(isDone)}>{title}</span>
             {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
           </div>
 
