@@ -1,9 +1,13 @@
 /**
- * Parse a file (path + raw content) into a flat StoreItem[].
+ * Parse a file (path + raw content) into StoreItem[] + FileMetadata root.
  *
  * This is the single load path for both disk files and seed YAML strings.
- * RawNode / EffectiveNode never leave this module — callers receive StoreItem[]
- * and never need to know the YAML shape.
+ * RawNode / EffectiveNode never leave this module — callers receive the pair
+ * { items: StoreItem[], root: FileMetadata } and never need the YAML shape.
+ *
+ * StoreItem carries OccurrenceMetadata only (no file-level fields).
+ * File-level fields (title/tags/topics/body) live in the returned FileMetadata
+ * and belong in the store's roots map keyed by fileSlug.
  */
 
 import { loadFile } from '../fileIO'
@@ -11,8 +15,8 @@ import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '../types'
-import { extractAppMetadata, isSeries, makeRootNode, withoutFileLevel } from '../types'
-import type { StoreItem } from '../types'
+import { extractFileMetadata, extractOccurrenceMetadata, isSeries } from '../types'
+import type { StoreItem, FileMetadata } from '../types'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
 
@@ -48,7 +52,7 @@ export function effectiveNodeToStoreItems(
         repeat: n.fields.repeat as Repeat,
         fileSlug,
         id:     seriesId,
-        metadata: extractAppMetadata(base),
+        metadata: extractOccurrenceMetadata(base),
       })
       for (const child of n.instances) {
         if (hasRepeat(child)) { walk(child); continue }  // nested series → flat sibling
@@ -60,7 +64,7 @@ export function effectiveNodeToStoreItems(
           id:      crypto.randomUUID(),
           ownerId: seriesId,
           ...(child.fields.excluded === true ? { excluded: true as const } : {}),
-          metadata: extractAppMetadata({ ...base, ...child.fields }),
+          metadata: extractOccurrenceMetadata({ ...base, ...child.fields }),
         })
       }
     } else if (n.fields.date !== undefined || n.instances.length === 0) {
@@ -73,7 +77,7 @@ export function effectiveNodeToStoreItems(
         source: 'explicit',
         fileSlug,
         id:     crypto.randomUUID(),
-        metadata: extractAppMetadata(base),
+        metadata: extractOccurrenceMetadata(base),
       })
       for (const child of n.instances) {
         if (child.fields.excluded === true) continue
@@ -83,7 +87,7 @@ export function effectiveNodeToStoreItems(
           source: 'explicit',
           fileSlug,
           id:     crypto.randomUUID(),
-          metadata: extractAppMetadata({ ...base, ...child.fields }),
+          metadata: extractOccurrenceMetadata({ ...base, ...child.fields }),
         })
       }
     } else {
@@ -97,53 +101,52 @@ export function effectiveNodeToStoreItems(
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+export interface ParseResult {
+  items: StoreItem[]
+  root:  FileMetadata
+}
+
 /**
- * Parse a markdown/YAML file into a flat StoreItem[].
+ * Parse a markdown/YAML file into StoreItem[] + FileMetadata.
  * Replaces `rawToNode` + `nodesToStoreItems`.
  */
-export function parseToStoreItems(path: string, content: string): StoreItem[] {
+export function parseToStoreItems(path: string, content: string): ParseResult {
   const { rawNode, body } = loadFile(path, content)
   const fileSlug = path.replace(/\.(md|yaml|yml)$/, '')
   const tree = buildEffectiveTree(rawNode as Parameters<typeof buildEffectiveTree>[0])
   const items = effectiveNodeToStoreItems(tree, fileSlug)
-  return withRootNode(items, rawNode, body, fileSlug)
+  return { items, root: buildRoot(rawNode, body) }
 }
 
 /**
- * Build the per-file root node and prepend it to the items.
+ * Build the FileMetadata for a file from its raw frontmatter + body.
  *
  * File-level fields (title/tags/topics) belong to the whole file. They are
  * written at the top-level frontmatter root and are NOT propagated to child
  * series by the defaults-only inheritance engine — so instead of copying them
- * onto every item, we model them explicitly on one root node. The markdown body
- * (also file-level) lives there too. The series/occurrences keep only their own
- * occurrence-level fields; expandRange joins the file-level fields back on.
+ * onto every item, we model them explicitly as a FileMetadata entry in the
+ * roots map. The markdown body (also file-level) lives there too.
  *
  * File-level values are read from the root frontmatter, falling back to a
  * top-level `defaults:` block for legacy files where they were nested.
  */
-function withRootNode(
-  items: StoreItem[],
+export function buildRoot(
   rawNode: Record<string, unknown>,
   body: string,
-  fileSlug: string,
-): StoreItem[] {
+): FileMetadata {
   const defaults = (rawNode.defaults as Record<string, unknown> | undefined) ?? {}
-  const fileMeta = extractAppMetadata({ ...defaults, ...rawNode })
-  const rootNode = makeRootNode(fileSlug, { ...fileMeta, body: body || undefined })
-  for (const it of items) it.metadata = withoutFileLevel(it.metadata)
-  return [rootNode, ...items]
+  return extractFileMetadata({ ...defaults, ...rawNode, body: body || undefined })
 }
 
 /**
  * Convert a YAML string (not a file path) — used for seed data.
  * `id` becomes the fileSlug.
  */
-export function parseYamlToStoreItems(yamlWithFrontmatter: string, fileSlug: string): StoreItem[] {
+export function parseYamlToStoreItems(yamlWithFrontmatter: string, fileSlug: string): ParseResult {
   const { rawNode, body } = loadFile(fileSlug + '.md', yamlWithFrontmatter)
   const tree = buildEffectiveTree(rawNode as Parameters<typeof buildEffectiveTree>[0])
   const items = effectiveNodeToStoreItems(tree, fileSlug)
-  return withRootNode(items, rawNode, body, fileSlug)
+  return { items, root: buildRoot(rawNode, body) }
 }
 
 // Re-export isSeries so storeOps can import it from here alongside item types.

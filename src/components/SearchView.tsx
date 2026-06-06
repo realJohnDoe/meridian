@@ -26,6 +26,7 @@ interface Props {
 
 export default function SearchView({ onOpen, onClose }: Props) {
   const storeItems   = useStore(s => s.items)
+  const roots        = useStore(s => s.roots)
   const nsFilterVal  = useStore(s => s.nsFilterVal)
   const setNsFilter  = useStore(s => s.setNsFilterVal)
   const [q, setQ]    = useState('')
@@ -43,7 +44,7 @@ export default function SearchView({ onOpen, onClose }: Props) {
     const to   = addDays(TODAY, 90)
     // Undated items (tasks/notes saved without a date) fall outside the expandRange
     // window, so collect them separately to keep them searchable.
-    const occs: Occurrence[] = [...expandRange(storeItems, from, to), ...collectUndated(storeItems)]
+    const occs: Occurrence[] = [...expandRange(storeItems, roots, from, to), ...collectUndated(storeItems, roots)]
     const seen = new Set<string>()
     return [
       ...(NOTES_DATA as SearchItem[]),
@@ -62,7 +63,7 @@ export default function SearchView({ onOpen, onClose }: Props) {
           occurrence: o,
         })),
     ]
-  }, [storeItems])
+  }, [storeItems, roots])
 
   const filtered = useMemo(() => {
     const ql = q.toLowerCase()

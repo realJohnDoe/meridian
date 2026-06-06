@@ -46,18 +46,21 @@ This file is **field-agnostic**: it never references domain field names.
 ### `storeItems.ts`
 **Tree → flat store.**
 
-- `parseToStoreItems(path, content)` — full parse pipeline: `yamlParse` →
-  `buildEffectiveTree` → `effectiveNodeToStoreItems`.
-- `parseYamlToStoreItems(yaml, fileSlug)` — same but from a raw YAML string
-  (used for seed data).
-- `effectiveNodeToStoreItems(tree, fileSlug, body?)` — walks an `EffectiveNode`
-  tree and emits a flat `StoreItem[]`:
+Returns `ParseResult = { items: StoreItem[]; root: FileMetadata }` — items carry
+only `OccurrenceMetadata` (no file-level fields); file-level identity is in `root`.
+
+- `parseToStoreItems(path, content): ParseResult` — full parse pipeline:
+  `yamlParse` → `buildEffectiveTree` → `effectiveNodeToStoreItems` + `buildRoot`.
+- `parseYamlToStoreItems(yaml, fileSlug): ParseResult` — same but from a raw
+  YAML string (used for seed data).
+- `effectiveNodeToStoreItems(tree, fileSlug)` — walks an `EffectiveNode` tree and
+  emits a flat `StoreItem[]` using `extractOccurrenceMetadata` (no file-level):
   - Series node (`repeat` present) → `RepeatPattern` + child `OccurrenceEntry`
     overrides.
   - Node with `date` but no `repeat` → standalone `OccurrenceEntry`.
   - Container node (no `date`, no `repeat`) → recurse into instances.
-
-Domain-aware: calls `extractAppMetadata` which maps raw fields to `AppMetadata`.
+- `buildRoot(rawNode, body): FileMetadata` — extracts file-level metadata from
+  the root node via `extractFileMetadata`.
 
 ### `expansion.ts`
 **Temporal expansion engine** — the largest module; consolidates what was
@@ -80,19 +83,23 @@ previously several separate files.
 `extractMetadata` function.
 
 *Main-app entry point* (domain-aware):
-- `expandRange(items, from, to)` — takes a `StoreItem[]` and expands all
-  series and standalones within the date window, returning
-  `OccurrenceEntry<AppMetadata>[]` with `jsTime` and `ownerId` populated.
+- `expandRange(items, roots, from, to)` — takes a `StoreItem[]` and a `Roots`
+  map and expands all series and standalones within the date window, returning
+  `OccurrenceEntry<AppMetadata>[]` with file-level metadata joined from `roots`,
+  `jsTime` and `ownerId` populated.
 - `multidayCoversDate(occ, date)` — returns true when a multi-day event
   (duration ≥ 2d) spans the given date.  Used by calendar views to show an
   event across all days it covers without expanding it into multiple occurrences.
 
 ### `collapse.ts`
-**Reverse-inheritance: `StoreItem[]` → YAML object for saving.**
+**Reverse-inheritance: `StoreItem[]` + `FileMetadata` → YAML object for saving.**
 
-- `collapseToYaml(items)` — takes all `StoreItem`s for one `fileSlug` and
-  produces the most compact `Record<string, unknown>` that round-trips back to
-  the same store state.
+- `collapseToYaml(items, root?: FileMetadata)` — takes all `StoreItem`s for one
+  `fileSlug` plus the optional per-file root metadata and produces the most
+  compact `Record<string, unknown>` that round-trips back to the same store state.
+  File-level fields (title, tags, topics) are emitted at the YAML root from `root`;
+  occurrence fields (done, priority, duration, …) are emitted via the hoisting
+  algorithm.
 
   The inheritance algorithm is driven by `hoistSharedMetadata`:
   - **Simple cases** (single item, no override children): flat output — metadata
@@ -113,14 +120,17 @@ previously several separate files.
   diffing each against the series metadata.
 
 ### `storeOps.ts`
-**Pure `StoreItem[]` edit operations.**
+**Pure edit operations on `StoreData = { items: StoreItem[], roots: Roots }`.**
 
-Every function takes a `StoreItem[]` and returns a new `StoreItem[]`; no store,
-React, or file I/O dependencies.
+No store, React, or file I/O dependencies.
 
-- `applyEdit(items, occ, scope, fields)` — apply an editor save across four
-  scopes: `'all'`, `'single'`, `'future'` (series split), `'add'`.
+- `applyEdit(data, occ, scope, fields): StoreData` — apply an editor save across
+  four scopes: `'all'`, `'single'`, `'future'` (series split), `'add'`. Updates
+  both items (occurrence-level changes) and roots (file-level title/tags/topics).
+- `updateRoot(roots, fileSlug, fields): Roots` — update file-level metadata for
+  one slug and return a new roots map.
 - `toggleDone`, `excludeOccurrence`, `deleteByFileSlug`, `deleteFollowing`
+  — take and return `StoreItem[]` only (no roots needed).
 - `upsertOverride`, `findSeries`, `fileSlugItems`
 
 ### `__tests__/`

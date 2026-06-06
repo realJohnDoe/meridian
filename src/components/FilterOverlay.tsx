@@ -35,6 +35,7 @@ interface Props {
 
 export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
   const items = useStore(s => s.items)
+  const roots = useStore(s => s.roots)
 
   const results = useMemo(() => {
     if (!query) return []
@@ -42,13 +43,13 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
     const to   = addDays(TODAY, 90)
     // Undated items (tasks/notes saved without a date) fall outside the expandRange
     // window, so collect them separately to keep them findable here too.
-    const occs = [...expandRange(items, from, to), ...collectUndated(items)]
+    const occs = [...expandRange(items, roots, from, to), ...collectUndated(items, roots)]
     return occs
       .filter(o => fuzzyMatch(query, o.metadata.title))
       .map(o => ({ occ: o, score: fuzzyScore(query, o.metadata.title) }))
       .sort((a, b) => b.score - a.score || +(a.occ.metadata.jsTime ?? 0) - +(b.occ.metadata.jsTime ?? 0))
       .map(x => x.occ)
-  }, [items, query])
+  }, [items, roots, query])
 
   if (!query) return null
 
