@@ -20,8 +20,8 @@ import {
   format, isValid, parseISO,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
-import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, FileMetadata, Roots } from '../types'
-import { isSeries, toFileMetadata } from '../types'
+import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots } from '../types'
+import { isSeries } from '../types'
 import type { EffectiveNode } from './inheritance'
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -120,6 +120,7 @@ export default function DayView({ onOpen }: Props) {
       .filter(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)
       .map(i => ({
         ...i,
+        source: 'explicit' as const,
         metadata: { ...(roots.get(i.fileSlug) ?? { title: '', tags: [], topics: [] }), ...i.metadata, jsTime: new Date(from) } as Occurrence['metadata'],
       }))
       .filter(i => {

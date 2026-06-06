@@ -36,7 +36,6 @@ export type SeriesSheetConfig = { title: string; options: SeriesSheetOption[] }
 const getItems      = (): StoreItem[]   => useStore.getState().items
 const setItems      = (i: StoreItem[])  => useStore.setState({ items: i })
 const getRoots      = (): Roots         => useStore.getState().roots
-const setRoots      = (r: Roots)        => useStore.setState({ roots: r })
 const setData       = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
 const getPrimary    = ()                => useStore.getState().primaryView
 const setPrimary    = (v: string)       => useStore.getState().setPrimaryView(v as any)
