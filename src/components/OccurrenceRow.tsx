@@ -147,7 +147,6 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       <div className="swipe-row" ref={rowRef}>
         <OccurrenceCard
           occ={occ}
-          variant="agenda"
           isDone={isDone}
           currentBarClass={currentBarClass}
           onOpen={onOpen}

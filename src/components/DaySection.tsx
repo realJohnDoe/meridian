@@ -114,6 +114,7 @@ function propsAreEqual(prev: Props, next: Props): boolean {
         && o.metadata.priority === n.metadata.priority
         && o.metadata.duration === n.metadata.duration
         && JSON.stringify(o.metadata.tags) === JSON.stringify(n.metadata.tags)
+        && JSON.stringify(o.metadata.topics) === JSON.stringify(n.metadata.topics)
         && JSON.stringify(o.metadata.participants) === JSON.stringify(n.metadata.participants)
   })) return false
   if (!prev.multidayBanners.every((o, i) => o.fileSlug === next.multidayBanners[i].fileSlug)) return false

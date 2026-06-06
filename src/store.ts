@@ -3,7 +3,7 @@ import type { StoreItem, Roots } from './types'
 import { TODAY as _today } from './constants'
 
 export type PrimaryView = 'agenda' | 'calendar' | 'day'
-export type OverlayView = 'entry' | 'search'
+export type OverlayView = 'entry'
 
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ interface MeridianStore {
 
   /**
    * Overlay stack — last entry is the topmost visible view.
-   * Only 'entry' and 'search' are overlay views; they slide over primary views.
+   * Only 'entry' is an overlay view; it slides over primary views.
    */
   overlayStack: OverlayView[]
   pushOverlay: (v: OverlayView) => void
