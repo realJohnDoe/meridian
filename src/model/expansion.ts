@@ -21,7 +21,7 @@ import {
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
 import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots } from '../types'
-import { isSeries } from '../types'
+import { isSeries, isStandaloneOcc } from '../types'
 import type { EffectiveNode } from './inheritance'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -636,9 +636,7 @@ export function expandRange(
 
   const seriesList = items.filter(isSeries) as StoreSeries[]
   // Standalone = non-series items with no ownerId
-  const standalones = items.filter(
-    i => !isSeries(i) && !(i as StoreOcc).ownerId,
-  ) as StoreOcc[]
+  const standalones = items.filter(isStandaloneOcc)
 
   // ── Expand each series ────────────────────────────────────────────────────
   for (const series of seriesList) {

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { fixtureNames, parseFixture, serialize, normalizeIds, rootMeta, occItems } from './helpers'
 import { parseToStoreItems } from '../storeItems'
 import { expandRange, multidayCoversDate } from '../expansion'
-import { isSeries } from '../../types'
+import { isSeries, isStandaloneOcc } from '../../types'
 
 const names = fixtureNames()
 
@@ -146,7 +146,7 @@ describe('mixed series and standalone instances', () => {
   it('parses into two series and one standalone', () => {
     const parsed = parseFixture('mixed-series-standalones')
     const series = parsed.items.filter(isSeries)
-    const standalones = parsed.items.filter(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)
+    const standalones = parsed.items.filter(isStandaloneOcc)
     expect(series).toHaveLength(2)
     expect(standalones).toHaveLength(1)
   })

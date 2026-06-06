@@ -2,7 +2,7 @@ import { useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { Checkbox } from './ui/checkbox'
 import type { Occurrence } from '../types'
-import { isSeries } from '../types'
+import { isStandaloneOcc } from '../types'
 import { expandRange, fmtT, parseDurationHours, parseDurationDays, multidayCoversDate, parseDateString } from '../model/expansion'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
 
@@ -117,7 +117,7 @@ export default function DayView({ onOpen }: Props) {
     // output (their single occurrence is on the start date). Find them by
     // scanning store items directly and add a virtual occurrence for today.
     const extraMultiday = items
-      .filter(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)
+      .filter(isStandaloneOcc)
       .map(i => ({
         ...i,
         source: 'explicit' as const,

@@ -158,26 +158,16 @@ export function extractOccurrenceMetadata(fields: Record<string, unknown>): Occu
   return meta
 }
 
-/** Extract AppMetadata from the raw fields of an expanded occurrence. */
-export function extractAppMetadata(fields: Record<string, unknown>): AppMetadata {
-  return {
-    ...extractFileMetadata(fields),
-    ...extractOccurrenceMetadata(fields),
-    jsTime: fields.jsTime as Date | undefined,
-  }
-}
-
-/** Build a FileMetadata from a partial AppMetadata (e.g. for roots map). */
-export function toFileMetadata(m: Partial<AppMetadata>): FileMetadata {
-  return {
-    title:  m.title ?? '',
-    tags:   [...(m.tags ?? [])],
-    topics: [...(m.topics ?? [])],
-    body:   m.body || undefined,
-  }
-}
-
 // ── Occurrence helpers ────────────────────────────────────────────────────────
+
+/**
+ * True when `i` is a standalone OccurrenceEntry — i.e. not a series and not an
+ * override child of one. Use this wherever you need to distinguish standalones
+ * from series overrides without reaching for an ad-hoc `ownerId` cast.
+ */
+export function isStandaloneOcc(i: StoreItem): i is StoreOcc {
+  return !isSeries(i) && !(i as StoreOcc).ownerId
+}
 
 /** Derive the display kind from occurrence data. */
 export function occKind(occ: Occurrence): 'event' | 'task' | 'note' {
