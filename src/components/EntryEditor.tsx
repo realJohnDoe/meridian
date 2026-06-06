@@ -407,43 +407,6 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           </Popover>
         </div>
 
-        {/* ── FILE-LEVEL: participants ── */}
-        <div className="entry-tags">
-          <Users size={13} className="opacity-40 self-center" />
-          {participants.map((p, i) => (
-            <Badge
-              key={i}
-              variant="tag"
-              className="cursor-pointer"
-              onClick={() => onChange(prev => ({ ...prev, participants: prev.participants.filter((_, j) => j !== i) }))}
-            >
-              {p}
-            </Badge>
-          ))}
-          {showParticipantInput ? (
-            <input
-              ref={participantInputRef}
-              className="etag-input"
-              value={participantInputVal}
-              placeholder="name"
-              onChange={e => setParticipantInputVal(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') { e.preventDefault(); commitParticipant() }
-                if (e.key === 'Escape') { setParticipantInputVal(''); setShowParticipantInput(false) }
-              }}
-              onBlur={commitParticipant}
-            />
-          ) : (
-            <Badge
-              variant="tag"
-              className="cursor-pointer text-primary bg-[var(--ab)] gap-1"
-              onClick={() => setShowParticipantInput(true)}
-            >
-              <Plus size={9} />person
-            </Badge>
-          )}
-        </div>
-
         <div className="entry-divider"></div>
 
         {/* ── OCCURRENCE-LEVEL: scope → type → metadata ── */}
@@ -517,6 +480,43 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
               <Repeat size={13} />Repeat
               <span className="text-[11px] font-mono opacity-80 ml-px">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
             </button>
+          )}
+        </div>
+
+        {/* ── OCCURRENCE-LEVEL: participants ── */}
+        <div className="entry-tags">
+          <Users size={13} className="opacity-40 self-center" />
+          {participants.map((p, i) => (
+            <Badge
+              key={i}
+              variant="tag"
+              className="cursor-pointer"
+              onClick={() => onChange(prev => ({ ...prev, participants: prev.participants.filter((_, j) => j !== i) }))}
+            >
+              {p}
+            </Badge>
+          ))}
+          {showParticipantInput ? (
+            <input
+              ref={participantInputRef}
+              className="etag-input"
+              value={participantInputVal}
+              placeholder="name"
+              onChange={e => setParticipantInputVal(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); commitParticipant() }
+                if (e.key === 'Escape') { setParticipantInputVal(''); setShowParticipantInput(false) }
+              }}
+              onBlur={commitParticipant}
+            />
+          ) : (
+            <Badge
+              variant="tag"
+              className="cursor-pointer text-primary bg-[var(--ab)] gap-1"
+              onClick={() => setShowParticipantInput(true)}
+            >
+              <Plus size={9} />person
+            </Badge>
           )}
         </div>
 

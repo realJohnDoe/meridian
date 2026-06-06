@@ -285,7 +285,7 @@
 .entry-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;align-items:center}
 .etag-input{background:var(--bg3);border:1px solid var(--ind);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--t0);outline:none;width:90px;font-family:inherit}
 .etag-input::placeholder{color:var(--t3)}
-.entry-divider{height:1px;background:var(--bdr);margin-bottom:14px}
+.entry-divider{height:1px;background:var(--bdr);margin:0 -14px 14px}
 .entry-body{min-height:160px;color:var(--t1);font-size:14px;line-height:1.85;outline:none;caret-color:var(--ind);white-space:pre-wrap;word-break:break-word;position:relative}
 .entry-body .wl{color:var(--ind);border-bottom:1px solid rgba(129,140,248,.35);cursor:pointer}
 .entry-body .wl-broken{color:var(--ros);border-bottom:1px solid rgba(251,113,133,.3)}
