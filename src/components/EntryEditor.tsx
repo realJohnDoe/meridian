@@ -8,6 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { Checkbox } from './ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
+import { Card, CardHeader, CardContent } from './ui/card'
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from './ui/command'
 import TagChip from './TagChip'
 import { unwrapRef, resolveWikilink } from '../wikilinks'
@@ -409,116 +410,121 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
         <div className="entry-divider"></div>
 
-        {/* ── OCCURRENCE-LEVEL: scope → type → metadata ── */}
-        {showScopeRow && (
-          <div className="scope-row">
-            <Select value={editScope} onValueChange={handleScopeChange}>
-              <SelectTrigger className="flex-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="add">Add new occurrence</SelectItem>
-                <SelectItem value="single">Edit this occurrence</SelectItem>
-                {isScheduled && <SelectItem value="future">Edit this and all following occurrences</SelectItem>}
-                {(isScheduled || isAfterCompletion) && <SelectItem value="all">Edit repeat pattern</SelectItem>}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+        {/* ── OCCURRENCE-LEVEL: scope (header) → type → metadata → participants ── */}
+        <Card className="mb-4">
+          {showScopeRow && (
+            <CardHeader className="p-3">
+              <Select value={editScope} onValueChange={handleScopeChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="add">Add new occurrence</SelectItem>
+                  <SelectItem value="single">Edit this occurrence</SelectItem>
+                  {isScheduled && <SelectItem value="future">Edit this and all following occurrences</SelectItem>}
+                  {(isScheduled || isAfterCompletion) && <SelectItem value="all">Edit repeat pattern</SelectItem>}
+                </SelectContent>
+              </Select>
+            </CardHeader>
+          )}
+          <CardContent className={cn(
+            'px-3 pt-3 pb-0',
+            showScopeRow && 'border-t bg-muted/30',
+          )}>
+            <ToggleGroup
+              type="single"
+              value={itemType}
+              onValueChange={(v) => { if (v) handleTypeChange(v as ItemType) }}
+              className="type-chip-row"
+            >
+              {(['task', 'event', 'note'] as ItemType[]).map(t => (
+                <ToggleGroupItem
+                  key={t}
+                  value={t}
+                  className={cn('type-chip', `type-chip-${t}`, 'h-auto min-w-0')}
+                >
+                  {t === 'task' && <CheckSquare size={13} />}
+                  {t === 'event' && <CalendarDays size={13} />}
+                  {t === 'note' && <FileText size={13} />}
+                  {t}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
 
-        <ToggleGroup
-          type="single"
-          value={itemType}
-          onValueChange={(v) => { if (v) handleTypeChange(v as ItemType) }}
-          className="type-chip-row"
-        >
-          {(['task', 'event', 'note'] as ItemType[]).map(t => (
-            <ToggleGroupItem
-              key={t}
-              value={t}
-              className={cn('type-chip', `type-chip-${t}`, 'h-auto min-w-0')}
-            >
-              {t === 'task' && <CheckSquare size={13} />}
-              {t === 'event' && <CalendarDays size={13} />}
-              {t === 'note' && <FileText size={13} />}
-              {t}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+            <div className="prop-chips">
+              {showDateChip && (
+                <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}>
+                  <Calendar size={13} />Date
+                  <span className="text-[11px] font-mono opacity-80 ml-px">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
+                </button>
+              )}
+              {showDateChip && hasDate && (
+                <button className={badgeVariants({ variant: 'chip' })} aria-pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}>
+                  <Clock size={13} />Time
+                  <span className="text-[11px] font-mono opacity-80 ml-px">{hasTime ? scheduled!.time : ''}</span>
+                </button>
+              )}
+              {showDateChip && hasDate && (
+                <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}>
+                  <Timer size={13} />Duration
+                  <span className="text-[11px] font-mono opacity-80 ml-px">{duration}</span>
+                </button>
+              )}
+              {tracked && (
+                <button
+                  className={cn(badgeVariants({ variant: 'chip' }), priority && PRIORITY_CLASS[priority])}
+                  aria-pressed={!!priority}
+                  onClick={() => onOpenDlg('dlgPriority')}
+                >
+                  <Flag size={13} />Priority
+                  <span className="text-[11px] font-mono opacity-80 ml-px">{priority ? PRIORITY_LABELS[priority] : ''}</span>
+                </button>
+              )}
+              {showRepeat && (
+                <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}>
+                  <Repeat size={13} />Repeat
+                  <span className="text-[11px] font-mono opacity-80 ml-px">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
+                </button>
+              )}
+            </div>
 
-        <div className="prop-chips">
-          {showDateChip && (
-            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}>
-              <Calendar size={13} />Date
-              <span className="text-[11px] font-mono opacity-80 ml-px">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
-            </button>
-          )}
-          {showDateChip && hasDate && (
-            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}>
-              <Clock size={13} />Time
-              <span className="text-[11px] font-mono opacity-80 ml-px">{hasTime ? scheduled!.time : ''}</span>
-            </button>
-          )}
-          {showDateChip && hasDate && (
-            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}>
-              <Timer size={13} />Duration
-              <span className="text-[11px] font-mono opacity-80 ml-px">{duration}</span>
-            </button>
-          )}
-          {tracked && (
-            <button
-              className={cn(badgeVariants({ variant: 'chip' }), priority && PRIORITY_CLASS[priority])}
-              aria-pressed={!!priority}
-              onClick={() => onOpenDlg('dlgPriority')}
-            >
-              <Flag size={13} />Priority
-              <span className="text-[11px] font-mono opacity-80 ml-px">{priority ? PRIORITY_LABELS[priority] : ''}</span>
-            </button>
-          )}
-          {showRepeat && (
-            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}>
-              <Repeat size={13} />Repeat
-              <span className="text-[11px] font-mono opacity-80 ml-px">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
-            </button>
-          )}
-        </div>
-
-        {/* ── OCCURRENCE-LEVEL: participants ── */}
-        <div className="entry-tags">
-          <Users size={13} className="opacity-40 self-center" />
-          {participants.map((p, i) => (
-            <Badge
-              key={i}
-              variant="tag"
-              className="cursor-pointer"
-              onClick={() => onChange(prev => ({ ...prev, participants: prev.participants.filter((_, j) => j !== i) }))}
-            >
-              {p}
-            </Badge>
-          ))}
-          {showParticipantInput ? (
-            <input
-              ref={participantInputRef}
-              className="etag-input"
-              value={participantInputVal}
-              placeholder="name"
-              onChange={e => setParticipantInputVal(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') { e.preventDefault(); commitParticipant() }
-                if (e.key === 'Escape') { setParticipantInputVal(''); setShowParticipantInput(false) }
-              }}
-              onBlur={commitParticipant}
-            />
-          ) : (
-            <Badge
-              variant="tag"
-              className="cursor-pointer text-primary bg-[var(--ab)] gap-1"
-              onClick={() => setShowParticipantInput(true)}
-            >
-              <Plus size={9} />person
-            </Badge>
-          )}
-        </div>
+            <div className="entry-tags">
+              <Users size={13} className="opacity-40 self-center" />
+              {participants.map((p, i) => (
+                <Badge
+                  key={i}
+                  variant="tag"
+                  className="cursor-pointer"
+                  onClick={() => onChange(prev => ({ ...prev, participants: prev.participants.filter((_, j) => j !== i) }))}
+                >
+                  {p}
+                </Badge>
+              ))}
+              {showParticipantInput ? (
+                <input
+                  ref={participantInputRef}
+                  className="etag-input"
+                  value={participantInputVal}
+                  placeholder="name"
+                  onChange={e => setParticipantInputVal(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); commitParticipant() }
+                    if (e.key === 'Escape') { setParticipantInputVal(''); setShowParticipantInput(false) }
+                  }}
+                  onBlur={commitParticipant}
+                />
+              ) : (
+                <Badge
+                  variant="tag"
+                  className="cursor-pointer text-primary bg-[var(--ab)] gap-1"
+                  onClick={() => setShowParticipantInput(true)}
+                >
+                  <Plus size={9} />person
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="entry-divider"></div>
 
