@@ -7,7 +7,7 @@ import { parseToStoreItems } from '../storeItems'
 import { expandRange } from '../expansion'
 import { applyEdit } from '../storeOps'
 import type { EditFields } from '../storeOps'
-import { isRootNode } from '../../types'
+import type { Roots } from '../../types'
 
 const STANDUP_YAML = `---
 title: Weekly Standup
@@ -31,8 +31,10 @@ const TO   = new Date('2026-04-30')
 
 describe('topics flow through expansion', () => {
   it('topics saved via applyEdit appear on expanded occurrences', () => {
-    const items = parseToStoreItems('standup.md', STANDUP_YAML)
-    const occs0 = expandRange(items, FROM, TO)
+    const { items, root } = parseToStoreItems('standup.md', STANDUP_YAML)
+    const roots: Roots = new Map([['standup', root]])
+
+    const occs0 = expandRange(items, roots, FROM, TO)
     const occ = occs0.find(o => o.date === '2026-04-20')!
     expect(occ).toBeDefined()
 
@@ -50,14 +52,14 @@ describe('topics flow through expansion', () => {
       duration:     '',
       repeat:       null,
     }
-    const next = applyEdit(items, occ, 'single', fields)
+    const next = applyEdit({ items, roots }, occ, 'single', fields)
 
-    // Root node must carry the topics
-    const root = next.find(isRootNode)
-    expect(root?.metadata.topics).toEqual(['[[project-alpha]]'])
+    // Root must carry the topics
+    const updatedRoot = next.roots.get('standup')
+    expect(updatedRoot?.topics).toEqual(['[[project-alpha]]'])
 
     // Topics must appear on every occurrence after expansion
-    const occs1 = expandRange(next, FROM, TO)
+    const occs1 = expandRange(next.items, next.roots, FROM, TO)
     expect(occs1.length).toBeGreaterThan(0)
     for (const o of occs1) {
       expect(o.metadata.topics).toEqual(['[[project-alpha]]'])
@@ -80,11 +82,12 @@ defaults:
   done: false
 ---
 `
-    const items = parseToStoreItems('standup.md', yaml)
-    const root = items.find(isRootNode)
-    expect(root?.metadata.topics).toEqual(['[[project-alpha]]'])
+    const { items, root } = parseToStoreItems('standup.md', yaml)
+    const roots: Roots = new Map([['standup', root]])
 
-    const occs = expandRange(items, FROM, TO)
+    expect(root.topics).toEqual(['[[project-alpha]]'])
+
+    const occs = expandRange(items, roots, FROM, TO)
     expect(occs.length).toBeGreaterThan(0)
     for (const o of occs) {
       expect(o.metadata.topics).toEqual(['[[project-alpha]]'])
