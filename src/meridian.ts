@@ -450,7 +450,9 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
 
 export function occState(o: Occurrence): string {
   if (o.metadata.done) return 'done'
-  if (occKind(o) === 'task' || o.metadata.done !== undefined) {
+  const kind = occKind(o)
+  if (kind === 'note') return 'note'
+  if (kind === 'task' || o.metadata.done !== undefined) {
     const p = o.metadata.priority
     if (p === 'high') return 'task-p1'
     if (p === 'medium') return 'task-p2'
@@ -465,6 +467,7 @@ export function occState(o: Occurrence): string {
 const _ccBarMap: Record<string, string> = {
   'done': 'done',
   'event-past': 'done',
+  'note': 'note',
   'task-open': 'task',
   'task-p1': 'task-p1',
   'task-p2': 'task-p2',

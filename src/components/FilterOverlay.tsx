@@ -78,6 +78,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
               currentBarClass={occState(o)}
               onOpen={() => onOpen(o)}
               onToggleDone={() => {}}
+              showTypeIcon
             />
           </div>
         ))}

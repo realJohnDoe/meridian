@@ -1,5 +1,6 @@
-import { Repeat2, Users } from 'lucide-react'
+import { Repeat2, Users, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence } from '../types'
+import { occKind } from '../types'
 import { fmtT, parseDateString } from '../model/expansion'
 import { fmtShort } from '../meridian'
 import { Checkbox } from './ui/checkbox'
@@ -13,6 +14,7 @@ export interface OccurrenceCardProps {
   currentBarClass: string
   onOpen: () => void
   onToggleDone: () => void
+  showTypeIcon?: boolean
 }
 
 const titleCls = (isDone: boolean) =>
@@ -30,6 +32,13 @@ function ParticipantsBadge({ participants }: { participants: string[] }) {
   )
 }
 
+function TypeIcon({ occ }: { occ: Occurrence }) {
+  const kind = occKind(occ)
+  if (kind === 'task') return <CheckSquare size={13} className="shrink-0 text-[var(--t3)]" />
+  if (kind === 'event') return <CalendarDays size={13} className="shrink-0 text-[var(--t3)]" />
+  return <FileText size={13} className="shrink-0 text-[var(--t3)]" />
+}
+
 export default function OccurrenceCard({
   occ,
   variant = 'agenda',
@@ -37,6 +46,7 @@ export default function OccurrenceCard({
   currentBarClass,
   onOpen,
   onToggleDone,
+  showTypeIcon = false,
 }: OccurrenceCardProps) {
   const t = fmtT(occ.time)
   const hasTrack = occ.metadata.done !== undefined
@@ -117,8 +127,9 @@ export default function OccurrenceCard({
 
         {/* Two rows stacked in a flex-col */}
         <div className="flex flex-col flex-1 min-w-0 gap-1">
-          {/* Row 1: checkbox + title */}
+          {/* Row 1: [type icon] + checkbox + title */}
           <div className="flex items-center gap-[6px]">
+            {showTypeIcon && !hasTrack && <TypeIcon occ={occ} />}
             {hasTrack && (
               <Checkbox
                 checked={isDone}
