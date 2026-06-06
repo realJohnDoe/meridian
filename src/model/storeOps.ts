@@ -1,13 +1,14 @@
 /**
- * Pure StoreItem[] + Roots edit operations.
+ * Pure StoreData edit operations.
  *
- * Functions that only touch occurrence items take/return StoreItem[].
- * Functions that also touch file-level data take/return StoreData.
+ * Every exported function takes and returns a StoreData snapshot so callers
+ * always have a uniform interface. Functions that don't touch file-level data
+ * pass roots through unchanged.
  * No store / React / fileIO dependencies — shared by the main app and the debug view.
  */
 
 import type { StoreItem, Occurrence, OccurrenceMetadata, Repeat, Roots, FileMetadata } from '../types'
-import { isSeries } from '../types'
+import { isSeries, isStandaloneOcc } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from './expansion'
 import { titleToSlug } from '../fileIO'
 
@@ -208,7 +209,7 @@ export function applyEdit(
     // For a standalone: occ.id is a random expansion UUID — match by fileSlug instead.
     const matchItem = occ.ownerId
       ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
-      : (i: StoreItem) => !isSeries(i) && !(i as OccurrenceEntry<OccurrenceMetadata>).ownerId && i.fileSlug === occ.fileSlug && i.date === occ.date
+      : (i: StoreItem) => isStandaloneOcc(i) && i.fileSlug === occ.fileSlug && i.date === occ.date
     items = items.map(i => {
       if (!matchItem(i)) return i
       const meta = occMeta(i.metadata, fields)
@@ -298,43 +299,48 @@ export function applyEdit(
 
 // ── Toggle done ───────────────────────────────────────────────────────────────
 
-export function toggleDone(items: StoreItem[], occ: Occurrence): StoreItem[] {
+export function toggleDone({ items, roots }: StoreData, occ: Occurrence): StoreData {
   const newDone = !occ.metadata.done
-  return upsertOverride(items, occ, { metadata: { ...occFromAppMeta(occ.metadata), done: newDone } })
+  return { items: upsertOverride(items, occ, { metadata: { ...occFromAppMeta(occ.metadata), done: newDone } }), roots }
 }
 
 // ── Exclude / delete ──────────────────────────────────────────────────────────
 
 /** Mark a recurring occurrence as excluded; remove a standalone by id. */
-export function excludeOccurrence(items: StoreItem[], occ: Occurrence): StoreItem[] {
+export function excludeOccurrence({ items, roots }: StoreData, occ: Occurrence): StoreData {
   if (occ.ownerId) {
-    return upsertOverride(items, occ, { excluded: true })
+    return { items: upsertOverride(items, occ, { excluded: true }), roots }
   }
-  return items.filter(i => i.id !== occ.id)
+  return { items: items.filter(i => i.id !== occ.id), roots }
 }
 
-/** Remove all items for a fileSlug; caller must also remove from roots. */
-export function deleteByFileSlug(items: StoreItem[], fileSlug: string): StoreItem[] {
-  return items.filter(i => i.fileSlug !== fileSlug)
+/** Remove all items and the root entry for a fileSlug. */
+export function deleteByFileSlug({ items, roots }: StoreData, fileSlug: string): StoreData {
+  const nextRoots = new Map(roots)
+  nextRoots.delete(fileSlug)
+  return { items: items.filter(i => i.fileSlug !== fileSlug), roots: nextRoots }
 }
 
 /**
  * Cap a series' repeat.end at the day before occDate.
  * Overrides at/after occDate within that series are also excluded.
  */
-export function deleteFollowing(items: StoreItem[], occ: Occurrence): StoreItem[] {
+export function deleteFollowing({ items, roots }: StoreData, occ: Occurrence): StoreData {
   const series = findSeries(items, occ)
-  if (!series) return items
+  if (!series) return { items, roots }
   const occDate = occ.date
-  return items.map(i => {
-    if (i.id === series.id) {
-      return { ...i as RepeatPattern<OccurrenceMetadata>,
-        repeat: { ...(i as RepeatPattern<OccurrenceMetadata>).repeat,
-          end: { type: 'until' as const, date: dayBefore(occDate) } } }
-    }
-    if (!isSeries(i) && (i as OccurrenceEntry<OccurrenceMetadata>).ownerId === series.id && i.date >= occDate) {
-      return { ...i, excluded: true }
-    }
-    return i
-  })
+  return {
+    roots,
+    items: items.map(i => {
+      if (i.id === series.id) {
+        return { ...i as RepeatPattern<OccurrenceMetadata>,
+          repeat: { ...(i as RepeatPattern<OccurrenceMetadata>).repeat,
+            end: { type: 'until' as const, date: dayBefore(occDate) } } }
+      }
+      if (!isSeries(i) && (i as OccurrenceEntry<OccurrenceMetadata>).ownerId === series.id && i.date >= occDate) {
+        return { ...i, excluded: true }
+      }
+      return i
+    }),
+  }
 }

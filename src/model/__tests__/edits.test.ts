@@ -50,7 +50,7 @@ describe('edit operations → serialized YAML', () => {
   it('toggleDone on a generated occurrence adds a done override', () => {
     const data = fixtureData('weekly-series')
     const occ = occOn(data.items, data.roots, '2026-04-20')
-    const next = { ...data, items: toggleDone(data.items, occ) }
+    const next = toggleDone(data, occ)
     expect(serializeData(next)).toMatchSnapshot()
   })
 
@@ -84,14 +84,14 @@ describe('edit operations → serialized YAML', () => {
   it('excludeOccurrence drops a single generated occurrence', () => {
     const data = fixtureData('weekly-series')
     const occ = occOn(data.items, data.roots, '2026-04-20')
-    const next = { ...data, items: excludeOccurrence(data.items, occ) }
+    const next = excludeOccurrence(data, occ)
     expect(serializeData(next)).toMatchSnapshot()
   })
 
   it('deleteFollowing caps the series end before the occurrence', () => {
     const data = fixtureData('weekly-series')
     const occ = occOn(data.items, data.roots, '2026-04-20')
-    const next = { ...data, items: deleteFollowing(data.items, occ) }
+    const next = deleteFollowing(data, occ)
     expect(serializeData(next)).toMatchSnapshot()
   })
 
@@ -107,7 +107,7 @@ describe('edit operations → serialized YAML', () => {
     // Its next generated occurrence is Apr 12 (interval: 2 days from Apr 10).
     const occ = occOn(data.items, data.roots, '2026-04-12')
     expect(occ.metadata.done).toBe(false)  // generated, not yet done
-    const next = { ...data, items: toggleDone(data.items, occ) }
+    const next = toggleDone(data, occ)
     expect(serializeData(next)).toMatchSnapshot()
   })
 
@@ -146,7 +146,7 @@ describe('edit operations → serialized YAML', () => {
   it('excludeOccurrence on a series in a mixed file leaves other series and standalone intact', () => {
     const data = fixtureData('mixed-series-standalones')
     const occ = occOn(data.items, data.roots, '2026-04-08')
-    const next = { ...data, items: excludeOccurrence(data.items, occ) }
+    const next = excludeOccurrence(data, occ)
     const yaml = serializeData(next)
     expect(yaml).toMatchSnapshot()
     // the friday series must still be present

@@ -1,5 +1,5 @@
 import type { StoreItem, OccurrenceMetadata, FileMetadata } from '../types'
-import { isSeries, OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, inlineFieldEqual, inlineFieldEmpty } from '../types'
+import { isSeries, isStandaloneOcc, OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, inlineFieldEqual, inlineFieldEmpty } from '../types'
 import type { OccurrenceEntry } from './expansion'
 
 type AnyOcc = OccurrenceEntry<OccurrenceMetadata>
@@ -29,7 +29,7 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
   const fileLevel = root ? fileMetaToYaml(root) : {}
 
   const series      = items.filter(isSeries)
-  const standalones = items.filter(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)
+  const standalones = items.filter(isStandaloneOcc)
 
   // Pair each series with its override children.
   const seriesBlocks = series.map(s => ({

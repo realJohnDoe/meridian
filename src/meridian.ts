@@ -34,7 +34,6 @@ export type SeriesSheetConfig = { title: string; options: SeriesSheetOption[] }
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
 const getItems      = (): StoreItem[]   => useStore.getState().items
-const setItems      = (i: StoreItem[])  => useStore.setState({ items: i })
 const getRoots      = (): Roots         => useStore.getState().roots
 const setData       = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
 const getPrimary    = ()                => useStore.getState().primaryView
@@ -591,41 +590,34 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
 }
 
 export function toggleOccDone(o: Occurrence): void {
-  const next = toggleDone(getItems(), o)
+  const next = toggleDone({ items: getItems(), roots: getRoots() }, o)
   o.metadata.done = !o.metadata.done  // optimistic UI
-  setItems(next)
+  setData(next)
   writeEntityToCache(o.fileSlug)
 }
 
 export function beginSwipeDelete(o: Occurrence): () => void {
-  const items  = getItems()
-  const title  = o.metadata.title   // expanded occurrence already carries the file-level title
-  let cancelled = false
+  const snapshot = { items: getItems(), roots: getRoots() }
+  const title    = o.metadata.title   // expanded occurrence already carries the file-level title
+  let cancelled  = false
 
-  if (occIsRecur(o, items)) {
-    // Snapshot for undo — capture items before mutation.
-    const snapshot = items
-    const next = excludeOccurrence(items, o)
-
+  if (occIsRecur(o, snapshot.items)) {
+    const next = excludeOccurrence(snapshot, o)
     showDeleteToast(title,
       () => { writeEntityToCache(o.fileSlug) },
-      () => { cancelled = true; setItems(snapshot) },
+      () => { cancelled = true; setData(snapshot) },
     )
-    return () => { if (!cancelled) setItems(next) }
+    return () => { if (!cancelled) setData(next) }
   } else {
-    const snapshot = items
     showDeleteToast(title,
       () => { deleteFileFromDisk(o.fileSlug) },
       () => {
         cancelled = true
-        if (!getItems().find(i => i.id === o.id)) setItems(snapshot)
+        if (!getItems().find(i => i.id === o.id)) setData(snapshot)
       },
     )
     return () => {
-      if (!cancelled) {
-        const nextRoots = new Map(getRoots()); nextRoots.delete(o.fileSlug)
-        setData({ items: deleteByFileSlug(getItems(), o.fileSlug), roots: nextRoots })
-      }
+      if (!cancelled) setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, o.fileSlug))
     }
   }
 }
@@ -652,20 +644,19 @@ export function deleteNode(
 
   function excludeThis() {
     if (!item) return
-    setItems(excludeOccurrence(getItems(), item))
+    setData(excludeOccurrence({ items: getItems(), roots: getRoots() }, item))
     writeEntityToCache(item.fileSlug)
     hideSheet(); closeEntry()
   }
   function deleteAll() {
     if (!item) return
-    const nextRoots = new Map(getRoots()); nextRoots.delete(item.fileSlug)
-    setData({ items: deleteByFileSlug(getItems(), item.fileSlug), roots: nextRoots })
+    setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug))
     deleteFileFromDisk(item.fileSlug)
     hideSheet(); closeEntry()
   }
   function deleteFuture() {
     if (!item) return
-    setItems(deleteFollowing(getItems(), item))
+    setData(deleteFollowing({ items: getItems(), roots: getRoots() }, item))
     writeEntityToCache(item.fileSlug)
     hideSheet(); closeEntry()
   }
@@ -673,8 +664,7 @@ export function deleteNode(
   // Non-recurring, single occurrence.
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
-      const nextRoots = new Map(getRoots()); nextRoots.delete(item.fileSlug)
-      setData({ items: deleteByFileSlug(getItems(), item.fileSlug), roots: nextRoots })
+      setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug))
       deleteFileFromDisk(item.fileSlug); closeEntry()
     }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }

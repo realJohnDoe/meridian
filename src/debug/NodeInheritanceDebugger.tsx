@@ -456,9 +456,9 @@ export default function NodeInheritanceDebugger() {
 
   const handleDebugDelete = useCallback(() => {
     if (!selectedOcc) return
-    const next = excludeOccurrence(items, selectedOcc)
-    applyItems(next, debugRoot, debugRoot?.body ?? '')
-  }, [selectedOcc, items, debugRoot, applyItems])
+    const next = excludeOccurrence({ items, roots: debugRoots }, selectedOcc)
+    applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), debugRoot?.body ?? '')
+  }, [selectedOcc, items, debugRoot, debugRoots, applyItems])
 
   const canEditPattern     = selectedOcc?.source === 'generated'
   const canEditFollowing   = selectedOcc !== null && selectedSeries !== null
@@ -665,8 +665,8 @@ export default function NodeInheritanceDebugger() {
                   {activeAction === 'edit-following' && selectedOcc && (
                     <EditFollowingForm occ={selectedOcc}
                       onApply={() => {
-                        const next = deleteFollowing(items, selectedOcc)
-                        applyItems(next, debugRoot, debugRoot?.body ?? '')
+                        const next = deleteFollowing({ items, roots: debugRoots }, selectedOcc)
+                        applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -676,8 +676,8 @@ export default function NodeInheritanceDebugger() {
                       message={selectedOcc.source === 'generated' ? `Mark ${selectedOcc.date} as excluded.` : `Remove explicit instance on ${selectedOcc.date}.`}
                       label="Delete occurrence"
                       onApply={() => {
-                        const next = excludeOccurrence(items, selectedOcc)
-                        applyItems(next, debugRoot, debugRoot?.body ?? '')
+                        const next = excludeOccurrence({ items, roots: debugRoots }, selectedOcc)
+                        applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -687,8 +687,8 @@ export default function NodeInheritanceDebugger() {
                       message={`End the series on ${dayBefore(selectedOcc.date)}. Occurrences from ${selectedOcc.date} onwards will be removed.`}
                       label="Delete this & following"
                       onApply={() => {
-                        const next = deleteFollowing(items, selectedOcc)
-                        applyItems(next, debugRoot, debugRoot?.body ?? '')
+                        const next = deleteFollowing({ items, roots: debugRoots }, selectedOcc)
+                        applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
