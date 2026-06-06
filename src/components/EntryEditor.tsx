@@ -8,7 +8,7 @@ import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { Checkbox } from './ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
-import { Card, CardHeader, CardContent } from './ui/card'
+import { Card, CardContent } from './ui/card'
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from './ui/command'
 import TagChip from './TagChip'
 import { unwrapRef, resolveWikilink } from '../wikilinks'
@@ -408,14 +408,12 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           </Popover>
         </div>
 
-        <div className="entry-divider"></div>
-
         {/* ── OCCURRENCE-LEVEL: scope (header) → type → metadata → participants ── */}
-        <Card className="mb-4">
+        <Card className="mt-3 mb-4 overflow-hidden bg-[var(--bg2)]">
           {showScopeRow && (
-            <CardHeader className="p-3">
+            <div className="px-3 py-2.5 bg-[var(--bg1)]">
               <Select value={editScope} onValueChange={handleScopeChange}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full border-0 shadow-none bg-transparent p-0 h-auto text-sm font-medium text-[var(--t2)] focus:ring-0 hover:bg-transparent [&>svg]:ml-auto [&>svg]:shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -425,11 +423,11 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
                   {(isScheduled || isAfterCompletion) && <SelectItem value="all">Edit repeat pattern</SelectItem>}
                 </SelectContent>
               </Select>
-            </CardHeader>
+            </div>
           )}
           <CardContent className={cn(
-            'px-3 pt-3 pb-0',
-            showScopeRow && 'border-t bg-muted/30',
+            'px-3 pt-3 pb-3 bg-[var(--bg2)]',
+            showScopeRow && 'border-t border-[var(--bdr2)]',
           )}>
             <ToggleGroup
               type="single"
@@ -488,7 +486,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
               )}
             </div>
 
-            <div className="entry-tags">
+            <div className="entry-tags !mb-0">
               <Users size={13} className="opacity-40 self-center" />
               {participants.map((p, i) => (
                 <Badge
@@ -525,8 +523,6 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
             </div>
           </CardContent>
         </Card>
-
-        <div className="entry-divider"></div>
 
         <div
           key={bodyKey}
