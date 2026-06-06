@@ -642,14 +642,13 @@ export function deleteNode(
   const series   = findSeries(items, item)
   const slugItems = fileSlugItems(items, item.fileSlug)
   // Are there any other non-excluded occurrences besides this one?
-  // The per-file root node is not an occurrence, so it must not count as a sibling.
   // Expanded occurrences carry a fresh random id (see expansion.ts / collectUndated),
   // so the standalone being deleted never matches by id — identify self by
   // (no ownerId, same date) the way upsertOverride does, otherwise it counts itself.
   const isSelf = (i: any) =>
     i.id === item.id || (!i.ownerId && !item.ownerId && i.date === item.date)
   const hasSiblings = slugItems.some(
-    i => !isSeries(i) && !isRootNode(i) && !isSelf(i) && !(i as any).excluded,
+    i => !isSeries(i) && !isSelf(i) && !(i as any).excluded,
   )
   const isRecurring = !!item.ownerId
   const isScheduled = series?.repeat?.type === 'schedule'
