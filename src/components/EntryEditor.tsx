@@ -237,6 +237,8 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       itemType: t,
       tracked: t === 'task',
       priority: t !== 'task' ? null : prev.priority,
+      // Notes have no date — clear it automatically so users don't have to
+      scheduled: t === 'note' ? null : prev.scheduled,
     }))
   }
 

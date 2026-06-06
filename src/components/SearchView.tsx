@@ -3,7 +3,7 @@ import { ArrowLeft, Search } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
 import { occKind } from '../types'
-import { expandRange } from '../model/expansion'
+import { expandRange, collectUndated } from '../model/expansion'
 import { addDays, fmtShort, NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
 
@@ -42,7 +42,9 @@ export default function SearchView({ onOpen, onClose }: Props) {
   const items = useMemo<SearchItem[]>(() => {
     const from = addDays(TODAY, -30)
     const to   = addDays(TODAY, 90)
-    const occs: Occurrence[] = expandRange(storeItems, roots, from, to)
+    // Undated items (tasks/notes saved without a date) fall outside the expandRange
+    // window, so collect them separately to keep them searchable.
+    const occs: Occurrence[] = [...expandRange(storeItems, roots, from, to), ...collectUndated(storeItems, roots)]
     const seen = new Set<string>()
     return [
       ...(NOTES_DATA as SearchItem[]),

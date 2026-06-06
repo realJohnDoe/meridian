@@ -450,7 +450,9 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
 
 export function occState(o: Occurrence): string {
   if (o.metadata.done) return 'done'
-  if (occKind(o) === 'task' || o.metadata.done !== undefined) {
+  const kind = occKind(o)
+  if (kind === 'note') return 'note'
+  if (kind === 'task' || o.metadata.done !== undefined) {
     const p = o.metadata.priority
     if (p === 'high') return 'task-p1'
     if (p === 'medium') return 'task-p2'
@@ -459,12 +461,22 @@ export function occState(o: Occurrence): string {
   }
   if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 'event-future'
   const now = new Date()
-  if (o.metadata.jsTime && o.metadata.jsTime < now) return 'event-past'
+  if (o.metadata.jsTime && o.metadata.jsTime < now) {
+    // Whole-day events (no time) use day-level comparison — they stay colored
+    // until midnight, not until 00:01 AM when jsTime (midnight) < now.
+    if (!o.time) {
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      const eventDay = new Date(o.metadata.jsTime); eventDay.setHours(0, 0, 0, 0)
+      if (eventDay >= today) return 'event-future'
+    }
+    return 'event-past'
+  }
   return 'event-future'
 }
 const _ccBarMap: Record<string, string> = {
   'done': 'done',
   'event-past': 'done',
+  'note': 'note',
   'task-open': 'task',
   'task-p1': 'task-p1',
   'task-p2': 'task-p2',
@@ -584,8 +596,9 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
   })
   setData(nextData)
 
-  // Determine which fileSlug to persist.
-  const fileSlug = item?.fileSlug ?? (fields.scheduled?.date ? titleToSlug(title) : null)
+  // Determine which fileSlug to persist. For a brand-new item the slug is derived
+  // from the title — matching applyEdit — so undated tasks/notes are persisted too.
+  const fileSlug = item?.fileSlug ?? titleToSlug(title)
   if (fileSlug) writeEntityToCache(fileSlug)
   closeEntry()
 }
@@ -641,8 +654,13 @@ export function deleteNode(
   const series   = findSeries(items, item)
   const slugItems = fileSlugItems(items, item.fileSlug)
   // Are there any other non-excluded occurrences besides this one?
+  // Expanded occurrences carry a fresh random id (see expansion.ts / collectUndated),
+  // so the standalone being deleted never matches by id — identify self by
+  // (no ownerId, same date) the way upsertOverride does, otherwise it counts itself.
+  const isSelf = (i: any) =>
+    i.id === item.id || (!i.ownerId && !item.ownerId && i.date === item.date)
   const hasSiblings = slugItems.some(
-    i => !isSeries(i) && i.id !== item.id && !(i as any).excluded,
+    i => !isSeries(i) && !isSelf(i) && !(i as any).excluded,
   )
   const isRecurring = !!item.ownerId
   const isScheduled = series?.repeat?.type === 'schedule'

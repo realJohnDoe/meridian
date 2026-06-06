@@ -1,5 +1,6 @@
-import { Repeat2, Users } from 'lucide-react'
+import { Repeat2, Users, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence } from '../types'
+import { occKind } from '../types'
 import { fmtT, parseDateString } from '../model/expansion'
 import { fmtShort } from '../meridian'
 import { Checkbox } from './ui/checkbox'
@@ -13,6 +14,7 @@ export interface OccurrenceCardProps {
   currentBarClass: string
   onOpen: () => void
   onToggleDone: () => void
+  showTypeIcon?: boolean
 }
 
 const titleCls = (isDone: boolean) =>
@@ -30,6 +32,13 @@ function ParticipantsBadge({ participants }: { participants: string[] }) {
   )
 }
 
+function TypeIcon({ occ }: { occ: Occurrence }) {
+  const kind = occKind(occ)
+  if (kind === 'task') return <CheckSquare size={13} className="shrink-0 text-[var(--t3)]" />
+  if (kind === 'event') return <CalendarDays size={13} className="shrink-0 text-[var(--t3)]" />
+  return <FileText size={13} className="shrink-0 text-[var(--t3)]" />
+}
+
 export default function OccurrenceCard({
   occ,
   variant = 'agenda',
@@ -37,6 +46,7 @@ export default function OccurrenceCard({
   currentBarClass,
   onOpen,
   onToggleDone,
+  showTypeIcon = false,
 }: OccurrenceCardProps) {
   const t = fmtT(occ.time)
   const hasTrack = occ.metadata.done !== undefined
@@ -62,7 +72,7 @@ export default function OccurrenceCard({
   if (variant === 'agenda') {
     return (
       <Card
-        className={`${cardCls} flex items-stretch gap-[9px] px-[14px] py-[8px] mx-2 mb-1.5`}
+        className={`${cardCls} flex items-stretch gap-[9px] pl-[8px] pr-[14px] py-[8px] mx-2 mb-1.5`}
         style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
         onClick={handleClick}
       >
@@ -112,13 +122,14 @@ export default function OccurrenceCard({
   // Compact variant
   return (
     <Card className={cardCls} onClick={handleClick}>
-      <div className="flex items-start gap-2 px-3 py-2.5">
+      <div className="flex items-start gap-2 pl-2.5 pr-3 py-2.5">
         <span className={`occ-bar ${currentBarClass}`} />
 
         {/* Two rows stacked in a flex-col */}
         <div className="flex flex-col flex-1 min-w-0 gap-1">
-          {/* Row 1: checkbox + title */}
+          {/* Row 1: [type icon] + checkbox + title */}
           <div className="flex items-center gap-[6px]">
+            {showTypeIcon && !hasTrack && <TypeIcon occ={occ} />}
             {hasTrack && (
               <Checkbox
                 checked={isDone}
@@ -131,13 +142,15 @@ export default function OccurrenceCard({
             {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
           </div>
 
-          {/* Row 2: date + time + tags + participants */}
-          <div className="flex flex-wrap gap-[5px]">
-            <Badge variant="tag">{dateBadge}</Badge>
-            {t && <Badge variant="tag">{t}</Badge>}
-            {tags.map(tg => <Badge key={tg} variant="tag">{tg}</Badge>)}
-            <ParticipantsBadge participants={participants} />
-          </div>
+          {/* Row 2: date + time + tags + participants (omitted entirely when empty) */}
+          {(dateBadge || t || tags.length > 0 || participants.length > 0) && (
+            <div className="flex flex-wrap gap-[5px]">
+              {dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
+              {t && <Badge variant="tag">{t}</Badge>}
+              {tags.map(tg => <Badge key={tg} variant="tag">{tg}</Badge>)}
+              <ParticipantsBadge participants={participants} />
+            </div>
+          )}
         </div>
       </div>
     </Card>

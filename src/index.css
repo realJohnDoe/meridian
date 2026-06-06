@@ -185,6 +185,7 @@
 .occ-bar.task-p1{background:var(--p1)}
 .occ-bar.task-p2{background:var(--p2)}
 .occ-bar.task-p3{background:var(--p3)}
+.occ-bar.note{background:var(--amb)}
 .occ-bar.done,.occ-bar.event-past{background:var(--bg4)}
 .multiday-banner{margin:2px 14px;background:rgba(129,140,248,.18);border:1px solid rgba(129,140,248,.3);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--ind);display:flex;align-items:center;gap:6px;cursor:pointer}
 .multiday-banner svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
