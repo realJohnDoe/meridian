@@ -53,6 +53,7 @@ export default function App() {
 
   // ── Navigation state (source of truth) ───────────────────────
   const storeItems   = useStore(s => s.items)
+  const storeRoots   = useStore(s => s.roots)
   const primaryView  = useStore(s => s.primaryView)
   const setPrimary   = useStore(s => s.setPrimaryView)
   const overlayStack = useStore(s => s.overlayStack)
@@ -263,6 +264,7 @@ export default function App() {
             onOpenRepeatDlg={handleOpenRepeatDlg}
             onScopeChange={handleScopeChange}
             items={storeItems}
+            roots={storeRoots}
           />
         </section>
 

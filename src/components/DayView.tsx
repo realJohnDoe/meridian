@@ -2,7 +2,7 @@ import { useMemo, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { Checkbox } from './ui/checkbox'
 import type { Occurrence } from '../types'
-import { isSeries, isRootNode } from '../types'
+import { isSeries } from '../types'
 import { expandRange, fmtT, parseDurationHours, parseDurationDays, multidayCoversDate, parseDateString } from '../model/expansion'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
 
@@ -105,31 +105,35 @@ interface Props {
 export default function DayView({ onOpen }: Props) {
   const dvDate    = useStore(s => s.dvDate)
   const items     = useStore(s => s.items)
+  const roots     = useStore(s => s.roots)
   const setDvDate = useStore(s => s.setDvDate)
 
   const { allDay, cols } = useMemo(() => {
     const from = new Date(dvDate); from.setHours(0, 0, 0, 0)
     const to   = new Date(dvDate); to.setHours(23, 59, 59)
-    const occs = expandRange(items, from, to)
+    const occs = expandRange(items, roots, from, to)
 
     // Multi-day events that started before today don't appear in expandRange
     // output (their single occurrence is on the start date). Find them by
     // scanning store items directly and add a virtual occurrence for today.
-    const extraMultiday = (items as Occurrence[])
-      .filter(i => !isSeries(i) && !isRootNode(i) && !(i as Occurrence).ownerId)
+    const extraMultiday = items
+      .filter(i => !isSeries(i) && !(i as { ownerId?: string }).ownerId)
+      .map(i => ({
+        ...i,
+        metadata: { ...(roots.get(i.fileSlug) ?? { title: '', tags: [], topics: [] }), ...i.metadata, jsTime: new Date(from) } as Occurrence['metadata'],
+      }))
       .filter(i => {
         const days = parseDurationDays(i.metadata.duration)
         if (!days || days < 2) return false
         const start = parseDateString(i.date)
-        return !!start && start < from && multidayCoversDate(i, dvDate)
+        return !!start && start < from && multidayCoversDate(i as Occurrence, dvDate)
       })
-      .map(i => ({ ...i, metadata: { ...i.metadata, jsTime: new Date(from) } }))
 
     const allOccs = [...occs, ...extraMultiday]
     const allDay = sortOccs(allOccs.filter(o => !fmtT(o.time)))
     const timed  = sortOccs(allOccs.filter(o =>  !!fmtT(o.time)))
     return { allDay, cols: computeColumns(timed) }
-  }, [dvDate, items])
+  }, [dvDate, items, roots])
 
   const scRef = useRef<HTMLDivElement>(null)
   useEffect(() => {

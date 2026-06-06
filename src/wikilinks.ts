@@ -1,5 +1,4 @@
-import type { StoreItem } from './types'
-import { isRootNode } from './types'
+import type { Roots } from './types'
 
 export interface WikilinkRef {
   ref: string
@@ -28,10 +27,14 @@ export function parseWikilinks(text: string): WikilinkRef[] {
 }
 
 /**
- * Resolve a wikilink ref to the per-file root node that owns the matching title.
- * File identity (title) lives on the root node, so links resolve against those.
+ * Resolve a wikilink ref against the roots map.
+ * Returns the fileSlug whose title matches ref, or undefined.
+ * File identity (title) lives in the roots map, not on StoreItems.
  */
-export function resolveWikilink(ref: string, items: StoreItem[]): StoreItem | undefined {
+export function resolveWikilink(ref: string, roots: Roots): string | undefined {
   const lower = ref.toLowerCase()
-  return items.find(i => isRootNode(i) && i.metadata.title.toLowerCase() === lower)
+  for (const [fileSlug, meta] of roots) {
+    if (meta.title.toLowerCase() === lower) return fileSlug
+  }
+  return undefined
 }

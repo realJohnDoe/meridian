@@ -15,9 +15,9 @@ import {
   applyEdit, toggleDone, excludeOccurrence, deleteByFileSlug, deleteFollowing,
   fileSlugItems, findSeries,
 } from './model/storeOps'
-import type { Occurrence, Repeat, Scheduled, Priority, StoreItem } from './types'
+import type { Occurrence, Repeat, Scheduled, Priority, StoreItem, Roots } from './types'
 import { parseWikilinks, resolveWikilink } from './wikilinks'
-import { occKind, occIsRecur, isSeries, isRootNode } from './types'
+import { occKind, occIsRecur, isSeries } from './types'
 export { occKind, occIsRecur }
 import type { EntryState, ItemType } from './components/EntryEditor'
 import { useStore } from './store'
@@ -35,6 +35,9 @@ export type SeriesSheetConfig = { title: string; options: SeriesSheetOption[] }
 // ── STORE ACCESSORS ────────────────────────────────────────────
 const getItems      = (): StoreItem[]   => useStore.getState().items
 const setItems      = (i: StoreItem[])  => useStore.setState({ items: i })
+const getRoots      = (): Roots         => useStore.getState().roots
+const setRoots      = (r: Roots)        => useStore.setState({ roots: r })
+const setData       = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
 const getPrimary    = ()                => useStore.getState().primaryView
 const setPrimary    = (v: string)       => useStore.getState().setPrimaryView(v as any)
 const pushOverlayFn = (v: string)       => useStore.getState().pushOverlay(v as any)
@@ -373,16 +376,19 @@ done: false
 ---` },
 ]
 
-function loadSeedItems(): StoreItem[] {
-  const result: StoreItem[] = []
+function loadSeedItems(): { items: StoreItem[]; roots: Roots } {
+  const items: StoreItem[] = []
+  const roots: Roots = new Map()
   for (const { id, yaml } of SEED_YAML) {
     try {
-      result.push(...parseYamlToStoreItems(yaml, id))
+      const parsed = parseYamlToStoreItems(yaml, id)
+      items.push(...parsed.items)
+      roots.set(id, parsed.root)
     } catch (e) {
       console.warn('[seed] parse failed for', id, e)
     }
   }
-  return result
+  return { items, roots }
 }
 
 export const NOTES_DATA = [
@@ -531,8 +537,8 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;')
 }
 
-export function buildBodyHtml(text: string, items?: StoreItem[]): string {
-  const allItems = items ?? getItems()
+export function buildBodyHtml(text: string, roots?: Roots): string {
+  const allRoots = roots ?? getRoots()
   const links = parseWikilinks(text)
   if (links.length === 0) return escapeHtml(text).replace(/\n/g, '<br>')
 
@@ -540,7 +546,7 @@ export function buildBodyHtml(text: string, items?: StoreItem[]): string {
   let cursor = 0
   for (const wl of links) {
     result += escapeHtml(text.slice(cursor, wl.start)).replace(/\n/g, '<br>')
-    const target = resolveWikilink(wl.ref, allItems)
+    const target = resolveWikilink(wl.ref, allRoots)
     const cls = target ? 'wl' : 'wl-broken'
     const safeRef   = escapeHtml(wl.ref)
     const safeLabel = escapeHtml(wl.label ?? wl.ref)
@@ -564,7 +570,7 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
     return
   }
 
-  const next = applyEdit(getItems(), item, editScope, {
+  const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
     title,
     tags:         fields.tags         ?? [],
     topics:       fields.topics       ?? [],
@@ -577,7 +583,7 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
     duration:     fields.duration     ?? '',
     repeat:       fields.repeat       ?? null,
   })
-  setItems(next)
+  setData(nextData)
 
   // Determine which fileSlug to persist.
   const fileSlug = item?.fileSlug ?? (fields.scheduled?.date ? titleToSlug(title) : null)
@@ -587,7 +593,7 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
 
 export function toggleOccDone(o: Occurrence): void {
   const next = toggleDone(getItems(), o)
-  o.metadata.done = !o.metadata.done // optimistic UI
+  o.metadata.done = !o.metadata.done  // optimistic UI
   setItems(next)
   writeEntityToCache(o.fileSlug)
 }
@@ -616,7 +622,12 @@ export function beginSwipeDelete(o: Occurrence): () => void {
         if (!getItems().find(i => i.id === o.id)) setItems(snapshot)
       },
     )
-    return () => { if (!cancelled) setItems(deleteByFileSlug(getItems(), o.fileSlug)) }
+    return () => {
+      if (!cancelled) {
+        const nextRoots = new Map(getRoots()); nextRoots.delete(o.fileSlug)
+        setData({ items: deleteByFileSlug(getItems(), o.fileSlug), roots: nextRoots })
+      }
+    }
   }
 }
 
@@ -648,7 +659,8 @@ export function deleteNode(
   }
   function deleteAll() {
     if (!item) return
-    setItems(deleteByFileSlug(getItems(), item.fileSlug))
+    const nextRoots = new Map(getRoots()); nextRoots.delete(item.fileSlug)
+    setData({ items: deleteByFileSlug(getItems(), item.fileSlug), roots: nextRoots })
     deleteFileFromDisk(item.fileSlug)
     hideSheet(); closeEntry()
   }
@@ -661,7 +673,11 @@ export function deleteNode(
 
   // Non-recurring, single occurrence.
   if (!isRecurring && !hasSiblings) {
-    const doDelete = () => { setItems(deleteByFileSlug(getItems(), item.fileSlug)); deleteFileFromDisk(item.fileSlug); closeEntry() }
+    const doDelete = () => {
+      const nextRoots = new Map(getRoots()); nextRoots.delete(item.fileSlug)
+      setData({ items: deleteByFileSlug(getItems(), item.fileSlug), roots: nextRoots })
+      deleteFileFromDisk(item.fileSlug); closeEntry()
+    }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }
     doDelete()
     return
@@ -720,9 +736,9 @@ async function writeEntityToCache(fileSlug: string): Promise<void> {
   try {
     const slugItems = fileSlugItems(getItems(), fileSlug)
     if (slugItems.length === 0) { await deleteFileFromDisk(fileSlug); return }
-    const frontmatter = collapseToYaml(slugItems)
-    // Body (file-level) lives on the per-file root node.
-    const body = slugItems.find(isRootNode)?.metadata.body ?? ''
+    const root = getRoots().get(fileSlug)
+    const frontmatter = collapseToYaml(slugItems, root)
+    const body = root?.body ?? ''
     const content = saveFile(frontmatter, body)
     const path = fileSlugToPath(fileSlug)
     await cacheWrite(path, content)
@@ -767,13 +783,17 @@ async function loadFilesFromDisk(): Promise<void> {
   if (!dh) return
   const files = await diskReadAll(dh)
   const loaded: StoreItem[] = []
+  const roots: Roots = new Map()
   for (const { path, content } of files) {
     await cacheWriteClean(path, content)
     try {
-      loaded.push(...parseToStoreItems(path, content))
+      const parsed = parseToStoreItems(path, content)
+      loaded.push(...parsed.items)
+      const slug = path.replace(/\.(md|yaml|yml)$/, '')
+      roots.set(slug, parsed.root)
     } catch (e) { console.warn('[storage] parse failed for', path, e) }
   }
-  setItems(loaded)
+  setData({ items: loaded, roots })
   updateSyncUI()
   setTimeout(() => goToday(), 100)
 }
@@ -798,7 +818,7 @@ export async function tryRestoreDirectory(): Promise<void> {
   try {
     await cacheInit()
     const h = await dirHandleLoad()
-    if (!h) { setItems(loadSeedItems()); return }
+    if (!h) { setData(loadSeedItems()); return }
     const perm = await h.queryPermission({ mode: 'readwrite' })
     if (perm === 'granted') {
       setDirHandle(h)
@@ -808,11 +828,11 @@ export async function tryRestoreDirectory(): Promise<void> {
       useStore.setState({ pendingDirReconnect: h.name })
     } else {
       await dirHandleClear()
-      setItems(loadSeedItems())
+      setData(loadSeedItems())
     }
   } catch (e) {
     console.warn('[storage] tryRestoreDirectory failed:', e)
-    setItems(loadSeedItems())
+    setData(loadSeedItems())
   }
 }
 
