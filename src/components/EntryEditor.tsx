@@ -303,6 +303,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
       <div className="entry-sc"><div className="entry-pad">
 
+        {/* ── FILE-LEVEL: title ── */}
         <div className="entry-title-row">
           {tracked && (
             <Checkbox
@@ -321,80 +322,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           />
         </div>
 
-        <ToggleGroup
-          type="single"
-          value={itemType}
-          onValueChange={(v) => { if (v) handleTypeChange(v as ItemType) }}
-          className="type-chip-row"
-        >
-          {(['task', 'event', 'note'] as ItemType[]).map(t => (
-            <ToggleGroupItem
-              key={t}
-              value={t}
-              className={cn('type-chip', `type-chip-${t}`, 'h-auto min-w-0')}
-            >
-              {t === 'task' && <CheckSquare size={13} />}
-              {t === 'event' && <CalendarDays size={13} />}
-              {t === 'note' && <FileText size={13} />}
-              {t}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-
-        {showScopeRow && (
-          <div className="scope-row">
-            <Select value={editScope} onValueChange={handleScopeChange}>
-              <SelectTrigger className="flex-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="add">Add new occurrence</SelectItem>
-                <SelectItem value="single">Edit this occurrence</SelectItem>
-                {isScheduled && <SelectItem value="future">Edit this and all following occurrences</SelectItem>}
-                {(isScheduled || isAfterCompletion) && <SelectItem value="all">Edit repeat pattern</SelectItem>}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        <div className="prop-chips">
-          {showDateChip && (
-            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}>
-              <Calendar size={13} />Date
-              <span className="text-[11px] font-mono opacity-80 ml-px">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
-            </button>
-          )}
-          {showDateChip && hasDate && (
-            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}>
-              <Clock size={13} />Time
-              <span className="text-[11px] font-mono opacity-80 ml-px">{hasTime ? scheduled!.time : ''}</span>
-            </button>
-          )}
-          {showDateChip && hasDate && (
-            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}>
-              <Timer size={13} />Duration
-              <span className="text-[11px] font-mono opacity-80 ml-px">{duration}</span>
-            </button>
-          )}
-          {tracked && (
-            <button
-              className={cn(badgeVariants({ variant: 'chip' }), priority && PRIORITY_CLASS[priority])}
-              aria-pressed={!!priority}
-              onClick={() => onOpenDlg('dlgPriority')}
-            >
-              <Flag size={13} />Priority
-              <span className="text-[11px] font-mono opacity-80 ml-px">{priority ? PRIORITY_LABELS[priority] : ''}</span>
-            </button>
-          )}
-          {showRepeat && (
-            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}>
-              <Repeat size={13} />Repeat
-              <span className="text-[11px] font-mono opacity-80 ml-px">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
-            </button>
-          )}
-        </div>
-
-        {/* ── TAGS + TOPICS ROW (merged, alphabetically sorted) ── */}
+        {/* ── FILE-LEVEL: tags + topics ── */}
         <div className="entry-tags">
           {allChips.map(c => (
             c.isTopic
@@ -479,7 +407,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           </Popover>
         </div>
 
-        {/* ── PARTICIPANTS ROW ── */}
+        {/* ── FILE-LEVEL: participants ── */}
         <div className="entry-tags">
           <Users size={13} className="opacity-40 self-center" />
           {participants.map((p, i) => (
@@ -513,6 +441,82 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
             >
               <Plus size={9} />person
             </Badge>
+          )}
+        </div>
+
+        <div className="entry-divider"></div>
+
+        {/* ── OCCURRENCE-LEVEL: scope → type → metadata ── */}
+        {showScopeRow && (
+          <div className="scope-row">
+            <Select value={editScope} onValueChange={handleScopeChange}>
+              <SelectTrigger className="flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="add">Add new occurrence</SelectItem>
+                <SelectItem value="single">Edit this occurrence</SelectItem>
+                {isScheduled && <SelectItem value="future">Edit this and all following occurrences</SelectItem>}
+                {(isScheduled || isAfterCompletion) && <SelectItem value="all">Edit repeat pattern</SelectItem>}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <ToggleGroup
+          type="single"
+          value={itemType}
+          onValueChange={(v) => { if (v) handleTypeChange(v as ItemType) }}
+          className="type-chip-row"
+        >
+          {(['task', 'event', 'note'] as ItemType[]).map(t => (
+            <ToggleGroupItem
+              key={t}
+              value={t}
+              className={cn('type-chip', `type-chip-${t}`, 'h-auto min-w-0')}
+            >
+              {t === 'task' && <CheckSquare size={13} />}
+              {t === 'event' && <CalendarDays size={13} />}
+              {t === 'note' && <FileText size={13} />}
+              {t}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+
+        <div className="prop-chips">
+          {showDateChip && (
+            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}>
+              <Calendar size={13} />Date
+              <span className="text-[11px] font-mono opacity-80 ml-px">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
+            </button>
+          )}
+          {showDateChip && hasDate && (
+            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}>
+              <Clock size={13} />Time
+              <span className="text-[11px] font-mono opacity-80 ml-px">{hasTime ? scheduled!.time : ''}</span>
+            </button>
+          )}
+          {showDateChip && hasDate && (
+            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}>
+              <Timer size={13} />Duration
+              <span className="text-[11px] font-mono opacity-80 ml-px">{duration}</span>
+            </button>
+          )}
+          {tracked && (
+            <button
+              className={cn(badgeVariants({ variant: 'chip' }), priority && PRIORITY_CLASS[priority])}
+              aria-pressed={!!priority}
+              onClick={() => onOpenDlg('dlgPriority')}
+            >
+              <Flag size={13} />Priority
+              <span className="text-[11px] font-mono opacity-80 ml-px">{priority ? PRIORITY_LABELS[priority] : ''}</span>
+            </button>
+          )}
+          {showRepeat && (
+            <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}>
+              <Repeat size={13} />Repeat
+              <span className="text-[11px] font-mono opacity-80 ml-px">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
+            </button>
           )}
         </div>
 
