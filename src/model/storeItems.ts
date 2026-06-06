@@ -63,9 +63,12 @@ export function effectiveNodeToStoreItems(
           metadata: extractAppMetadata({ ...base, ...child.fields }),
         })
       }
-    } else if (n.fields.date !== undefined) {
+    } else if (n.fields.date !== undefined || n.instances.length === 0) {
+      // A node with a date, OR a leaf with none (e.g. an undated task/note),
+      // becomes a standalone occurrence. The empty-date case keeps undated items
+      // representable so they round-trip and stay searchable.
       result.push({
-        date:   String(n.fields.date),
+        date:   n.fields.date !== undefined ? String(n.fields.date) : '',
         time:   n.fields.time ? String(n.fields.time) : null,
         source: 'explicit',
         fileSlug,

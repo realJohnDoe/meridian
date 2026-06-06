@@ -3,7 +3,7 @@ import { parseFixture, serialize, rootMeta } from './helpers'
 import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing } from '../storeOps'
 import type { EditFields } from '../storeOps'
 import { parseToStoreItems } from '../storeItems'
-import { expandRange } from '../expansion'
+import { expandRange, collectUndated } from '../expansion'
 import { isSeries, isRootNode } from '../../types'
 import type { Occurrence, StoreItem } from '../../types'
 
@@ -161,6 +161,36 @@ describe('edit operations → serialized YAML', () => {
       repeat: null,
     })
     expect(serialize(next)).toMatchSnapshot()
+  })
+
+  it('creating an undated task persists and stays searchable but off the calendar', () => {
+    const next = applyEdit([], null, 'all', {
+      title: 'Buy milk',
+      tags: [], topics: [], participants: [], body: '',
+      tracked: true, done: false, priority: null,
+      scheduled: null, duration: '', repeat: null,
+    })
+    // A standalone occurrence with an empty date is created alongside the root node.
+    const standalone = next.find(i => !isSeries(i) && !isRootNode(i)) as StoreItem
+    expect(standalone.date).toBe('')
+    expect(standalone.metadata.done).toBe(false)
+
+    // The serialized file omits the date line entirely (no `date: ""`)…
+    const yaml = serialize(next)
+    expect(yaml).not.toContain('date:')
+    // …yet it round-trips through reload without being dropped.
+    const reloaded = parseToStoreItems('buy-milk.md', yaml)
+    const reloadedOcc = reloaded.find(i => !isSeries(i) && !isRootNode(i)) as StoreItem
+    expect(reloadedOcc).toBeDefined()
+    expect(reloadedOcc.metadata.done).toBe(false)
+
+    // It never appears in the date-windowed expansion (no date to place it on)…
+    const occs = expandRange(reloaded, new Date('2026-01-01'), new Date('2026-12-31'))
+    expect(occs).toHaveLength(0)
+    // …but collectUndated surfaces it with the file-level title joined on.
+    const undated = collectUndated(reloaded)
+    expect(undated).toHaveLength(1)
+    expect(undated[0].metadata.title).toBe('Buy milk')
   })
 
   // ── File-level identity ──────────────────────────────────────────────────────

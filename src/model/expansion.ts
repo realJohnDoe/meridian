@@ -722,4 +722,27 @@ export function expandRange(
     .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
 }
 
+/**
+ * Collect standalone occurrences that carry no date (e.g. a task or note saved
+ * without scheduling). These never surface in the date-windowed expandRange
+ * output, but they are real persisted items and must stay searchable/editable.
+ * File-level fields (title/tags/body) are joined on from the per-file root node.
+ */
+export function collectUndated(items: StoreItem[]): OccurrenceEntry<AppMetadata>[] {
+  const fileMetaBySlug = new Map<string, FileMetadata>()
+  for (const i of items) {
+    if (isRootNode(i)) fileMetaBySlug.set(i.fileSlug, toFileMetadata(i.metadata))
+  }
+  const undated = items.filter(
+    i => !isSeries(i) && !isRootNode(i)
+      && !(i as OccurrenceEntry<AppMetadata>).ownerId
+      && !i.date,
+  ) as OccurrenceEntry<AppMetadata>[]
+  return undated.map(occ => ({
+    ...occ,
+    id: crypto.randomUUID(),
+    metadata: { ...occ.metadata, ...(fileMetaBySlug.get(occ.fileSlug) ?? {}) },
+  }))
+}
+
 /* eslint-enable @typescript-eslint/no-explicit-any */

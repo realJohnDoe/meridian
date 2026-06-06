@@ -49,7 +49,7 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
 
   if (series.length === 0 && standalones.length === 1) {
     const s = standalones[0]
-    return { ...fileLevel, ...metadataToYaml(omitFileLevel(s.metadata)), date: s.date, ...(s.time ? { time: s.time } : {}) }
+    return { ...fileLevel, ...metadataToYaml(omitFileLevel(s.metadata)), ...(s.date ? { date: s.date } : {}), ...(s.time ? { time: s.time } : {}) }
   }
 
   // ── Container cases — inheritance hierarchy applies ───────────────────────
@@ -106,7 +106,7 @@ export function collapseToYaml(items: StoreItem[]): Record<string, unknown> {
     const offset = seriesBlocks.length
     const ld = metadataToYaml(localDefaults[offset + i])
     allInstances.push({
-      date: s.date,
+      ...(s.date ? { date: s.date } : {}),
       ...(s.time ? { time: s.time } : {}),
       ...ld,
     })

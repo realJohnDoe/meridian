@@ -579,8 +579,9 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
   })
   setItems(next)
 
-  // Determine which fileSlug to persist.
-  const fileSlug = item?.fileSlug ?? (fields.scheduled?.date ? titleToSlug(title) : null)
+  // Determine which fileSlug to persist. For a brand-new item the slug is derived
+  // from the title — matching applyEdit — so undated tasks/notes are persisted too.
+  const fileSlug = item?.fileSlug ?? titleToSlug(title)
   if (fileSlug) writeEntityToCache(fileSlug)
   closeEntry()
 }

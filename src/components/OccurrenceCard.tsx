@@ -62,7 +62,7 @@ export default function OccurrenceCard({
   if (variant === 'agenda') {
     return (
       <Card
-        className={`${cardCls} flex items-stretch gap-[9px] px-[14px] py-[8px] mx-2 mb-1.5`}
+        className={`${cardCls} flex items-stretch gap-[9px] pl-[8px] pr-[14px] py-[8px] mx-2 mb-1.5`}
         style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
         onClick={handleClick}
       >
@@ -112,7 +112,7 @@ export default function OccurrenceCard({
   // Compact variant
   return (
     <Card className={cardCls} onClick={handleClick}>
-      <div className="flex items-start gap-2 px-3 py-2.5">
+      <div className="flex items-start gap-2 pl-2.5 pr-3 py-2.5">
         <span className={`occ-bar ${currentBarClass}`} />
 
         {/* Two rows stacked in a flex-col */}
@@ -131,13 +131,15 @@ export default function OccurrenceCard({
             {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
           </div>
 
-          {/* Row 2: date + time + tags + participants */}
-          <div className="flex flex-wrap gap-[5px]">
-            <Badge variant="tag">{dateBadge}</Badge>
-            {t && <Badge variant="tag">{t}</Badge>}
-            {tags.map(tg => <Badge key={tg} variant="tag">{tg}</Badge>)}
-            <ParticipantsBadge participants={participants} />
-          </div>
+          {/* Row 2: date + time + tags + participants (omitted entirely when empty) */}
+          {(dateBadge || t || tags.length > 0 || participants.length > 0) && (
+            <div className="flex flex-wrap gap-[5px]">
+              {dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
+              {t && <Badge variant="tag">{t}</Badge>}
+              {tags.map(tg => <Badge key={tg} variant="tag">{tg}</Badge>)}
+              <ParticipantsBadge participants={participants} />
+            </div>
+          )}
         </div>
       </div>
     </Card>

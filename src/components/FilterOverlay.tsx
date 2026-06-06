@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
 
-import { expandRange } from '../model/expansion'
+import { expandRange, collectUndated } from '../model/expansion'
 import { addDays, occState } from '../meridian'
 import OccurrenceCard from './OccurrenceCard'
 
@@ -40,7 +40,9 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
     if (!query) return []
     const from = addDays(TODAY, -7)
     const to   = addDays(TODAY, 90)
-    const occs = expandRange(items, from, to)
+    // Undated items (tasks/notes saved without a date) fall outside the expandRange
+    // window, so collect them separately to keep them findable here too.
+    const occs = [...expandRange(items, from, to), ...collectUndated(items)]
     return occs
       .filter(o => fuzzyMatch(query, o.metadata.title))
       .map(o => ({ occ: o, score: fuzzyScore(query, o.metadata.title) }))
