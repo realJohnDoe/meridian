@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { Occurrence, StoreItem } from '../types'
 import { fileEntries, targetOccurrence, occState } from '../meridian'
 import OccurrenceCard from './OccurrenceCard'
+import { useStore } from '../store'
 
 function fuzzyMatch(query: string, text: string): boolean {
   if (!query) return true
@@ -35,9 +36,10 @@ interface Props {
  * Tags and topics are matched the same way — no divergence between fields.
  */
 export default function FileResultsList({ query, items, onOpen }: Props) {
+  const roots = useStore(s => s.roots)
   const results = useMemo(() => {
     if (!query) return []
-    const entries = fileEntries(items)
+    const entries = fileEntries(roots)
     return entries
       .filter(e => {
         const haystack = [e.title, ...e.tags, ...e.topics].join(' ')
@@ -46,14 +48,14 @@ export default function FileResultsList({ query, items, onOpen }: Props) {
       .map(e => ({ entry: e, score: fuzzyScore(query, e.title) }))
       .sort((a, b) => b.score - a.score)
       .map(x => x.entry)
-  }, [items, query])
+  }, [roots, query])
 
   if (!results.length) return null
 
   return (
     <div className="flex flex-col gap-1.5 px-2 pt-2">
       {results.map((entry, i) => {
-        const occ = targetOccurrence(entry.fileSlug, items)
+        const occ = targetOccurrence(entry.fileSlug, items, roots)
         if (!occ) return null
         return (
           <div

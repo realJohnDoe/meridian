@@ -1,5 +1,4 @@
-import type { StoreItem } from './types'
-import { isRootNode } from './types'
+import type { Roots } from './types'
 
 export interface WikilinkRef {
   ref: string
@@ -28,21 +27,24 @@ export function parseWikilinks(text: string): WikilinkRef[] {
 }
 
 /**
- * Resolve a wikilink ref to the per-file root node.
+ * Resolve a wikilink ref against the roots map.
+ * Returns the fileSlug, or undefined if not found.
  *
  * Resolution order (Obsidian-compatible):
- *  1. Exact fileSlug match — `[[project-alpha]]` → root node with fileSlug "project-alpha"
- *  2. Title alias match    — `[[Project Alpha]]` → same node via its display title
- *
- * Always resolves to the file root node so callers work at file granularity.
+ *  1. Exact fileSlug match — `[[project-alpha]]` → the slug we store in topics
+ *  2. Title alias match    — `[[Project Alpha]]` → convenience for hand-typed links
  */
-export function resolveWikilink(ref: string, items: StoreItem[]): StoreItem | undefined {
+export function resolveWikilink(ref: string, roots: Roots): string | undefined {
   const lower = ref.toLowerCase()
   // 1. FileSlug match (primary — what we store in topics: ["[[fileSlug]]"])
-  const bySlug = items.find(i => isRootNode(i) && i.fileSlug.toLowerCase() === lower)
-  if (bySlug) return bySlug
-  // 2. Title alias (convenience for hand-typed links like [[Project Alpha]])
-  return items.find(i => isRootNode(i) && i.metadata.title.toLowerCase() === lower)
+  for (const [fileSlug] of roots) {
+    if (fileSlug.toLowerCase() === lower) return fileSlug
+  }
+  // 2. Title alias
+  for (const [fileSlug, meta] of roots) {
+    if (meta.title.toLowerCase() === lower) return fileSlug
+  }
+  return undefined
 }
 
 /** Strip `[[` / `]]` brackets from a stored wikilink string, returning the raw ref. */

@@ -15,9 +15,9 @@ import {
   applyEdit, toggleDone, excludeOccurrence, deleteByFileSlug, deleteFollowing,
   fileSlugItems, findSeries,
 } from './model/storeOps'
-import type { Occurrence, Repeat, Scheduled, Priority, StoreItem } from './types'
+import type { Occurrence, Repeat, Scheduled, Priority, StoreItem, Roots } from './types'
 import { parseWikilinks, resolveWikilink } from './wikilinks'
-import { occKind, occIsRecur, isSeries, isRootNode } from './types'
+import { occKind, occIsRecur, isSeries } from './types'
 export { occKind, occIsRecur }
 import type { EntryState, ItemType } from './components/EntryEditor'
 import { useStore } from './store'
@@ -35,6 +35,8 @@ export type SeriesSheetConfig = { title: string; options: SeriesSheetOption[] }
 // ── STORE ACCESSORS ────────────────────────────────────────────
 const getItems      = (): StoreItem[]   => useStore.getState().items
 const setItems      = (i: StoreItem[])  => useStore.setState({ items: i })
+const getRoots      = (): Roots         => useStore.getState().roots
+const setData       = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
 const getPrimary    = ()                => useStore.getState().primaryView
 const setPrimary    = (v: string)       => useStore.getState().setPrimaryView(v as any)
 const pushOverlayFn = (v: string)       => useStore.getState().pushOverlay(v as any)
@@ -373,16 +375,19 @@ done: false
 ---` },
 ]
 
-function loadSeedItems(): StoreItem[] {
-  const result: StoreItem[] = []
+function loadSeedItems(): { items: StoreItem[]; roots: Roots } {
+  const items: StoreItem[] = []
+  const roots: Roots = new Map()
   for (const { id, yaml } of SEED_YAML) {
     try {
-      result.push(...parseYamlToStoreItems(yaml, id))
+      const parsed = parseYamlToStoreItems(yaml, id)
+      items.push(...parsed.items)
+      roots.set(id, parsed.root)
     } catch (e) {
       console.warn('[seed] parse failed for', id, e)
     }
   }
-  return result
+  return { items, roots }
 }
 
 export const NOTES_DATA = [
@@ -405,22 +410,23 @@ export interface FileEntry {
 
 /**
  * One FileEntry per file (deduped by fileSlug), for the chip picker and search bar.
- * Root nodes are the primary source; NOTES_DATA fills gaps for demo notes.
+ * Roots map is the primary source; NOTES_DATA fills gaps for demo notes.
  */
-export function fileEntries(items: StoreItem[]): FileEntry[] {
-  const fromItems: FileEntry[] = items
-    .filter(isRootNode)
-    .map(i => ({
-      fileSlug: i.fileSlug,
-      title:    i.metadata.title || i.fileSlug,
-      tags:     (i.metadata.tags   as string[]) || [],
-      topics:   (i.metadata.topics as string[]) || [],
-    }))
-  const slugSet = new Set(fromItems.map(e => e.fileSlug))
+export function fileEntries(roots: Roots): FileEntry[] {
+  const fromRoots: FileEntry[] = []
+  for (const [fileSlug, meta] of roots) {
+    fromRoots.push({
+      fileSlug,
+      title:  meta.title || fileSlug,
+      tags:   (meta.tags   as string[]) || [],
+      topics: (meta.topics as string[]) || [],
+    })
+  }
+  const slugSet = new Set(fromRoots.map(e => e.fileSlug))
   const fromNotes: FileEntry[] = NOTES_DATA
     .filter(n => !slugSet.has(titleToSlug(n.title)))
     .map(n => ({ fileSlug: titleToSlug(n.title), title: n.title, tags: n.tags ?? [], topics: [] }))
-  return [...fromItems, ...fromNotes]
+  return [...fromRoots, ...fromNotes]
 }
 
 /**
@@ -429,13 +435,13 @@ export function fileEntries(items: StoreItem[]): FileEntry[] {
  * Strategy: pick the **next upcoming** occurrence (jsTime ≥ today); if none,
  * fall back to the **last past** occurrence. Returns `null` for dateless notes.
  */
-export function targetOccurrence(fileSlug: string, items: StoreItem[]): Occurrence | null {
+export function targetOccurrence(fileSlug: string, items: StoreItem[], roots: Roots): Occurrence | null {
   const msDay = 86400000
   const AHEAD = new Date(TODAY.getTime() + 365 * 3 * msDay)
   const BACK  = new Date(TODAY.getTime() - 365 * 3 * msDay)
-  const forward = expandRange(items, TODAY, AHEAD).filter(o => o.fileSlug === fileSlug)
+  const forward = expandRange(items, roots, TODAY, AHEAD).filter(o => o.fileSlug === fileSlug)
   if (forward.length) return forward[0]
-  const back = expandRange(items, BACK, TODAY).filter(o => o.fileSlug === fileSlug)
+  const back = expandRange(items, roots, BACK, TODAY).filter(o => o.fileSlug === fileSlug)
   if (back.length) return back[back.length - 1]
   return null
 }
@@ -486,7 +492,9 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
 
 export function occState(o: Occurrence): string {
   if (o.metadata.done) return 'done'
-  if (occKind(o) === 'task' || o.metadata.done !== undefined) {
+  const kind = occKind(o)
+  if (kind === 'note') return 'note'
+  if (kind === 'task' || o.metadata.done !== undefined) {
     const p = o.metadata.priority
     if (p === 'high') return 'task-p1'
     if (p === 'medium') return 'task-p2'
@@ -495,12 +503,22 @@ export function occState(o: Occurrence): string {
   }
   if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 'event-future'
   const now = new Date()
-  if (o.metadata.jsTime && o.metadata.jsTime < now) return 'event-past'
+  if (o.metadata.jsTime && o.metadata.jsTime < now) {
+    // Whole-day events (no time) use day-level comparison — they stay colored
+    // until midnight, not until 00:01 AM when jsTime (midnight) < now.
+    if (!o.time) {
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      const eventDay = new Date(o.metadata.jsTime); eventDay.setHours(0, 0, 0, 0)
+      if (eventDay >= today) return 'event-future'
+    }
+    return 'event-past'
+  }
   return 'event-future'
 }
 const _ccBarMap: Record<string, string> = {
   'done': 'done',
   'event-past': 'done',
+  'note': 'note',
   'task-open': 'task',
   'task-p1': 'task-p1',
   'task-p2': 'task-p2',
@@ -572,8 +590,8 @@ function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;')
 }
 
-export function buildBodyHtml(text: string, items?: StoreItem[]): string {
-  const allItems = items ?? getItems()
+export function buildBodyHtml(text: string, roots?: Roots): string {
+  const allRoots = roots ?? getRoots()
   const links = parseWikilinks(text)
   if (links.length === 0) return escapeHtml(text).replace(/\n/g, '<br>')
 
@@ -581,7 +599,7 @@ export function buildBodyHtml(text: string, items?: StoreItem[]): string {
   let cursor = 0
   for (const wl of links) {
     result += escapeHtml(text.slice(cursor, wl.start)).replace(/\n/g, '<br>')
-    const target = resolveWikilink(wl.ref, allItems)
+    const target = resolveWikilink(wl.ref, allRoots)
     const cls = target ? 'wl' : 'wl-broken'
     const safeRef   = escapeHtml(wl.ref)
     const safeLabel = escapeHtml(wl.label ?? wl.ref)
@@ -605,7 +623,7 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
     return
   }
 
-  const next = applyEdit(getItems(), item, editScope, {
+  const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
     title,
     tags:         fields.tags         ?? [],
     topics:       fields.topics       ?? [],
@@ -618,17 +636,18 @@ export function saveNode(item: Occurrence | null, editScope: string, fields: any
     duration:     fields.duration     ?? '',
     repeat:       fields.repeat       ?? null,
   })
-  setItems(next)
+  setData(nextData)
 
-  // Determine which fileSlug to persist.
-  const fileSlug = item?.fileSlug ?? (fields.scheduled?.date ? titleToSlug(title) : null)
+  // Determine which fileSlug to persist. For a brand-new item the slug is derived
+  // from the title — matching applyEdit — so undated tasks/notes are persisted too.
+  const fileSlug = item?.fileSlug ?? titleToSlug(title)
   if (fileSlug) writeEntityToCache(fileSlug)
   closeEntry()
 }
 
 export function toggleOccDone(o: Occurrence): void {
   const next = toggleDone(getItems(), o)
-  o.metadata.done = !o.metadata.done // optimistic UI
+  o.metadata.done = !o.metadata.done  // optimistic UI
   setItems(next)
   writeEntityToCache(o.fileSlug)
 }
@@ -657,7 +676,12 @@ export function beginSwipeDelete(o: Occurrence): () => void {
         if (!getItems().find(i => i.id === o.id)) setItems(snapshot)
       },
     )
-    return () => { if (!cancelled) setItems(deleteByFileSlug(getItems(), o.fileSlug)) }
+    return () => {
+      if (!cancelled) {
+        const nextRoots = new Map(getRoots()); nextRoots.delete(o.fileSlug)
+        setData({ items: deleteByFileSlug(getItems(), o.fileSlug), roots: nextRoots })
+      }
+    }
   }
 }
 
@@ -672,8 +696,13 @@ export function deleteNode(
   const series   = findSeries(items, item)
   const slugItems = fileSlugItems(items, item.fileSlug)
   // Are there any other non-excluded occurrences besides this one?
+  // Expanded occurrences carry a fresh random id (see expansion.ts / collectUndated),
+  // so the standalone being deleted never matches by id — identify self by
+  // (no ownerId, same date) the way upsertOverride does, otherwise it counts itself.
+  const isSelf = (i: any) =>
+    i.id === item.id || (!i.ownerId && !item.ownerId && i.date === item.date)
   const hasSiblings = slugItems.some(
-    i => !isSeries(i) && i.id !== item.id && !(i as any).excluded,
+    i => !isSeries(i) && !isSelf(i) && !(i as any).excluded,
   )
   const isRecurring = !!item.ownerId
   const isScheduled = series?.repeat?.type === 'schedule'
@@ -689,7 +718,8 @@ export function deleteNode(
   }
   function deleteAll() {
     if (!item) return
-    setItems(deleteByFileSlug(getItems(), item.fileSlug))
+    const nextRoots = new Map(getRoots()); nextRoots.delete(item.fileSlug)
+    setData({ items: deleteByFileSlug(getItems(), item.fileSlug), roots: nextRoots })
     deleteFileFromDisk(item.fileSlug)
     hideSheet(); closeEntry()
   }
@@ -702,7 +732,11 @@ export function deleteNode(
 
   // Non-recurring, single occurrence.
   if (!isRecurring && !hasSiblings) {
-    const doDelete = () => { setItems(deleteByFileSlug(getItems(), item.fileSlug)); deleteFileFromDisk(item.fileSlug); closeEntry() }
+    const doDelete = () => {
+      const nextRoots = new Map(getRoots()); nextRoots.delete(item.fileSlug)
+      setData({ items: deleteByFileSlug(getItems(), item.fileSlug), roots: nextRoots })
+      deleteFileFromDisk(item.fileSlug); closeEntry()
+    }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }
     doDelete()
     return
@@ -761,9 +795,9 @@ async function writeEntityToCache(fileSlug: string): Promise<void> {
   try {
     const slugItems = fileSlugItems(getItems(), fileSlug)
     if (slugItems.length === 0) { await deleteFileFromDisk(fileSlug); return }
-    const frontmatter = collapseToYaml(slugItems)
-    // Body (file-level) lives on the per-file root node.
-    const body = slugItems.find(isRootNode)?.metadata.body ?? ''
+    const root = getRoots().get(fileSlug)
+    const frontmatter = collapseToYaml(slugItems, root)
+    const body = root?.body ?? ''
     const content = saveFile(frontmatter, body)
     const path = fileSlugToPath(fileSlug)
     await cacheWrite(path, content)
@@ -808,13 +842,17 @@ async function loadFilesFromDisk(): Promise<void> {
   if (!dh) return
   const files = await diskReadAll(dh)
   const loaded: StoreItem[] = []
+  const roots: Roots = new Map()
   for (const { path, content } of files) {
     await cacheWriteClean(path, content)
     try {
-      loaded.push(...parseToStoreItems(path, content))
+      const parsed = parseToStoreItems(path, content)
+      loaded.push(...parsed.items)
+      const slug = path.replace(/\.(md|yaml|yml)$/, '')
+      roots.set(slug, parsed.root)
     } catch (e) { console.warn('[storage] parse failed for', path, e) }
   }
-  setItems(loaded)
+  setData({ items: loaded, roots })
   updateSyncUI()
   setTimeout(() => goToday(), 100)
 }
@@ -839,7 +877,7 @@ export async function tryRestoreDirectory(): Promise<void> {
   try {
     await cacheInit()
     const h = await dirHandleLoad()
-    if (!h) { setItems(loadSeedItems()); return }
+    if (!h) { setData(loadSeedItems()); return }
     const perm = await h.queryPermission({ mode: 'readwrite' })
     if (perm === 'granted') {
       setDirHandle(h)
@@ -849,11 +887,11 @@ export async function tryRestoreDirectory(): Promise<void> {
       useStore.setState({ pendingDirReconnect: h.name })
     } else {
       await dirHandleClear()
-      setItems(loadSeedItems())
+      setData(loadSeedItems())
     }
   } catch (e) {
     console.warn('[storage] tryRestoreDirectory failed:', e)
-    setItems(loadSeedItems())
+    setData(loadSeedItems())
   }
 }
 

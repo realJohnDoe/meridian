@@ -53,6 +53,7 @@ export default function App() {
 
   // ── Navigation state (source of truth) ───────────────────────
   const storeItems   = useStore(s => s.items)
+  const storeRoots   = useStore(s => s.roots)
   const primaryView  = useStore(s => s.primaryView)
   const setPrimary   = useStore(s => s.setPrimaryView)
   const overlayStack = useStore(s => s.overlayStack)
@@ -119,15 +120,15 @@ export default function App() {
    * the ref as the title so the user can create it.
    */
   const handleOpenWikilink = useCallback((ref: string) => {
-    const root = resolveWikilink(ref, storeItems)
-    if (root) {
-      const occ = targetOccurrence(root.fileSlug, storeItems)
+    const fileSlug = resolveWikilink(ref, storeRoots)
+    if (fileSlug) {
+      const occ = targetOccurrence(fileSlug, storeItems, storeRoots)
       if (occ) { openEntry(occ, 'single'); return }
     }
     // No occurrence found — open as new entry prefilled with the ref/title
-    const prefillTitle = root?.metadata.title || ref
+    const prefillTitle = fileSlug ? (storeRoots.get(fileSlug)?.title ?? ref) : ref
     openEntry(null, undefined, prefillTitle)
-  }, [storeItems, openEntry])
+  }, [storeRoots, storeItems, openEntry])
 
   const handleSave = useCallback((body: string) => {
     saveNode(entry.item, entry.editScope, { ...entry, body })
@@ -273,6 +274,7 @@ export default function App() {
             onOpenRepeatDlg={handleOpenRepeatDlg}
             onScopeChange={handleScopeChange}
             items={storeItems}
+            roots={storeRoots}
             onOpenWikilink={handleOpenWikilink}
           />
         </section>

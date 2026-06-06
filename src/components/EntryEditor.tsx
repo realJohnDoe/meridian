@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText, Users, Tag } from 'lucide-react'
-import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem } from '../types'
-import { isSeries, isRootNode } from '../types'
+import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem, Roots } from '../types'
+import { isSeries } from '../types'
 import { fileEntries, NOTES_DATA } from '../meridian'
 import { Badge, badgeVariants } from './ui/badge'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
@@ -75,13 +75,15 @@ interface Props {
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: string) => void
-  /** StoreItem[] to resolve wikilinks and parent series against. App passes global items; debug passes local items. */
+  /** StoreItem[] to resolve parent series against. */
   items: StoreItem[]
+  /** Roots map for wikilink autocomplete. App passes global roots; debug passes local roots. */
+  roots: Roots
   /** Called when the user clicks a wikilink chip or body link — navigate to that file. */
   onOpenWikilink?: (ref: string) => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, onOpenWikilink }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink }: Props) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [participantInputVal, setParticipantInputVal] = useState('')
@@ -150,7 +152,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     const m = before.match(/\[\[([^\]\n]*)$/)
     if (m) {
       const q = m[1].toLowerCase()
-      const allTitles = [...new Set([...items.filter(isRootNode).map(i => i.metadata.title), ...NOTES_DATA.map(n => n.title)])]
+      const allTitles = [...new Set([...[...roots.values()].map(r => r.title), ...NOTES_DATA.map(n => n.title)])]
       const matches = q
         ? allTitles.filter(t => t.toLowerCase().includes(q)).slice(0, 8)
         : allTitles.slice(0, 8)
@@ -234,14 +236,14 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const tagChips: ChipEntry[] = tags.map((t, i) => ({ label: t, isTopic: false, idx: i, raw: t }))
   const topicChips: ChipEntry[] = topics.map((raw, i) => {
     const ref = unwrapRef(raw)
-    const resolved = resolveWikilink(ref, items)
-    const label = resolved?.metadata.title || ref
+    const fileSlug = resolveWikilink(ref, roots)
+    const label = fileSlug ? (roots.get(fileSlug)?.title ?? ref) : ref
     return { label, isTopic: true, idx: i, raw }
   })
   const allChips = [...tagChips, ...topicChips].sort((a, b) => a.label.localeCompare(b.label))
 
   // File entries for the picker combobox.
-  const allFileEntries = fileEntries(items)
+  const allFileEntries = fileEntries(roots)
   const filteredEntries = pickerQuery
     ? allFileEntries.filter(e => e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
     : allFileEntries
@@ -281,6 +283,8 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       itemType: t,
       tracked: t === 'task',
       priority: t !== 'task' ? null : prev.priority,
+      // Notes have no date — clear it automatically so users don't have to
+      scheduled: t === 'note' ? null : prev.scheduled,
     }))
   }
 
@@ -541,10 +545,12 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       {wlOpen && wlPopupPos && (
         <div className="wl-popup show" style={{ top: wlPopupPos.top, left: wlPopupPos.left }}>
           {wlMatches.map((t, i) => {
-            const matchItem = items.find(i => isRootNode(i) && i.metadata.title === t)
             const matchNote = NOTES_DATA.find(n => n.title === t)
-            const Icon = (matchItem && matchItem.metadata.done !== undefined) ? CheckSquare
-              : (matchItem && 'time' in matchItem && matchItem.time) ? Calendar
+            // Determine icon: look for a series or timed occurrence in the matching file
+            const rootFileSlug = [...roots.entries()].find(([, r]) => r.title === t)?.[0]
+            const matchItem = rootFileSlug ? items.find(i => i.fileSlug === rootFileSlug && !isSeries(i)) : undefined
+            const Icon = matchItem && (matchItem as { metadata?: { done?: boolean } }).metadata?.done !== undefined ? CheckSquare
+              : matchItem && matchItem.time ? Calendar
               : matchNote ? FileText
               : FileText
             return (

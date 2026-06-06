@@ -70,6 +70,7 @@ interface Props {
 export default function MonthView({ onDayClick }: Props) {
   const calMonth   = useStore(s => s.calMonth)
   const items      = useStore(s => s.items)
+  const roots      = useStore(s => s.roots)
   const setCalMonth = useStore(s => s.setCalMonth)
 
   const m = calMonth.getMonth()
@@ -92,10 +93,10 @@ export default function MonthView({ onDayClick }: Props) {
 
     const from = new Date(y, m, 1)
     const to   = new Date(y, m + 1, 0, 23, 59, 59)
-    const occs = expandRange(items, from, to)
+    const occs = expandRange(items, roots, from, to)
 
     return { cells, occs }
-  }, [items, y, m])
+  }, [items, roots, y, m])
 
   function prevMonth() {
     const d = calMonthRef.current

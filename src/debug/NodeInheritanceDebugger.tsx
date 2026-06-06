@@ -18,10 +18,9 @@ import {
   type EditFields,
 } from '../model/storeOps'
 import { loadFile, saveFile } from '../fileIO'
-import type { Occurrence, Priority, Repeat as RepeatType, StoreItem } from '../types'
-import { isRootNode } from '../types'
+import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from '../model/expansion'
-import type { AppMetadata } from '../types'
+import type { OccurrenceMetadata } from '../types'
 import EntryEditor, { type EntryState } from '../components/EntryEditor'
 import RepeatDialog from '../components/RepeatDialog'
 import DatePickerDialog from '../components/DatePickerDialog'
@@ -43,17 +42,10 @@ const DEBUG_FILE_SLUG = 'debug-node'
 /**
  * Serialize items back to YAML content string (same path as writeEntityToCache).
  */
-function itemsToYaml(items: StoreItem[], body: string): string {
+function itemsToYaml(items: StoreItem[], root: FileMetadata | undefined, body: string): string {
   if (items.length === 0) return ''
-  const frontmatter = collapseToYaml(items)
+  const frontmatter = collapseToYaml(items, root)
   return saveFile(frontmatter, body)
-}
-
-/**
- * Extract the file-level body, which lives on the per-file root node.
- */
-function extractBody(items: StoreItem[]): string {
-  return items.find(isRootNode)?.metadata.body ?? ''
 }
 
 // ── Tree display helpers ──────────────────────────────────────────────────────
@@ -296,6 +288,8 @@ export default function NodeInheritanceDebugger() {
   const [isCollapsed,     setIsCollapsed]     = useState(false)
   const [parseErrors,     setParseErrors]     = useState<string[]>([])
   const [items,           setItems]           = useState<StoreItem[]>([])
+  const [debugRoot,       setDebugRoot]       = useState<FileMetadata | undefined>(undefined)
+  const debugRoots = useMemo<Roots>(() => debugRoot ? new Map([[DEBUG_FILE_SLUG, debugRoot]]) : new Map(), [debugRoot])
   const [expandEndDate,   setExpandEndDate]   = useState<string>(defaultEndDate)
   const [selectedIdx,     setSelectedIdx]     = useState<number | null>(null)
   const [activeAction,    setActiveAction]    = useState<ActionKind | null>(null)
@@ -315,9 +309,10 @@ export default function NodeInheritanceDebugger() {
   }, [displayContent, fileName])
 
   // ── Apply items → update displayContent + collapse state ─────────────────
-  const applyItems = useCallback((newItems: StoreItem[], body: string) => {
+  const applyItems = useCallback((newItems: StoreItem[], root: FileMetadata | undefined, body: string) => {
     setItems(newItems)
-    const content = itemsToYaml(newItems, body)
+    setDebugRoot(root)
+    const content = itemsToYaml(newItems, root, body)
     setDisplayContent(content)
     setIsCollapsed(true)
     setSelectedIdx(null)
@@ -335,20 +330,22 @@ export default function NodeInheritanceDebugger() {
     setActiveAction(null)
     setDebugEntry(null)
     setItems([])
+    setDebugRoot(undefined)
 
     try {
       const parsed = parseToStoreItems(name || 'debug.md', content)
       // Assign a stable debug fileSlug so expandRange can match series↔overrides.
-      const withSlug = parsed.map(i => ({ ...i, fileSlug: i.fileSlug || DEBUG_FILE_SLUG }))
+      const withSlug = parsed.items.map(i => ({ ...i, fileSlug: i.fileSlug || DEBUG_FILE_SLUG }))
       setItems(withSlug)
+      setDebugRoot(parsed.root)
     } catch (e) {
       setParseErrors([`Parse error: ${String(e)}`])
     }
   }, [])
 
   const handleCollapse = useCallback(() => {
-    const body = extractBody(items)
-    const content = itemsToYaml(items, body)
+    const body = debugRoot?.body ?? ''
+    const content = itemsToYaml(items, debugRoot, body)
     setDisplayContent(content)
     setIsCollapsed(true)
     setSelectedIdx(null)
@@ -386,12 +383,12 @@ export default function NodeInheritanceDebugger() {
     const from = new Date(2000, 0, 1)
     const to   = new Date(`${expandEndDate}T23:59:59`)
     if (isNaN(to.getTime())) return []
-    return expandRange(items, from, to)
-  }, [items, expandEndDate])
+    return expandRange(items, debugRoots, from, to)
+  }, [items, debugRoots, expandEndDate])
 
   // Derived selection state — before all callbacks that depend on it.
   const selectedOcc    = selectedIdx !== null ? (occurrences ?? [])[selectedIdx] ?? null : null
-  const selectedSeries = useMemo<RepeatPattern<AppMetadata> | null>(
+  const selectedSeries = useMemo<RepeatPattern<OccurrenceMetadata> | null>(
     () => selectedOcc ? findSeries(items, selectedOcc) ?? null : null,
     [selectedOcc, items],
   )
@@ -426,9 +423,9 @@ export default function NodeInheritanceDebugger() {
       duration: duration || '',
       repeat:   repeat ?? null,
     }
-    const next = applyEdit(items, selectedOcc, editScope, fields)
-    applyItems(next, body)
-  }, [debugEntry, selectedOcc, items, applyItems])
+    const next = applyEdit({ items, roots: debugRoots }, selectedOcc, editScope, fields)
+    applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), body)
+  }, [debugEntry, selectedOcc, items, debugRoot, debugRoots, applyItems])
 
   const handleDebugClose = useCallback(() => {
     setSelectedIdx(null); setDebugEntry(null)
@@ -440,13 +437,14 @@ export default function NodeInheritanceDebugger() {
       const occ = prev.item as Occurrence
       const { scheduled, repeat } = applyScope(occ, scope, items)
       if (scope === 'future' || scope === 'all') {
+        // File-level fields (title/tags/body) come from debugRoot; occurrence fields from series.
         const pm = selectedSeries?.metadata
         return {
           ...prev, editScope: scope, scheduled, repeat,
-          title:    pm?.title    ?? prev.title,
-          tags:     pm?.tags     ? [...pm.tags] : prev.tags,
+          title:    debugRoot?.title ?? prev.title,
+          tags:     debugRoot?.tags  ? [...debugRoot.tags] : prev.tags,
           priority: (pm?.priority ?? prev.priority ?? null) as Priority | null,
-          bodyHtml: pm?.body     ?? prev.bodyHtml,
+          bodyHtml: debugRoot?.body  ?? prev.bodyHtml,
           duration: pm?.duration ?? prev.duration,
           tracked:  prev.tracked,
           done:     pm?.done ?? prev.done,
@@ -454,13 +452,13 @@ export default function NodeInheritanceDebugger() {
       }
       return { ...prev, editScope: scope, scheduled, repeat }
     })
-  }, [selectedSeries, items])
+  }, [selectedSeries, debugRoot, items])
 
   const handleDebugDelete = useCallback(() => {
     if (!selectedOcc) return
     const next = excludeOccurrence(items, selectedOcc)
-    applyItems(next, extractBody(next))
-  }, [selectedOcc, items, applyItems])
+    applyItems(next, debugRoot, debugRoot?.body ?? '')
+  }, [selectedOcc, items, debugRoot, applyItems])
 
   const canEditPattern     = selectedOcc?.source === 'generated'
   const canEditFollowing   = selectedOcc !== null && selectedSeries !== null
@@ -640,14 +638,14 @@ export default function NodeInheritanceDebugger() {
                     <AddOccurrenceForm
                       onApply={(date, time, done) => {
                         const series = findSeries(items, selectedOcc)
-                        const newOcc: OccurrenceEntry<AppMetadata> = {
+                        const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
                           date, time: time || null, source: 'explicit',
                           fileSlug: selectedOcc.fileSlug, id: crypto.randomUUID(),
                           ownerId: selectedOcc.ownerId,
-                          metadata: { ...(series?.metadata ?? selectedOcc.metadata), done },
+                          metadata: { ...(series?.metadata ?? {}), done, participants: [] },
                         }
                         const next = [...items, newOcc]
-                        applyItems(next, extractBody(next))
+                        applyItems(next, debugRoot, debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -659,7 +657,7 @@ export default function NodeInheritanceDebugger() {
                           date, time: time || null,
                           metadata: { ...selectedOcc.metadata, done },
                         })
-                        applyItems(next, extractBody(next))
+                        applyItems(next, debugRoot, debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -668,7 +666,7 @@ export default function NodeInheritanceDebugger() {
                     <EditFollowingForm occ={selectedOcc}
                       onApply={() => {
                         const next = deleteFollowing(items, selectedOcc)
-                        applyItems(next, extractBody(next))
+                        applyItems(next, debugRoot, debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -679,7 +677,7 @@ export default function NodeInheritanceDebugger() {
                       label="Delete occurrence"
                       onApply={() => {
                         const next = excludeOccurrence(items, selectedOcc)
-                        applyItems(next, extractBody(next))
+                        applyItems(next, debugRoot, debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -690,7 +688,7 @@ export default function NodeInheritanceDebugger() {
                       label="Delete this & following"
                       onApply={() => {
                         const next = deleteFollowing(items, selectedOcc)
-                        applyItems(next, extractBody(next))
+                        applyItems(next, debugRoot, debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -722,6 +720,7 @@ export default function NodeInheritanceDebugger() {
                 onOpenRepeatDlg={() => setDebugDialog('dlgRepeat')}
                 onScopeChange={handleDebugScopeChange}
                 items={items}
+                roots={debugRoots}
               />
               <DatePickerDialog
                 open={debugDialog === 'dlgSched'}
@@ -782,10 +781,10 @@ export default function NodeInheritanceDebugger() {
           onConfirm={(r: RepeatType) => {
             const next = items.map(i =>
               i.id === selectedSeries.id
-                ? { ...i as RepeatPattern<AppMetadata>, repeat: r }
+                ? { ...i as RepeatPattern<OccurrenceMetadata>, repeat: r }
                 : i,
             )
-            applyItems(next, extractBody(next))
+            applyItems(next, debugRoot, debugRoot?.body ?? '')
             setPatternDialogOpen(false); setActiveAction(null)
           }}
           onRemove={() => setPatternDialogOpen(false)}

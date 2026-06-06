@@ -17,12 +17,13 @@ interface Props {
 
 export default function AgendaView({ onOpen }: Props) {
   const items = useStore(s => s.items)
+  const roots = useStore(s => s.roots)
 
   // Expand occurrences and group them by day — same window as buildAgenda().
   const groups = useMemo(() => {
     const from = addDays(TODAY, -7)
     const to = addDays(TODAY, 90)
-    const occs = expandRange(items, from, to)
+    const occs = expandRange(items, roots, from, to)
 
     const result: Record<string, { date: Date; items: Occurrence[] }> = {}
 
