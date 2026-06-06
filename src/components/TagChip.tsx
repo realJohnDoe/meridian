@@ -33,7 +33,6 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
         variant="link"
         className={cn(
           interactive && onNavigate && 'cursor-pointer underline underline-offset-2 decoration-indigo-400/60',
-          'pr-0.5',
           className,
         )}
         onClick={interactive && onNavigate ? onNavigate : undefined}
@@ -42,7 +41,7 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
         {interactive && onRemove && (
           <button
             type="button"
-            className="ml-0.5 rounded-sm opacity-60 hover:opacity-100 focus:outline-none"
+            className="rounded-sm opacity-60 hover:opacity-100 focus:outline-none"
             onClick={e => { e.stopPropagation(); onRemove() }}
             aria-label={`Remove ${label}`}
           >
@@ -56,13 +55,13 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
   return (
     <Badge
       variant="tag"
-      className={cn('pr-0.5', className)}
+      className={cn(className)}
     >
       {label}
       {interactive && onRemove && (
         <button
           type="button"
-          className="ml-0.5 rounded-sm opacity-60 hover:opacity-100 focus:outline-none"
+          className="rounded-sm opacity-60 hover:opacity-100 focus:outline-none"
           onClick={e => { e.stopPropagation(); onRemove() }}
           aria-label={`Remove ${label}`}
         >
