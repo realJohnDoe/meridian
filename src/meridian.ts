@@ -461,7 +461,16 @@ export function occState(o: Occurrence): string {
   }
   if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 'event-future'
   const now = new Date()
-  if (o.metadata.jsTime && o.metadata.jsTime < now) return 'event-past'
+  if (o.metadata.jsTime && o.metadata.jsTime < now) {
+    // Whole-day events (no time) use day-level comparison — they stay colored
+    // until midnight, not until 00:01 AM when jsTime (midnight) < now.
+    if (!o.time) {
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      const eventDay = new Date(o.metadata.jsTime); eventDay.setHours(0, 0, 0, 0)
+      if (eventDay >= today) return 'event-future'
+    }
+    return 'event-past'
+  }
   return 'event-future'
 }
 const _ccBarMap: Record<string, string> = {
