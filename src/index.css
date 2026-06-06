@@ -310,7 +310,7 @@
 /* .sheet-opt / .sopt-* removed — SeriesScopeDrawer now uses Tailwind */
 
 /* ── SWIPE GESTURES ── */
-.swipe-wrap{position:relative;overflow:hidden;border-radius:4px}
+.swipe-wrap{position:relative;overflow:hidden;border-radius:8px}
 .swipe-hint{position:absolute;inset:0;display:flex;align-items:center;padding:0 20px;pointer-events:none;z-index:0}
 .swipe-hint.left{background:var(--ros);justify-content:flex-end;gap:10px}
 .swipe-hint svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.5;flex-shrink:0;transition:transform .15s}
