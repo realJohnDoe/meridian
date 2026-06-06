@@ -33,7 +33,6 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
         variant="link"
         className={cn(
           interactive && onNavigate && 'cursor-pointer underline underline-offset-2 decoration-indigo-400/60',
-          interactive && onRemove && 'pr-1',
           className,
         )}
         onClick={interactive && onNavigate ? onNavigate : undefined}
@@ -56,7 +55,7 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
   return (
     <Badge
       variant="tag"
-      className={cn(interactive && onRemove && 'pr-1', className)}
+      className={cn(className)}
     >
       {label}
       {interactive && onRemove && (
