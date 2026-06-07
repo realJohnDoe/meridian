@@ -264,6 +264,14 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const hasTime = !!(scheduled?.time)
   const isSingleScope = editScope === 'single'
   const isNote = itemType === 'note'
+
+  /** Pick the right type icon for a file entry in the topic combobox. */
+  function entryTypeIcon(fileSlug: string) {
+    const first = items.find(i => i.fileSlug === fileSlug)
+    if (first && first.metadata.done !== undefined) return <CheckSquare size={13} className="shrink-0 opacity-60" />
+    if (first && first.date) return <CalendarDays size={13} className="shrink-0 opacity-60" />
+    return <FileText size={13} className="shrink-0 opacity-60" />
+  }
   // notes: no scheduling chips; events: date/time/duration + repeat (schedule only); tasks: everything
   const showDateChip = !isNote
   const showRepeat = !isNote && (hasDate || tracked) && (!isSingleScope || !isRecur)
@@ -393,7 +401,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
                           value={e.fileSlug}
                           onSelect={() => addTopic(e.fileSlug)}
                         >
-                          <FileText size={13} className="shrink-0 opacity-60" />
+                          {entryTypeIcon(e.fileSlug)}
                           <span className="truncate">{e.title}</span>
                           {e.tags[0] && (
                             <span className="ml-auto text-[10px] text-[var(--t3)] shrink-0">{e.tags[0]}</span>
