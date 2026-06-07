@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { Occurrence, StoreItem } from '../types'
 import { fileEntries, targetOccurrence, occState } from '../meridian'
+import { collectUndated } from '../model/expansion'
 import OccurrenceCard from './OccurrenceCard'
 import { useStore } from '../store'
 
@@ -37,6 +38,13 @@ interface Props {
  */
 export default function FileResultsList({ query, items, onOpen }: Props) {
   const roots = useStore(s => s.roots)
+
+  const undatedBySlug = useMemo(() => {
+    const map = new Map<string, Occurrence>()
+    for (const occ of collectUndated(items, roots)) map.set(occ.fileSlug, occ as Occurrence)
+    return map
+  }, [items, roots])
+
   const results = useMemo(() => {
     if (!query) return []
     const entries = fileEntries(roots)
@@ -55,7 +63,7 @@ export default function FileResultsList({ query, items, onOpen }: Props) {
   return (
     <div className="flex flex-col gap-1.5 px-2 pt-2">
       {results.map((entry, i) => {
-        const occ = targetOccurrence(entry.fileSlug, items, roots)
+        const occ = targetOccurrence(entry.fileSlug, items, roots) ?? undatedBySlug.get(entry.fileSlug)
         if (!occ) return null
         return (
           <div
@@ -64,6 +72,8 @@ export default function FileResultsList({ query, items, onOpen }: Props) {
           >
             <OccurrenceCard
               occ={occ}
+              variant="compact"
+              showTypeIcon
               isDone={!!occ.metadata.done}
               currentBarClass={occState(occ)}
               onOpen={() => onOpen(occ)}
