@@ -74,7 +74,7 @@ function DaySection({
       {/* Occurrence rows */}
       {items.map((o, i) => (
         <OccurrenceRow
-          key={`${o.fileSlug}-${o.date}-${o.time ?? ''}`}
+          key={o.id}
           occ={o}
           index={i}
           onOpen={() => onOpen(o)}
@@ -97,6 +97,7 @@ function propsAreEqual(prev: Props, next: Props): boolean {
         && o.metadata.priority === n.metadata.priority
         && o.metadata.duration === n.metadata.duration
         && JSON.stringify(o.metadata.tags) === JSON.stringify(n.metadata.tags)
+        && JSON.stringify(o.metadata.topics) === JSON.stringify(n.metadata.topics)
         && JSON.stringify(o.metadata.participants) === JSON.stringify(n.metadata.participants)
   })) return false
   return true

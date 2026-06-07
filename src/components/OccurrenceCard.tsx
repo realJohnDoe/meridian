@@ -6,6 +6,9 @@ import { fmtShort } from '../meridian'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
 import { Card } from './ui/card'
+import TagChip from './TagChip'
+import { unwrapRef, resolveWikilink } from '../wikilinks'
+import { useStore } from '../store'
 
 export interface OccurrenceCardProps {
   occ: Occurrence
@@ -40,6 +43,27 @@ function TypeIcon({ occ }: { occ: Occurrence }) {
   return <FileText size={13} className="shrink-0 text-[var(--t3)]" />
 }
 
+/** Unified tag + topic chip row — reads roots map for wikilink resolution. */
+function TagsRow({ tags, topics }: { tags: string[]; topics: string[] }) {
+  const roots = useStore(s => s.roots)
+
+  type ChipItem = { label: string; isTopic: boolean; key: string }
+  const tagChips: ChipItem[] = tags.map(t => ({ label: t, isTopic: false, key: `tag:${t}` }))
+  const topicChips: ChipItem[] = topics.map(raw => {
+    const ref = unwrapRef(raw)
+    const fileSlug = resolveWikilink(ref, roots)
+    const label = fileSlug ? (roots.get(fileSlug)?.title ?? ref) : ref
+    return { label, isTopic: true, key: `topic:${raw}` }
+  })
+  const all = [...tagChips, ...topicChips].sort((a, b) => a.label.localeCompare(b.label))
+  if (!all.length) return null
+  return (
+    <>
+      {all.map(c => <TagChip key={c.key} label={c.label} isTopic={c.isTopic} />)}
+    </>
+  )
+}
+
 export default function OccurrenceCard({
   occ,
   variant = 'agenda',
@@ -53,6 +77,7 @@ export default function OccurrenceCard({
   const t = fmtT(occ.time)
   const hasTrack = occ.metadata.done !== undefined
   const tags = occ.metadata.tags || []
+  const topics = (occ.metadata.topics as string[] | undefined) || []
   const participants = occ.metadata.participants || []
   const title = displayTitle ?? occ.metadata.title
 
@@ -75,7 +100,7 @@ export default function OccurrenceCard({
   if (variant === 'agenda') {
     return (
       <Card
-        className={`${cardCls} flex items-stretch gap-[9px] pl-[8px] pr-[14px] py-[8px] mx-2 mb-1.5`}
+        className={`${cardCls} flex items-stretch gap-[9px] pl-[8px] pr-[14px] py-[8px]`}
         style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
         onClick={handleClick}
       >
@@ -110,10 +135,10 @@ export default function OccurrenceCard({
             )}
           </div>
 
-          {/* Row 2: tags + participants */}
-          {(tags.length > 0 || participants.length > 0) && (
+          {/* Row 2: tags + topics + participants */}
+          {(tags.length > 0 || topics.length > 0 || participants.length > 0) && (
             <div className="flex flex-wrap gap-[5px]">
-              {tags.map(tg => <Badge key={tg} variant="tag">{tg}</Badge>)}
+              <TagsRow tags={tags} topics={topics} />
               <ParticipantsBadge participants={participants} />
             </div>
           )}
@@ -128,7 +153,6 @@ export default function OccurrenceCard({
       <div className="flex items-start gap-2 pl-2.5 pr-3 py-2.5">
         <span className={`occ-bar ${currentBarClass}`} />
 
-        {/* Two rows stacked in a flex-col */}
         <div className="flex flex-col flex-1 min-w-0 gap-1">
           {/* Row 1: [type icon] + checkbox + title */}
           <div className="flex items-center gap-[6px]">
@@ -145,12 +169,12 @@ export default function OccurrenceCard({
             {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
           </div>
 
-          {/* Row 2: date + time + tags + participants (omitted entirely when empty) */}
-          {(dateBadge || t || tags.length > 0 || participants.length > 0) && (
+          {/* Row 2: date + time + tags + topics + participants */}
+          {(dateBadge || t || tags.length > 0 || topics.length > 0 || participants.length > 0) && (
             <div className="flex flex-wrap gap-[5px]">
               {dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
               {t && <Badge variant="tag">{t}</Badge>}
-              {tags.map(tg => <Badge key={tg} variant="tag">{tg}</Badge>)}
+              <TagsRow tags={tags} topics={topics} />
               <ParticipantsBadge participants={participants} />
             </div>
           )}

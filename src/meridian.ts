@@ -1,4 +1,4 @@
-import { fmtISO, fmtT, parseDurationDays } from './model/expansion'
+import { fmtISO, fmtT, parseDurationDays, expandRange } from './model/expansion'
 import {
   cacheWrite, cacheWriteClean, cacheDelete, cacheGetDirty,
   cacheMarkClean, cacheDirtyCount,
@@ -397,6 +397,54 @@ export const NOTES_DATA = [
   {title:'Ideas',preview:'Offline-first sync, plugin system, graph view.',date:'May 9',tags:['ideas'],type:'note'},
 ]
 
+// ── FILE ENTRY HELPERS ─────────────────────────────────────────
+
+/** A flat, file-granular entry for the item picker and search overlay. */
+export interface FileEntry {
+  fileSlug: string
+  title:    string
+  tags:     string[]
+  topics:   string[]
+}
+
+/**
+ * One FileEntry per file (deduped by fileSlug), for the chip picker and search bar.
+ * Roots map is the primary source; NOTES_DATA fills gaps for demo notes.
+ */
+export function fileEntries(roots: Roots): FileEntry[] {
+  const fromRoots: FileEntry[] = []
+  for (const [fileSlug, meta] of roots) {
+    fromRoots.push({
+      fileSlug,
+      title:  meta.title || fileSlug,
+      tags:   (meta.tags   as string[]) || [],
+      topics: (meta.topics as string[]) || [],
+    })
+  }
+  const slugSet = new Set(fromRoots.map(e => e.fileSlug))
+  const fromNotes: FileEntry[] = NOTES_DATA
+    .filter(n => !slugSet.has(titleToSlug(n.title)))
+    .map(n => ({ fileSlug: titleToSlug(n.title), title: n.title, tags: n.tags ?? [], topics: [] }))
+  return [...fromRoots, ...fromNotes]
+}
+
+/**
+ * Navigate to the right occurrence for a file link.
+ *
+ * Strategy: pick the **next upcoming** occurrence (jsTime ≥ today); if none,
+ * fall back to the **last past** occurrence. Returns `null` for dateless notes.
+ */
+export function targetOccurrence(fileSlug: string, items: StoreItem[], roots: Roots): Occurrence | null {
+  const msDay = 86400000
+  const AHEAD = new Date(TODAY.getTime() + 365 * 3 * msDay)
+  const BACK  = new Date(TODAY.getTime() - 365 * 3 * msDay)
+  const forward = expandRange(items, roots, TODAY, AHEAD).filter(o => o.fileSlug === fileSlug)
+  if (forward.length) return forward[0]
+  const back = expandRange(items, roots, BACK, TODAY).filter(o => o.fileSlug === fileSlug)
+  if (back.length) return back[back.length - 1]
+  return null
+}
+
 // ── UTILS ──────────────────────────────────────────────────────
 export const sameDay = (a: Date, b: Date): boolean =>
   a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
@@ -405,7 +453,7 @@ export const fmtLong = (d: Date): string => d.toLocaleDateString('en-US', { week
 export const fmtShort = (d: Date): string => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
 // ── NAVIGATION ──────────────────────────────────────────────────
-export function pushOverlay(name: 'entry' | 'search'): void { pushOverlayFn(name) }
+export function pushOverlay(name: 'entry'): void { pushOverlayFn(name) }
 export function popOverlay(): void { popOverlayFn() }
 
 export function goToday(): void {
@@ -422,12 +470,6 @@ export function goToday(): void {
     }, 60)
   }
 }
-
-export function openSearch(): void {
-  pushOverlayFn('search')
-  setTimeout(() => { (window as any)._focusSearch?.() }, 50)
-}
-export function closeSearch(): void { popOverlayFn() }
 
 // ── SHARED OCCURRENCE SORT ────────────────────────────────────
 // Tier: 0 multiday · 1 whole-day · 2 timed future · 3 open tasks · 4 past events · 5 done
@@ -655,12 +697,7 @@ export function deleteNode(
   const items    = getItems()
   const series   = findSeries(items, item)
   const slugItems = fileSlugItems(items, item.fileSlug)
-  // Are there any other non-excluded occurrences besides this one?
-  // Expanded occurrences carry a fresh random id (see expansion.ts / collectUndated),
-  // so the standalone being deleted never matches by id — identify self by
-  // (no ownerId, same date) the way upsertOverride does, otherwise it counts itself.
-  const isSelf = (i: any) =>
-    i.id === item.id || (!i.ownerId && !item.ownerId && i.date === item.date)
+  const isSelf = (i: any) => i.id === item.id
   const hasSiblings = slugItems.some(
     i => !isSeries(i) && !isSelf(i) && !(i as any).excluded,
   )

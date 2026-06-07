@@ -9,6 +9,8 @@ const badgeVariants = cva(
       variant: {
         // Small display label — replaces .otag and .etag
         tag: 'px-1.5 py-0.5 text-[10px] rounded-lg border-transparent bg-secondary text-muted-foreground',
+        // Wikilink / topic chip — always indigo; underline only when interactive (applied via className)
+        link: 'px-1.5 py-0.5 text-[10px] rounded-lg border-transparent bg-indigo-500/15 text-indigo-400',
         // Interactive toggle chip — replaces .fchip and .pchip
         // Active state driven by aria-pressed; priority colors via inline style override
         chip: [

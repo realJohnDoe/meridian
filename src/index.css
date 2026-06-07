@@ -289,7 +289,7 @@
 .entry-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;align-items:center}
 .etag-input{background:var(--bg3);border:1px solid var(--ind);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--t0);outline:none;width:90px;font-family:inherit}
 .etag-input::placeholder{color:var(--t3)}
-.entry-divider{height:1px;background:var(--bdr);margin-bottom:14px}
+.entry-divider{height:1px;background:var(--bdr);margin:0 -14px 14px}
 .entry-body{min-height:160px;color:var(--t1);font-size:14px;line-height:1.85;outline:none;caret-color:var(--ind);white-space:pre-wrap;word-break:break-word;position:relative}
 .entry-body .wl{color:var(--ind);border-bottom:1px solid rgba(129,140,248,.35);cursor:pointer}
 .entry-body .wl-broken{color:var(--ros);border-bottom:1px solid rgba(251,113,133,.3)}
@@ -313,7 +313,7 @@
 /* .sheet-opt / .sopt-* removed — SeriesScopeDrawer now uses Tailwind */
 
 /* ── SWIPE GESTURES ── */
-.swipe-wrap{position:relative;overflow:hidden;border-radius:4px}
+.swipe-wrap{position:relative;overflow:hidden;border-radius:8px}
 .swipe-hint{position:absolute;inset:0;display:flex;align-items:center;padding:0 20px;pointer-events:none;z-index:0}
 .swipe-hint.left{background:var(--ros);justify-content:flex-end;gap:10px}
 .swipe-hint svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.5;flex-shrink:0;transition:transform .15s}

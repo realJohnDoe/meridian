@@ -65,7 +65,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       e.preventDefault()
       const rowW = wrap.offsetWidth || 320
       const absDx = Math.abs(dx)
-      const clamped = Math.max(dx, -rowW)
+      const clamped = Math.min(Math.max(dx, -rowW), 0)
       row.style.transform = `translateX(${clamped}px)`
       if (dx < -8) {
         hintL.style.display = 'flex'
@@ -133,9 +133,9 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
 
   return (
     <div
-      className="swipe-wrap"
+      className="swipe-wrap mx-2 mb-1.5"
       ref={wrapRef}
-      data-occ-key={`${occ.fileSlug}-${occ.date}`}
+      data-occ-key={occ.id}
       style={{ '--stagger': `${staggerRef.current * 0.025}s` } as React.CSSProperties}
     >
       {/* Left swipe hint */}
@@ -148,7 +148,6 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       <div className="swipe-row" ref={rowRef}>
         <OccurrenceCard
           occ={occ}
-          variant="agenda"
           isDone={isDone}
           currentBarClass={currentBarClass}
           onOpen={onOpen}

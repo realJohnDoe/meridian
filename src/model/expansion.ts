@@ -436,7 +436,7 @@ export interface OccurrenceEntry<T = Record<string, unknown>> {
   time:      string | null             // HH:mm or null
   source:    'generated' | 'explicit'
   fileSlug:  string                    // identifies source file (= node.id)
-  id:        string                    // own UUID; stable across promotion to RepeatPattern
+  id:        string                    // stable UUID — carried from the store item or memoised by logical key
   ownerId?:  string                    // UUID of parent RepeatPattern (undefined for standalone)
   excluded?: boolean                   // exclusion override: suppresses a generated occurrence
   metadata:  T
@@ -512,6 +512,20 @@ function generatedDateSet(expandable: Record<string, unknown>, from: Date, to: D
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// STABLE ID MEMO
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Series-generated occurrences have no backing store row, so we memo their id
+// by logical key. The same (ownerId, date, time) always resolves to the same
+// UUID within a session, making occ.id stable across re-expansions.
+const occIdCache = new Map<string, string>()
+function stableOccId(key: string): string {
+  let id = occIdCache.get(key)
+  if (!id) { id = crypto.randomUUID(); occIdCache.set(key, id) }
+  return id
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // COLLECTORS (generic)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -546,7 +560,7 @@ export function expandRepeat<T>(
       time:     occ.time ? String(occ.time) : null,
       source:   src,
       fileSlug,
-      id:       crypto.randomUUID(),
+      id:       stableOccId(`${fileSlug}|${ownerId}|${String(occ.date ?? '')}|${occ.time ?? ''}`),
       metadata: extractMetadata(metaFields),
     }
     if (ownerId) entry.ownerId = ownerId
@@ -582,7 +596,7 @@ export function collectAllOccurrences<T>(
           time:     n.fields.time ? String(n.fields.time) : null,
           source:   'explicit',
           fileSlug,
-          id:       crypto.randomUUID(),
+          id:       stableOccId(`${fileSlug}|${ownerId}|${dateStr}|${n.fields.time ?? ''}`),
           metadata: extractMetadata(metaFields),
         }
         if (ownerId) entry.ownerId = ownerId
@@ -622,7 +636,7 @@ export function collectRepeatPatterns<T>(
         time:     n.fields.time ? String(n.fields.time) : null,
         repeat:   n.fields.repeat as Repeat,
         fileSlug,
-        id:       crypto.randomUUID(),
+        id:       stableOccId(`${fileSlug}|series|${String(n.fields.date ?? '')}|${n.fields.time ?? ''}`),
         metadata: extractMetadata(metaFields),
       })
     }
@@ -705,7 +719,9 @@ export function expandRange(
         time:    occ.time ? String(occ.time) : null,
         source:  isGenerated ? 'generated' : 'explicit',
         fileSlug: series.fileSlug,
-        id:      crypto.randomUUID(),
+        id:      override
+          ? override.id
+          : stableOccId(`${series.id}|${String(occ.date ?? '')}|${occ.time ?? ''}`),
         ownerId: series.id,
         metadata: { ...joinFileMeta(series.fileSlug, occMeta), jsTime },
       })
@@ -725,7 +741,7 @@ export function expandRange(
       time:    occ.time,
       source:  occ.source,
       fileSlug: occ.fileSlug,
-      id:      crypto.randomUUID(),
+      id:      occ.id,
       excluded: occ.excluded,
       metadata: { ...joinFileMeta(occ.fileSlug, occ.metadata), jsTime },
     })
@@ -758,7 +774,6 @@ export function collectUndated(items: StoreItem[], roots: Roots): OccurrenceEntr
   ) as OccurrenceEntry<AppMetadata>[]
   return undated.map(occ => ({
     ...occ,
-    id: crypto.randomUUID(),
     metadata: { ...(roots.get(occ.fileSlug) ?? { title: '', tags: [], topics: [] }), ...occ.metadata },
   }))
 }

@@ -54,14 +54,11 @@ export function upsertOverride(
   patch: Partial<OccurrenceEntry<OccurrenceMetadata>>,
 ): StoreItem[] {
   if (!occ.ownerId) {
-    // Standalone — match by fileSlug + date.
-    // Expanded occurrences get a fresh random id each render (expansion.ts),
-    // so occ.id never matches a store item id. Use (fileSlug, date) instead.
     return items.map(i => {
       if (isSeries(i)) return i
       const io = i as OccurrenceEntry<OccurrenceMetadata>
       if (io.ownerId) return i   // skip child overrides of a series
-      return io.fileSlug === occ.fileSlug && io.date === occ.date
+      return io.id === occ.id
         ? { ...io, ...patch, metadata: { ...io.metadata, ...(patch.metadata ?? {}) } }
         : io
     })
@@ -205,11 +202,9 @@ export function applyEdit(
   if (scope === 'all') {
     // File-level fields go to roots; occurrence fields to the item.
     roots = updateRoot(roots, occ.fileSlug, fields)
-    // For a series: match by the stable series UUID (occ.ownerId).
-    // For a standalone: occ.id is a random expansion UUID — match by fileSlug instead.
     const matchItem = occ.ownerId
       ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
-      : (i: StoreItem) => isStandaloneOcc(i) && i.fileSlug === occ.fileSlug && i.date === occ.date
+      : (i: StoreItem) => isStandaloneOcc(i) && i.id === occ.id
     items = items.map(i => {
       if (!matchItem(i)) return i
       const meta = occMeta(i.metadata, fields)

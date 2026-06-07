@@ -273,7 +273,7 @@ export default function DayView({ onOpen }: Props) {
               })
               .map(o => (
                 <EventBlock
-                  key={`${o.fileSlug}-${o.date}-${o.time ?? ''}`}
+                  key={o.id}
                   o={o}
                   colIndex={ci}
                   totalCols={totalCols}

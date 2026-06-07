@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Menu, FolderSync, FolderOpen, CalendarCheck2, Search,
+  Menu, FolderSync, FolderOpen, CalendarCheck2,
   ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
-  Plus, X,
+  Plus, X, Search,
 } from 'lucide-react'
 import {
   initApp, applyScope, buildBodyHtml, entryFromOccurrence,
   saveNode, deleteNode, closeEntry, pushOverlay,
-  openDayViewForDate, goToday, openSearch,
+  openDayViewForDate, goToday,
   syncToDirectory, pickDirectory,
   tryRestoreDirectory, reconnectDirectory,
-  addDays, fmtLong,
+  addDays, fmtLong, targetOccurrence,
 } from './meridian'
 import type { SeriesSheetConfig } from './meridian'
 import { fmtISO } from './model/expansion'
@@ -30,9 +30,9 @@ import UndoToast from './components/UndoToast'
 import AgendaView from './components/AgendaView'
 import MonthView from './components/MonthView'
 import DayView from './components/DayView'
-import SearchView from './components/SearchView'
 import FilterOverlay from './components/FilterOverlay'
 import type { Occurrence, Priority } from './types'
+import { resolveWikilink } from './wikilinks'
 import { cn } from './lib/utils'
 
 
@@ -58,7 +58,7 @@ export default function App() {
   const setPrimary   = useStore(s => s.setPrimaryView)
   const overlayStack = useStore(s => s.overlayStack)
   const popOverlay   = useStore(s => s.popOverlay)
-  const topOverlay   = overlayStack[overlayStack.length - 1] // 'entry' | 'search' | undefined
+  const topOverlay   = overlayStack[overlayStack.length - 1] // 'entry' | undefined
 
   const dvDate    = useStore(s => s.dvDate)
   const setDvDate = useStore(s => s.setDvDate)
@@ -112,6 +112,23 @@ export default function App() {
     setEntry(prefillTitle && !item ? { ...state, title: prefillTitle } : state)
     pushOverlay('entry')
   }, [])
+
+  /**
+   * Navigate to a wikilink ref — resolve to a file root node, find the best
+   * occurrence (next upcoming or last past), and open the entry editor.
+   * If the ref can't be resolved to a known file, pre-fill a new entry with
+   * the ref as the title so the user can create it.
+   */
+  const handleOpenWikilink = useCallback((ref: string) => {
+    const fileSlug = resolveWikilink(ref, storeRoots)
+    if (fileSlug) {
+      const occ = targetOccurrence(fileSlug, storeItems, storeRoots)
+      if (occ) { openEntry(occ, 'single'); return }
+    }
+    // No occurrence found — open as new entry prefilled with the ref/title
+    const prefillTitle = fileSlug ? (storeRoots.get(fileSlug)?.title ?? ref) : ref
+    openEntry(null, undefined, prefillTitle)
+  }, [storeRoots, storeItems, openEntry])
 
   const handleSave = useCallback((body: string) => {
     saveNode(entry.item, entry.editScope, { ...entry, body })
@@ -186,6 +203,10 @@ export default function App() {
     setPrimary(v)
   }
 
+  // Suppress unused-variable warning — popOverlay is wired but SearchView removed;
+  // keep it in scope for future overlays.
+  void popOverlay
+
   return (
     <>
       <div id="app">
@@ -219,7 +240,6 @@ export default function App() {
                 title={pendingDirReconnect && !dirHandle ? `Reconnect vault "${pendingDirReconnect}"` : 'Open vault'}
               ><FolderOpen /></button>
               <button className="ib" onClick={goToday} title="Today"><CalendarCheck2 /></button>
-              <button className="ib" onClick={openSearch} title="Search"><Search /></button>
             </div>
           </header>
         )}
@@ -243,16 +263,6 @@ export default function App() {
           }} />
         </section>
 
-        {/* ── OVERLAY VIEWS ── */}
-        <section className={viewCls('search')} id="view-search">
-          <SearchView
-            onOpen={(item: any, scope?: string) => {
-              openEntry(item, scope ?? (item?._node ? 'single' : 'all'))
-            }}
-            onClose={popOverlay}
-          />
-        </section>
-
         <section className={viewCls('entry')} id="view-entry">
           <EntryEditor
             entry={entry}
@@ -265,6 +275,7 @@ export default function App() {
             onScopeChange={handleScopeChange}
             items={storeItems}
             roots={storeRoots}
+            onOpenWikilink={handleOpenWikilink}
           />
         </section>
 
