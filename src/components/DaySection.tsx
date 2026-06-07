@@ -78,7 +78,7 @@ function DaySection({
         const days   = parseDurationDays(o.metadata.duration) ?? 1
         const endD   = new Date(startD.getTime() + (days - 1) * 86_400_000)
         return (
-          <div key={o.fileSlug} className="multiday-banner" onClick={() => onOpen(o)}>
+          <div key={o.id} className="multiday-banner" onClick={() => onOpen(o)}>
             <CalendarRange size={14} />
             {o.metadata.title}
             <span className="opacity-55 text-[10px] ml-1">
@@ -91,7 +91,7 @@ function DaySection({
       {/* Regular occurrence rows */}
       {items.map((o, i) => (
         <OccurrenceRow
-          key={`${o.fileSlug}-${o.date}-${o.time ?? ''}`}
+          key={o.id}
           occ={o}
           index={i}
           onOpen={() => onOpen(o)}

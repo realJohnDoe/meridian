@@ -316,3 +316,72 @@ instances:
     expect(instancesSection).not.toMatch(/title:/)
   })
 })
+
+describe('stable occurrence ids', () => {
+  it('two standalones in the same file on the same date have distinct ids', () => {
+    // Two explicit instances on the same date — the old (fileSlug, date) matching
+    // would have collapsed them; stable ids keep them distinct.
+    // Root has no date so it acts as a container; only the two children are emitted.
+    const yaml = `---
+title: Multi-event day
+instances:
+  - date: 2026-06-01
+    time: "09:00"
+    title: Morning meeting
+  - date: 2026-06-01
+    time: "14:00"
+    title: Afternoon review
+`
+    const { items, root } = parseToStoreItems('multi-event-day.md', yaml)
+    const roots: Roots = new Map([['multi-event-day', root]])
+    const occs = expandRange(items, roots, new Date('2026-01-01'), new Date('2026-12-31'))
+    const sameDay = occs.filter(o => o.date === '2026-06-01')
+    expect(sameDay).toHaveLength(2)
+    expect(sameDay[0].id).not.toBe(sameDay[1].id)
+  })
+
+  it('editing one standalone leaves the other unchanged', () => {
+    const yaml = `---
+title: Multi-event day
+instances:
+  - date: 2026-06-01
+    time: "09:00"
+    title: Morning meeting
+  - date: 2026-06-01
+    time: "14:00"
+    title: Afternoon review
+`
+    const { items, root } = parseToStoreItems('multi-event-day.md', yaml)
+    const roots: Roots = new Map([['multi-event-day', root]])
+    const occs = expandRange(items, roots, new Date('2026-01-01'), new Date('2026-12-31'))
+    const morning = occs.find(o => o.date === '2026-06-01' && o.time === '09:00')!
+    const afternoon = occs.find(o => o.date === '2026-06-01' && o.time === '14:00')!
+
+    // Toggle done on morning only
+    const { items: nextItems } = toggleDone({ items, roots }, morning)
+    // Re-expand and check afternoon is untouched
+    const nextOccs = expandRange(nextItems, roots, new Date('2026-01-01'), new Date('2026-12-31'))
+    const nextAfternoon = nextOccs.find(o => o.id === afternoon.id)
+    expect(nextAfternoon?.metadata.done).toBeUndefined()
+
+    // Morning should now be done
+    const nextMorning = nextOccs.find(o => o.id === morning.id)
+    expect(nextMorning?.metadata.done).toBe(true)
+  })
+
+  it('expandRange returns the same id for the same occurrence across re-expansions', () => {
+    const yaml = `---
+title: Weekly standup
+date: 2026-04-06
+repeat:
+  freq: weekly
+`
+    const { items, root } = parseToStoreItems('standup.md', yaml)
+    const roots: Roots = new Map([['standup', root]])
+    const from = new Date('2026-04-01')
+    const to   = new Date('2026-04-30')
+    const first  = expandRange(items, roots, from, to)
+    const second = expandRange(items, roots, from, to)
+    expect(first.map(o => o.id)).toEqual(second.map(o => o.id))
+  })
+})
