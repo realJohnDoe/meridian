@@ -183,7 +183,7 @@ export default function DayView({ onOpen }: Props) {
       {allDayDeduped.length > 0 && (
         <div className="dv-allday" id="dvAllDay">
           <div className="dv-adlbl">All day</div>
-          {allDayDeduped.map((o, i) => (
+          {allDayDeduped.map(o => (
             <AllDayItem key={o.id} o={o} onOpen={onOpen} />
           ))}
         </div>
