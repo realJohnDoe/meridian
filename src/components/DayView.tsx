@@ -1,11 +1,12 @@
-import { useMemo, useEffect, useRef } from 'react'
+import { useMemo, useEffect, useRef, useState } from 'react'
+import { ChevronDown, ChevronUp, CalendarDays, CheckSquare, FileText } from 'lucide-react'
 import { useStore } from '../store'
 import { Checkbox } from './ui/checkbox'
+import { Button } from './ui/button'
 import type { Occurrence } from '../types'
-import { isStandaloneOcc } from '../types'
-import { expandRange, fmtT, parseDurationHours, parseDurationDays, multidayCoversDate, parseDateString } from '../model/expansion'
-import { sameDay, addDays, fmtLong, sortOccs, occState, toggleOccDone } from '../meridian'
-import OccurrenceCard from './OccurrenceCard'
+import { isStandaloneOcc, occKind } from '../types'
+import { expandRange, fmtT, parseDurationHours, parseDurationDays, multidayCoversDate, parseDateString, multidayDisplayTitle } from '../model/expansion'
+import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
 
 import { TODAY } from '../constants'
 const SH = 7    // start hour on timeline
@@ -50,17 +51,34 @@ function computeColumns(events: Occurrence[]): Occurrence[][] {
 
 // ── Sub-components ────────────────────────────────────────────
 
-interface AllDayItemProps { o: Occurrence; onOpen: (o: Occurrence) => void }
-function AllDayItem({ o, onOpen }: AllDayItemProps) {
-  const hasTrack = o.metadata.done !== undefined
+interface AllDayItemProps { o: Occurrence; onOpen: (o: Occurrence) => void; displayTitle?: string }
+function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
+  const kind = occKind(o)
+  const Icon = kind === 'task' ? CheckSquare : kind === 'event' ? CalendarDays : FileText
   return (
     <div
-      className={`dv-aditem ${(parseDurationDays(o.metadata.duration) ?? 0) >= 2 ? 'multiday' : dvBlkClass(o)}`}
+      className={`dv-aditem ${dvBlkClass(o)}`}
       onClick={() => onOpen(o)}
     >
-      {hasTrack && <Checkbox checked={!!o.metadata.done} tabIndex={-1} aria-hidden className="size-3.5 opacity-70 pointer-events-none" />}
-      <span>{o.metadata.title}</span>
+      <Icon size={11} className="shrink-0 opacity-70" />
+      <span>{displayTitle ?? o.metadata.title}</span>
     </div>
+  )
+}
+
+function renderAllDayItem(
+  o: Occurrence,
+  i: number,
+  dvMidnight: Date,
+  onOpen: (o: Occurrence) => void,
+) {
+  return (
+    <AllDayItem
+      key={`${o.fileSlug}-${o.date}-${i}`}
+      o={o}
+      onOpen={onOpen}
+      displayTitle={multidayDisplayTitle(o, dvMidnight)}
+    />
   )
 }
 
@@ -131,9 +149,9 @@ export default function DayView({ onOpen }: Props) {
         return !!start && start < from && multidayCoversDate(i as Occurrence, dvDate)
       })
 
-    const allOccs = [...occs, ...extraMultiday]
-    const allDay = sortOccs(allOccs.filter(o => !fmtT(o.time)))
-    const timed  = sortOccs(allOccs.filter(o =>  !!fmtT(o.time)))
+    const allOccs = sortOccs([...occs, ...extraMultiday])
+    const allDay  = allOccs.filter(o => !fmtT(o.time))
+    const timed   = allOccs.filter(o =>  !!fmtT(o.time))
     return { allDay, cols: computeColumns(timed) }
   }, [dvDate, items, roots])
 
@@ -181,34 +199,44 @@ export default function DayView({ onOpen }: Props) {
   const dvMidnight = new Date(dvDate)
   dvMidnight.setHours(0, 0, 0, 0)
 
+  const ALL_DAY_THRESHOLD = 3
+  const [allDayExpanded, setAllDayExpanded] = useState(false)
+  const hiddenCount = allDayDeduped.length - ALL_DAY_THRESHOLD
+
   return (
     <>
       {/* All-day / multiday strip */}
       {allDayDeduped.length > 0 && (
         <div className="dv-allday" id="dvAllDay">
           <div className="dv-adlbl">All day</div>
-          {allDayDeduped.map((o, i) => {
-            const days = parseDurationDays(o.metadata.duration) ?? 0
-            if (days >= 2) {
-              const startD = parseDateString(o.date)
-              const dayIdx = startD
-                ? Math.round((dvMidnight.getTime() - startD.getTime()) / 86_400_000) + 1
-                : 1
-              const displayOcc = { ...o, metadata: { ...o.metadata, title: `${o.metadata.title} (Day ${dayIdx}/${days})` } }
-              return (
-                <OccurrenceCard
-                  key={`${o.fileSlug}-${o.date}-${i}`}
-                  occ={displayOcc}
-                  variant="agenda"
-                  isDone={!!o.metadata.done}
-                  currentBarClass={occState(displayOcc)}
-                  onOpen={() => onOpen(o)}
-                  onToggleDone={() => toggleOccDone(o)}
-                />
-              )
-            }
-            return <AllDayItem key={`${o.fileSlug}-${o.date}-${i}`} o={o} onOpen={onOpen} />
-          })}
+
+          {/* Always-visible first N items */}
+          {allDayDeduped.slice(0, ALL_DAY_THRESHOLD).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
+
+          {/* Animated overflow */}
+          {hiddenCount > 0 && (
+            <div className={`dv-adoverflow${allDayExpanded ? ' open' : ''}`}>
+              <div>
+                {allDayDeduped.slice(ALL_DAY_THRESHOLD).map((o, i) =>
+                  renderAllDayItem(o, ALL_DAY_THRESHOLD + i, dvMidnight, onOpen)
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Expand / collapse toggle */}
+          {hiddenCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 py-0 text-[11px] text-[var(--t3)] hover:text-[var(--t1)] gap-1 self-start"
+              onClick={() => setAllDayExpanded(v => !v)}
+            >
+              {allDayExpanded
+                ? <><ChevronUp size={11} />Show less</>
+                : <><ChevronDown size={11} />{hiddenCount} more</>}
+            </Button>
+          )}
         </div>
       )}
 

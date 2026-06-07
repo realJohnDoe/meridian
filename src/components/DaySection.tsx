@@ -1,17 +1,9 @@
 import { memo, useRef, useLayoutEffect } from 'react'
 import type { Occurrence } from '../types'
-import { parseDateString, parseDurationDays } from '../model/expansion'
+import { multidayDisplayTitle } from '../model/expansion'
 import { fmtLong } from '../meridian'
 import OccurrenceRow from './OccurrenceRow'
 
-function multidayDisplayTitle(o: Occurrence): string | undefined {
-  const days = parseDurationDays(o.metadata.duration) ?? 0
-  if (days < 2 || !o.metadata.jsTime) return undefined
-  const startD = parseDateString(o.date)
-  if (!startD) return undefined
-  const dayIdx = Math.round((o.metadata.jsTime.getTime() - startD.getTime()) / 86_400_000) + 1
-  return `${o.metadata.title} (Day ${dayIdx}/${days})`
-}
 
 interface Props {
   dateKey: string
@@ -88,7 +80,7 @@ function DaySection({
           onOpen={() => onOpen(o)}
           onToggleDone={() => onToggleDone(o)}
           onSwipeDelete={() => onSwipeDelete(o)}
-          displayTitle={multidayDisplayTitle(o)}
+          displayTitle={o.metadata.jsTime ? multidayDisplayTitle(o, o.metadata.jsTime) : undefined}
         />
       ))}
     </div>

@@ -430,20 +430,31 @@ export function openSearch(): void {
 export function closeSearch(): void { popOverlayFn() }
 
 // ── SHARED OCCURRENCE SORT ────────────────────────────────────
+// Tier: 0 multiday · 1 whole-day · 2 timed future · 3 open tasks · 4 past events · 5 done
 const _prioOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
 function _sortKey(o: Occurrence): number {
-  const t = !!fmtT(o.time), ev = occKind(o) === 'event'
-  return (o.metadata.done ? 8 : 0) + (t ? 0 : 2) + (ev ? 0 : 1)
+  const state = occState(o)                                    // reuse existing classification
+  if (state === 'done')                              return 5  // done tasks
+  if (state === 'event-past')                        return 4  // past timed events
+  if (occKind(o) === 'task')                         return 3  // open tasks
+  if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 0  // multiday events
+  if (!fmtT(o.time))                                return 1  // whole-day events
+  return 2                                                     // timed future events
 }
 function _prioKey(o: Occurrence): number { return o.metadata.priority ? (_prioOrder[o.metadata.priority] ?? 3) : 3 }
+function _timeKey(o: Occurrence): number {
+  return (o.metadata.jsTime?.getHours() ?? 0) * 60 + (o.metadata.jsTime?.getMinutes() ?? 0)
+}
 export function sortOccs(arr: Occurrence[]): Occurrence[] {
-  return arr.sort((a: Occurrence, b: Occurrence) => {
+  return [...arr].sort((a, b) => {
     const sd = _sortKey(a) - _sortKey(b); if (sd) return sd
-    const pd = _prioKey(a) - _prioKey(b); if (pd) return pd
-    const td = (a.metadata.jsTime?.getHours() || 0) * 60 + (a.metadata.jsTime?.getMinutes() || 0)
-             - (b.metadata.jsTime?.getHours() || 0) * 60 - (b.metadata.jsTime?.getMinutes() || 0)
-    if (td) return td
-    return (a.metadata.title || '').localeCompare(b.metadata.title || '')
+    // Within tasks: priority first, then time
+    if (occKind(a) === 'task') {
+      const pd = _prioKey(a) - _prioKey(b); if (pd) return pd
+    }
+    // Within timed groups: sort by time
+    const td = _timeKey(a) - _timeKey(b); if (td) return td
+    return (a.metadata.title ?? '').localeCompare(b.metadata.title ?? '')
   })
 }
 
@@ -483,7 +494,6 @@ const _ccBarMap: Record<string, string> = {
   'event-future': 'event',
 }
 export function ccBarClass(o: Occurrence): string {
-  if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 'multiday'
   return _ccBarMap[occState(o)] ?? 'event'
 }
 
