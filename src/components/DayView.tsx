@@ -183,8 +183,8 @@ export default function DayView({ onOpen }: Props) {
       {allDayDeduped.length > 0 && (
         <div className="dv-allday" id="dvAllDay">
           <div className="dv-adlbl">All day</div>
-          {allDayDeduped.map((o, i) => (
-            <AllDayItem key={`${o.fileSlug}-${o.date}-${i}`} o={o} onOpen={onOpen} />
+          {allDayDeduped.map(o => (
+            <AllDayItem key={o.id} o={o} onOpen={onOpen} />
           ))}
         </div>
       )}
@@ -222,7 +222,7 @@ export default function DayView({ onOpen }: Props) {
               })
               .map(o => (
                 <EventBlock
-                  key={`${o.fileSlug}-${o.date}-${o.time ?? ''}`}
+                  key={o.id}
                   o={o}
                   colIndex={ci}
                   totalCols={totalCols}

@@ -134,7 +134,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
     <div
       className="swipe-wrap mx-2 mb-1.5"
       ref={wrapRef}
-      data-occ-key={`${occ.fileSlug}-${occ.date}`}
+      data-occ-key={occ.id}
       style={{ '--stagger': `${staggerRef.current * 0.025}s` } as React.CSSProperties}
     >
       {/* Left swipe hint */}

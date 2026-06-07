@@ -687,12 +687,7 @@ export function deleteNode(
   const items    = getItems()
   const series   = findSeries(items, item)
   const slugItems = fileSlugItems(items, item.fileSlug)
-  // Are there any other non-excluded occurrences besides this one?
-  // Expanded occurrences carry a fresh random id (see expansion.ts / collectUndated),
-  // so the standalone being deleted never matches by id — identify self by
-  // (no ownerId, same date) the way upsertOverride does, otherwise it counts itself.
-  const isSelf = (i: any) =>
-    i.id === item.id || (!i.ownerId && !item.ownerId && i.date === item.date)
+  const isSelf = (i: any) => i.id === item.id
   const hasSiblings = slugItems.some(
     i => !isSeries(i) && !isSelf(i) && !(i as any).excluded,
   )
