@@ -1,15 +1,16 @@
 import { useMemo, useCallback } from 'react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
+import { isStandaloneOcc } from '../types'
 
-import { expandRange, fmtISO } from '../model/expansion'
-import { parseDurationDays } from '../model/expansion'
+import { expandRange, fmtISO, parseDurationDays, parseDateString } from '../model/expansion'
 import {
   sameDay, addDays, sortOccs,
   toggleOccDone, beginSwipeDelete,
 } from '../meridian'
 import DaySection from './DaySection'
 import { TODAY } from '../constants'
+
 
 interface Props {
   onOpen: (occ: Occurrence, scope?: string) => void
@@ -25,6 +26,34 @@ export default function AgendaView({ onOpen }: Props) {
     const to = addDays(TODAY, 90)
     const occs = expandRange(items, roots, from, to)
 
+    // Generate a virtual occurrence for each subsequent day that a multiday
+    // event covers (day 1 is already in occs from expandRange).
+    const extraMultiday = items
+      .filter(isStandaloneOcc)
+      .flatMap(i => {
+        const days = parseDurationDays(i.metadata.duration)
+        if (!days || days < 2) return []
+        const startD = parseDateString(i.date)
+        if (!startD) return []
+        const extras: Occurrence[] = []
+        for (let d = 1; d < days; d++) {
+          const coveredDate = new Date(startD.getTime() + d * 86_400_000)
+          if (coveredDate < from || coveredDate > to) continue
+          extras.push({
+            ...i,
+            source: 'explicit' as const,
+            metadata: {
+              ...(roots.get(i.fileSlug) ?? { title: '', tags: [], topics: [] } as Record<string, unknown>),
+              ...i.metadata,
+              jsTime: coveredDate,
+            } as Occurrence['metadata'],
+          } as Occurrence)
+        }
+        return extras
+      })
+
+    const allOccs = [...occs, ...extraMultiday]
+
     const result: Record<string, { date: Date; items: Occurrence[] }> = {}
 
     // Always seed today so goToday() can always find a section to scroll to.
@@ -34,9 +63,9 @@ export default function AgendaView({ onOpen }: Props) {
       items: [],
     }
 
-    // Add each occurrence to its day group. Multi-day events (duration ≥ 2d)
-    // emit a single occurrence on their start date and appear as banners there.
-    occs.forEach(o => {
+    // Add each occurrence to its day group. Multiday events get a "(Day X of N)"
+    // suffix so they render like regular occurrence cards on every covered day.
+    allOccs.forEach(o => {
       const jsTime = o.metadata.jsTime
       if (!jsTime) return
       const k = fmtISO(jsTime)
@@ -50,7 +79,7 @@ export default function AgendaView({ onOpen }: Props) {
     })
 
     return result
-  }, [items])
+  }, [items, roots])
 
   // Stable references so DaySection's memo comparator isn't short-circuited
   // by new function identities on every AgendaView render.
@@ -64,11 +93,6 @@ export default function AgendaView({ onOpen }: Props) {
         const isToday = sameDay(g.date, TODAY)
         const isTomorrow = sameDay(g.date, addDays(TODAY, 1))
 
-        // Separate multi-day events (shown as banners) from regular items.
-        const isMultiday = (o: Occurrence) => (parseDurationDays(o.metadata.duration) ?? 0) >= 2
-        const multidayBanners = g.items.filter(isMultiday)
-        const nonMdItems = sortOccs(g.items.filter(o => !isMultiday(o)))
-
         return (
           <DaySection
             key={k}
@@ -76,8 +100,7 @@ export default function AgendaView({ onOpen }: Props) {
             date={g.date}
             isToday={isToday}
             isTomorrow={isTomorrow}
-            multidayBanners={multidayBanners}
-            items={nonMdItems}
+            items={sortOccs(g.items)}
             onOpen={onOpen}
             onToggleDone={handleToggleDone}
             onSwipeDelete={handleSwipeDelete}

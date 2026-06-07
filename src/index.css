@@ -231,6 +231,9 @@
 .dv-aditem.past{background:var(--bg3);color:var(--t3)}
 .dv-aditem.done{background:var(--bg3);color:var(--t3)}
 .dv-aditem.multiday{background:rgba(165,180,252,.25);color:#a5b4fc}
+.dv-adoverflow{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s ease}
+.dv-adoverflow.open{grid-template-rows:1fr}
+.dv-adoverflow>div{overflow:hidden}
 .dv-sc{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative}
 .dv-tl{position:relative;padding:0 0 60px;min-height:900px}
 .dv-hr{display:flex;align-items:flex-start;height:56px;position:relative}

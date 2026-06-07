@@ -111,8 +111,34 @@ export function parseDurationHours(dur: unknown): number {
  */
 export function parseDurationDays(dur: unknown): number | null {
   if (!dur) return null
-  const m = String(dur).toLowerCase().trim().match(/^(\d+)\s*d(?:ay)?s?$/)
-  return m ? parseInt(m[1], 10) : null
+  const s = String(dur).toLowerCase().trim()
+  const units: [RegExp, number][] = [
+    [/^(\d+)\s*d(?:ay)?s?$/,      1],
+    [/^(\d+)\s*w(?:eek)?s?$/,     7],
+    [/^(\d+)\s*mo(?:nth)?s?$/,   30],
+  ]
+  for (const [re, factor] of units) {
+    const m = s.match(re)
+    if (m) return parseInt(m[1], 10) * factor
+  }
+  return null
+}
+
+/**
+ * Returns the display title for a multiday occurrence on the given view date,
+ * e.g. "Mama in Esslingen (Day 3/15)". Returns undefined for non-multiday
+ * events so callers can fall back to the original title.
+ */
+export function multidayDisplayTitle(
+  occ: OccurrenceEntry<AppMetadata>,
+  viewDate: Date,
+): string | undefined {
+  const days = parseDurationDays(occ.metadata.duration) ?? 0
+  if (days < 2) return undefined
+  const startD = parseDateString(occ.date)
+  if (!startD) return undefined
+  const dayIdx = Math.round((viewDate.getTime() - startD.getTime()) / 86_400_000) + 1
+  return `${occ.metadata.title} (Day ${dayIdx}/${days})`
 }
 
 /**

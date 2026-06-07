@@ -1,17 +1,16 @@
 import { memo, useRef, useLayoutEffect } from 'react'
-import { CalendarRange } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { parseDateString, parseDurationDays } from '../model/expansion'
-import { fmtShort, fmtLong } from '../meridian'
+import { multidayDisplayTitle } from '../model/expansion'
+import { fmtLong } from '../meridian'
 import OccurrenceRow from './OccurrenceRow'
+
 
 interface Props {
   dateKey: string
   date: Date
   isToday: boolean
   isTomorrow: boolean
-  multidayBanners: Occurrence[]
-  items: Occurrence[]         // non-multiday, pre-sorted
+  items: Occurrence[]
   onOpen: (occ: Occurrence) => void
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
@@ -19,7 +18,7 @@ interface Props {
 
 function DaySection({
   dateKey, date, isToday, isTomorrow,
-  multidayBanners, items,
+  items,
   onOpen, onToggleDone, onSwipeDelete,
 }: Props) {
   const sectionRef = useRef<HTMLDivElement>(null)
@@ -72,23 +71,7 @@ function DaySection({
     <div className="day-section" data-key={dateKey} ref={sectionRef}>
       <div className={`day-lbl${isToday ? ' tl' : ''}`}>{label}</div>
 
-      {/* Multiday banners */}
-      {multidayBanners.map(o => {
-        const startD = parseDateString(o.date)!
-        const days   = parseDurationDays(o.metadata.duration) ?? 1
-        const endD   = new Date(startD.getTime() + (days - 1) * 86_400_000)
-        return (
-          <div key={o.id} className="multiday-banner" onClick={() => onOpen(o)}>
-            <CalendarRange size={14} />
-            {o.metadata.title}
-            <span className="opacity-55 text-[10px] ml-1">
-              {fmtShort(startD)}–{fmtShort(endD)}
-            </span>
-          </div>
-        )
-      })}
-
-      {/* Regular occurrence rows */}
+      {/* Occurrence rows */}
       {items.map((o, i) => (
         <OccurrenceRow
           key={o.id}
@@ -97,6 +80,7 @@ function DaySection({
           onOpen={() => onOpen(o)}
           onToggleDone={() => onToggleDone(o)}
           onSwipeDelete={() => onSwipeDelete(o)}
+          displayTitle={o.metadata.jsTime ? multidayDisplayTitle(o, o.metadata.jsTime) : undefined}
         />
       ))}
     </div>
@@ -106,7 +90,6 @@ function DaySection({
 function propsAreEqual(prev: Props, next: Props): boolean {
   if (prev.isToday !== next.isToday || prev.isTomorrow !== next.isTomorrow) return false
   if (prev.items.length !== next.items.length) return false
-  if (prev.multidayBanners.length !== next.multidayBanners.length) return false
   if (!prev.items.every((o, i) => {
     const n = next.items[i]
     return o.fileSlug === n.fileSlug && o.date === n.date && o.time === n.time
@@ -117,7 +100,6 @@ function propsAreEqual(prev: Props, next: Props): boolean {
         && JSON.stringify(o.metadata.topics) === JSON.stringify(n.metadata.topics)
         && JSON.stringify(o.metadata.participants) === JSON.stringify(n.metadata.participants)
   })) return false
-  if (!prev.multidayBanners.every((o, i) => o.fileSlug === next.multidayBanners[i].fileSlug)) return false
   return true
 }
 

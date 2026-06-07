@@ -4,7 +4,7 @@ import { useStore } from '../store'
 import type { Occurrence } from '../types'
 
 import { expandRange } from '../model/expansion'
-import { parseDurationDays, multidayCoversDate } from '../model/expansion'
+import { parseDurationDays, multidayCoversDate, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, sortOccs, ccBarClass } from '../meridian'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
@@ -44,13 +44,12 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
           const seen = new Set<string>()
           const bars: React.ReactNode[] = []
           dayOccs.slice(0, 4).forEach((o, i) => {
+            // Deduplicate multiday events (appear on every covered day via filter above).
             if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) {
               if (seen.has(o.fileSlug)) return
               seen.add(o.fileSlug)
-              bars.push(<div key={i} className="cc-bar multiday">{o.metadata.title}</div>)
-            } else {
-              bars.push(<div key={i} className={`cc-bar ${ccBarClass(o)}`}>{o.metadata.title}</div>)
             }
+            bars.push(<div key={i} className={`cc-bar ${ccBarClass(o)}`}>{multidayDisplayTitle(o, date) ?? o.metadata.title}</div>)
           })
           if (dayOccs.length > 4) bars.push(
             <div key="more" className="cc-more">+{dayOccs.length - 4}</div>
