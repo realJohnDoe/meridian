@@ -3,6 +3,7 @@
 - Make done tasks less prominent. The bright green checkmark is a bit distracting.
 - Improve performance on fuzzy search.
 - Use proper routing to fix wikilink following / back button navigation
+- Fix order in agenda view to show multiday first
 
 ## Results from last Quality Survey
 
