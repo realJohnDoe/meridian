@@ -1,6 +1,6 @@
 import { addDays, isSameDay } from 'date-fns'
 import { fmtT, parseDurationDays, expandRange } from './model/expansion'
-import { parseWikilinks, resolveWikilink } from './wikilinks'
+import { parseWikilinks, resolveWikilink, unwrapRef } from './wikilinks'
 import { occKind } from './types'
 import { getRoots } from './storeBridge'
 import type { Occurrence, StoreItem, Roots } from './types'
@@ -81,6 +81,22 @@ export function targetOccurrenceMap(items: StoreItem[], roots: Roots): Map<strin
   }
 
   return map
+}
+
+/**
+ * Returns the fileSlugs of all files whose topics include a link to `targetSlug`.
+ * Self-links are excluded. Memoize the result on [roots] at the call site.
+ */
+export function backlinksTo(targetSlug: string, roots: Roots): string[] {
+  const result: string[] = []
+  for (const [fileSlug, meta] of roots) {
+    if (fileSlug === targetSlug) continue
+    for (const raw of (meta.topics as string[] | undefined) ?? []) {
+      const ref = unwrapRef(raw)
+      if (resolveWikilink(ref, roots) === targetSlug) { result.push(fileSlug); break }
+    }
+  }
+  return result
 }
 
 // ── OCCURRENCE SORT ────────────────────────────────────────────
