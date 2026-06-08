@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { occState } from '../meridian'
+import { occState } from '../presentation'
 import { parseDateString } from '../model/expansion'
 import { TODAY } from '../constants'
 import OccurrenceCard from './OccurrenceCard'

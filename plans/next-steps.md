@@ -1,41 +1,117 @@
 ## Next steps
 
-- Fix saving of tasks without date
-- Adapt EntryEditor to have tags directly below title, then a separator, then the scope selector and then the type select, so it matches root / occurrence split
-- Fix look of multiday events. We want something like in Google Calendar: Render like a normal event but have '(Day 1/3)' suffixed.
-- Fix swiping to the right after swiping to the left
-- Fix allday events being shown gray instead of purple
 - Make done tasks less prominent. The bright green checkmark is a bit distracting.
+- Improve performance on fuzzy search.
+- Use proper routing to fix wikilink following / back button navigation
+- Fix order in agenda view to show multiday first
 
-From the first architecture / tech debt survey (maintainability, security, code duplication, architecture smells, styling consistency, UX bad practices, directory/file layout, domain separation):
+## Results from last Quality Survey
 
-1. Occurrence IDs are regenerated on every expansion → fragile matching everywhere
-   expandRange calls crypto.randomUUID() for every occurrence on every render (expansion.ts:643, and 5+ other sites). The comment in storeOps.ts:51 admits the consequence: occ.id never matches a store item, so the whole edit layer falls back to matching on (fileSlug, date) tuples. That's a structural smell — it makes overrides positionally fragile (two items same file+date collide) and defeats React keys. Derive a stable occurrence id (e.g. ${fileSlug}|${date}|${time}) so identity is meaningful and the (fileSlug,date) workarounds can go.
+1. Duplicated multiday-occurrence expansion & file-meta join across views
+   Impact: High
+   Evidence: AgendaView.tsx:29-51 and DayView.tsx:138-150 both re-implement the "scan standalones → generate virtual occurrences for each covered day → join roots meta" logic, including the literal fallback roots.get(i.fileSlug) ?? { title: '', tags: [], topics: [] }. That same join already exists privately as joinFileMeta in expansion.ts:672, and dedup logic is repeated again in DayView.tsx:189-194 and MonthView.tsx:46-51.
+   Problem: The most subtle domain rule in the app (multiday rendering) is copy-pasted in 3+ places, so a fix or schema change must be made everywhere or views silently diverge.
+   Fix: Export joinFileMeta and a single expandWithMultiday(items, roots, from, to) helper from expansion.ts and have all three views call it.
+2. Interactive <div>s with no keyboard/ARIA support (systemic a11y)
+   Impact: Medium
+   Evidence: Click-only divs with no role, tabIndex, or key handler: MonthView.tsx:37 (cal-cell), DayView.tsx:59 (dv-aditem) and DayView.tsx:102 (dv-eblk), FilterOverlay.tsx:20 (occ-create-row), App.tsx:280 (sidebar scrim), and the Card in OccurrenceCard.tsx:102.
+   Problem: Core navigation (open day, open event, create entry) is mouse/touch-only and invisible to keyboard and screen-reader users.
+   Fix: Convert these to <button> or add role="button" tabIndex={0} + onKeyDown (Enter/Space) — ideally one shared <ClickableCell> wrapper.
+3. Dead store actions and unused state field
+   Impact: Medium
+   Evidence: nsFilterVal/setNsFilterVal (store.ts:40-41, store.ts:90-91) are never read anywhere; setItems, setRoots (store.ts:73-74), setPendingDirReconnect, setSyncDirtyCount, setSyncFlash are defined but never called — code writes those keys via useStore.setState(...) directly instead (e.g. vault.ts:71).
+   Problem: Seven dead store members plus an inconsistent two-way pattern (actions vs. raw setState) mislead readers about the intended API.
+   Fix: Delete the unused actions and the nsFilterVal field, or route the existing setState calls through the actions — pick one convention.
+4. Pervasive any and unsafe casts in the model/mutation layer
+   Impact: Medium
+   Evidence: saveNode(item, editScope, fields: any) (mutations.ts:77), (i: any) / (i as any).excluded (mutations.ts:151-152), entryFromItem(item: any) and openEntry((item: any …)) (App.tsx:35, App.tsx:106), as any in storeBridge.ts:9-10, and an entire eslint-disable no-explicit-any block over expansion.ts:164+.
+   Problem: The most logic-heavy code (recurrence expansion, save path) has its type checking disabled, so schema mistakes surface at runtime instead of compile time.
+   Fix: Type saveNode's fields as a SaveFields interface (it already has a fixed shape) and replace any store accessors with the existing StoreItem/PrimaryView unions.
+5. Cache-write failures are silently swallowed
+   Impact: High
+   Evidence: vault.ts:42-44 writeEntityToCache and vault.ts:54-56 deleteFileFromDisk catch all errors and only console.error — unlike syncToDirectory which calls notify(...) (vault.ts:75). updateSyncUI also swallows with empty .catch(() => {}) (vault.ts:26).
+   Problem: If an IndexedDB write fails, the user's edit is lost with zero feedback while the UI shows the change as saved — silent data loss.
+   Fix: Call notify(...) (and avoid clearing dirty state) in these catch blocks, matching the sync path's error handling.
+6. Day-view "now" line is computed once and never updates
+   Impact: Medium
+   Evidence: DayView.tsx:256-265 computes const now = new Date() inside the render IIFE; nothing schedules a re-render, and isToday/now are not on any timer.
+   Problem: The current-time indicator is correct only at mount and then drifts, defeating its purpose in a calendar's primary day view.
+   Fix: Add a useEffect with setInterval (e.g. every 60s) that bumps a state tick to re-render the line.
+7. No loading or empty/error state while a vault loads
+   Impact: Medium
+   Evidence: loadFilesFromDisk (vault.ts:81-99) awaits disk reads then setData; the views render items=[] meanwhile, and AgendaView (AgendaView.tsx:87) has no empty/loading branch — it just renders a bare "Today" section.
+   Problem: During async vault load (or parse failure) the user sees a blank screen with no spinner or "no items" messaging, indistinguishable from a broken app.
+   Fix: Add an isLoading flag to the store and render skeleton/empty-state UI in the primary views.
+8. App.tsx is a god-component
+   Impact: Medium
+   Evidence: App.tsx is 388 lines holding 6 useStates, ~15 dialog/entry callbacks (App.tsx:130-205), sync-button color/title derivation (App.tsx:71-78), and the full markup for topbar, sidebar, 4 views, search bar, and 7 dialogs.
+   Problem: Entry-editing orchestration, navigation chrome, and dialog wiring are all in one file, making any change high-risk and hard to test.
+   Fix: Extract a useEntryEditor() hook (entry state + its callbacks) and a <DialogStack> component, leaving App as layout only.
+9. Sort/layout helpers mutate their inputs on the render path
+   Impact: Medium
+   Evidence: sortOccs does arr.sort(...) on the passed array (presentation.ts:71) and is called during render in AgendaView.tsx:101 (sortOccs(g.items) on memoized group arrays); computeColumns writes ev.metadata.\_dh/\_endMs onto live occurrence objects (DayView.tsx:36-37).
+   Problem: In-place mutation of memoized/store-derived data during render is a React anti-pattern that causes order-dependent bugs and makes memo comparisons unreliable.
+   Fix: Make sortOccs return [...arr].sort(...) and have computeColumns carry layout values in a local map instead of on metadata.
+10. MonthView redefines TODAY instead of using the shared constant
+    Impact: Medium
+    Evidence: MonthView.tsx:10 const TODAY = new Date(); TODAY.setHours(0,0,0,0) shadows the canonical constants.ts:5 TODAY that every other view imports.
+    Problem: Two independent "today" definitions can disagree (and a local one captured at module load won't match an app that's been open past midnight), an avoidable correctness/consistency hazard.
+    Fix: Delete the local constant and import { TODAY } from '../constants' like the other views.
 
-2. meridian.ts is an 845-line god-module, and ships mock data to production
-   meridian.ts mixes: seed YAML, storage/sync, directory-handle lifecycle, navigation, occurrence sorting, three different CSS-class color mappers, the mutation API, and the toast manager. Split it (storage, navigation, presentation/sorting, mutations). Notably, NOTES_DATA (meridian.ts:393) is hardcoded fake notes ("Reading List", "SICP") that are bundled into production and actually surface in the wikilink autocomplete (EntryEditor.tsx:143) — users will see phantom notes that don't exist. Remove it from real autocomplete.
+## Survey Prompt
 
-3. The debug tooling is bundled and deployed to production
-   vite.config.ts:97 lists debug.html as a Rollup input, so the 796-line NodeInheritanceDebugger.tsx — the largest single source file — is built and published to GitHub Pages alongside the app. It exposes internal model structure and bloats the deploy. Gate it behind dev-only (if (import.meta.env.DEV)) or a separate non-deployed config.
+Survey this codebase for code health issues across the categories below.
 
-4. as any and duck-typing pervade the core engine
-   The most critical module leans on Record<string, any> and as any throughout (expansion.ts:222, expandNode, mergeNode, the expandRange cast at line 625), plus setPrimary(v as any) / pushOverlay(v as any) in meridian.ts:38 and (window as any).\_focusSearch global (SearchView.tsx:36). TypeScript is providing little safety exactly where the logic is hardest. Tighten the OccurrenceEntry/node types so the engine is type-checked; replace the window global with a ref or store action.
+For each finding, output:
 
-5. In-place state mutation + DOM-driven navigation
-   toggleOccDone does o.metadata.done = !o.metadata.done (meridian.ts:584), mutating a store object in place before the immutable update — an anti-pattern with React/Zustand that can cause stale renders. Separately, navigation relies on document.querySelector('.day-section[...]') + setTimeout with magic delays (60/100/200ms) in goToday and App.tsx:98 — racy and fragile. Prefer refs/scrollIntoView driven by React, and never mutate store state directly.
+- **Title** — short label
+- **Impact** — one of: Critical / High / Medium (don't include Low)
+- **Evidence** — at least one specific file path + line number or code snippet
+- **Problem** — one sentence: what is wrong and why it matters
+- **Fix** — one sentence: what the concrete fix looks like
 
-From the schema title / tags / topics PR:
+List the **top 10 findings** ranked by: (severity × breadth of occurrence) ÷ estimated fix effort.
+Prefer systemic issues over isolated ones. Cite real code — no generic observations.
 
-1. The root node is a root: true flag on OccurrenceEntry, not a real type.
-   I did this deliberately to avoid churning the StoreItem union and every .date access — but it's a modeling smell. A root node has date: '', time: null, source: 'explicit' — all meaningless. And every "standalone" filter now needs && !isRootNode(i); forget it in new code and a root node silently leaks into expansion/collapse/render. Cleanest fix: a proper discriminated StoreItem variant (or a separate roots map on the store), with typed guards that actually narrow.
+---
 
-2. AppMetadata forces title: string on items where it's meaningless.
-   This is the root cause of several hacks: withoutFileLevel sets title: '' (rather than omitting it), collapse still has to omitFileLevel/pickFileLevel to keep those empty strings from serializing, and there are as AppMetadata casts. A clean split — OccurrenceMetadata (no file-level) vs FileMetadata (file-level only, on the root node) — would delete most of that and make the model self-documenting.
+Categories to scan:
 
-3. Dual raw-vs-expanded representation is an undocumented invariant.
-   item.metadata.title is '' on raw store items but populated on expanded occurrences (via the expandRange join). That's a real footgun — the scattered isRootNode redirects (resolveWikilink, the editor autocomplete, body persistence) all exist because of it. Worth at least a documented invariant, ideally enforced by the type split in #2.
+**Architecture & Code Health**
 
-4. expandRange mints a fresh crypto.randomUUID() per occurrence on every call.
-   So occurrence ids are never stable, which is why mutations match by (fileSlug, date) instead of id (see the comment in upsertOverride). Fragile — e.g. two occurrences on the same date/file can't be distinguished — and it'll complicate backlinks/linking later.
+- Dead code (unreachable, unexported, unused imports/exports)
+- DRY violations — duplicated logic that should be a shared utility or hook
+- SRP violations — files/functions doing too many unrelated things
+- File/directory layout — is co-location logical? Are abstractions at the right level?
+- Type safety — use of `any`, missing return types, unsafe casts (TypeScript)
+- Error handling — inconsistent, swallowed, or missing error paths
 
-5. buildBodyHtml + entryFromOccurrence's bodyTransform/bodyHtml param are legacy from the contentEditable editor — dead-ish weight, already slated for removal in the CM6 PR.
+**Styling & UX**
+
+- Shadcn component available but bypassed in favour of a custom re-implementation
+- Raw CSS / inline styles where Tailwind classes would suffice, or Tailwind used where plain CSS is clearly better
+- Dead or duplicated style code
+- UX anti-patterns: missing loading/error states, non-accessible interactive elements (no keyboard nav, missing ARIA), layout that breaks at common breakpoints
+
+**Performance**
+
+- React anti-patterns: object/array literals in JSX props, missing or incorrect `useMemo`/`useCallback`/`memo`, effects that run too often, unnecessary re-renders
+- Large synchronous computations on the render path
+- Missing lazy-loading / code-splitting opportunities
+- N+1 or waterfall data fetching
+
+**Security**
+
+- XSS vectors: `dangerouslySetInnerHTML`, unescaped user input rendered as HTML
+- Sensitive values hardcoded or exposed to the client bundle
+- Overly permissive CORS, missing auth guards, or security-relevant logic only enforced client-side
+
+**Dependencies & Maintainability**
+
+- Significantly outdated or abandoned dependencies
+- Dependencies imported but unused, or functionality duplicated across two libraries
+
+---
+
+If you find a significant issue in a category not listed above, include it.
+Do not pad to reach 10 — if fewer than 10 clear issues exist, stop there.

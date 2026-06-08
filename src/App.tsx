@@ -5,15 +5,11 @@ import {
   AlignLeft, CalendarDays, CalendarClock,
   Plus, X, Search,
 } from 'lucide-react'
-import {
-  initApp, applyScope, buildBodyHtml, entryFromOccurrence,
-  saveNode, deleteNode, closeEntry, pushOverlay,
-  openDayViewForDate, goToday,
-  syncToDirectory, pickDirectory,
-  tryRestoreDirectory, reconnectDirectory,
-  addDays, fmtLong, targetOccurrence,
-} from './meridian'
-import type { SeriesSheetConfig } from './meridian'
+import { initApp, syncToDirectory, pickDirectory, tryRestoreDirectory, reconnectDirectory } from './vault'
+import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './mutations'
+import type { SeriesSheetConfig } from './mutations'
+import { buildBodyHtml, addDays, fmtLong, targetOccurrence } from './presentation'
+import { openDayViewForDate, goToday } from './navigation'
 import { fmtISO } from './model/expansion'
 import { TODAY } from './constants'
 import { useStore } from './store'
@@ -57,6 +53,7 @@ export default function App() {
   const primaryView  = useStore(s => s.primaryView)
   const setPrimary   = useStore(s => s.setPrimaryView)
   const overlayStack = useStore(s => s.overlayStack)
+  const pushOverlay  = useStore(s => s.pushOverlay)
   const popOverlay   = useStore(s => s.popOverlay)
   const topOverlay   = overlayStack[overlayStack.length - 1] // 'entry' | undefined
 
@@ -144,8 +141,8 @@ export default function App() {
   }, [entry.item])
 
   const handleClose = useCallback(() => {
-    closeEntry()
-  }, [])
+    popOverlay()
+  }, [popOverlay])
 
   const handleScopeChange = useCallback((scope: string) => {
     setEntry(prev => {

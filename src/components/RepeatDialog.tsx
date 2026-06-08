@@ -374,6 +374,7 @@ export default function RepeatDialog({
                     min={1}
                     className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-xs font-mono text-foreground transition-colors"
                     value={intervalNum === 0 ? '' : intervalNum}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (val === '') {
@@ -509,6 +510,7 @@ export default function RepeatDialog({
                   min={1}
                   className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-xs font-mono text-foreground transition-colors"
                   value={completionNum === 0 ? '' : completionNum}
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => {
                     const val = e.target.value;
                     if (val === '') {
