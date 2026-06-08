@@ -4,10 +4,8 @@ import type { Occurrence } from '../types'
 import { isStandaloneOcc } from '../types'
 
 import { expandRange, fmtISO, parseDurationDays, parseDateString } from '../model/expansion'
-import {
-  sameDay, addDays, sortOccs,
-  toggleOccDone, beginSwipeDelete,
-} from '../meridian'
+import { sameDay, addDays, sortOccs } from '../presentation'
+import { toggleOccDone, beginSwipeDelete } from '../mutations'
 import DaySection from './DaySection'
 import { TODAY } from '../constants'
 

@@ -27,7 +27,7 @@ import DatePickerDialog from '../components/DatePickerDialog'
 import TimePickerDialog from '../components/TimePickerDialog'
 import DurationDialog from '../components/DurationDialog'
 import PriorityDrawer from '../components/PriorityDrawer'
-import { applyScope, entryFromOccurrence } from '../meridian'
+import { applyScope, entryFromOccurrence } from '../mutations'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
 

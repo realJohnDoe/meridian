@@ -2,7 +2,7 @@ import { Repeat2, Users, CheckSquare, CalendarDays, FileText } from 'lucide-reac
 import type { Occurrence } from '../types'
 import { occKind } from '../types'
 import { fmtT, parseDateString } from '../model/expansion'
-import { fmtShort } from '../meridian'
+import { fmtShort } from '../presentation'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
 import { Card } from './ui/card'

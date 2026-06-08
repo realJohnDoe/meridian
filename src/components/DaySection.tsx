@@ -1,7 +1,7 @@
 import { memo, useRef, useLayoutEffect } from 'react'
 import type { Occurrence } from '../types'
 import { multidayDisplayTitle } from '../model/expansion'
-import { fmtLong } from '../meridian'
+import { fmtLong } from '../presentation'
 import OccurrenceRow from './OccurrenceRow'
 
 
