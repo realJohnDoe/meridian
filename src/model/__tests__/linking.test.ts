@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '../storeItems'
 import { resolveWikilink, unwrapRef } from '../../wikilinks'
-import { fileEntries, targetOccurrence } from '../../meridian'
+import { fileEntries, targetOccurrence } from '../../presentation'
 import type { StoreItem, Roots } from '../../types'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -126,13 +126,12 @@ describe('fileEntries', () => {
     expect(alpha.tags).toEqual(['work'])
   })
 
-  it('supplements with NOTES_DATA for entries not in store', () => {
-    // Empty roots — should still return NOTES_DATA entries
+  it('returns empty array for empty roots', () => {
     const entries = fileEntries(new Map())
-    expect(entries.length).toBeGreaterThan(0)
+    expect(entries).toHaveLength(0)
   })
 
-  it('does not duplicate a file that is in both store and NOTES_DATA', () => {
+  it('does not duplicate entries (one per fileSlug)', () => {
     const entries = fileEntries(roots)
     const slugCounts = entries.reduce<Record<string, number>>((acc, e) => {
       acc[e.fileSlug] = (acc[e.fileSlug] ?? 0) + 1

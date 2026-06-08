@@ -5,7 +5,7 @@ import type { Occurrence } from '../types'
 
 import { expandRange } from '../model/expansion'
 import { parseDurationDays, multidayCoversDate, multidayDisplayTitle } from '../model/expansion'
-import { sameDay, sortOccs, ccBarClass } from '../meridian'
+import { sameDay, sortOccs, ccBarClass } from '../presentation'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 

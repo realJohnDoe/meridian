@@ -6,7 +6,7 @@ import { Button } from './ui/button'
 import type { Occurrence } from '../types'
 import { isStandaloneOcc, occKind } from '../types'
 import { expandRange, fmtT, parseDurationHours, parseDurationDays, multidayCoversDate, parseDateString, multidayDisplayTitle } from '../model/expansion'
-import { sameDay, addDays, fmtLong, sortOccs, occState } from '../meridian'
+import { sameDay, addDays, fmtLong, sortOccs, occState } from '../presentation'
 
 import { TODAY } from '../constants'
 const SH = 7    // start hour on timeline

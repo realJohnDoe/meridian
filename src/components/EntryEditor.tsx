@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText, Users, Tag } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem, Roots } from '../types'
 import { isSeries } from '../types'
-import { fileEntries, NOTES_DATA } from '../meridian'
+import { fileEntries } from '../presentation'
 import { Badge, badgeVariants } from './ui/badge'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
 import { Checkbox } from './ui/checkbox'
@@ -152,7 +152,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     const m = before.match(/\[\[([^\]\n]*)$/)
     if (m) {
       const q = m[1].toLowerCase()
-      const allTitles = [...new Set([...[...roots.values()].map(r => r.title), ...NOTES_DATA.map(n => n.title)])]
+      const allTitles = fileEntries(roots).map(e => e.title)
       const matches = q
         ? allTitles.filter(t => t.toLowerCase().includes(q)).slice(0, 8)
         : allTitles.slice(0, 8)
@@ -553,13 +553,11 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       {wlOpen && wlPopupPos && (
         <div className="wl-popup show" style={{ top: wlPopupPos.top, left: wlPopupPos.left }}>
           {wlMatches.map((t, i) => {
-            const matchNote = NOTES_DATA.find(n => n.title === t)
             // Determine icon: look for a series or timed occurrence in the matching file
             const rootFileSlug = [...roots.entries()].find(([, r]) => r.title === t)?.[0]
             const matchItem = rootFileSlug ? items.find(i => i.fileSlug === rootFileSlug && !isSeries(i)) : undefined
             const Icon = matchItem && (matchItem as { metadata?: { done?: boolean } }).metadata?.done !== undefined ? CheckSquare
               : matchItem && matchItem.time ? Calendar
-              : matchNote ? FileText
               : FileText
             return (
               <div

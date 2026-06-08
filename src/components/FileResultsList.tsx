@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Occurrence, StoreItem } from '../types'
-import { fileEntries, targetOccurrence, occState } from '../meridian'
+import { fileEntries, targetOccurrence, occState } from '../presentation'
 import { collectUndated } from '../model/expansion'
 import OccurrenceCard from './OccurrenceCard'
 import { useStore } from '../store'
