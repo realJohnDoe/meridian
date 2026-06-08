@@ -1,6 +1,5 @@
 ## Next steps
 
-- Improve performance on fuzzy search.
 - Use proper routing to fix wikilink following / back button navigation
 - Fix order in agenda view to show multiday first
 - Add overdue section in agenda
