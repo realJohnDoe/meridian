@@ -2,6 +2,8 @@ import { useRef, useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
 import { occState } from '../presentation'
+import { parseDateString } from '../model/expansion'
+import { TODAY } from '../constants'
 import OccurrenceCard from './OccurrenceCard'
 
 interface Props {
@@ -131,6 +133,11 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   const effectiveDone = hasTrack ? isDone : (occ.metadata.done as boolean | undefined)
   const currentBarClass = occState({ ...occ, metadata: { ...occ.metadata, done: effectiveDone } })
 
+  // Past events (non-task calendar entries whose date is before today) get the shader.
+  const isEvent = occ.metadata.done === undefined
+  const occDate = parseDateString(occ.date) ?? occ.metadata.jsTime
+  const isPast = isEvent && !!occDate && occDate < TODAY
+
   return (
     <div
       className="swipe-wrap mx-2 mb-1.5"
@@ -149,6 +156,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
         <OccurrenceCard
           occ={occ}
           isDone={isDone}
+          isPast={isPast}
           currentBarClass={currentBarClass}
           onOpen={onOpen}
           onToggleDone={() => { setIsDone(prev => !prev); onToggleDone() }}
