@@ -54,6 +54,35 @@ export function targetOccurrence(fileSlug: string, items: StoreItem[], roots: Ro
   return null
 }
 
+/**
+ * Same strategy as targetOccurrence, but for every file in one pass.
+ * Expands the vault once forward (±3 years) and once backward, then picks the
+ * best occurrence per fileSlug — instead of running a full vault expansion per
+ * file. Use this wherever you need a map of fileSlug → best occurrence.
+ */
+export function targetOccurrenceMap(items: StoreItem[], roots: Roots): Map<string, Occurrence> {
+  const msDay = 86400000
+  const AHEAD = new Date(TODAY.getTime() + 365 * 3 * msDay)
+  const BACK  = new Date(TODAY.getTime() - 365 * 3 * msDay)
+  const map = new Map<string, Occurrence>()
+
+  // Forward pass: expandRange returns occurrences in date order, so the first
+  // hit per fileSlug is the earliest upcoming occurrence.
+  for (const occ of expandRange(items, roots, TODAY, AHEAD)) {
+    if (!map.has(occ.fileSlug)) map.set(occ.fileSlug, occ)
+  }
+
+  // Backward pass: iterate in reverse so the first hit per fileSlug is the
+  // most recent past occurrence. Only fill slugs with no future occurrence.
+  const back = expandRange(items, roots, BACK, TODAY)
+  for (let i = back.length - 1; i >= 0; i--) {
+    const occ = back[i]
+    if (!map.has(occ.fileSlug)) map.set(occ.fileSlug, occ)
+  }
+
+  return map
+}
+
 // ── OCCURRENCE SORT ────────────────────────────────────────────
 
 const _prioOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
