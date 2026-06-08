@@ -4,8 +4,8 @@ import { useStore } from '../store'
 import { Checkbox } from './ui/checkbox'
 import { Button } from './ui/button'
 import type { Occurrence } from '../types'
-import { isStandaloneOcc, occKind } from '../types'
-import { expandRange, fmtT, parseDurationHours, parseDurationDays, multidayCoversDate, parseDateString, multidayDisplayTitle } from '../model/expansion'
+import { occKind } from '../types'
+import { expandWithMultiday, fmtT, parseDurationHours, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../presentation'
 
 import { TODAY } from '../constants'
@@ -130,26 +130,7 @@ export default function DayView({ onOpen }: Props) {
   const { allDay, cols } = useMemo(() => {
     const from = new Date(dvDate); from.setHours(0, 0, 0, 0)
     const to   = new Date(dvDate); to.setHours(23, 59, 59)
-    const occs = expandRange(items, roots, from, to)
-
-    // Multi-day events that started before today don't appear in expandRange
-    // output (their single occurrence is on the start date). Find them by
-    // scanning store items directly and add a virtual occurrence for today.
-    const extraMultiday = items
-      .filter(isStandaloneOcc)
-      .map(i => ({
-        ...i,
-        source: 'explicit' as const,
-        metadata: { ...(roots.get(i.fileSlug) ?? { title: '', tags: [], topics: [] }), ...i.metadata, jsTime: new Date(from) } as Occurrence['metadata'],
-      }))
-      .filter(i => {
-        const days = parseDurationDays(i.metadata.duration)
-        if (!days || days < 2) return false
-        const start = parseDateString(i.date)
-        return !!start && start < from && multidayCoversDate(i as Occurrence, dvDate)
-      })
-
-    const allOccs = sortOccs([...occs, ...extraMultiday])
+    const allOccs = sortOccs(expandWithMultiday(items, roots, from, to))
     const allDay  = allOccs.filter(o => !fmtT(o.time))
     const timed   = allOccs.filter(o =>  !!fmtT(o.time))
     return { allDay, cols: computeColumns(timed) }
@@ -184,15 +165,6 @@ export default function DayView({ onOpen }: Props) {
     }
   }, [setDvDate])
 
-  // Deduplicate: a multi-day event can appear both from expandRange (start date)
-  // and from the extraMultiday coverage scan if both land on the same day.
-  const seen = new Set<string>()
-  const allDayDeduped = allDay.filter(o => {
-    if ((parseDurationDays(o.metadata.duration) ?? 0) < 2) return true
-    if (seen.has(o.fileSlug)) return false
-    seen.add(o.fileSlug); return true
-  })
-
   const totalCols = Math.max(cols.length, 1)
   const isToday   = sameDay(dvDate, TODAY)
 
@@ -201,23 +173,23 @@ export default function DayView({ onOpen }: Props) {
 
   const ALL_DAY_THRESHOLD = 3
   const [allDayExpanded, setAllDayExpanded] = useState(false)
-  const hiddenCount = allDayDeduped.length - ALL_DAY_THRESHOLD
+  const hiddenCount = allDay.length - ALL_DAY_THRESHOLD
 
   return (
     <>
       {/* All-day / multiday strip */}
-      {allDayDeduped.length > 0 && (
+      {allDay.length > 0 && (
         <div className="dv-allday" id="dvAllDay">
           <div className="dv-adlbl">All day</div>
 
           {/* Always-visible first N items */}
-          {allDayDeduped.slice(0, ALL_DAY_THRESHOLD).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
+          {allDay.slice(0, ALL_DAY_THRESHOLD).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
 
           {/* Animated overflow */}
           {hiddenCount > 0 && (
             <div className={`dv-adoverflow${allDayExpanded ? ' open' : ''}`}>
               <div>
-                {allDayDeduped.slice(ALL_DAY_THRESHOLD).map((o, i) =>
+                {allDay.slice(ALL_DAY_THRESHOLD).map((o, i) =>
                   renderAllDayItem(o, ALL_DAY_THRESHOLD + i, dvMidnight, onOpen)
                 )}
               </div>

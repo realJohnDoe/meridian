@@ -1,9 +1,8 @@
 import { useMemo, useCallback } from 'react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
-import { isStandaloneOcc } from '../types'
 
-import { expandRange, fmtISO, parseDurationDays, parseDateString } from '../model/expansion'
+import { expandWithMultiday, fmtISO } from '../model/expansion'
 import { sameDay, addDays, sortOccs } from '../presentation'
 import { toggleOccDone, beginSwipeDelete } from '../mutations'
 import DaySection from './DaySection'
@@ -22,35 +21,7 @@ export default function AgendaView({ onOpen }: Props) {
   const groups = useMemo(() => {
     const from = addDays(TODAY, -7)
     const to = addDays(TODAY, 90)
-    const occs = expandRange(items, roots, from, to)
-
-    // Generate a virtual occurrence for each subsequent day that a multiday
-    // event covers (day 1 is already in occs from expandRange).
-    const extraMultiday = items
-      .filter(isStandaloneOcc)
-      .flatMap(i => {
-        const days = parseDurationDays(i.metadata.duration)
-        if (!days || days < 2) return []
-        const startD = parseDateString(i.date)
-        if (!startD) return []
-        const extras: Occurrence[] = []
-        for (let d = 1; d < days; d++) {
-          const coveredDate = new Date(startD.getTime() + d * 86_400_000)
-          if (coveredDate < from || coveredDate > to) continue
-          extras.push({
-            ...i,
-            source: 'explicit' as const,
-            metadata: {
-              ...(roots.get(i.fileSlug) ?? { title: '', tags: [], topics: [] } as Record<string, unknown>),
-              ...i.metadata,
-              jsTime: coveredDate,
-            } as Occurrence['metadata'],
-          } as Occurrence)
-        }
-        return extras
-      })
-
-    const allOccs = [...occs, ...extraMultiday]
+    const allOccs = expandWithMultiday(items, roots, from, to)
 
     const result: Record<string, { date: Date; items: Occurrence[] }> = {}
 

@@ -3,8 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
 
-import { expandRange } from '../model/expansion'
-import { parseDurationDays, multidayCoversDate, multidayDisplayTitle } from '../model/expansion'
+import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, sortOccs, ccBarClass } from '../presentation'
 
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
@@ -26,10 +25,7 @@ interface CalCellProps {
 function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
   const isToday = sameDay(date, TODAY)
   const dayOccs = useMemo(
-    () => sortOccs(occs.filter(o =>
-      (o.metadata.jsTime && sameDay(o.metadata.jsTime, date)) ||
-      multidayCoversDate(o, date)
-    )),
+    () => sortOccs(occs.filter(o => o.metadata.jsTime && sameDay(o.metadata.jsTime, date))),
     [occs, date],
   )
 
@@ -41,14 +37,8 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
       <span className="ccn">{date.getDate()}</span>
       <div className="cc-bars">
         {(() => {
-          const seen = new Set<string>()
           const bars: React.ReactNode[] = []
           dayOccs.slice(0, 4).forEach((o, i) => {
-            // Deduplicate multiday events (appear on every covered day via filter above).
-            if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) {
-              if (seen.has(o.fileSlug)) return
-              seen.add(o.fileSlug)
-            }
             bars.push(<div key={i} className={`cc-bar ${ccBarClass(o)}`}>{multidayDisplayTitle(o, date) ?? o.metadata.title}</div>)
           })
           if (dayOccs.length > 4) bars.push(
@@ -92,7 +82,7 @@ export default function MonthView({ onDayClick }: Props) {
 
     const from = new Date(y, m, 1)
     const to   = new Date(y, m + 1, 0, 23, 59, 59)
-    const occs = expandRange(items, roots, from, to)
+    const occs = expandWithMultiday(items, roots, from, to)
 
     return { cells, occs }
   }, [items, roots, y, m])
