@@ -653,6 +653,14 @@ export function collectRepeatPatterns<T>(
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+/** Merge file-level root fields (title/tags/topics/body) with occurrence metadata. */
+export function joinFileMeta(fileSlug: string, meta: OccurrenceMetadata, roots: Roots): AppMetadata {
+  return {
+    ...(roots.get(fileSlug) ?? { title: '', tags: [], topics: [] }),
+    ...meta,
+  }
+}
+
 /**
  * Expand StoreItem[] in the date range [from, to].
  * Series items are expanded via their repeat rule; standalone OccurrenceEntry
@@ -668,11 +676,6 @@ export function expandRange(
   to: Date,
 ): OccurrenceEntry<AppMetadata>[] {
   const result: OccurrenceEntry<AppMetadata>[] = []
-
-  const joinFileMeta = (fileSlug: string, meta: OccurrenceMetadata): AppMetadata => ({
-    ...(roots.get(fileSlug) ?? { title: '', tags: [], topics: [] }),
-    ...meta,
-  })
 
   const seriesList = items.filter(isSeries) as StoreSeries[]
   // Standalone = non-series items with no ownerId
@@ -723,7 +726,7 @@ export function expandRange(
           ? override.id
           : stableOccId(`${series.id}|${String(occ.date ?? '')}|${occ.time ?? ''}`),
         ownerId: series.id,
-        metadata: { ...joinFileMeta(series.fileSlug, occMeta), jsTime },
+        metadata: { ...joinFileMeta(series.fileSlug, occMeta, roots), jsTime },
       })
     }
   }
@@ -743,7 +746,7 @@ export function expandRange(
       fileSlug: occ.fileSlug,
       id:      occ.id,
       excluded: occ.excluded,
-      metadata: { ...joinFileMeta(occ.fileSlug, occ.metadata), jsTime },
+      metadata: { ...joinFileMeta(occ.fileSlug, occ.metadata, roots), jsTime },
     })
   }
 
@@ -774,8 +777,56 @@ export function collectUndated(items: StoreItem[], roots: Roots): OccurrenceEntr
   ) as OccurrenceEntry<AppMetadata>[]
   return undated.map(occ => ({
     ...occ,
-    metadata: { ...(roots.get(occ.fileSlug) ?? { title: '', tags: [], topics: [] }), ...occ.metadata },
+    metadata: joinFileMeta(occ.fileSlug, occ.metadata, roots),
   }))
+}
+
+/**
+ * Like expandRange, but also generates a virtual occurrence for every
+ * subsequent day that a multi-day standalone event covers within [from, to].
+ * The start-date occurrence is already produced by expandRange; this helper
+ * adds days 2..N so callers don't need to scatter that logic across views.
+ * Result is deduplicated by (fileSlug, jsTime) and sorted by jsTime.
+ */
+export function expandWithMultiday(
+  items: StoreItem[],
+  roots: Roots,
+  from: Date,
+  to: Date,
+): OccurrenceEntry<AppMetadata>[] {
+  const occs = expandRange(items, roots, from, to)
+
+  const extraMultiday = items
+    .filter(isStandaloneOcc)
+    .flatMap(i => {
+      const days = parseDurationDays(i.metadata.duration)
+      if (!days || days < 2) return []
+      const startD = parseDateString(i.date)
+      if (!startD) return []
+      const extras: OccurrenceEntry<AppMetadata>[] = []
+      for (let d = 1; d < days; d++) {
+        const coveredDate = new Date(startD.getTime() + d * 86_400_000)
+        coveredDate.setHours(0, 0, 0, 0)
+        if (coveredDate < from || coveredDate > to) continue
+        extras.push({
+          ...i,
+          source: 'explicit' as const,
+          metadata: { ...joinFileMeta(i.fileSlug, i.metadata, roots), jsTime: coveredDate },
+        })
+      }
+      return extras
+    })
+
+  const seen = new Set<string>()
+  return [...occs, ...extraMultiday]
+    .filter(o => {
+      if (!o.metadata.jsTime) return false
+      const k = `${o.fileSlug}|${o.metadata.jsTime.getTime()}`
+      if (seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
+    .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
 }
 
 /* eslint-enable @typescript-eslint/no-explicit-any */
