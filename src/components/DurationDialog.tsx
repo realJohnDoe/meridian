@@ -81,8 +81,12 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
             type="number"
             min={1}
             className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-xs font-mono text-foreground transition-colors"
-            value={n}
-            onChange={(e) => setN(Math.max(1, parseInt(e.target.value, 10) || 1))}
+            value={n === 0 ? '' : n}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '') { setN(0) } else { setN(Math.max(1, parseInt(val, 10) || 1)) }
+            }}
           />
           <Select value={unit} onValueChange={(v) => setUnit(v as Unit)}>
             <SelectTrigger className="flex-1">
@@ -101,7 +105,7 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
         <DrawerActions
           onRemove={() => { onRemove(); onClose() }}
           onCancel={onClose}
-          onSet={() => { onConfirm(serialise(n, unit)); onClose() }}
+          onSet={() => { onConfirm(serialise(Math.max(1, n), unit)); onClose() }}
         />
       </DrawerContent>
     </Drawer>
