@@ -88,8 +88,18 @@ export function targetOccurrenceMap(items: StoreItem[], roots: Roots): Map<strin
 const _prioOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
 
 function _sortKey(o: Occurrence): number {
-  const t = !!fmtT(o.time), ev = occKind(o) === 'event'
-  return (o.metadata.done ? 8 : 0) + (t ? 0 : 2) + (ev ? 0 : 1)
+  const state     = occState(o)
+  const dimmed    = state === 'done' || state === 'event-past'
+  const isEvent   = occKind(o) === 'event'
+  const isMultiday = (parseDurationDays(o.metadata.duration) ?? 0) >= 2
+  const hasTimed  = !!fmtT(o.time)
+
+  // Active items first (groups 0-3), then past/done in the same sub-order (4-7)
+  const base = dimmed ? 4 : 0
+  if (isEvent && isMultiday) return base + 0   // multiday events
+  if (isEvent && !hasTimed)  return base + 1   // untimed single-day events
+  if (isEvent &&  hasTimed)  return base + 2   // timed events
+  return base + 3                              // tasks
 }
 
 function _prioKey(o: Occurrence): number {
@@ -120,7 +130,16 @@ export function occState(o: Occurrence): string {
     if (p === 'low')    return 'task-p3'
     return 'task-open'
   }
-  if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 'event-future'
+  if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) {
+    // Use day-level comparison: past days of a multiday event get the gray shader,
+    // today and future days stay purple.
+    if (o.metadata.jsTime) {
+      const today  = new Date(); today.setHours(0, 0, 0, 0)
+      const day    = new Date(o.metadata.jsTime); day.setHours(0, 0, 0, 0)
+      if (day < today) return 'event-past'
+    }
+    return 'event-future'
+  }
   const now = new Date()
   if (o.metadata.jsTime && o.metadata.jsTime < now) {
     // Whole-day events (no time) use day-level comparison — they stay colored
