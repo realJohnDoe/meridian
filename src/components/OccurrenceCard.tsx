@@ -14,6 +14,7 @@ export interface OccurrenceCardProps {
   occ: Occurrence
   variant?: 'agenda' | 'compact'
   isDone: boolean
+  isPast?: boolean
   currentBarClass: string
   onOpen: () => void
   onToggleDone: () => void
@@ -22,7 +23,7 @@ export interface OccurrenceCardProps {
 }
 
 const titleCls = (isDone: boolean) =>
-  `text-[14px] font-medium truncate flex-1 ${isDone ? 'line-through text-[var(--t3)]' : 'text-[var(--t0)]'}`
+  `text-[14px] font-medium truncate flex-1 ${isDone ? 'line-through' : ''} text-[var(--t0)]`
 
 function ParticipantsBadge({ participants }: { participants: string[] }) {
   if (!participants.length) return null
@@ -68,6 +69,7 @@ export default function OccurrenceCard({
   occ,
   variant = 'agenda',
   isDone,
+  isPast = false,
   currentBarClass,
   onOpen,
   onToggleDone,
@@ -86,11 +88,12 @@ export default function OccurrenceCard({
     return d ? fmtShort(d) : occ.date
   })()
 
+  const dimmed = isDone || isPast
   const cardCls = [
     'cursor-pointer transition-colors shadow-none',
     'bg-[var(--bg2)] border border-[var(--bdr2)] rounded-[var(--r)]',
     'hover:bg-[var(--bg3)]',
-    isDone ? 'opacity-50' : '',
+    dimmed ? 'relative overflow-hidden' : '',
   ].filter(Boolean).join(' ')
 
   const handleClick = (e: React.MouseEvent) => {
@@ -104,6 +107,7 @@ export default function OccurrenceCard({
         style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
         onClick={handleClick}
       >
+        {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-[var(--r)]" />}
         {/* Priority bar */}
         <span className={`occ-bar ${currentBarClass}`} />
 
@@ -150,6 +154,7 @@ export default function OccurrenceCard({
   // Compact variant
   return (
     <Card className={cardCls} onClick={handleClick}>
+      {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-[var(--r)]" />}
       <div className="flex items-start gap-2 pl-2.5 pr-3 py-2.5">
         <span className={`occ-bar ${currentBarClass}`} />
 
