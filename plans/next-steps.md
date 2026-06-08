@@ -1,17 +1,12 @@
 ## Next steps
 
-- Make done tasks less prominent. The bright green checkmark is a bit distracting.
 - Improve performance on fuzzy search.
 - Use proper routing to fix wikilink following / back button navigation
 - Fix order in agenda view to show multiday first
+- Add overdue section in agenda
 
 ## Results from last Quality Survey
 
-1. Duplicated multiday-occurrence expansion & file-meta join across views
-   Impact: High
-   Evidence: AgendaView.tsx:29-51 and DayView.tsx:138-150 both re-implement the "scan standalones → generate virtual occurrences for each covered day → join roots meta" logic, including the literal fallback roots.get(i.fileSlug) ?? { title: '', tags: [], topics: [] }. That same join already exists privately as joinFileMeta in expansion.ts:672, and dedup logic is repeated again in DayView.tsx:189-194 and MonthView.tsx:46-51.
-   Problem: The most subtle domain rule in the app (multiday rendering) is copy-pasted in 3+ places, so a fix or schema change must be made everywhere or views silently diverge.
-   Fix: Export joinFileMeta and a single expandWithMultiday(items, roots, from, to) helper from expansion.ts and have all three views call it.
 2. Interactive <div>s with no keyboard/ARIA support (systemic a11y)
    Impact: Medium
    Evidence: Click-only divs with no role, tabIndex, or key handler: MonthView.tsx:37 (cal-cell), DayView.tsx:59 (dv-aditem) and DayView.tsx:102 (dv-eblk), FilterOverlay.tsx:20 (occ-create-row), App.tsx:280 (sidebar scrim), and the Card in OccurrenceCard.tsx:102.
