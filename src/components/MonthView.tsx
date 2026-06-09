@@ -40,7 +40,7 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
   return (
     <SurfaceButton
       className={cn(
-        'flex-col p-[3px_2px_2px] rounded-[var(--r)] transition-colors overflow-hidden min-h-0 w-full',
+        'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] transition-colors overflow-hidden min-h-0 w-full',
         'hover:bg-[var(--bg3)]',
         other && 'opacity-25',
         isToday && 'istoday',
