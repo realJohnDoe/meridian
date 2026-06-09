@@ -1,7 +1,6 @@
 ## Next steps
 
 - Bug: converting a note into an event does not persist
-- expansion.ts typing
 - Use proper routing to fix wikilink following / back button navigation
 - Add overdue section in agenda
 
@@ -12,27 +11,22 @@
    Evidence: nsFilterVal/setNsFilterVal (store.ts:40-41, store.ts:90-91) are never read anywhere; setItems, setRoots (store.ts:73-74), setPendingDirReconnect, setSyncDirtyCount, setSyncFlash are defined but never called — code writes those keys via useStore.setState(...) directly instead (e.g. vault.ts:71).
    Problem: Seven dead store members plus an inconsistent two-way pattern (actions vs. raw setState) mislead readers about the intended API.
    Fix: Delete the unused actions and the nsFilterVal field, or route the existing setState calls through the actions — pick one convention.
-2. Pervasive any and unsafe casts in the model/mutation layer
-   Impact: Medium
-   Evidence: saveNode(item, editScope, fields: any) (mutations.ts:77), (i: any) / (i as any).excluded (mutations.ts:151-152), entryFromItem(item: any) and openEntry((item: any …)) (App.tsx:35, App.tsx:106), as any in storeBridge.ts:9-10, and an entire eslint-disable no-explicit-any block over expansion.ts:164+.
-   Problem: The most logic-heavy code (recurrence expansion, save path) has its type checking disabled, so schema mistakes surface at runtime instead of compile time.
-   Fix: Type saveNode's fields as a SaveFields interface (it already has a fixed shape) and replace any store accessors with the existing StoreItem/PrimaryView unions.
-3. Cache-write failures are silently swallowed
+2. Cache-write failures are silently swallowed
    Impact: High
    Evidence: vault.ts:42-44 writeEntityToCache and vault.ts:54-56 deleteFileFromDisk catch all errors and only console.error — unlike syncToDirectory which calls notify(...) (vault.ts:75). updateSyncUI also swallows with empty .catch(() => {}) (vault.ts:26).
    Problem: If an IndexedDB write fails, the user's edit is lost with zero feedback while the UI shows the change as saved — silent data loss.
    Fix: Call notify(...) (and avoid clearing dirty state) in these catch blocks, matching the sync path's error handling.
-4. Day-view "now" line is computed once and never updates
+3. Day-view "now" line is computed once and never updates
    Impact: Medium
    Evidence: DayView.tsx:256-265 computes const now = new Date() inside the render IIFE; nothing schedules a re-render, and isToday/now are not on any timer.
    Problem: The current-time indicator is correct only at mount and then drifts, defeating its purpose in a calendar's primary day view.
    Fix: Add a useEffect with setInterval (e.g. every 60s) that bumps a state tick to re-render the line.
-5. No loading or empty/error state while a vault loads
+4. No loading or empty/error state while a vault loads
    Impact: Medium
    Evidence: loadFilesFromDisk (vault.ts:81-99) awaits disk reads then setData; the views render items=[] meanwhile, and AgendaView (AgendaView.tsx:87) has no empty/loading branch — it just renders a bare "Today" section.
    Problem: During async vault load (or parse failure) the user sees a blank screen with no spinner or "no items" messaging, indistinguishable from a broken app.
    Fix: Add an isLoading flag to the store and render skeleton/empty-state UI in the primary views.
-6. Sort/layout helpers mutate their inputs on the render path
+5. Sort/layout helpers mutate their inputs on the render path
    Impact: Medium
    Evidence: sortOccs does arr.sort(...) on the passed array (presentation.ts:71) and is called during render in AgendaView.tsx:101 (sortOccs(g.items) on memoized group arrays); computeColumns writes ev.metadata.\_dh/\_endMs onto live occurrence objects (DayView.tsx:36-37).
    Problem: In-place mutation of memoized/store-derived data during render is a React anti-pattern that causes order-dependent bugs and makes memo comparisons unreliable.
