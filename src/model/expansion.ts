@@ -519,7 +519,7 @@ function generatedDateSet(expandable: Record<string, unknown>, from: Date, to: D
 // by logical key. The same (ownerId, date, time) always resolves to the same
 // UUID within a session, making occ.id stable across re-expansions.
 const occIdCache = new Map<string, string>()
-function stableOccId(key: string): string {
+export function stableOccId(key: string): string {
   let id = occIdCache.get(key)
   if (!id) { id = crypto.randomUUID(); occIdCache.set(key, id) }
   return id

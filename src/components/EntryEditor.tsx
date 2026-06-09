@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Card, CardContent } from './ui/card'
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from './ui/command'
 import TagChip from './TagChip'
+import BacklinksPanel from './BacklinksPanel'
 import { unwrapRef, resolveWikilink } from '../wikilinks'
 import { cn } from '@/lib/utils'
 
@@ -81,9 +82,11 @@ interface Props {
   roots: Roots
   /** Called when the user clicks a wikilink chip or body link — navigate to that file. */
   onOpenWikilink?: (ref: string) => void
+  /** Called when the user toggles done on a backlink card. */
+  onToggleDoneBacklink?: (occ: Occurrence) => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const [participantInputVal, setParticipantInputVal] = useState('')
@@ -546,6 +549,16 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           onInput={handleBodyInput}
           onKeyDown={handleBodyKeyDown}
         />
+
+        {item?.fileSlug && onOpenWikilink && onToggleDoneBacklink && (
+          <BacklinksPanel
+            fileSlug={item.fileSlug}
+            items={items}
+            roots={roots}
+            onOpen={onOpenWikilink}
+            onToggleDone={onToggleDoneBacklink}
+          />
+        )}
 
       </div></div>
 

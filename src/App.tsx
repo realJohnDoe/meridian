@@ -6,6 +6,7 @@ import {
   Plus, X, Search,
 } from 'lucide-react'
 import { initApp, syncToDirectory, pickDirectory, tryRestoreDirectory, reconnectDirectory } from './vault'
+import { toggleOccDone } from './mutations'
 import { addDays, fmtLong } from './presentation'
 import { openDayViewForDate, goToday } from './navigation'
 import { fmtISO } from './model/expansion'
@@ -150,6 +151,7 @@ export default function App() {
             items={storeItems}
             roots={storeRoots}
             onOpenWikilink={handleOpenWikilink}
+            onToggleDoneBacklink={toggleOccDone}
           />
         </section>
 

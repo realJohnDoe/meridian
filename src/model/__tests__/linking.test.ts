@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '../storeItems'
 import { resolveWikilink, unwrapRef } from '../../wikilinks'
-import { fileEntries, targetOccurrence } from '../../presentation'
+import { fileEntries, fileOccurrenceMap } from '../../presentation'
 import type { StoreItem, Roots } from '../../types'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -143,28 +143,95 @@ describe('fileEntries', () => {
   })
 })
 
-// ── targetOccurrence ─────────────────────────────────────────────────────────
+// ── fileOccurrenceMap ─────────────────────────────────────────────────────────
 
-describe('targetOccurrence', () => {
-  const { items, roots } = makeStore([
-    { slug: 'project-alpha',  yaml: ALPHA_YAML },  // 2026-05-01 (past relative to test)
-    { slug: 'weekly-standup', yaml: RECUR_YAML },  // weekly recurring
-  ])
+const NOTE_YAML = `---
+title: Grocery List
+tags: [shopping]
+topics: []
+done: false
+---
+`
 
+const FAR_PAST_YAML = `---
+title: Old Project
+tags: []
+date: "2020-01-01"
+done: false
+---
+`
+
+describe('fileOccurrenceMap', () => {
   it('returns an occurrence for a file with a recurring series', () => {
-    const occ = targetOccurrence('weekly-standup', items, roots)
-    expect(occ).not.toBeNull()
-    expect(occ!.fileSlug).toBe('weekly-standup')
+    const { items, roots } = makeStore([{ slug: 'weekly-standup', yaml: RECUR_YAML }])
+    const map = fileOccurrenceMap(items, roots)
+    expect(map.get('weekly-standup')).toBeDefined()
+    expect(map.get('weekly-standup')!.fileSlug).toBe('weekly-standup')
   })
 
   it('returns an occurrence for a standalone past item', () => {
-    const occ = targetOccurrence('project-alpha', items, roots)
-    expect(occ).not.toBeNull()
-    expect(occ!.fileSlug).toBe('project-alpha')
+    const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const map = fileOccurrenceMap(items, roots)
+    expect(map.get('project-alpha')).toBeDefined()
+    expect(map.get('project-alpha')!.fileSlug).toBe('project-alpha')
   })
 
-  it('returns null for an unknown fileSlug', () => {
-    const occ = targetOccurrence('no-such-file', items, roots)
-    expect(occ).toBeNull()
+  it('returns undefined for an unknown fileSlug (slug not in roots)', () => {
+    const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const map = fileOccurrenceMap(items, roots)
+    expect(map.get('no-such-file')).toBeUndefined()
+  })
+
+  it('(original bug) dateless note resolves to its real store occurrence', () => {
+    // Before fileOccurrenceMap: handleOpenWikilink used targetOccurrence (expandRange)
+    // which skips undated items, then fell through to create-new. This test confirms
+    // the total map covers undated notes so the click handler can open them.
+    const { items, roots } = makeStore([{ slug: 'grocery-list', yaml: NOTE_YAML }])
+    const map = fileOccurrenceMap(items, roots)
+    const occ = map.get('grocery-list')
+    expect(occ).toBeDefined()
+    expect(occ!.fileSlug).toBe('grocery-list')
+    // Dateless note — date field is empty string
+    expect(occ!.date).toBe('')
+  })
+
+  it('out-of-±3yr-window single dated item resolves via step-2 standalone fill', () => {
+    // FAR_PAST_YAML has date 2020-01-01, well outside the ±3yr window from 2026.
+    // expandRange won't produce it; step 2 (isStandaloneOcc) must catch it.
+    const { items, roots } = makeStore([{ slug: 'old-project', yaml: FAR_PAST_YAML }])
+    const map = fileOccurrenceMap(items, roots)
+    const occ = map.get('old-project')
+    expect(occ).toBeDefined()
+    expect(occ!.fileSlug).toBe('old-project')
+    expect(occ!.date).toBe('2020-01-01')
+  })
+
+  it('is total — every slug present in roots has a .get() hit', () => {
+    const { items, roots } = makeStore([
+      { slug: 'project-alpha',  yaml: ALPHA_YAML   },
+      { slug: 'beta-notes',     yaml: BETA_YAML    },
+      { slug: 'weekly-standup', yaml: RECUR_YAML   },
+      { slug: 'grocery-list',   yaml: NOTE_YAML    },
+      { slug: 'old-project',    yaml: FAR_PAST_YAML },
+    ])
+    const map = fileOccurrenceMap(items, roots)
+    for (const slug of roots.keys()) {
+      expect(map.get(slug), `missing slug: ${slug}`).toBeDefined()
+    }
+  })
+
+  it('returns the same Map instance for identical (items, roots) references (memoization)', () => {
+    const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const map1 = fileOccurrenceMap(items, roots)
+    const map2 = fileOccurrenceMap(items, roots)
+    expect(map1).toBe(map2)
+  })
+
+  it('recomputes when items reference changes', () => {
+    const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const map1 = fileOccurrenceMap(items, roots)
+    // Simulate a store mutation by creating a new items array reference
+    const map2 = fileOccurrenceMap([...items], roots)
+    expect(map1).not.toBe(map2)
   })
 })

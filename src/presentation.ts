@@ -1,7 +1,7 @@
 import { addDays, isSameDay } from 'date-fns'
-import { fmtT, parseDurationDays, expandRange } from './model/expansion'
-import { parseWikilinks, resolveWikilink } from './wikilinks'
-import { occKind } from './types'
+import { fmtT, parseDurationDays, expandRange, joinFileMeta, stableOccId } from './model/expansion'
+import { parseWikilinks, resolveWikilink, unwrapRef } from './wikilinks'
+import { occKind, isSeries, isStandaloneOcc } from './types'
 import { getRoots } from './storeBridge'
 import type { Occurrence, StoreItem, Roots } from './types'
 import { TODAY } from './constants'
@@ -37,50 +37,99 @@ export function fileEntries(roots: Roots): FileEntry[] {
   return entries
 }
 
-/**
- * Navigate to the right occurrence for a file link.
- *
- * Strategy: pick the **next upcoming** occurrence (jsTime ≥ today); if none,
- * fall back to the **last past** occurrence. Returns `null` for dateless notes.
- */
-export function targetOccurrence(fileSlug: string, items: StoreItem[], roots: Roots): Occurrence | null {
-  const msDay = 86400000
-  const AHEAD = new Date(TODAY.getTime() + 365 * 3 * msDay)
-  const BACK  = new Date(TODAY.getTime() - 365 * 3 * msDay)
-  const forward = expandRange(items, roots, TODAY, AHEAD).filter(o => o.fileSlug === fileSlug)
-  if (forward.length) return forward[0]
-  const back = expandRange(items, roots, BACK, TODAY).filter(o => o.fileSlug === fileSlug)
-  if (back.length) return back[back.length - 1]
-  return null
-}
+// ── fileOccurrenceMap ──────────────────────────────────────────────────────────
+
+// Single-entry memo keyed on (items, roots) reference identity.
+// Zustand replaces both on every setData, so the map recomputes lazily on
+// the first read after any mutation and is otherwise returned as a stable
+// instance — safe to use as a useMemo dependency.
+let _fomCache: { items: StoreItem[]; roots: Roots; map: Map<string, Occurrence> } | null = null
+
+const _3YR_MS = 365 * 3 * 86_400_000
 
 /**
- * Same strategy as targetOccurrence, but for every file in one pass.
- * Expands the vault once forward (±3 years) and once backward, then picks the
- * best occurrence per fileSlug — instead of running a full vault expansion per
- * file. Use this wherever you need a map of fileSlug → best occurrence.
+ * Total map of fileSlug → best representative occurrence for every file.
+ *
+ * Fill order (first write per slug wins):
+ *  1. Nearest dated occurrence in the ±3yr window — upcoming first, most-recent
+ *     past as fallback. Covers series + dated standalones inside the window.
+ *  2. Standalone items not yet filled — undated notes and out-of-window dated
+ *     singles. Sourced entirely from real store items; roots used only for the
+ *     metadata join.
+ *  3. Series with no in-window occurrences — fallback to the series' own anchor
+ *     date (the series' stored date/time). Covers recurring items whose schedule
+ *     falls entirely outside ±3yr.
+ *
+ * Replaces both `targetOccurrence` (single-slug) and `targetOccurrenceMap`
+ * (batch). All consumers read `.get(slug)` from this one map.
+ *
+ * **Styling ⟺ behavior invariant:** `resolveWikilink(ref, roots) !== undefined`
+ * iff `.get(slug)` is non-null iff the link is rendered `wl` (not `wl-broken`)
+ * iff clicking opens the existing item. The total guarantee removes any path
+ * where a resolved slug lacks an occurrence.
  */
-export function targetOccurrenceMap(items: StoreItem[], roots: Roots): Map<string, Occurrence> {
-  const msDay = 86400000
-  const AHEAD = new Date(TODAY.getTime() + 365 * 3 * msDay)
-  const BACK  = new Date(TODAY.getTime() - 365 * 3 * msDay)
+export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string, Occurrence> {
+  if (_fomCache && _fomCache.items === items && _fomCache.roots === roots) {
+    return _fomCache.map
+  }
+
+  const AHEAD = new Date(TODAY.getTime() + _3YR_MS)
+  const BACK  = new Date(TODAY.getTime() - _3YR_MS)
   const map = new Map<string, Occurrence>()
 
-  // Forward pass: expandRange returns occurrences in date order, so the first
-  // hit per fileSlug is the earliest upcoming occurrence.
+  // Step 1: dated occurrences in the ±3yr window.
+  // expandRange is date-ordered; first hit per slug = nearest upcoming.
   for (const occ of expandRange(items, roots, TODAY, AHEAD)) {
     if (!map.has(occ.fileSlug)) map.set(occ.fileSlug, occ)
   }
-
-  // Backward pass: iterate in reverse so the first hit per fileSlug is the
-  // most recent past occurrence. Only fill slugs with no future occurrence.
+  // Backward pass: most-recent past fallback for files with no future occurrence.
   const back = expandRange(items, roots, BACK, TODAY)
   for (let i = back.length - 1; i >= 0; i--) {
     const occ = back[i]
     if (!map.has(occ.fileSlug)) map.set(occ.fileSlug, occ)
   }
 
+  // Step 2: standalone items not yet filled (undated notes, out-of-window singles).
+  for (const item of items) {
+    if (!isStandaloneOcc(item) || map.has(item.fileSlug)) continue
+    map.set(item.fileSlug, {
+      ...item,
+      metadata: joinFileMeta(item.fileSlug, item.metadata, roots),
+    } as Occurrence)
+  }
+
+  // Step 3: series with no in-window occurrences — use the series' anchor date.
+  for (const item of items) {
+    if (!isSeries(item) || map.has(item.fileSlug)) continue
+    map.set(item.fileSlug, {
+      date:     item.date,
+      time:     item.time,
+      source:   'explicit' as const,
+      fileSlug: item.fileSlug,
+      id:       stableOccId(`${item.fileSlug}|${item.id}|anchor`),
+      ownerId:  item.id,
+      metadata: joinFileMeta(item.fileSlug, item.metadata, roots),
+    })
+  }
+
+  _fomCache = { items, roots, map }
   return map
+}
+
+/**
+ * Returns the fileSlugs of all files whose topics include a link to `targetSlug`.
+ * Self-links are excluded. Memoize the result on [roots] at the call site.
+ */
+export function backlinksTo(targetSlug: string, roots: Roots): string[] {
+  const result: string[] = []
+  for (const [fileSlug, meta] of roots) {
+    if (fileSlug === targetSlug) continue
+    for (const raw of (meta.topics as string[] | undefined) ?? []) {
+      const ref = unwrapRef(raw)
+      if (resolveWikilink(ref, roots) === targetSlug) { result.push(fileSlug); break }
+    }
+  }
+  return result
 }
 
 // ── OCCURRENCE SORT ────────────────────────────────────────────

@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import type { Occurrence, StoreItem } from '../types'
-import { fileEntries, targetOccurrenceMap, occState } from '../presentation'
-import { collectUndated } from '../model/expansion'
+import { fileEntries, fileOccurrenceMap, occState } from '../presentation'
 import OccurrenceCard from './OccurrenceCard'
 import { useStore } from '../store'
 
@@ -40,15 +39,9 @@ export default function FileResultsList({ query, items, onOpen }: Props) {
   const roots = useStore(s => s.roots)
 
   // One vault expansion for all files — recomputes only when vault data changes,
-  // not on every keystroke. Replaces the per-row targetOccurrence() calls that
-  // each ran a full ±3-year expansion.
-  const occBySlug = useMemo(() => targetOccurrenceMap(items, roots), [items, roots])
-
-  const undatedBySlug = useMemo(() => {
-    const map = new Map<string, Occurrence>()
-    for (const occ of collectUndated(items, roots)) map.set(occ.fileSlug, occ as Occurrence)
-    return map
-  }, [items, roots])
+  // not on every keystroke. Total map: every file slug has a .get() hit,
+  // including dateless notes and out-of-window items.
+  const occBySlug = useMemo(() => fileOccurrenceMap(items, roots), [items, roots])
 
   const results = useMemo(() => {
     if (!query) return []
@@ -68,7 +61,7 @@ export default function FileResultsList({ query, items, onOpen }: Props) {
   return (
     <div className="flex flex-col gap-1.5 px-2 pt-2">
       {results.map((entry, i) => {
-        const occ = occBySlug.get(entry.fileSlug) ?? undatedBySlug.get(entry.fileSlug)
+        const occ = occBySlug.get(entry.fileSlug)
         if (!occ) return null
         return (
           <div

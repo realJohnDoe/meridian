@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useStore } from '../store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from '../mutations'
 import type { SeriesSheetConfig } from '../mutations'
-import { buildBodyHtml, targetOccurrence } from '../presentation'
+import { buildBodyHtml, fileOccurrenceMap } from '../presentation'
 import { fmtISO } from '../model/expansion'
 import { TODAY } from '../constants'
 import { resolveWikilink } from '../wikilinks'
@@ -42,12 +42,14 @@ export function useEntryEditor() {
 
   const handleOpenWikilink = useCallback((ref: string) => {
     const fileSlug = resolveWikilink(ref, storeRoots)
-    if (fileSlug) {
-      const occ = targetOccurrence(fileSlug, storeItems, storeRoots)
-      if (occ) { openEntry(occ, 'single'); return }
+    if (!fileSlug) {
+      // No matching file → render as wl-broken, click creates a new entry.
+      openEntry(null, undefined, ref)
+      return
     }
-    const prefillTitle = fileSlug ? (storeRoots.get(fileSlug)?.title ?? ref) : ref
-    openEntry(null, undefined, prefillTitle)
+    // resolveWikilink matched a real file → fileOccurrenceMap is total over
+    // roots, so .get() is guaranteed non-null (invariant: wl styling ⟺ opens existing).
+    openEntry(fileOccurrenceMap(storeItems, storeRoots).get(fileSlug)!, 'single')
   }, [storeRoots, storeItems, openEntry])
 
   const handleSave = useCallback((body: string) => {
