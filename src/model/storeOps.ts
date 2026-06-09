@@ -210,10 +210,10 @@ export function applyEdit(
       const meta = occMeta(i.metadata, fields)
       if (isSeries(i)) {
         return { ...i, metadata: meta, repeat: repeat ?? i.repeat,
-          ...(scheduled?.date ? { date: scheduled.date, time: scheduled.time || null } : {}) }
+          date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
       }
       return { ...i, metadata: meta,
-        ...(scheduled?.date ? { date: scheduled.date, time: scheduled.time || null } : {}) }
+        date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
     })
     return { items, roots }
   }
@@ -226,8 +226,8 @@ export function applyEdit(
     const baseSeries = findSeries(items, occ)
     const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
     items = upsertOverride(items, occ, {
-      date:    scheduled?.date ?? occ.date,
-      time:    scheduled?.time || null,
+      date:    scheduled?.date ?? '',
+      time:    scheduled?.date ? scheduled.time || null : null,
       metadata: occMeta(base, fields),
     })
     return { items, roots }
