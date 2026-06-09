@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import type { Occurrence, StoreItem, Roots } from '../types'
-import { backlinksTo, targetOccurrenceMap, sortOccs, occState } from '../presentation'
-import { collectUndated } from '../model/expansion'
+import { backlinksTo, fileOccurrenceMap, sortOccs, occState } from '../presentation'
 import OccurrenceCard from './OccurrenceCard'
 
 interface Props {
@@ -15,22 +14,16 @@ interface Props {
 export default function BacklinksPanel({ fileSlug, items, roots, onOpen, onToggleDone }: Props) {
   const slugs = useMemo(() => backlinksTo(fileSlug, roots), [fileSlug, roots])
 
-  const occBySlug = useMemo(() => targetOccurrenceMap(items, roots), [items, roots])
-
-  const undatedBySlug = useMemo(() => {
-    const map = new Map<string, Occurrence>()
-    for (const occ of collectUndated(items, roots)) map.set(occ.fileSlug, occ as Occurrence)
-    return map
-  }, [items, roots])
+  const occBySlug = useMemo(() => fileOccurrenceMap(items, roots), [items, roots])
 
   const occs = useMemo(() => {
     const result: Occurrence[] = []
     for (const slug of slugs) {
-      const occ = occBySlug.get(slug) ?? undatedBySlug.get(slug)
+      const occ = occBySlug.get(slug)
       if (occ) result.push(occ)
     }
     return sortOccs([...result])
-  }, [slugs, occBySlug, undatedBySlug])
+  }, [slugs, occBySlug])
 
   if (!occs.length) return null
 
