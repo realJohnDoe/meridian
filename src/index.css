@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* ── SHADCN THEME ─────────────────────────────────────────────── */
 /* Maps CSS custom-properties to Tailwind utility classes (bg-background, text-foreground, etc.) */

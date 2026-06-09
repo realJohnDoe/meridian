@@ -61,7 +61,7 @@ function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
     <SurfaceButton
       className={cn(
         `dv-aditem ${dvBlkClass(o)}`,
-        'flex items-center gap-[6px] rounded-[5px] px-[9px] py-[3px] text-[12px] font-medium truncate mb-0.5',
+        'w-full flex items-center gap-[6px] rounded-[5px] px-[9px] py-[3px] text-[12px] font-medium truncate mb-0.5',
         'hover:brightness-110',
       )}
       onClick={() => onOpen(o)}
