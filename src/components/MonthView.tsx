@@ -6,6 +6,8 @@ import type { Occurrence } from '../types'
 import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, sortOccs, ccBarClass } from '../presentation'
 import { TODAY } from '../constants'
+import { SurfaceButton } from './ui/surface-button'
+import { cn } from '../lib/utils'
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -28,10 +30,23 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
     [occs, date],
   )
 
+  const occCount = dayOccs.length
+  const ariaLabel = [
+    `${MONTHS[date.getMonth()]} ${date.getDate()}`,
+    isToday ? 'today' : '',
+    occCount ? `${occCount} event${occCount !== 1 ? 's' : ''}` : '',
+  ].filter(Boolean).join(', ')
+
   return (
-    <div
-      className={`cal-cell${other ? ' other' : ''}${isToday ? ' istoday' : ''}`}
+    <SurfaceButton
+      className={cn(
+        'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] transition-colors overflow-hidden min-h-0 w-full',
+        'hover:bg-[var(--bg3)]',
+        other && 'opacity-25',
+        isToday && 'istoday',
+      )}
       onClick={() => onDayClick(date)}
+      aria-label={ariaLabel}
     >
       <span className="ccn">{date.getDate()}</span>
       <div className="cc-bars">
@@ -46,7 +61,7 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
           return bars
         })()}
       </div>
-    </div>
+    </SurfaceButton>
   )
 }
 

@@ -6,6 +6,7 @@ import { fmtShort } from '../presentation'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
 import { Card } from './ui/card'
+import { SurfaceButton } from './ui/surface-button'
 import TagChip from './TagChip'
 import { unwrapRef, resolveWikilink } from '../wikilinks'
 import { useStore } from '../store'
@@ -44,7 +45,7 @@ function TypeIcon({ occ }: { occ: Occurrence }) {
   return <FileText size={13} className="shrink-0 text-[var(--t3)]" />
 }
 
-/** Unified tag + topic chip row — reads roots map for wikilink resolution. */
+/** Unified tag + topic chip row - reads roots map for wikilink resolution. */
 function TagsRow({ tags, topics }: { tags: string[]; topics: string[] }) {
   const roots = useStore(s => s.roots)
 
@@ -90,42 +91,42 @@ export default function OccurrenceCard({
 
   const dimmed = isDone || isPast
   const cardCls = [
-    'cursor-pointer transition-colors shadow-none',
+    'relative transition-colors shadow-none',
     'bg-[var(--bg2)] border border-[var(--bdr2)] rounded-[var(--r)]',
     'hover:bg-[var(--bg3)]',
-    dimmed ? 'relative overflow-hidden' : '',
+    dimmed ? 'overflow-hidden' : '',
   ].filter(Boolean).join(' ')
-
-  const handleClick = (e: React.MouseEvent) => {
-    if (!(e.target as HTMLElement).closest('[role=checkbox]')) onOpen()
-  }
 
   if (variant === 'agenda') {
     return (
       <Card
         className={`${cardCls} flex items-stretch gap-[9px] pl-[8px] pr-[14px] py-[8px]`}
         style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
-        onClick={handleClick}
       >
         {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-[var(--r)]" />}
-        {/* Priority bar */}
-        <span className={`occ-bar ${currentBarClass}`} />
 
-        {/* Two rows stacked in a flex-col */}
-        <div className="flex flex-col flex-1 min-w-0 gap-1 py-[2px]">
-          {/* Row 1: checkbox + title + [recur icon + time/duration] on the right */}
+        {/* Full-bleed open button */}
+        <SurfaceButton
+          className="absolute inset-0 z-[1] rounded-[var(--r)]"
+          aria-label={title}
+          onClick={onOpen}
+        />
+
+        {/* Priority bar */}
+        <span className={`occ-bar ${currentBarClass} relative z-20`} />
+
+        {/* Content - pointer-events-none passes clicks to the button behind */}
+        <div className="relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-[2px] pointer-events-none">
           <div className="flex items-center gap-[6px]">
             {hasTrack && (
               <Checkbox
                 checked={isDone}
                 onCheckedChange={() => onToggleDone()}
-                onClick={e => e.stopPropagation()}
-                className="size-5 shrink-0"
+                className="size-5 shrink-0 pointer-events-auto"
               />
             )}
             <span className={titleCls(isDone)}>{title}</span>
 
-            {/* Right-aligned: recur icon + time on one line, duration below */}
             {(!!occ.ownerId || !!t) && (
               <div className="flex flex-col items-end shrink-0 ml-1 gap-px">
                 <div className="flex items-end gap-[4px]">
@@ -139,7 +140,6 @@ export default function OccurrenceCard({
             )}
           </div>
 
-          {/* Row 2: tags + topics + participants */}
           {(tags.length > 0 || topics.length > 0 || participants.length > 0) && (
             <div className="flex flex-wrap gap-[5px]">
               <TagsRow tags={tags} topics={topics} />
@@ -153,28 +153,33 @@ export default function OccurrenceCard({
 
   // Compact variant
   return (
-    <Card className={cardCls} onClick={handleClick}>
+    <Card className={cardCls}>
       {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-[var(--r)]" />}
-      <div className="flex items-start gap-2 pl-2.5 pr-3 py-2.5">
+
+      {/* Full-bleed open button */}
+      <SurfaceButton
+        className="absolute inset-0 z-[1] rounded-[var(--r)]"
+        aria-label={title}
+        onClick={onOpen}
+      />
+
+      <div className="relative z-20 flex items-start gap-2 pl-2.5 pr-3 py-2.5 pointer-events-none">
         <span className={`occ-bar ${currentBarClass}`} />
 
         <div className="flex flex-col flex-1 min-w-0 gap-1">
-          {/* Row 1: [type icon] + checkbox + title */}
           <div className="flex items-center gap-[6px]">
             {showTypeIcon && !hasTrack && <TypeIcon occ={occ} />}
             {hasTrack && (
               <Checkbox
                 checked={isDone}
                 onCheckedChange={() => onToggleDone()}
-                onClick={e => e.stopPropagation()}
-                className="size-5 shrink-0"
+                className="size-5 shrink-0 pointer-events-auto"
               />
             )}
             <span className={titleCls(isDone)}>{title}</span>
             {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
           </div>
 
-          {/* Row 2: date + time + tags + topics + participants */}
           {(dateBadge || t || tags.length > 0 || topics.length > 0 || participants.length > 0) && (
             <div className="flex flex-wrap gap-[5px]">
               {dateBadge && <Badge variant="tag">{dateBadge}</Badge>}

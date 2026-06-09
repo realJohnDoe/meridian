@@ -23,6 +23,13 @@ import FilterOverlay from './components/FilterOverlay'
 import { useEntryEditor } from './hooks/useEntryEditor'
 import type { Occurrence } from './types'
 import { cn } from './lib/utils'
+import { Button } from './components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from './components/ui/sheet'
 
 export default function App() {
   const [filterQuery, setFilterQuery] = useState('')
@@ -155,30 +162,56 @@ export default function App() {
           />
         </section>
 
-        <div
-          className={`sidebar-ov${sidebarOpen ? ' open' : ''}`}
-          onClick={() => setSidebarOpen(false)}
-        />
-        <div className={`sidebar${sidebarOpen ? ' open' : ''}`}>
-          <div className="sidebar-head">
-            <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{ borderRadius: 5 }} alt="Meridian" />
-            <span className="sidebar-title">Meridian</span>
-          </div>
-          <div className="sidebar-body">
-            <button
-              className={`sni${primaryView === 'agenda' && !topOverlay ? ' active' : ''}`}
-              onClick={() => navTo('agenda')}
-            ><AlignLeft />Agenda</button>
-            <button
-              className={`sni${primaryView === 'calendar' && !topOverlay ? ' active' : ''}`}
-              onClick={() => navTo('calendar')}
-            ><CalendarDays />Month</button>
-            <button
-              className={`sni${primaryView === 'day' && !topOverlay ? ' active' : ''}`}
-              onClick={() => navTo('day')}
-            ><CalendarClock />Day</button>
-          </div>
-        </div>
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent
+            side="left"
+            className="w-[260px] sm:max-w-[260px] p-0 flex flex-col bg-[var(--bg2)] border-r border-[var(--bdr2)]"
+          >
+            {/* Visually-hidden title for screen readers */}
+            <SheetHeader className="sr-only">
+              <SheetTitle>Navigation</SheetTitle>
+            </SheetHeader>
+
+            {/* Sidebar header */}
+            <div className="flex items-center gap-[10px] h-[var(--th)] px-4 border-b border-[var(--bdr)] shrink-0">
+              <img
+                src={`${import.meta.env.BASE_URL}icon-192.png`}
+                width="26" height="26"
+                style={{ borderRadius: 5 }}
+                alt="Meridian"
+              />
+              <span className="font-[family-name:var(--disp)] italic text-[16px] text-[var(--t1)]">Meridian</span>
+            </div>
+
+            {/* Nav items */}
+            <nav className="flex-1 overflow-y-auto py-2">
+              {(
+                [
+                  ['agenda',   AlignLeft,    'Agenda'] as const,
+                  ['calendar', CalendarDays, 'Month']  as const,
+                  ['day',      CalendarClock,'Day']    as const,
+                ] as const
+              ).map(([view, Icon, label]) => {
+                const isActive = primaryView === view && !topOverlay
+                return (
+                  <Button
+                    key={view}
+                    variant="ghost"
+                    onClick={() => navTo(view)}
+                    className={cn(
+                      'w-full justify-start gap-[14px] px-5 h-auto py-[13px] text-[14px] font-medium rounded-none',
+                      'text-[var(--t2)] hover:bg-[var(--bg3)] hover:text-[var(--t1)]',
+                      isActive && 'text-[var(--ind)] bg-[var(--ab)] hover:text-[var(--ind)] hover:bg-[var(--ab)]',
+                    )}
+                  >
+                    <Icon className="size-[19px] stroke-[1.7] shrink-0" />
+                    {label}
+                  </Button>
+                )
+              })}
+            </nav>
+          </SheetContent>
+        </Sheet>
 
         {showBottomFloat && (
           <FilterOverlay

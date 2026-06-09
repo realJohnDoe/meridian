@@ -1,8 +1,9 @@
 import { useMemo, useEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, CalendarDays, CheckSquare, FileText } from 'lucide-react'
+import { ChevronDown, ChevronUp, CalendarDays, CheckSquare, Square, FileText } from 'lucide-react'
 import { useStore } from '../store'
-import { Checkbox } from './ui/checkbox'
 import { Button } from './ui/button'
+import { SurfaceButton } from './ui/surface-button'
+import { cn } from '../lib/utils'
 import type { Occurrence } from '../types'
 import { occKind } from '../types'
 import { expandWithMultiday, fmtT, parseDurationHours, multidayDisplayTitle } from '../model/expansion'
@@ -55,14 +56,20 @@ interface AllDayItemProps { o: Occurrence; onOpen: (o: Occurrence) => void; disp
 function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
   const kind = occKind(o)
   const Icon = kind === 'task' ? CheckSquare : kind === 'event' ? CalendarDays : FileText
+  const title = displayTitle ?? o.metadata.title
   return (
-    <div
-      className={`dv-aditem ${dvBlkClass(o)}`}
+    <SurfaceButton
+      className={cn(
+        `dv-aditem ${dvBlkClass(o)}`,
+        'w-full flex items-center gap-[6px] rounded-[5px] px-[9px] py-[3px] text-[12px] font-medium truncate mb-0.5',
+        'hover:brightness-110',
+      )}
       onClick={() => onOpen(o)}
+      aria-label={title}
     >
       <Icon size={11} className="shrink-0 opacity-70" />
-      <span>{displayTitle ?? o.metadata.title}</span>
-    </div>
+      <span>{title}</span>
+    </SurfaceButton>
   )
 }
 
@@ -94,24 +101,37 @@ function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
   const top = (h - SH) * HP + 1
   const height = Math.max(dh * HP - 4, 28)
   const hasTrack = o.metadata.done !== undefined
+  const isDone = !!o.metadata.done
 
   const left  = `calc(50px + ${colIndex} * (100% - 56px) / ${totalCols})`
   const width = `calc((100% - 56px) / ${totalCols} - 3px)`
 
+  const timeLabel = fmtT(o.time)
+  const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration].filter(Boolean).join(', ')
+
   return (
-    <div
-      className={`dv-eblk ${dvBlkClass(o)}`}
+    <SurfaceButton
+      className={cn(
+        `dv-eblk ${dvBlkClass(o)}`,
+        'absolute rounded-[7px] px-2 py-[5px] text-xs font-medium overflow-hidden transition-opacity hover:opacity-[0.85]',
+      )}
       style={{ top, height, left, width }}
       onClick={() => onOpen(o)}
+      aria-label={ariaLabel}
     >
       <div className="dv-et">
-        {hasTrack && <Checkbox checked={!!o.metadata.done} tabIndex={-1} aria-hidden className="size-3 pointer-events-none" />}
+        {/* Non-interactive done indicator — replaced Checkbox to avoid nested buttons */}
+        {hasTrack && (
+          isDone
+            ? <CheckSquare size={12} className="shrink-0 opacity-80" aria-hidden />
+            : <Square size={12} className="shrink-0 opacity-50" aria-hidden />
+        )}
         {o.metadata.title}
       </div>
       <div className="dv-em">
-        {fmtT(o.time)}{o.metadata.duration ? ` · ${o.metadata.duration}` : ''}
+        {timeLabel}{o.metadata.duration ? ` · ${o.metadata.duration}` : ''}
       </div>
-    </div>
+    </SurfaceButton>
   )
 }
 
