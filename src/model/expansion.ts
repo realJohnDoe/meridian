@@ -334,7 +334,7 @@ export function expandNode(
     const occDate = (instOverride && instOverride.child.date && instOverride.child.date !== node.date)
       ? instOverride.child.date
       : jsDateToSpec(jsDate).date
-    return { ...eff, date: occDate, time: occTimeStr, jsTime: jsDate, recur: true, _nodeId: node.id, _node: node }
+    return { ...eff, date: occDate, time: occTimeStr, jsTime: jsDate, recur: true }
   }
 
   if (node.repeat?.type !== 'after_completion') {
@@ -376,7 +376,7 @@ export function expandNode(
       if (!isGenerated && t >= from && t <= to) {
         const eff = mergeNode(node, inst)
         if (!eff.excluded) {
-          occurrences.push({ ...eff, date: inst.date || jsDateToSpec(t).date, jsTime: t, recur: true, _nodeId: node.id, _node: node })
+          occurrences.push({ ...eff, date: inst.date || jsDateToSpec(t).date, jsTime: t, recur: true })
         }
       }
     }
@@ -400,7 +400,7 @@ export function expandNode(
     for (const entry of allTimes) {
       if (entry.jsTime >= from && entry.jsTime <= to) {
         const spec = jsDateToSpec(entry.jsTime)
-        occurrences.push({ ...node, date: spec.date, time: spec.time || node.time || null, jsTime: entry.jsTime, done: entry.done, priority: entry.priority, recur: true, _nodeId: node.id, _node: node })
+        occurrences.push({ ...node, date: spec.date, time: spec.time || node.time || null, jsTime: entry.jsTime, done: entry.done, priority: entry.priority, recur: true })
       }
     }
     const lastDone = [...allTimes].reverse().find(e => e.done === true)
@@ -414,7 +414,7 @@ export function expandNode(
       })
       if (!alreadyExists && !isExcluded && nextJsTime >= from && nextJsTime <= to) {
         const spec = jsDateToSpec(nextJsTime)
-        occurrences.push({ ...node, date: spec.date, time: spec.time || node.time || null, jsTime: nextJsTime, done: false, recur: true, _nodeId: node.id, _node: node })
+        occurrences.push({ ...node, date: spec.date, time: spec.time || node.time || null, jsTime: nextJsTime, done: false, recur: true })
       }
     }
   }
@@ -436,8 +436,6 @@ export function expandNode(
 /**
  * Fields excluded from the `metadata` blob because they are either already
  * present as top-level fields on OccurrenceEntry, or are structural/internal.
- * The extractor function still receives the FULL raw fields object and may
- * include any of these explicitly if needed (e.g. _nodeId, _node for AppMetadata).
  */
 export const METADATA_EXCLUDE = new Set([
   'date', 'time',                           // top-level on OccurrenceEntry
