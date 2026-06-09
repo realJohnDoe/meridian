@@ -4,7 +4,7 @@ import {
   fileSlugItems, findSeries,
 } from './model/storeOps'
 import { isSeries, occIsRecur } from './types'
-import type { Occurrence, Repeat, Scheduled, Priority, StoreItem } from './types'
+import type { Occurrence, Repeat, Scheduled, Priority, StoreItem, EditScope } from './types'
 import { titleToSlug } from './fileIO'
 import { getItems, getRoots, setData, popOverlayFn, notify } from './storeBridge'
 import { writeEntityToCache, deleteFileFromDisk } from './vault'
@@ -26,7 +26,7 @@ export type SeriesSheetConfig = { title: string; options: SeriesSheetOption[] }
 
 export function applyScope(
   item:   Occurrence,
-  scope:  string,
+  scope:  EditScope,
   items?: StoreItem[],
 ): { scheduled: Scheduled | null; repeat: Repeat | null } {
   const allItems = items ?? getItems()
@@ -46,7 +46,7 @@ export function applyScope(
 
 export function entryFromOccurrence(
   item:          Occurrence,
-  editScope:     string,
+  editScope:     EditScope,
   bodyTransform: (body: string) => string = b => b,
   items?:        StoreItem[],
 ): EntryState {
@@ -76,7 +76,7 @@ export function entryFromOccurrence(
 
 type SaveFields = EntryState & { body: string }
 
-export function saveNode(item: Occurrence | null, editScope: string, fields: SaveFields): void {
+export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields): void {
   const { title } = fields
   if (!title) return
 
@@ -119,7 +119,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
   const title    = o.metadata.title   // expanded occurrence already carries the file-level title
   let cancelled  = false
 
-  if (occIsRecur(o, snapshot.items)) {
+  if (occIsRecur(o)) {
     const next = excludeOccurrence(snapshot, o)
     showDeleteToast(title,
       () => { writeEntityToCache(o.fileSlug) },

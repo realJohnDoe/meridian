@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useStore } from '../store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from '../mutations'
 import type { SeriesSheetConfig } from '../mutations'
-import type { Occurrence } from '../types'
+import type { Occurrence, EditScope } from '../types'
 import { buildBodyHtml, fileOccurrenceMap } from '../presentation'
 import { fmtISO } from '../model/expansion'
 import { TODAY } from '../constants'
@@ -10,7 +10,7 @@ import { resolveWikilink } from '../wikilinks'
 import { type EntryState, ENTRY_DEFAULT } from '../components/EntryEditor'
 import type { Priority } from '../types'
 
-function entryFromItem(item: Occurrence | null, editScope: string): EntryState {
+function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryState {
   if (!item) {
     return { ...ENTRY_DEFAULT, scheduled: { date: fmtISO(TODAY), time: '' } }
   }
@@ -34,8 +34,8 @@ export function useEntryEditor() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const openEntry = useCallback((item: Occurrence | null, scope?: string, prefillTitle?: string) => {
-    const editScope = scope ?? (item ? 'single' : 'all')
+  const openEntry = useCallback((item: Occurrence | null, scope?: EditScope, prefillTitle?: string) => {
+    const editScope: EditScope = scope ?? (item ? 'single' : 'all')
     const state = entryFromItem(item, editScope)
     setEntry(prefillTitle && !item ? { ...state, title: prefillTitle } : state)
     pushOverlay('entry')
@@ -68,7 +68,7 @@ export function useEntryEditor() {
 
   const handleClose = useCallback(() => popOverlay(), [popOverlay])
 
-  const handleScopeChange = useCallback((scope: string) => {
+  const handleScopeChange = useCallback((scope: EditScope) => {
     setEntry(prev => {
       if (!prev.item) return prev
       const { scheduled, repeat } = applyScope(prev.item, scope)

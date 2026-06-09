@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react'
 import { useStore } from '../store'
-import type { Occurrence } from '../types'
+import type { Occurrence, EditScope } from '../types'
 
 import { expandWithMultiday, fmtISO } from '../model/expansion'
 import { sameDay, addDays, sortOccs } from '../presentation'
@@ -10,7 +10,7 @@ import { TODAY } from '../constants'
 
 
 interface Props {
-  onOpen: (occ: Occurrence, scope?: string) => void
+  onOpen: (occ: Occurrence, scope?: EditScope) => void
 }
 
 export default function AgendaView({ onOpen }: Props) {
