@@ -1,32 +1,30 @@
 import { useState, useCallback, useEffect } from 'react'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '../store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from '../mutations'
 import type { SeriesSheetConfig } from '../mutations'
 import type { Occurrence, EditScope } from '../types'
-import { buildBodyHtml, fileOccurrenceMap } from '../presentation'
-import { fmtISO } from '../model/expansion'
-import { TODAY } from '../constants'
+import { buildBodyHtml } from '../presentation'
 import { resolveWikilink } from '../wikilinks'
 import { type EntryState, ENTRY_DEFAULT } from '../components/EntryEditor'
 import type { Priority } from '../types'
 
 function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryState {
   if (!item) {
-    return { ...ENTRY_DEFAULT, scheduled: { date: fmtISO(TODAY), time: '' } }
+    return { ...ENTRY_DEFAULT, editScope }
   }
   return entryFromOccurrence(item, editScope, buildBodyHtml)
 }
 
-export function useEntryEditor() {
-  const [entry, setEntry] = useState<EntryState>(ENTRY_DEFAULT)
+export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single') {
+  const [entry, setEntry] = useState<EntryState>(() => entryFromItem(initialOcc, initialScope))
   const [activeDialog, setActiveDialog] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void } | null>(null)
   const [seriesSheetConfig, setSeriesSheetConfig] = useState<SeriesSheetConfig | null>(null)
 
-  const storeItems = useStore(s => s.items)
   const storeRoots = useStore(s => s.roots)
-  const pushOverlay = useStore(s => s.pushOverlay)
-  const popOverlay  = useStore(s => s.popOverlay)
+  const navigate = useNavigate()
+  const router = useRouter()
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setActiveDialog(null) }
@@ -34,24 +32,14 @@ export function useEntryEditor() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const openEntry = useCallback((item: Occurrence | null, scope?: EditScope, prefillTitle?: string) => {
-    const editScope: EditScope = scope ?? (item ? 'single' : 'all')
-    const state = entryFromItem(item, editScope)
-    setEntry(prefillTitle && !item ? { ...state, title: prefillTitle } : state)
-    pushOverlay('entry')
-  }, [pushOverlay])
-
   const handleOpenWikilink = useCallback((ref: string) => {
     const fileSlug = resolveWikilink(ref, storeRoots)
     if (!fileSlug) {
-      // No matching file → render as wl-broken, click creates a new entry.
-      openEntry(null, undefined, ref)
+      navigate({ to: '/entry/new', search: { title: ref } })
       return
     }
-    // resolveWikilink matched a real file → fileOccurrenceMap is total over
-    // roots, so .get() is guaranteed non-null (invariant: wl styling ⟺ opens existing).
-    openEntry(fileOccurrenceMap(storeItems, storeRoots).get(fileSlug)!, 'single')
-  }, [storeRoots, storeItems, openEntry])
+    navigate({ to: '/entry/$fileSlug', params: { fileSlug }, search: {} })
+  }, [storeRoots, navigate])
 
   const handleSave = useCallback((body: string) => {
     saveNode(entry.item, entry.editScope, { ...entry, body })
@@ -66,7 +54,7 @@ export function useEntryEditor() {
     )
   }, [entry.item])
 
-  const handleClose = useCallback(() => popOverlay(), [popOverlay])
+  const handleClose = useCallback(() => router.history.back(), [router])
 
   const handleScopeChange = useCallback((scope: EditScope) => {
     setEntry(prev => {
@@ -117,15 +105,10 @@ export function useEntryEditor() {
   }, [])
 
   return {
-    // state
     entry, setEntry,
     activeDialog,
     pendingDelete, setPendingDelete,
     seriesSheetConfig, setSeriesSheetConfig,
-    // store refs needed by EntryEditor
-    storeItems, storeRoots,
-    // callbacks
-    openEntry,
     handleOpenWikilink,
     handleSave,
     handleDelete,

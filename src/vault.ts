@@ -11,7 +11,8 @@ import { fileSlugItems } from './model/storeOps'
 import type { StoreItem, Roots } from './types'
 import { getItems, getRoots, setData, getDirHandle, setDirHandle, notify } from './storeBridge'
 import { loadSeedItems } from './seed'
-import { goToday } from './navigation'
+import { fmtISO } from './model/expansion'
+import { TODAY } from './constants'
 import { useStore } from './store'
 
 // ── HELPERS ────────────────────────────────────────────────────
@@ -95,7 +96,10 @@ async function loadFilesFromDisk(): Promise<void> {
   }
   setData({ items: loaded, roots })
   updateSyncUI()
-  setTimeout(() => goToday(), 100)
+  setTimeout(() => {
+    const sec = document.querySelector(`.day-section[data-key="${fmtISO(TODAY)}"]`)
+    if (sec) sec.scrollIntoView({ behavior: 'instant', block: 'start' })
+  }, 200)
 }
 
 // ── DIRECTORY LIFECYCLE ───────────────────────────────────────
