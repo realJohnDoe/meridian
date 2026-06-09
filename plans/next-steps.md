@@ -1,56 +1,42 @@
 ## Next steps
 
+- Bug: converting a note into an event does not persist
+- expansion.ts typing
 - Use proper routing to fix wikilink following / back button navigation
-- Fix order in agenda view to show multiday first
 - Add overdue section in agenda
 
 ## Results from last Quality Survey
 
-2. Interactive <div>s with no keyboard/ARIA support (systemic a11y)
-   Impact: Medium
-   Evidence: Click-only divs with no role, tabIndex, or key handler: MonthView.tsx:37 (cal-cell), DayView.tsx:59 (dv-aditem) and DayView.tsx:102 (dv-eblk), FilterOverlay.tsx:20 (occ-create-row), App.tsx:280 (sidebar scrim), and the Card in OccurrenceCard.tsx:102.
-   Problem: Core navigation (open day, open event, create entry) is mouse/touch-only and invisible to keyboard and screen-reader users.
-   Fix: Convert these to <button> or add role="button" tabIndex={0} + onKeyDown (Enter/Space) — ideally one shared <ClickableCell> wrapper.
-3. Dead store actions and unused state field
+1. Dead store actions and unused state field
    Impact: Medium
    Evidence: nsFilterVal/setNsFilterVal (store.ts:40-41, store.ts:90-91) are never read anywhere; setItems, setRoots (store.ts:73-74), setPendingDirReconnect, setSyncDirtyCount, setSyncFlash are defined but never called — code writes those keys via useStore.setState(...) directly instead (e.g. vault.ts:71).
    Problem: Seven dead store members plus an inconsistent two-way pattern (actions vs. raw setState) mislead readers about the intended API.
    Fix: Delete the unused actions and the nsFilterVal field, or route the existing setState calls through the actions — pick one convention.
-4. Pervasive any and unsafe casts in the model/mutation layer
+2. Pervasive any and unsafe casts in the model/mutation layer
    Impact: Medium
    Evidence: saveNode(item, editScope, fields: any) (mutations.ts:77), (i: any) / (i as any).excluded (mutations.ts:151-152), entryFromItem(item: any) and openEntry((item: any …)) (App.tsx:35, App.tsx:106), as any in storeBridge.ts:9-10, and an entire eslint-disable no-explicit-any block over expansion.ts:164+.
    Problem: The most logic-heavy code (recurrence expansion, save path) has its type checking disabled, so schema mistakes surface at runtime instead of compile time.
    Fix: Type saveNode's fields as a SaveFields interface (it already has a fixed shape) and replace any store accessors with the existing StoreItem/PrimaryView unions.
-5. Cache-write failures are silently swallowed
+3. Cache-write failures are silently swallowed
    Impact: High
    Evidence: vault.ts:42-44 writeEntityToCache and vault.ts:54-56 deleteFileFromDisk catch all errors and only console.error — unlike syncToDirectory which calls notify(...) (vault.ts:75). updateSyncUI also swallows with empty .catch(() => {}) (vault.ts:26).
    Problem: If an IndexedDB write fails, the user's edit is lost with zero feedback while the UI shows the change as saved — silent data loss.
    Fix: Call notify(...) (and avoid clearing dirty state) in these catch blocks, matching the sync path's error handling.
-6. Day-view "now" line is computed once and never updates
+4. Day-view "now" line is computed once and never updates
    Impact: Medium
    Evidence: DayView.tsx:256-265 computes const now = new Date() inside the render IIFE; nothing schedules a re-render, and isToday/now are not on any timer.
    Problem: The current-time indicator is correct only at mount and then drifts, defeating its purpose in a calendar's primary day view.
    Fix: Add a useEffect with setInterval (e.g. every 60s) that bumps a state tick to re-render the line.
-7. No loading or empty/error state while a vault loads
+5. No loading or empty/error state while a vault loads
    Impact: Medium
    Evidence: loadFilesFromDisk (vault.ts:81-99) awaits disk reads then setData; the views render items=[] meanwhile, and AgendaView (AgendaView.tsx:87) has no empty/loading branch — it just renders a bare "Today" section.
    Problem: During async vault load (or parse failure) the user sees a blank screen with no spinner or "no items" messaging, indistinguishable from a broken app.
    Fix: Add an isLoading flag to the store and render skeleton/empty-state UI in the primary views.
-8. App.tsx is a god-component
-   Impact: Medium
-   Evidence: App.tsx is 388 lines holding 6 useStates, ~15 dialog/entry callbacks (App.tsx:130-205), sync-button color/title derivation (App.tsx:71-78), and the full markup for topbar, sidebar, 4 views, search bar, and 7 dialogs.
-   Problem: Entry-editing orchestration, navigation chrome, and dialog wiring are all in one file, making any change high-risk and hard to test.
-   Fix: Extract a useEntryEditor() hook (entry state + its callbacks) and a <DialogStack> component, leaving App as layout only.
-9. Sort/layout helpers mutate their inputs on the render path
+6. Sort/layout helpers mutate their inputs on the render path
    Impact: Medium
    Evidence: sortOccs does arr.sort(...) on the passed array (presentation.ts:71) and is called during render in AgendaView.tsx:101 (sortOccs(g.items) on memoized group arrays); computeColumns writes ev.metadata.\_dh/\_endMs onto live occurrence objects (DayView.tsx:36-37).
    Problem: In-place mutation of memoized/store-derived data during render is a React anti-pattern that causes order-dependent bugs and makes memo comparisons unreliable.
    Fix: Make sortOccs return [...arr].sort(...) and have computeColumns carry layout values in a local map instead of on metadata.
-10. MonthView redefines TODAY instead of using the shared constant
-    Impact: Medium
-    Evidence: MonthView.tsx:10 const TODAY = new Date(); TODAY.setHours(0,0,0,0) shadows the canonical constants.ts:5 TODAY that every other view imports.
-    Problem: Two independent "today" definitions can disagree (and a local one captured at module load won't match an app that's been open past midnight), an avoidable correctness/consistency hazard.
-    Fix: Delete the local constant and import { TODAY } from '../constants' like the other views.
 
 ## Survey Prompt
 
