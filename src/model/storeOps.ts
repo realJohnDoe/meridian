@@ -7,7 +7,7 @@
  * No store / React / fileIO dependencies — shared by the main app and the debug view.
  */
 
-import type { StoreItem, Occurrence, OccurrenceMetadata, Repeat, Roots, FileMetadata } from '../types'
+import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots, FileMetadata } from '../types'
 import { isSeries, isStandaloneOcc } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from './expansion'
 import { titleToSlug } from '../fileIO'
@@ -99,18 +99,18 @@ export interface EditFields {
   body:         string
   tracked:   boolean
   done:      boolean
-  priority:  string | null
+  priority:  Priority | null
   scheduled: { date: string; time: string } | null
   duration:  string
   repeat:    Repeat | null
 }
 
 /** Extract OccurrenceMetadata from expanded AppMetadata (strips file-level fields). */
-function occFromAppMeta(m: { done?: boolean; participants?: string[]; priority?: string; duration?: string; timezone?: string }): OccurrenceMetadata {
+function occFromAppMeta(m: { done?: boolean; participants?: string[]; priority?: Priority; duration?: string; timezone?: string }): OccurrenceMetadata {
   return {
     done:         m.done,
     participants: m.participants ?? [],
-    priority:     m.priority as OccurrenceMetadata['priority'],
+    priority:     m.priority,
     duration:     m.duration,
     timezone:     m.timezone,
   }
@@ -125,7 +125,7 @@ function occMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMe
     ...(base as OccurrenceMetadata),
     participants: f.participants ?? [],
     duration:     f.duration || undefined,
-    priority:     (f.priority as OccurrenceMetadata['priority']) ?? undefined,
+    priority:     f.priority ?? undefined,
     done:         f.tracked ? f.done : undefined,
   }
 }
