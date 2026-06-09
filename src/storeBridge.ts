@@ -1,13 +1,14 @@
 import type { StoreItem, Roots } from './types'
 import { useStore } from './store'
+import type { PrimaryView, OverlayView } from './store'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
 export const getItems      = (): StoreItem[]   => useStore.getState().items
 export const getRoots      = (): Roots         => useStore.getState().roots
 export const setData       = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
-export const getPrimary    = ()                => useStore.getState().primaryView
-export const setPrimary    = (v: string)       => useStore.getState().setPrimaryView(v as any)
-export const pushOverlayFn = (v: string)       => useStore.getState().pushOverlay(v as any)
+export const getPrimary    = ()                  => useStore.getState().primaryView
+export const setPrimary    = (v: PrimaryView)    => useStore.getState().setPrimaryView(v)
+export const pushOverlayFn = (v: OverlayView)    => useStore.getState().pushOverlay(v)
 export const popOverlayFn  = ()               => useStore.getState().popOverlay()
 export const setCalMonth   = (d: Date)         => useStore.setState({ calMonth: d })
 export const setDvDate     = (d: Date)         => useStore.setState({ dvDate: d })

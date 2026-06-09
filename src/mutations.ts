@@ -74,7 +74,9 @@ export function entryFromOccurrence(
 
 // ── MUTATION API ──────────────────────────────────────────────
 
-export function saveNode(item: Occurrence | null, editScope: string, fields: any): void {
+type SaveFields = EntryState & { body: string }
+
+export function saveNode(item: Occurrence | null, editScope: string, fields: SaveFields): void {
   const { title } = fields
   if (!title) return
 
@@ -148,8 +150,8 @@ export function deleteNode(
   const items     = getItems()
   const series    = findSeries(items, item)
   const slugItems = fileSlugItems(items, item.fileSlug)
-  const isSelf      = (i: any) => i.id === item.id
-  const hasSiblings = slugItems.some(i => !isSeries(i) && !isSelf(i) && !(i as any).excluded)
+  const isSelf      = (i: StoreItem) => i.id === item.id
+  const hasSiblings = slugItems.some(i => !isSeries(i) && !isSelf(i) && !i.excluded)
   const isRecurring = !!item.ownerId
   const isScheduled = series?.repeat?.type === 'schedule'
   const title       = item.metadata.title   // expanded occurrence already carries the file-level title

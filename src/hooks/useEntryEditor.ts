@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useStore } from '../store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from '../mutations'
 import type { SeriesSheetConfig } from '../mutations'
+import type { Occurrence } from '../types'
 import { buildBodyHtml, fileOccurrenceMap } from '../presentation'
 import { fmtISO } from '../model/expansion'
 import { TODAY } from '../constants'
@@ -9,7 +10,7 @@ import { resolveWikilink } from '../wikilinks'
 import { type EntryState, ENTRY_DEFAULT } from '../components/EntryEditor'
 import type { Priority } from '../types'
 
-function entryFromItem(item: any, editScope: string): EntryState {
+function entryFromItem(item: Occurrence | null, editScope: string): EntryState {
   if (!item) {
     return { ...ENTRY_DEFAULT, scheduled: { date: fmtISO(TODAY), time: '' } }
   }
@@ -33,7 +34,7 @@ export function useEntryEditor() {
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const openEntry = useCallback((item: any, scope?: string, prefillTitle?: string) => {
+  const openEntry = useCallback((item: Occurrence | null, scope?: string, prefillTitle?: string) => {
     const editScope = scope ?? (item ? 'single' : 'all')
     const state = entryFromItem(item, editScope)
     setEntry(prefillTitle && !item ? { ...state, title: prefillTitle } : state)
