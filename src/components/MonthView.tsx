@@ -5,8 +5,7 @@ import type { Occurrence } from '../types'
 
 import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, sortOccs, ccBarClass } from '../presentation'
-
-const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
+import { TODAY } from '../constants'
 
 const MONTHS = [
   'January','February','March','April','May','June',
