@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { StoreItem, Roots } from './types'
-import { TODAY as _today } from './constants'
 
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
@@ -10,10 +9,6 @@ interface MeridianStore {
   setRoots: (roots: Roots) => void
   /** Set items and roots together atomically. */
   setData: (data: { items: StoreItem[]; roots: Roots }) => void
-
-  // ── Calendar cursor ─────────────────────────────────────────────
-  calMonth: Date
-  setCalMonth: (d: Date) => void
 
   // ── Search ──────────────────────────────────────────────────────
   nsFilterVal: string
@@ -52,9 +47,6 @@ export const useStore = create<MeridianStore>((set) => ({
   setItems: (items) => set({ items }),
   setRoots: (roots) => set({ roots }),
   setData:  ({ items, roots }) => set({ items, roots }),
-
-  calMonth: new Date(_today.getFullYear(), _today.getMonth(), 1),
-  setCalMonth: (calMonth) => set({ calMonth }),
 
   nsFilterVal: 'all',
   setNsFilterVal: (nsFilterVal) => set({ nsFilterVal }),

@@ -5,7 +5,6 @@ import { useStore } from './store'
 export const getItems    = (): StoreItem[]   => useStore.getState().items
 export const getRoots    = (): Roots         => useStore.getState().roots
 export const setData     = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
-export const setCalMonth = (d: Date)         => useStore.setState({ calMonth: d })
 export const getDirHandle  = ()              => useStore.getState().dirHandle
 export const setDirHandle  = (h: FileSystemDirectoryHandle | null) => useStore.setState({ dirHandle: h })
 

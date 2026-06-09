@@ -67,20 +67,22 @@ function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
 
 // ── MonthView ─────────────────────────────────────────────────
 interface Props {
+  month: Date
+  onNavigateMonth: (d: Date) => void
   onDayClick: (date: Date) => void
 }
 
-export default function MonthView({ onDayClick }: Props) {
-  const calMonth   = useStore(s => s.calMonth)
-  const items      = useStore(s => s.items)
-  const roots      = useStore(s => s.roots)
-  const setCalMonth = useStore(s => s.setCalMonth)
+export default function MonthView({ month, onNavigateMonth, onDayClick }: Props) {
+  const items = useStore(s => s.items)
+  const roots = useStore(s => s.roots)
 
-  const m = calMonth.getMonth()
-  const y = calMonth.getFullYear()
+  const m = month.getMonth()
+  const y = month.getFullYear()
 
-  const calMonthRef = useRef(calMonth)
-  useEffect(() => { calMonthRef.current = calMonth }, [calMonth])
+  const monthRef = useRef(month)
+  useEffect(() => { monthRef.current = month }, [month])
+  const onNavigateMonthRef = useRef(onNavigateMonth)
+  useEffect(() => { onNavigateMonthRef.current = onNavigateMonth }, [onNavigateMonth])
 
   const { cells, occs } = useMemo(() => {
     const rawFirst = new Date(y, m, 1).getDay()
@@ -101,14 +103,8 @@ export default function MonthView({ onDayClick }: Props) {
     return { cells, occs }
   }, [items, roots, y, m])
 
-  function prevMonth() {
-    const d = calMonthRef.current
-    setCalMonth(new Date(d.getFullYear(), d.getMonth() - 1, 1))
-  }
-  function nextMonth() {
-    const d = calMonthRef.current
-    setCalMonth(new Date(d.getFullYear(), d.getMonth() + 1, 1))
-  }
+  function prevMonth() { onNavigateMonth(new Date(y, m - 1, 1)) }
+  function nextMonth() { onNavigateMonth(new Date(y, m + 1, 1)) }
 
   const wrapRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -120,7 +116,9 @@ export default function MonthView({ onDayClick }: Props) {
       const dx = e.changedTouches[0].clientX - sx
       const dy = e.changedTouches[0].clientY - sy
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-        if (dx < 0) nextMonth(); else prevMonth()
+        const d = monthRef.current
+        const next = new Date(d.getFullYear(), d.getMonth() + (dx < 0 ? 1 : -1), 1)
+        onNavigateMonthRef.current(next)
       }
     }
     el.addEventListener('touchstart', onStart, { passive: true })

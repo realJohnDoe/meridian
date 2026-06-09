@@ -33,7 +33,6 @@ function AppLayout() {
   const syncFlash           = useStore(s => s.syncFlash)
   const dirHandle           = useStore(s => s.dirHandle)
   const pendingDirReconnect = useStore(s => s.pendingDirReconnect)
-  const setCalMonth         = useStore(s => s.setCalMonth)
 
   const syncColor = syncFlash
     ? 'var(--grn)'
@@ -49,11 +48,14 @@ function AppLayout() {
     ? new Date(pathname.split('/')[2] + 'T00:00:00')
     : null
 
+  const fmtMonth = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+
   const handleToday = () => {
     if (isDayView) {
       navigate({ to: '/day/$date', params: { date: fmtISO(TODAY) } })
-    } else if (pathname === '/calendar') {
-      setCalMonth(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1))
+    } else if (pathname.startsWith('/calendar')) {
+      navigate({ to: '/calendar/$month', params: { month: fmtMonth(TODAY) } })
     } else {
       navigate({ to: '/' })
       setTimeout(() => {
@@ -64,9 +66,9 @@ function AppLayout() {
   }
 
   const navItems = [
-    { Icon: AlignLeft,    label: 'Agenda', active: pathname === '/',          onClick: () => { setSidebarOpen(false); navigate({ to: '/' }) } },
-    { Icon: CalendarDays, label: 'Month',  active: pathname === '/calendar',   onClick: () => { setSidebarOpen(false); navigate({ to: '/calendar' }) } },
-    { Icon: CalendarClock, label: 'Day',   active: isDayView,                  onClick: () => { setSidebarOpen(false); navigate({ to: '/day/$date', params: { date: fmtISO(TODAY) } }) } },
+    { Icon: AlignLeft,    label: 'Agenda', active: pathname === '/',                   onClick: () => { setSidebarOpen(false); navigate({ to: '/' }) } },
+    { Icon: CalendarDays, label: 'Month',  active: pathname.startsWith('/calendar'),   onClick: () => { setSidebarOpen(false); navigate({ to: '/calendar/$month', params: { month: fmtMonth(TODAY) } }) } },
+    { Icon: CalendarClock, label: 'Day',   active: isDayView,                          onClick: () => { setSidebarOpen(false); navigate({ to: '/day/$date', params: { date: fmtISO(TODAY) } }) } },
   ]
 
   const openEntry = (occ: Occurrence, scope?: string) =>
