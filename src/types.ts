@@ -175,10 +175,8 @@ export function occKind(occ: Occurrence): 'event' | 'task' | 'note' {
 }
 
 /** True when the occurrence belongs to a recurring series (has an ownerId). */
-export function occIsRecur(occ: Occurrence, items?: StoreItem[]): boolean {
-  if (occ.ownerId) return true
-  if (items) return items.some(i => isSeries(i) && i.id === occ.ownerId)
-  return false
+export function occIsRecur(occ: Occurrence): boolean {
+  return !!occ.ownerId
 }
 
 // ── Dialog / Editor helpers ───────────────────────────────────────────────────

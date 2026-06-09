@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText, Users, Tag } from 'lucide-react'
-import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem, Roots } from '../types'
+import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem, Roots, EditScope } from '../types'
 import { TODAY } from '../constants'
 import { fmtISO } from '../model/expansion'
 import { isSeries } from '../types'
@@ -35,7 +35,7 @@ export interface EntryState {
   topics: string[]
   participants: string[]
   priority: Priority | null
-  editScope: string
+  editScope: EditScope
 }
 
 export const ENTRY_DEFAULT: EntryState = {
@@ -77,7 +77,7 @@ interface Props {
   onClose: () => void
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
-  onScopeChange?: (scope: string) => void
+  onScopeChange?: (scope: EditScope) => void
   /** StoreItem[] to resolve parent series against. */
   items: StoreItem[]
   /** Roots map for wikilink autocomplete. App passes global roots; debug passes local roots. */
@@ -303,7 +303,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     }))
   }
 
-  function handleScopeChange(scope: string) {
+  function handleScopeChange(scope: EditScope) {
     onChange(prev => ({ ...prev, editScope: scope }))
     onScopeChange?.(scope)
   }
@@ -431,7 +431,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         <Card className="mt-3 mb-4 overflow-hidden bg-[var(--bg2)]">
           {showScopeRow && (
             <div className="px-3 py-2.5 bg-[var(--bg1)]">
-              <Select value={editScope} onValueChange={handleScopeChange}>
+              <Select value={editScope} onValueChange={v => handleScopeChange(v as EditScope)}>
                 <SelectTrigger className="w-full border-0 shadow-none bg-transparent p-0 h-auto text-sm font-medium text-[var(--t2)] focus:ring-0 hover:bg-transparent [&>svg]:ml-auto [&>svg]:shrink-0">
                   <SelectValue />
                 </SelectTrigger>

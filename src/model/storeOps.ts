@@ -7,7 +7,7 @@
  * No store / React / fileIO dependencies — shared by the main app and the debug view.
  */
 
-import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots, FileMetadata } from '../types'
+import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots, FileMetadata, EditScope } from '../types'
 import { isSeries, isStandaloneOcc } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from './expansion'
 import { titleToSlug } from '../fileIO'
@@ -160,7 +160,7 @@ export function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots
 export function applyEdit(
   data: StoreData,
   occ: Occurrence | null,
-  scope: string,
+  scope: EditScope,
   fields: EditFields,
 ): StoreData {
   const { title, scheduled, repeat } = fields

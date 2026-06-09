@@ -18,7 +18,7 @@ import {
   type EditFields,
 } from '../model/storeOps'
 import { loadFile, saveFile } from '../fileIO'
-import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata } from '../types'
+import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from '../model/expansion'
 import type { OccurrenceMetadata } from '../types'
 import EntryEditor, { type EntryState } from '../components/EntryEditor'
@@ -431,7 +431,7 @@ export default function NodeInheritanceDebugger() {
     setSelectedIdx(null); setDebugEntry(null)
   }, [])
 
-  const handleDebugScopeChange = useCallback((scope: string) => {
+  const handleDebugScopeChange = useCallback((scope: EditScope) => {
     setDebugEntry(prev => {
       if (!prev?.item) return prev
       const occ = prev.item as Occurrence
