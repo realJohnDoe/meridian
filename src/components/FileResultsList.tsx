@@ -31,8 +31,9 @@ interface Props {
 /**
  * Deduped, file-granular search results for the bottom-bar filter overlay.
  *
- * Shows one agenda OccurrenceCard per matching file (targetOccurrence of each
- * file), so no duplicates when a file has multiple occurrences in the range.
+ * Shows one agenda OccurrenceCard per matching file (one representative
+ * occurrence per file from fileOccurrenceMap), so no duplicates when a file
+ * has multiple occurrences in the range.
  * Tags and topics are matched the same way — no divergence between fields.
  */
 export default function FileResultsList({ query, items, onOpen }: Props) {
