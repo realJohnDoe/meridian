@@ -1,8 +1,8 @@
+import { useCallback, useEffect } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useEffect } from 'react'
 import AgendaView from '../components/AgendaView'
-import type { Occurrence } from '../types'
 import { fmtISO } from '../model/expansion'
+import { entryRoute } from './-entryRoute'
 import { TODAY } from '../constants'
 
 export const Route = createFileRoute('/_app/')({
@@ -19,13 +19,14 @@ function AgendaPage() {
     }, 200)
   }, [])
 
+  const onOpen = useCallback(
+    (occ: Parameters<typeof entryRoute>[0], scope?: string) => navigate(entryRoute(occ, scope)),
+    [navigate],
+  )
+
   return (
     <div className="ag-sc" id="agSc">
-      <AgendaView
-        onOpen={(occ: Occurrence, scope?: string) =>
-          navigate({ to: '/entry/$fileSlug', params: { fileSlug: occ.fileSlug }, search: { date: occ.date ?? undefined, scope: scope ?? 'single' } })
-        }
-      />
+      <AgendaView onOpen={onOpen} />
     </div>
   )
 }

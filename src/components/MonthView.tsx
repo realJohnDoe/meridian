@@ -81,8 +81,6 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
   const monthRef = useRef(month)
   useEffect(() => { monthRef.current = month }, [month])
-  const onNavigateMonthRef = useRef(onNavigateMonth)
-  useEffect(() => { onNavigateMonthRef.current = onNavigateMonth }, [onNavigateMonth])
 
   const { cells, occs } = useMemo(() => {
     const rawFirst = new Date(y, m, 1).getDay()
@@ -117,8 +115,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       const dy = e.changedTouches[0].clientY - sy
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
         const d = monthRef.current
-        const next = new Date(d.getFullYear(), d.getMonth() + (dx < 0 ? 1 : -1), 1)
-        onNavigateMonthRef.current(next)
+        onNavigateMonth(new Date(d.getFullYear(), d.getMonth() + (dx < 0 ? 1 : -1), 1))
       }
     }
     el.addEventListener('touchstart', onStart, { passive: true })
@@ -127,7 +124,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       el.removeEventListener('touchstart', onStart)
       el.removeEventListener('touchend',   onEnd)
     }
-  }, [])
+  }, [onNavigateMonth])
 
   return (
     <div className="cal-wrap" ref={wrapRef}>

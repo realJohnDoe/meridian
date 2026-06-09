@@ -9,8 +9,9 @@ import {
 import { useStore } from '../store'
 import { syncToDirectory, pickDirectory, reconnectDirectory } from '../vault'
 import { addDays, fmtLong } from '../presentation'
-import { fmtISO } from '../model/expansion'
+import { fmtISO, fmtMonth } from '../model/expansion'
 import { TODAY } from '../constants'
+import { entryRoute } from './-entryRoute'
 import FilterOverlay from '../components/FilterOverlay'
 import UndoToast from '../components/UndoToast'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet'
@@ -48,9 +49,6 @@ function AppLayout() {
     ? new Date(pathname.split('/')[2] + 'T00:00:00')
     : null
 
-  const fmtMonth = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-
   const handleToday = () => {
     if (isDayView) {
       navigate({ to: '/day/$date', params: { date: fmtISO(TODAY) } })
@@ -71,8 +69,7 @@ function AppLayout() {
     { Icon: CalendarClock, label: 'Day',   active: isDayView,                          onClick: () => { setSidebarOpen(false); navigate({ to: '/day/$date', params: { date: fmtISO(TODAY) } }) } },
   ]
 
-  const openEntry = (occ: Occurrence, scope?: string) =>
-    navigate({ to: '/entry/$fileSlug', params: { fileSlug: occ.fileSlug }, search: { date: occ.date ?? undefined, scope: scope ?? 'single' } })
+  const openEntry = (occ: Occurrence, scope?: string) => navigate(entryRoute(occ, scope))
 
   return (
     <>
