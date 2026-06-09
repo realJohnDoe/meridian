@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText, Users, Tag } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem, Roots } from '../types'
+import { TODAY } from '../constants'
+import { fmtISO } from '../model/expansion'
 import { isSeries } from '../types'
 import { fileEntries } from '../presentation'
 import { Badge, badgeVariants } from './ui/badge'
@@ -294,8 +296,10 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       itemType: t,
       tracked: t === 'task',
       priority: t !== 'task' ? null : prev.priority,
-      // Notes have no date — clear it automatically so users don't have to
-      scheduled: t === 'note' ? null : prev.scheduled,
+      scheduled:
+        t === 'note'                         ? null
+        : t === 'event' && !prev.scheduled   ? { date: fmtISO(TODAY), time: '' }
+        : prev.scheduled,
     }))
   }
 
