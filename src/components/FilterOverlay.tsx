@@ -2,6 +2,7 @@ import { Plus } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
 import FileResultsList from './FileResultsList'
+import { Button } from './ui/button'
 
 interface Props {
   query: string
@@ -17,10 +18,15 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
   return (
     <div id="filterOverlay" className="filter-overlay">
       {/* "Create" row */}
-      <div className="occ-create-row" onClick={() => onCreate(query)}>
-        <Plus size={14} />
+      <Button
+        variant="ghost"
+        className="w-full justify-start gap-[10px] px-[14px] py-3 h-auto rounded-none border-b border-[var(--bdr)] text-[var(--ind)] hover:bg-[var(--bg2)] hover:text-[var(--ind)]"
+        onClick={() => onCreate(query)}
+        aria-label={`Create "${query}"`}
+      >
+        <Plus size={14} className="shrink-0" />
         <span>Create "<strong>{query}</strong>"</span>
-      </div>
+      </Button>
 
       <FileResultsList query={query} items={items} onOpen={onOpen} />
     </div>
