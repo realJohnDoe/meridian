@@ -4,7 +4,7 @@ import { useStore } from '../store'
 import { Button } from './ui/button'
 import { SurfaceButton } from './ui/surface-button'
 import { cn } from '../lib/utils'
-import type { Occurrence } from '../types'
+import type { Occurrence, EditScope } from '../types'
 import { occKind } from '../types'
 import { expandWithMultiday, fmtT, parseDurationHours, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, addDays, fmtLong, sortOccs, occState } from '../presentation'
@@ -138,7 +138,7 @@ function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
 // ── DayView ───────────────────────────────────────────────────
 
 interface Props {
-  onOpen: (occ: Occurrence, scope?: string) => void
+  onOpen: (occ: Occurrence, scope?: EditScope) => void
 }
 
 export default function DayView({ onOpen }: Props) {

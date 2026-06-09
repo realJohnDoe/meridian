@@ -21,7 +21,7 @@ import MonthView from './components/MonthView'
 import DayView from './components/DayView'
 import FilterOverlay from './components/FilterOverlay'
 import { useEntryEditor } from './hooks/useEntryEditor'
-import type { Occurrence } from './types'
+import type { Occurrence, EditScope } from './types'
 import { cn } from './lib/utils'
 import { Button } from './components/ui/button'
 import {
@@ -133,7 +133,7 @@ export default function App() {
 
         <section className={viewCls('agenda')} id="view-agenda">
           <div className="ag-sc" id="agSc">
-            <AgendaView onOpen={(occ: Occurrence, scope?: string) => openEntry(occ, scope ?? 'single')} />
+            <AgendaView onOpen={(occ: Occurrence, scope?: EditScope) => openEntry(occ, scope ?? 'single')} />
           </div>
         </section>
 
@@ -142,7 +142,7 @@ export default function App() {
         </section>
 
         <section className={viewCls('day')} id="view-day">
-          <DayView onOpen={(occ: Occurrence, scope?: string) => openEntry(occ, scope ?? 'single')} />
+          <DayView onOpen={(occ: Occurrence, scope?: EditScope) => openEntry(occ, scope ?? 'single')} />
         </section>
 
         <section className={viewCls('entry')} id="view-entry">
