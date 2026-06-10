@@ -11,15 +11,22 @@ export const Route = createFileRoute('/_app/')({
   component: AgendaPage,
 })
 
+// Survives remounts; window scroll so we use scrollY not a container's scrollTop
+let savedScrollTop = 0
+
 function AgendaPage() {
   const navigate = useNavigate()
   const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
 
-  // Enable window-scroll layout before first paint; restore on unmount
+  // Toggle window-scroll layout and restore position — all before first paint
   useLayoutEffect(() => {
     document.documentElement.classList.add('agenda-scroll')
-    return () => document.documentElement.classList.remove('agenda-scroll')
-  }, [])
+    if (!scrollToTodayOnce) window.scrollTo(0, savedScrollTop)
+    return () => {
+      savedScrollTop = window.scrollY
+      document.documentElement.classList.remove('agenda-scroll')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll to today when flagged (vault load or Today button)
   useEffect(() => {
