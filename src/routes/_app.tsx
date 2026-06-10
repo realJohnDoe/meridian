@@ -36,8 +36,8 @@ function AppLayout() {
   const pendingDirReconnect = useStore(s => s.pendingDirReconnect)
 
   const syncColor = syncFlash
-    ? 'var(--grn)'
-    : !dirHandle ? 'var(--t3)' : syncDirtyCount > 0 ? 'var(--amb)' : 'var(--t2)'
+    ? 'var(--task)'
+    : !dirHandle ? 'var(--muted-foreground)' : syncDirtyCount > 0 ? 'var(--note)' : 'var(--dim)'
   const syncTitle = !dirHandle
     ? 'Click folder icon to open vault'
     : syncDirtyCount > 0
@@ -91,7 +91,7 @@ function AppLayout() {
         <div className="tb-r">
           <button className="ib" onClick={syncToDirectory} title={syncTitle} style={{ color: syncColor }}><FolderSync /></button>
           <button
-            className={cn('ib', pendingDirReconnect && !dirHandle && 'text-[var(--amb)]')}
+            className={cn('ib', pendingDirReconnect && !dirHandle && 'text-note')}
             onClick={pendingDirReconnect && !dirHandle ? reconnectDirectory : pickDirectory}
             title={pendingDirReconnect && !dirHandle ? `Reconnect vault "${pendingDirReconnect}"` : 'Open vault'}
           ><FolderOpen /></button>
@@ -106,19 +106,19 @@ function AppLayout() {
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent
           side="left"
-          className="w-[260px] sm:max-w-[260px] p-0 flex flex-col bg-[var(--bg2)] border-r border-[var(--bdr2)]"
+          className="w-[260px] sm:max-w-[260px] p-0 flex flex-col bg-sidebar border-r border-sidebar-border"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
           </SheetHeader>
-          <div className="flex items-center gap-[10px] h-[var(--th)] px-4 border-b border-[var(--bdr)] shrink-0">
+          <div className="flex items-center gap-[10px] h-[var(--th)] px-4 border-b border-sidebar-border shrink-0">
             <img
               src={`${import.meta.env.BASE_URL}icon-192.png`}
               width="26" height="26"
               style={{ borderRadius: 5 }}
               alt="Meridian"
             />
-            <span className="font-[family-name:var(--disp)] italic text-[16px] text-[var(--t1)]">Meridian</span>
+            <span className="font-[family-name:var(--disp)] italic text-[16px] text-sidebar-foreground">Meridian</span>
           </div>
           <nav className="flex-1 overflow-y-auto py-2">
             {navItems.map(({ Icon, label, active, onClick }) => (
@@ -128,8 +128,8 @@ function AppLayout() {
                 onClick={onClick}
                 className={cn(
                   'w-full justify-start gap-[14px] px-5 h-auto py-[13px] text-[14px] font-medium rounded-none',
-                  'text-[var(--t2)] hover:bg-[var(--bg3)] hover:text-[var(--t1)]',
-                  active && 'text-[var(--ind)] bg-[var(--ab)] hover:text-[var(--ind)] hover:bg-[var(--ab)]',
+                  'text-dim hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                  active && 'text-sidebar-primary bg-primary/12 hover:text-sidebar-primary hover:bg-primary/12',
                 )}
               >
                 <Icon className="size-[19px] stroke-[1.7] shrink-0" />

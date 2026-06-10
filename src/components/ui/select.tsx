@@ -67,7 +67,7 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'relative z-50 min-w-[8rem] overflow-hidden rounded-lg border border-border/50 bg-[var(--bg2)] text-foreground shadow-lg',
+        'relative z-50 min-w-[8rem] overflow-hidden rounded-lg border border-border/50 bg-popover text-foreground shadow-lg',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',

@@ -11,9 +11,9 @@ const Checkbox = React.forwardRef<
     ref={ref}
     className={cn(
       // Base: circular border, flex-centered, green when checked
-      'rounded-full border-[1.5px] border-[var(--bg4)] flex items-center justify-center shrink-0',
+      'rounded-full border-[1.5px] border-surface-raised flex items-center justify-center shrink-0',
       'transition-colors duration-150',
-      'data-[state=checked]:bg-[var(--grn)]/60 data-[state=checked]:border-[var(--grn)]/60',
+      'data-[state=checked]:bg-task/60 data-[state=checked]:border-task/60',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
       'disabled:cursor-not-allowed disabled:opacity-50',
       className,

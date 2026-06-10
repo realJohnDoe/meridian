@@ -314,7 +314,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         <button className="ib" onClick={onClose}><ArrowLeft /></button>
         <span className="entry-fname">{fname}</span>
         {item && (
-          <button className="ib" onClick={onDelete} title="Delete" style={{ color: 'var(--ros)' }}>
+          <button className="ib" onClick={onDelete} title="Delete" style={{ color: 'var(--destructive)' }}>
             <Trash2 />
           </button>
         )}
@@ -367,7 +367,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
             <PopoverTrigger asChild>
               <Badge
                 variant="tag"
-                className="cursor-pointer text-primary bg-[var(--ab)] gap-1"
+                className="cursor-pointer text-primary bg-primary/12 gap-1"
                 onClick={() => setPickerOpen(true)}
               >
                 <Plus size={9} /><Tag size={9} />add
@@ -411,7 +411,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
                           {entryTypeIcon(e.fileSlug)}
                           <span className="truncate">{e.title}</span>
                           {e.tags[0] && (
-                            <span className="ml-auto text-[10px] text-[var(--t3)] shrink-0">{e.tags[0]}</span>
+                            <span className="ml-auto text-[10px] text-muted-foreground shrink-0">{e.tags[0]}</span>
                           )}
                         </CommandItem>
                       ))}
@@ -428,11 +428,11 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         </div>
 
         {/* ── OCCURRENCE-LEVEL: scope (header) → type → metadata → participants ── */}
-        <Card className="mt-3 mb-4 overflow-hidden bg-[var(--bg2)]">
+        <Card className="mt-3 mb-4 overflow-hidden bg-card">
           {showScopeRow && (
-            <div className="px-3 py-2.5 bg-[var(--bg1)]">
+            <div className="px-3 py-2.5 bg-background">
               <Select value={editScope} onValueChange={v => handleScopeChange(v as EditScope)}>
-                <SelectTrigger className="w-full border-0 shadow-none bg-transparent p-0 h-auto text-sm font-medium text-[var(--t2)] focus:ring-0 hover:bg-transparent [&>svg]:ml-auto [&>svg]:shrink-0">
+                <SelectTrigger className="w-full border-0 shadow-none bg-transparent p-0 h-auto text-sm font-medium text-dim focus:ring-0 hover:bg-transparent [&>svg]:ml-auto [&>svg]:shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -445,8 +445,8 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
             </div>
           )}
           <CardContent className={cn(
-            'px-3 pt-3 pb-3 bg-[var(--bg2)]',
-            showScopeRow && 'border-t border-[var(--bdr2)]',
+            'px-3 pt-3 pb-3 bg-card',
+            showScopeRow && 'border-t border-input',
           )}>
             <ToggleGroup
               type="single"
@@ -533,7 +533,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
               ) : (
                 <Badge
                   variant="tag"
-                  className="cursor-pointer text-primary bg-[var(--ab)] gap-1"
+                  className="cursor-pointer text-primary bg-primary/12 gap-1"
                   onClick={() => setShowParticipantInput(true)}
                 >
                   <Plus size={9} />person

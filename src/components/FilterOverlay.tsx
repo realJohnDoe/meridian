@@ -20,7 +20,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
       {/* "Create" row */}
       <Button
         variant="ghost"
-        className="w-full justify-start gap-[10px] px-[14px] py-3 h-auto rounded-none border-b border-[var(--bdr)] text-[var(--ind)] hover:bg-[var(--bg2)] hover:text-[var(--ind)]"
+        className="w-full justify-start gap-[10px] px-[14px] py-3 h-auto rounded-none border-b border-border text-primary hover:bg-card hover:text-primary"
         onClick={() => onCreate(query)}
         aria-label={`Create "${query}"`}
       >
