@@ -82,7 +82,7 @@ async function reconcileWithDisk(backend: StorageBackend, vaultId: string): Prom
     const freshFiles = await backend.readFiles(changed)
     await cacheBulkWriteClean(vaultId, freshFiles)
     for (const f of freshFiles) {
-      cacheMap.set(f.path, { vaultId, path: f.path, content: f.content, dirty: 0, updatedAt: Date.now(), version: f.version })
+      cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, dirty: 0, updatedAt: Date.now(), version: f.version })
     }
   }
 
