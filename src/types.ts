@@ -43,8 +43,6 @@ export interface OccurrenceMetadata {
 /** Fields never persisted to YAML — computed at runtime or used only by the UI. */
 export interface ExtendedMetadata {
   jsTime?: Date    // computed from date+time; undefined in raw store items
-  _dh?:   number  // DayView layout
-  _endMs?: number // DayView layout
 }
 
 /**
