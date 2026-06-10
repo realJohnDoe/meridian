@@ -224,11 +224,11 @@ export function ccBarClass(o: Occurrence): string {
   return _ccBarMap[occState(o)] ?? 'event'
 }
 
-/** DayView event-block classes (applied as `dv-eblk <class>` / `dv-aditem <class>`). */
+/** DayView event-block classes (applied as `dv-eblk <class>` / `dv-aditem <class>`).
+ *  Notes are undated and never reach expandRange, so 'note' is not listed here. */
 const _dvBlkMap: Record<string, string> = {
   'done':         'past',
   'event-past':   'past',
-  'note':         'event',
   'task-open':    'task',
   'task-p1':      'task-p1',
   'task-p2':      'task-p2',
