@@ -7,6 +7,8 @@ export interface CacheRecord {
   content:   string
   dirty:     number
   updatedAt: number
+  /** Opaque change-detection token. FS backend: `${lastModified}:${size}`. In-memory edits: `local:${Date.now()}`. Absent on rows written before schema v3 → treat as unknown (re-read). */
+  version?:  string
 }
 
 export interface MetaRecord {
@@ -24,6 +26,8 @@ class MeridianDB extends Dexie {
     super('meridian_v2')
     this.version(1).stores({ files: 'path,dirty,updatedAt' })
     this.version(2).stores({ files: 'path,dirty,updatedAt', meta: 'key' })
+    // v3: adds `version` field to CacheRecord (no new index needed)
+    this.version(3).stores({ files: 'path,dirty,updatedAt', meta: 'key' })
   }
 }
 
@@ -43,14 +47,25 @@ export async function cacheInit(): Promise<MeridianDB> {
 
 // ── Cache CRUD ─────────────────────────────────────────────────
 
-export async function cacheWrite(path: string, content: string): Promise<void> {
+export async function cacheWrite(path: string, content: string, version?: string): Promise<void> {
   const d = await cacheInit()
-  await d.files.put({ path, content, dirty: 1, updatedAt: Date.now() })
+  await d.files.put({ path, content, dirty: 1, updatedAt: Date.now(), version })
 }
 
-export async function cacheWriteClean(path: string, content: string): Promise<void> {
+export async function cacheWriteClean(path: string, content: string, version?: string): Promise<void> {
   const d = await cacheInit()
-  await d.files.put({ path, content, dirty: 0, updatedAt: Date.now() })
+  await d.files.put({ path, content, dirty: 0, updatedAt: Date.now(), version })
+}
+
+export async function cacheBulkWriteClean(records: Array<{ path: string; content: string; version?: string }>): Promise<void> {
+  const d = await cacheInit()
+  const now = Date.now()
+  await d.files.bulkPut(records.map(r => ({ ...r, dirty: 0, updatedAt: now })))
+}
+
+export async function cacheLoadAll(): Promise<CacheRecord[]> {
+  const d = await cacheInit()
+  return d.files.toArray()
 }
 
 export async function cacheDelete(path: string): Promise<void> {
