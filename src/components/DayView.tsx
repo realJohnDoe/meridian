@@ -21,18 +21,21 @@ function formatHour(h: number): string {
   return `${h - 12}pm`
 }
 
-/** Greedy column-packing: returns an array of columns, each a list of events. */
-function computeColumns(events: Occurrence[]): Occurrence[][] {
-  const sorted = [...events].sort((a, b) => +(a.metadata.jsTime ?? 0) - +(b.metadata.jsTime ?? 0))
-  const cols: Occurrence[][] = []
+interface LayoutEvent { occ: Occurrence; dh: number; endMs: number }
+
+/** Greedy column-packing: returns columns of layout-annotated events. */
+function computeColumns(events: Occurrence[]): LayoutEvent[][] {
+  const sorted = [...events]
+    .sort((a, b) => +(a.metadata.jsTime ?? 0) - +(b.metadata.jsTime ?? 0))
+    .map<LayoutEvent>(occ => {
+      const dh = parseDurationHours(occ.metadata.duration)
+      return { occ, dh, endMs: (occ.metadata.jsTime?.getTime() ?? 0) + dh * 3_600_000 }
+    })
+  const cols: LayoutEvent[][] = []
   for (const ev of sorted) {
-    const dh = parseDurationHours(ev.metadata.duration)
-    const endMs = (ev.metadata.jsTime?.getTime() ?? 0) + dh * 3_600_000
-    ev.metadata._dh    = dh
-    ev.metadata._endMs = endMs
     let placed = false
     for (const col of cols) {
-      if ((ev.metadata.jsTime?.getTime() ?? 0) >= col[col.length - 1].metadata._endMs!) {
+      if ((ev.occ.metadata.jsTime?.getTime() ?? 0) >= col[col.length - 1].endMs) {
         col.push(ev); placed = true; break
       }
     }
@@ -80,13 +83,13 @@ function renderAllDayItem(
 
 interface EventBlockProps {
   o: Occurrence
+  dh: number
   colIndex: number
   totalCols: number
   onOpen: (o: Occurrence) => void
 }
-function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
+function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   const h   = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
-  const dh  = o.metadata._dh as number
   const top = (h - SH) * HP + 1
   const height = Math.max(dh * HP - 4, 28)
   const hasTrack = o.metadata.done !== undefined
@@ -142,7 +145,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
     const allOccs = sortOccs(expandWithMultiday(items, roots, from, to))
     const allDay  = allOccs.filter(o => !fmtT(o.time))
     const timed   = allOccs.filter(o =>  !!fmtT(o.time))
-    return { allDay, cols: computeColumns(timed) }
+    return { allDay, cols: computeColumns(timed) }  // cols: LayoutEvent[][]
   }, [dvDate, items, roots])
 
   const scRef = useRef<HTMLDivElement>(null)
@@ -256,14 +259,15 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
           {/* Timed event blocks */}
           {cols.flatMap((col, ci) =>
             col
-              .filter(o => {
-                const h = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
+              .filter(({ occ }) => {
+                const h = (occ.metadata.jsTime?.getHours() ?? 0) + (occ.metadata.jsTime?.getMinutes() ?? 0) / 60
                 return h >= SH && h <= EH
               })
-              .map(o => (
+              .map(({ occ, dh }) => (
                 <EventBlock
-                  key={o.id}
-                  o={o}
+                  key={occ.id}
+                  o={occ}
+                  dh={dh}
                   colIndex={ci}
                   totalCols={totalCols}
                   onOpen={onOpen}
