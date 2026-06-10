@@ -102,19 +102,65 @@ export async function diskPickDirectory(): Promise<FileSystemDirectoryHandle> {
   }
 }
 
-export async function diskReadAll(
+function isVaultFile(name: string): boolean {
+  return name.endsWith('.md') || name.endsWith('.yaml') || name.endsWith('.yml')
+}
+
+export async function diskStatAll(
   dh: FileSystemDirectoryHandle,
-): Promise<Array<{ path: string; content: string }>> {
-  const results: Array<{ path: string; content: string }> = []
+): Promise<Map<string, string>> {
+  const tokens = new Map<string, string>()
   for await (const [name, fh] of dh.entries()) {
-    if (!name.endsWith('.md') && !name.endsWith('.yaml') && !name.endsWith('.yml')) continue
+    if (!isVaultFile(name)) continue
     try {
       const file = await fh.getFile()
-      const content = await file.text()
-      results.push({ path: name, content })
-    } catch (e) { console.warn('[storage] could not read', name, e) }
+      tokens.set(name, `${file.lastModified}:${file.size}`)
+    } catch (e) { console.warn('[storage] could not stat', name, e) }
   }
-  return results
+  return tokens
+}
+
+export async function diskReadFiles(
+  dh: FileSystemDirectoryHandle,
+  paths: string[],
+): Promise<Array<{ path: string; content: string; version: string }>> {
+  const results = await Promise.all(
+    paths.map(async name => {
+      try {
+        const fh = await dh.getFileHandle(name)
+        const file = await fh.getFile()
+        const content = await file.text()
+        return { path: name, content, version: `${file.lastModified}:${file.size}` }
+      } catch (e) {
+        console.warn('[storage] could not read', name, e)
+        return null
+      }
+    })
+  )
+  return results.filter((r): r is { path: string; content: string; version: string } => r !== null)
+}
+
+export async function diskReadAll(
+  dh: FileSystemDirectoryHandle,
+): Promise<Array<{ path: string; content: string; version: string }>> {
+  const handles: Array<[string, FileSystemFileHandle]> = []
+  for await (const [name, fh] of dh.entries()) {
+    if (!isVaultFile(name)) continue
+    handles.push([name, fh])
+  }
+  const results = await Promise.all(
+    handles.map(async ([name, fh]) => {
+      try {
+        const file = await fh.getFile()
+        const content = await file.text()
+        return { path: name, content, version: `${file.lastModified}:${file.size}` }
+      } catch (e) {
+        console.warn('[storage] could not read', name, e)
+        return null
+      }
+    })
+  )
+  return results.filter((r): r is { path: string; content: string; version: string } => r !== null)
 }
 
 export async function diskWrite(
