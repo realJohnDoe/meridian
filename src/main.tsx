@@ -6,6 +6,7 @@ import { routeTree } from './routeTree.gen'
 export const router = createRouter({
   routeTree,
   basepath: '/meridian',
+  scrollRestoration: true,
 })
 
 declare module '@tanstack/react-router' {

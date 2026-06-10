@@ -11,34 +11,17 @@ export const Route = createFileRoute('/_app/')({
   component: AgendaPage,
 })
 
-// Persists across remounts so navigating back restores the exact position
-let savedScrollTop = 0
-
 function AgendaPage() {
   const navigate = useNavigate()
   const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
 
-  // Save position when leaving this page
-  useEffect(() => {
-    return () => {
-      savedScrollTop = document.getElementById('agSc')?.scrollTop ?? 0
-    }
+  // Enable window-scroll layout before first paint; restore on unmount
+  useLayoutEffect(() => {
+    document.documentElement.classList.add('agenda-scroll')
+    return () => document.documentElement.classList.remove('agenda-scroll')
   }, [])
 
-  // On mount: jump to today (if flagged) or restore saved position — before paint
-  useLayoutEffect(() => {
-    const el = document.getElementById('agSc')
-    if (!el) return
-    if (scrollToTodayOnce) {
-      useStore.setState({ scrollToTodayOnce: false })
-      const sec = document.querySelector(`.day-section[data-key="${fmtISO(TODAY)}"]`)
-      if (sec) sec.scrollIntoView({ behavior: 'instant', block: 'start' })
-    } else {
-      el.scrollTop = savedScrollTop
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // After mount: Today button clicked while already on this page
+  // Scroll to today when flagged (vault load or Today button)
   useEffect(() => {
     if (!scrollToTodayOnce) return
     useStore.setState({ scrollToTodayOnce: false })
