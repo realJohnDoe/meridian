@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, Plus, CheckSquare, CalendarDays, FileText, Users, Tag } from 'lucide-react'
+import KindIcon from './KindIcon'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem, Roots, EditScope } from '../types'
 import { TODAY } from '../constants'
 import { fmtISO } from '../model/expansion'
@@ -272,10 +273,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
   /** Pick the right type icon for a file entry in the topic combobox. */
   function entryTypeIcon(fileSlug: string) {
-    const first = items.find(i => i.fileSlug === fileSlug)
-    if (first && first.metadata.done !== undefined) return <CheckSquare size={13} className="shrink-0 opacity-60" />
-    if (first && first.date) return <CalendarDays size={13} className="shrink-0 opacity-60" />
-    return <FileText size={13} className="shrink-0 opacity-60" />
+    return <KindIcon item={items.find(i => i.fileSlug === fileSlug)} size={13} className="shrink-0 opacity-60" />
   }
   // notes: no scheduling chips; events: date/time/duration + repeat (schedule only); tasks: everything
   const showDateChip = !isNote
@@ -573,16 +571,13 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
             // Determine icon: look for a series or timed occurrence in the matching file
             const rootFileSlug = [...roots.entries()].find(([, r]) => r.title === t)?.[0]
             const matchItem = rootFileSlug ? items.find(i => i.fileSlug === rootFileSlug && !isSeries(i)) : undefined
-            const Icon = matchItem && (matchItem as { metadata?: { done?: boolean } }).metadata?.done !== undefined ? CheckSquare
-              : matchItem && matchItem.time ? Calendar
-              : FileText
             return (
               <div
                 key={t}
                 className={`wl-item${i === wlFocusIdx ? ' focused' : ''}`}
                 onMouseDown={e => { e.preventDefault(); insertWikilink(t) }}
               >
-                <Icon size={13} />
+                <KindIcon item={matchItem} size={13} />
                 {t}
               </div>
             )

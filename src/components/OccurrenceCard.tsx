@@ -1,6 +1,6 @@
-import { Repeat2, Users, CheckSquare, CalendarDays, FileText } from 'lucide-react'
+import { Repeat2, Users } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { occKind } from '../types'
+import KindIcon from './KindIcon'
 import { fmtT, parseDateString } from '../model/expansion'
 import { fmtShort } from '../presentation'
 import { Checkbox } from './ui/checkbox'
@@ -38,12 +38,6 @@ function ParticipantsBadge({ participants }: { participants: string[] }) {
   )
 }
 
-function TypeIcon({ occ }: { occ: Occurrence }) {
-  const kind = occKind(occ)
-  if (kind === 'task') return <CheckSquare size={13} className="shrink-0 text-muted-foreground" />
-  if (kind === 'event') return <CalendarDays size={13} className="shrink-0 text-muted-foreground" />
-  return <FileText size={13} className="shrink-0 text-muted-foreground" />
-}
 
 /** Unified tag + topic chip row - reads roots map for wikilink resolution. */
 function TagsRow({ tags, topics }: { tags: string[]; topics: string[] }) {
@@ -168,7 +162,7 @@ export default function OccurrenceCard({
 
         <div className="flex flex-col flex-1 min-w-0 gap-1">
           <div className="flex items-center gap-[6px]">
-            {showTypeIcon && !hasTrack && <TypeIcon occ={occ} />}
+            {showTypeIcon && !hasTrack && <KindIcon item={occ} size={13} className="shrink-0 text-muted-foreground" />}
             {hasTrack && (
               <Checkbox
                 checked={isDone}
