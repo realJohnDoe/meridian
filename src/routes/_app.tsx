@@ -90,7 +90,6 @@ function AppLayout() {
         ) : (
           <div className="tb-l" id="tbDefault">
             <button className="ib" onClick={() => setSidebarOpen(true)} title="Menu"><Menu /></button>
-            <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{ borderRadius: 5 }} alt="Meridian" />
             <span className="vault-name">{vaultName}</span>
           </div>
         )}

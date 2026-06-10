@@ -2,7 +2,6 @@ import {
   cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
   cacheMarkClean, cacheDirtyCount, cacheLoadAll, cacheInit,
   handleSave, handleLoad,
-  legacyDirHandleLoad, legacyDirHandleClear,
   vaultRefsSave, vaultRefsLoad,
   activeVaultIdSave, activeVaultIdLoad,
 } from './cache'
@@ -171,30 +170,29 @@ export async function syncToDirectory(): Promise<void> {
 // ── VAULT LIFECYCLE ───────────────────────────────────────────
 
 export async function restoreVaults(): Promise<void> {
+  const exampleRef: VaultRef = { id: 'example', name: 'Example data', kind: 'example' }
+
+  async function fallbackToExample() {
+    const backend = new ExampleBackend()
+    _activeBackend = backend
+    useStore.setState({
+      vaults: [exampleRef],
+      activeVaultId: 'example',
+      pendingDirReconnect: null,
+    })
+    setData(parseFiles(await backend.readAll()))
+  }
+
   try {
     await cacheInit()
 
-    // ── Migration: single legacy dirHandle → registry entry ──────
-    const legacyHandle = await legacyDirHandleLoad()
-    let migratedId: string | null = null
-    if (legacyHandle) {
-      migratedId = crypto.randomUUID()
-      await handleSave(migratedId, legacyHandle)
-      const existing = await vaultRefsLoad()
-      if (existing.length === 0) {
-        await vaultRefsSave([{ id: migratedId, name: legacyHandle.name, kind: 'local' }])
-      }
-      await legacyDirHandleClear()
-    }
-
     // ── Load registry ─────────────────────────────────────────────
-    const savedRefs  = await vaultRefsLoad()
-    const exampleRef: VaultRef = { id: 'example', name: 'Example data', kind: 'example' }
-    const allRefs: VaultRef[]  = [exampleRef, ...savedRefs]
+    const savedRefs = await vaultRefsLoad()
+    const allRefs: VaultRef[] = [exampleRef, ...savedRefs]
     useStore.setState({ vaults: allRefs })
 
     // ── Determine active vault ────────────────────────────────────
-    const savedActiveId = migratedId ?? (await activeVaultIdLoad())
+    const savedActiveId = await activeVaultIdLoad()
     const targetRef     = allRefs.find(r => r.id === savedActiveId) ?? exampleRef
 
     if (targetRef.kind === 'local') {
@@ -218,7 +216,7 @@ export async function restoreVaults(): Promise<void> {
     }
   } catch (e) {
     console.warn('[vault] restoreVaults failed:', e)
-    activateExampleVault().catch(() => {})
+    await fallbackToExample().catch(() => {})
   }
 }
 
