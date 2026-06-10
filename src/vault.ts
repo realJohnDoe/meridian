@@ -1,17 +1,20 @@
 import {
   cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
-  cacheMarkClean, cacheDirtyCount, cacheLoadAll,
-  dirHandleSave, dirHandleLoad, dirHandleClear,
-  cacheInit,
+  cacheMarkClean, cacheDirtyCount, cacheLoadAll, cacheInit,
+  handleSave, handleLoad,
+  vaultRefsSave, vaultRefsLoad,
+  activeVaultIdSave, activeVaultIdLoad,
 } from './cache'
-import { diskPickDirectory, diskStatAll, diskReadFiles, diskReadAll, diskWrite, diskDelete, saveFile } from './fileIO'
+import { diskPickDirectory } from './storage/fs'
+import { LocalBackend }   from './storage/localBackend'
+import { ExampleBackend } from './storage/exampleBackend'
+import type { StorageBackend, VaultRef } from './storage/backend'
 import { collapseToYaml } from './model/collapse'
 import { parseToStoreItems } from './model/storeItems'
 import { fileSlugItems } from './model/storeOps'
+import { saveFile } from './fileIO'
 import type { StoreItem, Roots } from './types'
-import { getItems, getRoots, setData, getDirHandle, setDirHandle, notify } from './storeBridge'
-import { loadSeedItems } from './seed'
-
+import { getItems, getRoots, setData, getVaults, notify } from './storeBridge'
 import { useStore } from './store'
 
 // ── HELPERS ────────────────────────────────────────────────────
@@ -21,7 +24,12 @@ function fileSlugToPath(fileSlug: string): string {
 }
 
 function updateSyncUI(): void {
-  cacheDirtyCount().then(n => {
+  const id = _activeBackend?.id
+  if (!id || _activeBackend?.readOnly) {
+    useStore.setState({ syncDirtyCount: 0 })
+    return
+  }
+  cacheDirtyCount(id).then(n => {
     useStore.setState({ syncDirtyCount: n })
   }).catch(() => {})
 }
@@ -41,10 +49,76 @@ function parseFiles(
   return { items: loaded, roots }
 }
 
+// ── MODULE STATE ───────────────────────────────────────────────
+
+let _activeBackend: StorageBackend | null = null
+
+// ── PRIVATE ACTIVATION HELPERS ─────────────────────────────────
+
+async function hydrateFromCache(vaultId: string): Promise<void> {
+  const cached = await cacheLoadAll(vaultId)
+  if (cached.length === 0) return
+  const { items, roots } = parseFiles(cached)
+  setData({ items, roots })
+}
+
+async function reconcileWithDisk(backend: StorageBackend, vaultId: string): Promise<void> {
+  const diskTokens = await backend.statAll()
+  const cached     = await cacheLoadAll(vaultId)
+  const cacheMap   = new Map(cached.map(r => [r.path, r]))
+
+  const changed: string[] = []
+  const deleted: string[] = []
+
+  for (const [path, diskToken] of diskTokens) {
+    const entry = cacheMap.get(path)
+    if (!entry || entry.version !== diskToken) changed.push(path)
+  }
+  for (const path of cacheMap.keys()) {
+    if (!diskTokens.has(path)) deleted.push(path)
+  }
+
+  if (changed.length > 0) {
+    const freshFiles = await backend.readFiles(changed)
+    await cacheBulkWriteClean(vaultId, freshFiles)
+    for (const f of freshFiles) {
+      cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, dirty: 0, updatedAt: Date.now(), version: f.version })
+    }
+  }
+
+  await Promise.all(deleted.map(p => cacheDelete(vaultId, p)))
+  for (const p of deleted) cacheMap.delete(p)
+
+  if (changed.length === 0 && deleted.length === 0) { updateSyncUI(); return }
+
+  const { items, roots } = parseFiles(Array.from(cacheMap.values()))
+  setData({ items, roots })
+  updateSyncUI()
+}
+
+async function activateExampleVault(): Promise<void> {
+  const backend = new ExampleBackend()
+  _activeBackend = backend
+  useStore.setState({ activeVaultId: 'example', pendingDirReconnect: null })
+  await activeVaultIdSave('example')
+  const files = await backend.readAll()
+  setData(parseFiles(files))
+  updateSyncUI()
+}
+
+async function activateLocalVault(backend: LocalBackend): Promise<void> {
+  _activeBackend = backend
+  useStore.setState({ activeVaultId: backend.id, pendingDirReconnect: null })
+  await activeVaultIdSave(backend.id)
+  await hydrateFromCache(backend.id)
+  await reconcileWithDisk(backend, backend.id)
+}
+
 // ── CACHE WRITE / DELETE ──────────────────────────────────────
 
 export async function writeEntityToCache(fileSlug: string): Promise<void> {
   try {
+    if (!_activeBackend || _activeBackend.readOnly) return
     const slugItems = fileSlugItems(getItems(), fileSlug)
     if (slugItems.length === 0) { await deleteFileFromDisk(fileSlug); return }
     const root        = getRoots().get(fileSlug)
@@ -52,8 +126,7 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body)
     const path        = fileSlugToPath(fileSlug)
-    // Use a synthetic version token so the next reconcile knows this file may differ from disk.
-    await cacheWrite(path, content, `local:${Date.now()}`)
+    await cacheWrite(_activeBackend.id, path, content, `local:${Date.now()}`)
     updateSyncUI()
   } catch (e) {
     console.error('[vault] writeEntityToCache failed:', e)
@@ -62,10 +135,10 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
 
 export async function deleteFileFromDisk(fileSlug: string): Promise<void> {
   try {
+    if (!_activeBackend || _activeBackend.readOnly) return
     const path = fileSlugToPath(fileSlug)
-    const dh   = getDirHandle()
-    await cacheDelete(path)
-    if (dh) await diskDelete(dh, path)
+    await cacheDelete(_activeBackend.id, path)
+    await _activeBackend.delete(path)
     updateSyncUI()
   } catch (e) {
     console.error('[vault] deleteFileFromDisk failed:', e)
@@ -76,13 +149,15 @@ export async function deleteFileFromDisk(fileSlug: string): Promise<void> {
 
 export async function syncToDirectory(): Promise<void> {
   try {
-    const dh = getDirHandle()
-    if (!dh) { notify('No vault folder connected. Click the folder icon first.'); return }
-    const dirty = await cacheGetDirty()
+    if (!_activeBackend || _activeBackend.readOnly) {
+      notify('No writable vault connected. Add a local folder first.')
+      return
+    }
+    const dirty = await cacheGetDirty(_activeBackend.id)
     if (!dirty.length) { updateSyncUI(); return }
     for (const f of dirty) {
-      await diskWrite(dh, f.path, f.content)
-      await cacheMarkClean(f.path)
+      await _activeBackend.write(f.path, f.content)
+      await cacheMarkClean(_activeBackend.id, f.path)
     }
     useStore.setState({ syncDirtyCount: 0, syncFlash: true })
     setTimeout(() => useStore.setState({ syncFlash: false }), 800)
@@ -92,164 +167,109 @@ export async function syncToDirectory(): Promise<void> {
   }
 }
 
-// ── HYDRATE FROM CACHE ────────────────────────────────────────
+// ── VAULT LIFECYCLE ───────────────────────────────────────────
 
-/** Paint instantly from last session's cached content (no disk IO). No-op if cache is empty. */
-async function hydrateFromCache(): Promise<void> {
-  const cached = await cacheLoadAll()
-  if (cached.length === 0) return
-  const { items, roots } = parseFiles(cached)
-  setData({ items, roots })
-}
+export async function restoreVaults(): Promise<void> {
+  const exampleRef: VaultRef = { id: 'example', name: 'Example data', kind: 'example' }
 
-// ── RECONCILE WITH DISK ───────────────────────────────────────
-
-/**
- * Diff disk vs cache by version token, re-read only changed/new files,
- * drop deleted ones, then update the store atomically.
- */
-async function reconcileWithDisk(): Promise<void> {
-  const dh = getDirHandle()
-  if (!dh) return
-
-  // Stat disk (cheap — no file content read)
-  const diskTokens = await diskStatAll(dh)
-
-  // Build a map of current cache records
-  const cached = await cacheLoadAll()
-  const cacheMap = new Map(cached.map(r => [r.path, r]))
-
-  const changed: string[] = []
-  const deleted: string[] = []
-
-  // Find new and changed files
-  for (const [path, diskToken] of diskTokens) {
-    const entry = cacheMap.get(path)
-    if (!entry || entry.version !== diskToken) {
-      changed.push(path)
-    }
+  async function fallbackToExample() {
+    const backend = new ExampleBackend()
+    _activeBackend = backend
+    useStore.setState({
+      vaults: [exampleRef],
+      activeVaultId: 'example',
+      pendingDirReconnect: null,
+    })
+    setData(parseFiles(await backend.readAll()))
   }
 
-  // Find deleted files (in cache but not on disk)
-  for (const path of cacheMap.keys()) {
-    if (!diskTokens.has(path)) {
-      deleted.push(path)
-    }
-  }
-
-  // Re-read only changed/new files
-  if (changed.length > 0) {
-    const freshFiles = await diskReadFiles(dh, changed)
-    await cacheBulkWriteClean(freshFiles)
-    // Update cacheMap with fresh records
-    for (const f of freshFiles) {
-      cacheMap.set(f.path, { path: f.path, content: f.content, dirty: 0, updatedAt: Date.now(), version: f.version })
-    }
-  }
-
-  // Remove deleted files from cache
-  await Promise.all(deleted.map(p => cacheDelete(p)))
-  for (const p of deleted) cacheMap.delete(p)
-
-  // If nothing changed, skip store update (avoids unnecessary re-renders)
-  if (changed.length === 0 && deleted.length === 0) {
-    updateSyncUI()
-    return
-  }
-
-  const { items, roots } = parseFiles(Array.from(cacheMap.values()))
-  setData({ items, roots })
-  updateSyncUI()
-}
-
-// ── DIRECTORY LIFECYCLE ───────────────────────────────────────
-
-let _pendingDirHandle: FileSystemDirectoryHandle | null = null
-
-export async function pickDirectory(): Promise<void> {
   try {
     await cacheInit()
-    const h = await diskPickDirectory()
 
-    // Clear cache when switching folders — cache is path-keyed, not vault-namespaced,
-    // so stale entries from a previous folder must not bleed into the new one.
-    const previousHandle = await dirHandleLoad()
-    if (previousHandle && typeof previousHandle.isSameEntry === 'function') {
-      const same = await previousHandle.isSameEntry(h).catch(() => false)
-      if (!same) {
-        const cached = await cacheLoadAll()
-        await Promise.all(cached.map(r => cacheDelete(r.path)))
+    // ── Load registry ─────────────────────────────────────────────
+    const savedRefs = await vaultRefsLoad()
+    const allRefs: VaultRef[] = [exampleRef, ...savedRefs]
+    useStore.setState({ vaults: allRefs })
+
+    // ── Determine active vault ────────────────────────────────────
+    const savedActiveId = await activeVaultIdLoad()
+    const targetRef     = allRefs.find(r => r.id === savedActiveId) ?? exampleRef
+
+    if (targetRef.kind === 'local') {
+      const handle = await handleLoad(targetRef.id)
+      if (!handle) { await activateExampleVault(); return }
+      const backend = new LocalBackend(targetRef.id, targetRef.name, handle)
+      const perm    = await backend.ensurePermission(false)
+      if (perm === 'granted') {
+        await activateLocalVault(backend)
+      } else if (perm === 'prompt') {
+        // Show cached data; user reconnects by clicking the vault in the sidebar.
+        _activeBackend = backend
+        useStore.setState({ activeVaultId: targetRef.id, pendingDirReconnect: targetRef.name })
+        await hydrateFromCache(targetRef.id)
+        updateSyncUI()
+      } else {
+        await activateExampleVault()
       }
-    } else if (previousHandle) {
-      // isSameEntry not available — clear on every explicit pick to be safe
-      const cached = await cacheLoadAll()
-      await Promise.all(cached.map(r => cacheDelete(r.path)))
+    } else {
+      await activateExampleVault()
     }
+  } catch (e) {
+    console.warn('[vault] restoreVaults failed:', e)
+    await fallbackToExample().catch(() => {})
+  }
+}
 
-    setDirHandle(h)
-    await dirHandleSave(h)
-    useStore.setState({ pendingDirReconnect: null })
-    _pendingDirHandle = null
+export async function setActiveVault(id: string): Promise<void> {
+  try {
+    if (id === 'example') { await activateExampleVault(); return }
 
-    // No prior cache for this folder; full read (cache is empty, everything is "new")
-    const files = await diskReadAll(h)
-    await cacheBulkWriteClean(files)
-    const { items, roots } = parseFiles(files)
-    setData({ items, roots })
-    updateSyncUI()
+    const ref = getVaults().find(v => v.id === id)
+    if (!ref || ref.kind !== 'local') return
+
+    const handle = await handleLoad(id)
+    if (!handle) { notify('Vault handle not found — try removing and re-adding it.'); return }
+
+    const backend = new LocalBackend(id, ref.name, handle)
+    const perm    = await backend.ensurePermission(true)
+    if (perm !== 'granted') { notify(`Permission denied for vault "${ref.name}".`); return }
+
+    await activateLocalVault(backend)
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
-    console.error('[vault] pickDirectory failed:', e)
-    notify((e as Error).message || 'Could not connect vault')
+    console.error('[vault] setActiveVault failed:', e)
+    notify((e as Error).message || 'Could not switch vault')
   }
 }
 
-export async function tryRestoreDirectory(): Promise<void> {
+export async function addLocalVault(): Promise<void> {
   try {
     await cacheInit()
-    const h = await dirHandleLoad()
-    if (!h) { setData(loadSeedItems()); return }
-    const perm = await h.queryPermission({ mode: 'readwrite' })
-    if (perm === 'granted') {
-      setDirHandle(h)
-      await hydrateFromCache()      // instant first paint from last session
-      await reconcileWithDisk()     // catch any external edits
-    } else if (perm === 'prompt') {
-      _pendingDirHandle = h
-      useStore.setState({ pendingDirReconnect: h.name })
-      await hydrateFromCache()      // show cached data while reconnect banner is visible
-    } else {
-      await dirHandleClear()
-      setData(loadSeedItems())
-    }
-  } catch (e) {
-    console.warn('[vault] tryRestoreDirectory failed:', e)
-    setData(loadSeedItems())
-  }
-}
+    const handle = await diskPickDirectory()
+    const id     = crypto.randomUUID()
 
-export async function reconnectDirectory(): Promise<void> {
-  if (!_pendingDirHandle) return
-  try {
-    const perm = await _pendingDirHandle.requestPermission({ mode: 'readwrite' })
-    if (perm === 'granted') {
-      setDirHandle(_pendingDirHandle)
-      useStore.setState({ pendingDirReconnect: null })
-      _pendingDirHandle = null
-      await reconcileWithDisk()     // cache already hydrated in tryRestoreDirectory
-    } else {
-      await dirHandleClear()
-      useStore.setState({ pendingDirReconnect: null })
-      _pendingDirHandle = null
-    }
+    await handleSave(id, handle)
+
+    const ref: VaultRef   = { id, name: handle.name, kind: 'local' }
+    const existing        = await vaultRefsLoad()
+    await vaultRefsSave([...existing, ref])
+
+    const exampleRef: VaultRef = { id: 'example', name: 'Example data', kind: 'example' }
+    useStore.setState({ vaults: [exampleRef, ...existing, ref] })
+
+    const backend = new LocalBackend(id, handle.name, handle)
+    const files   = await backend.readAll()
+    await cacheBulkWriteClean(id, files)
+    await activateLocalVault(backend)
   } catch (e) {
-    console.error('[vault] reconnectDirectory failed:', e)
-    notify((e as Error).message || 'Could not reconnect vault')
+    if ((e as Error).name === 'AbortError') return
+    console.error('[vault] addLocalVault failed:', e)
+    notify((e as Error).message || 'Could not connect vault')
   }
 }
 
 // ── INIT ──────────────────────────────────────────────────────
 
 export function initApp(): void {
-  // Items stay empty until tryRestoreDirectory() resolves.
+  // Items stay empty until restoreVaults() resolves.
 }

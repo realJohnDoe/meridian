@@ -1,12 +1,13 @@
 import type { StoreItem, Roots } from './types'
+import type { VaultRef } from './storage/backend'
 import { useStore } from './store'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
-export const getItems    = (): StoreItem[]   => useStore.getState().items
-export const getRoots    = (): Roots         => useStore.getState().roots
-export const setData     = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
-export const getDirHandle  = ()              => useStore.getState().dirHandle
-export const setDirHandle  = (h: FileSystemDirectoryHandle | null) => useStore.setState({ dirHandle: h })
+export const getItems        = (): StoreItem[]    => useStore.getState().items
+export const getRoots        = (): Roots          => useStore.getState().roots
+export const setData         = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
+export const getVaults       = (): VaultRef[]     => useStore.getState().vaults
+export const getActiveVaultId = (): string | null => useStore.getState().activeVaultId
 
 // ── NAVIGATION ─────────────────────────────────────────────────
 /** Navigate back in browser history (replaces popOverlay after router migration). */
