@@ -1,108 +1,170 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* ── SHADCN THEME ─────────────────────────────────────────────── */
-/* Maps CSS custom-properties to Tailwind utility classes (bg-background, text-foreground, etc.) */
-@theme {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
+/* ── THEME TOKENS → Tailwind utilities ──────────────────────── */
+/* @theme inline: utilities reference var(…) at runtime, required for theming */
+@theme inline {
+  --color-background:           var(--background);
+  --color-foreground:           var(--foreground);
+  --color-card:                 var(--card);
+  --color-card-foreground:      var(--card-foreground);
+  --color-popover:              var(--popover);
+  --color-popover-foreground:   var(--popover-foreground);
+  --color-primary:              var(--primary);
+  --color-primary-foreground:   var(--primary-foreground);
+  --color-secondary:            var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+  --color-muted:                var(--muted);
+  --color-muted-foreground:     var(--muted-foreground);
+  --color-accent:               var(--accent);
+  --color-accent-foreground:    var(--accent-foreground);
+  --color-destructive:          var(--destructive);
+  --color-border:               var(--border);
+  --color-input:                var(--input);
+  --color-ring:                 var(--ring);
+  --color-sidebar:              var(--sidebar);
+  --color-sidebar-foreground:   var(--sidebar-foreground);
+  --color-sidebar-primary:      var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent:       var(--sidebar-accent);
+  --color-sidebar-accent-foreground:  var(--sidebar-accent-foreground);
+  --color-sidebar-border:       var(--sidebar-border);
+  --color-sidebar-ring:         var(--sidebar-ring);
+
+  /* Domain tokens */
+  --color-backdrop:       var(--backdrop);
+  --color-event:          var(--event);
+  --color-task:           var(--task);
+  --color-note:           var(--note);
+  --color-brand-cyan:     var(--brand-cyan);
+  --color-brand-purple:   var(--brand-purple);
+  --color-priority-1:     var(--priority-1);
+  --color-priority-2:     var(--priority-2);
+  --color-priority-3:     var(--priority-3);
+  /* Backward-compat aliases used in EntryEditor priority chip Tailwind classes */
+  --color-p1:             var(--priority-1);
+  --color-p2:             var(--priority-2);
+  --color-p3:             var(--priority-3);
+  /* Extra text tier — icons, unselected nav */
+  --color-dim:            var(--dim);
+  /* Surface for past/done */
+  --color-surface-raised: var(--surface-raised);
+
+  --height-control: var(--control-h);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Shared interactive control height — used by inputs, selects, and chips */
+/* ── MERIDIAN THEME ─────────────────────────────────────────── */
 :root {
-  --control-h: 1.75rem; /* 28px */
+  /* Surfaces — 4-step elevation ramp */
+  --backdrop:   oklch(0.13 0.04 252);   /* html bg behind the 430px column */
+  --background: oklch(0.18 0.05 252);   /* app column, topbar, agenda stream */
+  --card:       oklch(0.24 0.05 252);   /* cards, panels, filter overlay */
+  --popover:    oklch(0.24 0.05 252);   /* dialogs, dropdowns, wikilink popup */
+  --secondary:  oklch(0.28 0.06 252);   /* chips, type-selector bg */
+  --muted:      oklch(0.28 0.06 252);   /* dim surfaces */
+  --accent:     oklch(0.28 0.06 252);   /* hover / selected row surfaces */
+
+  /* Text — 3-tier emphasis */
+  --foreground:           oklch(0.96 0.02 270);   /* primary text */
+  --card-foreground:      oklch(0.96 0.02 270);
+  --popover-foreground:   oklch(0.96 0.02 270);
+  --accent-foreground:    oklch(0.96 0.02 270);
+  --secondary-foreground: oklch(0.86 0.07 272);   /* indigo-tinted — wikilinks, time, entry body */
+  --muted-foreground:     oklch(0.54 0.04 250);   /* dim labels, placeholders, weekdays */
+  --dim:                  oklch(0.69 0.03 250);   /* icons, unselected nav — between secondary and muted */
+
+  /* Brand */
+  --primary:            oklch(0.71 0.20 278);   /* indigo */
+  --primary-foreground: oklch(1 0 0);
+
+  /* Destructive */
+  --destructive: oklch(0.72 0.20 15);   /* rose */
+
+  /* Borders */
+  --border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 92%);   /* slate at ~8% */
+  --input:  color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);   /* slate at ~15% */
+  --ring:   oklch(0.71 0.20 278);
+
+  /* Domain colors (no shadcn home) */
+  --event:        oklch(0.71 0.20 278);   /* indigo — alias of primary */
+  --task:         oklch(0.84 0.17 145);   /* green */
+  --note:         oklch(0.86 0.16 74);    /* amber */
+  --brand-cyan:   oklch(0.77 0.14 208);   /* sky blue — gradient accent */
+  --brand-purple: oklch(0.74 0.18 295);   /* violet */
+  --priority-1:   oklch(0.72 0.19 22);    /* red */
+  --priority-2:   oklch(0.76 0.17 48);    /* orange */
+  --priority-3:   oklch(0.88 0.18 82);    /* yellow */
+
+  /* Sidebar */
+  --sidebar:                    oklch(0.24 0.05 252);
+  --sidebar-foreground:         oklch(0.86 0.07 272);
+  --sidebar-primary:            oklch(0.71 0.20 278);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent:             oklch(0.28 0.06 252);
+  --sidebar-accent-foreground:  oklch(0.96 0.02 270);
+  --sidebar-border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);
+  --sidebar-ring:               oklch(0.71 0.20 278);
+
+  --radius: 0.625rem;
+
+  /* ── Derived — not authored per-theme ── */
+
+  /* Darker shades for gradients (search bar, save button) */
+  --primary-dark:    oklch(0.63 0.20 278);
+  --brand-cyan-dark: oklch(0.68 0.14 208);
+
+  /* Standard tint steps: fill ~18% and border/strong ~32% */
+  --event-tint:      color-mix(in oklab, var(--event),      transparent 82%);
+  --event-border:    color-mix(in oklab, var(--event),      transparent 68%);
+  --task-tint:       color-mix(in oklab, var(--task),       transparent 82%);
+  --task-border:     color-mix(in oklab, var(--task),       transparent 68%);
+  --priority-1-tint: color-mix(in oklab, var(--priority-1), transparent 85%);
+  --priority-2-tint: color-mix(in oklab, var(--priority-2), transparent 85%);
+  --priority-3-tint: color-mix(in oklab, var(--priority-3), transparent 85%);
+
+  /* Subtle primary fills (replaces --ab / --ab2) */
+  --primary-tint:  color-mix(in oklab, var(--primary), transparent 88%);
+  --primary-tint2: color-mix(in oklab, var(--primary), transparent 78%);
+
+  /* Elevated surface for past/done bars */
+  --surface-raised: oklch(0.33 0.05 252);
+
+  /* Layout & fonts (not themed) */
+  --control-h: 1.75rem;
+  --font: 'DM Sans', system-ui, sans-serif;
+  --mono: 'DM Mono', monospace;
+  --disp: 'Fraunces', Georgia, serif;
+  --nh: 0px; --th: 54px; --r: var(--radius); --rl: 16px; --rx: 24px;
 }
 
-/* Priority colours and control height exposed as Tailwind tokens */
-@theme inline {
-  --color-p1: var(--p1);
-  --color-p2: var(--p2);
-  --color-p3: var(--p3);
-  --height-control: var(--control-h);
-}
-
-/* Meridian is always dark — map shadcn tokens to the app's own palette */
-@layer base {
-  :root {
-    --background: var(--bg2);              /* dialog / card surface */
-    --foreground: var(--t0);               /* primary text */
-    --card: var(--bg3);
-    --card-foreground: var(--t0);
-    --popover: var(--bg2);
-    --popover-foreground: var(--t0);
-    --primary: var(--ind);                 /* indigo — Set button, selected day */
-    --primary-foreground: #fff;
-    --secondary: var(--bg3);
-    --secondary-foreground: var(--t1);
-    --muted: var(--bg3);
-    --muted-foreground: var(--t3);         /* dim text — "Date" title, weekday labels */
-    --accent: var(--bg3);
-    --accent-foreground: var(--t0);
-    --destructive: var(--ros);             /* rose — Remove button */
-    --border: var(--bdr);
-    --input: var(--bdr2);
-    --ring: var(--ind);
-    --radius: 0.625rem;
-  }
-}
-
-/* ── MERIDIAN APP STYLES ───────────────────────────────────────── */
-:root {
-  --bg0:#09111f;--bg1:#0f172a;--bg2:#1a2236;--bg3:#243049;--bg4:#2d3a57;
-  --bdr:rgba(148,163,184,.08);--bdr2:rgba(148,163,184,.15);
-  --t0:#eef2ff;--t1:#c7d2fe;--t2:#94a3b8;--t3:#64748b;
-  --ind:#818cf8;--ind2:#6366f1;--cyn:#38bdf8;--cyn2:#0ea5e9;
-  --pur:#a78bfa;--grn:#4ade80;--amb:#fbbf24;--ros:#fb7185;
-  --ab:rgba(129,140,248,.12);--ab2:rgba(129,140,248,.22);
-  --font:'DM Sans',system-ui,sans-serif;--mono:'DM Mono',monospace;--disp:'Fraunces',Georgia,serif;
-  --nh:0px;--th:54px;--r:10px;--rl:16px;--rx:24px;
-  --p1:#f87171;--p2:#fb923c;--p3:#facc15;
-  --p1-bg:rgba(248,113,113,.15);--p2-bg:rgba(251,146,60,.15);--p3-bg:rgba(250,204,21,.15);
-}
-/* Element resets live in @layer base so that Tailwind @layer utilities can override them.
-   (Unlayered CSS beats every Tailwind utility regardless of specificity.) */
+/* Element resets in @layer base so Tailwind utilities can override them */
 @layer base {
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  html{height:var(--app-h,100%);overflow:hidden;background:var(--bg0)}
-  body{height:100%;overflow:hidden;background:var(--bg0)}
-  body{color:var(--t0);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  html{height:var(--app-h,100%);overflow:hidden;background:var(--backdrop)}
+  body{height:100%;overflow:hidden;background:var(--backdrop)}
+  body{color:var(--foreground);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
   input,textarea,select{font-family:inherit}
   ::-webkit-scrollbar{width:0;height:0}
 }
 
 #root{height:100%}
-#app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:var(--bg1);position:relative}
+#app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:var(--background);position:relative}
 
 /* topbar */
-.topbar{height:var(--th);display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--bdr);flex-shrink:0;background:var(--bg1);z-index:10}
+.topbar{height:var(--th);display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--background);z-index:10}
 .tb-l{display:flex;align-items:center;gap:8px;min-width:0}
 .tb-l--day{flex:1;gap:4px;overflow:hidden}
-.vault-name{font-family:var(--disp);font-style:italic;font-size:16px;color:var(--t1)}
-.dv-date-title{flex:1;font-family:var(--disp);font-style:italic;font-size:15px;color:var(--t0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vault-name{font-family:var(--disp);font-style:italic;font-size:16px;color:var(--secondary-foreground)}
+.dv-date-title{flex:1;font-family:var(--disp);font-style:italic;font-size:15px;color:var(--foreground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tb-r{display:flex;align-items:center;gap:2px;flex-shrink:0}
-.ib{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--t2);transition:background .15s,color .15s;flex-shrink:0}
-.ib:hover{background:var(--bg3);color:var(--t0)}
+.ib{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--dim);transition:background .15s,color .15s;flex-shrink:0}
+.ib:hover{background:var(--accent);color:var(--foreground)}
 .ib svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
 /* views */
@@ -118,41 +180,39 @@
   pointer-events:none;
   z-index:30;
 }
-/* Toast is a compact notification chip — visually secondary to the search bar */
 .undo-toast{
   width:100%;
-  background:rgba(36,48,73,.88);backdrop-filter:blur(8px);
-  border:1px solid var(--bdr2);border-radius:20px;
+  background:color-mix(in oklab, var(--accent), transparent 12%);backdrop-filter:blur(8px);
+  border:1px solid var(--input);border-radius:20px;
   padding:8px 10px 8px 14px;display:flex;align-items:center;gap:8px;
   box-shadow:0 2px 12px rgba(0,0,0,.3);
   pointer-events:all;
   transition:opacity .25s ease,transform .25s ease;
 }
 .undo-toast.hiding{opacity:0;transform:translateY(6px)}
-.undo-toast-msg{flex:1;font-size:12px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.undo-btn{font-size:11px;font-weight:700;color:var(--ind);padding:3px 10px;border-radius:20px;background:var(--ab);flex-shrink:0;cursor:pointer}
-.undo-btn:hover{background:var(--ab2)}
+.undo-toast-msg{flex:1;font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.undo-btn{font-size:11px;font-weight:700;color:var(--primary);padding:3px 10px;border-radius:20px;background:var(--primary-tint);flex-shrink:0;cursor:pointer}
+.undo-btn:hover{background:var(--primary-tint2)}
 
 /* ── SIDEBAR → replaced by shadcn Sheet in App.tsx ── */
 
 /* ── SEARCH BAR (replaces FAB) ── */
-/* flex:none so the column-direction flex-basis doesn't fight the explicit height */
-.search-bar-wrap{flex:none;display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid rgba(148,163,184,.18);border-radius:26px;padding:0 6px 0 14px;height:52px;box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 40px rgba(99,102,241,.18),0 0 0 1px rgba(129,140,248,.06);pointer-events:all;transition:box-shadow .2s,border-color .2s}
-.search-bar-wrap:focus-within{border-color:rgba(129,140,248,.35);box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 44px rgba(99,102,241,.3),0 0 0 1px rgba(129,140,248,.18)}
-.search-bar-icon{width:15px;height:15px;stroke:var(--t3);fill:none;stroke-width:2;flex-shrink:0}
-.search-bar-input{flex:1;background:none;border:none;outline:none;color:var(--t0);font-size:14px;min-width:0}
-.search-bar-input::placeholder{color:var(--t3)}
-.search-bar-clear{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--t3);transition:background .12s,color .12s;flex-shrink:0}
-.search-bar-clear:hover{background:var(--bg3);color:var(--t0)}
+.search-bar-wrap{flex:none;display:flex;align-items:center;gap:8px;background:var(--accent);border:1px solid color-mix(in oklab,var(--dim),transparent 82%);border-radius:26px;padding:0 6px 0 14px;height:52px;box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 40px color-mix(in oklab,var(--primary-dark),transparent 82%),0 0 0 1px color-mix(in oklab,var(--primary),transparent 94%);pointer-events:all;transition:box-shadow .2s,border-color .2s}
+.search-bar-wrap:focus-within{border-color:color-mix(in oklab,var(--primary),transparent 65%);box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 44px color-mix(in oklab,var(--primary-dark),transparent 70%),0 0 0 1px color-mix(in oklab,var(--primary),transparent 82%)}
+.search-bar-icon{width:15px;height:15px;stroke:var(--muted-foreground);fill:none;stroke-width:2;flex-shrink:0}
+.search-bar-input{flex:1;background:none;border:none;outline:none;color:var(--foreground);font-size:14px;min-width:0}
+.search-bar-input::placeholder{color:var(--muted-foreground)}
+.search-bar-clear{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted-foreground);transition:background .12s,color .12s;flex-shrink:0}
+.search-bar-clear:hover{background:var(--accent);color:var(--foreground)}
 .search-bar-clear svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2}
-.search-bar-add{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--ind2),var(--cyn2));display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;transition:transform .15s,box-shadow .15s;box-shadow:0 2px 10px rgba(99,102,241,.4)}
-.search-bar-add:hover{transform:scale(1.08);box-shadow:0 4px 16px rgba(99,102,241,.6)}
+.search-bar-add{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary-dark),var(--brand-cyan-dark));display:flex;align-items:center;justify-content:center;color:var(--primary-foreground);flex-shrink:0;transition:transform .15s,box-shadow .15s;box-shadow:0 2px 10px color-mix(in oklab,var(--primary),transparent 60%)}
+.search-bar-add:hover{transform:scale(1.08);box-shadow:0 4px 16px color-mix(in oklab,var(--primary),transparent 40%)}
 .search-bar-add:active{transform:scale(.93)}
-.search-bar-add svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.search-bar-add svg{width:16px;height:16px;stroke:var(--primary-foreground);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── FILTER OVERLAY ── */
-.filter-overlay{position:absolute;top:var(--th);bottom:0;left:0;right:0;background:var(--bg1);z-index:25;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px}
-.empty-state{padding:40px 14px;text-align:center;color:var(--t3);font-size:13px}
+.filter-overlay{position:absolute;top:var(--th);bottom:0;left:0;right:0;background:var(--background);z-index:25;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px}
+.empty-state{padding:40px 14px;text-align:center;color:var(--muted-foreground);font-size:13px}
 
 /* ── CREATE ROW → replaced by shadcn Button in FilterOverlay.tsx ── */
 
@@ -160,152 +220,147 @@
 .ag-sc{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .ag-pad{padding-bottom:100px}
 .day-section{scroll-margin-top:8px}
-.day-lbl{padding:14px 14px 5px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--bg1);z-index:3}
-.day-lbl.tl{color:var(--ind)}
-.day-lbl::after{content:'';flex:1;height:1px;background:var(--bdr)}
-/* Priority bar — kept in CSS because the colour class is a dynamic string from barClass() */
-.occ-bar{width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;min-height:20px;background:var(--bg4)}
-.occ-bar.event-future{background:linear-gradient(to bottom,var(--ind),var(--pur))}
-.occ-bar.task-open{background:var(--grn)}
-.occ-bar.task-p1{background:var(--p1)}
-.occ-bar.task-p2{background:var(--p2)}
-.occ-bar.task-p3{background:var(--p3)}
-.occ-bar.note{background:var(--amb)}
-.occ-bar.done,.occ-bar.event-past{background:var(--bg4)}
-.multiday-banner{margin:2px 14px;background:rgba(129,140,248,.18);border:1px solid rgba(129,140,248,.3);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--ind);display:flex;align-items:center;gap:6px;cursor:pointer}
+.day-lbl{padding:14px 14px 5px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--background);z-index:3}
+.day-lbl.tl{color:var(--primary)}
+.day-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+/* Priority bar — colour class is a dynamic string from barClass() */
+.occ-bar{width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;min-height:20px;background:var(--surface-raised)}
+.occ-bar.event-future{background:linear-gradient(to bottom,var(--event),var(--brand-purple))}
+.occ-bar.task-open{background:var(--task)}
+.occ-bar.task-p1{background:var(--priority-1)}
+.occ-bar.task-p2{background:var(--priority-2)}
+.occ-bar.task-p3{background:var(--priority-3)}
+.occ-bar.note{background:var(--note)}
+.occ-bar.done,.occ-bar.event-past{background:var(--surface-raised)}
+.multiday-banner{margin:2px 14px;background:var(--event-tint);border:1px solid var(--event-border);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--event);display:flex;align-items:center;gap:6px;cursor:pointer}
 .multiday-banner svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
 
 /* ── MONTH ── */
 .cal-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
 .cal-hdr{padding:12px 14px 8px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.cal-mt{font-family:var(--disp);font-size:20px;font-weight:300;color:var(--t0)}
-.cal-mt em{font-style:italic;color:var(--ind)}
+.cal-mt{font-family:var(--disp);font-size:20px;font-weight:300;color:var(--foreground)}
+.cal-mt em{font-style:italic;color:var(--primary)}
 .mnav{display:flex;align-items:center;gap:2px}
-.mnb{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--t2);transition:background .12s}
-.mnb:hover{background:var(--bg3)}
+.mnb{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--dim);transition:background .12s}
+.mnb:hover{background:var(--accent)}
 .mnb svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .dow-row{display:grid;grid-template-columns:repeat(7,1fr);padding:0 4px;flex-shrink:0}
-.dow-c{text-align:center;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:3px 0}
+.dow-c{text-align:center;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);padding:3px 0}
 .cal-grid-wrap{flex:1;overflow:hidden;padding:0 4px 4px;display:flex;flex-direction:column}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;flex:1}
-/* cal-cell structural rules → Tailwind on SurfaceButton in MonthView.tsx */
-/* istoday descendant style kept — applied via .istoday class on the button */
-.istoday .ccn{background:var(--ind);color:#fff;font-weight:700}
-.ccn{font-size:11px;font-weight:500;color:var(--t2);width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;margin-bottom:1px}
+.istoday .ccn{background:var(--primary);color:var(--primary-foreground);font-weight:700}
+.ccn{font-size:11px;font-weight:500;color:var(--dim);width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;margin-bottom:1px}
 .cc-bars{display:flex;flex-direction:column;gap:1px;flex:1;overflow:hidden}
 .cc-bar{border-radius:3px;padding:1px 4px;font-size:8px;font-weight:500;@apply truncate;line-height:1.4;flex-shrink:0}
-.cc-bar.event{background:rgba(129,140,248,.25);color:var(--ind)}
-.cc-bar.task{background:rgba(74,222,128,.2);color:var(--grn)}
-.cc-bar.task-p1{background:var(--p1-bg);color:var(--p1)}
-.cc-bar.task-p2{background:var(--p2-bg);color:var(--p2)}
-.cc-bar.task-p3{background:var(--p3-bg);color:var(--p3)}
-.cc-bar.done{background:var(--bg3);color:var(--t3);text-decoration:line-through}
-.cc-bar.multiday{background:rgba(129,140,248,.35);color:#a5b4fc}
-.cc-more{font-size:8px;color:var(--t3);padding:0 2px}
+.cc-bar.event{background:var(--event-tint);color:var(--event)}
+.cc-bar.task{background:var(--task-tint);color:var(--task)}
+.cc-bar.task-p1{background:var(--priority-1-tint);color:var(--priority-1)}
+.cc-bar.task-p2{background:var(--priority-2-tint);color:var(--priority-2)}
+.cc-bar.task-p3{background:var(--priority-3-tint);color:var(--priority-3)}
+.cc-bar.done{background:var(--muted);color:var(--muted-foreground);text-decoration:line-through}
+.cc-bar.multiday{background:var(--event-border);color:var(--event)}
+.cc-more{font-size:8px;color:var(--muted-foreground);padding:0 2px}
 
 /* ── DAY VIEW ── */
-.dv-allday{padding:6px 12px;border-bottom:1px solid var(--bdr2);background:var(--bg2);flex-shrink:0}
-.dv-adlbl{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);margin-bottom:4px}
-/* dv-aditem structural rules → Tailwind on SurfaceButton in DayView.tsx */
-.dv-aditem.event{background:rgba(129,140,248,.2);color:var(--ind)}
-.dv-aditem.task{background:rgba(74,222,128,.15);color:var(--grn)}
-.dv-aditem.task-p1{background:var(--p1-bg);color:var(--p1)}
-.dv-aditem.task-p2{background:var(--p2-bg);color:var(--p2)}
-.dv-aditem.task-p3{background:var(--p3-bg);color:var(--p3)}
-.dv-aditem.past{background:var(--bg3);color:var(--t3)}
-.dv-aditem.done{background:var(--bg3);color:var(--t3)}
-.dv-aditem.multiday{background:rgba(165,180,252,.25);color:#a5b4fc}
+.dv-allday{padding:6px 12px;border-bottom:1px solid var(--input);background:var(--card);flex-shrink:0}
+.dv-adlbl{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted-foreground);margin-bottom:4px}
+.dv-aditem.event{background:var(--event-tint);color:var(--event)}
+.dv-aditem.task{background:var(--task-tint);color:var(--task)}
+.dv-aditem.task-p1{background:var(--priority-1-tint);color:var(--priority-1)}
+.dv-aditem.task-p2{background:var(--priority-2-tint);color:var(--priority-2)}
+.dv-aditem.task-p3{background:var(--priority-3-tint);color:var(--priority-3)}
+.dv-aditem.past{background:var(--accent);color:var(--muted-foreground)}
+.dv-aditem.done{background:var(--accent);color:var(--muted-foreground)}
+.dv-aditem.multiday{background:var(--event-border);color:var(--event)}
 .dv-adoverflow{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s ease}
 .dv-adoverflow.open{grid-template-rows:1fr}
 .dv-adoverflow>div{overflow:hidden}
 .dv-sc{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative}
 .dv-tl{position:relative;padding:0 0 60px;min-height:900px}
 .dv-hr{display:flex;align-items:flex-start;height:56px;position:relative}
-.dv-hlbl{width:46px;font-size:10px;font-family:var(--mono);color:var(--t3);text-align:right;padding-right:10px;flex-shrink:0;margin-top:-6px}
-.dv-hline{flex:1;border-top:1px solid var(--bdr);position:relative}
-/* dv-eblk structural rules → Tailwind on SurfaceButton in DayView.tsx */
+.dv-hlbl{width:46px;font-size:10px;font-family:var(--mono);color:var(--muted-foreground);text-align:right;padding-right:10px;flex-shrink:0;margin-top:-6px}
+.dv-hline{flex:1;border-top:1px solid var(--border);position:relative}
 .dv-eblk{position:absolute}
-.dv-eblk.event{background:rgba(99,102,241,.35);border-left:3px solid var(--ind);color:var(--t1)}
-.dv-eblk.past{background:var(--bg3);border-left:3px solid var(--bg4);color:var(--t3)}
-.dv-eblk.task{background:rgba(74,222,128,.18);border-left:3px solid var(--grn);color:var(--grn)}
-.dv-eblk.task-p1{background:var(--p1-bg);border-left:3px solid var(--p1);color:var(--p1)}
-.dv-eblk.task-p2{background:var(--p2-bg);border-left:3px solid var(--p2);color:var(--p2)}
-.dv-eblk.task-p3{background:var(--p3-bg);border-left:3px solid var(--p3);color:var(--p3)}
-.dv-eblk.done{background:var(--bg3);border-left:3px solid var(--bg4);color:var(--t3)}
+.dv-eblk.event{background:var(--event-border);border-left:3px solid var(--event);color:var(--secondary-foreground)}
+.dv-eblk.past{background:var(--accent);border-left:3px solid var(--surface-raised);color:var(--muted-foreground)}
+.dv-eblk.task{background:var(--task-tint);border-left:3px solid var(--task);color:var(--task)}
+.dv-eblk.task-p1{background:var(--priority-1-tint);border-left:3px solid var(--priority-1);color:var(--priority-1)}
+.dv-eblk.task-p2{background:var(--priority-2-tint);border-left:3px solid var(--priority-2);color:var(--priority-2)}
+.dv-eblk.task-p3{background:var(--priority-3-tint);border-left:3px solid var(--priority-3);color:var(--priority-3)}
+.dv-eblk.done{background:var(--accent);border-left:3px solid var(--surface-raised);color:var(--muted-foreground)}
 .dv-et{font-weight:600;@apply truncate;display:flex;align-items:center;gap:5px}
 .dv-em{font-size:10px;font-family:var(--mono);opacity:.7;margin-top:1px}
-.now-line{position:absolute;left:46px;right:0;height:2px;background:var(--ros);z-index:5;border-radius:1px}
-.now-dot{position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--ros)}
+.now-line{position:absolute;left:46px;right:0;height:2px;background:var(--destructive);z-index:5;border-radius:1px}
+.now-dot{position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--destructive)}
 
 /* ── SEARCH ── */
-.ns-bar{display:flex;align-items:center;gap:9px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);padding:9px 13px;margin:12px}
-.ns-bar input{flex:1;background:none;border:none;outline:none;color:var(--t0);font-size:14px}
-.ns-bar input::placeholder{color:var(--t3)}
-.ns-bar svg{width:16px;height:16px;stroke:var(--t3);fill:none;stroke-width:2;flex-shrink:0}
+.ns-bar{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--input);border-radius:var(--radius);padding:9px 13px;margin:12px}
+.ns-bar input{flex:1;background:none;border:none;outline:none;color:var(--foreground);font-size:14px}
+.ns-bar input::placeholder{color:var(--muted-foreground)}
+.ns-bar svg{width:16px;height:16px;stroke:var(--muted-foreground);fill:none;stroke-width:2;flex-shrink:0}
 .ns-filters{display:flex;gap:5px;padding:0 12px 10px;overflow-x:auto;scrollbar-width:none}
 .ns-sc{flex:1;overflow-y:auto}
 .ns-pad{padding-bottom:80px}
-.ns-sec{padding:10px 14px 3px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)}
-.note-row{padding:12px 14px;cursor:pointer;transition:background .1s;border-bottom:1px solid var(--bdr)}
-.note-row:hover{background:var(--bg2)}
-.nr-t{font-size:14px;font-weight:500;color:var(--t0);margin-bottom:3px}
-.nr-p{font-size:12px;color:var(--t3);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ns-sec{padding:10px 14px 3px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground)}
+.note-row{padding:12px 14px;cursor:pointer;transition:background .1s;border-bottom:1px solid var(--border)}
+.note-row:hover{background:var(--card)}
+.nr-t{font-size:14px;font-weight:500;color:var(--foreground);margin-bottom:3px}
+.nr-p{font-size:12px;color:var(--muted-foreground);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .nr-m{display:flex;gap:5px;margin-top:4px;align-items:center}
-.nr-d{font-size:11px;color:var(--t3);font-family:var(--mono)}
+.nr-d{font-size:11px;color:var(--muted-foreground);font-family:var(--mono)}
 
 /* ── ENTRY EDITOR ── */
-.entry-top{height:var(--th);display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--bdr);flex-shrink:0;background:var(--bg1)}
-.entry-fname{flex:1;font-family:var(--mono);font-size:11px;color:var(--t3);@apply truncate}
-.save-btn{font-size:13px;font-weight:600;color:#fff;background:linear-gradient(135deg,var(--ind2),var(--cyn2));padding:6px 16px;border-radius:20px;box-shadow:0 2px 12px rgba(99,102,241,.3)}
+.entry-top{height:var(--th);display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--background)}
+.entry-fname{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted-foreground);@apply truncate}
+.save-btn{font-size:13px;font-weight:600;color:var(--primary-foreground);background:linear-gradient(135deg,var(--primary-dark),var(--brand-cyan-dark));padding:6px 16px;border-radius:20px;box-shadow:0 2px 12px color-mix(in oklab,var(--primary),transparent 70%)}
 .entry-sc{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .entry-pad{padding:18px 14px 120px}
 .entry-title-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:16px}
-.entry-title-in{flex:1;font-family:var(--disp);font-size:22px;font-weight:300;color:var(--t0);background:none;border:none;outline:none;line-height:1.3;resize:none;min-height:36px}
-.entry-title-in::placeholder{color:var(--t3)}
+.entry-title-in{flex:1;font-family:var(--disp);font-size:22px;font-weight:300;color:var(--foreground);background:none;border:none;outline:none;line-height:1.3;resize:none;min-height:36px}
+.entry-title-in::placeholder{color:var(--muted-foreground)}
 .prop-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
-.type-chip-row{display:flex;gap:3px;margin-bottom:16px;background:var(--bg3);border-radius:22px;padding:3px;border:1px solid var(--bdr2);width:fit-content}
-.type-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:18px;font-size:12px;font-weight:500;color:var(--t3);cursor:pointer;transition:all .15s;white-space:nowrap;text-transform:capitalize}
+.type-chip-row{display:flex;gap:3px;margin-bottom:16px;background:var(--secondary);border-radius:22px;padding:3px;border:1px solid var(--input);width:fit-content}
+.type-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:18px;font-size:12px;font-weight:500;color:var(--muted-foreground);cursor:pointer;transition:all .15s;white-space:nowrap;text-transform:capitalize}
 .type-chip svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
-.type-chip[data-state=on]{background:var(--bg1);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,.35)}
-.type-chip-task[data-state=on]{color:var(--grn)}
-.type-chip-event[data-state=on]{color:var(--ind)}
-.type-chip-note[data-state=on]{color:var(--amb)}
+.type-chip[data-state=on]{background:var(--background);color:var(--secondary-foreground);box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.type-chip-task[data-state=on]{color:var(--task)}
+.type-chip-event[data-state=on]{color:var(--event)}
+.type-chip-note[data-state=on]{color:var(--note)}
 .entry-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;align-items:center}
-.etag-input{background:var(--bg3);border:1px solid var(--ind);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--t0);outline:none;width:90px;font-family:inherit}
-.etag-input::placeholder{color:var(--t3)}
-.entry-divider{height:1px;background:var(--bdr);margin:0 -14px 14px}
-.entry-body{min-height:160px;color:var(--t1);font-size:14px;line-height:1.85;outline:none;caret-color:var(--ind);white-space:pre-wrap;word-break:break-word;position:relative}
-.entry-body .wl{color:var(--ind);border-bottom:1px solid rgba(129,140,248,.35);cursor:pointer}
-.entry-body .wl-broken{color:var(--ros);border-bottom:1px solid rgba(251,113,133,.3)}
-.entry-backlinks{margin-top:28px;padding-top:20px;border-top:1px solid var(--bdr)}
-.entry-backlinks-label{font-size:11px;font-weight:600;color:var(--t3);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px}
+.etag-input{background:var(--secondary);border:1px solid var(--primary);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--foreground);outline:none;width:90px;font-family:inherit}
+.etag-input::placeholder{color:var(--muted-foreground)}
+.entry-divider{height:1px;background:var(--border);margin:0 -14px 14px}
+.entry-body{min-height:160px;color:var(--secondary-foreground);font-size:14px;line-height:1.85;outline:none;caret-color:var(--primary);white-space:pre-wrap;word-break:break-word;position:relative}
+.entry-body .wl{color:var(--primary);border-bottom:1px solid var(--event-border);cursor:pointer}
+.entry-body .wl-broken{color:var(--destructive);border-bottom:1px solid color-mix(in oklab,var(--destructive),transparent 70%)}
+.entry-backlinks{margin-top:28px;padding-top:20px;border-top:1px solid var(--border)}
+.entry-backlinks-label{font-size:11px;font-weight:600;color:var(--muted-foreground);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px}
 
 /* wikilink popup */
-.wl-popup{background:var(--bg2);border:1px solid var(--bdr2);border-radius:var(--r);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:45;min-width:210px;max-height:200px;overflow-y:auto;display:none;position:fixed}
+.wl-popup{background:var(--popover);border:1px solid var(--input);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:45;min-width:210px;max-height:200px;overflow-y:auto;display:none;position:fixed}
 .wl-popup.show{display:block}
-.wl-item{padding:9px 14px;cursor:pointer;font-size:13px;color:var(--t1);transition:background .1s;display:flex;align-items:center;gap:8px}
-.wl-item:hover,.wl-item.focused{background:var(--bg3)}
-.wl-item svg{width:13px;height:13px;stroke:var(--t3);fill:none;stroke-width:1.8;flex-shrink:0}
+.wl-item{padding:9px 14px;cursor:pointer;font-size:13px;color:var(--secondary-foreground);transition:background .1s;display:flex;align-items:center;gap:8px}
+.wl-item:hover,.wl-item.focused{background:var(--accent)}
+.wl-item svg{width:13px;height:13px;stroke:var(--muted-foreground);fill:none;stroke-width:1.8;flex-shrink:0}
 
 /* ── ERROR NOTIFICATION BANNER ── */
-.error-banner{position:fixed;top:calc(var(--th) + 8px);left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:402px;background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.35);border-radius:var(--r);padding:10px 12px;display:flex;align-items:center;gap:10px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.3);animation:banner-in .2s ease}
+.error-banner{position:fixed;top:calc(var(--th) + 8px);left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:402px;background:color-mix(in oklab,var(--destructive),transparent 88%);border:1px solid color-mix(in oklab,var(--destructive),transparent 65%);border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:10px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.3);animation:banner-in .2s ease}
 @keyframes banner-in{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-.error-banner-msg{flex:1;font-size:13px;color:var(--ros);line-height:1.4}
-.error-banner-close{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ros);opacity:.7;flex-shrink:0;transition:opacity .12s}
+.error-banner-msg{flex:1;font-size:13px;color:var(--destructive);line-height:1.4}
+.error-banner-close{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--destructive);opacity:.7;flex-shrink:0;transition:opacity .12s}
 .error-banner-close:hover{opacity:1}
 
 /* scope selector */
 .scope-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
-/* .sheet-opt / .sopt-* removed — SeriesScopeDrawer now uses Tailwind */
 
 /* ── SWIPE GESTURES ── */
 .swipe-wrap{position:relative;overflow:hidden;border-radius:8px}
 .swipe-hint{position:absolute;inset:0;display:flex;align-items:center;padding:0 20px;pointer-events:none;z-index:0}
-.swipe-hint.left{background:var(--ros);justify-content:flex-end;gap:10px}
-.swipe-hint svg{width:18px;height:18px;stroke:#fff;fill:none;stroke-width:2.5;flex-shrink:0;transition:transform .15s}
-.swipe-hint span{font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+.swipe-hint.left{background:var(--destructive);justify-content:flex-end;gap:10px}
+.swipe-hint svg{width:18px;height:18px;stroke:var(--primary-foreground);fill:none;stroke-width:2.5;flex-shrink:0;transition:transform .15s}
+.swipe-hint span{font-size:12px;font-weight:700;color:var(--primary-foreground);white-space:nowrap}
 .swipe-hint.ready svg{transform:scale(1.3)}
-.swipe-row{position:relative;z-index:1;background:var(--bg1);touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.swipe-row{position:relative;z-index:1;background:var(--background);touch-action:pan-y;user-select:none;-webkit-user-select:none}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 
 /* Hide number input spinners globally for a cleaner, premium design */
@@ -317,4 +372,3 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
-

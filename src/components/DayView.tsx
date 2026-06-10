@@ -222,7 +222,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 px-2 py-0 text-[11px] text-[var(--t3)] hover:text-[var(--t1)] gap-1 self-start"
+              className="h-6 px-2 py-0 text-[11px] text-muted-foreground hover:text-secondary-foreground gap-1 self-start"
               onClick={() => setAllDayExpanded(v => !v)}
             >
               {allDayExpanded

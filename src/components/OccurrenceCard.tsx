@@ -24,14 +24,14 @@ export interface OccurrenceCardProps {
 }
 
 const titleCls = (isDone: boolean) =>
-  `text-[14px] font-medium truncate flex-1 ${isDone ? 'line-through' : ''} text-[var(--t0)]`
+  `text-[14px] font-medium truncate flex-1 ${isDone ? 'line-through' : ''} text-foreground`
 
 function ParticipantsBadge({ participants }: { participants: string[] }) {
   if (!participants.length) return null
   const names = participants.slice(0, 2).join(', ')
   const overflow = participants.length > 2 ? ` +${participants.length - 2}` : ''
   return (
-    <span className="inline-flex items-center gap-[3px] text-[11px] text-[var(--t3)]">
+    <span className="inline-flex items-center gap-[3px] text-[11px] text-muted-foreground">
       <Users size={11} className="shrink-0" />
       {names}{overflow}
     </span>
@@ -40,9 +40,9 @@ function ParticipantsBadge({ participants }: { participants: string[] }) {
 
 function TypeIcon({ occ }: { occ: Occurrence }) {
   const kind = occKind(occ)
-  if (kind === 'task') return <CheckSquare size={13} className="shrink-0 text-[var(--t3)]" />
-  if (kind === 'event') return <CalendarDays size={13} className="shrink-0 text-[var(--t3)]" />
-  return <FileText size={13} className="shrink-0 text-[var(--t3)]" />
+  if (kind === 'task') return <CheckSquare size={13} className="shrink-0 text-muted-foreground" />
+  if (kind === 'event') return <CalendarDays size={13} className="shrink-0 text-muted-foreground" />
+  return <FileText size={13} className="shrink-0 text-muted-foreground" />
 }
 
 /** Unified tag + topic chip row - reads roots map for wikilink resolution. */
@@ -92,8 +92,8 @@ export default function OccurrenceCard({
   const dimmed = isDone || isPast
   const cardCls = [
     'relative transition-colors shadow-none',
-    'bg-[var(--bg2)] border border-[var(--bdr2)] rounded-[var(--r)]',
-    'hover:bg-[var(--bg3)]',
+    'bg-card border border-input rounded-lg',
+    'hover:bg-accent',
     dimmed ? 'overflow-hidden' : '',
   ].filter(Boolean).join(' ')
 
@@ -103,11 +103,11 @@ export default function OccurrenceCard({
         className={`${cardCls} flex items-stretch gap-[9px] pl-[8px] pr-[14px] py-[8px]`}
         style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
       >
-        {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-[var(--r)]" />}
+        {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-lg" />}
 
         {/* Full-bleed open button */}
         <SurfaceButton
-          className="absolute inset-0 z-[1] rounded-[var(--r)]"
+          className="absolute inset-0 z-[1] rounded-lg"
           aria-label={title}
           onClick={onOpen}
         />
@@ -130,11 +130,11 @@ export default function OccurrenceCard({
             {(!!occ.ownerId || !!t) && (
               <div className="flex flex-col items-end shrink-0 ml-1 gap-px">
                 <div className="flex items-end gap-[4px]">
-                  {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
-                  {!!t && <span className="text-[11px] font-mono text-[var(--cyn)] tracking-[.02em] leading-[1.2]">{t}</span>}
+                  {!!occ.ownerId && <Repeat2 size={11} className="stroke-muted-foreground fill-none shrink-0" />}
+                  {!!t && <span className="text-[11px] font-mono text-brand-cyan tracking-[.02em] leading-[1.2]">{t}</span>}
                 </div>
                 {!!t && occ.metadata.duration && (
-                  <span className="text-[9px] font-mono text-[var(--t2)] leading-[1.2]">{occ.metadata.duration}</span>
+                  <span className="text-[9px] font-mono text-dim leading-[1.2]">{occ.metadata.duration}</span>
                 )}
               </div>
             )}
@@ -154,11 +154,11 @@ export default function OccurrenceCard({
   // Compact variant
   return (
     <Card className={cardCls}>
-      {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-[var(--r)]" />}
+      {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-lg" />}
 
       {/* Full-bleed open button */}
       <SurfaceButton
-        className="absolute inset-0 z-[1] rounded-[var(--r)]"
+        className="absolute inset-0 z-[1] rounded-lg"
         aria-label={title}
         onClick={onOpen}
       />
@@ -177,7 +177,7 @@ export default function OccurrenceCard({
               />
             )}
             <span className={titleCls(isDone)}>{title}</span>
-            {!!occ.ownerId && <Repeat2 size={11} className="stroke-[var(--t3)] fill-none shrink-0" />}
+            {!!occ.ownerId && <Repeat2 size={11} className="stroke-muted-foreground fill-none shrink-0" />}
           </div>
 
           {(dateBadge || t || tags.length > 0 || topics.length > 0 || participants.length > 0) && (
