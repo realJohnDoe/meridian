@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import AgendaView from '../components/AgendaView'
 import { fmtISO } from '../model/expansion'
 import { entryRoute } from './-entryRoute'
+import type { EditScope } from '../types'
 import { TODAY } from '../constants'
 
 export const Route = createFileRoute('/_app/')({
@@ -20,7 +21,7 @@ function AgendaPage() {
   }, [])
 
   const onOpen = useCallback(
-    (occ: Parameters<typeof entryRoute>[0], scope?: string) => navigate(entryRoute(occ, scope)),
+    (occ: Parameters<typeof entryRoute>[0], scope?: EditScope) => navigate(entryRoute(occ, scope)),
     [navigate],
   )
 

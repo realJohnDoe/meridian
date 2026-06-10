@@ -5,13 +5,18 @@ import { useEntryEditor } from '../hooks/useEntryEditor'
 import { expandRange } from '../model/expansion'
 import { fileOccurrenceMap } from '../presentation'
 import EditorShell from '../components/EditorShell'
-import type { Occurrence, StoreItem, Roots } from '../types'
+import type { Occurrence, StoreItem, Roots, EditScope } from '../types'
+
+const EDIT_SCOPES: EditScope[] = ['single', 'future', 'all', 'add']
+function isEditScope(s: unknown): s is EditScope {
+  return typeof s === 'string' && (EDIT_SCOPES as string[]).includes(s)
+}
 
 export const Route = createFileRoute('/entry/$fileSlug')({
   component: EntryPage,
-  validateSearch: (search: Record<string, unknown>): { date?: string; scope?: string } => ({
-    date:  typeof search.date  === 'string' ? search.date  : undefined,
-    scope: typeof search.scope === 'string' ? search.scope : undefined,
+  validateSearch: (search: Record<string, unknown>): { date?: string; scope?: EditScope } => ({
+    date:  typeof search.date === 'string' ? search.date : undefined,
+    scope: isEditScope(search.scope) ? search.scope : undefined,
   }),
 })
 
@@ -38,7 +43,7 @@ function EntryPage() {
 
 function EditorView({ occ, scope, items, roots }: {
   occ: Occurrence | null
-  scope: string
+  scope: EditScope
   items: StoreItem[]
   roots: Roots
 }) {
