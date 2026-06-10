@@ -1,7 +1,7 @@
 ## Next steps
 
 - Fix agenda loading time and scroll behavior
-- Add multivault support
+- Add GitHub Vault support
 - Add CodeMirror 6 for markdown editing
 - Add overdue section in agenda
 
