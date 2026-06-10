@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { StoreItem, Roots } from './types'
+import type { VaultRef } from './storage/backend'
 
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
@@ -8,9 +9,10 @@ interface MeridianStore {
   /** Set items and roots together atomically. */
   setData: (data: { items: StoreItem[]; roots: Roots }) => void
 
-  // ── File system ─────────────────────────────────────────────────
-  dirHandle: FileSystemDirectoryHandle | null
-  /** Non-null when a persisted handle exists but needs a user gesture to re-grant permission. */
+  // ── Vaults ──────────────────────────────────────────────────────
+  vaults:        VaultRef[]
+  activeVaultId: string | null
+  /** Non-null when the active local vault needs a user gesture to re-grant FS permission. */
   pendingDirReconnect: string | null
 
   // ── Undo toast ──────────────────────────────────────────────────
@@ -30,20 +32,19 @@ interface MeridianStore {
 }
 
 export const useStore = create<MeridianStore>((set) => ({
-  // items/roots start empty; tryRestoreDirectory() seeds them (or disk data replaces
-  // them when the user opens a vault folder).
   items: [],
   roots: new Map(),
   setData: ({ items, roots }) => set({ items, roots }),
 
-  dirHandle: null,
+  vaults:              [],
+  activeVaultId:       null,
   pendingDirReconnect: null,
 
   toast: null,
   setToast: (toast) => set({ toast }),
 
   syncDirtyCount: 0,
-  syncFlash: false,
+  syncFlash:      false,
 
   errorNotification: null,
   setErrorNotification: (errorNotification) => set({ errorNotification }),
