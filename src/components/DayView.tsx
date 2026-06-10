@@ -7,22 +7,13 @@ import { cn } from '../lib/utils'
 import type { Occurrence, EditScope } from '../types'
 import { occKind } from '../types'
 import { expandWithMultiday, fmtT, parseDurationHours, multidayDisplayTitle } from '../model/expansion'
-import { sameDay, addDays, fmtLong, sortOccs, occState } from '../presentation'
+import { sameDay, addDays, fmtLong, sortOccs, occDvClass } from '../presentation'
 
 import { TODAY } from '../constants'
 const SH = 7    // start hour on timeline
 const EH = 22   // end hour on timeline
 const HP = 56   // pixels per hour
 
-function dvBlkClass(o: Occurrence): string {
-  const s = occState(o)
-  if (s === 'done' || s === 'event-past') return 'past'
-  if (s === 'task-open') return 'task'
-  if (s === 'task-p1')   return 'task-p1'
-  if (s === 'task-p2')   return 'task-p2'
-  if (s === 'task-p3')   return 'task-p3'
-  return 'event'
-}
 
 function formatHour(h: number): string {
   if (h < 12)  return `${h}am`
@@ -60,7 +51,7 @@ function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
   return (
     <SurfaceButton
       className={cn(
-        `dv-aditem ${dvBlkClass(o)}`,
+        `dv-aditem ${occDvClass(o)}`,
         'w-full flex items-center gap-[6px] rounded-[5px] px-[9px] py-[3px] text-[12px] font-medium truncate mb-0.5',
         'hover:brightness-110',
       )}
@@ -112,7 +103,7 @@ function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
   return (
     <SurfaceButton
       className={cn(
-        `dv-eblk ${dvBlkClass(o)}`,
+        `dv-eblk ${occDvClass(o)}`,
         'absolute rounded-[7px] px-2 py-[5px] text-xs font-medium overflow-hidden transition-opacity hover:opacity-[0.85]',
       )}
       style={{ top, height, left, width }}
