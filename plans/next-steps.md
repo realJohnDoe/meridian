@@ -27,25 +27,20 @@
    Evidence: src/components/DayView.tsx:167 and src/components/MonthView.tsx:107 contain the same touchstart/touchend handler (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)\*1.5, ref-tracked current date/month, passive listeners, identical cleanup).
    Problem: Identical low-level touch-gesture logic is maintained twice, so threshold/axis-lock tweaks must be made in parallel.
    Fix: Extract a useHorizontalSwipe(ref, onPrev, onNext) hook and call it from both views.
-5. EntryEditor is a 594-line component mixing 4+ unrelated concerns
-   Impact: Medium
-   Evidence: src/components/EntryEditor.tsx:91 holds wikilink autocomplete (caret math, popup positioning, insertWikilink), the tag/topic combobox, free-text participant input, contentEditable body management, and the chip/metadata layout — all in one function component.
-   Problem: Unrelated state machines (wikilink popup vs. tag picker vs. participants) share one render scope, making the editor hard to test or change without cross-impact.
-   Fix: Split the wikilink-autocomplete and tag/topic-picker logic into dedicated sub-components/hooks.
 
-6. sortOccs mutates memoized arrays in place during render
+5. sortOccs mutates memoized arrays in place during render
    Impact: Medium
    Evidence: src/presentation.ts:158 returns arr.sort(...) (in-place); callers pass memoized data, e.g. src/components/AgendaView.tsx:72 items={sortOccs(g.items)} sorts the memoized groups[k].items array during render.
    Problem: A render-path call reorders cached/memoized state as a side effect, which breaks referential assumptions (e.g. DaySection.propsAreEqual compares items by index) and is impure.
    Fix: Have sortOccs copy first (return [...arr].sort(...)).
 
-7. fileOccurrenceMap runs two ±3-year expansions on the navigation path
+6. fileOccurrenceMap runs two ±3-year expansions on the navigation path
    Impact: Medium
    Evidence: src/presentation.ts:76 calls expandRange(items, roots, TODAY, AHEAD) and expandRange(..., BACK, TODAY) across a 6-year window; it's invoked on every entry open and wikilink resolve (src/routes/entry.$fileSlug.tsx:37).
    Problem: A full 6-year recurrence expansion runs synchronously on the first read after any mutation, scaling with series count and recomputing far more than the nearest occurrence actually needs.
    Fix: Narrow the default window (e.g. ±1yr) with a lazy widen-on-miss fallback, or build the map incrementally rather than via two full-range expansions.
 
-8. Cache-write failures are silently swallowed
+7. Cache-write failures are silently swallowed
    Impact: High
    Evidence: vault.ts:42-44 writeEntityToCache and vault.ts:54-56 deleteFileFromDisk catch all errors and only console.error — unlike syncToDirectory which calls notify(...) (vault.ts:75). updateSyncUI also swallows with empty .catch(() => {}) (vault.ts:26).
    Problem: If an IndexedDB write fails, the user's edit is lost with zero feedback while the UI shows the change as saved — silent data loss.
