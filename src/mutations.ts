@@ -6,7 +6,7 @@ import {
 import { isSeries, occIsRecur } from './types'
 import type { Occurrence, Repeat, Scheduled, Priority, StoreItem, EditScope } from './types'
 import { titleToSlug } from './fileIO'
-import { getItems, getRoots, setData, popOverlayFn, notify } from './storeBridge'
+import { getItems, getRoots, setData, navigateBack, notify } from './storeBridge'
 import { writeEntityToCache, deleteFileFromDisk } from './vault'
 import { useStore } from './store'
 import { TODAY } from './constants'
@@ -104,7 +104,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   // from the title — matching applyEdit — so undated tasks/notes are persisted too.
   const fileSlug = item?.fileSlug ?? titleToSlug(title)
   if (fileSlug) writeEntityToCache(fileSlug)
-  popOverlayFn()
+  navigateBack()
 }
 
 export function toggleOccDone(o: Occurrence): void {
@@ -162,26 +162,26 @@ export function deleteNode(
     if (!item) return
     setData(excludeOccurrence({ items: getItems(), roots: getRoots() }, item))
     writeEntityToCache(item.fileSlug)
-    hideSheet(); popOverlayFn()
+    hideSheet(); navigateBack()
   }
   function deleteAll() {
     if (!item) return
     setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug))
     deleteFileFromDisk(item.fileSlug)
-    hideSheet(); popOverlayFn()
+    hideSheet(); navigateBack()
   }
   function deleteFuture() {
     if (!item) return
     setData(deleteFollowing({ items: getItems(), roots: getRoots() }, item))
     writeEntityToCache(item.fileSlug)
-    hideSheet(); popOverlayFn()
+    hideSheet(); navigateBack()
   }
 
   // Non-recurring, single occurrence.
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
       setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug))
-      deleteFileFromDisk(item.fileSlug); popOverlayFn()
+      deleteFileFromDisk(item.fileSlug); navigateBack()
     }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }
     doDelete()

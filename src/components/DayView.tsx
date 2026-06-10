@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, CalendarDays, CheckSquare, Square, FileText } from 'lucide-react'
-import { useStore } from '../store'
+import { useStore } from '../store'  // items + roots only
 import { Button } from './ui/button'
 import { SurfaceButton } from './ui/surface-button'
 import { cn } from '../lib/utils'
@@ -138,14 +138,14 @@ function EventBlock({ o, colIndex, totalCols, onOpen }: EventBlockProps) {
 // ── DayView ───────────────────────────────────────────────────
 
 interface Props {
+  date: Date
   onOpen: (occ: Occurrence, scope?: EditScope) => void
+  onNavigateDate?: (date: Date) => void
 }
 
-export default function DayView({ onOpen }: Props) {
-  const dvDate    = useStore(s => s.dvDate)
-  const items     = useStore(s => s.items)
-  const roots     = useStore(s => s.roots)
-  const setDvDate = useStore(s => s.setDvDate)
+export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props) {
+  const items = useStore(s => s.items)
+  const roots = useStore(s => s.roots)
 
   const { allDay, cols } = useMemo(() => {
     const from = new Date(dvDate); from.setHours(0, 0, 0, 0)
@@ -166,6 +166,7 @@ export default function DayView({ onOpen }: Props) {
 
   const tlRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    if (!onNavigateDate) return
     const el = tlRef.current
     if (!el) return
     let sx = 0, sy = 0
@@ -174,7 +175,7 @@ export default function DayView({ onOpen }: Props) {
       const dx = e.changedTouches[0].clientX - sx
       const dy = e.changedTouches[0].clientY - sy
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-        setDvDate(addDays(dvDateRef.current, dx < 0 ? 1 : -1))
+        onNavigateDate(addDays(dvDateRef.current, dx < 0 ? 1 : -1))
       }
     }
     el.addEventListener('touchstart', onStart, { passive: true })
@@ -183,7 +184,7 @@ export default function DayView({ onOpen }: Props) {
       el.removeEventListener('touchstart', onStart)
       el.removeEventListener('touchend',   onEnd)
     }
-  }, [setDvDate])
+  }, [onNavigateDate])
 
   const totalCols = Math.max(cols.length, 1)
   const isToday   = sameDay(dvDate, TODAY)

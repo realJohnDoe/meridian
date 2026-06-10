@@ -1,9 +1,5 @@
 import { create } from 'zustand'
 import type { StoreItem, Roots } from './types'
-import { TODAY as _today } from './constants'
-
-export type PrimaryView = 'agenda' | 'calendar' | 'day'
-export type OverlayView = 'entry'
 
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
@@ -13,28 +9,6 @@ interface MeridianStore {
   setRoots: (roots: Roots) => void
   /** Set items and roots together atomically. */
   setData: (data: { items: StoreItem[]; roots: Roots }) => void
-
-  // ── Navigation ──────────────────────────────────────────────────
-  /** The active primary tab — always visible behind any overlay. */
-  primaryView: PrimaryView
-  setPrimaryView: (v: PrimaryView) => void
-
-  /**
-   * Overlay stack — last entry is the topmost visible view.
-   * Only 'entry' is an overlay view; it slides over primary views.
-   */
-  overlayStack: OverlayView[]
-  pushOverlay: (v: OverlayView) => void
-  /** Pop the top overlay. No-op if the stack is empty. */
-  popOverlay: () => void
-
-  // ── Calendar cursor ─────────────────────────────────────────────
-  calMonth: Date
-  setCalMonth: (d: Date) => void
-
-  // ── Day-view cursor ─────────────────────────────────────────────
-  dvDate: Date
-  setDvDate: (d: Date) => void
 
   // ── Search ──────────────────────────────────────────────────────
   nsFilterVal: string
@@ -73,19 +47,6 @@ export const useStore = create<MeridianStore>((set) => ({
   setItems: (items) => set({ items }),
   setRoots: (roots) => set({ roots }),
   setData:  ({ items, roots }) => set({ items, roots }),
-
-  primaryView: 'agenda',
-  setPrimaryView: (primaryView) => set({ primaryView }),
-
-  overlayStack: [],
-  pushOverlay: (v) => set(s => ({ overlayStack: [...s.overlayStack, v] })),
-  popOverlay:  ()  => set(s => ({ overlayStack: s.overlayStack.slice(0, -1) })),
-
-  calMonth: new Date(_today.getFullYear(), _today.getMonth(), 1),
-  setCalMonth: (calMonth) => set({ calMonth }),
-
-  dvDate: new Date(_today),
-  setDvDate: (dvDate) => set({ dvDate }),
 
   nsFilterVal: 'all',
   setNsFilterVal: (nsFilterVal) => set({ nsFilterVal }),

@@ -11,7 +11,7 @@ import { fileSlugItems } from './model/storeOps'
 import type { StoreItem, Roots } from './types'
 import { getItems, getRoots, setData, getDirHandle, setDirHandle, notify } from './storeBridge'
 import { loadSeedItems } from './seed'
-import { goToday } from './navigation'
+
 import { useStore } from './store'
 
 // ── HELPERS ────────────────────────────────────────────────────
@@ -95,7 +95,6 @@ async function loadFilesFromDisk(): Promise<void> {
   }
   setData({ items: loaded, roots })
   updateSyncUI()
-  setTimeout(() => goToday(), 100)
 }
 
 // ── DIRECTORY LIFECYCLE ───────────────────────────────────────
