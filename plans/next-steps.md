@@ -1,6 +1,8 @@
 ## Next steps
 
-- Fix agenda loading time
+- Fix agenda loading time and scroll behavior
+- Add multivault support
+- Add CodeMirror 6 for markdown editing
 - Add overdue section in agenda
 
 ## Results from last Quality Survey
