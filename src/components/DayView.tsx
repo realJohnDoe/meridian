@@ -1,11 +1,11 @@
 import { useMemo, useEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, CalendarDays, CheckSquare, Square, FileText } from 'lucide-react'
+import { ChevronDown, ChevronUp, CheckSquare, Square } from 'lucide-react'
 import { useStore } from '../store'  // items + roots only
 import { Button } from './ui/button'
 import { SurfaceButton } from './ui/surface-button'
 import { cn } from '../lib/utils'
 import type { Occurrence, EditScope } from '../types'
-import { occKind } from '../types'
+import KindIcon from './KindIcon'
 import { expandWithMultiday, fmtT, parseDurationHours, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, addDays, fmtLong, sortOccs, occDvClass } from '../presentation'
 
@@ -45,8 +45,6 @@ function computeColumns(events: Occurrence[]): Occurrence[][] {
 
 interface AllDayItemProps { o: Occurrence; onOpen: (o: Occurrence) => void; displayTitle?: string }
 function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
-  const kind = occKind(o)
-  const Icon = kind === 'task' ? CheckSquare : kind === 'event' ? CalendarDays : FileText
   const title = displayTitle ?? o.metadata.title
   return (
     <SurfaceButton
@@ -58,7 +56,7 @@ function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
       onClick={() => onOpen(o)}
       aria-label={title}
     >
-      <Icon size={11} className="shrink-0 opacity-70" />
+      <KindIcon item={o} size={11} className="shrink-0 opacity-70" />
       <span>{title}</span>
     </SurfaceButton>
   )
