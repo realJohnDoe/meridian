@@ -27,6 +27,10 @@ interface MeridianStore {
   /** Non-null while an error banner is visible. */
   errorNotification: string | null
   setErrorNotification: (msg: string | null) => void
+
+  // ── Agenda scroll ────────────────────────────────────────────────
+  /** When true, AgendaPage will scroll to today once then clear this flag. */
+  scrollToTodayOnce: boolean
 }
 
 export const useStore = create<MeridianStore>((set) => ({
@@ -47,4 +51,6 @@ export const useStore = create<MeridianStore>((set) => ({
 
   errorNotification: null,
   setErrorNotification: (errorNotification) => set({ errorNotification }),
+
+  scrollToTodayOnce: false,
 }))

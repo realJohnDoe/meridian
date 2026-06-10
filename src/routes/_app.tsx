@@ -55,11 +55,8 @@ function AppLayout() {
     } else if (pathname.startsWith('/calendar')) {
       navigate({ to: '/calendar/$month', params: { month: fmtMonth(TODAY) } })
     } else {
+      useStore.setState({ scrollToTodayOnce: true })
       navigate({ to: '/' })
-      setTimeout(() => {
-        const sec = document.querySelector(`.day-section[data-key="${fmtISO(TODAY)}"]`)
-        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 60)
     }
   }
 

@@ -196,6 +196,7 @@ export async function pickDirectory(): Promise<void> {
     await cacheBulkWriteClean(files)
     const { items, roots } = parseFiles(files)
     setData({ items, roots })
+    useStore.setState({ scrollToTodayOnce: true })
     updateSyncUI()
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
@@ -237,6 +238,7 @@ export async function reconnectDirectory(): Promise<void> {
       useStore.setState({ pendingDirReconnect: null })
       _pendingDirHandle = null
       await reconcileWithDisk()     // cache already hydrated in tryRestoreDirectory
+      useStore.setState({ scrollToTodayOnce: true })
     } else {
       await dirHandleClear()
       useStore.setState({ pendingDirReconnect: null })

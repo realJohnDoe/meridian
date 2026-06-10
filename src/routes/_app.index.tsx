@@ -5,6 +5,7 @@ import { fmtISO } from '../model/expansion'
 import { entryRoute } from './-entryRoute'
 import type { EditScope } from '../types'
 import { TODAY } from '../constants'
+import { useStore } from '../store'
 
 export const Route = createFileRoute('/_app/')({
   component: AgendaPage,
@@ -12,13 +13,16 @@ export const Route = createFileRoute('/_app/')({
 
 function AgendaPage() {
   const navigate = useNavigate()
+  const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
 
   useEffect(() => {
+    if (!scrollToTodayOnce) return
+    useStore.setState({ scrollToTodayOnce: false })
     setTimeout(() => {
       const sec = document.querySelector(`.day-section[data-key="${fmtISO(TODAY)}"]`)
       if (sec) sec.scrollIntoView({ behavior: 'instant', block: 'start' })
     }, 200)
-  }, [])
+  }, [scrollToTodayOnce])
 
   const onOpen = useCallback(
     (occ: Parameters<typeof entryRoute>[0], scope?: EditScope) => navigate(entryRoute(occ, scope)),
