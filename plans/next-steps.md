@@ -1,56 +1,70 @@
 ## Next steps
 
-- Use proper routing to fix wikilink following / back button navigation
-- Fix order in agenda view to show multiday first
+- Fix agenda loading time and scroll behavior
+- Add multivault support
+- Add CodeMirror 6 for markdown editing
 - Add overdue section in agenda
 
 ## Results from last Quality Survey
 
-2. Interactive <div>s with no keyboard/ARIA support (systemic a11y)
-   Impact: Medium
-   Evidence: Click-only divs with no role, tabIndex, or key handler: MonthView.tsx:37 (cal-cell), DayView.tsx:59 (dv-aditem) and DayView.tsx:102 (dv-eblk), FilterOverlay.tsx:20 (occ-create-row), App.tsx:280 (sidebar scrim), and the Card in OccurrenceCard.tsx:102.
-   Problem: Core navigation (open day, open event, create entry) is mouse/touch-only and invisible to keyboard and screen-reader users.
-   Fix: Convert these to <button> or add role="button" tabIndex={0} + onKeyDown (Enter/Space) — ideally one shared <ClickableCell> wrapper.
-3. Dead store actions and unused state field
-   Impact: Medium
-   Evidence: nsFilterVal/setNsFilterVal (store.ts:40-41, store.ts:90-91) are never read anywhere; setItems, setRoots (store.ts:73-74), setPendingDirReconnect, setSyncDirtyCount, setSyncFlash are defined but never called — code writes those keys via useStore.setState(...) directly instead (e.g. vault.ts:71).
-   Problem: Seven dead store members plus an inconsistent two-way pattern (actions vs. raw setState) mislead readers about the intended API.
-   Fix: Delete the unused actions and the nsFilterVal field, or route the existing setState calls through the actions — pick one convention.
-4. Pervasive any and unsafe casts in the model/mutation layer
-   Impact: Medium
-   Evidence: saveNode(item, editScope, fields: any) (mutations.ts:77), (i: any) / (i as any).excluded (mutations.ts:151-152), entryFromItem(item: any) and openEntry((item: any …)) (App.tsx:35, App.tsx:106), as any in storeBridge.ts:9-10, and an entire eslint-disable no-explicit-any block over expansion.ts:164+.
-   Problem: The most logic-heavy code (recurrence expansion, save path) has its type checking disabled, so schema mistakes surface at runtime instead of compile time.
-   Fix: Type saveNode's fields as a SaveFields interface (it already has a fixed shape) and replace any store accessors with the existing StoreItem/PrimaryView unions.
-5. Cache-write failures are silently swallowed
+1. Occurrence-state → CSS-class mapping is forked into 3 diverging copies
    Impact: High
-   Evidence: vault.ts:42-44 writeEntityToCache and vault.ts:54-56 deleteFileFromDisk catch all errors and only console.error — unlike syncToDirectory which calls notify(...) (vault.ts:75). updateSyncUI also swallows with empty .catch(() => {}) (vault.ts:26).
-   Problem: If an IndexedDB write fails, the user's edit is lost with zero feedback while the UI shows the change as saved — silent data loss.
-   Fix: Call notify(...) (and avoid clearing dirty state) in these catch blocks, matching the sync path's error handling.
-6. Day-view "now" line is computed once and never updates
+   Evidence: src/presentation.ts:171 defines occState() (canonical states), then \_ccBarMap + ccBarClass() re-map those states; src/components/DayView.tsx:17 dvBlkClass() hand-maps the same states to a near-identical but separately-maintained set ('done'/'event-past'→'past', etc.).
+   Problem: The colour system's state→class logic lives in three independent switch tables that must be kept in lock-step by hand, so any new state or rename silently diverges the timeline view from the agenda/month views.
+   Fix: Make occState the single source and derive every view's class from one stateToClass(view, state) lookup table in presentation.ts.
+2. Kind → icon mapping duplicated across 4 components
    Impact: Medium
-   Evidence: DayView.tsx:256-265 computes const now = new Date() inside the render IIFE; nothing schedules a re-render, and isToday/now are not on any timer.
-   Problem: The current-time indicator is correct only at mount and then drifts, defeating its purpose in a calendar's primary day view.
-   Fix: Add a useEffect with setInterval (e.g. every 60s) that bumps a state tick to re-render the line.
-7. No loading or empty/error state while a vault loads
+   Evidence: src/components/OccurrenceCard.tsx:41 TypeIcon, src/components/DayView.tsx:58 AllDayItem, src/components/EntryEditor.tsx:274 entryTypeIcon, and src/components/EntryEditor.tsx:576 all reimplement "task→CheckSquare / event→CalendarDays / note→FileText".
+   Problem: The same done!==undefined ? task : date ? event : note icon decision is copy-pasted four times (one with a raw as { metadata?: { done?: boolean } } cast), so icon behaviour drifts per surface.
+   Fix: Add one <KindIcon occ size=.../> component driven by the existing occKind() and use it everywhere.
+3. ISO-date helpers reimplemented in dialogs, duplicating existing model utils
    Impact: Medium
-   Evidence: loadFilesFromDisk (vault.ts:81-99) awaits disk reads then setData; the views render items=[] meanwhile, and AgendaView (AgendaView.tsx:87) has no empty/loading branch — it just renders a bare "Today" section.
-   Problem: During async vault load (or parse failure) the user sees a blank screen with no spinner or "no items" messaging, indistinguishable from a broken app.
-   Fix: Add an isLoading flag to the store and render skeleton/empty-state UI in the primary views.
-8. App.tsx is a god-component
+   Evidence: Identical isoToDate / dateToIso / startOfToday appear in src/components/DatePickerDialog.tsx:9 and src/components/RepeatDialog.tsx:63, while src/model/expansion.ts:31 already exports fmtISO (== dateToIso) and parseDateString (== isoToDate).
+   Problem: Three copies of local-timezone date↔ISO conversion exist, two of which re-derive a utility the model layer already ships, risking subtle off-by-one timezone divergence.
+   Fix: Delete the local copies and import fmtISO / parseDateString from model/expansion.
+4. Dead Zod schema keeps the entire zod dependency alive
    Impact: Medium
-   Evidence: App.tsx is 388 lines holding 6 useStates, ~15 dialog/entry callbacks (App.tsx:130-205), sync-button color/title derivation (App.tsx:71-78), and the full markup for topbar, sidebar, 4 views, search bar, and 7 dialogs.
-   Problem: Entry-editing orchestration, navigation chrome, and dialog wiring are all in one file, making any change high-risk and hard to test.
-   Fix: Extract a useEntryEditor() hook (entry state + its callbacks) and a <DialogStack> component, leaving App as layout only.
-9. Sort/layout helpers mutate their inputs on the render path
+   Evidence: src/model/nodeSchema.ts:20 RawNodeSchema is never imported anywhere (only the RawNode type is used); zod appears in exactly one file (package.json "zod": "^4.4.3").
+   Problem: A runtime validation schema that nothing calls ships an entire dependency to the bundle and implies validation that never actually runs.
+   Fix: Remove RawNodeSchema (keep the RawNode type) and drop zod from package.json.
+5. Icon-only buttons have no accessible name
    Impact: Medium
-   Evidence: sortOccs does arr.sort(...) on the passed array (presentation.ts:71) and is called during render in AgendaView.tsx:101 (sortOccs(g.items) on memoized group arrays); computeColumns writes ev.metadata.\_dh/\_endMs onto live occurrence objects (DayView.tsx:36-37).
-   Problem: In-place mutation of memoized/store-derived data during render is a React anti-pattern that causes order-dependent bugs and makes memo comparisons unreliable.
-   Fix: Make sortOccs return [...arr].sort(...) and have computeColumns carry layout values in a local map instead of on metadata.
-10. MonthView redefines TODAY instead of using the shared constant
+   Evidence: src/routes/\_app.tsx:81 day prev/next <button className="ib"><ChevronLeft/></button> have neither title nor aria-label; same for the search clear/add buttons at src/routes/\_app.tsx:161 and src/routes/\_app.tsx:165 (lucide icons render aria-hidden).
+   Problem: Multiple primary navigation/action controls announce only "button" to screen readers and fail keyboard/AT discoverability.
+   Fix: Add aria-label (e.g. "Previous day", "Clear search", "New entry") to each icon-only button.
+6. Horizontal swipe-navigation gesture duplicated in DayView and MonthView
+   Impact: Medium
+   Evidence: src/components/DayView.tsx:167 and src/components/MonthView.tsx:107 contain the same touchstart/touchend handler (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)\*1.5, ref-tracked current date/month, passive listeners, identical cleanup).
+   Problem: Identical low-level touch-gesture logic is maintained twice, so threshold/axis-lock tweaks must be made in parallel.
+   Fix: Extract a useHorizontalSwipe(ref, onPrev, onNext) hook and call it from both views.
+7. EntryEditor is a 594-line component mixing 4+ unrelated concerns
+   Impact: Medium
+   Evidence: src/components/EntryEditor.tsx:91 holds wikilink autocomplete (caret math, popup positioning, insertWikilink), the tag/topic combobox, free-text participant input, contentEditable body management, and the chip/metadata layout — all in one function component.
+   Problem: Unrelated state machines (wikilink popup vs. tag picker vs. participants) share one render scope, making the editor hard to test or change without cross-impact.
+   Fix: Split the wikilink-autocomplete and tag/topic-picker logic into dedicated sub-components/hooks.
+8. UI-only layout fields leak into the domain metadata type and are mutated during render
+   Impact: Medium
+   Evidence: src/types.ts:43 ExtendedMetadata adds \_dh/\_endMs ("DayView layout") to AppMetadata; src/components/DayView.tsx:42 computeColumns writes ev.metadata.\_dh/\_endMs onto occurrence objects inside a useMemo.
+   Problem: Transient per-render layout state is stored on the shared domain model and mutated as a side effect of rendering, blurring data vs. view and risking stale values across re-layouts.
+   Fix: Compute dh/endMs into a local {occ, top, height}[] structure inside DayView and drop \_dh/\_endMs from ExtendedMetadata.
+
+9. sortOccs mutates memoized arrays in place during render
+   Impact: Medium
+   Evidence: src/presentation.ts:158 returns arr.sort(...) (in-place); callers pass memoized data, e.g. src/components/AgendaView.tsx:72 items={sortOccs(g.items)} sorts the memoized groups[k].items array during render.
+   Problem: A render-path call reorders cached/memoized state as a side effect, which breaks referential assumptions (e.g. DaySection.propsAreEqual compares items by index) and is impure.
+   Fix: Have sortOccs copy first (return [...arr].sort(...)).
+
+10. fileOccurrenceMap runs two ±3-year expansions on the navigation path
     Impact: Medium
-    Evidence: MonthView.tsx:10 const TODAY = new Date(); TODAY.setHours(0,0,0,0) shadows the canonical constants.ts:5 TODAY that every other view imports.
-    Problem: Two independent "today" definitions can disagree (and a local one captured at module load won't match an app that's been open past midnight), an avoidable correctness/consistency hazard.
-    Fix: Delete the local constant and import { TODAY } from '../constants' like the other views.
+    Evidence: src/presentation.ts:76 calls expandRange(items, roots, TODAY, AHEAD) and expandRange(..., BACK, TODAY) across a 6-year window; it's invoked on every entry open and wikilink resolve (src/routes/entry.$fileSlug.tsx:37).
+    Problem: A full 6-year recurrence expansion runs synchronously on the first read after any mutation, scaling with series count and recomputing far more than the nearest occurrence actually needs.
+    Fix: Narrow the default window (e.g. ±1yr) with a lazy widen-on-miss fallback, or build the map incrementally rather than via two full-range expansions.
+
+11. Cache-write failures are silently swallowed
+    Impact: High
+    Evidence: vault.ts:42-44 writeEntityToCache and vault.ts:54-56 deleteFileFromDisk catch all errors and only console.error — unlike syncToDirectory which calls notify(...) (vault.ts:75). updateSyncUI also swallows with empty .catch(() => {}) (vault.ts:26).
+    Problem: If an IndexedDB write fails, the user's edit is lost with zero feedback while the UI shows the change as saved — silent data loss.
+    Fix: Call notify(...) (and avoid clearing dirty state) in these catch blocks, matching the sync path's error handling.
 
 ## Survey Prompt
 
@@ -79,6 +93,7 @@ Categories to scan:
 - File/directory layout — is co-location logical? Are abstractions at the right level?
 - Type safety — use of `any`, missing return types, unsafe casts (TypeScript)
 - Error handling — inconsistent, swallowed, or missing error paths
+- Typescript React / Shadcn / TanStack / Tailwind antipatterns
 
 **Styling & UX**
 
