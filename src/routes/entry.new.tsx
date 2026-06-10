@@ -14,10 +14,7 @@ function NewEntryPage() {
   const { title } = Route.useSearch()
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
-  const hooks = useEntryEditor(null, 'all')
+  const hooks = useEntryEditor(null, 'all', title)
 
-  // Prefill title on first render (entry.title is empty until user types)
-  const entry = title && !hooks.entry.title ? { ...hooks.entry, title } : hooks.entry
-
-  return <EditorShell entry={entry} hooks={hooks} items={items} roots={roots} />
+  return <EditorShell entry={hooks.entry} hooks={hooks} items={items} roots={roots} />
 }
