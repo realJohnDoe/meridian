@@ -37,6 +37,26 @@ export function fileEntries(roots: Roots): FileEntry[] {
   return entries
 }
 
+// ── TAG / TOPIC CHIP HELPERS ──────────────────────────────────────────────────
+
+export interface TagTopicChip {
+  label:   string
+  isTopic: boolean
+  raw:     string
+}
+
+/** Build a sorted mixed list of tag chips and wikilink-resolved topic chips. */
+export function buildTagTopicChips(tags: string[], topics: string[], roots: Roots): TagTopicChip[] {
+  const tagChips:   TagTopicChip[] = tags.map(t => ({ label: t, isTopic: false, raw: t }))
+  const topicChips: TagTopicChip[] = topics.map(raw => {
+    const ref      = unwrapRef(raw)
+    const fileSlug = resolveWikilink(ref, roots)
+    const label    = fileSlug ? (roots.get(fileSlug)?.title ?? ref) : ref
+    return { label, isTopic: true, raw }
+  })
+  return [...tagChips, ...topicChips].sort((a, b) => a.label.localeCompare(b.label))
+}
+
 // ── fileOccurrenceMap ──────────────────────────────────────────────────────────
 
 // Single-entry memo keyed on (items, roots) reference identity.
