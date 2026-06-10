@@ -5,17 +5,64 @@
 
 ## Results from last Quality Survey
 
-2. Cache-write failures are silently swallowed
+1. Occurrence-state → CSS-class mapping is forked into 3 diverging copies
    Impact: High
-   Evidence: vault.ts:42-44 writeEntityToCache and vault.ts:54-56 deleteFileFromDisk catch all errors and only console.error — unlike syncToDirectory which calls notify(...) (vault.ts:75). updateSyncUI also swallows with empty .catch(() => {}) (vault.ts:26).
-   Problem: If an IndexedDB write fails, the user's edit is lost with zero feedback while the UI shows the change as saved — silent data loss.
-   Fix: Call notify(...) (and avoid clearing dirty state) in these catch blocks, matching the sync path's error handling.
-
-3. Sort/layout helpers mutate their inputs on the render path
+   Evidence: src/presentation.ts:171 defines occState() (canonical states), then \_ccBarMap + ccBarClass() re-map those states; src/components/DayView.tsx:17 dvBlkClass() hand-maps the same states to a near-identical but separately-maintained set ('done'/'event-past'→'past', etc.).
+   Problem: The colour system's state→class logic lives in three independent switch tables that must be kept in lock-step by hand, so any new state or rename silently diverges the timeline view from the agenda/month views.
+   Fix: Make occState the single source and derive every view's class from one stateToClass(view, state) lookup table in presentation.ts.
+2. Kind → icon mapping duplicated across 4 components
    Impact: Medium
-   Evidence: sortOccs does arr.sort(...) on the passed array (presentation.ts:71) and is called during render in AgendaView.tsx:101 (sortOccs(g.items) on memoized group arrays); computeColumns writes ev.metadata.\_dh/\_endMs onto live occurrence objects (DayView.tsx:36-37).
-   Problem: In-place mutation of memoized/store-derived data during render is a React anti-pattern that causes order-dependent bugs and makes memo comparisons unreliable.
-   Fix: Make sortOccs return [...arr].sort(...) and have computeColumns carry layout values in a local map instead of on metadata.
+   Evidence: src/components/OccurrenceCard.tsx:41 TypeIcon, src/components/DayView.tsx:58 AllDayItem, src/components/EntryEditor.tsx:274 entryTypeIcon, and src/components/EntryEditor.tsx:576 all reimplement "task→CheckSquare / event→CalendarDays / note→FileText".
+   Problem: The same done!==undefined ? task : date ? event : note icon decision is copy-pasted four times (one with a raw as { metadata?: { done?: boolean } } cast), so icon behaviour drifts per surface.
+   Fix: Add one <KindIcon occ size=.../> component driven by the existing occKind() and use it everywhere.
+3. ISO-date helpers reimplemented in dialogs, duplicating existing model utils
+   Impact: Medium
+   Evidence: Identical isoToDate / dateToIso / startOfToday appear in src/components/DatePickerDialog.tsx:9 and src/components/RepeatDialog.tsx:63, while src/model/expansion.ts:31 already exports fmtISO (== dateToIso) and parseDateString (== isoToDate).
+   Problem: Three copies of local-timezone date↔ISO conversion exist, two of which re-derive a utility the model layer already ships, risking subtle off-by-one timezone divergence.
+   Fix: Delete the local copies and import fmtISO / parseDateString from model/expansion.
+4. Dead Zod schema keeps the entire zod dependency alive
+   Impact: Medium
+   Evidence: src/model/nodeSchema.ts:20 RawNodeSchema is never imported anywhere (only the RawNode type is used); zod appears in exactly one file (package.json "zod": "^4.4.3").
+   Problem: A runtime validation schema that nothing calls ships an entire dependency to the bundle and implies validation that never actually runs.
+   Fix: Remove RawNodeSchema (keep the RawNode type) and drop zod from package.json.
+5. Icon-only buttons have no accessible name
+   Impact: Medium
+   Evidence: src/routes/\_app.tsx:81 day prev/next <button className="ib"><ChevronLeft/></button> have neither title nor aria-label; same for the search clear/add buttons at src/routes/\_app.tsx:161 and src/routes/\_app.tsx:165 (lucide icons render aria-hidden).
+   Problem: Multiple primary navigation/action controls announce only "button" to screen readers and fail keyboard/AT discoverability.
+   Fix: Add aria-label (e.g. "Previous day", "Clear search", "New entry") to each icon-only button.
+6. Horizontal swipe-navigation gesture duplicated in DayView and MonthView
+   Impact: Medium
+   Evidence: src/components/DayView.tsx:167 and src/components/MonthView.tsx:107 contain the same touchstart/touchend handler (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)\*1.5, ref-tracked current date/month, passive listeners, identical cleanup).
+   Problem: Identical low-level touch-gesture logic is maintained twice, so threshold/axis-lock tweaks must be made in parallel.
+   Fix: Extract a useHorizontalSwipe(ref, onPrev, onNext) hook and call it from both views.
+7. EntryEditor is a 594-line component mixing 4+ unrelated concerns
+   Impact: Medium
+   Evidence: src/components/EntryEditor.tsx:91 holds wikilink autocomplete (caret math, popup positioning, insertWikilink), the tag/topic combobox, free-text participant input, contentEditable body management, and the chip/metadata layout — all in one function component.
+   Problem: Unrelated state machines (wikilink popup vs. tag picker vs. participants) share one render scope, making the editor hard to test or change without cross-impact.
+   Fix: Split the wikilink-autocomplete and tag/topic-picker logic into dedicated sub-components/hooks.
+8. UI-only layout fields leak into the domain metadata type and are mutated during render
+   Impact: Medium
+   Evidence: src/types.ts:43 ExtendedMetadata adds \_dh/\_endMs ("DayView layout") to AppMetadata; src/components/DayView.tsx:42 computeColumns writes ev.metadata.\_dh/\_endMs onto occurrence objects inside a useMemo.
+   Problem: Transient per-render layout state is stored on the shared domain model and mutated as a side effect of rendering, blurring data vs. view and risking stale values across re-layouts.
+   Fix: Compute dh/endMs into a local {occ, top, height}[] structure inside DayView and drop \_dh/\_endMs from ExtendedMetadata.
+
+9. sortOccs mutates memoized arrays in place during render
+   Impact: Medium
+   Evidence: src/presentation.ts:158 returns arr.sort(...) (in-place); callers pass memoized data, e.g. src/components/AgendaView.tsx:72 items={sortOccs(g.items)} sorts the memoized groups[k].items array during render.
+   Problem: A render-path call reorders cached/memoized state as a side effect, which breaks referential assumptions (e.g. DaySection.propsAreEqual compares items by index) and is impure.
+   Fix: Have sortOccs copy first (return [...arr].sort(...)).
+
+10. fileOccurrenceMap runs two ±3-year expansions on the navigation path
+    Impact: Medium
+    Evidence: src/presentation.ts:76 calls expandRange(items, roots, TODAY, AHEAD) and expandRange(..., BACK, TODAY) across a 6-year window; it's invoked on every entry open and wikilink resolve (src/routes/entry.$fileSlug.tsx:37).
+    Problem: A full 6-year recurrence expansion runs synchronously on the first read after any mutation, scaling with series count and recomputing far more than the nearest occurrence actually needs.
+    Fix: Narrow the default window (e.g. ±1yr) with a lazy widen-on-miss fallback, or build the map incrementally rather than via two full-range expansions.
+
+11. Cache-write failures are silently swallowed
+    Impact: High
+    Evidence: vault.ts:42-44 writeEntityToCache and vault.ts:54-56 deleteFileFromDisk catch all errors and only console.error — unlike syncToDirectory which calls notify(...) (vault.ts:75). updateSyncUI also swallows with empty .catch(() => {}) (vault.ts:26).
+    Problem: If an IndexedDB write fails, the user's edit is lost with zero feedback while the UI shows the change as saved — silent data loss.
+    Fix: Call notify(...) (and avoid clearing dirty state) in these catch blocks, matching the sync path's error handling.
 
 ## Survey Prompt
 
