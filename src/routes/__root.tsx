@@ -2,7 +2,7 @@ import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
-import { initApp, tryRestoreDirectory } from '../vault'
+import { initApp, restoreVaults } from '../vault'
 
 export const Route = createRootRoute({
   component: Root,
@@ -14,7 +14,7 @@ function Root() {
 
   useEffect(() => {
     initApp()
-    tryRestoreDirectory()
+    restoreVaults()
   }, [])
 
   return (
