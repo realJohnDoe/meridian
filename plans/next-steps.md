@@ -4,6 +4,7 @@
 - Add GitHub Vault support
 - Add CodeMirror 6 for markdown editing
 - Add overdue section in agenda
+- Add Solarized Light theme
 
 ## Results from last Quality Survey
 
@@ -18,6 +19,7 @@
    Evidence: src/routes/\_app.tsx:81 day prev/next <button className="ib"><ChevronLeft/></button> have neither title nor aria-label; same for the search clear/add buttons at src/routes/\_app.tsx:161 and src/routes/\_app.tsx:165 (lucide icons render aria-hidden).
    Problem: Multiple primary navigation/action controls announce only "button" to screen readers and fail keyboard/AT discoverability.
    Fix: Add aria-label (e.g. "Previous day", "Clear search", "New entry") to each icon-only button.
+
 3. Horizontal swipe-navigation gesture duplicated in DayView and MonthView
    Impact: Medium
    Evidence: src/components/DayView.tsx:167 and src/components/MonthView.tsx:107 contain the same touchstart/touchend handler (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)\*1.5, ref-tracked current date/month, passive listeners, identical cleanup).
