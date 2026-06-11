@@ -1,6 +1,7 @@
 ## Next steps
 
 - Add 'I have the right version'/'Take version from GitHub / Local File' behavior
+- Add auto-sync
 - Turn error messages and delete undo messages into shadcn toasts
 - Turn Example vault into tutorial
 - Fix top bar label
@@ -9,6 +10,219 @@
 - Add Solarized Light theme
 
 ## Results from last Quality Survey
+
+1. Domain/UI leakage: the mutation layer drives navigation and toast state directly
+   Category: architecture srp
+   Impact: 7
+   Evidence: mutations.ts:107 navigateBack(), mutations.ts:215 useStore.setState({ toast… }), storeBridge.ts:14 navigateBack = () => window.history.back(). saveNode/deleteNode/beginSwipeDelete all call navigateBack() and poke the store directly.
+   Problem: Pure data-mutation functions are hard-wired to browser history and UI toast/error state, so domain logic can't be reused or unit-tested without a DOM + Zustand, and navigation timing is buried inside "save" semantics.
+   Fix: Have mutation functions return a result/outcome and let the calling hook (useEntryEditor) own router.history.back() and toast display.
+2. The 796-line debug view re-implements the entire editor/dialog stack — and ships in the production build
+   Category: dead-code dry architecture
+   Impact: 6
+   Evidence: NodeInheritanceDebugger.tsx imports EntryEditor, RepeatDialog, DatePickerDialog, TimePickerDialog, DurationDialog, PriorityDrawer and manages dialog state itself (lines 24-30), duplicating useEntryEditor.ts + DialogStack.tsx + EditorShell.tsx. It's a rollup input: vite.config.ts:103 debug: resolve(\_\_dirname, 'debug.html').
+   Problem: Every change to editor wiring must be mirrored in a second 796-line copy, and the whole debug bundle (plus inheritance.ts tree API it alone consumes) is shipped to end users.
+   Fix: Refactor the debugger to reuse EditorShell/useEntryEditor, and exclude debug.html from the production rollup input (dev-only plugin).
+3. Two parallel data models: RawNode/EffectiveNode tree vs flat StoreItem
+   Category: architecture
+   Impact: 6
+   Evidence: storeItems.ts:116 builds an EffectiveNode tree via buildEffectiveTree then flattens to StoreItem[]; collapse.ts rebuilds a tree to serialize; the tree API (buildEffectiveTree, EffectiveNode, displayValue) is consumed in production only by parsing + the debug tool (grep: zero other call sites).
+   Problem: The codebase maintains an inheritance-tree representation and a flat-item representation of the same data, with conversion logic in both directions — a large conceptual surface that exists mostly to serve the parser and the debug view.
+   Fix: Confine the tree model entirely inside storeItems.ts/collapse.ts as a private parse/serialize detail, and stop exporting EffectiveNode/buildEffectiveTree from model/.
+4. expansion.ts is an 855-line god-module mixing date utils, duration parsing, tree expansion, and metadata join — with a wide dead/internal-only export surface
+   Category: architecture dead-code
+   Impact: 5
+   Evidence: expansion.ts exports fmtISO/fmtMonth/fmtT (date fmt), parseDurationHours/parseDurationDays (duration), expandNode/mergeNode/expandRepeat/collectAllOccurrences/collectRepeatPatterns/treeHasRepeat/jsDateToSpec/collectUndated — all of which have zero non-test consumers outside expansion.ts itself (verified by grep).
+   Problem: Unrelated concerns share one file and many functions are exported as if public API but are internal or test-only, obscuring the real surface and inflating what every importer pulls in.
+   Fix: Split into dateUtils.ts / duration.ts / expansion.ts, and downgrade internal-only functions from export to module-private.
+5. Dual styling system: ~84 hand-written component CSS rules alongside inline Tailwind + shadcn
+   Category: styling
+   Impact: 5
+   Evidence: index.css:160-272 defines bespoke rules like .topbar, .ib, .search-bar-_, .dv-_, .cc-_, .entry-_ as raw CSS, while components mix Tailwind utilities inline (\_app.tsx:148) and shadcn ui/ components — and even @apply truncate appears inside raw CSS (index.css:254).
+   Problem: There's no rule for which system to use; the same visual concern (e.g. an icon button) is sometimes .ib, sometimes Tailwind, making styling unpredictable and theming changes touch two places.
+   Fix: Pick one convention (Tailwind @layer components or cva variants for repeated patterns) and migrate the bespoke .dv-_/.cc-_/.entry-\* families into it.
+6. AppLayout (\_app.tsx) is a god-component owning ~7 unrelated concerns
+   Category: srp architecture
+   Impact: 5
+   Evidence: \_app.tsx:40-245 — one component handles topbar + day-nav, sidebar/vault list, sync-status color/title logic (:59-66), search bar, filter overlay, entry overlay, and the add-vault dialog, plus inline vaultIcon/navItems building.
+   Problem: Any change to the sidebar, sync indicator, or search bar forces edits to a single 245-line layout file with intertwined state (filterQuery, sidebarOpen, addVaultOpen).
+   Fix: Extract <Sidebar>, <SyncButton>, and <SearchBar> components, each owning its own state and store selectors.
+7. Duplicated "open new entry" navigation object (4×)
+   Category: dry
+   Impact: 4
+   Evidence: Identical navigate({ to: '.', search: prev => ({ ...prev, editor: 'new', etitle: …, edate: undefined, escope: undefined }) }) at \_app.tsx:210, \_app.tsx:224, \_app.tsx:235, useEntryEditor.ts:43.
+   Problem: There's an entryRoute() helper for existing entries but no parallel helper for new entries, so the param shape is copy-pasted and easy to skew.
+   Fix: Add newEntryRoute(title?: string) next to entryRoute and call it everywhere.
+8. exampleRef literal hand-rolled 4× in vault.ts
+   Category: dry
+   Impact: 3
+   Evidence: Identical { id: 'example', name: 'Example data', kind: 'example' } at vault.ts:177, :283, :328, :358 (last one with as const).
+   Problem: The canonical example vault descriptor is duplicated; renaming "Example data" means four edits and the variants already drift (typed vs as const).
+   Fix: Export one EXAMPLE_VAULT_REF constant and reference it.
+9. onOpen = navigate(entryRoute(...)) duplicated across route files
+   Category: dry
+   Impact: 3
+   Evidence: Same callback at \_app.day.$date.tsx:18, \_app.index.tsx:42, \_app.tsx:90.
+   Problem: The open-entry handler is re-declared in every route that lists occurrences.
+   Fix: A small useOpenEntry() hook returning the memoized callback.
+10. Stateful toast scheduler lives as module globals inside mutations.ts
+    Category: srp architecture
+    Impact: 4
+    Evidence: mutations.ts:206-231 — let \_toastTimer, let \_pendingCommit, showDeleteToast with setTimeout/clearTimeout, all in the same file as the pure edit API.
+    Problem: Module-level mutable singletons make mutations.ts non-pure and the undo-commit timing untestable in isolation; "apply edit" and "manage a 4s undo timer" are unrelated responsibilities.
+    Fix: Move the undo-toast scheduler into its own module (e.g. undoToast.ts) that mutations.ts calls.
+11. Editor handler prop-drilling through three layers
+    Category: architecture dry
+    Impact: 3
+    Evidence: ~18 handlers from useEntryEditor are destructured and re-passed individually in EditorShell.tsx:23-71 and again declared as 16 props in DialogStack.tsx:14-31.
+    Problem: Adding one dialog field means editing the hook return, EditorShell, the DialogStack props interface, and the call site — four touch points for one wire.
+    Fix: Pass the hooks object (or a grouped dialogHandlers) straight through rather than spreading every callback by hand.
+12. Dead no-op spread + unused binding in updateRoot
+    Category: dead-code
+    Impact: 2
+    Evidence: storeOps.ts:140-147 — const existing = next.get(fileSlug) then ...(existing ? {} : {}), a spread that is a no-op in both branches; existing is otherwise unused.
+    Problem: Misleading code suggesting a merge that never happens (comment even says "merge if needed").
+    Fix: Delete the existing binding and the dead spread.
+13. initApp() is an empty no-op still wired into the root
+    Category: dead-code
+    Impact: 1
+    Evidence: vault.ts:373-375 — body is only a comment; called at \_\_root.tsx:16.
+    Problem: A do-nothing function called on boot implies an init step that doesn't exist.
+    Fix: Remove initApp and its call.
+14. GitHub backend only sees the repo root and keys files by name, not path
+    Category: architecture error-handling
+    Impact: 4
+    Evidence: githubBackend.ts:50-65 requests path: '' and stores tokens.set(item.name, item.sha); statAll never recurses into subdirectories.
+    Problem: Vaults with files in subfolders silently won't sync/round-trip via GitHub, unlike the local backend — an inconsistent boundary contract between two StorageBackend implementations.
+    Fix: Use the Git Trees API (recursive=1) and key by full path to match LocalBackend's semantics.
+15. GitHub PAT persisted in plaintext IndexedDB
+    Category: security
+    Impact: 3
+    Evidence: vault.ts:317 tokenSave(id, cfg.token) → cache.ts:127 stores the raw token in the meta table.
+    Problem: Any XSS or shared-device access exposes a repo-scoped write token in cleartext; there's no scoping note or exp\* handling.
+    Fix: At minimum document the requirement for a fine-grained, single-repo token and prefer the shortest viable expiry; consider not persisting and re-prompting.
+16. No global loading/error UI while the vault restores
+    Category: ux
+    Impact: 3
+    Evidence: \_\_root.tsx:15-18 fires restoreVaults() in an effect; the agenda renders against empty items until it resolves (\_app.index.tsx:34-40 even has a comment about scrolling "against an empty agenda").
+    Problem: On a slow GitHub/FS load the user sees an empty app with no spinner, and there's no surfaced state distinguishing "loading" from "empty vault."
+    Fix: Add a loading flag to the store, set it around restoreVaults, and render a skeleton/spinner.
+17. Occurrence visual state is stringly-typed and decoded by ad-hoc maps
+    Category: types naming
+    Impact: 3
+    Evidence: presentation.ts:191 occState(): string returns magic strings ('task-p1', 'event-future'…) consumed via untyped Record<string,string> maps \_ccBarMap/\_dvBlkMap (:231, :249) with ?? 'event' fallbacks hiding typos.
+    Problem: A renamed state or typo'd map key fails silently to the fallback class instead of a compile error.
+    Fix: Make occState return a string-literal union and type the maps as Record<OccState, string>.
+18. Navigation hard-bound to window.history.back()
+    Category: architecture
+    Impact: 2
+    Evidence: storeBridge.ts:14 — navigateBack = () => window.history.back(), used by the mutation layer instead of the router's history.
+    Problem: Bypasses the TanStack router abstraction (used elsewhere via router.history.back() in useEntryEditor.ts:62), giving two inconsistent back-navigation paths and coupling non-UI code to the global window.
+    Fix: Route all back-navigation through the router and remove the window.history shim (folds into finding #1).
+19. notify() builds error strings by hand and re-implements an auto-dismiss timer
+    Category: error-handling dry
+    Impact: 2
+    Evidence: storeBridge.ts:17-24 hand-rolls a setTimeout dismiss; callers across vault.ts repeat notify('… failed: ' + ((e as Error).message || (e as Error).name)) (vault.ts:135, :148, :170).
+    Problem: The error-banner timer logic and the (e as Error).message || .name formatting are duplicated, and the timer mechanism overlaps with the toast timer in mutations.ts (two bespoke dismiss schedulers).
+    Fix: A single notifyError(prefix, e) helper plus one shared transient-message scheduler.
+20. EntryEditor repeats the metadata-chip button five times
+    Category: dry
+    Impact: 2
+    Evidence: EntryEditor.tsx:224-257 — Date/Time/Duration/Priority/Repeat are five near-identical badgeVariants({variant:'chip'}) buttons differing only in icon, label, value text, and onClick.
+    Problem: Each new metadata chip is another copy of the same markup; styling/aria tweaks must be applied five times.
+    Fix: Extract a <PropChip icon label value pressed onClick className?> component and map over a small config array.
+
+🔴 High — data loss: reconcile deletes unsynced local edits
+src/vault.ts:79-92 — reconcileWithDisk treats any cached file not present on disk as a deletion, with no dirty guard:
+
+for (const path of cacheMap.keys()) {
+if (!diskTokens.has(path)) deleted.push(path) // includes dirty, never-synced files
+}
+await Promise.all(deleted.map(p => cacheDelete(vaultId, p)))
+Writes only go to the cache as dirty:1 (cache.ts:64); they reach disk only when the user clicks the sync button (syncToDirectory is the sole caller, wired to a button in \_app.tsx:115). So accumulating unsynced changes is the normal state — that's what the dirty-count badge is for.
+
+Failure scenario: user creates/edits a few notes (now dirty in cache, not yet on disk) → reloads the app → restoreVaults → activateWritableVault → reconcileWithDisk → those files aren't in diskTokens → they're cacheDeleted and rebuilt-out of the store. The unsynced work is silently gone. Fix: exclude dirty === 1 records from the deleted set (a locally-created file missing from disk is pending-create, not a remote delete).
+
+🟠 Medium — deletes bypass the offline staging model
+src/vault.ts:139-150 — deleteFileFromDisk writes through to the backend immediately (\_activeBackend.delete(path)), while edits are staged in cache and synced later. Also reached implicitly when a file is emptied (vault.ts:125).
+
+Failure scenario: user is offline (or GitHub token is rate-limited). An edit succeeds (staged dirty), but a delete immediately throws → "Delete failed" banner, and unlike edits it can't be retried via the sync button. The two operations have inconsistent durability/offline semantics. Consider staging deletes as a tombstone flushed by syncToDirectory too.
+
+🟠 Medium — GitHub ensurePermission only proves read access
+src/storage/githubBackend.ts:141-151 — it does GET /repos/{owner}/{repo} and returns 'granted' on success, but that succeeds for a read-only token and doesn't check the configured branch.
+
+Failure scenario: user adds a GitHub vault with a read-scoped (or wrong-branch) token. addGitHubVault reports success and saves the vault; the first write() during sync 403s/404s later with a confusing "Sync failed" rather than being caught at connect time.
+
+🟡 Low — redundant in-place mutation of shared metadata
+src/mutations.ts:112 — o.metadata.done = !o.metadata.done mutates the occurrence object directly "for optimistic UI", but setData(next) runs synchronously on the next line and re-renders from freshly-expanded items. The mutation is dead for its stated purpose and risks mutating an object that expansion may share/cache. Drop it.
+
+🟡 Low — cleanup
+src/model/storeOps.ts:146 — ...(existing ? {} : {}) spreads an empty object on both branches: dead code, and the "merge if needed" comment describes behavior that doesn't exist. Remove it or implement the merge.
+src/storeBridge.ts:17-24 — notify auto-clears after 5s by comparing errorNotification === msg. Two identical messages in a row share the key, so the first timer can clear the second banner ~early. A token/id would be more robust.
+src/index.css:347 (the PR under review) — the banner now hardcodes color:#fff for text and close button instead of a theme token. Fine on the opaque destructive background, but inconsistent with the token-based styling everywhere else.
+
+[
+{
+"file": "src/vault.ts",
+"line": 77,
+"summary": "reconcileWithDisk silently overwrites unsaved local edits on vault activation",
+"failure_scenario": "User edits a note (dirty=1, version='local:…'), closes the tab without syncing. On next load, reconcileWithDisk fires: entry.version ('local:…') never equals the disk token, so the file is added to 'changed' and cacheBulkWriteClean overwrites it with the remote version at dirty:0. The local edit is permanently gone — no merge, no conflict prompt, no undo."
+},
+{
+"file": "src/cache.ts",
+"line": 47,
+"summary": "cacheInit assigns db before db.open() resolves; concurrent caller gets an un-opened Dexie instance",
+"failure_scenario": "Two callers hit cacheInit() concurrently. The first enters the IIFE and sets db = new MeridianDB() synchronously before the first await. The second caller arrives in the next microtask, takes the 'if (db) return db' fast-path (line 44), and receives a MeridianDB whose open() has not completed. Any subsequent Dexie operation on that instance throws DatabaseClosedError, breaking the entire cache layer."
+},
+{
+"file": "src/storage/githubApi.ts",
+"line": 16,
+"summary": "onSecondaryRateLimit always returns true, causing infinite retry with no cap",
+"failure_scenario": "A sync burst triggers GitHub's abuse-detection secondary rate limit. Unlike onRateLimit which caps at retryCount < 2, this handler unconditionally returns true. Octokit retries after retryAfter seconds each time; GitHub re-triggers the limit; the loop never exits. syncToDirectory hangs indefinitely and the user sees no error — only a frozen spinner."
+},
+{
+"file": "src/storage/githubBackend.ts",
+"line": 52,
+"summary": "statAll uses path:'' which only lists the repo root; files in subdirectories are silently skipped",
+"failure_scenario": "A GitHub vault with any .md/.yaml file in a subdirectory (e.g. journal/2025-01.md) will never appear in statAll(). The file is absent from the sync tokens map, is never read into the cache, and is never displayed in the UI. There is no error — the files simply vanish silently on first load."
+},
+{
+"file": "src/storeBridge.ts",
+"line": 19,
+"summary": "notify() clears a still-active notification when two calls fire with identical message strings",
+"failure_scenario": "Two rapid save failures both call notify('Save failed: NetworkError'). Each arms a 5-second timer. The first timer fires at T+5s, sees errorNotification === msg → true, clears the banner. Even if the user was still reading it (second timer hasn't expired yet), the notification is gone. With high-frequency failures (e.g. repeated sync errors) the banner can flash and vanish repeatedly."
+},
+{
+"file": "src/model/storeOps.ts",
+"line": 146,
+"summary": "Dead spread ...(existing ? {} : {}) in updateRoot always spreads an empty object",
+"failure_scenario": "The spread is a no-op in both branches — existing is never used. The comment 'merge if needed — for now full replace from form' invites a future developer to add merge logic in the wrong place, believing this line already guards it. Any field-preserving merge intent is silently absent."
+},
+{
+"file": "src/presentation.ts",
+"line": 106,
+"summary": "fileOccurrenceMap materialises a full 3-year backward occurrence array just to reverse-iterate it",
+"failure_scenario": "expandRange(items, roots, BACK, TODAY) allocates an array of all past occurrences (up to 3 years of daily recurrences — potentially tens of thousands of objects) even when the forward pass already filled every slug. On a large vault viewed on a low-memory device, this causes a measurable GC pause on every cache miss."
+},
+{
+"file": "src/constants.ts",
+"line": 5,
+"summary": "TODAY is computed once at module load and never refreshed; items appear in wrong time bucket after midnight",
+"failure_scenario": "As a PWA, Meridian stays open across midnight. After midnight, TODAY still holds yesterday's date. fileOccurrenceMap anchors AHEAD/BACK from the stale TODAY, so the new calendar day's occurrences fall into the 'most-recent past' backward-pass bucket instead of the 'upcoming' forward-pass bucket — wrong representative occurrences in the item picker and wikilink targets until next reload."
+}
+]
+Summary by severity:
+
+# File Severity Kind
+
+1 vault.ts:77 Critical Data loss — unsaved edits silently overwritten on restart
+2 cache.ts:47 High Race — un-opened DB returned to concurrent caller
+3 githubApi.ts:16 High Correctness — infinite retry hangs sync indefinitely
+4 githubBackend.ts:52 High Correctness — subdirectory files silently invisible
+5 storeBridge.ts:19 Medium Race — notification cleared prematurely on duplicate messages
+6 storeOps.ts:146 Low Cleanup — dead spread, misleading comment
+7 presentation.ts:106 Low Efficiency — unnecessary full backward array allocation
+8 constants.ts:5 Low Staleness — wrong date bucket after midnight in long-running PWA
 
 ## Survey Prompt
 
