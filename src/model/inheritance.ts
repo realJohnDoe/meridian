@@ -21,6 +21,11 @@ import type { RawNode } from './nodeSchema'
  * this node's children (parent accumulated + this node's own `defaults:`).
  * The expansion engine uses this to seed generated occurrences, which are
  * semantically equivalent to virtual children with only a date override.
+ *
+ * **Intended scope:** this type is an implementation detail of the parse
+ * pipeline (`storeItems.ts`). It is exported only so that
+ * `NodeInheritanceDebugger` can visualise the inheritance tree. Production
+ * code should depend on `StoreItem[]` (via `parseToStoreItems`) instead.
  */
 export interface EffectiveNode {
   fields:        Record<string, unknown>
@@ -95,6 +100,9 @@ function childDefaults(
  *
  * `defaults:` is consumed at every level — children's fields are fully merged
  * with accumulated parent defaults before being returned.
+ *
+ * See `EffectiveNode` for intended scope: exported for the debug view only.
+ * The canonical entry point for all other callers is `parseToStoreItems`.
  */
 export function buildEffectiveTree(
   node: RawNode,

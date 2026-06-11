@@ -11,8 +11,7 @@
  *                   jsDateToSpec, addInterval, parseDurationHours, mergeNode
  *   - Engine:       expandNode
  *   - Model types:  OccurrenceEntry<T>, RepeatPattern<T>
- *   - Predicates:   hasRepeat, treeHasRepeat, treeHasOccurrences
- *   - Collectors:   expandRepeat, collectAllOccurrences, collectRepeatPatterns
+ *   - Predicates:   hasRepeat, treeHasOccurrences (used by debug view)
  *   - Main-app API: expandRange
  */
 
@@ -492,11 +491,6 @@ export function hasRepeat(node: EffectiveNode): boolean {
   return node.fields.repeat !== undefined && node.fields.repeat !== null
 }
 
-export function treeHasRepeat(node: EffectiveNode): boolean {
-  if (hasRepeat(node)) return true
-  return node.instances.some(treeHasRepeat)
-}
-
 export function treeHasOccurrences(node: EffectiveNode): boolean {
   if (hasRepeat(node) || node.fields.date !== undefined) return true
   return node.instances.some(treeHasOccurrences)
@@ -505,32 +499,6 @@ export function treeHasOccurrences(node: EffectiveNode): boolean {
 // ─────────────────────────────────────────────────────────────────────────────
 // TOEXPANDABLE  (internal)
 // ─────────────────────────────────────────────────────────────────────────────
-
-const SCHEDULING_FIELDS = new Set(['date', 'time', 'repeat', 'instances', 'excluded', 'defaults'])
-
-/**
- * Build a duck-typed node suitable for expandNode() from an EffectiveNode.
- *
- * Generated occurrences are semantically virtual children with only a date
- * override, so they should inherit from the node's accumulated childDefaults —
- * the same defaults its explicit child instances inherit.  This correctly
- * handles series that store task defaults (done, priority, …) inside a
- * `defaults:` block rather than as direct fields.
- */
-function toExpandable(node: EffectiveNode): ExpandNode {
-  const fields: Record<string, unknown> = { ...node.fields }
-
-  // Seed base values for generated occurrences from accumulated child defaults.
-  // Fields already on the node and scheduling-structural keys are skipped.
-  for (const [key, value] of Object.entries(node.childDefaults)) {
-    if (!SCHEDULING_FIELDS.has(key) && !(key in fields)) {
-      fields[key] = value
-    }
-  }
-
-  fields.instances = node.instances.map(child => ({ ...child.fields }))
-  return fields
-}
 
 function generatedDateSet(expandable: ExpandNode, from: Date, to: Date): Set<string> {
   const noInsts: ExpandNode = { ...expandable, instances: [] }
@@ -550,127 +518,6 @@ export function stableOccId(key: string): string {
   let id = occIdCache.get(key)
   if (!id) { id = crypto.randomUUID(); occIdCache.set(key, id) }
   return id
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// COLLECTORS (generic)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Expand the repeat schedule of an EffectiveNode up to `endDateStr`.
- * `extractMetadata` converts the raw merged occurrence fields to the caller's type.
- */
-export function expandRepeat<T>(
-  node: EffectiveNode,
-  endDateStr: string,
-  extractMetadata: (fields: Record<string, unknown>) => T,
-  fileSlug: string = '',
-  ownerId: string = '',
-): OccurrenceEntry<T>[] {
-  const expandable = toExpandable(node)
-  const from = new Date(0)
-  const to   = new Date(`${endDateStr}T23:59:59`)
-  if (isNaN(to.getTime())) return []
-
-  const genDates = generatedDateSet(expandable, from, to)
-  const raw = expandNode(expandable, from, to)
-
-  return raw.map(occ => {
-    const src: 'generated' | 'explicit' =
-      genDates.has(String(occ.date ?? '')) ? 'generated' : 'explicit'
-    const metaFields = Object.fromEntries(
-      Object.entries(occ).filter(([k]) => !METADATA_EXCLUDE.has(k)),
-    )
-    const entry: OccurrenceEntry<T> = {
-      date:     String(occ.date ?? ''),
-      time:     occ.time ? String(occ.time) : null,
-      source:   src,
-      fileSlug,
-      id:       stableOccId(`${fileSlug}|${ownerId}|${String(occ.date ?? '')}|${occ.time ?? ''}`),
-      metadata: extractMetadata(metaFields),
-    }
-    if (ownerId) entry.ownerId = ownerId
-    return entry
-  })
-}
-
-/**
- * Walk the entire EffectiveNode tree and collect all concrete occurrences.
- * Handles container roots (split-series pattern) where `repeat` lives on children.
- */
-export function collectAllOccurrences<T>(
-  node: EffectiveNode,
-  endDateStr: string,
-  extractMetadata: (fields: Record<string, unknown>) => T,
-  fileSlug: string = '',
-): OccurrenceEntry<T>[] {
-  const results: OccurrenceEntry<T>[] = []
-  const to = new Date(`${endDateStr}T23:59:59`)
-
-  function walk(n: EffectiveNode, ownerId: string) {
-    if (hasRepeat(n)) {
-      results.push(...expandRepeat(n, endDateStr, extractMetadata, fileSlug, ownerId))
-    } else if (n.fields.date !== undefined) {
-      const dateStr = String(n.fields.date)
-      const d = new Date(`${dateStr}T00:00:00`)
-      if (!isNaN(d.getTime()) && d <= to) {
-        const metaFields = Object.fromEntries(
-          Object.entries(n.fields).filter(([k]) => !METADATA_EXCLUDE.has(k)),
-        )
-        const entry: OccurrenceEntry<T> = {
-          date:     dateStr,
-          time:     n.fields.time ? String(n.fields.time) : null,
-          source:   'explicit',
-          fileSlug,
-          id:       stableOccId(`${fileSlug}|${ownerId}|${dateStr}|${n.fields.time ?? ''}`),
-          metadata: extractMetadata(metaFields),
-        }
-        if (ownerId) entry.ownerId = ownerId
-        results.push(entry)
-      }
-    } else {
-      n.instances.forEach(child => walk(child, ownerId))
-    }
-  }
-
-  walk(node, '')
-
-  return results.sort((a, b) => {
-    const d = a.date.localeCompare(b.date)
-    if (d !== 0) return d
-    return (a.time ?? '').localeCompare(b.time ?? '')
-  })
-}
-
-/**
- * Walk the EffectiveNode tree and collect one RepeatPattern per series node.
- */
-export function collectRepeatPatterns<T>(
-  node: EffectiveNode,
-  extractMetadata: (fields: Record<string, unknown>) => T,
-  fileSlug: string = '',
-): RepeatPattern<T>[] {
-  const results: RepeatPattern<T>[] = []
-
-  function walk(n: EffectiveNode) {
-    if (hasRepeat(n)) {
-      const metaFields = Object.fromEntries(
-        Object.entries(n.fields).filter(([k]) => !METADATA_EXCLUDE.has(k)),
-      )
-      results.push({
-        date:     String(n.fields.date ?? ''),
-        time:     n.fields.time ? String(n.fields.time) : null,
-        repeat:   n.fields.repeat as Repeat,
-        fileSlug,
-        id:       stableOccId(`${fileSlug}|series|${String(n.fields.date ?? '')}|${n.fields.time ?? ''}`),
-        metadata: extractMetadata(metaFields),
-      })
-    }
-    n.instances.forEach(child => walk(child))
-  }
-
-  walk(node)
-  return results
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
