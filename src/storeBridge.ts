@@ -9,10 +9,6 @@ export const setData         = (d: { items: StoreItem[]; roots: Roots }) => useS
 export const getVaults       = (): VaultRef[]     => useStore.getState().vaults
 export const getActiveVaultId = (): string | null => useStore.getState().activeVaultId
 
-// ── NAVIGATION ─────────────────────────────────────────────────
-/** Navigate back in browser history (replaces popOverlay after router migration). */
-export const navigateBack = () => window.history.back()
-
 // ── ERROR NOTIFICATION ─────────────────────────────────────────
 export function notify(msg: string): void {
   useStore.setState({ errorNotification: msg });

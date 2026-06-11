@@ -6,9 +6,8 @@ import {
 import { isSeries, occIsRecur } from './types'
 import type { Occurrence, Repeat, Scheduled, Priority, StoreItem, EditScope } from './types'
 import { titleToSlug } from './fileIO'
-import { getItems, getRoots, setData, navigateBack, notify } from './storeBridge'
+import { getItems, getRoots, setData } from './storeBridge'
 import { writeEntityToCache, deleteFileFromDisk } from './vault'
-import { useStore } from './store'
 import { TODAY } from './constants'
 import type { EntryState, ItemType } from './components/EntryEditor'
 
@@ -76,13 +75,14 @@ export function entryFromOccurrence(
 
 type SaveFields = EntryState & { body: string }
 
-export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields): void {
+export type SaveResult = 'saved' | 'missing-title' | 'missing-date'
+
+export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields): SaveResult {
   const { title } = fields
-  if (!title) return
+  if (!title) return 'missing-title'
 
   if (editScope === 'add' && item && !fields.scheduled?.date) {
-    notify('Please set a date for the new occurrence.')
-    return
+    return 'missing-date'
   }
 
   const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
@@ -104,7 +104,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   // from the title — matching applyEdit — so undated tasks/notes are persisted too.
   const fileSlug = item?.fileSlug ?? titleToSlug(title)
   if (fileSlug) writeEntityToCache(fileSlug)
-  navigateBack()
+  return 'saved'
 }
 
 export function toggleOccDone(o: Occurrence): void {
@@ -114,7 +114,13 @@ export function toggleOccDone(o: Occurrence): void {
   writeEntityToCache(o.fileSlug)
 }
 
-export function beginSwipeDelete(o: Occurrence): () => void {
+type ToastConfig = { title: string; onUndo: () => void }
+
+export function beginSwipeDelete(
+  o: Occurrence,
+  showToast: (config: ToastConfig) => void,
+  hideToast: () => void,
+): () => void {
   const snapshot = { items: getItems(), roots: getRoots() }
   const title    = o.metadata.title   // expanded occurrence already carries the file-level title
   let cancelled  = false
@@ -124,6 +130,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
     showDeleteToast(title,
       () => { writeEntityToCache(o.fileSlug) },
       () => { cancelled = true; setData(snapshot) },
+      showToast, hideToast,
     )
     return () => { if (!cancelled) setData(next) }
   } else {
@@ -133,6 +140,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
         cancelled = true
         if (!getItems().find(i => i.id === o.id)) setData(snapshot)
       },
+      showToast, hideToast,
     )
     return () => {
       if (!cancelled) setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, o.fileSlug))
@@ -142,6 +150,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
 
 export function deleteNode(
   item:             Occurrence | null,
+  navigateBack:     () => void,
   onShowSeries?:    (config: SeriesSheetConfig) => void,
   onHideSeries?:    () => void,
   onConfirmSingle?: (title: string, onConfirm: () => void) => void,
@@ -207,25 +216,29 @@ let _toastTimer:    ReturnType<typeof setTimeout> | null = null
 let _pendingCommit: (() => void) | null                  = null
 const TOAST_MS = 4000
 
-function showDeleteToast(title: string, commitFn: () => void, undoFn: () => void): void {
+function showDeleteToast(
+  title: string,
+  commitFn: () => void,
+  undoFn: () => void,
+  showToast: (config: ToastConfig) => void,
+  hideToast: () => void,
+): void {
   if (_toastTimer)    { clearTimeout(_toastTimer); _toastTimer = null }
   if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
 
   _pendingCommit = commitFn
-  useStore.setState({
-    toast: {
-      title,
-      onUndo: () => {
-        clearTimeout(_toastTimer!); _toastTimer = null
-        _pendingCommit = null
-        undoFn()
-        useStore.setState({ toast: null })
-      },
+  showToast({
+    title,
+    onUndo: () => {
+      clearTimeout(_toastTimer!); _toastTimer = null
+      _pendingCommit = null
+      undoFn()
+      hideToast()
     },
   })
   _toastTimer = setTimeout(() => {
     _toastTimer = null
     if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-    useStore.setState({ toast: null })
+    hideToast()
   }, TOAST_MS)
 }
