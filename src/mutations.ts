@@ -8,7 +8,7 @@ import type { Occurrence, Repeat, Scheduled, Priority, StoreItem, EditScope } fr
 import { titleToSlug } from './fileIO'
 import { getItems, getRoots, setData, navigateBack, notify } from './storeBridge'
 import { writeEntityToCache, deleteFileFromDisk } from './vault'
-import { useStore } from './store'
+import { toast } from 'sonner'
 import { TODAY } from './constants'
 import type { EntryState, ItemType } from './components/EntryEditor'
 
@@ -203,29 +203,34 @@ export function deleteNode(
 
 // ── UNDO TOAST MANAGER ────────────────────────────────────────
 
-let _toastTimer:    ReturnType<typeof setTimeout> | null = null
-let _pendingCommit: (() => void) | null                  = null
+let _toastId:       string | number | null = null
+let _pendingCommit: (() => void) | null    = null
 const TOAST_MS = 4000
 
 function showDeleteToast(title: string, commitFn: () => void, undoFn: () => void): void {
-  if (_toastTimer)    { clearTimeout(_toastTimer); _toastTimer = null }
+  // Commit any previous pending deletion before showing the new toast.
+  // Clear _pendingCommit first so the dismiss callback below is a no-op.
   if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
+  if (_toastId !== null) { toast.dismiss(_toastId); _toastId = null }
 
   _pendingCommit = commitFn
-  useStore.setState({
-    toast: {
-      title,
-      onUndo: () => {
-        clearTimeout(_toastTimer!); _toastTimer = null
+  _toastId = toast(`Deleted: ${title}`, {
+    duration: TOAST_MS,
+    action: {
+      label: 'Undo',
+      onClick: () => {
         _pendingCommit = null
+        _toastId = null
         undoFn()
-        useStore.setState({ toast: null })
       },
     },
+    onDismiss: () => {
+      if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
+      _toastId = null
+    },
+    onAutoClose: () => {
+      if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
+      _toastId = null
+    },
   })
-  _toastTimer = setTimeout(() => {
-    _toastTimer = null
-    if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-    useStore.setState({ toast: null })
-  }, TOAST_MS)
 }

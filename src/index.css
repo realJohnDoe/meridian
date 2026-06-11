@@ -172,7 +172,7 @@
 .view{flex:1;overflow:hidden;display:none;flex-direction:column}
 .view.active{display:flex}
 
-/* ── UNDO TOAST + SEARCH BAR COLUMN ── */
+/* ── SEARCH BAR COLUMN ── */
 .bottom-float{
   position:absolute;
   bottom:calc(var(--nh) + 14px);
@@ -181,19 +181,6 @@
   pointer-events:none;
   z-index:30;
 }
-.undo-toast{
-  width:100%;
-  background:color-mix(in oklab, var(--accent), transparent 12%);backdrop-filter:blur(8px);
-  border:1px solid var(--input);border-radius:20px;
-  padding:8px 10px 8px 14px;display:flex;align-items:center;gap:8px;
-  box-shadow:0 2px 12px rgba(0,0,0,.3);
-  pointer-events:all;
-  transition:opacity .25s ease,transform .25s ease;
-}
-.undo-toast.hiding{opacity:0;transform:translateY(6px)}
-.undo-toast-msg{flex:1;font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.undo-btn{font-size:11px;font-weight:700;color:var(--primary);padding:3px 10px;border-radius:20px;background:var(--primary-tint);flex-shrink:0;cursor:pointer}
-.undo-btn:hover{background:var(--primary-tint2)}
 
 /* ── SIDEBAR → replaced by shadcn Sheet in App.tsx ── */
 
@@ -344,18 +331,13 @@
 .wl-item:hover,.wl-item.focused{background:var(--accent)}
 .wl-item svg{width:13px;height:13px;stroke:var(--muted-foreground);fill:none;stroke-width:1.8;flex-shrink:0}
 
-/* ── ERROR NOTIFICATION BANNER ── */
-.error-banner{position:fixed;top:calc(var(--th) + 8px);left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:402px;background:color-mix(in oklab,var(--destructive),transparent 15%);backdrop-filter:blur(8px);border:1px solid color-mix(in oklab,var(--destructive),transparent 35%);border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:10px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.3);animation:banner-in .2s ease}
-@keyframes banner-in{from{opacity:0;transform:translateX(-50%) translateY(-6px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-.error-banner-msg{flex:1;font-size:13px;color:#fff;line-height:1.4}
-.error-banner-close{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;opacity:.7;flex-shrink:0;transition:opacity .12s}
-.error-banner-close:hover{opacity:1}
-
-/* ── WARNING NOTIFICATION BANNER ── */
-.warning-banner{position:fixed;top:calc(var(--th) + 8px);left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:402px;background:color-mix(in oklab,var(--warning),transparent 15%);backdrop-filter:blur(8px);border:1px solid color-mix(in oklab,var(--warning),transparent 35%);border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:10px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.3);animation:banner-in .2s ease}
-.warning-banner-msg{flex:1;font-size:13px;color:oklch(0.15 0.02 74);line-height:1.4}
-.warning-banner-close{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:oklch(0.15 0.02 74);opacity:.7;flex-shrink:0;transition:opacity .12s}
-.warning-banner-close:hover{opacity:1}
+/* ── SONNER TOAST COLOR OVERRIDES ── */
+[data-sonner-toast][data-type="error"]   { background:color-mix(in oklab,var(--destructive),var(--background) 25%) !important; border-color:color-mix(in oklab,var(--destructive),transparent 40%) !important; color:#fff !important; }
+[data-sonner-toast][data-type="error"] [data-icon]   { color:#fff !important; }
+[data-sonner-toast][data-type="error"] [data-title]  { color:#fff !important; }
+[data-sonner-toast][data-type="warning"] { background:color-mix(in oklab,var(--warning),var(--background) 25%) !important; border-color:color-mix(in oklab,var(--warning),transparent 40%) !important; }
+[data-sonner-toast][data-type="warning"] [data-icon]  { color:oklch(0.15 0.02 74) !important; }
+[data-sonner-toast][data-type="warning"] [data-title] { color:oklch(0.15 0.02 74) !important; }
 
 /* scope selector */
 .scope-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
