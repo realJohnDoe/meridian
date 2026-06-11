@@ -21,9 +21,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       position="bottom-center"
       richColors
       className="toaster group"
-      // mobileOffset is written as inline CSS vars by Sonner's assignOffset,
-      // so these win over any stylesheet. 14px = filter overlay horizontal padding.
-      // bottom clears the 52px search bar (bottom-float: var(--nh)+14px) + 8px gap.
+      // assignOffset writes these as inline CSS vars, beating the runtime stylesheet.
+      // bottom: var(--nh)+74px = 14px margin + 52px search bar + 8px gap.
+      // 14px left/right matches the filter overlay horizontal padding.
+      offset={{ bottom: "calc(var(--nh) + 74px)" }}
       mobileOffset={{ bottom: "calc(var(--nh) + 74px)", left: "14px", right: "14px", top: "16px" }}
       style={{ "--width": "min(calc(100vw - 28px), 402px)" } as React.CSSProperties}
       icons={{
