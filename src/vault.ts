@@ -132,6 +132,7 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     updateSyncUI()
   } catch (e) {
     console.error('[vault] writeEntityToCache failed:', e)
+    notify('Save failed: ' + ((e as Error).message || (e as Error).name))
   }
 }
 
@@ -144,6 +145,7 @@ export async function deleteFileFromDisk(fileSlug: string): Promise<void> {
     updateSyncUI()
   } catch (e) {
     console.error('[vault] deleteFileFromDisk failed:', e)
+    notify('Delete failed: ' + ((e as Error).message || (e as Error).name))
   }
 }
 
