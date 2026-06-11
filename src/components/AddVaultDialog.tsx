@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { HardDrive, Github, BookOpen, Trash2, Plus } from 'lucide-react'
+import { HardDrive, GitBranch, BookOpen, Trash2, Plus } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
@@ -16,7 +16,7 @@ interface Props {
 
 function vaultIcon(kind: string) {
   if (kind === 'local')  return HardDrive
-  if (kind === 'github') return Github
+  if (kind === 'github') return GitBranch
   return BookOpen
 }
 
@@ -99,7 +99,7 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
     },
     {
       id:    'github',
-      Icon:  Github,
+      Icon:  GitBranch,
       title: 'GitHub repository',
       desc:  'Use a GitHub repo as a vault via a fine-grained access token. Works on any device and browser.',
     },

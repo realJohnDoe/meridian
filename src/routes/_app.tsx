@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
   Plus, X, Search,
-  HardDrive, BookOpen, Github, Settings2, AlertCircle,
+  HardDrive, BookOpen, GitBranch, Settings2, AlertCircle,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { syncToDirectory, setActiveVault } from '../vault'
@@ -91,7 +91,7 @@ function AppLayout() {
 
   function vaultIcon(kind: string) {
     if (kind === 'local')   return HardDrive
-    if (kind === 'github')  return Github
+    if (kind === 'github')  return GitBranch
     return BookOpen
   }
 
