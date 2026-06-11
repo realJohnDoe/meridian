@@ -176,7 +176,7 @@ function _prioKey(o: Occurrence): number {
 }
 
 export function sortOccs(arr: Occurrence[]): Occurrence[] {
-  return arr.sort((a: Occurrence, b: Occurrence) => {
+  return [...arr].sort((a: Occurrence, b: Occurrence) => {
     const sd = _sortKey(a) - _sortKey(b); if (sd) return sd
     const pd = _prioKey(a) - _prioKey(b); if (pd) return pd
     const td = (a.metadata.jsTime?.getHours() || 0) * 60 + (a.metadata.jsTime?.getMinutes() || 0)
