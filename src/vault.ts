@@ -148,7 +148,8 @@ async function reconcileWithDisk(backend: StorageBackend, vaultId: string): Prom
     }
   }
   for (const path of cacheMap.keys()) {
-    if (!diskTokens.has(path)) deleted.push(path)
+    const entry = cacheMap.get(path)
+    if (!diskTokens.has(path) && entry?.dirty !== 1) deleted.push(path)
   }
 
   if (changed.length > 0) {
