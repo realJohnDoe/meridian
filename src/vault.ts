@@ -99,7 +99,7 @@ async function reconcileWithDisk(backend: StorageBackend, vaultId: string): Prom
 async function activateExampleVault(): Promise<void> {
   const backend = new ExampleBackend()
   _activeBackend = backend
-  useStore.setState({ activeVaultId: 'example', pendingDirReconnect: null })
+  useStore.setState({ activeVaultId: 'example', pendingDirReconnect: null, scrollToTodayOnce: true })
   await activeVaultIdSave('example')
   const files = await backend.readAll()
   setData(parseFiles(files))
@@ -108,7 +108,7 @@ async function activateExampleVault(): Promise<void> {
 
 async function activateLocalVault(backend: LocalBackend): Promise<void> {
   _activeBackend = backend
-  useStore.setState({ activeVaultId: backend.id, pendingDirReconnect: null })
+  useStore.setState({ activeVaultId: backend.id, pendingDirReconnect: null, scrollToTodayOnce: true })
   await activeVaultIdSave(backend.id)
   await hydrateFromCache(backend.id)
   await reconcileWithDisk(backend, backend.id)
