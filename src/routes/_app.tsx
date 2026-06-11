@@ -102,8 +102,8 @@ function AppLayout() {
           <div className="tb-l tb-l--day">
             <button className="ib" onClick={() => setSidebarOpen(true)} title="Menu"><Menu /></button>
             <span className="dv-date-title">{fmtLong(dvDate)}</span>
-            <button className="ib" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) } })}><ChevronLeft /></button>
-            <button className="ib" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) } })}><ChevronRight /></button>
+            <button className="ib" aria-label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) } })}><ChevronLeft /></button>
+            <button className="ib" aria-label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) } })}><ChevronRight /></button>
           </div>
         ) : (
           <div className="tb-l" id="tbDefault">
@@ -213,12 +213,13 @@ function AppLayout() {
             }}
           />
           {filterQuery && (
-            <button className="search-bar-clear" onClick={() => setFilterQuery('')}>
+            <button className="search-bar-clear" aria-label="Clear search" onClick={() => setFilterQuery('')}>
               <X size={13} />
             </button>
           )}
           <button
             className="search-bar-add"
+            aria-label="New entry"
             onClick={() => {
               navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: 'new', etitle: filterQuery || undefined, edate: undefined, escope: undefined }) })
               if (filterQuery) setFilterQuery('')
