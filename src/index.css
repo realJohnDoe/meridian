@@ -221,18 +221,6 @@
 .ag-pad{padding-bottom:100px}
 .day-section{scroll-margin-top:8px}
 .day-lbl{padding:14px 14px 5px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--background);z-index:3}
-
-/* Window-scroll mode — class toggled by AgendaPage so other views are unaffected */
-html.agenda-scroll,html.agenda-scroll body{height:auto;overflow:visible}
-html.agenda-scroll #root{height:auto}
-html.agenda-scroll #app{height:auto;min-height:var(--app-h,100vh)}
-html.agenda-scroll .view.active{display:block;overflow:visible}
-html.agenda-scroll .ag-sc{overflow:visible}
-html.agenda-scroll .topbar{position:sticky;top:0}
-html.agenda-scroll .day-lbl{top:var(--th)}
-html.agenda-scroll .day-section{scroll-margin-top:calc(var(--th) + 8px)}
-html.agenda-scroll .bottom-float{position:fixed;bottom:calc(var(--nh) + 14px);left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:402px}
-html.agenda-scroll .filter-overlay{position:fixed;top:var(--th);bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px}
 .day-lbl.tl{color:var(--primary)}
 .day-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
 /* Priority bar — colour class is a dynamic string from barClass() */

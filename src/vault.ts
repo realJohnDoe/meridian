@@ -207,6 +207,8 @@ export async function pickDirectory(): Promise<void> {
 
 export async function tryRestoreDirectory(): Promise<void> {
   try {
+    // Startup is a vault load — land on today (the agenda consumes this once).
+    useStore.setState({ scrollToTodayOnce: true })
     await cacheInit()
     const h = await dirHandleLoad()
     if (!h) { setData(loadSeedItems()); return }

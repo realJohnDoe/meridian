@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import AgendaView from '../components/AgendaView'
 import { fmtISO } from '../model/expansion'
@@ -11,30 +11,33 @@ export const Route = createFileRoute('/_app/')({
   component: AgendaPage,
 })
 
-// Survives remounts; window scroll so we use scrollY not a container's scrollTop
+// Survives remounts so navigating back (e.g. from the entry editor) lands where we left off.
 let savedScrollTop = 0
 
 function AgendaPage() {
   const navigate = useNavigate()
   const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
+  const itemCount = useStore(s => s.items.length)
+  const scRef = useRef<HTMLDivElement>(null)
 
-  // Toggle window-scroll layout and restore position — all before first paint
+  // Restore saved scroll before paint (no blink); save on unmount.
   useLayoutEffect(() => {
-    document.documentElement.classList.add('agenda-scroll')
-    if (!scrollToTodayOnce) window.scrollTo(0, savedScrollTop)
-    return () => {
-      savedScrollTop = window.scrollY
-      document.documentElement.classList.remove('agenda-scroll')
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    const el = scRef.current
+    if (el && !useStore.getState().scrollToTodayOnce) el.scrollTop = savedScrollTop
+    return () => { if (el) savedScrollTop = el.scrollTop }
+  }, [])
 
-  // Scroll to today when flagged (vault load or Today button)
+  // Scroll to today when flagged (vault load or Today button). The today section is always
+  // seeded, so we wait for real data (itemCount > 0) before positioning — otherwise we'd
+  // scroll against an empty agenda, then today shifts down once items load. Depends on
+  // itemCount so it retries as data arrives; only consumes the flag once it actually scrolls.
   useEffect(() => {
-    if (!scrollToTodayOnce) return
-    useStore.setState({ scrollToTodayOnce: false })
+    if (!scrollToTodayOnce || itemCount === 0) return
     const sec = document.querySelector(`.day-section[data-key="${fmtISO(TODAY)}"]`)
-    if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [scrollToTodayOnce])
+    if (!sec) return
+    useStore.setState({ scrollToTodayOnce: false })
+    sec.scrollIntoView({ behavior: 'instant', block: 'start' })
+  }, [scrollToTodayOnce, itemCount])
 
   const onOpen = useCallback(
     (occ: Parameters<typeof entryRoute>[0], scope?: EditScope) => navigate(entryRoute(occ, scope)),
@@ -42,7 +45,7 @@ function AgendaPage() {
   )
 
   return (
-    <div className="ag-sc" id="agSc">
+    <div className="ag-sc" id="agSc" ref={scRef}>
       <AgendaView onOpen={onOpen} />
     </div>
   )
