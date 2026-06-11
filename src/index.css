@@ -331,13 +331,44 @@
 .wl-item:hover,.wl-item.focused{background:var(--accent)}
 .wl-item svg{width:13px;height:13px;stroke:var(--muted-foreground);fill:none;stroke-width:1.8;flex-shrink:0}
 
-/* ── SONNER TOAST COLOR OVERRIDES ── */
-[data-sonner-toast][data-type="error"]   { background:color-mix(in oklab,var(--destructive),var(--background) 25%) !important; border-color:color-mix(in oklab,var(--destructive),transparent 40%) !important; color:#fff !important; }
-[data-sonner-toast][data-type="error"] [data-icon]   { color:#fff !important; }
-[data-sonner-toast][data-type="error"] [data-title]  { color:#fff !important; }
-[data-sonner-toast][data-type="warning"] { background:color-mix(in oklab,var(--warning),var(--background) 25%) !important; border-color:color-mix(in oklab,var(--warning),transparent 40%) !important; }
-[data-sonner-toast][data-type="warning"] [data-icon]  { color:oklch(0.15 0.02 74) !important; }
-[data-sonner-toast][data-type="warning"] [data-title] { color:oklch(0.15 0.02 74) !important; }
+/* ── SONNER TOAST THEMING ──
+   Direct property overrides (specificity 030) beat Sonner's base styles (020)
+   even when Sonner's runtime <style> is injected after this linked stylesheet. */
+
+/* Default (undo) toast — use Meridian card surface */
+[data-sonner-toast][data-styled='true'][data-sonner-toast] {
+  background: var(--card);
+  border-color: var(--input);
+  color: var(--foreground);
+  border-radius: var(--radius);
+  font-family: var(--font);
+}
+
+/* Error toast — rose brand color */
+[data-sonner-toast][data-type='error'][data-styled='true'] {
+  background: color-mix(in oklab, var(--destructive), var(--background) 20%);
+  border-color: color-mix(in oklab, var(--destructive), transparent 40%);
+  color: #fff;
+}
+
+/* Warning toast — amber brand color */
+[data-sonner-toast][data-type='warning'][data-styled='true'] {
+  background: color-mix(in oklab, var(--warning), var(--background) 20%);
+  border-color: color-mix(in oklab, var(--warning), transparent 40%);
+  color: oklch(0.15 0.02 74);
+}
+
+/* Width + position above the search bar */
+[data-sonner-toaster] {
+  --width: min(calc(100vw - 28px), 402px);
+}
+@media (max-width: 600px) {
+  [data-sonner-toaster] {
+    --mobile-offset-bottom: calc(var(--nh) + 80px);
+    --mobile-offset-left: 14px;
+    --mobile-offset-right: 14px;
+  }
+}
 
 /* scope selector */
 .scope-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
