@@ -1,9 +1,10 @@
 ## Next steps
 
 - Fix agenda loading time and scroll behavior
-- Add multivault support
+- Add GitHub Vault support
 - Add CodeMirror 6 for markdown editing
 - Add overdue section in agenda
+- Add Solarized Light theme
 
 ## Results from last Quality Survey
 
@@ -12,35 +13,32 @@
    Evidence: Identical isoToDate / dateToIso / startOfToday appear in src/components/DatePickerDialog.tsx:9 and src/components/RepeatDialog.tsx:63, while src/model/expansion.ts:31 already exports fmtISO (== dateToIso) and parseDateString (== isoToDate).
    Problem: Three copies of local-timezone date↔ISO conversion exist, two of which re-derive a utility the model layer already ships, risking subtle off-by-one timezone divergence.
    Fix: Delete the local copies and import fmtISO / parseDateString from model/expansion.
-2. Dead Zod schema keeps the entire zod dependency alive
-   Impact: Medium
-   Evidence: src/model/nodeSchema.ts:20 RawNodeSchema is never imported anywhere (only the RawNode type is used); zod appears in exactly one file (package.json "zod": "^4.4.3").
-   Problem: A runtime validation schema that nothing calls ships an entire dependency to the bundle and implies validation that never actually runs.
-   Fix: Remove RawNodeSchema (keep the RawNode type) and drop zod from package.json.
-3. Icon-only buttons have no accessible name
+
+2. Icon-only buttons have no accessible name
    Impact: Medium
    Evidence: src/routes/\_app.tsx:81 day prev/next <button className="ib"><ChevronLeft/></button> have neither title nor aria-label; same for the search clear/add buttons at src/routes/\_app.tsx:161 and src/routes/\_app.tsx:165 (lucide icons render aria-hidden).
    Problem: Multiple primary navigation/action controls announce only "button" to screen readers and fail keyboard/AT discoverability.
    Fix: Add aria-label (e.g. "Previous day", "Clear search", "New entry") to each icon-only button.
-4. Horizontal swipe-navigation gesture duplicated in DayView and MonthView
+
+3. Horizontal swipe-navigation gesture duplicated in DayView and MonthView
    Impact: Medium
    Evidence: src/components/DayView.tsx:167 and src/components/MonthView.tsx:107 contain the same touchstart/touchend handler (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)\*1.5, ref-tracked current date/month, passive listeners, identical cleanup).
    Problem: Identical low-level touch-gesture logic is maintained twice, so threshold/axis-lock tweaks must be made in parallel.
    Fix: Extract a useHorizontalSwipe(ref, onPrev, onNext) hook and call it from both views.
 
-5. sortOccs mutates memoized arrays in place during render
+4. sortOccs mutates memoized arrays in place during render
    Impact: Medium
    Evidence: src/presentation.ts:158 returns arr.sort(...) (in-place); callers pass memoized data, e.g. src/components/AgendaView.tsx:72 items={sortOccs(g.items)} sorts the memoized groups[k].items array during render.
    Problem: A render-path call reorders cached/memoized state as a side effect, which breaks referential assumptions (e.g. DaySection.propsAreEqual compares items by index) and is impure.
    Fix: Have sortOccs copy first (return [...arr].sort(...)).
 
-6. fileOccurrenceMap runs two ±3-year expansions on the navigation path
+5. fileOccurrenceMap runs two ±3-year expansions on the navigation path
    Impact: Medium
    Evidence: src/presentation.ts:76 calls expandRange(items, roots, TODAY, AHEAD) and expandRange(..., BACK, TODAY) across a 6-year window; it's invoked on every entry open and wikilink resolve (src/routes/entry.$fileSlug.tsx:37).
    Problem: A full 6-year recurrence expansion runs synchronously on the first read after any mutation, scaling with series count and recomputing far more than the nearest occurrence actually needs.
    Fix: Narrow the default window (e.g. ±1yr) with a lazy widen-on-miss fallback, or build the map incrementally rather than via two full-range expansions.
 
-7. Cache-write failures are silently swallowed
+6. Cache-write failures are silently swallowed
    Impact: High
    Evidence: vault.ts:42-44 writeEntityToCache and vault.ts:54-56 deleteFileFromDisk catch all errors and only console.error — unlike syncToDirectory which calls notify(...) (vault.ts:75). updateSyncUI also swallows with empty .catch(() => {}) (vault.ts:26).
    Problem: If an IndexedDB write fails, the user's edit is lost with zero feedback while the UI shows the change as saved — silent data loss.

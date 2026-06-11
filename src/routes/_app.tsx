@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { createFileRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
-  Menu, FolderSync, FolderOpen, CalendarCheck2,
+  Menu, FolderSync, CalendarCheck2,
   ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
   Plus, X, Search,
+  HardDrive, BookOpen, FolderPlus, AlertCircle,
 } from 'lucide-react'
 import { useStore } from '../store'
-import { syncToDirectory, pickDirectory, reconnectDirectory } from '../vault'
+import { syncToDirectory, setActiveVault, addLocalVault } from '../vault'
 import { addDays, fmtLong } from '../presentation'
 import { fmtISO, fmtMonth } from '../model/expansion'
 import { TODAY } from '../constants'
@@ -32,14 +33,19 @@ function AppLayout() {
 
   const syncDirtyCount      = useStore(s => s.syncDirtyCount)
   const syncFlash           = useStore(s => s.syncFlash)
-  const dirHandle           = useStore(s => s.dirHandle)
+  const vaults              = useStore(s => s.vaults)
+  const activeVaultId       = useStore(s => s.activeVaultId)
   const pendingDirReconnect = useStore(s => s.pendingDirReconnect)
+
+  const activeVault  = vaults.find(v => v.id === activeVaultId)
+  const isWritable   = activeVault?.kind === 'local'
+  const vaultName    = activeVault?.name ?? 'Meridian'
 
   const syncColor = syncFlash
     ? 'var(--task)'
-    : !dirHandle ? 'var(--muted-foreground)' : syncDirtyCount > 0 ? 'var(--note)' : 'var(--dim)'
-  const syncTitle = !dirHandle
-    ? 'Click folder icon to open vault'
+    : !isWritable ? 'var(--muted-foreground)' : syncDirtyCount > 0 ? 'var(--note)' : 'var(--dim)'
+  const syncTitle = !isWritable
+    ? 'Example vault is read-only'
     : syncDirtyCount > 0
       ? `${syncDirtyCount} unsaved change${syncDirtyCount > 1 ? 's' : ''} — click to sync`
       : 'All synced'
@@ -81,17 +87,11 @@ function AppLayout() {
         ) : (
           <div className="tb-l" id="tbDefault">
             <button className="ib" onClick={() => setSidebarOpen(true)} title="Menu"><Menu /></button>
-            <img src={`${import.meta.env.BASE_URL}icon-192.png`} width="26" height="26" style={{ borderRadius: 5 }} alt="Meridian" />
-            <span className="vault-name">Meridian</span>
+            <span className="vault-name">{vaultName}</span>
           </div>
         )}
         <div className="tb-r">
           <button className="ib" onClick={syncToDirectory} title={syncTitle} style={{ color: syncColor }}><FolderSync /></button>
-          <button
-            className={cn('ib', pendingDirReconnect && !dirHandle && 'text-note')}
-            onClick={pendingDirReconnect && !dirHandle ? reconnectDirectory : pickDirectory}
-            title={pendingDirReconnect && !dirHandle ? `Reconnect vault "${pendingDirReconnect}"` : 'Open vault'}
-          ><FolderOpen /></button>
           <button className="ib" onClick={handleToday} title="Today"><CalendarCheck2 /></button>
         </div>
       </header>
@@ -133,6 +133,41 @@ function AppLayout() {
                 {label}
               </Button>
             ))}
+
+            <div className="px-5 pt-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-dim border-t border-sidebar-border mt-2">
+              Vaults
+            </div>
+
+            {vaults.map(vault => {
+              const isActive  = vault.id === activeVaultId
+              const needsReconnect = isActive && !!pendingDirReconnect && vault.kind === 'local'
+              const VaultIcon = vault.kind === 'local' ? HardDrive : BookOpen
+              return (
+                <Button
+                  key={vault.id}
+                  variant="ghost"
+                  onClick={() => { setSidebarOpen(false); setActiveVault(vault.id) }}
+                  className={cn(
+                    'w-full justify-start gap-[14px] px-5 h-auto py-[11px] text-[14px] font-medium rounded-none',
+                    'text-dim hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                    isActive && 'text-sidebar-primary bg-primary/12 hover:text-sidebar-primary hover:bg-primary/12',
+                  )}
+                >
+                  <VaultIcon className="size-[17px] stroke-[1.7] shrink-0" />
+                  <span className="flex-1 truncate text-left">{vault.name}</span>
+                  {needsReconnect && <span title="Permission needed — click to reconnect"><AlertCircle className="size-[14px] text-note shrink-0" /></span>}
+                </Button>
+              )
+            })}
+
+            <Button
+              variant="ghost"
+              onClick={() => { setSidebarOpen(false); addLocalVault() }}
+              className="w-full justify-start gap-[14px] px-5 h-auto py-[11px] text-[14px] font-medium rounded-none text-dim hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            >
+              <FolderPlus className="size-[17px] stroke-[1.7] shrink-0" />
+              Add local vault
+            </Button>
           </nav>
         </SheetContent>
       </Sheet>

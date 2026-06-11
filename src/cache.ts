@@ -1,13 +1,17 @@
 import Dexie from 'dexie'
+import type { VaultRef } from './storage/backend'
 
 // ── Types ──────────────────────────────────────────────────────
 
 export interface CacheRecord {
+  /** Primary key: `${vaultId}::${path}` */
+  vaultPath: string
+  vaultId:   string
   path:      string
   content:   string
   dirty:     number
   updatedAt: number
-  /** Opaque change-detection token. FS backend: `${lastModified}:${size}`. In-memory edits: `local:${Date.now()}`. Absent on rows written before schema v3 → treat as unknown (re-read). */
+  /** Opaque change-detection token. FS backend: `${lastModified}:${size}`. In-memory edits: `local:${Date.now()}`. */
   version?:  string
 }
 
@@ -23,11 +27,13 @@ class MeridianDB extends Dexie {
   files!: Dexie.Table<CacheRecord, string>
   meta!:  Dexie.Table<MetaRecord,  string>
   constructor() {
-    super('meridian_v2')
-    this.version(1).stores({ files: 'path,dirty,updatedAt' })
-    this.version(2).stores({ files: 'path,dirty,updatedAt', meta: 'key' })
-    // v3: adds `version` field to CacheRecord (no new index needed)
-    this.version(3).stores({ files: 'path,dirty,updatedAt', meta: 'key' })
+    // New database name (meridian_v3) — avoids any upgrade conflicts with the
+    // old meridian_v2 schema. Users re-import their vault once.
+    super('meridian_v3')
+    this.version(1).stores({
+      files: 'vaultPath,dirty,updatedAt,vaultId',
+      meta:  'key',
+    })
   }
 }
 
@@ -45,64 +51,101 @@ export async function cacheInit(): Promise<MeridianDB> {
   return _cacheInitPromise
 }
 
+// ── Key helpers ────────────────────────────────────────────────
+
+function vp(vaultId: string, path: string): string {
+  return `${vaultId}::${path}`
+}
+
 // ── Cache CRUD ─────────────────────────────────────────────────
 
-export async function cacheWrite(path: string, content: string, version?: string): Promise<void> {
+export async function cacheWrite(vaultId: string, path: string, content: string, version?: string): Promise<void> {
   const d = await cacheInit()
-  await d.files.put({ path, content, dirty: 1, updatedAt: Date.now(), version })
+  await d.files.put({ vaultPath: vp(vaultId, path), vaultId, path, content, dirty: 1, updatedAt: Date.now(), version })
 }
 
-export async function cacheWriteClean(path: string, content: string, version?: string): Promise<void> {
+export async function cacheWriteClean(vaultId: string, path: string, content: string, version?: string): Promise<void> {
   const d = await cacheInit()
-  await d.files.put({ path, content, dirty: 0, updatedAt: Date.now(), version })
+  await d.files.put({ vaultPath: vp(vaultId, path), vaultId, path, content, dirty: 0, updatedAt: Date.now(), version })
 }
 
-export async function cacheBulkWriteClean(records: Array<{ path: string; content: string; version?: string }>): Promise<void> {
+export async function cacheBulkWriteClean(
+  vaultId: string,
+  records: Array<{ path: string; content: string; version?: string }>,
+): Promise<void> {
   const d = await cacheInit()
   const now = Date.now()
-  await d.files.bulkPut(records.map(r => ({ ...r, dirty: 0, updatedAt: now })))
+  await d.files.bulkPut(records.map(r => ({ vaultPath: vp(vaultId, r.path), vaultId, ...r, dirty: 0, updatedAt: now })))
 }
 
-export async function cacheLoadAll(): Promise<CacheRecord[]> {
+export async function cacheLoadAll(vaultId: string): Promise<CacheRecord[]> {
   const d = await cacheInit()
-  return d.files.toArray()
+  return d.files.where('vaultId').equals(vaultId).toArray()
 }
 
-export async function cacheDelete(path: string): Promise<void> {
+export async function cacheDelete(vaultId: string, path: string): Promise<void> {
   const d = await cacheInit()
-  await d.files.delete(path)
+  await d.files.delete(vp(vaultId, path))
 }
 
-export async function cacheGetDirty(): Promise<CacheRecord[]> {
+export async function cacheGetDirty(vaultId: string): Promise<CacheRecord[]> {
   const d = await cacheInit()
-  return d.files.where('dirty').equals(1).toArray()
+  return d.files.where('vaultId').equals(vaultId).filter(r => r.dirty === 1).toArray()
 }
 
-export async function cacheMarkClean(path: string): Promise<void> {
+export async function cacheMarkClean(vaultId: string, path: string): Promise<void> {
   const d = await cacheInit()
-  await d.files.update(path, { dirty: 0 })
+  await d.files.update(vp(vaultId, path), { dirty: 0 })
 }
 
-export async function cacheDirtyCount(): Promise<number> {
+export async function cacheDirtyCount(vaultId: string): Promise<number> {
   if (!db) return 0
-  try { return await db.files.where('dirty').equals(1).count() }
+  try { return await db.files.where('vaultId').equals(vaultId).filter(r => r.dirty === 1).count() }
   catch { return 0 }
 }
 
-// ── Directory handle persistence ───────────────────────────────
+// ── Per-vault handle persistence ──────────────────────────────
 
-export async function dirHandleSave(h: FileSystemDirectoryHandle): Promise<void> {
+export async function handleSave(vaultId: string, h: FileSystemDirectoryHandle): Promise<void> {
   const d = await cacheInit()
-  await d.meta.put({ key: 'dirHandle', value: h })
+  await d.meta.put({ key: `handle:${vaultId}`, value: h })
 }
 
-export async function dirHandleLoad(): Promise<FileSystemDirectoryHandle | null> {
+export async function handleLoad(vaultId: string): Promise<FileSystemDirectoryHandle | null> {
   const d = await cacheInit()
-  const record = await d.meta.get('dirHandle')
+  const record = await d.meta.get(`handle:${vaultId}`)
   return (record?.value as FileSystemDirectoryHandle) ?? null
 }
 
-export async function dirHandleClear(): Promise<void> {
+export async function handleClear(vaultId: string): Promise<void> {
   const d = await cacheInit()
-  await d.meta.delete('dirHandle')
+  await d.meta.delete(`handle:${vaultId}`)
+}
+
+// ── Vault registry ─────────────────────────────────────────────
+
+export async function vaultRefsSave(refs: VaultRef[]): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.put({ key: 'vaults', value: refs })
+}
+
+export async function vaultRefsLoad(): Promise<VaultRef[]> {
+  const d = await cacheInit()
+  const record = await d.meta.get('vaults')
+  return (record?.value as VaultRef[]) ?? []
+}
+
+export async function activeVaultIdSave(id: string | null): Promise<void> {
+  const d = await cacheInit()
+  if (id === null) {
+    await d.meta.delete('activeVaultId')
+  } else {
+    await d.meta.put({ key: 'activeVaultId', value: id })
+  }
+}
+
+export async function activeVaultIdLoad(): Promise<string | null> {
+  const d = await cacheInit()
+  const record = await d.meta.get('activeVaultId')
+  return (record?.value as string) ?? null
 }
