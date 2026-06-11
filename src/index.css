@@ -358,16 +358,21 @@
   color: oklch(0.15 0.02 74);
 }
 
-/* Width + position above the search bar */
-[data-sonner-toaster] {
-  --width: min(calc(100vw - 28px), 402px);
+/* Action button — override Sonner's [data-button] defaults (030) with 040 so
+   the shadcn buttonVariants classes applied via classNames.actionButton show through */
+[data-sonner-toast][data-styled='true'][data-sonner-toast] [data-button] {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  height: 2.25rem;
+  padding-inline: 0.75rem;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-left: auto;
+  transition: background 0.12s;
 }
-@media (max-width: 600px) {
-  [data-sonner-toaster] {
-    --mobile-offset-bottom: calc(var(--nh) + 80px);
-    --mobile-offset-left: 14px;
-    --mobile-offset-right: 14px;
-  }
+[data-sonner-toast][data-styled='true'][data-sonner-toast] [data-button]:hover {
+  background: color-mix(in oklab, var(--secondary), transparent 20%);
 }
 
 /* scope selector */
