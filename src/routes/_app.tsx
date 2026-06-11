@@ -10,7 +10,7 @@ import {
 import { useStore } from '../store'
 import { syncToDirectory, setActiveVault } from '../vault'
 import { addDays, fmtLong } from '../presentation'
-import { fmtISO, fmtMonth } from '../model/expansion'
+import { fmtISO, fmtMonth } from '../model/dateUtils'
 import { TODAY } from '../constants'
 import { entryRoute, newEntryRoute } from './-entryRoute'
 import FilterOverlay from '../components/FilterOverlay'
