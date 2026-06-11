@@ -2,13 +2,15 @@ import {
   cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
   cacheMarkClean, cacheDirtyCount, cacheLoadAll, cacheInit,
   handleSave, handleLoad,
+  tokenSave, tokenLoad,
   vaultRefsSave, vaultRefsLoad,
   activeVaultIdSave, activeVaultIdLoad,
 } from './cache'
 import { diskPickDirectory } from './storage/fs'
 import { LocalBackend }   from './storage/localBackend'
 import { ExampleBackend } from './storage/exampleBackend'
-import type { StorageBackend, VaultRef } from './storage/backend'
+import { GitHubBackend }  from './storage/githubBackend'
+import type { StorageBackend, VaultRef, GitHubVaultRef } from './storage/backend'
 import { collapseToYaml } from './model/collapse'
 import { parseToStoreItems } from './model/storeItems'
 import { fileSlugItems } from './model/storeOps'
@@ -106,7 +108,7 @@ async function activateExampleVault(): Promise<void> {
   updateSyncUI()
 }
 
-async function activateLocalVault(backend: LocalBackend): Promise<void> {
+async function activateWritableVault(backend: StorageBackend): Promise<void> {
   _activeBackend = backend
   useStore.setState({ activeVaultId: backend.id, pendingDirReconnect: null })
   await activeVaultIdSave(backend.id)
@@ -201,7 +203,7 @@ export async function restoreVaults(): Promise<void> {
       const backend = new LocalBackend(targetRef.id, targetRef.name, handle)
       const perm    = await backend.ensurePermission(false)
       if (perm === 'granted') {
-        await activateLocalVault(backend)
+        await activateWritableVault(backend)
       } else if (perm === 'prompt') {
         // Show cached data; user reconnects by clicking the vault in the sidebar.
         _activeBackend = backend
@@ -209,6 +211,17 @@ export async function restoreVaults(): Promise<void> {
         await hydrateFromCache(targetRef.id)
         updateSyncUI()
       } else {
+        await activateExampleVault()
+      }
+    } else if (targetRef.kind === 'github') {
+      const token = await tokenLoad(targetRef.id)
+      if (!token) { await activateExampleVault(); return }
+      const backend = new GitHubBackend(targetRef.id, targetRef.name, { ...targetRef.github, token })
+      const perm    = await backend.ensurePermission(false)
+      if (perm === 'granted') {
+        await activateWritableVault(backend)
+      } else {
+        notify(`Could not reconnect GitHub vault "${targetRef.name}" — check your token.`)
         await activateExampleVault()
       }
     } else {
@@ -225,16 +238,27 @@ export async function setActiveVault(id: string): Promise<void> {
     if (id === 'example') { await activateExampleVault(); return }
 
     const ref = getVaults().find(v => v.id === id)
-    if (!ref || ref.kind !== 'local') return
+    if (!ref) return
 
-    const handle = await handleLoad(id)
-    if (!handle) { notify('Vault handle not found — try removing and re-adding it.'); return }
+    if (ref.kind === 'local') {
+      const handle = await handleLoad(id)
+      if (!handle) { notify('Vault handle not found — try removing and re-adding it.'); return }
 
-    const backend = new LocalBackend(id, ref.name, handle)
-    const perm    = await backend.ensurePermission(true)
-    if (perm !== 'granted') { notify(`Permission denied for vault "${ref.name}".`); return }
+      const backend = new LocalBackend(id, ref.name, handle)
+      const perm    = await backend.ensurePermission(true)
+      if (perm !== 'granted') { notify(`Permission denied for vault "${ref.name}".`); return }
 
-    await activateLocalVault(backend)
+      await activateWritableVault(backend)
+    } else if (ref.kind === 'github') {
+      const token = await tokenLoad(id)
+      if (!token) { notify('GitHub token not found — try removing and re-adding this vault.'); return }
+
+      const backend = new GitHubBackend(id, ref.name, { ...ref.github, token })
+      const perm    = await backend.ensurePermission(true)
+      if (perm !== 'granted') { notify(`Could not connect to GitHub vault "${ref.name}" — check your token.`); return }
+
+      await activateWritableVault(backend)
+    }
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
     console.error('[vault] setActiveVault failed:', e)
@@ -260,11 +284,54 @@ export async function addLocalVault(): Promise<void> {
     const backend = new LocalBackend(id, handle.name, handle)
     const files   = await backend.readAll()
     await cacheBulkWriteClean(id, files)
-    await activateLocalVault(backend)
+    await activateWritableVault(backend)
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
     console.error('[vault] addLocalVault failed:', e)
     notify((e as Error).message || 'Could not connect vault')
+  }
+}
+
+export interface GitHubVaultConfig {
+  owner:  string
+  repo:   string
+  branch: string
+  token:  string
+}
+
+export async function addGitHubVault(cfg: GitHubVaultConfig): Promise<void> {
+  try {
+    await cacheInit()
+    const id = crypto.randomUUID()
+
+    // Validate token + repo access before saving anything
+    const backend = new GitHubBackend(id, `${cfg.owner}/${cfg.repo}`, cfg)
+    const perm    = await backend.ensurePermission(true)
+    if (perm !== 'granted') {
+      notify('Could not connect to GitHub repository — check your token and repo name.')
+      return
+    }
+
+    await tokenSave(id, cfg.token)
+
+    const ref: GitHubVaultRef = {
+      id,
+      name:   `${cfg.owner}/${cfg.repo}`,
+      kind:   'github',
+      github: { owner: cfg.owner, repo: cfg.repo, branch: cfg.branch },
+    }
+    const existing = await vaultRefsLoad()
+    await vaultRefsSave([...existing, ref])
+
+    const exampleRef: VaultRef = { id: 'example', name: 'Example data', kind: 'example' }
+    useStore.setState({ vaults: [exampleRef, ...existing, ref] })
+
+    const files = await backend.readAll()
+    await cacheBulkWriteClean(id, files)
+    await activateWritableVault(backend)
+  } catch (e) {
+    console.error('[vault] addGitHubVault failed:', e)
+    notify((e as Error).message || 'Could not connect GitHub vault')
   }
 }
 

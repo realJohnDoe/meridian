@@ -5,16 +5,17 @@ import {
   ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
   Plus, X, Search,
-  HardDrive, BookOpen, FolderPlus, AlertCircle,
+  HardDrive, BookOpen, Github, FolderPlus, AlertCircle,
 } from 'lucide-react'
 import { useStore } from '../store'
-import { syncToDirectory, setActiveVault, addLocalVault } from '../vault'
+import { syncToDirectory, setActiveVault } from '../vault'
 import { addDays, fmtLong } from '../presentation'
 import { fmtISO, fmtMonth } from '../model/expansion'
 import { TODAY } from '../constants'
 import { entryRoute } from './-entryRoute'
 import FilterOverlay from '../components/FilterOverlay'
 import UndoToast from '../components/UndoToast'
+import AddVaultDialog from '../components/AddVaultDialog'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet'
 import { Button } from '../components/ui/button'
 import { cn } from '../lib/utils'
@@ -25,8 +26,9 @@ export const Route = createFileRoute('/_app')({
 })
 
 function AppLayout() {
-  const [filterQuery, setFilterQuery] = useState('')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [filterQuery,   setFilterQuery]   = useState('')
+  const [sidebarOpen,   setSidebarOpen]   = useState(false)
+  const [addVaultOpen,  setAddVaultOpen]  = useState(false)
 
   const navigate = useNavigate()
   const pathname = useRouterState({ select: s => s.location.pathname })
@@ -38,7 +40,7 @@ function AppLayout() {
   const pendingDirReconnect = useStore(s => s.pendingDirReconnect)
 
   const activeVault  = vaults.find(v => v.id === activeVaultId)
-  const isWritable   = activeVault?.kind === 'local'
+  const isWritable   = activeVault?.kind === 'local' || activeVault?.kind === 'github'
   const vaultName    = activeVault?.name ?? 'Meridian'
 
   const syncColor = syncFlash
@@ -76,6 +78,12 @@ function AppLayout() {
   ]
 
   const openEntry = (occ: Occurrence, scope?: EditScope) => navigate(entryRoute(occ, scope))
+
+  function vaultIcon(kind: string) {
+    if (kind === 'local')   return HardDrive
+    if (kind === 'github')  return Github
+    return BookOpen
+  }
 
   return (
     <>
@@ -142,9 +150,9 @@ function AppLayout() {
             </div>
 
             {vaults.map(vault => {
-              const isActive  = vault.id === activeVaultId
+              const isActive       = vault.id === activeVaultId
               const needsReconnect = isActive && !!pendingDirReconnect && vault.kind === 'local'
-              const VaultIcon = vault.kind === 'local' ? HardDrive : BookOpen
+              const VaultIcon      = vaultIcon(vault.kind)
               return (
                 <Button
                   key={vault.id}
@@ -165,15 +173,17 @@ function AppLayout() {
 
             <Button
               variant="ghost"
-              onClick={() => { setSidebarOpen(false); addLocalVault() }}
+              onClick={() => { setSidebarOpen(false); setAddVaultOpen(true) }}
               className="w-full justify-start gap-[14px] px-5 h-auto py-[11px] text-[14px] font-medium rounded-none text-dim hover:bg-sidebar-accent hover:text-sidebar-foreground"
             >
               <FolderPlus className="size-[17px] stroke-[1.7] shrink-0" />
-              Add local vault
+              Add vault
             </Button>
           </nav>
         </SheetContent>
       </Sheet>
+
+      <AddVaultDialog open={addVaultOpen} onOpenChange={setAddVaultOpen} />
 
       <div className="bottom-float">
         <UndoToast />

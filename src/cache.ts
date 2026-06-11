@@ -122,6 +122,24 @@ export async function handleClear(vaultId: string): Promise<void> {
   await d.meta.delete(`handle:${vaultId}`)
 }
 
+// ── Per-vault token persistence ───────────────────────────────
+
+export async function tokenSave(vaultId: string, token: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.put({ key: `token:${vaultId}`, value: token })
+}
+
+export async function tokenLoad(vaultId: string): Promise<string | null> {
+  const d = await cacheInit()
+  const record = await d.meta.get(`token:${vaultId}`)
+  return (record?.value as string) ?? null
+}
+
+export async function tokenClear(vaultId: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.delete(`token:${vaultId}`)
+}
+
 // ── Vault registry ─────────────────────────────────────────────
 
 export async function vaultRefsSave(refs: VaultRef[]): Promise<void> {
