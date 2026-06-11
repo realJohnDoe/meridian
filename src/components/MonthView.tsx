@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useRef } from 'react'
+import { useHorizontalSwipe } from '../hooks/useHorizontalSwipe'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
@@ -105,26 +106,11 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   function nextMonth() { onNavigateMonth(new Date(y, m + 1, 1)) }
 
   const wrapRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = wrapRef.current
-    if (!el) return
-    let sx = 0, sy = 0
-    const onStart = (e: TouchEvent) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY }
-    const onEnd   = (e: TouchEvent) => {
-      const dx = e.changedTouches[0].clientX - sx
-      const dy = e.changedTouches[0].clientY - sy
-      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-        const d = monthRef.current
-        onNavigateMonth(new Date(d.getFullYear(), d.getMonth() + (dx < 0 ? 1 : -1), 1))
-      }
-    }
-    el.addEventListener('touchstart', onStart, { passive: true })
-    el.addEventListener('touchend',   onEnd,   { passive: true })
-    return () => {
-      el.removeEventListener('touchstart', onStart)
-      el.removeEventListener('touchend',   onEnd)
-    }
-  }, [onNavigateMonth])
+  useHorizontalSwipe(
+    wrapRef,
+    () => { const d = monthRef.current; onNavigateMonth(new Date(d.getFullYear(), d.getMonth() - 1, 1)) },
+    () => { const d = monthRef.current; onNavigateMonth(new Date(d.getFullYear(), d.getMonth() + 1, 1)) },
+  )
 
   return (
     <div className="cal-wrap" ref={wrapRef}>

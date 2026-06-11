@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useRef, useState } from 'react'
+import { useHorizontalSwipe } from '../hooks/useHorizontalSwipe'
 import { ChevronDown, ChevronUp, CheckSquare, Square } from 'lucide-react'
 import { useStore } from '../store'  // items + roots only
 import { Button } from './ui/button'
@@ -157,26 +158,11 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
   useEffect(() => { dvDateRef.current = dvDate }, [dvDate])
 
   const tlRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (!onNavigateDate) return
-    const el = tlRef.current
-    if (!el) return
-    let sx = 0, sy = 0
-    const onStart = (e: TouchEvent) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY }
-    const onEnd   = (e: TouchEvent) => {
-      const dx = e.changedTouches[0].clientX - sx
-      const dy = e.changedTouches[0].clientY - sy
-      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-        onNavigateDate(addDays(dvDateRef.current, dx < 0 ? 1 : -1))
-      }
-    }
-    el.addEventListener('touchstart', onStart, { passive: true })
-    el.addEventListener('touchend',   onEnd,   { passive: true })
-    return () => {
-      el.removeEventListener('touchstart', onStart)
-      el.removeEventListener('touchend',   onEnd)
-    }
-  }, [onNavigateDate])
+  useHorizontalSwipe(
+    tlRef,
+    () => { onNavigateDate?.(addDays(dvDateRef.current, -1)) },
+    () => { onNavigateDate?.(addDays(dvDateRef.current,  1)) },
+  )
 
   const [, setNowTick] = useState(0)
   useEffect(() => {
