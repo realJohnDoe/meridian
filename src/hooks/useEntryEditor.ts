@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '../store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from '../mutations'
+import { notify } from '../storeBridge'
 import type { SeriesSheetConfig } from '../mutations'
 import type { Occurrence, EditScope } from '../types'
 import { buildBodyHtml } from '../presentation'
@@ -47,17 +48,20 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   }, [storeRoots, navigate])
 
   const handleSave = useCallback((body: string) => {
-    saveNode(entry.item, entry.editScope, { ...entry, body })
-  }, [entry])
+    const result = saveNode(entry.item, entry.editScope, { ...entry, body })
+    if (result === 'missing-date') notify('Please set a date for the new occurrence.')
+    if (result === 'saved') router.history.back()
+  }, [entry, router])
 
   const handleDelete = useCallback(() => {
     deleteNode(
       entry.item,
+      () => router.history.back(),
       (config) => setSeriesSheetConfig(config),
       () => setSeriesSheetConfig(null),
       (title, onConfirm) => setPendingDelete({ title, onConfirm }),
     )
-  }, [entry.item])
+  }, [entry.item, router])
 
   const handleClose = useCallback(() => router.history.back(), [router])
 
