@@ -12,7 +12,7 @@ import { syncToDirectory, setActiveVault } from '../vault'
 import { addDays, fmtLong } from '../presentation'
 import { fmtISO, fmtMonth } from '../model/expansion'
 import { TODAY } from '../constants'
-import { entryRoute } from './-entryRoute'
+import { entryRoute, newEntryRoute } from './-entryRoute'
 import FilterOverlay from '../components/FilterOverlay'
 import EntryOverlay, { isEditScope } from '../components/EntryOverlay'
 import UndoToast from '../components/UndoToast'
@@ -207,7 +207,7 @@ function AppLayout() {
             onChange={e => setFilterQuery(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && filterQuery) {
-                navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: 'new', etitle: filterQuery, edate: undefined, escope: undefined }) })
+                navigate(newEntryRoute(filterQuery))
                 setFilterQuery('')
               }
             }}
@@ -221,7 +221,7 @@ function AppLayout() {
             className="search-bar-add"
             aria-label="New entry"
             onClick={() => {
-              navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: 'new', etitle: filterQuery || undefined, edate: undefined, escope: undefined }) })
+              navigate(newEntryRoute(filterQuery))
               if (filterQuery) setFilterQuery('')
             }}
           ><Plus size={16} /></button>
@@ -232,7 +232,7 @@ function AppLayout() {
         query={filterQuery}
         onOpen={openEntry}
         onCreate={(title: string) => {
-          navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: 'new', etitle: title, edate: undefined, escope: undefined }) })
+          navigate(newEntryRoute(title))
           setFilterQuery('')
         }}
       />

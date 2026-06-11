@@ -8,6 +8,7 @@ import type { Occurrence, EditScope } from '../types'
 import { buildBodyHtml } from '../presentation'
 import { fmtISO } from '../model/expansion'
 import { TODAY } from '../constants'
+import { newEntryRoute } from '../routes/-entryRoute'
 import { resolveWikilink } from '../wikilinks'
 import { type EntryState, ENTRY_DEFAULT } from '../components/EntryEditor'
 import type { Priority } from '../types'
@@ -41,7 +42,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const handleOpenWikilink = useCallback((ref: string) => {
     const fileSlug = resolveWikilink(ref, storeRoots)
     if (!fileSlug) {
-      navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: 'new', etitle: ref, edate: undefined, escope: undefined }) })
+      navigate(newEntryRoute(ref))
       return
     }
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: fileSlug, etitle: undefined, edate: undefined, escope: undefined }) })
