@@ -40,10 +40,10 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const handleOpenWikilink = useCallback((ref: string) => {
     const fileSlug = resolveWikilink(ref, storeRoots)
     if (!fileSlug) {
-      navigate({ to: '/entry/new', search: { title: ref } })
+      navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: 'new', etitle: ref, edate: undefined, escope: undefined }) })
       return
     }
-    navigate({ to: '/entry/$fileSlug', params: { fileSlug }, search: {} })
+    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: fileSlug, etitle: undefined, edate: undefined, escope: undefined }) })
   }, [storeRoots, navigate])
 
   const handleSave = useCallback((body: string) => {
