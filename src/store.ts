@@ -30,6 +30,11 @@ interface MeridianStore {
   errorNotification: string | null
   setErrorNotification: (msg: string | null) => void
 
+  // ── Warning notification ─────────────────────────────────────────
+  /** Non-null while a warning banner is visible (e.g. sync conflict). */
+  warningNotification: string | null
+  setWarningNotification: (msg: string | null) => void
+
   // ── Agenda scroll ────────────────────────────────────────────────
   /** When true, AgendaPage will scroll to today once then clear this flag. */
   scrollToTodayOnce: boolean
@@ -52,6 +57,9 @@ export const useStore = create<MeridianStore>((set) => ({
 
   errorNotification: null,
   setErrorNotification: (errorNotification) => set({ errorNotification }),
+
+  warningNotification: null,
+  setWarningNotification: (warningNotification) => set({ warningNotification }),
 
   scrollToTodayOnce: false,
 }))

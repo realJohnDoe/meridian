@@ -84,6 +84,7 @@
 
   /* Destructive */
   --destructive: oklch(0.72 0.20 15);   /* rose */
+  --warning:     oklch(0.86 0.16 74);   /* amber — alias of --note */
 
   /* Borders */
   --border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 92%);   /* slate at ~8% */
@@ -349,6 +350,12 @@
 .error-banner-msg{flex:1;font-size:13px;color:#fff;line-height:1.4}
 .error-banner-close{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;opacity:.7;flex-shrink:0;transition:opacity .12s}
 .error-banner-close:hover{opacity:1}
+
+/* ── WARNING NOTIFICATION BANNER ── */
+.warning-banner{position:fixed;top:calc(var(--th) + 8px);left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:402px;background:color-mix(in oklab,var(--warning),transparent 15%);backdrop-filter:blur(8px);border:1px solid color-mix(in oklab,var(--warning),transparent 35%);border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:10px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.3);animation:banner-in .2s ease}
+.warning-banner-msg{flex:1;font-size:13px;color:oklch(0.15 0.02 74);line-height:1.4}
+.warning-banner-close{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:oklch(0.15 0.02 74);opacity:.7;flex-shrink:0;transition:opacity .12s}
+.warning-banner-close:hover{opacity:1}
 
 /* scope selector */
 .scope-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}

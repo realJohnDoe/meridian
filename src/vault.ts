@@ -18,7 +18,7 @@ import { parseToStoreItems } from './model/storeItems'
 import { fileSlugItems } from './model/storeOps'
 import { saveFile } from './fileIO'
 import type { StoreItem, Roots } from './types'
-import { getItems, getRoots, setData, getVaults, notify } from './storeBridge'
+import { getItems, getRoots, setData, getVaults, notify, warn } from './storeBridge'
 import { useStore } from './store'
 
 // ── HELPERS ────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ async function resolveCollision(
     })
   }
 
-  notify(`Conflict on ${path} — your version saved as ${copy}.`)
+  warn(`Conflict on ${path} — your version saved as ${copy}.`)
 }
 
 // ── MODULE STATE ───────────────────────────────────────────────
