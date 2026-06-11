@@ -1,5 +1,7 @@
 import { addDays, isSameDay } from 'date-fns'
-import { fmtT, parseDurationDays, expandRange, joinFileMeta, stableOccId } from './model/expansion'
+import { expandRange, joinFileMeta, stableOccId } from './model/expansion'
+import { fmtT } from './model/dateUtils'
+import { parseDurationDays } from './model/duration'
 import { parseWikilinks, resolveWikilink, unwrapRef } from './wikilinks'
 import { occKind, isSeries, isStandaloneOcc } from './types'
 import { getRoots } from './storeBridge'

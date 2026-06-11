@@ -1,7 +1,7 @@
 import { Repeat2, Users } from 'lucide-react'
 import type { Occurrence } from '../types'
 import KindIcon from './KindIcon'
-import { fmtT, parseDateString } from '../model/expansion'
+import { fmtT, parseDateString } from '../model/dateUtils'
 import { fmtShort, buildTagTopicChips } from '../presentation'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
