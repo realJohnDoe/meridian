@@ -24,6 +24,8 @@ interface MeridianStore {
   syncDirtyCount: number
   /** Briefly true after a successful sync (drives the green flash). */
   syncFlash: boolean
+  /** True when the most recent sync attempt failed (drives the red icon). */
+  syncError: boolean
 
   // ── Error notification ──────────────────────────────────────────
   /** Non-null while an error banner is visible. */
@@ -54,6 +56,7 @@ export const useStore = create<MeridianStore>((set) => ({
 
   syncDirtyCount: 0,
   syncFlash:      false,
+  syncError:      false,
 
   errorNotification: null,
   setErrorNotification: (errorNotification) => set({ errorNotification }),

@@ -48,6 +48,7 @@ function AppLayout() {
 
   const syncDirtyCount      = useStore(s => s.syncDirtyCount)
   const syncFlash           = useStore(s => s.syncFlash)
+  const syncError           = useStore(s => s.syncError)
   const vaults              = useStore(s => s.vaults)
   const activeVaultId       = useStore(s => s.activeVaultId)
   const pendingDirReconnect = useStore(s => s.pendingDirReconnect)
@@ -56,14 +57,19 @@ function AppLayout() {
   const isWritable   = activeVault?.kind === 'local' || activeVault?.kind === 'github'
   const vaultName    = activeVault?.name ?? 'Meridian'
 
-  const syncColor = syncFlash
-    ? 'var(--task)'
-    : !isWritable ? 'var(--muted-foreground)' : syncDirtyCount > 0 ? 'var(--note)' : 'var(--dim)'
+  const syncColor = syncError
+    ? 'var(--destructive)'
+    : syncFlash ? 'var(--task)'
+    : !isWritable ? 'var(--muted-foreground)'
+    : syncDirtyCount > 0 ? 'var(--note)'
+    : 'var(--dim)'
   const syncTitle = !isWritable
     ? 'Example vault is read-only'
-    : syncDirtyCount > 0
-      ? `${syncDirtyCount} unsaved change${syncDirtyCount > 1 ? 's' : ''} — click to sync`
-      : 'All synced'
+    : syncError
+      ? 'Sync failed — click to retry'
+      : syncDirtyCount > 0
+        ? `${syncDirtyCount} unsaved change${syncDirtyCount > 1 ? 's' : ''} — syncing…`
+        : 'All synced'
 
   const isDayView = pathname.startsWith('/day/')
   const dvDate = isDayView
