@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { HardDrive, Github } from 'lucide-react'
+import { HardDrive, Github, BookOpen, Trash2, Plus } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
-import { addLocalVault, addGitHubVault } from '../vault'
+import { useStore } from '../store'
+import { addLocalVault, addGitHubVault, removeVault } from '../vault'
 
+type Step = 'manage' | 'source' | 'github'
 type Source = 'local' | 'github'
 
 interface Props {
@@ -12,8 +14,14 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-export default function AddVaultDialog({ open, onOpenChange }: Props) {
-  const [step,    setStep]    = useState<'source' | 'github'>('source')
+function vaultIcon(kind: string) {
+  if (kind === 'local')  return HardDrive
+  if (kind === 'github') return Github
+  return BookOpen
+}
+
+export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
+  const [step,    setStep]    = useState<Step>('manage')
   const [source,  setSource]  = useState<Source>('local')
   const [token,   setToken]   = useState('')
   const [repoStr, setRepoStr] = useState('')
@@ -21,8 +29,11 @@ export default function AddVaultDialog({ open, onOpenChange }: Props) {
   const [busy,    setBusy]    = useState(false)
   const [error,   setError]   = useState<string | null>(null)
 
+  const vaults        = useStore(s => s.vaults)
+  const activeVaultId = useStore(s => s.activeVaultId)
+
   function reset() {
-    setStep('source')
+    setStep('manage')
     setSource('local')
     setToken('')
     setRepoStr('')
@@ -73,6 +84,12 @@ export default function AddVaultDialog({ open, onOpenChange }: Props) {
     }
   }
 
+  async function handleRemove(id: string) {
+    await removeVault(id)
+    // If we removed the last non-example vault, stay open on manage view
+    // (the vault list will just show Example only)
+  }
+
   const sourceCards: { id: Source; Icon: typeof HardDrive; title: string; desc: string }[] = [
     {
       id:    'local',
@@ -91,7 +108,57 @@ export default function AddVaultDialog({ open, onOpenChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[420px]">
-        {step === 'source' ? (
+        {step === 'manage' && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Manage vaults</DialogTitle>
+              <DialogDescription>Switch, add, or remove vaults.</DialogDescription>
+            </DialogHeader>
+
+            <div className="flex flex-col gap-1 py-2">
+              {vaults.map(vault => {
+                const VaultIcon  = vaultIcon(vault.kind)
+                const isActive   = vault.id === activeVaultId
+                const isExample  = vault.kind === 'example'
+                return (
+                  <div
+                    key={vault.id}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-[10px]',
+                      isActive && 'bg-primary/8',
+                    )}
+                  >
+                    <VaultIcon className="size-[16px] shrink-0 stroke-[1.7] text-dim" />
+                    <span className="flex-1 truncate text-[14px]">{vault.name}</span>
+                    {isActive && (
+                      <span className="text-[11px] font-medium text-primary px-2 py-[2px] rounded-full bg-primary/10 shrink-0">
+                        Active
+                      </span>
+                    )}
+                    {!isExample && (
+                      <button
+                        onClick={() => handleRemove(vault.id)}
+                        title={`Remove "${vault.name}"`}
+                        className="shrink-0 p-1 rounded text-dim hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <Trash2 className="size-[14px] stroke-[1.7]" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex justify-end pt-1 border-t border-border">
+              <Button variant="ghost" onClick={() => setStep('source')} className="gap-2">
+                <Plus className="size-[15px] stroke-[1.7]" />
+                Add vault
+              </Button>
+            </div>
+          </>
+        )}
+
+        {step === 'source' && (
           <>
             <DialogHeader>
               <DialogTitle>Add vault</DialogTitle>
@@ -119,13 +186,16 @@ export default function AddVaultDialog({ open, onOpenChange }: Props) {
               ))}
             </div>
 
-            <div className="flex justify-end pt-1">
+            <div className="flex justify-between pt-1">
+              <Button variant="ghost" onClick={() => setStep('manage')}>Back</Button>
               <Button onClick={handleNext}>
                 {source === 'local' ? 'Choose folder' : 'Next'}
               </Button>
             </div>
           </>
-        ) : (
+        )}
+
+        {step === 'github' && (
           <>
             <DialogHeader>
               <DialogTitle>Connect GitHub repository</DialogTitle>
@@ -180,9 +250,7 @@ export default function AddVaultDialog({ open, onOpenChange }: Props) {
             </div>
 
             <div className="flex justify-between pt-1">
-              <Button variant="ghost" onClick={() => setStep('source')} disabled={busy}>
-                Back
-              </Button>
+              <Button variant="ghost" onClick={() => setStep('source')} disabled={busy}>Back</Button>
               <Button onClick={handleConnect} disabled={busy}>
                 {busy ? 'Connecting…' : 'Connect'}
               </Button>

@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight,
   AlignLeft, CalendarDays, CalendarClock,
   Plus, X, Search,
-  HardDrive, BookOpen, Github, FolderPlus, AlertCircle,
+  HardDrive, BookOpen, Github, Settings2, AlertCircle,
 } from 'lucide-react'
 import { useStore } from '../store'
 import { syncToDirectory, setActiveVault } from '../vault'
@@ -15,7 +15,7 @@ import { TODAY } from '../constants'
 import { entryRoute } from './-entryRoute'
 import FilterOverlay from '../components/FilterOverlay'
 import UndoToast from '../components/UndoToast'
-import AddVaultDialog from '../components/AddVaultDialog'
+import ManageVaultsDialog from '../components/AddVaultDialog'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet'
 import { Button } from '../components/ui/button'
 import { cn } from '../lib/utils'
@@ -176,14 +176,14 @@ function AppLayout() {
               onClick={() => { setSidebarOpen(false); setAddVaultOpen(true) }}
               className="w-full justify-start gap-[14px] px-5 h-auto py-[11px] text-[14px] font-medium rounded-none text-dim hover:bg-sidebar-accent hover:text-sidebar-foreground"
             >
-              <FolderPlus className="size-[17px] stroke-[1.7] shrink-0" />
-              Add vault
+              <Settings2 className="size-[17px] stroke-[1.7] shrink-0" />
+              Manage vaults
             </Button>
           </nav>
         </SheetContent>
       </Sheet>
 
-      <AddVaultDialog open={addVaultOpen} onOpenChange={setAddVaultOpen} />
+      <ManageVaultsDialog open={addVaultOpen} onOpenChange={setAddVaultOpen} />
 
       <div className="bottom-float">
         <UndoToast />

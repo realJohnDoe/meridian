@@ -1,8 +1,8 @@
 import {
   cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
-  cacheMarkClean, cacheDirtyCount, cacheLoadAll, cacheInit,
-  handleSave, handleLoad,
-  tokenSave, tokenLoad,
+  cacheMarkClean, cacheDirtyCount, cacheLoadAll, cacheInit, cacheDeleteAll,
+  handleSave, handleLoad, handleClear,
+  tokenSave, tokenLoad, tokenClear,
   vaultRefsSave, vaultRefsLoad,
   activeVaultIdSave, activeVaultIdLoad,
 } from './cache'
@@ -332,6 +332,37 @@ export async function addGitHubVault(cfg: GitHubVaultConfig): Promise<void> {
   } catch (e) {
     console.error('[vault] addGitHubVault failed:', e)
     notify((e as Error).message || 'Could not connect GitHub vault')
+  }
+}
+
+// ── REMOVE VAULT ─────────────────────────────────────────────
+
+export async function removeVault(id: string): Promise<void> {
+  try {
+    const existing = await vaultRefsLoad()
+    const ref      = existing.find(r => r.id === id)
+    if (!ref) return
+
+    // Clean up kind-specific secrets / handles
+    if (ref.kind === 'local')  await handleClear(id)
+    if (ref.kind === 'github') await tokenClear(id)
+
+    // Delete all cached files for this vault
+    await cacheDeleteAll(id)
+
+    // Remove from registry and update store
+    const updated = existing.filter(r => r.id !== id)
+    await vaultRefsSave(updated)
+    const exampleRef = { id: 'example', name: 'Example data', kind: 'example' as const }
+    useStore.setState({ vaults: [exampleRef, ...updated] })
+
+    // If this was the active vault, fall back to example
+    if (_activeBackend?.id === id) {
+      await activateExampleVault()
+    }
+  } catch (e) {
+    console.error('[vault] removeVault failed:', e)
+    notify((e as Error).message || 'Could not remove vault')
   }
 }
 

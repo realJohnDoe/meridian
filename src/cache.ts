@@ -140,6 +140,11 @@ export async function tokenClear(vaultId: string): Promise<void> {
   await d.meta.delete(`token:${vaultId}`)
 }
 
+export async function cacheDeleteAll(vaultId: string): Promise<void> {
+  const d = await cacheInit()
+  await d.files.where('vaultId').equals(vaultId).delete()
+}
+
 // ── Vault registry ─────────────────────────────────────────────
 
 export async function vaultRefsSave(refs: VaultRef[]): Promise<void> {
