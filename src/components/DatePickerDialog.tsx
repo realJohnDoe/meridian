@@ -1,23 +1,10 @@
 import { useState, useEffect } from 'react'
 import { addDays } from 'date-fns'
+import { fmtISO, parseDateString } from '../model/expansion'
 import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from './ui/drawer'
 import { Separator } from './ui/separator'
 import { Calendar } from './ui/calendar'
 import { Button } from './ui/button'
-
-// ── Date helpers ────────────────────────────────────────────────
-function isoToDate(iso: string): Date | undefined {
-  if (!iso) return undefined
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y, m - 1, d)   // local time, avoids UTC-offset day shift
-}
-
-function dateToIso(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
 
 function startOfToday(): Date {
   const d = new Date()
@@ -39,14 +26,14 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
   const today    = startOfToday()
   const tomorrow = addDays(today, 1)
 
-  const [selected, setSelected] = useState<Date | undefined>(isoToDate(initialDate))
-  const [month,    setMonth]    = useState<Date>(isoToDate(initialDate) ?? today)
+  const [selected, setSelected] = useState<Date | undefined>(parseDateString(initialDate) ?? undefined)
+  const [month,    setMonth]    = useState<Date>(parseDateString(initialDate) ?? today)
 
   // Sync calendar to the entry's date whenever the dialog opens
   useEffect(() => {
     if (open) {
-      const d = isoToDate(initialDate)
-      setSelected(d)
+      const d = parseDateString(initialDate)
+      setSelected(d ?? undefined)
       setMonth(d ?? today)
     }
   }, [open, initialDate]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -58,12 +45,12 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
   }
 
   function handleSet() {
-    if (selected) onConfirm(dateToIso(selected))
+    if (selected) onConfirm(fmtISO(selected))
     onClose()
   }
 
-  const isToday    = !!selected && dateToIso(selected) === dateToIso(today)
-  const isTomorrow = !!selected && dateToIso(selected) === dateToIso(tomorrow)
+  const isToday    = !!selected && fmtISO(selected) === fmtISO(today)
+  const isTomorrow = !!selected && fmtISO(selected) === fmtISO(tomorrow)
 
   // ── Spacing contract ────────────────────────────────────────────
   // DrawerTitle  owns: text-to-separator gap (pb-2)

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '../types'
-import { parseDateString } from '../model/expansion'
+import { fmtISO, parseDateString } from '../model/expansion'
 import {
   Drawer,
   DrawerContent,
@@ -64,19 +64,6 @@ function startOfToday(): Date {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
   return d
-}
-
-function isoToDate(iso: string): Date | undefined {
-  if (!iso) return undefined
-  const [y, m, d] = iso.split('-').map(Number)
-  return new Date(y, m - 1, d)   // local time, avoids UTC-offset day shift
-}
-
-function dateToIso(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
 }
 
 function parseCompletionInterval(s: string): { n: number; unit: string } {
@@ -302,7 +289,7 @@ export default function RepeatDialog({
   // Synchronize calendar grid month page whenever the end date calendar dialog opens
   useEffect(() => {
     if (endCalOpen) {
-      setEndCalMonth(isoToDate(endVal) ?? startOfToday())
+      setEndCalMonth(parseDateString(endVal) ?? startOfToday())
     }
   }, [endCalOpen, endVal])
 
@@ -556,10 +543,10 @@ export default function RepeatDialog({
               <Calendar
                 mode="single"
                 fixedWeeks
-                selected={isoToDate(endVal)}
+                selected={parseDateString(endVal) ?? undefined}
                 onSelect={(date) => {
                   if (date) {
-                    setEndVal(dateToIso(date))
+                    setEndVal(fmtISO(date))
                   }
                   setEndCalOpen(false)
                 }}
@@ -575,8 +562,8 @@ export default function RepeatDialog({
                   const tomorrow = new Date(today)
                   tomorrow.setDate(today.getDate() + 1)
                   
-                  const isToday = endVal === dateToIso(today)
-                  const isTomorrow = endVal === dateToIso(tomorrow)
+                  const isToday = endVal === fmtISO(today)
+                  const isTomorrow = endVal === fmtISO(tomorrow)
                   
                   return (
                     <>
@@ -585,7 +572,7 @@ export default function RepeatDialog({
                         size="sm"
                         className="flex-1 text-xs"
                         onClick={() => {
-                          setEndVal(dateToIso(today))
+                          setEndVal(fmtISO(today))
                           setEndCalMonth(today)
                         }}
                       >
@@ -596,7 +583,7 @@ export default function RepeatDialog({
                         size="sm"
                         className="flex-1 text-xs"
                         onClick={() => {
-                          setEndVal(dateToIso(tomorrow))
+                          setEndVal(fmtISO(tomorrow))
                           setEndCalMonth(tomorrow)
                         }}
                       >
