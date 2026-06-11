@@ -1,11 +1,13 @@
 import {
   cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
-  cacheMarkClean, cacheDirtyCount, cacheLoadAll, cacheInit, cacheDeleteAll,
+  cacheMarkClean, cacheWriteClean, cacheDirtyCount, cacheLoadAll, cacheInit, cacheDeleteAll,
   handleSave, handleLoad, handleClear,
   tokenSave, tokenLoad, tokenClear,
   vaultRefsSave, vaultRefsLoad,
   activeVaultIdSave, activeVaultIdLoad,
 } from './cache'
+import type { CacheRecord } from './cache'
+import { conflictPath } from './storage/conflictName'
 import { diskPickDirectory } from './storage/fs'
 import { LocalBackend }   from './storage/localBackend'
 import { ExampleBackend } from './storage/exampleBackend'
@@ -16,7 +18,7 @@ import { parseToStoreItems } from './model/storeItems'
 import { fileSlugItems } from './model/storeOps'
 import { saveFile } from './fileIO'
 import type { StoreItem, Roots } from './types'
-import { getItems, getRoots, setData, getVaults, notify } from './storeBridge'
+import { getItems, getRoots, setData, getVaults, notify, warn } from './storeBridge'
 import { useStore } from './store'
 
 // ── HELPERS ────────────────────────────────────────────────────
@@ -51,6 +53,67 @@ function parseFiles(
   return { items: loaded, roots }
 }
 
+// ── COLLISION RESOLUTION ───────────────────────────────────────
+
+/**
+ * Handle a write collision: backend version of `path` has drifted while the
+ * cache also has unsaved local edits.
+ *
+ * Resolution:
+ *  1. Re-pull the backend's copy → overwrite the original path in cache (clean).
+ *  2. Write the local content to a timestamped copy on the backend immediately.
+ *  3. Cache the copy (clean) and notify the user.
+ *
+ * `cacheMap` is provided by reconcileWithDisk so it can update in-place before
+ * the subsequent parseFiles call reflects both entries.
+ */
+async function resolveCollision(
+  backend: StorageBackend,
+  vaultId: string,
+  path: string,
+  localContent: string,
+  cacheMap?: Map<string, CacheRecord>,
+): Promise<void> {
+  // Step 1: fetch the backend's current version of the original file.
+  const [fresh] = await backend.readFiles([path])
+  if (fresh) {
+    await cacheWriteClean(vaultId, path, fresh.content, fresh.version)
+    if (cacheMap) {
+      cacheMap.set(path, {
+        vaultPath: `${vaultId}::${path}`,
+        vaultId, path,
+        content: fresh.content,
+        dirty: 0,
+        updatedAt: Date.now(),
+        version: fresh.version,
+      })
+    }
+  }
+
+  // Step 2: write the local content to the backend under a conflict-copy path.
+  const copy = conflictPath(path, new Date())
+  await backend.write(copy, localContent)
+
+  // Step 3: determine the version of the newly written copy and cache it.
+  let copyVersion: string | undefined
+  const [copyFresh] = await backend.readFiles([copy])
+  if (copyFresh) copyVersion = copyFresh.version
+
+  await cacheWriteClean(vaultId, copy, localContent, copyVersion)
+  if (cacheMap && copyVersion !== undefined) {
+    cacheMap.set(copy, {
+      vaultPath: `${vaultId}::${copy}`,
+      vaultId, path: copy,
+      content: localContent,
+      dirty: 0,
+      updatedAt: Date.now(),
+      version: copyVersion,
+    })
+  }
+
+  warn(`Conflict on ${path} — your version saved as ${copy}.`)
+}
+
 // ── MODULE STATE ───────────────────────────────────────────────
 
 let _activeBackend: StorageBackend | null = null
@@ -70,11 +133,19 @@ async function reconcileWithDisk(backend: StorageBackend, vaultId: string): Prom
   const cacheMap   = new Map(cached.map(r => [r.path, r]))
 
   const changed: string[] = []
+  const collisions: Array<{ path: string; localContent: string }> = []
   const deleted: string[] = []
 
   for (const [path, diskToken] of diskTokens) {
     const entry = cacheMap.get(path)
-    if (!entry || entry.version !== diskToken) changed.push(path)
+    if (!entry || entry.version !== diskToken) {
+      if (entry?.dirty === 1) {
+        // Both sides changed — preserve local edit as a conflict copy.
+        collisions.push({ path, localContent: entry.content })
+      } else {
+        changed.push(path)
+      }
+    }
   }
   for (const path of cacheMap.keys()) {
     if (!diskTokens.has(path)) deleted.push(path)
@@ -86,6 +157,10 @@ async function reconcileWithDisk(backend: StorageBackend, vaultId: string): Prom
     for (const f of freshFiles) {
       cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, dirty: 0, updatedAt: Date.now(), version: f.version })
     }
+  }
+
+  for (const { path, localContent } of collisions) {
+    await resolveCollision(backend, vaultId, path, localContent, cacheMap)
   }
 
   await Promise.all(deleted.map(p => cacheDelete(vaultId, p)))
@@ -157,14 +232,32 @@ export async function syncToDirectory(): Promise<void> {
       notify('No writable vault connected. Add a local folder first.')
       return
     }
-    const dirty = await cacheGetDirty(_activeBackend.id)
+    const backend = _activeBackend
+    const vaultId = backend.id
+    const dirty = await cacheGetDirty(vaultId)
     if (!dirty.length) { updateSyncUI(); return }
+
+    // Snapshot current backend versions to detect drift before writing.
+    const tokens = await backend.statAll()
+    let hadCollision = false
+
     for (const f of dirty) {
-      await _activeBackend.write(f.path, f.content)
-      await cacheMarkClean(_activeBackend.id, f.path)
+      const cur = tokens.get(f.path)
+      const drifted = cur !== undefined && cur !== f.version
+      if (drifted) {
+        await resolveCollision(backend, vaultId, f.path, f.content)
+        hadCollision = true
+      } else {
+        await backend.write(f.path, f.content)
+        await cacheMarkClean(vaultId, f.path)
+      }
     }
+
     useStore.setState({ syncDirtyCount: 0, syncFlash: true })
     setTimeout(() => useStore.setState({ syncFlash: false }), 800)
+
+    // Re-reconcile so conflict copies appear in the UI immediately.
+    if (hadCollision) await reconcileWithDisk(backend, vaultId)
   } catch (e) {
     console.error('[vault] sync failed:', e)
     notify('Sync failed: ' + ((e as Error).message || (e as Error).name))

@@ -22,3 +22,12 @@ export function notify(msg: string): void {
     }
   }, 5000);
 }
+
+export function warn(msg: string): void {
+  useStore.setState({ warningNotification: msg });
+  setTimeout(() => {
+    if (useStore.getState().warningNotification === msg) {
+      useStore.setState({ warningNotification: null });
+    }
+  }, 7000);
+}
