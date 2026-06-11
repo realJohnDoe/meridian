@@ -14,6 +14,7 @@ import { fmtISO, fmtMonth } from '../model/expansion'
 import { TODAY } from '../constants'
 import { entryRoute } from './-entryRoute'
 import FilterOverlay from '../components/FilterOverlay'
+import EntryOverlay, { isEditScope } from '../components/EntryOverlay'
 import UndoToast from '../components/UndoToast'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet'
 import { Button } from '../components/ui/button'
@@ -22,6 +23,17 @@ import type { Occurrence, EditScope } from '../types'
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
+  validateSearch: (search: Record<string, unknown>): {
+    editor?: string
+    edate?: string
+    escope?: EditScope
+    etitle?: string
+  } => ({
+    editor: typeof search.editor === 'string' ? search.editor : undefined,
+    edate:  typeof search.edate  === 'string' ? search.edate  : undefined,
+    escope: isEditScope(search.escope) ? search.escope : undefined,
+    etitle: typeof search.etitle === 'string' ? search.etitle : undefined,
+  }),
 })
 
 function AppLayout() {
@@ -30,6 +42,7 @@ function AppLayout() {
 
   const navigate = useNavigate()
   const pathname = useRouterState({ select: s => s.location.pathname })
+  const { editor, edate, escope, etitle } = Route.useSearch()
 
   const syncDirtyCount      = useStore(s => s.syncDirtyCount)
   const syncFlash           = useStore(s => s.syncFlash)
@@ -184,7 +197,7 @@ function AppLayout() {
             onChange={e => setFilterQuery(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && filterQuery) {
-                navigate({ to: '/entry/new', search: { title: filterQuery } })
+                navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: 'new', etitle: filterQuery, edate: undefined, escope: undefined }) })
                 setFilterQuery('')
               }
             }}
@@ -197,7 +210,7 @@ function AppLayout() {
           <button
             className="search-bar-add"
             onClick={() => {
-              navigate({ to: '/entry/new', search: filterQuery ? { title: filterQuery } : {} })
+              navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: 'new', etitle: filterQuery || undefined, edate: undefined, escope: undefined }) })
               if (filterQuery) setFilterQuery('')
             }}
           ><Plus size={16} /></button>
@@ -208,10 +221,14 @@ function AppLayout() {
         query={filterQuery}
         onOpen={openEntry}
         onCreate={(title: string) => {
-          navigate({ to: '/entry/new', search: { title } })
+          navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: 'new', etitle: title, edate: undefined, escope: undefined }) })
           setFilterQuery('')
         }}
       />
+
+      {editor && (
+        <EntryOverlay editor={editor} edate={edate} escope={escope} etitle={etitle} />
+      )}
     </>
   )
 }
