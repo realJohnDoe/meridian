@@ -1,4 +1,4 @@
-export type VaultKind = 'local' | 'example'
+export type VaultKind = 'local' | 'example' | 'github'
 
 export interface FileEntry {
   path:    string
@@ -6,11 +6,25 @@ export interface FileEntry {
   version: string
 }
 
-export interface VaultRef {
+interface VaultRefBase {
   id:   string
   name: string
-  kind: VaultKind
 }
+
+export interface LocalVaultRef extends VaultRefBase {
+  kind: 'local'
+}
+
+export interface ExampleVaultRef extends VaultRefBase {
+  kind: 'example'
+}
+
+export interface GitHubVaultRef extends VaultRefBase {
+  kind:   'github'
+  github: { owner: string; repo: string; branch: string }
+}
+
+export type VaultRef = LocalVaultRef | ExampleVaultRef | GitHubVaultRef
 
 export interface StorageBackend {
   readonly id:       string
