@@ -1,6 +1,5 @@
 ## Next steps
 
-- Add 'I have the right version'/'Take version from GitHub / Local File' behavior
 - Fix inconsistent first day of the week in set date view
 - Add auto-sync
 - Turn error messages, collision warnings and delete undo messages into shadcn toasts
