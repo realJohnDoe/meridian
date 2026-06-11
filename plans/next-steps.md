@@ -115,17 +115,6 @@
     Problem: Each new metadata chip is another copy of the same markup; styling/aria tweaks must be applied five times.
     Fix: Extract a <PropChip icon label value pressed onClick className?> component and map over a small config array.
 
-🔴 High — data loss: reconcile deletes unsynced local edits
-src/vault.ts:79-92 — reconcileWithDisk treats any cached file not present on disk as a deletion, with no dirty guard:
-
-for (const path of cacheMap.keys()) {
-if (!diskTokens.has(path)) deleted.push(path) // includes dirty, never-synced files
-}
-await Promise.all(deleted.map(p => cacheDelete(vaultId, p)))
-Writes only go to the cache as dirty:1 (cache.ts:64); they reach disk only when the user clicks the sync button (syncToDirectory is the sole caller, wired to a button in \_app.tsx:115). So accumulating unsynced changes is the normal state — that's what the dirty-count badge is for.
-
-Failure scenario: user creates/edits a few notes (now dirty in cache, not yet on disk) → reloads the app → restoreVaults → activateWritableVault → reconcileWithDisk → those files aren't in diskTokens → they're cacheDeleted and rebuilt-out of the store. The unsynced work is silently gone. Fix: exclude dirty === 1 records from the deleted set (a locally-created file missing from disk is pending-create, not a remote delete).
-
 🟠 Medium — deletes bypass the offline staging model
 src/vault.ts:139-150 — deleteFileFromDisk writes through to the backend immediately (\_activeBackend.delete(path)), while edits are staged in cache and synced later. Also reached implicitly when a file is emptied (vault.ts:125).
 
