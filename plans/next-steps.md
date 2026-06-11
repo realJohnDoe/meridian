@@ -11,121 +11,115 @@
 
 ## Results from last Quality Survey
 
-1. Domain/UI leakage: the mutation layer drives navigation and toast state directly
-   Category: architecture srp
-   Impact: 7
-   Evidence: mutations.ts:107 navigateBack(), mutations.ts:215 useStore.setState({ toast… }), storeBridge.ts:14 navigateBack = () => window.history.back(). saveNode/deleteNode/beginSwipeDelete all call navigateBack() and poke the store directly.
-   Problem: Pure data-mutation functions are hard-wired to browser history and UI toast/error state, so domain logic can't be reused or unit-tested without a DOM + Zustand, and navigation timing is buried inside "save" semantics.
-   Fix: Have mutation functions return a result/outcome and let the calling hook (useEntryEditor) own router.history.back() and toast display.
-2. The 796-line debug view re-implements the entire editor/dialog stack — and ships in the production build
+1. The 796-line debug view re-implements the entire editor/dialog stack — and ships in the production build
    Category: dead-code dry architecture
    Impact: 6
    Evidence: NodeInheritanceDebugger.tsx imports EntryEditor, RepeatDialog, DatePickerDialog, TimePickerDialog, DurationDialog, PriorityDrawer and manages dialog state itself (lines 24-30), duplicating useEntryEditor.ts + DialogStack.tsx + EditorShell.tsx. It's a rollup input: vite.config.ts:103 debug: resolve(\_\_dirname, 'debug.html').
    Problem: Every change to editor wiring must be mirrored in a second 796-line copy, and the whole debug bundle (plus inheritance.ts tree API it alone consumes) is shipped to end users.
    Fix: Refactor the debugger to reuse EditorShell/useEntryEditor, and exclude debug.html from the production rollup input (dev-only plugin).
-3. Two parallel data models: RawNode/EffectiveNode tree vs flat StoreItem
+2. Two parallel data models: RawNode/EffectiveNode tree vs flat StoreItem
    Category: architecture
    Impact: 6
    Evidence: storeItems.ts:116 builds an EffectiveNode tree via buildEffectiveTree then flattens to StoreItem[]; collapse.ts rebuilds a tree to serialize; the tree API (buildEffectiveTree, EffectiveNode, displayValue) is consumed in production only by parsing + the debug tool (grep: zero other call sites).
    Problem: The codebase maintains an inheritance-tree representation and a flat-item representation of the same data, with conversion logic in both directions — a large conceptual surface that exists mostly to serve the parser and the debug view.
    Fix: Confine the tree model entirely inside storeItems.ts/collapse.ts as a private parse/serialize detail, and stop exporting EffectiveNode/buildEffectiveTree from model/.
-4. expansion.ts is an 855-line god-module mixing date utils, duration parsing, tree expansion, and metadata join — with a wide dead/internal-only export surface
+3. expansion.ts is an 855-line god-module mixing date utils, duration parsing, tree expansion, and metadata join — with a wide dead/internal-only export surface
    Category: architecture dead-code
    Impact: 5
    Evidence: expansion.ts exports fmtISO/fmtMonth/fmtT (date fmt), parseDurationHours/parseDurationDays (duration), expandNode/mergeNode/expandRepeat/collectAllOccurrences/collectRepeatPatterns/treeHasRepeat/jsDateToSpec/collectUndated — all of which have zero non-test consumers outside expansion.ts itself (verified by grep).
    Problem: Unrelated concerns share one file and many functions are exported as if public API but are internal or test-only, obscuring the real surface and inflating what every importer pulls in.
    Fix: Split into dateUtils.ts / duration.ts / expansion.ts, and downgrade internal-only functions from export to module-private.
-5. Dual styling system: ~84 hand-written component CSS rules alongside inline Tailwind + shadcn
+4. Dual styling system: ~84 hand-written component CSS rules alongside inline Tailwind + shadcn
    Category: styling
    Impact: 5
    Evidence: index.css:160-272 defines bespoke rules like .topbar, .ib, .search-bar-_, .dv-_, .cc-_, .entry-_ as raw CSS, while components mix Tailwind utilities inline (\_app.tsx:148) and shadcn ui/ components — and even @apply truncate appears inside raw CSS (index.css:254).
    Problem: There's no rule for which system to use; the same visual concern (e.g. an icon button) is sometimes .ib, sometimes Tailwind, making styling unpredictable and theming changes touch two places.
    Fix: Pick one convention (Tailwind @layer components or cva variants for repeated patterns) and migrate the bespoke .dv-_/.cc-_/.entry-\* families into it.
-6. AppLayout (\_app.tsx) is a god-component owning ~7 unrelated concerns
+5. AppLayout (\_app.tsx) is a god-component owning ~7 unrelated concerns
    Category: srp architecture
    Impact: 5
    Evidence: \_app.tsx:40-245 — one component handles topbar + day-nav, sidebar/vault list, sync-status color/title logic (:59-66), search bar, filter overlay, entry overlay, and the add-vault dialog, plus inline vaultIcon/navItems building.
    Problem: Any change to the sidebar, sync indicator, or search bar forces edits to a single 245-line layout file with intertwined state (filterQuery, sidebarOpen, addVaultOpen).
    Fix: Extract <Sidebar>, <SyncButton>, and <SearchBar> components, each owning its own state and store selectors.
-7. Duplicated "open new entry" navigation object (4×)
+6. Duplicated "open new entry" navigation object (4×)
    Category: dry
    Impact: 4
    Evidence: Identical navigate({ to: '.', search: prev => ({ ...prev, editor: 'new', etitle: …, edate: undefined, escope: undefined }) }) at \_app.tsx:210, \_app.tsx:224, \_app.tsx:235, useEntryEditor.ts:43.
    Problem: There's an entryRoute() helper for existing entries but no parallel helper for new entries, so the param shape is copy-pasted and easy to skew.
    Fix: Add newEntryRoute(title?: string) next to entryRoute and call it everywhere.
-8. exampleRef literal hand-rolled 4× in vault.ts
+7. exampleRef literal hand-rolled 4× in vault.ts
    Category: dry
    Impact: 3
    Evidence: Identical { id: 'example', name: 'Example data', kind: 'example' } at vault.ts:177, :283, :328, :358 (last one with as const).
    Problem: The canonical example vault descriptor is duplicated; renaming "Example data" means four edits and the variants already drift (typed vs as const).
    Fix: Export one EXAMPLE_VAULT_REF constant and reference it.
-9. onOpen = navigate(entryRoute(...)) duplicated across route files
+8. onOpen = navigate(entryRoute(...)) duplicated across route files
    Category: dry
    Impact: 3
    Evidence: Same callback at \_app.day.$date.tsx:18, \_app.index.tsx:42, \_app.tsx:90.
    Problem: The open-entry handler is re-declared in every route that lists occurrences.
    Fix: A small useOpenEntry() hook returning the memoized callback.
-10. Stateful toast scheduler lives as module globals inside mutations.ts
-    Category: srp architecture
-    Impact: 4
-    Evidence: mutations.ts:206-231 — let \_toastTimer, let \_pendingCommit, showDeleteToast with setTimeout/clearTimeout, all in the same file as the pure edit API.
-    Problem: Module-level mutable singletons make mutations.ts non-pure and the undo-commit timing untestable in isolation; "apply edit" and "manage a 4s undo timer" are unrelated responsibilities.
-    Fix: Move the undo-toast scheduler into its own module (e.g. undoToast.ts) that mutations.ts calls.
-11. Editor handler prop-drilling through three layers
+9. Stateful toast scheduler lives as module globals inside mutations.ts
+   Category: srp architecture
+   Impact: 4
+   Evidence: mutations.ts:206-231 — let \_toastTimer, let \_pendingCommit, showDeleteToast with setTimeout/clearTimeout, all in the same file as the pure edit API.
+   Problem: Module-level mutable singletons make mutations.ts non-pure and the undo-commit timing untestable in isolation; "apply edit" and "manage a 4s undo timer" are unrelated responsibilities.
+   Fix: Move the undo-toast scheduler into its own module (e.g. undoToast.ts) that mutations.ts calls.
+10. Editor handler prop-drilling through three layers
     Category: architecture dry
     Impact: 3
     Evidence: ~18 handlers from useEntryEditor are destructured and re-passed individually in EditorShell.tsx:23-71 and again declared as 16 props in DialogStack.tsx:14-31.
     Problem: Adding one dialog field means editing the hook return, EditorShell, the DialogStack props interface, and the call site — four touch points for one wire.
     Fix: Pass the hooks object (or a grouped dialogHandlers) straight through rather than spreading every callback by hand.
-12. Dead no-op spread + unused binding in updateRoot
+11. Dead no-op spread + unused binding in updateRoot
     Category: dead-code
     Impact: 2
     Evidence: storeOps.ts:140-147 — const existing = next.get(fileSlug) then ...(existing ? {} : {}), a spread that is a no-op in both branches; existing is otherwise unused.
     Problem: Misleading code suggesting a merge that never happens (comment even says "merge if needed").
     Fix: Delete the existing binding and the dead spread.
-13. initApp() is an empty no-op still wired into the root
+12. initApp() is an empty no-op still wired into the root
     Category: dead-code
     Impact: 1
     Evidence: vault.ts:373-375 — body is only a comment; called at \_\_root.tsx:16.
     Problem: A do-nothing function called on boot implies an init step that doesn't exist.
     Fix: Remove initApp and its call.
-14. GitHub backend only sees the repo root and keys files by name, not path
+13. GitHub backend only sees the repo root and keys files by name, not path
     Category: architecture error-handling
     Impact: 4
     Evidence: githubBackend.ts:50-65 requests path: '' and stores tokens.set(item.name, item.sha); statAll never recurses into subdirectories.
     Problem: Vaults with files in subfolders silently won't sync/round-trip via GitHub, unlike the local backend — an inconsistent boundary contract between two StorageBackend implementations.
     Fix: Use the Git Trees API (recursive=1) and key by full path to match LocalBackend's semantics.
-15. GitHub PAT persisted in plaintext IndexedDB
+14. GitHub PAT persisted in plaintext IndexedDB
     Category: security
     Impact: 3
     Evidence: vault.ts:317 tokenSave(id, cfg.token) → cache.ts:127 stores the raw token in the meta table.
     Problem: Any XSS or shared-device access exposes a repo-scoped write token in cleartext; there's no scoping note or exp\* handling.
     Fix: At minimum document the requirement for a fine-grained, single-repo token and prefer the shortest viable expiry; consider not persisting and re-prompting.
-16. No global loading/error UI while the vault restores
+15. No global loading/error UI while the vault restores
     Category: ux
     Impact: 3
     Evidence: \_\_root.tsx:15-18 fires restoreVaults() in an effect; the agenda renders against empty items until it resolves (\_app.index.tsx:34-40 even has a comment about scrolling "against an empty agenda").
     Problem: On a slow GitHub/FS load the user sees an empty app with no spinner, and there's no surfaced state distinguishing "loading" from "empty vault."
     Fix: Add a loading flag to the store, set it around restoreVaults, and render a skeleton/spinner.
-17. Occurrence visual state is stringly-typed and decoded by ad-hoc maps
+16. Occurrence visual state is stringly-typed and decoded by ad-hoc maps
     Category: types naming
     Impact: 3
     Evidence: presentation.ts:191 occState(): string returns magic strings ('task-p1', 'event-future'…) consumed via untyped Record<string,string> maps \_ccBarMap/\_dvBlkMap (:231, :249) with ?? 'event' fallbacks hiding typos.
     Problem: A renamed state or typo'd map key fails silently to the fallback class instead of a compile error.
     Fix: Make occState return a string-literal union and type the maps as Record<OccState, string>.
-18. Navigation hard-bound to window.history.back()
+17. Navigation hard-bound to window.history.back()
     Category: architecture
     Impact: 2
     Evidence: storeBridge.ts:14 — navigateBack = () => window.history.back(), used by the mutation layer instead of the router's history.
     Problem: Bypasses the TanStack router abstraction (used elsewhere via router.history.back() in useEntryEditor.ts:62), giving two inconsistent back-navigation paths and coupling non-UI code to the global window.
     Fix: Route all back-navigation through the router and remove the window.history shim (folds into finding #1).
-19. notify() builds error strings by hand and re-implements an auto-dismiss timer
+18. notify() builds error strings by hand and re-implements an auto-dismiss timer
     Category: error-handling dry
     Impact: 2
     Evidence: storeBridge.ts:17-24 hand-rolls a setTimeout dismiss; callers across vault.ts repeat notify('… failed: ' + ((e as Error).message || (e as Error).name)) (vault.ts:135, :148, :170).
     Problem: The error-banner timer logic and the (e as Error).message || .name formatting are duplicated, and the timer mechanism overlaps with the toast timer in mutations.ts (two bespoke dismiss schedulers).
     Fix: A single notifyError(prefix, e) helper plus one shared transient-message scheduler.
-20. EntryEditor repeats the metadata-chip button five times
+19. EntryEditor repeats the metadata-chip button five times
     Category: dry
     Impact: 2
     Evidence: EntryEditor.tsx:224-257 — Date/Time/Duration/Priority/Repeat are five near-identical badgeVariants({variant:'chip'}) buttons differing only in icon, label, value text, and onClick.
