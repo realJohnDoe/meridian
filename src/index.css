@@ -1,6 +1,19 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/*
+ * STYLING CONVENTION
+ * ──────────────────
+ * 1. One-off structural/layout  → inline Tailwind utilities; no bespoke class.
+ * 2. Repeated variant patterns  → cva in src/components/ui/ (see badge.tsx, button.tsx).
+ * 3. Colors                     → semantic tokens only (bg-card, text-muted-foreground…).
+ *                                 No raw oklch(…) or #hex in component markup.
+ * 4. Spacing/radius             → Tailwind scale snapped to nearest step; no arbitrary px.
+ * 5. Kept signatures            → documented @layer components block at bottom of this file.
+ *    Current kept set: .swipe-*, .now-line/.now-dot, .search-bar-wrap (brand CTA glow).
+ * 6. @theme + :root tokens below are the design system — extend here, not in components.
+ */
+
 /* ── THEME TOKENS → Tailwind utilities ──────────────────────── */
 /* @theme inline: utilities reference var(…) at runtime, required for theming */
 @theme inline {
@@ -51,6 +64,11 @@
   --color-surface-raised: var(--surface-raised);
 
   --height-control: var(--control-h);
+
+  /* Sub-xs type scale — only these two lack a Tailwind default equivalent.
+     Use text-2xs (10px) for dense labels/timestamps, text-3xs (8px) for calendar mini-bars. */
+  --text-2xs: 0.625rem;  /* 10px */
+  --text-3xs: 0.5rem;    /* 8px  */
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -239,7 +257,7 @@
 .istoday .ccn{background:var(--primary);color:var(--primary-foreground);font-weight:700}
 .ccn{font-size:11px;font-weight:500;color:var(--dim);width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;margin-bottom:1px}
 .cc-bars{display:flex;flex-direction:column;gap:1px;flex:1;overflow:hidden}
-.cc-bar{border-radius:3px;padding:1px 4px;font-size:8px;font-weight:500;@apply truncate;line-height:1.4;flex-shrink:0}
+.cc-bar{border-radius:3px;padding:1px 4px;font-size:8px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4;flex-shrink:0}
 .cc-bar.event{background:var(--event-tint);color:var(--event)}
 .cc-bar.task{background:var(--task-tint);color:var(--task)}
 .cc-bar.task-p1{background:var(--priority-1-tint);color:var(--priority-1)}
@@ -276,30 +294,14 @@
 .dv-eblk.task-p2{background:var(--priority-2-tint);border-left:3px solid var(--priority-2);color:var(--priority-2)}
 .dv-eblk.task-p3{background:var(--priority-3-tint);border-left:3px solid var(--priority-3);color:var(--priority-3)}
 .dv-eblk.done{background:var(--accent);border-left:3px solid var(--surface-raised);color:var(--muted-foreground)}
-.dv-et{font-weight:600;@apply truncate;display:flex;align-items:center;gap:5px}
+.dv-et{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px}
 .dv-em{font-size:10px;font-family:var(--mono);opacity:.7;margin-top:1px}
 .now-line{position:absolute;left:46px;right:0;height:2px;background:var(--destructive);z-index:5;border-radius:1px}
 .now-dot{position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--destructive)}
 
-/* ── SEARCH ── */
-.ns-bar{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--input);border-radius:var(--radius);padding:9px 13px;margin:12px}
-.ns-bar input{flex:1;background:none;border:none;outline:none;color:var(--foreground);font-size:14px}
-.ns-bar input::placeholder{color:var(--muted-foreground)}
-.ns-bar svg{width:16px;height:16px;stroke:var(--muted-foreground);fill:none;stroke-width:2;flex-shrink:0}
-.ns-filters{display:flex;gap:5px;padding:0 12px 10px;overflow-x:auto;scrollbar-width:none}
-.ns-sc{flex:1;overflow-y:auto}
-.ns-pad{padding-bottom:80px}
-.ns-sec{padding:10px 14px 3px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground)}
-.note-row{padding:12px 14px;cursor:pointer;transition:background .1s;border-bottom:1px solid var(--border)}
-.note-row:hover{background:var(--card)}
-.nr-t{font-size:14px;font-weight:500;color:var(--foreground);margin-bottom:3px}
-.nr-p{font-size:12px;color:var(--muted-foreground);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.nr-m{display:flex;gap:5px;margin-top:4px;align-items:center}
-.nr-d{font-size:11px;color:var(--muted-foreground);font-family:var(--mono)}
-
 /* ── ENTRY EDITOR ── */
 .entry-top{height:var(--th);display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--background)}
-.entry-fname{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted-foreground);@apply truncate}
+.entry-fname{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .save-btn{font-size:13px;font-weight:600;color:var(--primary-foreground);background:linear-gradient(135deg,var(--primary-dark),var(--brand-cyan-dark));padding:6px 16px;border-radius:20px;box-shadow:0 2px 12px color-mix(in oklab,var(--primary),transparent 70%)}
 .entry-sc{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .entry-pad{padding:18px 14px 120px}
@@ -374,9 +376,6 @@
 [data-sonner-toast][data-styled='true'][data-sonner-toast] [data-button]:hover {
   background: color-mix(in oklab, var(--secondary), transparent 20%);
 }
-
-/* scope selector */
-.scope-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 
 /* ── SWIPE GESTURES ── */
 .swipe-wrap{position:relative;overflow:hidden;border-radius:8px}
