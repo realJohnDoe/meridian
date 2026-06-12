@@ -1,4 +1,4 @@
-import { fmtISO } from './model/expansion'
+import { fmtISO } from './model/dateUtils'
 import {
   applyEdit, toggleDone, excludeOccurrence, deleteByFileSlug, deleteFollowing,
   fileSlugItems, findSeries,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import AgendaView from '../components/AgendaView'
-import { fmtISO } from '../model/expansion'
+import { fmtISO } from '../model/dateUtils'
 import { entryRoute } from './-entryRoute'
 import type { EditScope } from '../types'
 import { TODAY } from '../constants'

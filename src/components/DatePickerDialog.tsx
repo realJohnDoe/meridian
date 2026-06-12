@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { addDays } from 'date-fns'
-import { fmtISO, parseDateString } from '../model/expansion'
+import { fmtISO, parseDateString } from '../model/dateUtils'
 import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from './ui/drawer'
 import { Separator } from './ui/separator'
 import { Calendar } from './ui/calendar'

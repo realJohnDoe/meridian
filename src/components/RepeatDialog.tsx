@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '../types'
-import { fmtISO, parseDateString } from '../model/expansion'
+import { fmtISO, parseDateString } from '../model/dateUtils'
 import {
   Drawer,
   DrawerContent,

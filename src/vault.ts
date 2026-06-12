@@ -21,7 +21,7 @@ import type { StoreItem, Roots } from './types'
 import { getItems, getRoots, setData, getVaults, notify, warn } from './storeBridge'
 import { useStore } from './store'
 
-// ── HELPERS ────────────────────────────────────────────────────
+// ── HELPERS ────────────────────────────────────────────
 
 function fileSlugToPath(fileSlug: string): string {
   return fileSlug + '.md'
@@ -117,6 +117,8 @@ async function resolveCollision(
 // ── MODULE STATE ───────────────────────────────────────────────
 
 let _activeBackend: StorageBackend | null = null
+let _syncing = false
+let _pushTimer: ReturnType<typeof setTimeout> | null = null
 
 // ── PRIVATE ACTIVATION HELPERS ─────────────────────────────────
 
@@ -206,6 +208,7 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     const path        = fileSlugToPath(fileSlug)
     await cacheWrite(_activeBackend.id, path, content, `local:${Date.now()}`)
     updateSyncUI()
+    scheduleAutoPush()
   } catch (e) {
     console.error('[vault] writeEntityToCache failed:', e)
     notify('Save failed: ' + ((e as Error).message || (e as Error).name))
@@ -225,44 +228,71 @@ export async function deleteFileFromDisk(fileSlug: string): Promise<void> {
   }
 }
 
-// ── SYNC ──────────────────────────────────────────────────────
+// ── SYNC CORE ─────────────────────────────────────────────────
 
-export async function syncToDirectory(): Promise<void> {
+/** Pushes all dirty cache entries to the backend. Returns true if any collision occurred. */
+async function pushDirty(backend: StorageBackend, vaultId: string): Promise<boolean> {
+  const dirty = await cacheGetDirty(vaultId)
+  if (!dirty.length) return false
+
+  const tokens = await backend.statAll()
+  let hadCollision = false
+
+  for (const f of dirty) {
+    const cur = tokens.get(f.path)
+    const drifted = cur !== undefined && cur !== f.version
+    if (drifted) {
+      await resolveCollision(backend, vaultId, f.path, f.content)
+      hadCollision = true
+    } else {
+      await backend.write(f.path, f.content)
+      await cacheMarkClean(vaultId, f.path)
+    }
+  }
+
+  return hadCollision
+}
+
+async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> {
+  if (!_activeBackend || _activeBackend.readOnly) {
+    if (!opts.silent) notify('No writable vault connected. Add a local folder first.')
+    return
+  }
+  if (_syncing) return
+  _syncing = true
+
+  const backend = _activeBackend
+  const vaultId = backend.id
+
   try {
-    if (!_activeBackend || _activeBackend.readOnly) {
-      notify('No writable vault connected. Add a local folder first.')
-      return
+    const hadCollision = await pushDirty(backend, vaultId)
+    if (opts.pull || hadCollision) {
+      await reconcileWithDisk(backend, vaultId)
     }
-    const backend = _activeBackend
-    const vaultId = backend.id
-    const dirty = await cacheGetDirty(vaultId)
-    if (!dirty.length) { updateSyncUI(); return }
-
-    // Snapshot current backend versions to detect drift before writing.
-    const tokens = await backend.statAll()
-    let hadCollision = false
-
-    for (const f of dirty) {
-      const cur = tokens.get(f.path)
-      const drifted = cur !== undefined && cur !== f.version
-      if (drifted) {
-        await resolveCollision(backend, vaultId, f.path, f.content)
-        hadCollision = true
-      } else {
-        await backend.write(f.path, f.content)
-        await cacheMarkClean(vaultId, f.path)
-      }
-    }
-
-    useStore.setState({ syncDirtyCount: 0, syncFlash: true })
+    useStore.setState({ syncError: false, syncFlash: true })
     setTimeout(() => useStore.setState({ syncFlash: false }), 800)
-
-    // Re-reconcile so conflict copies appear in the UI immediately.
-    if (hadCollision) await reconcileWithDisk(backend, vaultId)
+    updateSyncUI()
   } catch (e) {
     console.error('[vault] sync failed:', e)
-    notify('Sync failed: ' + ((e as Error).message || (e as Error).name))
+    useStore.setState({ syncError: true })
+    if (!opts.silent) notify('Sync failed: ' + ((e as Error).message || (e as Error).name))
+  } finally {
+    _syncing = false
   }
+}
+
+export function scheduleAutoPush(): void {
+  if (!_activeBackend || _activeBackend.readOnly) return
+  if (_pushTimer) clearTimeout(_pushTimer)
+  _pushTimer = setTimeout(() => { _pushTimer = null; void runSync({ silent: true, pull: false }) }, 1000)
+}
+
+export function autoSyncTick(): void {
+  void runSync({ silent: true, pull: true })
+}
+
+export async function syncToDirectory(): Promise<void> {
+  await runSync({ silent: false, pull: true })
 }
 
 // ── VAULT LIFECYCLE ───────────────────────────────────────────

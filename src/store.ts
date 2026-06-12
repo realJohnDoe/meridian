@@ -20,6 +20,8 @@ interface MeridianStore {
   syncDirtyCount: number
   /** Briefly true after a successful sync (drives the green flash). */
   syncFlash: boolean
+  /** True when the most recent sync attempt failed (drives the red icon). */
+  syncError: boolean
 
   // ── Agenda scroll ────────────────────────────────────────────────
   /** When true, AgendaPage will scroll to today once then clear this flag. */
@@ -37,6 +39,7 @@ export const useStore = create<MeridianStore>((set) => ({
 
   syncDirtyCount: 0,
   syncFlash:      false,
+  syncError:      false,
 
   scrollToTodayOnce: false,
 }))

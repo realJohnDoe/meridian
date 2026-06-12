@@ -1,73 +1,37 @@
 /**
- * Meridian expansion pipeline — single module.
- *
- * Consolidates:
- *   src/recurrence.ts          — date helpers + low-level expansion engine
- *   src/model/expand.ts        — inheritance-aware expandRange
- *   src/model/repeatExpander.ts — OccurrenceEntry / collectors
+ * Meridian expansion pipeline.
  *
  * Public surface:
- *   - Date helpers: fmtISO, fmtT, parseDateString, toDate, nodeDateTime,
- *                   jsDateToSpec, addInterval, parseDurationHours, mergeNode
- *   - Engine:       expandNode
- *   - Model types:  OccurrenceEntry<T>, RepeatPattern<T>
- *   - Predicates:   hasRepeat, treeHasOccurrences (used by debug view)
- *   - Main-app API: expandRange
+ *   - Types:        OccurrenceEntry<T>, RepeatPattern<T>
+ *   - Predicates:   hasRepeat, treeHasOccurrences
+ *   - Multiday:     multidayDisplayTitle, multidayCoversDate
+ *   - Main-app API: expandRange, expandWithMultiday, collectUndated,
+ *                   joinFileMeta, stableOccId
+ *
+ * Date helpers live in ./dateUtils; duration helpers in ./duration.
  */
 
 import {
-  format, isValid, parseISO,
+  isValid,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
 import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots } from '../types'
 import { isSeries, isStandaloneOcc } from '../types'
 import type { EffectiveNode } from './inheritance'
+import { fmtISO, fmtT, parseDateString } from './dateUtils'
+import { parseDurationDays } from './duration'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DATE HELPERS
+// INTERNAL DATE HELPERS  (not exported — no consumers outside this file)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function fmtISO(d: Date): string {
-  return format(d, 'yyyy-MM-dd')
-}
-
-/** Format a Date as `YYYY-MM` for use in calendar route params. */
-export function fmtMonth(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-/** Parse a `YYYY-MM` calendar route param into the first day of that month. */
-export function parseMonth(s: string): Date {
-  const [y, m] = s.split('-').map(Number)
-  return new Date(y, m - 1, 1)
-}
-
-export function fmtT(v: unknown): string | null {
-  if (!v) return null
-  if (typeof v === 'string' && /^\d{1,2}:\d{2}/.test(v)) return v.slice(0, 5)
-  if (v instanceof Date) {
-    const h = v.getHours(), m = v.getMinutes()
-    return (h || m) ? format(v, 'HH:mm') : null
-  }
-  return null
-}
-
-export function parseDateString(s: unknown): Date | null {
-  if (!s) return null
-  if (s instanceof Date) return isValid(s) ? s : null
-  const dm = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (dm) return new Date(+dm[1], +dm[2] - 1, +dm[3])
-  const d = parseISO(String(s))
-  return isValid(d) ? d : null
-}
-
-export function toDate(v: unknown): Date | null {
+function toDate(v: unknown): Date | null {
   if (!v) return null
   if (v instanceof Date) return isValid(v) ? v : null
   return parseDateString(String(v))
 }
 
-export function addInterval(date: Date, intervalStr: string): Date {
+function addInterval(date: Date, intervalStr: string): Date {
   const m = String(intervalStr).match(/(\d+)\s*(day|week|hour|minute|month|year)s?/i)
   if (!m) return date
   const n = parseInt(m[1], 10)
@@ -81,7 +45,7 @@ export function addInterval(date: Date, intervalStr: string): Date {
   return date
 }
 
-export function nodeDateTime(node: Record<string, unknown>): Date | null {
+function nodeDateTime(node: Record<string, unknown>): Date | null {
   const dateStr = node.date
   const timeStr = node.time
   if (!dateStr) return null
@@ -95,44 +59,14 @@ export function nodeDateTime(node: Record<string, unknown>): Date | null {
   return new Date(y, mo - 1, d, 0, 0, 0, 0)
 }
 
-export function jsDateToSpec(jsDate: Date): { date: string | null; time: string | null } {
+function jsDateToSpec(jsDate: Date): { date: string | null; time: string | null } {
   if (!jsDate || !isValid(jsDate)) return { date: null, time: null }
   return { date: fmtISO(jsDate), time: fmtT(jsDate) }
 }
 
-export function parseDurationHours(dur: unknown): number {
-  if (!dur) return 0.75
-  const s = String(dur).toLowerCase().trim()
-  let h = 0, m = 0
-  const dm = s.match(/^(\d+(?:\.\d+)?)\s*d(?:ay)?s?$/)
-  if (dm) return parseFloat(dm[1]) * 24
-  const hm = s.match(/(\d+(?:\.\d+)?)\s*h/)
-  const mm = s.match(/(\d+)\s*m/)
-  if (hm) h = parseFloat(hm[1])
-  if (mm) m = parseInt(mm[1], 10)
-  if (!hm && !mm) { const n = parseFloat(s); if (!isNaN(n)) h = n }
-  const total = h + m / 60
-  return total > 0 ? total : 0.75
-}
-
-/**
- * Returns the whole-day count if `dur` is in day format ("3d", "2 days", etc.),
- * null otherwise. Used to determine whether an event spans multiple calendar days.
- */
-export function parseDurationDays(dur: unknown): number | null {
-  if (!dur) return null
-  const s = String(dur).toLowerCase().trim()
-  const units: [RegExp, number][] = [
-    [/^(\d+)\s*d(?:ay)?s?$/,      1],
-    [/^(\d+)\s*w(?:eek)?s?$/,     7],
-    [/^(\d+)\s*mo(?:nth)?s?$/,   30],
-  ]
-  for (const [re, factor] of units) {
-    const m = s.match(re)
-    if (m) return parseInt(m[1], 10) * factor
-  }
-  return null
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// MULTIDAY HELPERS  (exported — consumed by calendar views)
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Returns the display title for a multiday occurrence on the given view date,
@@ -168,7 +102,7 @@ export function multidayCoversDate(occ: OccurrenceEntry<AppMetadata>, date: Date
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EXPANSION ENGINE  (logic preserved from recurrence.ts)
+// EXPANSION ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -195,7 +129,7 @@ interface ExpandNode {
 
 const WDAYS_MAP: Record<string, number> = { su: 0, mo: 1, tu: 2, we: 3, th: 4, fr: 5, sa: 6 }
 
-export function mergeNode(
+function mergeNode(
   parent: Record<string, unknown>,
   child: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -303,7 +237,7 @@ function generateScheduledDates(
   return results
 }
 
-export function expandNode(
+function expandNode(
   node: ExpandNode,
   from: Date,
   to: Date,
@@ -444,17 +378,6 @@ export function expandNode(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Fields excluded from the `metadata` blob because they are either already
- * present as top-level fields on OccurrenceEntry, or are structural/internal.
- */
-export const METADATA_EXCLUDE = new Set([
-  'date', 'time',                           // top-level on OccurrenceEntry
-  'instances', 'defaults',                  // structural tree fields
-  'excluded',                               // exclusion sentinel
-  '_isGenerated',                           // internal source-tagging field
-])
-
-/**
  * A concrete resolved occurrence (single point in time).
  * `T` is the metadata type defined by the caller.
  */
@@ -494,16 +417,6 @@ export function hasRepeat(node: EffectiveNode): boolean {
 export function treeHasOccurrences(node: EffectiveNode): boolean {
   if (hasRepeat(node) || node.fields.date !== undefined) return true
   return node.instances.some(treeHasOccurrences)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TOEXPANDABLE  (internal)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function generatedDateSet(expandable: ExpandNode, from: Date, to: Date): Set<string> {
-  const noInsts: ExpandNode = { ...expandable, instances: [] }
-  const raw = expandNode(noInsts, from, to)
-  return new Set(raw.map(o => String(o.date ?? '')))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -700,3 +613,12 @@ export function expandWithMultiday(
     .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// INTERNAL  (used only within this file)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function generatedDateSet(expandable: ExpandNode, from: Date, to: Date): Set<string> {
+  const noInsts: ExpandNode = { ...expandable, instances: [] }
+  const raw = expandNode(noInsts, from, to)
+  return new Set(raw.map(o => String(o.date ?? '')))
+}

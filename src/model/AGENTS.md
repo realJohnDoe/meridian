@@ -62,34 +62,38 @@ only `OccurrenceMetadata` (no file-level fields); file-level identity is in `roo
 - `buildRoot(rawNode, body): FileMetadata` — extracts file-level metadata from
   the root node via `extractFileMetadata`.
 
+### `dateUtils.ts`
+**Date formatting and parsing helpers** — exported for UI and model use.
+
+`fmtISO(d)`, `fmtMonth(d)`, `parseMonth(s)`, `fmtT(v)`, `parseDateString(s)`.
+
+Internal (not exported): `toDate`, `addInterval`, `nodeDateTime`, `jsDateToSpec`
+live in `expansion.ts` and are only used there.
+
+### `duration.ts`
+**Duration string parsing helpers** — exported for UI and model use.
+
+`parseDurationDays(dur)` — whole-day count from a duration string, or null.
+`parseDurationHours(dur)` — fractional-hour count from a duration string.
+
 ### `expansion.ts`
-**Temporal expansion engine** — the largest module; consolidates what was
-previously several separate files.
+**Temporal expansion engine.**
 
-*Date helpers* (exported for UI use):
-`fmtISO`, `fmtT`, `parseDateString`, `toDate`, `nodeDateTime`, `jsDateToSpec`,
-`addInterval`, `parseDurationHours`, `parseDurationDays`, `multidayCoversDate`.
+*Model types*: `OccurrenceEntry<T>`, `RepeatPattern<T>`.
 
-*Low-level engine* (field-agnostic):
-- `expandNode(node, from, to)` — expands a single duck-typed node with a
-  `repeat` field into raw occurrence objects.
-- `mergeNode(parent, child)` — merges child fields on top of parent.
+*Predicates*: `hasRepeat`, `treeHasOccurrences` (used by debug view).
 
-*Model types*: `OccurrenceEntry<T>`, `RepeatPattern<T>`, `METADATA_EXCLUDE`.
-
-*Collectors* (generic):
-`expandRepeat`, `collectAllOccurrences`, `collectRepeatPatterns` — walk
-`EffectiveNode` trees and produce typed occurrences; callers supply an
-`extractMetadata` function.
+*Multiday helpers*: `multidayDisplayTitle`, `multidayCoversDate`.
 
 *Main-app entry point* (domain-aware):
 - `expandRange(items, roots, from, to)` — takes a `StoreItem[]` and a `Roots`
   map and expands all series and standalones within the date window, returning
   `OccurrenceEntry<AppMetadata>[]` with file-level metadata joined from `roots`,
   `jsTime` and `ownerId` populated.
-- `multidayCoversDate(occ, date)` — returns true when a multi-day event
-  (duration ≥ 2d) spans the given date.  Used by calendar views to show an
-  event across all days it covers without expanding it into multiple occurrences.
+- `expandWithMultiday` — like `expandRange` but also generates virtual
+  occurrences for days 2..N of multi-day events.
+- `collectUndated` — collects store items with no date.
+- `joinFileMeta`, `stableOccId` — metadata join and stable ID memo.
 
 ### `collapse.ts`
 **Reverse-inheritance: `StoreItem[]` + `FileMetadata` → YAML object for saving.**
@@ -145,7 +149,7 @@ as round-trip and edit-operation golden inputs.
 |---|---|
 | Domain field names used in logic | `storeOps.ts`, `storeItems.ts`, `collapse.ts` via `INLINE_FIELDS` registry |
 | Field-agnostic tree / inheritance | `inheritance.ts`, `nodeSchema.ts` |
-| Field-agnostic low-level expansion | `expandNode`, `mergeNode` in `expansion.ts` |
+| Field-agnostic low-level expansion | `expandNode`, `mergeNode` (internal) in `expansion.ts` |
 | Persistence / Dexie cache | `src/meridian.ts` |
 | React state / store mutations | `src/App.tsx`, `src/store.ts` |
 | UI formatting, dialogs, editor state | `src/components/`, `src/debug/` |
