@@ -6,7 +6,7 @@ import {
 import { isSeries, occIsRecur } from './types'
 import type { Occurrence, Repeat, Scheduled, Priority, StoreItem, EditScope } from './types'
 import { titleToSlug } from './fileIO'
-import { getItems, getRoots, setData, navigateBack, notify } from './storeBridge'
+import { getItems, getRoots, setData } from './storeBridge'
 import { writeEntityToCache, deleteFileFromDisk } from './vault'
 import { toast } from 'sonner'
 import { TODAY } from './constants'
@@ -76,13 +76,14 @@ export function entryFromOccurrence(
 
 type SaveFields = EntryState & { body: string }
 
-export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields): void {
+export type SaveResult = 'saved' | 'missing-title' | 'missing-date'
+
+export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields): SaveResult {
   const { title } = fields
-  if (!title) return
+  if (!title) return 'missing-title'
 
   if (editScope === 'add' && item && !fields.scheduled?.date) {
-    notify('Please set a date for the new occurrence.')
-    return
+    return 'missing-date'
   }
 
   const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
@@ -104,7 +105,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   // from the title — matching applyEdit — so undated tasks/notes are persisted too.
   const fileSlug = item?.fileSlug ?? titleToSlug(title)
   if (fileSlug) writeEntityToCache(fileSlug)
-  navigateBack()
+  return 'saved'
 }
 
 export function toggleOccDone(o: Occurrence): void {
@@ -116,7 +117,7 @@ export function toggleOccDone(o: Occurrence): void {
 
 export function beginSwipeDelete(o: Occurrence): () => void {
   const snapshot = { items: getItems(), roots: getRoots() }
-  const title    = o.metadata.title   // expanded occurrence already carries the file-level title
+  const title    = o.metadata.title
   let cancelled  = false
 
   if (occIsRecur(o)) {
@@ -142,6 +143,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
 
 export function deleteNode(
   item:             Occurrence | null,
+  navigateBack:     () => void,
   onShowSeries?:    (config: SeriesSheetConfig) => void,
   onHideSeries?:    () => void,
   onConfirmSingle?: (title: string, onConfirm: () => void) => void,
@@ -208,8 +210,6 @@ let _pendingCommit: (() => void) | null    = null
 const TOAST_MS = 4000
 
 function showDeleteToast(title: string, commitFn: () => void, undoFn: () => void): void {
-  // Commit any previous pending deletion before showing the new toast.
-  // Clear _pendingCommit first so the dismiss callback below is a no-op.
   if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
   if (_toastId !== null) { toast.dismiss(_toastId); _toastId = null }
 

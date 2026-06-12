@@ -8,7 +8,7 @@ import {
   type EffectiveNode,
 } from '../model/inheritance'
 import {
-  expandRange, treeHasOccurrences, fmtISO,
+  expandRange, treeHasOccurrences,
 } from '../model/expansion'
 import { collapseToYaml } from '../model/collapse'
 import { parseToStoreItems } from '../model/storeItems'
@@ -23,10 +23,7 @@ import type { OccurrenceEntry, RepeatPattern } from '../model/expansion'
 import type { OccurrenceMetadata } from '../types'
 import EntryEditor, { type EntryState } from '../components/EntryEditor'
 import RepeatDialog from '../components/RepeatDialog'
-import DatePickerDialog from '../components/DatePickerDialog'
-import TimePickerDialog from '../components/TimePickerDialog'
-import DurationDialog from '../components/DurationDialog'
-import PriorityDrawer from '../components/PriorityDrawer'
+import DialogStack from '../components/DialogStack'
 import { applyScope, entryFromOccurrence } from '../mutations'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
@@ -722,42 +719,23 @@ export default function NodeInheritanceDebugger() {
                 items={items}
                 roots={debugRoots}
               />
-              <DatePickerDialog
-                open={debugDialog === 'dlgSched'}
-                initialDate={debugEntry.scheduled?.date || fmtISO(new Date())}
-                onConfirm={date => { setDebugEntry(prev => prev ? { ...prev, scheduled: { date, time: prev.scheduled?.time || '' } } : prev); setDebugDialog(null) }}
-                onRemove={() => { setDebugEntry(prev => prev ? { ...prev, scheduled: null, duration: '' } : prev); setDebugDialog(null) }}
+              <DialogStack
+                entry={debugEntry}
+                activeDialog={debugDialog}
+                pendingDelete={null}
+                seriesSheetConfig={null}
                 onClose={() => setDebugDialog(null)}
-              />
-              <TimePickerDialog
-                open={debugDialog === 'dlgTime'}
-                value={debugEntry.scheduled?.time || ''}
-                onConfirm={time => { setDebugEntry(prev => prev?.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time } } : prev); setDebugDialog(null) }}
-                onRemove={() => { setDebugEntry(prev => prev?.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: '' } } : prev); setDebugDialog(null) }}
-                onClose={() => setDebugDialog(null)}
-              />
-              <DurationDialog
-                open={debugDialog === 'dlgDur'}
-                value={debugEntry.duration || ''}
-                onConfirm={dur => { setDebugEntry(prev => prev ? { ...prev, duration: dur } : prev); setDebugDialog(null) }}
-                onRemove={() => { setDebugEntry(prev => prev ? { ...prev, duration: '' } : prev); setDebugDialog(null) }}
-                onClose={() => setDebugDialog(null)}
-              />
-              <PriorityDrawer
-                open={debugDialog === 'dlgPriority'}
-                value={debugEntry.priority}
-                onSelect={p => { setDebugEntry(prev => prev ? { ...prev, priority: p } : prev); setDebugDialog(null) }}
-                onClose={() => setDebugDialog(null)}
-              />
-              <RepeatDialog
-                open={debugDialog === 'dlgRepeat'}
-                scheduled={debugEntry.scheduled}
-                tracked={debugEntry.tracked}
-                itemType={debugEntry.itemType}
-                repeat={debugEntry.repeat}
-                onConfirm={r => { setDebugEntry(prev => prev ? { ...prev, repeat: r } : prev); setDebugDialog(null) }}
-                onRemove={() => { setDebugEntry(prev => prev ? { ...prev, repeat: null } : prev); setDebugDialog(null) }}
-                onClose={() => setDebugDialog(null)}
+                onDateConfirm={date => { setDebugEntry(prev => prev ? { ...prev, scheduled: { date, time: prev.scheduled?.time || '' } } : prev); setDebugDialog(null) }}
+                onDateRemove={() => { setDebugEntry(prev => prev ? { ...prev, scheduled: null, duration: '' } : prev); setDebugDialog(null) }}
+                onPriority={p => { setDebugEntry(prev => prev ? { ...prev, priority: p } : prev); setDebugDialog(null) }}
+                onTimeConfirm={time => { setDebugEntry(prev => prev?.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time } } : prev); setDebugDialog(null) }}
+                onTimeRemove={() => { setDebugEntry(prev => prev?.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: '' } } : prev); setDebugDialog(null) }}
+                onDurConfirm={dur => { setDebugEntry(prev => prev ? { ...prev, duration: dur } : prev); setDebugDialog(null) }}
+                onDurRemove={() => { setDebugEntry(prev => prev ? { ...prev, duration: '' } : prev); setDebugDialog(null) }}
+                onRepeatConfirm={r => { setDebugEntry(prev => prev ? { ...prev, repeat: r } : prev); setDebugDialog(null) }}
+                onRepeatRemove={() => { setDebugEntry(prev => prev ? { ...prev, repeat: null } : prev); setDebugDialog(null) }}
+                onSeriesClose={() => {}}
+                onDeleteClose={() => {}}
               />
             </>
           ) : (

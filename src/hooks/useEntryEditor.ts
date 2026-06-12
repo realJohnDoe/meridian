@@ -2,11 +2,13 @@ import { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '../store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from '../mutations'
+import { notify } from '../storeBridge'
 import type { SeriesSheetConfig } from '../mutations'
 import type { Occurrence, EditScope } from '../types'
 import { buildBodyHtml } from '../presentation'
 import { fmtISO } from '../model/expansion'
 import { TODAY } from '../constants'
+import { newEntryRoute } from '../routes/-entryRoute'
 import { resolveWikilink } from '../wikilinks'
 import { type EntryState, ENTRY_DEFAULT } from '../components/EntryEditor'
 import type { Priority } from '../types'
@@ -40,24 +42,27 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const handleOpenWikilink = useCallback((ref: string) => {
     const fileSlug = resolveWikilink(ref, storeRoots)
     if (!fileSlug) {
-      navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: 'new', etitle: ref, edate: undefined, escope: undefined }) })
+      navigate(newEntryRoute(ref))
       return
     }
     navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: fileSlug, etitle: undefined, edate: undefined, escope: undefined }) })
   }, [storeRoots, navigate])
 
   const handleSave = useCallback((body: string) => {
-    saveNode(entry.item, entry.editScope, { ...entry, body })
-  }, [entry])
+    const result = saveNode(entry.item, entry.editScope, { ...entry, body })
+    if (result === 'missing-date') notify('Please set a date for the new occurrence.')
+    if (result === 'saved') router.history.back()
+  }, [entry, router])
 
   const handleDelete = useCallback(() => {
     deleteNode(
       entry.item,
+      () => router.history.back(),
       (config) => setSeriesSheetConfig(config),
       () => setSeriesSheetConfig(null),
       (title, onConfirm) => setPendingDelete({ title, onConfirm }),
     )
-  }, [entry.item])
+  }, [entry.item, router])
 
   const handleClose = useCallback(() => router.history.back(), [router])
 

@@ -2,8 +2,10 @@
  * Parse a file (path + raw content) into StoreItem[] + FileMetadata root.
  *
  * This is the single load path for both disk files and seed YAML strings.
- * RawNode / EffectiveNode never leave this module — callers receive the pair
- * { items: StoreItem[], root: FileMetadata } and never need the YAML shape.
+ * RawNode / EffectiveNode are implementation details of this pipeline — callers
+ * receive { items: StoreItem[], root: FileMetadata } and never need the YAML
+ * shape. The one exception is NodeInheritanceDebugger, which imports
+ * EffectiveNode from inheritance.ts directly to visualise the parse tree.
  *
  * StoreItem carries OccurrenceMetadata only (no file-level fields).
  * File-level fields (title/tags/topics/body) live in the returned FileMetadata
