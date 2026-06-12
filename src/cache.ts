@@ -11,7 +11,11 @@ export interface CacheRecord {
   content:   string
   dirty:     number
   updatedAt: number
-  /** Opaque change-detection token. FS backend: `${lastModified}:${size}`. In-memory edits: `local:${Date.now()}`. */
+  /**
+   * Opaque base-version token from the backend the content was last synced
+   * against (FS: `${lastModified}:${size}`, GitHub: blob SHA). Used to detect
+   * drift. Undefined for files created locally that were never pulled/pushed.
+   */
   version?:  string
 }
 
@@ -59,9 +63,17 @@ function vp(vaultId: string, path: string): string {
 
 // ── Cache CRUD ─────────────────────────────────────────────────
 
-export async function cacheWrite(vaultId: string, path: string, content: string, version?: string): Promise<void> {
+/**
+ * Records a local edit (dirty=1). Preserves the existing record's `version` —
+ * the *base* backend token the edit derives from — so collision detection can
+ * tell whether the backend has drifted since we last synced. A brand-new file
+ * has no base version (undefined).
+ */
+export async function cacheWrite(vaultId: string, path: string, content: string): Promise<void> {
   const d = await cacheInit()
-  await d.files.put({ vaultPath: vp(vaultId, path), vaultId, path, content, dirty: 1, updatedAt: Date.now(), version })
+  const key = vp(vaultId, path)
+  const existing = await d.files.get(key)
+  await d.files.put({ vaultPath: key, vaultId, path, content, dirty: 1, updatedAt: Date.now(), version: existing?.version })
 }
 
 export async function cacheWriteClean(vaultId: string, path: string, content: string, version?: string): Promise<void> {

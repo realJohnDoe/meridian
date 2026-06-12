@@ -95,7 +95,7 @@ export async function diskWrite(
   dh: FileSystemDirectoryHandle,
   path: string,
   content: string,
-): Promise<void> {
+): Promise<string | undefined> {
   const perm = await dh.queryPermission({ mode: 'readwrite' })
   if (perm !== 'granted') {
     const ask = await dh.requestPermission({ mode: 'readwrite' })
@@ -105,6 +105,13 @@ export async function diskWrite(
   const w = await fh.createWritable()
   await w.write(content)
   await w.close()
+  // Re-stat so the caller can record the new version token (matches diskStatAll).
+  try {
+    const file = await fh.getFile()
+    return `${file.lastModified}:${file.size}`
+  } catch {
+    return undefined
+  }
 }
 
 export async function diskDelete(

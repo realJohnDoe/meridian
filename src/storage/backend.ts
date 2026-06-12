@@ -34,7 +34,8 @@ export interface StorageBackend {
   statAll():                               Promise<Map<string, string>>
   readFiles(paths: string[]):              Promise<FileEntry[]>
   readAll():                               Promise<FileEntry[]>
-  write(path: string, content: string):   Promise<void>
+  /** Writes the file and returns its new version token, if the backend can determine it. */
+  write(path: string, content: string):   Promise<string | undefined>
   delete(path: string):                   Promise<void>
   /** Local: query/request FS permission. Example: always returns 'granted'. */
   ensurePermission(interactive: boolean): Promise<PermissionState>
