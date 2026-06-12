@@ -7,8 +7,8 @@ import TimePickerDialog from './TimePickerDialog'
 import DurationDialog from './DurationDialog'
 import { fmtISO } from '../model/dateUtils'
 import { useToday } from '../hooks/useToday'
-import type { EntryState } from './EntryEditor'
-import type { SeriesSheetConfig } from '../mutations'
+import type { EntryState } from '@/editor/state'
+import type { SeriesSheetConfig } from '@/editor/save'
 import type { Priority } from '../types'
 
 interface Props {

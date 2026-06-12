@@ -5,7 +5,7 @@ import type { Occurrence, EditScope } from '../types'
 import { expandWithMultiday } from '../model/expansion'
 import { fmtISO } from '../model/dateUtils'
 import { sameDay, addDays, sortOccs } from '../presentation'
-import { toggleOccDone, beginSwipeDelete } from '../mutations'
+import { toggleOccDone, beginSwipeDelete } from '../occurrenceActions'
 import DaySection from './DaySection'
 import { useToday } from '../hooks/useToday'
 

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { Plus, Tag } from 'lucide-react'
 import type { Roots, StoreItem } from '../types'
-import type { EntryState } from './EntryEditor'
+import type { EntryState } from '@/editor/state'
 import { fileEntries, buildTagTopicChips } from '../presentation'
 import { unwrapRef } from '../wikilinks'
 import { Badge } from './ui/badge'

@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from './ui/alert-dialog'
 import { RadioGroup, RadioGroupItem } from './ui/radio-group'
-import type { SeriesSheetConfig } from '../mutations'
+import type { SeriesSheetConfig } from '@/editor/save'
 
 interface Props {
   config: SeriesSheetConfig | null
