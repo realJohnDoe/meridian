@@ -6,6 +6,7 @@ import { parseWikilinks, resolveWikilink, unwrapRef } from './wikilinks'
 import { occKind, isSeries, isStandaloneOcc } from './types'
 import { getRoots } from './storeBridge'
 import type { Occurrence, StoreItem, Roots } from './types'
+import type { OccState, CcBarState, DvBlockState } from './components/ui/occurrence-variants'
 
 export { addDays, isSameDay as sameDay }
 
@@ -190,7 +191,7 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
 
 // ── OCCURRENCE STATE → CSS ─────────────────────────────────────
 
-export function occState(o: Occurrence): string {
+export function occState(o: Occurrence): OccState {
   if (o.metadata.done) return 'done'
   const kind = occKind(o)
   if (kind === 'note') return 'note'
@@ -230,7 +231,7 @@ export function occState(o: Occurrence): string {
 // add a map here rather than fork the state logic elsewhere.
 
 /** Agenda / MonthView colour-bar classes. */
-const _ccBarMap: Record<string, string> = {
+const _ccBarMap: Record<string, CcBarState> = {
   'done':         'done',
   'event-past':   'done',
   'note':         'note',
@@ -241,14 +242,14 @@ const _ccBarMap: Record<string, string> = {
   'event-future': 'event',
 }
 
-export function ccBarClass(o: Occurrence): string {
+export function ccBarClass(o: Occurrence): CcBarState {
   if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 'multiday'
   return _ccBarMap[occState(o)] ?? 'event'
 }
 
-/** DayView event-block classes (applied as `dv-eblk <class>` / `dv-aditem <class>`).
+/** DayView event-block state keys used by adItemVariants / eventBlockVariants.
  *  Notes are undated and never reach expandRange, so 'note' is not listed here. */
-const _dvBlkMap: Record<string, string> = {
+const _dvBlkMap: Record<string, DvBlockState> = {
   'done':         'past',
   'event-past':   'past',
   'task-open':    'task',
@@ -258,7 +259,7 @@ const _dvBlkMap: Record<string, string> = {
   'event-future': 'event',
 }
 
-export function occDvClass(o: Occurrence): string {
+export function occDvClass(o: Occurrence): DvBlockState {
   return _dvBlkMap[occState(o)] ?? 'event'
 }
 

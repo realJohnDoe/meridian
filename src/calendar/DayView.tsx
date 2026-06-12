@@ -11,6 +11,7 @@ import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
 import { fmtT } from '../model/dateUtils'
 import { parseDurationHours } from '../model/duration'
 import { sameDay, addDays, fmtLong, sortOccs, occDvClass } from '../presentation'
+import { adItemVariants, eventBlockVariants } from './ui/occurrence-variants'
 
 import { useToday } from '../hooks/useToday'
 const SH = 7    // start hour on timeline
@@ -55,8 +56,8 @@ function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
   return (
     <SurfaceButton
       className={cn(
-        `dv-aditem ${occDvClass(o)}`,
-        'w-full flex items-center gap-[6px] rounded-[5px] px-[9px] py-[3px] text-[12px] font-medium truncate mb-0.5',
+        adItemVariants({ state: occDvClass(o) }),
+        'w-full flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
         'hover:brightness-110',
       )}
       onClick={() => onOpen(o)}
@@ -107,8 +108,8 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   return (
     <SurfaceButton
       className={cn(
-        `dv-eblk ${occDvClass(o)}`,
-        'absolute rounded-[7px] px-2 py-[5px] text-xs font-medium overflow-hidden transition-opacity hover:opacity-[0.85]',
+        eventBlockVariants({ state: occDvClass(o) }),
+        'absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-opacity hover:opacity-[0.85]',
       )}
       style={{ top, height, left, width }}
       onClick={() => onOpen(o)}

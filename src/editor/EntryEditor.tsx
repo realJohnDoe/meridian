@@ -22,6 +22,12 @@ const PRIORITY_CLASS: Record<string, string> = {
   medium: 'aria-[pressed=true]:bg-p2/15 aria-[pressed=true]:border-p2 aria-[pressed=true]:text-p2',
   low:    'aria-[pressed=true]:bg-p3/15 aria-[pressed=true]:border-p3 aria-[pressed=true]:text-p3',
 }
+// Active-state colour per type — replaces .type-chip-{task|event|note}[data-state=on] CSS rules
+const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
+  task:  'data-[state=on]:text-task',
+  event: 'data-[state=on]:text-event',
+  note:  'data-[state=on]:text-note',
+}
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto'
@@ -174,7 +180,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
                 <ToggleGroupItem
                   key={t}
                   value={t}
-                  className={cn('type-chip', `type-chip-${t}`, 'h-auto min-w-0')}
+                  className={cn('type-chip', TYPE_CHIP_ACTIVE_CLS[t], 'h-auto min-w-0')}
                 >
                   {t === 'task' && <CheckSquare size={13} />}
                   {t === 'event' && <CalendarDays size={13} />}
