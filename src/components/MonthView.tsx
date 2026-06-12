@@ -6,7 +6,7 @@ import type { Occurrence } from '../types'
 
 import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, sortOccs, ccBarClass } from '../presentation'
-import { TODAY } from '../constants'
+import { useToday } from '../hooks/useToday'
 import { SurfaceButton } from './ui/surface-button'
 import { cn } from '../lib/utils'
 
@@ -21,11 +21,12 @@ interface CalCellProps {
   date: Date
   other: boolean
   occs: Occurrence[]
+  today: Date
   onDayClick: (date: Date) => void
 }
 
-function CalCell({ date, other, occs, onDayClick }: CalCellProps) {
-  const isToday = sameDay(date, TODAY)
+function CalCell({ date, other, occs, today, onDayClick }: CalCellProps) {
+  const isToday = sameDay(date, today)
   const dayOccs = useMemo(
     () => sortOccs(occs.filter(o => o.metadata.jsTime && sameDay(o.metadata.jsTime, date))),
     [occs, date],
@@ -74,6 +75,7 @@ interface Props {
 }
 
 export default function MonthView({ month, onNavigateMonth, onDayClick }: Props) {
+  const today = useToday()
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
 
@@ -134,6 +136,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
               date={date}
               other={other}
               occs={occs}
+              today={today}
               onDayClick={onDayClick}
             />
           ))}

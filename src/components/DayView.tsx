@@ -12,7 +12,7 @@ import { fmtT } from '../model/dateUtils'
 import { parseDurationHours } from '../model/duration'
 import { sameDay, addDays, fmtLong, sortOccs, occDvClass } from '../presentation'
 
-import { TODAY } from '../constants'
+import { useToday } from '../hooks/useToday'
 const SH = 7    // start hour on timeline
 const EH = 22   // end hour on timeline
 const HP = 56   // pixels per hour
@@ -139,6 +139,7 @@ interface Props {
 }
 
 export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props) {
+  const today = useToday()
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
 
@@ -168,13 +169,13 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
 
   const [, setNowTick] = useState(0)
   useEffect(() => {
-    if (!sameDay(dvDate, TODAY)) return
+    if (!sameDay(dvDate, today)) return
     const id = setInterval(() => setNowTick(t => t + 1), 60_000)
     return () => clearInterval(id)
   }, [dvDate])
 
   const totalCols = Math.max(cols.length, 1)
-  const isToday   = sameDay(dvDate, TODAY)
+  const isToday   = sameDay(dvDate, today)
 
   const dvMidnight = new Date(dvDate)
   dvMidnight.setHours(0, 0, 0, 0)

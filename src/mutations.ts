@@ -9,7 +9,6 @@ import { titleToSlug } from './fileIO'
 import { getItems, getRoots, setData } from './storeBridge'
 import { writeEntityToCache, deleteFileFromDisk } from './vault'
 import { toast } from 'sonner'
-import { TODAY } from './constants'
 import type { EntryState, ItemType } from './components/EntryEditor'
 
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
@@ -40,7 +39,7 @@ export function applyScope(
   const rootTime = (parentSeries && isSeries(parentSeries)) ? parentSeries.time : occTime
   if (scope === 'single') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: null }
   if (scope === 'future') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: seriesRepeat || null }
-  if (scope === 'add')    return { scheduled: { date: fmtISO(TODAY), time: occTime || '' }, repeat: null }
+  if (scope === 'add')    { const t = new Date(); t.setHours(0, 0, 0, 0); return { scheduled: { date: fmtISO(t), time: occTime || '' }, repeat: null } }
   return { scheduled: rootDate ? { date: rootDate, time: (rootTime as string) || '' } : null, repeat: seriesRepeat || null }
 }
 

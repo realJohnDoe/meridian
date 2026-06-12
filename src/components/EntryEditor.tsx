@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem, Roots, EditScope } from '../types'
-import { TODAY } from '../constants'
+import { useToday } from '../hooks/useToday'
 import { fmtISO } from '../model/dateUtils'
 import { isSeries } from '../types'
 import { badgeVariants } from './ui/badge'
@@ -81,6 +81,7 @@ interface Props {
 }
 
 export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
+  const today    = useToday()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const bodyRef  = useRef<HTMLDivElement>(null)
 
@@ -96,7 +97,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       priority: t !== 'task' ? null : prev.priority,
       scheduled:
         t === 'note'                         ? null
-        : t === 'event' && !prev.scheduled   ? { date: fmtISO(TODAY), time: '' }
+        : t === 'event' && !prev.scheduled   ? { date: fmtISO(today), time: '' }
         : prev.scheduled,
     }))
   }
