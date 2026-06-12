@@ -8,6 +8,7 @@ import type { Occurrence, Repeat, Scheduled, Priority, StoreItem, EditScope } fr
 import { titleToSlug } from './fileIO'
 import { getItems, getRoots, setData } from './storeBridge'
 import { writeEntityToCache, deleteFileFromDisk } from './vault'
+import { toast } from 'sonner'
 import { TODAY } from './constants'
 import type { EntryState, ItemType } from './components/EntryEditor'
 
@@ -114,15 +115,9 @@ export function toggleOccDone(o: Occurrence): void {
   writeEntityToCache(o.fileSlug)
 }
 
-type ToastConfig = { title: string; onUndo: () => void }
-
-export function beginSwipeDelete(
-  o: Occurrence,
-  showToast: (config: ToastConfig) => void,
-  hideToast: () => void,
-): () => void {
+export function beginSwipeDelete(o: Occurrence): () => void {
   const snapshot = { items: getItems(), roots: getRoots() }
-  const title    = o.metadata.title   // expanded occurrence already carries the file-level title
+  const title    = o.metadata.title
   let cancelled  = false
 
   if (occIsRecur(o)) {
@@ -130,7 +125,6 @@ export function beginSwipeDelete(
     showDeleteToast(title,
       () => { writeEntityToCache(o.fileSlug) },
       () => { cancelled = true; setData(snapshot) },
-      showToast, hideToast,
     )
     return () => { if (!cancelled) setData(next) }
   } else {
@@ -140,7 +134,6 @@ export function beginSwipeDelete(
         cancelled = true
         if (!getItems().find(i => i.id === o.id)) setData(snapshot)
       },
-      showToast, hideToast,
     )
     return () => {
       if (!cancelled) setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, o.fileSlug))
@@ -212,33 +205,32 @@ export function deleteNode(
 
 // ── UNDO TOAST MANAGER ────────────────────────────────────────
 
-let _toastTimer:    ReturnType<typeof setTimeout> | null = null
-let _pendingCommit: (() => void) | null                  = null
+let _toastId:       string | number | null = null
+let _pendingCommit: (() => void) | null    = null
 const TOAST_MS = 4000
 
-function showDeleteToast(
-  title: string,
-  commitFn: () => void,
-  undoFn: () => void,
-  showToast: (config: ToastConfig) => void,
-  hideToast: () => void,
-): void {
-  if (_toastTimer)    { clearTimeout(_toastTimer); _toastTimer = null }
+function showDeleteToast(title: string, commitFn: () => void, undoFn: () => void): void {
   if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
+  if (_toastId !== null) { toast.dismiss(_toastId); _toastId = null }
 
   _pendingCommit = commitFn
-  showToast({
-    title,
-    onUndo: () => {
-      clearTimeout(_toastTimer!); _toastTimer = null
-      _pendingCommit = null
-      undoFn()
-      hideToast()
+  _toastId = toast(`Deleted: ${title}`, {
+    duration: TOAST_MS,
+    action: {
+      label: 'Undo',
+      onClick: () => {
+        _pendingCommit = null
+        _toastId = null
+        undoFn()
+      },
+    },
+    onDismiss: () => {
+      if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
+      _toastId = null
+    },
+    onAutoClose: () => {
+      if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
+      _toastId = null
     },
   })
-  _toastTimer = setTimeout(() => {
-    _toastTimer = null
-    if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-    hideToast()
-  }, TOAST_MS)
 }

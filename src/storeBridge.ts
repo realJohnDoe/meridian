@@ -1,6 +1,7 @@
 import type { StoreItem, Roots } from './types'
 import type { VaultRef } from './storage/backend'
 import { useStore } from './store'
+import { toast } from 'sonner'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
 export const getItems        = (): StoreItem[]    => useStore.getState().items
@@ -9,21 +10,15 @@ export const setData         = (d: { items: StoreItem[]; roots: Roots }) => useS
 export const getVaults       = (): VaultRef[]     => useStore.getState().vaults
 export const getActiveVaultId = (): string | null => useStore.getState().activeVaultId
 
-// ── ERROR NOTIFICATION ─────────────────────────────────────────
+// ── NAVIGATION ─────────────────────────────────────────────────
+/** Navigate back in browser history (replaces popOverlay after router migration). */
+export const navigateBack = () => window.history.back()
+
+// ── NOTIFICATIONS ──────────────────────────────────────────────
 export function notify(msg: string): void {
-  useStore.setState({ errorNotification: msg });
-  setTimeout(() => {
-    if (useStore.getState().errorNotification === msg) {
-      useStore.setState({ errorNotification: null });
-    }
-  }, 5000);
+  toast.error(msg, { duration: 5000 })
 }
 
 export function warn(msg: string): void {
-  useStore.setState({ warningNotification: msg });
-  setTimeout(() => {
-    if (useStore.getState().warningNotification === msg) {
-      useStore.setState({ warningNotification: null });
-    }
-  }, 7000);
+  toast.warning(msg, { duration: 7000 })
 }
