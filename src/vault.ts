@@ -206,7 +206,7 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body)
     const path        = fileSlugToPath(fileSlug)
-    await cacheWrite(_activeBackend.id, path, content, `local:${Date.now()}`)
+    await cacheWrite(_activeBackend.id, path, content)
     updateSyncUI()
     scheduleAutoPush()
   } catch (e) {
@@ -245,8 +245,11 @@ async function pushDirty(backend: StorageBackend, vaultId: string): Promise<bool
       await resolveCollision(backend, vaultId, f.path, f.content)
       hadCollision = true
     } else {
-      await backend.write(f.path, f.content)
-      await cacheMarkClean(vaultId, f.path)
+      const newVersion = await backend.write(f.path, f.content)
+      // Record the backend's new version as the base so the next edit isn't
+      // mistaken for drift. Falls back to marking clean if unknown.
+      if (newVersion !== undefined) await cacheWriteClean(vaultId, f.path, f.content, newVersion)
+      else await cacheMarkClean(vaultId, f.path)
     }
   }
 

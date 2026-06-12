@@ -172,7 +172,7 @@ export class ExampleBackend implements StorageBackend {
     return ENTRIES.map(e => ({ path: e.id + '.md', content: e.content, version: VERSION }))
   }
 
-  async write(_path: string, _content: string): Promise<void> {}
+  async write(_path: string, _content: string): Promise<string | undefined> { return undefined }
   async delete(_path: string): Promise<void> {}
 
   async ensurePermission(_interactive: boolean): Promise<PermissionState> {
