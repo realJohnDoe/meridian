@@ -51,16 +51,10 @@ export default function AgendaView({ onOpen }: Props) {
     return result
   }, [items, roots])
 
-  const setToast = useStore(s => s.setToast)
-
   // Stable references so DaySection's memo comparator isn't short-circuited
   // by new function identities on every AgendaView render.
   const handleToggleDone = useCallback((occ: Occurrence) => toggleOccDone(occ), [])
-  const handleSwipeDelete = useCallback((occ: Occurrence) => beginSwipeDelete(
-    occ,
-    (config) => setToast(config),
-    () => setToast(null),
-  ), [setToast])
+  const handleSwipeDelete = useCallback((occ: Occurrence) => beginSwipeDelete(occ), [])
 
   return (
     <div className="ag-pad">

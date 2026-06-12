@@ -15,7 +15,6 @@ import { TODAY } from '../constants'
 import { entryRoute, newEntryRoute } from './-entryRoute'
 import FilterOverlay from '../components/FilterOverlay'
 import EntryOverlay, { isEditScope } from '../components/EntryOverlay'
-import UndoToast from '../components/UndoToast'
 import ManageVaultsDialog from '../components/AddVaultDialog'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet'
 import { Button } from '../components/ui/button'
@@ -202,7 +201,6 @@ function AppLayout() {
       <ManageVaultsDialog open={addVaultOpen} onOpenChange={setAddVaultOpen} />
 
       <div className="bottom-float">
-        <UndoToast />
         <div className="search-bar-wrap">
           <Search size={15} className="search-bar-icon" />
           <input
