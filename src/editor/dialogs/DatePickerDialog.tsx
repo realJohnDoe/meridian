@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { addDays } from 'date-fns'
-import { fmtISO, parseDateString } from '../model/dateUtils'
-import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from './ui/drawer'
-import { Separator } from './ui/separator'
-import { Calendar } from './ui/calendar'
-import { Button } from './ui/button'
+import { fmtISO, parseDateString } from '@/model/dateUtils'
+import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from '@/components/ui/drawer'
+import { Separator } from '@/components/ui/separator'
+import { Calendar } from '@/components/ui/calendar'
+import { Button } from '@/components/ui/button'
 
 function startOfToday(): Date {
   const d = new Date()

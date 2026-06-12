@@ -6,9 +6,9 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerActions,
-} from './ui/drawer'
-import { Separator } from './ui/separator'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
+} from '@/components/ui/drawer'
+import { Separator } from '@/components/ui/separator'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 const UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const

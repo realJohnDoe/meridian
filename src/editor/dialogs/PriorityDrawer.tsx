@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Flag } from 'lucide-react'
-import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from './ui/drawer'
-import { Separator } from './ui/separator'
-import { badgeVariants } from './ui/badge'
-import { cn } from '../lib/utils'
-import type { Priority } from '../types'
+import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from '@/components/ui/drawer'
+import { Separator } from '@/components/ui/separator'
+import { badgeVariants } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
+import type { Priority } from '@/types'
 
 const PRIORITY_CLASS: Record<string, string> = {
   high:   'aria-[pressed=true]:bg-p1/15 aria-[pressed=true]:border-p1 aria-[pressed=true]:text-p1',

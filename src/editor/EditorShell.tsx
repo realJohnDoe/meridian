@@ -3,8 +3,8 @@
  * Receives the entry to display (may differ from hooks.entry when a title is
  * pre-filled) and the full return value of useEntryEditor.
  */
-import type { useEntryEditor } from '../hooks/useEntryEditor'
-import type { EntryState } from '@/editor/state'
+import type { useEntryEditor } from './useEntryEditor'
+import type { EntryState } from './state'
 import type { StoreItem, Roots } from '../types'
 import EntryEditor from './EntryEditor'
 import DialogStack from './DialogStack'

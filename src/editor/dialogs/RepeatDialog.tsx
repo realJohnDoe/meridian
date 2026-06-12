@@ -1,28 +1,28 @@
 import { useState, useEffect } from 'react'
 import { Info } from 'lucide-react'
-import type { Repeat, Scheduled, Weekday } from '../types'
-import { fmtISO, parseDateString } from '../model/dateUtils'
+import type { Repeat, Scheduled, Weekday } from '@/types'
+import { fmtISO, parseDateString } from '@/model/dateUtils'
 import {
   Drawer,
   DrawerContent,
   DrawerTitle,
   DrawerDescription,
   DrawerActions,
-} from './ui/drawer'
+} from '@/components/ui/drawer'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog'
-import { Separator } from './ui/separator'
-import { Button } from './ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
-import { badgeVariants } from './ui/badge'
-import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
-import { Calendar } from './ui/calendar'
-import { cn } from '../lib/utils'
+} from '@/components/ui/dialog'
+import { Separator } from '@/components/ui/separator'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { badgeVariants } from '@/components/ui/badge'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Calendar } from '@/components/ui/calendar'
+import { cn } from '@/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

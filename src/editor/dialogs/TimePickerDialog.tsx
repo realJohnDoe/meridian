@@ -5,9 +5,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog'
-import { Button } from './ui/button'
-import { ScrollColumn } from './ui/ScrollColumn'
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { ScrollColumn } from '@/components/ui/ScrollColumn'
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 const HOURS:   number[] = Array.from({ length: 24 }, (_, i) => i)      // 0–23

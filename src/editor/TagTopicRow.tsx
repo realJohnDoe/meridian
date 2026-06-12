@@ -1,14 +1,14 @@
 import { useState, useCallback } from 'react'
 import { Plus, Tag } from 'lucide-react'
 import type { Roots, StoreItem } from '../types'
-import type { EntryState } from '@/editor/state'
+import type { EntryState } from './state'
 import { fileEntries, buildTagTopicChips } from '../presentation'
 import { unwrapRef } from '../wikilinks'
-import { Badge } from './ui/badge'
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
-import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from './ui/command'
-import TagChip from './TagChip'
-import KindIcon from './KindIcon'
+import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/components/ui/command'
+import TagChip from '@/components/TagChip'
+import KindIcon from '@/components/KindIcon'
 
 interface Props {
   tags:           string[]

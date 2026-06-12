@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useStore } from '../store'
-import { useEntryEditor } from '../hooks/useEntryEditor'
+import { useEntryEditor } from './useEntryEditor'
 import { expandRange } from '../model/expansion'
 import { fileOccurrenceMap } from '../presentation'
 import EditorShell from './EditorShell'

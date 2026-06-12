@@ -8,9 +8,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from './ui/alert-dialog'
-import { RadioGroup, RadioGroupItem } from './ui/radio-group'
-import type { SeriesSheetConfig } from '@/editor/save'
+} from '@/components/ui/alert-dialog'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import type { SeriesSheetConfig } from '../save'
 
 interface Props {
   config: SeriesSheetConfig | null
