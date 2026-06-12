@@ -18,14 +18,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
-      position="bottom-center"
+      position="top-center"
       richColors
       className="toaster group"
       // assignOffset writes these as inline CSS vars, beating the runtime stylesheet.
-      // bottom: var(--nh)+74px = 14px margin + 52px search bar + 8px gap.
+      // top: var(--th)+8px places toasts just below the top bar.
       // 14px left/right matches the filter overlay horizontal padding.
-      offset={{ bottom: "calc(var(--nh) + 74px)" }}
-      mobileOffset={{ bottom: "calc(var(--nh) + 74px)", left: "14px", right: "14px", top: "16px" }}
+      offset={{ top: "calc(var(--th) + 8px)" }}
+      mobileOffset={{ top: "calc(var(--th) + 8px)", left: "14px", right: "14px" }}
       style={{ "--width": "min(calc(100vw - 28px), 402px)" } as React.CSSProperties}
       icons={{
         success: <CircleCheck className="h-4 w-4" />,
