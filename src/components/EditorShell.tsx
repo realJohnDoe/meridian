@@ -4,11 +4,11 @@
  * pre-filled) and the full return value of useEntryEditor.
  */
 import type { useEntryEditor } from '../hooks/useEntryEditor'
-import type { EntryState } from './EntryEditor'
+import type { EntryState } from '@/editor/state'
 import type { StoreItem, Roots } from '../types'
 import EntryEditor from './EntryEditor'
 import DialogStack from './DialogStack'
-import { toggleOccDone } from '../mutations'
+import { toggleOccDone } from '../occurrenceActions'
 
 type Hooks = ReturnType<typeof useEntryEditor>
 

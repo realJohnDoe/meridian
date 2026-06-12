@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
-import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, StoreItem, Roots, EditScope } from '../types'
+import type { Occurrence, StoreItem, Roots, EditScope } from '../types'
 import { useToday } from '../hooks/useToday'
 import { fmtISO } from '../model/dateUtils'
 import { isSeries } from '../types'
@@ -14,44 +14,11 @@ import TagTopicRow from './TagTopicRow'
 import ParticipantsRow from './ParticipantsRow'
 import EntryBody from './EntryBody'
 import { cn } from '@/lib/utils'
+import type { EntryState, ItemType } from '@/editor/state'
 
-export type { Scheduled }
-
-export type ItemType = 'task' | 'event' | 'note'
-
-export interface EntryState {
-  item: Occurrence | null
-  title: string
-  bodyHtml: string
-  scheduled: Scheduled | null
-  duration: string
-  tracked: boolean
-  itemType: ItemType
-  repeat: RepeatValue | null
-  done: boolean
-  tags: string[]
-  topics: string[]
-  participants: string[]
-  priority: Priority | null
-  editScope: EditScope
-}
-
-export const ENTRY_DEFAULT: EntryState = {
-  item: null,
-  title: '',
-  bodyHtml: '',
-  scheduled: null,
-  duration: '',
-  tracked: true,
-  itemType: 'task',
-  repeat: null,
-  done: false,
-  tags: [],
-  topics: [],
-  participants: [],
-  priority: null,
-  editScope: 'all',
-}
+// Re-exported for backward compatibility — will be removed in PR 2 when files move to editor/
+export type { EntryState, ItemType }
+export { ENTRY_DEFAULT } from '@/editor/state'
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
 const PRIORITY_CLASS: Record<string, string> = {

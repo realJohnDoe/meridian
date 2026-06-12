@@ -1,15 +1,15 @@
-import { fmtISO } from './model/dateUtils'
+import { fmtISO } from '../model/dateUtils'
 import {
-  applyEdit, toggleDone, excludeOccurrence, deleteByFileSlug, deleteFollowing,
+  applyEdit, excludeOccurrence, deleteByFileSlug, deleteFollowing,
   fileSlugItems, findSeries,
-} from './model/storeOps'
-import { isSeries, occIsRecur } from './types'
-import type { Occurrence, Repeat, Scheduled, Priority, StoreItem, EditScope } from './types'
-import { titleToSlug } from './fileIO'
-import { getItems, getRoots, setData } from './storeBridge'
-import { writeEntityToCache, deleteFileFromDisk } from './vault'
-import { toast } from 'sonner'
-import type { EntryState, ItemType } from './components/EntryEditor'
+} from '../model/storeOps'
+import { isSeries } from '../types'
+import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '../types'
+import { titleToSlug } from '../fileIO'
+import { getItems, getRoots, setData } from '../storeBridge'
+import { writeEntityToCache, deleteFileFromDisk } from '../vault'
+import { TODAY } from '../constants'
+import type { EntryState, ItemType } from './state'
 
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
 
@@ -66,7 +66,7 @@ export function entryFromOccurrence(
     tags:         [...(m.tags         || [])],
     topics:       [...(m.topics       || [])],
     participants: [...(m.participants || [])],
-    priority:     (m.priority || null) as Priority | null,
+    priority:     (m.priority || null) as EntryState['priority'],
     editScope,
   }
 }
@@ -100,44 +100,9 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   })
   setData(nextData)
 
-  // Determine which fileSlug to persist. For a brand-new item the slug is derived
-  // from the title — matching applyEdit — so undated tasks/notes are persisted too.
   const fileSlug = item?.fileSlug ?? titleToSlug(title)
   if (fileSlug) writeEntityToCache(fileSlug)
   return 'saved'
-}
-
-export function toggleOccDone(o: Occurrence): void {
-  const next = toggleDone({ items: getItems(), roots: getRoots() }, o)
-  o.metadata.done = !o.metadata.done  // optimistic UI
-  setData(next)
-  writeEntityToCache(o.fileSlug)
-}
-
-export function beginSwipeDelete(o: Occurrence): () => void {
-  const snapshot = { items: getItems(), roots: getRoots() }
-  const title    = o.metadata.title
-  let cancelled  = false
-
-  if (occIsRecur(o)) {
-    const next = excludeOccurrence(snapshot, o)
-    showDeleteToast(title,
-      () => { writeEntityToCache(o.fileSlug) },
-      () => { cancelled = true; setData(snapshot) },
-    )
-    return () => { if (!cancelled) setData(next) }
-  } else {
-    showDeleteToast(title,
-      () => { deleteFileFromDisk(o.fileSlug) },
-      () => {
-        cancelled = true
-        if (!getItems().find(i => i.id === o.id)) setData(snapshot)
-      },
-    )
-    return () => {
-      if (!cancelled) setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, o.fileSlug))
-    }
-  }
 }
 
 export function deleteNode(
@@ -155,7 +120,7 @@ export function deleteNode(
   const hasSiblings = slugItems.some(i => !isSeries(i) && !isSelf(i) && !i.excluded)
   const isRecurring = !!item.ownerId
   const isScheduled = series?.repeat?.type === 'schedule'
-  const title       = item.metadata.title   // expanded occurrence already carries the file-level title
+  const title       = item.metadata.title
 
   function hideSheet() { onHideSeries?.() }
 
@@ -178,7 +143,6 @@ export function deleteNode(
     hideSheet(); navigateBack()
   }
 
-  // Non-recurring, single occurrence.
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
       setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug))
@@ -200,36 +164,4 @@ export function deleteNode(
   }
 
   onShowSeries?.({ title: `Delete "${title}"`, options })
-}
-
-// ── UNDO TOAST MANAGER ────────────────────────────────────────
-
-let _toastId:       string | number | null = null
-let _pendingCommit: (() => void) | null    = null
-const TOAST_MS = 4000
-
-function showDeleteToast(title: string, commitFn: () => void, undoFn: () => void): void {
-  if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-  if (_toastId !== null) { toast.dismiss(_toastId); _toastId = null }
-
-  _pendingCommit = commitFn
-  _toastId = toast(`Deleted: ${title}`, {
-    duration: TOAST_MS,
-    action: {
-      label: 'Undo',
-      onClick: () => {
-        _pendingCommit = null
-        _toastId = null
-        undoFn()
-      },
-    },
-    onDismiss: () => {
-      if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-      _toastId = null
-    },
-    onAutoClose: () => {
-      if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-      _toastId = null
-    },
-  })
 }

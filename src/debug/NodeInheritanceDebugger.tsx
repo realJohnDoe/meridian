@@ -21,10 +21,11 @@ import { loadFile, saveFile } from '../fileIO'
 import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from '../model/expansion'
 import type { OccurrenceMetadata } from '../types'
-import EntryEditor, { type EntryState } from '../components/EntryEditor'
+import EntryEditor from '../components/EntryEditor'
+import type { EntryState } from '@/editor/state'
 import RepeatDialog from '../components/RepeatDialog'
 import DialogStack from '../components/DialogStack'
-import { applyScope, entryFromOccurrence } from '../mutations'
+import { applyScope, entryFromOccurrence } from '@/editor/save'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
 

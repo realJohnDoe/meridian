@@ -1,15 +1,15 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '../store'
-import { applyScope, entryFromOccurrence, saveNode, deleteNode } from '../mutations'
+import { applyScope, entryFromOccurrence, saveNode, deleteNode } from '@/editor/save'
 import { notify } from '../storeBridge'
-import type { SeriesSheetConfig } from '../mutations'
+import type { SeriesSheetConfig } from '@/editor/save'
 import type { Occurrence, EditScope } from '../types'
 import { buildBodyHtml } from '../presentation'
 import { fmtISO } from '../model/dateUtils'
 import { newEntryRoute } from '../routes/-entryRoute'
 import { resolveWikilink } from '../wikilinks'
-import { type EntryState, ENTRY_DEFAULT } from '../components/EntryEditor'
+import { type EntryState, ENTRY_DEFAULT } from '@/editor/state'
 import type { Priority } from '../types'
 
 function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryState {
