@@ -8,7 +8,6 @@ import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '../typ
 import { titleToSlug } from '../fileIO'
 import { getItems, getRoots, setData } from '../storeBridge'
 import { writeEntityToCache, deleteFileFromDisk } from '../vault'
-import { TODAY } from '../constants'
 import type { EntryState, ItemType } from './state'
 
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
