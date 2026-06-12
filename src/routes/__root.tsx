@@ -2,7 +2,7 @@ import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import { useStore } from '../store'
-import { initApp, restoreVaults } from '../vault'
+import { initApp, restoreVaults, autoSyncTick } from '../vault'
 
 export const Route = createRootRoute({
   component: Root,
@@ -17,6 +17,16 @@ function Root() {
   useEffect(() => {
     initApp()
     restoreVaults()
+    const intervalId = setInterval(autoSyncTick, 60_000)
+    const onOnline = () => autoSyncTick()
+    const onVisible = () => { if (document.visibilityState === 'visible') autoSyncTick() }
+    window.addEventListener('online', onOnline)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(intervalId)
+      window.removeEventListener('online', onOnline)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   return (
