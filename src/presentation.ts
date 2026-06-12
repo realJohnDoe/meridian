@@ -6,7 +6,6 @@ import { parseWikilinks, resolveWikilink, unwrapRef } from './wikilinks'
 import { occKind, isSeries, isStandaloneOcc } from './types'
 import { getRoots } from './storeBridge'
 import type { Occurrence, StoreItem, Roots } from './types'
-import { TODAY } from './constants'
 
 export { addDays, isSameDay as sameDay }
 
@@ -95,17 +94,18 @@ export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string,
     return _fomCache.map
   }
 
-  const AHEAD = new Date(TODAY.getTime() + _3YR_MS)
-  const BACK  = new Date(TODAY.getTime() - _3YR_MS)
+  const now   = new Date(); now.setHours(0, 0, 0, 0)
+  const AHEAD = new Date(now.getTime() + _3YR_MS)
+  const BACK  = new Date(now.getTime() - _3YR_MS)
   const map = new Map<string, Occurrence>()
 
   // Step 1: dated occurrences in the ±3yr window.
   // expandRange is date-ordered; first hit per slug = nearest upcoming.
-  for (const occ of expandRange(items, roots, TODAY, AHEAD)) {
+  for (const occ of expandRange(items, roots, now, AHEAD)) {
     if (!map.has(occ.fileSlug)) map.set(occ.fileSlug, occ)
   }
   // Backward pass: most-recent past fallback for files with no future occurrence.
-  const back = expandRange(items, roots, BACK, TODAY)
+  const back = expandRange(items, roots, BACK, now)
   for (let i = back.length - 1; i >= 0; i--) {
     const occ = back[i]
     if (!map.has(occ.fileSlug)) map.set(occ.fileSlug, occ)

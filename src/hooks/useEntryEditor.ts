@@ -7,7 +7,6 @@ import type { SeriesSheetConfig } from '../mutations'
 import type { Occurrence, EditScope } from '../types'
 import { buildBodyHtml } from '../presentation'
 import { fmtISO } from '../model/dateUtils'
-import { TODAY } from '../constants'
 import { newEntryRoute } from '../routes/-entryRoute'
 import { resolveWikilink } from '../wikilinks'
 import { type EntryState, ENTRY_DEFAULT } from '../components/EntryEditor'
@@ -15,7 +14,8 @@ import type { Priority } from '../types'
 
 function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryState {
   if (!item) {
-    return { ...ENTRY_DEFAULT, editScope, scheduled: { date: fmtISO(TODAY), time: '' } }
+    const t = new Date(); t.setHours(0, 0, 0, 0)
+    return { ...ENTRY_DEFAULT, editScope, scheduled: { date: fmtISO(t), time: '' } }
   }
   return entryFromOccurrence(item, editScope, buildBodyHtml)
 }

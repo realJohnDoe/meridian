@@ -11,7 +11,7 @@ import { useStore } from '../store'
 import { syncToDirectory, setActiveVault } from '../vault'
 import { addDays, fmtLong } from '../presentation'
 import { fmtISO, fmtMonth } from '../model/dateUtils'
-import { TODAY } from '../constants'
+import { useToday } from '../hooks/useToday'
 import { entryRoute, newEntryRoute } from './-entryRoute'
 import FilterOverlay from '../components/FilterOverlay'
 import EntryOverlay, { isEditScope } from '../components/EntryOverlay'
@@ -45,6 +45,8 @@ function AppLayout() {
   const pathname = useRouterState({ select: s => s.location.pathname })
   const { editor, edate, escope, etitle } = Route.useSearch()
 
+  const today = useToday()
+
   const syncDirtyCount      = useStore(s => s.syncDirtyCount)
   const syncFlash           = useStore(s => s.syncFlash)
   const syncError           = useStore(s => s.syncError)
@@ -77,9 +79,9 @@ function AppLayout() {
 
   const handleToday = () => {
     if (isDayView) {
-      navigate({ to: '/day/$date', params: { date: fmtISO(TODAY) } })
+      navigate({ to: '/day/$date', params: { date: fmtISO(today) } })
     } else if (pathname.startsWith('/calendar')) {
-      navigate({ to: '/calendar/$month', params: { month: fmtMonth(TODAY) } })
+      navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } })
     } else {
       useStore.setState({ scrollToTodayOnce: true })
       navigate({ to: '/' })
@@ -88,8 +90,8 @@ function AppLayout() {
 
   const navItems = [
     { Icon: AlignLeft,    label: 'Agenda', active: pathname === '/',                   onClick: () => { setSidebarOpen(false); navigate({ to: '/' }) } },
-    { Icon: CalendarDays, label: 'Month',  active: pathname.startsWith('/calendar'),   onClick: () => { setSidebarOpen(false); navigate({ to: '/calendar/$month', params: { month: fmtMonth(TODAY) } }) } },
-    { Icon: CalendarClock, label: 'Day',   active: isDayView,                          onClick: () => { setSidebarOpen(false); navigate({ to: '/day/$date', params: { date: fmtISO(TODAY) } }) } },
+    { Icon: CalendarDays, label: 'Month',  active: pathname.startsWith('/calendar'),   onClick: () => { setSidebarOpen(false); navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } }) } },
+    { Icon: CalendarClock, label: 'Day',   active: isDayView,                          onClick: () => { setSidebarOpen(false); navigate({ to: '/day/$date', params: { date: fmtISO(today) } }) } },
   ]
 
   const openEntry = (occ: Occurrence, scope?: EditScope) => navigate(entryRoute(occ, scope))

@@ -6,7 +6,7 @@ import PriorityDrawer from './PriorityDrawer'
 import TimePickerDialog from './TimePickerDialog'
 import DurationDialog from './DurationDialog'
 import { fmtISO } from '../model/dateUtils'
-import { TODAY } from '../constants'
+import { useToday } from '../hooks/useToday'
 import type { EntryState } from './EntryEditor'
 import type { SeriesSheetConfig } from '../mutations'
 import type { Priority } from '../types'
@@ -36,11 +36,12 @@ export default function DialogStack({
   onTimeConfirm, onTimeRemove, onDurConfirm, onDurRemove,
   onRepeatConfirm, onRepeatRemove, onSeriesClose, onDeleteClose,
 }: Props) {
+  const today = useToday()
   return (
     <>
       <DatePickerDialog
         open={activeDialog === 'dlgSched'}
-        initialDate={entry.scheduled?.date || fmtISO(TODAY)}
+        initialDate={entry.scheduled?.date || fmtISO(today)}
         onConfirm={onDateConfirm}
         onRemove={onDateRemove}
         onClose={onClose}

@@ -7,7 +7,7 @@ import { fmtISO } from '../model/dateUtils'
 import { sameDay, addDays, sortOccs } from '../presentation'
 import { toggleOccDone, beginSwipeDelete } from '../mutations'
 import DaySection from './DaySection'
-import { TODAY } from '../constants'
+import { useToday } from '../hooks/useToday'
 
 
 interface Props {
@@ -15,21 +15,22 @@ interface Props {
 }
 
 export default function AgendaView({ onOpen }: Props) {
+  const today = useToday()
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
 
   // Expand occurrences and group them by day — same window as buildAgenda().
   const groups = useMemo(() => {
-    const from = addDays(TODAY, -7)
-    const to = addDays(TODAY, 90)
+    const from = addDays(today, -7)
+    const to = addDays(today, 90)
     const allOccs = expandWithMultiday(items, roots, from, to)
 
     const result: Record<string, { date: Date; items: Occurrence[] }> = {}
 
     // Always seed today so goToday() can always find a section to scroll to.
-    const todayKey = fmtISO(TODAY)
+    const todayKey = fmtISO(today)
     result[todayKey] = {
-      date: new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()),
+      date: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
       items: [],
     }
 
@@ -60,8 +61,8 @@ export default function AgendaView({ onOpen }: Props) {
     <div className="ag-pad">
       {Object.keys(groups).sort().map(k => {
         const g = groups[k]
-        const isToday = sameDay(g.date, TODAY)
-        const isTomorrow = sameDay(g.date, addDays(TODAY, 1))
+        const isToday = sameDay(g.date, today)
+        const isTomorrow = sameDay(g.date, addDays(today, 1))
 
         return (
           <DaySection
