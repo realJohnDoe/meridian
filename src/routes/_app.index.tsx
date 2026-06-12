@@ -4,7 +4,7 @@ import AgendaView from '../components/AgendaView'
 import { fmtISO } from '../model/dateUtils'
 import { entryRoute } from './-entryRoute'
 import type { EditScope } from '../types'
-import { TODAY } from '../constants'
+import { useToday } from '../hooks/useToday'
 import { useStore } from '../store'
 
 export const Route = createFileRoute('/_app/')({
@@ -15,6 +15,7 @@ export const Route = createFileRoute('/_app/')({
 let savedScrollTop = 0
 
 function AgendaPage() {
+  const today = useToday()
   const navigate = useNavigate()
   const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
   const itemCount = useStore(s => s.items.length)
@@ -33,11 +34,11 @@ function AgendaPage() {
   // itemCount so it retries as data arrives; only consumes the flag once it actually scrolls.
   useEffect(() => {
     if (!scrollToTodayOnce || itemCount === 0) return
-    const sec = document.querySelector(`.day-section[data-key="${fmtISO(TODAY)}"]`)
+    const sec = document.querySelector(`.day-section[data-key="${fmtISO(today)}"]`)
     if (!sec) return
     useStore.setState({ scrollToTodayOnce: false })
     sec.scrollIntoView({ behavior: 'instant', block: 'start' })
-  }, [scrollToTodayOnce, itemCount])
+  }, [scrollToTodayOnce, itemCount, today])
 
   const onOpen = useCallback(
     (occ: Parameters<typeof entryRoute>[0], scope?: EditScope) => navigate(entryRoute(occ, scope)),
