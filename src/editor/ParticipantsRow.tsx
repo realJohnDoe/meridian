@@ -25,7 +25,7 @@ export default function ParticipantsRow({ participants, onChange }: Props) {
   }, [inputVal, onChange])
 
   return (
-    <div className="entry-tags !mb-0">
+    <div className="flex flex-wrap gap-1.5 items-center">
       <Users size={13} className="opacity-40 self-center" />
       {participants.map((p, i) => (
         <Badge
@@ -40,7 +40,7 @@ export default function ParticipantsRow({ participants, onChange }: Props) {
       {showInput ? (
         <input
           ref={inputRef}
-          className="etag-input"
+          className="bg-secondary border border-primary rounded-full px-2.5 py-0.5 text-[11px] text-foreground outline-none w-[90px] placeholder:text-muted-foreground"
           value={inputVal}
           placeholder="name"
           onChange={e => setInputVal(e.target.value)}
