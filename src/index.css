@@ -99,7 +99,7 @@
   --dim:                  oklch(0.69 0.03 250);   /* icons, unselected nav — between secondary and muted */
 
   /* Brand */
-  --primary:            oklch(0.71 0.20 278);   /* indigo */
+  --primary:            oklch(0.68 0.22 278);   /* indigo — balanced for text on dark surfaces and filled button bg */
   --primary-foreground: oklch(1 0 0);
 
   /* Destructive */
@@ -135,9 +135,16 @@
 
   /* ── Derived — not authored per-theme ── */
 
-  /* Darker shades for gradients (search bar, save button) */
+  /* Darker shades for gradients (brand button, search bar) */
   --primary-dark:    oklch(0.63 0.20 278);
   --brand-cyan-dark: oklch(0.68 0.14 208);
+
+  /* Search bar surface — subtle primary tint over accent */
+  --search-bar-bg: color-mix(in oklab, var(--primary), var(--accent) 92%);
+
+  /* Floating search bar glow — rest and focus-within states */
+  --shadow-float:       0 2px 16px rgba(0,0,0,.55), 0 12px 48px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 90%);
+  --shadow-float-focus: 0 2px 16px rgba(0,0,0,.55), 0 14px 52px color-mix(in oklab,var(--primary-dark),transparent 58%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 75%);
 
   /* Standard tint steps: fill ~18% and border/strong ~32% */
   --event-tint:      color-mix(in oklab, var(--event),      transparent 82%);
@@ -177,22 +184,10 @@
 #root{height:100%}
 #app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:var(--background);position:relative}
 
-/* ── SEARCH BAR — brand identity widget (Phase 4: re-express via tokens) ── */
-.search-bar-wrap{flex:none;display:flex;align-items:center;gap:8px;background:var(--accent);border:1px solid color-mix(in oklab,var(--dim),transparent 82%);border-radius:26px;padding:0 6px 0 14px;height:52px;box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 40px color-mix(in oklab,var(--primary-dark),transparent 82%),0 0 0 1px color-mix(in oklab,var(--primary),transparent 94%);pointer-events:all;transition:box-shadow .2s,border-color .2s}
-.search-bar-wrap:focus-within{border-color:color-mix(in oklab,var(--primary),transparent 65%);box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 44px color-mix(in oklab,var(--primary-dark),transparent 70%),0 0 0 1px color-mix(in oklab,var(--primary),transparent 82%)}
-.search-bar-icon{width:15px;height:15px;stroke:var(--muted-foreground);fill:none;stroke-width:2;flex-shrink:0}
-.search-bar-input{flex:1;background:none;border:none;outline:none;color:var(--foreground);font-size:14px;min-width:0}
-.search-bar-input::placeholder{color:var(--muted-foreground)}
-.search-bar-clear{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted-foreground);transition:background .12s,color .12s;flex-shrink:0}
-.search-bar-clear:hover{background:var(--accent);color:var(--foreground)}
-.search-bar-clear svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2}
-.search-bar-add{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary-dark),var(--brand-cyan-dark));display:flex;align-items:center;justify-content:center;color:var(--primary-foreground);flex-shrink:0;transition:transform .15s,box-shadow .15s;box-shadow:0 2px 10px color-mix(in oklab,var(--primary),transparent 60%)}
-.search-bar-add:hover{transform:scale(1.08);box-shadow:0 4px 16px color-mix(in oklab,var(--primary),transparent 40%)}
-.search-bar-add:active{transform:scale(.93)}
-.search-bar-add svg{width:16px;height:16px;stroke:var(--primary-foreground);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
-
-/* ── ENTRY EDITOR — brand CTA (Phase 4: unify with search-bar-add as Button brand variant) ── */
-.save-btn{font-size:13px;font-weight:600;color:var(--primary-foreground);background:linear-gradient(135deg,var(--primary-dark),var(--brand-cyan-dark));padding:6px 16px;border-radius:20px;box-shadow:0 2px 12px color-mix(in oklab,var(--primary),transparent 70%)}
+/* ── SEARCH BAR — brand identity widget ─────────────────────────────────────────────────────── */
+/* .search-bar-wrap kept: :focus-within selector + multi-layer shadow can't be Tailwind utilities */
+.search-bar-wrap{flex:none;display:flex;align-items:center;gap:8px;background:var(--search-bar-bg);border:1px solid color-mix(in oklab,var(--dim),transparent 82%);border-radius:26px;padding:0 6px 0 14px;height:52px;box-shadow:var(--shadow-float);pointer-events:all;transition:box-shadow .2s,border-color .2s}
+.search-bar-wrap:focus-within{border-color:color-mix(in oklab,var(--primary),transparent 65%);box-shadow:var(--shadow-float-focus)}
 
 /* ── DAY VIEW — animated all-day overflow (grid-template-rows transition) ── */
 .dv-adoverflow{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s ease}

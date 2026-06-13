@@ -96,6 +96,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Align dep pre-bundling target with the build target. Without this, Vite's
+  // optimizeDeps uses its own default (es2020/chrome87/…) and fails on packages
+  // like sonner@2+ that use syntax only available in later environments.
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'es2022',
+    },
+  },
   build: {
     // The app uses File System Access API and Web Crypto — both require modern
     // browsers. Targeting es2022 / 2022-era browsers aligns with the actual

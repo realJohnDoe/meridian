@@ -59,6 +59,7 @@ export default function TagTopicRow({ tags, topics, roots, items, onChange, onOp
 
   return (
     <div className="flex flex-wrap gap-1.5 mb-4 items-center">
+      <Tag size={13} className="opacity-40 self-center shrink-0" />
       {chips.map(c => {
         if (c.isTopic) {
           const idx = topics.indexOf(c.raw)
@@ -91,7 +92,7 @@ export default function TagTopicRow({ tags, topics, roots, items, onChange, onOp
             className="cursor-pointer text-primary bg-primary/12 gap-1"
             onClick={() => setPickerOpen(true)}
           >
-            <Plus size={9} /><Tag size={9} />add
+            <Plus size={9} />tag
           </Badge>
         </PopoverTrigger>
         <PopoverContent className="w-64 p-0" align="start">
