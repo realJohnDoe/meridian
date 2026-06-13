@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createFileRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   Menu, FolderSync, CalendarCheck2,
@@ -8,7 +8,9 @@ import {
   HardDrive, BookOpen, GitBranch, Settings2, AlertCircle,
 } from 'lucide-react'
 import { useStore } from '../store'
-import { syncToDirectory, setActiveVault } from '../vault'
+import { syncToBackend } from '../storage/sync'
+import { setActiveVault } from '../storage/vaultRegistry'
+import { on } from '../events'
 import { addDays, fmtLong } from '../presentation'
 import { fmtISO, fmtMonth } from '../model/dateUtils'
 import { useToday } from '../hooks/useToday'
@@ -53,6 +55,11 @@ function AppLayout() {
   const vaults              = useStore(s => s.vaults)
   const activeVaultId       = useStore(s => s.activeVaultId)
   const pendingDirReconnect = useStore(s => s.pendingDirReconnect)
+
+  useEffect(() => on('sync:done', () => {
+    useStore.setState({ syncFlash: true })
+    setTimeout(() => useStore.setState({ syncFlash: false }), 800)
+  }), [])
 
   const activeVault  = vaults.find(v => v.id === activeVaultId)
   const isWritable   = activeVault?.kind === 'local' || activeVault?.kind === 'github'
@@ -119,7 +126,7 @@ function AppLayout() {
           </div>
         )}
         <div className="tb-r">
-          <button className="ib" onClick={syncToDirectory} title={syncTitle} style={{ color: syncColor }}><FolderSync /></button>
+          <button className="ib" onClick={syncToBackend} title={syncTitle} style={{ color: syncColor }}><FolderSync /></button>
           <button className="ib" onClick={handleToday} title="Today"><CalendarCheck2 /></button>
         </div>
       </header>

@@ -7,7 +7,7 @@ import { isSeries } from '../types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '../types'
 import { titleToSlug } from '../fileIO'
 import { getItems, getRoots, setData } from '../storeBridge'
-import { writeEntityToCache, deleteFileFromDisk } from '../vault'
+import { writeEntityToCache, deleteFromBackend as deleteFileFromDisk } from '../storage/sync'
 import type { EntryState, ItemType } from './state'
 
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────

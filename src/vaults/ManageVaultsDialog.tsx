@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button'
 import { cn } from '../lib/utils'
 import { useStore } from '../store'
-import { addLocalVault, addGitHubVault, removeVault } from '../vault'
+import { addLocalVault, addGitHubVault, removeVault } from '../storage/vaultRegistry'
 
 type Step = 'manage' | 'source' | 'github'
 type Source = 'local' | 'github'
