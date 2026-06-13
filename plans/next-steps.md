@@ -10,104 +10,97 @@
 
 ### Custom Prompt with Fable 5
 
-1. The core expansion engine is effectively untyped
-   Category: types architecture
-   Impact: 7
-   Evidence: expansion.ts:122-128 — ExpandNode has [key: string]: unknown with date?: unknown; expandNode returns Record<string, unknown>[] and expandRange re-casts (occ.jsTime as Date, String(occ.date ?? '') at expansion.ts:490-514); 11 as-casts in this file, 15 in storeOps.ts.
-   Problem: The most algorithmically dense domain logic in the app (recurrence, overrides, exclusions) has zero compile-time field checking, so typos in field names or shape drift between StoreItem and the duck-typed engine surface only as wrong calendar output.
-   Fix: Give expandNode a typed input/output (a narrow ExpandNode with concrete date: string, metadata: OccurrenceMetadata) and do the YAML coercion once at the storeItems.ts boundary instead of inside the engine.
-
-2. Two parallel styling systems with a cryptic class vocabulary
+1. Two parallel styling systems with a cryptic class vocabulary
    Category: styling naming
    Impact: 6
    Evidence: index.css:161-345 defines .ib, .tb-l, .ccn, .mnb, .dv-eblk, .nr-t, .ns-sec etc.; \_app.tsx:103-115 mixes className="ib" buttons with fully Tailwind-styled shadcn Buttons in the same header; @apply truncate embedded in plain CSS at index.css:255.
    Problem: Nearly every component pulls styling from both a 380-line legacy stylesheet of two-letter class names and Tailwind utilities, so changing any visual element requires grepping an opaque vocabulary and knowing which system wins.
    Fix: Pick a direction per component (the shadcn/Tailwind one, given the tokens already live in @theme) and migrate the structural classes (.ib, .topbar, .entry-\*) into components incrementally, keeping only genuinely shared keyframes/scrollbar rules in CSS.
 
-3. Every view re-runs full expansion; fileOccurrenceMap expands ±3 years
+2. Every view re-runs full expansion; fileOccurrenceMap expands ±3 years
    Category: performance
    Impact: 5
    Evidence: presentation.ts:104-111 expands a 6-year window on every items/roots change; inside expandRange, generatedDateSet (expansion.ts:487-488) re-runs the entire expandNode a second time per series, and override matching is children.find per occurrence (expansion.ts:496-499) — O(occurrences × children).
    Problem: Each keystroke-level store update triggers agenda (97-day window) plus the 6-year fileOccurrenceMap expansion with redundant double-expansion per series, which will degrade noticeably as vaults grow into hundreds of files.
    Fix: Make expandNode return the generated/explicit flag itself (eliminating the second expansion), index overrides by date in a Map, and shrink the fileOccurrenceMap fallback window or compute it lazily per slug.
 
-4. Editor field shape redefined three times with manual remapping
+3. Editor field shape redefined three times with manual remapping
    Category: dry naming
    Impact: 5
    Evidence: EntryState (EntryEditor.tsx:22-37), EditFields (storeOps.ts:94-106), and SaveFields = EntryState & { body: string } (mutations.ts:76) carry the same 11 fields; mutations.ts:88-100 hand-copies each with ?? [] defaults; the same concept is bodyHtml vs body and tracked vs done !== undefined across layers.
    Problem: Adding one metadata field (e.g. "location") requires synchronized edits to three near-identical interfaces plus the copy block, and the rename across layers makes the mapping easy to get subtly wrong.
    Fix: Define one canonical editor-fields type next to EditFields in the model layer, derive EntryState from it (+ item/bodyHtml/editScope), and replace the field-by-field copy with a typed projection function.
 
-5. Recurrence-interval logic duplicated between dialog and engine
+4. Recurrence-interval logic duplicated between dialog and engine
    Category: dry srp
    Impact: 4
    Evidence: RepeatDialog.tsx:69-80 (parseCompletionInterval/serialiseCompletionInterval) and expansion.ts:34-46 (addInterval) independently regex-parse the same "2 weeks" string format; getMonthlyWeekdaySpec (RepeatDialog.tsx:90-121) re-implements the bysetpos candidate-scan from generateScheduledDates (expansion.ts:207-217); the dialog is 608 lines of mixed rule math and UI.
    Problem: The Repeat/interval grammar has two unsynchronized implementations, so a format the dialog writes but the engine's regex rejects silently produces no occurrences.
    Fix: Extract interval parse/serialize and the monthly-weekday spec into model/duration.ts/model/repeat.ts and have both the dialog and engine consume them, shrinking RepeatDialog to presentation.
 
-6. Persistence is fire-and-forget; UI confirms saves before they happen
+5. Persistence is fire-and-forget; UI confirms saves before they happen
    Category: error-handling
    Impact: 4
    Evidence: mutations.ts:106 — if (fileSlug) writeEntityToCache(fileSlug) (unawaited promise) followed by return 'saved', which triggers router.history.back() in useEntryEditor.ts:54; same pattern at mutations.ts:114 and in the delete callbacks; updateSyncUI swallows errors with .catch(() => {}) (vault.ts:38).
    Problem: The editor closes and reports success before the IndexedDB write resolves, so a failed write (quota, closed DB) only surfaces as a banner after the user has already navigated away believing the edit persisted — and store state then disagrees with the cache.
    Fix: Make saveNode/toggleOccDone async, await writeEntityToCache before returning 'saved', and on failure keep the editor open (or roll back setData).
 
-7. GitHub PAT stored in plaintext IndexedDB
+6. GitHub PAT stored in plaintext IndexedDB
    Category: security
    Impact: 4
    Evidence: cache.ts:127-130 — tokenSave puts the raw token into the unencrypted meta table; loaded into memory at vault.ts:313.
    Problem: Any XSS, malicious extension, or shared-machine access can exfiltrate a write-capable repo token; client-side options are limited, but plaintext-at-rest with no mitigation guidance is the weakest choice.
    Fix: Encrypt the token at rest with a non-extractable WebCrypto key (raises the bar meaningfully), and have AddVaultDialog instruct users to issue a fine-grained PAT scoped to the single vault repo with contents-only permission.
 
-8. Vault registry update ritual duplicated four times
+7. Vault registry update ritual duplicated four times
    Category: dry
    Impact: 3
    Evidence: The literal { id: 'example', name: 'Example data', kind: 'example' } is constructed at vault.ts:271, 377, 422, and 452; the load-refs → save-refs → setState({ vaults: [exampleRef, ...] }) sequence repeats in addLocalVault, addGitHubVault, and removeVault.
    Problem: Four copies of the registry-update protocol means a future change (e.g. ordering, a second built-in vault) must be applied in four places or the sidebar and persisted registry drift.
    Fix: Add a single EXAMPLE_REF constant and an updateVaultRefs(mutate: (refs: VaultRef[]) => VaultRef[]) helper that persists and pushes to the store atomically.
 
-9. Identical dedupe/sort block copy-pasted in the expansion API
+8. Identical dedupe/sort block copy-pasted in the expansion API
    Category: dry
    Impact: 3
    Evidence: expansion.ts:538-547 and expansion.ts:604-613 — the same 10-line seen-set filter + jsTime sort, character for character.
    Problem: Pure duplication in the model's public API; a dedup-key change (e.g. including time) must be made twice.
    Fix: Extract dedupeAndSort(occs: OccurrenceEntry<AppMetadata>[]) and call it from both expandRange and expandWithMultiday.
 
-10. Notification system implemented twice end-to-end
-    Category: dry ux
-    Impact: 3
-    Evidence: notify/warn differ only in field name and timeout (storeBridge.ts:13-29); paired errorNotification/warningNotification state in store.ts:28-36; twin banner JSX blocks in \_\_root.tsx:27-42; twin CSS rules at index.css:348-358.
-    Problem: Four-layer duplication for what is one concept with a severity flag; adding a third level (info/success) would double everything again.
-    Fix: Collapse to one notification: { message, severity } | null store field, one notify(msg, severity) helper, and one <NotificationBanner> styled by severity.
+9. Notification system implemented twice end-to-end
+   Category: dry ux
+   Impact: 3
+   Evidence: notify/warn differ only in field name and timeout (storeBridge.ts:13-29); paired errorNotification/warningNotification state in store.ts:28-36; twin banner JSX blocks in \_\_root.tsx:27-42; twin CSS rules at index.css:348-358.
+   Problem: Four-layer duplication for what is one concept with a severity flag; adding a third level (info/success) would double everything again.
+   Fix: Collapse to one notification: { message, severity } | null store field, one notify(msg, severity) helper, and one <NotificationBanner> styled by severity.
 
-11. Date primitives re-implemented in three modules
+10. Date primitives re-implemented in three modules
     Category: dry
     Impact: 3
     Evidence: dayBefore hand-formats ISO (storeOps.ts:23-27) despite fmtISO/date-fns addDays existing; nodeDateTime/toDate (expansion.ts:28-60) re-implement parseDateString with an inline time regex; startOfToday (RepeatDialog.tsx:63-67) duplicates TODAY's construction.
     Problem: Date string ↔ Date conversion has at least four implementations whose edge-case behavior (invalid input, time suffixes) can diverge silently — in a calendar app this is the riskiest place to be inconsistent.
     Fix: Consolidate all parse/format helpers into model/dateUtils.ts (add parseDateTime(date, time) and dayBefore) and delete the local copies.
 
-12. MonthView filters all month occurrences once per cell
+11. MonthView filters all month occurrences once per cell
     Category: performance
     Impact: 3
     Evidence: MonthView.tsx:29-31 — each of 42 CalCells receives the full occs array and runs occs.filter(...sameDay...); CalCell is not memoized, so all 42 re-filter on any store change.
     Problem: O(cells × occurrences) work per render with no memo boundary; busy months with multiday expansion make month navigation visibly janky on mobile (the app's 430px target).
     Fix: Group occs into a Map<dateKey, Occurrence[]> once inside the existing useMemo and pass each cell only its own (sorted) array, wrapping CalCell in memo.
 
-13. Storage-layer names still describe the local-disk era
+12. Storage-layer names still describe the local-disk era
     Category: naming
     Impact: 2
     Evidence: reconcileWithDisk (vault.ts:130), syncToDirectory (vault.ts:230), and deleteFileFromDisk (vault.ts:215) all operate on the abstract StorageBackend, including GitHub; the file AddVaultDialog.tsx exports ManageVaultsDialog (imported under that name in \_app.tsx:19).
     Problem: Names asserting "disk/directory" over a backend abstraction mislead readers about what the code touches, and the dialog's filename no longer matches its role.
     Fix: Rename to reconcileWithBackend, syncToBackend, deleteFromBackend, and rename the file to ManageVaultsDialog.tsx — a mechanical, IDE-assisted change.
-14. Dead code at module boundaries
+13. Dead code at module boundaries
     Category: dead-code
     Impact: 2
     Evidence: collectUndated (expansion.ts:556) is exported as "Main-app API" but only tests import it; initApp() is an empty function (vault.ts:467-469) still ceremonially called in \_\_root.tsx:18; updateRoot contains the no-op spread ...(existing ? {} : {}) (storeOps.ts:147).
     Problem: Phantom API surface misleads readers about what the app actually uses and what's safe to change.
     Fix: Delete initApp and the no-op spread; either wire collectUndated into search/fileOccurrenceMap or move it into the test helpers.
 
-15. Unbounded module-level caches in the model layer
+14. Unbounded module-level caches in the model layer
     Category: performance architecture
     Impact: 1 — low severity, included because the fix is trivial and the pattern is in the hottest module
     Evidence: occIdCache grows forever per (series, date, time) key with no eviction (expansion.ts:429-434); \_fomCache is a mutable module singleton in presentation.ts:68.
