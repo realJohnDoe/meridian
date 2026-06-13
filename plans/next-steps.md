@@ -1,6 +1,5 @@
 ## Next steps
 
-- Fix inconsistent first day of the week in set date view
 - Turn Example vault into tutorial
 - Fix top bar label
 - Add CodeMirror 6 for markdown editing

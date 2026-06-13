@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { addDays } from 'date-fns'
-import { fmtISO, parseDateString } from '@/model/dateUtils'
+import { fmtISO, parseDateString, WEEK_STARTS_ON } from '@/model/dateUtils'
 import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from '@/components/ui/drawer'
 import { Separator } from '@/components/ui/separator'
 import { Calendar } from '@/components/ui/calendar'
@@ -72,6 +72,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           <Calendar
             mode="single"
             fixedWeeks
+            weekStartsOn={WEEK_STARTS_ON}
             selected={selected}
             onSelect={setSelected}
             month={month}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '@/types'
-import { fmtISO, parseDateString } from '@/model/dateUtils'
+import { fmtISO, parseDateString, WEEK_STARTS_ON } from '@/model/dateUtils'
 import {
   Drawer,
   DrawerContent,
@@ -543,6 +543,7 @@ export default function RepeatDialog({
               <Calendar
                 mode="single"
                 fixedWeeks
+                weekStartsOn={WEEK_STARTS_ON}
                 selected={parseDateString(endVal) ?? undefined}
                 onSelect={(date) => {
                   if (date) {
