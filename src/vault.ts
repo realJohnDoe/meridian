@@ -1,6 +1,6 @@
 import {
   cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
-  cacheMarkClean, cacheWriteClean, cacheDirtyCount, cacheLoadAll, cacheInit, cacheDeleteAll,
+  cacheWriteClean, cacheDirtyCount, cacheLoadAll, cacheInit, cacheDeleteAll,
   handleSave, handleLoad, handleClear,
   tokenSave, tokenLoad, tokenClear,
   vaultRefsSave, vaultRefsLoad,
@@ -8,6 +8,7 @@ import {
 } from './cache'
 import type { CacheRecord } from './cache'
 import { conflictPath } from './storage/conflictName'
+import { ConflictError } from './storage/conflictError'
 import { diskPickDirectory } from './storage/fs'
 import { LocalBackend }   from './storage/localBackend'
 import { ExampleBackend } from './storage/exampleBackend'
@@ -135,18 +136,15 @@ async function reconcileWithDisk(backend: StorageBackend, vaultId: string): Prom
   const cacheMap   = new Map(cached.map(r => [r.path, r]))
 
   const changed: string[] = []
-  const collisions: Array<{ path: string; localContent: string }> = []
   const deleted: string[] = []
 
   for (const [path, diskToken] of diskTokens) {
     const entry = cacheMap.get(path)
-    if (!entry || entry.version !== diskToken) {
-      if (entry?.dirty === 1) {
-        // Both sides changed — preserve local edit as a conflict copy.
-        collisions.push({ path, localContent: entry.content })
-      } else {
-        changed.push(path)
-      }
+    // Skip dirty entries — any genuine divergence will be caught by the CAS
+    // write in pushDirty. Don't over-pull based on an eventually-consistent
+    // listing token that might be stale.
+    if ((!entry || entry.version !== diskToken) && entry?.dirty !== 1) {
+      changed.push(path)
     }
   }
   for (const path of cacheMap.keys()) {
@@ -160,10 +158,6 @@ async function reconcileWithDisk(backend: StorageBackend, vaultId: string): Prom
     for (const f of freshFiles) {
       cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, dirty: 0, updatedAt: Date.now(), version: f.version })
     }
-  }
-
-  for (const { path, localContent } of collisions) {
-    await resolveCollision(backend, vaultId, path, localContent, cacheMap)
   }
 
   await Promise.all(deleted.map(p => cacheDelete(vaultId, p)))
@@ -235,21 +229,22 @@ async function pushDirty(backend: StorageBackend, vaultId: string): Promise<bool
   const dirty = await cacheGetDirty(vaultId)
   if (!dirty.length) return false
 
-  const tokens = await backend.statAll()
   let hadCollision = false
 
   for (const f of dirty) {
-    const cur = tokens.get(f.path)
-    const drifted = cur !== undefined && cur !== f.version
-    if (drifted) {
-      await resolveCollision(backend, vaultId, f.path, f.content)
-      hadCollision = true
-    } else {
-      const newVersion = await backend.write(f.path, f.content)
-      // Record the backend's new version as the base so the next edit isn't
-      // mistaken for drift. Falls back to marking clean if unknown.
-      if (newVersion !== undefined) await cacheWriteClean(vaultId, f.path, f.content, newVersion)
-      else await cacheMarkClean(vaultId, f.path)
+    try {
+      // CAS write: pass the base version as the precondition. The backend
+      // throws ConflictError only when the content genuinely diverged — it
+      // never false-positives due to stale listing tokens.
+      const newVersion = await backend.write(f.path, f.content, f.version)
+      await cacheWriteClean(vaultId, f.path, f.content, newVersion)
+    } catch (e) {
+      if (e instanceof ConflictError) {
+        await resolveCollision(backend, vaultId, f.path, f.content)
+        hadCollision = true
+      } else {
+        throw e
+      }
     }
   }
 

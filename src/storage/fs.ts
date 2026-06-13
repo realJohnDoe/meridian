@@ -95,17 +95,41 @@ export async function diskWrite(
   dh: FileSystemDirectoryHandle,
   path: string,
   content: string,
+  expectedVersion?: string,
 ): Promise<string | undefined> {
   const perm = await dh.queryPermission({ mode: 'readwrite' })
   if (perm !== 'granted') {
     const ask = await dh.requestPermission({ mode: 'readwrite' })
     if (ask !== 'granted') throw new Error('Write permission denied')
   }
+
+  // CAS check: if the caller supplied an expectedVersion, verify the current
+  // file token matches before writing. The local FS is always consistent so
+  // this stat is authoritative (no eventual-consistency lag).
+  if (expectedVersion !== undefined) {
+    try {
+      const fhExisting = await dh.getFileHandle(path)
+      const existing   = await fhExisting.getFile()
+      const cur = `${existing.lastModified}:${existing.size}`
+      if (cur !== expectedVersion) {
+        const { ConflictError } = await import('./conflictError')
+        throw new ConflictError(path)
+      }
+    } catch (e) {
+      // File does not exist yet — mismatch against a supplied expectedVersion.
+      if ((e as { name?: string }).name === 'NotFoundError') {
+        const { ConflictError } = await import('./conflictError')
+        throw new ConflictError(path)
+      }
+      throw e
+    }
+  }
+
   const fh = await dh.getFileHandle(path, { create: true })
-  const w = await fh.createWritable()
+  const w  = await fh.createWritable()
   await w.write(content)
   await w.close()
-  // Re-stat so the caller can record the new version token (matches diskStatAll).
+  // Re-stat so the caller can record the new version token.
   try {
     const file = await fh.getFile()
     return `${file.lastModified}:${file.size}`
