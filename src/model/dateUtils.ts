@@ -1,5 +1,8 @@
 import { format, isValid, parseISO } from 'date-fns'
 
+/** Single source of truth for which day starts the week (1 = Monday). */
+export const WEEK_STARTS_ON = 1 as const
+
 export function fmtISO(d: Date): string {
   return format(d, 'yyyy-MM-dd')
 }
