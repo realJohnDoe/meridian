@@ -120,34 +120,34 @@ export function multidayCoversDate(occ: OccurrenceEntry<AppMetadata>, date: Date
  * under `metadata` and are transparent to the engine — they flow through
  * unchanged to the ExpandedOcc output.
  */
-interface ExpandNode {
+interface ExpandNode<M extends OccurrenceMetadata = OccurrenceMetadata> {
   date:       string
   time:       string | null
   repeat?:    Repeat
   excluded?:  boolean
-  instances?: ExpandNode[]
-  metadata:   OccurrenceMetadata
+  instances?: ExpandNode<M>[]
+  metadata:   M
 }
 
 /** One resolved occurrence emitted by the engine, before file-meta join. */
-interface ExpandedOcc {
+interface ExpandedOcc<M extends OccurrenceMetadata = OccurrenceMetadata> {
   date:      string
   time:      string | null
   jsTime:    Date
   excluded?: boolean
-  metadata:  OccurrenceMetadata
+  metadata:  M
 }
 
 const WDAYS_MAP: Record<string, number> = { su: 0, mo: 1, tu: 2, we: 3, th: 4, fr: 5, sa: 6 }
 
-function mergeNode(parent: ExpandNode, child: ExpandNode): ExpandNode {
+function mergeNode<M extends OccurrenceMetadata>(parent: ExpandNode<M>, child: ExpandNode<M>): ExpandNode<M> {
   return {
     date:      child.date || parent.date,
     time:      child.time ?? parent.time,
     repeat:    child.repeat ?? parent.repeat,
     excluded:  child.excluded ?? parent.excluded,
     instances: parent.instances,
-    metadata:  { ...parent.metadata, ...child.metadata },
+    metadata:  { ...parent.metadata, ...child.metadata } as M,
   }
 }
 
@@ -241,12 +241,12 @@ function generateScheduledDates(
   return results
 }
 
-function expandNode(
-  node: ExpandNode,
+function expandNode<M extends OccurrenceMetadata>(
+  node: ExpandNode<M>,
   from: Date,
   to: Date,
-): ExpandedOcc[] {
-  const occurrences: ExpandedOcc[] = []
+): ExpandedOcc<M>[] {
+  const occurrences: ExpandedOcc<M>[] = []
   const anchor = nodeDateTime(node)
   if (!anchor) return occurrences
 
@@ -276,7 +276,7 @@ function expandNode(
     return null
   }
 
-  function makeOcc(eff: ExpandNode, jsDate: Date, baseNode: ExpandNode, instOverride: { child: ExpandNode } | null): ExpandedOcc | null {
+  function makeOcc(eff: ExpandNode<M>, jsDate: Date, baseNode: ExpandNode<M>, instOverride: { child: ExpandNode<M> } | null): ExpandedOcc<M> | null {
     if (eff.excluded) return null
     const occTimeStr = eff.time ?? baseNode.time ?? node.time
     const occDate = (instOverride?.child.date && instOverride.child.date !== node.date)
@@ -361,7 +361,7 @@ function expandNode(
           date:     spec.date ?? '',
           time:     spec.time ?? node.time,
           jsTime:   entry.jsTime,
-          metadata: { ...node.metadata, done: entry.done, priority: entry.priority },
+          metadata: { ...node.metadata, done: entry.done, priority: entry.priority } as M,
         })
       }
     }
@@ -380,7 +380,7 @@ function expandNode(
           date:     spec.date ?? '',
           time:     spec.time ?? node.time,
           jsTime:   nextJsTime,
-          metadata: { ...node.metadata, done: false },
+          metadata: { ...node.metadata, done: false } as M,
         })
       }
     }
