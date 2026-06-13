@@ -4,7 +4,7 @@ import {
 import { occIsRecur } from './types'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
-import { writeEntityToCache, deleteFileFromDisk } from './vault'
+import { writeEntityToCache, deleteFromBackend as deleteFileFromDisk } from './storage/sync'
 import { toast } from 'sonner'
 
 export function toggleOccDone(o: Occurrence): void {

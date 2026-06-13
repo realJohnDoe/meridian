@@ -1,6 +1,7 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { initApp, restoreVaults, autoSyncTick } from '../vault'
+import { restoreVaults } from '../storage/vaultRegistry'
+import { autoSyncTick } from '../storage/sync'
 import { Toaster } from '../components/ui/sonner'
 
 export const Route = createRootRoute({
@@ -9,7 +10,6 @@ export const Route = createRootRoute({
 
 function Root() {
   useEffect(() => {
-    initApp()
     restoreVaults()
     const intervalId = setInterval(autoSyncTick, 60_000)
     const onOnline = () => autoSyncTick()

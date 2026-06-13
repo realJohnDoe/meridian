@@ -6,6 +6,7 @@ import { entryRoute } from './-entryRoute'
 import type { EditScope } from '../types'
 import { useToday } from '../hooks/useToday'
 import { useStore } from '../store'
+import { on } from '../events'
 
 export const Route = createFileRoute('/_app/')({
   component: AgendaPage,
@@ -20,6 +21,9 @@ function AgendaPage() {
   const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
   const itemCount = useStore(s => s.items.length)
   const scRef = useRef<HTMLDivElement>(null)
+
+  // When a vault activates, scroll to today once data arrives.
+  useEffect(() => on('vault:changed', () => useStore.setState({ scrollToTodayOnce: true })), [])
 
   // Restore saved scroll before paint (no blink); save on unmount.
   useLayoutEffect(() => {
