@@ -85,15 +85,16 @@ live in `expansion.ts` and are only used there.
 
 *Multiday helpers*: `multidayDisplayTitle`, `multidayCoversDate`.
 
-*Internal engine* (domain-typed):
-- `ExpandNode` — typed input with concrete `date: string`, `time: string | null`,
-  `repeat?`, `excluded?`, `instances?`, and `metadata: OccurrenceMetadata`. No
-  index signature — structural fields are separated from domain metadata.
-- `ExpandedOcc` — typed output of `expandNode`: `date`, `time`, `jsTime: Date`,
-  `metadata: OccurrenceMetadata`. No cast hacks needed at the `expandRange` boundary.
-- `mergeNode(parent, child)` — typed merge of two `ExpandNode`s; structural fields
-  take the child's value when set; `metadata` is shallow-merged.
-- `expandNode(node, from, to)` — core recurrence engine; returns `ExpandedOcc[]`.
+*Internal engine*:
+- `ExpandNode<M>` — structural fields the engine actually reads: `date`, `time`,
+  `repeat`, `excluded`, `done`, `instances`. `metadata: M` is unconstrained
+  pass-through — the engine never reads it. `done` and `excluded` are structural
+  because they affect what gets generated; everything else is metadata.
+- `ExpandedOcc<M>` — output of `expandNode`: same structural fields plus `jsTime`.
+  No cast hacks needed at the `expandRange` boundary.
+- `mergeNode<M>(parent, child)` — merges two `ExpandNode<M>`s; structural fields
+  take the child's value when present; `metadata` is shallow-merged.
+- `expandNode<M>(node, from, to)` — core recurrence engine; returns `ExpandedOcc<M>[]`.
 
 *Main-app entry point* (domain-aware):
 - `expandRange(items, roots, from, to)` — takes a `StoreItem[]` and a `Roots`
@@ -159,12 +160,15 @@ as round-trip and edit-operation golden inputs.
 |---|---|
 | Domain field names used in logic | `storeOps.ts`, `storeItems.ts`, `collapse.ts` via `INLINE_FIELDS` registry |
 | Field-agnostic tree / inheritance | `inheritance.ts`, `nodeSchema.ts` |
-| Domain-typed low-level expansion | `expandNode`, `mergeNode` (internal) in `expansion.ts` |
+| Structural-field expansion (generic pass-through metadata) | `expandNode`, `mergeNode` (internal) in `expansion.ts` |
 | Persistence / Dexie cache | `src/meridian.ts` |
 | React state / store mutations | `src/App.tsx`, `src/store.ts` |
 | UI formatting, dialogs, editor state | `src/components/`, `src/debug/` |
 
 The `inheritance.ts` / `nodeSchema.ts` files remain fully field-agnostic.
-`expansion.ts` is field-agnostic at the engine level but domain-aware at the
-`expandRange` entry point.  `collapse.ts` uses the `INLINE_FIELDS` registry
-rather than hard-coding field names.
+`expansion.ts`'s internal engine (`expandNode`, `mergeNode`) knows only the
+structural fields that affect scheduling (`date`, `time`, `repeat`, `excluded`,
+`done`); all other domain fields flow through as opaque `M`. `expandRange` is
+the domain-aware entry point that bridges `StoreItem[]` into the engine and
+assembles typed `OccurrenceEntry<AppMetadata>[]` on the way out.
+`collapse.ts` uses the `INLINE_FIELDS` registry rather than hard-coding field names.
