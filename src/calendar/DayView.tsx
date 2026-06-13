@@ -10,8 +10,8 @@ import KindIcon from '@/components/KindIcon'
 import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
 import { fmtT } from '../model/dateUtils'
 import { parseDurationHours } from '../model/duration'
-import { sameDay, addDays, fmtLong, sortOccs, occDvClass } from '../presentation'
-import { adItemVariants, eventBlockVariants } from './ui/occurrence-variants'
+import { sameDay, addDays, fmtLong, sortOccs, occState } from '../presentation'
+import { dvBlockVariants } from '@/components/ui/occurrence-variants'
 
 import { useToday } from '../hooks/useToday'
 const SH = 7    // start hour on timeline
@@ -56,7 +56,7 @@ function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
   return (
     <SurfaceButton
       className={cn(
-        adItemVariants({ state: occDvClass(o) }),
+        dvBlockVariants({ state: occState(o) }),
         'w-full flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
         'hover:brightness-110',
       )}
@@ -108,7 +108,7 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   return (
     <SurfaceButton
       className={cn(
-        eventBlockVariants({ state: occDvClass(o) }),
+        dvBlockVariants({ state: occState(o), bordered: true }),
         'absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-opacity hover:opacity-[0.85]',
       )}
       style={{ top, height, left, width }}

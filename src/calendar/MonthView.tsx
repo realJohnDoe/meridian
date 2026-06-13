@@ -5,11 +5,11 @@ import { useStore } from '../store'
 import type { Occurrence } from '../types'
 
 import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
-import { sameDay, sortOccs, ccBarClass } from '../presentation'
+import { sameDay, sortOccs, occState } from '../presentation'
 import { useToday } from '../hooks/useToday'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '../lib/utils'
-import { ccBarVariants } from './ui/occurrence-variants'
+import { ccBarVariants } from '@/components/ui/occurrence-variants'
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -56,7 +56,7 @@ function CalCell({ date, other, occs, today, onDayClick }: CalCellProps) {
         {(() => {
           const bars: React.ReactNode[] = []
           dayOccs.slice(0, 4).forEach((o, i) => {
-            bars.push(<div key={i} className={ccBarVariants({ state: ccBarClass(o) })}>{multidayDisplayTitle(o, date) ?? o.metadata.title}</div>)
+            bars.push(<div key={i} className={ccBarVariants({ state: occState(o) })}>{multidayDisplayTitle(o, date) ?? o.metadata.title}</div>)
           })
           if (dayOccs.length > 4) bars.push(
             <div key="more" className="cc-more">+{dayOccs.length - 4}</div>
