@@ -210,7 +210,7 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
               <label className="flex flex-col gap-1">
                 <span className="text-[13px] font-medium">Repository</span>
                 <input
-                  className="search-bar-input w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
                   placeholder="owner/repo"
                   value={repoStr}
                   onChange={e => setRepoStr(e.target.value)}
@@ -222,7 +222,7 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
               <label className="flex flex-col gap-1">
                 <span className="text-[13px] font-medium">Branch</span>
                 <input
-                  className="search-bar-input w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
                   placeholder="main"
                   value={branch}
                   onChange={e => setBranch(e.target.value)}
@@ -235,7 +235,7 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
                 <span className="text-[13px] font-medium">Fine-grained access token</span>
                 <input
                   type="password"
-                  className="search-bar-input w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
+                  className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
                   placeholder="github_pat_…"
                   value={token}
                   onChange={e => setToken(e.target.value)}
