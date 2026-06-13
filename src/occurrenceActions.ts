@@ -9,7 +9,6 @@ import { toast } from 'sonner'
 
 export function toggleOccDone(o: Occurrence): void {
   const next = toggleDone({ items: getItems(), roots: getRoots() }, o)
-  o.metadata.done = !o.metadata.done  // optimistic UI
   setData(next)
   writeEntityToCache(o.fileSlug)
 }
