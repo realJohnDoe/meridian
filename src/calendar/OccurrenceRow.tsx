@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
 import { occState } from '../presentation'
@@ -17,16 +17,12 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   const wrapRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
-  const [isDone, setIsDone] = useState(!!occ.metadata.done)
   // Lock the stagger delay at first mount so reordering never restarts the entry animation.
   const staggerRef = useRef(index)
 
   // Keep a stable ref to the callback so the touch-listener closure never goes stale.
   const onSwipeDeleteRef = useRef(onSwipeDelete)
   useEffect(() => { onSwipeDeleteRef.current = onSwipeDelete }, [onSwipeDelete])
-
-  // Sync optimistic state when the store settles.
-  useEffect(() => { setIsDone(!!occ.metadata.done) }, [occ.metadata.done])
 
   // Swipe-to-delete: touchmove must call preventDefault() to block scroll while
   // the user is swiping horizontally. JSX onTouchMove cannot do that (passive by
@@ -126,10 +122,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
     }
   }, []) // listeners are stable; callback accessed via ref
 
-  // Compute bar class with optimistic done value so the colour changes instantly.
-  const hasTrack = occ.metadata.done !== undefined
-  const effectiveDone = hasTrack ? isDone : (occ.metadata.done as boolean | undefined)
-  const currentBarClass = occState({ ...occ, metadata: { ...occ.metadata, done: effectiveDone } })
+  const currentBarClass = occState(occ)
 
   // Reuse the bar-class result to drive the overlay — occState already has the
   // correct logic (jsTime-based for timed events, day-level for all-day, always
@@ -153,11 +146,11 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       <div className="swipe-row" ref={rowRef}>
         <OccurrenceCard
           occ={occ}
-          isDone={isDone}
+          isDone={!!occ.metadata.done}
           isPast={isPast}
           currentBarClass={currentBarClass}
           onOpen={onOpen}
-          onToggleDone={() => { setIsDone(prev => !prev); onToggleDone() }}
+          onToggleDone={onToggleDone}
           displayTitle={displayTitle}
         />
       </div>
