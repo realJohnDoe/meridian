@@ -119,7 +119,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30">
 
         {/* ── FILE-LEVEL: title ── */}
-        <div className="flex items-start gap-2.5 mb-4">
+        <div className="flex items-start gap-2.5 mb-2">
           {tracked && (
             <Checkbox
               checked={done}
