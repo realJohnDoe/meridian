@@ -115,7 +115,7 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
       onClick={() => onOpen(o)}
       aria-label={ariaLabel}
     >
-      <div className="dv-et">
+      <div className="font-semibold overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-1.5">
         {/* Non-interactive done indicator — replaced Checkbox to avoid nested buttons */}
         {hasTrack && (
           isDone
@@ -124,7 +124,7 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
         )}
         {o.metadata.title}
       </div>
-      <div className="dv-em">
+      <div className="text-2xs font-mono opacity-70 mt-px">
         {timeLabel}{o.metadata.duration ? ` · ${o.metadata.duration}` : ''}
       </div>
     </SurfaceButton>
@@ -189,8 +189,8 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
     <>
       {/* All-day / multiday strip */}
       {allDay.length > 0 && (
-        <div className="dv-allday" id="dvAllDay">
-          <div className="dv-adlbl">All day</div>
+        <div className="px-3 py-1.5 border-b border-input bg-card shrink-0" id="dvAllDay">
+          <div className="text-2xs font-semibold tracking-[.07em] uppercase text-muted-foreground mb-1">All day</div>
 
           {/* Always-visible first N items */}
           {allDay.slice(0, ALL_DAY_THRESHOLD).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
@@ -223,14 +223,15 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
       )}
 
       {/* Scrollable timeline */}
-      <div className="dv-sc" id="dvSc" ref={scRef}>
-        <div className="dv-tl" id="dvTl" ref={tlRef}>
+      <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch] relative" id="dvSc" ref={scRef}>
+        {/* min-h derived from (EH - SH + 1) * HP px timeline height */}
+        <div className="relative pb-16 min-h-[900px]" id="dvTl" ref={tlRef}>
 
           {/* Hour rows */}
           {Array.from({ length: EH - SH + 1 }, (_, i) => SH + i).map(h => (
-            <div key={h} className="dv-hr">
-              <span className="dv-hlbl">{formatHour(h)}</span>
-              <div className="dv-hline" />
+            <div key={h} className="flex items-start h-14 relative">
+              <span className="w-[46px] text-2xs font-mono text-muted-foreground text-right pr-2.5 shrink-0 -mt-1.5">{formatHour(h)}</span>
+              <div className="flex-1 border-t border-border relative" />
             </div>
           ))}
 

@@ -28,8 +28,8 @@ export default function BacklinksPanel({ fileSlug, items, roots, onOpen, onToggl
   if (!occs.length) return null
 
   return (
-    <div className="entry-backlinks">
-      <div className="entry-backlinks-label">Linked from</div>
+    <div className="mt-7 pt-5 border-t border-border">
+      <div className="text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase mb-2.5">Linked from</div>
       <div className="flex flex-col gap-1.5">
         {occs.map(occ => (
           <OccurrenceCard

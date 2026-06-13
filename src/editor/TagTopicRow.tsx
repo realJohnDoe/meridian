@@ -58,7 +58,7 @@ export default function TagTopicRow({ tags, topics, roots, items, onChange, onOp
   }
 
   return (
-    <div className="entry-tags">
+    <div className="flex flex-wrap gap-1.5 mb-4 items-center">
       {chips.map(c => {
         if (c.isTopic) {
           const idx = topics.indexOf(c.raw)

@@ -8,6 +8,7 @@ import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, sortOccs, occState } from '../presentation'
 import { useToday } from '../hooks/useToday'
 import { SurfaceButton } from '@/components/ui/surface-button'
+import { Button } from '@/components/ui/button'
 import { cn } from '../lib/utils'
 import { ccBarVariants } from '@/components/ui/occurrence-variants'
 
@@ -46,20 +47,22 @@ function CalCell({ date, other, occs, today, onDayClick }: CalCellProps) {
         'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] transition-colors overflow-hidden min-h-0 w-full',
         'hover:bg-accent',
         other && 'opacity-25',
-        isToday && 'istoday',
       )}
       onClick={() => onDayClick(date)}
       aria-label={ariaLabel}
     >
-      <span className="ccn">{date.getDate()}</span>
-      <div className="cc-bars">
+      <span className={cn(
+        'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px',
+        isToday && 'bg-primary text-primary-foreground font-bold',
+      )}>{date.getDate()}</span>
+      <div className="flex flex-col gap-px flex-1 overflow-hidden">
         {(() => {
           const bars: React.ReactNode[] = []
           dayOccs.slice(0, 4).forEach((o, i) => {
             bars.push(<div key={i} className={ccBarVariants({ state: occState(o) })}>{multidayDisplayTitle(o, date) ?? o.metadata.title}</div>)
           })
           if (dayOccs.length > 4) bars.push(
-            <div key="more" className="cc-more">+{dayOccs.length - 4}</div>
+            <div key="more" className="text-3xs text-muted-foreground px-0.5">+{dayOccs.length - 4}</div>
           )
           return bars
         })()}
@@ -116,21 +119,23 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   )
 
   return (
-    <div className="cal-wrap" ref={wrapRef}>
-      <div className="cal-hdr">
-        <div className="cal-mt"><em>{MONTHS[m]}</em> {y}</div>
-        <div className="mnav">
-          <button className="mnb" onClick={prevMonth}><ChevronLeft /></button>
-          <button className="mnb" onClick={nextMonth}><ChevronRight /></button>
+    <div className="flex-1 flex flex-col overflow-hidden" ref={wrapRef}>
+      <div className="px-3.5 pt-3 pb-2 flex items-center justify-between shrink-0">
+        <div className="font-[family-name:var(--disp)] text-xl font-light text-foreground">
+          <em className="italic text-primary">{MONTHS[m]}</em> {y}
+        </div>
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon" className="rounded-full text-dim" onClick={prevMonth}><ChevronLeft size={16} /></Button>
+          <Button variant="ghost" size="icon" className="rounded-full text-dim" onClick={nextMonth}><ChevronRight size={16} /></Button>
         </div>
       </div>
 
-      <div className="dow-row">
-        {DAYS.map(d => <div key={d} className="dow-c">{d}</div>)}
+      <div className="grid grid-cols-7 px-1 shrink-0">
+        {DAYS.map(d => <div key={d} className="text-center text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground py-0.75">{d}</div>)}
       </div>
 
-      <div className="cal-grid-wrap">
-        <div className="cal-grid">
+      <div className="flex-1 overflow-hidden px-1 pb-1 flex flex-col">
+        <div className="grid grid-cols-7 gap-0.5 flex-1">
           {cells.map(({ date, other }) => (
             <CalCell
               key={`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`}
