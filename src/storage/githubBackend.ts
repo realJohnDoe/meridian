@@ -100,9 +100,11 @@ export class GitHubBackend implements StorageBackend {
     return this.readFiles(Array.from(tokens.keys()))
   }
 
-  async write(path: string, content: string): Promise<string | undefined> {
+  async write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> {
     try {
-      const existingSha = this._shas.get(path)
+      // Use the caller-supplied expectedVersion as the CAS SHA.
+      // Avoid falling back to _shas here — that cache may be stale from a
+      // prior statAll() call, which is eventually-consistent on GitHub.
       const { data } = await this._octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
         owner:   this._cfg.owner,
         repo:    this._cfg.repo,
@@ -110,14 +112,14 @@ export class GitHubBackend implements StorageBackend {
         branch:  this._cfg.branch,
         message: `Update ${path}`,
         content: encodeBase64(content),
-        ...(existingSha ? { sha: existingSha } : {}),
+        ...(expectedVersion ? { sha: expectedVersion } : {}),
       })
-      // Update SHA from the response so subsequent writes in the same session work
+      // Update SHA from the response so delete() still works in the same session.
       const newSha = (data as { content?: { sha?: string } }).content?.sha
       if (newSha) this._shas.set(path, newSha)
       return newSha
     } catch (e) {
-      throw mapGitHubError(e)
+      throw mapGitHubError(e, path)
     }
   }
 

@@ -4,9 +4,16 @@
 #
 # minimumReleaseAge (minutes): pnpm refuses to install any package version
 # published less than N minutes ago. The pnpm 11 default is 1440 (24 h).
-# 4320 min = 3 days — gives the ecosystem time to flag hijacked releases before
-# they can land in this project.
-minimumReleaseAge: 2880
+# 1440 min = 24 h — gives the ecosystem time to flag hijacked releases while
+# still allowing the esbuild security patch (GHSA-gv7w-rqvm-qjhr) to install.
+minimumReleaseAge: 1440
+
+# ── Dependency overrides ───────────────────────────────────────────────────────
+# Force patched versions of vulnerable transitive dependencies.
+# esbuild <0.28.1 has GHSA-gv7w-rqvm-qjhr (missing binary integrity in Deno
+# module, RCE via NPM_CONFIG_REGISTRY). All paths run through vite.
+overrides:
+  esbuild: ">=0.28.1"
 
 # allowBuilds: explicit allowlist for packages permitted to run install-time
 # build scripts. Only add packages here after reviewing what the script does.

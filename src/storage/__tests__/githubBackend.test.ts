@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { encodeBase64, decodeBase64, mapGitHubError } from '../githubApi'
 import { GitHubBackend } from '../githubBackend'
+import { ConflictError } from '../conflictError'
 
 // ── Base64 helpers ─────────────────────────────────────────────
 
@@ -36,8 +37,8 @@ describe('mapGitHubError', () => {
   it('maps 401 to token message',      () => expect(mapGitHubError(makeErr(401)).message).toMatch(/invalid or expired/i))
   it('maps 403 to access/rate message',() => expect(mapGitHubError(makeErr(403)).message).toMatch(/access denied|rate limit/i))
   it('maps 404 to not-found message',  () => expect(mapGitHubError(makeErr(404)).message).toMatch(/not found|lacks access/i))
-  it('maps 409 to conflict message',   () => expect(mapGitHubError(makeErr(409)).message).toMatch(/changed on github/i))
-  it('maps 422 to conflict message',   () => expect(mapGitHubError(makeErr(422)).message).toMatch(/changed on github/i))
+  it('maps 409 to ConflictError',       () => expect(mapGitHubError(makeErr(409))).toBeInstanceOf(ConflictError))
+  it('maps 422 to ConflictError',       () => expect(mapGitHubError(makeErr(422))).toBeInstanceOf(ConflictError))
   it('passes through unknown errors',  () => {
     const e = new Error('network failure')
     expect(mapGitHubError(e)).toBe(e)
@@ -133,15 +134,50 @@ describe('GitHubBackend', () => {
     expect(decodeBase64(body.content)).toBe('# New note')
   })
 
-  it('write sends sha when updating an existing file', async () => {
-    // First statAll to populate _shas
+  it('write sends expectedVersion as sha (CAS write)', async () => {
+    mockFetch({ content: { sha: 'updatedsha' } })
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await backend.write('note.md', '# Updated', 'existingsha')
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
+    const body = JSON.parse(init.body as string)
+    expect(body.sha).toBe('existingsha')
+    expect(decodeBase64(body.content)).toBe('# Updated')
+  })
+
+  it('write without expectedVersion omits sha (new file)', async () => {
+    mockFetch({ content: { sha: 'newsha' } })
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await backend.write('new.md', '# New')
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
+    const body = JSON.parse(init.body as string)
+    expect(body.sha).toBeUndefined()
+  })
+
+  it('write throws ConflictError on 409', async () => {
+    mockFetch({ message: 'Conflict' }, 409)
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await expect(backend.write('note.md', '# Updated', 'stalesha'))
+      .rejects.toBeInstanceOf(ConflictError)
+  })
+
+  it('write throws ConflictError on 422', async () => {
+    mockFetch({ message: 'Unprocessable' }, 422)
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await expect(backend.write('note.md', '# Updated', 'stalesha'))
+      .rejects.toBeInstanceOf(ConflictError)
+  })
+
+  it('write sends sha when updating an existing file (via statAll)', async () => {
+    // Kept for backwards compat: _shas still updated from statAll for delete().
     mockFetch(makeRootDirResponse([{ name: 'note.md', sha: 'existingsha' }]))
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     await backend.statAll()
 
-    // Now write the existing file
     mockFetch({ content: { sha: 'updatedsha' } })
-    await backend.write('note.md', '# Updated')
+    // Now write passing expectedVersion explicitly (old path via _shas is no longer the route)
+    await backend.write('note.md', '# Updated', 'existingsha')
 
     const [, init] = fetchSpy.mock.calls[1] as [string, RequestInit]
     const body = JSON.parse(init.body as string)
