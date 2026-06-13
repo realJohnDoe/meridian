@@ -99,7 +99,7 @@
   --dim:                  oklch(0.69 0.03 250);   /* icons, unselected nav — between secondary and muted */
 
   /* Brand */
-  --primary:            oklch(0.58 0.22 278);   /* indigo — darkened for AA contrast with white */
+  --primary:            oklch(0.68 0.22 278);   /* indigo — balanced for text on dark surfaces and filled button bg */
   --primary-foreground: oklch(1 0 0);
 
   /* Destructive */
