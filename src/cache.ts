@@ -105,10 +105,6 @@ export async function cacheGetDirty(vaultId: string): Promise<CacheRecord[]> {
   return d.files.where('vaultId').equals(vaultId).filter(r => r.dirty === 1).toArray()
 }
 
-export async function cacheMarkClean(vaultId: string, path: string): Promise<void> {
-  const d = await cacheInit()
-  await d.files.update(vp(vaultId, path), { dirty: 0 })
-}
 
 export async function cacheDirtyCount(vaultId: string): Promise<number> {
   if (!db) return 0

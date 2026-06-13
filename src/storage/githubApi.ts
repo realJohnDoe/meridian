@@ -41,13 +41,15 @@ export function decodeBase64(b64: string): string {
 
 // ── Error mapping ──────────────────────────────────────────────
 
-export function mapGitHubError(e: unknown): Error {
+import { ConflictError } from './conflictError'
+
+export function mapGitHubError(e: unknown, path?: string): Error {
   if (e instanceof Error && 'status' in e) {
     const status = (e as { status: number }).status
     if (status === 401) return new Error('GitHub token is invalid or expired.')
     if (status === 403) return new Error('GitHub access denied or rate limit reached.')
     if (status === 404) return new Error('Repository not found or token lacks access.')
-    if (status === 409 || status === 422) return new Error('File changed on GitHub since last sync — reload the vault to continue.')
+    if (status === 409 || status === 422) return new ConflictError(path ?? 'unknown')
   }
   return e instanceof Error ? e : new Error(String(e))
 }

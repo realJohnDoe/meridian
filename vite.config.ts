@@ -97,6 +97,10 @@ export default defineConfig({
     },
   },
   build: {
+    // The app uses File System Access API and Web Crypto — both require modern
+    // browsers. Targeting es2022 / 2022-era browsers aligns with the actual
+    // runtime requirements and is compatible with esbuild ≥0.28.
+    target: ['es2022', 'chrome102', 'firefox102', 'safari16'],
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),

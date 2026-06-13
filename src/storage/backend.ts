@@ -34,8 +34,13 @@ export interface StorageBackend {
   statAll():                               Promise<Map<string, string>>
   readFiles(paths: string[]):              Promise<FileEntry[]>
   readAll():                               Promise<FileEntry[]>
-  /** Writes the file and returns its new version token, if the backend can determine it. */
-  write(path: string, content: string):   Promise<string | undefined>
+  /**
+   * Write `content` to `path`. If `expectedVersion` is provided the write is a
+   * compare-and-swap: it only succeeds if the backend's current version token
+   * matches `expectedVersion`. Throws `ConflictError` when the precondition
+   * fails. Returns the new version token, if the backend can determine it.
+   */
+  write(path: string, content: string, expectedVersion?: string): Promise<string | undefined>
   delete(path: string):                   Promise<void>
   /** Local: query/request FS permission. Example: always returns 'granted'. */
   ensurePermission(interactive: boolean): Promise<PermissionState>
