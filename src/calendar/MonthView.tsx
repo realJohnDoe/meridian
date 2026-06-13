@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef } from 'react'
-import { useHorizontalSwipe } from '../hooks/useHorizontalSwipe'
+import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
@@ -7,7 +7,7 @@ import type { Occurrence } from '../types'
 import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, sortOccs, ccBarClass } from '../presentation'
 import { useToday } from '../hooks/useToday'
-import { SurfaceButton } from './ui/surface-button'
+import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '../lib/utils'
 
 const MONTHS = [

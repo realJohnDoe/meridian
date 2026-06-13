@@ -1,8 +1,8 @@
 import type React from 'react'
-import KindIcon from './KindIcon'
+import KindIcon from '@/components/KindIcon'
 import type { Roots, StoreItem } from '../types'
 import { isSeries } from '../types'
-import { useWikilinkAutocomplete } from '../hooks/useWikilinkAutocomplete'
+import { useWikilinkAutocomplete } from './useWikilinkAutocomplete'
 
 interface Props {
   bodyRef: React.RefObject<HTMLDivElement | null>

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { Occurrence, StoreItem, Roots } from '../types'
 import { backlinksTo, fileOccurrenceMap, sortOccs, occState } from '../presentation'
-import OccurrenceCard from './OccurrenceCard'
+import OccurrenceCard from '@/components/OccurrenceCard'
 
 interface Props {
   fileSlug: string

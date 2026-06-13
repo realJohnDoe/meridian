@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
 import { occState } from '../presentation'
-import OccurrenceCard from './OccurrenceCard'
+import OccurrenceCard from '@/components/OccurrenceCard'
 
 interface Props {
   occ: Occurrence

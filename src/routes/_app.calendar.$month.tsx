@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import MonthView from '../components/MonthView'
+import MonthView from '@/calendar/MonthView'
 import { fmtISO, fmtMonth, parseMonth } from '../model/dateUtils'
 
 export const Route = createFileRoute('/_app/calendar/$month')({

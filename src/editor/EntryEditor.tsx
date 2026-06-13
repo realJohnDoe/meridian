@@ -4,21 +4,17 @@ import type { Occurrence, StoreItem, Roots, EditScope } from '../types'
 import { useToday } from '../hooks/useToday'
 import { fmtISO } from '../model/dateUtils'
 import { isSeries } from '../types'
-import { badgeVariants } from './ui/badge'
-import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
-import { Checkbox } from './ui/checkbox'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
-import { Card, CardContent } from './ui/card'
+import { badgeVariants } from '@/components/ui/badge'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent } from '@/components/ui/card'
 import BacklinksPanel from './BacklinksPanel'
 import TagTopicRow from './TagTopicRow'
 import ParticipantsRow from './ParticipantsRow'
 import EntryBody from './EntryBody'
 import { cn } from '@/lib/utils'
-import type { EntryState, ItemType } from '@/editor/state'
-
-// Re-exported for backward compatibility — will be removed in PR 2 when files move to editor/
-export type { EntryState, ItemType }
-export { ENTRY_DEFAULT } from '@/editor/state'
+import type { EntryState, ItemType } from './state'
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
 const PRIORITY_CLASS: Record<string, string> = {

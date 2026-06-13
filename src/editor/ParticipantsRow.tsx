@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Plus, Users } from 'lucide-react'
-import type { EntryState } from '@/editor/state'
-import { Badge } from './ui/badge'
+import type { EntryState } from './state'
+import { Badge } from '@/components/ui/badge'
 
 interface Props {
   participants: string[]

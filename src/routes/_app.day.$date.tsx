@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import DayView from '../components/DayView'
+import DayView from '@/calendar/DayView'
 import { fmtISO } from '../model/dateUtils'
 import { entryRoute } from './-entryRoute'
 import type { EditScope } from '../types'
