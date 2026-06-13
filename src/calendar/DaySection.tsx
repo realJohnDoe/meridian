@@ -2,6 +2,7 @@ import { memo, useRef, useLayoutEffect } from 'react'
 import type { Occurrence } from '../types'
 import { multidayDisplayTitle } from '../model/expansion'
 import { fmtLong } from '../presentation'
+import { cn } from '../lib/utils'
 import OccurrenceRow from './OccurrenceRow'
 
 
@@ -68,8 +69,13 @@ function DaySection({
   const label = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : fmtLong(date)
 
   return (
-    <div className="day-section" data-key={dateKey} ref={sectionRef}>
-      <div className={`day-lbl${isToday ? ' tl' : ''}`}>{label}</div>
+    <div className="day-section scroll-mt-2" data-key={dateKey} ref={sectionRef}>
+      <div className={cn(
+        'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-muted-foreground',
+        'flex items-center gap-2 sticky top-0 bg-background z-[3]',
+        'after:content-[""] after:flex-1 after:h-px after:bg-border',
+        isToday && 'text-primary',
+      )}>{label}</div>
 
       {/* Occurrence rows */}
       {items.map((o, i) => (

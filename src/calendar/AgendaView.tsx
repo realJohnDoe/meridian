@@ -58,7 +58,7 @@ export default function AgendaView({ onOpen }: Props) {
   const handleSwipeDelete = useCallback((occ: Occurrence) => beginSwipeDelete(occ), [])
 
   return (
-    <div className="ag-pad">
+    <div className="pb-24">
       {Object.keys(groups).sort().map(k => {
         const g = groups[k]
         const isToday = sameDay(g.date, today)

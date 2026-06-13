@@ -5,6 +5,7 @@ import { useToday } from '../hooks/useToday'
 import { fmtISO } from '../model/dateUtils'
 import { isSeries } from '../types'
 import { badgeVariants } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -22,7 +23,6 @@ const PRIORITY_CLASS: Record<string, string> = {
   medium: 'aria-[pressed=true]:bg-p2/15 aria-[pressed=true]:border-p2 aria-[pressed=true]:text-p2',
   low:    'aria-[pressed=true]:bg-p3/15 aria-[pressed=true]:border-p3 aria-[pressed=true]:text-p3',
 }
-// Active-state colour per type — replaces .type-chip-{task|event|note}[data-state=on] CSS rules
 const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
   task:  'data-[state=on]:text-task',
   event: 'data-[state=on]:text-event',
@@ -107,21 +107,19 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
   return (
     <>
-      <div className="entry-top">
-        <button className="ib" onClick={onClose}><ArrowLeft /></button>
-        <span className="entry-fname">{fname}</span>
+      <div className="h-topbar flex items-center gap-2 px-3 border-b border-border shrink-0 bg-background">
+        <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={onClose}><ArrowLeft size={18} /></Button>
+        <span className="flex-1 font-mono text-2xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">{fname}</span>
         {item && (
-          <button className="ib" onClick={onDelete} title="Delete" style={{ color: 'var(--destructive)' }}>
-            <Trash2 />
-          </button>
+          <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete"><Trash2 size={18} /></Button>
         )}
         <button className="save-btn" onClick={() => onSave(bodyRef.current?.innerText?.trim() ?? '')}>Save</button>
       </div>
 
-      <div className="entry-sc"><div className="entry-pad">
+      <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30">
 
         {/* ── FILE-LEVEL: title ── */}
-        <div className="entry-title-row">
+        <div className="flex items-start gap-2.5 mb-4">
           {tracked && (
             <Checkbox
               checked={done}
@@ -131,7 +129,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           )}
           <textarea
             ref={titleRef}
-            className="entry-title-in"
+            className="flex-1 font-[family-name:var(--disp)] text-2xl font-light text-foreground bg-transparent border-none outline-none leading-snug resize-none min-h-9 placeholder:text-muted-foreground"
             placeholder="Title"
             rows={1}
             value={title}
@@ -174,13 +172,18 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
               type="single"
               value={itemType}
               onValueChange={(v) => { if (v) handleTypeChange(v as ItemType) }}
-              className="type-chip-row"
+              className="flex gap-0.75 mb-4 bg-secondary rounded-full p-0.75 border border-input w-fit"
             >
               {(['task', 'event', 'note'] as ItemType[]).map(t => (
                 <ToggleGroupItem
                   key={t}
                   value={t}
-                  className={cn('type-chip', TYPE_CHIP_ACTIVE_CLS[t], 'h-auto min-w-0')}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium text-muted-foreground',
+                    'cursor-pointer transition-all whitespace-nowrap capitalize h-auto min-w-0',
+                    'data-[state=on]:bg-background data-[state=on]:text-secondary-foreground data-[state=on]:[box-shadow:0_1px_4px_rgb(0_0_0/.35)]',
+                    TYPE_CHIP_ACTIVE_CLS[t],
+                  )}
                 >
                   {t === 'task' && <CheckSquare size={13} />}
                   {t === 'event' && <CalendarDays size={13} />}
@@ -190,7 +193,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
               ))}
             </ToggleGroup>
 
-            <div className="prop-chips">
+            <div className="flex gap-1.5 flex-wrap mb-4">
               {showDateChip && (
                 <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}>
                   <Calendar size={13} />Date

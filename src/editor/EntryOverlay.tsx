@@ -39,7 +39,7 @@ function OverlayInner({ editor, edate, escope, etitle }: Props) {
 
 export default function EntryOverlay(props: Props) {
   return (
-    <div className="entry-overlay">
+    <div className="absolute inset-0 z-40 bg-background flex flex-col">
       <OverlayInner key={`${props.editor}-${props.edate ?? ''}`} {...props} />
     </div>
   )

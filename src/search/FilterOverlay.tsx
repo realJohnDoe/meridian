@@ -16,7 +16,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
   if (!query) return null
 
   return (
-    <div id="filterOverlay" className="filter-overlay">
+    <div id="filterOverlay" className="absolute top-[var(--th)] bottom-0 left-0 right-0 bg-background z-[25] overflow-y-auto [-webkit-overflow-scrolling:touch] pb-20">
       {/* "Create" row */}
       <Button
         variant="ghost"

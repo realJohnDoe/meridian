@@ -10,7 +10,7 @@
  *                                 No raw oklch(…) or #hex in component markup.
  * 4. Spacing/radius             → Tailwind scale snapped to nearest step; no arbitrary px.
  * 5. Kept signatures            → documented @layer components block at bottom of this file.
- *    Current kept set: .swipe-*, .now-line/.now-dot, .search-bar-wrap (brand CTA glow).
+ *    Current kept set: .swipe-*, .now-line/.now-dot, .search-bar-wrap (brand CTA glow), .save-btn.
  * 6. @theme + :root tokens below are the design system — extend here, not in components.
  */
 
@@ -64,6 +64,8 @@
   --color-surface-raised: var(--surface-raised);
 
   --height-control: var(--control-h);
+  /* Topbar height token — used for h-topbar, and top-[var(--th)] in positioned children */
+  --height-topbar: var(--th);
 
   /* Sub-xs type scale — only these two lack a Tailwind default equivalent.
      Use text-2xs (10px) for dense labels/timestamps, text-3xs (8px) for calendar mini-bars. */
@@ -175,34 +177,7 @@
 #root{height:100%}
 #app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:var(--background);position:relative}
 
-/* topbar */
-.topbar{height:var(--th);display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--background);z-index:10}
-.tb-l{display:flex;align-items:center;gap:8px;min-width:0}
-.tb-l--day{flex:1;gap:4px;overflow:hidden}
-.vault-name{font-family:var(--disp);font-style:italic;font-size:16px;color:var(--secondary-foreground)}
-.dv-date-title{flex:1;font-family:var(--disp);font-style:italic;font-size:15px;color:var(--foreground);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tb-r{display:flex;align-items:center;gap:2px;flex-shrink:0}
-.ib{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--dim);transition:background .15s,color .15s;flex-shrink:0}
-.ib:hover{background:var(--accent);color:var(--foreground)}
-.ib svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-
-/* views */
-.view{flex:1;overflow:hidden;display:none;flex-direction:column}
-.view.active{display:flex}
-
-/* ── SEARCH BAR COLUMN ── */
-.bottom-float{
-  position:absolute;
-  bottom:calc(var(--nh) + 14px);
-  left:14px;right:14px;
-  display:flex;flex-direction:column;gap:8px;
-  pointer-events:none;
-  z-index:30;
-}
-
-/* ── SIDEBAR → replaced by shadcn Sheet in App.tsx ── */
-
-/* ── SEARCH BAR (replaces FAB) ── */
+/* ── SEARCH BAR — brand identity widget (Phase 4: re-express via tokens) ── */
 .search-bar-wrap{flex:none;display:flex;align-items:center;gap:8px;background:var(--accent);border:1px solid color-mix(in oklab,var(--dim),transparent 82%);border-radius:26px;padding:0 6px 0 14px;height:52px;box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 40px color-mix(in oklab,var(--primary-dark),transparent 82%),0 0 0 1px color-mix(in oklab,var(--primary),transparent 94%);pointer-events:all;transition:box-shadow .2s,border-color .2s}
 .search-bar-wrap:focus-within{border-color:color-mix(in oklab,var(--primary),transparent 65%);box-shadow:0 2px 12px rgba(0,0,0,.5),0 10px 44px color-mix(in oklab,var(--primary-dark),transparent 70%),0 0 0 1px color-mix(in oklab,var(--primary),transparent 82%)}
 .search-bar-icon{width:15px;height:15px;stroke:var(--muted-foreground);fill:none;stroke-width:2;flex-shrink:0}
@@ -216,91 +191,13 @@
 .search-bar-add:active{transform:scale(.93)}
 .search-bar-add svg{width:16px;height:16px;stroke:var(--primary-foreground);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 
-/* ── FILTER OVERLAY ── */
-.filter-overlay{position:absolute;top:var(--th);bottom:0;left:0;right:0;background:var(--background);z-index:25;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px}
-.empty-state{padding:40px 14px;text-align:center;color:var(--muted-foreground);font-size:13px}
+/* ── ENTRY EDITOR — brand CTA (Phase 4: unify with search-bar-add as Button brand variant) ── */
+.save-btn{font-size:13px;font-weight:600;color:var(--primary-foreground);background:linear-gradient(135deg,var(--primary-dark),var(--brand-cyan-dark));padding:6px 16px;border-radius:20px;box-shadow:0 2px 12px color-mix(in oklab,var(--primary),transparent 70%)}
 
-/* ── CREATE ROW → replaced by shadcn Button in FilterOverlay.tsx ── */
-
-/* ── AGENDA ── */
-.ag-sc{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.ag-pad{padding-bottom:100px}
-.day-section{scroll-margin-top:8px}
-.day-lbl{padding:14px 14px 5px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground);display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--background);z-index:3}
-.day-lbl.tl{color:var(--primary)}
-.day-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
-
-.multiday-banner{margin:2px 14px;background:var(--event-tint);border:1px solid var(--event-border);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--event);display:flex;align-items:center;gap:6px;cursor:pointer}
-.multiday-banner svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
-
-/* ── MONTH ── */
-.cal-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.cal-hdr{padding:12px 14px 8px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.cal-mt{font-family:var(--disp);font-size:20px;font-weight:300;color:var(--foreground)}
-.cal-mt em{font-style:italic;color:var(--primary)}
-.mnav{display:flex;align-items:center;gap:2px}
-.mnb{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--dim);transition:background .12s}
-.mnb:hover{background:var(--accent)}
-.mnb svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.dow-row{display:grid;grid-template-columns:repeat(7,1fr);padding:0 4px;flex-shrink:0}
-.dow-c{text-align:center;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);padding:3px 0}
-.cal-grid-wrap{flex:1;overflow:hidden;padding:0 4px 4px;display:flex;flex-direction:column}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;flex:1}
-.istoday .ccn{background:var(--primary);color:var(--primary-foreground);font-weight:700}
-.ccn{font-size:11px;font-weight:500;color:var(--dim);width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;flex-shrink:0;margin-bottom:1px}
-.cc-bars{display:flex;flex-direction:column;gap:1px;flex:1;overflow:hidden}
-
-.cc-more{font-size:8px;color:var(--muted-foreground);padding:0 2px}
-
-/* ── DAY VIEW ── */
-.dv-allday{padding:6px 12px;border-bottom:1px solid var(--input);background:var(--card);flex-shrink:0}
-.dv-adlbl{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted-foreground);margin-bottom:4px}
-
+/* ── DAY VIEW — animated all-day overflow (grid-template-rows transition) ── */
 .dv-adoverflow{display:grid;grid-template-rows:0fr;transition:grid-template-rows .22s ease}
 .dv-adoverflow.open{grid-template-rows:1fr}
 .dv-adoverflow>div{overflow:hidden}
-.dv-sc{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative}
-.dv-tl{position:relative;padding:0 0 60px;min-height:900px}
-.dv-hr{display:flex;align-items:flex-start;height:56px;position:relative}
-.dv-hlbl{width:46px;font-size:10px;font-family:var(--mono);color:var(--muted-foreground);text-align:right;padding-right:10px;flex-shrink:0;margin-top:-6px}
-.dv-hline{flex:1;border-top:1px solid var(--border);position:relative}
-
-.dv-et{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:5px}
-.dv-em{font-size:10px;font-family:var(--mono);opacity:.7;margin-top:1px}
-.now-line{position:absolute;left:46px;right:0;height:2px;background:var(--destructive);z-index:5;border-radius:1px}
-.now-dot{position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--destructive)}
-
-/* ── ENTRY EDITOR ── */
-.entry-top{height:var(--th);display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--background)}
-.entry-fname{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.save-btn{font-size:13px;font-weight:600;color:var(--primary-foreground);background:linear-gradient(135deg,var(--primary-dark),var(--brand-cyan-dark));padding:6px 16px;border-radius:20px;box-shadow:0 2px 12px color-mix(in oklab,var(--primary),transparent 70%)}
-.entry-sc{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.entry-pad{padding:18px 14px 120px}
-.entry-title-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:16px}
-.entry-title-in{flex:1;font-family:var(--disp);font-size:22px;font-weight:300;color:var(--foreground);background:none;border:none;outline:none;line-height:1.3;resize:none;min-height:36px}
-.entry-title-in::placeholder{color:var(--muted-foreground)}
-.prop-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
-.type-chip-row{display:flex;gap:3px;margin-bottom:16px;background:var(--secondary);border-radius:22px;padding:3px;border:1px solid var(--input);width:fit-content}
-.type-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:18px;font-size:12px;font-weight:500;color:var(--muted-foreground);cursor:pointer;transition:all .15s;white-space:nowrap;text-transform:capitalize}
-.type-chip svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
-.type-chip[data-state=on]{background:var(--background);color:var(--secondary-foreground);box-shadow:0 1px 4px rgba(0,0,0,.35)}
-
-.entry-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;align-items:center}
-.etag-input{background:var(--secondary);border:1px solid var(--primary);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--foreground);outline:none;width:90px;font-family:inherit}
-.etag-input::placeholder{color:var(--muted-foreground)}
-.entry-divider{height:1px;background:var(--border);margin:0 -14px 14px}
-.entry-body{min-height:160px;color:var(--secondary-foreground);font-size:14px;line-height:1.85;outline:none;caret-color:var(--primary);white-space:pre-wrap;word-break:break-word;position:relative}
-.entry-body .wl{color:var(--primary);border-bottom:1px solid var(--event-border);cursor:pointer}
-.entry-body .wl-broken{color:var(--destructive);border-bottom:1px solid color-mix(in oklab,var(--destructive),transparent 70%)}
-.entry-backlinks{margin-top:28px;padding-top:20px;border-top:1px solid var(--border)}
-.entry-backlinks-label{font-size:11px;font-weight:600;color:var(--muted-foreground);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px}
-
-/* wikilink popup */
-.wl-popup{background:var(--popover);border:1px solid var(--input);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:45;min-width:210px;max-height:200px;overflow-y:auto;display:none;position:fixed}
-.wl-popup.show{display:block}
-.wl-item{padding:9px 14px;cursor:pointer;font-size:13px;color:var(--secondary-foreground);transition:background .1s;display:flex;align-items:center;gap:8px}
-.wl-item:hover,.wl-item.focused{background:var(--accent)}
-.wl-item svg{width:13px;height:13px;stroke:var(--muted-foreground);fill:none;stroke-width:1.8;flex-shrink:0}
 
 /* ── SONNER TOAST THEMING ──
    Direct property overrides (specificity 030) beat Sonner's base styles (020)
@@ -354,8 +251,13 @@
 .swipe-hint span{font-size:12px;font-weight:700;color:var(--primary-foreground);white-space:nowrap}
 .swipe-hint.ready svg{transform:scale(1.3)}
 .swipe-row{position:relative;z-index:1;background:var(--background);touch-action:pan-y;user-select:none;-webkit-user-select:none}
+
+/* ── CURRENT-TIME LINE — functional indicator, kept ── */
+.now-line{position:absolute;left:46px;right:0;height:2px;background:var(--destructive);z-index:5;border-radius:1px}
+.now-dot{position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--destructive)}
+
+/* ── OCCURRENCE CARD ENTRANCE ANIMATION ── */
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-.entry-overlay{position:absolute;inset:0;z-index:40;background:var(--background);display:flex;flex-direction:column}
 
 /* Hide number input spinners globally for a cleaner, premium design */
 input[type="number"]::-webkit-inner-spin-button,

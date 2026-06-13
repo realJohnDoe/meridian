@@ -111,27 +111,27 @@ function AppLayout() {
 
   return (
     <>
-      <header className="topbar" id="mainTop">
+      <header className="h-topbar flex items-center justify-between px-3.5 border-b border-border shrink-0 bg-background z-10" id="mainTop">
         {isDayView && dvDate ? (
-          <div className="tb-l tb-l--day">
-            <button className="ib" onClick={() => setSidebarOpen(true)} title="Menu"><Menu /></button>
-            <span className="dv-date-title">{fmtLong(dvDate)}</span>
-            <button className="ib" aria-label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) } })}><ChevronLeft /></button>
-            <button className="ib" aria-label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) } })}><ChevronRight /></button>
+          <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
+            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={() => setSidebarOpen(true)} title="Menu"><Menu size={18} /></Button>
+            <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{fmtLong(dvDate)}</span>
+            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) } })}><ChevronLeft size={18} /></Button>
+            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) } })}><ChevronRight size={18} /></Button>
           </div>
         ) : (
-          <div className="tb-l" id="tbDefault">
-            <button className="ib" onClick={() => setSidebarOpen(true)} title="Menu"><Menu /></button>
-            <span className="vault-name">{vaultName}</span>
+          <div className="flex items-center gap-2 min-w-0" id="tbDefault">
+            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={() => setSidebarOpen(true)} title="Menu"><Menu size={18} /></Button>
+            <span className="font-[family-name:var(--disp)] italic text-base text-secondary-foreground">{vaultName}</span>
           </div>
         )}
-        <div className="tb-r">
-          <button className="ib" onClick={syncToBackend} title={syncTitle} style={{ color: syncColor }}><FolderSync /></button>
-          <button className="ib" onClick={handleToday} title="Today"><CalendarCheck2 /></button>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={syncToBackend} title={syncTitle} style={{ color: syncColor }}><FolderSync size={18} /></Button>
+          <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={handleToday} title="Today"><CalendarCheck2 size={18} /></Button>
         </div>
       </header>
 
-      <section className="view active">
+      <section className="flex flex-1 flex-col overflow-hidden">
         <Outlet />
       </section>
 
@@ -209,7 +209,7 @@ function AppLayout() {
 
       <ManageVaultsDialog open={addVaultOpen} onOpenChange={setAddVaultOpen} />
 
-      <div className="bottom-float">
+      <div className="absolute left-3.5 right-3.5 flex flex-col gap-2 pointer-events-none z-30" style={{ bottom: 'calc(var(--nh) + 0.875rem)' }}>
         <div className="search-bar-wrap">
           <Search size={15} className="search-bar-icon" />
           <input

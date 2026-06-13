@@ -50,7 +50,7 @@ function AgendaPage() {
   )
 
   return (
-    <div className="ag-sc" id="agSc" ref={scRef}>
+    <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" id="agSc" ref={scRef}>
       <AgendaView onOpen={onOpen} />
     </div>
   )
