@@ -6,6 +6,7 @@ import { parseWikilinks, resolveWikilink, unwrapRef } from './wikilinks'
 import { occKind, isSeries, isStandaloneOcc } from './types'
 import { getRoots } from './storeBridge'
 import type { Occurrence, StoreItem, Roots } from './types'
+import type { OccState } from './components/ui/occurrence-variants'
 
 export { addDays, isSameDay as sameDay }
 
@@ -190,7 +191,7 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
 
 // ── OCCURRENCE STATE → CSS ─────────────────────────────────────
 
-export function occState(o: Occurrence): string {
+export function occState(o: Occurrence): OccState {
   if (o.metadata.done) return 'done'
   const kind = occKind(o)
   if (kind === 'note') return 'note'
@@ -223,43 +224,6 @@ export function occState(o: Occurrence): string {
     return 'event-past'
   }
   return 'event-future'
-}
-
-// ── State → class maps ─────────────────────────────────────────
-// Each view that needs colour classes derived from occState should
-// add a map here rather than fork the state logic elsewhere.
-
-/** Agenda / MonthView colour-bar classes. */
-const _ccBarMap: Record<string, string> = {
-  'done':         'done',
-  'event-past':   'done',
-  'note':         'note',
-  'task-open':    'task',
-  'task-p1':      'task-p1',
-  'task-p2':      'task-p2',
-  'task-p3':      'task-p3',
-  'event-future': 'event',
-}
-
-export function ccBarClass(o: Occurrence): string {
-  if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) return 'multiday'
-  return _ccBarMap[occState(o)] ?? 'event'
-}
-
-/** DayView event-block classes (applied as `dv-eblk <class>` / `dv-aditem <class>`).
- *  Notes are undated and never reach expandRange, so 'note' is not listed here. */
-const _dvBlkMap: Record<string, string> = {
-  'done':         'past',
-  'event-past':   'past',
-  'task-open':    'task',
-  'task-p1':      'task-p1',
-  'task-p2':      'task-p2',
-  'task-p3':      'task-p3',
-  'event-future': 'event',
-}
-
-export function occDvClass(o: Occurrence): string {
-  return _dvBlkMap[occState(o)] ?? 'event'
 }
 
 // ── WIKILINK → HTML ────────────────────────────────────────────

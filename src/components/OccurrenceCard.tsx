@@ -9,13 +9,15 @@ import { Card } from './ui/card'
 import { SurfaceButton } from './ui/surface-button'
 import TagChip from './TagChip'
 import { useStore } from '../store'
+import { cn } from '../lib/utils'
+import { occBarVariants, type OccState } from './ui/occurrence-variants'
 
 export interface OccurrenceCardProps {
   occ: Occurrence
   variant?: 'agenda' | 'compact'
   isDone: boolean
   isPast?: boolean
-  currentBarClass: string
+  currentBarClass: OccState
   onOpen: () => void
   onToggleDone: () => void
   showTypeIcon?: boolean
@@ -97,7 +99,7 @@ export default function OccurrenceCard({
         />
 
         {/* Priority bar */}
-        <span className={`occ-bar ${currentBarClass} relative z-20`} />
+        <span className={cn(occBarVariants({ state: currentBarClass }), 'relative z-20')} />
 
         {/* Content - pointer-events-none passes clicks to the button behind */}
         <div className="relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-[2px] pointer-events-none">
@@ -148,7 +150,7 @@ export default function OccurrenceCard({
       />
 
       <div className="relative z-20 flex items-start gap-2 pl-2.5 pr-3 py-2.5 pointer-events-none">
-        <span className={`occ-bar ${currentBarClass}`} />
+        <span className={occBarVariants({ state: currentBarClass })} />
 
         <div className="flex flex-col flex-1 min-w-0 gap-1">
           <div className="flex items-center gap-[6px]">
