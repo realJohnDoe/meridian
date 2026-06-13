@@ -15,7 +15,7 @@ import {
   isValid,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
-import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots, Priority } from '../types'
+import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots } from '../types'
 import { isSeries, isStandaloneOcc } from '../types'
 import type { EffectiveNode } from './inheritance'
 import { fmtISO, fmtT, parseDateString } from './dateUtils'
@@ -334,7 +334,7 @@ function expandNode<M extends OccurrenceMetadata>(
       }
     }
   } else if (repeat.type === 'after_completion') {
-    const allTimes: Array<{ jsTime: Date; done: boolean | undefined; priority: Priority | undefined }> = []
+    const allTimes: Array<{ jsTime: Date; metadata: M }> = []
     const anchorInst = (node.instances ?? []).find(i => {
       const t = nodeDateTime(i) || parseDateString(i.date)
       return t && Math.abs(t.getTime() - anchor.getTime()) < 60000
@@ -342,15 +342,14 @@ function expandNode<M extends OccurrenceMetadata>(
     if (!anchorInst?.excluded) {
       allTimes.push({
         jsTime:   anchor,
-        done:     anchorInst !== undefined ? anchorInst.metadata.done : node.metadata.done,
-        priority: anchorInst?.metadata.priority ?? node.metadata.priority,
+        metadata: anchorInst ? { ...node.metadata, ...anchorInst.metadata } as M : node.metadata,
       })
     }
     for (const inst of node.instances ?? []) {
       const t = nodeDateTime(inst) || parseDateString(inst.date)
       if (!t || inst.excluded) continue
       if (Math.abs(t.getTime() - anchor.getTime()) < 60000) continue
-      allTimes.push({ jsTime: t, done: inst.metadata.done, priority: inst.metadata.priority ?? node.metadata.priority })
+      allTimes.push({ jsTime: t, metadata: { ...node.metadata, ...inst.metadata } as M })
     }
     allTimes.sort((a, b) => a.jsTime.getTime() - b.jsTime.getTime())
 
@@ -361,11 +360,11 @@ function expandNode<M extends OccurrenceMetadata>(
           date:     spec.date ?? '',
           time:     spec.time ?? node.time,
           jsTime:   entry.jsTime,
-          metadata: { ...node.metadata, done: entry.done, priority: entry.priority } as M,
+          metadata: entry.metadata,
         })
       }
     }
-    const lastDone = [...allTimes].reverse().find(e => e.done === true)
+    const lastDone = [...allTimes].reverse().find(e => e.metadata.done === true)
     if (lastDone) {
       const nextJsTime = addInterval(lastDone.jsTime, String(repeat.interval || '1 day'))
       const alreadyExists = allTimes.some(e => Math.abs(e.jsTime.getTime() - nextJsTime.getTime()) < 60000)
