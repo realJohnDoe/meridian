@@ -15,7 +15,7 @@ import {
   isValid,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
-import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots } from '../types'
+import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots, Priority } from '../types'
 import { isSeries, isStandaloneOcc } from '../types'
 import type { EffectiveNode } from './inheritance'
 import { fmtISO, fmtT, parseDateString } from './dateUtils'
@@ -45,15 +45,15 @@ function addInterval(date: Date, intervalStr: string): Date {
   return date
 }
 
-function nodeDateTime(node: Record<string, unknown>): Date | null {
+function nodeDateTime(node: { date: string; time: string | null }): Date | null {
   const dateStr = node.date
   const timeStr = node.time
   if (!dateStr) return null
-  const dm = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  const dm = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!dm) return null
   const [, y, mo, d] = dm.map(Number)
   if (timeStr) {
-    const tm = String(timeStr).match(/^(\d{1,2}):(\d{2})/)
+    const tm = timeStr.match(/^(\d{1,2}):(\d{2})/)
     if (tm) return new Date(y, mo - 1, d, +tm[1], +tm[2], 0, 0)
   }
   return new Date(y, mo - 1, d, 0, 0, 0, 0)
@@ -106,50 +106,54 @@ export function multidayCoversDate(occ: OccurrenceEntry<AppMetadata>, date: Date
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Open, duck-typed node consumed by the field-agnostic expansion engine.
- * The same shape covers series nodes, explicit occurrences, series instances,
- * and override children.
+ * Typed engine input — structural fields are concrete; domain metadata is
+ * nested under `metadata` rather than spread flat. This separation is what
+ * allows the index signature to be removed.
  *
- * Declared fields are the engine's load-bearing structural inputs:
- *   - `date` / `time` — the anchor read by nodeDateTime; drive all expansion.
- *     Typed `unknown` because raw YAML values may not be clean strings — the
- *     engine deliberately coerces them (String(...) / regex).
- *   - `repeat`     — discriminated-union narrowing.
- *   - `instances`  — the recursive child array.
- * Everything else — `id`, `excluded`, `timezone`, and all domain metadata —
- * flows through the index signature. Sibling of nodeSchema.ts's RawNode.
+ * Structural fields drive all expansion logic:
+ *   - `date` / `time` — anchor read by nodeDateTime.
+ *   - `repeat`        — discriminated-union narrowing.
+ *   - `excluded`      — suppresses an occurrence.
+ *   - `instances`     — recursive child array.
+ *
+ * All domain fields (done, priority, duration, participants, timezone) live
+ * under `metadata` and are transparent to the engine — they flow through
+ * unchanged to the ExpandedOcc output.
  */
 interface ExpandNode {
-  date?:      unknown
-  time?:      unknown
+  date:       string
+  time:       string | null
   repeat?:    Repeat
+  excluded?:  boolean
   instances?: ExpandNode[]
-  [key: string]: unknown
+  metadata:   OccurrenceMetadata
+}
+
+/** One resolved occurrence emitted by the engine, before file-meta join. */
+interface ExpandedOcc {
+  date:      string
+  time:      string | null
+  jsTime:    Date
+  excluded?: boolean
+  metadata:  OccurrenceMetadata
 }
 
 const WDAYS_MAP: Record<string, number> = { su: 0, mo: 1, tu: 2, we: 3, th: 4, fr: 5, sa: 6 }
 
-function mergeNode(
-  parent: Record<string, unknown>,
-  child: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...parent }
-  for (const [k, v] of Object.entries(child)) {
-    if (k === 'instances') continue
-    if (v && typeof v === 'object' && !Array.isArray(v) && (v as { type?: unknown }).type !== undefined) {
-      merged[k] = v
-    } else if (v && typeof v === 'object' && !Array.isArray(v)) {
-      merged[k] = mergeNode((merged[k] || {}) as Record<string, unknown>, v as Record<string, unknown>)
-    } else {
-      merged[k] = v
-    }
+function mergeNode(parent: ExpandNode, child: ExpandNode): ExpandNode {
+  return {
+    date:      child.date || parent.date,
+    time:      child.time ?? parent.time,
+    repeat:    child.repeat ?? parent.repeat,
+    excluded:  child.excluded ?? parent.excluded,
+    instances: parent.instances,
+    metadata:  { ...parent.metadata, ...child.metadata },
   }
-  return merged
 }
 
 function generateScheduledDates(
   anchor: Date,
-  anchorTimeStr: unknown,
+  anchorTimeStr: string | null,
   sched: Extract<Repeat, { type: 'schedule' }>,
   from: Date,
   to: Date,
@@ -163,7 +167,7 @@ function generateScheduledDates(
   function withTime(d: Date): Date {
     const r = new Date(d)
     if (anchorTimeStr) {
-      const tm = String(anchorTimeStr).match(/^(\d{1,2}):(\d{2})/)
+      const tm = anchorTimeStr.match(/^(\d{1,2}):(\d{2})/)
       if (tm) r.setHours(+tm[1], +tm[2], 0, 0)
     } else {
       r.setHours(0, 0, 0, 0)
@@ -241,8 +245,8 @@ function expandNode(
   node: ExpandNode,
   from: Date,
   to: Date,
-): Record<string, unknown>[] {
-  const occurrences: Record<string, unknown>[] = []
+): ExpandedOcc[] {
+  const occurrences: ExpandedOcc[] = []
   const anchor = nodeDateTime(node)
   if (!anchor) return occurrences
 
@@ -272,13 +276,13 @@ function expandNode(
     return null
   }
 
-  function makeOcc(eff: Record<string, unknown>, jsDate: Date, baseNode: ExpandNode, instOverride: { child: ExpandNode } | null) {
+  function makeOcc(eff: ExpandNode, jsDate: Date, baseNode: ExpandNode, instOverride: { child: ExpandNode } | null): ExpandedOcc | null {
     if (eff.excluded) return null
-    const occTimeStr = (eff.time || baseNode.time || node.time) as string | null ?? null
-    const occDate = (instOverride && instOverride.child.date && instOverride.child.date !== node.date)
+    const occTimeStr = eff.time ?? baseNode.time ?? node.time
+    const occDate = (instOverride?.child.date && instOverride.child.date !== node.date)
       ? instOverride.child.date
-      : jsDateToSpec(jsDate).date
-    return { ...eff, date: occDate, time: occTimeStr, jsTime: jsDate, recur: true }
+      : (jsDateToSpec(jsDate).date ?? '')
+    return { date: occDate, time: occTimeStr, jsTime: jsDate, metadata: eff.metadata }
   }
 
   if (node.repeat?.type !== 'after_completion') {
@@ -320,31 +324,45 @@ function expandNode(
       if (!isGenerated && t >= from && t <= to) {
         const eff = mergeNode(node, inst)
         if (!eff.excluded) {
-          occurrences.push({ ...eff, date: inst.date || jsDateToSpec(t).date, jsTime: t, recur: true })
+          occurrences.push({
+            date: inst.date || (jsDateToSpec(t).date ?? ''),
+            time: eff.time,
+            jsTime: t,
+            metadata: eff.metadata,
+          })
         }
       }
     }
   } else if (repeat.type === 'after_completion') {
-    const allTimes: Array<{ jsTime: Date; done: unknown; priority: unknown }> = []
+    const allTimes: Array<{ jsTime: Date; done: boolean | undefined; priority: Priority | undefined }> = []
     const anchorInst = (node.instances ?? []).find(i => {
       const t = nodeDateTime(i) || parseDateString(i.date)
       return t && Math.abs(t.getTime() - anchor.getTime()) < 60000
     })
     if (!anchorInst?.excluded) {
-      allTimes.push({ jsTime: anchor, done: anchorInst !== undefined ? anchorInst.done : node.done, priority: anchorInst?.priority || node.priority })
+      allTimes.push({
+        jsTime:   anchor,
+        done:     anchorInst !== undefined ? anchorInst.metadata.done : node.metadata.done,
+        priority: anchorInst?.metadata.priority ?? node.metadata.priority,
+      })
     }
     for (const inst of node.instances ?? []) {
       const t = nodeDateTime(inst) || parseDateString(inst.date)
       if (!t || inst.excluded) continue
       if (Math.abs(t.getTime() - anchor.getTime()) < 60000) continue
-      allTimes.push({ jsTime: t, done: inst.done, priority: inst.priority || node.priority })
+      allTimes.push({ jsTime: t, done: inst.metadata.done, priority: inst.metadata.priority ?? node.metadata.priority })
     }
     allTimes.sort((a, b) => a.jsTime.getTime() - b.jsTime.getTime())
 
     for (const entry of allTimes) {
       if (entry.jsTime >= from && entry.jsTime <= to) {
         const spec = jsDateToSpec(entry.jsTime)
-        occurrences.push({ ...node, date: spec.date, time: spec.time || node.time || null, jsTime: entry.jsTime, done: entry.done, priority: entry.priority, recur: true })
+        occurrences.push({
+          date:     spec.date ?? '',
+          time:     spec.time ?? node.time,
+          jsTime:   entry.jsTime,
+          metadata: { ...node.metadata, done: entry.done, priority: entry.priority },
+        })
       }
     }
     const lastDone = [...allTimes].reverse().find(e => e.done === true)
@@ -358,7 +376,12 @@ function expandNode(
       })
       if (!alreadyExists && !isExcluded && nextJsTime >= from && nextJsTime <= to) {
         const spec = jsDateToSpec(nextJsTime)
-        occurrences.push({ ...node, date: spec.date, time: spec.time || node.time || null, jsTime: nextJsTime, done: false, recur: true })
+        occurrences.push({
+          date:     spec.date ?? '',
+          time:     spec.time ?? node.time,
+          jsTime:   nextJsTime,
+          metadata: { ...node.metadata, done: false },
+        })
       }
     }
   }
@@ -366,7 +389,7 @@ function expandNode(
   for (const child of node.instances ?? []) {
     if (child.repeat) {
       const effChild = mergeNode(node, child)
-      occurrences.push(...expandNode({ ...effChild, instances: [] } as ExpandNode, from, to))
+      occurrences.push(...expandNode({ ...effChild, instances: [] }, from, to))
     }
   }
 
@@ -472,15 +495,15 @@ export function expandRange(
     ) as StoreOcc[]
 
     const expandable: ExpandNode = {
-      ...series.metadata,
       date:     series.date,
       time:     series.time,
       repeat:   series.repeat,
+      metadata: series.metadata,
       instances: children.map(c => ({
         date:     c.date,
-        time:     c.time ?? undefined,
+        time:     c.time ?? null,
         excluded: c.excluded,
-        ...c.metadata,
+        metadata: c.metadata,
       })),
     }
 
@@ -488,9 +511,8 @@ export function expandRange(
     const raw = expandNode(expandable, from, to)
 
     for (const occ of raw) {
-      const jsTime = occ.jsTime as Date | undefined
-      if (!jsTime) continue
-      const isGenerated = genDates.has(String(occ.date ?? ''))
+      const { jsTime } = occ
+      const isGenerated = genDates.has(occ.date)
 
       // Find an explicit override whose date matches this occurrence
       const override = children.find(c => {
@@ -502,13 +524,13 @@ export function expandRange(
         ? { ...series.metadata, ...override.metadata }
         : series.metadata
       result.push({
-        date:    String(occ.date ?? ''),
-        time:    occ.time ? String(occ.time) : null,
+        date:    occ.date,
+        time:    occ.time,
         source:  isGenerated ? 'generated' : 'explicit',
         fileSlug: series.fileSlug,
         id:      override
           ? override.id
-          : stableOccId(`${series.id}|${String(occ.date ?? '')}|${occ.time ?? ''}`),
+          : stableOccId(`${series.id}|${occ.date}|${occ.time ?? ''}`),
         ownerId: series.id,
         metadata: { ...joinFileMeta(series.fileSlug, occMeta, roots), jsTime },
       })
@@ -620,5 +642,5 @@ export function expandWithMultiday(
 function generatedDateSet(expandable: ExpandNode, from: Date, to: Date): Set<string> {
   const noInsts: ExpandNode = { ...expandable, instances: [] }
   const raw = expandNode(noInsts, from, to)
-  return new Set(raw.map(o => String(o.date ?? '')))
+  return new Set(raw.map(o => o.date))
 }

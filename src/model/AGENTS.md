@@ -85,6 +85,16 @@ live in `expansion.ts` and are only used there.
 
 *Multiday helpers*: `multidayDisplayTitle`, `multidayCoversDate`.
 
+*Internal engine* (domain-typed):
+- `ExpandNode` — typed input with concrete `date: string`, `time: string | null`,
+  `repeat?`, `excluded?`, `instances?`, and `metadata: OccurrenceMetadata`. No
+  index signature — structural fields are separated from domain metadata.
+- `ExpandedOcc` — typed output of `expandNode`: `date`, `time`, `jsTime: Date`,
+  `metadata: OccurrenceMetadata`. No cast hacks needed at the `expandRange` boundary.
+- `mergeNode(parent, child)` — typed merge of two `ExpandNode`s; structural fields
+  take the child's value when set; `metadata` is shallow-merged.
+- `expandNode(node, from, to)` — core recurrence engine; returns `ExpandedOcc[]`.
+
 *Main-app entry point* (domain-aware):
 - `expandRange(items, roots, from, to)` — takes a `StoreItem[]` and a `Roots`
   map and expands all series and standalones within the date window, returning
@@ -149,7 +159,7 @@ as round-trip and edit-operation golden inputs.
 |---|---|
 | Domain field names used in logic | `storeOps.ts`, `storeItems.ts`, `collapse.ts` via `INLINE_FIELDS` registry |
 | Field-agnostic tree / inheritance | `inheritance.ts`, `nodeSchema.ts` |
-| Field-agnostic low-level expansion | `expandNode`, `mergeNode` (internal) in `expansion.ts` |
+| Domain-typed low-level expansion | `expandNode`, `mergeNode` (internal) in `expansion.ts` |
 | Persistence / Dexie cache | `src/meridian.ts` |
 | React state / store mutations | `src/App.tsx`, `src/store.ts` |
 | UI formatting, dialogs, editor state | `src/components/`, `src/debug/` |
