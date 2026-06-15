@@ -36,7 +36,7 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
   } = hooks
 
   return (
-    <section className="view active">
+    <section className="view active flex-1 min-h-0 flex flex-col">
       <EntryEditor
         entry={entry}
         onChange={setEntry}

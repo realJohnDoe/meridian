@@ -35,7 +35,8 @@ export default function BacklinksPanel({ fileSlug, items, roots, onOpen, onToggl
           <OccurrenceCard
             key={occ.fileSlug}
             occ={occ}
-            variant="agenda"
+            variant="compact"
+            hideMeta
             isDone={!!occ.metadata.done}
             currentBarClass={occState(occ)}
             onOpen={() => onOpen(occ.fileSlug)}
