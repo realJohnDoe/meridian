@@ -41,13 +41,24 @@ export function effectiveNodeToStoreItems(
 ): StoreItem[] {
   const result: StoreItem[] = []
 
+  // Collision guard: tracks how many times each derived key has been emitted
+  // within this file so duplicate-date items get unique #2/#3 suffixes.
+  const usedKeys = new Map<string, number>()
+  function stableId(key: string): string {
+    const n = (usedKeys.get(key) ?? 0) + 1
+    usedKeys.set(key, n)
+    return n === 1 ? key : `${key}#${n}`
+  }
+
   function walk(n: EffectiveNode) {
     // Merge childDefaults under fields so task defaults (done/priority) that live
     // in a `defaults:` block survive — mirrors `toExpandable` in expansion.ts.
     const base = { ...n.childDefaults, ...n.fields }
 
     if (hasRepeat(n)) {
-      const seriesId = crypto.randomUUID()
+      const anchorDate = n.fields.date ? String(n.fields.date) : ''
+      const anchorTime = n.fields.time ? String(n.fields.time) : ''
+      const seriesId = stableId(`${fileSlug}|series|${anchorDate}|${anchorTime}`)
       result.push({
         date:   n.fields.date ? String(n.fields.date) : '',
         time:   n.fields.time ? String(n.fields.time) : null,
@@ -58,12 +69,14 @@ export function effectiveNodeToStoreItems(
       })
       for (const child of n.instances) {
         if (hasRepeat(child)) { walk(child); continue }  // nested series → flat sibling
+        const childDate = child.fields.date ? String(child.fields.date) : ''
+        const childTime = child.fields.time ? String(child.fields.time) : ''
         result.push({
-          date:    child.fields.date ? String(child.fields.date) : '',
+          date:    childDate,
           time:    child.fields.time ? String(child.fields.time) : null,
           source:  'explicit',
           fileSlug,
-          id:      crypto.randomUUID(),
+          id:      stableId(`${seriesId}|inst|${childDate}|${childTime}`),
           ownerId: seriesId,
           ...(child.fields.excluded === true ? { excluded: true as const } : {}),
           metadata: extractOccurrenceMetadata({ ...base, ...child.fields }),
@@ -73,22 +86,26 @@ export function effectiveNodeToStoreItems(
       // A node with a date, OR a leaf with none (e.g. an undated task/note),
       // becomes a standalone occurrence. The empty-date case keeps undated items
       // representable so they round-trip and stay searchable.
+      const occDate = n.fields.date !== undefined ? String(n.fields.date) : 'undated'
+      const occTime = n.fields.time ? String(n.fields.time) : ''
       result.push({
         date:   n.fields.date !== undefined ? String(n.fields.date) : '',
         time:   n.fields.time ? String(n.fields.time) : null,
         source: 'explicit',
         fileSlug,
-        id:     crypto.randomUUID(),
+        id:     stableId(`${fileSlug}|occ|${occDate}|${occTime}`),
         metadata: extractOccurrenceMetadata(base),
       })
       for (const child of n.instances) {
         if (child.fields.excluded === true) continue
+        const childDate = child.fields.date ? String(child.fields.date) : 'undated'
+        const childTime = child.fields.time ? String(child.fields.time) : ''
         result.push({
           date:   child.fields.date ? String(child.fields.date) : '',
           time:   child.fields.time ? String(child.fields.time) : null,
           source: 'explicit',
           fileSlug,
-          id:     crypto.randomUUID(),
+          id:     stableId(`${fileSlug}|occ|${childDate}|${childTime}`),
           metadata: extractOccurrenceMetadata({ ...base, ...child.fields }),
         })
       }
