@@ -1,20 +1,24 @@
 /**
- * Regression tests for the stale-occurrence toggle bug.
+ * Regression tests for the stale-occurrence toggle bug — updated for Fix C.
  *
- * After a reconcile, parseToStoreItems assigns new UUIDs to every item
- * (ID churn). If DaySection's memo comparator doesn't check id/ownerId,
- * it considers the re-rendered props equal and skips the re-render, leaving
- * OccurrenceRow children with pre-reconcile occurrences whose id/ownerId no
- * longer exist in the store. Toggling such a stale occurrence is a no-op.
+ * The original bug (documented in PR 1):
+ *   After a reconcile, parseToStoreItems assigned new UUIDs to every item.
+ *   DaySection's memo comparator did not check id/ownerId, so it skipped
+ *   re-renders and left OccurrenceRow children with stale occurrences whose
+ *   ownerId no longer matched any series in the store. Toggling such a stale
+ *   occurrence was a no-op in the model, yet cacheWrite still marked the file
+ *   dirty, producing a phantom commit.
  *
- * Fix A (DaySection propsAreEqual) ensures id/ownerId changes trigger a
- * re-render so children always close over live occurrences.
- * Fix B (cacheWrite) ensures a no-op toggle produces no phantom commit.
+ * Fix A (DaySection propsAreEqual) adds id/ownerId to the memo comparator so
+ * any identity change forces a re-render and children always close over live
+ * occurrences.
+ * Fix B (cacheWrite) short-circuits when content is unchanged, eliminating
+ * phantom commits from no-op toggles.
+ * Fix C (storeItems deterministic IDs, this PR) eliminates ID churn entirely:
+ * re-parsing identical content now yields identical IDs, so a "stale" ownerId
+ * from a prior parse still matches the freshly-parsed store.
  *
- * These tests cover the model-layer side of the bug: that re-parsing the
- * same content yields different IDs, and that toggling a stale occurrence
- * (one whose ownerId no longer matches any series in the store) leaves the
- * store unchanged.
+ * These tests assert the correct post-Fix-C behaviour.
  */
 import { describe, it, expect } from 'vitest'
 import { loadFixture, parseFixture } from './helpers'
@@ -25,8 +29,8 @@ import { isSeries } from '../../types'
 import type { StoreData } from '../storeOps'
 import type { Roots } from '../../types'
 
-describe('ID churn on re-parse', () => {
-  it('parsing the same fixture twice produces different series IDs', () => {
+describe('stable IDs across re-parse (Fix C)', () => {
+  it('parsing the same fixture twice produces identical series IDs', () => {
     const content = loadFixture('weekly-series')
     const parse1 = parseToStoreItems('weekly-series.md', content)
     const parse2 = parseToStoreItems('weekly-series.md', content)
@@ -36,11 +40,10 @@ describe('ID churn on re-parse', () => {
 
     expect(ids1).toHaveLength(1)
     expect(ids2).toHaveLength(1)
-    // Same file, same content — but different UUIDs each time
-    expect(ids1[0]).not.toBe(ids2[0])
+    expect(ids1[0]).toBe(ids2[0])
   })
 
-  it('override children get a new ownerId on each parse', () => {
+  it('override children get identical ownerIds on each parse', () => {
     const content = loadFixture('weekly-series')
     const parse1 = parseToStoreItems('weekly-series.md', content)
     const parse2 = parseToStoreItems('weekly-series.md', content)
@@ -49,13 +52,12 @@ describe('ID churn on re-parse', () => {
     const ownerIds2 = parse2.items.filter(i => !isSeries(i)).map(i => (i as { ownerId?: string }).ownerId).filter(Boolean)
 
     expect(ownerIds1.length).toBeGreaterThan(0)
-    // Each parse produces fresh UUIDs — ownerIds point to the new series ID
-    expect(ownerIds1).not.toEqual(ownerIds2)
+    expect(ownerIds1).toEqual(ownerIds2)
   })
 })
 
-describe('toggle with stale occurrence is a no-op in the store', () => {
-  it('toggling a generated occurrence whose ownerId is from a prior parse leaves done unchanged', () => {
+describe('toggle works across a simulated reconcile (Fix A + Fix C)', () => {
+  it('toggling an occurrence taken from parse1 against a store rebuilt from parse2 flips done', () => {
     const content = loadFixture('weekly-series')
     const roots: Roots = new Map([['weekly-series', parseFixture('weekly-series').root]])
 
@@ -63,24 +65,23 @@ describe('toggle with stale occurrence is a no-op in the store', () => {
     const parse1 = parseToStoreItems('weekly-series.md', content)
     const occs1 = expandRange(parse1.items, roots, new Date('2026-01-01'), new Date('2026-12-31'))
     // Pick a generated (not explicitly overridden) occurrence — 2026-04-20 is a Monday
-    const staleOcc = occs1.find(o => o.date === '2026-04-20')!
-    expect(staleOcc).toBeDefined()
-    expect(staleOcc.metadata.done).toBe(false)
+    const occ = occs1.find(o => o.date === '2026-04-20')!
+    expect(occ).toBeDefined()
+    expect(occ.metadata.done).toBe(false)
 
-    // parse2: reconcile produces fresh IDs (simulates post-reconcile store)
+    // parse2: reconcile rebuilds the store from the same content
     const parse2 = parseToStoreItems('weekly-series.md', content)
     const freshStore: StoreData = { items: parse2.items, roots }
 
-    // The stale occ's ownerId no longer matches any series in freshStore
+    // With deterministic IDs, occ.ownerId matches the series in the fresh store
     const freshSeriesIds = new Set(freshStore.items.filter(isSeries).map(i => i.id))
-    expect(freshSeriesIds.has(staleOcc.ownerId!)).toBe(false)
+    expect(freshSeriesIds.has(occ.ownerId!)).toBe(true)
 
-    // toggleDone with a stale ownerId creates an orphaned override —
-    // expansion never surfaces it, so done stays false
-    const next = toggleDone(freshStore, staleOcc)
+    // toggleDone against the fresh store correctly creates an override
+    const next = toggleDone(freshStore, occ)
     const nextOccs = expandRange(next.items, roots, new Date('2026-01-01'), new Date('2026-12-31'))
-    const toggledOcc = nextOccs.find(o => o.date === '2026-04-20')!
-    expect(toggledOcc).toBeDefined()
-    expect(toggledOcc.metadata.done).toBe(false)  // no-op: stale ownerId → orphaned override
+    const toggled = nextOccs.find(o => o.date === '2026-04-20')!
+    expect(toggled).toBeDefined()
+    expect(toggled.metadata.done).toBe(true)
   })
 })
