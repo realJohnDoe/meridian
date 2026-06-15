@@ -20,6 +20,7 @@ import { isSeries, isStandaloneOcc } from '../types'
 import type { EffectiveNode } from './inheritance'
 import { fmtISO, fmtT, parseDateString } from './dateUtils'
 import { parseDurationDays } from './duration'
+import { parseInterval } from './repeat'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL DATE HELPERS  (not exported — no consumers outside this file)
@@ -32,16 +33,13 @@ function toDate(v: unknown): Date | null {
 }
 
 function addInterval(date: Date, intervalStr: string): Date {
-  const m = String(intervalStr).match(/(\d+)\s*(day|week|hour|minute|month|year)s?/i)
-  if (!m) return date
-  const n = parseInt(m[1], 10)
-  const unit = m[2].toLowerCase()
-  if (unit === 'day')    return addDays(date, n)
-  if (unit === 'week')   return addWeeks(date, n)
-  if (unit === 'month')  return addMonths(date, n)
-  if (unit === 'year')   return addYears(date, n)
-  if (unit === 'hour')   return addHours(date, n)
-  if (unit === 'minute') return addMinutes(date, n)
+  const { n, unit } = parseInterval(intervalStr)
+  if (unit === 'days')    return addDays(date, n)
+  if (unit === 'weeks')   return addWeeks(date, n)
+  if (unit === 'months')  return addMonths(date, n)
+  if (unit === 'years')   return addYears(date, n)
+  if (unit === 'hours')   return addHours(date, n)
+  if (unit === 'minutes') return addMinutes(date, n)
   return date
 }
 
