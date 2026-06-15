@@ -4,11 +4,13 @@ import {
 import { occIsRecur } from './types'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
+import { warmSlugInFOM } from './presentation'
 import { writeEntityToCache, deleteFromBackend as deleteFileFromDisk } from './storage/sync'
 import { toast } from 'sonner'
 
 export function toggleOccDone(o: Occurrence): void {
   const next = toggleDone({ items: getItems(), roots: getRoots() }, o)
+  warmSlugInFOM(o.fileSlug, next.items, next.roots)
   setData(next)
   writeEntityToCache(o.fileSlug)
 }

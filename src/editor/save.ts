@@ -3,11 +3,11 @@ import {
   applyEdit, excludeOccurrence, deleteByFileSlug, deleteFollowing,
   fileSlugItems, findSeries,
 } from '../model/storeOps'
-import type { EditFields } from '../model/storeOps'
 import { isSeries } from '../types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '../types'
 import { titleToSlug } from '../fileIO'
 import { getItems, getRoots, setData } from '../storeBridge'
+import { warmSlugInFOM } from '../presentation'
 import { writeEntityToCache, deleteFromBackend as deleteFileFromDisk } from '../storage/sync'
 import type { EntryState, ItemType } from './state'
 
@@ -75,11 +75,6 @@ export function entryFromOccurrence(
 
 type SaveFields = EntryState & { body: string }
 
-function toEditFields(f: SaveFields): EditFields {
-  const { title, tags, topics, participants, tracked, done, priority, scheduled, duration, repeat, body } = f
-  return { title, tags, topics, participants, tracked, done, priority, scheduled, duration, repeat, body }
-}
-
 export type SaveResult = 'saved' | 'missing-title' | 'missing-date'
 
 export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields): SaveResult {
@@ -90,10 +85,22 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
     return 'missing-date'
   }
 
-  const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, toEditFields(fields))
-  setData(nextData)
-
+  const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
+    title,
+    tags:         fields.tags         ?? [],
+    topics:       fields.topics       ?? [],
+    participants: fields.participants  ?? [],
+    body:         fields.body         ?? '',
+    tracked:      fields.tracked      ?? false,
+    done:         fields.done         ?? false,
+    priority:     fields.priority     ?? null,
+    scheduled:    fields.scheduled    ?? null,
+    duration:     fields.duration     ?? '',
+    repeat:       fields.repeat       ?? null,
+  })
   const fileSlug = item?.fileSlug ?? titleToSlug(title)
+  warmSlugInFOM(fileSlug, nextData.items, nextData.roots)
+  setData(nextData)
   if (fileSlug) writeEntityToCache(fileSlug)
   return 'saved'
 }
@@ -119,26 +126,34 @@ export function deleteNode(
 
   function excludeThis() {
     if (!item) return
-    setData(excludeOccurrence({ items: getItems(), roots: getRoots() }, item))
+    const next = excludeOccurrence({ items: getItems(), roots: getRoots() }, item)
+    warmSlugInFOM(item.fileSlug, next.items, next.roots)
+    setData(next)
     writeEntityToCache(item.fileSlug)
     hideSheet(); navigateBack()
   }
   function deleteAll() {
     if (!item) return
-    setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug))
+    const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
+    warmSlugInFOM(item.fileSlug, next.items, next.roots)
+    setData(next)
     deleteFileFromDisk(item.fileSlug)
     hideSheet(); navigateBack()
   }
   function deleteFuture() {
     if (!item) return
-    setData(deleteFollowing({ items: getItems(), roots: getRoots() }, item))
+    const next = deleteFollowing({ items: getItems(), roots: getRoots() }, item)
+    warmSlugInFOM(item.fileSlug, next.items, next.roots)
+    setData(next)
     writeEntityToCache(item.fileSlug)
     hideSheet(); navigateBack()
   }
 
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
-      setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug))
+      const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
+      warmSlugInFOM(item.fileSlug, next.items, next.roots)
+      setData(next)
       deleteFileFromDisk(item.fileSlug); navigateBack()
     }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }
