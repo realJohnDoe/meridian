@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '@/types'
 import { fmtISO, parseDateString, WEEK_STARTS_ON } from '@/model/dateUtils'
+import { parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model/repeat'
 import {
   Drawer,
   DrawerContent,
@@ -55,8 +56,6 @@ interface Props {
 
 const WDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 const WDAY_CODES: Weekday[] = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su']
-const WDAY_CODES_SUN_FIRST: Weekday[] = ['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa']
-const WDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -66,59 +65,12 @@ function startOfToday(): Date {
   return d
 }
 
-function parseCompletionInterval(s: string): { n: number; unit: string } {
-  if (!s) return { n: 1, unit: 'days' }
-  const match = s.trim().match(/^(\d+)\s*(day|week|month|year)s?$/i)
-  if (!match) return { n: 1, unit: 'days' }
-  const unit = match[2].toLowerCase() + 's' // standardize to plural
-  return { n: parseInt(match[1], 10), unit }
-}
-
-function serialiseCompletionInterval(n: number, unit: string): string {
-  const label = n === 1 ? unit.replace(/s$/, '') : unit
-  return `${n} ${label}`
-}
-
 // ── Dropdown options and calculations ─────────────────────────────────────────
 
 function getOrdinalSuffix(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
-function getMonthlyWeekdaySpec(jsDate: Date) {
-  const jsDay = jsDate.getDay();
-  const wdayCode = WDAY_CODES_SUN_FIRST[jsDay];
-  const wdayLabel = WDAY_NAMES[jsDay]; // e.g. "Friday"
-  
-  const year = jsDate.getFullYear();
-  const month = jsDate.getMonth();
-  const candidates: number[] = [];
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  for (let day = 1; day <= daysInMonth; day++) {
-    const candidate = new Date(year, month, day);
-    if (candidate.getDay() === jsDay) {
-      candidates.push(day);
-    }
-  }
-  
-  const index = candidates.indexOf(jsDate.getDate());
-  const isLast = (index === candidates.length - 1);
-  
-  let bysetpos = index + 1;
-  let ordinal = ['first', 'second', 'third', 'fourth', 'fifth'][index];
-  
-  if (isLast) {
-    bysetpos = -1;
-    ordinal = 'last';
-  }
-  
-  return {
-    byweekday: [wdayCode],
-    bysetpos,
-    label: `Every ${ordinal} ${wdayLabel} of the month`
-  };
 }
 
 // ── State helpers ─────────────────────────────────────────────────────────────
@@ -231,7 +183,7 @@ function buildRepeat(
       if (monthly === 'same-day') {
         r.bymonthday = [d.getDate()]
       } else {
-        const spec = getMonthlyWeekdaySpec(d)
+        const spec = monthlyWeekdaySpec(d)
         r.byweekday = spec.byweekday
         r.bysetpos = spec.bysetpos
       }
@@ -281,7 +233,7 @@ export default function RepeatDialog({
     setEndVal(s.endVal)
     setIntervalNum(s.intervalNum)
     
-    const parsed = parseCompletionInterval(s.interval)
+    const parsed = parseInterval(s.interval)
     setCompletionNum(parsed.n)
     setCompletionUnit(parsed.unit)
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -303,7 +255,7 @@ export default function RepeatDialog({
   function handleSet() {
     const finalIntervalNum = Math.max(1, intervalNum)
     const finalCompletionNum = Math.max(1, completionNum)
-    onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, serialiseCompletionInterval(finalCompletionNum, completionUnit), finalIntervalNum, scheduled?.date))
+    onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, serialiseInterval(finalCompletionNum, completionUnit), finalIntervalNum, scheduled?.date))
     onClose()
   }
 
@@ -420,7 +372,7 @@ export default function RepeatDialog({
                       const mdayStr = getOrdinalSuffix(mday)
                       options.push({ id: 'same-day', label: `Every ${mdayStr} of the month` })
                       
-                      const spec = getMonthlyWeekdaySpec(d)
+                      const spec = monthlyWeekdaySpec(d)
                       options.push({ id: 'weekday-pattern', label: spec.label })
                     } else {
                       options.push({ id: 'same-day', label: 'Same day of month' })
