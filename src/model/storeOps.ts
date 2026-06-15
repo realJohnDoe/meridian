@@ -91,18 +91,21 @@ export function upsertOverride(
 
 // ── Edit operations ───────────────────────────────────────────────────────────
 
-export interface EditFields {
+export interface EditorFields {
   title:        string
   tags:         string[]
   topics:       string[]
   participants: string[]
-  body:         string
-  tracked:   boolean
-  done:      boolean
-  priority:  Priority | null
-  scheduled: { date: string; time: string } | null
-  duration:  string
-  repeat:    Repeat | null
+  tracked:      boolean
+  done:         boolean
+  priority:     Priority | null
+  scheduled:    { date: string; time: string } | null
+  duration:     string
+  repeat:       Repeat | null
+}
+
+export interface EditFields extends EditorFields {
+  body: string
 }
 
 /** Extract OccurrenceMetadata from expanded AppMetadata (strips file-level fields). */

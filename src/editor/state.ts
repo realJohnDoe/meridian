@@ -1,23 +1,14 @@
-import type { Occurrence, Scheduled, Priority, Repeat as RepeatValue, EditScope } from '../types'
+import type { Occurrence, Scheduled, EditScope } from '../types'
+import type { EditorFields } from '../model/storeOps'
 
 export type { Scheduled }
 
 export type ItemType = 'task' | 'event' | 'note'
 
-export interface EntryState {
-  item: Occurrence | null
-  title: string
-  bodyHtml: string
-  scheduled: Scheduled | null
-  duration: string
-  tracked: boolean
-  itemType: ItemType
-  repeat: RepeatValue | null
-  done: boolean
-  tags: string[]
-  topics: string[]
-  participants: string[]
-  priority: Priority | null
+export interface EntryState extends EditorFields {
+  item:      Occurrence | null
+  bodyHtml:  string
+  itemType:  ItemType
   editScope: EditScope
 }
 

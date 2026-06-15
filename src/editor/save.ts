@@ -3,6 +3,7 @@ import {
   applyEdit, excludeOccurrence, deleteByFileSlug, deleteFollowing,
   fileSlugItems, findSeries,
 } from '../model/storeOps'
+import type { EditFields } from '../model/storeOps'
 import { isSeries } from '../types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '../types'
 import { titleToSlug } from '../fileIO'
@@ -74,6 +75,11 @@ export function entryFromOccurrence(
 
 type SaveFields = EntryState & { body: string }
 
+function toEditFields(f: SaveFields): EditFields {
+  const { title, tags, topics, participants, tracked, done, priority, scheduled, duration, repeat, body } = f
+  return { title, tags, topics, participants, tracked, done, priority, scheduled, duration, repeat, body }
+}
+
 export type SaveResult = 'saved' | 'missing-title' | 'missing-date'
 
 export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields): SaveResult {
@@ -84,19 +90,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
     return 'missing-date'
   }
 
-  const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
-    title,
-    tags:         fields.tags         ?? [],
-    topics:       fields.topics       ?? [],
-    participants: fields.participants  ?? [],
-    body:         fields.body         ?? '',
-    tracked:      fields.tracked      ?? false,
-    done:         fields.done         ?? false,
-    priority:     fields.priority     ?? null,
-    scheduled:    fields.scheduled    ?? null,
-    duration:     fields.duration     ?? '',
-    repeat:       fields.repeat       ?? null,
-  })
+  const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, toEditFields(fields))
   setData(nextData)
 
   const fileSlug = item?.fileSlug ?? titleToSlug(title)
