@@ -136,6 +136,7 @@ interface ExpandedOcc<M = Record<string, unknown>> {
   date:      string
   time:      string | null
   jsTime:    Date
+  source:    'generated' | 'explicit'
   excluded?: boolean
   done?:     boolean
   metadata:  M
@@ -280,19 +281,19 @@ function expandNode<M>(
     return null
   }
 
-  function makeOcc(eff: ExpandNode<M>, jsDate: Date, baseNode: ExpandNode<M>, instOverride: { child: ExpandNode<M> } | null): ExpandedOcc<M> | null {
+  function makeOcc(eff: ExpandNode<M>, jsDate: Date, baseNode: ExpandNode<M>, instOverride: { child: ExpandNode<M> } | null, source: 'generated' | 'explicit'): ExpandedOcc<M> | null {
     if (eff.excluded) return null
     const occTimeStr = eff.time ?? baseNode.time ?? node.time
     const occDate = (instOverride?.child.date && instOverride.child.date !== node.date)
       ? instOverride.child.date
       : (jsDateToSpec(jsDate).date ?? '')
-    return { date: occDate, time: occTimeStr, jsTime: jsDate, done: eff.done, metadata: eff.metadata }
+    return { date: occDate, time: occTimeStr, jsTime: jsDate, source, done: eff.done, metadata: eff.metadata }
   }
 
   if (node.repeat?.type !== 'after_completion') {
     if (anchor >= from && anchor <= to) {
       const ov = findOverride(anchor)
-      const occ = makeOcc(ov ? ov.eff : node, anchor, node, ov)
+      const occ = makeOcc(ov ? ov.eff : node, anchor, node, ov, node.repeat ? 'generated' : 'explicit')
       if (occ) occurrences.push(occ)
     }
   }
@@ -308,7 +309,7 @@ function expandNode<M>(
 
     for (const genDate of generated) {
       const ov = findOverride(genDate)
-      const occ = makeOcc(ov ? ov.eff : node, genDate, node, ov)
+      const occ = makeOcc(ov ? ov.eff : node, genDate, node, ov, 'generated')
       if (occ) occurrences.push(occ)
     }
 
@@ -332,6 +333,7 @@ function expandNode<M>(
             date: inst.date || (jsDateToSpec(t).date ?? ''),
             time: eff.time,
             jsTime: t,
+            source: 'explicit',
             metadata: eff.metadata,
           })
         }
@@ -365,6 +367,7 @@ function expandNode<M>(
           date:     spec.date ?? '',
           time:     spec.time ?? node.time,
           jsTime:   entry.jsTime,
+          source:   'explicit',
           done:     entry.done,
           metadata: entry.metadata,
         })
@@ -385,6 +388,7 @@ function expandNode<M>(
           date:     spec.date ?? '',
           time:     spec.time ?? node.time,
           jsTime:   nextJsTime,
+          source:   'generated',
           done:     false,
           metadata: node.metadata,
         })
@@ -515,18 +519,17 @@ export function expandRange(
       })),
     }
 
-    const genDates = generatedDateSet(expandable, from, to)
     const raw = expandNode(expandable, from, to)
+
+    const childByMinute = new Map<number, StoreOcc>()
+    for (const c of children) {
+      const ct = nodeDateTime({ date: c.date, time: c.time }) || parseDateString(c.date)
+      if (ct) childByMinute.set(Math.round(ct.getTime() / 60000), c)
+    }
 
     for (const occ of raw) {
       const { jsTime } = occ
-      const isGenerated = genDates.has(occ.date)
-
-      // Find an explicit override whose date matches this occurrence
-      const override = children.find(c => {
-        const ct = nodeDateTime({ date: c.date, time: c.time }) || parseDateString(c.date)
-        return ct && Math.abs(ct.getTime() - jsTime.getTime()) < 60000
-      })
+      const override = childByMinute.get(Math.round(jsTime.getTime() / 60000))
 
       const occMeta: OccurrenceMetadata = override
         ? { ...series.metadata, ...override.metadata }
@@ -534,7 +537,7 @@ export function expandRange(
       result.push({
         date:    occ.date,
         time:    occ.time,
-        source:  isGenerated ? 'generated' : 'explicit',
+        source:  occ.source,
         fileSlug: series.fileSlug,
         id:      override
           ? override.id
@@ -643,12 +646,3 @@ export function expandWithMultiday(
     .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// INTERNAL  (used only within this file)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function generatedDateSet<M>(expandable: ExpandNode<M>, from: Date, to: Date): Set<string> {
-  const noInsts: ExpandNode<M> = { ...expandable, instances: [] }
-  const raw = expandNode(noInsts, from, to)
-  return new Set(raw.map(o => o.date))
-}

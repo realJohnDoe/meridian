@@ -139,6 +139,46 @@ export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string,
   return map
 }
 
+function computeSlugOccurrence(fileSlug: string, items: StoreItem[], roots: Roots): Occurrence | null {
+  const slugItems = items.filter(i => i.fileSlug === fileSlug)
+  if (slugItems.length === 0) return null
+
+  const now   = new Date(); now.setHours(0, 0, 0, 0)
+  const AHEAD = new Date(now.getTime() + _3YR_MS)
+  const BACK  = new Date(now.getTime() - _3YR_MS)
+
+  for (const occ of expandRange(slugItems, roots, now, AHEAD)) return occ
+  const back = expandRange(slugItems, roots, BACK, now)
+  for (let i = back.length - 1; i >= 0; i--) return back[i]
+
+  for (const item of slugItems) {
+    if (!isStandaloneOcc(item)) continue
+    return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) } as Occurrence
+  }
+  for (const item of slugItems) {
+    if (!isSeries(item)) continue
+    return {
+      date:     item.date,
+      time:     item.time,
+      source:   'explicit' as const,
+      fileSlug: item.fileSlug,
+      id:       stableOccId(`${item.fileSlug}|${item.id}|anchor`),
+      ownerId:  item.id,
+      metadata: joinFileMeta(item.fileSlug, item.metadata, roots),
+    }
+  }
+  return null
+}
+
+export function warmSlugInFOM(fileSlug: string, items: StoreItem[], roots: Roots): void {
+  if (!_fomCache) return
+  _fomCache.items = items
+  _fomCache.roots = roots
+  const occ = computeSlugOccurrence(fileSlug, items, roots)
+  if (occ) _fomCache.map.set(fileSlug, occ)
+  else     _fomCache.map.delete(fileSlug)
+}
+
 /**
  * Returns the fileSlugs of all files whose topics include a link to `targetSlug`.
  * Self-links are excluded. Memoize the result on [roots] at the call site.
