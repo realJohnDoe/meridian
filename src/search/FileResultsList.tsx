@@ -72,7 +72,7 @@ export default function FileResultsList({ query, items, onOpen }: Props) {
             <OccurrenceCard
               occ={occ}
               variant="compact"
-              showTypeIcon
+              staticIcon
               isDone={!!occ.metadata.done}
               currentBarClass={occState(occ)}
               onOpen={() => onOpen(occ)}

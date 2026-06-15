@@ -21,9 +21,13 @@ export default function EntryBody({ bodyRef, bodyKey, roots, items }: Props) {
       <div
         key={bodyKey}
         ref={bodyRef}
+        data-placeholder="Add a description…"
         className={[
           'min-h-40 text-secondary-foreground text-sm leading-[1.85] outline-none caret-primary',
           'whitespace-pre-wrap break-words relative',
+          'rounded-md border border-input bg-transparent px-3 py-2',
+          'focus:ring-2 focus:ring-ring focus:ring-offset-0',
+          'empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none',
           '[&_.wl]:text-primary [&_.wl]:border-b [&_.wl]:border-[var(--event-border)] [&_.wl]:cursor-pointer',
           '[&_.wl-broken]:text-destructive [&_.wl-broken]:border-b [&_.wl-broken]:border-[color-mix(in_oklab,var(--destructive),transparent_70%)]',
         ].join(' ')}

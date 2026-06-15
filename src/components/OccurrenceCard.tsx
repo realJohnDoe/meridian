@@ -20,7 +20,8 @@ export interface OccurrenceCardProps {
   currentBarClass: OccState
   onOpen: () => void
   onToggleDone: () => void
-  showTypeIcon?: boolean
+  staticIcon?: boolean
+  hideMeta?: boolean
   displayTitle?: string
 }
 
@@ -60,7 +61,8 @@ export default function OccurrenceCard({
   currentBarClass,
   onOpen,
   onToggleDone,
-  showTypeIcon = false,
+  staticIcon = false,
+  hideMeta = false,
   displayTitle,
 }: OccurrenceCardProps) {
   const t = fmtT(occ.time)
@@ -109,6 +111,8 @@ export default function OccurrenceCard({
                 checked={isDone}
                 onCheckedChange={() => onToggleDone()}
                 className="size-5 shrink-0 pointer-events-auto"
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
               />
             )}
             <span className={titleCls(isDone)}>{title}</span>
@@ -154,19 +158,24 @@ export default function OccurrenceCard({
 
         <div className="flex flex-col flex-1 min-w-0 gap-1">
           <div className="flex items-center gap-[6px]">
-            {showTypeIcon && !hasTrack && <KindIcon item={occ} size={13} className="shrink-0 text-muted-foreground" />}
-            {hasTrack && (
-              <Checkbox
-                checked={isDone}
-                onCheckedChange={() => onToggleDone()}
-                className="size-5 shrink-0 pointer-events-auto"
-              />
-            )}
+            {staticIcon
+              ? <KindIcon item={occ} size={13} className="shrink-0 text-muted-foreground" />
+              : hasTrack
+                ? (
+                  <Checkbox
+                    checked={isDone}
+                    onCheckedChange={() => onToggleDone()}
+                    className="size-5 shrink-0 pointer-events-auto"
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={e => e.stopPropagation()}
+                  />
+                )
+                : <KindIcon item={occ} size={13} className="shrink-0 text-muted-foreground" />}
             <span className={titleCls(isDone)}>{title}</span>
             {!!occ.ownerId && <Repeat2 size={11} className="stroke-muted-foreground fill-none shrink-0" />}
           </div>
 
-          {(dateBadge || t || tags.length > 0 || topics.length > 0 || participants.length > 0) && (
+          {!hideMeta && (dateBadge || t || tags.length > 0 || topics.length > 0 || participants.length > 0) && (
             <div className="flex flex-wrap gap-[5px]">
               {dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
               {t && <Badge variant="tag">{t}</Badge>}
