@@ -4,6 +4,7 @@
 - Fix top bar label
 - Add overdue section in agenda
 - Add CodeMirror 6 for markdown editing
+- Make layout tablet-friendly
 - Add Solarized Light theme
 
 ## Results from last Quality Survey
