@@ -73,6 +73,7 @@ export async function cacheWrite(vaultId: string, path: string, content: string)
   const d = await cacheInit()
   const key = vp(vaultId, path)
   const existing = await d.files.get(key)
+  if (existing && existing.content === content) return
   await d.files.put({ vaultPath: key, vaultId, path, content, dirty: 1, updatedAt: Date.now(), version: existing?.version })
 }
 
