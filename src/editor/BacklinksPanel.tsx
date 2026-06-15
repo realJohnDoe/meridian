@@ -1,7 +1,8 @@
-import { useMemo, useRef, useLayoutEffect } from 'react'
+import { useMemo, useRef } from 'react'
 import type { Occurrence, StoreItem, Roots } from '../types'
 import { backlinksTo, fileOccurrenceMap, sortOccs, occState } from '../presentation'
 import OccurrenceCard from '@/components/OccurrenceCard'
+import { useFlipReorder } from '../hooks/useFlipReorder'
 
 interface Props {
   fileSlug: string
@@ -26,46 +27,7 @@ export default function BacklinksPanel({ fileSlug, items, roots, onOpen, onToggl
   }, [slugs, occBySlug])
 
   const listRef = useRef<HTMLDivElement>(null)
-  const prevTops = useRef<Record<string, number>>({})
-  const prevItemCount = useRef(occs.length)
-
-  useLayoutEffect(() => {
-    const list = listRef.current
-    if (!list) return
-
-    const wasReorder = occs.length === prevItemCount.current
-    prevItemCount.current = occs.length
-
-    const listTop = list.getBoundingClientRect().top
-    const wraps = list.querySelectorAll<HTMLElement>('[data-occ-key]')
-    const newTops: Record<string, number> = {}
-
-    wraps.forEach(wrap => {
-      const key = wrap.getAttribute('data-occ-key')!
-      const curr = wrap.getBoundingClientRect().top - listTop
-
-      if (wasReorder) {
-        const prev = prevTops.current[key]
-        if (prev !== undefined) {
-          const dy = prev - curr
-          if (Math.abs(dy) > 1) {
-            wrap.style.transition = 'none'
-            wrap.style.transform = `translateY(${dy}px)`
-            void wrap.offsetHeight
-            requestAnimationFrame(() => {
-              wrap.style.transition = 'transform .35s cubic-bezier(.4,0,.2,1)'
-              wrap.style.transform = ''
-              wrap.addEventListener('transitionend', () => { wrap.style.transition = '' }, { once: true })
-            })
-          }
-        }
-      }
-
-      newTops[key] = curr
-    })
-
-    prevTops.current = newTops
-  }, [occs])
+  useFlipReorder(listRef, occs)
 
   if (!occs.length) return null
 

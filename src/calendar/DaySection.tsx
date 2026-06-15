@@ -1,9 +1,10 @@
-import { memo, useRef, useLayoutEffect } from 'react'
+import { memo, useRef } from 'react'
 import type { Occurrence } from '../types'
 import { multidayDisplayTitle } from '../model/expansion'
 import { fmtLong } from '../presentation'
 import { cn } from '../lib/utils'
 import OccurrenceRow from './OccurrenceRow'
+import { useFlipReorder } from '../hooks/useFlipReorder'
 
 
 interface Props {
@@ -23,48 +24,7 @@ function DaySection({
   onOpen, onToggleDone, onSwipeDelete,
 }: Props) {
   const sectionRef = useRef<HTMLDivElement>(null)
-  // Stores the section-relative top of each row from the previous render.
-  const prevTops = useRef<Record<string, number>>({})
-  // Tracks item count so we can distinguish reorders from deletions.
-  const prevItemCount = useRef(items.length)
-
-  useLayoutEffect(() => {
-    const section = sectionRef.current
-    if (!section) return
-
-    const wasReorder = items.length === prevItemCount.current
-    prevItemCount.current = items.length
-
-    const sectionTop = section.getBoundingClientRect().top
-    const wraps = section.querySelectorAll<HTMLElement>('.swipe-wrap[data-occ-key]')
-    const newTops: Record<string, number> = {}
-
-    wraps.forEach(wrap => {
-      const key = wrap.getAttribute('data-occ-key')!
-      const curr = wrap.getBoundingClientRect().top - sectionTop
-
-      if (wasReorder) {
-        const prev = prevTops.current[key]
-        if (prev !== undefined) {
-          const dy = prev - curr
-          if (Math.abs(dy) > 1) {
-            wrap.style.transition = 'none'
-            wrap.style.transform = `translateY(${dy}px)`
-            void wrap.offsetHeight
-            requestAnimationFrame(() => {
-              wrap.style.transition = 'transform .35s cubic-bezier(.4,0,.2,1)'
-              wrap.style.transform = ''
-              wrap.addEventListener('transitionend', () => { wrap.style.transition = '' }, { once: true })
-            })
-          }
-        }
-      }
-
-      newTops[key] = curr
-    })
-
-    prevTops.current = newTops
-  }, [items])
+  useFlipReorder(sectionRef, items)
 
   const label = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : fmtLong(date)
 
