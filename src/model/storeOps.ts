@@ -131,6 +131,22 @@ function occMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMe
 }
 
 /**
+ * Build metadata for a RepeatPattern (series) root. Identical to `occMeta` but
+ * `done` is forced to the default (`false` when tracked, `undefined` when not) —
+ * never the editor's current `done` value.
+ *
+ * A series root's `done` is the value every generated occurrence inherits when
+ * it has no override of its own (see expansion's `inst.done ?? node.done`).
+ * Letting a `true` leak onto the root marks all future occurrences as already
+ * done — exactly the `done: true` + `type: after_completion` poisoning we guard
+ * against here. Per-occurrence completion is always stored as an override, never
+ * on the series root.
+ */
+function seriesMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMetadata {
+  return { ...occMeta(base, f), done: f.tracked ? false : undefined }
+}
+
+/**
  * Update (or create) the per-file entry in the roots map with the file-level
  * fields from `fields`. The roots map is the single source of truth for a file's
  * title/tags/topics/body, so every edit scope routes file-level changes here.
@@ -174,7 +190,6 @@ export function applyEdit(
     }
     const newRoots = new Map(roots)
     newRoots.set(fileSlug, newRoot)
-    const meta = occMeta({}, fields)
     if (repeat) {
       const newSeries: RepeatPattern<OccurrenceMetadata> = {
         date:     scheduled?.date ?? '',
@@ -182,7 +197,7 @@ export function applyEdit(
         repeat,
         fileSlug,
         id:       crypto.randomUUID(),
-        metadata: meta,
+        metadata: seriesMeta({}, fields),
       }
       return { items: [...items, newSeries], roots: newRoots }
     } else {
@@ -192,7 +207,7 @@ export function applyEdit(
         source:  'explicit',
         fileSlug,
         id:      crypto.randomUUID(),
-        metadata: meta,
+        metadata: occMeta({}, fields),
       }
       return { items: [...items, newOcc], roots: newRoots }
     }
@@ -207,12 +222,11 @@ export function applyEdit(
       : (i: StoreItem) => isStandaloneOcc(i) && i.id === occ.id
     items = items.map(i => {
       if (!matchItem(i)) return i
-      const meta = occMeta(i.metadata, fields)
       if (isSeries(i)) {
-        return { ...i, metadata: meta, repeat: repeat ?? i.repeat,
+        return { ...i, metadata: seriesMeta(i.metadata, fields), repeat: repeat ?? i.repeat,
           date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
       }
-      return { ...i, metadata: meta,
+      return { ...i, metadata: occMeta(i.metadata, fields),
         date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
     })
     return { items, roots }
@@ -243,7 +257,7 @@ export function applyEdit(
     const occDate = occ.date
     const newSeriesId = crypto.randomUUID()
     const newRepeat = repeat ?? series.repeat
-    const newMeta2 = occMeta(series.metadata, fields)
+    const newMeta2 = seriesMeta(series.metadata, fields)
     roots = updateRoot(roots, occ.fileSlug, fields)
 
     items = items.flatMap(i => {
