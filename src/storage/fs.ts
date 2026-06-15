@@ -12,6 +12,8 @@ declare global {
   }
 }
 
+import { ConflictError } from './conflictError'
+
 // ── Helpers ────────────────────────────────────────────────────
 
 function isVaultFile(name: string): boolean {
@@ -112,13 +114,11 @@ export async function diskWrite(
       const existing   = await fhExisting.getFile()
       const cur = `${existing.lastModified}:${existing.size}`
       if (cur !== expectedVersion) {
-        const { ConflictError } = await import('./conflictError')
         throw new ConflictError(path)
       }
     } catch (e) {
       // File does not exist yet — mismatch against a supplied expectedVersion.
       if ((e as { name?: string }).name === 'NotFoundError') {
-        const { ConflictError } = await import('./conflictError')
         throw new ConflictError(path)
       }
       throw e
