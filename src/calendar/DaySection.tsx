@@ -98,7 +98,8 @@ function propsAreEqual(prev: Props, next: Props): boolean {
   if (prev.items.length !== next.items.length) return false
   if (!prev.items.every((o, i) => {
     const n = next.items[i]
-    return o.fileSlug === n.fileSlug && o.date === n.date && o.time === n.time
+    return o.id === n.id && o.ownerId === n.ownerId
+        && o.fileSlug === n.fileSlug && o.date === n.date && o.time === n.time
         && o.metadata.done === n.metadata.done && o.metadata.title === n.metadata.title
         && o.metadata.priority === n.metadata.priority
         && o.metadata.duration === n.metadata.duration
