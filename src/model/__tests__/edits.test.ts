@@ -241,6 +241,49 @@ describe('edit operations → serialized YAML', () => {
     expect(override?.metadata.priority).toBe('high')
   })
 
+  // ── series root never carries done: true ─────────────────────────────────────
+
+  it('creating a new repeating task initializes the series root with done: false', () => {
+    // Even when the editor's done flag is true, a brand-new RepeatPattern must
+    // start with done: false — otherwise every generated occurrence inherits
+    // done: true (the after_completion poisoning bug).
+    const emptyData: StoreData = { items: [], roots: new Map() }
+    const next = applyEdit(emptyData, null, 'all', {
+      title: 'Take Vitamins',
+      tags: ['health'], topics: [], participants: [], body: '',
+      tracked: true, done: true, priority: null,
+      scheduled: { date: '2026-05-10', time: '' },
+      duration: '',
+      repeat: { type: 'after_completion', interval: '1 day' },
+    })
+    const series = next.items.filter(isSeries)
+    expect(series).toHaveLength(1)
+    expect(series[0].metadata.done).toBe(false)
+  })
+
+  it('all-scope edit on a done occurrence does not poison the series root with done: true', () => {
+    // Editing "all" while the current occurrence is done must keep the series
+    // root at done: false; per-occurrence completion lives in overrides only.
+    const data = fixtureData('weekly-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const next = applyEdit(data, occ, 'all', editFields(occ, {
+      done: true,
+      title: 'Weekly Standup',
+      scheduled: { date: '2026-04-06', time: '09:00' },
+    }))
+    const series = next.items.filter(isSeries)
+    expect(series[0].metadata.done).toBe(false)
+  })
+
+  it('future-scope split keeps the new series root at done: false', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const next = applyEdit(data, occ, 'future', editFields(occ, { done: true }))
+    for (const s of next.items.filter(isSeries)) {
+      expect(s.metadata.done).not.toBe(true)
+    }
+  })
+
   it('topics round-trips through parse → serialize', () => {
     const data = fixtureData('weekly-series')
     const occ = occOn(data.items, data.roots, '2026-04-20')
