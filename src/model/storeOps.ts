@@ -225,9 +225,32 @@ export function applyEdit(
     roots = updateRoot(roots, occ.fileSlug, fields)
     const baseSeries = findSeries(items, occ)
     const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
+    const newDate = scheduled?.date ?? ''
+    const newTime = scheduled?.date ? scheduled.time || null : null
+
+    // Moving a *generated* occurrence to another date can't be expressed by a
+    // single override: the override key (its date) doubles as the recurrence-id,
+    // so changing the date leaves the original generated slot un-suppressed.
+    // Instead, exclude the original slot and attach a detached occurrence at the
+    // new date. (Explicit/detached occurrences sit on non-generated dates, so
+    // moving them in place needs no exclusion.)
+    if (occ.ownerId && occ.source === 'generated' && newDate && newDate !== occ.date) {
+      items = upsertOverride(items, occ, { excluded: true })
+      const moved: OccurrenceEntry<OccurrenceMetadata> = {
+        date:     newDate,
+        time:     newTime,
+        source:   'explicit',
+        fileSlug: occ.fileSlug,
+        id:       crypto.randomUUID(),
+        ownerId:  occ.ownerId,
+        metadata: occMeta(base, fields),
+      }
+      return { items: [...items, moved], roots }
+    }
+
     items = upsertOverride(items, occ, {
-      date:    scheduled?.date ?? '',
-      time:    scheduled?.date ? scheduled.time || null : null,
+      date:    newDate,
+      time:    newTime,
       metadata: occMeta(base, fields),
     })
     return { items, roots }
