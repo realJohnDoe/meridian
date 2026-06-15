@@ -261,6 +261,39 @@ Quick sync. Agenda:
 - [[weekly-log]] updates"
 `;
 
+exports[`edit operations → serialized YAML > single-scope move excludes the original slot and re-adds at the new date 1`] = `
+"---
+defaults:
+  done: false
+  duration: 30m
+title: Weekly Standup
+tags:
+  - work
+date: 2026-04-06
+time: 09:00
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday:
+    - mo
+instances:
+  - date: 2026-04-13
+    done: true
+  - date: 2026-04-14
+    done: true
+  - date: 2026-04-20
+    time: 09:00
+    excluded: true
+  - date: 2026-04-22
+    time: 09:00
+---
+
+Quick sync. Agenda:
+- [[project-alpha]] status
+- Blockers
+- [[weekly-log]] updates"
+`;
+
 exports[`edit operations → serialized YAML > toggleDone on a generated occurrence adds a done override 1`] = `
 "---
 defaults:

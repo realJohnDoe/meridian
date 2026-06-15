@@ -95,6 +95,20 @@ describe('edit operations → serialized YAML', () => {
     expect(serializeData(next)).toMatchSnapshot()
   })
 
+  it('single-scope move excludes the original slot and re-adds at the new date', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const next = applyEdit(data, occ, 'single', editFields(occ, {
+      scheduled: { date: '2026-04-22', time: '09:00' },
+    }))
+    const dates = expandRange(next.items, next.roots, new Date('2026-04-19'), new Date('2026-04-23'))
+      .map(o => o.date)
+    // Original generated slot suppressed, moved occurrence present.
+    expect(dates).toContain('2026-04-22')
+    expect(dates).not.toContain('2026-04-20')
+    expect(serializeData(next)).toMatchSnapshot()
+  })
+
   // ── split-series ────────────────────────────────────────────────────────────
 
   it('toggleDone on generated occurrence from the after_completion series targets series2', () => {
