@@ -17,9 +17,6 @@ export const setVaultList        = (refs: VaultRef[])  => useStore.setState({ va
 export const setActiveVaultId    = (id: string | null) => useStore.setState({ activeVaultId: id })
 export const setPendingReconnect = (name: string | null) => useStore.setState({ pendingDirReconnect: name })
 
-// ── NAVIGATION ─────────────────────────────────────────────────
-export const navigateBack = () => window.history.back()
-
 // ── NOTIFICATIONS ──────────────────────────────────────────────
 export function notify(msg: string): void {
   toast.error(msg, { duration: 5000 })
