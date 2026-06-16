@@ -3,6 +3,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView, placeholder } from '@codemirror/view'
 import type { Roots, StoreItem } from '../types'
 import { rootsField, setRootsEffect, wikilinkDecorations } from './cm/wikilinkDecorations'
+import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme } from './cm/markdownFormatting'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
 
 interface Props {
@@ -30,6 +31,7 @@ const editorTheme = EditorView.theme({
     caretColor: 'var(--primary)',
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-words',
+    minHeight: '10rem',
   },
   '.cm-line': {
     padding: '0',
@@ -66,6 +68,11 @@ export default function EntryBody({ body, roots, items, viewRef }: Props) {
     const state = EditorState.create({
       doc: body,
       extensions: [
+        markdownLanguage,
+        markdownHighlight,
+        markdownListTheme,
+        markdownListDecos,
+        markdownLivePreview,
         rootsField.init(() => roots),
         wikilinkDecorations,
         editorTheme,
@@ -108,7 +115,7 @@ export default function EntryBody({ body, roots, items, viewRef }: Props) {
     <>
       <div
         ref={containerRef}
-        className="mt-1 min-h-[10rem] text-sm leading-[1.85] text-secondary-foreground border border-input rounded-[var(--radius-md)] focus-within:ring-2 focus-within:ring-ring"
+        className="mt-1 text-sm leading-[1.85] text-secondary-foreground border border-input rounded-[var(--radius-md)] focus-within:ring-2 focus-within:ring-ring"
       />
       {wlPopup && viewRef.current && (
         <WikilinkPopup
