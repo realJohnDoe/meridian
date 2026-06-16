@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { EditorView } from '@codemirror/view'
 import type { Roots, StoreItem } from '../types'
 import OccurrenceCard from '../components/OccurrenceCard'
-import { fileEntries, fileOccurrenceMap, occState } from '../presentation'
+import { fileEntries, fileOccurrenceMap } from '../presentation'
 
 export interface WlPopupState {
   query:  string
@@ -98,12 +98,9 @@ export default function WikilinkPopup({ popup, roots, items, view, onClose }: Pr
           <div key={e.fileSlug} className={wrapCls} onMouseEnter={() => setFocusIdx(i)}>
             <OccurrenceCard
               occ={occ}
-              variant="compact"
-              hideMeta
-              staticIcon
-              isDone={!!occ.metadata.done}
-              isPast={false}
-              currentBarClass={occState(occ)}
+              taskCheckbox={false}
+              showTime="none"
+              showTagsParticipants={false}
               onOpen={() => insertWikilink(e.title)}
               onToggleDone={() => {}}
             />
