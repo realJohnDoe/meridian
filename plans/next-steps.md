@@ -96,12 +96,6 @@ src/index.css:347 (the PR under review) — the banner now hardcodes color:#fff 
 "line": 106,
 "summary": "fileOccurrenceMap materialises a full 3-year backward occurrence array just to reverse-iterate it",
 "failure_scenario": "expandRange(items, roots, BACK, TODAY) allocates an array of all past occurrences (up to 3 years of daily recurrences — potentially tens of thousands of objects) even when the forward pass already filled every slug. On a large vault viewed on a low-memory device, this causes a measurable GC pause on every cache miss."
-},
-{
-"file": "src/constants.ts",
-"line": 5,
-"summary": "TODAY is computed once at module load and never refreshed; items appear in wrong time bucket after midnight",
-"failure_scenario": "As a PWA, Meridian stays open across midnight. After midnight, TODAY still holds yesterday's date. fileOccurrenceMap anchors AHEAD/BACK from the stale TODAY, so the new calendar day's occurrences fall into the 'most-recent past' backward-pass bucket instead of the 'upcoming' forward-pass bucket — wrong representative occurrences in the item picker and wikilink targets until next reload."
 }
 ]
 Summary by severity:
@@ -115,7 +109,6 @@ Summary by severity:
 5 storeBridge.ts:19 Medium Race — notification cleared prematurely on duplicate messages
 6 storeOps.ts:146 Low Cleanup — dead spread, misleading comment
 7 presentation.ts:106 Low Efficiency — unnecessary full backward array allocation
-8 constants.ts:5 Low Staleness — wrong date bucket after midnight in long-running PWA
 
 ## Survey Prompt
 
