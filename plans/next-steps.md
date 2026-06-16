@@ -90,12 +90,6 @@ src/index.css:347 (the PR under review) — the banner now hardcodes color:#fff 
 "line": 146,
 "summary": "Dead spread ...(existing ? {} : {}) in updateRoot always spreads an empty object",
 "failure_scenario": "The spread is a no-op in both branches — existing is never used. The comment 'merge if needed — for now full replace from form' invites a future developer to add merge logic in the wrong place, believing this line already guards it. Any field-preserving merge intent is silently absent."
-},
-{
-"file": "src/presentation.ts",
-"line": 106,
-"summary": "fileOccurrenceMap materialises a full 3-year backward occurrence array just to reverse-iterate it",
-"failure_scenario": "expandRange(items, roots, BACK, TODAY) allocates an array of all past occurrences (up to 3 years of daily recurrences — potentially tens of thousands of objects) even when the forward pass already filled every slug. On a large vault viewed on a low-memory device, this causes a measurable GC pause on every cache miss."
 }
 ]
 Summary by severity:
@@ -108,7 +102,6 @@ Summary by severity:
 4 githubBackend.ts:52 High Correctness — subdirectory files silently invisible
 5 storeBridge.ts:19 Medium Race — notification cleared prematurely on duplicate messages
 6 storeOps.ts:146 Low Cleanup — dead spread, misleading comment
-7 presentation.ts:106 Low Efficiency — unnecessary full backward array allocation
 
 ## Survey Prompt
 
