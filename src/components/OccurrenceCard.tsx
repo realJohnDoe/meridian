@@ -23,6 +23,7 @@ export interface OccurrenceCardProps {
   staticIcon?: boolean
   hideMeta?: boolean
   displayTitle?: string
+  showDate?: boolean
 }
 
 const titleCls = (isDone: boolean) =>
@@ -64,6 +65,7 @@ export default function OccurrenceCard({
   staticIcon = false,
   hideMeta = false,
   displayTitle,
+  showDate = false,
 }: OccurrenceCardProps) {
   const t = fmtT(occ.time)
   const hasTrack = occ.metadata.done !== undefined
@@ -131,8 +133,9 @@ export default function OccurrenceCard({
             )}
           </div>
 
-          {(tags.length > 0 || topics.length > 0 || participants.length > 0) && (
+          {(showDate || tags.length > 0 || topics.length > 0 || participants.length > 0) && (
             <div className="flex flex-wrap gap-[5px]">
+              {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
               <TagsRow tags={tags} topics={topics} />
               <ParticipantsBadge participants={participants} />
             </div>

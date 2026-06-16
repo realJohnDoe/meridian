@@ -38,7 +38,9 @@ function AgendaPage() {
   // itemCount so it retries as data arrives; only consumes the flag once it actually scrolls.
   useEffect(() => {
     if (!scrollToTodayOnce || itemCount === 0) return
-    const sec = document.querySelector(`.day-section[data-key="${fmtISO(today)}"]`)
+    const sec =
+      document.querySelector('.day-section[data-overdue]') ??
+      document.querySelector(`.day-section[data-key="${fmtISO(today)}"]`)
     if (!sec) return
     useStore.setState({ scrollToTodayOnce: false })
     sec.scrollIntoView({ behavior: 'instant', block: 'start' })
