@@ -11,19 +11,6 @@
 
 ### Custom Prompt with Fable 5
 
-4. Storage-layer names still describe the local-disk era
-   Category: naming
-   Impact: 2
-   Evidence: reconcileWithDisk (vault.ts:130), syncToDirectory (vault.ts:230), and deleteFileFromDisk (vault.ts:215) all operate on the abstract StorageBackend, including GitHub; the file AddVaultDialog.tsx exports ManageVaultsDialog (imported under that name in \_app.tsx:19).
-   Problem: Names asserting "disk/directory" over a backend abstraction mislead readers about what the code touches, and the dialog's filename no longer matches its role.
-   Fix: Rename to reconcileWithBackend, syncToBackend, deleteFromBackend, and rename the file to ManageVaultsDialog.tsx — a mechanical, IDE-assisted change.
-5. Dead code at module boundaries
-   Category: dead-code
-   Impact: 2
-   Evidence: collectUndated (expansion.ts:556) is exported as "Main-app API" but only tests import it; initApp() is an empty function (vault.ts:467-469) still ceremonially called in \_\_root.tsx:18; updateRoot contains the no-op spread ...(existing ? {} : {}) (storeOps.ts:147).
-   Problem: Phantom API surface misleads readers about what the app actually uses and what's safe to change.
-   Fix: Delete initApp and the no-op spread; either wire collectUndated into search/fileOccurrenceMap or move it into the test helpers.
-
 6. Unbounded module-level caches in the model layer
    Category: performance architecture
    Impact: 1 — low severity, included because the fix is trivial and the pattern is in the hottest module
