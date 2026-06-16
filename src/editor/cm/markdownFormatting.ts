@@ -33,17 +33,18 @@ export const markdownHighlight = syntaxHighlighting(
 
 export const markdownListTheme = EditorView.theme({
   '.cm-ul-item': { paddingLeft: '1.2em', textIndent: '-1.2em' },
-  '.cm-ol-item': { paddingLeft: '1.5em', textIndent: '-1.5em' },
-  // Fixed-width, right-aligned marker so the text after `1.` / `2.` aligns
-  // regardless of the font's (proportional) digit widths. Right-aligning keeps
-  // multi-digit markers (`10.`) flush to the same text column.
-  '.cm-ol-marker': {
-    display: 'inline-block',
-    minWidth: '1.2em',
-    textAlign: 'right',
-    marginRight: '0.3em',
-  },
+  // text-indent is inherited; reset it so the hanging indent on the line
+  // doesn't get re-applied inside the inline-block marker box.
+  '.cm-ol-marker': { display: 'inline-block', textIndent: '0' },
 })
+
+// Width of an ordered-list marker box, sized in `ch` (the font's digit advance)
+// per digit plus room for the period and gap. Same digit count → same width, so
+// text aligns within a digit group (1–9, 10–99, …) Obsidian-style, while a
+// longer number simply pushes its text one column further right.
+const olIndent  = (digits: number) => `calc(${digits}ch + 0.45em)`
+const olNegIndent = (digits: number) => `calc(-${digits}ch - 0.45em)`
+const markDigits = (label: string) => label.replace(/\D/g, '').length
 
 // ── Marker widgets ────────────────────────────────────────────────
 
@@ -64,6 +65,9 @@ class OrderedMarkerWidget extends WidgetType {
     const span = document.createElement('span')
     span.textContent = this.label
     span.className = 'cm-ol-marker'
+    // Fixed-width box (left-aligned) so the digit glyph's proportional width
+    // doesn't shift the text after it; the gap lives inside the box.
+    span.style.width = olIndent(markDigits(this.label))
     return span
   }
   eq(other: OrderedMarkerWidget): boolean { return other.label === this.label }
@@ -84,8 +88,18 @@ function buildLineDecorations(view: EditorView): DecorationSet {
     enter(node) {
       if (node.name !== 'ListItem') return
       const lineFrom = doc.lineAt(node.from).from
-      const cls = node.node.parent?.name === 'OrderedList' ? 'cm-ol-item' : 'cm-ul-item'
-      builder.add(lineFrom, lineFrom, Decoration.line({ class: cls }))
+      if (node.node.parent?.name === 'OrderedList') {
+        // Match the line's hanging indent to this item's marker width so
+        // wrapped lines align under the text.
+        const mark = node.node.getChild('ListMark')
+        const digits = mark ? markDigits(doc.sliceString(mark.from, mark.to)) : 1
+        builder.add(lineFrom, lineFrom, Decoration.line({
+          class: 'cm-ol-item',
+          attributes: { style: `padding-left:${olIndent(digits)};text-indent:${olNegIndent(digits)}` },
+        }))
+      } else {
+        builder.add(lineFrom, lineFrom, Decoration.line({ class: 'cm-ul-item' }))
+      }
     },
   })
 
