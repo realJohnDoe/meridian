@@ -5,8 +5,10 @@ import { parseToStoreItems } from '../storeItems'
 import type { ParseResult } from '../storeItems'
 import { collapseToYaml } from '../collapse'
 import { saveFile } from '../../fileIO'
+import { joinFileMeta } from '../expansion'
+import type { OccurrenceEntry } from '../expansion'
 import { isSeries } from '../../types'
-import type { StoreItem, FileMetadata } from '../../types'
+import type { StoreItem, FileMetadata, AppMetadata, Roots } from '../../types'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DIR = resolve(HERE, 'fixtures')
@@ -48,6 +50,19 @@ export function rootMeta(result: ParseResult): FileMetadata {
 /** The occurrence items from a ParseResult (series + standalone occurrences). */
 export function occItems(result: ParseResult): StoreItem[] {
   return result.items
+}
+
+/** Collect standalone occurrences with no date — test helper for verifying undated items. */
+export function collectUndated(items: StoreItem[], roots: Roots): OccurrenceEntry<AppMetadata>[] {
+  const undated = items.filter(
+    i => !isSeries(i)
+      && !(i as OccurrenceEntry<AppMetadata>).ownerId
+      && !i.date,
+  ) as OccurrenceEntry<AppMetadata>[]
+  return undated.map(occ => ({
+    ...occ,
+    metadata: joinFileMeta(occ.fileSlug, occ.metadata, roots),
+  }))
 }
 
 /**

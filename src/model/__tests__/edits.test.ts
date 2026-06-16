@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { parseFixture, serialize, rootMeta } from './helpers'
+import { parseFixture, serialize, rootMeta, collectUndated } from './helpers'
 import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing } from '../storeOps'
 import type { EditFields, StoreData } from '../storeOps'
 import { parseToStoreItems } from '../storeItems'
-import { expandRange, collectUndated } from '../expansion'
+import { expandRange } from '../expansion'
 import { isSeries } from '../../types'
 import type { Occurrence, Roots, StoreItem } from '../../types'
 
