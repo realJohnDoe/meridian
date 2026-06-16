@@ -29,14 +29,8 @@
    Evidence: githubBackend.ts:50-65 requests path: '' and stores tokens.set(item.name, item.sha); statAll never recurses into subdirectories.
    Problem: Vaults with files in subfolders silently won't sync/round-trip via GitHub, unlike the local backend — an inconsistent boundary contract between two StorageBackend implementations.
    Fix: Use the Git Trees API (recursive=1) and key by full path to match LocalBackend's semantics.
-4. No global loading/error UI while the vault restores
-   Category: ux
-   Impact: 3
-   Evidence: \_\_root.tsx:15-18 fires restoreVaults() in an effect; the agenda renders against empty items until it resolves (\_app.index.tsx:34-40 even has a comment about scrolling "against an empty agenda").
-   Problem: On a slow GitHub/FS load the user sees an empty app with no spinner, and there's no surfaced state distinguishing "loading" from "empty vault."
-   Fix: Add a loading flag to the store, set it around restoreVaults, and render a skeleton/spinner.
 
-5. notify() builds error strings by hand and re-implements an auto-dismiss timer
+4. notify() builds error strings by hand and re-implements an auto-dismiss timer
    Category: error-handling dry
    Impact: 2
    Evidence: storeBridge.ts:17-24 hand-rolls a setTimeout dismiss; callers across vault.ts repeat notify('… failed: ' + ((e as Error).message || (e as Error).name)) (vault.ts:135, :148, :170).
