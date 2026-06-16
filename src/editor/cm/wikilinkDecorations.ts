@@ -1,6 +1,6 @@
 import { StateEffect, StateField, RangeSetBuilder } from '@codemirror/state'
 import { Decoration, type DecorationSet, ViewPlugin, type ViewUpdate } from '@codemirror/view'
-import type { Roots, StoreItem } from '../../types'
+import type { Roots } from '../../types'
 import { parseWikilinks, resolveWikilink } from '../../wikilinks'
 
 // ── Roots state — updated via effect when the React component re-renders ──
@@ -12,20 +12,6 @@ export const rootsField = StateField.define<Roots>({
   update(value, tr) {
     for (const e of tr.effects) {
       if (e.is(setRootsEffect)) return e.value
-    }
-    return value
-  },
-})
-
-// ── Items state — for kind lookup in autocomplete ──────────────
-
-export const setItemsEffect = StateEffect.define<StoreItem[]>()
-
-export const itemsField = StateField.define<StoreItem[]>({
-  create: () => [],
-  update(value, tr) {
-    for (const e of tr.effects) {
-      if (e.is(setItemsEffect)) return e.value
     }
     return value
   },

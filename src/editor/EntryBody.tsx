@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, placeholder } from '@codemirror/view'
 import type { Roots, StoreItem } from '../types'
-import { rootsField, setRootsEffect, itemsField, setItemsEffect, wikilinkDecorations } from './cm/wikilinkDecorations'
-import { wikilinkAutocomplete, autocompleteTooltipTheme } from './cm/wikilinkAutocomplete'
+import { rootsField, setRootsEffect, wikilinkDecorations } from './cm/wikilinkDecorations'
+import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
 
 interface Props {
   body:    string
@@ -50,7 +50,6 @@ const editorTheme = EditorView.theme({
   '.cm-placeholder': {
     color: 'var(--muted-foreground)',
   },
-  // Wikilink marks — visual parity with old [&_.wl] / [&_.wl-broken] classes
   '.wl': {
     color: 'var(--primary)',
     borderBottom: '1px solid var(--event-border)',
@@ -64,6 +63,8 @@ const editorTheme = EditorView.theme({
 
 export default function EntryBody({ body, roots, items, viewRef }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [wlPopup, setWlPopup] = useState<WlPopupState | null>(null)
+  const closePopup = useCallback(() => setWlPopup(null), [])
 
   // Mount CM6 EditorView once per component lifetime (key= on parent handles remounts)
   useEffect(() => {
@@ -73,14 +74,23 @@ export default function EntryBody({ body, roots, items, viewRef }: Props) {
       doc: body,
       extensions: [
         rootsField.init(() => roots),
-        itemsField.init(() => items),
         wikilinkDecorations,
-        wikilinkAutocomplete,
-        autocompleteTooltipTheme,
         editorTheme,
         placeholder('Add a description…'),
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ spellcheck: 'false' }),
+        // Detect [[query before cursor and drive the React popup
+        EditorView.updateListener.of(update => {
+          if (!update.docChanged && !update.selectionSet) return
+          const sel = update.state.selection.main
+          if (!sel.empty) { setWlPopup(null); return }
+          const before = update.state.doc.sliceString(0, sel.head)
+          const m = before.match(/\[\[[^\]\n]*$/)
+          if (!m) { setWlPopup(null); return }
+          const coords = update.view.coordsAtPos(sel.head)
+          if (!coords) { setWlPopup(null); return }
+          setWlPopup({ query: m[0].slice(2), from: sel.head - m[0].length, coords })
+        }),
       ],
     })
 
@@ -94,18 +104,25 @@ export default function EntryBody({ body, roots, items, viewRef }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Keep roots and items in sync without remounting the editor
+  // Keep roots in sync without remounting the editor
   useEffect(() => {
     if (viewRef.current) {
       viewRef.current.dispatch({ effects: setRootsEffect.of(roots) })
     }
   }, [roots, viewRef])
 
-  useEffect(() => {
-    if (viewRef.current) {
-      viewRef.current.dispatch({ effects: setItemsEffect.of(items) })
-    }
-  }, [items, viewRef])
-
-  return <div ref={containerRef} className="mt-1" />
+  return (
+    <>
+      <div ref={containerRef} className="mt-1" />
+      {wlPopup && viewRef.current && (
+        <WikilinkPopup
+          popup={wlPopup}
+          roots={roots}
+          items={items}
+          view={viewRef.current}
+          onClose={closePopup}
+        />
+      )}
+    </>
+  )
 }
