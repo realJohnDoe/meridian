@@ -29,38 +29,15 @@
    Evidence: githubBackend.ts:50-65 requests path: '' and stores tokens.set(item.name, item.sha); statAll never recurses into subdirectories.
    Problem: Vaults with files in subfolders silently won't sync/round-trip via GitHub, unlike the local backend — an inconsistent boundary contract between two StorageBackend implementations.
    Fix: Use the Git Trees API (recursive=1) and key by full path to match LocalBackend's semantics.
-4. No global loading/error UI while the vault restores
-   Category: ux
-   Impact: 3
-   Evidence: \_\_root.tsx:15-18 fires restoreVaults() in an effect; the agenda renders against empty items until it resolves (\_app.index.tsx:34-40 even has a comment about scrolling "against an empty agenda").
-   Problem: On a slow GitHub/FS load the user sees an empty app with no spinner, and there's no surfaced state distinguishing "loading" from "empty vault."
-   Fix: Add a loading flag to the store, set it around restoreVaults, and render a skeleton/spinner.
 
-5. Navigation hard-bound to window.history.back()
-   Category: architecture
-   Impact: 2
-   Evidence: storeBridge.ts:14 — navigateBack = () => window.history.back(), used by the mutation layer instead of the router's history.
-   Problem: Bypasses the TanStack router abstraction (used elsewhere via router.history.back() in useEntryEditor.ts:62), giving two inconsistent back-navigation paths and coupling non-UI code to the global window.
-   Fix: Route all back-navigation through the router and remove the window.history shim (folds into finding #1).
-6. notify() builds error strings by hand and re-implements an auto-dismiss timer
+4. notify() builds error strings by hand and re-implements an auto-dismiss timer
    Category: error-handling dry
    Impact: 2
    Evidence: storeBridge.ts:17-24 hand-rolls a setTimeout dismiss; callers across vault.ts repeat notify('… failed: ' + ((e as Error).message || (e as Error).name)) (vault.ts:135, :148, :170).
    Problem: The error-banner timer logic and the (e as Error).message || .name formatting are duplicated, and the timer mechanism overlaps with the toast timer in mutations.ts (two bespoke dismiss schedulers).
    Fix: A single notifyError(prefix, e) helper plus one shared transient-message scheduler.
-7. EntryEditor repeats the metadata-chip button five times
-   Category: dry
-   Impact: 2
-   Evidence: EntryEditor.tsx:224-257 — Date/Time/Duration/Priority/Repeat are five near-identical badgeVariants({variant:'chip'}) buttons differing only in icon, label, value text, and onClick.
-   Problem: Each new metadata chip is another copy of the same markup; styling/aria tweaks must be applied five times.
-   Fix: Extract a <PropChip icon label value pressed onClick className?> component and map over a small config array.
 
 ### /code-review with Opus
-
-🟠 Medium — deletes bypass the offline staging model
-src/vault.ts:139-150 — deleteFileFromDisk writes through to the backend immediately (\_activeBackend.delete(path)), while edits are staged in cache and synced later. Also reached implicitly when a file is emptied (vault.ts:125).
-
-Failure scenario: user is offline (or GitHub token is rate-limited). An edit succeeds (staged dirty), but a delete immediately throws → "Delete failed" banner, and unlike edits it can't be retried via the sync button. The two operations have inconsistent durability/offline semantics. Consider staging deletes as a tombstone flushed by syncToDirectory too.
 
 🟠 Medium — GitHub ensurePermission only proves read access
 src/storage/githubBackend.ts:141-151 — it does GET /repos/{owner}/{repo} and returns 'granted' on success, but that succeeds for a read-only token and doesn't check the configured branch.
@@ -113,18 +90,6 @@ src/index.css:347 (the PR under review) — the banner now hardcodes color:#fff 
 "line": 146,
 "summary": "Dead spread ...(existing ? {} : {}) in updateRoot always spreads an empty object",
 "failure_scenario": "The spread is a no-op in both branches — existing is never used. The comment 'merge if needed — for now full replace from form' invites a future developer to add merge logic in the wrong place, believing this line already guards it. Any field-preserving merge intent is silently absent."
-},
-{
-"file": "src/presentation.ts",
-"line": 106,
-"summary": "fileOccurrenceMap materialises a full 3-year backward occurrence array just to reverse-iterate it",
-"failure_scenario": "expandRange(items, roots, BACK, TODAY) allocates an array of all past occurrences (up to 3 years of daily recurrences — potentially tens of thousands of objects) even when the forward pass already filled every slug. On a large vault viewed on a low-memory device, this causes a measurable GC pause on every cache miss."
-},
-{
-"file": "src/constants.ts",
-"line": 5,
-"summary": "TODAY is computed once at module load and never refreshed; items appear in wrong time bucket after midnight",
-"failure_scenario": "As a PWA, Meridian stays open across midnight. After midnight, TODAY still holds yesterday's date. fileOccurrenceMap anchors AHEAD/BACK from the stale TODAY, so the new calendar day's occurrences fall into the 'most-recent past' backward-pass bucket instead of the 'upcoming' forward-pass bucket — wrong representative occurrences in the item picker and wikilink targets until next reload."
 }
 ]
 Summary by severity:
@@ -137,8 +102,6 @@ Summary by severity:
 4 githubBackend.ts:52 High Correctness — subdirectory files silently invisible
 5 storeBridge.ts:19 Medium Race — notification cleared prematurely on duplicate messages
 6 storeOps.ts:146 Low Cleanup — dead spread, misleading comment
-7 presentation.ts:106 Low Efficiency — unnecessary full backward array allocation
-8 constants.ts:5 Low Staleness — wrong date bucket after midnight in long-running PWA
 
 ## Survey Prompt
 
