@@ -1,6 +1,5 @@
 import { memo } from 'react'
 import type { Occurrence, EditScope } from '../types'
-import { multidayDisplayTitle } from '../model/expansion'
 import { cn } from '../lib/utils'
 import OccurrenceRow from './OccurrenceRow'
 
@@ -30,7 +29,6 @@ function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
           onOpen={() => onOpen(o)}
           onToggleDone={() => onToggleDone(o)}
           onSwipeDelete={() => onSwipeDelete(o)}
-          displayTitle={o.metadata.jsTime ? multidayDisplayTitle(o, o.metadata.jsTime) : undefined}
         />
       ))}
     </div>

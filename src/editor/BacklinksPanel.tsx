@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react'
 import type { Occurrence, StoreItem, Roots } from '../types'
-import { backlinksTo, fileOccurrenceMap, sortOccs, occState } from '../presentation'
+import { backlinksTo, fileOccurrenceMap, sortOccs } from '../presentation'
 import OccurrenceCard from '@/components/OccurrenceCard'
 import { useFlipReorder } from '../hooks/useFlipReorder'
 
@@ -39,10 +39,9 @@ export default function BacklinksPanel({ fileSlug, items, roots, onOpen, onToggl
           <div key={occ.fileSlug} data-occ-key={occ.fileSlug}>
             <OccurrenceCard
               occ={occ}
-              variant="compact"
-              hideMeta
-              isDone={!!occ.metadata.done}
-              currentBarClass={occState(occ)}
+              eventNoteIcon
+              showTime="none"
+              showTagsParticipants={false}
               onOpen={() => onOpen(occ.fileSlug)}
               onToggleDone={() => onToggleDone(occ)}
             />
