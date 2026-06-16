@@ -20,7 +20,7 @@ function findTopDate(scEl: HTMLDivElement): string | null {
   const containerTop = scEl.getBoundingClientRect().top
   let best: string | null = null
   for (const sec of sections) {
-    if (sec.getBoundingClientRect().top <= containerTop + 4) {
+    if (sec.getBoundingClientRect().top <= containerTop + 12) {
       best = sec.getAttribute('data-key')
     } else {
       break

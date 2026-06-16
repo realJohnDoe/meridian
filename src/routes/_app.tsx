@@ -84,12 +84,12 @@ function AppLayout() {
   const isDayView    = pathname.startsWith('/day/')
   const isMonthView  = pathname.startsWith('/calendar')
   const dvDate = isDayView ? new Date(pathname.split('/')[2] + 'T00:00:00') : null
+  const monthViewDate = isMonthView
+    ? (pathname.split('/')[2] ? parseMonth(pathname.split('/')[2]) : null)
+    : null
 
   const topBarLabel = (() => {
-    if (isMonthView) {
-      const monthStr = pathname.split('/')[2]
-      return monthStr ? fmtTopBarMonth(parseMonth(monthStr), today) : ''
-    }
+    if (monthViewDate) return fmtTopBarMonth(monthViewDate, today)
     // Agenda view — use topmost visible day, falling back to today
     const d = agendaTopDate ? new Date(agendaTopDate + 'T00:00:00') : today
     return fmtTopBarDay(d, today)
@@ -140,6 +140,13 @@ function AppLayout() {
             <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{fmtTopBarDay(dvDate, today)}</span>
             <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) } })}><ChevronLeft size={18} /></Button>
             <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) } })}><ChevronRight size={18} /></Button>
+          </div>
+        ) : isMonthView && monthViewDate ? (
+          <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
+            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={() => setSidebarOpen(true)} title="Menu"><Menu size={18} /></Button>
+            <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
+            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) } })}><ChevronLeft size={18} /></Button>
+            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) } })}><ChevronRight size={18} /></Button>
           </div>
         ) : (
           <div className="flex items-center gap-2 min-w-0" id="tbDefault">

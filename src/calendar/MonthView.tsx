@@ -1,6 +1,5 @@
 import { useMemo, useEffect, useRef } from 'react'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
 import type { Occurrence } from '../types'
 
@@ -8,7 +7,6 @@ import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, sortOccs, occState } from '../presentation'
 import { useToday } from '../hooks/useToday'
 import { SurfaceButton } from '@/components/ui/surface-button'
-import { Button } from '@/components/ui/button'
 import { cn } from '../lib/utils'
 import { ccBarVariants } from '@/components/ui/occurrence-variants'
 
@@ -108,9 +106,6 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     return { cells, occs }
   }, [items, roots, y, m])
 
-  function prevMonth() { onNavigateMonth(new Date(y, m - 1, 1)) }
-  function nextMonth() { onNavigateMonth(new Date(y, m + 1, 1)) }
-
   const wrapRef = useRef<HTMLDivElement>(null)
   useHorizontalSwipe(
     wrapRef,
@@ -120,17 +115,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden" ref={wrapRef}>
-      <div className="px-3.5 pt-3 pb-2 flex items-center justify-between shrink-0">
-        <div className="font-[family-name:var(--disp)] text-xl font-light text-foreground">
-          <em className="italic text-primary">{MONTHS[m]}</em> {y}
-        </div>
-        <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="icon" className="rounded-full text-dim" onClick={prevMonth}><ChevronLeft size={16} /></Button>
-          <Button variant="ghost" size="icon" className="rounded-full text-dim" onClick={nextMonth}><ChevronRight size={16} /></Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-7 px-1 shrink-0">
+      <div className="grid grid-cols-7 px-1 shrink-0 pt-2">
         {DAYS.map(d => <div key={d} className="text-center text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground py-0.75">{d}</div>)}
       </div>
 
