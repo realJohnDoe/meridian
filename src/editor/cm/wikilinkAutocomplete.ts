@@ -1,4 +1,4 @@
-import { autocompletion, type CompletionContext, type CompletionResult, type Completion } from '@codemirror/autocomplete'
+import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { EditorView } from '@codemirror/view'
 import { isSeries } from '../../types'
 import { fileEntries } from '../../presentation'
@@ -69,16 +69,8 @@ function wikilinkCompletionSource(context: CompletionContext): CompletionResult 
       return {
         label: e.title,
         apply: `[[${e.title}]]`,
-        // Custom DOM render: icon + label (cards come in PR 3)
-        render(): HTMLElement {
-          const row = document.createElement('span')
-          row.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%'
-          row.appendChild(kindIcon(kind))
-          const label = document.createElement('span')
-          label.textContent = e.title
-          row.appendChild(label)
-          return row
-        },
+        // Encode kind in the type field so addToOptions can read it per row
+        type: kind,
       }
     })
 
@@ -130,4 +122,12 @@ export const wikilinkAutocomplete = autocompletion({
   override: [wikilinkCompletionSource],
   activateOnTyping: true,
   closeOnBlur: true,
+  // addToOptions inserts a DOM node per row at the given slot position.
+  // Position 20 is between the (hidden) cm-completionIcon and the label at 50.
+  addToOptions: [{
+    render(completion) {
+      return kindIcon((completion.type ?? 'note') as Kind)
+    },
+    position: 20,
+  }],
 })
