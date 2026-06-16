@@ -466,6 +466,19 @@ export function joinFileMeta(fileSlug: string, meta: OccurrenceMetadata, roots: 
   }
 }
 
+function dedupeAndSort(occs: OccurrenceEntry<AppMetadata>[]): OccurrenceEntry<AppMetadata>[] {
+  const seen = new Set<string>()
+  return occs
+    .filter(o => {
+      if (!o.metadata.jsTime) return false
+      const k = `${o.fileSlug}|${o.metadata.jsTime.getTime()}`
+      if (seen.has(k)) return false
+      seen.add(k)
+      return true
+    })
+    .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
+}
+
 /**
  * Expand StoreItem[] in the date range [from, to].
  * Series items are expanded via their repeat rule; standalone OccurrenceEntry
@@ -555,17 +568,7 @@ export function expandRange(
     })
   }
 
-  // ── Deduplicate by (fileSlug, jsTime) and sort ────────────────────────────
-  const seen = new Set<string>()
-  return result
-    .filter(o => {
-      if (!o.metadata.jsTime) return false
-      const k = `${o.fileSlug}|${o.metadata.jsTime.getTime()}`
-      if (seen.has(k)) return false
-      seen.add(k)
-      return true
-    })
-    .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
+  return dedupeAndSort(result)
 }
 
 /**
@@ -622,15 +625,6 @@ export function expandWithMultiday(
       return extras
     })
 
-  const seen = new Set<string>()
-  return [...occs, ...extraMultiday]
-    .filter(o => {
-      if (!o.metadata.jsTime) return false
-      const k = `${o.fileSlug}|${o.metadata.jsTime.getTime()}`
-      if (seen.has(k)) return false
-      seen.add(k)
-      return true
-    })
-    .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
+  return dedupeAndSort([...occs, ...extraMultiday])
 }
 
