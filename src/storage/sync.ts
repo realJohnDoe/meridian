@@ -1,6 +1,7 @@
 import {
   cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
   cacheWriteClean, cacheDirtyCount, cacheLoadAll,
+  cacheWriteTombstone, cacheGetTombstones,
 } from '../cache'
 import type { CacheRecord } from '../cache'
 import { conflictPath } from './conflictName'
@@ -112,16 +113,16 @@ export async function reconcileWithBackend(backend: StorageBackend, vaultId: str
 
   for (const [path, diskToken] of diskTokens) {
     const entry = cacheMap.get(path)
-    // Skip dirty entries — any genuine divergence is caught by the CAS write
-    // in pushDirty. Don't over-pull based on an eventually-consistent listing
-    // token that might be stale.
-    if ((!entry || entry.version !== diskToken) && entry?.dirty !== 1) {
+    // Skip dirty entries (pending write) and tombstones (pending delete) —
+    // any genuine divergence is caught by the CAS write in pushDirty.
+    if ((!entry || entry.version !== diskToken) && entry?.dirty === 0) {
       changed.push(path)
     }
   }
   for (const path of cacheMap.keys()) {
     const entry = cacheMap.get(path)
-    if (!diskTokens.has(path) && entry?.dirty !== 1) deleted.push(path)
+    // Skip dirty entries and tombstones — don't clobber pending local changes.
+    if (!diskTokens.has(path) && entry?.dirty === 0) deleted.push(path)
   }
 
   if (changed.length > 0) {
@@ -148,8 +149,9 @@ let _syncing = false
 let _pushTimer: ReturnType<typeof setTimeout> | null = null
 
 async function pushDirty(backend: StorageBackend, vaultId: string): Promise<boolean> {
-  const dirty = await cacheGetDirty(vaultId)
-  if (!dirty.length) return false
+  const dirty      = await cacheGetDirty(vaultId)
+  const tombstones = await cacheGetTombstones(vaultId)
+  if (!dirty.length && !tombstones.length) return false
 
   let hadCollision = false
 
@@ -168,6 +170,13 @@ async function pushDirty(backend: StorageBackend, vaultId: string): Promise<bool
         throw e
       }
     }
+  }
+
+  for (const f of tombstones) {
+    // Pass the cached version (blob SHA for GitHub) so the delete works even
+    // when the backend's in-memory SHA cache is cold after a page reload.
+    await backend.delete(f.path, f.version)
+    await cacheDelete(vaultId, f.path)
   }
 
   return hadCollision
@@ -243,9 +252,9 @@ export async function deleteFromBackend(fileSlug: string): Promise<void> {
     const backend = getActiveBackend()
     if (!backend || backend.readOnly) return
     const path = fileSlugToPath(fileSlug)
-    await cacheDelete(backend.id, path)
-    await backend.delete(path)
+    await cacheWriteTombstone(backend.id, path)
     updateSyncUI()
+    scheduleAutoPush()
   } catch (e) {
     console.error('[vault] deleteFromBackend failed:', e)
     notify('Delete failed: ' + ((e as Error).message || (e as Error).name))

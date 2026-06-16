@@ -41,7 +41,7 @@ export interface StorageBackend {
    * fails. Returns the new version token, if the backend can determine it.
    */
   write(path: string, content: string, expectedVersion?: string): Promise<string | undefined>
-  delete(path: string):                   Promise<void>
+  delete(path: string, expectedVersion?: string): Promise<void>
   /** Local: query/request FS permission. Example: always returns 'granted'. */
   ensurePermission(interactive: boolean): Promise<PermissionState>
 }

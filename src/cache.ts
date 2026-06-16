@@ -106,10 +106,27 @@ export async function cacheGetDirty(vaultId: string): Promise<CacheRecord[]> {
   return d.files.where('vaultId').equals(vaultId).filter(r => r.dirty === 1).toArray()
 }
 
+/**
+ * Stage a pending remote delete. dirty=2 acts as a tombstone: the file is
+ * removed from the UI immediately but the backend delete is deferred to the
+ * next sync (pushDirty). The base version is preserved so GitHub's delete API
+ * can use it as the required blob SHA even after a page reload.
+ */
+export async function cacheWriteTombstone(vaultId: string, path: string): Promise<void> {
+  const d = await cacheInit()
+  const key = vp(vaultId, path)
+  const existing = await d.files.get(key)
+  await d.files.put({ vaultPath: key, vaultId, path, content: '', dirty: 2, updatedAt: Date.now(), version: existing?.version })
+}
+
+export async function cacheGetTombstones(vaultId: string): Promise<CacheRecord[]> {
+  const d = await cacheInit()
+  return d.files.where('vaultId').equals(vaultId).filter(r => r.dirty === 2).toArray()
+}
 
 export async function cacheDirtyCount(vaultId: string): Promise<number> {
   if (!db) return 0
-  try { return await db.files.where('vaultId').equals(vaultId).filter(r => r.dirty === 1).count() }
+  try { return await db.files.where('vaultId').equals(vaultId).filter(r => r.dirty === 1 || r.dirty === 2).count() }
   catch { return 0 }
 }
 

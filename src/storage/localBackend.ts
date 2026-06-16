@@ -17,7 +17,7 @@ export class LocalBackend implements StorageBackend {
   readFiles(paths: string[]):            Promise<FileEntry[]>         { return diskReadFiles(this._handle, paths) }
   readAll():                             Promise<FileEntry[]>         { return diskReadAll(this._handle) }
   write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> { return diskWrite(this._handle, path, content, expectedVersion) }
-  delete(path: string):                 Promise<void>                { return diskDelete(this._handle, path) }
+  delete(path: string, _expectedVersion?: string): Promise<void>    { return diskDelete(this._handle, path) }
 
   async ensurePermission(interactive: boolean): Promise<PermissionState> {
     const perm = await this._handle.queryPermission({ mode: 'readwrite' })

@@ -271,7 +271,7 @@ export class ExampleBackend implements StorageBackend {
   }
 
   async write(_path: string, _content: string, _expectedVersion?: string): Promise<string | undefined> { return undefined }
-  async delete(_path: string): Promise<void> {}
+  async delete(_path: string, _expectedVersion?: string): Promise<void> {}
 
   async ensurePermission(_interactive: boolean): Promise<PermissionState> {
     return 'granted'

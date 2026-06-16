@@ -123,8 +123,8 @@ export class GitHubBackend implements StorageBackend {
     }
   }
 
-  async delete(path: string): Promise<void> {
-    const sha = this._shas.get(path)
+  async delete(path: string, expectedVersion?: string): Promise<void> {
+    const sha = this._shas.get(path) ?? expectedVersion
     if (!sha) return // File doesn't exist on GitHub; nothing to do
     try {
       await this._octokit.request('DELETE /repos/{owner}/{repo}/contents/{path}', {
