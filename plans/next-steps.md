@@ -1,6 +1,5 @@
 ## Next steps
 
-- Fix top bar label
 - Add overdue section in agenda
 - Add CodeMirror 6 for markdown editing
 - Make layout tablet-friendly
@@ -8,15 +7,6 @@
 - Add Solarized Light theme
 
 ## Results from last Quality Survey
-
-### Custom Prompt with Fable 5
-
-6. Unbounded module-level caches in the model layer
-   Category: performance architecture
-   Impact: 1 — low severity, included because the fix is trivial and the pattern is in the hottest module
-   Evidence: occIdCache grows forever per (series, date, time) key with no eviction (expansion.ts:429-434); \_fomCache is a mutable module singleton in presentation.ts:68.
-   Problem: A long-lived PWA session navigating across months keeps accreting UUID entries, and module-singleton state leaks between vault switches and tests.
-   Fix: Cap occIdCache (clear it in setData, since IDs only need stability within a data snapshot's lifetime) and document or co-locate \_fomCache invalidation with the store.
 
 ### Custom Prompt on Opus
 
