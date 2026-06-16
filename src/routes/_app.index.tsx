@@ -15,12 +15,27 @@ export const Route = createFileRoute('/_app/')({
 // Survives remounts so navigating back (e.g. from the entry editor) lands where we left off.
 let savedScrollTop = 0
 
+function findTopDate(scEl: HTMLDivElement): string | null {
+  const sections = scEl.querySelectorAll<HTMLElement>('.day-section[data-key]')
+  const containerTop = scEl.getBoundingClientRect().top
+  let best: string | null = null
+  for (const sec of sections) {
+    if (sec.getBoundingClientRect().top <= containerTop + 4) {
+      best = sec.getAttribute('data-key')
+    } else {
+      break
+    }
+  }
+  return best
+}
+
 function AgendaPage() {
   const today = useToday()
   const navigate = useNavigate()
   const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
   const itemCount = useStore(s => s.items.length)
   const scRef = useRef<HTMLDivElement>(null)
+  const rafRef = useRef<number>(0)
 
   // When a vault activates, scroll to today once data arrives.
   useEffect(() => on('vault:changed', () => useStore.setState({ scrollToTodayOnce: true })), [])
@@ -32,6 +47,22 @@ function AgendaPage() {
     return () => { if (el) savedScrollTop = el.scrollTop }
   }, [])
 
+  // Track topmost visible day for the top bar label.
+  useEffect(() => {
+    const el = scRef.current
+    if (!el) return
+    const update = () => {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(() => {
+        const date = findTopDate(el)
+        useStore.setState({ agendaTopDate: date ?? fmtISO(today) })
+      })
+    }
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    return () => { el.removeEventListener('scroll', update); cancelAnimationFrame(rafRef.current) }
+  }, [today])
+
   // Scroll to today when flagged (vault load or Today button). The today section is always
   // seeded, so we wait for real data (itemCount > 0) before positioning — otherwise we'd
   // scroll against an empty agenda, then today shifts down once items load. Depends on
@@ -42,6 +73,7 @@ function AgendaPage() {
     if (!sec) return
     useStore.setState({ scrollToTodayOnce: false })
     sec.scrollIntoView({ behavior: 'instant', block: 'start' })
+    useStore.setState({ agendaTopDate: fmtISO(today) })
   }, [scrollToTodayOnce, itemCount, today])
 
   const onOpen = useCallback(
