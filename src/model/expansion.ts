@@ -18,7 +18,7 @@ import {
 import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots } from '../types'
 import { isSeries, isStandaloneOcc } from '../types'
 import type { EffectiveNode } from './inheritance'
-import { fmtISO, fmtT, parseDateString } from './dateUtils'
+import { fmtISO, fmtT, parseDateString, parseDateTime } from './dateUtils'
 import { parseDurationDays } from './duration'
 import { parseInterval } from './repeat'
 
@@ -44,17 +44,7 @@ function addInterval(date: Date, intervalStr: string): Date {
 }
 
 function nodeDateTime(node: { date: string; time: string | null }): Date | null {
-  const dateStr = node.date
-  const timeStr = node.time
-  if (!dateStr) return null
-  const dm = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (!dm) return null
-  const [, y, mo, d] = dm.map(Number)
-  if (timeStr) {
-    const tm = timeStr.match(/^(\d{1,2}):(\d{2})/)
-    if (tm) return new Date(y, mo - 1, d, +tm[1], +tm[2], 0, 0)
-  }
-  return new Date(y, mo - 1, d, 0, 0, 0, 0)
+  return parseDateTime(node.date, node.time)
 }
 
 function jsDateToSpec(jsDate: Date): { date: string | null; time: string | null } {

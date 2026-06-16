@@ -14,9 +14,10 @@ import { collapseToYaml } from '../model/collapse'
 import { parseToStoreItems } from '../model/storeItems'
 import {
   applyEdit, excludeOccurrence, deleteFollowing,
-  findSeries, upsertOverride, dayBefore,
+  findSeries, upsertOverride,
   type EditFields,
 } from '../model/storeOps'
+import { dayBefore } from '../model/dateUtils'
 import { loadFile, saveFile } from '../fileIO'
 import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from '../model/expansion'
