@@ -5,8 +5,7 @@
  *   - Types:        OccurrenceEntry<T>, RepeatPattern<T>
  *   - Predicates:   hasRepeat, treeHasOccurrences
  *   - Multiday:     multidayDisplayTitle, multidayCoversDate
- *   - Main-app API: expandRange, expandWithMultiday, collectUndated,
- *                   joinFileMeta, stableOccId
+ *   - Main-app API: expandRange, expandWithMultiday, joinFileMeta, stableOccId
  *
  * Date helpers live in ./dateUtils; duration helpers in ./duration.
  */
@@ -569,24 +568,6 @@ export function expandRange(
   }
 
   return dedupeAndSort(result)
-}
-
-/**
- * Collect standalone occurrences that carry no date (e.g. a task or note saved
- * without scheduling). These never surface in the date-windowed expandRange
- * output, but they are real persisted items and must stay searchable/editable.
- * File-level fields (title/tags/body) are joined on from the per-file root node.
- */
-export function collectUndated(items: StoreItem[], roots: Roots): OccurrenceEntry<AppMetadata>[] {
-  const undated = items.filter(
-    i => !isSeries(i)
-      && !(i as OccurrenceEntry<AppMetadata>).ownerId
-      && !i.date,
-  ) as OccurrenceEntry<AppMetadata>[]
-  return undated.map(occ => ({
-    ...occ,
-    metadata: joinFileMeta(occ.fileSlug, occ.metadata, roots),
-  }))
 }
 
 /**

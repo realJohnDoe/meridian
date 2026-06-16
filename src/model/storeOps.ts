@@ -148,13 +148,11 @@ function seriesMeta(base: Partial<OccurrenceMetadata>, f: EditFields): Occurrenc
  */
 export function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots {
   const next = new Map(roots)
-  const existing = next.get(fileSlug)
   next.set(fileSlug, {
     title:  f.title,
     tags:   f.tags,
     topics: f.topics ?? [],
     body:   f.body || undefined,
-    ...(existing ? {} : {}),  // merge if needed — for now full replace from form
   })
   return next
 }
