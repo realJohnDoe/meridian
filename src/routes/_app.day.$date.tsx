@@ -2,8 +2,7 @@ import { useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import DayView from '@/calendar/DayView'
 import { fmtISO } from '../model/dateUtils'
-import { entryRoute } from './-entryRoute'
-import type { EditScope } from '../types'
+import { useOpenEntry } from '../hooks/useOpenEntry'
 
 export const Route = createFileRoute('/_app/day/$date')({
   component: DayPage,
@@ -15,10 +14,7 @@ function DayPage() {
 
   const dvDate = useMemo(() => new Date(date + 'T00:00:00'), [date])
 
-  const onOpen = useCallback(
-    (occ: Parameters<typeof entryRoute>[0], scope?: EditScope) => navigate(entryRoute(occ, scope)),
-    [navigate],
-  )
+  const onOpen = useOpenEntry()
   const onNavigateDate = useCallback(
     (d: Date) => navigate({ to: '/day/$date', params: { date: fmtISO(d) } }),
     [navigate],
