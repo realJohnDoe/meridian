@@ -199,10 +199,24 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
           <>
             <DialogHeader>
               <DialogTitle>Connect GitHub repository</DialogTitle>
-              <DialogDescription>
-                Create a <strong>fine-grained personal access token</strong> scoped to a single
-                repository with <em>Contents: read and write</em> permission. Store the token
-                securely — it will be saved in your browser&apos;s local storage.
+              <DialogDescription asChild>
+                <div>
+                  Create a{' '}
+                  <a
+                    href="https://github.com/settings/tokens?type=beta"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    fine-grained personal access token
+                  </a>{' '}
+                  on GitHub with these settings:
+                  <ul className="mt-2 ml-4 list-disc space-y-1 text-[12px]">
+                    <li><strong>Repository access:</strong> Only select repositories — pick this vault&apos;s repo</li>
+                    <li><strong>Permissions → Contents:</strong> Read and write</li>
+                    <li>Leave all other permissions as <em>No access</em></li>
+                  </ul>
+                </div>
               </DialogDescription>
             </DialogHeader>
 
