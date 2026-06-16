@@ -33,9 +33,19 @@ export const markdownHighlight = syntaxHighlighting(
 
 export const markdownListTheme = EditorView.theme({
   '.cm-ul-item': { paddingLeft: '1.2em', textIndent: '-1.2em' },
+  '.cm-ol-item': { paddingLeft: '1.5em', textIndent: '-1.5em' },
+  // Fixed-width, right-aligned marker so the text after `1.` / `2.` aligns
+  // regardless of the font's (proportional) digit widths. Right-aligning keeps
+  // multi-digit markers (`10.`) flush to the same text column.
+  '.cm-ol-marker': {
+    display: 'inline-block',
+    minWidth: '1.2em',
+    textAlign: 'right',
+    marginRight: '0.3em',
+  },
 })
 
-// ── Bullet widget ─────────────────────────────────────────────────
+// ── Marker widgets ────────────────────────────────────────────────
 
 class BulletWidget extends WidgetType {
   toDOM(): HTMLElement {
@@ -45,6 +55,18 @@ class BulletWidget extends WidgetType {
     return span
   }
   eq(): boolean { return true }
+  ignoreEvent(): boolean { return false }
+}
+
+class OrderedMarkerWidget extends WidgetType {
+  constructor(readonly label: string) { super() }
+  toDOM(): HTMLElement {
+    const span = document.createElement('span')
+    span.textContent = this.label
+    span.className = 'cm-ol-marker'
+    return span
+  }
+  eq(other: OrderedMarkerWidget): boolean { return other.label === this.label }
   ignoreEvent(): boolean { return false }
 }
 
@@ -61,9 +83,9 @@ function buildLineDecorations(view: EditorView): DecorationSet {
   syntaxTree(view.state).iterate({
     enter(node) {
       if (node.name !== 'ListItem') return
-      if (node.node.parent?.name === 'OrderedList') return
       const lineFrom = doc.lineAt(node.from).from
-      builder.add(lineFrom, lineFrom, Decoration.line({ class: 'cm-ul-item' }))
+      const cls = node.node.parent?.name === 'OrderedList' ? 'cm-ol-item' : 'cm-ul-item'
+      builder.add(lineFrom, lineFrom, Decoration.line({ class: cls }))
     },
   })
 
@@ -111,10 +133,24 @@ function buildHideDecorations(view: EditorView): DecorationSet {
       } else if (node.name === 'EmphasisMark' || node.name === 'CodeMark') {
         builder.add(node.from, node.to, hideDeco)
       } else if (node.name === 'ListMark') {
-        // Unordered only — replace with filled circle; ordered numbers stay
-        const first = doc.sliceString(node.from, node.from + 1)
-        if (first !== '-' && first !== '*' && first !== '+') return
-        builder.add(node.from, node.to, bulletDeco)
+        const label = doc.sliceString(node.from, node.to)
+        if (label === '-' || label === '*' || label === '+') {
+          // Unordered → filled circle
+          builder.add(node.from, node.to, bulletDeco)
+        } else {
+          // Ordered → keep the number but render it in a fixed-width box.
+          // Consume the trailing space too so the gap comes solely from the
+          // marker's margin (keeps first lines and wrapped lines aligned).
+          const end =
+            node.to < line.to && doc.sliceString(node.to, node.to + 1) === ' '
+              ? node.to + 1
+              : node.to
+          builder.add(
+            node.from,
+            end,
+            Decoration.replace({ widget: new OrderedMarkerWidget(label) }),
+          )
+        }
       }
     },
   })
