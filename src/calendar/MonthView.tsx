@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react'
+import { memo, useMemo, useEffect, useRef } from 'react'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useStore } from '../store'
@@ -6,6 +6,8 @@ import type { Occurrence } from '../types'
 
 import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
 import { sameDay, sortOccs, occState } from '../presentation'
+
+const EMPTY: Occurrence[] = []
 import { useToday } from '../hooks/useToday'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { Button } from '@/components/ui/button'
@@ -22,17 +24,13 @@ const DAYS = ['Mo','Tu','We','Th','Fr','Sa','Su']
 interface CalCellProps {
   date: Date
   other: boolean
-  occs: Occurrence[]
+  dayOccs: Occurrence[]
   today: Date
   onDayClick: (date: Date) => void
 }
 
-function CalCell({ date, other, occs, today, onDayClick }: CalCellProps) {
+const CalCell = memo(function CalCell({ date, other, dayOccs, today, onDayClick }: CalCellProps) {
   const isToday = sameDay(date, today)
-  const dayOccs = useMemo(
-    () => sortOccs(occs.filter(o => o.metadata.jsTime && sameDay(o.metadata.jsTime, date))),
-    [occs, date],
-  )
 
   const occCount = dayOccs.length
   const ariaLabel = [
@@ -69,7 +67,7 @@ function CalCell({ date, other, occs, today, onDayClick }: CalCellProps) {
       </div>
     </SurfaceButton>
   )
-}
+})
 
 // ── MonthView ─────────────────────────────────────────────────
 interface Props {
@@ -89,7 +87,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   const monthRef = useRef(month)
   useEffect(() => { monthRef.current = month }, [month])
 
-  const { cells, occs } = useMemo(() => {
+  const { cells, occsByDay } = useMemo(() => {
     const rawFirst = new Date(y, m, 1).getDay()
     const first    = (rawFirst + 6) % 7
     const dim      = new Date(y, m + 1, 0).getDate()
@@ -105,7 +103,18 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     const to   = new Date(y, m + 1, 0, 23, 59, 59)
     const occs = expandWithMultiday(items, roots, from, to)
 
-    return { cells, occs }
+    const occsByDay = new Map<string, Occurrence[]>()
+    for (const o of occs) {
+      if (!o.metadata.jsTime) continue
+      const d = o.metadata.jsTime
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+      const arr = occsByDay.get(key)
+      if (arr) arr.push(o)
+      else occsByDay.set(key, [o])
+    }
+    for (const [k, arr] of occsByDay) occsByDay.set(k, sortOccs(arr))
+
+    return { cells, occsByDay }
   }, [items, roots, y, m])
 
   function prevMonth() { onNavigateMonth(new Date(y, m - 1, 1)) }
@@ -136,16 +145,19 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
       <div className="flex-1 overflow-hidden px-1 pb-1 flex flex-col">
         <div className="grid grid-cols-7 gap-0.5 flex-1">
-          {cells.map(({ date, other }) => (
-            <CalCell
-              key={`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`}
-              date={date}
-              other={other}
-              occs={occs}
-              today={today}
-              onDayClick={onDayClick}
-            />
-          ))}
+          {cells.map(({ date, other }) => {
+            const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+            return (
+              <CalCell
+                key={key}
+                date={date}
+                other={other}
+                dayOccs={occsByDay.get(key) ?? EMPTY}
+                today={today}
+                onDayClick={onDayClick}
+              />
+            )
+          })}
         </div>
       </div>
     </div>
