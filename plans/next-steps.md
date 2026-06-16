@@ -36,24 +36,12 @@
    Problem: On a slow GitHub/FS load the user sees an empty app with no spinner, and there's no surfaced state distinguishing "loading" from "empty vault."
    Fix: Add a loading flag to the store, set it around restoreVaults, and render a skeleton/spinner.
 
-5. Navigation hard-bound to window.history.back()
-   Category: architecture
-   Impact: 2
-   Evidence: storeBridge.ts:14 — navigateBack = () => window.history.back(), used by the mutation layer instead of the router's history.
-   Problem: Bypasses the TanStack router abstraction (used elsewhere via router.history.back() in useEntryEditor.ts:62), giving two inconsistent back-navigation paths and coupling non-UI code to the global window.
-   Fix: Route all back-navigation through the router and remove the window.history shim (folds into finding #1).
-6. notify() builds error strings by hand and re-implements an auto-dismiss timer
+5. notify() builds error strings by hand and re-implements an auto-dismiss timer
    Category: error-handling dry
    Impact: 2
    Evidence: storeBridge.ts:17-24 hand-rolls a setTimeout dismiss; callers across vault.ts repeat notify('… failed: ' + ((e as Error).message || (e as Error).name)) (vault.ts:135, :148, :170).
    Problem: The error-banner timer logic and the (e as Error).message || .name formatting are duplicated, and the timer mechanism overlaps with the toast timer in mutations.ts (two bespoke dismiss schedulers).
    Fix: A single notifyError(prefix, e) helper plus one shared transient-message scheduler.
-7. EntryEditor repeats the metadata-chip button five times
-   Category: dry
-   Impact: 2
-   Evidence: EntryEditor.tsx:224-257 — Date/Time/Duration/Priority/Repeat are five near-identical badgeVariants({variant:'chip'}) buttons differing only in icon, label, value text, and onClick.
-   Problem: Each new metadata chip is another copy of the same markup; styling/aria tweaks must be applied five times.
-   Fix: Extract a <PropChip icon label value pressed onClick className?> component and map over a small config array.
 
 ### /code-review with Opus
 
