@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { StoreItem, Roots } from './types'
 import type { VaultRef } from './storage/backend'
+import { clearOccIdCache } from './model/expansion'
+import { resetFOMCache } from './presentation'
 
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
@@ -31,7 +33,7 @@ interface MeridianStore {
 export const useStore = create<MeridianStore>((set) => ({
   items: [],
   roots: new Map(),
-  setData: ({ items, roots }) => set({ items, roots }),
+  setData: ({ items, roots }) => { clearOccIdCache(); resetFOMCache(); set({ items, roots }) },
 
   vaults:              [],
   activeVaultId:       null,
