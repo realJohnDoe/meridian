@@ -65,7 +65,10 @@ export function buildTagTopicChips(tags: string[], topics: string[], roots: Root
 // Zustand replaces both on every setData, so the map recomputes lazily on
 // the first read after any mutation and is otherwise returned as a stable
 // instance — safe to use as a useMemo dependency.
+// Call resetFOMCache() on setData to prevent stale state across vault switches
+// and to enable test isolation.
 let _fomCache: { items: StoreItem[]; roots: Roots; map: Map<string, Occurrence> } | null = null
+export function resetFOMCache(): void { _fomCache = null }
 
 const _3YR_MS = 365 * 3 * 86_400_000
 
