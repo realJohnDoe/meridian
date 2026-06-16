@@ -237,9 +237,9 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
   return [...arr].sort((a: Occurrence, b: Occurrence) => {
     const sd = _sortKey(a) - _sortKey(b); if (sd) return sd
     const pd = _prioKey(a) - _prioKey(b); if (pd) return pd
-    const td = (a.metadata.jsTime?.getHours() || 0) * 60 + (a.metadata.jsTime?.getMinutes() || 0)
-             - (b.metadata.jsTime?.getHours() || 0) * 60 - (b.metadata.jsTime?.getMinutes() || 0)
-    if (td) return td
+    const ta = a.metadata.jsTime?.getTime() ?? 0
+    const tb = b.metadata.jsTime?.getTime() ?? 0
+    if (ta !== tb) return ta - tb
     return (a.metadata.title || '').localeCompare(b.metadata.title || '')
   })
 }

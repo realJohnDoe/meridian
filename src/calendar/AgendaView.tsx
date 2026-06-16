@@ -1,13 +1,17 @@
 import { useMemo, useCallback } from 'react'
 import { useStore } from '../store'
 import type { Occurrence, EditScope } from '../types'
+import { occKind } from '../types'
 
 import { expandWithMultiday } from '../model/expansion'
 import { fmtISO } from '../model/dateUtils'
 import { sameDay, addDays, sortOccs } from '../presentation'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import DaySection from './DaySection'
+import OverdueSection from './OverdueSection'
 import { useToday } from '../hooks/useToday'
+
+const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 
 
 interface Props {
@@ -57,13 +61,48 @@ export default function AgendaView({ onOpen }: Props) {
   const handleToggleDone = useCallback((occ: Occurrence) => toggleOccDone(occ), [])
   const handleSwipeDelete = useCallback((occ: Occurrence) => beginSwipeDelete(occ), [])
 
+  const todayKey = fmtISO(today)
+  const sortedKeys = Object.keys(groups).sort()
+  const pastKeys = sortedKeys.filter(k => k < todayKey)
+  const currentKeys = sortedKeys.filter(k => k >= todayKey)
+  const overdueItems = sortOccs(pastKeys.flatMap(k => groups[k].items.filter(isOverdue)))
+
   return (
     <div className="pb-24">
-      {Object.keys(groups).sort().map(k => {
+      {/* Past day sections — overdue tasks excluded; skip sections that become empty */}
+      {pastKeys.map(k => {
+        const items = sortOccs(groups[k].items.filter(o => !isOverdue(o)))
+        if (!items.length) return null
+        return (
+          <DaySection
+            key={k}
+            dateKey={k}
+            date={groups[k].date}
+            isToday={false}
+            isTomorrow={false}
+            items={items}
+            onOpen={onOpen}
+            onToggleDone={handleToggleDone}
+            onSwipeDelete={handleSwipeDelete}
+          />
+        )
+      })}
+
+      {/* Overdue — only rendered when non-empty */}
+      {overdueItems.length > 0 && (
+        <OverdueSection
+          items={overdueItems}
+          onOpen={onOpen}
+          onToggleDone={handleToggleDone}
+          onSwipeDelete={handleSwipeDelete}
+        />
+      )}
+
+      {/* Today + future */}
+      {currentKeys.map(k => {
         const g = groups[k]
         const isToday = sameDay(g.date, today)
         const isTomorrow = sameDay(g.date, addDays(today, 1))
-
         return (
           <DaySection
             key={k}
