@@ -1,80 +1,129 @@
 import type { StorageBackend, FileEntry, VaultKind } from './backend'
+import { fmtISO } from '../model/dateUtils'
+import { addDays } from '../presentation'
+
+// ── Date helpers ────────────────────────────────────────────────
+// All example dates are computed relative to today so items always
+// land in the Agenda's -7d … +90d window regardless of when the app
+// is opened.
+
+function todayMidnight(): Date {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+/** ISO string N days offset from today. */
+function d(offset: number): string {
+  return fmtISO(addDays(todayMidnight(), offset))
+}
+
+/** Most-recent occurrence of a given weekday (0=Sun … 6=Sat) at or before today. */
+function lastWeekday(dow: number): string {
+  const t = todayMidnight()
+  const diff = (t.getDay() - dow + 7) % 7
+  return fmtISO(addDays(t, -diff))
+}
+
+/** N weeks before lastWeekday(dow). */
+function prevWeekday(dow: number, weeksBack: number): string {
+  const t = todayMidnight()
+  const diff = (t.getDay() - dow + 7) % 7
+  return fmtISO(addDays(t, -(diff + 7 * weeksBack)))
+}
 
 // ── Seed content ───────────────────────────────────────────────
 // Each entry maps to one virtual .md file.  Content uses the same
 // YAML-frontmatter format that local vault files use, so it flows
 // through the exact same parseToStoreItems path.
 
-const ENTRIES: Array<{ id: string; content: string }> = [
-  {
-    id: 'welcome',
-    content: `---
+// Weekday indices
+const MON = 1, WED = 3
+
+function buildEntries(): Array<{ id: string; content: string }> {
+  // Recurring series anchor: most-recent Monday
+  const recAnchor   = lastWeekday(MON)
+  const recPrev1Mon = prevWeekday(MON, 1)
+  const recPrev1Wed = prevWeekday(WED, 1)
+
+  return [
+    // ── 01: Landing pad — dated today so it tops the Agenda ────
+    {
+      id: '01-start-here',
+      content: `---
 title: Welcome to Meridian
 tags: [guide]
-topics: [team-standup, ship-api]
+topics: [02-your-first-task, 03-plan-your-week, 04-link-your-notes, 05-make-it-yours]
+date: "${d(0)}"
 ---
 
-Meridian stores your data as plain YAML/Markdown files in a local folder.
+Meridian keeps your notes, events, and tasks as plain text files in a folder you own.
 
-Item kinds:
-- **Notes** — no date and no done field; freeform writing
-- **Events** — have a date (plus optional time, duration, participants)
-- **Tasks** — have a done checkbox (plus optional priority)
+**Three item kinds — set by frontmatter fields:**
+- **Notes** — no \`date\`, no \`done\` field; freeform writing
+- **Events** — have a \`date\` (plus optional \`time\`, \`duration\`, \`participants\`)
+- **Tasks** — have a \`done\` checkbox (plus optional \`priority\` and \`date\`)
 
-Open a local folder via **Add vault** in the sidebar to get started with your own data.`,
-  },
+This vault is a read-only sandbox. A guided tour has started — follow the steps,
+or explore these linked items yourself:
+- [[02-your-first-task]] — what tasks look like
+- [[03-plan-your-week]] — what events look like
+- [[04-link-your-notes]] — tags, topics, and wikilinks
+- [[05-make-it-yours]] — how to add your own vault`,
+    },
 
-  {
-    id: 'dev-notes',
-    content: `---
-title: Dev Notes
-tags: [dev, work]
-topics: [ship-api]
----
-
-API uses REST with JWT auth.  Rate limit: 1 000 req/min per tenant.
-
-Key endpoints:
-- \`POST /api/items\` — create
-- \`GET  /api/items\` — list with filters
-- \`PUT  /api/items/:id\` — update`,
-  },
-
-  {
-    id: 'ship-api',
-    content: `---
-title: Ship Backend API
-tags: [work, dev]
-topics: [client-demo, dev-notes]
-date: "2026-06-20"
+    // ── 02: Task example ───────────────────────────────────────
+    {
+      id: '02-your-first-task',
+      content: `---
+title: Read the Meridian welcome note
+tags: [guide]
+topics: [01-start-here]
+date: "${d(0)}"
 done: false
 priority: high
 ---
 
-Core endpoints to deliver before the demo.  See [[client-demo]] for the deadline.`,
-  },
+This is a **task** — it has a \`done\` field and a \`priority\`.
 
-  {
-    id: 'client-demo',
-    content: `---
-title: Client Demo
-tags: [work]
-topics: [ship-api]
-date: "2026-06-18"
-time: "15:00"
-duration: 60m
-priority: high
+Tasks show a checkbox in the editor. Tick it and Meridian writes \`done: true\`
+back to the file. Priority can be \`high\`, \`medium\`, or \`low\`.
+
+Tasks can also be undated (just omit the \`date\` field) — useful for a backlog.
+
+> This vault is read-only, so the checkbox won't persist here.
+> Try it for real after adding your own vault — see [[05-make-it-yours]].`,
+    },
+
+    // ── 03: Event example ──────────────────────────────────────
+    {
+      id: '03-plan-your-week',
+      content: `---
+title: Weekly planning session
+tags: [guide]
+topics: [01-start-here]
+date: "${d(1)}"
+time: "10:00"
+duration: 30m
 ---
 
-Final run-through with the client.  [[ship-api]] must be complete first.`,
-  },
+This is an **event** — it has a \`date\`, a \`time\`, and a \`duration\`.
 
-  {
-    id: 'team-standup',
-    content: `---
+Events appear in all three calendar views: Agenda, Month, and Day.
+The Day view shows them on a timeline — handy for spotting conflicts.
+
+Optional extras: \`participants\` (a list of names) and \`repeat\` for recurring events.
+See [[team-standup]] for a live recurring-event example.`,
+    },
+
+    // ── team-standup: recurring event ──────────────────────────
+    {
+      id: 'team-standup',
+      content: `---
 title: Team Standup
 tags: [work]
-date: "2026-06-09"
+topics: [03-plan-your-week]
+date: "${recAnchor}"
 time: "09:00"
 duration: 30m
 repeat:
@@ -84,35 +133,28 @@ repeat:
 defaults:
   done: false
 instances:
-  - date: "2026-06-09"
+  - date: "${recPrev1Mon}"
     done: true
-  - date: "2026-06-11"
+  - date: "${recPrev1Wed}"
     done: true
 ---
 
-Quick sync — blockers and progress.`,
-  },
+A **recurring event** that repeats Mon/Wed/Fri.
 
-  {
-    id: 'book-club',
-    content: `---
-title: Book Club
-tags: [social]
-date: "2026-06-14"
-time: "18:30"
-duration: 90m
-participants: [Alice, Bob, Carol]
----
+The \`repeat\` block defines the schedule. Each \`instances\` entry overrides one
+occurrence — here two past occurrences are marked done while future ones stay open.
 
-This month: *The Pragmatic Programmer*.`,
-  },
+When you edit a recurring item the editor asks: *This event*, *This and future*, or
+*All events* — so you can update just one without breaking the series.`,
+    },
 
-  {
-    id: 'morning-run',
-    content: `---
+    // ── morning-run: recurring task ────────────────────────────
+    {
+      id: 'morning-run',
+      content: `---
 title: Morning Run
 tags: [health]
-date: "2026-06-09"
+date: "${recAnchor}"
 repeat:
   type: schedule
   freq: weekly
@@ -121,33 +163,89 @@ defaults:
   done: false
   priority: medium
 instances:
-  - date: "2026-06-09"
+  - date: "${recPrev1Mon}"
     done: true
-  - date: "2026-06-11"
+  - date: "${recPrev1Wed}"
     done: true
-`,
-  },
+---
 
-  {
-    id: 'weekly-review',
-    content: `---
-title: Weekly Review
-tags: [work, personal]
-date: "2026-06-14"
-time: "16:00"
-duration: 30m
-repeat:
-  type: schedule
-  freq: weekly
-  byweekday: [sa]
-defaults:
-  done: false
-  priority: low
-`,
-  },
-]
+A **recurring task** — same \`repeat\` mechanics as events, but with a \`done\` field
+instead of \`time\`. The \`defaults\` block sets the priority for every occurrence.`,
+    },
 
-const VERSION = 'example-v1'
+    // ── 04: Tags / topics / wikilinks explainer ────────────────
+    {
+      id: '04-link-your-notes',
+      content: `---
+title: Linking your notes
+tags: [guide]
+topics: [01-start-here, dev-notes]
+---
+
+Meridian has two ways to connect items:
+
+**Tags** are free-text labels (e.g. \`work\`, \`health\`). They appear as chips and
+are searchable from the bottom bar.
+
+**Topics** are wikilinks that point to other files by slug or title. They're listed
+under a file's name in the editor and create a two-way connection: open [[dev-notes]]
+and you'll see this file listed in its Backlinks panel.
+
+**Wikilinks in the body** work the same way — \`[[slug]]\` or \`[[Title]]\` —
+and also appear in Backlinks.
+
+> Tip: type \`[[\` in the body editor for autocomplete suggestions.`,
+    },
+
+    // ── dev-notes: plain note, linked from above ───────────────
+    {
+      id: 'dev-notes',
+      content: `---
+title: Dev Notes
+tags: [work, dev]
+topics: [04-link-your-notes]
+---
+
+API uses REST with JWT auth.  Rate limit: 1 000 req/min per tenant.
+
+Key endpoints:
+- \`POST /api/items\` — create
+- \`GET  /api/items\` — list with filters
+- \`PUT  /api/items/:id\` — update
+
+Open the **Backlinks** panel (bottom of editor) to see which files link here.`,
+    },
+
+    // ── 05: Call-to-action — add your own vault ────────────────
+    {
+      id: '05-make-it-yours',
+      content: `---
+title: Add your own vault
+tags: [guide]
+topics: [01-start-here]
+date: "${d(0)}"
+---
+
+This example vault is **read-only** — edits and new entries won't be saved here.
+
+To use Meridian for real:
+
+1. Open the **menu** (top-left ☰) and tap **Manage vaults**.
+2. Choose **Add local folder** — your browser will ask you to pick a folder.
+   Meridian reads and writes plain \`.md\` files there; no lock-in.
+3. Or choose **Add GitHub repo** if you want your notes synced to a repository.
+
+Once you have a writable vault selected, everything works: create entries,
+tick tasks done, set up recurring events, and link files with \`[[wikilinks]]\`.
+
+Your files stay yours — just a folder full of Markdown.`,
+    },
+  ]
+}
+
+const ENTRIES = buildEntries()
+
+const VERSION = 'example-v2'
 
 export class ExampleBackend implements StorageBackend {
   readonly id       = 'example'
