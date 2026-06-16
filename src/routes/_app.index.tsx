@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect, useLayoutEffect, useRef } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
 import AgendaView from '@/calendar/AgendaView'
 import { fmtISO } from '../model/dateUtils'
-import { entryRoute } from './-entryRoute'
-import type { EditScope } from '../types'
+import { useOpenEntry } from '../hooks/useOpenEntry'
 import { useToday } from '../hooks/useToday'
 import { useStore } from '../store'
 import { on } from '../events'
@@ -31,7 +30,6 @@ function findTopDate(scEl: HTMLDivElement): string | null {
 
 function AgendaPage() {
   const today = useToday()
-  const navigate = useNavigate()
   const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
   const itemCount = useStore(s => s.items.length)
   const scRef = useRef<HTMLDivElement>(null)
@@ -78,10 +76,7 @@ function AgendaPage() {
     useStore.setState({ agendaTopDate: fmtISO(today) })
   }, [scrollToTodayOnce, itemCount, today])
 
-  const onOpen = useCallback(
-    (occ: Parameters<typeof entryRoute>[0], scope?: EditScope) => navigate(entryRoute(occ, scope)),
-    [navigate],
-  )
+  const onOpen = useOpenEntry()
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" id="agSc" ref={scRef}>

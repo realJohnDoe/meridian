@@ -14,7 +14,8 @@ import { on } from '../events'
 import { addDays, fmtTopBarDay, fmtTopBarMonth } from '../presentation'
 import { fmtISO, fmtMonth, parseMonth } from '../model/dateUtils'
 import { useToday } from '../hooks/useToday'
-import { entryRoute, newEntryRoute } from './-entryRoute'
+import { newEntryRoute } from './-entryRoute'
+import { useOpenEntry } from '../hooks/useOpenEntry'
 import FilterOverlay from '@/search/FilterOverlay'
 import EntryOverlay, { isEditScope } from '@/editor/EntryOverlay'
 import ManageVaultsDialog from '@/vaults/ManageVaultsDialog'
@@ -22,7 +23,7 @@ import CoachTour from '@/onboarding/CoachTour'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet'
 import { Button } from '../components/ui/button'
 import { cn } from '../lib/utils'
-import type { Occurrence, EditScope } from '../types'
+import type { EditScope } from '../types'
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
@@ -112,7 +113,7 @@ function AppLayout() {
     { Icon: CalendarClock, label: 'Day',   active: isDayView,                          onClick: () => { setSidebarOpen(false); navigate({ to: '/day/$date', params: { date: fmtISO(today) } }) } },
   ]
 
-  const openEntry = (occ: Occurrence, scope?: EditScope) => navigate(entryRoute(occ, scope))
+  const openEntry = useOpenEntry()
 
   const navigateHome = useCallback(() => navigate({ to: '/' }), [navigate])
   const openTourEntry = useCallback(() => navigate({
