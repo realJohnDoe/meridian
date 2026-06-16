@@ -2,15 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, placeholder } from '@codemirror/view'
 import type { Roots, StoreItem } from '../types'
-import { rootsField, setRootsEffect, wikilinkDecorations } from './cm/wikilinkDecorations'
+import {
+  rootsField, setRootsEffect,
+  itemsField, setItemsEffect,
+  createWikilinkExtension, wikilinkTheme,
+} from './cm/wikilinkDecorations'
 import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme } from './cm/markdownFormatting'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
 
 interface Props {
-  body:    string
-  roots:   Roots
-  items:   StoreItem[]
-  viewRef: React.MutableRefObject<EditorView | null>
+  body:            string
+  roots:           Roots
+  items:           StoreItem[]
+  viewRef:         React.MutableRefObject<EditorView | null>
+  onOpenWikilink?: (ref: string) => void
 }
 
 const editorTheme = EditorView.theme({
@@ -45,6 +50,7 @@ const editorTheme = EditorView.theme({
   '.cm-placeholder': {
     color: 'var(--muted-foreground)',
   },
+  // Raw wikilink text shown when cursor is on the line
   '.wl': {
     color: 'var(--primary)',
     borderBottom: '1px solid var(--event-border)',
@@ -56,10 +62,14 @@ const editorTheme = EditorView.theme({
   },
 })
 
-export default function EntryBody({ body, roots, items, viewRef }: Props) {
+export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [wlPopup, setWlPopup] = useState<WlPopupState | null>(null)
   const closePopup = useCallback(() => setWlPopup(null), [])
+
+  // Stable ref so the CM6 plugin always reads the latest callback without remounting
+  const onOpenRef = useRef<(ref: string) => void>(onOpenWikilink ?? (() => {}))
+  useEffect(() => { onOpenRef.current = onOpenWikilink ?? (() => {}) }, [onOpenWikilink])
 
   // Mount CM6 EditorView once per component lifetime (key= on parent handles remounts)
   useEffect(() => {
@@ -73,13 +83,16 @@ export default function EntryBody({ body, roots, items, viewRef }: Props) {
         markdownListTheme,
         markdownListDecos,
         markdownLivePreview,
+        // Wikilink state fields (must be registered before the decoration plugin)
         rootsField.init(() => roots),
-        wikilinkDecorations,
+        itemsField.init(() => items),
+        createWikilinkExtension(onOpenRef),
+        wikilinkTheme,
         editorTheme,
         placeholder('Add a description…'),
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ spellcheck: 'false' }),
-        // Detect [[query before cursor and drive the React popup
+        // Drive the [[…]] autocomplete popup
         EditorView.updateListener.of(update => {
           if (!update.docChanged && !update.selectionSet) return
           const sel = update.state.selection.main
@@ -104,12 +117,15 @@ export default function EntryBody({ body, roots, items, viewRef }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Keep roots in sync without remounting the editor
+  // Keep roots in sync without remounting
   useEffect(() => {
-    if (viewRef.current) {
-      viewRef.current.dispatch({ effects: setRootsEffect.of(roots) })
-    }
+    viewRef.current?.dispatch({ effects: setRootsEffect.of(roots) })
   }, [roots, viewRef])
+
+  // Keep items in sync without remounting
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: setItemsEffect.of(items) })
+  }, [items, viewRef])
 
   return (
     <>

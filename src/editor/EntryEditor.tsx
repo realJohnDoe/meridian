@@ -233,7 +233,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} />
 
         {item?.fileSlug && onOpenWikilink && onToggleDoneBacklink && (
           <BacklinksPanel
