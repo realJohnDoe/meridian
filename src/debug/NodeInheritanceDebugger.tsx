@@ -400,7 +400,7 @@ export default function NodeInheritanceDebugger() {
       setSelectedIdx(idx); setActiveAction(null)
       const occEntry = (occurrences ?? [])[idx]
       if (occEntry) {
-        setDebugEntry(entryFromOccurrence(occEntry, 'single', b => b, items))
+        setDebugEntry(entryFromOccurrence(occEntry, 'single', items))
       }
     }
   }, [selectedIdx, occurrences, items])
@@ -443,7 +443,7 @@ export default function NodeInheritanceDebugger() {
           title:    debugRoot?.title ?? prev.title,
           tags:     debugRoot?.tags  ? [...debugRoot.tags] : prev.tags,
           priority: (pm?.priority ?? prev.priority ?? null) as Priority | null,
-          bodyHtml: debugRoot?.body  ?? prev.bodyHtml,
+          body: debugRoot?.body  ?? prev.body,
           duration: pm?.duration ?? prev.duration,
           tracked:  prev.tracked,
           done:     pm?.done ?? prev.done,
