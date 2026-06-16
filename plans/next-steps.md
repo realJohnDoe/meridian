@@ -10,13 +10,6 @@
 
 ### Custom Prompt with Fable 5
 
-3. MonthView filters all month occurrences once per cell
-   Category: performance
-   Impact: 3
-   Evidence: MonthView.tsx:29-31 — each of 42 CalCells receives the full occs array and runs occs.filter(...sameDay...); CalCell is not memoized, so all 42 re-filter on any store change.
-   Problem: O(cells × occurrences) work per render with no memo boundary; busy months with multiday expansion make month navigation visibly janky on mobile (the app's 430px target).
-   Fix: Group occs into a Map<dateKey, Occurrence[]> once inside the existing useMemo and pass each cell only its own (sorted) array, wrapping CalCell in memo.
-
 4. Storage-layer names still describe the local-disk era
    Category: naming
    Impact: 2
