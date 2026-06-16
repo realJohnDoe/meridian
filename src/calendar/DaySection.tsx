@@ -1,6 +1,5 @@
 import { memo, useRef } from 'react'
 import type { Occurrence } from '../types'
-import { multidayDisplayTitle } from '../model/expansion'
 import { fmtLong } from '../presentation'
 import { cn } from '../lib/utils'
 import OccurrenceRow from './OccurrenceRow'
@@ -46,7 +45,6 @@ function DaySection({
           onOpen={() => onOpen(o)}
           onToggleDone={() => onToggleDone(o)}
           onSwipeDelete={() => onSwipeDelete(o)}
-          displayTitle={o.metadata.jsTime ? multidayDisplayTitle(o, o.metadata.jsTime) : undefined}
         />
       ))}
     </div>

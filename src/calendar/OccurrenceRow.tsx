@@ -1,7 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '../types'
-import { occState } from '../presentation'
 import OccurrenceCard from '@/components/OccurrenceCard'
 
 interface Props {
@@ -10,11 +9,10 @@ interface Props {
   onOpen: () => void
   onToggleDone: () => void
   onSwipeDelete: () => (() => void)
-  displayTitle?: string
   showDate?: boolean
 }
 
-export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete, displayTitle, showDate }: Props) {
+export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
@@ -123,13 +121,6 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
     }
   }, []) // listeners are stable; callback accessed via ref
 
-  const currentBarClass = occState(occ)
-
-  // Reuse the bar-class result to drive the overlay — occState already has the
-  // correct logic (jsTime-based for timed events, day-level for all-day, always
-  // event-future for multiday). This keeps bar colour and overlay in sync.
-  const isPast = currentBarClass === 'event-past'
-
   return (
     <div
       className="swipe-wrap mx-2 mb-1.5"
@@ -147,12 +138,8 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       <div className="swipe-row" ref={rowRef}>
         <OccurrenceCard
           occ={occ}
-          isDone={!!occ.metadata.done}
-          isPast={isPast}
-          currentBarClass={currentBarClass}
           onOpen={onOpen}
           onToggleDone={onToggleDone}
-          displayTitle={displayTitle}
           showDate={showDate}
         />
       </div>

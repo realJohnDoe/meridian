@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Occurrence, StoreItem } from '../types'
-import { fileEntries, fileOccurrenceMap, occState } from '../presentation'
+import { fileEntries, fileOccurrenceMap } from '../presentation'
 import OccurrenceCard from '@/components/OccurrenceCard'
 import { useStore } from '../store'
 
@@ -67,14 +67,14 @@ export default function FileResultsList({ query, items, onOpen }: Props) {
         return (
           <div
             key={entry.fileSlug}
-            style={{ animation: 'fadeUp .16s ease both', animationDelay: `${i * 0.025}s` }}
+            style={{ '--stagger': `${i * 0.025}s` } as React.CSSProperties}
           >
             <OccurrenceCard
               occ={occ}
-              variant="compact"
-              staticIcon
-              isDone={!!occ.metadata.done}
-              currentBarClass={occState(occ)}
+              taskCheckbox={false}
+              eventNoteIcon
+              showTime="badge"
+              showDate
               onOpen={() => onOpen(occ)}
               onToggleDone={() => {}}
             />
