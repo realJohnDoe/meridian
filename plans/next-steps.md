@@ -9,13 +9,6 @@
 
 ### Custom Prompt on Opus
 
-1. AppLayout (\_app.tsx) is a god-component owning ~7 unrelated concerns
-   Category: srp architecture
-   Impact: 5
-   Evidence: \_app.tsx:40-245 — one component handles topbar + day-nav, sidebar/vault list, sync-status color/title logic (:59-66), search bar, filter overlay, entry overlay, and the add-vault dialog, plus inline vaultIcon/navItems building.
-   Problem: Any change to the sidebar, sync indicator, or search bar forces edits to a single 245-line layout file with intertwined state (filterQuery, sidebarOpen, addVaultOpen).
-   Fix: Extract <Sidebar>, <SyncButton>, and <SearchBar> components, each owning its own state and store selectors.
-
 2. Editor handler prop-drilling through three layers
    Category: architecture dry
    Impact: 3
