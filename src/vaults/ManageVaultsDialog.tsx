@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { HardDrive, GitBranch, BookOpen, Trash2, Plus } from 'lucide-react'
+import { HardDrive, GitBranch, Trash2, Plus } from 'lucide-react'
+import { vaultIcon } from '../lib/vaultIcon'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '../lib/utils'
@@ -14,11 +15,6 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-function vaultIcon(kind: string) {
-  if (kind === 'local')  return HardDrive
-  if (kind === 'github') return GitBranch
-  return BookOpen
-}
 
 export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
   const [step,    setStep]    = useState<Step>('manage')
