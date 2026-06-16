@@ -8,7 +8,7 @@ import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '../typ
 import { titleToSlug } from '../fileIO'
 import { getItems, getRoots, setData } from '../storeBridge'
 import { warmSlugInFOM } from '../presentation'
-import { writeEntityToCache, deleteFromBackend as deleteFileFromDisk } from '../storage/sync'
+import { writeEntityToCache, deleteFromBackend } from '../storage/sync'
 import type { EntryState, ItemType } from './state'
 
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
@@ -137,7 +137,7 @@ export function deleteNode(
     const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
     warmSlugInFOM(item.fileSlug, next.items, next.roots)
     setData(next)
-    deleteFileFromDisk(item.fileSlug)
+    deleteFromBackend(item.fileSlug)
     hideSheet(); navigateBack()
   }
   function deleteFuture() {
@@ -154,7 +154,7 @@ export function deleteNode(
       const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
       warmSlugInFOM(item.fileSlug, next.items, next.roots)
       setData(next)
-      deleteFileFromDisk(item.fileSlug); navigateBack()
+      deleteFromBackend(item.fileSlug); navigateBack()
     }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }
     doDelete()

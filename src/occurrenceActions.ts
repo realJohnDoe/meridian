@@ -5,7 +5,7 @@ import { occIsRecur } from './types'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
 import { warmSlugInFOM } from './presentation'
-import { writeEntityToCache, deleteFromBackend as deleteFileFromDisk } from './storage/sync'
+import { writeEntityToCache, deleteFromBackend } from './storage/sync'
 import { toast } from 'sonner'
 
 export function toggleOccDone(o: Occurrence): void {
@@ -29,7 +29,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
     return () => { if (!cancelled) setData(next) }
   } else {
     showDeleteToast(title,
-      () => { deleteFileFromDisk(o.fileSlug) },
+      () => { deleteFromBackend(o.fileSlug) },
       () => {
         cancelled = true
         if (!getItems().find(i => i.id === o.id)) setData(snapshot)
