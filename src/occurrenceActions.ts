@@ -6,7 +6,7 @@ import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
 import { warmSlugInFOM } from './presentation'
 import { writeEntityToCache, deleteFromBackend } from './storage/sync'
-import { toast } from 'sonner'
+import { showDeleteToast } from './undoToast'
 
 export function toggleOccDone(o: Occurrence): void {
   const next = toggleDone({ items: getItems(), roots: getRoots() }, o)
@@ -41,34 +41,3 @@ export function beginSwipeDelete(o: Occurrence): () => void {
   }
 }
 
-// ── UNDO TOAST MANAGER ────────────────────────────────────────
-
-let _toastId:       string | number | null = null
-let _pendingCommit: (() => void) | null    = null
-const TOAST_MS = 4000
-
-function showDeleteToast(title: string, commitFn: () => void, undoFn: () => void): void {
-  if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-  if (_toastId !== null) { toast.dismiss(_toastId); _toastId = null }
-
-  _pendingCommit = commitFn
-  _toastId = toast(`Deleted: ${title}`, {
-    duration: TOAST_MS,
-    action: {
-      label: 'Undo',
-      onClick: () => {
-        _pendingCommit = null
-        _toastId = null
-        undoFn()
-      },
-    },
-    onDismiss: () => {
-      if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-      _toastId = null
-    },
-    onAutoClose: () => {
-      if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-      _toastId = null
-    },
-  })
-}
