@@ -11,8 +11,8 @@ import { useStore } from '../store'
 import { syncToBackend } from '../storage/sync'
 import { setActiveVault } from '../storage/vaultRegistry'
 import { on } from '../events'
-import { addDays, fmtLong } from '../presentation'
-import { fmtISO, fmtMonth } from '../model/dateUtils'
+import { addDays, fmtTopBarDay, fmtTopBarMonth } from '../presentation'
+import { fmtISO, fmtMonth, parseMonth } from '../model/dateUtils'
 import { useToday } from '../hooks/useToday'
 import { entryRoute, newEntryRoute } from './-entryRoute'
 import FilterOverlay from '@/search/FilterOverlay'
@@ -62,9 +62,10 @@ function AppLayout() {
     setTimeout(() => useStore.setState({ syncFlash: false }), 800)
   }), [])
 
+  const agendaTopDate = useStore(s => s.agendaTopDate)
+
   const activeVault  = vaults.find(v => v.id === activeVaultId)
   const isWritable   = activeVault?.kind === 'local' || activeVault?.kind === 'github'
-  const vaultName    = activeVault?.name ?? 'Meridian'
 
   const syncColor = syncError
     ? 'var(--destructive)'
@@ -80,10 +81,19 @@ function AppLayout() {
         ? `${syncDirtyCount} unsaved change${syncDirtyCount > 1 ? 's' : ''} — syncing…`
         : 'All synced'
 
-  const isDayView = pathname.startsWith('/day/')
-  const dvDate = isDayView
-    ? new Date(pathname.split('/')[2] + 'T00:00:00')
+  const isDayView    = pathname.startsWith('/day/')
+  const isMonthView  = pathname.startsWith('/calendar')
+  const dvDate = isDayView ? new Date(pathname.split('/')[2] + 'T00:00:00') : null
+  const monthViewDate = isMonthView
+    ? (pathname.split('/')[2] ? parseMonth(pathname.split('/')[2]) : null)
     : null
+
+  const topBarLabel = (() => {
+    if (monthViewDate) return fmtTopBarMonth(monthViewDate, today)
+    // Agenda view — use topmost visible day, falling back to today
+    const d = agendaTopDate ? new Date(agendaTopDate + 'T00:00:00') : today
+    return fmtTopBarDay(d, today)
+  })()
 
   const handleToday = () => {
     if (isDayView) {
@@ -127,14 +137,21 @@ function AppLayout() {
         {isDayView && dvDate ? (
           <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
             <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={() => setSidebarOpen(true)} title="Menu"><Menu size={18} /></Button>
-            <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{fmtLong(dvDate)}</span>
+            <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{fmtTopBarDay(dvDate, today)}</span>
             <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) } })}><ChevronLeft size={18} /></Button>
             <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) } })}><ChevronRight size={18} /></Button>
+          </div>
+        ) : isMonthView && monthViewDate ? (
+          <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
+            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={() => setSidebarOpen(true)} title="Menu"><Menu size={18} /></Button>
+            <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
+            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) } })}><ChevronLeft size={18} /></Button>
+            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) } })}><ChevronRight size={18} /></Button>
           </div>
         ) : (
           <div className="flex items-center gap-2 min-w-0" id="tbDefault">
             <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={() => setSidebarOpen(true)} title="Menu"><Menu size={18} /></Button>
-            <span className="font-[family-name:var(--disp)] italic text-base text-secondary-foreground">{vaultName}</span>
+            <span className="font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
           </div>
         )}
         <div className="flex items-center gap-0.5 shrink-0">

@@ -28,6 +28,8 @@ interface MeridianStore {
   // ── Agenda scroll ────────────────────────────────────────────────
   /** When true, AgendaPage will scroll to today once then clear this flag. */
   scrollToTodayOnce: boolean
+  /** ISO date string of the topmost visible day in the agenda view. */
+  agendaTopDate: string | null
 }
 
 export const useStore = create<MeridianStore>((set) => ({
@@ -44,4 +46,5 @@ export const useStore = create<MeridianStore>((set) => ({
   syncError:      false,
 
   scrollToTodayOnce: false,
+  agendaTopDate:     null,
 }))
