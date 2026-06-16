@@ -235,6 +235,7 @@ The category ranking is a tiebreaker, not a filter. A serious finding in any cat
 
 - DRY violations — duplicated logic that should be a shared utility or hook, especially across feature boundaries
 - SRP violations — functions/components doing too many unrelated things
+- Overly defensive coding - checking for the same risks in multiple layers without a clear strategy
 - Naming — misleading, ambiguous, or inconsistent names across a module boundary (e.g. the same concept called different things in different layers, or a name that no longer reflects what the code does)
 - Dead code — unreachable paths, unused exports, or unused imports at module boundaries (not just individual variables)
 - Type safety — pervasive use of `any`, missing return types on public API surfaces, unsafe casts
