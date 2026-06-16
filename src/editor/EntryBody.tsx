@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, placeholder } from '@codemirror/view'
 import type { Roots, StoreItem } from '../types'
-import { rootsField, setRootsEffect, wikilinkDecorations } from './cm/wikilinkDecorations'
-import { wikilinkAutocomplete } from './cm/wikilinkAutocomplete'
+import { rootsField, setRootsEffect, itemsField, setItemsEffect, wikilinkDecorations } from './cm/wikilinkDecorations'
+import { wikilinkAutocomplete, autocompleteTooltipTheme } from './cm/wikilinkAutocomplete'
 
 interface Props {
   body:    string
@@ -60,37 +60,9 @@ const editorTheme = EditorView.theme({
     color: 'var(--destructive)',
     borderBottom: '1px solid color-mix(in oklab, var(--destructive), transparent 70%)',
   },
-  // Autocomplete dropdown — matches the existing wikilink popup styling
-  '.cm-tooltip.cm-tooltip-autocomplete': {
-    background: 'var(--popover)',
-    border: '1px solid var(--input)',
-    borderRadius: 'var(--radius)',
-    boxShadow: '0 8px 32px rgba(0,0,0,.4)',
-    minWidth: '210px',
-    maxHeight: '200px',
-    overflow: 'hidden',
-  },
-  '.cm-tooltip-autocomplete > ul': {
-    fontFamily: 'inherit',
-    maxHeight: '200px',
-    overflow: 'auto',
-  },
-  '.cm-tooltip-autocomplete > ul > li': {
-    padding: '0.5rem 0.875rem',
-    fontSize: '0.875rem',
-    color: 'var(--secondary-foreground)',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-  },
-  '.cm-tooltip-autocomplete > ul > li[aria-selected="true"]': {
-    background: 'var(--accent)',
-    color: 'var(--secondary-foreground)',
-  },
 })
 
-export default function EntryBody({ body, roots, items: _items, viewRef }: Props) {
+export default function EntryBody({ body, roots, items, viewRef }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Mount CM6 EditorView once per component lifetime (key= on parent handles remounts)
@@ -101,8 +73,10 @@ export default function EntryBody({ body, roots, items: _items, viewRef }: Props
       doc: body,
       extensions: [
         rootsField.init(() => roots),
+        itemsField.init(() => items),
         wikilinkDecorations,
         wikilinkAutocomplete,
+        autocompleteTooltipTheme,
         editorTheme,
         placeholder('Add a description…'),
         EditorView.lineWrapping,
@@ -120,12 +94,18 @@ export default function EntryBody({ body, roots, items: _items, viewRef }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Keep roots in sync without remounting the editor
+  // Keep roots and items in sync without remounting the editor
   useEffect(() => {
     if (viewRef.current) {
       viewRef.current.dispatch({ effects: setRootsEffect.of(roots) })
     }
   }, [roots, viewRef])
+
+  useEffect(() => {
+    if (viewRef.current) {
+      viewRef.current.dispatch({ effects: setItemsEffect.of(items) })
+    }
+  }, [items, viewRef])
 
   return <div ref={containerRef} className="mt-1" />
 }
