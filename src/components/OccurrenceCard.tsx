@@ -88,6 +88,7 @@ export default function OccurrenceCard({
   if (variant === 'agenda') {
     return (
       <Card
+        data-tour="entry-card"
         className={`${cardCls} flex items-stretch gap-[9px] pl-[8px] pr-[14px] py-[8px]`}
         style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
       >

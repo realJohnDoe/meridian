@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createFileRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   Menu, FolderSync, CalendarCheck2,
@@ -18,6 +18,7 @@ import { entryRoute, newEntryRoute } from './-entryRoute'
 import FilterOverlay from '@/search/FilterOverlay'
 import EntryOverlay, { isEditScope } from '@/editor/EntryOverlay'
 import ManageVaultsDialog from '@/vaults/ManageVaultsDialog'
+import CoachTour from '@/onboarding/CoachTour'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet'
 import { Button } from '../components/ui/button'
 import { cn } from '../lib/utils'
@@ -103,6 +104,17 @@ function AppLayout() {
 
   const openEntry = (occ: Occurrence, scope?: EditScope) => navigate(entryRoute(occ, scope))
 
+  const navigateHome = useCallback(() => navigate({ to: '/' }), [navigate])
+  const openTourEntry = useCallback(() => navigate({
+    to: '.' as const,
+    search: (_prev: Record<string, unknown>) => ({
+      editor: '02-your-first-task',
+      escope: 'single' as EditScope,
+      edate: undefined,
+      etitle: undefined,
+    }),
+  }), [navigate])
+
   function vaultIcon(kind: string) {
     if (kind === 'local')   return HardDrive
     if (kind === 'github')  return GitBranch
@@ -131,7 +143,7 @@ function AppLayout() {
         </div>
       </header>
 
-      <section className="flex flex-1 flex-col overflow-hidden">
+      <section data-tour="main-content" className="flex flex-1 flex-col overflow-hidden">
         <Outlet />
       </section>
 
@@ -152,7 +164,7 @@ function AppLayout() {
             />
             <span className="font-[family-name:var(--disp)] italic text-[16px] text-sidebar-foreground">Meridian</span>
           </div>
-          <nav className="flex-1 overflow-y-auto py-2">
+          <nav data-tour="nav-group" className="flex-1 overflow-y-auto py-2">
             {navItems.map(({ Icon, label, active, onClick }) => (
               <Button
                 key={label}
@@ -196,6 +208,7 @@ function AppLayout() {
             })}
 
             <Button
+              data-tour="manage-vaults"
               variant="ghost"
               onClick={() => { setSidebarOpen(false); setAddVaultOpen(true) }}
               className="w-full justify-start gap-[14px] px-5 h-auto py-[11px] text-[14px] font-medium rounded-none text-dim hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -210,7 +223,7 @@ function AppLayout() {
       <ManageVaultsDialog open={addVaultOpen} onOpenChange={setAddVaultOpen} />
 
       <div className="absolute left-3.5 right-3.5 flex flex-col gap-2 pointer-events-none z-30" style={{ bottom: 'calc(var(--nh) + 0.875rem)' }}>
-        <div className="search-bar-wrap">
+        <div data-tour="search-bar" className="search-bar-wrap">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           <input
             id="filterInput"
@@ -255,6 +268,12 @@ function AppLayout() {
       {editor && (
         <EntryOverlay editor={editor} edate={edate} escope={escope} etitle={etitle} />
       )}
+
+      <CoachTour
+        setSidebarOpen={setSidebarOpen}
+        navigateHome={navigateHome}
+        openTourEntry={openTourEntry}
+      />
     </>
   )
 }
