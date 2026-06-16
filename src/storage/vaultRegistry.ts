@@ -10,7 +10,7 @@ import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
 import { GitHubBackend }  from './githubBackend'
 import type { StorageBackend, VaultRef, GitHubVaultRef } from './backend'
-import { setData, getVaults, notify, setVaultList, setActiveVaultId, setPendingReconnect } from '../storeBridge'
+import { setData, getVaults, notify, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading } from '../storeBridge'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
 import { reconcileWithBackend, parseFiles, updateSyncUI } from './sync'
 import { emit } from '../events'
@@ -62,6 +62,14 @@ async function activateWritableVault(backend: StorageBackend): Promise<void> {
 // ── VAULT LIFECYCLE ───────────────────────────────────────────
 
 export async function restoreVaults(): Promise<void> {
+  try {
+    await restoreVaultsInner()
+  } finally {
+    setVaultLoading(false)
+  }
+}
+
+async function restoreVaultsInner(): Promise<void> {
   async function fallbackToExample() {
     const backend = new ExampleBackend()
     setActiveBackend(backend)

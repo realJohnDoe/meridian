@@ -25,6 +25,10 @@ interface MeridianStore {
   /** True when the most recent sync attempt failed (drives the red icon). */
   syncError: boolean
 
+  // ── Vault loading ─────────────────────────────────────────────────
+  /** True from app start until restoreVaults() settles — distinguishes "loading" from "empty". */
+  vaultLoading: boolean
+
   // ── Agenda scroll ────────────────────────────────────────────────
   /** When true, AgendaPage will scroll to today once then clear this flag. */
   scrollToTodayOnce: boolean
@@ -44,6 +48,8 @@ export const useStore = create<MeridianStore>((set) => ({
   syncDirtyCount: 0,
   syncFlash:      false,
   syncError:      false,
+
+  vaultLoading: true,
 
   scrollToTodayOnce: false,
   agendaTopDate:     null,
