@@ -22,43 +22,38 @@
    Evidence: ~18 handlers from useEntryEditor are destructured and re-passed individually in EditorShell.tsx:23-71 and again declared as 16 props in DialogStack.tsx:14-31.
    Problem: Adding one dialog field means editing the hook return, EditorShell, the DialogStack props interface, and the call site — four touch points for one wire.
    Fix: Pass the hooks object (or a grouped dialogHandlers) straight through rather than spreading every callback by hand.
-3. initApp() is an empty no-op still wired into the root
-   Category: dead-code
-   Impact: 1
-   Evidence: vault.ts:373-375 — body is only a comment; called at \_\_root.tsx:16.
-   Problem: A do-nothing function called on boot implies an init step that doesn't exist.
-   Fix: Remove initApp and its call.
-4. GitHub backend only sees the repo root and keys files by name, not path
+
+3. GitHub backend only sees the repo root and keys files by name, not path
    Category: architecture error-handling
    Impact: 4
    Evidence: githubBackend.ts:50-65 requests path: '' and stores tokens.set(item.name, item.sha); statAll never recurses into subdirectories.
    Problem: Vaults with files in subfolders silently won't sync/round-trip via GitHub, unlike the local backend — an inconsistent boundary contract between two StorageBackend implementations.
    Fix: Use the Git Trees API (recursive=1) and key by full path to match LocalBackend's semantics.
-5. No global loading/error UI while the vault restores
+4. No global loading/error UI while the vault restores
    Category: ux
    Impact: 3
    Evidence: \_\_root.tsx:15-18 fires restoreVaults() in an effect; the agenda renders against empty items until it resolves (\_app.index.tsx:34-40 even has a comment about scrolling "against an empty agenda").
    Problem: On a slow GitHub/FS load the user sees an empty app with no spinner, and there's no surfaced state distinguishing "loading" from "empty vault."
    Fix: Add a loading flag to the store, set it around restoreVaults, and render a skeleton/spinner.
-6. Occurrence visual state is stringly-typed and decoded by ad-hoc maps
+5. Occurrence visual state is stringly-typed and decoded by ad-hoc maps
    Category: types naming
    Impact: 3
    Evidence: presentation.ts:191 occState(): string returns magic strings ('task-p1', 'event-future'…) consumed via untyped Record<string,string> maps \_ccBarMap/\_dvBlkMap (:231, :249) with ?? 'event' fallbacks hiding typos.
    Problem: A renamed state or typo'd map key fails silently to the fallback class instead of a compile error.
    Fix: Make occState return a string-literal union and type the maps as Record<OccState, string>.
-7. Navigation hard-bound to window.history.back()
+6. Navigation hard-bound to window.history.back()
    Category: architecture
    Impact: 2
    Evidence: storeBridge.ts:14 — navigateBack = () => window.history.back(), used by the mutation layer instead of the router's history.
    Problem: Bypasses the TanStack router abstraction (used elsewhere via router.history.back() in useEntryEditor.ts:62), giving two inconsistent back-navigation paths and coupling non-UI code to the global window.
    Fix: Route all back-navigation through the router and remove the window.history shim (folds into finding #1).
-8. notify() builds error strings by hand and re-implements an auto-dismiss timer
+7. notify() builds error strings by hand and re-implements an auto-dismiss timer
    Category: error-handling dry
    Impact: 2
    Evidence: storeBridge.ts:17-24 hand-rolls a setTimeout dismiss; callers across vault.ts repeat notify('… failed: ' + ((e as Error).message || (e as Error).name)) (vault.ts:135, :148, :170).
    Problem: The error-banner timer logic and the (e as Error).message || .name formatting are duplicated, and the timer mechanism overlaps with the toast timer in mutations.ts (two bespoke dismiss schedulers).
    Fix: A single notifyError(prefix, e) helper plus one shared transient-message scheduler.
-9. EntryEditor repeats the metadata-chip button five times
+8. EntryEditor repeats the metadata-chip button five times
    Category: dry
    Impact: 2
    Evidence: EntryEditor.tsx:224-257 — Date/Time/Duration/Priority/Repeat are five near-identical badgeVariants({variant:'chip'}) buttons differing only in icon, label, value text, and onClick.
