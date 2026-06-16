@@ -7,7 +7,7 @@ export type ItemType = 'task' | 'event' | 'note'
 
 export interface EntryState extends EditorFields {
   item:      Occurrence | null
-  bodyHtml:  string
+  body:      string
   itemType:  ItemType
   editScope: EditScope
 }
@@ -15,7 +15,7 @@ export interface EntryState extends EditorFields {
 export const ENTRY_DEFAULT: EntryState = {
   item: null,
   title: '',
-  bodyHtml: '',
+  body: '',
   scheduled: null,
   duration: '',
   tracked: true,

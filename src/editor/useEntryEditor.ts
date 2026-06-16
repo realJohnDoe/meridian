@@ -5,7 +5,6 @@ import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './save'
 import { notify } from '../storeBridge'
 import type { SeriesSheetConfig } from './save'
 import type { Occurrence, EditScope } from '../types'
-import { buildBodyHtml } from '../presentation'
 import { fmtISO } from '../model/dateUtils'
 import { newEntryRoute } from '../routes/-entryRoute'
 import { resolveWikilink } from '../wikilinks'
@@ -17,7 +16,7 @@ function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryStat
     const t = new Date(); t.setHours(0, 0, 0, 0)
     return { ...ENTRY_DEFAULT, editScope, scheduled: { date: fmtISO(t), time: '' } }
   }
-  return entryFromOccurrence(item, editScope, buildBodyHtml)
+  return entryFromOccurrence(item, editScope)
 }
 
 export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string) {
