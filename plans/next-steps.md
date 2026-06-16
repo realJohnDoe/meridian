@@ -45,11 +45,6 @@
 
 ### /code-review with Opus
 
-🟠 Medium — deletes bypass the offline staging model
-src/vault.ts:139-150 — deleteFileFromDisk writes through to the backend immediately (\_activeBackend.delete(path)), while edits are staged in cache and synced later. Also reached implicitly when a file is emptied (vault.ts:125).
-
-Failure scenario: user is offline (or GitHub token is rate-limited). An edit succeeds (staged dirty), but a delete immediately throws → "Delete failed" banner, and unlike edits it can't be retried via the sync button. The two operations have inconsistent durability/offline semantics. Consider staging deletes as a tombstone flushed by syncToDirectory too.
-
 🟠 Medium — GitHub ensurePermission only proves read access
 src/storage/githubBackend.ts:141-151 — it does GET /repos/{owner}/{repo} and returns 'granted' on success, but that succeeds for a read-only token and doesn't check the configured branch.
 
