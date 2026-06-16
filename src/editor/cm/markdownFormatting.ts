@@ -33,7 +33,6 @@ export const markdownHighlight = syntaxHighlighting(
 
 export const markdownListTheme = EditorView.theme({
   '.cm-ul-item': { paddingLeft: '1.2em', textIndent: '-1.2em' },
-  '.cm-ol-item': { paddingLeft: '2em',   textIndent: '-2em' },
 })
 
 // ── Bullet widget ─────────────────────────────────────────────────
@@ -62,9 +61,9 @@ function buildLineDecorations(view: EditorView): DecorationSet {
   syntaxTree(view.state).iterate({
     enter(node) {
       if (node.name !== 'ListItem') return
+      if (node.node.parent?.name === 'OrderedList') return
       const lineFrom = doc.lineAt(node.from).from
-      const cls = node.node.parent?.name === 'OrderedList' ? 'cm-ol-item' : 'cm-ul-item'
-      builder.add(lineFrom, lineFrom, Decoration.line({ class: cls }))
+      builder.add(lineFrom, lineFrom, Decoration.line({ class: 'cm-ul-item' }))
     },
   })
 
