@@ -3,6 +3,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView, placeholder } from '@codemirror/view'
 import type { Roots, StoreItem } from '../types'
 import { rootsField, setRootsEffect, wikilinkDecorations } from './cm/wikilinkDecorations'
+import { wikilinkAutocomplete } from './cm/wikilinkAutocomplete'
 
 interface Props {
   body:    string
@@ -59,6 +60,34 @@ const editorTheme = EditorView.theme({
     color: 'var(--destructive)',
     borderBottom: '1px solid color-mix(in oklab, var(--destructive), transparent 70%)',
   },
+  // Autocomplete dropdown — matches the existing wikilink popup styling
+  '.cm-tooltip.cm-tooltip-autocomplete': {
+    background: 'var(--popover)',
+    border: '1px solid var(--input)',
+    borderRadius: 'var(--radius)',
+    boxShadow: '0 8px 32px rgba(0,0,0,.4)',
+    minWidth: '210px',
+    maxHeight: '200px',
+    overflow: 'hidden',
+  },
+  '.cm-tooltip-autocomplete > ul': {
+    fontFamily: 'inherit',
+    maxHeight: '200px',
+    overflow: 'auto',
+  },
+  '.cm-tooltip-autocomplete > ul > li': {
+    padding: '0.5rem 0.875rem',
+    fontSize: '0.875rem',
+    color: 'var(--secondary-foreground)',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  '.cm-tooltip-autocomplete > ul > li[aria-selected="true"]': {
+    background: 'var(--accent)',
+    color: 'var(--secondary-foreground)',
+  },
 })
 
 export default function EntryBody({ body, roots, items: _items, viewRef }: Props) {
@@ -73,6 +102,7 @@ export default function EntryBody({ body, roots, items: _items, viewRef }: Props
       extensions: [
         rootsField.init(() => roots),
         wikilinkDecorations,
+        wikilinkAutocomplete,
         editorTheme,
         placeholder('Add a description…'),
         EditorView.lineWrapping,
