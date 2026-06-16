@@ -1,6 +1,5 @@
 ## Next steps
 
-- Turn Example vault into tutorial
 - Fix top bar label
 - Add overdue section in agenda
 - Add CodeMirror 6 for markdown editing
