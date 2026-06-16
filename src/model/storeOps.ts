@@ -11,19 +11,11 @@ import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots
 import { isSeries, isStandaloneOcc } from '../types'
 import type { OccurrenceEntry, RepeatPattern } from './expansion'
 import { titleToSlug } from '../fileIO'
+import { dayBefore } from './dateUtils'
 
 export interface StoreData {
   items: StoreItem[]
   roots: Roots
-}
-
-// ── Date helper ───────────────────────────────────────────────────────────────
-
-/** Return the ISO date string for the day before `dateStr`. */
-export function dayBefore(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00`)
-  d.setDate(d.getDate() - 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
