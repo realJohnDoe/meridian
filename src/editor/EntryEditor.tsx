@@ -17,6 +17,23 @@ import ParticipantsRow from './ParticipantsRow'
 import EntryBody from './EntryBody'
 import { cn } from '@/lib/utils'
 import type { EntryState, ItemType } from './state'
+import type { LucideIcon } from 'lucide-react'
+
+function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
+  icon: LucideIcon
+  label: string
+  value?: string
+  pressed: boolean
+  onClick: () => void
+  className?: string
+}) {
+  return (
+    <button className={cn(badgeVariants({ variant: 'chip' }), className)} aria-pressed={pressed} onClick={onClick}>
+      <Icon size={13} />{label}
+      {value && <span className="text-[11px] font-mono opacity-80 ml-px">{value}</span>}
+    </button>
+  )
+}
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
 const PRIORITY_CLASS: Record<string, string> = {
@@ -190,38 +207,25 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
             <div className="flex gap-1.5 flex-wrap mb-4">
               {showDateChip && (
-                <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}>
-                  <Calendar size={13} />Date
-                  <span className="text-[11px] font-mono opacity-80 ml-px">{scheduled ? scheduled.date.slice(5).replace('-', '/') : ''}</span>
-                </button>
+                <PropChip icon={Calendar} label="Date" pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}
+                  value={scheduled ? scheduled.date.slice(5).replace('-', '/') : undefined} />
               )}
               {showDateChip && hasDate && (
-                <button className={badgeVariants({ variant: 'chip' })} aria-pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}>
-                  <Clock size={13} />Time
-                  <span className="text-[11px] font-mono opacity-80 ml-px">{hasTime ? scheduled!.time : ''}</span>
-                </button>
+                <PropChip icon={Clock} label="Time" pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}
+                  value={hasTime ? scheduled!.time : undefined} />
               )}
               {showDateChip && hasDate && (
-                <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}>
-                  <Timer size={13} />Duration
-                  <span className="text-[11px] font-mono opacity-80 ml-px">{duration}</span>
-                </button>
+                <PropChip icon={Timer} label="Duration" pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}
+                  value={duration ?? undefined} />
               )}
               {tracked && (
-                <button
-                  className={cn(badgeVariants({ variant: 'chip' }), priority && PRIORITY_CLASS[priority])}
-                  aria-pressed={!!priority}
-                  onClick={() => onOpenDlg('dlgPriority')}
-                >
-                  <Flag size={13} />Priority
-                  <span className="text-[11px] font-mono opacity-80 ml-px">{priority ? PRIORITY_LABELS[priority] : ''}</span>
-                </button>
+                <PropChip icon={Flag} label="Priority" pressed={!!priority} onClick={() => onOpenDlg('dlgPriority')}
+                  value={priority ? PRIORITY_LABELS[priority] : undefined}
+                  className={priority ? PRIORITY_CLASS[priority] : undefined} />
               )}
               {showRepeat && (
-                <button className={badgeVariants({ variant: 'chip' })} aria-pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}>
-                  <Repeat size={13} />Repeat
-                  <span className="text-[11px] font-mono opacity-80 ml-px">{repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : ''}</span>
-                </button>
+                <PropChip icon={Repeat} label="Repeat" pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}
+                  value={repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : undefined} />
               )}
             </div>
 
