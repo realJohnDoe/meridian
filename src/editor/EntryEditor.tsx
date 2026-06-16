@@ -1,4 +1,5 @@
-import { useRef, useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import type { EditorView } from '@codemirror/view'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '../types'
 import { useToday } from '../hooks/useToday'
@@ -52,7 +53,7 @@ interface Props {
 export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
   const today    = useToday()
   const titleRef = useRef<HTMLTextAreaElement>(null)
-  const bodyRef  = useRef<HTMLDivElement>(null)
+  const viewRef  = useRef<EditorView | null>(null)
 
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
@@ -76,7 +77,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     onScopeChange?.(scope)
   }
 
-  const { item, title, bodyHtml, scheduled, duration, tracked, itemType, repeat, done, tags, topics, participants, priority, editScope } = entry
+  const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, tags, topics, participants, priority, editScope } = entry
 
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)
@@ -97,12 +98,6 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const showRepeat = !isNote && (hasDate || tracked) && (!isSingleScope || !isRecur)
   const bodyKey = item ? `${item.fileSlug || 'item'}-${item.date || ''}-${editScope}` : 'new'
 
-  // Set body HTML imperatively so React never touches innerHTML during re-renders
-  // triggered by wikilink state updates. bodyKey changes when a new entry is opened
-  // or the edit scope changes, remounting the div via key= and re-running this effect.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (bodyRef.current) bodyRef.current.innerHTML = bodyHtml }, [bodyKey])
-
   const showScopeRow = isRecur || hasSched
 
   return (
@@ -113,7 +108,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         {item && (
           <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete"><Trash2 size={18} /></Button>
         )}
-        <Button variant="default" size="sm" onClick={() => onSave(bodyRef.current?.innerText?.trim() ?? '')}>Save</Button>
+        <Button variant="default" size="sm" onClick={() => onSave(viewRef.current?.state.doc.toString().trim() ?? '')}>Save</Button>
       </div>
 
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30">
@@ -234,7 +229,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           </CardContent>
         </Card>
 
-        <EntryBody bodyRef={bodyRef} bodyKey={bodyKey} roots={roots} items={items} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} />
 
         {item?.fileSlug && onOpenWikilink && onToggleDoneBacklink && (
           <BacklinksPanel

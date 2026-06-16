@@ -44,10 +44,9 @@ export function applyScope(
 }
 
 export function entryFromOccurrence(
-  item:          Occurrence,
-  editScope:     EditScope,
-  bodyTransform: (body: string) => string = b => b,
-  items?:        StoreItem[],
+  item:      Occurrence,
+  editScope: EditScope,
+  items?:    StoreItem[],
 ): EntryState {
   const m = item.metadata
   const { scheduled, repeat } = applyScope(item, editScope, items)
@@ -56,7 +55,7 @@ export function entryFromOccurrence(
   return {
     item,
     title:        m.title    || '',
-    bodyHtml:     bodyTransform(m.body || ''),
+    body:         m.body     || '',
     scheduled,
     repeat,
     duration:     m.duration || '',
