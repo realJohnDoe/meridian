@@ -54,7 +54,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry 
     },
     {
       title: 'Your Agenda',
-      body: 'Everything with a date appears here, sorted by day. Scroll to travel through time — notes, events, and tasks all in one stream.',
+      body: 'Dated events and tasks appear here, sorted by day. Scroll to travel through time — undated notes are reachable via the search bar.',
       target: '[data-tour="main-content"]',
       before: async () => {
         navigateHome()
