@@ -18,41 +18,34 @@
    Problem: Pure duplication in the model's public API; a dedup-key change (e.g. including time) must be made twice.
    Fix: Extract dedupeAndSort(occs: OccurrenceEntry<AppMetadata>[]) and call it from both expandRange and expandWithMultiday.
 
-3. Notification system implemented twice end-to-end
-   Category: dry ux
-   Impact: 3
-   Evidence: notify/warn differ only in field name and timeout (storeBridge.ts:13-29); paired errorNotification/warningNotification state in store.ts:28-36; twin banner JSX blocks in \_\_root.tsx:27-42; twin CSS rules at index.css:348-358.
-   Problem: Four-layer duplication for what is one concept with a severity flag; adding a third level (info/success) would double everything again.
-   Fix: Collapse to one notification: { message, severity } | null store field, one notify(msg, severity) helper, and one <NotificationBanner> styled by severity.
-
-4. Date primitives re-implemented in three modules
+3. Date primitives re-implemented in three modules
    Category: dry
    Impact: 3
    Evidence: dayBefore hand-formats ISO (storeOps.ts:23-27) despite fmtISO/date-fns addDays existing; nodeDateTime/toDate (expansion.ts:28-60) re-implement parseDateString with an inline time regex; startOfToday (RepeatDialog.tsx:63-67) duplicates TODAY's construction.
    Problem: Date string ↔ Date conversion has at least four implementations whose edge-case behavior (invalid input, time suffixes) can diverge silently — in a calendar app this is the riskiest place to be inconsistent.
    Fix: Consolidate all parse/format helpers into model/dateUtils.ts (add parseDateTime(date, time) and dayBefore) and delete the local copies.
 
-5. MonthView filters all month occurrences once per cell
+4. MonthView filters all month occurrences once per cell
    Category: performance
    Impact: 3
    Evidence: MonthView.tsx:29-31 — each of 42 CalCells receives the full occs array and runs occs.filter(...sameDay...); CalCell is not memoized, so all 42 re-filter on any store change.
    Problem: O(cells × occurrences) work per render with no memo boundary; busy months with multiday expansion make month navigation visibly janky on mobile (the app's 430px target).
    Fix: Group occs into a Map<dateKey, Occurrence[]> once inside the existing useMemo and pass each cell only its own (sorted) array, wrapping CalCell in memo.
 
-6. Storage-layer names still describe the local-disk era
+5. Storage-layer names still describe the local-disk era
    Category: naming
    Impact: 2
    Evidence: reconcileWithDisk (vault.ts:130), syncToDirectory (vault.ts:230), and deleteFileFromDisk (vault.ts:215) all operate on the abstract StorageBackend, including GitHub; the file AddVaultDialog.tsx exports ManageVaultsDialog (imported under that name in \_app.tsx:19).
    Problem: Names asserting "disk/directory" over a backend abstraction mislead readers about what the code touches, and the dialog's filename no longer matches its role.
    Fix: Rename to reconcileWithBackend, syncToBackend, deleteFromBackend, and rename the file to ManageVaultsDialog.tsx — a mechanical, IDE-assisted change.
-7. Dead code at module boundaries
+6. Dead code at module boundaries
    Category: dead-code
    Impact: 2
    Evidence: collectUndated (expansion.ts:556) is exported as "Main-app API" but only tests import it; initApp() is an empty function (vault.ts:467-469) still ceremonially called in \_\_root.tsx:18; updateRoot contains the no-op spread ...(existing ? {} : {}) (storeOps.ts:147).
    Problem: Phantom API surface misleads readers about what the app actually uses and what's safe to change.
    Fix: Delete initApp and the no-op spread; either wire collectUndated into search/fileOccurrenceMap or move it into the test helpers.
 
-8. Unbounded module-level caches in the model layer
+7. Unbounded module-level caches in the model layer
    Category: performance architecture
    Impact: 1 — low severity, included because the fix is trivial and the pattern is in the hottest module
    Evidence: occIdCache grows forever per (series, date, time) key with no eviction (expansion.ts:429-434); \_fomCache is a mutable module singleton in presentation.ts:68.
