@@ -14,18 +14,11 @@ interface Props {
 
 const editorTheme = EditorView.theme({
   '&': {
-    fontSize: '0.875rem',
-    lineHeight: '1.85',
-    minHeight: '10rem',
     background: 'transparent',
-    borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--input)',
     outline: 'none',
-    color: 'var(--secondary-foreground)',
   },
   '&.cm-focused': {
     outline: 'none',
-    boxShadow: '0 0 0 2px var(--ring)',
   },
   '.cm-scroller': {
     fontFamily: 'inherit',
@@ -113,7 +106,10 @@ export default function EntryBody({ body, roots, items, viewRef }: Props) {
 
   return (
     <>
-      <div ref={containerRef} className="mt-1" />
+      <div
+        ref={containerRef}
+        className="mt-1 min-h-[10rem] text-sm leading-[1.85] text-secondary-foreground border border-input rounded-[var(--radius-md)] focus-within:ring-2 focus-within:ring-ring"
+      />
       {wlPopup && viewRef.current && (
         <WikilinkPopup
           popup={wlPopup}
