@@ -11,13 +11,6 @@
 
 ### Custom Prompt with Fable 5
 
-1. GitHub PAT stored in plaintext IndexedDB
-   Category: security
-   Impact: 4
-   Evidence: cache.ts:127-130 — tokenSave puts the raw token into the unencrypted meta table; loaded into memory at vault.ts:313.
-   Problem: Any XSS, malicious extension, or shared-machine access can exfiltrate a write-capable repo token; client-side options are limited, but plaintext-at-rest with no mitigation guidance is the weakest choice.
-   Fix: Encrypt the token at rest with a non-extractable WebCrypto key (raises the bar meaningfully), and have AddVaultDialog instruct users to issue a fine-grained PAT scoped to the single vault repo with contents-only permission.
-
 2. Identical dedupe/sort block copy-pasted in the expansion API
    Category: dry
    Impact: 3
@@ -117,37 +110,31 @@
    Evidence: githubBackend.ts:50-65 requests path: '' and stores tokens.set(item.name, item.sha); statAll never recurses into subdirectories.
    Problem: Vaults with files in subfolders silently won't sync/round-trip via GitHub, unlike the local backend — an inconsistent boundary contract between two StorageBackend implementations.
    Fix: Use the Git Trees API (recursive=1) and key by full path to match LocalBackend's semantics.
-9. GitHub PAT persisted in plaintext IndexedDB
-   Category: security
+9. No global loading/error UI while the vault restores
+   Category: ux
    Impact: 3
-   Evidence: vault.ts:317 tokenSave(id, cfg.token) → cache.ts:127 stores the raw token in the meta table.
-   Problem: Any XSS or shared-device access exposes a repo-scoped write token in cleartext; there's no scoping note or exp\* handling.
-   Fix: At minimum document the requirement for a fine-grained, single-repo token and prefer the shortest viable expiry; consider not persisting and re-prompting.
-10. No global loading/error UI while the vault restores
-    Category: ux
-    Impact: 3
-    Evidence: \_\_root.tsx:15-18 fires restoreVaults() in an effect; the agenda renders against empty items until it resolves (\_app.index.tsx:34-40 even has a comment about scrolling "against an empty agenda").
-    Problem: On a slow GitHub/FS load the user sees an empty app with no spinner, and there's no surfaced state distinguishing "loading" from "empty vault."
-    Fix: Add a loading flag to the store, set it around restoreVaults, and render a skeleton/spinner.
-11. Occurrence visual state is stringly-typed and decoded by ad-hoc maps
+   Evidence: \_\_root.tsx:15-18 fires restoreVaults() in an effect; the agenda renders against empty items until it resolves (\_app.index.tsx:34-40 even has a comment about scrolling "against an empty agenda").
+   Problem: On a slow GitHub/FS load the user sees an empty app with no spinner, and there's no surfaced state distinguishing "loading" from "empty vault."
+   Fix: Add a loading flag to the store, set it around restoreVaults, and render a skeleton/spinner.
+10. Occurrence visual state is stringly-typed and decoded by ad-hoc maps
     Category: types naming
     Impact: 3
     Evidence: presentation.ts:191 occState(): string returns magic strings ('task-p1', 'event-future'…) consumed via untyped Record<string,string> maps \_ccBarMap/\_dvBlkMap (:231, :249) with ?? 'event' fallbacks hiding typos.
     Problem: A renamed state or typo'd map key fails silently to the fallback class instead of a compile error.
     Fix: Make occState return a string-literal union and type the maps as Record<OccState, string>.
-12. Navigation hard-bound to window.history.back()
+11. Navigation hard-bound to window.history.back()
     Category: architecture
     Impact: 2
     Evidence: storeBridge.ts:14 — navigateBack = () => window.history.back(), used by the mutation layer instead of the router's history.
     Problem: Bypasses the TanStack router abstraction (used elsewhere via router.history.back() in useEntryEditor.ts:62), giving two inconsistent back-navigation paths and coupling non-UI code to the global window.
     Fix: Route all back-navigation through the router and remove the window.history shim (folds into finding #1).
-13. notify() builds error strings by hand and re-implements an auto-dismiss timer
+12. notify() builds error strings by hand and re-implements an auto-dismiss timer
     Category: error-handling dry
     Impact: 2
     Evidence: storeBridge.ts:17-24 hand-rolls a setTimeout dismiss; callers across vault.ts repeat notify('… failed: ' + ((e as Error).message || (e as Error).name)) (vault.ts:135, :148, :170).
     Problem: The error-banner timer logic and the (e as Error).message || .name formatting are duplicated, and the timer mechanism overlaps with the toast timer in mutations.ts (two bespoke dismiss schedulers).
     Fix: A single notifyError(prefix, e) helper plus one shared transient-message scheduler.
-14. EntryEditor repeats the metadata-chip button five times
+13. EntryEditor repeats the metadata-chip button five times
     Category: dry
     Impact: 2
     Evidence: EntryEditor.tsx:224-257 — Date/Time/Duration/Priority/Repeat are five near-identical badgeVariants({variant:'chip'}) buttons differing only in icon, label, value text, and onClick.
