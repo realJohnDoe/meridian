@@ -81,11 +81,12 @@ function AgendaPage() {
   }, [today])
 
   // Scroll to today when flagged (vault load or Today button). The today section is always
-  // seeded, so we wait for real data (itemCount > 0) before positioning — otherwise we'd
-  // scroll against an empty agenda, then today shifts down once items load. Depends on
-  // itemCount so it retries as data arrives; only consumes the flag once it actually scrolls.
+  // seeded, so we wait for real data (itemCount > 0) and for the vault to finish loading
+  // before positioning — otherwise the AgendaView hasn't rendered yet (skeleton is shown)
+  // and the .day-section query finds nothing, leaving the flag stuck. vaultLoading is in
+  // the deps so the effect re-runs when the skeleton gives way to the real view.
   useEffect(() => {
-    if (!scrollToTodayOnce || itemCount === 0) return
+    if (!scrollToTodayOnce || itemCount === 0 || vaultLoading) return
     const sec =
       document.querySelector('.day-section[data-overdue]') ??
       document.querySelector(`.day-section[data-key="${fmtISO(today)}"]`)
@@ -93,7 +94,7 @@ function AgendaPage() {
     useStore.setState({ scrollToTodayOnce: false })
     sec.scrollIntoView({ behavior: 'instant', block: 'start' })
     useStore.setState({ agendaTopDate: fmtISO(today) })
-  }, [scrollToTodayOnce, itemCount, today])
+  }, [scrollToTodayOnce, itemCount, today, vaultLoading])
 
   const onOpen = useOpenEntry()
 
