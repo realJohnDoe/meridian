@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import type { Roots, StoreItem } from '../types'
+import type { Roots, StoreItem, Occurrence } from '../types'
 import {
   rootsField, setRootsEffect,
   itemsField, setItemsEffect,
   createWikilinkExtension, wikilinkTheme,
 } from './cm/wikilinkDecorations'
+import { saveNode } from './save'
 import { createTaskExtension, taskTheme } from './cm/taskDecorations'
 import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme } from './cm/markdownFormatting'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
@@ -77,6 +78,26 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
   const onPromoteTaskRef = useRef(onPromoteTask)
   useEffect(() => { onPromoteTaskRef.current = onPromoteTask }, [onPromoteTask])
 
+  // Toggle-done for occurrence cards — saves the occ with done flipped
+  const onToggleDoneRef = useRef((occ: Occurrence) => {
+    saveNode(occ, 'single', {
+      item: occ,
+      title: occ.metadata.title,
+      body: occ.metadata.body ?? '',
+      tracked: true,
+      itemType: 'task',
+      done: !occ.metadata.done,
+      tags: occ.metadata.tags ?? [],
+      topics: (occ.metadata.topics as string[] | undefined) ?? [],
+      participants: occ.metadata.participants ?? [],
+      priority: (occ.metadata.priority ?? null) as Parameters<typeof saveNode>[2]['priority'],
+      scheduled: occ.date ? { date: occ.date, time: occ.time ?? '' } : null,
+      duration: occ.metadata.duration ?? '',
+      repeat: null,
+      editScope: 'single',
+    })
+  })
+
   // Promote callback invoked by TaskCardWidget: creates the item then replaces the line
   const onPromoteRef = useRef(
     (text: string, done: boolean, lineFrom: number, lineTo: number, edView: EditorView) => {
@@ -102,7 +123,7 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
         // Wikilink state fields (must be registered before the decoration plugin)
         rootsField.init(() => roots),
         itemsField.init(() => items),
-        createWikilinkExtension(onOpenRef),
+        createWikilinkExtension(onOpenRef, onToggleDoneRef),
         wikilinkTheme,
         createTaskExtension(onPromoteRef),
         taskTheme,
