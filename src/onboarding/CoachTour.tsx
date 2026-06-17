@@ -13,7 +13,7 @@ interface Step {
   target: string | null
   before?: () => Promise<void> | void
   /** Condition checked on each relevant state change to auto-advance. */
-  autoAdvance?: 'route-changed' | 'editor-opened' | 'search-used'
+  autoAdvance?: 'route-changed' | 'editor-opened'
 }
 
 interface TargetRect { top: number; left: number; width: number; height: number }
@@ -99,7 +99,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry 
         navigateHome()
         await sleep(150)
       },
-      autoAdvance: 'search-used',
     },
     {
       title: 'Make it yours',
@@ -183,17 +182,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry 
     if (steps[stepIndex]?.autoAdvance === 'editor-opened' && editorParam) advance()
   }, [active, ready, editorParam, stepIndex, steps, advance])
 
-  // Auto-advance: user typed in the search bar
-  useEffect(() => {
-    if (!active || !ready) return
-    if (steps[stepIndex]?.autoAdvance !== 'search-used') return
-    const input = document.getElementById('filterInput') as HTMLInputElement | null
-    if (!input) return
-    const handler = () => { if (input.value) advance() }
-    input.addEventListener('input', handler)
-    return () => input.removeEventListener('input', handler)
-  }, [active, ready, stepIndex, steps, advance])
-
   if (!active) return null
 
   const step = steps[stepIndex]
@@ -238,21 +226,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry 
 
   return (
     <>
-      {/* Highlight ring around the target element */}
-      {rect && (
-        <div
-          aria-hidden
-          className="pointer-events-none fixed rounded-lg ring-2 ring-primary ring-offset-2 ring-offset-background"
-          style={{
-            top: rect.top - 4,
-            left: rect.left - 4,
-            width: rect.width + 8,
-            height: rect.height + 8,
-            zIndex: 9001,
-          }}
-        />
-      )}
-
       {/* Popover card */}
       <div
         role="dialog"
