@@ -103,27 +103,45 @@ async function resolveCollision(
 
 // ── RECONCILE ─────────────────────────────────────────────────
 
-export async function reconcileWithBackend(backend: StorageBackend, vaultId: string): Promise<void> {
-  const diskTokens = await backend.statAll()
-  const cached     = await cacheLoadAll(vaultId)
-  const cacheMap   = new Map(cached.map(r => [r.path, r]))
-
+/**
+ * Pure reconciliation planner: given the backend's listing tokens and the local
+ * cache records, decide which paths to pull (`changed`) and which to drop
+ * (`deleted`). Extracted as a side-effect-free function so the branching logic
+ * can be unit-tested without Dexie, a backend, or the store.
+ */
+export function planReconcile(
+  diskTokens: Map<string, string>,
+  cacheRecords: CacheRecord[],
+): { changed: string[]; deleted: string[] } {
+  const cacheMap = new Map(cacheRecords.map(r => [r.path, r]))
   const changed: string[] = []
   const deleted: string[] = []
 
   for (const [path, diskToken] of diskTokens) {
     const entry = cacheMap.get(path)
-    // Skip dirty entries (pending write) and tombstones (pending delete) —
-    // any genuine divergence is caught by the CAS write in pushDirty.
-    if ((!entry || entry.version !== diskToken) && entry?.dirty === 0) {
+    // Pull a file the cache has never seen, OR one whose backend version drifted
+    // while we hold no pending local change. Skip dirty entries (pending write)
+    // and tombstones (pending delete) — any genuine divergence on those is caught
+    // by the CAS write in pushDirty.
+    if (!entry || (entry.version !== diskToken && entry.dirty === 0)) {
       changed.push(path)
     }
   }
-  for (const path of cacheMap.keys()) {
-    const entry = cacheMap.get(path)
-    // Skip dirty entries and tombstones — don't clobber pending local changes.
-    if (!diskTokens.has(path) && entry?.dirty === 0) deleted.push(path)
+  for (const entry of cacheRecords) {
+    // Drop locally-cached files that vanished from the backend — but don't
+    // clobber pending local changes (dirty) or pending deletes (tombstone).
+    if (!diskTokens.has(entry.path) && entry.dirty === 0) deleted.push(entry.path)
   }
+
+  return { changed, deleted }
+}
+
+export async function reconcileWithBackend(backend: StorageBackend, vaultId: string): Promise<void> {
+  const diskTokens = await backend.statAll()
+  const cached     = await cacheLoadAll(vaultId)
+  const cacheMap   = new Map(cached.map(r => [r.path, r]))
+
+  const { changed, deleted } = planReconcile(diskTokens, cached)
 
   if (changed.length > 0) {
     const freshFiles = await backend.readFiles(changed)
