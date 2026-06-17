@@ -5,6 +5,14 @@
 - Convert duration into end date/time
 - Add Solarized Light theme
 
+PR 5 — Source-resort + FLIP animation on toggle (depends on PR 4)
+On toggling a task done, compute its contiguous task block and rewrite the source so done tasks
+sink to the bottom of that block (one CM transaction; cursor handling is natural because order
+lives in the doc).
+Animate the line movement with the existing FLIP technique from
+useFlipReorder.ts (.35s cubic-bezier(.4,0,.2,1)), adapted to
+.cm-line elements so it matches Agenda / Linked-from.
+
 ## Results from last Quality Survey
 
 ### Custom Prompt on Opus
