@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '../types'
@@ -71,6 +72,7 @@ interface Props {
 
 export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
   const today    = useToday()
+  const navigate = useNavigate()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const viewRef  = useRef<EditorView | null>(null)
 
@@ -98,7 +100,11 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
     })
-    return result === 'saved' ? titleToSlug(title) : null
+    if (result !== 'saved') return null
+    const slug = titleToSlug(title)
+    // Navigate directly by slug — bypasses the stale storeRoots closure in onOpenWikilink
+    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: slug, etitle: undefined, edate: undefined, escope: undefined }) })
+    return slug
   }
 
   function handleScopeChange(scope: EditScope) {
