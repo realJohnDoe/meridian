@@ -125,7 +125,11 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         {item && (
           <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete"><Trash2 size={18} /></Button>
         )}
-        <Button variant="default" size="sm" onClick={() => onSave(viewRef.current?.state.doc.toString().trim() ?? '')}>Save</Button>
+        <Button variant="default" size="sm" onClick={() => {
+          const raw = viewRef.current?.state.doc.toString() ?? ''
+          const trimmed = raw.trimEnd()
+          onSave(trimmed ? trimmed + '\n' : '')
+        }}>Save</Button>
       </div>
 
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30">
