@@ -126,9 +126,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete"><Trash2 size={18} /></Button>
         )}
         <Button variant="default" size="sm" onClick={() => {
-          const raw = viewRef.current?.state.doc.toString() ?? ''
-          const trimmed = raw.trimEnd()
-          onSave(trimmed ? trimmed + '\n' : '')
+          onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
         }}>Save</Button>
       </div>
 
