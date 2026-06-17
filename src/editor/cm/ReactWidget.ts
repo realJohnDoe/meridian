@@ -8,8 +8,14 @@ const roots = new WeakMap<HTMLElement, Root>()
 export abstract class ReactWidget extends WidgetType {
   abstract renderReact(): ReactNode
 
+  /** Optional class applied to the widget's container element. */
+  protected get domClassName(): string {
+    return ''
+  }
+
   toDOM(): HTMLElement {
     const el = document.createElement('div')
+    if (this.domClassName) el.className = this.domClassName
     // Reset inherited text-indent so the card's content isn't shifted by
     // the list item's hanging-indent value (which is −1.2 em by default).
     el.style.textIndent = '0'

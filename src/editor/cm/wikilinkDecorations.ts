@@ -66,10 +66,13 @@ class OccCardWidget extends ReactWidget {
     private readonly onClick: () => void,
   ) { super() }
 
+  protected get domClassName() { return 'cm-occ-card' }
+
   renderReact() {
     return createElement(OccurrenceCard, {
       occ: this.occ,
       taskCheckbox: false,
+      eventNoteIcon: true,
       showTime: 'none' as const,
       showTagsParticipants: false,
       onOpen: this.onClick,
@@ -225,43 +228,63 @@ export function createWikilinkExtension(
 // ── Theme ─────────────────────────────────────────────────────────
 
 export const wikilinkTheme = EditorView.theme({
-  // Resolved wikilink chip — mirrors the "link" Badge variant (bg-indigo-500/15 text-indigo-400)
+  // Resolved wikilink chip — exactly mirrors Badge variant="link"
+  // base: inline-flex items-center gap-[5px] border font-medium whitespace-nowrap
+  // link: px-1.5 py-0.5 text-[10px] rounded-lg border-transparent bg-indigo-500/15 text-indigo-400
   '.cm-wl-chip': {
     display: 'inline-flex',
     alignItems: 'center',
-    padding: '0 0.375rem',
-    verticalAlign: 'baseline',
-    borderRadius: '0.375rem',
+    gap: '5px',
+    border: '1px solid transparent',
+    fontWeight: '500',
+    whiteSpace: 'nowrap',
+    padding: '0.125rem 0.375rem',
+    fontSize: '10px',
+    borderRadius: '0.5rem',
     background: 'rgb(99 102 241 / 0.15)',
     color: 'rgb(129 140 248)',
-    fontSize: '0.75rem',
-    fontWeight: '500',
     cursor: 'pointer',
     userSelect: 'none',
-    lineHeight: '1.4',
-    // Reset inherited text-indent so the chip label isn't shifted when it is
-    // the first element on a list item line (cm-ul-item has text-indent: -1.2em).
+    verticalAlign: 'baseline',
     textIndent: '0',
   },
-  // Broken wikilink chip — mirrors the wl-broken destructive styling
+  // Broken wikilink chip — same structure, destructive colors
   '.cm-wl-chip-broken': {
     display: 'inline-flex',
     alignItems: 'center',
-    padding: '0 0.375rem',
-    verticalAlign: 'baseline',
-    borderRadius: '0.375rem',
+    gap: '5px',
+    border: '1px solid transparent',
+    fontWeight: '500',
+    whiteSpace: 'nowrap',
+    padding: '0.125rem 0.375rem',
+    fontSize: '10px',
+    borderRadius: '0.5rem',
     background: 'color-mix(in oklab, var(--destructive), transparent 85%)',
     color: 'var(--destructive)',
-    fontSize: '0.75rem',
-    fontWeight: '500',
     cursor: 'pointer',
     userSelect: 'none',
-    lineHeight: '1.4',
+    verticalAlign: 'baseline',
     textIndent: '0',
   },
-  // Container div for occurrence card widgets — add breathing room
+  // Container div for occurrence card widgets.
+  // margin-left: -1.2em + width: calc(100% + 1.2em) cancels the first-level
+  // cm-ul-item padding-left so the card left-aligns with normal (non-list)
+  // text.
   '.cm-occ-card': {
     display: 'block',
-    margin: '0.25rem 0',
+    marginLeft: '-1.2em',
+    width: 'calc(100% + 1.2em)',
+    // Adjacent card margins collapse through the empty line wrappers, so the
+    // inter-card gap equals this value (not 2×). 6px ≈ the panel's gap-1.5.
+    marginTop: '6px',
+    marginBottom: '6px',
+  },
+  // CM6 inserts zero-width <img class="cm-widgetBuffer"> spacers on both sides
+  // of a widget. For a full-line block card they add a line-box of leading
+  // above and below the card, inflating the row height. Hide them on card
+  // lines only (keeping the line's font metrics so cm-ul-item's em-based
+  // padding still resolves correctly).
+  '.cm-line:has(.cm-occ-card) .cm-widgetBuffer': {
+    display: 'none',
   },
 })
