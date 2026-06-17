@@ -104,7 +104,7 @@
 
   /* Destructive */
   --destructive: oklch(0.72 0.20 15);   /* rose */
-  --warning:     oklch(0.86 0.16 74);   /* amber — alias of --note */
+  --warning:     oklch(0.86 0.16 74);   /* amber */
 
   /* Borders */
   --border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 92%);   /* slate at ~8% */
@@ -114,7 +114,7 @@
   /* Domain colors (no shadcn home) */
   --event:        oklch(0.71 0.20 278);   /* indigo — alias of primary */
   --task:         oklch(0.84 0.17 145);   /* green */
-  --note:         oklch(0.86 0.16 74);    /* amber */
+  --note:         oklch(0.75 0.17 215);   /* sky blue */
   --brand-cyan:   oklch(0.77 0.14 208);   /* sky blue — gradient accent */
   --brand-purple: oklch(0.74 0.18 295);   /* violet */
   --priority-1:   oklch(0.72 0.19 22);    /* red */
