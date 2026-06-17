@@ -2,14 +2,17 @@ import { StateEffect, StateField, RangeSetBuilder, Prec, type Extension } from '
 import {
   Decoration, type DecorationSet,
   ViewPlugin, type ViewUpdate,
-  WidgetType, EditorView,
+  EditorView,
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
-import { createElement } from 'react'
+import { createElement, type MouseEvent as ReactMouseEvent } from 'react'
 import type { Roots, StoreItem, Occurrence } from '../../types'
 import { parseWikilinks, resolveWikilink } from '../../wikilinks'
 import { fileOccurrenceMap } from '../../presentation'
 import OccurrenceCard from '../../components/OccurrenceCard'
+import TagChip from '../../components/TagChip'
+import { Badge } from '../../components/ui/badge'
+import { cn } from '../../lib/utils'
 import { ReactWidget } from './ReactWidget'
 
 // ── State fields ──────────────────────────────────────────────────
@@ -32,9 +35,9 @@ export const itemsField = StateField.define<StoreItem[]>({
   },
 })
 
-// ── Chip widget (plain DOM — fast, many per doc) ──────────────────
+// ── Chip widget (reuses the design-system TagChip / Badge) ────────
 
-class ChipWidget extends WidgetType {
+class ChipWidget extends ReactWidget {
   constructor(
     readonly label: string,
     readonly resolved: boolean,
@@ -42,19 +45,31 @@ class ChipWidget extends WidgetType {
     private readonly onClick: () => void,
   ) { super() }
 
-  toDOM(): HTMLElement {
-    const span = document.createElement('span')
-    span.textContent = this.label
-    span.className = this.resolved ? 'cm-wl-chip' : 'cm-wl-chip-broken'
-    span.addEventListener('mousedown', e => { e.preventDefault(); this.onClick() })
-    return span
+  protected get inline() { return true }
+
+  renderReact() {
+    const chip = this.resolved
+      // Resolved link → the exact indigo topic chip from the tag line.
+      ? createElement(TagChip, { label: this.label, isTopic: true })
+      // Broken link → same Badge base, recoloured destructive.
+      : createElement(
+          Badge,
+          { variant: 'link' as const, className: cn('!bg-destructive/15 !text-destructive') },
+          this.label,
+        )
+    return createElement(
+      'span',
+      {
+        style: { cursor: 'pointer' },
+        onMouseDown: (e: ReactMouseEvent) => { e.preventDefault(); this.onClick() },
+      },
+      chip,
+    )
   }
 
   eq(other: ChipWidget): boolean {
     return other.label === this.label && other.resolved === this.resolved && other.ref === this.ref
   }
-
-  ignoreEvent(): boolean { return false }
 }
 
 // ── Occurrence-card widget (React — few per doc) ──────────────────
@@ -228,44 +243,8 @@ export function createWikilinkExtension(
 // ── Theme ─────────────────────────────────────────────────────────
 
 export const wikilinkTheme = EditorView.theme({
-  // Resolved wikilink chip — exactly mirrors Badge variant="link"
-  // base: inline-flex items-center gap-[5px] border font-medium whitespace-nowrap
-  // link: px-1.5 py-0.5 text-[10px] rounded-lg border-transparent bg-indigo-500/15 text-indigo-400
-  '.cm-wl-chip': {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '5px',
-    border: '1px solid transparent',
-    fontWeight: '500',
-    whiteSpace: 'nowrap',
-    padding: '0.125rem 0.375rem',
-    fontSize: '10px',
-    borderRadius: '0.5rem',
-    background: 'rgb(99 102 241 / 0.15)',
-    color: 'rgb(129 140 248)',
-    cursor: 'pointer',
-    userSelect: 'none',
-    verticalAlign: 'baseline',
-    textIndent: '0',
-  },
-  // Broken wikilink chip — same structure, destructive colors
-  '.cm-wl-chip-broken': {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '5px',
-    border: '1px solid transparent',
-    fontWeight: '500',
-    whiteSpace: 'nowrap',
-    padding: '0.125rem 0.375rem',
-    fontSize: '10px',
-    borderRadius: '0.5rem',
-    background: 'color-mix(in oklab, var(--destructive), transparent 85%)',
-    color: 'var(--destructive)',
-    cursor: 'pointer',
-    userSelect: 'none',
-    verticalAlign: 'baseline',
-    textIndent: '0',
-  },
+  // Inline wikilink chips are rendered with the real TagChip / Badge component
+  // (see ChipWidget), so no chip styles are needed here.
   // Container div for occurrence card widgets.
   // margin-left: -1.2em + width: calc(100% + 1.2em) cancels the first-level
   // cm-ul-item padding-left so the card left-aligns with normal (non-list)

@@ -13,12 +13,25 @@ export abstract class ReactWidget extends WidgetType {
     return ''
   }
 
+  /**
+   * Render into an inline `<span>` (for chips that flow inside a line) instead
+   * of the default block `<div>` (for full-line card/task widgets).
+   */
+  protected get inline(): boolean {
+    return false
+  }
+
   toDOM(): HTMLElement {
-    const el = document.createElement('div')
+    const el = document.createElement(this.inline ? 'span' : 'div')
     if (this.domClassName) el.className = this.domClassName
-    // Reset inherited text-indent so the card's content isn't shifted by
-    // the list item's hanging-indent value (which is −1.2 em by default).
+    // Reset inherited text-indent so the content isn't shifted by a list
+    // item's hanging indent (cm-ul-item sets text-indent: −1.2em).
     el.style.textIndent = '0'
+    if (this.inline) {
+      // The editor's tall line-height (1.85) would stretch the chip; reset to
+      // 1.5 (the app's default) so the chip matches the tag-line badge height.
+      el.style.lineHeight = '1.5'
+    }
     const root = createRoot(el)
     root.render(this.renderReact())
     roots.set(el, root)
