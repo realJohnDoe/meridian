@@ -49,12 +49,20 @@ class ChipWidget extends ReactWidget {
 
   renderReact() {
     const chip = this.resolved
-      // Resolved link → the exact indigo topic chip from the tag line.
-      ? createElement(TagChip, { label: this.label, isTopic: true })
-      // Broken link → same Badge base, recoloured destructive.
+      // Resolved link → the exact indigo topic chip from the tag line,
+      // underlined like the interactive topic chips there.
+      ? createElement(TagChip, {
+          label: this.label,
+          isTopic: true,
+          className: 'underline underline-offset-2 decoration-indigo-400/60',
+        })
+      // Broken link → same Badge base, recoloured destructive, underlined.
       : createElement(
           Badge,
-          { variant: 'link' as const, className: cn('!bg-destructive/15 !text-destructive') },
+          {
+            variant: 'link' as const,
+            className: cn('!bg-destructive/15 !text-destructive underline underline-offset-2 decoration-destructive/60'),
+          },
           this.label,
         )
     return createElement(
@@ -78,25 +86,73 @@ class OccCardWidget extends ReactWidget {
   constructor(
     readonly occ: Occurrence,
     readonly fileSlug: string,
-    private readonly onClick: () => void,
+    readonly numberLabel: string,   // ordered-list number (e.g. "2."), '' for bullets
+    readonly padLeft: string,       // the line's padding-left, to recover full width
+    readonly indentEm: number,      // nesting indent in em (0 = top level)
+    readonly lineFrom: number,      // for the edit-on-marker click and eq() freshness
+    private readonly onOpen: () => void,
+    private readonly onEdit: () => void,
   ) { super() }
 
   protected get domClassName() { return 'cm-occ-card' }
 
+  // The list line's `text-indent: -padLeft` already pulls this inline widget to
+  // the normal-text left edge; `padding-left` shrank the line box by the same
+  // amount, so add it back to width to reach the text's right edge. Nested
+  // items shift right by `indentEm` for visual hierarchy. line-height: normal
+  // stops the editor's 1.85 leading from making the card taller than the
+  // "Linked from" cards.
+  protected get containerStyle(): Partial<CSSStyleDeclaration> {
+    return {
+      width: `calc(100% + ${this.padLeft} - ${this.indentEm}em)`,
+      marginLeft: `${this.indentEm}em`,
+      marginTop: '3px',
+      marginBottom: '3px',
+      lineHeight: 'normal',
+    }
+  }
+
   renderReact() {
-    return createElement(OccurrenceCard, {
-      occ: this.occ,
-      taskCheckbox: false,
-      eventNoteIcon: true,
-      showTime: 'none' as const,
-      showTagsParticipants: false,
-      onOpen: this.onClick,
-      onToggleDone: () => {},
-    })
+    const card = createElement(
+      'div',
+      { style: { flex: '1 1 0', minWidth: 0 } },
+      createElement(OccurrenceCard, {
+        occ: this.occ,
+        taskCheckbox: false,
+        eventNoteIcon: true,
+        showTime: 'none' as const,
+        showTagsParticipants: false,
+        onOpen: this.onOpen,
+        onToggleDone: () => {},
+      }),
+    )
+    const children = []
+    if (this.numberLabel) {
+      // Fixed-width box (= the line's hanging indent) so the card always starts
+      // at the same x regardless of the digit glyph's width — keeps the card
+      // left edges aligned down an ordered list. Click it to place the cursor.
+      children.push(createElement(
+        'span',
+        {
+          key: 'num',
+          className: 'cm-occ-num',
+          style: { width: this.padLeft },
+          onMouseDown: (e: ReactMouseEvent) => { e.preventDefault(); this.onEdit() },
+        },
+        this.numberLabel,
+      ))
+    }
+    children.push(card)
+    return createElement('div', { style: { display: 'flex', alignItems: 'stretch' } }, ...children)
   }
 
   eq(other: OccCardWidget): boolean {
-    return other.fileSlug === this.fileSlug && other.occ === this.occ
+    return other.fileSlug === this.fileSlug
+      && other.occ === this.occ
+      && other.numberLabel === this.numberLabel
+      && other.padLeft === this.padLeft
+      && other.indentEm === this.indentEm
+      && other.lineFrom === this.lineFrom
   }
 }
 
@@ -124,9 +180,18 @@ function build(
     for (let n = a; n <= b; n++) cursorLines.add(n)
   }
 
-  // Find sole-wikilink list-item lines → OccurrenceCard block widget
-  // key: lineFrom position
-  const cardMap = new Map<number, { occ: Occurrence; fileSlug: string }>()
+  // Find sole-wikilink list-item lines → OccurrenceCard widget. We replace the
+  // whole line with a flex [number?][card] row: the number shows for ordered
+  // lists, bullets are dropped, and the card fills the rest of the row out to
+  // the text's right edge. Nesting depth indents the card for visual hierarchy.
+  type CardInfo = {
+    occ: Occurrence
+    fileSlug: string
+    numberLabel: string
+    padLeft: string
+    indentEm: number
+  }
+  const cardMap = new Map<number, CardInfo>()
   syntaxTree(view.state).iterate({
     enter(node) {
       if (node.name !== 'ListItem') return
@@ -134,15 +199,33 @@ function build(
       if (!mark) return
       const line = doc.lineAt(node.from)
       if (cursorLines.has(line.number)) return
-      const content = doc.sliceString(mark.to, line.to).trim()
-      const m = SOLE_WL_RE.exec(content)
+      const after = doc.sliceString(mark.to, line.to)
+      const m = SOLE_WL_RE.exec(after.trim())
       if (!m) return
       const ref = m[1].trim()
       const fileSlug = resolveWikilink(ref, roots)
       if (!fileSlug) return
       const occ = occMap.get(fileSlug)
       if (!occ) return
-      cardMap.set(line.from, { occ, fileSlug })
+
+      const ordered = node.node.parent?.name === 'OrderedList'
+      const markText = doc.sliceString(mark.from, mark.to)
+      const digits = markText.replace(/\D/g, '').length || 1
+      // Mirror markdownListTheme's hanging indent so width recovery is exact.
+      const padLeft = ordered ? `calc(${digits}ch + 0.45em)` : '1.2em'
+
+      // Nesting depth = number of ancestor list nodes (1 = top level).
+      let depth = 0
+      for (let p = node.node.parent; p; p = p.parent) {
+        if (p.name === 'OrderedList' || p.name === 'BulletList') depth++
+      }
+
+      cardMap.set(line.from, {
+        occ, fileSlug,
+        numberLabel: ordered ? markText : '',
+        padLeft,
+        indentEm: (depth - 1) * 1.2,
+      })
     },
   })
 
@@ -162,7 +245,8 @@ function build(
     const cardInfo = cardMap.get(line.from)
 
     if (cardInfo && !isCursor) {
-      // Replace the full line content with the occurrence card
+      // Replace the whole line with the card row (Prec.highest lets this win
+      // over markdownLivePreview's bullet/number marker on the same range).
       builder.add(
         line.from,
         line.to,
@@ -170,7 +254,12 @@ function build(
           widget: new OccCardWidget(
             cardInfo.occ,
             cardInfo.fileSlug,
+            cardInfo.numberLabel,
+            cardInfo.padLeft,
+            cardInfo.indentEm,
+            line.from,
             () => onOpenRef.current(cardInfo.fileSlug),
+            () => view.dispatch({ selection: { anchor: line.from }, scrollIntoView: true }),
           ),
         }),
       )
@@ -218,9 +307,8 @@ function build(
 export function createWikilinkExtension(
   onOpenRef: { current: (ref: string) => void },
 ): Extension {
-  // Prec.highest so card widgets (which replace the full list-item line including
-  // the "- " marker) take priority over markdownLivePreview's bullet widget,
-  // which otherwise conflicts at the same start position.
+  // Prec.highest so our bullet-hiding decoration on card lines wins over
+  // markdownLivePreview's bullet widget (both target the ListMark range).
   return Prec.highest(ViewPlugin.fromClass(
     class {
       decorations: DecorationSet
@@ -245,25 +333,24 @@ export function createWikilinkExtension(
 export const wikilinkTheme = EditorView.theme({
   // Inline wikilink chips are rendered with the real TagChip / Badge component
   // (see ChipWidget), so no chip styles are needed here.
-  // Container div for occurrence card widgets.
-  // margin-left: -1.2em + width: calc(100% + 1.2em) cancels the first-level
-  // cm-ul-item padding-left so the card left-aligns with normal (non-list)
-  // text.
+  //
+  // Inline-block so the list line's hanging indent (text-indent) pulls the
+  // card to the normal-text left edge; per-instance width/margins come from
+  // the widget's containerStyle (see OccCardWidget).
   '.cm-occ-card': {
-    display: 'block',
-    marginLeft: '-1.2em',
-    width: 'calc(100% + 1.2em)',
-    // Adjacent card margins collapse through the empty line wrappers, so the
-    // inter-card gap equals this value (not 2×). 6px ≈ the panel's gap-1.5.
-    marginTop: '6px',
-    marginBottom: '6px',
+    display: 'inline-block',
+    verticalAlign: 'top',
   },
-  // CM6 inserts zero-width <img class="cm-widgetBuffer"> spacers on both sides
-  // of a widget. For a full-line block card they add a line-box of leading
-  // above and below the card, inflating the row height. Hide them on card
-  // lines only (keeping the line's font metrics so cm-ul-item's em-based
-  // padding still resolves correctly).
-  '.cm-line:has(.cm-occ-card) .cm-widgetBuffer': {
-    display: 'none',
+  // Ordered-list number shown in a fixed-width box to the left of the card
+  // (width is set per-instance to the line's hanging indent). The box keeps the
+  // card aligned; the box's own 0.45em tail provides the gap before the card.
+  '.cm-occ-num': {
+    flexShrink: '0',
+    boxSizing: 'border-box',
+    textAlign: 'left',
+    paddingTop: '10px',
+    color: 'var(--muted-foreground)',
+    cursor: 'text',
+    userSelect: 'none',
   },
 })

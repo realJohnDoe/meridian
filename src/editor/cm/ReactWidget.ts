@@ -21,6 +21,11 @@ export abstract class ReactWidget extends WidgetType {
     return false
   }
 
+  /** Optional per-instance inline styles applied to the container element. */
+  protected get containerStyle(): Partial<CSSStyleDeclaration> {
+    return {}
+  }
+
   toDOM(): HTMLElement {
     const el = document.createElement(this.inline ? 'span' : 'div')
     if (this.domClassName) el.className = this.domClassName
@@ -32,6 +37,7 @@ export abstract class ReactWidget extends WidgetType {
       // 1.5 (the app's default) so the chip matches the tag-line badge height.
       el.style.lineHeight = '1.5'
     }
+    Object.assign(el.style, this.containerStyle)
     const root = createRoot(el)
     root.render(this.renderReact())
     roots.set(el, root)
