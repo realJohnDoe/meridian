@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorState } from '@codemirror/state'
-import { EditorView, placeholder } from '@codemirror/view'
+import { EditorView, keymap, placeholder } from '@codemirror/view'
+import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import type { Roots, StoreItem } from '../types'
 import {
   rootsField, setRootsEffect,
@@ -92,6 +93,8 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink 
         placeholder('Add a description…'),
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ spellcheck: 'false' }),
+        history(),
+        keymap.of([...defaultKeymap, ...historyKeymap]),
         // Drive the [[…]] autocomplete popup
         EditorView.updateListener.of(update => {
           if (!update.docChanged && !update.selectionSet) return
