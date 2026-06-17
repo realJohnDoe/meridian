@@ -7,15 +7,17 @@ import {
   itemsField, setItemsEffect,
   createWikilinkExtension, wikilinkTheme,
 } from './cm/wikilinkDecorations'
+import { createTaskExtension, taskTheme } from './cm/taskDecorations'
 import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme } from './cm/markdownFormatting'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
 
 interface Props {
-  body:            string
-  roots:           Roots
-  items:           StoreItem[]
-  viewRef:         React.MutableRefObject<EditorView | null>
-  onOpenWikilink?: (ref: string) => void
+  body:             string
+  roots:            Roots
+  items:            StoreItem[]
+  viewRef:          React.MutableRefObject<EditorView | null>
+  onOpenWikilink?:  (ref: string) => void
+  onPromoteTask?:   (title: string, done: boolean) => string | null
 }
 
 const editorTheme = EditorView.theme({
@@ -62,7 +64,7 @@ const editorTheme = EditorView.theme({
   },
 })
 
-export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink }: Props) {
+export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink, onPromoteTask }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [wlPopup, setWlPopup] = useState<WlPopupState | null>(null)
   const closePopup = useCallback(() => setWlPopup(null), [])
@@ -70,6 +72,19 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink 
   // Stable ref so the CM6 plugin always reads the latest callback without remounting
   const onOpenRef = useRef<(ref: string) => void>(onOpenWikilink ?? (() => {}))
   useEffect(() => { onOpenRef.current = onOpenWikilink ?? (() => {}) }, [onOpenWikilink])
+
+  const onPromoteTaskRef = useRef(onPromoteTask)
+  useEffect(() => { onPromoteTaskRef.current = onPromoteTask }, [onPromoteTask])
+
+  // Promote callback invoked by TaskCardWidget: creates the item then replaces the line
+  const onPromoteRef = useRef(
+    (text: string, done: boolean, lineFrom: number, lineTo: number, edView: EditorView) => {
+      const slug = onPromoteTaskRef.current?.(text, done)
+      if (slug) {
+        edView.dispatch({ changes: { from: lineFrom, to: lineTo, insert: `- [[${slug}]]` } })
+      }
+    },
+  )
 
   // Mount CM6 EditorView once per component lifetime (key= on parent handles remounts)
   useEffect(() => {
@@ -88,6 +103,8 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink 
         itemsField.init(() => items),
         createWikilinkExtension(onOpenRef),
         wikilinkTheme,
+        createTaskExtension(onPromoteRef),
+        taskTheme,
         editorTheme,
         placeholder('Add a description…'),
         EditorView.lineWrapping,

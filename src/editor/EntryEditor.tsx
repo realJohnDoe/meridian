@@ -18,6 +18,8 @@ import EntryBody from './EntryBody'
 import { cn } from '@/lib/utils'
 import type { EntryState, ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
+import { saveNode } from './save'
+import { titleToSlug } from '../fileIO'
 
 function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   icon: LucideIcon
@@ -87,6 +89,16 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         : t === 'event' && !prev.scheduled   ? { date: fmtISO(today), time: '' }
         : prev.scheduled,
     }))
+  }
+
+  function handlePromoteTask(title: string, done: boolean): string | null {
+    const result = saveNode(null, 'all', {
+      item: null, title, tracked: true, itemType: 'task', done,
+      body: '', tags: [], topics: [], participants: [],
+      priority: null, scheduled: null, duration: '', repeat: null,
+      editScope: 'all',
+    })
+    return result === 'saved' ? titleToSlug(title) : null
   }
 
   function handleScopeChange(scope: EditScope) {
@@ -233,7 +245,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} onPromoteTask={handlePromoteTask} />
 
         {item?.fileSlug && onOpenWikilink && onToggleDoneBacklink && (
           <BacklinksPanel
