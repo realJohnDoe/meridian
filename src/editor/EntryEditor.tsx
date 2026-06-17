@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '../types'
@@ -18,6 +19,8 @@ import EntryBody from './EntryBody'
 import { cn } from '@/lib/utils'
 import type { EntryState, ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
+import { saveNode } from './save'
+import { titleToSlug } from '../fileIO'
 
 function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   icon: LucideIcon
@@ -69,6 +72,7 @@ interface Props {
 
 export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
   const today    = useToday()
+  const navigate = useNavigate()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const viewRef  = useRef<EditorView | null>(null)
 
@@ -87,6 +91,20 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         : t === 'event' && !prev.scheduled   ? { date: fmtISO(today), time: '' }
         : prev.scheduled,
     }))
+  }
+
+  function handlePromoteTask(title: string, done: boolean): string | null {
+    const result = saveNode(null, 'all', {
+      item: null, title, tracked: true, itemType: 'task', done,
+      body: '', tags: [], topics: [], participants: [],
+      priority: null, scheduled: null, duration: '', repeat: null,
+      editScope: 'all',
+    })
+    if (result !== 'saved') return null
+    const slug = titleToSlug(title)
+    // Navigate directly by slug — bypasses the stale storeRoots closure in onOpenWikilink
+    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: slug, etitle: undefined, edate: undefined, escope: undefined }) })
+    return slug
   }
 
   function handleScopeChange(scope: EditScope) {
@@ -235,7 +253,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} onPromoteTask={handlePromoteTask} />
 
         {item?.fileSlug && onOpenWikilink && onToggleDoneBacklink && (
           <BacklinksPanel
