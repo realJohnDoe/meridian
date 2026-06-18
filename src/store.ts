@@ -41,6 +41,12 @@ interface MeridianStore {
   loadFavorites:    (vaultId: string) => void
   toggleFavorite:   (fileSlug: string) => void
   reorderFavorites: (fromIdx: number, toIdx: number) => void
+
+  // ── Default participants ──────────────────────────────────────────
+  /** Per-vault participant strings seeded into new entries. Stored in localStorage. */
+  defaultParticipants:     string[]
+  loadDefaultParticipants: (vaultId: string) => void
+  setDefaultParticipants:  (participants: string[]) => void
 }
 
 export const useStore = create<MeridianStore>((set, get) => ({
@@ -87,5 +93,22 @@ export const useStore = create<MeridianStore>((set, get) => ({
     next.splice(toIdx, 0, item)
     if (activeVaultId) localStorage.setItem(`meridian_favorites_${activeVaultId}`, JSON.stringify(next))
     set({ favorites: next })
+  },
+
+  defaultParticipants: [],
+  loadDefaultParticipants: (vaultId: string) => {
+    try {
+      const raw = localStorage.getItem(`meridian_default_participants_${vaultId}`)
+      const parsed: unknown = raw ? JSON.parse(raw) : []
+      set({ defaultParticipants: Array.isArray(parsed) ? parsed as string[] : [] })
+    } catch {
+      set({ defaultParticipants: [] })
+    }
+  },
+  setDefaultParticipants: (participants: string[]) => {
+    const { activeVaultId } = get()
+    if (activeVaultId)
+      localStorage.setItem(`meridian_default_participants_${activeVaultId}`, JSON.stringify(participants))
+    set({ defaultParticipants: participants })
   },
 }))

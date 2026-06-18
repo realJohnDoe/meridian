@@ -20,9 +20,14 @@ function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryStat
 }
 
 export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string) {
+  const defaultParticipants = useStore.getState().defaultParticipants
+
   const [entry, setEntry] = useState<EntryState>(() => {
     const base = entryFromItem(initialOcc, initialScope)
-    return initialTitle ? { ...base, title: initialTitle } : base
+    const seeded = (!initialOcc && defaultParticipants.length > 0)
+      ? { ...base, participants: [...defaultParticipants] }
+      : base
+    return initialTitle ? { ...seeded, title: initialTitle } : seeded
   })
   const [activeDialog, setActiveDialog] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void } | null>(null)

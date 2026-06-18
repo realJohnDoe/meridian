@@ -1,11 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Plus, Users } from 'lucide-react'
-import type { EntryState } from './state'
 import { Badge } from '@/components/ui/badge'
 
 interface Props {
   participants: string[]
-  onChange:     (updater: (prev: EntryState) => EntryState) => void
+  onChange:     (next: string[]) => void
 }
 
 export default function ParticipantsRow({ participants, onChange }: Props) {
@@ -19,10 +18,10 @@ export default function ParticipantsRow({ participants, onChange }: Props) {
 
   const commit = useCallback(() => {
     const p = inputVal.trim()
-    if (p) onChange(prev => ({ ...prev, participants: [...prev.participants, p] }))
+    if (p) onChange([...participants, p])
     setInputVal('')
     setShowInput(false)
-  }, [inputVal, onChange])
+  }, [inputVal, onChange, participants])
 
   return (
     <div className="flex flex-wrap gap-1.5 items-center">
@@ -32,7 +31,7 @@ export default function ParticipantsRow({ participants, onChange }: Props) {
           key={i}
           variant="tag"
           className="cursor-pointer"
-          onClick={() => onChange(prev => ({ ...prev, participants: prev.participants.filter((_, j) => j !== i) }))}
+          onClick={() => onChange(participants.filter((_, j) => j !== i))}
         >
           {p}
         </Badge>

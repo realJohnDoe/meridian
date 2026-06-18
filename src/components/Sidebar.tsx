@@ -6,7 +6,7 @@ import { setActiveVault } from '../storage/vaultRegistry'
 import { fmtISO, fmtMonth } from '../model/dateUtils'
 import { useToday } from '../hooks/useToday'
 import { vaultIcon } from '../lib/vaultIcon'
-import ManageVaultsDialog from '@/vaults/ManageVaultsDialog'
+import SettingsDialog from './SettingsDialog'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
@@ -18,7 +18,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, onOpenChange }: SidebarProps) {
-  const [addVaultOpen, setAddVaultOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [editingFavorites, setEditingFavorites] = useState(false)
 
   const navigate  = useNavigate()
@@ -164,20 +164,22 @@ export default function Sidebar({ open, onOpenChange }: SidebarProps) {
               )
             })}
 
-            <Button
-              data-tour="manage-vaults"
-              variant="ghost"
-              onClick={() => { onOpenChange(false); setAddVaultOpen(true) }}
-              className="w-full justify-start gap-[14px] px-5 h-auto py-[11px] text-[14px] font-medium rounded-none text-dim hover:bg-sidebar-accent hover:text-sidebar-foreground"
-            >
-              <Settings2 className="size-[17px] stroke-[1.7] shrink-0" />
-              Manage vaults
-            </Button>
+            <div className="border-t border-sidebar-border mt-2">
+              <Button
+                data-tour="manage-vaults"
+                variant="ghost"
+                onClick={() => { onOpenChange(false); setSettingsOpen(true) }}
+                className="w-full justify-start gap-[14px] px-5 h-auto py-[11px] text-[14px] font-medium rounded-none text-dim hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              >
+                <Settings2 className="size-[17px] stroke-[1.7] shrink-0" />
+                Settings
+              </Button>
+            </div>
           </nav>
         </SheetContent>
       </Sheet>
 
-      <ManageVaultsDialog open={addVaultOpen} onOpenChange={setAddVaultOpen} />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   )
 }
