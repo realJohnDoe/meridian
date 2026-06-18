@@ -1,6 +1,5 @@
 ## Next steps
 
-- Add CodeMirror 6 for markdown editing
 - Make layout tablet-friendly
 - Convert duration into end date/time
 - Add Solarized Light theme
