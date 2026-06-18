@@ -9,6 +9,7 @@ import type { StoreItem, Roots } from '../types'
 import EntryEditor from './EntryEditor'
 import DialogStack from './DialogStack'
 import { toggleOccDone } from '../occurrenceActions'
+import { useStore } from '../store'
 
 type Hooks = ReturnType<typeof useEntryEditor>
 
@@ -35,6 +36,11 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
     handlePriority,
   } = hooks
 
+  const favorites       = useStore(s => s.favorites)
+  const toggleFavorite  = useStore(s => s.toggleFavorite)
+  const fileSlug        = entry.item?.fileSlug
+  const isFavorited     = fileSlug ? favorites.includes(fileSlug) : false
+
   return (
     <section className="view active flex-1 min-h-0 flex flex-col">
       <EntryEditor
@@ -50,6 +56,8 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
         roots={roots}
         onOpenWikilink={handleOpenWikilink}
         onToggleDoneBacklink={toggleOccDone}
+        isFavorited={isFavorited}
+        onToggleFavorite={fileSlug ? () => toggleFavorite(fileSlug) : undefined}
       />
       <DialogStack
         entry={entry}

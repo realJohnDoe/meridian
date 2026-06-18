@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { EditorView } from '@codemirror/view'
-import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
+import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '../types'
 import { useToday } from '../hooks/useToday'
 import { fmtISO } from '../model/dateUtils'
@@ -65,9 +65,11 @@ interface Props {
   roots: Roots
   onOpenWikilink?: (ref: string) => void
   onToggleDoneBacklink?: (occ: Occurrence) => void
+  isFavorited?: boolean
+  onToggleFavorite?: () => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink, isFavorited, onToggleFavorite }: Props) {
   const today    = useToday()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const viewRef  = useRef<EditorView | null>(null)
@@ -122,6 +124,17 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
       <div className="h-topbar flex items-center gap-2 px-3 border-b border-border shrink-0 bg-background">
         <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={onClose}><ArrowLeft size={18} /></Button>
         <span className="flex-1 font-mono text-2xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">{fname}</span>
+        {item && onToggleFavorite && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn('rounded-full shrink-0', isFavorited ? 'text-rose-400' : 'text-dim')}
+            onClick={onToggleFavorite}
+            title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Heart size={18} className={isFavorited ? 'fill-current' : ''} />
+          </Button>
+        )}
         {item && (
           <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete"><Trash2 size={18} /></Button>
         )}

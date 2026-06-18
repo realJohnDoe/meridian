@@ -15,7 +15,11 @@ export const setVaultLoading     = (loading: boolean)  => useStore.setState({ va
 export const setSyncDirtyCount   = (n: number)         => useStore.setState({ syncDirtyCount: n })
 export const setSyncError        = (error: boolean)    => useStore.setState({ syncError: error })
 export const setVaultList        = (refs: VaultRef[])  => useStore.setState({ vaults: refs })
-export const setActiveVaultId    = (id: string | null) => useStore.setState({ activeVaultId: id })
+export const setActiveVaultId    = (id: string | null) => {
+  useStore.setState({ activeVaultId: id })
+  if (id) useStore.getState().loadFavorites(id)
+  else useStore.setState({ favorites: [] })
+}
 export const setPendingReconnect = (name: string | null) => useStore.setState({ pendingDirReconnect: name })
 
 // ── NOTIFICATIONS ──────────────────────────────────────────────

@@ -27,3 +27,17 @@ export function entryRoute(occ: Occurrence, scope?: EditScope) {
     }),
   }
 }
+
+/** Build TanStack Router navigate params for opening an entry by fileSlug (no date context). */
+export function slugRoute(fileSlug: string) {
+  return {
+    to: '.' as const,
+    search: (prev: Record<string, unknown>) => ({
+      ...prev,
+      editor: fileSlug,
+      edate: undefined,
+      escope: undefined,
+      etitle: undefined,
+    }),
+  }
+}
