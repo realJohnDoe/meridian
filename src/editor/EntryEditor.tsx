@@ -262,7 +262,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
               )}
             </div>
 
-            <ParticipantsRow participants={participants} onChange={onChange} />
+            <ParticipantsRow participants={participants} onChange={next => onChange(prev => ({ ...prev, participants: next }))} />
           </CardContent>
         </Card>
 

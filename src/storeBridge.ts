@@ -17,8 +17,12 @@ export const setSyncError        = (error: boolean)    => useStore.setState({ sy
 export const setVaultList        = (refs: VaultRef[])  => useStore.setState({ vaults: refs })
 export const setActiveVaultId    = (id: string | null) => {
   useStore.setState({ activeVaultId: id })
-  if (id) useStore.getState().loadFavorites(id)
-  else useStore.setState({ favorites: [] })
+  if (id) {
+    useStore.getState().loadFavorites(id)
+    useStore.getState().loadDefaultParticipants(id)
+  } else {
+    useStore.setState({ favorites: [], defaultParticipants: [] })
+  }
 }
 export const setPendingReconnect = (name: string | null) => useStore.setState({ pendingDirReconnect: name })
 
