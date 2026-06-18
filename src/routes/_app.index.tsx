@@ -31,7 +31,7 @@ function findTopDate(scEl: HTMLDivElement): string | null {
 
 function AgendaSkeleton() {
   return (
-    <div className="flex flex-col gap-0 px-4 pt-3 pb-8">
+    <div className="flex flex-col gap-0 px-4 pt-3 pb-8 lg:max-w-[720px] lg:mx-auto">
       {[0, 1, 2].map(i => (
         <div key={i} className="mb-5">
           <Skeleton className="h-4 w-28 mb-3" />
