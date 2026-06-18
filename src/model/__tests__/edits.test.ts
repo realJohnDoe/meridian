@@ -155,6 +155,19 @@ describe('edit operations → serialized YAML', () => {
     expect(serializeData(next)).toMatchSnapshot()
   })
 
+  it('adding a new instance to a done task initializes the new instance as not done', () => {
+    const data = fixtureData('standalone-task')
+    const existing = occOn(data.items, data.roots, '2026-04-09')
+    expect(existing.metadata.done).toBe(true)
+    const next = applyEdit(data, existing, 'add', editFields(existing, {
+      scheduled: { date: '2026-05-01', time: '' },
+    }))
+    const occs = expandRange(next.items, next.roots, new Date('2026-01-01'), new Date('2026-12-31'))
+    const newOcc = occs.find(o => o.date === '2026-05-01')
+    expect(newOcc).toBeDefined()
+    expect(newOcc!.metadata.done).toBe(false)
+  })
+
   // ── mixed series + standalones ────────────────────────────────────────────────
 
   it('excludeOccurrence on a series in a mixed file leaves other series and standalone intact', () => {
