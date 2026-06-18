@@ -13,7 +13,7 @@ export default function SearchBar() {
 
   return (
     <>
-      <div className="absolute left-3.5 right-3.5 flex flex-col gap-2 pointer-events-none z-30" style={{ bottom: 'calc(var(--nh) + 0.875rem)' }}>
+      <div className="absolute left-3.5 right-3.5 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 lg:w-[430px] flex flex-col gap-2 pointer-events-none z-30" style={{ bottom: 'calc(var(--nh) + 0.875rem)' }}>
         <div data-tour="search-bar" className="search-bar-wrap">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           <input
