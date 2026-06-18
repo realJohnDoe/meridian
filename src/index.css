@@ -196,7 +196,7 @@
 
 /* ── SONNER TOAST THEMING ──
    Direct property overrides (specificity 030) beat Sonner's base styles (020)
-   even when Sonner's runtime <style> is injected after this linked stylesheet. */
+   even when Sonner's runtime \3c style> is injected after this linked stylesheet. */
 
 /* Default (undo) toast — use Meridian card surface */
 [data-sonner-toast][data-styled='true'][data-sonner-toast] {
