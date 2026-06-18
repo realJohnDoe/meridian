@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '../store'
 import { setActiveVault } from '../storage/vaultRegistry'
@@ -10,6 +10,7 @@ import ManageVaultsDialog from '@/vaults/ManageVaultsDialog'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
+import { slugRoute } from '../routes/-entryRoute'
 
 interface SidebarProps {
   open:         boolean
@@ -18,6 +19,7 @@ interface SidebarProps {
 
 export default function Sidebar({ open, onOpenChange }: SidebarProps) {
   const [addVaultOpen, setAddVaultOpen] = useState(false)
+  const [editingFavorites, setEditingFavorites] = useState(false)
 
   const navigate  = useNavigate()
   const pathname  = useRouterState({ select: s => s.location.pathname })
@@ -26,6 +28,12 @@ export default function Sidebar({ open, onOpenChange }: SidebarProps) {
   const vaults              = useStore(s => s.vaults)
   const activeVaultId       = useStore(s => s.activeVaultId)
   const pendingDirReconnect = useStore(s => s.pendingDirReconnect)
+  const favorites           = useStore(s => s.favorites)
+  const roots               = useStore(s => s.roots)
+  const toggleFavorite      = useStore(s => s.toggleFavorite)
+  const reorderFavorites    = useStore(s => s.reorderFavorites)
+
+  useEffect(() => { setEditingFavorites(false) }, [activeVaultId])
 
   const isDayView = pathname.startsWith('/day/')
 
@@ -70,6 +78,65 @@ export default function Sidebar({ open, onOpenChange }: SidebarProps) {
                 {label}
               </Button>
             ))}
+
+            {favorites.length > 0 && (
+              <>
+                <div className="flex items-center px-5 pt-5 pb-1 border-t border-sidebar-border mt-2">
+                  <span className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-dim">Favorites</span>
+                  <button
+                    className="text-dim hover:text-foreground p-0.5"
+                    onClick={() => setEditingFavorites(e => !e)}
+                    title={editingFavorites ? 'Done' : 'Reorder / remove'}
+                  >
+                    {editingFavorites ? <Check size={13} /> : <Pencil size={13} />}
+                  </button>
+                </div>
+
+                {favorites.map((slug, idx) => {
+                  const title = roots.get(slug)?.title ?? slug
+                  return (
+                    <div key={slug} className="flex items-center">
+                      {editingFavorites ? (
+                        <div className="flex-1 flex items-center gap-1 px-5 py-[11px] text-[14px] font-medium text-dim">
+                          <span className="flex-1 truncate">{title}</span>
+                          <button
+                            disabled={idx === 0}
+                            onClick={() => reorderFavorites(idx, idx - 1)}
+                            className="disabled:opacity-30 hover:text-foreground"
+                            title="Move up"
+                          >
+                            <ChevronUp size={13} />
+                          </button>
+                          <button
+                            disabled={idx === favorites.length - 1}
+                            onClick={() => reorderFavorites(idx, idx + 1)}
+                            className="disabled:opacity-30 hover:text-foreground"
+                            title="Move down"
+                          >
+                            <ChevronDown size={13} />
+                          </button>
+                          <button
+                            onClick={() => toggleFavorite(slug)}
+                            className="hover:text-destructive"
+                            title="Remove from favorites"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          onClick={() => { onOpenChange(false); navigate(slugRoute(slug)) }}
+                          className="w-full justify-start px-5 h-auto py-[11px] text-[14px] font-medium rounded-none text-dim hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                        >
+                          <span className="truncate">{title}</span>
+                        </Button>
+                      )}
+                    </div>
+                  )
+                })}
+              </>
+            )}
 
             <div className="px-5 pt-5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-dim border-t border-sidebar-border mt-2">
               Vaults

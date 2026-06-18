@@ -34,9 +34,16 @@ interface MeridianStore {
   scrollToTodayOnce: boolean
   /** ISO date string of the topmost visible day in the agenda view. */
   agendaTopDate: string | null
+
+  // ── Favorites ────────────────────────────────────────────────────
+  /** Ordered fileSlug array for the active vault. Stored in localStorage, never written to files. */
+  favorites:        string[]
+  loadFavorites:    (vaultId: string) => void
+  toggleFavorite:   (fileSlug: string) => void
+  reorderFavorites: (fromIdx: number, toIdx: number) => void
 }
 
-export const useStore = create<MeridianStore>((set) => ({
+export const useStore = create<MeridianStore>((set, get) => ({
   items: [],
   roots: new Map(),
   setData: ({ items, roots }) => { clearOccIdCache(); resetFOMCache(); set({ items, roots }) },
@@ -53,4 +60,32 @@ export const useStore = create<MeridianStore>((set) => ({
 
   scrollToTodayOnce: false,
   agendaTopDate:     null,
+
+  favorites: [],
+  loadFavorites: (vaultId: string) => {
+    try {
+      const raw = localStorage.getItem(`meridian_favorites_${vaultId}`)
+      const parsed: unknown = raw ? JSON.parse(raw) : []
+      set({ favorites: Array.isArray(parsed) ? parsed as string[] : [] })
+    } catch {
+      set({ favorites: [] })
+    }
+  },
+  toggleFavorite: (fileSlug: string) => {
+    const { favorites, activeVaultId } = get()
+    const next = favorites.includes(fileSlug)
+      ? favorites.filter(s => s !== fileSlug)
+      : [...favorites, fileSlug]
+    if (activeVaultId) localStorage.setItem(`meridian_favorites_${activeVaultId}`, JSON.stringify(next))
+    set({ favorites: next })
+  },
+  reorderFavorites: (fromIdx: number, toIdx: number) => {
+    const { favorites, activeVaultId } = get()
+    if (toIdx < 0 || toIdx >= favorites.length) return
+    const next = [...favorites]
+    const [item] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, item)
+    if (activeVaultId) localStorage.setItem(`meridian_favorites_${activeVaultId}`, JSON.stringify(next))
+    set({ favorites: next })
+  },
 }))
