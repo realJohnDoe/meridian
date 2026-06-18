@@ -314,7 +314,7 @@ export function applyEdit(
       fileSlug: occ.fileSlug,
       id:      crypto.randomUUID(),
       ownerId: occ.ownerId,
-      metadata: occMeta(base, fields),
+      metadata: { ...occMeta(base, fields), done: fields.tracked ? false : undefined },
     }
     return { items: [...items, newOcc], roots }
   }
