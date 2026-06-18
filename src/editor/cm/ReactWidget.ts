@@ -54,5 +54,9 @@ export abstract class ReactWidget extends WidgetType {
     }
   }
 
-  ignoreEvent(): boolean { return false }
+  // Tell CM6 not to process mouse/pointer events inside the widget — React
+  // handlers (navigate, toggle, promote, edit-dispatch) own all interactions.
+  // Without this, CM6's mousedown handler places the cursor and the widget
+  // disappears before React's handlers can fire (observed on desktop).
+  ignoreEvent(): boolean { return true }
 }

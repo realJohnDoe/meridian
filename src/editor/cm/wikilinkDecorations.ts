@@ -92,6 +92,7 @@ class OccCardWidget extends ReactWidget {
     readonly lineFrom: number,      // for the edit-on-marker click and eq() freshness
     private readonly onOpen: () => void,
     private readonly onEdit: () => void,
+    private readonly onToggleDone: () => void,
   ) { super() }
 
   protected get domClassName() { return 'cm-occ-card' }
@@ -118,12 +119,12 @@ class OccCardWidget extends ReactWidget {
       { style: { flex: '1 1 0', minWidth: 0 } },
       createElement(OccurrenceCard, {
         occ: this.occ,
-        taskCheckbox: false,
-        eventNoteIcon: true,
+        taskCheckbox: this.occ.metadata.done !== undefined,
+        eventNoteIcon: this.occ.metadata.done === undefined,
         showTime: 'none' as const,
         showTagsParticipants: false,
         onOpen: this.onOpen,
-        onToggleDone: () => {},
+        onToggleDone: this.onToggleDone,
       }),
     )
     const children = []
@@ -165,6 +166,7 @@ const SOLE_WL_RE = /^\[\[([^\]|\n]+)(?:\|[^\]\n]+)?\]\]$/
 function build(
   view: EditorView,
   onOpenRef: { current: (ref: string) => void },
+  onToggleDoneRef: { current: (occ: Occurrence) => void },
 ): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { doc, selection } = view.state
@@ -260,6 +262,7 @@ function build(
             line.from,
             () => onOpenRef.current(cardInfo.fileSlug),
             () => view.dispatch({ selection: { anchor: line.from }, scrollIntoView: true }),
+            () => onToggleDoneRef.current(cardInfo.occ),
           ),
         }),
       )
@@ -306,13 +309,14 @@ function build(
  */
 export function createWikilinkExtension(
   onOpenRef: { current: (ref: string) => void },
+  onToggleDoneRef: { current: (occ: Occurrence) => void },
 ): Extension {
   // Prec.highest so our bullet-hiding decoration on card lines wins over
   // markdownLivePreview's bullet widget (both target the ListMark range).
   return Prec.highest(ViewPlugin.fromClass(
     class {
       decorations: DecorationSet
-      constructor(view: EditorView) { this.decorations = build(view, onOpenRef) }
+      constructor(view: EditorView) { this.decorations = build(view, onOpenRef, onToggleDoneRef) }
       update(update: ViewUpdate) {
         const needsRebuild =
           update.docChanged ||
@@ -321,7 +325,7 @@ export function createWikilinkExtension(
           update.transactions.some(tr =>
             tr.effects.some(e => e.is(setRootsEffect) || e.is(setItemsEffect)),
           )
-        if (needsRebuild) this.decorations = build(update.view, onOpenRef)
+        if (needsRebuild) this.decorations = build(update.view, onOpenRef, onToggleDoneRef)
       }
     },
     { decorations: v => v.decorations },
