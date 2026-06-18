@@ -161,7 +161,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         }}>Save</Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30">
+      <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-[720px] lg:mx-auto">
 
         {/* ── FILE-LEVEL: title ── */}
         <div className="flex items-start gap-2.5 mb-2">

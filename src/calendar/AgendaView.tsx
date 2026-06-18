@@ -161,7 +161,7 @@ export default function AgendaView({ onOpen }: Props) {
   const overdueItems = sortOccs(pastKeys.flatMap(k => groups[k].items.filter(isOverdue)))
 
   return (
-    <div className="pb-24">
+    <div className="pb-24 lg:max-w-[720px] lg:mx-auto">
       {/* Past day sections — overdue tasks excluded; skip sections that become empty */}
       {pastKeys.map(k => {
         const items = sortOccs(groups[k].items.filter(o => !isOverdue(o)))

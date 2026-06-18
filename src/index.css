@@ -182,7 +182,7 @@
 }
 
 #root{height:100%}
-#app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;background:var(--background);position:relative}
+#app{display:flex;height:100%;margin:0 auto;background:var(--background);position:relative}
 
 /* ── SEARCH BAR — brand identity widget ─────────────────────────────────────────────────────── */
 /* .search-bar-wrap kept: :focus-within selector + multi-layer shadow can't be Tailwind utilities */

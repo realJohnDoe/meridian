@@ -79,6 +79,7 @@ function AppLayout() {
 
   return (
     <>
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
       <header className="h-topbar flex items-center justify-between px-3.5 border-b border-border shrink-0 bg-background z-10" id="mainTop">
         {isDayView && dvDate ? (
           <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
@@ -109,6 +110,7 @@ function AppLayout() {
       <section data-tour="main-content" className="flex flex-1 flex-col overflow-hidden">
         <Outlet />
       </section>
+      </div>
 
       <Sidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
 
