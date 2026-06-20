@@ -104,21 +104,21 @@ function AppMain() {
         <header className="h-topbar flex items-center justify-between px-3.5 border-b border-border shrink-0 bg-background z-10" id="mainTop">
           {isDayView && dvDate ? (
             <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 lg:hidden" onClick={openSidebar} title="Menu"><Menu size={18} /></Button>
+              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={openSidebar} title="Menu"><Menu size={18} /></Button>
               <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{fmtTopBarDay(dvDate, today)}</span>
               <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) } })}><ChevronLeft size={18} /></Button>
               <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) } })}><ChevronRight size={18} /></Button>
             </div>
           ) : isMonthView && monthViewDate ? (
             <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 lg:hidden" onClick={openSidebar} title="Menu"><Menu size={18} /></Button>
+              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={openSidebar} title="Menu"><Menu size={18} /></Button>
               <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
               <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) } })}><ChevronLeft size={18} /></Button>
               <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) } })}><ChevronRight size={18} /></Button>
             </div>
           ) : (
             <div className="flex items-center gap-2 min-w-0" id="tbDefault">
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 lg:hidden" onClick={openSidebar} title="Menu"><Menu size={18} /></Button>
+              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={openSidebar} title="Menu"><Menu size={18} /></Button>
               <span className="font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
             </div>
           )}

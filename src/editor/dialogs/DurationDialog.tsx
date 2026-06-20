@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react'
 import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerActions,
-} from '@/components/ui/drawer'
-import { Separator } from '@/components/ui/separator'
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalTitle,
+  ResponsiveModalDescription,
+  ResponsiveModalActions,
+} from '@/components/ui/responsive-modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 // ── Data ──────────────────────────────────────────────────────────────────────
@@ -65,15 +63,12 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
   }, [open, value])
 
   return (
-    <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
-      <DrawerContent>
-        <DrawerHeader className="px-4 pt-3 pb-0">
-          <DrawerTitle>Duration</DrawerTitle>
-          <DrawerDescription className="sr-only">
-            Set a duration using the number input and unit selector
-          </DrawerDescription>
-          <Separator className="mt-2" />
-        </DrawerHeader>
+    <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()}>
+      <ResponsiveModalContent>
+        <ResponsiveModalTitle>Duration</ResponsiveModalTitle>
+        <ResponsiveModalDescription>
+          Set a duration using the number input and unit selector
+        </ResponsiveModalDescription>
 
         {/* Number input + unit selector */}
         <div className="flex gap-2 px-4 py-4">
@@ -102,12 +97,12 @@ export default function DurationDialog({ open, value, onConfirm, onRemove, onClo
           </Select>
         </div>
 
-        <DrawerActions
+        <ResponsiveModalActions
           onRemove={() => { onRemove(); onClose() }}
           onCancel={onClose}
           onSet={() => { onConfirm(serialise(Math.max(1, n), unit)); onClose() }}
         />
-      </DrawerContent>
-    </Drawer>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   )
 }

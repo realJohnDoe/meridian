@@ -13,7 +13,7 @@ export default function SearchBar() {
 
   return (
     <>
-      <div className="absolute left-1/2 lg:left-[calc(50%+var(--sidebar-width)/2)] -translate-x-1/2 w-[calc(100%-1.75rem)] max-w-[600px] flex flex-col gap-2 pointer-events-none z-30" style={{ bottom: 'calc(var(--nh) + 0.875rem)' }}>
+      <div className="absolute left-1/2 md:left-[calc(50%+var(--sidebar-width)/2)] -translate-x-1/2 w-[calc(100%-1.75rem)] max-w-[600px] flex flex-col gap-2 pointer-events-none z-30" style={{ bottom: 'calc(var(--nh) + 0.875rem)' }}>
         <div data-tour="search-bar" className="search-bar-wrap">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           <input

@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react'
 import { addDays } from 'date-fns'
 import { fmtISO, parseDateString, WEEK_STARTS_ON } from '@/model/dateUtils'
-import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from '@/components/ui/drawer'
-import { Separator } from '@/components/ui/separator'
+import {
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalTitle,
+  ResponsiveModalActions,
+} from '@/components/ui/responsive-modal'
 import { Calendar } from '@/components/ui/calendar'
 import { Button } from '@/components/ui/button'
 
@@ -58,11 +62,10 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
   // Content div  owns: gap below separator (pt-4) and gap above next separator (pb-4)
   // DrawerFooter owns: gap below separator (pt-4, built into component) and px-4
   return (
-    <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
-      <DrawerContent className="pt-3">
+    <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()}>
+      <ResponsiveModalContent>
 
-        <DrawerTitle>Date</DrawerTitle>
-        <Separator />
+        <ResponsiveModalTitle>Date</ResponsiveModalTitle>
 
         {/* pt-4: gap from separator to first content (calendar)
             pb-4: gap from last content (Today/Tomorrow) to next separator   */}
@@ -103,14 +106,14 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           </div>
         </div>
 
-        <DrawerActions
+        <ResponsiveModalActions
           onRemove={() => { onRemove(); onClose() }}
           onCancel={onClose}
           onSet={handleSet}
           setDisabled={!selected}
         />
 
-      </DrawerContent>
-    </Drawer>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   )
 }
