@@ -1,38 +1,61 @@
 import { CircleFadingArrowUp } from 'lucide-react'
 import { Checkbox } from './ui/checkbox'
 import { Card } from './ui/card'
-import { SurfaceButton } from './ui/surface-button'
 
 interface MarkdownTaskCardProps {
-  text: string
-  done: boolean
-  onToggle: () => void
-  onPromote: () => void
+  text:          string
+  done:          boolean
+  onToggle:      () => void
+  onPromote:     () => void
+  // Inline editing — when editValue is provided the text becomes an input
+  onClickText?:  () => void
+  editValue?:    string
+  onEditChange?: (value: string) => void
+  onEditCommit?: () => void
+  onEditCancel?: () => void
 }
 
-export default function MarkdownTaskCard({ text, done, onToggle, onPromote }: MarkdownTaskCardProps) {
+export default function MarkdownTaskCard({
+  text, done, onToggle, onPromote,
+  onClickText, editValue, onEditChange, onEditCommit, onEditCancel,
+}: MarkdownTaskCardProps) {
+  const isEditing = editValue !== undefined
+
   return (
-    <Card className="relative flex items-stretch gap-[9px] pl-[8px] pr-[10px] py-[8px] shadow-none bg-card border border-input rounded-lg transition-colors hover:bg-accent">
-      <SurfaceButton className="absolute inset-0 z-[1] rounded-lg" aria-label={text} onClick={() => {}} />
-
-      {/* Dim neutral bar — same geometry as OccurrenceCard's priority bar */}
-      <span className="w-1 self-stretch rounded-full shrink-0 min-h-5 bg-muted-foreground/20 relative z-20" />
-
-      <div className="relative z-20 flex flex-1 min-w-0 items-center gap-[6px] py-[2px] pointer-events-none">
+    <Card className="flex items-stretch gap-[9px] pl-[8px] pr-[10px] py-[8px] shadow-none bg-card border border-input rounded-lg transition-colors hover:bg-accent">
+      <span className="w-1 self-stretch rounded-full shrink-0 min-h-5 bg-muted-foreground/20" />
+      <div className="flex flex-1 min-w-0 items-center gap-[6px] py-[2px]">
         <Checkbox
           checked={done}
-          onCheckedChange={() => onToggle()}
-          className="size-5 shrink-0 pointer-events-auto"
+          onCheckedChange={onToggle}
+          className="size-5 shrink-0"
           onPointerDown={e => e.stopPropagation()}
           onClick={e => e.stopPropagation()}
         />
-        <span className={`text-[14px] font-medium text-foreground truncate flex-1 ${done ? 'line-through opacity-60' : ''}`}>
-          {text}
-        </span>
+        {isEditing ? (
+          <input
+            autoFocus
+            className="flex-1 text-[14px] font-medium bg-transparent border-none outline-none"
+            value={editValue}
+            onChange={e => onEditChange?.(e.target.value)}
+            onBlur={onEditCommit}
+            onKeyDown={e => {
+              if (e.key === 'Enter')  { e.preventDefault(); onEditCommit?.() }
+              if (e.key === 'Escape') { onEditCancel?.() }
+            }}
+          />
+        ) : (
+          <span
+            className={`flex-1 text-[14px] font-medium truncate ${onClickText ? 'cursor-pointer' : ''} ${done ? 'line-through opacity-60' : 'text-foreground'}`}
+            onClick={onClickText}
+          >
+            {text}
+          </span>
+        )}
         <button
-          aria-label="Promote to task"
-          title="Promote to task"
-          className="shrink-0 text-muted-foreground hover:text-foreground transition-colors pointer-events-auto"
+          aria-label="Convert to item"
+          title="Convert to item"
+          className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
           onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onPromote() }}
         >
           <CircleFadingArrowUp size={15} />

@@ -1,14 +1,14 @@
 import { useState, useCallback, useMemo } from 'react'
-import { Plus, X, Tag, CircleFadingArrowUp } from 'lucide-react'
+import { Plus, X, Tag } from 'lucide-react'
 import type { Occurrence, Roots, StoreItem } from '../types'
 import { occKind } from '../types'
 import { parseItemEntry, serializeTaskEntry } from '../items'
 import { fileEntries, fileOccurrenceMap, occState } from '../presentation'
 import { resolveWikilink } from '../wikilinks'
 import OccurrenceCard from '@/components/OccurrenceCard'
+import MarkdownTaskCard from '@/components/MarkdownTaskCard'
 import TagChip from '@/components/TagChip'
 import { Card } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 
@@ -163,51 +163,24 @@ export default function ItemsList({ items, onChange, roots, storeItems, onPromot
             )
           }
 
-          // String task — same card anatomy as MarkdownTaskCard
+          // String task
           const { text, done } = entry
           const isEditing = editingIdx === idx
           return (
             <div key={idx} className="flex items-start gap-1">
-              <Card className="flex-1 flex items-stretch gap-[9px] pl-[8px] pr-[10px] py-[8px] shadow-none bg-card border border-input rounded-lg transition-colors hover:bg-accent">
-                <span className="w-1 self-stretch rounded-full shrink-0 min-h-5 bg-muted-foreground/20" />
-                <div className="flex flex-1 min-w-0 items-center gap-[6px] py-[2px]">
-                  <Checkbox
-                    checked={done}
-                    onCheckedChange={() => { if (!isEditing) toggleTask(idx, text, done) }}
-                    className="size-5 shrink-0"
-                    onPointerDown={e => e.stopPropagation()}
-                    onClick={e => e.stopPropagation()}
-                  />
-                  {isEditing ? (
-                    <input
-                      autoFocus
-                      className="flex-1 text-[14px] font-medium bg-transparent border-none outline-none"
-                      value={editText}
-                      onChange={e => setEditText(e.target.value)}
-                      onBlur={() => commitEdit(idx, done)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter')  { e.preventDefault(); commitEdit(idx, done) }
-                        if (e.key === 'Escape') { setEditingIdx(null) }
-                      }}
-                    />
-                  ) : (
-                    <span
-                      className={`flex-1 text-[14px] font-medium truncate cursor-pointer ${done ? 'line-through opacity-60' : 'text-foreground'}`}
-                      onClick={() => startEdit(idx, text)}
-                    >
-                      {text}
-                    </span>
-                  )}
-                  <button
-                    aria-label="Convert to item"
-                    title="Convert to item"
-                    className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                    onMouseDown={e => { e.preventDefault(); e.stopPropagation(); promote(idx, text, done) }}
-                  >
-                    <CircleFadingArrowUp size={15} />
-                  </button>
-                </div>
-              </Card>
+              <div className="flex-1 min-w-0">
+                <MarkdownTaskCard
+                  text={text}
+                  done={done}
+                  onToggle={() => toggleTask(idx, text, done)}
+                  onPromote={() => promote(idx, text, done)}
+                  onClickText={isEditing ? undefined : () => startEdit(idx, text)}
+                  editValue={isEditing ? editText : undefined}
+                  onEditChange={setEditText}
+                  onEditCommit={() => commitEdit(idx, done)}
+                  onEditCancel={() => setEditingIdx(null)}
+                />
+              </div>
               <button
                 type="button"
                 className="shrink-0 mt-[9px] p-1 text-muted-foreground hover:text-foreground"
