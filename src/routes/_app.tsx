@@ -45,11 +45,13 @@ function AppLayout() {
 }
 
 function AppMain() {
-  const { isMobile, setOpenMobile, setOpen } = useSidebar()
+  const { isMobile, setOpenMobile } = useSidebar()
+  // The menu button and coach tour drive the mobile sheet only. On desktop the
+  // sidebar is persistent, so open/close requests are ignored there (users can
+  // still collapse it via the Ctrl/Cmd+B shortcut).
   const setSidebarOpen = useCallback((open: boolean) => {
     if (isMobile) setOpenMobile(open)
-    else setOpen(open)
-  }, [isMobile, setOpenMobile, setOpen])
+  }, [isMobile, setOpenMobile])
 
   const navigate = useNavigate()
   const pathname = useRouterState({ select: s => s.location.pathname })
