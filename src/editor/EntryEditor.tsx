@@ -12,8 +12,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
-import BacklinksPanel from './BacklinksPanel'
-import TagTopicRow from './TagTopicRow'
+import ListedOnRow from './ListedOnRow'
+import ItemsList from './ItemsList'
 import ParticipantsRow from './ParticipantsRow'
 import EntryBody from './EntryBody'
 import { cn } from '@/lib/utils'
@@ -98,7 +98,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   function handlePromoteTask(title: string, done: boolean): string | null {
     const result = saveNode(null, 'all', {
       item: null, title, tracked: true, itemType: 'task', done,
-      body: '', tags: [], topics: [], participants: [],
+      body: '', tags: [], items: [], participants: [],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
     })
@@ -114,7 +114,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     onScopeChange?.(scope)
   }
 
-  const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, tags, topics, participants, priority, editScope } = entry
+  const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)
@@ -182,13 +182,10 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           />
         </div>
 
-        {/* ── FILE-LEVEL: tags + topics ── */}
-        <TagTopicRow
-          tags={tags}
-          topics={topics}
+        {/* ── FILE-LEVEL: listed-on reverse chips ── */}
+        <ListedOnRow
+          fileSlug={item?.fileSlug}
           roots={roots}
-          items={items}
-          onChange={onChange}
           onOpenWikilink={onOpenWikilink}
         />
 
@@ -268,15 +265,15 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
         <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} onPromoteTask={handlePromoteTask} />
 
-        {item?.fileSlug && onOpenWikilink && onToggleDoneBacklink && (
-          <BacklinksPanel
-            fileSlug={item.fileSlug}
-            items={items}
-            roots={roots}
-            onOpen={onOpenWikilink}
-            onToggleDone={onToggleDoneBacklink}
-          />
-        )}
+        <ItemsList
+          items={listItems}
+          onChange={next => onChange(prev => ({ ...prev, items: next }))}
+          roots={roots}
+          storeItems={items}
+          onPromote={handlePromoteTask}
+          onOpenWikilink={onOpenWikilink}
+          onToggleDone={onToggleDoneBacklink}
+        />
 
       </div></div>
     </>

@@ -86,7 +86,7 @@ export function upsertOverride(
 export interface EditorFields {
   title:        string
   tags:         string[]
-  topics:       string[]
+  items:        string[]
   participants: string[]
   tracked:      boolean
   done:         boolean
@@ -113,7 +113,7 @@ function occFromAppMeta(m: { done?: boolean; participants?: string[]; priority?:
 
 /**
  * Build occurrence-level metadata from editor fields.
- * File-level fields (title/tags/topics/body) never appear here — they go to roots.
+ * File-level fields (title/tags/items/body) never appear here — they go to roots.
  */
 function occMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMetadata {
   return {
@@ -144,15 +144,15 @@ function seriesMeta(base: Partial<OccurrenceMetadata>, f: EditFields): Occurrenc
 /**
  * Update (or create) the per-file entry in the roots map with the file-level
  * fields from `fields`. The roots map is the single source of truth for a file's
- * title/tags/topics/body, so every edit scope routes file-level changes here.
+ * title/tags/items/body, so every edit scope routes file-level changes here.
  */
 export function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots {
   const next = new Map(roots)
   next.set(fileSlug, {
-    title:  f.title,
-    tags:   f.tags,
-    topics: f.topics ?? [],
-    body:   f.body || undefined,
+    title: f.title,
+    tags:  f.tags,
+    items: f.items ?? [],
+    body:  f.body || undefined,
   })
   return next
 }
@@ -179,7 +179,7 @@ export function applyEdit(
   if (!occ) {
     const fileSlug = titleToSlug(title) || crypto.randomUUID()
     const newRoot: FileMetadata = {
-      title, tags: fields.tags, topics: fields.topics ?? [], body: fields.body || undefined,
+      title, tags: fields.tags, items: fields.items ?? [], body: fields.body || undefined,
     }
     const newRoots = new Map(roots)
     newRoots.set(fileSlug, newRoot)

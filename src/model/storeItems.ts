@@ -140,7 +140,7 @@ export function parseToStoreItems(path: string, content: string): ParseResult {
 /**
  * Build the FileMetadata for a file from its raw frontmatter + body.
  *
- * File-level fields (title/tags/topics) belong to the whole file. They are
+ * File-level fields (title/tags/items) belong to the whole file. They are
  * written at the top-level frontmatter root and are NOT propagated to child
  * series by the defaults-only inheritance engine — so instead of copying them
  * onto every item, we model them explicitly as a FileMetadata entry in the

@@ -22,10 +22,10 @@ export type Repeat =
  * Stored in the roots map (Map<fileSlug, FileMetadata>), not on StoreItems.
  */
 export interface FileMetadata {
-  title:  string
-  tags:   string[]
-  topics: string[]
-  body?:  string
+  title: string
+  tags:  string[]
+  items: string[]
+  body?: string
 }
 
 /**
@@ -58,7 +58,7 @@ import type { OccurrenceEntry, RepeatPattern } from './model/expansion'
 
 /**
  * Raw store items carry OccurrenceMetadata (no file-level fields).
- * File-level identity (title/tags/topics/body) lives in the roots map.
+ * File-level identity (title/tags/items/body) lives in the roots map.
  */
 export type StoreSeries = RepeatPattern<OccurrenceMetadata>
 export type StoreOcc    = OccurrenceEntry<OccurrenceMetadata>
@@ -99,7 +99,7 @@ interface InlineFieldSpec {
 export const INLINE_FIELDS: readonly InlineFieldSpec[] = [
   { key: 'title',        kind: 'string',      level: 'file',       required: true },
   { key: 'tags',         kind: 'stringArray', level: 'file',       required: true },
-  { key: 'topics',       kind: 'stringArray', level: 'file',       required: true },
+  { key: 'items',        kind: 'stringArray', level: 'file',       required: true },
   { key: 'done',         kind: 'boolean',     level: 'occurrence' },
   { key: 'participants', kind: 'stringArray', level: 'occurrence', required: true },
   { key: 'priority',     kind: 'priority',    level: 'occurrence' },
@@ -136,13 +136,13 @@ function parseInlineField(spec: InlineFieldSpec, raw: unknown): unknown {
   }
 }
 
-/** Extract file-level metadata from raw YAML fields. */
+/** Extract file-level metadata from raw YAML fields. Migrates legacy `topics` to `items`. */
 export function extractFileMetadata(fields: Record<string, unknown>): FileMetadata {
   return {
-    title:  (fields.title ? String(fields.title) : '') as string,
-    tags:   Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
-    topics: Array.isArray(fields.topics) ? (fields.topics as string[]) : [],
-    body:   fields.body ? String(fields.body) : undefined,
+    title: (fields.title ? String(fields.title) : '') as string,
+    tags:  Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
+    items: Array.isArray(fields.items) ? (fields.items as string[]) : [],
+    body:  fields.body ? String(fields.body) : undefined,
   }
 }
 

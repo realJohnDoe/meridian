@@ -460,10 +460,10 @@ export function clearOccIdCache(): void { occIdCache.clear() }
 // EXPANDRANGE  (main-app entry point — takes StoreItem[])
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Merge file-level root fields (title/tags/topics/body) with occurrence metadata. */
+/** Merge file-level root fields (title/tags/items/body) with occurrence metadata. */
 export function joinFileMeta(fileSlug: string, meta: OccurrenceMetadata, roots: Roots): AppMetadata {
   return {
-    ...(roots.get(fileSlug) ?? { title: '', tags: [], topics: [] }),
+    ...(roots.get(fileSlug) ?? { title: '', tags: [], items: [] }),
     ...meta,
   }
 }

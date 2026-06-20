@@ -34,7 +34,7 @@ export interface FileEntry {
   fileSlug: string
   title:    string
   tags:     string[]
-  topics:   string[]
+  items:    string[]
 }
 
 /** One FileEntry per file (deduped by fileSlug), sourced entirely from the roots map. */
@@ -43,33 +43,15 @@ export function fileEntries(roots: Roots): FileEntry[] {
   for (const [fileSlug, meta] of roots) {
     entries.push({
       fileSlug,
-      title:  meta.title || fileSlug,
-      tags:   (meta.tags   as string[]) || [],
-      topics: (meta.topics as string[]) || [],
+      title: meta.title || fileSlug,
+      tags:  meta.tags  || [],
+      items: meta.items || [],
     })
   }
   return entries
 }
 
-// ── TAG / TOPIC CHIP HELPERS ──────────────────────────────────────────────────
 
-export interface TagTopicChip {
-  label:   string
-  isTopic: boolean
-  raw:     string
-}
-
-/** Build a sorted mixed list of tag chips and wikilink-resolved topic chips. */
-export function buildTagTopicChips(tags: string[], topics: string[], roots: Roots): TagTopicChip[] {
-  const tagChips:   TagTopicChip[] = tags.map(t => ({ label: t, isTopic: false, raw: t }))
-  const topicChips: TagTopicChip[] = topics.map(raw => {
-    const ref      = unwrapRef(raw)
-    const fileSlug = resolveWikilink(ref, roots)
-    const label    = fileSlug ? (roots.get(fileSlug)?.title ?? ref) : ref
-    return { label, isTopic: true, raw }
-  })
-  return [...tagChips, ...topicChips].sort((a, b) => a.label.localeCompare(b.label))
-}
 
 // ── fileOccurrenceMap ──────────────────────────────────────────────────────────
 
@@ -195,14 +177,14 @@ export function warmSlugInFOM(fileSlug: string, items: StoreItem[], roots: Roots
 }
 
 /**
- * Returns the fileSlugs of all files whose topics include a link to `targetSlug`.
+ * Returns the fileSlugs of all files whose items list includes a link to `targetSlug`.
  * Self-links are excluded. Memoize the result on [roots] at the call site.
  */
 export function backlinksTo(targetSlug: string, roots: Roots): string[] {
   const result: string[] = []
   for (const [fileSlug, meta] of roots) {
     if (fileSlug === targetSlug) continue
-    for (const raw of (meta.topics as string[] | undefined) ?? []) {
+    for (const raw of meta.items ?? []) {
       const ref = unwrapRef(raw)
       if (resolveWikilink(ref, roots) === targetSlug) { result.push(fileSlug); break }
     }

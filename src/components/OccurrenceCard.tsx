@@ -2,14 +2,12 @@ import { Repeat2, Users } from 'lucide-react'
 import type { Occurrence } from '../types'
 import KindIcon from './KindIcon'
 import { fmtT, parseDateString } from '../model/dateUtils'
-import { fmtShort, buildTagTopicChips, occState } from '../presentation'
+import { fmtShort, occState } from '../presentation'
 import { multidayDisplayTitle } from '../model/expansion'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
 import { Card } from './ui/card'
 import { SurfaceButton } from './ui/surface-button'
-import TagChip from './TagChip'
-import { useStore } from '../store'
 import { cn } from '../lib/utils'
 import { occBarVariants } from './ui/occurrence-variants'
 
@@ -50,18 +48,6 @@ function ParticipantsBadge({ participants }: { participants: string[] }) {
   )
 }
 
-function TagsRow({ tags, topics }: { tags: string[]; topics: string[] }) {
-  const roots = useStore(s => s.roots)
-  const chips = buildTagTopicChips(tags, topics, roots)
-  if (!chips.length) return null
-  return (
-    <>
-      {chips.map(c => (
-        <TagChip key={c.isTopic ? `topic:${c.raw}` : `tag:${c.raw}`} label={c.label} isTopic={c.isTopic} />
-      ))}
-    </>
-  )
-}
 
 export default function OccurrenceCard({
   occ,
@@ -83,7 +69,6 @@ export default function OccurrenceCard({
   const t            = fmtT(occ.time)
   const hasTrack     = occ.metadata.done !== undefined
   const tags         = occ.metadata.tags || []
-  const topics       = (occ.metadata.topics as string[] | undefined) || []
   const participants = occ.metadata.participants || []
 
   const dateBadge = (() => {
@@ -100,7 +85,7 @@ export default function OccurrenceCard({
   ].filter(Boolean).join(' ')
 
   const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime === 'badge' && !!t)
-  const hasTagsContent      = showTagsParticipants && (tags.length > 0 || topics.length > 0 || participants.length > 0)
+  const hasTagsContent      = showTagsParticipants && (tags.length > 0 || participants.length > 0)
   const showMeta            = hasDateTimeContent || hasTagsContent
 
   return (
@@ -165,10 +150,7 @@ export default function OccurrenceCard({
             {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
             {showTime === 'badge' && t && <Badge variant="tag">{t}</Badge>}
             {showTagsParticipants && (
-              <>
-                <TagsRow tags={tags} topics={topics} />
-                <ParticipantsBadge participants={participants} />
-              </>
+              <ParticipantsBadge participants={participants} />
             )}
           </div>
         )}

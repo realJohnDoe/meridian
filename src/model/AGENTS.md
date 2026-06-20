@@ -141,7 +141,7 @@ No store, React, or file I/O dependencies.
 
 - `applyEdit(data, occ, scope, fields): StoreData` — apply an editor save across
   four scopes: `'all'`, `'single'`, `'future'` (series split), `'add'`. Updates
-  both items (occurrence-level changes) and roots (file-level title/tags/topics).
+  both items (occurrence-level changes) and roots (file-level title/tags/items).
 - `updateRoot(roots, fileSlug, fields): Roots` — update file-level metadata for
   one slug and return a new roots map.
 - `toggleDone`, `excludeOccurrence`, `deleteByFileSlug`, `deleteFollowing`

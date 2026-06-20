@@ -23,7 +23,7 @@ export const ENTRY_DEFAULT: EntryState = {
   repeat: null,
   done: false,
   tags: [],
-  topics: [],
+  items: [],
   participants: [],
   priority: null,
   editScope: 'all',
