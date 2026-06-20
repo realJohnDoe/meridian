@@ -220,13 +220,11 @@ export default function ItemsList({ items, onChange, roots, storeItems, onPromot
           )
         })}
 
-        {/* Add item — half-card affordance */}
+        {/* Add item — half-card affordance, same dimensions as item cards */}
+        <div className="flex items-start gap-1 mt-0.5">
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
-            <Card
-              className="flex items-center gap-2 px-3 py-[7px] border-dashed bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground mt-0.5"
-              onClick={() => setPickerOpen(true)}
-            >
+            <Card className="flex-1 flex items-center gap-2 pl-[8px] pr-[10px] py-[8px] border-dashed bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground">
               <Plus size={13} className="shrink-0" />
               <span className="text-[13px]">Add item…</span>
             </Card>
@@ -278,6 +276,9 @@ export default function ItemsList({ items, onChange, roots, storeItems, onPromot
             </Command>
           </PopoverContent>
         </Popover>
+        {/* Spacer matching the X button so the card aligns with cards above */}
+        <span className="w-[21px] shrink-0" aria-hidden="true" />
+        </div>
       </div>
     </div>
   )
