@@ -103,12 +103,13 @@ interface DrawerActionsProps {
   onSet: () => void
   removeLabel?: string
   setDisabled?: boolean
+  className?: string
 }
 
-const DrawerActions = ({ onRemove, onCancel, onSet, removeLabel = 'Remove', setDisabled }: DrawerActionsProps) => (
+const DrawerActions = ({ onRemove, onCancel, onSet, removeLabel = 'Remove', setDisabled, className }: DrawerActionsProps) => (
   <>
     <Separator />
-    <DrawerFooter>
+    <DrawerFooter className={className}>
       <Button
         variant="outline"
         size="sm"

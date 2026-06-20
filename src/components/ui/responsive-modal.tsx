@@ -1,10 +1,8 @@
 import * as React from 'react'
-import { X } from 'lucide-react'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './dialog'
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerActions } from './drawer'
 import { Separator } from './separator'
-import { Button } from './button'
 import { cn } from '@/lib/utils'
 
 const ModalCtx = React.createContext(false) // false = mobile (drawer)
@@ -65,15 +63,13 @@ function ResponsiveModalTitle({ children, className }: {
   }
   return (
     <>
-      <div className={cn(
+      <DialogTitle className={cn(
         'text-[11px] font-bold tracking-[.07em] uppercase text-muted-foreground',
         'px-[18px] pt-4 pb-2 pr-10',
         className,
       )}>
-        <DialogTitle className="text-[11px] font-bold tracking-[.07em] uppercase text-muted-foreground">
-          {children}
-        </DialogTitle>
-      </div>
+        {children}
+      </DialogTitle>
       <Separator />
     </>
   )
@@ -104,36 +100,15 @@ function ResponsiveModalActions({
   onRemove, onCancel, onSet, removeLabel = 'Remove', setDisabled,
 }: ResponsiveModalActionsProps) {
   const isDesktop = React.useContext(ModalCtx)
-  if (!isDesktop) {
-    return (
-      <DrawerActions
-        onRemove={onRemove}
-        onCancel={onCancel}
-        onSet={onSet}
-        removeLabel={removeLabel}
-        setDisabled={setDisabled}
-      />
-    )
-  }
   return (
-    <>
-      <Separator />
-      <div className="flex items-center justify-between px-4 pt-4 pb-4">
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-          onClick={onRemove}
-        >
-          <X size={13} />
-          {removeLabel}
-        </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
-          <Button size="sm" disabled={setDisabled} onClick={onSet}>Set</Button>
-        </div>
-      </div>
-    </>
+    <DrawerActions
+      onRemove={onRemove}
+      onCancel={onCancel}
+      onSet={onSet}
+      removeLabel={removeLabel}
+      setDisabled={setDisabled}
+      className={isDesktop ? 'pb-4' : undefined}
+    />
   )
 }
 
