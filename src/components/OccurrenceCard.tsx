@@ -83,7 +83,7 @@ export default function OccurrenceCard({
   const t            = fmtT(occ.time)
   const hasTrack     = occ.metadata.done !== undefined
   const tags         = occ.metadata.tags || []
-  const topics       = (occ.metadata.topics as string[] | undefined) || []
+  const topics       = (occ.metadata.items  as string[] | undefined) || []
   const participants = occ.metadata.participants || []
 
   const dateBadge = (() => {

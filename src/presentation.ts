@@ -34,7 +34,7 @@ export interface FileEntry {
   fileSlug: string
   title:    string
   tags:     string[]
-  topics:   string[]
+  items:    string[]
 }
 
 /** One FileEntry per file (deduped by fileSlug), sourced entirely from the roots map. */
@@ -43,9 +43,9 @@ export function fileEntries(roots: Roots): FileEntry[] {
   for (const [fileSlug, meta] of roots) {
     entries.push({
       fileSlug,
-      title:  meta.title || fileSlug,
-      tags:   (meta.tags   as string[]) || [],
-      topics: (meta.topics as string[]) || [],
+      title: meta.title || fileSlug,
+      tags:  meta.tags  || [],
+      items: meta.items || [],
     })
   }
   return entries
@@ -195,14 +195,14 @@ export function warmSlugInFOM(fileSlug: string, items: StoreItem[], roots: Roots
 }
 
 /**
- * Returns the fileSlugs of all files whose topics include a link to `targetSlug`.
+ * Returns the fileSlugs of all files whose items list includes a link to `targetSlug`.
  * Self-links are excluded. Memoize the result on [roots] at the call site.
  */
 export function backlinksTo(targetSlug: string, roots: Roots): string[] {
   const result: string[] = []
   for (const [fileSlug, meta] of roots) {
     if (fileSlug === targetSlug) continue
-    for (const raw of (meta.topics as string[] | undefined) ?? []) {
+    for (const raw of meta.items ?? []) {
       const ref = unwrapRef(raw)
       if (resolveWikilink(ref, roots) === targetSlug) { result.push(fileSlug); break }
     }

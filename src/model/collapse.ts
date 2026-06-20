@@ -9,7 +9,7 @@ type AnyOcc = OccurrenceEntry<OccurrenceMetadata>
  * Implements reverse-inheritance: fields that instances override are hoisted
  * into a `defaults:` block so generated occurrences inherit the right base.
  *
- * `root` carries the file-level fields (title/tags/topics/body) — emitted at
+ * `root` carries the file-level fields (title/tags/items/body) — emitted at
  * the top-level root of the YAML, never hoisted into per-occurrence defaults.
  *
  * Single-series algorithm:

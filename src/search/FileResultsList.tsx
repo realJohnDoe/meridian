@@ -49,7 +49,7 @@ export default function FileResultsList({ query, items, onOpen }: Props) {
     const entries = fileEntries(roots)
     return entries
       .filter(e => {
-        const haystack = [e.title, ...e.tags, ...e.topics].join(' ')
+        const haystack = [e.title, ...e.tags, ...e.items].join(' ')
         return fuzzyMatch(query, haystack)
       })
       .map(e => ({ entry: e, score: fuzzyScore(query, e.title) }))

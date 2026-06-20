@@ -98,7 +98,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   function handlePromoteTask(title: string, done: boolean): string | null {
     const result = saveNode(null, 'all', {
       item: null, title, tracked: true, itemType: 'task', done,
-      body: '', tags: [], topics: [], participants: [],
+      body: '', tags: [], items: [], participants: [],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
     })
@@ -114,7 +114,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     onScopeChange?.(scope)
   }
 
-  const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, tags, topics, participants, priority, editScope } = entry
+  const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, tags, items: listItems, participants, priority, editScope } = entry
 
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)
@@ -182,10 +182,10 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           />
         </div>
 
-        {/* ── FILE-LEVEL: tags + topics ── */}
+        {/* ── FILE-LEVEL: tags + topics (shim: pass only wikilink entries as topics) ── */}
         <TagTopicRow
           tags={tags}
-          topics={topics}
+          topics={listItems.filter(s => s.startsWith('[['))}
           roots={roots}
           items={items}
           onChange={onChange}

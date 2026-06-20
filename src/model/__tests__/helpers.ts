@@ -42,7 +42,7 @@ export function serialize(items: StoreItem[], root?: FileMetadata): string {
   return saveFile(frontmatter, body)
 }
 
-/** The per-file root metadata (title/tags/topics/body). */
+/** The per-file root metadata (title/tags/items/body). */
 export function rootMeta(result: ParseResult): FileMetadata {
   return result.root
 }

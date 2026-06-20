@@ -148,7 +148,6 @@ describe('fileEntries', () => {
 const NOTE_YAML = `---
 title: Grocery List
 tags: [shopping]
-topics: []
 done: false
 ---
 `

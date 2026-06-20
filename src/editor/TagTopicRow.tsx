@@ -27,8 +27,8 @@ export default function TagTopicRow({ tags, topics, roots, items, onChange, onOp
     onChange(prev => ({ ...prev, tags: prev.tags.filter((_, i) => i !== idx) }))
   }, [onChange])
 
-  const removeTopic = useCallback((idx: number) => {
-    onChange(prev => ({ ...prev, topics: prev.topics.filter((_, i) => i !== idx) }))
+  const removeTopic = useCallback((raw: string) => {
+    onChange(prev => ({ ...prev, items: prev.items.filter(s => s !== raw) }))
   }, [onChange])
 
   const addTag = useCallback((raw: string) => {
@@ -41,7 +41,7 @@ export default function TagTopicRow({ tags, topics, roots, items, onChange, onOp
 
   const addTopic = useCallback((fileSlug: string) => {
     const stored = `[[${fileSlug}]]`
-    onChange(prev => prev.topics.includes(stored) ? prev : { ...prev, topics: [...prev.topics, stored] })
+    onChange(prev => prev.items.includes(stored) ? prev : { ...prev, items: [...prev.items, stored] })
     setPickerQuery('')
     setPickerOpen(false)
   }, [onChange])
@@ -62,14 +62,13 @@ export default function TagTopicRow({ tags, topics, roots, items, onChange, onOp
       <Tag size={13} className="opacity-40 self-center shrink-0" />
       {chips.map(c => {
         if (c.isTopic) {
-          const idx = topics.indexOf(c.raw)
           return (
             <TagChip
               key={c.raw}
               label={c.label}
               isTopic
               interactive
-              onRemove={() => removeTopic(idx)}
+              onRemove={() => removeTopic(c.raw)}
               onNavigate={onOpenWikilink ? () => onOpenWikilink(unwrapRef(c.raw)) : undefined}
             />
           )

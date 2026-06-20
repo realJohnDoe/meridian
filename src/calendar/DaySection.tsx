@@ -62,7 +62,7 @@ function propsAreEqual(prev: Props, next: Props): boolean {
         && o.metadata.priority === n.metadata.priority
         && o.metadata.duration === n.metadata.duration
         && JSON.stringify(o.metadata.tags) === JSON.stringify(n.metadata.tags)
-        && JSON.stringify(o.metadata.topics) === JSON.stringify(n.metadata.topics)
+        && JSON.stringify(o.metadata.items) === JSON.stringify(n.metadata.items)
         && JSON.stringify(o.metadata.participants) === JSON.stringify(n.metadata.participants)
   })) return false
   return true

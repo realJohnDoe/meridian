@@ -63,7 +63,7 @@ export function entryFromOccurrence(
     itemType,
     done:         m.done     ?? false,
     tags:         [...(m.tags         || [])],
-    topics:       [...(m.topics       || [])],
+    items:        [...(m.items        || [])],
     participants: [...(m.participants || [])],
     priority:     (m.priority || null) as EntryState['priority'],
     editScope,
@@ -87,7 +87,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
     title,
     tags:         fields.tags         ?? [],
-    topics:       fields.topics       ?? [],
+    items:        fields.items        ?? [],
     participants: fields.participants  ?? [],
     body:         fields.body         ?? '',
     tracked:      fields.tracked      ?? false,

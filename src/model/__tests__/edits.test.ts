@@ -33,7 +33,7 @@ function editFields(occ: Occurrence, over: Partial<EditFields> = {}): EditFields
   return {
     title:        m.title,
     tags:         m.tags ?? [],
-    topics:       m.topics ?? [],
+    items:        m.items ?? [],
     participants: m.participants ?? [],
     body:         m.body ?? '',
     tracked:      m.done !== undefined,
@@ -187,7 +187,7 @@ describe('edit operations → serialized YAML', () => {
     const next = applyEdit(emptyData, null, 'all', {
       title: 'Buy groceries',
       tags: ['errand'],
-      topics: [],
+      items: [],
       participants: [],
       body: 'Milk, eggs, bread',
       tracked: true,
@@ -204,7 +204,7 @@ describe('edit operations → serialized YAML', () => {
     const emptyData: StoreData = { items: [], roots: new Map() }
     const next = applyEdit(emptyData, null, 'all', {
       title: 'Buy milk',
-      tags: [], topics: [], participants: [], body: '',
+      tags: [], items: [], participants: [], body: '',
       tracked: true, done: false, priority: null,
       scheduled: null, duration: '', repeat: null,
     })
@@ -234,25 +234,25 @@ describe('edit operations → serialized YAML', () => {
 
   // ── File-level identity ──────────────────────────────────────────────────────
 
-  it('single-scope title/tags/topics change updates the root, not the override', () => {
+  it('single-scope title/tags/items change updates the root, not the override', () => {
     const data = fixtureData('weekly-series')
     const occ = occOn(data.items, data.roots, '2026-04-20')
     const next = applyEdit(data, occ, 'single', editFields(occ, {
       title: 'Team Standup Renamed',
       tags: ['work', 'renamed'],
-      topics: ['[[project-alpha]]'],
+      items: ['[[project-alpha]]'],
     }))
-    // The per-file root carries the new title, tags, and topics.
+    // The per-file root carries the new title, tags, and items.
     const root = [...next.roots.values()][0]
     expect(root.title).toBe('Team Standup Renamed')
     expect(root.tags).toEqual(['work', 'renamed'])
-    expect(root.topics).toEqual(['[[project-alpha]]'])
-    // The override instance must NOT carry title/tags/topics in serialized YAML.
+    expect(root.items).toEqual(['[[project-alpha]]'])
+    // The override instance must NOT carry title/tags/items in serialized YAML.
     const yaml = serializeData(next)
     const instancesSection = yaml.slice(yaml.indexOf('instances:'))
     expect(instancesSection).not.toMatch(/title:/)
     expect(instancesSection).not.toMatch(/tags:/)
-    expect(instancesSection).not.toMatch(/topics:/)
+    expect(instancesSection).not.toMatch(/items:/)
   })
 
   it('done/priority edits in single scope stay per-occurrence, not on the root', () => {
@@ -277,7 +277,7 @@ describe('edit operations → serialized YAML', () => {
     const emptyData: StoreData = { items: [], roots: new Map() }
     const next = applyEdit(emptyData, null, 'all', {
       title: 'Take Vitamins',
-      tags: ['health'], topics: [], participants: [], body: '',
+      tags: ['health'], items: [], participants: [], body: '',
       tracked: true, done: true, priority: null,
       scheduled: { date: '2026-05-10', time: '' },
       duration: '',
@@ -311,20 +311,20 @@ describe('edit operations → serialized YAML', () => {
     }
   })
 
-  it('topics round-trips through parse → serialize', () => {
+  it('items round-trips through parse → serialize', () => {
     const data = fixtureData('weekly-series')
     const occ = occOn(data.items, data.roots, '2026-04-20')
     const next = applyEdit(data, occ, 'all', editFields(occ, {
       title: 'Weekly Standup',
-      topics: ['[[project-alpha]]', '[[weekly-log]]'],
+      items: ['[[project-alpha]]', '[[weekly-log]]'],
       scheduled: { date: '2026-04-06', time: '09:00' },
     }))
     const yaml = serializeData(next)
-    // topics must appear at root, not in instances
-    expect(yaml).toContain('topics:')
+    // items must appear at root, not in instances
+    expect(yaml).toContain('items:')
     expect(yaml).toContain('[[project-alpha]]')
     const instancesSection = yaml.slice(yaml.indexOf('instances:'))
-    expect(instancesSection).not.toMatch(/topics:/)
+    expect(instancesSection).not.toMatch(/items:/)
   })
 
   it('file-level fields are emitted at the top-level root, never inside defaults:', () => {
@@ -333,14 +333,14 @@ describe('edit operations → serialized YAML', () => {
     const next = applyEdit(data, occ, 'all', editFields(occ, {
       title: 'Weekly Standup',
       tags: ['work'],
-      topics: ['[[project-alpha]]'],
+      items: ['[[project-alpha]]'],
       scheduled: { date: '2026-04-06', time: '09:00' },
     }))
     const yaml = serializeData(next)
-    // title/tags/topics are top-level keys (no leading whitespace) — Obsidian-visible.
+    // title/tags/items are top-level keys (no leading whitespace) — Obsidian-visible.
     expect(yaml).toMatch(/^title: Weekly Standup$/m)
     expect(yaml).toMatch(/^tags:$/m)
-    expect(yaml).toMatch(/^topics:$/m)
+    expect(yaml).toMatch(/^items:$/m)
     // The defaults: block must NOT contain them.
     const defaultsStart = yaml.indexOf('defaults:')
     if (defaultsStart >= 0) {
@@ -349,7 +349,7 @@ describe('edit operations → serialized YAML', () => {
       const defaultsBlock = blockEnd >= 0 ? after.slice(0, blockEnd) : after
       expect(defaultsBlock).not.toMatch(/title:/)
       expect(defaultsBlock).not.toMatch(/tags:/)
-      expect(defaultsBlock).not.toMatch(/topics:/)
+      expect(defaultsBlock).not.toMatch(/items:/)
     }
   })
 

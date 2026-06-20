@@ -1,5 +1,5 @@
 /**
- * Targeted regression test: topics must flow from root node through
+ * Targeted regression test: items must flow from root node through
  * expandRange so they appear in the agenda view and EntryEditor.
  */
 import { describe, it, expect } from 'vitest'
@@ -29,8 +29,8 @@ instances:
 const FROM = new Date('2026-04-01')
 const TO   = new Date('2026-04-30')
 
-describe('topics flow through expansion', () => {
-  it('topics saved via applyEdit appear on expanded occurrences', () => {
+describe('items flow through expansion', () => {
+  it('items saved via applyEdit appear on expanded occurrences', () => {
     const { items, root } = parseToStoreItems('standup.md', STANDUP_YAML)
     const roots: Roots = new Map([['standup', root]])
 
@@ -38,11 +38,11 @@ describe('topics flow through expansion', () => {
     const occ = occs0.find(o => o.date === '2026-04-20')!
     expect(occ).toBeDefined()
 
-    // Simulate user saving with a topic added (single scope)
+    // Simulate user saving with an item link added (single scope)
     const fields: EditFields = {
       title:        'Weekly Standup',
       tags:         ['work'],
-      topics:       ['[[project-alpha]]'],
+      items:        ['[[project-alpha]]'],
       participants: [],
       body:         '',
       tracked:      true,
@@ -54,19 +54,47 @@ describe('topics flow through expansion', () => {
     }
     const next = applyEdit({ items, roots }, occ, 'single', fields)
 
-    // Root must carry the topics
+    // Root must carry the items
     const updatedRoot = next.roots.get('standup')
-    expect(updatedRoot?.topics).toEqual(['[[project-alpha]]'])
+    expect(updatedRoot?.items).toEqual(['[[project-alpha]]'])
 
-    // Topics must appear on every occurrence after expansion
+    // Items must appear on every occurrence after expansion
     const occs1 = expandRange(next.items, next.roots, FROM, TO)
     expect(occs1.length).toBeGreaterThan(0)
     for (const o of occs1) {
-      expect(o.metadata.topics).toEqual(['[[project-alpha]]'])
+      expect(o.metadata.items).toEqual(['[[project-alpha]]'])
     }
   })
 
-  it('topics in YAML top-level are joined onto expanded occurrences', () => {
+  it('items in YAML top-level are joined onto expanded occurrences', () => {
+    const yaml = `---
+title: Weekly Standup
+tags: [work]
+items:
+  - "[[project-alpha]]"
+date: "2026-04-06"
+time: "09:00"
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday: [mo]
+defaults:
+  done: false
+---
+`
+    const { items, root } = parseToStoreItems('standup.md', yaml)
+    const roots: Roots = new Map([['standup', root]])
+
+    expect(root.items).toEqual(['[[project-alpha]]'])
+
+    const occs = expandRange(items, roots, FROM, TO)
+    expect(occs.length).toBeGreaterThan(0)
+    for (const o of occs) {
+      expect(o.metadata.items).toEqual(['[[project-alpha]]'])
+    }
+  })
+
+  it('legacy topics field is migrated to items on read', () => {
     const yaml = `---
 title: Weekly Standup
 tags: [work]
@@ -82,15 +110,8 @@ defaults:
   done: false
 ---
 `
-    const { items, root } = parseToStoreItems('standup.md', yaml)
-    const roots: Roots = new Map([['standup', root]])
-
-    expect(root.topics).toEqual(['[[project-alpha]]'])
-
-    const occs = expandRange(items, roots, FROM, TO)
-    expect(occs.length).toBeGreaterThan(0)
-    for (const o of occs) {
-      expect(o.metadata.topics).toEqual(['[[project-alpha]]'])
-    }
+    const { root } = parseToStoreItems('standup.md', yaml)
+    // Legacy topics: field is read as items via migration
+    expect(root.items).toEqual(['[[project-alpha]]'])
   })
 })
