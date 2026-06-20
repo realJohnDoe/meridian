@@ -1,13 +1,14 @@
 import { useState, useCallback, useMemo } from 'react'
 import { Plus, X, Tag, CircleFadingArrowUp } from 'lucide-react'
 import type { Occurrence, Roots, StoreItem } from '../types'
+import { occKind } from '../types'
 import { parseItemEntry, serializeTaskEntry } from '../items'
-import { fileEntries, fileOccurrenceMap } from '../presentation'
+import { fileEntries, fileOccurrenceMap, occState } from '../presentation'
 import { resolveWikilink } from '../wikilinks'
 import OccurrenceCard from '@/components/OccurrenceCard'
 import TagChip from '@/components/TagChip'
+import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 
@@ -21,6 +22,31 @@ interface Props {
   onToggleDone?:   (occ: Occurrence) => void
 }
 
+type ParsedEntry = ReturnType<typeof parseItemEntry> & { idx: number }
+type Row = { entry: ParsedEntry; occ: Occurrence | undefined }
+
+// Sort order: notes α → events chronologically → open tasks by priority →
+// open string tasks (stored) → done tasks + done string tasks α → broken links (stored)
+function rowSortKey({ entry, occ }: Row): [number, number, string] {
+  if (entry.kind === 'link') {
+    if (!occ) return [5, entry.idx, '']
+    const s = occState(occ)
+    if (s === 'done' || s === 'event-past') {
+      return [4, 0, occ.metadata.title?.toLowerCase() ?? '']
+    }
+    const k = occKind(occ)
+    if (k === 'note')  return [0, 0, occ.metadata.title?.toLowerCase() ?? '']
+    if (k === 'event') return [1, occ.metadata.jsTime?.getTime() ?? 0, '']
+    // task: sort by priority
+    const p = occ.metadata.priority
+    const prank = p === 'high' ? 0 : p === 'medium' ? 1 : p === 'low' ? 2 : 3
+    return [2, prank, occ.metadata.title?.toLowerCase() ?? '']
+  }
+  // string task
+  if (entry.done) return [4, 0, entry.text.toLowerCase()]
+  return [3, entry.idx, '']
+}
+
 export default function ItemsList({ items, onChange, roots, storeItems, onPromote, onOpenWikilink, onToggleDone }: Props) {
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
@@ -32,6 +58,26 @@ export default function ItemsList({ items, onChange, roots, storeItems, onPromot
   const filtered  = pickerQuery
     ? allFiles.filter(e => e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
     : allFiles
+
+  const entries: ParsedEntry[] = useMemo(
+    () => items.map((raw, idx) => ({ ...parseItemEntry(raw), idx })),
+    [items],
+  )
+
+  const sortedRows: Row[] = useMemo(() => {
+    const rows: Row[] = entries.map(entry => {
+      if (entry.kind !== 'link') return { entry, occ: undefined }
+      const slug = resolveWikilink(entry.ref, roots)
+      return { entry, occ: slug ? occBySlug.get(slug) : undefined }
+    })
+    return [...rows].sort((a, b) => {
+      const [ga, na, sa] = rowSortKey(a)
+      const [gb, nb, sb] = rowSortKey(b)
+      if (ga !== gb) return ga - gb
+      if (na !== nb) return na - nb
+      return sa.localeCompare(sb)
+    })
+  }, [entries, occBySlug, roots])
 
   const addTask = useCallback((text: string) => {
     const t = text.trim()
@@ -81,18 +127,14 @@ export default function ItemsList({ items, onChange, roots, storeItems, onPromot
     onChange(next)
   }
 
-  const entries = items.map((raw, idx) => ({ ...parseItemEntry(raw), idx }))
-
   return (
     <div className="mt-6 pt-5 border-t border-border">
       <div className="text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase mb-2.5">Items</div>
-      <div className="flex flex-col gap-2">
-        {entries.map(entry => {
+      <div className="flex flex-col gap-1.5">
+        {sortedRows.map(({ entry, occ }) => {
           const { idx } = entry
 
           if (entry.kind === 'link') {
-            const slug = resolveWikilink(entry.ref, roots)
-            const occ  = slug ? occBySlug.get(slug) : undefined
             return (
               <div key={idx} className="flex items-start gap-1">
                 <div className="flex-1 min-w-0">
@@ -111,7 +153,7 @@ export default function ItemsList({ items, onChange, roots, storeItems, onPromot
                 </div>
                 <button
                   type="button"
-                  className="shrink-0 mt-2 p-1 text-muted-foreground hover:text-foreground"
+                  className="shrink-0 mt-[9px] p-1 text-muted-foreground hover:text-foreground"
                   onClick={() => remove(idx)}
                   aria-label="Remove"
                 >
@@ -121,47 +163,54 @@ export default function ItemsList({ items, onChange, roots, storeItems, onPromot
             )
           }
 
-          // task entry
+          // String task — same card anatomy as MarkdownTaskCard
           const { text, done } = entry
           const isEditing = editingIdx === idx
           return (
-            <div key={idx} className="flex items-center gap-2 min-h-8">
-              <Checkbox
-                checked={done}
-                onCheckedChange={() => isEditing ? undefined : toggleTask(idx, text, done)}
-                className="size-4 shrink-0"
-              />
-              {isEditing ? (
-                <input
-                  autoFocus
-                  className="flex-1 text-sm bg-transparent border-none outline-none"
-                  value={editText}
-                  onChange={e => setEditText(e.target.value)}
-                  onBlur={() => commitEdit(idx, done)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter')  { e.preventDefault(); commitEdit(idx, done) }
-                    if (e.key === 'Escape') { setEditingIdx(null) }
-                  }}
-                />
-              ) : (
-                <span
-                  className={`flex-1 text-sm cursor-pointer select-none ${done ? 'line-through text-muted-foreground' : ''}`}
-                  onClick={() => startEdit(idx, text)}
-                >
-                  {text}
-                </span>
-              )}
+            <div key={idx} className="flex items-start gap-1">
+              <Card className="flex-1 flex items-stretch gap-[9px] pl-[8px] pr-[10px] py-[8px] shadow-none bg-card border border-input rounded-lg transition-colors hover:bg-accent">
+                <span className="w-1 self-stretch rounded-full shrink-0 min-h-5 bg-muted-foreground/20" />
+                <div className="flex flex-1 min-w-0 items-center gap-[6px] py-[2px]">
+                  <Checkbox
+                    checked={done}
+                    onCheckedChange={() => { if (!isEditing) toggleTask(idx, text, done) }}
+                    className="size-5 shrink-0"
+                    onPointerDown={e => e.stopPropagation()}
+                    onClick={e => e.stopPropagation()}
+                  />
+                  {isEditing ? (
+                    <input
+                      autoFocus
+                      className="flex-1 text-[14px] font-medium bg-transparent border-none outline-none"
+                      value={editText}
+                      onChange={e => setEditText(e.target.value)}
+                      onBlur={() => commitEdit(idx, done)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter')  { e.preventDefault(); commitEdit(idx, done) }
+                        if (e.key === 'Escape') { setEditingIdx(null) }
+                      }}
+                    />
+                  ) : (
+                    <span
+                      className={`flex-1 text-[14px] font-medium truncate cursor-pointer ${done ? 'line-through opacity-60' : 'text-foreground'}`}
+                      onClick={() => startEdit(idx, text)}
+                    >
+                      {text}
+                    </span>
+                  )}
+                  <button
+                    aria-label="Convert to item"
+                    title="Convert to item"
+                    className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                    onMouseDown={e => { e.preventDefault(); e.stopPropagation(); promote(idx, text, done) }}
+                  >
+                    <CircleFadingArrowUp size={15} />
+                  </button>
+                </div>
+              </Card>
               <button
                 type="button"
-                className="shrink-0 p-1 text-muted-foreground hover:text-foreground"
-                onClick={() => promote(idx, text, done)}
-                title="Convert to item"
-              >
-                <CircleFadingArrowUp size={13} />
-              </button>
-              <button
-                type="button"
-                className="shrink-0 p-1 text-muted-foreground hover:text-foreground"
+                className="shrink-0 mt-[9px] p-1 text-muted-foreground hover:text-foreground"
                 onClick={() => remove(idx)}
                 aria-label="Remove"
               >
@@ -171,15 +220,16 @@ export default function ItemsList({ items, onChange, roots, storeItems, onPromot
           )
         })}
 
+        {/* Add item — half-card affordance */}
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
-            <Badge
-              variant="tag"
-              className="cursor-pointer text-primary bg-primary/12 gap-1 w-fit mt-0.5"
+            <Card
+              className="flex items-center gap-2 px-3 py-[7px] border-dashed bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground mt-0.5"
               onClick={() => setPickerOpen(true)}
             >
-              <Plus size={9} />add item
-            </Badge>
+              <Plus size={13} className="shrink-0" />
+              <span className="text-[13px]">Add item…</span>
+            </Card>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-0" align="start">
             <Command shouldFilter={false}>
