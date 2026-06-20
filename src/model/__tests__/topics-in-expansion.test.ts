@@ -111,7 +111,7 @@ defaults:
 ---
 `
     const { root } = parseToStoreItems('standup.md', yaml)
-    // Legacy topics: field is read as items via migration
-    expect(root.items).toEqual(['[[project-alpha]]'])
+    // Legacy topics: field is ignored — items starts empty (direction is inverted, no migration)
+    expect(root.items).toEqual([])
   })
 })

@@ -141,8 +141,7 @@ export function extractFileMetadata(fields: Record<string, unknown>): FileMetada
   return {
     title: (fields.title ? String(fields.title) : '') as string,
     tags:  Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
-    // `topics` is the deprecated predecessor of `items` — read it as a fallback.
-    items: Array.isArray(fields.items) ? (fields.items as string[]) : Array.isArray(fields.topics) ? (fields.topics as string[]) : [],
+    items: Array.isArray(fields.items) ? (fields.items as string[]) : [],
     body:  fields.body ? String(fields.body) : undefined,
   }
 }

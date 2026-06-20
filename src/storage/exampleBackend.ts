@@ -53,7 +53,7 @@ function buildEntries(): Array<{ id: string; content: string }> {
       content: `---
 title: Welcome to Meridian
 tags: [guide]
-topics: [02-your-first-task, 03-plan-your-week, 04-link-your-notes, 05-make-it-yours]
+items: [02-your-first-task, 03-plan-your-week, 04-link-your-notes, 05-make-it-yours]
 date: "${d(0)}"
 ---
 
@@ -78,7 +78,6 @@ or explore these linked items yourself:
       content: `---
 title: Read the Meridian welcome note
 tags: [guide]
-topics: [01-start-here]
 date: "${d(0)}"
 done: false
 priority: high
@@ -101,7 +100,7 @@ Tasks can also be undated (just omit the \`date\` field) — useful for a backlo
       content: `---
 title: Weekly planning session
 tags: [guide]
-topics: [01-start-here]
+items: [team-standup]
 date: "${d(1)}"
 time: "10:00"
 duration: 30m
@@ -122,7 +121,6 @@ See [[team-standup]] for a live recurring-event example.`,
       content: `---
 title: Team Standup
 tags: [work]
-topics: [03-plan-your-week]
 date: "${recAnchor}"
 time: "09:00"
 duration: 30m
@@ -179,7 +177,7 @@ instead of \`time\`. The \`defaults\` block sets the priority for every occurren
       content: `---
 title: Linking your notes
 tags: [guide]
-topics: [01-start-here, dev-notes]
+items: [dev-notes]
 ---
 
 Meridian has two ways to connect items:
@@ -203,7 +201,6 @@ and also appear in Backlinks.
       content: `---
 title: Dev Notes
 tags: [work, dev]
-topics: [04-link-your-notes]
 ---
 
 API uses REST with JWT auth.  Rate limit: 1 000 req/min per tenant.
@@ -222,7 +219,6 @@ Open the **Backlinks** panel (bottom of editor) to see which files link here.`,
       content: `---
 title: Add your own vault
 tags: [guide]
-topics: [01-start-here]
 date: "${d(0)}"
 ---
 
