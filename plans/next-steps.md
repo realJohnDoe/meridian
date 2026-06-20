@@ -1,6 +1,5 @@
 ## Next steps
 
-- Allow hiding done tasks and past events from the items section
 - Convert duration into end date/time
 - Add Solarized Light theme
 
