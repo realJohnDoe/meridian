@@ -25,7 +25,7 @@ function Root() {
 
   return (
     <>
-      <div id="app" className="flex flex-col lg:flex-row max-w-[430px] lg:max-w-none">
+      <div id="app" className="flex flex-col">
         <Outlet />
       </div>
       <Toaster />
