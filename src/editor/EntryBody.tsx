@@ -52,6 +52,14 @@ const editorTheme = EditorView.theme({
   '.cm-placeholder': {
     color: 'var(--muted-foreground)',
   },
+  // Rendered markdown link on non-cursor lines
+  '.cm-md-link': {
+    color: 'var(--primary)',
+    textDecoration: 'underline',
+    textUnderlineOffset: '2px',
+    textDecorationColor: 'color-mix(in oklab, var(--primary), transparent 40%)',
+    cursor: 'pointer',
+  },
   // Raw wikilink text shown when cursor is on the line
   '.wl': {
     color: 'var(--primary)',

@@ -46,6 +46,29 @@ const olIndent  = (digits: number) => `calc(${digits}ch + 0.45em)`
 const olNegIndent = (digits: number) => `calc(-${digits}ch - 0.45em)`
 const markDigits = (label: string) => label.replace(/\D/g, '').length
 
+// ── Link widget ───────────────────────────────────────────────────
+
+class LinkWidget extends WidgetType {
+  constructor(readonly label: string, readonly url: string) { super() }
+
+  toDOM(): HTMLElement {
+    const span = document.createElement('span')
+    span.textContent = this.label
+    span.className = 'cm-md-link'
+    span.addEventListener('mousedown', e => {
+      e.preventDefault()
+      window.open(this.url, '_blank', 'noopener,noreferrer')
+    })
+    return span
+  }
+
+  eq(other: LinkWidget): boolean {
+    return other.label === this.label && other.url === this.url
+  }
+
+  ignoreEvent(): boolean { return false }
+}
+
 // ── Marker widgets ────────────────────────────────────────────────
 
 class BulletWidget extends WidgetType {
@@ -137,7 +160,16 @@ function buildHideDecorations(view: EditorView): DecorationSet {
       const line = doc.lineAt(node.from)
       if (cursorLines.has(line.number)) return
 
-      if (node.name === 'HeaderMark') {
+      if (node.name === 'Link') {
+        const labelNode = node.node.getChild('LinkLabel')
+        const urlNode   = node.node.getChild('URL')
+        if (urlNode) {
+          const label = labelNode ? doc.sliceString(labelNode.from, labelNode.to) : ''
+          const url   = doc.sliceString(urlNode.from, urlNode.to)
+          builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(label || url, url) }))
+        }
+        return false  // skip children — whole node is replaced
+      } else if (node.name === 'HeaderMark') {
         // Also consume the space that follows the # marks
         const end =
           node.to < line.to && doc.sliceString(node.to, node.to + 1) === ' '
