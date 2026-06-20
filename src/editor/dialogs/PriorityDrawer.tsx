@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Flag } from 'lucide-react'
-import { Drawer, DrawerContent, DrawerTitle, DrawerActions } from '@/components/ui/drawer'
-import { Separator } from '@/components/ui/separator'
+import {
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalTitle,
+  ResponsiveModalActions,
+} from '@/components/ui/responsive-modal'
 import { badgeVariants } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { Priority } from '@/types'
@@ -32,11 +36,10 @@ export default function PriorityDrawer({ open, value, onSelect, onClose }: Props
   useEffect(() => { if (open) setPending(value) }, [open, value])
 
   return (
-    <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
-      <DrawerContent className="pt-3">
+    <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()}>
+      <ResponsiveModalContent>
 
-        <DrawerTitle>Priority</DrawerTitle>
-        <Separator />
+        <ResponsiveModalTitle>Priority</ResponsiveModalTitle>
 
         <div className="flex gap-2 px-4 pt-4 pb-4">
           {PRIORITIES.map((p) => (
@@ -52,13 +55,13 @@ export default function PriorityDrawer({ open, value, onSelect, onClose }: Props
           ))}
         </div>
 
-        <DrawerActions
+        <ResponsiveModalActions
           onRemove={() => { onSelect(null); onClose() }}
           onCancel={onClose}
           onSet={() => { onSelect(pending); onClose() }}
         />
 
-      </DrawerContent>
-    </Drawer>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   )
 }

@@ -4,12 +4,12 @@ import type { Repeat, Scheduled, Weekday } from '@/types'
 import { fmtISO, parseDateString, WEEK_STARTS_ON } from '@/model/dateUtils'
 import { parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model/repeat'
 import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-  DrawerDescription,
-  DrawerActions,
-} from '@/components/ui/drawer'
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalTitle,
+  ResponsiveModalDescription,
+  ResponsiveModalActions,
+} from '@/components/ui/responsive-modal'
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { badgeVariants } from '@/components/ui/badge'
@@ -260,13 +259,12 @@ export default function RepeatDialog({
   }
 
   return (
-    <Drawer open={open} onOpenChange={(o) => !o && onClose()}>
-      <DrawerContent className="pt-3 pb-6">
-        <DrawerTitle>Repeat</DrawerTitle>
-        <DrawerDescription className="sr-only">
+    <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()}>
+      <ResponsiveModalContent className="sm:max-w-md">
+        <ResponsiveModalTitle>Repeat</ResponsiveModalTitle>
+        <ResponsiveModalDescription>
           Configure repeat patterns for this entry
-        </DrawerDescription>
-        <Separator />
+        </ResponsiveModalDescription>
 
         <div className="px-4 pt-4 pb-4 flex flex-col gap-4">
           {/* Hint */}
@@ -475,7 +473,7 @@ export default function RepeatDialog({
           )}
         </div>
 
-        <DrawerActions
+        <ResponsiveModalActions
           onRemove={() => { onRemove(); onClose() }}
           onCancel={onClose}
           onSet={handleSet}
@@ -555,7 +553,7 @@ export default function RepeatDialog({
             </div>
           </DialogContent>
         </Dialog>
-      </DrawerContent>
-    </Drawer>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   )
 }
