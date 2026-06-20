@@ -9,50 +9,27 @@ import { createElement } from 'react'
 import { Checkbox } from '../../components/ui/checkbox'
 import { ReactWidget } from './ReactWidget'
 
-// ── Task checkbox widget ──────────────────────────────────────────
+// ── Task checkbox widget (inline — only replaces the `[ ]`/`[x]` token) ─────
 
-class TaskCheckboxWidget extends ReactWidget {
+class CheckboxWidget extends ReactWidget {
   constructor(
-    readonly text: string,
     readonly done: boolean,
-    readonly indentEm: number,
-    readonly lineFrom: number,
+    readonly lineFrom: number,  // for eq() freshness
     private readonly onToggle: () => void,
   ) { super() }
 
-  protected get domClassName() { return 'cm-task-checkbox' }
-
-  protected get containerStyle(): Partial<CSSStyleDeclaration> {
-    return {
-      marginLeft: `${this.indentEm}em`,
-      lineHeight: 'normal',
-    }
-  }
+  protected get inline() { return true }
 
   renderReact() {
-    return createElement(
-      'span',
-      { style: { display: 'inline-flex', alignItems: 'center', gap: '6px' } },
-      createElement(Checkbox, {
-        checked: this.done,
-        onCheckedChange: this.onToggle,
-        className: 'size-4 shrink-0',
-        onPointerDown: (e: { stopPropagation(): void }) => e.stopPropagation(),
-        onClick: (e: { stopPropagation(): void }) => e.stopPropagation(),
-      }),
-      createElement(
-        'span',
-        { className: `text-sm${this.done ? ' line-through opacity-60' : ''}` },
-        this.text,
-      ),
-    )
+    return createElement(Checkbox, {
+      checked: this.done,
+      onCheckedChange: this.onToggle,
+      className: 'size-4 align-middle',
+    })
   }
 
-  eq(other: TaskCheckboxWidget): boolean {
-    return other.text === this.text
-      && other.done === this.done
-      && other.lineFrom === this.lineFrom
-      && other.indentEm === this.indentEm
+  eq(other: CheckboxWidget): boolean {
+    return other.done === this.done && other.lineFrom === this.lineFrom
   }
 }
 
@@ -63,11 +40,9 @@ const TASK_CONTENT_RE = /^\[([ xX])\]\s+(.+)$/
 // ── Build decorations ─────────────────────────────────────────────
 
 type TaskInfo = {
-  text: string
   done: boolean
   checkboxFrom: number
   checkboxTo: number
-  indentEm: number
 }
 
 function build(view: EditorView): DecorationSet {
@@ -94,18 +69,11 @@ function build(view: EditorView): DecorationSet {
       if (!m) return
 
       const done = m[1] !== ' '
-      const text = m[2].trim()
-      // Locate `[ ]` / `[x]` start within the doc — skip leading whitespace after mark
       const leadingSpace = after.length - after.trimStart().length
       const checkboxFrom = mark.to + leadingSpace
       const checkboxTo   = checkboxFrom + 3  // `[ ]` is always 3 chars
 
-      let depth = 0
-      for (let p = node.node.parent; p; p = p.parent) {
-        if (p.name === 'OrderedList' || p.name === 'BulletList') depth++
-      }
-
-      taskMap.set(line.from, { text, done, checkboxFrom, checkboxTo, indentEm: (depth - 1) * 1.2 })
+      taskMap.set(line.from, { done, checkboxFrom, checkboxTo })
     },
   })
 
@@ -114,14 +82,14 @@ function build(view: EditorView): DecorationSet {
     const info = taskMap.get(line.from)
     if (!info) continue
 
+    // Replace only the `[ ]`/`[x]` token; the rest of the line (text, wikilinks)
+    // is processed by other plugins (wikilinkDecorations, markdownLivePreview).
     builder.add(
-      line.from,
-      line.to,
+      info.checkboxFrom,
+      info.checkboxTo,
       Decoration.replace({
-        widget: new TaskCheckboxWidget(
-          info.text,
+        widget: new CheckboxWidget(
           info.done,
-          info.indentEm,
           line.from,
           () => view.dispatch({
             changes: { from: info.checkboxFrom, to: info.checkboxTo, insert: info.done ? '[ ]' : '[x]' },
@@ -129,6 +97,10 @@ function build(view: EditorView): DecorationSet {
         ),
       }),
     )
+    // Strikethrough the text following the checkbox for done items.
+    if (info.done) {
+      builder.add(info.checkboxTo, line.to, Decoration.mark({ class: 'cm-task-done' }))
+    }
   }
 
   return builder.finish()
@@ -153,8 +125,8 @@ export function createTaskExtension(): Extension {
 // ── Theme ─────────────────────────────────────────────────────────
 
 export const taskTheme = EditorView.theme({
-  '.cm-task-checkbox': {
-    display: 'inline-block',
-    verticalAlign: 'middle',
+  '.cm-task-done': {
+    textDecoration: 'line-through',
+    opacity: '0.6',
   },
 })
