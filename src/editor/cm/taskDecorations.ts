@@ -114,7 +114,8 @@ export function createTaskExtension(): Extension {
       decorations: DecorationSet
       constructor(view: EditorView) { this.decorations = build(view) }
       update(update: ViewUpdate) {
-        if (update.docChanged || update.selectionSet || update.viewportChanged)
+        if (update.docChanged || update.selectionSet || update.viewportChanged ||
+            syntaxTree(update.startState) !== syntaxTree(update.state))
           this.decorations = build(update.view)
       }
     },

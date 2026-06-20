@@ -134,7 +134,8 @@ export const markdownListDecos = ViewPlugin.fromClass(
     decorations: DecorationSet
     constructor(view: EditorView) { this.decorations = buildLineDecorations(view) }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged) {
+      if (update.docChanged || update.viewportChanged ||
+          syntaxTree(update.startState) !== syntaxTree(update.state)) {
         this.decorations = buildLineDecorations(update.view)
       }
     }
@@ -209,7 +210,8 @@ export const markdownLivePreview = ViewPlugin.fromClass(
     decorations: DecorationSet
     constructor(view: EditorView) { this.decorations = buildHideDecorations(view) }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+      if (update.docChanged || update.selectionSet || update.viewportChanged ||
+          syntaxTree(update.startState) !== syntaxTree(update.state)) {
         this.decorations = buildHideDecorations(update.view)
       }
     }
