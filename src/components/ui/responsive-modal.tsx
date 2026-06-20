@@ -1,13 +1,13 @@
 import * as React from 'react'
 import { X } from 'lucide-react'
-import { useIsMobile } from '@/hooks/use-mobile'
+import { useMediaQuery } from '@/hooks/use-media-query'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './dialog'
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerActions } from './drawer'
 import { Separator } from './separator'
 import { Button } from './button'
 import { cn } from '@/lib/utils'
 
-const ModalCtx = React.createContext(true)
+const ModalCtx = React.createContext(false) // false = mobile (drawer)
 
 // ── Root ─────────────────────────────────────────────────────────
 
@@ -16,12 +16,12 @@ function ResponsiveModal({ open, onOpenChange, children }: {
   onOpenChange: (open: boolean) => void
   children: React.ReactNode
 }) {
-  const isMobile = useIsMobile()
+  const isDesktop = useMediaQuery("(min-width: 768px)")
   return (
-    <ModalCtx.Provider value={isMobile}>
-      {isMobile
-        ? <Drawer open={open} onOpenChange={onOpenChange}>{children}</Drawer>
-        : <Dialog open={open} onOpenChange={onOpenChange}>{children}</Dialog>
+    <ModalCtx.Provider value={isDesktop}>
+      {isDesktop
+        ? <Dialog open={open} onOpenChange={onOpenChange}>{children}</Dialog>
+        : <Drawer open={open} onOpenChange={onOpenChange}>{children}</Drawer>
       }
     </ModalCtx.Provider>
   )
@@ -35,8 +35,8 @@ function ResponsiveModalContent({ className, children }: {
   className?: string
   children: React.ReactNode
 }) {
-  const isMobile = React.useContext(ModalCtx)
-  if (isMobile) {
+  const isDesktop = React.useContext(ModalCtx)
+  if (!isDesktop) {
     return <DrawerContent className={cn('pt-3', className)}>{children}</DrawerContent>
   }
   return (
@@ -54,8 +54,8 @@ function ResponsiveModalTitle({ children, className }: {
   children: React.ReactNode
   className?: string
 }) {
-  const isMobile = React.useContext(ModalCtx)
-  if (isMobile) {
+  const isDesktop = React.useContext(ModalCtx)
+  if (!isDesktop) {
     return (
       <>
         <DrawerTitle className={className}>{children}</DrawerTitle>
@@ -82,8 +82,8 @@ function ResponsiveModalTitle({ children, className }: {
 // ── Description (always sr-only) ──────────────────────────────────
 
 function ResponsiveModalDescription({ children }: { children: React.ReactNode }) {
-  const isMobile = React.useContext(ModalCtx)
-  if (isMobile) {
+  const isDesktop = React.useContext(ModalCtx)
+  if (!isDesktop) {
     return <DrawerDescription className="sr-only">{children}</DrawerDescription>
   }
   return <DialogDescription className="sr-only">{children}</DialogDescription>
@@ -103,8 +103,8 @@ interface ResponsiveModalActionsProps {
 function ResponsiveModalActions({
   onRemove, onCancel, onSet, removeLabel = 'Remove', setDisabled,
 }: ResponsiveModalActionsProps) {
-  const isMobile = React.useContext(ModalCtx)
-  if (isMobile) {
+  const isDesktop = React.useContext(ModalCtx)
+  if (!isDesktop) {
     return (
       <DrawerActions
         onRemove={onRemove}
