@@ -6,43 +6,49 @@ import {
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import { createElement } from 'react'
-import MarkdownTaskCard from '../../components/MarkdownTaskCard'
+import { Checkbox } from '../../components/ui/checkbox'
 import { ReactWidget } from './ReactWidget'
 
-// ── Task card widget ──────────────────────────────────────────────
+// ── Task checkbox widget ──────────────────────────────────────────
 
-class TaskCardWidget extends ReactWidget {
+class TaskCheckboxWidget extends ReactWidget {
   constructor(
     readonly text: string,
     readonly done: boolean,
     readonly indentEm: number,
     readonly lineFrom: number,
     private readonly onToggle: () => void,
-    private readonly onPromote: () => void,
   ) { super() }
 
-  protected get domClassName() { return 'cm-task-card' }
+  protected get domClassName() { return 'cm-task-checkbox' }
 
   protected get containerStyle(): Partial<CSSStyleDeclaration> {
     return {
-      width: `calc(100% + 1.2em - ${this.indentEm}em)`,
       marginLeft: `${this.indentEm}em`,
-      marginTop: '3px',
-      marginBottom: '3px',
       lineHeight: 'normal',
     }
   }
 
   renderReact() {
-    return createElement(MarkdownTaskCard, {
-      text: this.text,
-      done: this.done,
-      onToggle: this.onToggle,
-      onPromote: this.onPromote,
-    })
+    return createElement(
+      'span',
+      { style: { display: 'inline-flex', alignItems: 'center', gap: '6px' } },
+      createElement(Checkbox, {
+        checked: this.done,
+        onCheckedChange: this.onToggle,
+        className: 'size-4 shrink-0',
+        onPointerDown: (e: { stopPropagation(): void }) => e.stopPropagation(),
+        onClick: (e: { stopPropagation(): void }) => e.stopPropagation(),
+      }),
+      createElement(
+        'span',
+        { className: `text-sm${this.done ? ' line-through opacity-60' : ''}` },
+        this.text,
+      ),
+    )
   }
 
-  eq(other: TaskCardWidget): boolean {
+  eq(other: TaskCheckboxWidget): boolean {
     return other.text === this.text
       && other.done === this.done
       && other.lineFrom === this.lineFrom
@@ -64,10 +70,7 @@ type TaskInfo = {
   indentEm: number
 }
 
-function build(
-  view: EditorView,
-  onPromoteRef: { current: (text: string, done: boolean, lineFrom: number, lineTo: number, view: EditorView) => void },
-): DecorationSet {
+function build(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { doc, selection } = view.state
 
@@ -115,7 +118,7 @@ function build(
       line.from,
       line.to,
       Decoration.replace({
-        widget: new TaskCardWidget(
+        widget: new TaskCheckboxWidget(
           info.text,
           info.done,
           info.indentEm,
@@ -123,7 +126,6 @@ function build(
           () => view.dispatch({
             changes: { from: info.checkboxFrom, to: info.checkboxTo, insert: info.done ? '[ ]' : '[x]' },
           }),
-          () => onPromoteRef.current(info.text, info.done, line.from, line.to, view),
         ),
       }),
     )
@@ -134,16 +136,14 @@ function build(
 
 // ── Extension factory ─────────────────────────────────────────────
 
-export function createTaskExtension(
-  onPromoteRef: { current: (text: string, done: boolean, lineFrom: number, lineTo: number, view: EditorView) => void },
-): Extension {
+export function createTaskExtension(): Extension {
   return Prec.highest(ViewPlugin.fromClass(
     class {
       decorations: DecorationSet
-      constructor(view: EditorView) { this.decorations = build(view, onPromoteRef) }
+      constructor(view: EditorView) { this.decorations = build(view) }
       update(update: ViewUpdate) {
         if (update.docChanged || update.selectionSet || update.viewportChanged)
-          this.decorations = build(update.view, onPromoteRef)
+          this.decorations = build(update.view)
       }
     },
     { decorations: v => v.decorations },
@@ -153,8 +153,8 @@ export function createTaskExtension(
 // ── Theme ─────────────────────────────────────────────────────────
 
 export const taskTheme = EditorView.theme({
-  '.cm-task-card': {
+  '.cm-task-checkbox': {
     display: 'inline-block',
-    verticalAlign: 'top',
+    verticalAlign: 'middle',
   },
 })
