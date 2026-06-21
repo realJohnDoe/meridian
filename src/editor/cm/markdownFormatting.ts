@@ -11,6 +11,8 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
+import { TASK_ITEM_RE } from '../../items'
+import { focusedCursorLines } from './viewUtils'
 
 // ── Language ──────────────────────────────────────────────────────
 
@@ -60,7 +62,8 @@ class LinkWidget extends WidgetType {
     span.className = 'cm-md-link'
     span.addEventListener('mousedown', e => {
       e.preventDefault()
-      window.open(this.url, '_blank', 'noopener,noreferrer')
+      const safe = /^(https?|mailto):/i.test(this.url)
+      if (safe) window.open(this.url, '_blank', 'noopener,noreferrer')
     })
     return span
   }
@@ -103,9 +106,9 @@ class OrderedMarkerWidget extends WidgetType {
 const bulletDeco = Decoration.replace({ widget: new BulletWidget() })
 const hideDeco   = Decoration.replace({})
 
-// A list item whose content is a `[ ]` / `[x]` task — taskDecorations renders
-// its checkbox, so we suppress the bullet here to avoid showing both.
-const TASK_CONTENT_RE = /^\[[ xX]\]\s+/
+// A list item whose content is a task — taskDecorations renders its checkbox,
+// so we suppress the bullet here to avoid showing both.
+// Shared with taskDecorations.ts via TASK_ITEM_RE from items.ts.
 
 // ── Plugin 1: list item line decorations (cursor-independent) ─────
 // Applies hanging-indent classes to list item lines.
@@ -154,19 +157,8 @@ export const markdownListDecos = ViewPlugin.fromClass(
 
 function buildHideDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
-  const { doc, selection } = view.state
-
-  // Only suppress decorations on the cursor's line(s) while the editor is
-  // focused — when it's unfocused (e.g. just opened) there is no active cursor,
-  // so everything should render rather than showing raw markdown on line 1.
-  const cursorLines = new Set<number>()
-  if (view.hasFocus) {
-    for (const r of selection.ranges) {
-      const a = doc.lineAt(r.from).number
-      const b = doc.lineAt(r.to).number
-      for (let n = a; n <= b; n++) cursorLines.add(n)
-    }
-  }
+  const { doc } = view.state
+  const cursorLines = focusedCursorLines(view)
 
   syntaxTree(view.state).iterate({
     enter(node) {
@@ -211,7 +203,7 @@ function buildHideDecorations(view: EditorView): DecorationSet {
         builder.add(node.from, node.to, hideDeco)
       } else if (node.name === 'ListMark') {
         const label = doc.sliceString(node.from, node.to)
-        const isTask = TASK_CONTENT_RE.test(doc.sliceString(node.to, line.to).trimStart())
+        const isTask = TASK_ITEM_RE.test(doc.sliceString(node.to, line.to).trimStart())
         if (isTask) {
           // Task line → checkbox stands in for the marker; drop the bullet and
           // the space after it so the checkbox sits at the marker position.

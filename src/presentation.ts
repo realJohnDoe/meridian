@@ -2,9 +2,8 @@ import { addDays, isSameDay } from 'date-fns'
 import { expandRange, joinFileMeta, stableOccId } from './model/expansion'
 import { fmtT } from './model/dateUtils'
 import { parseDurationDays } from './model/duration'
-import { parseWikilinks, resolveWikilink, unwrapRef } from './wikilinks'
+import { resolveWikilink, unwrapRef } from './wikilinks'
 import { occKind, isSeries, isStandaloneOcc } from './types'
-import { getRoots } from './storeBridge'
 import type { Occurrence, StoreItem, Roots } from './types'
 import type { OccState } from './components/ui/occurrence-variants'
 
@@ -261,35 +260,4 @@ export function occState(o: Occurrence): OccState {
     return 'event-past'
   }
   return 'event-future'
-}
-
-// ── WIKILINK → HTML ────────────────────────────────────────────
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
-export function buildBodyHtml(text: string, roots?: Roots): string {
-  const allRoots = roots ?? getRoots()
-  const links = parseWikilinks(text)
-  if (links.length === 0) return escapeHtml(text).replace(/\n/g, '<br>')
-
-  let result = ''
-  let cursor = 0
-  for (const wl of links) {
-    result += escapeHtml(text.slice(cursor, wl.start)).replace(/\n/g, '<br>')
-    const target = resolveWikilink(wl.ref, allRoots)
-    const cls      = target ? 'wl' : 'wl-broken'
-    const safeRef   = escapeHtml(wl.ref)
-    const safeLabel = escapeHtml(wl.label ?? wl.ref)
-    result += `<span class="${cls}" data-ref="${safeRef}">[[${safeLabel}]]</span>`
-    cursor = wl.end
-  }
-  result += escapeHtml(text.slice(cursor)).replace(/\n/g, '<br>')
-  return result
 }

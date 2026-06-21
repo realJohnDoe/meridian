@@ -9,7 +9,9 @@
  */
 
 const WIKILINK_ITEM_RE = /^\[\[([^\]|\n]+)(?:\|[^\]\n]+)?\]\]$/
-const TASK_ITEM_RE     = /^\[([ xX])\]\s+(.+)$/
+
+/** Matches `[ ] text` / `[x] text` — group 1 is the done char, group 2 is the content. */
+export const TASK_ITEM_RE = /^\[([ xX])\]\s+(.+)$/
 
 export type ItemEntry =
   | { kind: 'link'; ref: string; raw: string }
