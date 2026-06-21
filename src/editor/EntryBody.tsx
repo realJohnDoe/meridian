@@ -2,13 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import type { Roots, StoreItem, Occurrence } from '../types'
+import type { Roots, StoreItem } from '../types'
 import {
   rootsField, setRootsEffect,
   itemsField, setItemsEffect,
   createWikilinkExtension, wikilinkTheme,
 } from './cm/wikilinkDecorations'
-import { saveNode } from './save'
 import { createTaskExtension, taskTheme } from './cm/taskDecorations'
 import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme } from './cm/markdownFormatting'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
@@ -19,7 +18,6 @@ interface Props {
   items:            StoreItem[]
   viewRef:          React.MutableRefObject<EditorView | null>
   onOpenWikilink?:  (ref: string) => void
-  onPromoteTask?:   (title: string, done: boolean) => string | null
 }
 
 const editorTheme = EditorView.theme({
@@ -54,6 +52,14 @@ const editorTheme = EditorView.theme({
   '.cm-placeholder': {
     color: 'var(--muted-foreground)',
   },
+  // Rendered markdown link on non-cursor lines
+  '.cm-md-link': {
+    color: 'var(--primary)',
+    textDecoration: 'underline',
+    textUnderlineOffset: '2px',
+    textDecorationColor: 'color-mix(in oklab, var(--primary), transparent 40%)',
+    cursor: 'pointer',
+  },
   // Raw wikilink text shown when cursor is on the line
   '.wl': {
     color: 'var(--primary)',
@@ -66,7 +72,7 @@ const editorTheme = EditorView.theme({
   },
 })
 
-export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink, onPromoteTask }: Props) {
+export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [wlPopup, setWlPopup] = useState<WlPopupState | null>(null)
   const closePopup = useCallback(() => setWlPopup(null), [])
@@ -74,39 +80,6 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
   // Stable ref so the CM6 plugin always reads the latest callback without remounting
   const onOpenRef = useRef<(ref: string) => void>(onOpenWikilink ?? (() => {}))
   useEffect(() => { onOpenRef.current = onOpenWikilink ?? (() => {}) }, [onOpenWikilink])
-
-  const onPromoteTaskRef = useRef(onPromoteTask)
-  useEffect(() => { onPromoteTaskRef.current = onPromoteTask }, [onPromoteTask])
-
-  // Toggle-done for occurrence cards — saves the occ with done flipped
-  const onToggleDoneRef = useRef((occ: Occurrence) => {
-    saveNode(occ, 'single', {
-      item: occ,
-      title: occ.metadata.title,
-      body: occ.metadata.body ?? '',
-      tracked: true,
-      itemType: 'task',
-      done: !occ.metadata.done,
-      tags: occ.metadata.tags ?? [],
-      items:  (occ.metadata.items  as string[] | undefined) ?? [],
-      participants: occ.metadata.participants ?? [],
-      priority: (occ.metadata.priority ?? null) as Parameters<typeof saveNode>[2]['priority'],
-      scheduled: occ.date ? { date: occ.date, time: occ.time ?? '' } : null,
-      duration: occ.metadata.duration ?? '',
-      repeat: null,
-      editScope: 'single',
-    })
-  })
-
-  // Promote callback invoked by TaskCardWidget: creates the item then replaces the line
-  const onPromoteRef = useRef(
-    (text: string, done: boolean, lineFrom: number, lineTo: number, edView: EditorView) => {
-      const slug = onPromoteTaskRef.current?.(text, done)
-      if (slug) {
-        edView.dispatch({ changes: { from: lineFrom, to: lineTo, insert: `- [[${slug}]]` } })
-      }
-    },
-  )
 
   // Mount CM6 EditorView once per component lifetime (key= on parent handles remounts)
   useEffect(() => {
@@ -123,9 +96,9 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
         // Wikilink state fields (must be registered before the decoration plugin)
         rootsField.init(() => roots),
         itemsField.init(() => items),
-        createWikilinkExtension(onOpenRef, onToggleDoneRef),
+        createWikilinkExtension(onOpenRef),
         wikilinkTheme,
-        createTaskExtension(onPromoteRef),
+        createTaskExtension(),
         taskTheme,
         editorTheme,
         placeholder('Add a description…'),

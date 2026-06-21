@@ -29,6 +29,9 @@ importers:
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.3
+      '@lezer/markdown':
+        specifier: 1.6.4
+        version: 1.6.4
       '@octokit/core':
         specifier: ^7.0.6
         version: 7.0.6

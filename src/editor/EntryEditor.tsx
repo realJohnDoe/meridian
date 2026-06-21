@@ -263,7 +263,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} onPromoteTask={handlePromoteTask} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} />
 
         <ItemsList
           items={listItems}

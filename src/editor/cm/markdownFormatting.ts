@@ -1,4 +1,5 @@
 import { markdown } from '@codemirror/lang-markdown'
+import { Autolink } from '@lezer/markdown'
 import { syntaxHighlighting, HighlightStyle, syntaxTree } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 import {
@@ -13,7 +14,9 @@ import { RangeSetBuilder } from '@codemirror/state'
 
 // ── Language ──────────────────────────────────────────────────────
 
-export const markdownLanguage = markdown()
+// Enable GFM autolinking so bare URLs / emails become `URL` nodes we can render
+// as clickable links (see the URL branch in buildHideDecorations).
+export const markdownLanguage = markdown({ extensions: [Autolink] })
 
 // ── Highlight style ───────────────────────────────────────────────
 
@@ -46,6 +49,29 @@ const olIndent  = (digits: number) => `calc(${digits}ch + 0.45em)`
 const olNegIndent = (digits: number) => `calc(-${digits}ch - 0.45em)`
 const markDigits = (label: string) => label.replace(/\D/g, '').length
 
+// ── Link widget ───────────────────────────────────────────────────
+
+class LinkWidget extends WidgetType {
+  constructor(readonly label: string, readonly url: string) { super() }
+
+  toDOM(): HTMLElement {
+    const span = document.createElement('span')
+    span.textContent = this.label
+    span.className = 'cm-md-link'
+    span.addEventListener('mousedown', e => {
+      e.preventDefault()
+      window.open(this.url, '_blank', 'noopener,noreferrer')
+    })
+    return span
+  }
+
+  eq(other: LinkWidget): boolean {
+    return other.label === this.label && other.url === this.url
+  }
+
+  ignoreEvent(): boolean { return false }
+}
+
 // ── Marker widgets ────────────────────────────────────────────────
 
 class BulletWidget extends WidgetType {
@@ -76,6 +102,10 @@ class OrderedMarkerWidget extends WidgetType {
 
 const bulletDeco = Decoration.replace({ widget: new BulletWidget() })
 const hideDeco   = Decoration.replace({})
+
+// A list item whose content is a `[ ]` / `[x]` task — taskDecorations renders
+// its checkbox, so we suppress the bullet here to avoid showing both.
+const TASK_CONTENT_RE = /^\[[ xX]\]\s+/
 
 // ── Plugin 1: list item line decorations (cursor-independent) ─────
 // Applies hanging-indent classes to list item lines.
@@ -111,7 +141,8 @@ export const markdownListDecos = ViewPlugin.fromClass(
     decorations: DecorationSet
     constructor(view: EditorView) { this.decorations = buildLineDecorations(view) }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.viewportChanged) {
+      if (update.docChanged || update.viewportChanged ||
+          syntaxTree(update.startState) !== syntaxTree(update.state)) {
         this.decorations = buildLineDecorations(update.view)
       }
     }
@@ -125,11 +156,16 @@ function buildHideDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { doc, selection } = view.state
 
+  // Only suppress decorations on the cursor's line(s) while the editor is
+  // focused — when it's unfocused (e.g. just opened) there is no active cursor,
+  // so everything should render rather than showing raw markdown on line 1.
   const cursorLines = new Set<number>()
-  for (const r of selection.ranges) {
-    const a = doc.lineAt(r.from).number
-    const b = doc.lineAt(r.to).number
-    for (let n = a; n <= b; n++) cursorLines.add(n)
+  if (view.hasFocus) {
+    for (const r of selection.ranges) {
+      const a = doc.lineAt(r.from).number
+      const b = doc.lineAt(r.to).number
+      for (let n = a; n <= b; n++) cursorLines.add(n)
+    }
   }
 
   syntaxTree(view.state).iterate({
@@ -137,7 +173,34 @@ function buildHideDecorations(view: EditorView): DecorationSet {
       const line = doc.lineAt(node.from)
       if (cursorLines.has(line.number)) return
 
-      if (node.name === 'HeaderMark') {
+      if (node.name === 'URL') {
+        // Bare autolink (GFM) — a top-level URL node. URLs inside markdown links
+        // are children of Link, which we skip via `return false`, so this only
+        // catches standalone URLs / emails. Render them as clickable links.
+        const raw  = doc.sliceString(node.from, node.to)
+        const href = /^[a-z][-\w+.]*:/i.test(raw) ? raw
+          : raw.includes('@') ? `mailto:${raw}`
+          : `https://${raw}`
+        builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(raw, href) }))
+        return false
+      } else if (node.name === 'Link') {
+        // Inline link `[text](url)`: lezer emits LinkMark for each of [ ] ( ),
+        // with no LinkLabel node (that's only for reference definitions). The
+        // visible label is the text between the first two marks; the URL is the
+        // URL child. Only links with a real URL are turned into widgets — a
+        // bare `[text]` (shortcut ref, no URL) is left as raw text.
+        const urlNode = node.node.getChild('URL')
+        if (urlNode) {
+          const marks = node.node.getChildren('LinkMark')
+          const label = marks.length >= 2
+            ? doc.sliceString(marks[0].to, marks[1].from)
+            : ''
+          const url = doc.sliceString(urlNode.from, urlNode.to)
+          builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(label || url, url) }))
+          return false  // skip children — whole node is replaced
+        }
+        return  // no URL: fall through, leave children to render normally
+      } else if (node.name === 'HeaderMark') {
         // Also consume the space that follows the # marks
         const end =
           node.to < line.to && doc.sliceString(node.to, node.to + 1) === ' '
@@ -148,7 +211,16 @@ function buildHideDecorations(view: EditorView): DecorationSet {
         builder.add(node.from, node.to, hideDeco)
       } else if (node.name === 'ListMark') {
         const label = doc.sliceString(node.from, node.to)
-        if (label === '-' || label === '*' || label === '+') {
+        const isTask = TASK_CONTENT_RE.test(doc.sliceString(node.to, line.to).trimStart())
+        if (isTask) {
+          // Task line → checkbox stands in for the marker; drop the bullet and
+          // the space after it so the checkbox sits at the marker position.
+          const end =
+            node.to < line.to && doc.sliceString(node.to, node.to + 1) === ' '
+              ? node.to + 1
+              : node.to
+          builder.add(node.from, end, hideDeco)
+        } else if (label === '-' || label === '*' || label === '+') {
           // Unordered → filled circle
           builder.add(node.from, node.to, bulletDeco)
         } else {
@@ -177,7 +249,9 @@ export const markdownLivePreview = ViewPlugin.fromClass(
     decorations: DecorationSet
     constructor(view: EditorView) { this.decorations = buildHideDecorations(view) }
     update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+      if (update.docChanged || update.selectionSet || update.viewportChanged ||
+          update.focusChanged ||
+          syntaxTree(update.startState) !== syntaxTree(update.state)) {
         this.decorations = buildHideDecorations(update.view)
       }
     }
