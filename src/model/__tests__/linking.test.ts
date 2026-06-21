@@ -219,6 +219,28 @@ describe('fileOccurrenceMap', () => {
     }
   })
 
+  it('prefers undated open occurrence over done dated one', () => {
+    // Regression: after marking an instance done (with a date) and adding a new
+    // undated open instance, the map was returning the done dated one because
+    // Step 2 skipped the undated standalone when the slug was already mapped.
+    const DONE_DATED_PLUS_UNDATED_OPEN = `---
+title: Bargeld
+defaults:
+  priority: low
+instances:
+  - date: "2026-06-06"
+    done: true
+  - done: false
+---
+`
+    const { items, roots } = makeStore([{ slug: 'bargeld', yaml: DONE_DATED_PLUS_UNDATED_OPEN }])
+    const map = fileOccurrenceMap(items, roots)
+    const occ = map.get('bargeld')
+    expect(occ).toBeDefined()
+    expect(occ!.date).toBe('')
+    expect(occ!.metadata.done).toBe(false)
+  })
+
   it('returns the same Map instance for identical (items, roots) references (memoization)', () => {
     const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const map1 = fileOccurrenceMap(items, roots)

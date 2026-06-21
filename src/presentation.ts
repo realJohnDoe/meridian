@@ -109,8 +109,14 @@ export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string,
   }
 
   // Step 2: standalone items not yet filled (undated notes, out-of-window singles).
+  // An undated open standalone also displaces a done dated occurrence — it
+  // represents pending work with no scheduled date yet, which is more actionable.
   for (const item of items) {
-    if (!isStandaloneOcc(item) || map.has(item.fileSlug)) continue
+    if (!isStandaloneOcc(item)) continue
+    const existing = map.get(item.fileSlug)
+    const displaces = !existing
+      || (item.date === '' && !item.metadata.done && existing.metadata.done)
+    if (!displaces) continue
     map.set(item.fileSlug, {
       ...item,
       metadata: joinFileMeta(item.fileSlug, item.metadata, roots),
@@ -145,7 +151,14 @@ function computeSlugOccurrence(fileSlug: string, items: StoreItem[], roots: Root
 
   for (const occ of expandRange(slugItems, roots, now, AHEAD)) return occ
   const back = expandRange(slugItems, roots, BACK, now)
-  for (let i = back.length - 1; i >= 0; i--) return back[i]
+  const pastOcc = back[back.length - 1]
+  if (pastOcc) {
+    if (!pastOcc.metadata.done) return pastOcc
+    // Past occurrence is done — prefer an undated open standalone if one exists.
+    const undatedOpen = slugItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
+    if (undatedOpen) return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
+    return pastOcc
+  }
 
   for (const item of slugItems) {
     if (!isStandaloneOcc(item)) continue
