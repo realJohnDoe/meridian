@@ -1,8 +1,9 @@
+import { useMemo } from 'react'
 import { Repeat2, Users } from 'lucide-react'
 import type { Occurrence } from '../types'
 import KindIcon from './KindIcon'
 import { fmtT, parseDateString } from '../model/dateUtils'
-import { fmtShort, occState } from '../presentation'
+import { backlinksTo, fmtShort, occState } from '../presentation'
 import { multidayDisplayTitle } from '../model/expansion'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
@@ -72,10 +73,11 @@ export default function OccurrenceCard({
   const hasTrack     = occ.metadata.done !== undefined
   const tags         = occ.metadata.tags || []
   const participants = occ.metadata.participants || []
-  const roots      = getRoots()
-  const listedOn   = Array.from(roots.entries())
-    .filter(([, meta]) => meta.items.includes(`[[${occ.fileSlug}]]`))
-    .map(([, meta]) => meta.title)
+  const roots    = getRoots()
+  const listedOn = useMemo(
+    () => backlinksTo(occ.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug),
+    [occ.fileSlug, roots],
+  )
 
   const dateBadge = (() => {
     const d = parseDateString(occ.date)
