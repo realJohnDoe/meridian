@@ -7,8 +7,8 @@ import {
 import { syntaxTree } from '@codemirror/language'
 import { createElement } from 'react'
 import { Checkbox } from '../../components/ui/checkbox'
-import { TASK_ITEM_RE } from '../../items'
 import { focusedCursorLines } from './viewUtils'
+import { buildTaskLineMap } from './taskLines'
 import { ReactWidget } from './ReactWidget'
 
 // ── Task checkbox widget (inline — only replaces the `[ ]`/`[x]` token) ─────
@@ -39,47 +39,16 @@ class CheckboxWidget extends ReactWidget {
 
 // ── Build decorations ─────────────────────────────────────────────
 
-type TaskInfo = {
-  done: boolean
-  checkboxFrom: number
-  checkboxTo: number
-  textFrom: number    // first non-space char after the checkbox (strike starts here)
-}
-
 function build(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { doc } = view.state
   const cursorLines = focusedCursorLines(view)
+  const taskLineMap = buildTaskLineMap(view.state)
 
-  const taskMap = new Map<number, TaskInfo>()
-  syntaxTree(view.state).iterate({
-    enter(node) {
-      if (node.name !== 'ListItem') return
-      const mark = node.node.getChild('ListMark')
-      if (!mark) return
-      const line = doc.lineAt(node.from)
-      if (cursorLines.has(line.number)) return
-      const after = doc.sliceString(mark.to, line.to)
-      const m = TASK_ITEM_RE.exec(after.trim())
-      if (!m) return
-
-      const done = m[1] !== ' '
-      const leadingSpace = after.length - after.trimStart().length
-      const checkboxFrom = mark.to + leadingSpace
-      const checkboxTo   = checkboxFrom + 3  // `[ ]` is always 3 chars
-      // First non-space char after the checkbox — start the strikethrough here
-      // so the line doesn't render over the gap between checkbox and content.
-      const restOfLine = doc.sliceString(checkboxTo, line.to)
-      const textFrom = checkboxTo + (restOfLine.length - restOfLine.trimStart().length)
-
-      taskMap.set(line.from, { done, checkboxFrom, checkboxTo, textFrom })
-    },
-  })
-
-  for (let i = 1; i <= doc.lines; i++) {
-    const line = doc.line(i)
-    const info = taskMap.get(line.from)
-    if (!info) continue
+  for (const [lineFrom, info] of taskLineMap) {
+    const line = doc.lineAt(lineFrom)
+    // Show raw `[ ]`/`[x]` on the focused cursor's line so the user can edit it.
+    if (cursorLines.has(line.number)) continue
 
     // Replace only the `[ ]`/`[x]` token; the rest of the line (text, wikilinks)
     // is processed by other plugins (wikilinkDecorations, markdownLivePreview).
