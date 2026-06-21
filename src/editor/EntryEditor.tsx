@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart } from 'lucide-react'
@@ -113,6 +113,17 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
     onChange(prev => ({ ...prev, editScope: scope }))
     onScopeChange?.(scope)
   }
+
+  const allParticipants = useMemo(() => {
+    const set = new Set<string>()
+    for (const storeItem of items) {
+      for (const p of storeItem.metadata.participants) {
+        const trimmed = p.trim()
+        if (trimmed) set.add(trimmed)
+      }
+    }
+    return [...set].sort()
+  }, [items])
 
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
@@ -259,7 +270,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
               )}
             </div>
 
-            <ParticipantsRow participants={participants} onChange={next => onChange(prev => ({ ...prev, participants: next }))} />
+            <ParticipantsRow participants={participants} onChange={next => onChange(prev => ({ ...prev, participants: next }))} allParticipants={allParticipants} />
           </CardContent>
         </Card>
 
