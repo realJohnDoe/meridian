@@ -1,6 +1,5 @@
 ## Next steps
 
-- Fix differently colored sync icon and red colors without notification
 - Investigate conflicts in spite of single user
 - Add participants combobox
 - Convert duration into end date/time
