@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Roots } from '../types'
 import { backlinksTo, fileEntries } from '../presentation'
-import { addItemLink } from './save'
+import { addItemLink, removeItemLink } from './save'
 import TagChip from '@/components/TagChip'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -54,6 +54,7 @@ export default function ListedOnRow({ fileSlug, roots, onOpenWikilink }: Props) 
             isTopic
             interactive
             onNavigate={onOpenWikilink ? () => onOpenWikilink(slug) : undefined}
+            onRemove={fileSlug ? () => removeItemLink(slug, fileSlug) : undefined}
           />
         )
       })}
