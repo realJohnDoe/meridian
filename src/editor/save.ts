@@ -11,6 +11,33 @@ import { warmSlugInFOM } from '../presentation'
 import { writeEntityToCache, deleteFromBackend } from '../storage/sync'
 import type { EntryState, ItemType } from './state'
 
+// ── BACKLINK HELPERS ──────────────────────────────────────────
+
+/** Add `[[sourceSlug]]` to targetSlug's items list if not already present. */
+export function addItemLink(targetSlug: string, sourceSlug: string): void {
+  const roots = getRoots()
+  const file = roots.get(targetSlug)
+  if (!file) return
+  const stored = `[[${sourceSlug}]]`
+  if ((file.items ?? []).includes(stored)) return
+  const newRoots = new Map(roots)
+  newRoots.set(targetSlug, { ...file, items: [...(file.items ?? []), stored] })
+  setData({ items: getItems(), roots: newRoots })
+  writeEntityToCache(targetSlug)
+}
+
+/** Remove `[[sourceSlug]]` from targetSlug's items list. */
+export function removeItemLink(targetSlug: string, sourceSlug: string): void {
+  const roots = getRoots()
+  const file = roots.get(targetSlug)
+  if (!file) return
+  const stored = `[[${sourceSlug}]]`
+  const newRoots = new Map(roots)
+  newRoots.set(targetSlug, { ...file, items: (file.items ?? []).filter(i => i !== stored) })
+  setData({ items: getItems(), roots: newRoots })
+  writeEntityToCache(targetSlug)
+}
+
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
 
 export type SeriesSheetOption = {
