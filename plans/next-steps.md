@@ -5,6 +5,7 @@
 - Investigate conflicts in spite of single user
 - Add participants combobox
 - Convert duration into end date/time
+- Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Add Solarized Light theme
 - Investigate more secure storage options
 
@@ -31,22 +32,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 - **Evidence:** `src/storage/githubApi.ts:16-19` — `onSecondaryRateLimit: (...) => { console.warn(...); return true }`, vs `onRateLimit` above which caps at `retryCount < 2`.
 - **Problem:** The secondary (abuse-detection) handler unconditionally returns `true`, so Octokit retries indefinitely; `runSync` never resolves and the user sees a permanently frozen sync spinner with no error.
 - **Fix:** Return `retryCount < 2` (or similar cap) to bound retries and surface a failure after exhaustion.
-
-### 2. Four CM6 plugins coordinate the same document by convention, with task-detection duplicated
-
-- **Category:** `architecture` `srp`
-- **Impact:** 6 · **Breadth:** 4 files · **Fix effort:** L
-- **Evidence:** `taskDecorations.ts:63` (`TASK_ITEM_RE.exec(after.trim())`) and `markdownFormatting.ts:206` (`TASK_ITEM_RE.test(...)`) each independently decide "is this line a task," and both call `Decoration.replace` on the same lines; CM6 throws if their ranges overlap.
-- **Problem:** The "disjoint ranges" contract between the four plugins is enforced only by hand-coordination — the recurring class of bugs (double bullet/checkbox, swallowed lines) are symptoms of this implicit coupling.
-- **Fix:** Consolidate list-line analysis into one shared pass (or one plugin that owns list-line rendering) that the others consume.
-
-### 3. No tests for the editor / CM6 / calendar / component layer
-
-- **Category:** `error-handling` (test coverage) `architecture`
-- **Impact:** 5 · **Breadth:** ~50 UI files · **Fix effort:** L
-- **Evidence:** `find src/editor src/calendar src/components -name "*.test.*"` → `0`; tests exist only under `model/__tests__` and `storage/__tests__`.
-- **Problem:** The most bug-prone logic (body decorations, `occState`, sort keys) is verified only by manual preview, which is why subtle decoration cases regressed repeatedly.
-- **Fix:** Add a unit suite for the pure-ish builders (`buildHideDecorations`, `occState`/`sortOccs`, parse helpers) with regression cases for "wikilink after checkbox" and "bullet suppressed on task line."
 
 ### 4. `listedOn` re-implements `backlinksTo` — divergent matching, recomputed per card
 
