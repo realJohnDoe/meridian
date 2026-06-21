@@ -100,6 +100,10 @@ class OrderedMarkerWidget extends WidgetType {
 const bulletDeco = Decoration.replace({ widget: new BulletWidget() })
 const hideDeco   = Decoration.replace({})
 
+// A list item whose content is a `[ ]` / `[x]` task — taskDecorations renders
+// its checkbox, so we suppress the bullet here to avoid showing both.
+const TASK_CONTENT_RE = /^\[[ xX]\]\s+/
+
 // ── Plugin 1: list item line decorations (cursor-independent) ─────
 // Applies hanging-indent classes to list item lines.
 
@@ -189,7 +193,16 @@ function buildHideDecorations(view: EditorView): DecorationSet {
         builder.add(node.from, node.to, hideDeco)
       } else if (node.name === 'ListMark') {
         const label = doc.sliceString(node.from, node.to)
-        if (label === '-' || label === '*' || label === '+') {
+        const isTask = TASK_CONTENT_RE.test(doc.sliceString(node.to, line.to).trimStart())
+        if (isTask) {
+          // Task line → checkbox stands in for the marker; drop the bullet and
+          // the space after it so the checkbox sits at the marker position.
+          const end =
+            node.to < line.to && doc.sliceString(node.to, node.to + 1) === ' '
+              ? node.to + 1
+              : node.to
+          builder.add(node.from, end, hideDeco)
+        } else if (label === '-' || label === '*' || label === '+') {
           // Unordered → filled circle
           builder.add(node.from, node.to, bulletDeco)
         } else {
