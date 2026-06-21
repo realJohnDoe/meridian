@@ -13,7 +13,7 @@ export const getActiveVaultId = (): string | null  => useStore.getState().active
 // ── STORE WRITERS (storage layer uses these instead of useStore directly) ──
 export const setVaultLoading     = (loading: boolean)  => useStore.setState({ vaultLoading: loading })
 export const setSyncDirtyCount   = (n: number)         => useStore.setState({ syncDirtyCount: n })
-export const setSyncError        = (error: boolean)    => useStore.setState({ syncError: error })
+export const setSyncError        = (error: string | null) => useStore.setState({ syncError: error })
 export const setVaultList        = (refs: VaultRef[])  => useStore.setState({ vaults: refs })
 export const setActiveVaultId    = (id: string | null) => {
   useStore.setState({ activeVaultId: id })

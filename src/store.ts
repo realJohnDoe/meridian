@@ -20,10 +20,8 @@ interface MeridianStore {
   // ── Sync status ─────────────────────────────────────────────────
   /** Number of dirty (unsynced) files in the IndexedDB cache. */
   syncDirtyCount: number
-  /** Briefly true after a successful sync (drives the green flash). */
-  syncFlash: boolean
-  /** True when the most recent sync attempt failed (drives the red icon). */
-  syncError: boolean
+  /** Non-null when the vault is read-only or a sync attempt failed; holds the reason string. */
+  syncError: string | null
 
   // ── Vault loading ─────────────────────────────────────────────────
   /** True from app start until restoreVaults() settles — distinguishes "loading" from "empty". */
@@ -59,8 +57,7 @@ export const useStore = create<MeridianStore>((set, get) => ({
   pendingDirReconnect: null,
 
   syncDirtyCount: 0,
-  syncFlash:      false,
-  syncError:      false,
+  syncError:      null,
 
   vaultLoading: true,
 
