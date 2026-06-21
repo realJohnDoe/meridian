@@ -12,7 +12,6 @@ import { cn } from '../lib/utils'
 import { occBarVariants } from './ui/occurrence-variants'
 import TagChip from './TagChip'
 import { getRoots } from '../storeBridge'
-import { unwrapRef } from '../wikilinks'
 
 export interface OccurrenceCardProps {
   occ: Occurrence
@@ -73,12 +72,10 @@ export default function OccurrenceCard({
   const hasTrack     = occ.metadata.done !== undefined
   const tags         = occ.metadata.tags || []
   const participants = occ.metadata.participants || []
-  const itemRefs     = occ.metadata.items || []
-  const roots        = getRoots()
-  const itemLabels   = itemRefs.map(ref => {
-    const slug = unwrapRef(ref)
-    return roots.get(slug)?.title ?? slug
-  })
+  const roots      = getRoots()
+  const listedOn   = Array.from(roots.entries())
+    .filter(([, meta]) => meta.items.includes(`[[${occ.fileSlug}]]`))
+    .map(([, meta]) => meta.title)
 
   const dateBadge = (() => {
     const d = parseDateString(occ.date)
@@ -94,7 +91,7 @@ export default function OccurrenceCard({
   ].filter(Boolean).join(' ')
 
   const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime === 'badge' && !!t)
-  const hasTagsContent      = showTagsParticipants && (tags.length > 0 || participants.length > 0 || itemLabels.length > 0)
+  const hasTagsContent      = showTagsParticipants && (tags.length > 0 || participants.length > 0 || listedOn.length > 0)
   const showMeta            = hasDateTimeContent || hasTagsContent
 
   return (
@@ -158,7 +155,7 @@ export default function OccurrenceCard({
           <div className="flex flex-wrap gap-[5px]">
             {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
             {showTime === 'badge' && t && <Badge variant="tag">{t}</Badge>}
-            {showTagsParticipants && itemLabels.map(label => (
+            {showTagsParticipants && listedOn.map(label => (
               <TagChip key={label} label={label} isTopic />
             ))}
             {showTagsParticipants && (
