@@ -1,6 +1,5 @@
 type EventMap = {
   'vault:changed': void
-  'sync:done':     void
 }
 
 const listeners = new Map<keyof EventMap, Set<() => void>>()

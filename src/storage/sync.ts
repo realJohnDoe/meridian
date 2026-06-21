@@ -14,7 +14,6 @@ import { saveFile } from '../fileIO'
 import type { StoreItem, Roots } from '../types'
 import { getItems, getRoots, setData, notify, warn, setSyncDirtyCount, setSyncError } from '../storeBridge'
 import { getActiveBackend } from './activeBackend'
-import { emit } from '../events'
 
 // ── HELPERS ────────────────────────────────────────────────────
 
@@ -26,8 +25,10 @@ export function updateSyncUI(): void {
   const backend = getActiveBackend()
   if (!backend?.id || backend.readOnly) {
     setSyncDirtyCount(0)
+    setSyncError('Read-only vault')
     return
   }
+  setSyncError(null)
   cacheDirtyCount(backend.id).then(n => setSyncDirtyCount(n)).catch(() => {})
 }
 
@@ -216,13 +217,13 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
     if (opts.pull || hadCollision) {
       await reconcileWithBackend(backend, vaultId)
     }
-    setSyncError(false)
-    emit('sync:done')
+    setSyncError(null)
     updateSyncUI()
   } catch (e) {
     console.error('[vault] sync failed:', e)
-    setSyncError(true)
-    if (!opts.silent) notify('Sync failed: ' + ((e as Error).message || (e as Error).name))
+    const msg = (e as Error).message || (e as Error).name || 'Unknown error'
+    setSyncError(msg)
+    notify('Sync failed: ' + msg)
   } finally {
     _syncing = false
   }
