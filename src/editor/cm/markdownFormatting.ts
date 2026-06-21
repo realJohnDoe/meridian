@@ -11,8 +11,8 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
-import { TASK_ITEM_RE } from '../../items'
 import { focusedCursorLines } from './viewUtils'
+import { buildTaskLineMap } from './taskLines'
 
 // ── Language ──────────────────────────────────────────────────────
 
@@ -106,10 +106,6 @@ class OrderedMarkerWidget extends WidgetType {
 const bulletDeco = Decoration.replace({ widget: new BulletWidget() })
 const hideDeco   = Decoration.replace({})
 
-// A list item whose content is a task — taskDecorations renders its checkbox,
-// so we suppress the bullet here to avoid showing both.
-// Shared with taskDecorations.ts via TASK_ITEM_RE from items.ts.
-
 // ── Plugin 1: list item line decorations (cursor-independent) ─────
 // Applies hanging-indent classes to list item lines.
 
@@ -159,6 +155,8 @@ function buildHideDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { doc } = view.state
   const cursorLines = focusedCursorLines(view)
+  // Shared with taskDecorations — O(1) WeakMap hit if taskDecorations ran first.
+  const taskLineMap = buildTaskLineMap(view.state)
 
   syntaxTree(view.state).iterate({
     enter(node) {
@@ -203,7 +201,9 @@ function buildHideDecorations(view: EditorView): DecorationSet {
         builder.add(node.from, node.to, hideDeco)
       } else if (node.name === 'ListMark') {
         const label = doc.sliceString(node.from, node.to)
-        const isTask = TASK_ITEM_RE.test(doc.sliceString(node.to, line.to).trimStart())
+        // Task line → taskDecorations owns the checkbox; drop the bullet here
+        // to avoid both showing. Uses the shared map so detection can't diverge.
+        const isTask = taskLineMap.has(line.from)
         if (isTask) {
           // Task line → checkbox stands in for the marker; drop the bullet and
           // the space after it so the checkbox sits at the marker position.
