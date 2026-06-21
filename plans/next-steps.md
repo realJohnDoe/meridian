@@ -23,14 +23,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 
 ## Findings
 
-### 1. GitHub secondary-rate-limit handler retries forever
-
-- **Category:** `error-handling`
-- **Impact:** 6 · **Breadth:** 1 file · **Fix effort:** S
-- **Evidence:** `src/storage/githubApi.ts:16-19` — `onSecondaryRateLimit: (...) => { console.warn(...); return true }`, vs `onRateLimit` above which caps at `retryCount < 2`.
-- **Problem:** The secondary (abuse-detection) handler unconditionally returns `true`, so Octokit retries indefinitely; `runSync` never resolves and the user sees a permanently frozen sync spinner with no error.
-- **Fix:** Return `retryCount < 2` (or similar cap) to bound retries and surface a failure after exhaustion.
-
 ### 4. `listedOn` re-implements `backlinksTo` — divergent matching, recomputed per card
 
 - **Category:** `dry` `performance`
