@@ -1,6 +1,5 @@
 ## Next steps
 
-- Fix tasks without dates and multiple occurrences not being linked correctly
 - Fix differently colored sync icon and red colors without notification
 - Investigate conflicts in spite of single user
 - Add participants combobox
