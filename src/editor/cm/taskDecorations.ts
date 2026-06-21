@@ -21,10 +21,12 @@ class CheckboxWidget extends ReactWidget {
   protected get inline() { return true }
 
   renderReact() {
+    // inline-flex (not the component's default block-level `flex`) so the
+    // checkbox flows inline with the text/chips that follow it on the line.
     return createElement(Checkbox, {
       checked: this.done,
       onCheckedChange: this.onToggle,
-      className: 'size-4 align-middle',
+      className: 'size-4 inline-flex align-middle mr-1',
     })
   }
 
@@ -43,6 +45,7 @@ type TaskInfo = {
   done: boolean
   checkboxFrom: number
   checkboxTo: number
+  textFrom: number    // first non-space char after the checkbox (strike starts here)
 }
 
 function build(view: EditorView): DecorationSet {
@@ -72,8 +75,12 @@ function build(view: EditorView): DecorationSet {
       const leadingSpace = after.length - after.trimStart().length
       const checkboxFrom = mark.to + leadingSpace
       const checkboxTo   = checkboxFrom + 3  // `[ ]` is always 3 chars
+      // First non-space char after the checkbox — start the strikethrough here
+      // so the line doesn't render over the gap between checkbox and content.
+      const restOfLine = doc.sliceString(checkboxTo, line.to)
+      const textFrom = checkboxTo + (restOfLine.length - restOfLine.trimStart().length)
 
-      taskMap.set(line.from, { done, checkboxFrom, checkboxTo })
+      taskMap.set(line.from, { done, checkboxFrom, checkboxTo, textFrom })
     },
   })
 
@@ -97,9 +104,10 @@ function build(view: EditorView): DecorationSet {
         ),
       }),
     )
-    // Strikethrough the text following the checkbox for done items.
-    if (info.done) {
-      builder.add(info.checkboxTo, line.to, Decoration.mark({ class: 'cm-task-done' }))
+    // Strikethrough the text following the checkbox for done items (starting at
+    // the text itself, not the gap after the checkbox).
+    if (info.done && info.textFrom < line.to) {
+      builder.add(info.textFrom, line.to, Decoration.mark({ class: 'cm-task-done' }))
     }
   }
 

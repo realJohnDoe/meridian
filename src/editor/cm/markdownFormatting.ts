@@ -162,14 +162,22 @@ function buildHideDecorations(view: EditorView): DecorationSet {
       if (cursorLines.has(line.number)) return
 
       if (node.name === 'Link') {
-        const labelNode = node.node.getChild('LinkLabel')
-        const urlNode   = node.node.getChild('URL')
+        // Inline link `[text](url)`: lezer emits LinkMark for each of [ ] ( ),
+        // with no LinkLabel node (that's only for reference definitions). The
+        // visible label is the text between the first two marks; the URL is the
+        // URL child. Only links with a real URL are turned into widgets — a
+        // bare `[text]` (shortcut ref, no URL) is left as raw text.
+        const urlNode = node.node.getChild('URL')
         if (urlNode) {
-          const label = labelNode ? doc.sliceString(labelNode.from, labelNode.to) : ''
-          const url   = doc.sliceString(urlNode.from, urlNode.to)
+          const marks = node.node.getChildren('LinkMark')
+          const label = marks.length >= 2
+            ? doc.sliceString(marks[0].to, marks[1].from)
+            : ''
+          const url = doc.sliceString(urlNode.from, urlNode.to)
           builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(label || url, url) }))
+          return false  // skip children — whole node is replaced
         }
-        return false  // skip children — whole node is replaced
+        return  // no URL: fall through, leave children to render normally
       } else if (node.name === 'HeaderMark') {
         // Also consume the space that follows the # marks
         const end =
