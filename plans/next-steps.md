@@ -8,109 +8,158 @@
 - Add Solarized Light theme
 - Investigate more secure storage options
 
-## Results from last Quality Survey
+# Meridian — Code Health Survey
 
-### Custom Prompt on Opus
+## Health Verdict
 
-2. Editor handler prop-drilling through three layers
-   Category: architecture dry
-   Impact: 3
-   Evidence: ~18 handlers from useEntryEditor are destructured and re-passed individually in EditorShell.tsx:23-71 and again declared as 16 props in DialogStack.tsx:14-31.
-   Problem: Adding one dialog field means editing the hook return, EditorShell, the DialogStack props interface, and the call site — four touch points for one wire.
-   Fix: Pass the hooks object (or a grouped dialogHandlers) straight through rather than spreading every callback by hand.
+Meridian is a **healthy, carefully-maintained codebase** — strong typing (one `any` in app code), zero `dangerouslySetInnerHTML`, a well-factored styling layer (`occurrence-variants.ts` with shared `TINT_CLASSES`), and genuinely good module-level documentation. Many findings from prior surveys have already been _fixed_ (the `cache.ts` init race now has a promise guard, `reconcileWithBackend` correctly skips dirty entries so the old data-loss bug is gone, `notify()` now delegates to sonner, the dead spread in `storeOps` is removed). The two weakest subsystems are the **`storage/github*` layer** (an unbounded secondary-rate-limit retry loop that can hang sync forever, and a permission check that only proves read access) and the **`editor/cm` body-decoration layer** (four CodeMirror plugins silently coordinate over disjoint document ranges with task-detection logic duplicated across two of them). The single biggest _structural_ theme is a **testing/observability gap**: all automated tests live in `model/` and `storage/`, while the entire `editor/`, `calendar/`, and `components/` UI — including the fragile decoration code that caused most recent bugs — has **zero tests**.
 
-3. GitHub backend only sees the repo root and keys files by name, not path
-   Category: architecture error-handling
-   Impact: 4
-   Evidence: githubBackend.ts:50-65 requests path: '' and stores tokens.set(item.name, item.sha); statAll never recurses into subdirectories.
-   Problem: Vaults with files in subfolders silently won't sync/round-trip via GitHub, unlike the local backend — an inconsistent boundary contract between two StorageBackend implementations.
-   Fix: Use the Git Trees API (recursive=1) and key by full path to match LocalBackend's semantics.
+## Coverage Statement
 
-4. notify() builds error strings by hand and re-implements an auto-dismiss timer
-   Category: error-handling dry
-   Impact: 2
-   Evidence: storeBridge.ts:17-24 hand-rolls a setTimeout dismiss; callers across vault.ts repeat notify('… failed: ' + ((e as Error).message || (e as Error).name)) (vault.ts:135, :148, :170).
-   Problem: The error-banner timer logic and the (e as Error).message || .name formatting are duplicated, and the timer mechanism overlaps with the toast timer in mutations.ts (two bespoke dismiss schedulers).
-   Fix: A single notifyError(prefix, e) helper plus one shared transient-message scheduler.
+- **Examined closely:** `package.json`, `types.ts`, `store.ts`, `storeBridge.ts`, `presentation.ts`, all of `storage/` (sync, githubBackend, githubApi, localBackend, fs, vaultRegistry, cache), `editor/` core (EditorShell, DialogStack, EntryBody, useEntryEditor, cm/taskDecorations, cm/markdownFormatting), `routes/__root` + `_app`, `components/OccurrenceCard`, `components/ui/occurrence-variants`. Repo-wide greps for `any`, `dangerouslySetInnerHTML`, inline styles, import conventions, lazy/Suspense, tests, error-string duplication.
+- **Sampled only:** `model/expansion.ts` (614 lines, exports + key sections), `model/storeOps.ts`, `editor/dialogs/RepeatDialog.tsx` (559), `calendar/*`, `components/ui/*` shadcn primitives (vendored), `vaults/ManageVaultsDialog`, `search/*`, `onboarding/CoachTour`.
+- **Skipped:** `components/ui/sidebar.tsx` (771 lines, generated shadcn), `debug/NodeInheritanceDebugger.tsx` (776 lines, separate dev entry, not imported by the app).
+- **Fraction:** ~55–65% of `src` read directly; the rest grep-sampled.
+- **Unverified:** (a) `model/expansion.ts` internals (614 lines — possible god file / SRP issues not fully audited); (b) `RepeatDialog.tsx` recurrence logic; (c) whether `debug/` is actually excluded from the production Vite build (assumed separate-entry, did not read `vite.config`).
 
-### /code-review with Opus
+## Findings
 
-🟠 Medium — GitHub ensurePermission only proves read access
-src/storage/githubBackend.ts:141-151 — it does GET /repos/{owner}/{repo} and returns 'granted' on success, but that succeeds for a read-only token and doesn't check the configured branch.
+### 1. GitHub secondary-rate-limit handler retries forever
 
-Failure scenario: user adds a GitHub vault with a read-scoped (or wrong-branch) token. addGitHubVault reports success and saves the vault; the first write() during sync 403s/404s later with a confusing "Sync failed" rather than being caught at connect time.
+- **Category:** `error-handling`
+- **Impact:** 6 · **Breadth:** 1 file · **Fix effort:** S
+- **Evidence:** `src/storage/githubApi.ts:16-19` — `onSecondaryRateLimit: (...) => { console.warn(...); return true }`, vs `onRateLimit` above which caps at `retryCount < 2`.
+- **Problem:** The secondary (abuse-detection) handler unconditionally returns `true`, so Octokit retries indefinitely; `runSync` never resolves and the user sees a permanently frozen sync spinner with no error.
+- **Fix:** Return `retryCount < 2` (or similar cap) to bound retries and surface a failure after exhaustion.
 
-🟡 Low — redundant in-place mutation of shared metadata
-src/mutations.ts:112 — o.metadata.done = !o.metadata.done mutates the occurrence object directly "for optimistic UI", but setData(next) runs synchronously on the next line and re-renders from freshly-expanded items. The mutation is dead for its stated purpose and risks mutating an object that expansion may share/cache. Drop it.
+### 2. Four CM6 plugins coordinate the same document by convention, with task-detection duplicated
 
-🟡 Low — cleanup
-src/model/storeOps.ts:146 — ...(existing ? {} : {}) spreads an empty object on both branches: dead code, and the "merge if needed" comment describes behavior that doesn't exist. Remove it or implement the merge.
-src/storeBridge.ts:17-24 — notify auto-clears after 5s by comparing errorNotification === msg. Two identical messages in a row share the key, so the first timer can clear the second banner ~early. A token/id would be more robust.
-src/index.css:347 (the PR under review) — the banner now hardcodes color:#fff for text and close button instead of a theme token. Fine on the opaque destructive background, but inconsistent with the token-based styling everywhere else.
+- **Category:** `architecture` `srp`
+- **Impact:** 6 · **Breadth:** 4 files · **Fix effort:** L
+- **Evidence:** `taskDecorations.ts:63` (`TASK_ITEM_RE.exec(after.trim())`) and `markdownFormatting.ts:206` (`TASK_ITEM_RE.test(...)`) each independently decide "is this line a task," and both call `Decoration.replace` on the same lines; CM6 throws if their ranges overlap.
+- **Problem:** The "disjoint ranges" contract between the four plugins is enforced only by hand-coordination — the recurring class of bugs (double bullet/checkbox, swallowed lines) are symptoms of this implicit coupling.
+- **Fix:** Consolidate list-line analysis into one shared pass (or one plugin that owns list-line rendering) that the others consume.
 
-### /code-review with Sonnet
+### 3. No tests for the editor / CM6 / calendar / component layer
 
-[
-{
-"file": "src/vault.ts",
-"line": 77,
-"summary": "reconcileWithDisk silently overwrites unsaved local edits on vault activation",
-"failure_scenario": "User edits a note (dirty=1, version='local:…'), closes the tab without syncing. On next load, reconcileWithDisk fires: entry.version ('local:…') never equals the disk token, so the file is added to 'changed' and cacheBulkWriteClean overwrites it with the remote version at dirty:0. The local edit is permanently gone — no merge, no conflict prompt, no undo."
-},
-{
-"file": "src/cache.ts",
-"line": 47,
-"summary": "cacheInit assigns db before db.open() resolves; concurrent caller gets an un-opened Dexie instance",
-"failure_scenario": "Two callers hit cacheInit() concurrently. The first enters the IIFE and sets db = new MeridianDB() synchronously before the first await. The second caller arrives in the next microtask, takes the 'if (db) return db' fast-path (line 44), and receives a MeridianDB whose open() has not completed. Any subsequent Dexie operation on that instance throws DatabaseClosedError, breaking the entire cache layer."
-},
-{
-"file": "src/storage/githubApi.ts",
-"line": 16,
-"summary": "onSecondaryRateLimit always returns true, causing infinite retry with no cap",
-"failure_scenario": "A sync burst triggers GitHub's abuse-detection secondary rate limit. Unlike onRateLimit which caps at retryCount < 2, this handler unconditionally returns true. Octokit retries after retryAfter seconds each time; GitHub re-triggers the limit; the loop never exits. syncToDirectory hangs indefinitely and the user sees no error — only a frozen spinner."
-},
-{
-"file": "src/storage/githubBackend.ts",
-"line": 52,
-"summary": "statAll uses path:'' which only lists the repo root; files in subdirectories are silently skipped",
-"failure_scenario": "A GitHub vault with any .md/.yaml file in a subdirectory (e.g. journal/2025-01.md) will never appear in statAll(). The file is absent from the sync tokens map, is never read into the cache, and is never displayed in the UI. There is no error — the files simply vanish silently on first load."
-},
-{
-"file": "src/storeBridge.ts",
-"line": 19,
-"summary": "notify() clears a still-active notification when two calls fire with identical message strings",
-"failure_scenario": "Two rapid save failures both call notify('Save failed: NetworkError'). Each arms a 5-second timer. The first timer fires at T+5s, sees errorNotification === msg → true, clears the banner. Even if the user was still reading it (second timer hasn't expired yet), the notification is gone. With high-frequency failures (e.g. repeated sync errors) the banner can flash and vanish repeatedly."
-},
-{
-"file": "src/model/storeOps.ts",
-"line": 146,
-"summary": "Dead spread ...(existing ? {} : {}) in updateRoot always spreads an empty object",
-"failure_scenario": "The spread is a no-op in both branches — existing is never used. The comment 'merge if needed — for now full replace from form' invites a future developer to add merge logic in the wrong place, believing this line already guards it. Any field-preserving merge intent is silently absent."
-}
-]
-Summary by severity:
+- **Category:** `error-handling` (test coverage) `architecture`
+- **Impact:** 5 · **Breadth:** ~50 UI files · **Fix effort:** L
+- **Evidence:** `find src/editor src/calendar src/components -name "*.test.*"` → `0`; tests exist only under `model/__tests__` and `storage/__tests__`.
+- **Problem:** The most bug-prone logic (body decorations, `occState`, sort keys) is verified only by manual preview, which is why subtle decoration cases regressed repeatedly.
+- **Fix:** Add a unit suite for the pure-ish builders (`buildHideDecorations`, `occState`/`sortOccs`, parse helpers) with regression cases for "wikilink after checkbox" and "bullet suppressed on task line."
 
-#### File Severity Kind
+### 4. `listedOn` re-implements `backlinksTo` — divergent matching, recomputed per card
 
-1 vault.ts:77 Critical Data loss — unsaved edits silently overwritten on restart
-2 cache.ts:47 High Race — un-opened DB returned to concurrent caller
-3 githubApi.ts:16 High Correctness — infinite retry hangs sync indefinitely
-4 githubBackend.ts:52 High Correctness — subdirectory files silently invisible
-5 storeBridge.ts:19 Medium Race — notification cleared prematurely on duplicate messages
-6 storeOps.ts:146 Low Cleanup — dead spread, misleading comment
+- **Category:** `dry` `performance`
+- **Impact:** 4 · **Breadth:** 2 implementations, runs per agenda card · **Fix effort:** M
+- **Evidence:** `OccurrenceCard.tsx:76-78` does `Array.from(roots.entries()).filter(([,meta]) => meta.items.includes(\`[[${occ.fileSlug}]]\`))`inline & unmemoized, while`presentation.ts:182 backlinksTo`computes the same concept using`resolveWikilink(unwrapRef(raw), roots)`.
+- **Problem:** Two "files that list this slug" implementations that disagree (naive string-includes vs. proper wikilink resolution), and the card version runs O(roots) inside render for every card in the agenda.
+- **Fix:** Route both through one memoized `backlinksTo`/`listedOn` helper.
 
-### Remainder from body / wikilink / checklist refinement
+### 5. GitHub `ensurePermission` only proves read access
 
-1. Implicit cross-plugin coordination on the body (the real architectural smell)
-   Four ViewPlugins now decorate the same CM6 document and silently depend on each other owning disjoint ranges:
-   taskDecorations replaces only the [ ] token + strikethrough mark
-   markdownFormatting (markdownLivePreview) hides the bullet on task lines, replaces [text](url) / bare URLs, headers, emphasis
-   wikilinkDecorations replaces [[…]]
-   markdownListDecos does hanging-indent
-   The coupling is by convention, not code. Notably, "is this line a task?" is computed independently in two places — taskDecorations.ts:75 and markdownFormatting.ts:214 — and they must agree or you get either a double bullet/checkbox or, worse, overlapping Decoration.replace ranges (CM6 throws). Most of the bugs we chased this session (line swallowing, bullet+checkbox) were symptoms of this. Consolidating the task/line analysis into one shared pass (or one plugin that owns "list-line rendering") is the highest-value cleanup.
+- **Category:** `error-handling` `ux`
+- **Impact:** 4 · **Breadth:** 1 file · **Fix effort:** S
+- **Evidence:** `githubBackend.ts:144-154` — `GET /repos/{owner}/{repo}` then `return 'granted'`; succeeds for a read-only token and never checks the configured branch.
+- **Problem:** A read-scoped or wrong-branch token reports success at connect time, then the first `write()` during sync fails later with a confusing "Sync failed."
+- **Fix:** Probe write capability (e.g. check `permissions.push` from the repo response, or verify the branch ref) before returning `'granted'`.
 
-2. No tests for any body-decoration logic
-   All of the task/link/focus behavior is verified only by manual preview — which is exactly why the subtle cases slipped. The build/buildHideDecorations functions are pure-ish and the parse helpers in items.ts are trivially testable. Worth a small suite, especially regression tests for "wikilink after checkbox," "link on first line unfocused," and "bullet suppressed on task line."
+### 6. Editor handler prop-drilling through three layers
+
+- **Category:** `architecture` `dry`
+- **Impact:** 3 · **Breadth:** 3 files · **Fix effort:** M
+- **Evidence:** `useEntryEditor.ts:121-143` returns 21 keys; `EditorShell.tsx:24-37` destructures ~18; `DialogStack.tsx:14-31` re-declares 16 of them as a props interface.
+- **Problem:** Adding one dialog field means touching the hook return, `EditorShell`, the `DialogStack` props interface, and the callsite — four edits for one wire.
+- **Fix:** Pass the `hooks` object (or a grouped `dialogHandlers`) straight through instead of spreading each callback by hand.
+
+### 7. Mixed import conventions — `@/` alias vs relative `../`, often in the same file
+
+- **Category:** `naming` `layout`
+- **Impact:** 2 · **Breadth:** ~40 files (89 `@/` imports vs many relative) · **Fix effort:** S (codemod/lint)
+- **Evidence:** `routes/_app.tsx:11-17` mixes `import EntryOverlay from '@/editor/EntryOverlay'` with `import { Button } from '../components/ui/button'` in adjacent lines.
+- **Problem:** No consistent path convention across the codebase makes imports noisy and moves harder to reason about.
+- **Fix:** Pick one (the `@/` alias) and add an ESLint `no-restricted-imports`/`import/no-relative-parent-imports` rule to enforce it.
+
+### 8. Core generic types live in deep `model/expansion.ts` but are imported upward by top-level `types.ts`
+
+- **Category:** `architecture` `layout`
+- **Impact:** 3 · **Breadth:** `types.ts` + every `Occurrence`/`StoreItem` consumer · **Fix effort:** M
+- **Evidence:** `types.ts:57` — `import type { OccurrenceEntry, RepeatPattern } from './model/expansion'`; these interfaces are defined at `expansion.ts:404` and `:419`, a 614-line module that also holds heavy expansion logic.
+- **Problem:** Foundational, broadly-used type definitions sit inside a deeply-nested, heavyweight implementation file — a depth mismatch that forces the top-level types module to depend downward into `model/`.
+- **Fix:** Move `OccurrenceEntry`/`RepeatPattern` into `types.ts` (or a `model/types.ts`) and have `expansion.ts` import them.
+
+### 9. `reconcileWithBackend` re-parses the entire cache on every change
+
+- **Category:** `performance`
+- **Impact:** 3 · **Breadth:** 1 file (hot path) · **Fix effort:** M
+- **Evidence:** `sync.ts:159` — after pulling `changed`, it calls `parseFiles(Array.from(cacheMap.values()))` over **all** cached files, then `setData` replaces the whole store, even when one file changed.
+- **Problem:** Every sync tick that touches a single file re-parses and re-expands the full vault, which scales poorly as vaults grow.
+- **Fix:** Parse only the changed/deleted slugs and merge into existing `items`/`roots` rather than rebuilding from scratch.
+
+### 10. Error-string formatting duplicated across the storage layer
+
+- **Category:** `dry` `error-handling`
+- **Impact:** 2 · **Breadth:** ~8 callsites · **Fix effort:** S
+- **Evidence:** `sync.ts:225,264,278`, `vaultRegistry.ts` (×4), `ManageVaultsDialog.tsx` — `notify('Sync failed: ' + ((e as Error).message || (e as Error).name))`; the `(e as Error).message || .name` idiom is copy-pasted everywhere errors surface.
+- **Problem:** The same unsafe cast + fallback formatting is repeated, so any change to error presentation must be made in eight places.
+- **Fix:** A single `notifyError(prefix, e)` helper that owns the formatting.
+
+### 11. No route- or feature-level code-splitting
+
+- **Category:** `performance`
+- **Impact:** 3 · **Breadth:** all routes · **Fix effort:** M
+- **Evidence:** `grep "lazy(\|Suspense"` → `0`; `EntryOverlay`, the full CM6 editor + all dialogs, and the calendar views are statically imported into the initial bundle (`_app.tsx:11`).
+- **Problem:** The CodeMirror editor stack (a large dependency) and the dialog tree load on first paint even though the editor opens only on demand.
+- **Fix:** Lazy-load `EntryOverlay`/editor and calendar route components behind `React.lazy` + `Suspense`.
+
+### 12. Subdirectory files are silently ignored by both backends
+
+- **Category:** `error-handling` `ux`
+- **Impact:** 3 · **Breadth:** 2 files · **Fix effort:** M
+- **Evidence:** `githubBackend.ts:52` requests `path: ''` (repo root only) and keys by `item.name`; `fs.ts:43` iterates only `dh.entries()` (no recursion). _Note: consistent across both backends — the prior survey's "GitHub diverges from local" framing is inaccurate; both are flat-by-design._
+- **Problem:** Any `.md`/`.yaml` in a subfolder never appears in `statAll`, is never cached, and vanishes from the UI with no error.
+- **Fix:** Recurse directories (FS) / use the Git Trees API `recursive=1` (GitHub) and key by full path, or explicitly validate flat-vault-only.
+
+### 13. `presentation.ts` duplicates its 3-step occurrence-fill logic
+
+- **Category:** `dry`
+- **Impact:** 3 · **Breadth:** 2 functions in 1 file · **Fix effort:** M
+- **Evidence:** `fileOccurrenceMap` (`presentation.ts:89-136`) and `computeSlugOccurrence` (`:138-167`) implement the identical "expand-forward → expand-back → standalone fallback → series-anchor fallback" sequence.
+- **Problem:** The batch and single-slug variants must be kept in lockstep by hand; a fix to the fill ordering in one can silently diverge from the other.
+- **Fix:** Express `computeSlugOccurrence` in terms of a shared per-slug primitive that `fileOccurrenceMap` also calls.
+
+### 14. Arbitrary pixel values bypass the Tailwind scale across card components
+
+- **Category:** `styling`
+- **Impact:** 2 · **Breadth:** ~5 files · **Fix effort:** M
+- **Evidence:** `OccurrenceCard.tsx:39,46,100,144` — `text-[14px]`, `gap-[9px]`, `pl-[8px] pr-[14px] py-[8px]`, `text-[11px]`, `text-[9px]` scattered as one-off arbitrary values (also in `OccurrenceRow`, `DayView`).
+- **Problem:** Spacing/typography are hardcoded per-component rather than drawn from the Tailwind scale or design tokens, so visual consistency is manual and drift-prone.
+- **Fix:** Map these to the nearest scale steps or define semantic tokens (e.g. `text-card-title`, `gap-card`).
+
+### 15. Storage layer reaches into UI state via mutable global singletons
+
+- **Category:** `architecture`
+- **Impact:** 3 · **Breadth:** `sync.ts`, `vaultRegistry.ts` · **Fix effort:** L
+- **Evidence:** `sync.ts:15` imports `getItems, getRoots, setData, notify, setSyncDirtyCount, setSyncError` from `storeBridge` and calls `setData`/`notify` directly inside sync logic.
+- **Problem:** The data/sync domain is coupled to the UI store and toast system through a global bridge, so storage can't be exercised or reused without the Zustand store and sonner present.
+- **Fix:** Have sync functions return results/events and let a thin app-layer adapter push them into the store, rather than the storage layer writing UI state itself.
+
+### 16. `any` and unchecked casts at the cache/persistence boundary
+
+- **Category:** `types`
+- **Impact:** 2 · **Breadth:** ~6 callsites · **Fix effort:** S
+- **Evidence:** `cache.ts:25` `value: any` on `MetaRecord`, then unchecked reads like `record?.value as FileSystemDirectoryHandle` (`cache.ts:143`), `as VaultRef[]` (`:184`), `store.ts:75` `parsed as string[]`.
+- **Problem:** Everything read back from IndexedDB/localStorage is cast without validation, so a corrupted or schema-drifted record fails at an arbitrary later point instead of at the boundary.
+- **Fix:** Give `MetaRecord` a discriminated value type (or per-key typed accessors) and validate on read.
+
+---
+
+## Notes on prior-survey findings
+
+- **Already fixed (excluded):** `vault.ts:77` data-loss, `cache.ts:47` init race, `storeBridge` notify timer, `storeOps:146` dead spread.
+- **Overstated (see #12):** the "GitHub keys by name not path / diverges from local" finding — both backends are flat by design, so it's a consistent limitation, not an inter-backend divergence.
+
+_Stopped at 16 — remaining candidates are single-callsite or lint-level; padding to 20 would dilute the signal._
 
 # Codebase Health Survey
 
