@@ -1,7 +1,11 @@
 ## Next steps
 
+- Fix differently colored sync icon and red colors without notification
+- Investigate conflicts in spite of single user
+- Add participants combobox
 - Convert duration into end date/time
 - Add Solarized Light theme
+- Investigate more secure storage options
 
 ## Results from last Quality Survey
 
@@ -85,7 +89,7 @@ src/index.css:347 (the PR under review) — the banner now hardcodes color:#fff 
 ]
 Summary by severity:
 
-# File Severity Kind
+#### File Severity Kind
 
 1 vault.ts:77 Critical Data loss — unsaved edits silently overwritten on restart
 2 cache.ts:47 High Race — un-opened DB returned to concurrent caller
@@ -93,6 +97,31 @@ Summary by severity:
 4 githubBackend.ts:52 High Correctness — subdirectory files silently invisible
 5 storeBridge.ts:19 Medium Race — notification cleared prematurely on duplicate messages
 6 storeOps.ts:146 Low Cleanup — dead spread, misleading comment
+
+### Remainder from body / wikilink / checklist refinement
+
+1. Implicit cross-plugin coordination on the body (the real architectural smell)
+   Four ViewPlugins now decorate the same CM6 document and silently depend on each other owning disjoint ranges:
+   taskDecorations replaces only the [ ] token + strikethrough mark
+   markdownFormatting (markdownLivePreview) hides the bullet on task lines, replaces [text](url) / bare URLs, headers, emphasis
+   wikilinkDecorations replaces [[…]]
+   markdownListDecos does hanging-indent
+   The coupling is by convention, not code. Notably, "is this line a task?" is computed independently in two places — taskDecorations.ts:75 and markdownFormatting.ts:214 — and they must agree or you get either a double bullet/checkbox or, worse, overlapping Decoration.replace ranges (CM6 throws). Most of the bugs we chased this session (line swallowing, bullet+checkbox) were symptoms of this. Consolidating the task/line analysis into one shared pass (or one plugin that owns "list-line rendering") is the highest-value cleanup.
+
+2. Task-detection regex duplicated three times
+   The same /^\[([ xX])\]\s+(.+)$/ lives as TASK_ITEM_RE in items.ts:12, TASK_CONTENT_RE in taskDecorations.ts:40, and again in markdownFormatting.ts. They will drift. Hoist to one shared constant (probably items.ts, which already owns the item grammar).
+
+3. Cursor-line + focus logic copy-pasted three times
+   The identical if (view.hasFocus) { …cursorLines… } block and the update.focusChanged rebuild condition are duplicated across all three decoration plugins (taskDecorations, wikilinkDecorations, markdownFormatting). A shared focusedCursorLines(view) helper removes the triplication and the risk that a future tweak updates only two of three.
+
+4. Dead code: buildBodyHtml
+   presentation.ts:277 is exported but has no remaining callers (it was the old read-only body renderer). It's now also semantically stale — it won't autolink URLs or reflect any of the new rendering. Delete it, or if a read-only render path is still intended, reconcile it with the editor.
+
+5. No tests for any body-decoration logic
+   All of the task/link/focus behavior is verified only by manual preview — which is exactly why the subtle cases slipped. The build/buildHideDecorations functions are pure-ish and the parse helpers in items.ts are trivially testable. Worth a small suite, especially regression tests for "wikilink after checkbox," "link on first line unfocused," and "bullet suppressed on task line."
+
+6. Minor: no scheme allowlist on autolink opening
+   markdownFormatting.ts:181 builds an href and LinkWidget calls window.open(url, …). It already sets noopener,noreferrer and the content is the user's own notes, so risk is low — but there's no guard against e.g. a javascript:/data: scheme sneaking through. A one-line allowlist (http, https, mailto) is cheap hardening.
 
 ## Survey Prompt
 
