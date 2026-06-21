@@ -13,9 +13,9 @@ export function makeOctokit(token: string): InstanceType<typeof ThrottledOctokit
         console.warn(`[github] rate limit hit for ${options.method} ${options.url}; retrying after ${retryAfter}s (attempt ${retryCount + 1})`)
         return retryCount < 2
       },
-      onSecondaryRateLimit: (retryAfter: number, options: { method: string; url: string }) => {
-        console.warn(`[github] secondary rate limit hit for ${options.method} ${options.url}; retrying after ${retryAfter}s`)
-        return true
+      onSecondaryRateLimit: (retryAfter: number, options: { method: string; url: string }, _octokit: unknown, retryCount: number) => {
+        console.warn(`[github] secondary rate limit hit for ${options.method} ${options.url}; retrying after ${retryAfter}s (attempt ${retryCount + 1})`)
+        return retryCount < 2
       },
     },
   })
