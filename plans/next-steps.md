@@ -1,8 +1,8 @@
 ## Next steps
 
 - Investigate conflicts in spite of single user
-- Add participants combobox
 - Convert duration into end date/time
+- Add filter by participants in side bar
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Add Solarized Light theme
 - Investigate more secure storage options
@@ -22,14 +22,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 - **Unverified:** (a) `model/expansion.ts` internals (614 lines — possible god file / SRP issues not fully audited); (b) `RepeatDialog.tsx` recurrence logic; (c) whether `debug/` is actually excluded from the production Vite build (assumed separate-entry, did not read `vite.config`).
 
 ## Findings
-
-### 4. `listedOn` re-implements `backlinksTo` — divergent matching, recomputed per card
-
-- **Category:** `dry` `performance`
-- **Impact:** 4 · **Breadth:** 2 implementations, runs per agenda card · **Fix effort:** M
-- **Evidence:** `OccurrenceCard.tsx:76-78` does `Array.from(roots.entries()).filter(([,meta]) => meta.items.includes(\`[[${occ.fileSlug}]]\`))`inline & unmemoized, while`presentation.ts:182 backlinksTo`computes the same concept using`resolveWikilink(unwrapRef(raw), roots)`.
-- **Problem:** Two "files that list this slug" implementations that disagree (naive string-includes vs. proper wikilink resolution), and the card version runs O(roots) inside render for every card in the agenda.
-- **Fix:** Route both through one memoized `backlinksTo`/`listedOn` helper.
 
 ### 5. GitHub `ensurePermission` only proves read access
 
@@ -126,15 +118,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 - **Evidence:** `cache.ts:25` `value: any` on `MetaRecord`, then unchecked reads like `record?.value as FileSystemDirectoryHandle` (`cache.ts:143`), `as VaultRef[]` (`:184`), `store.ts:75` `parsed as string[]`.
 - **Problem:** Everything read back from IndexedDB/localStorage is cast without validation, so a corrupted or schema-drifted record fails at an arbitrary later point instead of at the boundary.
 - **Fix:** Give `MetaRecord` a discriminated value type (or per-key typed accessors) and validate on read.
-
----
-
-## Notes on prior-survey findings
-
-- **Already fixed (excluded):** `vault.ts:77` data-loss, `cache.ts:47` init race, `storeBridge` notify timer, `storeOps:146` dead spread.
-- **Overstated (see #12):** the "GitHub keys by name not path / diverges from local" finding — both backends are flat by design, so it's a consistent limitation, not an inter-backend divergence.
-
-_Stopped at 16 — remaining candidates are single-callsite or lint-level; padding to 20 would dilute the signal._
 
 # Codebase Health Survey
 
