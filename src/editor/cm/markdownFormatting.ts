@@ -1,4 +1,5 @@
 import { markdown } from '@codemirror/lang-markdown'
+import { Autolink } from '@lezer/markdown'
 import { syntaxHighlighting, HighlightStyle, syntaxTree } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 import {
@@ -13,7 +14,9 @@ import { RangeSetBuilder } from '@codemirror/state'
 
 // ── Language ──────────────────────────────────────────────────────
 
-export const markdownLanguage = markdown()
+// Enable GFM autolinking so bare URLs / emails become `URL` nodes we can render
+// as clickable links (see the URL branch in buildHideDecorations).
+export const markdownLanguage = markdown({ extensions: [Autolink] })
 
 // ── Highlight style ───────────────────────────────────────────────
 
@@ -153,11 +156,16 @@ function buildHideDecorations(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { doc, selection } = view.state
 
+  // Only suppress decorations on the cursor's line(s) while the editor is
+  // focused — when it's unfocused (e.g. just opened) there is no active cursor,
+  // so everything should render rather than showing raw markdown on line 1.
   const cursorLines = new Set<number>()
-  for (const r of selection.ranges) {
-    const a = doc.lineAt(r.from).number
-    const b = doc.lineAt(r.to).number
-    for (let n = a; n <= b; n++) cursorLines.add(n)
+  if (view.hasFocus) {
+    for (const r of selection.ranges) {
+      const a = doc.lineAt(r.from).number
+      const b = doc.lineAt(r.to).number
+      for (let n = a; n <= b; n++) cursorLines.add(n)
+    }
   }
 
   syntaxTree(view.state).iterate({
@@ -165,7 +173,17 @@ function buildHideDecorations(view: EditorView): DecorationSet {
       const line = doc.lineAt(node.from)
       if (cursorLines.has(line.number)) return
 
-      if (node.name === 'Link') {
+      if (node.name === 'URL') {
+        // Bare autolink (GFM) — a top-level URL node. URLs inside markdown links
+        // are children of Link, which we skip via `return false`, so this only
+        // catches standalone URLs / emails. Render them as clickable links.
+        const raw  = doc.sliceString(node.from, node.to)
+        const href = /^[a-z][-\w+.]*:/i.test(raw) ? raw
+          : raw.includes('@') ? `mailto:${raw}`
+          : `https://${raw}`
+        builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(raw, href) }))
+        return false
+      } else if (node.name === 'Link') {
         // Inline link `[text](url)`: lezer emits LinkMark for each of [ ] ( ),
         // with no LinkLabel node (that's only for reference definitions). The
         // visible label is the text between the first two marks; the URL is the
@@ -232,6 +250,7 @@ export const markdownLivePreview = ViewPlugin.fromClass(
     constructor(view: EditorView) { this.decorations = buildHideDecorations(view) }
     update(update: ViewUpdate) {
       if (update.docChanged || update.selectionSet || update.viewportChanged ||
+          update.focusChanged ||
           syntaxTree(update.startState) !== syntaxTree(update.state)) {
         this.decorations = buildHideDecorations(update.view)
       }

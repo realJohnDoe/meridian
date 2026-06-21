@@ -52,11 +52,15 @@ function build(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { doc, selection } = view.state
 
+  // Raw `[ ]`/`[x]` text is shown only on the focused cursor's line; when
+  // unfocused (e.g. just opened) every task renders its checkbox.
   const cursorLines = new Set<number>()
-  for (const r of selection.ranges) {
-    const a = doc.lineAt(r.from).number
-    const b = doc.lineAt(r.to).number
-    for (let n = a; n <= b; n++) cursorLines.add(n)
+  if (view.hasFocus) {
+    for (const r of selection.ranges) {
+      const a = doc.lineAt(r.from).number
+      const b = doc.lineAt(r.to).number
+      for (let n = a; n <= b; n++) cursorLines.add(n)
+    }
   }
 
   const taskMap = new Map<number, TaskInfo>()
@@ -123,6 +127,7 @@ export function createTaskExtension(): Extension {
       constructor(view: EditorView) { this.decorations = build(view) }
       update(update: ViewUpdate) {
         if (update.docChanged || update.selectionSet || update.viewportChanged ||
+            update.focusChanged ||
             syntaxTree(update.startState) !== syntaxTree(update.state))
           this.decorations = build(update.view)
       }

@@ -87,11 +87,15 @@ function build(
   const { doc, selection } = view.state
   const roots = view.state.field(rootsField)
 
+  // Raw `[[…]]` text is shown only on the focused cursor's line; when unfocused
+  // (e.g. just opened) every wikilink renders as a chip.
   const cursorLines = new Set<number>()
-  for (const r of selection.ranges) {
-    const a = doc.lineAt(r.from).number
-    const b = doc.lineAt(r.to).number
-    for (let n = a; n <= b; n++) cursorLines.add(n)
+  if (view.hasFocus) {
+    for (const r of selection.ranges) {
+      const a = doc.lineAt(r.from).number
+      const b = doc.lineAt(r.to).number
+      for (let n = a; n <= b; n++) cursorLines.add(n)
+    }
   }
 
   const allLinks = parseWikilinks(doc.toString())
@@ -154,6 +158,7 @@ export function createWikilinkExtension(
           update.docChanged ||
           update.selectionSet ||
           update.viewportChanged ||
+          update.focusChanged ||
           update.transactions.some(tr =>
             tr.effects.some(e => e.is(setRootsEffect)),
           )
