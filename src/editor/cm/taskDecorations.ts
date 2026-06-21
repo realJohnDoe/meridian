@@ -7,6 +7,8 @@ import {
 import { syntaxTree } from '@codemirror/language'
 import { createElement } from 'react'
 import { Checkbox } from '../../components/ui/checkbox'
+import { TASK_ITEM_RE } from '../../items'
+import { focusedCursorLines } from './viewUtils'
 import { ReactWidget } from './ReactWidget'
 
 // ── Task checkbox widget (inline — only replaces the `[ ]`/`[x]` token) ─────
@@ -35,10 +37,6 @@ class CheckboxWidget extends ReactWidget {
   }
 }
 
-// ── Detect `[ ]` / `[x]` content after a list mark ───────────────
-
-const TASK_CONTENT_RE = /^\[([ xX])\]\s+(.+)$/
-
 // ── Build decorations ─────────────────────────────────────────────
 
 type TaskInfo = {
@@ -50,18 +48,8 @@ type TaskInfo = {
 
 function build(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
-  const { doc, selection } = view.state
-
-  // Raw `[ ]`/`[x]` text is shown only on the focused cursor's line; when
-  // unfocused (e.g. just opened) every task renders its checkbox.
-  const cursorLines = new Set<number>()
-  if (view.hasFocus) {
-    for (const r of selection.ranges) {
-      const a = doc.lineAt(r.from).number
-      const b = doc.lineAt(r.to).number
-      for (let n = a; n <= b; n++) cursorLines.add(n)
-    }
-  }
+  const { doc } = view.state
+  const cursorLines = focusedCursorLines(view)
 
   const taskMap = new Map<number, TaskInfo>()
   syntaxTree(view.state).iterate({
@@ -72,7 +60,7 @@ function build(view: EditorView): DecorationSet {
       const line = doc.lineAt(node.from)
       if (cursorLines.has(line.number)) return
       const after = doc.sliceString(mark.to, line.to)
-      const m = TASK_CONTENT_RE.exec(after.trim())
+      const m = TASK_ITEM_RE.exec(after.trim())
       if (!m) return
 
       const done = m[1] !== ' '

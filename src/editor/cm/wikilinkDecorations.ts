@@ -10,6 +10,7 @@ import { parseWikilinks, resolveWikilink } from '../../wikilinks'
 import TagChip from '../../components/TagChip'
 import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
+import { focusedCursorLines } from './viewUtils'
 import { ReactWidget } from './ReactWidget'
 
 // ── State fields ──────────────────────────────────────────────────
@@ -84,19 +85,9 @@ function build(
   onOpenRef: { current: (ref: string) => void },
 ): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
-  const { doc, selection } = view.state
+  const { doc } = view.state
   const roots = view.state.field(rootsField)
-
-  // Raw `[[…]]` text is shown only on the focused cursor's line; when unfocused
-  // (e.g. just opened) every wikilink renders as a chip.
-  const cursorLines = new Set<number>()
-  if (view.hasFocus) {
-    for (const r of selection.ranges) {
-      const a = doc.lineAt(r.from).number
-      const b = doc.lineAt(r.to).number
-      for (let n = a; n <= b; n++) cursorLines.add(n)
-    }
-  }
+  const cursorLines = focusedCursorLines(view)
 
   const allLinks = parseWikilinks(doc.toString())
   const linksByLineFrom = new Map<number, typeof allLinks>()
