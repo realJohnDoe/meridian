@@ -69,7 +69,7 @@ export const useStore = create<MeridianStore>((set, get) => ({
     try {
       const raw = localStorage.getItem(`meridian_favorites_${vaultId}`)
       const parsed: unknown = raw ? JSON.parse(raw) : []
-      set({ favorites: Array.isArray(parsed) ? parsed as string[] : [] })
+      set({ favorites: Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [] })
     } catch {
       set({ favorites: [] })
     }
@@ -97,7 +97,7 @@ export const useStore = create<MeridianStore>((set, get) => ({
     try {
       const raw = localStorage.getItem(`meridian_default_participants_${vaultId}`)
       const parsed: unknown = raw ? JSON.parse(raw) : []
-      set({ defaultParticipants: Array.isArray(parsed) ? parsed as string[] : [] })
+      set({ defaultParticipants: Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [] })
     } catch {
       set({ defaultParticipants: [] })
     }

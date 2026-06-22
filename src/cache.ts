@@ -21,8 +21,7 @@ export interface CacheRecord {
 
 export interface MetaRecord {
   key:   string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value: any
+  value: FileSystemDirectoryHandle | string | VaultRef[]
 }
 
 // ── Dexie DB ───────────────────────────────────────────────────
@@ -140,7 +139,8 @@ export async function handleSave(vaultId: string, h: FileSystemDirectoryHandle):
 export async function handleLoad(vaultId: string): Promise<FileSystemDirectoryHandle | null> {
   const d = await cacheInit()
   const record = await d.meta.get(`handle:${vaultId}`)
-  return (record?.value as FileSystemDirectoryHandle) ?? null
+  const v = record?.value
+  return (v instanceof FileSystemDirectoryHandle) ? v : null
 }
 
 export async function handleClear(vaultId: string): Promise<void> {
@@ -158,7 +158,8 @@ export async function tokenSave(vaultId: string, token: string): Promise<void> {
 export async function tokenLoad(vaultId: string): Promise<string | null> {
   const d = await cacheInit()
   const record = await d.meta.get(`token:${vaultId}`)
-  return (record?.value as string) ?? null
+  const v = record?.value
+  return typeof v === 'string' ? v : null
 }
 
 export async function tokenClear(vaultId: string): Promise<void> {
@@ -178,10 +179,19 @@ export async function vaultRefsSave(refs: VaultRef[]): Promise<void> {
   await d.meta.put({ key: 'vaults', value: refs })
 }
 
+function isVaultRef(v: unknown): v is VaultRef {
+  if (!v || typeof v !== 'object') return false
+  const r = v as Record<string, unknown>
+  return typeof r['id'] === 'string'
+    && typeof r['name'] === 'string'
+    && (r['kind'] === 'local' || r['kind'] === 'example' || r['kind'] === 'github')
+}
+
 export async function vaultRefsLoad(): Promise<VaultRef[]> {
   const d = await cacheInit()
   const record = await d.meta.get('vaults')
-  return (record?.value as VaultRef[]) ?? []
+  const v = record?.value
+  return Array.isArray(v) ? v.filter(isVaultRef) : []
 }
 
 export async function activeVaultIdSave(id: string | null): Promise<void> {
@@ -196,5 +206,6 @@ export async function activeVaultIdSave(id: string | null): Promise<void> {
 export async function activeVaultIdLoad(): Promise<string | null> {
   const d = await cacheInit()
   const record = await d.meta.get('activeVaultId')
-  return (record?.value as string) ?? null
+  const v = record?.value
+  return typeof v === 'string' ? v : null
 }
