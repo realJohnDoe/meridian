@@ -1,5 +1,6 @@
 ## Next steps
 
+- Fix font / occurrence size in month view on large screens
 - Investigate conflicts in spite of single user
 - Convert duration into end date/time
 - Add filter by participants in side bar
