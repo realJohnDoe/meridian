@@ -7,7 +7,7 @@ import { isSeries } from '../types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '../types'
 import { titleToSlug } from '../fileIO'
 import { getItems, getRoots, setData } from '../storeBridge'
-import { warmSlugInFOM } from '../presentation'
+import { warmSlugInFOM, backlinksTo } from '../presentation'
 import { writeEntityToCache, deleteFromBackend } from '../storage/sync'
 import type { EntryState, ItemType } from './state'
 
@@ -160,9 +160,11 @@ export function deleteNode(
   }
   function deleteAll() {
     if (!item) return
+    const affected = backlinksTo(item.fileSlug, getRoots())
     const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
     warmSlugInFOM(item.fileSlug, next.items, next.roots)
     setData(next)
+    affected.forEach(writeEntityToCache)
     deleteFromBackend(item.fileSlug)
     hideSheet(); navigateBack()
   }
@@ -177,9 +179,11 @@ export function deleteNode(
 
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
+      const affected = backlinksTo(item.fileSlug, getRoots())
       const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
       warmSlugInFOM(item.fileSlug, next.items, next.roots)
       setData(next)
+      affected.forEach(writeEntityToCache)
       deleteFromBackend(item.fileSlug); navigateBack()
     }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }
