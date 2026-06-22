@@ -5,13 +5,8 @@ declare global {
   interface Window {
     showDirectoryPicker(options?: { mode?: 'read' | 'readwrite' }): Promise<FileSystemDirectoryHandle>
   }
-  interface FileSystemHandle {
-    readonly kind: 'file' | 'directory'
-    readonly name: string
-  }
   interface FileSystemDirectoryHandle {
     entries(): AsyncIterableIterator<[string, FileSystemHandle]>
-    getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<FileSystemDirectoryHandle>
     queryPermission(options?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>
     requestPermission(options?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>
   }
