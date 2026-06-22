@@ -69,19 +69,23 @@ describe('GitHubBackend', () => {
     vi.unstubAllGlobals()
   })
 
-  function mockFetch(body: unknown, status = 200) {
+  function makeJsonResp(body: unknown, status = 200) {
     // Octokit iterates over response.headers, so we must provide a real Headers object.
     const headers = new Headers({
       'content-type': 'application/json',
       'x-ratelimit-remaining': '4999',
     })
-    fetchSpy.mockResolvedValue({
+    return {
       ok:     status >= 200 && status < 300,
       status,
       headers,
       json: () => Promise.resolve(body),
       text: () => Promise.resolve(JSON.stringify(body)),
-    })
+    }
+  }
+
+  function mockFetch(body: unknown, status = 200) {
+    fetchSpy.mockResolvedValue(makeJsonResp(body, status))
   }
 
   it('statAll calls root contents endpoint and filters vault files', async () => {
@@ -209,14 +213,36 @@ describe('GitHubBackend', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('ensurePermission returns granted on successful repo fetch', async () => {
-    mockFetch({ id: 123, name: 'notes' })
+  it('ensurePermission returns granted when push permission is true and branch exists', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes', permissions: { push: true, pull: true, admin: false } }))
+      .mockResolvedValueOnce(makeJsonResp({ name: 'main' }))
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     expect(await backend.ensurePermission(false)).toBe('granted')
   })
 
+  it('ensurePermission returns denied when push permission is false (read-only token)', async () => {
+    fetchSpy.mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes', permissions: { push: false, pull: true, admin: false } }))
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    expect(await backend.ensurePermission(false)).toBe('denied')
+  })
+
+  it('ensurePermission returns denied when permissions field is absent', async () => {
+    fetchSpy.mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes' }))
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    expect(await backend.ensurePermission(false)).toBe('denied')
+  })
+
+  it('ensurePermission returns denied when configured branch does not exist', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes', permissions: { push: true, pull: true, admin: false } }))
+      .mockResolvedValueOnce(makeJsonResp({ message: 'Branch not found' }, 404))
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    expect(await backend.ensurePermission(false)).toBe('denied')
+  })
+
   it('ensurePermission returns denied on 401', async () => {
-    mockFetch({ message: 'Bad credentials' }, 401)
+    fetchSpy.mockResolvedValueOnce(makeJsonResp({ message: 'Bad credentials' }, 401))
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     expect(await backend.ensurePermission(false)).toBe('denied')
   })

@@ -143,9 +143,17 @@ export class GitHubBackend implements StorageBackend {
 
   async ensurePermission(_interactive: boolean): Promise<PermissionState> {
     try {
-      await this._octokit.request('GET /repos/{owner}/{repo}', {
+      const { data } = await this._octokit.request('GET /repos/{owner}/{repo}', {
         owner: this._cfg.owner,
         repo:  this._cfg.repo,
+      })
+      // permissions is only present for authenticated requests; absent means read-only or public token
+      if (!data.permissions?.push) return 'denied'
+      // Verify the configured branch exists so a wrong-branch config fails early
+      await this._octokit.request('GET /repos/{owner}/{repo}/branches/{branch}', {
+        owner:  this._cfg.owner,
+        repo:   this._cfg.repo,
+        branch: this._cfg.branch,
       })
       return 'granted'
     } catch {
