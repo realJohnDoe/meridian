@@ -25,22 +25,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 
 ## Findings
 
-### 9. `reconcileWithBackend` re-parses the entire cache on every change
-
-- **Category:** `performance`
-- **Impact:** 3 · **Breadth:** 1 file (hot path) · **Fix effort:** M
-- **Evidence:** `sync.ts:159` — after pulling `changed`, it calls `parseFiles(Array.from(cacheMap.values()))` over **all** cached files, then `setData` replaces the whole store, even when one file changed.
-- **Problem:** Every sync tick that touches a single file re-parses and re-expands the full vault, which scales poorly as vaults grow.
-- **Fix:** Parse only the changed/deleted slugs and merge into existing `items`/`roots` rather than rebuilding from scratch.
-
-### 10. Error-string formatting duplicated across the storage layer
-
-- **Category:** `dry` `error-handling`
-- **Impact:** 2 · **Breadth:** ~8 callsites · **Fix effort:** S
-- **Evidence:** `sync.ts:225,264,278`, `vaultRegistry.ts` (×4), `ManageVaultsDialog.tsx` — `notify('Sync failed: ' + ((e as Error).message || (e as Error).name))`; the `(e as Error).message || .name` idiom is copy-pasted everywhere errors surface.
-- **Problem:** The same unsafe cast + fallback formatting is repeated, so any change to error presentation must be made in eight places.
-- **Fix:** A single `notifyError(prefix, e)` helper that owns the formatting.
-
 ### 11. No route- or feature-level code-splitting
 
 - **Category:** `performance`
