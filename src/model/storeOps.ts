@@ -7,9 +7,8 @@
  * No store / React / fileIO dependencies — shared by the main app and the debug view.
  */
 
-import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots, FileMetadata, EditScope } from '@/types'
+import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
-import type { OccurrenceEntry, RepeatPattern } from './expansion'
 import { titleToSlug } from '@/fileIO'
 import { dayBefore } from './dateUtils'
 import { resolveWikilink, unwrapRef } from '../wikilinks'
