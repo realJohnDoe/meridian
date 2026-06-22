@@ -14,19 +14,266 @@
 
 # Meridian — Code Health Survey
 
-## Health Verdict
+## 1. Health verdict
 
-Meridian is a **healthy, carefully-maintained codebase** — strong typing (one `any` in app code), zero `dangerouslySetInnerHTML`, a well-factored styling layer (`occurrence-variants.ts` with shared `TINT_CLASSES`), and genuinely good module-level documentation. Many findings from prior surveys have already been _fixed_ (the `cache.ts` init race now has a promise guard, `reconcileWithBackend` correctly skips dirty entries so the old data-loss bug is gone, `notify()` now delegates to sonner, the dead spread in `storeOps` is removed). The two weakest subsystems are the **`storage/github*` layer** (an unbounded secondary-rate-limit retry loop that can hang sync forever, and a permission check that only proves read access) and the **`editor/cm` body-decoration layer** (four CodeMirror plugins silently coordinate over disjoint document ranges with task-detection logic duplicated across two of them). The single biggest _structural_ theme is a **testing/observability gap**: all automated tests live in `model/` and `storage/`, while the entire `editor/`, `calendar/`, and `components/` UI — including the fragile decoration code that caused most recent bugs — has **zero tests**.
+Meridian is a **well-engineered codebase** with unusually disciplined lower layers: `model/` and
+`storage/` are pure, dependency-correct (they never import upward into UI), heavily commented with
+intent, and backed by real unit tests. The type system is genuinely strong — there is not a single
+`: any` or `as any` in `src/`. The weakest area is the **`src/` root directory itself**, which has
+become a flat catch-all of ~12 unrelated domain modules (DOM toasts, IndexedDB cache, YAML I/O,
+presentation logic, global Zustand state, wikilink parsing) with no layering, and within it
+**`presentation.ts`**, a 268-line god module spanning five unrelated concerns. The single biggest
+structural theme is **hidden global mutable state and hand-choreographed side effects**: a
+`mutate → warmSlugInFOM → setData → writeEntityToCache` sequence is manually repeated at ~8 call
+sites, and module-level mutable caches (`_fomCache`, `_shas`, `_syncing`) are invalidated by
+convention rather than by the type system. None of this is catastrophic — the app works and is
+tested — but the root layer's lack of boundaries is where future bugs will hide.
 
-## Coverage Statement
+---
 
-- **Examined closely:** `package.json`, `types.ts`, `store.ts`, `storeBridge.ts`, `presentation.ts`, all of `storage/` (sync, githubBackend, githubApi, localBackend, fs, vaultRegistry, cache), `editor/` core (EditorShell, DialogStack, EntryBody, useEntryEditor, cm/taskDecorations, cm/markdownFormatting), `routes/__root` + `_app`, `components/OccurrenceCard`, `components/ui/occurrence-variants`. Repo-wide greps for `any`, `dangerouslySetInnerHTML`, inline styles, import conventions, lazy/Suspense, tests, error-string duplication.
-- **Sampled only:** `model/expansion.ts` (614 lines, exports + key sections), `model/storeOps.ts`, `editor/dialogs/RepeatDialog.tsx` (559), `calendar/*`, `components/ui/*` shadcn primitives (vendored), `vaults/ManageVaultsDialog`, `search/*`, `onboarding/CoachTour`.
-- **Skipped:** `components/ui/sidebar.tsx` (771 lines, generated shadcn), `debug/NodeInheritanceDebugger.tsx` (776 lines, separate dev entry, not imported by the app).
-- **Fraction:** ~55–65% of `src` read directly; the rest grep-sampled.
-- **Unverified:** (a) `model/expansion.ts` internals (614 lines — possible god file / SRP issues not fully audited); (b) `RepeatDialog.tsx` recurrence logic; (c) whether `debug/` is actually excluded from the production Vite build (assumed separate-entry, did not read `vite.config`).
+## 2. Coverage statement
 
-## Findings
+**Read in full (~55%):** `store.ts`, `storeBridge.ts`, `types.ts`, `presentation.ts`, `cache.ts`,
+`items.ts`, `wikilinks.ts`, `events.ts`, `fileIO.ts`, `occurrenceActions.ts`; all of `storage/`
+except backend impls (`sync.ts`, `backend.ts`, `githubBackend.ts`, `githubApi.ts`,
+`vaultRegistry.ts` read fully); `model/storeOps.ts`, `model/dateUtils.ts`, `model/types`;
+`editor/` core (`EntryEditor`, `EntryOverlay`, `EditorShell`, `DialogStack`, `useEntryEditor`,
+`save.ts`, `state.ts`); `calendar/DayView`, `AgendaView`, `OccurrenceRow`;
+`components/OccurrenceCard`; `routes/_app.tsx`, `_app.index.tsx`; `vaults/ManageVaultsDialog`;
+`vite.config.ts`.
+
+**Sampled (headers/greps only):** `model/expansion.ts` (580 LOC — read only the header/public
+surface), `RepeatDialog.tsx` (559), `NodeInheritanceDebugger.tsx` (777), `components/ui/*`
+(shadcn-generated — checked for bypass, not audited).
+
+**Deliberately skipped:** `components/ui/*` internals (vendored/generated), all `__tests__/`,
+`model/inheritance|collapse|repeat|storeItems`, `editor/cm/*` (CodeMirror decoration plumbing),
+`onboarding/CoachTour`, `search/`, `MonthView`, `SettingsDialog`, `Sidebar`. Reasons: generated,
+or lower-risk leaf code, or budget.
+
+**Unverified (suspected issues, not investigated):** `model/expansion.ts` is the algorithmic core
+(580 LOC) and the most likely home of an undiscovered god-function/complexity problem — flag as
+unverified.
+
+This report is based on roughly **55–60%** of the application source (excluding tests and generated UI).
+
+---
+
+## 3. Findings
+
+### 1. `src/` root is a god directory with no layering
+
+- **Category:** `architecture` `layout`
+- **Impact:** 6
+- **Breadth:** ~12 files
+- **Fix effort:** L
+- **Evidence:** Flat at `src/`: `cache.ts` (Dexie/IndexedDB), `storeBridge.ts` (DOM toasts + store writers), `fileIO.ts` (YAML), `presentation.ts` (view logic), `wikilinks.ts`, `items.ts`, `occurrenceActions.ts`, `events.ts`, `undoToast.ts`, `store.ts`, `types.ts`. Meanwhile `model/`, `storage/`, `editor/` are cleanly foldered.
+- **Problem:** Unrelated domains (persistence, notifications, parsing, presentation, global state) sit as sibling files with no boundary, so there is no obvious owner for cross-cutting logic and imports reach anywhere.
+- **Fix:** Relocate root modules into existing layers — `cache.ts`→`storage/`, `wikilinks.ts`/`items.ts`/`fileIO.ts`→`model/`, `presentation.ts`/`undoToast.ts`→a `ui/` or `lib/` layer — leaving only `main.tsx`/`store.ts` at root.
+
+---
+
+### 2. Hand-choreographed `mutate → warm → setData → persist` duplicated across call sites
+
+- **Category:** `dry` `error-handling`
+- **Impact:** 5
+- **Breadth:** 8 call sites (`save.ts` ×5, `occurrenceActions.ts` ×2, plus `addItemLink`/`removeItemLink`)
+- **Fix effort:** M
+- **Evidence:** `save.ts:128`, `156`, `165`, `174`, `184` and `occurrenceActions.ts:13` all repeat `const next = op(...); warmSlugInFOM(slug, next.items, next.roots); setData(next); writeEntityToCache(slug)`.
+- **Problem:** The cache-warm + store-set + persist invariant is enforced by copy-paste; any new mutation that forgets `warmSlugInFOM` silently desyncs the file-occurrence map, and `deleteAll` already has to special-case `affected.forEach(writeEntityToCache)`.
+- **Fix:** Introduce one `commit(next: StoreData, affectedSlugs: string[])` helper that warms, sets, and persists, and route every mutation through it.
+
+---
+
+### 3. `presentation.ts` is a god module of 5 unrelated concerns
+
+- **Category:** `srp` `architecture`
+- **Impact:** 5
+- **Breadth:** 1 file, imported by ~8
+- **Fix effort:** M
+- **Evidence:** `src/presentation.ts` exports date formatters (`fmtLong`/`fmtTopBarDay`), the `FileEntry` domain type + `fileEntries`, the stateful `fileOccurrenceMap` memo (`_fomCache`, `warmSlugInFOM`), occurrence sorting (`sortOccs`), `occState` CSS mapping, and `backlinksTo`.
+- **Problem:** A single 268-line module owns formatting, a domain projection, a mutable cache, sorting, and styling — unrelated reasons to change all collide here, and it transitively couples `store.setData` to a cache reset (`store.ts:53`).
+- **Fix:** Split into `format.ts`, `fileOccurrence.ts` (the cache), `occSort.ts`, and `occState.ts`.
+
+---
+
+### 4. Hidden module-level mutable caches invalidated by convention
+
+- **Category:** `architecture` `performance`
+- **Impact:** 5
+- **Breadth:** 3 caches (`presentation._fomCache`, `expansion` occId cache, `githubBackend._shas`)
+- **Fix effort:** M
+- **Evidence:** `store.ts:53` `setData` must manually call `clearOccIdCache()` + `resetFOMCache()`; `presentation.ts:174` `warmSlugInFOM` mutates `_fomCache.items`/`.roots` in place to keep a reference-identity memo valid.
+- **Problem:** Correctness depends on every store mutation remembering to warm/reset out-of-band singletons; a missed call yields stale occurrences with no type-level signal.
+- **Fix:** Make the FOM a derived selector keyed on `(items, roots)` identity (or a Zustand computed slice) so invalidation is automatic, removing `warmSlugInFOM` entirely.
+
+---
+
+### 5. GitHub personal access token stored in plaintext IndexedDB
+
+- **Category:** `security`
+- **Impact:** 5
+- **Breadth:** `cache.ts` (`tokenSave`/`tokenLoad`) + `vaultRegistry.ts` (4 sites)
+- **Fix effort:** M
+- **Evidence:** `cache.ts:153` `tokenSave` writes the raw token to the Dexie `meta` table; `vaultRegistry.ts:111,148` read it back into `GitHubBackend`.
+- **Problem:** The fine-grained PAT (repo write scope) sits unencrypted in IndexedDB, so any XSS or malicious dependency in this client-only PWA can exfiltrate a credential that can rewrite the user's repo. The UI hygiene is good (`type="password"`, `autoComplete="off"`) but storage is not.
+- **Fix:** Wrap the token with a non-extractable WebCrypto key before persisting (the app already targets environments with full WebCrypto support per `vite.config.ts`), or at minimum document the trust boundary explicitly and scope guidance toward read-only tokens where possible.
+
+---
+
+### 6. No feature public-API surface — deep cross-feature internal imports
+
+- **Category:** `architecture` `layout`
+- **Impact:** 4
+- **Breadth:** Many (no `index.ts` barrels anywhere)
+- **Fix effort:** L
+- **Evidence:** `debug/NodeInheritanceDebugger.tsx:23-28` imports `@/editor/save`, `@/editor/useEntryEditor`, `@/editor/dialogs/RepeatDialog`, `@/editor/DialogStack` directly; storage internals are imported the same way across the app.
+- **Problem:** Every consumer reaches into a feature's private files, so there is no boundary to refactor behind — moving `editor/save.ts` breaks unrelated debug + UI code.
+- **Fix:** Add per-feature `index.ts` barrels exposing the intended surface, and lint against deep imports (`eslint-plugin-import` is already installed).
+
+---
+
+### 7. `applyEdit` is a 170-line, 5-branch god function
+
+- **Category:** `srp`
+- **Impact:** 4
+- **Breadth:** 1 function, central to all edits
+- **Fix effort:** M
+- **Evidence:** `model/storeOps.ts:169-338` — one function handles `new`, `all`, `single`, `future`, `add`, each with its own series/standalone/override sub-logic and repeated `as RepeatPattern<OccurrenceMetadata>` casts.
+- **Problem:** All five edit semantics share one body, making each branch hard to read in isolation and risky to change; the heavy casts also weaken the otherwise-strong typing.
+- **Fix:** Extract one function per scope (`applyNew`, `applyAll`, `applySingle`, `applyFuture`, `applyAdd`) dispatched by a small switch.
+
+---
+
+### 8. `expandWithMultiday` re-expansion hand-cached via deep structural diff
+
+- **Category:** `performance` `architecture`
+- **Impact:** 4
+- **Breadth:** `AgendaView` (+ `DayView` reuses `expandWithMultiday`)
+- **Fix effort:** M
+- **Evidence:** `calendar/AgendaView.tsx:30-150` — `hasSameStructure` manually diffs every store item (including `JSON.stringify(repeat)`) on each render to decide whether to reuse a `useRef` expansion cache, then overlays changed metadata by hand.
+- **Problem:** A perf-critical memoization is implemented as ~90 lines of bespoke diffing inside a view component; the structural-field list must be kept in sync with the expansion algorithm by hand (a comment lists the invariant).
+- **Fix:** Move expansion caching beside the algorithm in `model/` keyed on item identity, and have the view consume a memoized selector.
+
+---
+
+### 9. Two independent wikilink parsers / unwrap regexes
+
+- **Category:** `dry`
+- **Impact:** 3
+- **Breadth:** 2 files
+- **Fix effort:** S
+- **Evidence:** `wikilinks.ts:12` `WIKILINK_RE` + `unwrapRef` (`wikilinks.ts:51`, its own `/^\[\[(.+)\]\]$/`); `items.ts:11` `WIKILINK_ITEM_RE` parses the same `[[...|...]]` syntax separately.
+- **Problem:** The wikilink grammar is encoded in three regexes across two modules; a syntax change (e.g. escaping) must be made in all of them.
+- **Fix:** Centralize wikilink parsing/unwrapping in `wikilinks.ts` and have `items.ts` call it.
+
+---
+
+### 10. Naming collision: two unrelated `FileEntry` types
+
+- **Category:** `naming`
+- **Impact:** 3
+- **Breadth:** ~15 import sites
+- **Fix effort:** S
+- **Evidence:** `storage/backend.ts:3` `FileEntry = { path, content, version }` vs `presentation.ts:32` `FileEntry = { fileSlug, title, tags, items }`; both are imported widely.
+- **Problem:** The same name denotes a raw storage blob in one layer and a UI picker row in another, so a reader/IDE cannot tell which `FileEntry` a file means without checking the import path.
+- **Fix:** Rename the storage one to `RawFile`/`BackendFile` and the presentation one to `FilePickerEntry`.
+
+---
+
+### 11. `OccurrenceCard` reads the store non-reactively during render
+
+- **Category:** `performance` `architecture`
+- **Impact:** 3
+- **Breadth:** 1 component (rendered per row)
+- **Fix effort:** S
+- **Evidence:** `components/OccurrenceCard.tsx:76` `const roots = getRoots()` (a `storeBridge` getter) inside the component body, then `useMemo([occ.fileSlug, roots])`.
+- **Problem:** The card bypasses the Zustand subscription and relies on the parent always re-rendering it when `roots` changes; the `useMemo` key is a fresh getter result, so the memo's reactivity is incidental, not guaranteed.
+- **Fix:** Pass `roots` in as a prop (the parent already subscribes) or use `useStore(s => s.roots)`.
+
+---
+
+### 12. `OccurrenceCard` prop explosion (7 display flags)
+
+- **Category:** `srp` `architecture`
+- **Impact:** 3
+- **Breadth:** 1 component, 3 call sites
+- **Fix effort:** M
+- **Evidence:** `OccurrenceCardProps` carries `taskCheckbox`, `eventNoteIcon`, `showTime: 'inline'|'badge'|'none'`, `showDate`, `showTagsParticipants` — and the body has nested ternaries (`OccurrenceCard.tsx:118-132`) to reconcile them.
+- **Problem:** One component encodes several distinct card layouts via boolean combinations, making valid/invalid combinations implicit and the render logic hard to follow.
+- **Fix:** Split into a couple of presentational variants or a single `variant` enum prop.
+
+---
+
+### 13. `NodeInheritanceDebugger` (777 LOC) duplicates editor wiring; `debug/` depends on `editor/` internals
+
+- **Category:** `dead-code` `architecture`
+- **Impact:** 3
+- **Breadth:** 1 file (dev-only)
+- **Fix effort:** M
+- **Evidence:** `debug/NodeInheritanceDebugger.tsx` is the largest file in the repo, served only via the dev-only `debugPagePlugin` (`vite.config.ts:19`), and re-implements editor/dialog glue by importing `@/editor/save`, `useEntryEditor`, `DialogStack`.
+- **Problem:** A 777-line dev tool reaches into editor internals and reimplements their choreography, so it must be maintained in lockstep with the real editor despite never shipping.
+- **Fix:** Either delete it or have it mount the real `EditorShell`/`useEntryEditor` instead of duplicating their wiring.
+
+---
+
+### 14. Autosave effect fires on every `entry` change via suppressed exhaustive-deps lint
+
+- **Category:** `error-handling` `performance`
+- **Impact:** 3
+- **Breadth:** 1 file
+- **Fix effort:** S
+- **Evidence:** `editor/EntryEditor.tsx:103-108` `useEffect(... , [entry])` with `// eslint-disable-next-line react-hooks/exhaustive-deps`, calling `onAutoSave` whenever any entry field changes.
+- **Problem:** Autosave triggers on unrelated state changes (type toggles, dialog-driven field edits), not just body edits, risking redundant saves/network writes; the disabled lint rule hides the over-broad dependency.
+- **Fix:** Trigger autosave from the specific change handlers (body/title) rather than a catch-all effect on the whole `entry`.
+
+---
+
+### 15. Imperative DOM-style manipulation for swipe-to-delete
+
+- **Category:** `styling` `srp`
+- **Impact:** 2
+- **Breadth:** 1 file (~80 lines)
+- **Fix effort:** M
+- **Evidence:** `calendar/OccurrenceRow.tsx:42-112` sets `row.style.transform`, `hintL.style.filter/opacity`, queries `querySelector('svg')`, and drives animation timers manually.
+- **Problem:** Animation state lives entirely outside React in mutated inline styles, which is hard to test and reason about. The `preventDefault` need is legitimate; the style choreography is the smell.
+- **Fix:** Keep the raw `touchmove` listener but drive transforms via CSS custom properties or class toggles rather than direct multi-element style writes.
+
+---
+
+### 16. Occurrence view-model derivation split across `types.ts` and `presentation.ts`
+
+- **Category:** `architecture` `naming`
+- **Impact:** 3
+- **Breadth:** 2 files, many consumers
+- **Fix effort:** S
+- **Evidence:** `types.ts:204-211` owns `occKind`/`occIsRecur`/`isStandaloneOcc`; `presentation.ts:235` owns `occState` and `sortOccs` — both derive display semantics from an `Occurrence`.
+- **Problem:** The rules that classify an occurrence for display are spread between the type module and the presentation module, so "how is a task-vs-event decided" has no single home.
+- **Fix:** Consolidate all occurrence-display derivations into one `occView.ts`.
+
+---
+
+### 17. Empty `<Suspense>` fallback for the lazy editor overlay
+
+- **Category:** `ux`
+- **Impact:** 2
+- **Breadth:** 1 route
+- **Fix effort:** S
+- **Evidence:** `routes/_app.tsx:141` `<Suspense>` with no `fallback` wrapping the `lazy(EntryOverlay)`.
+- **Problem:** On a cold chunk load the editor overlay renders nothing until the chunk arrives — no spinner/skeleton on a primary user flow (opening an entry).
+- **Fix:** Provide a lightweight skeleton fallback (the agenda already has `AgendaSkeleton`/`Skeleton`).
+
+---
+
+### 18. `storeBridge.ts` mixes store accessors with DOM toast notifications
+
+- **Category:** `srp` `architecture`
+- **Impact:** 3
+- **Breadth:** 1 file, imported by storage + actions
+- **Fix effort:** S
+- **Evidence:** `src/storeBridge.ts` exports `getItems`/`setSyncError`/`setActiveVaultId` **and** `notify`/`warn`/`notifyError` (sonner toasts) from the same module.
+- **Problem:** The storage layer's "bridge to global state" also owns user-facing notifications, coupling pure state plumbing to a UI toast library and giving the module two reasons to change.
+- **Fix:** Move `notify`/`warn`/`notifyError` into a `notifications.ts` (UI layer) and keep `storeBridge` to state access only.
 
 # Codebase Health Survey
 
