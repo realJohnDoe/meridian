@@ -12,11 +12,10 @@ interface GitHubConfig {
   token:  string
 }
 
-type ContentItem = {
+type TreeItem = {
   type: string
-  name: string
-  sha:  string
   path: string
+  sha:  string
 }
 
 type ContentFile = {
@@ -49,18 +48,18 @@ export class GitHubBackend implements StorageBackend {
 
   async statAll(): Promise<Map<string, string>> {
     try {
-      const { data } = await this._octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
-        owner: this._cfg.owner,
-        repo:  this._cfg.repo,
-        path:  '',
-        ref:   this._cfg.branch,
+      const { data } = await this._octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
+        owner:     this._cfg.owner,
+        repo:      this._cfg.repo,
+        tree_sha:  this._cfg.branch,
+        recursive: '1',
       })
-      const items = (Array.isArray(data) ? data : [data]) as ContentItem[]
+      const items = (data as { tree: TreeItem[] }).tree
       const tokens = new Map<string, string>()
       for (const item of items) {
-        if (item.type !== 'file' || !isVaultFile(item.name)) continue
-        tokens.set(item.name, item.sha)
-        this._shas.set(item.name, item.sha)
+        if (item.type !== 'blob' || !isVaultFile(item.path)) continue
+        tokens.set(item.path, item.sha)
+        this._shas.set(item.path, item.sha)
       }
       return tokens
     } catch (e) {

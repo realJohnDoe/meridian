@@ -5,8 +5,13 @@ declare global {
   interface Window {
     showDirectoryPicker(options?: { mode?: 'read' | 'readwrite' }): Promise<FileSystemDirectoryHandle>
   }
+  interface FileSystemHandle {
+    readonly kind: 'file' | 'directory'
+    readonly name: string
+  }
   interface FileSystemDirectoryHandle {
-    entries(): AsyncIterableIterator<[string, FileSystemFileHandle]>
+    entries(): AsyncIterableIterator<[string, FileSystemHandle]>
+    getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<FileSystemDirectoryHandle>
     queryPermission(options?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>
     requestPermission(options?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>
   }
@@ -18,6 +23,46 @@ import { ConflictError } from './conflictError'
 
 function isVaultFile(name: string): boolean {
   return name.endsWith('.md') || name.endsWith('.yaml') || name.endsWith('.yml')
+}
+
+async function collectVaultFiles(
+  dh: FileSystemDirectoryHandle,
+  prefix: string,
+  out: Array<[string, FileSystemFileHandle]>,
+): Promise<void> {
+  for await (const [name, handle] of dh.entries()) {
+    const path = prefix ? `${prefix}/${name}` : name
+    if (handle.kind === 'directory') {
+      await collectVaultFiles(handle as FileSystemDirectoryHandle, path, out)
+    } else if (isVaultFile(name)) {
+      out.push([path, handle as FileSystemFileHandle])
+    }
+  }
+}
+
+async function resolveFileHandle(
+  dh: FileSystemDirectoryHandle,
+  path: string,
+  create = false,
+): Promise<FileSystemFileHandle> {
+  const parts = path.split('/')
+  let dir = dh
+  for (const part of parts.slice(0, -1)) {
+    dir = await dir.getDirectoryHandle(part, { create })
+  }
+  return dir.getFileHandle(parts[parts.length - 1], { create })
+}
+
+async function resolveParentDir(
+  dh: FileSystemDirectoryHandle,
+  path: string,
+): Promise<[FileSystemDirectoryHandle, string]> {
+  const parts = path.split('/')
+  let dir = dh
+  for (const part of parts.slice(0, -1)) {
+    dir = await dir.getDirectoryHandle(part)
+  }
+  return [dir, parts[parts.length - 1]]
 }
 
 // ── Public API ─────────────────────────────────────────────────
@@ -39,14 +84,17 @@ export async function diskPickDirectory(): Promise<FileSystemDirectoryHandle> {
 export async function diskStatAll(
   dh: FileSystemDirectoryHandle,
 ): Promise<Map<string, string>> {
+  const handles: Array<[string, FileSystemFileHandle]> = []
+  await collectVaultFiles(dh, '', handles)
   const tokens = new Map<string, string>()
-  for await (const [name, fh] of dh.entries()) {
-    if (!isVaultFile(name)) continue
-    try {
-      const file = await fh.getFile()
-      tokens.set(name, `${file.lastModified}:${file.size}`)
-    } catch (e) { console.warn('[storage] could not stat', name, e) }
-  }
+  await Promise.all(
+    handles.map(async ([path, fh]) => {
+      try {
+        const file = await fh.getFile()
+        tokens.set(path, `${file.lastModified}:${file.size}`)
+      } catch (e) { console.warn('[storage] could not stat', path, e) }
+    })
+  )
   return tokens
 }
 
@@ -55,14 +103,14 @@ export async function diskReadFiles(
   paths: string[],
 ): Promise<Array<{ path: string; content: string; version: string }>> {
   const results = await Promise.all(
-    paths.map(async name => {
+    paths.map(async path => {
       try {
-        const fh = await dh.getFileHandle(name)
+        const fh   = await resolveFileHandle(dh, path)
         const file = await fh.getFile()
         const content = await file.text()
-        return { path: name, content, version: `${file.lastModified}:${file.size}` }
+        return { path, content, version: `${file.lastModified}:${file.size}` }
       } catch (e) {
-        console.warn('[storage] could not read', name, e)
+        console.warn('[storage] could not read', path, e)
         return null
       }
     })
@@ -74,18 +122,15 @@ export async function diskReadAll(
   dh: FileSystemDirectoryHandle,
 ): Promise<Array<{ path: string; content: string; version: string }>> {
   const handles: Array<[string, FileSystemFileHandle]> = []
-  for await (const [name, fh] of dh.entries()) {
-    if (!isVaultFile(name)) continue
-    handles.push([name, fh])
-  }
+  await collectVaultFiles(dh, '', handles)
   const results = await Promise.all(
-    handles.map(async ([name, fh]) => {
+    handles.map(async ([path, fh]) => {
       try {
         const file = await fh.getFile()
         const content = await file.text()
-        return { path: name, content, version: `${file.lastModified}:${file.size}` }
+        return { path, content, version: `${file.lastModified}:${file.size}` }
       } catch (e) {
-        console.warn('[storage] could not read', name, e)
+        console.warn('[storage] could not read', path, e)
         return null
       }
     })
@@ -110,7 +155,7 @@ export async function diskWrite(
   // this stat is authoritative (no eventual-consistency lag).
   if (expectedVersion !== undefined) {
     try {
-      const fhExisting = await dh.getFileHandle(path)
+      const fhExisting = await resolveFileHandle(dh, path)
       const existing   = await fhExisting.getFile()
       const cur = `${existing.lastModified}:${existing.size}`
       if (cur !== expectedVersion) {
@@ -125,7 +170,7 @@ export async function diskWrite(
     }
   }
 
-  const fh = await dh.getFileHandle(path, { create: true })
+  const fh = await resolveFileHandle(dh, path, true)
   const w  = await fh.createWritable()
   await w.write(content)
   await w.close()
@@ -142,5 +187,8 @@ export async function diskDelete(
   dh: FileSystemDirectoryHandle,
   path: string,
 ): Promise<void> {
-  try { await dh.removeEntry(path) } catch { }
+  try {
+    const [dir, name] = await resolveParentDir(dh, path)
+    await dir.removeEntry(name)
+  } catch { }
 }
