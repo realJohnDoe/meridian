@@ -12,7 +12,7 @@ import { parseToStoreItems } from '@/model/storeItems'
 import { fileSlugItems } from '@/model/storeOps'
 import { saveFile } from '@/fileIO'
 import type { StoreItem, Roots } from '@/types'
-import { getItems, getRoots, setData, notify, warn, setSyncDirtyCount, setSyncError } from '@/storeBridge'
+import { getItems, getRoots, setData, notify, warn, notifyError, setSyncDirtyCount, setSyncError } from '@/storeBridge'
 import { getActiveBackend } from './activeBackend'
 
 // ── HELPERS ────────────────────────────────────────────────────
@@ -223,7 +223,7 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
     console.error('[vault] sync failed:', e)
     const msg = (e as Error).message || (e as Error).name || 'Unknown error'
     setSyncError(msg)
-    notify('Sync failed: ' + msg)
+    notifyError('Sync failed', e)
   } finally {
     _syncing = false
   }
@@ -262,7 +262,7 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     scheduleAutoPush()
   } catch (e) {
     console.error('[vault] writeEntityToCache failed:', e)
-    notify('Save failed: ' + ((e as Error).message || (e as Error).name))
+    notifyError('Save failed', e)
   }
 }
 
@@ -276,6 +276,6 @@ export async function deleteFromBackend(fileSlug: string): Promise<void> {
     scheduleAutoPush()
   } catch (e) {
     console.error('[vault] deleteFromBackend failed:', e)
-    notify('Delete failed: ' + ((e as Error).message || (e as Error).name))
+    notifyError('Delete failed', e)
   }
 }

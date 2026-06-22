@@ -10,7 +10,7 @@ import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
 import { GitHubBackend }  from './githubBackend'
 import type { StorageBackend, VaultRef, GitHubVaultRef } from './backend'
-import { setData, getVaults, notify, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading } from '@/storeBridge'
+import { setData, getVaults, notify, notifyError, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading } from '@/storeBridge'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
 import { reconcileWithBackend, parseFiles, updateSyncUI } from './sync'
 import { emit } from '@/events'
@@ -154,7 +154,7 @@ export async function setActiveVault(id: string): Promise<void> {
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
     console.error('[vault] setActiveVault failed:', e)
-    notify((e as Error).message || 'Could not switch vault')
+    notifyError('Could not switch vault', e)
   }
 }
 
@@ -183,7 +183,7 @@ export async function addLocalVault(): Promise<void> {
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
     console.error('[vault] addLocalVault failed:', e)
-    notify((e as Error).message || 'Could not connect vault')
+    notifyError('Could not connect vault', e)
   }
 }
 
@@ -214,7 +214,7 @@ export async function addGitHubVault(cfg: GitHubVaultConfig): Promise<void> {
     await activateWritableVault(backend)
   } catch (e) {
     console.error('[vault] addGitHubVault failed:', e)
-    notify((e as Error).message || 'Could not connect GitHub vault')
+    notifyError('Could not connect GitHub vault', e)
   }
 }
 
@@ -235,6 +235,6 @@ export async function removeVault(id: string): Promise<void> {
     }
   } catch (e) {
     console.error('[vault] removeVault failed:', e)
-    notify((e as Error).message || 'Could not remove vault')
+    notifyError('Could not remove vault', e)
   }
 }
