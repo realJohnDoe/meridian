@@ -1,7 +1,8 @@
-import { useCallback, useMemo } from 'react'
+import { lazy, Suspense, useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import MonthView from '@/calendar/MonthView'
 import { fmtISO, fmtMonth, parseMonth } from '@/model/dateUtils'
+
+const MonthView = lazy(() => import('@/calendar/MonthView'))
 
 export const Route = createFileRoute('/_app/calendar/$month')({
   component: CalendarPage,
@@ -23,10 +24,12 @@ function CalendarPage() {
   )
 
   return (
-    <MonthView
-      month={month}
-      onNavigateMonth={onNavigateMonth}
-      onDayClick={onDayClick}
-    />
+    <Suspense>
+      <MonthView
+        month={month}
+        onNavigateMonth={onNavigateMonth}
+        onDayClick={onDayClick}
+      />
+    </Suspense>
   )
 }

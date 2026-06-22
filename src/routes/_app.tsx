@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { lazy, Suspense, useCallback } from 'react'
 import { createFileRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   Menu, CalendarCheck2,
@@ -8,7 +8,7 @@ import { useStore } from '@/store'
 import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/presentation'
 import { fmtISO, fmtMonth, parseMonth } from '@/model/dateUtils'
 import { useToday } from '@/hooks/useToday'
-import EntryOverlay, { isEditScope } from '@/editor/EntryOverlay'
+import { isEditScope } from '@/types'
 import CoachTour from '@/onboarding/CoachTour'
 import AppSidebar from '@/components/Sidebar'
 import SyncButton from '@/components/SyncButton'
@@ -16,6 +16,8 @@ import SearchBar from '@/components/SearchBar'
 import { Button } from '@/components/ui/button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import type { EditScope } from '@/types'
+
+const EntryOverlay = lazy(() => import('@/editor/EntryOverlay'))
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
@@ -136,7 +138,9 @@ function AppMain() {
       </div>
 
       {editor && (
-        <EntryOverlay editor={editor} edate={edate} escope={escope} etitle={etitle} />
+        <Suspense>
+          <EntryOverlay editor={editor} edate={edate} escope={escope} etitle={etitle} />
+        </Suspense>
       )}
 
       <CoachTour

@@ -109,6 +109,10 @@ export function isSeries(item: StoreItem): item is StoreSeries {
 export type Occurrence      = OccurrenceEntry<AppMetadata>
 export type CollectedSeries = RepeatPattern<AppMetadata>
 export type EditScope = 'single' | 'future' | 'all' | 'add'
+const EDIT_SCOPES: EditScope[] = ['single', 'future', 'all', 'add']
+export function isEditScope(s: unknown): s is EditScope {
+  return typeof s === 'string' && (EDIT_SCOPES as string[]).includes(s)
+}
 
 // ── Inline-field registry ─────────────────────────────────────────────────────
 // Single source of truth for all persisted (frontmatter) metadata fields.
