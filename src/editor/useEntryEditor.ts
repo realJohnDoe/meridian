@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './save'
@@ -49,6 +49,25 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const [activeDialog, setActiveDialog] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void } | null>(null)
   const [seriesSheetConfig, setSeriesSheetConfig] = useState<SeriesSheetConfig | null>(null)
+
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'pending' | 'saved'>('idle')
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const scheduleAutoSave = useCallback((body: string) => {
+    if (!entry.item) return
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+    setSaveStatus('pending')
+    autosaveTimerRef.current = setTimeout(() => {
+      const result = saveNode(entry.item!, entry.editScope, { ...entry, body })
+      autosaveTimerRef.current = null
+      if (result === 'saved') {
+        setSaveStatus('saved')
+        setTimeout(() => setSaveStatus('idle'), 2000)
+      } else {
+        setSaveStatus('idle')
+      }
+    }, 1500)
+  }, [entry])
 
   const storeRoots = useStore(s => s.roots)
   const navigate = useNavigate()
@@ -166,5 +185,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     handleOpenDlg,
     handleOpenRepeatDlg,
     dialogHandlers,
+    saveStatus,
+    scheduleAutoSave,
   }
 }

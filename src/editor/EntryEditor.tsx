@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
-import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart } from 'lucide-react'
+import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart, Check } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import { useToday } from '@/hooks/useToday'
 import { fmtISO } from '@/model/dateUtils'
@@ -40,6 +40,16 @@ function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   )
 }
 
+function AutoSaveIndicator({ status }: { status: 'idle' | 'pending' | 'saved' }) {
+  if (status === 'idle') return null
+  return (
+    <span className="flex items-center gap-1 text-xs text-muted-foreground select-none shrink-0">
+      {status === 'saved' && <Check size={12} />}
+      {status === 'pending' ? 'Saving…' : 'Saved'}
+    </span>
+  )
+}
+
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
 const PRIORITY_CLASS: Record<string, string> = {
   high:   'aria-[pressed=true]:bg-p1/15 aria-[pressed=true]:border-p1 aria-[pressed=true]:text-p1',
@@ -61,6 +71,8 @@ interface Props {
   entry: EntryState
   onChange: (updater: (prev: EntryState) => EntryState) => void
   onSave: (body: string) => void
+  onAutoSave?: (body: string) => void
+  saveStatus?: 'idle' | 'pending' | 'saved'
   onDelete: () => void
   onClose: () => void
   onOpenDlg: (id: string) => void
@@ -74,14 +86,24 @@ interface Props {
   onToggleFavorite?: () => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink, isFavorited, onToggleFavorite }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onAutoSave, saveStatus, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink, isFavorited, onToggleFavorite }: Props) {
   const today    = useToday()
   const navigate = useNavigate()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const viewRef  = useRef<EditorView | null>(null)
+  const isFirstRender = useRef(true)
+
+
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
+
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    if (!entry.item || !onAutoSave) return
+    onAutoSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry])
 
   function handleTypeChange(t: ItemType) {
     onChange(prev => ({
@@ -174,10 +196,14 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         {item && (
           <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete"><Trash2 size={18} /></Button>
         )}
-        <Button variant="default" size="sm" onClick={() => {
-          onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
-          flushOnSave(titleToSlug(title))
-        }}>Save</Button>
+        {item ? (
+          <AutoSaveIndicator status={saveStatus ?? 'idle'} />
+        ) : (
+          <Button variant="default" size="sm" onClick={() => {
+            onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+            flushOnSave(titleToSlug(title))
+          }}>Save</Button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-[720px] lg:mx-auto">
@@ -285,7 +311,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} onChange={item ? onAutoSave : undefined} />
 
         <ItemsList
           items={listItems}

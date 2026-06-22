@@ -27,6 +27,7 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
     handleSave, handleDelete, handleClose, handleScopeChange,
     handleOpenDlg, handleOpenRepeatDlg,
     dialogHandlers,
+    saveStatus, scheduleAutoSave,
   } = hooks
 
   const favorites       = useStore(s => s.favorites)
@@ -40,6 +41,8 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
         entry={entry}
         onChange={setEntry}
         onSave={handleSave}
+        onAutoSave={scheduleAutoSave}
+        saveStatus={saveStatus}
         onDelete={handleDelete}
         onClose={handleClose}
         onOpenDlg={handleOpenDlg}

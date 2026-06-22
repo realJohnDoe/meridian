@@ -18,6 +18,7 @@ interface Props {
   items:            StoreItem[]
   viewRef:          React.MutableRefObject<EditorView | null>
   onOpenWikilink?:  (ref: string) => void
+  onChange?:        (body: string) => void
 }
 
 const editorTheme = EditorView.theme({
@@ -72,14 +73,16 @@ const editorTheme = EditorView.theme({
   },
 })
 
-export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink }: Props) {
+export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink, onChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [wlPopup, setWlPopup] = useState<WlPopupState | null>(null)
   const closePopup = useCallback(() => setWlPopup(null), [])
 
-  // Stable ref so the CM6 plugin always reads the latest callback without remounting
-  const onOpenRef = useRef<(ref: string) => void>(onOpenWikilink ?? (() => {}))
-  useEffect(() => { onOpenRef.current = onOpenWikilink ?? (() => {}) }, [onOpenWikilink])
+  // Stable refs so CM6 plugins always read the latest callbacks without remounting
+  const onOpenRef   = useRef<(ref: string) => void>(onOpenWikilink ?? (() => {}))
+  const onChangeRef = useRef<(body: string) => void>(onChange ?? (() => {}))
+  useEffect(() => { onOpenRef.current   = onOpenWikilink ?? (() => {}) }, [onOpenWikilink])
+  useEffect(() => { onChangeRef.current = onChange ?? (() => {}) }, [onChange])
 
   // Mount CM6 EditorView once per component lifetime (key= on parent handles remounts)
   useEffect(() => {
@@ -106,8 +109,9 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink 
         EditorView.contentAttributes.of({ spellcheck: 'false' }),
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
-        // Drive the [[…]] autocomplete popup
+        // Drive the [[…]] autocomplete popup and report body changes
         EditorView.updateListener.of(update => {
+          if (update.docChanged) onChangeRef.current(update.state.doc.toString().trimEnd())
           if (!update.docChanged && !update.selectionSet) return
           const sel = update.state.selection.main
           if (!sel.empty) { setWlPopup(null); return }
