@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart } from 'lucide-react'
@@ -19,7 +19,7 @@ import EntryBody from './EntryBody'
 import { cn } from '@/lib/utils'
 import type { EntryState, ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
-import { saveNode } from './save'
+import { saveNode, addItemLink } from './save'
 import { titleToSlug } from '../fileIO'
 
 function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
@@ -77,6 +77,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const navigate = useNavigate()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const viewRef  = useRef<EditorView | null>(null)
+  const [pendingLinks, setPendingLinks] = useState<string[]>([])
 
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
@@ -169,6 +170,10 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         )}
         <Button variant="default" size="sm" onClick={() => {
           onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+          if (!item && pendingLinks.length > 0) {
+            const finalSlug = titleToSlug(title)
+            pendingLinks.forEach(target => addItemLink(target, finalSlug))
+          }
         }}>Save</Button>
       </div>
 
@@ -195,9 +200,12 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
         {/* ── FILE-LEVEL: listed-on reverse chips ── */}
         <ListedOnRow
-          fileSlug={item?.fileSlug}
+          fileSlug={item?.fileSlug ?? (title.trim() ? titleToSlug(title) : undefined)}
           roots={roots}
           onOpenWikilink={onOpenWikilink}
+          pendingLinks={item ? undefined : pendingLinks}
+          onAddLink={item ? undefined : (t) => setPendingLinks(prev => [...prev, t])}
+          onRemoveLink={item ? undefined : (t) => setPendingLinks(prev => prev.filter(l => l !== t))}
         />
 
         {/* ── OCCURRENCE-LEVEL: scope (header) → type → metadata → participants ── */}

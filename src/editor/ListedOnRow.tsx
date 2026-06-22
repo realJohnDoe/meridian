@@ -12,9 +12,12 @@ interface Props {
   fileSlug:        string | undefined
   roots:           Roots
   onOpenWikilink?: (ref: string) => void
+  pendingLinks?:   string[]
+  onAddLink?:      (targetSlug: string) => void
+  onRemoveLink?:   (targetSlug: string) => void
 }
 
-export default function ListedOnRow({ fileSlug, roots, onOpenWikilink }: Props) {
+export default function ListedOnRow({ fileSlug, roots, onOpenWikilink, pendingLinks, onAddLink, onRemoveLink }: Props) {
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
 
@@ -25,22 +28,26 @@ export default function ListedOnRow({ fileSlug, roots, onOpenWikilink }: Props) 
 
   const allFiles = useMemo(() => fileEntries(roots), [roots])
   const filtered = useMemo(() => {
-    const alreadyLinked = new Set(slugs)
+    const alreadyLinked = new Set([...slugs, ...(pendingLinks ?? [])])
     return allFiles.filter(e =>
       e.fileSlug !== fileSlug &&
       !alreadyLinked.has(e.fileSlug) &&
       (!pickerQuery || e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
     )
-  }, [allFiles, fileSlug, slugs, pickerQuery])
+  }, [allFiles, fileSlug, slugs, pendingLinks, pickerQuery])
 
   function handleSelect(targetSlug: string) {
     if (!fileSlug) return
-    addItemLink(targetSlug, fileSlug)
+    if (onAddLink) {
+      onAddLink(targetSlug)
+    } else {
+      addItemLink(targetSlug, fileSlug)
+    }
     setPickerQuery('')
     setPickerOpen(false)
   }
 
-  if (!slugs.length && !fileSlug) return null
+  if (!slugs.length && !(pendingLinks?.length) && !fileSlug) return null
 
   return (
     <div className="flex flex-wrap gap-1.5 mb-4 items-center">
@@ -55,6 +62,18 @@ export default function ListedOnRow({ fileSlug, roots, onOpenWikilink }: Props) 
             interactive
             onNavigate={onOpenWikilink ? () => onOpenWikilink(slug) : undefined}
             onRemove={fileSlug ? () => removeItemLink(slug, fileSlug) : undefined}
+          />
+        )
+      })}
+      {pendingLinks?.map(slug => {
+        const label = roots.get(slug)?.title || slug
+        return (
+          <TagChip
+            key={`pending-${slug}`}
+            label={label}
+            isTopic
+            interactive
+            onRemove={() => onRemoveLink?.(slug)}
           />
         )
       })}
