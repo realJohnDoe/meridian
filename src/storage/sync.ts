@@ -157,8 +157,24 @@ export async function reconcileWithBackend(backend: StorageBackend, vaultId: str
 
   if (changed.length === 0 && deleted.length === 0) { updateSyncUI(); return }
 
-  const { items, roots } = parseFiles(Array.from(cacheMap.values()))
-  setData({ items, roots })
+  // Collect slugs that were changed or deleted so we can evict them from the store.
+  const affectedSlugs = new Set<string>()
+  for (const p of changed) affectedSlugs.add(p.replace(/\.(md|yaml|yml)$/, ''))
+  for (const p of deleted) affectedSlugs.add(p.replace(/\.(md|yaml|yml)$/, ''))
+
+  // Keep items/roots that belong to untouched files.
+  const keptItems = getItems().filter(item => !affectedSlugs.has(item.fileSlug))
+  const keptRoots: Roots = new Map(
+    [...getRoots()].filter(([slug]) => !affectedSlugs.has(slug)),
+  )
+
+  // Parse only the changed files and merge into the kept state.
+  const changedRecords = changed
+    .map(p => cacheMap.get(p))
+    .filter((r): r is NonNullable<typeof r> => r != null)
+  const { items: newItems, roots: newRoots } = parseFiles(changedRecords)
+
+  setData({ items: [...keptItems, ...newItems], roots: new Map([...keptRoots, ...newRoots]) })
   updateSyncUI()
 }
 
