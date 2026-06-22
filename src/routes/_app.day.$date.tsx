@@ -1,8 +1,9 @@
-import { useCallback, useMemo } from 'react'
+import { lazy, Suspense, useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import DayView from '@/calendar/DayView'
 import { fmtISO } from '@/model/dateUtils'
 import { useOpenEntry } from '@/hooks/useOpenEntry'
+
+const DayView = lazy(() => import('@/calendar/DayView'))
 
 export const Route = createFileRoute('/_app/day/$date')({
   component: DayPage,
@@ -21,10 +22,12 @@ function DayPage() {
   )
 
   return (
-    <DayView
-      date={dvDate}
-      onOpen={onOpen}
-      onNavigateDate={onNavigateDate}
-    />
+    <Suspense>
+      <DayView
+        date={dvDate}
+        onOpen={onOpen}
+        onNavigateDate={onNavigateDate}
+      />
+    </Suspense>
   )
 }

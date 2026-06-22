@@ -6,11 +6,6 @@ import { fileOccurrenceMap } from '@/presentation'
 import EditorShell from './EditorShell'
 import type { Occurrence, EditScope } from '@/types'
 
-const EDIT_SCOPES: EditScope[] = ['single', 'future', 'all', 'add']
-export function isEditScope(s: unknown): s is EditScope {
-  return typeof s === 'string' && (EDIT_SCOPES as string[]).includes(s)
-}
-
 interface Props {
   editor: string
   edate?: string
