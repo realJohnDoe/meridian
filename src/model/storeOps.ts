@@ -235,6 +235,21 @@ export function applyEdit(
     const newDate = scheduled?.date ?? ''
     const newTime = scheduled?.date ? scheduled.time || null : null
 
+    // A standalone occurrence being given a repeat must be converted to a series —
+    // OccurrenceEntry has no repeat field and the repeat would otherwise be lost.
+    if (repeat && !occ.ownerId) {
+      const newSeries: RepeatPattern<OccurrenceMetadata> = {
+        date:     newDate,
+        time:     newTime,
+        repeat,
+        fileSlug: occ.fileSlug,
+        id:       occ.id,
+        metadata: seriesMeta(base, fields),
+      }
+      items = items.map(i => i.id === occ.id ? newSeries : i)
+      return { items, roots }
+    }
+
     // Moving a *generated* occurrence to another date can't be expressed by a
     // single override: the override key (its date) doubles as the recurrence-id,
     // so changing the date leaves the original generated slot un-suppressed.
