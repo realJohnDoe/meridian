@@ -1,5 +1,6 @@
 import type { StoreItem, Roots } from './types'
 import type { VaultRef } from './storage/backend'
+import type { StorageCallbacks } from './storage/storageCallbacks'
 import { useStore } from './store'
 import { toast } from 'sonner'
 
@@ -39,4 +40,12 @@ export function notifyError(prefix: string, e: unknown): void {
   const err = e as Error
   const detail = err?.message || err?.name
   notify(detail ? `${prefix}: ${detail}` : prefix)
+}
+
+// ── STORAGE ADAPTER ────────────────────────────────────────────
+export const bridgeCallbacks: StorageCallbacks = {
+  getItems, getRoots, getVaults,
+  setData, setVaultLoading, setSyncDirtyCount, setSyncError,
+  setVaultList, setActiveVaultId, setPendingReconnect,
+  notify, warn, notifyError,
 }

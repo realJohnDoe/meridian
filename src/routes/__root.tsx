@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { restoreVaults } from '@/storage/vaultRegistry'
 import { autoSyncTick } from '@/storage/sync'
 import { initStorageCallbacks } from '@/storage/storageCallbacks'
-import * as storeBridge from '@/storeBridge'
+import { bridgeCallbacks } from '@/storeBridge'
 import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createRootRoute({
@@ -12,7 +12,7 @@ export const Route = createRootRoute({
 
 function Root() {
   useEffect(() => {
-    initStorageCallbacks(storeBridge)
+    initStorageCallbacks(bridgeCallbacks)
     restoreVaults()
     const intervalId = setInterval(autoSyncTick, 60_000)
     const onOnline = () => autoSyncTick()
