@@ -45,8 +45,8 @@ function AutoSaveIndicator({ status }: { status: 'idle' | 'pending' | 'saved' })
     <Loader2
       size={13}
       className={cn(
-        'shrink-0 text-muted-foreground transition-opacity duration-300',
-        status === 'pending' ? 'opacity-100 animate-spin' : 'opacity-0',
+        'shrink-0 text-muted-foreground transition-opacity duration-300 animate-spin',
+        status === 'pending' ? 'opacity-100' : 'opacity-0',
       )}
     />
   )
