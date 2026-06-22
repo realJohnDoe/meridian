@@ -49,8 +49,11 @@ describe('mapGitHubError', () => {
 
 const BASE_CFG = { owner: 'alice', repo: 'notes', branch: 'main', token: 'ghp_test' }
 
-function makeRootDirResponse(files: { name: string; sha: string }[]) {
-  return files.map(f => ({ type: 'file', name: f.name, sha: f.sha, path: f.name }))
+function makeTreeResponse(blobs: { path: string; sha: string }[]) {
+  return {
+    tree: blobs.map(b => ({ type: 'blob', path: b.path, sha: b.sha })),
+    truncated: false,
+  }
 }
 
 function makeFileResponse(name: string, content: string, sha: string) {
@@ -88,25 +91,45 @@ describe('GitHubBackend', () => {
     fetchSpy.mockResolvedValue(makeJsonResp(body, status))
   }
 
-  it('statAll calls root contents endpoint and filters vault files', async () => {
-    const files = [
-      { name: 'note.md',   sha: 'sha1' },
-      { name: 'image.png', sha: 'sha2' }, // non-vault file — should be filtered
-      { name: 'data.yaml', sha: 'sha3' },
-    ]
-    mockFetch(makeRootDirResponse(files))
+  it('statAll uses git trees API (recursive) and filters vault files', async () => {
+    mockFetch({
+      tree: [
+        { type: 'blob', path: 'note.md',      sha: 'sha1' },
+        { type: 'blob', path: 'image.png',    sha: 'sha2' }, // non-vault — filtered
+        { type: 'blob', path: 'data.yaml',    sha: 'sha3' },
+        { type: 'tree', path: 'subdir',       sha: 'sha-dir' }, // dir entry — filtered
+        { type: 'blob', path: 'subdir/deep.md', sha: 'sha4' },
+      ],
+      truncated: false,
+    })
+
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    const tokens  = await backend.statAll()
+
+    expect(tokens.size).toBe(3)
+    expect(tokens.get('note.md')).toBe('sha1')
+    expect(tokens.get('data.yaml')).toBe('sha3')
+    expect(tokens.get('subdir/deep.md')).toBe('sha4')
+    expect(tokens.has('image.png')).toBe(false)
+    expect(tokens.has('subdir')).toBe(false)
+
+    const [url] = fetchSpy.mock.calls[0] as [string]
+    expect(url).toContain('/repos/alice/notes/git/trees/main')
+    expect(url).toContain('recursive=1')
+  })
+
+  it('statAll keys by full path so subdirectory files are not lost', async () => {
+    mockFetch(makeTreeResponse([
+      { path: 'root.md',          sha: 'sha-root' },
+      { path: 'archive/old.yaml', sha: 'sha-old'  },
+    ]))
 
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     const tokens  = await backend.statAll()
 
     expect(tokens.size).toBe(2)
-    expect(tokens.get('note.md')).toBe('sha1')
-    expect(tokens.get('data.yaml')).toBe('sha3')
-    expect(tokens.has('image.png')).toBe(false)
-
-    const [url] = fetchSpy.mock.calls[0] as [string]
-    expect(url).toContain('/repos/alice/notes/contents')
-    expect(url).toContain('ref=main')
+    expect(tokens.get('root.md')).toBe('sha-root')
+    expect(tokens.get('archive/old.yaml')).toBe('sha-old')
   })
 
   it('readFiles fetches each file and decodes content', async () => {
@@ -175,7 +198,7 @@ describe('GitHubBackend', () => {
 
   it('write sends sha when updating an existing file (via statAll)', async () => {
     // Kept for backwards compat: _shas still updated from statAll for delete().
-    mockFetch(makeRootDirResponse([{ name: 'note.md', sha: 'existingsha' }]))
+    mockFetch(makeTreeResponse([{ path: 'note.md', sha: 'existingsha' }]))
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     await backend.statAll()
 
@@ -191,7 +214,7 @@ describe('GitHubBackend', () => {
 
   it('delete sends DELETE with current sha', async () => {
     // Populate sha via statAll
-    mockFetch(makeRootDirResponse([{ name: 'old.md', sha: 'delsha' }]))
+    mockFetch(makeTreeResponse([{ path: 'old.md', sha: 'delsha' }]))
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     await backend.statAll()
 
@@ -255,11 +278,11 @@ describe('GitHubBackend', () => {
       text: () => Promise.resolve(JSON.stringify(body)),
     })
 
-    // statAll response
+    // statAll response (git trees API)
     fetchSpy
-      .mockResolvedValueOnce(makeResp(makeRootDirResponse([
-        { name: 'a.md', sha: 'sha-a' },
-        { name: 'b.md', sha: 'sha-b' },
+      .mockResolvedValueOnce(makeResp(makeTreeResponse([
+        { path: 'a.md', sha: 'sha-a' },
+        { path: 'b.md', sha: 'sha-b' },
       ])))
       // readFiles responses (two parallel fetches)
       .mockResolvedValueOnce(makeResp(makeFileResponse('a.md', '# A', 'sha-a')))
