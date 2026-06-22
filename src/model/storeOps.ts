@@ -12,6 +12,7 @@ import { isSeries, isStandaloneOcc } from '@/types'
 import type { OccurrenceEntry, RepeatPattern } from './expansion'
 import { titleToSlug } from '@/fileIO'
 import { dayBefore } from './dateUtils'
+import { resolveWikilink, unwrapRef } from '../wikilinks'
 
 export interface StoreData {
   items: StoreItem[]
@@ -354,9 +355,17 @@ export function excludeOccurrence({ items, roots }: StoreData, occ: Occurrence):
   return { items: items.filter(i => i.id !== occ.id), roots }
 }
 
-/** Remove all items and the root entry for a fileSlug. */
+/** Remove all items and the root entry for a fileSlug, cleaning up backlinks from other files. */
 export function deleteByFileSlug({ items, roots }: StoreData, fileSlug: string): StoreData {
   const nextRoots = new Map(roots)
+  for (const [slug, meta] of nextRoots) {
+    if (slug === fileSlug) continue
+    const filtered = (meta.items ?? []).filter(
+      raw => resolveWikilink(unwrapRef(raw), roots) !== fileSlug,
+    )
+    if (filtered.length !== (meta.items ?? []).length)
+      nextRoots.set(slug, { ...meta, items: filtered })
+  }
   nextRoots.delete(fileSlug)
   return { items: items.filter(i => i.fileSlug !== fileSlug), roots: nextRoots }
 }

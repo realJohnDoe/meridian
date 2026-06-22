@@ -1,27 +1,24 @@
 import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Roots } from '@/types'
-import { backlinksTo, fileEntries } from '@/presentation'
-import { addItemLink, removeItemLink } from './save'
+import { fileEntries } from '@/presentation'
 import TagChip from '@/components/TagChip'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 
 interface Props {
+  slugs:           string[]
   fileSlug:        string | undefined
   roots:           Roots
   onOpenWikilink?: (ref: string) => void
+  onAdd?:          (targetSlug: string) => void
+  onRemove?:       (targetSlug: string) => void
 }
 
-export default function ListedOnRow({ fileSlug, roots, onOpenWikilink }: Props) {
+export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, onAdd, onRemove }: Props) {
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
-
-  const slugs = useMemo(
-    () => fileSlug ? backlinksTo(fileSlug, roots) : [],
-    [fileSlug, roots],
-  )
 
   const allFiles = useMemo(() => fileEntries(roots), [roots])
   const filtered = useMemo(() => {
@@ -35,7 +32,7 @@ export default function ListedOnRow({ fileSlug, roots, onOpenWikilink }: Props) 
 
   function handleSelect(targetSlug: string) {
     if (!fileSlug) return
-    addItemLink(targetSlug, fileSlug)
+    onAdd?.(targetSlug)
     setPickerQuery('')
     setPickerOpen(false)
   }
@@ -54,7 +51,7 @@ export default function ListedOnRow({ fileSlug, roots, onOpenWikilink }: Props) 
             isTopic
             interactive
             onNavigate={onOpenWikilink ? () => onOpenWikilink(slug) : undefined}
-            onRemove={fileSlug ? () => removeItemLink(slug, fileSlug) : undefined}
+            onRemove={onRemove ? () => onRemove(slug) : undefined}
           />
         )
       })}

@@ -21,6 +21,8 @@ import type { EntryState, ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
 import { saveNode } from './save'
 import { titleToSlug } from '@/fileIO'
+import { backlinksTo } from '@/presentation'
+import { usePendingLinks } from './usePendingLinks'
 
 function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   icon: LucideIcon
@@ -77,7 +79,6 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const navigate = useNavigate()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const viewRef  = useRef<EditorView | null>(null)
-
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
@@ -127,6 +128,12 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
+  const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(item, title)
+  const linkedSlugs = useMemo(
+    () => [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs],
+    [effectiveSlug, roots, pendingSlugs],
+  )
+
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)
   const seriesRepeat = (parentSeries && isSeries(parentSeries)) ? parentSeries.repeat : null
@@ -169,6 +176,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         )}
         <Button variant="default" size="sm" onClick={() => {
           onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+          flushOnSave(titleToSlug(title))
         }}>Save</Button>
       </div>
 
@@ -195,9 +203,12 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
         {/* ── FILE-LEVEL: listed-on reverse chips ── */}
         <ListedOnRow
-          fileSlug={item?.fileSlug}
+          slugs={linkedSlugs}
+          fileSlug={effectiveSlug}
           roots={roots}
           onOpenWikilink={onOpenWikilink}
+          onAdd={handleAdd}
+          onRemove={handleRemove}
         />
 
         {/* ── OCCURRENCE-LEVEL: scope (header) → type → metadata → participants ── */}

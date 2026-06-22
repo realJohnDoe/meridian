@@ -6,7 +6,7 @@ import { setActiveVault } from '@/storage/vaultRegistry'
 import { fmtISO, fmtMonth } from '@/model/dateUtils'
 import { useToday } from '@/hooks/useToday'
 import { vaultIcon } from '@/lib/vaultIcon'
-import ManageVaultsDialog from '@/vaults/ManageVaultsDialog'
+import SettingsDialog from './SettingsDialog'
 import {
   Sidebar,
   SidebarContent,
@@ -22,7 +22,7 @@ import {
 import { slugRoute } from '@/routes/-entryRoute'
 
 export default function AppSidebar() {
-  const [addVaultOpen, setAddVaultOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [editingFavorites, setEditingFavorites] = useState(false)
 
   const navigate  = useNavigate()
@@ -149,11 +149,11 @@ export default function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   data-tour="manage-vaults"
-                  onClick={() => { close(); setAddVaultOpen(true) }}
+                  onClick={() => { close(); setSettingsOpen(true) }}
                   className="gap-[14px] px-5 h-auto py-[11px] text-[14px] font-medium rounded-none"
                 >
                   <Settings2 className="size-[17px] stroke-[1.7] shrink-0" />
-                  Manage vaults
+                  Settings
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -161,7 +161,7 @@ export default function AppSidebar() {
         </SidebarContent>
       </Sidebar>
 
-      <ManageVaultsDialog open={addVaultOpen} onOpenChange={setAddVaultOpen} />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   )
 }
