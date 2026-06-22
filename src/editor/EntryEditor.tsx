@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart } from 'lucide-react'
@@ -19,8 +19,10 @@ import EntryBody from './EntryBody'
 import { cn } from '@/lib/utils'
 import type { EntryState, ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
-import { saveNode, addItemLink } from './save'
+import { saveNode } from './save'
 import { titleToSlug } from '../fileIO'
+import { backlinksTo } from '../presentation'
+import { usePendingLinks } from './usePendingLinks'
 
 function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   icon: LucideIcon
@@ -77,8 +79,6 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
   const navigate = useNavigate()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const viewRef  = useRef<EditorView | null>(null)
-  const [pendingLinks, setPendingLinks] = useState<string[]>([])
-
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
@@ -128,6 +128,12 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
+  const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(item, title)
+  const linkedSlugs = useMemo(
+    () => [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs],
+    [effectiveSlug, roots, pendingSlugs],
+  )
+
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)
   const seriesRepeat = (parentSeries && isSeries(parentSeries)) ? parentSeries.repeat : null
@@ -170,10 +176,7 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
         )}
         <Button variant="default" size="sm" onClick={() => {
           onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
-          if (!item && pendingLinks.length > 0) {
-            const finalSlug = titleToSlug(title)
-            pendingLinks.forEach(target => addItemLink(target, finalSlug))
-          }
+          flushOnSave(titleToSlug(title))
         }}>Save</Button>
       </div>
 
@@ -200,12 +203,12 @@ export default function EntryEditor({ entry, onChange, onSave, onDelete, onClose
 
         {/* ── FILE-LEVEL: listed-on reverse chips ── */}
         <ListedOnRow
-          fileSlug={item?.fileSlug ?? (title.trim() ? titleToSlug(title) : undefined)}
+          slugs={linkedSlugs}
+          fileSlug={effectiveSlug}
           roots={roots}
           onOpenWikilink={onOpenWikilink}
-          pendingLinks={item ? undefined : pendingLinks}
-          onAddLink={item ? undefined : (t) => setPendingLinks(prev => [...prev, t])}
-          onRemoveLink={item ? undefined : (t) => setPendingLinks(prev => prev.filter(l => l !== t))}
+          onAdd={handleAdd}
+          onRemove={handleRemove}
         />
 
         {/* ── OCCURRENCE-LEVEL: scope (header) → type → metadata → participants ── */}

@@ -1,53 +1,43 @@
 import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Roots } from '../types'
-import { backlinksTo, fileEntries } from '../presentation'
-import { addItemLink, removeItemLink } from './save'
+import { fileEntries } from '../presentation'
 import TagChip from '@/components/TagChip'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 
 interface Props {
+  slugs:           string[]
   fileSlug:        string | undefined
   roots:           Roots
   onOpenWikilink?: (ref: string) => void
-  pendingLinks?:   string[]
-  onAddLink?:      (targetSlug: string) => void
-  onRemoveLink?:   (targetSlug: string) => void
+  onAdd?:          (targetSlug: string) => void
+  onRemove?:       (targetSlug: string) => void
 }
 
-export default function ListedOnRow({ fileSlug, roots, onOpenWikilink, pendingLinks, onAddLink, onRemoveLink }: Props) {
+export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, onAdd, onRemove }: Props) {
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
 
-  const slugs = useMemo(
-    () => fileSlug ? backlinksTo(fileSlug, roots) : [],
-    [fileSlug, roots],
-  )
-
   const allFiles = useMemo(() => fileEntries(roots), [roots])
   const filtered = useMemo(() => {
-    const alreadyLinked = new Set([...slugs, ...(pendingLinks ?? [])])
+    const alreadyLinked = new Set(slugs)
     return allFiles.filter(e =>
       e.fileSlug !== fileSlug &&
       !alreadyLinked.has(e.fileSlug) &&
       (!pickerQuery || e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
     )
-  }, [allFiles, fileSlug, slugs, pendingLinks, pickerQuery])
+  }, [allFiles, fileSlug, slugs, pickerQuery])
 
   function handleSelect(targetSlug: string) {
     if (!fileSlug) return
-    if (onAddLink) {
-      onAddLink(targetSlug)
-    } else {
-      addItemLink(targetSlug, fileSlug)
-    }
+    onAdd?.(targetSlug)
     setPickerQuery('')
     setPickerOpen(false)
   }
 
-  if (!slugs.length && !(pendingLinks?.length) && !fileSlug) return null
+  if (!slugs.length && !fileSlug) return null
 
   return (
     <div className="flex flex-wrap gap-1.5 mb-4 items-center">
@@ -61,19 +51,7 @@ export default function ListedOnRow({ fileSlug, roots, onOpenWikilink, pendingLi
             isTopic
             interactive
             onNavigate={onOpenWikilink ? () => onOpenWikilink(slug) : undefined}
-            onRemove={fileSlug ? () => removeItemLink(slug, fileSlug) : undefined}
-          />
-        )
-      })}
-      {pendingLinks?.map(slug => {
-        const label = roots.get(slug)?.title || slug
-        return (
-          <TagChip
-            key={`pending-${slug}`}
-            label={label}
-            isTopic
-            interactive
-            onRemove={() => onRemoveLink?.(slug)}
+            onRemove={onRemove ? () => onRemove(slug) : undefined}
           />
         )
       })}
