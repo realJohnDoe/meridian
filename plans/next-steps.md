@@ -27,22 +27,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 
 ## Findings
 
-### 13. `presentation.ts` duplicates its 3-step occurrence-fill logic
-
-- **Category:** `dry`
-- **Impact:** 3 · **Breadth:** 2 functions in 1 file · **Fix effort:** M
-- **Evidence:** `fileOccurrenceMap` (`presentation.ts:89-136`) and `computeSlugOccurrence` (`:138-167`) implement the identical "expand-forward → expand-back → standalone fallback → series-anchor fallback" sequence.
-- **Problem:** The batch and single-slug variants must be kept in lockstep by hand; a fix to the fill ordering in one can silently diverge from the other.
-- **Fix:** Express `computeSlugOccurrence` in terms of a shared per-slug primitive that `fileOccurrenceMap` also calls.
-
-### 14. Arbitrary pixel values bypass the Tailwind scale across card components
-
-- **Category:** `styling`
-- **Impact:** 2 · **Breadth:** ~5 files · **Fix effort:** M
-- **Evidence:** `OccurrenceCard.tsx:39,46,100,144` — `text-[14px]`, `gap-[9px]`, `pl-[8px] pr-[14px] py-[8px]`, `text-[11px]`, `text-[9px]` scattered as one-off arbitrary values (also in `OccurrenceRow`, `DayView`).
-- **Problem:** Spacing/typography are hardcoded per-component rather than drawn from the Tailwind scale or design tokens, so visual consistency is manual and drift-prone.
-- **Fix:** Map these to the nearest scale steps or define semantic tokens (e.g. `text-card-title`, `gap-card`).
-
 ### 15. Storage layer reaches into UI state via mutable global singletons
 
 - **Category:** `architecture`
