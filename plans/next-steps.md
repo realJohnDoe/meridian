@@ -28,14 +28,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 
 ## Findings
 
-### 15. Storage layer reaches into UI state via mutable global singletons
-
-- **Category:** `architecture`
-- **Impact:** 3 · **Breadth:** `sync.ts`, `vaultRegistry.ts` · **Fix effort:** L
-- **Evidence:** `sync.ts:15` imports `getItems, getRoots, setData, notify, setSyncDirtyCount, setSyncError` from `storeBridge` and calls `setData`/`notify` directly inside sync logic.
-- **Problem:** The data/sync domain is coupled to the UI store and toast system through a global bridge, so storage can't be exercised or reused without the Zustand store and sonner present.
-- **Fix:** Have sync functions return results/events and let a thin app-layer adapter push them into the store, rather than the storage layer writing UI state itself.
-
 # Codebase Health Survey
 
 Survey this codebase for code health issues across the categories below.
