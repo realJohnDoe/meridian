@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
-import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart, Check } from 'lucide-react'
+import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart, Loader2 } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import { useToday } from '@/hooks/useToday'
 import { fmtISO } from '@/model/dateUtils'
@@ -41,12 +41,14 @@ function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
 }
 
 function AutoSaveIndicator({ status }: { status: 'idle' | 'pending' | 'saved' }) {
-  if (status === 'idle') return null
   return (
-    <span className="flex items-center gap-1 text-xs text-muted-foreground select-none shrink-0">
-      {status === 'saved' && <Check size={12} />}
-      {status === 'pending' ? 'Saving…' : 'Saved'}
-    </span>
+    <Loader2
+      size={13}
+      className={cn(
+        'shrink-0 text-muted-foreground transition-opacity duration-300 animate-spin',
+        status === 'pending' ? 'opacity-100' : 'opacity-0',
+      )}
+    />
   )
 }
 
@@ -181,6 +183,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, saveS
     <>
       <div className="h-topbar flex items-center gap-2 px-3 border-b border-border shrink-0 bg-background">
         <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={onClose}><ArrowLeft size={18} /></Button>
+        {item && <AutoSaveIndicator status={saveStatus ?? 'idle'} />}
         <span className="flex-1 font-mono text-2xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">{fname}</span>
         {item && onToggleFavorite && (
           <Button
@@ -196,9 +199,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, saveS
         {item && (
           <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete"><Trash2 size={18} /></Button>
         )}
-        {item ? (
-          <AutoSaveIndicator status={saveStatus ?? 'idle'} />
-        ) : (
+        {!item && (
           <Button variant="default" size="sm" onClick={() => {
             onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
             flushOnSave(titleToSlug(title))
