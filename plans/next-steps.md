@@ -25,22 +25,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 
 ## Findings
 
-### 5. GitHub `ensurePermission` only proves read access
-
-- **Category:** `error-handling` `ux`
-- **Impact:** 4 · **Breadth:** 1 file · **Fix effort:** S
-- **Evidence:** `githubBackend.ts:144-154` — `GET /repos/{owner}/{repo}` then `return 'granted'`; succeeds for a read-only token and never checks the configured branch.
-- **Problem:** A read-scoped or wrong-branch token reports success at connect time, then the first `write()` during sync fails later with a confusing "Sync failed."
-- **Fix:** Probe write capability (e.g. check `permissions.push` from the repo response, or verify the branch ref) before returning `'granted'`.
-
-### 6. Editor handler prop-drilling through three layers
-
-- **Category:** `architecture` `dry`
-- **Impact:** 3 · **Breadth:** 3 files · **Fix effort:** M
-- **Evidence:** `useEntryEditor.ts:121-143` returns 21 keys; `EditorShell.tsx:24-37` destructures ~18; `DialogStack.tsx:14-31` re-declares 16 of them as a props interface.
-- **Problem:** Adding one dialog field means touching the hook return, `EditorShell`, the `DialogStack` props interface, and the callsite — four edits for one wire.
-- **Fix:** Pass the `hooks` object (or a grouped `dialogHandlers`) straight through instead of spreading each callback by hand.
-
 ### 7. Mixed import conventions — `@/` alias vs relative `../`, often in the same file
 
 - **Category:** `naming` `layout`
