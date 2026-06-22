@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
-import { useStore } from '../store'
+import { useStore } from '@/store'
 import { useEntryEditor } from './useEntryEditor'
-import { expandRange } from '../model/expansion'
-import { fileOccurrenceMap } from '../presentation'
+import { expandRange } from '@/model/expansion'
+import { fileOccurrenceMap } from '@/presentation'
 import EditorShell from './EditorShell'
-import type { Occurrence, EditScope } from '../types'
+import type { Occurrence, EditScope } from '@/types'
 
 const EDIT_SCOPES: EditScope[] = ['single', 'future', 'all', 'add']
 export function isEditScope(s: unknown): s is EditScope {

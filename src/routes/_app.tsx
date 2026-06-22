@@ -4,18 +4,18 @@ import {
   Menu, CalendarCheck2,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
-import { useStore } from '../store'
-import { addDays, fmtTopBarDay, fmtTopBarMonth } from '../presentation'
-import { fmtISO, fmtMonth, parseMonth } from '../model/dateUtils'
-import { useToday } from '../hooks/useToday'
+import { useStore } from '@/store'
+import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/presentation'
+import { fmtISO, fmtMonth, parseMonth } from '@/model/dateUtils'
+import { useToday } from '@/hooks/useToday'
 import EntryOverlay, { isEditScope } from '@/editor/EntryOverlay'
 import CoachTour from '@/onboarding/CoachTour'
 import AppSidebar from '@/components/Sidebar'
 import SyncButton from '@/components/SyncButton'
 import SearchBar from '@/components/SearchBar'
-import { Button } from '../components/ui/button'
-import { SidebarProvider, useSidebar } from '../components/ui/sidebar'
-import type { EditScope } from '../types'
+import { Button } from '@/components/ui/button'
+import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
+import type { EditScope } from '@/types'
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,

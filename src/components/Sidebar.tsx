@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { useStore } from '../store'
-import { setActiveVault } from '../storage/vaultRegistry'
-import { fmtISO, fmtMonth } from '../model/dateUtils'
-import { useToday } from '../hooks/useToday'
-import { vaultIcon } from '../lib/vaultIcon'
+import { useStore } from '@/store'
+import { setActiveVault } from '@/storage/vaultRegistry'
+import { fmtISO, fmtMonth } from '@/model/dateUtils'
+import { useToday } from '@/hooks/useToday'
+import { vaultIcon } from '@/lib/vaultIcon'
 import ManageVaultsDialog from '@/vaults/ManageVaultsDialog'
 import {
   Sidebar,
@@ -19,7 +19,7 @@ import {
   SidebarSeparator,
   useSidebar,
 } from './ui/sidebar'
-import { slugRoute } from '../routes/-entryRoute'
+import { slugRoute } from '@/routes/-entryRoute'
 
 export default function AppSidebar() {
   const [addVaultOpen, setAddVaultOpen] = useState(false)

@@ -4,16 +4,16 @@ import {
   tokenSave, tokenLoad, tokenClear,
   vaultRefsSave, vaultRefsLoad,
   activeVaultIdSave, activeVaultIdLoad,
-} from '../cache'
+} from '@/cache'
 import { diskPickDirectory } from './fs'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
 import { GitHubBackend }  from './githubBackend'
 import type { StorageBackend, VaultRef, GitHubVaultRef } from './backend'
-import { setData, getVaults, notify, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading } from '../storeBridge'
+import { setData, getVaults, notify, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading } from '@/storeBridge'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
 import { reconcileWithBackend, parseFiles, updateSyncUI } from './sync'
-import { emit } from '../events'
+import { emit } from '@/events'
 
 // ── CONSTANTS ─────────────────────────────────────────────────
 

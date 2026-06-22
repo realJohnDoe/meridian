@@ -1,6 +1,6 @@
 import { type EditorState } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
-import { TASK_ITEM_RE } from '../../items'
+import { TASK_ITEM_RE } from '@/items'
 
 export type TaskLineInfo = {
   done: boolean

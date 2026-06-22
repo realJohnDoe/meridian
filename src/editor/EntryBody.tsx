@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import type { Roots, StoreItem } from '../types'
+import type { Roots, StoreItem } from '@/types'
 import {
   rootsField, setRootsEffect,
   itemsField, setItemsEffect,

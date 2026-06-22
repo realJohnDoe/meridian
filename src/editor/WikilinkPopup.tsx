@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { EditorView } from '@codemirror/view'
-import type { Roots, StoreItem } from '../types'
-import OccurrenceCard from '../components/OccurrenceCard'
-import { fileEntries, fileOccurrenceMap } from '../presentation'
+import type { Roots, StoreItem } from '@/types'
+import OccurrenceCard from '@/components/OccurrenceCard'
+import { fileEntries, fileOccurrenceMap } from '@/presentation'
 
 export interface WlPopupState {
   query:  string

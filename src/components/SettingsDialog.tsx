@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { useStore } from '../store'
-import ManageVaultsDialog from '../vaults/ManageVaultsDialog'
-import ParticipantsRow from '../editor/ParticipantsRow'
+import { useStore } from '@/store'
+import ManageVaultsDialog from '@/vaults/ManageVaultsDialog'
+import ParticipantsRow from '@/editor/ParticipantsRow'
 
 interface Props {
   open:         boolean

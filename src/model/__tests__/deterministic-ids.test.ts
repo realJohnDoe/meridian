@@ -15,8 +15,8 @@
  */
 import { describe, it, expect } from 'vitest'
 import { loadFixture, fixtureNames } from './helpers'
-import { parseToStoreItems } from '../storeItems'
-import { isSeries } from '../../types'
+import { parseToStoreItems } from '@/model/storeItems'
+import { isSeries } from '@/types'
 
 /** Extract all IDs from a parse result in a stable order. */
 function allIds(items: ReturnType<typeof parseToStoreItems>['items']): string[] {

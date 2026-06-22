@@ -5,11 +5,11 @@
  */
 import type { useEntryEditor } from './useEntryEditor'
 import type { EntryState } from './state'
-import type { StoreItem, Roots } from '../types'
+import type { StoreItem, Roots } from '@/types'
 import EntryEditor from './EntryEditor'
 import DialogStack from './DialogStack'
-import { toggleOccDone } from '../occurrenceActions'
-import { useStore } from '../store'
+import { toggleOccDone } from '@/occurrenceActions'
+import { useStore } from '@/store'
 
 type Hooks = ReturnType<typeof useEntryEditor>
 

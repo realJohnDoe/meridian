@@ -1,19 +1,19 @@
 import { useMemo, useEffect, useRef, useState } from 'react'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { ChevronDown, ChevronUp, CheckSquare, Square } from 'lucide-react'
-import { useStore } from '../store'  // items + roots only
+import { useStore } from '@/store'  // items + roots only
 import { Button } from '@/components/ui/button'
 import { SurfaceButton } from '@/components/ui/surface-button'
-import { cn } from '../lib/utils'
-import type { Occurrence, EditScope } from '../types'
+import { cn } from '@/lib/utils'
+import type { Occurrence, EditScope } from '@/types'
 import KindIcon from '@/components/KindIcon'
-import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
-import { fmtT } from '../model/dateUtils'
-import { parseDurationHours } from '../model/duration'
-import { sameDay, addDays, fmtLong, sortOccs, occState } from '../presentation'
+import { expandWithMultiday, multidayDisplayTitle } from '@/model/expansion'
+import { fmtT } from '@/model/dateUtils'
+import { parseDurationHours } from '@/model/duration'
+import { sameDay, addDays, fmtLong, sortOccs, occState } from '@/presentation'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
 
-import { useToday } from '../hooks/useToday'
+import { useToday } from '@/hooks/useToday'
 const SH = 7    // start hour on timeline
 const EH = 22   // end hour on timeline
 const HP = 56   // pixels per hour

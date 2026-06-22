@@ -5,11 +5,11 @@ import {
   EditorView,
 } from '@codemirror/view'
 import { createElement, type MouseEvent as ReactMouseEvent } from 'react'
-import type { Roots, StoreItem } from '../../types'
-import { parseWikilinks, resolveWikilink } from '../../wikilinks'
-import TagChip from '../../components/TagChip'
-import { Badge } from '../../components/ui/badge'
-import { cn } from '../../lib/utils'
+import type { Roots, StoreItem } from '@/types'
+import { parseWikilinks, resolveWikilink } from '@/wikilinks'
+import TagChip from '@/components/TagChip'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { focusedCursorLines } from './viewUtils'
 import { ReactWidget } from './ReactWidget'
 

@@ -1,4 +1,4 @@
-import type { Occurrence, EditScope } from '../types'
+import type { Occurrence, EditScope } from '@/types'
 
 /** Build TanStack Router navigate params for creating a new entry as a search-param overlay. */
 export function newEntryRoute(title?: string) {

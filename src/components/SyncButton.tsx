@@ -1,6 +1,6 @@
 import { FolderSync } from 'lucide-react'
-import { useStore } from '../store'
-import { syncToBackend } from '../storage/sync'
+import { useStore } from '@/store'
+import { syncToBackend } from '@/storage/sync'
 import { Button } from './ui/button'
 
 export default function SyncButton() {

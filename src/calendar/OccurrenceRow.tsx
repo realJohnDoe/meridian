@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
-import type { Occurrence } from '../types'
+import type { Occurrence } from '@/types'
 import OccurrenceCard from '@/components/OccurrenceCard'
 
 interface Props {

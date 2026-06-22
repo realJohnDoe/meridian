@@ -1,15 +1,15 @@
 import { useMemo, useCallback, useRef } from 'react'
-import { useStore } from '../store'
-import type { Occurrence, EditScope, StoreItem, StoreOcc, Roots } from '../types'
-import { occKind, isSeries } from '../types'
+import { useStore } from '@/store'
+import type { Occurrence, EditScope, StoreItem, StoreOcc, Roots } from '@/types'
+import { occKind, isSeries } from '@/types'
 
-import { expandWithMultiday } from '../model/expansion'
-import { fmtISO } from '../model/dateUtils'
-import { sameDay, addDays, sortOccs } from '../presentation'
+import { expandWithMultiday } from '@/model/expansion'
+import { fmtISO } from '@/model/dateUtils'
+import { sameDay, addDays, sortOccs } from '@/presentation'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import DaySection from './DaySection'
 import OverdueSection from './OverdueSection'
-import { useToday } from '../hooks/useToday'
+import { useToday } from '@/hooks/useToday'
 
 const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouterState } from '@tanstack/react-router'
-import { useStore } from '../store'
+import { useStore } from '@/store'
 import { isTourDone, markTourDone } from './tourState'
-import { Button } from '../components/ui/button'
+import { Button } from '@/components/ui/button'
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 

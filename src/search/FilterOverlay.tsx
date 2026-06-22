@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react'
-import { useStore } from '../store'
-import type { Occurrence } from '../types'
+import { useStore } from '@/store'
+import type { Occurrence } from '@/types'
 import FileResultsList from './FileResultsList'
 import { Button } from '@/components/ui/button'
 

@@ -1,9 +1,9 @@
 import { memo, useRef } from 'react'
-import type { Occurrence } from '../types'
-import { fmtLong } from '../presentation'
-import { cn } from '../lib/utils'
+import type { Occurrence } from '@/types'
+import { fmtLong } from '@/presentation'
+import { cn } from '@/lib/utils'
 import OccurrenceRow from './OccurrenceRow'
-import { useFlipReorder } from '../hooks/useFlipReorder'
+import { useFlipReorder } from '@/hooks/useFlipReorder'
 
 
 interface Props {

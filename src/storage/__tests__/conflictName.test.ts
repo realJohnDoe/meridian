@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { conflictPath } from '../conflictName'
+import { conflictPath } from '@/storage/conflictName'
 
 const D = new Date('2026-06-11T14:30:22')
 

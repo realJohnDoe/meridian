@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { parseFixture, serialize, rootMeta, collectUndated } from './helpers'
-import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing } from '../storeOps'
-import type { EditFields, StoreData } from '../storeOps'
-import { parseToStoreItems } from '../storeItems'
-import { expandRange } from '../expansion'
-import { isSeries } from '../../types'
-import type { Occurrence, Roots, StoreItem } from '../../types'
+import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing } from '@/model/storeOps'
+import type { EditFields, StoreData } from '@/model/storeOps'
+import { parseToStoreItems } from '@/model/storeItems'
+import { expandRange } from '@/model/expansion'
+import { isSeries } from '@/types'
+import type { Occurrence, Roots, StoreItem } from '@/types'
 
 /** Build a StoreData from a ParseResult (single-file fixture). */
 function fixtureData(name: string): StoreData {
