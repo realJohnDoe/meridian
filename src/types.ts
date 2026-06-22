@@ -52,9 +52,38 @@ export interface ExtendedMetadata {
  */
 export type AppMetadata = OccurrenceMetadata & FileMetadata & ExtendedMetadata
 
-// ── Store types ───────────────────────────────────────────────────────────────
+// ── Expansion model types ─────────────────────────────────────────────────────
 
-import type { OccurrenceEntry, RepeatPattern } from './model/expansion'
+/**
+ * A concrete resolved occurrence (single point in time).
+ * `T` is the metadata type defined by the caller.
+ */
+export interface OccurrenceEntry<T = Record<string, unknown>> {
+  date:      string                    // YYYY-MM-DD
+  time:      string | null             // HH:mm or null
+  source:    'generated' | 'explicit'
+  fileSlug:  string                    // identifies source file (= node.id)
+  id:        string                    // stable UUID — carried from the store item or memoised by logical key
+  ownerId?:  string                    // UUID of parent RepeatPattern (undefined for standalone)
+  excluded?: boolean                   // exclusion override: suppresses a generated occurrence
+  metadata:  T
+}
+
+/**
+ * A recurring series node — produces OccurrenceEntry values via expansion.
+ * `T` is the metadata type defined by the caller.
+ */
+export interface RepeatPattern<T = Record<string, unknown>> {
+  date:      string
+  time:      string | null
+  repeat:    Repeat
+  fileSlug:  string
+  id:        string                    // own UUID
+  // No ownerId — RepeatPatterns are flat siblings, never nested in the store
+  metadata:  T
+}
+
+// ── Store types ───────────────────────────────────────────────────────────────
 
 /**
  * Raw store items carry OccurrenceMetadata (no file-level fields).

@@ -6,9 +6,8 @@ import type { ParseResult } from '@/model/storeItems'
 import { collapseToYaml } from '@/model/collapse'
 import { saveFile } from '@/fileIO'
 import { joinFileMeta } from '@/model/expansion'
-import type { OccurrenceEntry } from '@/model/expansion'
 import { isSeries } from '@/types'
-import type { StoreItem, FileMetadata, AppMetadata, Roots } from '@/types'
+import type { StoreItem, FileMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DIR = resolve(HERE, 'fixtures')
