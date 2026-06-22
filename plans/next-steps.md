@@ -26,14 +26,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 
 ## Findings
 
-### 11. No route- or feature-level code-splitting
-
-- **Category:** `performance`
-- **Impact:** 3 · **Breadth:** all routes · **Fix effort:** M
-- **Evidence:** `grep "lazy(\|Suspense"` → `0`; `EntryOverlay`, the full CM6 editor + all dialogs, and the calendar views are statically imported into the initial bundle (`_app.tsx:11`).
-- **Problem:** The CodeMirror editor stack (a large dependency) and the dialog tree load on first paint even though the editor opens only on demand.
-- **Fix:** Lazy-load `EntryOverlay`/editor and calendar route components behind `React.lazy` + `Suspense`.
-
 ### 13. `presentation.ts` duplicates its 3-step occurrence-fill logic
 
 - **Category:** `dry`
