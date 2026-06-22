@@ -5,14 +5,17 @@ import {
 } from '@/cache'
 import type { CacheRecord } from '@/cache'
 import { conflictPath } from './conflictName'
-import { ConflictError } from './conflictError'
+import { ConflictError, isTransientSyncError } from './conflictError'
 import type { StorageBackend } from './backend'
 import { collapseToYaml } from '@/model/collapse'
 import { parseToStoreItems } from '@/model/storeItems'
 import { fileSlugItems } from '@/model/storeOps'
 import { saveFile } from '@/fileIO'
 import type { StoreItem, Roots } from '@/types'
-import { getItems, getRoots, setData, notify, warn, notifyError, setSyncDirtyCount, setSyncError } from '@/storeBridge'
+import {
+  getItems, getRoots, setData, notify, warn, notifyError,
+  setSyncDirtyCount, setSyncError, setSyncOffline, setLastSyncedAt,
+} from '@/storeBridge'
 import { getActiveBackend } from './activeBackend'
 
 // ── HELPERS ────────────────────────────────────────────────────
@@ -28,7 +31,6 @@ export function updateSyncUI(): void {
     setSyncError('Read-only vault')
     return
   }
-  setSyncError(null)
   cacheDirtyCount(backend.id).then(n => setSyncDirtyCount(n)).catch(() => {})
 }
 
@@ -183,6 +185,20 @@ export async function reconcileWithBackend(backend: StorageBackend, vaultId: str
 let _syncing = false
 let _pushTimer: ReturnType<typeof setTimeout> | null = null
 
+// ── BACKOFF STATE ─────────────────────────────────────────────────────
+const BACKOFF_BASE_MS  = 60_000
+const BACKOFF_MAX_MS   = 30 * 60_000
+
+let _consecutiveFailures = 0
+let _nextRetryAt         = 0
+// Dedupe toasts for actionable (non-transient) errors across silent ticks.
+let _lastErrorSig: string | null = null
+
+export function resetSyncBackoff(): void {
+  _consecutiveFailures = 0
+  _nextRetryAt         = 0
+}
+
 async function pushDirty(backend: StorageBackend, vaultId: string): Promise<boolean> {
   const dirty      = await cacheGetDirty(vaultId)
   const tombstones = await cacheGetTombstones(vaultId)
@@ -233,13 +249,37 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
     if (opts.pull || hadCollision) {
       await reconcileWithBackend(backend, vaultId)
     }
+    // ── SUCCESS ──────────────────────────────────────────────────
     setSyncError(null)
+    setSyncOffline(false)
+    setLastSyncedAt(Date.now())
+    _consecutiveFailures = 0
+    _nextRetryAt         = 0
+    _lastErrorSig        = null
     updateSyncUI()
   } catch (e) {
     console.error('[vault] sync failed:', e)
-    const msg = (e as Error).message || (e as Error).name || 'Unknown error'
-    setSyncError(msg)
-    notifyError('Sync failed', e)
+
+    if (isTransientSyncError(e)) {
+      // ── TRANSIENT (offline / network drop) ───────────────────
+      setSyncOffline(true)
+      _consecutiveFailures++
+      _nextRetryAt = Date.now() + Math.min(
+        BACKOFF_BASE_MS * Math.pow(2, _consecutiveFailures - 1),
+        BACKOFF_MAX_MS,
+      )
+      if (!opts.silent) {
+        notify("You're offline — changes are saved locally and will sync when you reconnect.")
+      }
+    } else {
+      // ── ACTIONABLE (auth, repo missing, etc.) ────────────────
+      const msg = (e as Error).message || (e as Error).name || 'Unknown error'
+      setSyncError(msg)
+      if (!opts.silent || _lastErrorSig !== msg) {
+        notifyError('Sync failed', e)
+        _lastErrorSig = msg
+      }
+    }
   } finally {
     _syncing = false
   }
@@ -253,10 +293,13 @@ export function scheduleAutoPush(): void {
 }
 
 export function autoSyncTick(): void {
+  if (Date.now() < _nextRetryAt) return
   void runSync({ silent: true, pull: true })
 }
 
 export async function syncToBackend(): Promise<void> {
+  // Manual sync always bypasses the backoff gate.
+  _nextRetryAt = 0
   await runSync({ silent: false, pull: true })
 }
 

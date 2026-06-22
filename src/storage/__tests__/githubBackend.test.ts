@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { encodeBase64, decodeBase64, mapGitHubError } from '@/storage/githubApi'
 import { GitHubBackend } from '@/storage/githubBackend'
-import { ConflictError } from '@/storage/conflictError'
+import { ConflictError, AuthSyncError, TransientSyncError, isTransientSyncError } from '@/storage/conflictError'
 
 // ── Base64 helpers ─────────────────────────────────────────────
 
@@ -34,14 +34,38 @@ describe('mapGitHubError', () => {
     return e
   }
 
-  it('maps 401 to token message',      () => expect(mapGitHubError(makeErr(401)).message).toMatch(/invalid or expired/i))
-  it('maps 403 to access/rate message',() => expect(mapGitHubError(makeErr(403)).message).toMatch(/access denied|rate limit/i))
-  it('maps 404 to not-found message',  () => expect(mapGitHubError(makeErr(404)).message).toMatch(/not found|lacks access/i))
+  it('maps 401 to AuthSyncError',       () => expect(mapGitHubError(makeErr(401))).toBeInstanceOf(AuthSyncError))
+  it('maps 403 to AuthSyncError',       () => expect(mapGitHubError(makeErr(403))).toBeInstanceOf(AuthSyncError))
+  it('maps 404 to AuthSyncError',       () => expect(mapGitHubError(makeErr(404))).toBeInstanceOf(AuthSyncError))
+  it('maps 401 to token message',       () => expect(mapGitHubError(makeErr(401)).message).toMatch(/invalid or expired/i))
+  it('maps 403 to access/rate message', () => expect(mapGitHubError(makeErr(403)).message).toMatch(/access denied/i))
+  it('maps 404 to not-found message',   () => expect(mapGitHubError(makeErr(404)).message).toMatch(/not found|lacks access/i))
   it('maps 409 to ConflictError',       () => expect(mapGitHubError(makeErr(409))).toBeInstanceOf(ConflictError))
   it('maps 422 to ConflictError',       () => expect(mapGitHubError(makeErr(422))).toBeInstanceOf(ConflictError))
-  it('passes through unknown errors',  () => {
+  it('passes through unknown errors',   () => {
     const e = new Error('network failure')
     expect(mapGitHubError(e)).toBe(e)
+  })
+  it('maps TypeError fetch failure to TransientSyncError', () => {
+    const e = new TypeError('Failed to fetch')
+    expect(mapGitHubError(e)).toBeInstanceOf(TransientSyncError)
+  })
+})
+
+describe('isTransientSyncError', () => {
+  it('returns true for TransientSyncError', () => {
+    expect(isTransientSyncError(new TransientSyncError())).toBe(true)
+  })
+  it('returns true for TypeError with fetch-failure message', () => {
+    expect(isTransientSyncError(new TypeError('Failed to fetch'))).toBe(true)
+    expect(isTransientSyncError(new TypeError('NetworkError when attempting to fetch resource.'))).toBe(true)
+    expect(isTransientSyncError(new TypeError('Load failed'))).toBe(true)
+  })
+  it('returns false for AuthSyncError', () => {
+    expect(isTransientSyncError(new AuthSyncError('bad token'))).toBe(false)
+  })
+  it('returns false for plain Error with non-network message', () => {
+    expect(isTransientSyncError(new Error('something unexpected'))).toBe(false)
   })
 })
 
