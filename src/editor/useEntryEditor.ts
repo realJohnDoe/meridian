@@ -4,12 +4,29 @@ import { useStore } from '../store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './save'
 import { notify } from '../storeBridge'
 import type { SeriesSheetConfig } from './save'
-import type { Occurrence, EditScope } from '../types'
+import type { Occurrence, EditScope, Priority } from '../types'
 import { fmtISO } from '../model/dateUtils'
 import { newEntryRoute } from '../routes/-entryRoute'
 import { resolveWikilink } from '../wikilinks'
 import { type EntryState, ENTRY_DEFAULT } from './state'
-import type { Priority } from '../types'
+
+export interface DialogHandlers {
+  activeDialog: string | null
+  pendingDelete: { title: string; onConfirm: () => void } | null
+  seriesSheetConfig: SeriesSheetConfig | null
+  onClose: () => void
+  onDateConfirm: (dateStr: string) => void
+  onDateRemove: () => void
+  onPriority: (p: Priority | null) => void
+  onTimeConfirm: (hhmm: string) => void
+  onTimeRemove: () => void
+  onDurConfirm: (dur: string) => void
+  onDurRemove: () => void
+  onRepeatConfirm: (repeat: EntryState['repeat']) => void
+  onRepeatRemove: () => void
+  onSeriesClose: () => void
+  onDeleteClose: () => void
+}
 
 function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryState {
   if (!item) {
@@ -118,11 +135,29 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     setActiveDialog(null)
   }, [])
 
+  const handleSeriesClose = useCallback(() => setSeriesSheetConfig(null), [])
+  const handleDeleteClose = useCallback(() => setPendingDelete(null), [])
+
+  const dialogHandlers: DialogHandlers = {
+    activeDialog,
+    pendingDelete,
+    seriesSheetConfig,
+    onClose: closeDialog,
+    onDateConfirm: handleDateConfirm,
+    onDateRemove: handleDateRemove,
+    onPriority: handlePriority,
+    onTimeConfirm: handleTimeConfirm,
+    onTimeRemove: handleTimeRemove,
+    onDurConfirm: handleDurConfirm,
+    onDurRemove: handleDurRemove,
+    onRepeatConfirm: handleRepeatConfirm,
+    onRepeatRemove: handleRepeatRemove,
+    onSeriesClose: handleSeriesClose,
+    onDeleteClose: handleDeleteClose,
+  }
+
   return {
     entry, setEntry,
-    activeDialog,
-    pendingDelete, setPendingDelete,
-    seriesSheetConfig, setSeriesSheetConfig,
     handleOpenWikilink,
     handleSave,
     handleDelete,
@@ -130,15 +165,6 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     handleScopeChange,
     handleOpenDlg,
     handleOpenRepeatDlg,
-    closeDialog,
-    handleDateConfirm,
-    handleDateRemove,
-    handleTimeConfirm,
-    handleTimeRemove,
-    handleDurConfirm,
-    handleDurRemove,
-    handleRepeatConfirm,
-    handleRepeatRemove,
-    handlePriority,
+    dialogHandlers,
   }
 }

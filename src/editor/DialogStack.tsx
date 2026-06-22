@@ -8,34 +8,20 @@ import DurationDialog from './dialogs/DurationDialog'
 import { fmtISO } from '../model/dateUtils'
 import { useToday } from '../hooks/useToday'
 import type { EntryState } from './state'
-import type { SeriesSheetConfig } from './save'
-import type { Priority } from '../types'
+import type { DialogHandlers } from './useEntryEditor'
 
 interface Props {
   entry: EntryState
-  activeDialog: string | null
-  pendingDelete: { title: string; onConfirm: () => void } | null
-  seriesSheetConfig: SeriesSheetConfig | null
-  onClose: () => void
-  onDateConfirm: (dateStr: string) => void
-  onDateRemove: () => void
-  onPriority: (p: Priority | null) => void
-  onTimeConfirm: (hhmm: string) => void
-  onTimeRemove: () => void
-  onDurConfirm: (dur: string) => void
-  onDurRemove: () => void
-  onRepeatConfirm: (repeat: EntryState['repeat']) => void
-  onRepeatRemove: () => void
-  onSeriesClose: () => void
-  onDeleteClose: () => void
+  handlers: DialogHandlers
 }
 
-export default function DialogStack({
-  entry, activeDialog, pendingDelete, seriesSheetConfig,
-  onClose, onDateConfirm, onDateRemove, onPriority,
-  onTimeConfirm, onTimeRemove, onDurConfirm, onDurRemove,
-  onRepeatConfirm, onRepeatRemove, onSeriesClose, onDeleteClose,
-}: Props) {
+export default function DialogStack({ entry, handlers }: Props) {
+  const {
+    activeDialog, pendingDelete, seriesSheetConfig,
+    onClose, onDateConfirm, onDateRemove, onPriority,
+    onTimeConfirm, onTimeRemove, onDurConfirm, onDurRemove,
+    onRepeatConfirm, onRepeatRemove, onSeriesClose, onDeleteClose,
+  } = handlers
   const today = useToday()
   return (
     <>
