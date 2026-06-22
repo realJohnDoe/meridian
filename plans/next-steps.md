@@ -25,14 +25,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 
 ## Findings
 
-### 7. Mixed import conventions — `@/` alias vs relative `../`, often in the same file
-
-- **Category:** `naming` `layout`
-- **Impact:** 2 · **Breadth:** ~40 files (89 `@/` imports vs many relative) · **Fix effort:** S (codemod/lint)
-- **Evidence:** `routes/_app.tsx:11-17` mixes `import EntryOverlay from '@/editor/EntryOverlay'` with `import { Button } from '../components/ui/button'` in adjacent lines.
-- **Problem:** No consistent path convention across the codebase makes imports noisy and moves harder to reason about.
-- **Fix:** Pick one (the `@/` alias) and add an ESLint `no-restricted-imports`/`import/no-relative-parent-imports` rule to enforce it.
-
 ### 8. Core generic types live in deep `model/expansion.ts` but are imported upward by top-level `types.ts`
 
 - **Category:** `architecture` `layout`
