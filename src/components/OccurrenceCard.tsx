@@ -37,14 +37,14 @@ export interface OccurrenceCardProps {
 }
 
 const titleCls = (isDone: boolean) =>
-  `text-[14px] font-medium truncate flex-1 ${isDone ? 'line-through' : ''} text-foreground`
+  `text-sm font-medium truncate flex-1 ${isDone ? 'line-through' : ''} text-foreground`
 
 function ParticipantsBadge({ participants }: { participants: string[] }) {
   if (!participants.length) return null
   const names = participants.slice(0, 2).join(', ')
   const overflow = participants.length > 2 ? ` +${participants.length - 2}` : ''
   return (
-    <span className="inline-flex items-center gap-[3px] text-[11px] text-muted-foreground">
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       <Users size={11} className="shrink-0" />
       {names}{overflow}
     </span>
@@ -99,7 +99,7 @@ export default function OccurrenceCard({
   return (
     <Card
       data-tour="entry-card"
-      className={`${cardCls} flex items-stretch gap-[9px] pl-[8px] pr-[14px] py-[8px]`}
+      className={`${cardCls} flex items-stretch gap-2 pl-2 pr-3.5 py-2`}
       style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
     >
       {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-lg" />}
@@ -112,8 +112,8 @@ export default function OccurrenceCard({
 
       <span className={cn(occBarVariants({ state: barClass }), 'relative z-20')} />
 
-      <div className="relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-[2px] pointer-events-none">
-        <div className="flex items-center gap-[6px]">
+      <div className="relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none">
+        <div className="flex items-center gap-1.5">
           {/* Icon / checkbox */}
           {!taskCheckbox
             ? <KindIcon item={occ} size={13} className="shrink-0 text-muted-foreground" />
@@ -141,12 +141,12 @@ export default function OccurrenceCard({
           {/* Right-aligned time column (inline mode) */}
           {showTime === 'inline' && (!!occ.ownerId || !!t) && (
             <div className="flex flex-col items-end shrink-0 ml-1 gap-px">
-              <div className="flex items-end gap-[4px]">
+              <div className="flex items-end gap-1">
                 {!!occ.ownerId && <Repeat2 size={11} className="stroke-muted-foreground fill-none shrink-0" />}
-                {!!t && <span className="text-[11px] font-mono text-brand-cyan tracking-[.02em] leading-[1.2]">{t}</span>}
+                {!!t && <span className="text-xs font-mono text-brand-cyan tracking-[.02em] leading-[1.2]">{t}</span>}
               </div>
               {!!t && occ.metadata.duration && (
-                <span className="text-[9px] font-mono text-dim leading-[1.2]">{occ.metadata.duration}</span>
+                <span className="text-3xs font-mono text-dim leading-[1.2]">{occ.metadata.duration}</span>
               )}
             </div>
           )}
@@ -154,7 +154,7 @@ export default function OccurrenceCard({
 
         {/* Meta row */}
         {showMeta && (
-          <div className="flex flex-wrap gap-[5px]">
+          <div className="flex flex-wrap gap-1.5">
             {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
             {showTime === 'badge' && t && <Badge variant="tag">{t}</Badge>}
             {showTagsParticipants && listedOn.map(label => (
