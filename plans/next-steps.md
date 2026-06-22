@@ -25,14 +25,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 
 ## Findings
 
-### 8. Core generic types live in deep `model/expansion.ts` but are imported upward by top-level `types.ts`
-
-- **Category:** `architecture` `layout`
-- **Impact:** 3 · **Breadth:** `types.ts` + every `Occurrence`/`StoreItem` consumer · **Fix effort:** M
-- **Evidence:** `types.ts:57` — `import type { OccurrenceEntry, RepeatPattern } from './model/expansion'`; these interfaces are defined at `expansion.ts:404` and `:419`, a 614-line module that also holds heavy expansion logic.
-- **Problem:** Foundational, broadly-used type definitions sit inside a deeply-nested, heavyweight implementation file — a depth mismatch that forces the top-level types module to depend downward into `model/`.
-- **Fix:** Move `OccurrenceEntry`/`RepeatPattern` into `types.ts` (or a `model/types.ts`) and have `expansion.ts` import them.
-
 ### 9. `reconcileWithBackend` re-parses the entire cache on every change
 
 - **Category:** `performance`
