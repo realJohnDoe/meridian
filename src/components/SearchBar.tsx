@@ -49,7 +49,7 @@ export default function SearchBar() {
 
       <FilterOverlay
         query={filterQuery}
-        onOpen={openEntry}
+        onOpen={(occ) => { openEntry(occ); setFilterQuery('') }}
         onCreate={(title: string) => {
           navigate(newEntryRoute(title))
           setFilterQuery('')
