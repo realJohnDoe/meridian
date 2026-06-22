@@ -7,8 +7,8 @@
  * the CAS logic from module-level state).
  */
 import { describe, it, expect } from 'vitest'
-import { planReconcile } from '../sync'
-import type { CacheRecord } from '../../cache'
+import { planReconcile } from '@/storage/sync'
+import type { CacheRecord } from '@/cache'
 
 // ── Helpers ────────────────────────────────────────────────────
 

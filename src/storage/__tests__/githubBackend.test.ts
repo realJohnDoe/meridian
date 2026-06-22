@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { encodeBase64, decodeBase64, mapGitHubError } from '../githubApi'
-import { GitHubBackend } from '../githubBackend'
-import { ConflictError } from '../conflictError'
+import { encodeBase64, decodeBase64, mapGitHubError } from '@/storage/githubApi'
+import { GitHubBackend } from '@/storage/githubBackend'
+import { ConflictError } from '@/storage/conflictError'
 
 // ── Base64 helpers ─────────────────────────────────────────────
 

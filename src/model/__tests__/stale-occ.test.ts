@@ -22,12 +22,12 @@
  */
 import { describe, it, expect } from 'vitest'
 import { loadFixture, parseFixture } from './helpers'
-import { parseToStoreItems } from '../storeItems'
-import { toggleDone } from '../storeOps'
-import { expandRange } from '../expansion'
-import { isSeries } from '../../types'
-import type { StoreData } from '../storeOps'
-import type { Roots } from '../../types'
+import { parseToStoreItems } from '@/model/storeItems'
+import { toggleDone } from '@/model/storeOps'
+import { expandRange } from '@/model/expansion'
+import { isSeries } from '@/types'
+import type { StoreData } from '@/model/storeOps'
+import type { Roots } from '@/types'
 
 describe('stable IDs across re-parse (Fix C)', () => {
   it('parsing the same fixture twice produces identical series IDs', () => {

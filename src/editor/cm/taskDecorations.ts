@@ -6,7 +6,7 @@ import {
 } from '@codemirror/view'
 import { syntaxTree } from '@codemirror/language'
 import { createElement } from 'react'
-import { Checkbox } from '../../components/ui/checkbox'
+import { Checkbox } from '@/components/ui/checkbox'
 import { focusedCursorLines } from './viewUtils'
 import { buildTaskLineMap } from './taskLines'
 import { ReactWidget } from './ReactWidget'

@@ -1,15 +1,15 @@
 import { memo, useMemo, useEffect, useRef } from 'react'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
-import { useStore } from '../store'
-import type { Occurrence } from '../types'
+import { useStore } from '@/store'
+import type { Occurrence } from '@/types'
 
-import { expandWithMultiday, multidayDisplayTitle } from '../model/expansion'
-import { sameDay, sortOccs, occState } from '../presentation'
+import { expandWithMultiday, multidayDisplayTitle } from '@/model/expansion'
+import { sameDay, sortOccs, occState } from '@/presentation'
 
 const EMPTY: Occurrence[] = []
-import { useToday } from '../hooks/useToday'
+import { useToday } from '@/hooks/useToday'
 import { SurfaceButton } from '@/components/ui/surface-button'
-import { cn } from '../lib/utils'
+import { cn } from '@/lib/utils'
 import { ccBarVariants } from '@/components/ui/occurrence-variants'
 
 const MONTHS = [

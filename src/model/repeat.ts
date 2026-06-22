@@ -4,7 +4,7 @@
  * dialog can never write a string the engine fails to parse.
  */
 
-import type { Weekday } from '../types'
+import type { Weekday } from '@/types'
 
 // JS getDay() → Weekday code / full name
 const WDAY_CODE_BY_JS_DAY: Weekday[] = ['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa']

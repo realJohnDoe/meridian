@@ -2,17 +2,17 @@ import {
   cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
   cacheWriteClean, cacheDirtyCount, cacheLoadAll,
   cacheWriteTombstone, cacheGetTombstones,
-} from '../cache'
-import type { CacheRecord } from '../cache'
+} from '@/cache'
+import type { CacheRecord } from '@/cache'
 import { conflictPath } from './conflictName'
 import { ConflictError } from './conflictError'
 import type { StorageBackend } from './backend'
-import { collapseToYaml } from '../model/collapse'
-import { parseToStoreItems } from '../model/storeItems'
-import { fileSlugItems } from '../model/storeOps'
-import { saveFile } from '../fileIO'
-import type { StoreItem, Roots } from '../types'
-import { getItems, getRoots, setData, notify, warn, setSyncDirtyCount, setSyncError } from '../storeBridge'
+import { collapseToYaml } from '@/model/collapse'
+import { parseToStoreItems } from '@/model/storeItems'
+import { fileSlugItems } from '@/model/storeOps'
+import { saveFile } from '@/fileIO'
+import type { StoreItem, Roots } from '@/types'
+import { getItems, getRoots, setData, notify, warn, setSyncDirtyCount, setSyncError } from '@/storeBridge'
 import { getActiveBackend } from './activeBackend'
 
 // ── HELPERS ────────────────────────────────────────────────────

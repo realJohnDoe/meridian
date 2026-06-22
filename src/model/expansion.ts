@@ -14,8 +14,8 @@ import {
   isValid,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
 } from 'date-fns'
-import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots } from '../types'
-import { isSeries, isStandaloneOcc } from '../types'
+import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots } from '@/types'
+import { isSeries, isStandaloneOcc } from '@/types'
 import type { EffectiveNode } from './inheritance'
 import { fmtISO, fmtT, parseDateString, parseDateTime } from './dateUtils'
 import { parseDurationDays } from './duration'

@@ -6,22 +6,22 @@ import {
 import {
   buildEffectiveTree, displayValue,
   type EffectiveNode,
-} from '../model/inheritance'
+} from '@/model/inheritance'
 import {
   expandRange, treeHasOccurrences,
-} from '../model/expansion'
-import { collapseToYaml } from '../model/collapse'
-import { parseToStoreItems } from '../model/storeItems'
+} from '@/model/expansion'
+import { collapseToYaml } from '@/model/collapse'
+import { parseToStoreItems } from '@/model/storeItems'
 import {
   applyEdit, excludeOccurrence, deleteFollowing,
   findSeries, upsertOverride,
   type EditFields,
-} from '../model/storeOps'
-import { dayBefore } from '../model/dateUtils'
-import { loadFile, saveFile } from '../fileIO'
-import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope } from '../types'
-import type { OccurrenceEntry, RepeatPattern } from '../model/expansion'
-import type { OccurrenceMetadata } from '../types'
+} from '@/model/storeOps'
+import { dayBefore } from '@/model/dateUtils'
+import { loadFile, saveFile } from '@/fileIO'
+import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope } from '@/types'
+import type { OccurrenceEntry, RepeatPattern } from '@/model/expansion'
+import type { OccurrenceMetadata } from '@/types'
 import EntryEditor from '@/editor/EntryEditor'
 import type { EntryState } from '@/editor/state'
 import RepeatDialog from '@/editor/dialogs/RepeatDialog'

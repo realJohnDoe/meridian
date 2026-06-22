@@ -1,14 +1,14 @@
-import { fmtISO } from '../model/dateUtils'
+import { fmtISO } from '@/model/dateUtils'
 import {
   applyEdit, excludeOccurrence, deleteByFileSlug, deleteFollowing,
   fileSlugItems, findSeries,
-} from '../model/storeOps'
-import { isSeries } from '../types'
-import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '../types'
-import { titleToSlug } from '../fileIO'
-import { getItems, getRoots, setData } from '../storeBridge'
-import { warmSlugInFOM, backlinksTo } from '../presentation'
-import { writeEntityToCache, deleteFromBackend } from '../storage/sync'
+} from '@/model/storeOps'
+import { isSeries } from '@/types'
+import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
+import { titleToSlug } from '@/fileIO'
+import { getItems, getRoots, setData } from '@/storeBridge'
+import { warmSlugInFOM, backlinksTo } from '@/presentation'
+import { writeEntityToCache, deleteFromBackend } from '@/storage/sync'
 import type { EntryState, ItemType } from './state'
 
 // ── BACKLINK HELPERS ──────────────────────────────────────────

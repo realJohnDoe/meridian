@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { fixtureNames, parseFixture, serialize, normalizeIds, rootMeta, occItems } from './helpers'
-import { parseToStoreItems } from '../storeItems'
-import { expandRange, multidayCoversDate } from '../expansion'
-import { isSeries, isStandaloneOcc } from '../../types'
+import { parseToStoreItems } from '@/model/storeItems'
+import { expandRange, multidayCoversDate } from '@/model/expansion'
+import { isSeries, isStandaloneOcc } from '@/types'
 
 const names = fixtureNames()
 

@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import AgendaView from '@/calendar/AgendaView'
-import { fmtISO } from '../model/dateUtils'
-import { useOpenEntry } from '../hooks/useOpenEntry'
-import { useToday } from '../hooks/useToday'
-import { useStore } from '../store'
-import { on } from '../events'
-import { Skeleton } from '../components/ui/skeleton'
+import { fmtISO } from '@/model/dateUtils'
+import { useOpenEntry } from '@/hooks/useOpenEntry'
+import { useToday } from '@/hooks/useToday'
+import { useStore } from '@/store'
+import { on } from '@/events'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export const Route = createFileRoute('/_app/')({
   component: AgendaPage,

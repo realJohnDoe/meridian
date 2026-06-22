@@ -3,8 +3,8 @@ import { Search, Plus, X } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { Button } from './ui/button'
 import FilterOverlay from '@/search/FilterOverlay'
-import { newEntryRoute } from '../routes/-entryRoute'
-import { useOpenEntry } from '../hooks/useOpenEntry'
+import { newEntryRoute } from '@/routes/-entryRoute'
+import { useOpenEntry } from '@/hooks/useOpenEntry'
 
 export default function SearchBar() {
   const [filterQuery, setFilterQuery] = useState('')

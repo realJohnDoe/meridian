@@ -12,13 +12,13 @@
  * and belong in the store's roots map keyed by fileSlug.
  */
 
-import { loadFile } from '../fileIO'
+import { loadFile } from '@/fileIO'
 import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
-import type { Repeat } from '../types'
-import { extractFileMetadata, extractOccurrenceMetadata, isSeries } from '../types'
-import type { StoreItem, FileMetadata } from '../types'
+import type { Repeat } from '@/types'
+import { extractFileMetadata, extractOccurrenceMetadata, isSeries } from '@/types'
+import type { StoreItem, FileMetadata } from '@/types'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
 

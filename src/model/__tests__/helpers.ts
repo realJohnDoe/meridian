@@ -1,14 +1,14 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
-import { parseToStoreItems } from '../storeItems'
-import type { ParseResult } from '../storeItems'
-import { collapseToYaml } from '../collapse'
-import { saveFile } from '../../fileIO'
-import { joinFileMeta } from '../expansion'
-import type { OccurrenceEntry } from '../expansion'
-import { isSeries } from '../../types'
-import type { StoreItem, FileMetadata, AppMetadata, Roots } from '../../types'
+import { parseToStoreItems } from '@/model/storeItems'
+import type { ParseResult } from '@/model/storeItems'
+import { collapseToYaml } from '@/model/collapse'
+import { saveFile } from '@/fileIO'
+import { joinFileMeta } from '@/model/expansion'
+import type { OccurrenceEntry } from '@/model/expansion'
+import { isSeries } from '@/types'
+import type { StoreItem, FileMetadata, AppMetadata, Roots } from '@/types'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DIR = resolve(HERE, 'fixtures')

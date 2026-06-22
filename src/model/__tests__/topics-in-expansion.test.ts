@@ -3,11 +3,11 @@
  * expandRange so they appear in the agenda view and EntryEditor.
  */
 import { describe, it, expect } from 'vitest'
-import { parseToStoreItems } from '../storeItems'
-import { expandRange } from '../expansion'
-import { applyEdit } from '../storeOps'
-import type { EditFields } from '../storeOps'
-import type { Roots } from '../../types'
+import { parseToStoreItems } from '@/model/storeItems'
+import { expandRange } from '@/model/expansion'
+import { applyEdit } from '@/model/storeOps'
+import type { EditFields } from '@/model/storeOps'
+import type { Roots } from '@/types'
 
 const STANDUP_YAML = `---
 title: Weekly Standup
