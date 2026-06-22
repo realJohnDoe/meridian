@@ -23,17 +23,10 @@ interface Props {
 export default function EditorShell({ entry, hooks, items, roots }: Props) {
   const {
     setEntry,
-    activeDialog,
-    pendingDelete, setPendingDelete,
-    seriesSheetConfig, setSeriesSheetConfig,
     handleOpenWikilink,
     handleSave, handleDelete, handleClose, handleScopeChange,
-    handleOpenDlg, handleOpenRepeatDlg, closeDialog,
-    handleDateConfirm, handleDateRemove,
-    handleTimeConfirm, handleTimeRemove,
-    handleDurConfirm, handleDurRemove,
-    handleRepeatConfirm, handleRepeatRemove,
-    handlePriority,
+    handleOpenDlg, handleOpenRepeatDlg,
+    dialogHandlers,
   } = hooks
 
   const favorites       = useStore(s => s.favorites)
@@ -59,24 +52,7 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
         isFavorited={isFavorited}
         onToggleFavorite={fileSlug ? () => toggleFavorite(fileSlug) : undefined}
       />
-      <DialogStack
-        entry={entry}
-        activeDialog={activeDialog}
-        pendingDelete={pendingDelete}
-        seriesSheetConfig={seriesSheetConfig}
-        onClose={closeDialog}
-        onDateConfirm={handleDateConfirm}
-        onDateRemove={handleDateRemove}
-        onPriority={handlePriority}
-        onTimeConfirm={handleTimeConfirm}
-        onTimeRemove={handleTimeRemove}
-        onDurConfirm={handleDurConfirm}
-        onDurRemove={handleDurRemove}
-        onRepeatConfirm={handleRepeatConfirm}
-        onRepeatRemove={handleRepeatRemove}
-        onSeriesClose={() => setSeriesSheetConfig(null)}
-        onDeleteClose={() => setPendingDelete(null)}
-      />
+      <DialogStack entry={entry} handlers={dialogHandlers} />
     </section>
   )
 }
