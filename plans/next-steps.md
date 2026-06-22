@@ -33,14 +33,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 - **Problem:** The CodeMirror editor stack (a large dependency) and the dialog tree load on first paint even though the editor opens only on demand.
 - **Fix:** Lazy-load `EntryOverlay`/editor and calendar route components behind `React.lazy` + `Suspense`.
 
-### 12. Subdirectory files are silently ignored by both backends
-
-- **Category:** `error-handling` `ux`
-- **Impact:** 3 · **Breadth:** 2 files · **Fix effort:** M
-- **Evidence:** `githubBackend.ts:52` requests `path: ''` (repo root only) and keys by `item.name`; `fs.ts:43` iterates only `dh.entries()` (no recursion). _Note: consistent across both backends — the prior survey's "GitHub diverges from local" framing is inaccurate; both are flat-by-design._
-- **Problem:** Any `.md`/`.yaml` in a subfolder never appears in `statAll`, is never cached, and vanishes from the UI with no error.
-- **Fix:** Recurse directories (FS) / use the Git Trees API `recursive=1` (GitHub) and key by full path, or explicitly validate flat-vault-only.
-
 ### 13. `presentation.ts` duplicates its 3-step occurrence-fill logic
 
 - **Category:** `dry`
