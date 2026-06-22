@@ -12,7 +12,7 @@ import { parseToStoreItems } from '@/model/storeItems'
 import { fileSlugItems } from '@/model/storeOps'
 import { saveFile } from '@/fileIO'
 import type { StoreItem, Roots } from '@/types'
-import { getItems, getRoots, setData, notify, warn, notifyError, setSyncDirtyCount, setSyncError } from '@/storeBridge'
+import { getCb } from './storageCallbacks'
 import { getActiveBackend } from './activeBackend'
 
 // ── HELPERS ────────────────────────────────────────────────────
@@ -24,12 +24,12 @@ function fileSlugToPath(fileSlug: string): string {
 export function updateSyncUI(): void {
   const backend = getActiveBackend()
   if (!backend?.id || backend.readOnly) {
-    setSyncDirtyCount(0)
-    setSyncError('Read-only vault')
+    getCb().setSyncDirtyCount(0)
+    getCb().setSyncError('Read-only vault')
     return
   }
-  setSyncError(null)
-  cacheDirtyCount(backend.id).then(n => setSyncDirtyCount(n)).catch(() => {})
+  getCb().setSyncError(null)
+  cacheDirtyCount(backend.id).then(n => getCb().setSyncDirtyCount(n)).catch(() => {})
 }
 
 export function parseFiles(
@@ -99,7 +99,7 @@ async function resolveCollision(
     })
   }
 
-  warn(`Conflict on ${path} — your version saved as ${copy}.`)
+  getCb().warn(`Conflict on ${path} — your version saved as ${copy}.`)
 }
 
 // ── RECONCILE ─────────────────────────────────────────────────
@@ -163,9 +163,9 @@ export async function reconcileWithBackend(backend: StorageBackend, vaultId: str
   for (const p of deleted) affectedSlugs.add(p.replace(/\.(md|yaml|yml)$/, ''))
 
   // Keep items/roots that belong to untouched files.
-  const keptItems = getItems().filter(item => !affectedSlugs.has(item.fileSlug))
+  const keptItems = getCb().getItems().filter(item => !affectedSlugs.has(item.fileSlug))
   const keptRoots: Roots = new Map(
-    [...getRoots()].filter(([slug]) => !affectedSlugs.has(slug)),
+    [...getCb().getRoots()].filter(([slug]) => !affectedSlugs.has(slug)),
   )
 
   // Parse only the changed files and merge into the kept state.
@@ -174,7 +174,7 @@ export async function reconcileWithBackend(backend: StorageBackend, vaultId: str
     .filter((r): r is NonNullable<typeof r> => r != null)
   const { items: newItems, roots: newRoots } = parseFiles(changedRecords)
 
-  setData({ items: [...keptItems, ...newItems], roots: new Map([...keptRoots, ...newRoots]) })
+  getCb().setData({ items: [...keptItems, ...newItems], roots: new Map([...keptRoots, ...newRoots]) })
   updateSyncUI()
 }
 
@@ -220,7 +220,7 @@ async function pushDirty(backend: StorageBackend, vaultId: string): Promise<bool
 async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> {
   const backend = getActiveBackend()
   if (!backend || backend.readOnly) {
-    if (!opts.silent) notify('No writable vault connected. Add a local folder first.')
+    if (!opts.silent) getCb().notify('No writable vault connected. Add a local folder first.')
     return
   }
   if (_syncing) return
@@ -233,13 +233,13 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
     if (opts.pull || hadCollision) {
       await reconcileWithBackend(backend, vaultId)
     }
-    setSyncError(null)
+    getCb().setSyncError(null)
     updateSyncUI()
   } catch (e) {
     console.error('[vault] sync failed:', e)
     const msg = (e as Error).message || (e as Error).name || 'Unknown error'
-    setSyncError(msg)
-    notifyError('Sync failed', e)
+    getCb().setSyncError(msg)
+    getCb().notifyError('Sync failed', e)
   } finally {
     _syncing = false
   }
@@ -266,9 +266,9 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
   try {
     const backend = getActiveBackend()
     if (!backend || backend.readOnly) return
-    const slugItems = fileSlugItems(getItems(), fileSlug)
+    const slugItems = fileSlugItems(getCb().getItems(), fileSlug)
     if (slugItems.length === 0) { await deleteFromBackend(fileSlug); return }
-    const root        = getRoots().get(fileSlug)
+    const root        = getCb().getRoots().get(fileSlug)
     const frontmatter = collapseToYaml(slugItems, root)
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body)
@@ -278,7 +278,7 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     scheduleAutoPush()
   } catch (e) {
     console.error('[vault] writeEntityToCache failed:', e)
-    notifyError('Save failed', e)
+    getCb().notifyError('Save failed', e)
   }
 }
 
@@ -292,6 +292,6 @@ export async function deleteFromBackend(fileSlug: string): Promise<void> {
     scheduleAutoPush()
   } catch (e) {
     console.error('[vault] deleteFromBackend failed:', e)
-    notifyError('Delete failed', e)
+    getCb().notifyError('Delete failed', e)
   }
 }

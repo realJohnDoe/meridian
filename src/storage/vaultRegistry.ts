@@ -10,7 +10,7 @@ import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
 import { GitHubBackend }  from './githubBackend'
 import type { StorageBackend, VaultRef, GitHubVaultRef } from './backend'
-import { setData, getVaults, notify, notifyError, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading } from '@/storeBridge'
+import { getCb } from './storageCallbacks'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
 import { reconcileWithBackend, parseFiles, updateSyncUI } from './sync'
 import { emit } from '@/events'
@@ -25,7 +25,7 @@ async function updateVaultRefs(mutate: (current: VaultRef[]) => VaultRef[]): Pro
   const current = await vaultRefsLoad()
   const updated = mutate(current)
   await vaultRefsSave(updated)
-  setVaultList([EXAMPLE_REF, ...updated])
+  getCb().setVaultList([EXAMPLE_REF, ...updated])
 }
 
 // ── ACTIVATION HELPERS ─────────────────────────────────────────
@@ -34,25 +34,25 @@ async function hydrateFromCache(vaultId: string): Promise<void> {
   const cached = await cacheLoadAll(vaultId)
   if (cached.length === 0) return
   const { items, roots } = parseFiles(cached)
-  setData({ items, roots })
+  getCb().setData({ items, roots })
 }
 
 async function activateExampleVault(): Promise<void> {
   const backend = new ExampleBackend()
   setActiveBackend(backend)
-  setActiveVaultId('example')
-  setPendingReconnect(null)
+  getCb().setActiveVaultId('example')
+  getCb().setPendingReconnect(null)
   await activeVaultIdSave('example')
   const files = await backend.readAll()
-  setData(parseFiles(files))
+  getCb().setData(parseFiles(files))
   updateSyncUI()
   emit('vault:changed')
 }
 
 async function activateWritableVault(backend: StorageBackend): Promise<void> {
   setActiveBackend(backend)
-  setActiveVaultId(backend.id)
-  setPendingReconnect(null)
+  getCb().setActiveVaultId(backend.id)
+  getCb().setPendingReconnect(null)
   await activeVaultIdSave(backend.id)
   await hydrateFromCache(backend.id)
   await reconcileWithBackend(backend, backend.id)
@@ -65,7 +65,7 @@ export async function restoreVaults(): Promise<void> {
   try {
     await restoreVaultsInner()
   } finally {
-    setVaultLoading(false)
+    getCb().setVaultLoading(false)
   }
 }
 
@@ -73,10 +73,10 @@ async function restoreVaultsInner(): Promise<void> {
   async function fallbackToExample() {
     const backend = new ExampleBackend()
     setActiveBackend(backend)
-    setVaultList([EXAMPLE_REF])
-    setActiveVaultId('example')
-    setPendingReconnect(null)
-    setData(parseFiles(await backend.readAll()))
+    getCb().setVaultList([EXAMPLE_REF])
+    getCb().setActiveVaultId('example')
+    getCb().setPendingReconnect(null)
+    getCb().setData(parseFiles(await backend.readAll()))
   }
 
   try {
@@ -84,7 +84,7 @@ async function restoreVaultsInner(): Promise<void> {
 
     const savedRefs = await vaultRefsLoad()
     const allRefs: VaultRef[] = [EXAMPLE_REF, ...savedRefs]
-    setVaultList(allRefs)
+    getCb().setVaultList(allRefs)
 
     const savedActiveId = await activeVaultIdLoad()
     const targetRef     = allRefs.find(r => r.id === savedActiveId) ?? EXAMPLE_REF
@@ -98,8 +98,8 @@ async function restoreVaultsInner(): Promise<void> {
         await activateWritableVault(backend)
       } else if (perm === 'prompt') {
         setActiveBackend(backend)
-        setActiveVaultId(targetRef.id)
-        setPendingReconnect(targetRef.name)
+        getCb().setActiveVaultId(targetRef.id)
+        getCb().setPendingReconnect(targetRef.name)
         await hydrateFromCache(targetRef.id)
         updateSyncUI()
       } else {
@@ -113,7 +113,7 @@ async function restoreVaultsInner(): Promise<void> {
       if (perm === 'granted') {
         await activateWritableVault(backend)
       } else {
-        notify(`Could not reconnect GitHub vault "${targetRef.name}" — check your token.`)
+        getCb().notify(`Could not reconnect GitHub vault "${targetRef.name}" — check your token.`)
         await activateExampleVault()
       }
     } else {
@@ -129,32 +129,32 @@ export async function setActiveVault(id: string): Promise<void> {
   try {
     if (id === 'example') { await activateExampleVault(); return }
 
-    const ref = getVaults().find(v => v.id === id)
+    const ref = getCb().getVaults().find(v => v.id === id)
     if (!ref) return
 
     if (ref.kind === 'local') {
       const handle = await handleLoad(id)
-      if (!handle) { notify('Vault handle not found — try removing and re-adding it.'); return }
+      if (!handle) { getCb().notify('Vault handle not found — try removing and re-adding it.'); return }
 
       const backend = new LocalBackend(id, ref.name, handle)
       const perm    = await backend.ensurePermission(true)
-      if (perm !== 'granted') { notify(`Permission denied for vault "${ref.name}".`); return }
+      if (perm !== 'granted') { getCb().notify(`Permission denied for vault "${ref.name}".`); return }
 
       await activateWritableVault(backend)
     } else if (ref.kind === 'github') {
       const token = await tokenLoad(id)
-      if (!token) { notify('GitHub token not found — try removing and re-adding this vault.'); return }
+      if (!token) { getCb().notify('GitHub token not found — try removing and re-adding this vault.'); return }
 
       const backend = new GitHubBackend(id, ref.name, { ...ref.github, token })
       const perm    = await backend.ensurePermission(true)
-      if (perm !== 'granted') { notify(`Could not connect to GitHub vault "${ref.name}" — check your token.`); return }
+      if (perm !== 'granted') { getCb().notify(`Could not connect to GitHub vault "${ref.name}" — check your token.`); return }
 
       await activateWritableVault(backend)
     }
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
     console.error('[vault] setActiveVault failed:', e)
-    notifyError('Could not switch vault', e)
+    getCb().notifyError('Could not switch vault', e)
   }
 }
 
@@ -183,7 +183,7 @@ export async function addLocalVault(): Promise<void> {
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
     console.error('[vault] addLocalVault failed:', e)
-    notifyError('Could not connect vault', e)
+    getCb().notifyError('Could not connect vault', e)
   }
 }
 
@@ -195,7 +195,7 @@ export async function addGitHubVault(cfg: GitHubVaultConfig): Promise<void> {
     const backend = new GitHubBackend(id, `${cfg.owner}/${cfg.repo}`, cfg)
     const perm    = await backend.ensurePermission(true)
     if (perm !== 'granted') {
-      notify('Could not connect to GitHub repository — check your token and repo name.')
+      getCb().notify('Could not connect to GitHub repository — check your token and repo name.')
       return
     }
 
@@ -214,7 +214,7 @@ export async function addGitHubVault(cfg: GitHubVaultConfig): Promise<void> {
     await activateWritableVault(backend)
   } catch (e) {
     console.error('[vault] addGitHubVault failed:', e)
-    notifyError('Could not connect GitHub vault', e)
+    getCb().notifyError('Could not connect GitHub vault', e)
   }
 }
 
@@ -235,6 +235,6 @@ export async function removeVault(id: string): Promise<void> {
     }
   } catch (e) {
     console.error('[vault] removeVault failed:', e)
-    notifyError('Could not remove vault', e)
+    getCb().notifyError('Could not remove vault', e)
   }
 }
