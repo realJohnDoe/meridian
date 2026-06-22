@@ -36,14 +36,6 @@ Meridian is a **healthy, carefully-maintained codebase** — strong typing (one 
 - **Problem:** The data/sync domain is coupled to the UI store and toast system through a global bridge, so storage can't be exercised or reused without the Zustand store and sonner present.
 - **Fix:** Have sync functions return results/events and let a thin app-layer adapter push them into the store, rather than the storage layer writing UI state itself.
 
-### 16. `any` and unchecked casts at the cache/persistence boundary
-
-- **Category:** `types`
-- **Impact:** 2 · **Breadth:** ~6 callsites · **Fix effort:** S
-- **Evidence:** `cache.ts:25` `value: any` on `MetaRecord`, then unchecked reads like `record?.value as FileSystemDirectoryHandle` (`cache.ts:143`), `as VaultRef[]` (`:184`), `store.ts:75` `parsed as string[]`.
-- **Problem:** Everything read back from IndexedDB/localStorage is cast without validation, so a corrupted or schema-drifted record fails at an arbitrary later point instead of at the boundary.
-- **Fix:** Give `MetaRecord` a discriminated value type (or per-key typed accessors) and validate on read.
-
 # Codebase Health Survey
 
 Survey this codebase for code health issues across the categories below.
