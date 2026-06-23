@@ -1,13 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { HardDrive, GitBranch, Trash2, Plus } from 'lucide-react'
-import { vaultIcon } from './vaultIcon'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
 import { addLocalVault, addGitHubVault, removeVault } from '@/storage/vaultRegistry'
+import { tokenSave } from '@/storage/cache'
+import {
+  Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import ParticipantsRow from '@/editor/ParticipantsRow'
+import {
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalTitle,
+  ResponsiveModalDescription,
+} from '@/components/ui/responsive-modal'
 
-type Step = 'manage' | 'source' | 'github'
+type Step = 'vault' | 'source' | 'github'
 type Source = 'local' | 'github'
 
 interface Props {
@@ -15,22 +24,56 @@ interface Props {
   onOpenChange: (open: boolean) => void
 }
 
-
 export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
-  const [step,    setStep]    = useState<Step>('manage')
-  const [source,  setSource]  = useState<Source>('local')
-  const [token,   setToken]   = useState('')
-  const [repoStr, setRepoStr] = useState('')
-  const [branch,  setBranch]  = useState('main')
-  const [busy,    setBusy]    = useState(false)
-  const [error,   setError]   = useState<string | null>(null)
+  const [step,               setStep]               = useState<Step>('vault')
+  const [source,             setSource]             = useState<Source>('local')
+  const [selectedVaultId,    setSelectedVaultId]    = useState<string | null>(null)
+  const [vaultParticipants,  setVaultParticipants]  = useState<string[]>([])
+  const [token,              setToken]              = useState('')
+  const [repoStr,            setRepoStr]            = useState('')
+  const [branch,             setBranch]             = useState('main')
+  const [busy,               setBusy]               = useState(false)
+  const [error,              setError]              = useState<string | null>(null)
 
-  const vaults        = useStore(s => s.vaults)
-  const activeVaultId = useStore(s => s.activeVaultId)
+  const vaults                = useStore(s => s.vaults)
+  const activeVaultId         = useStore(s => s.activeVaultId)
+  const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
+
+  function loadVaultLocals(vaultId: string) {
+    try {
+      const raw = localStorage.getItem(`meridian_default_participants_${vaultId}`)
+      const parsed: unknown = raw ? JSON.parse(raw) : []
+      setVaultParticipants(Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [])
+    } catch {
+      setVaultParticipants([])
+    }
+    setSelectedVaultId(vaultId)
+  }
+
+  function handleOpenChange(v: boolean) {
+    if (v) {
+      const id = activeVaultId ?? vaults[0]?.id ?? null
+      if (id) loadVaultLocals(id)
+    } else {
+      reset()
+    }
+    onOpenChange(v)
+  }
+
+  // If the selected vault was removed, fall back to active or first remaining vault
+  useEffect(() => {
+    if (!open) return
+    if (selectedVaultId && vaults.some(v => v.id === selectedVaultId)) return
+    const id = activeVaultId ?? vaults[0]?.id ?? null
+    if (id) loadVaultLocals(id)
+    else setSelectedVaultId(null)
+  }, [vaults, open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function reset() {
-    setStep('manage')
+    setStep('vault')
     setSource('local')
+    setSelectedVaultId(null)
+    setVaultParticipants([])
     setToken('')
     setRepoStr('')
     setBranch('main')
@@ -38,9 +81,34 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
     setError(null)
   }
 
-  function handleOpenChange(v: boolean) {
-    if (!v) reset()
-    onOpenChange(v)
+  function handleVaultSelect(value: string) {
+    if (value === '__add__') {
+      setStep('source')
+    } else {
+      loadVaultLocals(value)
+    }
+  }
+
+  function handleParticipantsChange(next: string[]) {
+    setVaultParticipants(next)
+    if (selectedVaultId) {
+      localStorage.setItem(`meridian_default_participants_${selectedVaultId}`, JSON.stringify(next))
+      if (selectedVaultId === activeVaultId) setDefaultParticipants(next)
+    }
+  }
+
+  async function handleSaveToken() {
+    if (!selectedVaultId || !token.trim()) return
+    setBusy(true)
+    setError(null)
+    try {
+      await tokenSave(selectedVaultId, token.trim())
+      setToken('')
+    } catch (e) {
+      setError((e as Error).message || 'Could not save token.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleNext() {
@@ -82,8 +150,7 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
 
   async function handleRemove(id: string) {
     await removeVault(id)
-    // If we removed the last non-example vault, stay open on manage view
-    // (the vault list will just show Example only)
+    // useEffect above handles falling back to a valid selectedVaultId
   }
 
   const sourceCards: { id: Source; Icon: typeof HardDrive; title: string; desc: string }[] = [
@@ -101,67 +168,106 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
     },
   ]
 
+  const selectedVault = vaults.find(v => v.id === selectedVaultId)
+
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[420px]">
-        {step === 'manage' && (
+    <ResponsiveModal open={open} onOpenChange={handleOpenChange}>
+      <ResponsiveModalContent className="sm:max-w-[420px]">
+        <ResponsiveModalDescription>Manage vaults</ResponsiveModalDescription>
+
+        {step === 'vault' && (
           <>
-            <DialogHeader>
-              <DialogTitle>Manage vaults</DialogTitle>
-              <DialogDescription>Switch, add, or remove vaults.</DialogDescription>
-            </DialogHeader>
+            <ResponsiveModalTitle>Manage vaults</ResponsiveModalTitle>
 
-            <div className="flex flex-col gap-1 py-2">
-              {vaults.map(vault => {
-                const VaultIcon  = vaultIcon(vault.kind)
-                const isActive   = vault.id === activeVaultId
-                const isExample  = vault.kind === 'example'
-                return (
-                  <div
-                    key={vault.id}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-[10px]',
-                      isActive && 'bg-primary/8',
-                    )}
-                  >
-                    <VaultIcon className="size-[16px] shrink-0 stroke-[1.7] text-dim" />
-                    <span className="flex-1 truncate text-[14px]">{vault.name}</span>
-                    {isActive && (
-                      <span className="text-[11px] font-medium text-primary px-2 py-[2px] rounded-full bg-primary/10 shrink-0">
-                        Active
-                      </span>
-                    )}
-                    {!isExample && (
-                      <button
-                        onClick={() => handleRemove(vault.id)}
-                        title={`Remove "${vault.name}"`}
-                        className="shrink-0 p-1 rounded text-dim hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      >
-                        <Trash2 className="size-[14px] stroke-[1.7]" />
-                      </button>
-                    )}
+            <div className="flex flex-col gap-4 p-4">
+              <Select value={selectedVaultId ?? ''} onValueChange={handleVaultSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select vault…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vaults.map(v => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.name}{v.id === activeVaultId ? ' (active)' : ''}
+                    </SelectItem>
+                  ))}
+                  <SelectSeparator />
+                  <SelectItem value="__add__">
+                    <span className="flex items-center gap-1.5">
+                      <Plus className="size-[13px] stroke-[1.7]" />
+                      Add new vault…
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              {selectedVault && (
+                <>
+                  <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                    <span className="text-[13px] font-medium">Default participants</span>
+                    <p className="text-[12px] text-muted-foreground">
+                      Added to new entries in this vault automatically.
+                    </p>
+                    <ParticipantsRow
+                      participants={vaultParticipants}
+                      onChange={handleParticipantsChange}
+                    />
                   </div>
-                )
-              })}
-            </div>
 
-            <div className="flex justify-end pt-1 border-t border-border">
-              <Button variant="ghost" onClick={() => setStep('source')} className="gap-2">
-                <Plus className="size-[15px] stroke-[1.7]" />
-                Add vault
-              </Button>
+                  {selectedVault.kind === 'github' && (
+                    <div className="flex flex-col gap-3 pt-2 border-t border-border">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[13px] font-medium">Repository</span>
+                        <span className="text-[13px] text-muted-foreground font-mono">
+                          {selectedVault.github.owner}/{selectedVault.github.repo} ({selectedVault.github.branch})
+                        </span>
+                      </div>
+                      <label className="flex flex-col gap-1">
+                        <span className="text-[13px] font-medium">Update token</span>
+                        <input
+                          type="password"
+                          className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
+                          placeholder="github_pat_… (leave blank to keep current)"
+                          value={token}
+                          onChange={e => { setToken(e.target.value); setError(null) }}
+                          autoComplete="off"
+                          spellCheck={false}
+                        />
+                      </label>
+                      {error && <p className="text-[13px] text-destructive">{error}</p>}
+                      {token.trim() && (
+                        <div className="flex justify-end">
+                          <Button size="sm" onClick={handleSaveToken} disabled={busy}>
+                            {busy ? 'Saving…' : 'Save token'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedVault.kind !== 'example' && (
+                    <div className="flex justify-end pt-2 border-t border-border">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
+                        onClick={() => handleRemove(selectedVault.id)}
+                      >
+                        <Trash2 className="size-[13px] stroke-[1.7]" />
+                        Remove vault
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </>
         )}
 
         {step === 'source' && (
           <>
-            <DialogHeader>
-              <DialogTitle>Add vault</DialogTitle>
-              <DialogDescription>Choose where to store your notes.</DialogDescription>
-            </DialogHeader>
+            <ResponsiveModalTitle>Add vault</ResponsiveModalTitle>
 
-            <div className="flex flex-col gap-3 py-2">
+            <div className="flex flex-col gap-3 p-4">
               {sourceCards.map(({ id, Icon, title, desc }) => (
                 <button
                   key={id}
@@ -182,8 +288,8 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
               ))}
             </div>
 
-            <div className="flex justify-between pt-1">
-              <Button variant="ghost" onClick={() => setStep('manage')}>Back</Button>
+            <div className="flex justify-between px-4 pb-4">
+              <Button variant="ghost" onClick={() => setStep('vault')}>Back</Button>
               <Button onClick={handleNext}>
                 {source === 'local' ? 'Choose folder' : 'Next'}
               </Button>
@@ -193,30 +299,27 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
 
         {step === 'github' && (
           <>
-            <DialogHeader>
-              <DialogTitle>Connect GitHub repository</DialogTitle>
-              <DialogDescription asChild>
-                <div>
-                  Create a{' '}
-                  <a
-                    href="https://github.com/settings/tokens?type=beta"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                  >
-                    fine-grained personal access token
-                  </a>{' '}
-                  on GitHub with these settings:
-                  <ul className="mt-2 ml-4 list-disc space-y-1 text-[12px]">
-                    <li><strong>Repository access:</strong> Only select repositories — pick this vault&apos;s repo</li>
-                    <li><strong>Permissions → Contents:</strong> Read and write</li>
-                    <li>Leave all other permissions as <em>No access</em></li>
-                  </ul>
-                </div>
-              </DialogDescription>
-            </DialogHeader>
+            <ResponsiveModalTitle>Connect GitHub repository</ResponsiveModalTitle>
 
-            <div className="flex flex-col gap-3 py-2">
+            <div className="flex flex-col gap-3 p-4">
+              <p className="text-[13px] text-muted-foreground">
+                Create a{' '}
+                <a
+                  href="https://github.com/settings/tokens?type=beta"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  fine-grained personal access token
+                </a>{' '}
+                on GitHub with these settings:
+              </p>
+              <ul className="ml-4 list-disc space-y-1 text-[12px] text-muted-foreground">
+                <li><strong>Repository access:</strong> Only select repositories — pick this vault&apos;s repo</li>
+                <li><strong>Permissions → Contents:</strong> Read and write</li>
+                <li>Leave all other permissions as <em>No access</em></li>
+              </ul>
+
               <label className="flex flex-col gap-1">
                 <span className="text-[13px] font-medium">Repository</span>
                 <input
@@ -254,12 +357,10 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
                 />
               </label>
 
-              {error && (
-                <p className="text-[13px] text-destructive">{error}</p>
-              )}
+              {error && <p className="text-[13px] text-destructive">{error}</p>}
             </div>
 
-            <div className="flex justify-between pt-1">
+            <div className="flex justify-between px-4 pb-4">
               <Button variant="ghost" onClick={() => setStep('source')} disabled={busy}>Back</Button>
               <Button onClick={handleConnect} disabled={busy}>
                 {busy ? 'Connecting…' : 'Connect'}
@@ -267,7 +368,7 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
             </div>
           </>
         )}
-      </DialogContent>
-    </Dialog>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   )
 }
