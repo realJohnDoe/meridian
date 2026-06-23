@@ -87,7 +87,7 @@ export default function AgendaView({ onOpen }: Props) {
 
   // Expand occurrences and group them by day — same window as buildAgenda().
   const groups = useMemo(() => {
-    const from = addDays(today, -7)
+    const from = addDays(today, -365)
     const to = addDays(today, 90)
 
     let allOccs: Occurrence[]
