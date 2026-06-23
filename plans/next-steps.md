@@ -1,5 +1,6 @@
 ## Next steps
 
+- Bug: Also show past overdue tasks from more than a week ago
 - Fix font / occurrence size in month view on large screens
 - If task is set done on another day, move to today with button to keep original date / no date.
 - Convert duration into end date/time
