@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { HardDrive, GitBranch, Trash2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
 import { addLocalVault, addGitHubVault, removeVault } from '@/storage/vaultRegistry'
 import { tokenSave } from '@/storage/cache'
+import { syncToBackend } from '@/storage/sync'
 import {
   Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -33,11 +34,24 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
   const [repoStr,            setRepoStr]            = useState('')
   const [branch,             setBranch]             = useState('main')
   const [busy,               setBusy]               = useState(false)
+  const [syncing,            setSyncing]            = useState(false)
   const [error,              setError]              = useState<string | null>(null)
 
-  const vaults                = useStore(s => s.vaults)
-  const activeVaultId         = useStore(s => s.activeVaultId)
+  const vaults                 = useStore(s => s.vaults)
+  const activeVaultId          = useStore(s => s.activeVaultId)
   const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
+  const items                  = useStore(s => s.items)
+
+  const allParticipants = useMemo(() => {
+    const set = new Set<string>()
+    for (const item of items) {
+      for (const p of item.metadata.participants) {
+        const trimmed = p.trim()
+        if (trimmed) set.add(trimmed)
+      }
+    }
+    return [...set].sort()
+  }, [items])
 
   function loadVaultLocals(vaultId: string) {
     try {
@@ -69,6 +83,15 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
     else setSelectedVaultId(null)
   }, [vaults, open]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function handleSyncNow() {
+    setSyncing(true)
+    try {
+      await syncToBackend()
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   function reset() {
     setStep('vault')
     setSource('local')
@@ -78,6 +101,7 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
     setRepoStr('')
     setBranch('main')
     setBusy(false)
+    setSyncing(false)
     setError(null)
   }
 
@@ -202,24 +226,34 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
 
               {selectedVault && (
                 <>
-                  <div className="flex flex-col gap-2 pt-2 border-t border-border">
-                    <span className="text-[13px] font-medium">Default participants</span>
-                    <p className="text-[12px] text-muted-foreground">
-                      Added to new entries in this vault automatically.
-                    </p>
-                    <ParticipantsRow
-                      participants={vaultParticipants}
-                      onChange={handleParticipantsChange}
-                    />
-                  </div>
+                  {selectedVault.kind === 'local' && (
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <span className="text-[13px] font-medium">Folder</span>
+                        <span className="text-[12px] text-muted-foreground font-mono truncate">{selectedVault.name}</span>
+                      </div>
+                      {selectedVaultId === activeVaultId && (
+                        <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
+                          {syncing ? 'Syncing…' : 'Sync now'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
 
                   {selectedVault.kind === 'github' && (
                     <div className="flex flex-col gap-3 pt-2 border-t border-border">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[13px] font-medium">Repository</span>
-                        <span className="text-[13px] text-muted-foreground font-mono">
-                          {selectedVault.github.owner}/{selectedVault.github.repo} ({selectedVault.github.branch})
-                        </span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <span className="text-[13px] font-medium">Repository</span>
+                          <span className="text-[12px] text-muted-foreground font-mono truncate">
+                            {selectedVault.github.owner}/{selectedVault.github.repo} ({selectedVault.github.branch})
+                          </span>
+                        </div>
+                        {selectedVaultId === activeVaultId && (
+                          <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
+                            {syncing ? 'Syncing…' : 'Sync now'}
+                          </Button>
+                        )}
                       </div>
                       <label className="flex flex-col gap-1">
                         <span className="text-[13px] font-medium">Update token</span>
@@ -243,6 +277,18 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
                       )}
                     </div>
                   )}
+
+                  <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                    <span className="text-[13px] font-medium">Default participants</span>
+                    <p className="text-[12px] text-muted-foreground">
+                      Added to new entries in this vault automatically.
+                    </p>
+                    <ParticipantsRow
+                      participants={vaultParticipants}
+                      onChange={handleParticipantsChange}
+                      allParticipants={allParticipants}
+                    />
+                  </div>
 
                   {selectedVault.kind !== 'example' && (
                     <div className="flex justify-end pt-2 border-t border-border">
