@@ -86,18 +86,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ---
 
-### 3. `presentation.ts` is a god module of 5 unrelated concerns
-
-- **Category:** `srp` `architecture`
-- **Impact:** 5
-- **Breadth:** 1 file, imported by ~8
-- **Fix effort:** M
-- **Evidence:** `src/presentation.ts` exports date formatters (`fmtLong`/`fmtTopBarDay`), the `FileEntry` domain type + `fileEntries`, the stateful `fileOccurrenceMap` memo (`_fomCache`, `warmSlugInFOM`), occurrence sorting (`sortOccs`), `occState` CSS mapping, and `backlinksTo`.
-- **Problem:** A single 268-line module owns formatting, a domain projection, a mutable cache, sorting, and styling — unrelated reasons to change all collide here, and it transitively couples `store.setData` to a cache reset (`store.ts:53`).
-- **Fix:** Split into `format.ts`, `fileOccurrence.ts` (the cache), `occSort.ts`, and `occState.ts`.
-
----
-
 ### 4. Hidden module-level mutable caches invalidated by convention
 
 - **Category:** `architecture` `performance`
