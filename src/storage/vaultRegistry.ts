@@ -4,7 +4,7 @@ import {
   tokenSave, tokenLoad, tokenClear,
   vaultRefsSave, vaultRefsLoad,
   activeVaultIdSave, activeVaultIdLoad,
-} from '@/cache'
+} from '@/storage/cache'
 import { diskPickDirectory } from './fs'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'

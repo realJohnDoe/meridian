@@ -7,7 +7,7 @@ import { isSeries } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import { titleToSlug } from '@/fileIO'
 import { getItems, getRoots, setData } from '@/storeBridge'
-import { warmSlugInFOM, backlinksTo } from '@/presentation'
+import { warmSlugInFOM, backlinksTo } from '@/fileOccurrence'
 import { writeEntityToCache, deleteFromBackend } from '@/storage/sync'
 import type { EntryState, ItemType } from './state'
 

@@ -7,7 +7,7 @@ import {
   ResponsiveModalActions,
 } from '@/components/ui/responsive-modal'
 import { badgeVariants } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 import type { Priority } from '@/types'
 
 const PRIORITY_CLASS: Record<string, string> = {

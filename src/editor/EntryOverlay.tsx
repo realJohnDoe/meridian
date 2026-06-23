@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useStore } from '@/store'
 import { useEntryEditor } from './useEntryEditor'
 import { expandRange } from '@/model/expansion'
-import { fileOccurrenceMap } from '@/presentation'
+import { fileOccurrenceMap } from '@/fileOccurrence'
 import EditorShell from './EditorShell'
 import type { Occurrence, EditScope } from '@/types'
 

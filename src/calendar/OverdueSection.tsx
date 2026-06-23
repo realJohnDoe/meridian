@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import type { Occurrence, EditScope } from '@/types'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 import OccurrenceRow from './OccurrenceRow'
 
 

@@ -2,8 +2,8 @@ import {
   cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
   cacheWriteClean, cacheDirtyCount, cacheLoadAll,
   cacheWriteTombstone, cacheGetTombstones,
-} from '@/cache'
-import type { CacheRecord } from '@/cache'
+} from '@/storage/cache'
+import type { CacheRecord } from '@/storage/cache'
 import { conflictPath } from './conflictName'
 import { ConflictError } from './conflictError'
 import type { StorageBackend } from './backend'

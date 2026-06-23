@@ -1,5 +1,5 @@
 import Dexie from 'dexie'
-import type { VaultRef } from './storage/backend'
+import type { VaultRef } from './backend'
 
 // ── Types ──────────────────────────────────────────────────────
 
