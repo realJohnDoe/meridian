@@ -16,7 +16,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
   if (!query) return null
 
   return (
-    <div id="filterOverlay" className="absolute bottom-full left-0 right-0 bg-background z-[25] overflow-y-auto [-webkit-overflow-scrolling:touch] pointer-events-auto max-h-[calc(100svh-var(--th))]">
+    <div id="filterOverlay" className="absolute bottom-full left-0 right-0 bg-background z-[25] overflow-y-auto [-webkit-overflow-scrolling:touch] pointer-events-auto max-h-[calc(100svh-var(--th)-80px)]">
       <div className="lg:max-w-[720px] lg:mx-auto">
         {/* "Create" row */}
         <Button
