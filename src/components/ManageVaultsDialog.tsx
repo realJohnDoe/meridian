@@ -249,11 +249,9 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
                             {selectedVault.github.owner}/{selectedVault.github.repo} ({selectedVault.github.branch})
                           </span>
                         </div>
-                        {selectedVaultId === activeVaultId && (
-                          <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
-                            {syncing ? 'Syncing…' : 'Sync now'}
-                          </Button>
-                        )}
+                        <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
+                          {syncing ? 'Syncing…' : 'Sync now'}
+                        </Button>
                       </div>
                       <label className="flex flex-col gap-1">
                         <span className="text-[13px] font-medium">Update token</span>

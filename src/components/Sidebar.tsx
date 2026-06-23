@@ -146,6 +146,7 @@ export default function AppSidebar() {
                   </SidebarMenuItem>
                 )
               })}
+              <SidebarSeparator />
               <SidebarMenuItem>
                 <SidebarMenuButton
                   data-tour="manage-vaults"
