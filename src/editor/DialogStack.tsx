@@ -51,6 +51,7 @@ export default function DialogStack({ entry, handlers }: Props) {
       <DurationDialog
         open={activeDialog === 'dlgDur'}
         value={entry.duration || ''}
+        scheduled={entry.scheduled}
         onConfirm={onDurConfirm}
         onRemove={onDurRemove}
         onClose={onClose}

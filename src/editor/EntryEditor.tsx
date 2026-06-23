@@ -20,6 +20,7 @@ import { cn } from '@/lib/cn'
 import type { EntryState, ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
 import { saveNode } from './save'
+import { formatDurationChip } from './dialogs/DurationDialog'
 import { titleToSlug } from '@/fileIO'
 import { backlinksTo } from '@/fileOccurrence'
 import { usePendingLinks } from './usePendingLinks'
@@ -283,7 +284,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDel
               )}
               {showDateChip && hasDate && (
                 <PropChip icon={Timer} label="Duration" pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}
-                  value={duration ?? undefined} />
+                  value={duration && scheduled ? formatDurationChip(duration, scheduled) : undefined} />
               )}
               {tracked && (
                 <PropChip icon={Flag} label="Priority" pressed={!!priority} onClick={() => onOpenDlg('dlgPriority')}
