@@ -4,8 +4,8 @@ import {
 import { occIsRecur, occKind } from './types'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
-import { warmSlugInFOM } from './fileOccurrence'
 import { writeEntityToCache, deleteFromBackend } from './storage/sync'
+import { commitNext } from './storeCommit'
 import { showDeleteToast, showDoneMovedToast } from './undoToast'
 import { fmtISO } from './model/dateUtils'
 
@@ -22,23 +22,17 @@ export function toggleOccDone(o: Occurrence): void {
       const afterDone = toggleDone(snapshot, o)
       const afterMove = { items: moveOccToDate(afterDone.items, o, today), roots: afterDone.roots }
 
-      warmSlugInFOM(o.fileSlug, afterMove.items, afterMove.roots)
-      setData(afterMove)
-      writeEntityToCache(o.fileSlug)
+      commitNext(afterMove, [o.fileSlug])
 
       showDoneMovedToast(o.metadata.title, o.date, () => {
-        warmSlugInFOM(o.fileSlug, afterDone.items, afterDone.roots)
-        setData(afterDone)
-        writeEntityToCache(o.fileSlug)
+        commitNext(afterDone, [o.fileSlug])
       })
       return
     }
   }
 
   const next = toggleDone(snapshot, o)
-  warmSlugInFOM(o.fileSlug, next.items, next.roots)
-  setData(next)
-  writeEntityToCache(o.fileSlug)
+  commitNext(next, [o.fileSlug])
 }
 
 export function beginSwipeDelete(o: Occurrence): () => void {

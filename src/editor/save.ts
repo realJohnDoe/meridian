@@ -6,9 +6,9 @@ import {
 import { isSeries } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import { titleToSlug } from '@/fileIO'
-import { getItems, getRoots, setData } from '@/storeBridge'
-import { warmSlugInFOM, backlinksTo } from '@/fileOccurrence'
-import { writeEntityToCache, deleteFromBackend } from '@/storage/sync'
+import { getItems, getRoots } from '@/storeBridge'
+import { backlinksTo } from '@/fileOccurrence'
+import { commitNext, commitDelete } from '@/storeCommit'
 import type { EntryState, ItemType } from './state'
 
 // ── BACKLINK HELPERS ──────────────────────────────────────────
@@ -22,8 +22,7 @@ export function addItemLink(targetSlug: string, sourceSlug: string): void {
   if ((file.items ?? []).includes(stored)) return
   const newRoots = new Map(roots)
   newRoots.set(targetSlug, { ...file, items: [...(file.items ?? []), stored] })
-  setData({ items: getItems(), roots: newRoots })
-  writeEntityToCache(targetSlug)
+  commitNext({ items: getItems(), roots: newRoots }, [targetSlug])
 }
 
 /** Remove `[[sourceSlug]]` from targetSlug's items list. */
@@ -34,8 +33,7 @@ export function removeItemLink(targetSlug: string, sourceSlug: string): void {
   const stored = `[[${sourceSlug}]]`
   const newRoots = new Map(roots)
   newRoots.set(targetSlug, { ...file, items: (file.items ?? []).filter(i => i !== stored) })
-  setData({ items: getItems(), roots: newRoots })
-  writeEntityToCache(targetSlug)
+  commitNext({ items: getItems(), roots: newRoots }, [targetSlug])
 }
 
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
@@ -125,9 +123,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
     repeat:       fields.repeat       ?? null,
   })
   const fileSlug = item?.fileSlug ?? titleToSlug(title)
-  warmSlugInFOM(fileSlug, nextData.items, nextData.roots)
-  setData(nextData)
-  if (fileSlug) writeEntityToCache(fileSlug)
+  if (fileSlug) commitNext(nextData, [fileSlug])
   return 'saved'
 }
 
@@ -153,27 +149,20 @@ export function deleteNode(
   function excludeThis() {
     if (!item) return
     const next = excludeOccurrence({ items: getItems(), roots: getRoots() }, item)
-    warmSlugInFOM(item.fileSlug, next.items, next.roots)
-    setData(next)
-    writeEntityToCache(item.fileSlug)
+    commitNext(next, [item.fileSlug])
     hideSheet(); navigateBack()
   }
   function deleteAll() {
     if (!item) return
     const affected = backlinksTo(item.fileSlug, getRoots())
     const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
-    warmSlugInFOM(item.fileSlug, next.items, next.roots)
-    setData(next)
-    affected.forEach(writeEntityToCache)
-    deleteFromBackend(item.fileSlug)
+    commitDelete(next, item.fileSlug, affected)
     hideSheet(); navigateBack()
   }
   function deleteFuture() {
     if (!item) return
     const next = deleteFollowing({ items: getItems(), roots: getRoots() }, item)
-    warmSlugInFOM(item.fileSlug, next.items, next.roots)
-    setData(next)
-    writeEntityToCache(item.fileSlug)
+    commitNext(next, [item.fileSlug])
     hideSheet(); navigateBack()
   }
 
@@ -181,10 +170,8 @@ export function deleteNode(
     const doDelete = () => {
       const affected = backlinksTo(item.fileSlug, getRoots())
       const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
-      warmSlugInFOM(item.fileSlug, next.items, next.roots)
-      setData(next)
-      affected.forEach(writeEntityToCache)
-      deleteFromBackend(item.fileSlug); navigateBack()
+      commitDelete(next, item.fileSlug, affected)
+      navigateBack()
     }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }
     doDelete()
