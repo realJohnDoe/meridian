@@ -266,6 +266,7 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
                       {error && <p className="text-[13px] text-destructive">{error}</p>}
                       <div className="flex justify-end">
                         <Button
+                          variant="outline"
                           size="sm"
                           onClick={token.trim() ? handleSaveToken : handleSyncNow}
                           disabled={busy || syncing}
