@@ -7,6 +7,13 @@
       "runtimeArgs": ["dev", "--", "--host"],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "nostalgic-wilson",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "C:\\Users\\johan\\code\\meridian\\.claude\\worktrees\\nostalgic-wilson-e925e0", "exec", "vite", "--host", "--port", "5199", "--strictPort"],
+      "port": 5199,
+      "autoPort": false
     }
   ]
 }
