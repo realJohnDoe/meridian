@@ -1,15 +1,41 @@
 import {
-  toggleDone, excludeOccurrence, deleteByFileSlug,
+  toggleDone, excludeOccurrence, deleteByFileSlug, moveOccToDate,
 } from './model/storeOps'
-import { occIsRecur } from './types'
+import { occIsRecur, occKind } from './types'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
 import { warmSlugInFOM } from './fileOccurrence'
 import { writeEntityToCache, deleteFromBackend } from './storage/sync'
-import { showDeleteToast } from './undoToast'
+import { showDeleteToast, showDoneMovedToast } from './undoToast'
+import { fmtISO } from './model/dateUtils'
 
 export function toggleOccDone(o: Occurrence): void {
-  const next = toggleDone({ items: getItems(), roots: getRoots() }, o)
+  const newDone = !o.metadata.done
+  const snapshot = { items: getItems(), roots: getRoots() }
+
+  if (newDone && occKind(o) === 'task') {
+    const today = fmtISO(new Date())
+    const isWholeDay = !o.time && !!o.date
+    const hasNoDate = !o.date
+
+    if ((isWholeDay || hasNoDate) && o.date !== today) {
+      const afterDone = toggleDone(snapshot, o)
+      const afterMove = { items: moveOccToDate(afterDone.items, o, today), roots: afterDone.roots }
+
+      warmSlugInFOM(o.fileSlug, afterMove.items, afterMove.roots)
+      setData(afterMove)
+      writeEntityToCache(o.fileSlug)
+
+      showDoneMovedToast(o.metadata.title, o.date, () => {
+        warmSlugInFOM(o.fileSlug, afterDone.items, afterDone.roots)
+        setData(afterDone)
+        writeEntityToCache(o.fileSlug)
+      })
+      return
+    }
+  }
+
+  const next = toggleDone(snapshot, o)
   warmSlugInFOM(o.fileSlug, next.items, next.roots)
   setData(next)
   writeEntityToCache(o.fileSlug)
