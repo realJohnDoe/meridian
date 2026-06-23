@@ -1,6 +1,5 @@
 ## Next steps
 
-- Fix font sizes for month view on small screens (see commit 7eac74616aa1843e9315733e82784e7fd25702ed)
 - Bug: Also show past overdue tasks from more than a week ago
 - Convert duration into end date/time
 - Add filter by participants in side bar
