@@ -66,7 +66,7 @@ async function resolveCollision(
   path: string,
   localContent: string,
   cacheMap?: Map<string, CacheRecord>,
-): Promise<void> {
+): Promise<string> {
   const [fresh] = await backend.readFiles([path])
   if (fresh) {
     await cacheWriteClean(vaultId, path, fresh.content, fresh.version)
@@ -102,6 +102,7 @@ async function resolveCollision(
   }
 
   warn(`Conflict on ${path} — your version saved as ${copy}.`)
+  return copy
 }
 
 // ── RECONCILE ─────────────────────────────────────────────────
@@ -115,12 +116,18 @@ async function resolveCollision(
 export function planReconcile(
   diskTokens: Map<string, string>,
   cacheRecords: CacheRecord[],
+  skipPaths: Set<string> = new Set(),
 ): { changed: string[]; deleted: string[] } {
   const cacheMap = new Map(cacheRecords.map(r => [r.path, r]))
   const changed: string[] = []
   const deleted: string[] = []
 
   for (const [path, diskToken] of diskTokens) {
+    // Skip paths we authoritatively wrote/deleted in this same sync cycle: we
+    // already hold their true state, and GitHub's listing API is eventually
+    // consistent, so it may still report the pre-push SHA (or omit a just-created
+    // file). Trusting it here would re-pull stale content over our fresh write.
+    if (skipPaths.has(path)) continue
     const entry = cacheMap.get(path)
     // Pull a file the cache has never seen, OR one whose backend version drifted
     // while we hold no pending local change. Skip dirty entries (pending write)
@@ -131,6 +138,7 @@ export function planReconcile(
     }
   }
   for (const entry of cacheRecords) {
+    if (skipPaths.has(entry.path)) continue
     // Drop locally-cached files that vanished from the backend — but don't
     // clobber pending local changes (dirty) or pending deletes (tombstone).
     if (!diskTokens.has(entry.path) && entry.dirty === 0) deleted.push(entry.path)
@@ -139,12 +147,16 @@ export function planReconcile(
   return { changed, deleted }
 }
 
-export async function reconcileWithBackend(backend: StorageBackend, vaultId: string): Promise<void> {
+export async function reconcileWithBackend(
+  backend: StorageBackend,
+  vaultId: string,
+  skipPaths: Set<string> = new Set(),
+): Promise<void> {
   const diskTokens = await backend.statAll()
   const cached     = await cacheLoadAll(vaultId)
   const cacheMap   = new Map(cached.map(r => [r.path, r]))
 
-  const { changed, deleted } = planReconcile(diskTokens, cached)
+  const { changed, deleted } = planReconcile(diskTokens, cached, skipPaths)
 
   if (changed.length > 0) {
     const freshFiles = await backend.readFiles(changed)
@@ -199,10 +211,21 @@ export function resetSyncBackoff(): void {
   _nextRetryAt         = 0
 }
 
-async function pushDirty(backend: StorageBackend, vaultId: string): Promise<boolean> {
+/**
+ * Push pending local changes to the backend. Returns whether a collision
+ * occurred and the set of paths we authoritatively wrote/deleted this cycle —
+ * the latter must be skipped by a same-cycle reconcile (see planReconcile),
+ * since the backend's listing API is eventually consistent and may not yet
+ * reflect these writes.
+ */
+async function pushDirty(
+  backend: StorageBackend,
+  vaultId: string,
+): Promise<{ hadCollision: boolean; pushed: Set<string> }> {
   const dirty      = await cacheGetDirty(vaultId)
   const tombstones = await cacheGetTombstones(vaultId)
-  if (!dirty.length && !tombstones.length) return false
+  const pushed     = new Set<string>()
+  if (!dirty.length && !tombstones.length) return { hadCollision: false, pushed }
 
   let hadCollision = false
 
@@ -213,10 +236,13 @@ async function pushDirty(backend: StorageBackend, vaultId: string): Promise<bool
       // never false-positives due to stale listing tokens.
       const newVersion = await backend.write(f.path, f.content, f.version)
       await cacheWriteClean(vaultId, f.path, f.content, newVersion)
+      pushed.add(f.path)
     } catch (e) {
       if (e instanceof ConflictError) {
-        await resolveCollision(backend, vaultId, f.path, f.content)
+        const copy = await resolveCollision(backend, vaultId, f.path, f.content)
         hadCollision = true
+        pushed.add(f.path)
+        pushed.add(copy)
       } else {
         throw e
       }
@@ -228,9 +254,10 @@ async function pushDirty(backend: StorageBackend, vaultId: string): Promise<bool
     // when the backend's in-memory SHA cache is cold after a page reload.
     await backend.delete(f.path, f.version)
     await cacheDelete(vaultId, f.path)
+    pushed.add(f.path)
   }
 
-  return hadCollision
+  return { hadCollision, pushed }
 }
 
 async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> {
@@ -245,9 +272,9 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
   const vaultId = backend.id
 
   try {
-    const hadCollision = await pushDirty(backend, vaultId)
+    const { hadCollision, pushed } = await pushDirty(backend, vaultId)
     if (opts.pull || hadCollision) {
-      await reconcileWithBackend(backend, vaultId)
+      await reconcileWithBackend(backend, vaultId, pushed)
     }
     // ── SUCCESS ──────────────────────────────────────────────────
     setSyncError(null)

@@ -66,6 +66,45 @@ describe('planReconcile — protecting pending local changes', () => {
   })
 })
 
+describe('planReconcile — skipping paths pushed this cycle', () => {
+  // GitHub's listing API is eventually consistent: right after we push, statAll
+  // may still report the pre-push SHA or omit a just-created file. Paths we wrote
+  // this cycle must be skipped so the stale listing can't clobber our fresh write.
+
+  it('does not re-pull a just-pushed file whose listing still shows the old SHA', () => {
+    // Cache holds the authoritative post-push SHA; the listing lags at the old one.
+    const diskTokens = new Map([['task.md', 'oldsha']])
+    const cache = [rec('task.md', 'newsha', 0)]
+
+    const { changed } = planReconcile(diskTokens, cache, new Set(['task.md']))
+    expect(changed).toEqual([])
+  })
+
+  it('does not drop a just-created file the listing has not caught up to yet', () => {
+    // We pushed new.md (now clean in cache) but statAll does not list it yet.
+    const diskTokens = new Map<string, string>()
+    const cache = [rec('new.md', 'sha', 0)]
+
+    const { deleted } = planReconcile(diskTokens, cache, new Set(['new.md']))
+    expect(deleted).toEqual([])
+  })
+
+  it('does not resurrect a just-deleted file the listing still reports', () => {
+    // Tombstone was applied (cache entry already gone) but statAll still lists it.
+    const diskTokens = new Map([['gone.md', 'sha']])
+    const { changed } = planReconcile(diskTokens, [], new Set(['gone.md']))
+    expect(changed).toEqual([])
+  })
+
+  it('still reconciles other paths in the same cycle', () => {
+    const diskTokens = new Map([['task.md', 'oldsha'], ['other.md', 'sha2']])
+    const cache = [rec('task.md', 'newsha', 0)]
+
+    const { changed } = planReconcile(diskTokens, cache, new Set(['task.md']))
+    expect(changed).toEqual(['other.md'])
+  })
+})
+
 describe('planReconcile — dropping vanished files', () => {
   it('drops a clean cached file that no longer exists on the backend', () => {
     const diskTokens = new Map<string, string>()
