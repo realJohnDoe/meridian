@@ -105,18 +105,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ---
 
-### 7. `applyEdit` is a 170-line, 5-branch god function
-
-- **Category:** `srp`
-- **Impact:** 4
-- **Breadth:** 1 function, central to all edits
-- **Fix effort:** M
-- **Evidence:** `model/storeOps.ts:169-338` — one function handles `new`, `all`, `single`, `future`, `add`, each with its own series/standalone/override sub-logic and repeated `as RepeatPattern<OccurrenceMetadata>` casts.
-- **Problem:** All five edit semantics share one body, making each branch hard to read in isolation and risky to change; the heavy casts also weaken the otherwise-strong typing.
-- **Fix:** Extract one function per scope (`applyNew`, `applyAll`, `applySingle`, `applyFuture`, `applyAdd`) dispatched by a small switch.
-
----
-
 ### 8. `expandWithMultiday` re-expansion hand-cached via deep structural diff
 
 - **Category:** `performance` `architecture`
