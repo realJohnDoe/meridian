@@ -1,4 +1,4 @@
-import { FolderSync } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { useStore } from '@/store'
 import { syncToBackend } from '@/storage/sync'
@@ -32,7 +32,7 @@ export default function SyncButton() {
           style={{ color }}
           aria-label="Sync status"
         >
-          <FolderSync size={18} />
+          <RefreshCw size={18} />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3 space-y-2" align="end">
