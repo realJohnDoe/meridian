@@ -93,18 +93,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ---
 
-### 8. `expandWithMultiday` re-expansion hand-cached via deep structural diff
-
-- **Category:** `performance` `architecture`
-- **Impact:** 4
-- **Breadth:** `AgendaView` (+ `DayView` reuses `expandWithMultiday`)
-- **Fix effort:** M
-- **Evidence:** `calendar/AgendaView.tsx:30-150` — `hasSameStructure` manually diffs every store item (including `JSON.stringify(repeat)`) on each render to decide whether to reuse a `useRef` expansion cache, then overlays changed metadata by hand.
-- **Problem:** A perf-critical memoization is implemented as ~90 lines of bespoke diffing inside a view component; the structural-field list must be kept in sync with the expansion algorithm by hand (a comment lists the invariant).
-- **Fix:** Move expansion caching beside the algorithm in `model/` keyed on item identity, and have the view consume a memoized selector.
-
----
-
 ### 9. Two independent wikilink parsers / unwrap regexes
 
 - **Category:** `dry`
