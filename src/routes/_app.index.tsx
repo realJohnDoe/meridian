@@ -5,7 +5,7 @@ import { fmtISO } from '@/model/dateUtils'
 import { useOpenEntry } from '@/hooks/useOpenEntry'
 import { useToday } from '@/hooks/useToday'
 import { useStore } from '@/store'
-import { on } from '@/events'
+import { onVaultChanged } from '@/storage/vaultRegistry'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const Route = createFileRoute('/_app/')({
@@ -55,7 +55,7 @@ function AgendaPage() {
   const rafRef = useRef<number>(0)
 
   // When a vault activates, scroll to today once data arrives.
-  useEffect(() => on('vault:changed', () => useStore.setState({ scrollToTodayOnce: true })), [])
+  useEffect(() => onVaultChanged(() => useStore.setState({ scrollToTodayOnce: true })), [])
 
   // Restore saved scroll before paint (no blink); save on unmount.
   useLayoutEffect(() => {

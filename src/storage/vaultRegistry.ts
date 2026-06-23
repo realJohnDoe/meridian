@@ -13,7 +13,18 @@ import type { StorageBackend, VaultRef, GitHubVaultRef } from './backend'
 import { setData, getVaults, notify, notifyError, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading } from '@/storeBridge'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
 import { reconcileWithBackend, parseFiles, updateSyncUI } from './sync'
-import { emit } from '@/events'
+// ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
+
+const _vaultChangedListeners = new Set<() => void>()
+
+export function onVaultChanged(fn: () => void): () => void {
+  _vaultChangedListeners.add(fn)
+  return () => _vaultChangedListeners.delete(fn)
+}
+
+function emitVaultChanged(): void {
+  _vaultChangedListeners.forEach(fn => fn())
+}
 
 // ── CONSTANTS ─────────────────────────────────────────────────
 
@@ -46,7 +57,7 @@ async function activateExampleVault(): Promise<void> {
   const files = await backend.readAll()
   setData(parseFiles(files))
   updateSyncUI()
-  emit('vault:changed')
+  emitVaultChanged()
 }
 
 async function activateWritableVault(backend: StorageBackend): Promise<void> {
@@ -56,7 +67,7 @@ async function activateWritableVault(backend: StorageBackend): Promise<void> {
   await activeVaultIdSave(backend.id)
   await hydrateFromCache(backend.id)
   await reconcileWithBackend(backend, backend.id)
-  emit('vault:changed')
+  emitVaultChanged()
 }
 
 // ── VAULT LIFECYCLE ───────────────────────────────────────────
