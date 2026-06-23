@@ -1,6 +1,5 @@
 ## Next steps
 
-- Fix combobox in default participants
 - Bug: Events are styled done only based on their start time. This is wrong for whole day events and events with duration
 - Fix font / occurrence size in month view on large screens
 - If task is set done on another day, move to today with button to keep original date / no date.
@@ -11,7 +10,6 @@
 - Add nice readme
 - Add Solarized Light theme
 - Investigate more secure storage options
-- Investigate conflicts in spite of single user
 
 # Meridian — Code Health Survey
 
