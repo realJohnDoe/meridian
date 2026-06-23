@@ -136,6 +136,14 @@ export class GitHubBackend implements StorageBackend {
       })
       this._shas.delete(path)
     } catch (e) {
+      // Idempotent delete: a 404 means the file is already gone on GitHub —
+      // the desired end state. Treat it as success so a stale tombstone (e.g.
+      // the delete landed on a prior sync but its cache eviction didn't) can be
+      // cleared instead of wedging sync in a permanent retry loop.
+      if (e instanceof Error && 'status' in e && (e as { status: number }).status === 404) {
+        this._shas.delete(path)
+        return
+      }
       throw mapGitHubError(e)
     }
   }
