@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
-import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart, Loader2 } from 'lucide-react'
+import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import { useToday } from '@/hooks/useToday'
 import { fmtISO } from '@/model/dateUtils'
@@ -40,17 +40,6 @@ function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   )
 }
 
-function AutoSaveIndicator({ status }: { status: 'idle' | 'pending' | 'saved' }) {
-  return (
-    <Loader2
-      size={13}
-      className={cn(
-        'shrink-0 text-muted-foreground transition-opacity duration-300 animate-spin',
-        status === 'pending' ? 'opacity-100' : 'opacity-0',
-      )}
-    />
-  )
-}
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
 const PRIORITY_CLASS: Record<string, string> = {
@@ -74,7 +63,6 @@ interface Props {
   onChange: (updater: (prev: EntryState) => EntryState) => void
   onSave: (body: string) => void
   onAutoSave?: (body: string) => void
-  saveStatus?: 'idle' | 'pending' | 'saved'
   onDelete: () => void
   onClose: () => void
   onOpenDlg: (id: string) => void
@@ -88,7 +76,7 @@ interface Props {
   onToggleFavorite?: () => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onAutoSave, saveStatus, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink, isFavorited, onToggleFavorite }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink, isFavorited, onToggleFavorite }: Props) {
   const today    = useToday()
   const navigate = useNavigate()
   const titleRef = useRef<HTMLTextAreaElement>(null)
@@ -183,7 +171,6 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, saveS
     <>
       <div className="h-topbar flex items-center gap-2 px-3 border-b border-border shrink-0 bg-background">
         <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={onClose}><ArrowLeft size={18} /></Button>
-        {item && <AutoSaveIndicator status={saveStatus ?? 'idle'} />}
         <span className="flex-1 font-mono text-2xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">{fname}</span>
         {item && onToggleFavorite && (
           <Button
