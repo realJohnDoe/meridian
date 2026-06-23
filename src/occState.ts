@@ -1,0 +1,39 @@
+import { parseDurationDays } from './model/duration'
+import { occKind } from './types'
+import type { Occurrence } from './types'
+import type { OccState } from './components/ui/occurrence-variants'
+
+export function occState(o: Occurrence): OccState {
+  if (o.metadata.done) return 'done'
+  const kind = occKind(o)
+  if (kind === 'note') return 'note'
+  if (kind === 'task' || o.metadata.done !== undefined) {
+    const p = o.metadata.priority
+    if (p === 'high')   return 'task-p1'
+    if (p === 'medium') return 'task-p2'
+    if (p === 'low')    return 'task-p3'
+    return 'task-open'
+  }
+  if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) {
+    // Use day-level comparison: past days of a multiday event get the gray shader,
+    // today and future days stay purple.
+    if (o.metadata.jsTime) {
+      const today  = new Date(); today.setHours(0, 0, 0, 0)
+      const day    = new Date(o.metadata.jsTime); day.setHours(0, 0, 0, 0)
+      if (day < today) return 'event-past'
+    }
+    return 'event-future'
+  }
+  const now = new Date()
+  if (o.metadata.jsTime && o.metadata.jsTime < now) {
+    // Whole-day events (no time) use day-level comparison — they stay colored
+    // until midnight, not until 00:01 AM when jsTime (midnight) < now.
+    if (!o.time) {
+      const today    = new Date(); today.setHours(0, 0, 0, 0)
+      const eventDay = new Date(o.metadata.jsTime); eventDay.setHours(0, 0, 0, 0)
+      if (eventDay >= today) return 'event-future'
+    }
+    return 'event-past'
+  }
+  return 'event-future'
+}

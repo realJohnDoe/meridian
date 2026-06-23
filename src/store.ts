@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { StoreItem, Roots } from './types'
 import type { VaultRef } from './storage/backend'
 import { clearOccIdCache } from './model/expansion'
-import { resetFOMCache } from './presentation'
+import { resetFOMCache } from './fileOccurrence'
 
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { EditorView } from '@codemirror/view'
 import type { Roots, StoreItem } from '@/types'
 import OccurrenceCard from '@/components/OccurrenceCard'
-import { fileEntries, fileOccurrenceMap } from '@/presentation'
+import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
 
 export interface WlPopupState {
   query:  string

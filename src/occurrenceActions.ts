@@ -4,7 +4,7 @@ import {
 import { occIsRecur } from './types'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
-import { warmSlugInFOM } from './presentation'
+import { warmSlugInFOM } from './fileOccurrence'
 import { writeEntityToCache, deleteFromBackend } from './storage/sync'
 import { showDeleteToast } from './undoToast'
 

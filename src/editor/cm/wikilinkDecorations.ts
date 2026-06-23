@@ -9,7 +9,7 @@ import type { Roots, StoreItem } from '@/types'
 import { parseWikilinks, resolveWikilink } from '@/wikilinks'
 import TagChip from '@/components/TagChip'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 import { focusedCursorLines } from './viewUtils'
 import { ReactWidget } from './ReactWidget'
 

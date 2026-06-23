@@ -5,7 +5,7 @@ import { useStore } from '@/store'
 import { setActiveVault } from '@/storage/vaultRegistry'
 import { fmtISO, fmtMonth } from '@/model/dateUtils'
 import { useToday } from '@/hooks/useToday'
-import { vaultIcon } from '@/lib/vaultIcon'
+import { vaultIcon } from './vaultIcon'
 import SettingsDialog from './SettingsDialog'
 import {
   Sidebar,

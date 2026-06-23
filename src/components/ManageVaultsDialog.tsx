@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { HardDrive, GitBranch, Trash2, Plus } from 'lucide-react'
-import { vaultIcon } from '@/lib/vaultIcon'
+import { vaultIcon } from './vaultIcon'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
 import { addLocalVault, addGitHubVault, removeVault } from '@/storage/vaultRegistry'
 

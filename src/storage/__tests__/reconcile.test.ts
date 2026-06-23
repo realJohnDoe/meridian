@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { planReconcile } from '@/storage/sync'
-import type { CacheRecord } from '@/cache'
+import type { CacheRecord } from '@/storage/cache'
 
 // ── Helpers ────────────────────────────────────────────────────
 

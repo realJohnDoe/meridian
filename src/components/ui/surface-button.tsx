@@ -11,7 +11,7 @@
  */
 import * as React from 'react'
 import { Button } from './button'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 
 export type SurfaceButtonProps = React.ComponentPropsWithoutRef<typeof Button>
 

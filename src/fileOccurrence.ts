@@ -1,32 +1,7 @@
-import { addDays, isSameDay } from 'date-fns'
 import { expandRange, joinFileMeta, stableOccId } from './model/expansion'
-import { fmtT } from './model/dateUtils'
-import { parseDurationDays } from './model/duration'
 import { resolveWikilink, unwrapRef } from './wikilinks'
-import { occKind, isSeries, isStandaloneOcc } from './types'
+import { isSeries, isStandaloneOcc } from './types'
 import type { Occurrence, StoreItem, Roots } from './types'
-import type { OccState } from './components/ui/occurrence-variants'
-
-export { addDays, isSameDay as sameDay }
-
-// ── DATE FORMATTERS ────────────────────────────────────────────
-
-export const fmtLong  = (d: Date): string => d.toLocaleDateString('en-US', { weekday: 'long',  month: 'long',  day: 'numeric' })
-export const fmtShort = (d: Date): string => d.toLocaleDateString('en-US', {                   month: 'short', day: 'numeric' })
-
-export function fmtTopBarDay(d: Date, today: Date): string {
-  const opts: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' }
-  if (d.getFullYear() !== today.getFullYear()) opts.year = 'numeric'
-  return d.toLocaleDateString('en-US', opts)
-}
-
-export function fmtTopBarMonth(d: Date, today: Date): string {
-  const opts: Intl.DateTimeFormatOptions = { month: 'long' }
-  if (d.getFullYear() !== today.getFullYear()) opts.year = 'numeric'
-  return d.toLocaleDateString('en-US', opts)
-}
-
-// ── FILE ENTRY HELPERS ─────────────────────────────────────────
 
 /** A flat, file-granular entry for the item picker and search overlay. */
 export interface FileEntry {
@@ -49,7 +24,6 @@ export function fileEntries(roots: Roots): FileEntry[] {
   }
   return entries
 }
-
 
 
 // ── fileOccurrenceMap ──────────────────────────────────────────────────────────
@@ -194,75 +168,4 @@ export function backlinksTo(targetSlug: string, roots: Roots): string[] {
     }
   }
   return result
-}
-
-// ── OCCURRENCE SORT ────────────────────────────────────────────
-
-const _prioOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
-
-function _sortKey(o: Occurrence): number {
-  const state     = occState(o)
-  const dimmed    = state === 'done' || state === 'event-past'
-  const isEvent   = occKind(o) === 'event'
-  const isMultiday = (parseDurationDays(o.metadata.duration) ?? 0) >= 2
-  const hasTimed  = !!fmtT(o.time)
-
-  // Active items first (groups 0-3), then past/done in the same sub-order (4-7)
-  const base = dimmed ? 4 : 0
-  if (isEvent && isMultiday) return base + 0   // multiday events
-  if (isEvent && !hasTimed)  return base + 1   // untimed single-day events
-  if (isEvent &&  hasTimed)  return base + 2   // timed events
-  return base + 3                              // tasks
-}
-
-function _prioKey(o: Occurrence): number {
-  return o.metadata.priority ? (_prioOrder[o.metadata.priority] ?? 3) : 3
-}
-
-export function sortOccs(arr: Occurrence[]): Occurrence[] {
-  return [...arr].sort((a: Occurrence, b: Occurrence) => {
-    const sd = _sortKey(a) - _sortKey(b); if (sd) return sd
-    const pd = _prioKey(a) - _prioKey(b); if (pd) return pd
-    const ta = a.metadata.jsTime?.getTime() ?? 0
-    const tb = b.metadata.jsTime?.getTime() ?? 0
-    if (ta !== tb) return ta - tb
-    return (a.metadata.title || '').localeCompare(b.metadata.title || '')
-  })
-}
-
-// ── OCCURRENCE STATE → CSS ─────────────────────────────────────
-
-export function occState(o: Occurrence): OccState {
-  if (o.metadata.done) return 'done'
-  const kind = occKind(o)
-  if (kind === 'note') return 'note'
-  if (kind === 'task' || o.metadata.done !== undefined) {
-    const p = o.metadata.priority
-    if (p === 'high')   return 'task-p1'
-    if (p === 'medium') return 'task-p2'
-    if (p === 'low')    return 'task-p3'
-    return 'task-open'
-  }
-  if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) {
-    // Use day-level comparison: past days of a multiday event get the gray shader,
-    // today and future days stay purple.
-    if (o.metadata.jsTime) {
-      const today  = new Date(); today.setHours(0, 0, 0, 0)
-      const day    = new Date(o.metadata.jsTime); day.setHours(0, 0, 0, 0)
-      if (day < today) return 'event-past'
-    }
-    return 'event-future'
-  }
-  const now = new Date()
-  if (o.metadata.jsTime && o.metadata.jsTime < now) {
-    // Whole-day events (no time) use day-level comparison — they stay colored
-    // until midnight, not until 00:01 AM when jsTime (midnight) < now.
-    if (!o.time) {
-      const today    = new Date(); today.setHours(0, 0, 0, 0)
-      const eventDay = new Date(o.metadata.jsTime); eventDay.setHours(0, 0, 0, 0)
-      if (eventDay >= today) return 'event-future'
-    }
-    return 'event-past'
-  }
-  return 'event-future'
 }

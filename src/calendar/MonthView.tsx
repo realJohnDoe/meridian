@@ -4,12 +4,14 @@ import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
 
 import { expandWithMultiday, multidayDisplayTitle } from '@/model/expansion'
-import { sameDay, sortOccs, occState } from '@/presentation'
+import { sameDay } from '@/format'
+import { sortOccs } from './occSort'
+import { occState } from '@/occState'
 
 const EMPTY: Occurrence[] = []
 import { useToday } from '@/hooks/useToday'
 import { SurfaceButton } from '@/components/ui/surface-button'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 import { ccBarVariants } from '@/components/ui/occurrence-variants'
 
 const MONTHS = [

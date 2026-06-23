@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const ITEM_H = 44 // px — h-11

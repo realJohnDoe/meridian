@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import { Badge } from './ui/badge'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 
 interface TagChipProps {
   /** Display label shown on the chip. */
