@@ -41,15 +41,18 @@ export function decodeBase64(b64: string): string {
 
 // ── Error mapping ──────────────────────────────────────────────
 
-import { ConflictError } from './conflictError'
+import { ConflictError, AuthSyncError, TransientSyncError, isTransientSyncError } from './conflictError'
 
 export function mapGitHubError(e: unknown, path?: string): Error {
   if (e instanceof Error && 'status' in e) {
     const status = (e as { status: number }).status
-    if (status === 401) return new Error('GitHub token is invalid or expired.')
-    if (status === 403) return new Error('GitHub access denied or rate limit reached.')
-    if (status === 404) return new Error('Repository not found or token lacks access.')
+    if (status === 401) return new AuthSyncError('GitHub token is invalid or expired.')
+    // 403 can mean rate-limit or permission denied; octokit retries rate limits so a
+    // surviving 403 is most likely a permission issue — treat as actionable.
+    if (status === 403) return new AuthSyncError('GitHub access denied. Check your token permissions.')
+    if (status === 404) return new AuthSyncError('Repository not found or token lacks access.')
     if (status === 409 || status === 422) return new ConflictError(path ?? 'unknown')
   }
+  if (isTransientSyncError(e)) return new TransientSyncError((e as Error)?.message)
   return e instanceof Error ? e : new Error(String(e))
 }
