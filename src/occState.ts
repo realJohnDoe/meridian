@@ -1,4 +1,4 @@
-import { parseDurationDays } from './model/duration'
+import { parseDurationDays, parseDurationHours } from './model/duration'
 import { occKind } from './types'
 import type { Occurrence } from './types'
 import type { OccState } from './components/ui/occurrence-variants'
@@ -32,6 +32,10 @@ export function occState(o: Occurrence): OccState {
       const today    = new Date(); today.setHours(0, 0, 0, 0)
       const eventDay = new Date(o.metadata.jsTime); eventDay.setHours(0, 0, 0, 0)
       if (eventDay >= today) return 'event-future'
+    } else if (o.metadata.duration) {
+      // Timed event with explicit duration: still future while the event is ongoing.
+      const endMs = o.metadata.jsTime.getTime() + parseDurationHours(o.metadata.duration) * 3_600_000
+      if (endMs > now.getTime()) return 'event-future'
     }
     return 'event-past'
   }
