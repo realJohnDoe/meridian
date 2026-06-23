@@ -260,6 +260,21 @@ describe('GitHubBackend', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
+  it('delete treats a 404 (already gone on GitHub) as success', async () => {
+    // A tombstone replays a delete with a cached blob SHA, but the file was
+    // already removed on GitHub — GitHub answers 404. This must resolve cleanly
+    // so the stale tombstone can be evicted, not wedge sync in a retry loop.
+    mockFetch({ message: 'Not Found' }, 404)
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await expect(backend.delete('gone.md', 'stalesha')).resolves.toBeUndefined()
+  })
+
+  it('delete still throws on non-404 errors (e.g. auth)', async () => {
+    mockFetch({ message: 'Bad credentials' }, 401)
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await expect(backend.delete('note.md', 'somesha')).rejects.toBeInstanceOf(AuthSyncError)
+  })
+
   it('ensurePermission returns granted when push permission is true and branch exists', async () => {
     fetchSpy
       .mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes', permissions: { push: true, pull: true, admin: false } }))
