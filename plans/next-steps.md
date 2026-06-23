@@ -62,18 +62,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ## 3. Findings
 
-### 1. `src/` root is a god directory with no layering
-
-- **Category:** `architecture` `layout`
-- **Impact:** 6
-- **Breadth:** ~12 files
-- **Fix effort:** L
-- **Evidence:** Flat at `src/`: `cache.ts` (Dexie/IndexedDB), `storeBridge.ts` (DOM toasts + store writers), `fileIO.ts` (YAML), `presentation.ts` (view logic), `wikilinks.ts`, `items.ts`, `occurrenceActions.ts`, `events.ts`, `undoToast.ts`, `store.ts`, `types.ts`. Meanwhile `model/`, `storage/`, `editor/` are cleanly foldered.
-- **Problem:** Unrelated domains (persistence, notifications, parsing, presentation, global state) sit as sibling files with no boundary, so there is no obvious owner for cross-cutting logic and imports reach anywhere.
-- **Fix:** Relocate root modules into existing layers — `cache.ts`→`storage/`, `wikilinks.ts`/`items.ts`/`fileIO.ts`→`model/`, `presentation.ts`/`undoToast.ts`→a `ui/` or `lib/` layer — leaving only `main.tsx`/`store.ts` at root.
-
----
-
 ### 2. Hand-choreographed `mutate → warm → setData → persist` duplicated across call sites
 
 - **Category:** `dry` `error-handling`
