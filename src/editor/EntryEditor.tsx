@@ -91,6 +91,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDel
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return }
     if (!entry.item || !onAutoSave) return
+    if (entry.editScope === 'add') return
     onAutoSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry])
@@ -296,10 +297,18 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDel
             </div>
 
             <ParticipantsRow participants={participants} onChange={next => onChange(prev => ({ ...prev, participants: next }))} allParticipants={allParticipants} />
+
+            {editScope === 'add' && (
+              <div className="mt-3 flex justify-end">
+                <Button variant="default" size="sm" onClick={() => onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')}>
+                  Save occurrence
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} onChange={item ? onAutoSave : undefined} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} onChange={(item && editScope !== 'add') ? onAutoSave : undefined} />
 
         <ItemsList
           items={listItems}
