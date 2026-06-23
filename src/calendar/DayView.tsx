@@ -7,7 +7,8 @@ import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
 import KindIcon from '@/components/KindIcon'
-import { expandWithMultiday, multidayDisplayTitle } from '@/model/expansion'
+import { multidayDisplayTitle } from '@/model/expansion'
+import { useExpandWithMultiday } from '@/model/useExpandWithMultiday'
 import { fmtT } from '@/model/dateUtils'
 import { parseDurationHours } from '@/model/duration'
 import { sameDay, addDays, fmtLong } from '@/format'
@@ -146,14 +147,16 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
 
+  const dvFrom = new Date(dvDate); dvFrom.setHours(0, 0, 0, 0)
+  const dvTo   = new Date(dvDate); dvTo.setHours(23, 59, 59)
+  const dvOccs = useExpandWithMultiday(items, roots, dvFrom, dvTo)
+
   const { allDay, cols } = useMemo(() => {
-    const from = new Date(dvDate); from.setHours(0, 0, 0, 0)
-    const to   = new Date(dvDate); to.setHours(23, 59, 59)
-    const allOccs = sortOccs(expandWithMultiday(items, roots, from, to))
-    const allDay  = allOccs.filter(o => !fmtT(o.time))
-    const timed   = allOccs.filter(o =>  !!fmtT(o.time))
+    const sorted = sortOccs(dvOccs)
+    const allDay = sorted.filter(o => !fmtT(o.time))
+    const timed  = sorted.filter(o =>  !!fmtT(o.time))
     return { allDay, cols: computeColumns(timed) }  // cols: LayoutEvent[][]
-  }, [dvDate, items, roots])
+  }, [dvOccs])
 
   const scRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
