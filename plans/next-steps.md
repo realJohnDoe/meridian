@@ -3,6 +3,7 @@
 - Fix combobox in default participants
 - Bug: Events are styled done only based on their start time. This is wrong for whole day events and events with duration
 - Fix font / occurrence size in month view on large screens
+- If task is set done on another day, move to today with button to keep original date / no date.
 - Investigate conflicts in spite of single user
 - Convert duration into end date/time
 - Add filter by participants in side bar
