@@ -124,14 +124,17 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
   async function handleSaveToken() {
     if (!selectedVaultId || !token.trim()) return
     setBusy(true)
+    setSyncing(true)
     setError(null)
     try {
       await tokenSave(selectedVaultId, token.trim())
       setToken('')
+      await syncToBackend()
     } catch (e) {
       setError((e as Error).message || 'Could not save token.')
     } finally {
       setBusy(false)
+      setSyncing(false)
     }
   }
 
@@ -268,8 +271,8 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
                       {error && <p className="text-[13px] text-destructive">{error}</p>}
                       {token.trim() && (
                         <div className="flex justify-end">
-                          <Button size="sm" onClick={handleSaveToken} disabled={busy}>
-                            {busy ? 'Saving…' : 'Save token'}
+                          <Button size="sm" onClick={handleSaveToken} disabled={busy || syncing}>
+                            {busy ? 'Saving…' : 'Save & sync'}
                           </Button>
                         </div>
                       )}
