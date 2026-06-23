@@ -29,6 +29,8 @@ export function isTransientSyncError(e: unknown): boolean {
   // navigator.onLine === false means the browser explicitly reports offline.
   // undefined (e.g. in tests or SSR) means unknown — don't classify.
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
-  if (e instanceof TypeError && TRANSIENT_MSG_RE.test((e as Error).message)) return true
+  // Octokit wraps browser TypeErrors in its own RequestError, so check the
+  // message pattern on any Error rather than requiring instanceof TypeError.
+  if (e instanceof Error && TRANSIENT_MSG_RE.test(e.message)) return true
   return false
 }
