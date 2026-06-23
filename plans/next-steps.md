@@ -57,18 +57,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ## 3. Findings
 
-### 2. Hand-choreographed `mutate → warm → setData → persist` duplicated across call sites
-
-- **Category:** `dry` `error-handling`
-- **Impact:** 5
-- **Breadth:** 8 call sites (`save.ts` ×5, `occurrenceActions.ts` ×2, plus `addItemLink`/`removeItemLink`)
-- **Fix effort:** M
-- **Evidence:** `save.ts:128`, `156`, `165`, `174`, `184` and `occurrenceActions.ts:13` all repeat `const next = op(...); warmSlugInFOM(slug, next.items, next.roots); setData(next); writeEntityToCache(slug)`.
-- **Problem:** The cache-warm + store-set + persist invariant is enforced by copy-paste; any new mutation that forgets `warmSlugInFOM` silently desyncs the file-occurrence map, and `deleteAll` already has to special-case `affected.forEach(writeEntityToCache)`.
-- **Fix:** Introduce one `commit(next: StoreData, affectedSlugs: string[])` helper that warms, sets, and persists, and route every mutation through it.
-
----
-
 ### 4. Hidden module-level mutable caches invalidated by convention
 
 - **Category:** `architecture` `performance`
