@@ -3,18 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script>
-      // Keep --app-h in sync with the visual viewport (shrinks when the
-      // Android soft keyboard opens). Runs inline so the first paint is correct.
-      function _setAppH() {
-        var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        document.documentElement.style.setProperty('--app-h', h + 'px');
-      }
-      if (window.visualViewport) window.visualViewport.addEventListener('resize', _setAppH);
-      window.addEventListener('resize', _setAppH);
-      _setAppH();
-    </script>
-    <title>Meridian</title>
+<title>Meridian</title>
     <link rel="icon" type="image/png" href="/icon-192.png">
     <link rel="shortcut icon" type="image/png" href="/icon-192.png">
     <link rel="apple-touch-icon" href="/icon-180.png">

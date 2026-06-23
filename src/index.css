@@ -173,7 +173,7 @@
 /* Element resets in @layer base so Tailwind utilities can override them */
 @layer base {
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  html{height:var(--app-h,100%);overflow:hidden;background:var(--backdrop)}
+  html{height:100svh;overflow:hidden;background:var(--backdrop)}
   body{height:100%;overflow:hidden;background:var(--backdrop)}
   body{color:var(--foreground);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
