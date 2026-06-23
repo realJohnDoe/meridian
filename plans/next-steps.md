@@ -1,6 +1,5 @@
 ## Next steps
 
-- Bug: Also show past overdue tasks from more than a week ago
 - Convert duration into end date/time
 - Add filter by participants in side bar
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
