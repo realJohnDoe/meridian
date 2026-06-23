@@ -3,7 +3,7 @@ import { useMediaQuery } from '@/hooks/use-media-query'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './dialog'
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerActions } from './drawer'
 import { Separator } from './separator'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 
 const ModalCtx = React.createContext(false) // false = mobile (drawer)
 

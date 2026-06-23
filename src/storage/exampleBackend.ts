@@ -1,6 +1,6 @@
 import type { StorageBackend, FileEntry, VaultKind } from './backend'
 import { fmtISO } from '@/model/dateUtils'
-import { addDays } from '@/presentation'
+import { addDays } from '@/format'
 
 // ── Date helpers ────────────────────────────────────────────────
 // All example dates are computed relative to today so items always

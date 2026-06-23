@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { badgeVariants } from '@/components/ui/badge'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Calendar } from '@/components/ui/calendar'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/cn'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

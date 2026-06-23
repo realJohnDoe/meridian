@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
 import { resolveWikilink, unwrapRef } from '@/wikilinks'
-import { fileEntries, fileOccurrenceMap } from '@/presentation'
+import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
 import type { StoreItem, Roots } from '@/types'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

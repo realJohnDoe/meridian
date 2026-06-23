@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Occurrence, StoreItem } from '@/types'
-import { fileEntries, fileOccurrenceMap } from '@/presentation'
+import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
 import OccurrenceCard from '@/components/OccurrenceCard'
 import { useStore } from '@/store'
 

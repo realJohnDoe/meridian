@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { Roots, StoreItem } from '@/types'
-import { fileEntries } from '@/presentation'
+import { fileEntries } from '@/fileOccurrence'
 
 interface WlPopupPos { top: number; left: number }
 

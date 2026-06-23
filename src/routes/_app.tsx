@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useStore } from '@/store'
-import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/presentation'
+import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseMonth } from '@/model/dateUtils'
 import { useToday } from '@/hooks/useToday'
 import { isEditScope } from '@/types'
