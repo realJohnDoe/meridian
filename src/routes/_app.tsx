@@ -130,7 +130,7 @@ function AppMain() {
           </div>
         </header>
 
-        <section data-tour="main-content" className="flex flex-1 flex-col overflow-hidden">
+        <section data-tour="main-content" className="flex flex-1 flex-col overflow-hidden min-h-0">
           <Outlet />
         </section>
 

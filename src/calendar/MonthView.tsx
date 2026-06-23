@@ -12,7 +12,8 @@ const EMPTY: Occurrence[] = []
 import { useToday } from '@/hooks/useToday'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
-import { ccBarVariants } from '@/components/ui/occurrence-variants'
+import { dvBlockVariants } from '@/components/ui/occurrence-variants'
+import KindIcon from '@/components/KindIcon'
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -53,14 +54,19 @@ const CalCell = memo(function CalCell({ date, other, dayOccs, today, onDayClick 
         'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px',
         isToday && 'bg-primary text-primary-foreground font-bold',
       )}>{date.getDate()}</span>
-      <div className="flex flex-col gap-px flex-1 overflow-hidden">
+      <div className="flex flex-col gap-0.5 flex-1 overflow-hidden">
         {(() => {
           const bars: React.ReactNode[] = []
-          dayOccs.slice(0, 4).forEach((o, i) => {
-            bars.push(<div key={i} className={ccBarVariants({ state: occState(o) })}>{multidayDisplayTitle(o, date) ?? o.metadata.title}</div>)
+          dayOccs.slice(0, 3).forEach((o, i) => {
+            bars.push(
+              <div key={i} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center gap-1 rounded-sm px-1.5 py-px text-xs font-medium w-full overflow-hidden')}>
+                <KindIcon item={o} size={10} className="shrink-0 opacity-70" />
+                <span className="truncate min-w-0">{multidayDisplayTitle(o, date) ?? o.metadata.title}</span>
+              </div>
+            )
           })
-          if (dayOccs.length > 4) bars.push(
-            <div key="more" className="text-3xs text-muted-foreground px-0.5">+{dayOccs.length - 4}</div>
+          if (dayOccs.length > 3) bars.push(
+            <div key="more" className="text-2xs text-muted-foreground px-1">+{dayOccs.length - 3}</div>
           )
           return bars
         })()}
@@ -125,7 +131,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   )
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden" ref={wrapRef}>
+    <div className="flex-1 flex flex-col overflow-hidden pb-10" ref={wrapRef}>
       <div className="grid grid-cols-7 px-1 shrink-0 pt-2">
         {DAYS.map(d => <div key={d} className="text-center text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground py-0.75">{d}</div>)}
       </div>
