@@ -70,6 +70,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        cleanupOutdatedCaches: true,
         // Do not redirect debug.html navigations to index.html.
         // Without this, the NavigationRoute catches all navigations and serves
         // the main app instead of the debug page.
