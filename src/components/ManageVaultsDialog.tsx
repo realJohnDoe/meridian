@@ -124,14 +124,17 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
   async function handleSaveToken() {
     if (!selectedVaultId || !token.trim()) return
     setBusy(true)
+    setSyncing(true)
     setError(null)
     try {
       await tokenSave(selectedVaultId, token.trim())
       setToken('')
+      await syncToBackend()
     } catch (e) {
       setError((e as Error).message || 'Could not save token.')
     } finally {
       setBusy(false)
+      setSyncing(false)
     }
   }
 
@@ -242,18 +245,11 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
 
                   {selectedVault.kind === 'github' && (
                     <div className="flex flex-col gap-3 pt-2 border-t border-border">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex flex-col gap-0.5 min-w-0">
-                          <span className="text-[13px] font-medium">Repository</span>
-                          <span className="text-[12px] text-muted-foreground font-mono truncate">
-                            {selectedVault.github.owner}/{selectedVault.github.repo} ({selectedVault.github.branch})
-                          </span>
-                        </div>
-                        {selectedVaultId === activeVaultId && (
-                          <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
-                            {syncing ? 'Syncing…' : 'Sync now'}
-                          </Button>
-                        )}
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[13px] font-medium">Repository</span>
+                        <span className="text-[12px] text-muted-foreground font-mono truncate">
+                          {selectedVault.github.owner}/{selectedVault.github.repo} ({selectedVault.github.branch})
+                        </span>
                       </div>
                       <label className="flex flex-col gap-1">
                         <span className="text-[13px] font-medium">Update token</span>
@@ -268,13 +264,18 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
                         />
                       </label>
                       {error && <p className="text-[13px] text-destructive">{error}</p>}
-                      {token.trim() && (
-                        <div className="flex justify-end">
-                          <Button size="sm" onClick={handleSaveToken} disabled={busy}>
-                            {busy ? 'Saving…' : 'Save token'}
-                          </Button>
-                        </div>
-                      )}
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={token.trim() ? handleSaveToken : handleSyncNow}
+                          disabled={busy || syncing}
+                        >
+                          {(busy || syncing)
+                            ? (token.trim() ? 'Saving…' : 'Syncing…')
+                            : (token.trim() ? 'Save & sync' : 'Sync now')}
+                        </Button>
+                      </div>
                     </div>
                   )}
 
