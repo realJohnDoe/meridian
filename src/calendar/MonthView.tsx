@@ -59,14 +59,14 @@ const CalCell = memo(function CalCell({ date, other, dayOccs, today, onDayClick 
           const bars: React.ReactNode[] = []
           dayOccs.slice(0, 3).forEach((o, i) => {
             bars.push(
-              <div key={i} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center gap-1 rounded-sm px-1.5 py-px text-xs font-medium w-full overflow-hidden')}>
-                <KindIcon item={o} size={10} className="shrink-0 opacity-70" />
+              <div key={i} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center gap-0.5 sm:gap-1 rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
+                <KindIcon item={o} size={10} className="shrink-0 opacity-70 hidden sm:block" />
                 <span className="truncate min-w-0">{multidayDisplayTitle(o, date) ?? o.metadata.title}</span>
               </div>
             )
           })
           if (dayOccs.length > 3) bars.push(
-            <div key="more" className="text-2xs text-muted-foreground px-1">+{dayOccs.length - 3}</div>
+            <div key="more" className="text-3xs sm:text-2xs text-muted-foreground px-0.5 sm:px-1">+{dayOccs.length - 3}</div>
           )
           return bars
         })()}
