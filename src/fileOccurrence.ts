@@ -64,12 +64,14 @@ const _3YR_MS = 365 * 3 * 86_400_000
  * Shared per-slug primitive used by both `fileOccurrenceMap` (batch) and
  * `computeSlugOccurrence` (single-slug warm path).
  *
- * Fill order (first match wins):
- *  1. Nearest upcoming dated occurrence in the ±3yr window.
- *  2. Most-recent past occurrence — unless it is done and an undated open
- *     standalone exists, which is preferred as more actionable.
- *  3. First standalone item (undated note or out-of-window dated single).
- *  4. Series anchor date (series entirely outside the ±3yr window).
+ * Fill order (first match wins — all open before all done):
+ *  1. Nearest upcoming undone dated occurrence in the ±3yr window.
+ *  2. Most-recent overdue occurrence (past undone).
+ *  3. Undated open standalone.
+ *  4. Most-recent past done occurrence.
+ *  5. Any upcoming done occurrence.
+ *  6. First standalone item (undated done or out-of-window dated single).
+ *  7. Series anchor date (series entirely outside the ±3yr window).
  */
 function resolveOneSlug(
   fileSlug: string,
@@ -79,21 +81,33 @@ function resolveOneSlug(
   AHEAD: Date,
   BACK: Date,
 ): Occurrence | null {
-  for (const occ of expandRange(slugItems, roots, now, AHEAD)) return occ
-
-  const back = expandRange(slugItems, roots, BACK, now)
-  const pastOcc = back[back.length - 1]
-  if (pastOcc) {
-    if (!pastOcc.metadata.done) return pastOcc
-    // Past occurrence is done — prefer an undated open standalone if one exists.
-    const undatedOpen = slugItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
-    if (undatedOpen) return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
-    return pastOcc
+  // 1. Nearest upcoming undone occurrence.
+  for (const occ of expandRange(slugItems, roots, now, AHEAD)) {
+    if (!occ.metadata.done) return occ
   }
 
+  // 2. Most-recent overdue occurrence (past undone).
+  const back = expandRange(slugItems, roots, BACK, now)
+  const pastUndone = [...back].reverse().find(o => !o.metadata.done)
+  if (pastUndone) return pastUndone
+
+  // 3. Undated open standalone.
+  const undatedOpen = slugItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
+  if (undatedOpen) return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
+
+  // 4. Most-recent past done occurrence.
+  const pastDone = back[back.length - 1]
+  if (pastDone) return pastDone
+
+  // 5. Any upcoming done occurrence.
+  for (const occ of expandRange(slugItems, roots, now, AHEAD)) return occ
+
+  // 6. Any standalone (undated done or out-of-window dated single).
   for (const item of slugItems) {
     if (isStandaloneOcc(item)) return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) } as Occurrence
   }
+
+  // 7. Series anchor date.
   for (const item of slugItems) {
     if (!isSeries(item)) continue
     return {

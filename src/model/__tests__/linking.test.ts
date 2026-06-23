@@ -241,6 +241,27 @@ instances:
     expect(occ!.metadata.done).toBe(false)
   })
 
+  it('prefers undated open over done dated occurrence when done instance is today', () => {
+    // Regression: done instance dated today falls in [now, AHEAD] so step 1 was
+    // returning it immediately, skipping the undated open. Step 1 now filters for
+    // undone only, so the undated open wins.
+    const today = new Date().toISOString().slice(0, 10)
+    const DONE_TODAY_PLUS_UNDATED_OPEN = `---
+title: Sync Bug
+instances:
+  - date: "${today}"
+    done: true
+  - done: false
+---
+`
+    const { items, roots } = makeStore([{ slug: 'sync-bug', yaml: DONE_TODAY_PLUS_UNDATED_OPEN }])
+    const map = fileOccurrenceMap(items, roots)
+    const occ = map.get('sync-bug')
+    expect(occ).toBeDefined()
+    expect(occ!.date).toBe('')
+    expect(occ!.metadata.done).toBe(false)
+  })
+
   it('returns the same Map instance for identical (items, roots) references (memoization)', () => {
     const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const map1 = fileOccurrenceMap(items, roots)
