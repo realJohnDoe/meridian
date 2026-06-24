@@ -82,18 +82,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ---
 
-### 11. `OccurrenceCard` reads the store non-reactively during render
-
-- **Category:** `performance` `architecture`
-- **Impact:** 3
-- **Breadth:** 1 component (rendered per row)
-- **Fix effort:** S
-- **Evidence:** `components/OccurrenceCard.tsx:76` `const roots = getRoots()` (a `storeBridge` getter) inside the component body, then `useMemo([occ.fileSlug, roots])`.
-- **Problem:** The card bypasses the Zustand subscription and relies on the parent always re-rendering it when `roots` changes; the `useMemo` key is a fresh getter result, so the memo's reactivity is incidental, not guaranteed.
-- **Fix:** Pass `roots` in as a prop (the parent already subscribes) or use `useStore(s => s.roots)`.
-
----
-
 ### 12. `OccurrenceCard` prop explosion (7 display flags)
 
 - **Category:** `srp` `architecture`
