@@ -13,7 +13,7 @@ import { fmtT } from '@/model/dateUtils'
 import { parseDurationHours } from '@/model/duration'
 import { sameDay, addDays, fmtLong } from '@/format'
 import { sortOccs } from './occSort'
-import { occState } from '@/occState'
+import { occState } from '@/occView'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
 
 import { useToday } from '@/hooks/useToday'

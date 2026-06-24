@@ -1,7 +1,7 @@
 import {
   toggleDone, excludeOccurrence, deleteByFileSlug, moveOccToDate,
 } from './model/storeOps'
-import { occIsRecur, occKind } from './types'
+import { occIsRecur, occKind } from './occView'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
 import { writeEntityToCache, deleteFromBackend } from './storage/sync'

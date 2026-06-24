@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from 'react'
 import { useStore } from '@/store'
 import type { Occurrence, EditScope } from '@/types'
-import { occKind } from '@/types'
+import { occKind } from '@/occView'
 
 import { fmtISO } from '@/model/dateUtils'
 import { sameDay, addDays } from '@/format'

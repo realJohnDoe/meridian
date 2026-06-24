@@ -6,7 +6,7 @@ import type { Occurrence } from '@/types'
 import { expandWithMultiday, multidayDisplayTitle } from '@/model/expansion'
 import { sameDay } from '@/format'
 import { sortOccs } from './occSort'
-import { occState } from '@/occState'
+import { occState } from '@/occView'
 
 const EMPTY: Occurrence[] = []
 import { useToday } from '@/hooks/useToday'
