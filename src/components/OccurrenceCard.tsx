@@ -3,6 +3,7 @@ import type { Occurrence } from '@/types'
 import KindIcon from './KindIcon'
 import { fmtT, parseDateString } from '@/model/dateUtils'
 import { fmtShort } from '@/format'
+import { formatDurationChip, fmtDuration } from '@/editor/dialogs/DurationDialog'
 import { occState } from '@/occView'
 import { multidayDisplayTitle } from '@/model/expansion'
 import { Checkbox } from './ui/checkbox'
@@ -101,6 +102,12 @@ export default function OccurrenceCard({
   const hasTrack     = occ.metadata.done !== undefined
   const tags         = occ.metadata.tags || []
   const participants = occ.metadata.participants || []
+  const rawDuration  = occ.metadata.duration
+  const durationLabel = rawDuration
+    ? (occ.time
+        ? formatDurationChip(rawDuration, { date: occ.date, time: occ.time })
+        : fmtDuration(rawDuration))
+    : null
 
   const dateBadge = (() => {
     const d = parseDateString(occ.date)
@@ -167,7 +174,7 @@ export default function OccurrenceCard({
           <div className="flex flex-wrap gap-1.5">
             {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
             {showTime !== 'none' && t && <Badge variant="tag">{t}</Badge>}
-            {showTime !== 'none' && t && occ.metadata.duration && <Badge variant="tag">{occ.metadata.duration}</Badge>}
+            {showTime !== 'none' && t && durationLabel && <Badge variant="tag">{durationLabel}</Badge>}
             {showTagsParticipants && listedOn.map(label => (
               <TagChip key={label} label={label} isTopic />
             ))}
