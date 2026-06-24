@@ -6,6 +6,7 @@
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
 - Add nice readme
 - Add Solarized Light theme
+- Add option to show dates formatted european / first day of the week config
 - Investigate more secure storage options
 
 # Meridian — Code Health Survey
