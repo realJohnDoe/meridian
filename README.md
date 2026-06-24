@@ -80,7 +80,7 @@ Meridian was heavily inspired by tools we already loved, and tries to fill the g
 | Plain Markdown storage | ✅ | ✅ | ❌ | ❌ |
 | Calendar views (day / month) | ✅ | Plugin-dependent | ✅ | Partial |
 | Task management | ✅ | ✅ (TaskNotes plugin) | Limited | ✅ |
-| Wikilinks between entries | ✅ | ✅ | ❌ | ❌ |
+| Wikilinks between entries | ✅ | ✅ | ❌ | ✅ (`#123` issue links) |
 | Rich recurrence rules | ✅ | Limited | ✅ | ❌ |
 | Multiple participants / assignees | ✅ | Partial | ❌ | ✅ |
 | Free & open source | ✅ | Partially (core only) | ❌ | ❌ |
