@@ -8,7 +8,7 @@ Meridian is a free, open-source PWA that blends task management, event schedulin
 
 ---
 
-## What it does
+## ✨ What it does
 
 - **Agenda, day, and month views** — see your tasks and events in whatever layout suits the moment.
 - **Tasks, events, and notes in one place** — every entry lives in a Markdown file with YAML frontmatter for metadata, so it's readable outside Meridian too.
@@ -22,7 +22,7 @@ Meridian is a free, open-source PWA that blends task management, event schedulin
 
 ---
 
-## Your data, your way
+## 🗄️ Your data, your way
 
 Meridian doesn't run a server that holds your notes. You choose where your files live:
 
@@ -36,7 +36,7 @@ Files are plain `.md` files. Open them in any text editor, check them into git, 
 
 ---
 
-## Getting started
+## 🚀 Getting started
 
 1. **Open the app** at [realjohndoe.github.io/meridian](https://realjohndoe.github.io/meridian/).
 2. Try the **Example vault** to get a feel for the interface — click through the onboarding tour.
@@ -47,7 +47,7 @@ Files are plain `.md` files. Open them in any text editor, check them into git, 
 
 ---
 
-## Entry format
+## 📄 Entry format
 
 Every entry is a Markdown file. Here's what a task looks like:
 
@@ -70,7 +70,7 @@ You can write and edit these files by hand if you prefer — Meridian will pick 
 
 ---
 
-## Inspiration and comparisons
+## 🙏 Inspiration and comparisons
 
 Meridian was heavily inspired by tools we already loved, and tries to fill the gap where they didn't quite fit together.
 
