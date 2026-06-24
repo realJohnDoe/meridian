@@ -3,8 +3,6 @@ import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
 import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
-import { useToday } from '@/hooks/useToday'
-import { fmtISO } from '@/model/dateUtils'
 import { isSeries } from '@/types'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -63,11 +61,15 @@ interface Props {
   onChange: (updater: (prev: EntryState) => EntryState) => void
   onSave: (body: string) => void
   onAutoSave?: (body: string) => void
+  onMetaSave?: (next: EntryState) => void
+  getBodyRef?: React.MutableRefObject<() => string>
   onDelete: () => void
   onClose: () => void
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: EditScope) => void
+  onTypeChange?: (t: ItemType) => void
+  onDoneToggle?: () => void
   items: StoreItem[]
   roots: Roots
   onOpenWikilink?: (ref: string) => void
@@ -76,28 +78,16 @@ interface Props {
   onToggleFavorite?: () => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, items, roots, onOpenWikilink, onToggleDoneBacklink, isFavorited, onToggleFavorite }: Props) {
-  const today    = useToday()
+export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink, isFavorited, onToggleFavorite }: Props) {
   const navigate = useNavigate()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const viewRef  = useRef<EditorView | null>(null)
 
+  if (getBodyRef) getBodyRef.current = () => viewRef.current?.state.doc.toString().trimEnd() ?? ''
+
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
-
-  function handleTypeChange(t: ItemType) {
-    onChange(prev => ({
-      ...prev,
-      itemType: t,
-      tracked: t === 'task',
-      priority: t !== 'task' ? null : prev.priority,
-      scheduled:
-        t === 'note'                         ? null
-        : t === 'event' && !prev.scheduled   ? { date: fmtISO(today), time: '' }
-        : prev.scheduled,
-    }))
-  }
 
   function handlePromoteTask(title: string, done: boolean): string | null {
     const result = saveNode(null, 'all', {
@@ -192,7 +182,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDel
           {tracked && (
             <Checkbox
               checked={done}
-              onCheckedChange={() => onChange(prev => ({ ...prev, done: !prev.done }))}
+              onCheckedChange={() => onDoneToggle?.()}
               className="size-6 mt-1"
             />
           )}
@@ -244,7 +234,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDel
             <ToggleGroup
               type="single"
               value={itemType}
-              onValueChange={(v) => { if (v) handleTypeChange(v as ItemType) }}
+              onValueChange={(v) => { if (v) onTypeChange?.(v as ItemType) }}
               className="flex gap-0.75 mb-4 bg-secondary rounded-full p-0.75 border border-input w-fit"
             >
               {(['task', 'event', 'note'] as ItemType[]).map(t => (
@@ -290,7 +280,11 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDel
               )}
             </div>
 
-            <ParticipantsRow participants={participants} onChange={next => onChange(prev => ({ ...prev, participants: next }))} allParticipants={allParticipants} />
+            <ParticipantsRow participants={participants} onChange={ps => {
+              const next = { ...entry, participants: ps }
+              onChange(() => next)
+              onMetaSave?.(next)
+            }} allParticipants={allParticipants} />
 
             {editScope === 'add' && (
               <div className="mt-3 flex justify-end">
@@ -306,7 +300,11 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDel
 
         <ItemsList
           items={listItems}
-          onChange={next => onChange(prev => ({ ...prev, items: next }))}
+          onChange={its => {
+            const next = { ...entry, items: its }
+            onChange(() => next)
+            onMetaSave?.(next)
+          }}
           roots={roots}
           onPromote={handlePromoteTask}
           onOpenWikilink={onOpenWikilink}

@@ -6,9 +6,10 @@ import { notify } from '@/storeBridge'
 import type { SeriesSheetConfig } from './save'
 import type { Occurrence, EditScope, Priority } from '@/types'
 import { fmtISO } from '@/model/dateUtils'
+import { useToday } from '@/hooks/useToday'
 import { newEntryRoute } from '@/routes/-entryRoute'
 import { resolveWikilink } from '@/wikilinks'
-import { type EntryState, ENTRY_DEFAULT } from './state'
+import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 
 export interface DialogHandlers {
   activeDialog: string | null
@@ -38,6 +39,7 @@ function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryStat
 
 export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string) {
   const defaultParticipants = useStore.getState().defaultParticipants
+  const today = useToday()
 
   const [entry, setEntry] = useState<EntryState>(() => {
     const base = entryFromItem(initialOcc, initialScope)
@@ -51,6 +53,13 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const [seriesSheetConfig, setSeriesSheetConfig] = useState<SeriesSheetConfig | null>(null)
 
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Populated by EntryEditor once CodeMirror mounts; used by saveMeta to capture current body
+  const getBodyRef = useRef<() => string>(() => '')
+
+  function saveMeta(next: EntryState) {
+    if (!next.item || next.editScope === 'add') return
+    saveNode(next.item, next.editScope, { ...next, body: getBodyRef.current() })
+  }
 
   const scheduleAutoSave = useCallback((body: string) => {
     if (!entry.item) return
@@ -99,52 +108,98 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const handleClose = useCallback(() => router.history.back(), [router])
 
   const handleScopeChange = useCallback((scope: EditScope) => {
-    setEntry(prev => {
-      if (!prev.item) return prev
-      const { scheduled, repeat } = applyScope(prev.item, scope)
-      return { ...prev, editScope: scope, scheduled, repeat }
-    })
-  }, [])
+    if (!entry.item) return
+    const { scheduled, repeat } = applyScope(entry.item, scope)
+    const next = { ...entry, editScope: scope, scheduled, repeat }
+    setEntry(next)
+    saveMeta(next)
+  }, [entry])
+
+  const handleTypeChange = useCallback((t: ItemType) => {
+    const next: EntryState = {
+      ...entry,
+      itemType: t,
+      tracked: t === 'task',
+      priority: t !== 'task' ? null : entry.priority,
+      scheduled:
+        t === 'note'                         ? null
+        : t === 'event' && !entry.scheduled  ? { date: fmtISO(today), time: '' }
+        : entry.scheduled,
+    }
+    setEntry(next)
+    saveMeta(next)
+  }, [entry, today])
+
+  const handleDoneToggle = useCallback(() => {
+    const next = { ...entry, done: !entry.done }
+    setEntry(next)
+    saveMeta(next)
+  }, [entry])
 
   const handleOpenDlg = useCallback((id: string) => setActiveDialog(id), [])
   const handleOpenRepeatDlg = useCallback((_itemType?: string) => setActiveDialog('dlgRepeat'), [])
   const closeDialog = useCallback(() => setActiveDialog(null), [])
 
   const handleDateConfirm = useCallback((dateStr: string) => {
-    setEntry(prev => ({ ...prev, scheduled: { date: dateStr, time: prev.scheduled?.time || '' } }))
+    const next = { ...entry, scheduled: { date: dateStr, time: entry.scheduled?.time || '' } }
+    setEntry(next)
     setActiveDialog(null)
-  }, [])
+    saveMeta(next)
+  }, [entry])
 
   const handleDateRemove = useCallback(() => {
-    setEntry(prev => ({ ...prev, scheduled: null, duration: '' }))
+    const next = { ...entry, scheduled: null, duration: '' }
+    setEntry(next)
     setActiveDialog(null)
-  }, [])
+    saveMeta(next)
+  }, [entry])
 
   const handleTimeConfirm = useCallback((hhmm: string) => {
-    setEntry(prev => prev.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: hhmm } } : prev)
-  }, [])
+    if (!entry.scheduled) return
+    const next = { ...entry, scheduled: { ...entry.scheduled, time: hhmm } }
+    setEntry(next)
+    saveMeta(next)
+  }, [entry])
 
   const handleTimeRemove = useCallback(() => {
-    setEntry(prev => prev.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: '' } } : prev)
-  }, [])
+    if (!entry.scheduled) return
+    const next = { ...entry, scheduled: { ...entry.scheduled, time: '' } }
+    setEntry(next)
+    saveMeta(next)
+  }, [entry])
 
-  const handleDurConfirm = useCallback((dur: string) => setEntry(prev => ({ ...prev, duration: dur })), [])
-  const handleDurRemove  = useCallback(() => setEntry(prev => ({ ...prev, duration: '' })), [])
+  const handleDurConfirm = useCallback((dur: string) => {
+    const next = { ...entry, duration: dur }
+    setEntry(next)
+    saveMeta(next)
+  }, [entry])
+
+  const handleDurRemove = useCallback(() => {
+    const next = { ...entry, duration: '' }
+    setEntry(next)
+    saveMeta(next)
+  }, [entry])
 
   const handleRepeatConfirm = useCallback((repeat: EntryState['repeat']) => {
-    setEntry(prev => ({ ...prev, repeat }))
+    const next = { ...entry, repeat }
+    setEntry(next)
     setActiveDialog(null)
-  }, [])
+    saveMeta(next)
+  }, [entry])
 
   const handleRepeatRemove = useCallback(() => {
-    setEntry(prev => ({ ...prev, repeat: null }))
+    const next = { ...entry, repeat: null }
+    setEntry(next)
     setActiveDialog(null)
-  }, [])
+    saveMeta(next)
+  }, [entry])
 
   const handlePriority = useCallback((p: Priority | null) => {
-    setEntry(prev => ({ ...prev, priority: p }))
+    const next = { ...entry, priority: p }
+    setEntry(next)
     setActiveDialog(null)
-  }, [])
+    saveMeta(next)
+  }, [entry])
 
   const handleSeriesClose = useCallback(() => setSeriesSheetConfig(null), [])
   const handleDeleteClose = useCallback(() => setPendingDelete(null), [])
@@ -169,11 +224,15 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   return {
     entry, setEntry,
+    getBodyRef,
+    saveMeta,
     handleOpenWikilink,
     handleSave,
     handleDelete,
     handleClose,
     handleScopeChange,
+    handleTypeChange,
+    handleDoneToggle,
     handleOpenDlg,
     handleOpenRepeatDlg,
     dialogHandlers,
