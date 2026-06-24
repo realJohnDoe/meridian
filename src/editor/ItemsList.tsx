@@ -5,6 +5,7 @@ import { occKind } from '@/types'
 import { parseItemEntry, serializeTaskEntry } from './items'
 import { fileEntries } from '@/fileOccurrence'
 import { useStore } from '@/store'
+import { useParticipantFilter, NO_PARTICIPANT } from '@/hooks/useParticipantFilter'
 import { occState } from '@/occState'
 import { resolveWikilink } from '@/wikilinks'
 import OccurrenceCard from '@/components/OccurrenceCard'
@@ -61,6 +62,8 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
     ? allFiles.filter(e => e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
     : allFiles
 
+  const { filter: participantFilter } = useParticipantFilter()
+
   const entries: ParsedEntry[] = useMemo(
     () => items.map((raw, idx) => ({ ...parseItemEntry(raw), idx })),
     [items],
@@ -72,14 +75,25 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
       const slug = resolveWikilink(entry.ref, roots)
       return { entry, occ: slug ? occBySlug.get(slug) : undefined }
     })
-    return [...rows].sort((a, b) => {
+    const sorted = [...rows].sort((a, b) => {
       const [ga, na, sa] = rowSortKey(a)
       const [gb, nb, sb] = rowSortKey(b)
       if (ga !== gb) return ga - gb
       if (na !== nb) return na - nb
       return sa.localeCompare(sb)
     })
-  }, [entries, occBySlug, roots])
+    if (!participantFilter.length) return sorted
+    return sorted.filter(({ entry, occ }) => {
+      if (entry.kind === 'link') {
+        if (!occ) return true // broken link: always show
+        const ps = occ.metadata.participants
+        if (participantFilter.includes(NO_PARTICIPANT) && ps.length === 0) return true
+        return ps.some(p => participantFilter.includes(p))
+      }
+      // string task: no participants → show only if NO_PARTICIPANT is checked
+      return participantFilter.includes(NO_PARTICIPANT)
+    })
+  }, [entries, occBySlug, roots, participantFilter])
 
   const addTask = useCallback((text: string) => {
     const t = text.trim()

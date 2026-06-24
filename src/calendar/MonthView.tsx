@@ -10,6 +10,7 @@ import { occState } from '@/occState'
 
 const EMPTY: Occurrence[] = []
 import { useToday } from '@/hooks/useToday'
+import { useParticipantFilter } from '@/hooks/useParticipantFilter'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
@@ -86,6 +87,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   const today = useToday()
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
+  const { filterOccs } = useParticipantFilter()
 
   const m = month.getMonth()
   const y = month.getFullYear()
@@ -107,7 +109,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
     const from = new Date(y, m, 1)
     const to   = new Date(y, m + 1, 0, 23, 59, 59)
-    const occs = expandWithMultiday(items, roots, from, to)
+    const occs = filterOccs(expandWithMultiday(items, roots, from, to))
 
     const occsByDay = new Map<string, Occurrence[]>()
     for (const o of occs) {
@@ -121,7 +123,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     for (const [k, arr] of occsByDay) occsByDay.set(k, sortOccs(arr))
 
     return { cells, occsByDay }
-  }, [items, roots, y, m])
+  }, [items, roots, y, m, filterOccs])
 
   const wrapRef = useRef<HTMLDivElement>(null)
   useHorizontalSwipe(

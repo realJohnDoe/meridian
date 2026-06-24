@@ -51,6 +51,13 @@ interface MeridianStore {
   defaultParticipants:     string[]
   loadDefaultParticipants: (vaultId: string) => void
   setDefaultParticipants:  (participants: string[]) => void
+
+  // ── Participant filter ────────────────────────────────────────────
+  /** Checked participant names for sidebar filter. Empty = no filter (show all). */
+  participantFilter:        string[]
+  loadParticipantFilter:    (vaultId: string) => void
+  toggleParticipantFilter:  (name: string) => void
+  clearParticipantFilter:   () => void
 }
 
 export const useStore = create<MeridianStore>((set, get) => ({
@@ -116,5 +123,29 @@ export const useStore = create<MeridianStore>((set, get) => ({
     if (activeVaultId)
       localStorage.setItem(`meridian_default_participants_${activeVaultId}`, JSON.stringify(participants))
     set({ defaultParticipants: participants })
+  },
+
+  participantFilter: [],
+  loadParticipantFilter: (vaultId: string) => {
+    try {
+      const raw = localStorage.getItem(`meridian_participant_filter_${vaultId}`)
+      const parsed: unknown = raw ? JSON.parse(raw) : []
+      set({ participantFilter: Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [] })
+    } catch {
+      set({ participantFilter: [] })
+    }
+  },
+  toggleParticipantFilter: (name: string) => {
+    const { participantFilter, activeVaultId } = get()
+    const next = participantFilter.includes(name)
+      ? participantFilter.filter(s => s !== name)
+      : [...participantFilter, name]
+    if (activeVaultId) localStorage.setItem(`meridian_participant_filter_${activeVaultId}`, JSON.stringify(next))
+    set({ participantFilter: next })
+  },
+  clearParticipantFilter: () => {
+    const { activeVaultId } = get()
+    if (activeVaultId) localStorage.setItem(`meridian_participant_filter_${activeVaultId}`, JSON.stringify([]))
+    set({ participantFilter: [] })
   },
 }))

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
@@ -7,6 +7,8 @@ import { fmtISO, fmtMonth } from '@/model/dateUtils'
 import { useToday } from '@/hooks/useToday'
 import { vaultIcon } from './vaultIcon'
 import ManageVaultsDialog from './ManageVaultsDialog'
+import { Checkbox } from './ui/checkbox'
+import { NO_PARTICIPANT } from '@/hooks/useParticipantFilter'
 import {
   Sidebar,
   SidebarContent,
@@ -30,13 +32,26 @@ export default function AppSidebar() {
   const today     = useToday()
   const { isMobile, setOpenMobile } = useSidebar()
 
-  const vaults              = useStore(s => s.vaults)
-  const activeVaultId       = useStore(s => s.activeVaultId)
-  const pendingDirReconnect = useStore(s => s.pendingDirReconnect)
-  const favorites           = useStore(s => s.favorites)
-  const roots               = useStore(s => s.roots)
-  const toggleFavorite      = useStore(s => s.toggleFavorite)
-  const reorderFavorites    = useStore(s => s.reorderFavorites)
+  const vaults                  = useStore(s => s.vaults)
+  const activeVaultId           = useStore(s => s.activeVaultId)
+  const pendingDirReconnect     = useStore(s => s.pendingDirReconnect)
+  const favorites               = useStore(s => s.favorites)
+  const roots                   = useStore(s => s.roots)
+  const items                   = useStore(s => s.items)
+  const toggleFavorite          = useStore(s => s.toggleFavorite)
+  const reorderFavorites        = useStore(s => s.reorderFavorites)
+  const participantFilter       = useStore(s => s.participantFilter)
+  const toggleParticipantFilter = useStore(s => s.toggleParticipantFilter)
+
+  const allParticipants = useMemo(() => {
+    const set = new Set<string>()
+    for (const item of items) {
+      for (const p of item.metadata.participants) {
+        const t = p.trim(); if (t) set.add(t)
+      }
+    }
+    return [...set].sort()
+  }, [items])
 
   useEffect(() => { setEditingFavorites(false) }, [activeVaultId])
 
@@ -120,6 +135,35 @@ export default function AppSidebar() {
                     )
                   })}
                 </SidebarMenu>
+              </SidebarGroup>
+            </>
+          )}
+
+          {allParticipants.length > 0 && (
+            <>
+              <SidebarSeparator />
+              <SidebarGroup className="p-0">
+                <SidebarGroupLabel className="px-5 h-8 text-[11px] font-semibold uppercase tracking-wider">Participants</SidebarGroupLabel>
+                <div className="px-5 flex flex-col">
+                  <label className="flex items-center gap-2 cursor-pointer py-[11px]">
+                    <Checkbox
+                      checked={participantFilter.includes(NO_PARTICIPANT)}
+                      onCheckedChange={() => toggleParticipantFilter(NO_PARTICIPANT)}
+                      className="size-[18px] data-[state=checked]:bg-sidebar-foreground/70 data-[state=checked]:border-sidebar-foreground/70"
+                    />
+                    <span className="text-[13px] text-muted-foreground italic">No participants</span>
+                  </label>
+                  {allParticipants.map(p => (
+                    <label key={p} className="flex items-center gap-2 cursor-pointer py-[11px]">
+                      <Checkbox
+                        checked={participantFilter.includes(p)}
+                        onCheckedChange={() => toggleParticipantFilter(p)}
+                        className="size-[18px] data-[state=checked]:bg-sidebar-foreground/70 data-[state=checked]:border-sidebar-foreground/70"
+                      />
+                      <span className="text-[13px]">{p}</span>
+                    </label>
+                  ))}
+                </div>
               </SidebarGroup>
             </>
           )}
