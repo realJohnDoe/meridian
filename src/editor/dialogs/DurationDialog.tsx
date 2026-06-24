@@ -105,12 +105,7 @@ function fmtEndDate(dateStr: string): string {
 }
 
 function fmtEndTime(hhmm: string): string {
-  const m = hhmm.match(/^(\d{1,2}):(\d{2})/)
-  if (!m) return hhmm
-  const h = parseInt(m[1], 10), mn = parseInt(m[2], 10)
-  const period = h < 12 ? 'am' : 'pm'
-  const h12 = h % 12 === 0 ? 12 : h % 12
-  return mn === 0 ? `${h12} ${period}` : `${h12}:${String(mn).padStart(2, '0')} ${period}`
+  return hhmm.slice(0, 5)
 }
 
 // ── Multi-unit display format ─────────────────────────────────────────────────
