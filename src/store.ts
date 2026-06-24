@@ -1,13 +1,15 @@
 import { create } from 'zustand'
-import type { StoreItem, Roots } from './types'
+import type { StoreItem, Roots, Occurrence } from './types'
 import type { VaultRef } from './storage/backend'
 import { clearOccIdCache } from './model/expansion'
-import { resetFOMCache } from './fileOccurrence'
+import { fileOccurrenceMap } from './fileOccurrence'
 
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
   items: StoreItem[]
   roots: Roots
+  /** Derived: one representative Occurrence per file slug. Recomputed on every setData. */
+  fom: Map<string, Occurrence>
   /** Set items and roots together atomically. */
   setData: (data: { items: StoreItem[]; roots: Roots }) => void
 
@@ -54,7 +56,8 @@ interface MeridianStore {
 export const useStore = create<MeridianStore>((set, get) => ({
   items: [],
   roots: new Map(),
-  setData: ({ items, roots }) => { clearOccIdCache(); resetFOMCache(); set({ items, roots }) },
+  fom: new Map(),
+  setData: ({ items, roots }) => { clearOccIdCache(); set({ items, roots, fom: fileOccurrenceMap(items, roots) }) },
 
   vaults:              [],
   activeVaultId:       null,
