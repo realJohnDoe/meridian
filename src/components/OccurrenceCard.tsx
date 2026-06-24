@@ -41,7 +41,7 @@ export interface OccurrenceCardProps {
 }
 
 const titleCls = (isDone: boolean) =>
-  `text-sm font-medium truncate flex-1 ${isDone ? 'line-through' : ''} text-foreground`
+  `text-sm font-medium truncate ${isDone ? 'line-through' : ''} text-foreground`
 
 function ParticipantAvatars({ participants }: { participants: string[] }) {
   if (!participants.length) return null
@@ -115,7 +115,7 @@ export default function OccurrenceCard({
     dimmed ? 'overflow-hidden' : '',
   ].filter(Boolean).join(' ')
 
-  const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime === 'badge' && !!t)
+  const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime !== 'none' && !!t)
   const hasTagsContent      = showTagsParticipants && (tags.length > 0 || listedOn.length > 0)
   const showMeta            = hasDateTimeContent || hasTagsContent
 
@@ -153,27 +153,21 @@ export default function OccurrenceCard({
             return null
           })()}
 
-          <span className={titleCls(isDone)}>{title}</span>
-
-          {/* Repeat icon directly after the title */}
-          {!!occ.ownerId && (
-            <Repeat2 size={11} className="stroke-muted-foreground fill-none shrink-0" />
-          )}
-
-          {/* Time + duration chips (inline mode) */}
-          {showTime === 'inline' && !!t && (
-            <Badge variant="chip" className="h-auto py-0.5 px-2 text-xs font-mono shrink-0 cursor-default">{t}</Badge>
-          )}
-          {showTime === 'inline' && !!t && occ.metadata.duration && (
-            <Badge variant="chip" className="h-auto py-0.5 px-2 text-xs font-mono shrink-0 cursor-default">{occ.metadata.duration}</Badge>
-          )}
+          {/* Title + recurrence icon grouped so repeat stays left-adjacent to text */}
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            <span className={titleCls(isDone)}>{title}</span>
+            {!!occ.ownerId && (
+              <Repeat2 size={11} className="stroke-muted-foreground fill-none shrink-0" />
+            )}
+          </div>
         </div>
 
         {/* Meta row */}
         {showMeta && (
           <div className="flex flex-wrap gap-1.5">
             {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
-            {showTime === 'badge' && t && <Badge variant="chip" className="h-auto py-0.5 px-2 text-xs font-mono cursor-default">{t}</Badge>}
+            {showTime !== 'none' && t && <Badge variant="chip" className="h-auto py-0.5 px-2 text-xs font-mono cursor-default">{t}</Badge>}
+            {showTime !== 'none' && t && occ.metadata.duration && <Badge variant="chip" className="h-auto py-0.5 px-2 text-xs font-mono cursor-default">{occ.metadata.duration}</Badge>}
             {showTagsParticipants && listedOn.map(label => (
               <TagChip key={label} label={label} isTopic />
             ))}
