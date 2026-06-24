@@ -11,17 +11,33 @@ export interface WikilinkRef {
 
 const WIKILINK_RE = /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g
 
+function matchToRef(m: RegExpExecArray): WikilinkRef {
+  return {
+    ref:   m[1].trim(),
+    label: m[2]?.trim(),
+    start: m.index,
+    end:   m.index + m[0].length,
+  }
+}
+
+/**
+ * Parse a raw string that is exactly one complete wikilink (the entire string).
+ * Returns the WikilinkRef if it matches, or null otherwise.
+ */
+export function parseSingleWikilink(raw: string): WikilinkRef | null {
+  const trimmed = raw.trim()
+  WIKILINK_RE.lastIndex = 0
+  const m = WIKILINK_RE.exec(trimmed)
+  if (m && m.index === 0 && m[0].length === trimmed.length) return matchToRef(m)
+  return null
+}
+
 export function parseWikilinks(text: string): WikilinkRef[] {
   const results: WikilinkRef[] = []
   let m: RegExpExecArray | null
   WIKILINK_RE.lastIndex = 0
   while ((m = WIKILINK_RE.exec(text)) !== null) {
-    results.push({
-      ref:   m[1].trim(),
-      label: m[2]?.trim(),
-      start: m.index,
-      end:   m.index + m[0].length,
-    })
+    results.push(matchToRef(m))
   }
   return results
 }

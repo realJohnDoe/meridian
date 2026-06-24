@@ -8,7 +8,7 @@
  * Strings that don't match either pattern are treated as unchecked tasks.
  */
 
-const WIKILINK_ITEM_RE = /^\[\[([^\]|\n]+)(?:\|[^\]\n]+)?\]\]$/
+import { parseSingleWikilink } from '../wikilinks'
 
 /** Matches `[ ] text` / `[x] text` — group 1 is the done char, group 2 is the content. */
 export const TASK_ITEM_RE = /^\[([ xX])\]\s+(.+)$/
@@ -19,8 +19,8 @@ export type ItemEntry =
 
 export function parseItemEntry(raw: string): ItemEntry {
   const trimmed = raw.trim()
-  const wl = WIKILINK_ITEM_RE.exec(trimmed)
-  if (wl) return { kind: 'link', ref: wl[1].trim(), raw }
+  const wl = parseSingleWikilink(trimmed)
+  if (wl) return { kind: 'link', ref: wl.ref, raw }
   const task = TASK_ITEM_RE.exec(trimmed)
   if (task) return { kind: 'task', text: task[2].trim(), done: task[1] !== ' ', raw }
   return { kind: 'task', text: trimmed, done: false, raw }
