@@ -25,6 +25,7 @@ interface Props {
 
 export default function TimePickerDialog({ open, value, onConfirm, onRemove, onClose }: Props) {
   const [time, setTime] = useState('09:00')
+  const [isTouch] = useState(() => window.matchMedia('(pointer: coarse)').matches)
 
   useEffect(() => {
     if (open) setTime(normaliseTime(value || '09:00'))
@@ -38,9 +39,18 @@ export default function TimePickerDialog({ open, value, onConfirm, onRemove, onC
           <DialogDescription className="sr-only">Select a time</DialogDescription>
         </DialogHeader>
 
-        <div className="flex justify-center py-2">
-          <TimeWheels value={time} onChange={setTime} />
-        </div>
+        {isTouch ? (
+          <div className="flex justify-center py-2">
+            <TimeWheels value={time} onChange={setTime} />
+          </div>
+        ) : (
+          <input
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            className="w-full bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+          />
+        )}
 
         <div className="flex items-center justify-between pt-2">
           <Button
