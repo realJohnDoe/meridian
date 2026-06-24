@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { addDays, addMinutes, differenceInMinutes, differenceInDays } from 'date-fns'
-import { ChevronDownIcon } from 'lucide-react'
-import { parseDateString, parseDateTime, fmtISO, WEEK_STARTS_ON } from '@/model/dateUtils'
+import { CalendarIcon } from 'lucide-react'
+import { parseDateString, parseDateTime, fmtISO } from '@/model/dateUtils'
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -11,11 +11,9 @@ import {
 } from '@/components/ui/responsive-modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-
 import { badgeVariants } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
+import DatePickerDialog from './DatePickerDialog'
 
 // ── Types / data ──────────────────────────────────────────────────────────────
 const UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
@@ -142,7 +140,7 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
   const [unit, setUnit] = useState<Unit>('hours')
   const [endDate, setEndDate] = useState('')   // YYYY-MM-DD
   const [endTime, setEndTime] = useState('')   // HH:MM
-  const [dateOpen, setDateOpen] = useState(false)
+  const [dateDlgOpen, setDateDlgOpen] = useState(false)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -209,10 +207,10 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
     onConfirm(dur); onClose()
   }
 
-  const startDate    = parseDateString(scheduled?.date ?? '') ?? new Date()
   const endDateTabLabel = hasTime ? 'End date & time' : 'End date'
 
   return (
+    <>
     <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveModalContent>
         <ResponsiveModalTitle>Duration</ResponsiveModalTitle>
@@ -300,25 +298,15 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
           {tab === 'endDate' && (
             <div className="space-y-2">
               <div className="flex gap-2">
-                <Popover open={dateOpen} onOpenChange={setDateOpen}>
-                  <PopoverTrigger asChild>
-                    <button className="flex-1 flex items-center justify-between bg-background border border-border/50 hover:border-border focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-normal text-foreground transition-colors">
-                      <span className={endDate ? '' : 'text-muted-foreground'}>
-                        {endDate ? fmtEndDate(endDate) : 'End date'}
-                      </span>
-                      <ChevronDownIcon size={14} className="text-muted-foreground shrink-0" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto overflow-hidden p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      weekStartsOn={WEEK_STARTS_ON}
-                      selected={parseDateString(endDate) ?? undefined}
-                      onSelect={(d) => { if (d) { setEndDate(fmtISO(d)); setDateOpen(false) } }}
-                      disabled={(d) => hasTime ? d < startDate : d <= startDate}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <button
+                  className="flex-1 flex items-center justify-between bg-background border border-border/50 hover:border-border focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-normal text-foreground transition-colors"
+                  onClick={() => setDateDlgOpen(true)}
+                >
+                  <span className={endDate ? '' : 'text-muted-foreground'}>
+                    {endDate ? fmtEndDate(endDate) : 'End date'}
+                  </span>
+                  <CalendarIcon size={13} className="text-muted-foreground shrink-0" />
+                </button>
 
                 {hasTime && (
                   <input
@@ -345,5 +333,13 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
         />
       </ResponsiveModalContent>
     </ResponsiveModal>
+    <DatePickerDialog
+      open={dateDlgOpen}
+      initialDate={endDate || scheduled?.date || ''}
+      onConfirm={(d) => setEndDate(d)}
+      onRemove={() => setEndDate('')}
+      onClose={() => setDateDlgOpen(false)}
+    />
+    </>
   )
 }
