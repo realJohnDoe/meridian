@@ -166,8 +166,8 @@ export default function OccurrenceCard({
         {showMeta && (
           <div className="flex flex-wrap gap-1.5">
             {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
-            {showTime !== 'none' && t && <Badge variant="chip" className="h-auto py-0.5 px-2 text-xs font-mono cursor-default">{t}</Badge>}
-            {showTime !== 'none' && t && occ.metadata.duration && <Badge variant="chip" className="h-auto py-0.5 px-2 text-xs font-mono cursor-default">{occ.metadata.duration}</Badge>}
+            {showTime !== 'none' && t && <Badge variant="chip">{t}</Badge>}
+            {showTime !== 'none' && t && occ.metadata.duration && <Badge variant="chip">{occ.metadata.duration}</Badge>}
             {showTagsParticipants && listedOn.map(label => (
               <TagChip key={label} label={label} isTopic />
             ))}
