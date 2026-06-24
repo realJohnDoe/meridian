@@ -69,8 +69,7 @@ export default function FileResultsList({ query, onOpen }: Props) {
           >
             <OccurrenceCard
               occ={occ}
-              taskCheckbox={false}
-              eventNoteIcon
+              leadingIcon="kind"
               showTime="badge"
               showDate
               listedOn={listedOn}

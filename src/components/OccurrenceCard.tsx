@@ -18,10 +18,13 @@ export interface OccurrenceCardProps {
   onOpen: () => void
   onToggleDone: () => void
 
-  /** Trackable tasks show a checkbox (default: true). false → KindIcon instead. */
-  taskCheckbox?: boolean
-  /** Events and notes show their KindIcon (default: false). */
-  eventNoteIcon?: boolean
+  /**
+   * What to render in the leading slot:
+   *   'checkbox' (default) — checkbox for trackable tasks, nothing otherwise
+   *   'kind'               — always KindIcon
+   *   'both'               — checkbox for trackable tasks, KindIcon otherwise
+   */
+  leadingIcon?: 'checkbox' | 'kind' | 'both'
   /**
    * Where to display the time:
    *   'inline' (default) — right-aligned cyan mono in the title row
@@ -57,8 +60,7 @@ export default function OccurrenceCard({
   occ,
   onOpen,
   onToggleDone,
-  taskCheckbox = true,
-  eventNoteIcon = false,
+  leadingIcon = 'checkbox',
   showTime = 'inline',
   showDate = false,
   showTagsParticipants = true,
@@ -112,21 +114,20 @@ export default function OccurrenceCard({
       <div className="relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none">
         <div className="flex items-center gap-1.5">
           {/* Icon / checkbox */}
-          {!taskCheckbox
-            ? <KindIcon item={occ} size={13} className="shrink-0 text-muted-foreground" />
-            : hasTrack
-              ? (
-                <Checkbox
-                  checked={isDone}
-                  onCheckedChange={() => onToggleDone()}
-                  className="size-5 shrink-0 pointer-events-auto"
-                  onPointerDown={e => e.stopPropagation()}
-                  onClick={e => e.stopPropagation()}
-                />
-              )
-              : eventNoteIcon
-                ? <KindIcon item={occ} size={13} className="shrink-0 text-muted-foreground" />
-                : null}
+          {(() => {
+            const showKind = leadingIcon === 'kind' || (leadingIcon === 'both' && !hasTrack)
+            if (showKind) return <KindIcon item={occ} size={13} className="shrink-0 text-muted-foreground" />
+            if (hasTrack) return (
+              <Checkbox
+                checked={isDone}
+                onCheckedChange={() => onToggleDone()}
+                className="size-5 shrink-0 pointer-events-auto"
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
+              />
+            )
+            return null
+          })()}
 
           <span className={titleCls(isDone)}>{title}</span>
 
