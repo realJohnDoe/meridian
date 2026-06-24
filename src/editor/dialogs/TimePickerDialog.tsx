@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useMediaQuery } from '@/hooks/use-media-query'
 import {
   Dialog,
   DialogContent,
@@ -25,7 +26,7 @@ interface Props {
 
 export default function TimePickerDialog({ open, value, onConfirm, onRemove, onClose }: Props) {
   const [time, setTime] = useState('09:00')
-  const [isTouch] = useState(() => window.matchMedia('(pointer: coarse)').matches)
+  const isTouch = useMediaQuery('(pointer: coarse)')
 
   useEffect(() => {
     if (open) setTime(normaliseTime(value || '09:00'))
