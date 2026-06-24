@@ -105,18 +105,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ---
 
-### 14. Autosave effect fires on every `entry` change via suppressed exhaustive-deps lint
-
-- **Category:** `error-handling` `performance`
-- **Impact:** 3
-- **Breadth:** 1 file
-- **Fix effort:** S
-- **Evidence:** `editor/EntryEditor.tsx:103-108` `useEffect(... , [entry])` with `// eslint-disable-next-line react-hooks/exhaustive-deps`, calling `onAutoSave` whenever any entry field changes.
-- **Problem:** Autosave triggers on unrelated state changes (type toggles, dialog-driven field edits), not just body edits, risking redundant saves/network writes; the disabled lint rule hides the over-broad dependency.
-- **Fix:** Trigger autosave from the specific change handlers (body/title) rather than a catch-all effect on the whole `entry`.
-
----
-
 ### 15. Imperative DOM-style manipulation for swipe-to-delete
 
 - **Category:** `styling` `srp`
