@@ -14,7 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { badgeVariants } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
 import DatePickerDialog from './DatePickerDialog'
-import TimeWheels from '@/components/ui/TimeWheels'
+import TimePickerDialog from './TimePickerDialog'
 
 // ── Types / data ──────────────────────────────────────────────────────────────
 const UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
@@ -179,6 +179,8 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
   const [endDate, setEndDate] = useState('')   // YYYY-MM-DD
   const [endTime, setEndTime] = useState('')   // HH:MM
   const [dateDlgOpen, setDateDlgOpen] = useState(false)
+  const [timeDlgOpen, setTimeDlgOpen] = useState(false)
+  const [isTouch] = useState(() => window.matchMedia('(pointer: coarse)').matches)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -351,12 +353,23 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                   <CalendarIcon size={13} className="text-muted-foreground shrink-0" />
                 </button>
 
+                {hasTime && isTouch && (
+                  <button
+                    className="bg-background border border-border/50 hover:border-border focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors"
+                    onClick={() => setTimeDlgOpen(true)}
+                  >
+                    {endTime || '—'}
+                  </button>
+                )}
+                {hasTime && !isTouch && (
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                  />
+                )}
               </div>
-              {hasTime && (
-                <div className="flex justify-center pt-1">
-                  <TimeWheels value={endTime || '09:00'} onChange={setEndTime} />
-                </div>
-              )}
               {!computedDuration && endDate && (
                 <p className="text-xs text-destructive">End must be after start</p>
               )}
@@ -378,6 +391,13 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
       onConfirm={(d) => setEndDate(d)}
       onRemove={() => setEndDate('')}
       onClose={() => setDateDlgOpen(false)}
+    />
+    <TimePickerDialog
+      open={timeDlgOpen}
+      value={endTime || '09:00'}
+      onConfirm={(t) => setEndTime(t)}
+      onRemove={() => setEndTime('')}
+      onClose={() => setTimeDlgOpen(false)}
     />
     </>
   )
