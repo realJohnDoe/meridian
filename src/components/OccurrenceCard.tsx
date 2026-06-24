@@ -1,10 +1,8 @@
-import { useMemo } from 'react'
 import { Repeat2, Users } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import KindIcon from './KindIcon'
 import { fmtT, parseDateString } from '@/model/dateUtils'
 import { fmtShort } from '@/format'
-import { backlinksTo } from '@/fileOccurrence'
 import { occState } from '@/occState'
 import { multidayDisplayTitle } from '@/model/expansion'
 import { Checkbox } from './ui/checkbox'
@@ -14,7 +12,6 @@ import { SurfaceButton } from './ui/surface-button'
 import { cn } from '@/lib/cn'
 import { occBarVariants } from './ui/occurrence-variants'
 import TagChip from './TagChip'
-import { getRoots } from '@/storeBridge'
 
 export interface OccurrenceCardProps {
   occ: Occurrence
@@ -36,6 +33,8 @@ export interface OccurrenceCardProps {
   showDate?: boolean
   /** Show tags, topics, and participants in the meta row (default: true). */
   showTagsParticipants?: boolean
+  /** Titles of files that link to this entry (backlinks). Computed by the caller. */
+  listedOn?: string[]
 }
 
 const titleCls = (isDone: boolean) =>
@@ -63,6 +62,7 @@ export default function OccurrenceCard({
   showTime = 'inline',
   showDate = false,
   showTagsParticipants = true,
+  listedOn = [],
 }: OccurrenceCardProps) {
   const barClass = occState(occ)
   const isDone   = !!occ.metadata.done
@@ -75,11 +75,6 @@ export default function OccurrenceCard({
   const hasTrack     = occ.metadata.done !== undefined
   const tags         = occ.metadata.tags || []
   const participants = occ.metadata.participants || []
-  const roots    = getRoots()
-  const listedOn = useMemo(
-    () => backlinksTo(occ.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug),
-    [occ.fileSlug, roots],
-  )
 
   const dateBadge = (() => {
     const d = parseDateString(occ.date)
