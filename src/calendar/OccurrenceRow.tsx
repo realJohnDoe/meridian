@@ -146,6 +146,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       <div className="swipe-row" ref={rowRef}>
         <OccurrenceCard
           occ={occ}
+          leadingIcon="checkbox"
           onOpen={onOpen}
           onToggleDone={onToggleDone}
           showDate={showDate}

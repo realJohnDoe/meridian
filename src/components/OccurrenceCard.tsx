@@ -19,11 +19,12 @@ export interface OccurrenceCardProps {
   onToggleDone: () => void
 
   /**
-   * What to render in the leading slot (omit for checkbox-for-trackable-tasks):
-   *   'kind'  — always KindIcon
-   *   'both'  — checkbox for trackable tasks, KindIcon otherwise
+   * What to render in the leading slot:
+   *   'checkbox' — checkbox for trackable tasks, nothing otherwise
+   *   'kind'     — always KindIcon
+   *   'both'     — checkbox for trackable tasks, KindIcon otherwise
    */
-  leadingIcon?: 'kind' | 'both'
+  leadingIcon: 'checkbox' | 'kind' | 'both'
   /**
    * Where to display the time:
    *   'inline' (default) — right-aligned cyan mono in the title row
