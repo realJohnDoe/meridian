@@ -3,7 +3,6 @@
 - Update card layout with participants on right side
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
-- Add nice readme
 - Add Solarized Light theme
 - Add option to show dates formatted european / first day of the week config
 - Investigate more secure storage options
