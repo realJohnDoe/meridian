@@ -15,7 +15,7 @@ Meridian is a free, open-source PWA that blends task management, event schedulin
 - **Rich recurrence** — daily, weekly, monthly, yearly, custom intervals, weekday-specific patterns, and "repeat N days after completion" — without fiddling with a wizard.
 - **Wikilinks** — connect entries with `[[Note Title]]` links that render as inline chips with a preview popover.
 - **Participants** — tag people on entries and filter the whole calendar to show only their items.
-- **Priority, duration, timezone** — first-class metadata on every task or event.
+- **Priority and duration** — first-class metadata on every task or event.
 - **Search** — find any entry by title or content across your entire vault.
 - **Offline-first** — the app works without a network connection and syncs automatically when you're back online.
 - **Installable** — add Meridian to your home screen or desktop like any native app (it's a PWA).
@@ -28,8 +28,8 @@ Meridian doesn't run a server that holds your notes. You choose where your files
 
 | Backend | How it works |
 |---|---|
-| **Local folder** | Opens a folder on your computer via the browser's File System API. Files stay on your machine. |
-| **GitHub repository** | Reads and writes directly to a repo of your choice via the GitHub API. Instant cloud sync, full git history. |
+| **GitHub repository** ⭐ | Reads and writes directly to a repo of your choice via the GitHub API. Instant cloud sync, full git history, and works on any device including iOS. This is the recommended backend for most users. |
+| **Local folder** | Opens a folder on your computer via the browser's File System API. Files stay on your machine. Supported in Chrome and Edge only — not available on iOS or Firefox. |
 | **Example vault** | A built-in demo you can explore before connecting anything — no account needed. |
 
 Files are plain `.md` files. Open them in any text editor, check them into git, sync them with any tool you already use.
@@ -41,8 +41,8 @@ Files are plain `.md` files. Open them in any text editor, check them into git, 
 1. **Open the app** at [realjohndoe.github.io/meridian](https://realjohndoe.github.io/meridian/).
 2. Try the **Example vault** to get a feel for the interface — click through the onboarding tour.
 3. When you're ready, connect your own storage:
-   - **Local folder** — click "Connect local folder" and pick a directory. Works best in Chrome or Edge.
-   - **GitHub** — click "Connect GitHub repo", paste a repo URL, and enter a personal access token with `repo` scope. Meridian will read and write files directly.
+   - **GitHub** (recommended) — click "Connect GitHub repo", paste a repo URL, and enter a personal access token with `repo` scope. Meridian will read and write files directly — and you can access your vault from any device.
+   - **Local folder** — click "Connect local folder" and pick a directory. Chrome and Edge only; not supported on iOS or Firefox.
 4. Create your first entry with the **+** button and start building your calendar.
 
 ---
@@ -60,6 +60,7 @@ priority: high
 duration: 30m
 repeat: weekly
 tags: [review, planning]
+participants: [alice, bob]
 ---
 
 Notes about this task go here, in plain Markdown.
@@ -69,32 +70,19 @@ You can write and edit these files by hand if you prefer — Meridian will pick 
 
 ---
 
-## Keyboard shortcuts
-
-| Action | Shortcut |
-|---|---|
-| New entry | `N` |
-| Save entry | `Ctrl / ⌘ + S` |
-| Search | `Ctrl / ⌘ + K` |
-| Previous / next day | `← →` |
-| Today | `T` |
-
----
-
 ## Inspiration and comparisons
 
 Meridian was heavily inspired by tools we already loved, and tries to fill the gap where they didn't quite fit together.
 
 | Feature | Meridian | Obsidian + TaskNotes | Google Calendar | GitHub Issues / Projects |
 |---|---|---|---|---|
+| Great mobile UX | ✅ | Partial | ✅ | Partial |
 | Plain Markdown storage | ✅ | ✅ | ❌ | ❌ |
 | Calendar views (day / month) | ✅ | Plugin-dependent | ✅ | Partial |
 | Task management | ✅ | ✅ (TaskNotes plugin) | Limited | ✅ |
 | Wikilinks between entries | ✅ | ✅ | ❌ | ❌ |
 | Rich recurrence rules | ✅ | Limited | ✅ | ❌ |
-| Participants / people filter | ✅ | ❌ | ✅ | Assignees only |
-| GitHub sync (no plugin) | ✅ (built-in) | Via Obsidian Git plugin | ❌ | Native |
-| Offline-first PWA | ✅ | ✅ (desktop app) | Partial | ❌ |
+| Multiple participants / assignees | ✅ | Partial | ❌ | ✅ |
 | Free & open source | ✅ | Partially (core only) | ❌ | ❌ |
 | Works in the browser | ✅ | ❌ | ✅ | ✅ |
 
