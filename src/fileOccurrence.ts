@@ -4,16 +4,16 @@ import { isSeries, isStandaloneOcc } from './types'
 import type { Occurrence, StoreItem, Roots } from './types'
 
 /** A flat, file-granular entry for the item picker and search overlay. */
-export interface FileEntry {
+export interface FilePickerEntry {
   fileSlug: string
   title:    string
   tags:     string[]
   items:    string[]
 }
 
-/** One FileEntry per file (deduped by fileSlug), sourced entirely from the roots map. */
-export function fileEntries(roots: Roots): FileEntry[] {
-  const entries: FileEntry[] = []
+/** One FilePickerEntry per file (deduped by fileSlug), sourced entirely from the roots map. */
+export function fileEntries(roots: Roots): FilePickerEntry[] {
+  const entries: FilePickerEntry[] = []
   for (const [fileSlug, meta] of roots) {
     entries.push({
       fileSlug,

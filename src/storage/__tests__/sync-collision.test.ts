@@ -6,7 +6,7 @@
  * logic without Dexie or module-level state.
  */
 import { describe, it, expect } from 'vitest'
-import type { StorageBackend, FileEntry, VaultKind } from '@/storage/backend'
+import type { StorageBackend, RawFile, VaultKind } from '@/storage/backend'
 import { ConflictError } from '@/storage/conflictError'
 
 // ── FakeBackend ────────────────────────────────────────────────
@@ -39,14 +39,14 @@ class FakeBackend implements StorageBackend {
     return m
   }
 
-  async readFiles(paths: string[]): Promise<FileEntry[]> {
+  async readFiles(paths: string[]): Promise<RawFile[]> {
     return paths.flatMap(p => {
       const f = this._files.get(p)
       return f ? [{ path: p, content: f.content, version: f.version }] : []
     })
   }
 
-  async readAll(): Promise<FileEntry[]> {
+  async readAll(): Promise<RawFile[]> {
     return Array.from(this._files.entries()).map(([p, f]) => ({ path: p, content: f.content, version: f.version }))
   }
 

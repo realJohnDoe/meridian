@@ -1,4 +1,4 @@
-import type { StorageBackend, FileEntry, VaultKind } from './backend'
+import type { StorageBackend, RawFile, VaultKind } from './backend'
 import { diskStatAll, diskReadFiles, diskReadAll, diskWrite, diskDelete } from './fs'
 
 export class LocalBackend implements StorageBackend {
@@ -14,8 +14,8 @@ export class LocalBackend implements StorageBackend {
   get handle(): FileSystemDirectoryHandle { return this._handle }
 
   statAll():                             Promise<Map<string, string>> { return diskStatAll(this._handle) }
-  readFiles(paths: string[]):            Promise<FileEntry[]>         { return diskReadFiles(this._handle, paths) }
-  readAll():                             Promise<FileEntry[]>         { return diskReadAll(this._handle) }
+  readFiles(paths: string[]):            Promise<RawFile[]>         { return diskReadFiles(this._handle, paths) }
+  readAll():                             Promise<RawFile[]>         { return diskReadAll(this._handle) }
   write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> { return diskWrite(this._handle, path, content, expectedVersion) }
   delete(path: string, _expectedVersion?: string): Promise<void>    { return diskDelete(this._handle, path) }
 

@@ -1,4 +1,4 @@
-import type { StorageBackend, FileEntry, VaultKind } from './backend'
+import type { StorageBackend, RawFile, VaultKind } from './backend'
 import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError } from './githubApi'
 
 function isVaultFile(name: string): boolean {
@@ -67,7 +67,7 @@ export class GitHubBackend implements StorageBackend {
     }
   }
 
-  async readFiles(paths: string[]): Promise<FileEntry[]> {
+  async readFiles(paths: string[]): Promise<RawFile[]> {
     try {
       const results = await Promise.all(
         paths.map(async path => {
@@ -88,13 +88,13 @@ export class GitHubBackend implements StorageBackend {
           }
         })
       )
-      return results.filter((r): r is FileEntry => r !== null)
+      return results.filter((r): r is RawFile => r !== null)
     } catch (e) {
       throw mapGitHubError(e)
     }
   }
 
-  async readAll(): Promise<FileEntry[]> {
+  async readAll(): Promise<RawFile[]> {
     const tokens = await this.statAll()
     return this.readFiles(Array.from(tokens.keys()))
   }

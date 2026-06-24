@@ -1,6 +1,6 @@
 export type VaultKind = 'local' | 'example' | 'github'
 
-export interface FileEntry {
+export interface RawFile {
   path:    string
   content: string
   version: string
@@ -32,8 +32,8 @@ export interface StorageBackend {
   readonly kind:     VaultKind
   readonly readOnly: boolean
   statAll():                               Promise<Map<string, string>>
-  readFiles(paths: string[]):              Promise<FileEntry[]>
-  readAll():                               Promise<FileEntry[]>
+  readFiles(paths: string[]):              Promise<RawFile[]>
+  readAll():                               Promise<RawFile[]>
   /**
    * Write `content` to `path`. If `expectedVersion` is provided the write is a
    * compare-and-swap: it only succeeds if the backend's current version token
