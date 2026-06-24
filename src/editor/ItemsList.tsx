@@ -165,7 +165,7 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
             {occ ? (
               <OccurrenceCard
                 occ={occ}
-                eventNoteIcon
+                leadingIcon="both"
                 showTime="none"
                 showTagsParticipants={false}
                 onOpen={() => onOpenWikilink?.(occ.fileSlug)}

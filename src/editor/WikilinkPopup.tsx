@@ -98,7 +98,7 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
           <div key={e.fileSlug} className={wrapCls} onMouseEnter={() => setFocusIdx(i)}>
             <OccurrenceCard
               occ={occ}
-              taskCheckbox={false}
+              leadingIcon="kind"
               showTime="none"
               showTagsParticipants={false}
               onOpen={() => insertWikilink(e.title)}
