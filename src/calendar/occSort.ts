@@ -1,8 +1,7 @@
 import { parseDurationDays } from '@/model/duration'
 import { fmtT } from '@/model/dateUtils'
-import { occKind } from '@/types'
 import type { Occurrence } from '@/types'
-import { occState } from '@/occState'
+import { occKind, occState } from '@/occView'
 
 const _prioOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
 
