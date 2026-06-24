@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useMediaQuery } from '@/hooks/use-media-query'
 import { addDays, addMinutes, differenceInMinutes, differenceInDays } from 'date-fns'
 import { CalendarIcon, Clock, ChevronLeft } from 'lucide-react'
 import { parseDateString, parseDateTime, fmtISO, WEEK_STARTS_ON } from '@/model/dateUtils'
@@ -128,9 +129,10 @@ export function formatDurationChip(duration: string, scheduled: Scheduled): stri
   if (scheduled.time) {
     const { time } = durationToEndDateTime(scheduled.date, scheduled.time, duration)
     return `until ${fmtEndTime(time)} (${duration})`
-  } else {
-    return `until ${fmtEndDate(durationToEndDate(scheduled.date, duration))} (${duration})`
   }
+  const p = parseDurationStr(duration)
+  if (!p || p.unit === 'minutes' || p.unit === 'hours') return duration
+  return `until ${fmtEndDate(durationToEndDate(scheduled.date, duration))} (${duration})`
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -145,6 +147,7 @@ interface Props {
 
 export default function DurationDialog({ open, value, scheduled, onConfirm, onRemove, onClose }: Props) {
   const hasTime = !!scheduled?.time
+  const isTouch = useMediaQuery('(pointer: coarse)')
 
   // ── View ──
   const [view, setView] = useState<View>('main')
@@ -182,10 +185,15 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
         : durationToEndDateTime(scheduled.date, scheduled.time, '1 hour')
       setEndDate(end.date)
       setEndTime(end.time)
+      const d = parseDateString(end.date)
+      if (d) { setPendingDate(d); setPendingMonth(d) }
     } else {
-      setEndDate(value
+      const ed = value
         ? durationToEndDate(scheduled.date, value)
-        : fmtISO(addDays(parseDateString(scheduled.date) ?? new Date(), 1)))
+        : fmtISO(addDays(parseDateString(scheduled.date) ?? new Date(), 1))
+      setEndDate(ed)
+      const d = parseDateString(ed)
+      if (d) { setPendingDate(d); setPendingMonth(d) }
     }
   }, [open, value, scheduled?.date, scheduled?.time])
 
@@ -370,8 +378,34 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
                 </div>
               )}
 
-              {/* End date */}
-              {tab === 'endDate' && (
+              {/* End date — desktop: inline calendar + time input; touch: chips → sub-views */}
+              {tab === 'endDate' && !isTouch && (
+                <div className="space-y-3">
+                  <Calendar
+                    mode="single"
+                    fixedWeeks
+                    weekStartsOn={WEEK_STARTS_ON}
+                    selected={pendingDate}
+                    onSelect={(d) => { if (d) { setPendingDate(d); setPendingMonth(d); setEndDate(fmtISO(d)) } }}
+                    month={pendingMonth}
+                    onMonthChange={setPendingMonth}
+                    disabled={(d) => hasTime ? d < startDate : d <= startDate}
+                    className="w-full [--cell-size:2.25rem] p-0"
+                  />
+                  {hasTime && (
+                    <input
+                      type="time"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="w-full bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                    />
+                  )}
+                  <p className={`text-xs ${computedDuration ? 'text-muted-foreground' : 'text-destructive'}`}>
+                    {computedDuration ?? 'End must be after start'}
+                  </p>
+                </div>
+              )}
+              {tab === 'endDate' && isTouch && (
                 <div className="space-y-2">
                   <div className="flex gap-1.5 flex-wrap">
                     <button
