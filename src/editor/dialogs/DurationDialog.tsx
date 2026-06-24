@@ -111,15 +111,34 @@ function fmtEndTime(hhmm: string): string {
   return mn === 0 ? `${h12} ${period}` : `${h12}:${String(mn).padStart(2, '0')} ${period}`
 }
 
+// ── Multi-unit display format ─────────────────────────────────────────────────
+function fmtDuration(duration: string): string {
+  const p = parseDurationStr(duration)
+  if (!p) return duration
+  const { n, unit } = p
+  if (unit === 'minutes' && n >= 60) {
+    const h = Math.floor(n / 60), m = n % 60
+    const hStr = `${h} ${h === 1 ? 'hour' : 'hours'}`
+    return m > 0 ? `${hStr}, ${m} ${m === 1 ? 'minute' : 'minutes'}` : hStr
+  }
+  if (unit === 'hours' && n >= 24) {
+    const d = Math.floor(n / 24), h = n % 24
+    const dStr = `${d} ${d === 1 ? 'day' : 'days'}`
+    return h > 0 ? `${dStr}, ${h} ${h === 1 ? 'hour' : 'hours'}` : dStr
+  }
+  return duration
+}
+
 // ── Chip label (used by EntryEditor) ─────────────────────────────────────────
 export function formatDurationChip(duration: string, scheduled: Scheduled): string {
+  const display = fmtDuration(duration)
   if (scheduled.time) {
     const { time } = durationToEndDateTime(scheduled.date, scheduled.time, duration)
-    return `until ${fmtEndTime(time)} (${duration})`
+    return `until ${fmtEndTime(time)} (${display})`
   }
   const p = parseDurationStr(duration)
-  if (!p || p.unit === 'minutes' || p.unit === 'hours') return duration
-  return `until ${fmtEndDate(durationToEndDate(scheduled.date, duration))} (${duration})`
+  if (!p || p.unit === 'minutes' || p.unit === 'hours') return display
+  return `until ${fmtEndDate(durationToEndDate(scheduled.date, duration))} (${display})`
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
