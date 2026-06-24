@@ -1,5 +1,6 @@
 ## Next steps
 
+- Revert to time spinners and move duration string to mode selector
 - Update card layout with participants on right side
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
