@@ -121,6 +121,7 @@ See [[team-standup]] for a live recurring-event example.`,
       content: `---
 title: Team Standup
 tags: [work]
+participants: [Alice, Bob]
 date: "${recAnchor}"
 time: "09:00"
 duration: 30m

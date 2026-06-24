@@ -17,6 +17,7 @@ import { occState } from '@/occState'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
 
 import { useToday } from '@/hooks/useToday'
+import { useParticipantFilter } from '@/hooks/useParticipantFilter'
 const SH = 7    // start hour on timeline
 const EH = 22   // end hour on timeline
 const HP = 56   // pixels per hour
@@ -147,9 +148,11 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
 
+  const { filterOccs } = useParticipantFilter()
+
   const dvFrom = new Date(dvDate); dvFrom.setHours(0, 0, 0, 0)
   const dvTo   = new Date(dvDate); dvTo.setHours(23, 59, 59)
-  const dvOccs = useExpandWithMultiday(items, roots, dvFrom, dvTo)
+  const dvOccs = filterOccs(useExpandWithMultiday(items, roots, dvFrom, dvTo))
 
   const { allDay, cols } = useMemo(() => {
     const sorted = sortOccs(dvOccs)
