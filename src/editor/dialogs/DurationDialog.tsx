@@ -198,7 +198,11 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
         const end = durationToEndDateTime(scheduled.date, scheduled.time, dur)
         setEndDate(end.date); setEndTime(end.time)
       } else {
-        setEndDate(durationToEndDate(scheduled.date, dur))
+        // Sub-day intervals don't map meaningfully to date-only mode — default to next day
+        const converted = durationToEndDate(scheduled.date, dur)
+        setEndDate(converted !== scheduled.date
+          ? converted
+          : fmtISO(addDays(parseDateString(scheduled.date) ?? new Date(), 1)))
       }
     } else {
       const dur = hasTime
@@ -317,8 +321,8 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
                 </ToggleGroup>
               </div>
 
-              {/* Quick presets — shown for interval tab, or end-date tab when hasTime */}
-              {(tab === 'interval' || hasTime) && (
+              {/* Quick presets — interval tab only */}
+              {tab === 'interval' && (
                 <div className="flex gap-1.5 flex-wrap">
                   {PRESETS.map(p => (
                     <button
@@ -326,7 +330,7 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
                       className={cn(
                         badgeVariants({ variant: 'chip' }),
                         'cursor-pointer',
-                        value === p.value && 'bg-primary/20 text-primary border-primary',
+                        serialise(Math.max(1, n), unit) === p.value && 'bg-primary/20 text-primary border-primary',
                       )}
                       onClick={() => { onConfirm(p.value); onClose() }}
                     >
