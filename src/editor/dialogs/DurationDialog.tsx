@@ -112,7 +112,7 @@ function fmtEndTime(hhmm: string): string {
 }
 
 // ── Multi-unit display format ─────────────────────────────────────────────────
-function fmtDuration(duration: string): string {
+export function fmtDuration(duration: string): string {
   const p = parseDurationStr(duration)
   if (!p) return duration
   const { n, unit } = p
@@ -154,7 +154,7 @@ interface Props {
 export default function DurationDialog({ open, value, scheduled, onConfirm, onRemove, onClose }: Props) {
   const hasTime = !!scheduled?.time
 
-  const [tab,  setTab]  = useState<Tab>('endDate')
+  const [tab,  setTab]  = useState<Tab>(scheduled ? 'endDate' : 'interval')
   const [n,    setN]    = useState(1)
   const [unit, setUnit] = useState<Unit>('hours')
   const [endDate, setEndDate] = useState('')   // YYYY-MM-DD
@@ -163,10 +163,11 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!open || !scheduled) return
+    if (!open) return
     const parsed = value ? parseDurationStr(value) : null
     setN(parsed?.n ?? 1)
     setUnit(parsed?.unit ?? 'hours')
+    if (!scheduled) { setTab('interval'); return }
     if (hasTime) {
       const end = value
         ? durationToEndDateTime(scheduled.date, scheduled.time, value)
@@ -239,8 +240,8 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
 
         <div className="px-4 pt-4 pb-4 space-y-4">
 
-          {/* Select-by toggle */}
-          <div className="space-y-1.5">
+          {/* Select-by toggle — only shown when a date is set */}
+          {scheduled && <div className="space-y-1.5">
             <p className="text-xs text-muted-foreground">Select by</p>
             <ToggleGroup
               type="single"
@@ -262,7 +263,7 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
-          </div>
+          </div>}
 
           {/* Quick presets — interval tab only */}
           {tab === 'interval' && (
