@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useMediaQuery } from '@/hooks/use-media-query'
 import { addDays, addMinutes, differenceInMinutes, differenceInDays } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
 import { parseDateString, parseDateTime, fmtISO } from '@/model/dateUtils'
@@ -14,6 +15,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { badgeVariants } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
 import DatePickerDialog from './DatePickerDialog'
+import TimePickerDialog from './TimePickerDialog'
 
 // ── Types / data ──────────────────────────────────────────────────────────────
 const UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
@@ -129,6 +131,19 @@ export function fmtDuration(duration: string): string {
   return duration
 }
 
+function fmtDurationCompact(duration: string): string {
+  const p = parseDurationStr(duration)
+  if (!p) return duration
+  const { n, unit } = p
+  if (unit === 'minutes') { if (n < 60) return `${n}m`; const h = Math.floor(n/60), m = n%60; return m ? `${h}h ${m}m` : `${h}h` }
+  if (unit === 'hours')   { if (n < 24) return `${n}h`; const d = Math.floor(n/24), h = n%24; return h ? `${d}d ${h}h` : `${d}d` }
+  if (unit === 'days')    return `${n}d`
+  if (unit === 'weeks')   return `${n}w`
+  if (unit === 'months')  return `${n}mo`
+  if (unit === 'years')   return `${n}y`
+  return duration
+}
+
 // ── Chip label (used by EntryEditor) ─────────────────────────────────────────
 export function formatDurationChip(duration: string, scheduled: Scheduled): string {
   const display = fmtDuration(duration)
@@ -165,6 +180,8 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
   const [endDate, setEndDate] = useState('')   // YYYY-MM-DD
   const [endTime, setEndTime] = useState('')   // HH:MM
   const [dateDlgOpen, setDateDlgOpen] = useState(false)
+  const [timeDlgOpen, setTimeDlgOpen] = useState(false)
+  const isTouch = useMediaQuery('(pointer: coarse)')
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -216,16 +233,22 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
         : endDateToDuration(scheduled.date, endDate))
     : null
 
-  const intervalEndPreview = (() => {
-    if (!scheduled || n < 1) return null
-    const dur = serialise(n, unit)
-    if (hasTime) {
-      const { time } = durationToEndDateTime(scheduled.date, scheduled.time, dur)
-      return `Ends at ${fmtEndTime(time)}`
+  function getChipLabel(t: Tab): string {
+    if (t === tab || !scheduled) return t === 'interval' ? 'Interval' : endDateTabLabel
+    if (t === 'endDate' && n >= 1) {
+      const dur = serialise(n, unit)
+      if (hasTime) {
+        const end = durationToEndDateTime(scheduled.date, scheduled.time, dur)
+        return `${endDateTabLabel} (${fmtEndDate(end.date)} ${fmtEndTime(end.time)})`
+      }
+      const endDateStr = durationToEndDate(scheduled.date, dur)
+      if (endDateStr !== scheduled.date) return `${endDateTabLabel} (${fmtEndDate(endDateStr)})`
     }
-    const endDateStr = durationToEndDate(scheduled.date, dur)
-    return endDateStr !== scheduled.date ? `Ends on ${fmtEndDate(endDateStr)}` : null
-  })()
+    if (t === 'interval' && computedDuration) {
+      return `Interval (${fmtDurationCompact(computedDuration)})`
+    }
+    return t === 'interval' ? 'Interval' : endDateTabLabel
+  }
 
   function handleSet() {
     const dur = tab === 'interval' ? serialise(Math.max(1, n), unit) : computedDuration
@@ -265,7 +288,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                     'data-[state=on]:bg-background data-[state=on]:text-secondary-foreground data-[state=on]:[box-shadow:0_1px_4px_rgb(0_0_0/.35)]',
                   )}
                 >
-                  {t === 'interval' ? 'Interval' : endDateTabLabel}
+                  {getChipLabel(t)}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
@@ -314,9 +337,6 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                   </SelectContent>
                 </Select>
               </div>
-              {intervalEndPreview && (
-                <p className="text-xs text-muted-foreground">{intervalEndPreview}</p>
-              )}
             </div>
           )}
 
@@ -334,7 +354,15 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                   <CalendarIcon size={13} className="text-muted-foreground shrink-0" />
                 </button>
 
-                {hasTime && (
+                {hasTime && isTouch && (
+                  <button
+                    className="bg-background border border-border/50 hover:border-border focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors"
+                    onClick={() => setTimeDlgOpen(true)}
+                  >
+                    {endTime || '—'}
+                  </button>
+                )}
+                {hasTime && !isTouch && (
                   <input
                     type="time"
                     value={endTime}
@@ -343,10 +371,9 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                   />
                 )}
               </div>
-
-              <p className={`text-xs ${computedDuration ? 'text-muted-foreground' : 'text-destructive'}`}>
-                {computedDuration ? fmtDuration(computedDuration) : 'End must be after start'}
-              </p>
+              {!computedDuration && endDate && (
+                <p className="text-xs text-destructive">End must be after start</p>
+              )}
             </div>
           )}
         </div>
@@ -365,6 +392,13 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
       onConfirm={(d) => setEndDate(d)}
       onRemove={() => setEndDate('')}
       onClose={() => setDateDlgOpen(false)}
+    />
+    <TimePickerDialog
+      open={timeDlgOpen}
+      value={endTime || '09:00'}
+      onConfirm={(t) => setEndTime(t)}
+      onRemove={() => setEndTime('')}
+      onClose={() => setTimeDlgOpen(false)}
     />
     </>
   )
