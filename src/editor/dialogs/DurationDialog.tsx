@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Button } from '@/components/ui/button'
+
 import { badgeVariants } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
 
@@ -302,20 +302,20 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
               <div className="flex gap-2">
                 <Popover open={dateOpen} onOpenChange={setDateOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="flex-1 justify-between font-normal">
-                      {endDate ? fmtEndDate(endDate) : 'End date'}
-                      <ChevronDownIcon size={14} />
-                    </Button>
+                    <button className="flex-1 flex items-center justify-between bg-background border border-border/50 hover:border-border focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-normal text-foreground transition-colors">
+                      <span className={endDate ? '' : 'text-muted-foreground'}>
+                        {endDate ? fmtEndDate(endDate) : 'End date'}
+                      </span>
+                      <ChevronDownIcon size={14} className="text-muted-foreground shrink-0" />
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto overflow-hidden p-0" align="start">
                     <Calendar
                       mode="single"
-                      fixedWeeks
                       weekStartsOn={WEEK_STARTS_ON}
                       selected={parseDateString(endDate) ?? undefined}
                       onSelect={(d) => { if (d) { setEndDate(fmtISO(d)); setDateOpen(false) } }}
                       disabled={(d) => hasTime ? d < startDate : d <= startDate}
-                      className="[--cell-size:2.25rem]"
                     />
                   </PopoverContent>
                 </Popover>
