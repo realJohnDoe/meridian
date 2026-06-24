@@ -81,20 +81,10 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDel
   const navigate = useNavigate()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const viewRef  = useRef<EditorView | null>(null)
-  const isFirstRender = useRef(true)
-
 
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
-
-  useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return }
-    if (!entry.item || !onAutoSave) return
-    if (entry.editScope === 'add') return
-    onAutoSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry])
 
   function handleTypeChange(t: ItemType) {
     onChange(prev => ({
@@ -212,7 +202,11 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDel
             placeholder="Title"
             rows={1}
             value={title}
-            onChange={e => { onChange(prev => ({ ...prev, title: e.target.value })); autoResize(e.target) }}
+            onChange={e => {
+              onChange(prev => ({ ...prev, title: e.target.value }))
+              autoResize(e.target)
+              if (item && editScope !== 'add') onAutoSave?.(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+            }}
           />
         </div>
 
