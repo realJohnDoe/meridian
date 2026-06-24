@@ -93,18 +93,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ---
 
-### 10. Naming collision: two unrelated `FileEntry` types
-
-- **Category:** `naming`
-- **Impact:** 3
-- **Breadth:** ~15 import sites
-- **Fix effort:** S
-- **Evidence:** `storage/backend.ts:3` `FileEntry = { path, content, version }` vs `presentation.ts:32` `FileEntry = { fileSlug, title, tags, items }`; both are imported widely.
-- **Problem:** The same name denotes a raw storage blob in one layer and a UI picker row in another, so a reader/IDE cannot tell which `FileEntry` a file means without checking the import path.
-- **Fix:** Rename the storage one to `RawFile`/`BackendFile` and the presentation one to `FilePickerEntry`.
-
----
-
 ### 11. `OccurrenceCard` reads the store non-reactively during render
 
 - **Category:** `performance` `architecture`
