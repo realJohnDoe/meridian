@@ -146,15 +146,20 @@ interface Props {
   open: boolean
   value: string
   scheduled: Scheduled | null
+  itemType: 'task' | 'event' | 'note'
   onConfirm: (duration: string) => void
   onRemove: () => void
   onClose: () => void
 }
 
-export default function DurationDialog({ open, value, scheduled, onConfirm, onRemove, onClose }: Props) {
+export default function DurationDialog({ open, value, scheduled, itemType, onConfirm, onRemove, onClose }: Props) {
   const hasTime = !!scheduled?.time
 
-  const [tab,  setTab]  = useState<Tab>(scheduled ? 'endDate' : 'interval')
+  function defaultTab(): Tab {
+    return (!scheduled || itemType === 'task') ? 'interval' : 'endDate'
+  }
+
+  const [tab,  setTab]  = useState<Tab>(defaultTab)
   const [n,    setN]    = useState(1)
   const [unit, setUnit] = useState<Unit>('hours')
   const [endDate, setEndDate] = useState('')   // YYYY-MM-DD
@@ -167,7 +172,8 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
     const parsed = value ? parseDurationStr(value) : null
     setN(parsed?.n ?? 1)
     setUnit(parsed?.unit ?? 'hours')
-    if (!scheduled) { setTab('interval'); return }
+    setTab(defaultTab())
+    if (!scheduled) return
     if (hasTime) {
       const end = value
         ? durationToEndDateTime(scheduled.date, scheduled.time, value)
