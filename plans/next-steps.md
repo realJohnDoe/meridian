@@ -127,18 +127,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 - **Problem:** On a cold chunk load the editor overlay renders nothing until the chunk arrives — no spinner/skeleton on a primary user flow (opening an entry).
 - **Fix:** Provide a lightweight skeleton fallback (the agenda already has `AgendaSkeleton`/`Skeleton`).
 
----
-
-### 18. `storeBridge.ts` mixes store accessors with DOM toast notifications
-
-- **Category:** `srp` `architecture`
-- **Impact:** 3
-- **Breadth:** 1 file, imported by storage + actions
-- **Fix effort:** S
-- **Evidence:** `src/storeBridge.ts` exports `getItems`/`setSyncError`/`setActiveVaultId` **and** `notify`/`warn`/`notifyError` (sonner toasts) from the same module.
-- **Problem:** The storage layer's "bridge to global state" also owns user-facing notifications, coupling pure state plumbing to a UI toast library and giving the module two reasons to change.
-- **Fix:** Move `notify`/`warn`/`notifyError` into a `notifications.ts` (UI layer) and keep `storeBridge` to state access only.
-
 # Codebase Health Survey
 
 Survey this codebase for code health issues across the categories below.
