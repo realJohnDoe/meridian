@@ -4,7 +4,7 @@ import {
 import { occIsRecur, occKind } from './types'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
-import { writeEntityToCache, deleteFromBackend } from './storage/sync'
+import { writeEntityToCache, deleteFromBackend } from '@/storage'
 import { commitNext } from './storeCommit'
 import { showDeleteToast, showDoneMovedToast } from './undoToast'
 import { fmtISO } from './model/dateUtils'

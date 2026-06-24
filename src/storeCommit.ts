@@ -1,5 +1,5 @@
 import { setData } from './storeBridge'
-import { writeEntityToCache, deleteFromBackend } from './storage/sync'
+import { writeEntityToCache, deleteFromBackend } from '@/storage'
 import type { StoreData } from './model/storeOps'
 
 /** Commit to store and persist all slugs. */

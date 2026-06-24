@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { StoreItem, Roots, Occurrence } from './types'
-import type { VaultRef } from './storage/backend'
+import type { VaultRef } from '@/storage'
 import { clearOccIdCache } from './model/expansion'
 import { fileOccurrenceMap } from './fileOccurrence'
 

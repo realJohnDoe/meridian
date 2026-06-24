@@ -1,7 +1,6 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { restoreVaults } from '@/storage/vaultRegistry'
-import { autoSyncTick, resetSyncBackoff } from '@/storage/sync'
+import { restoreVaults, autoSyncTick, resetSyncBackoff } from '@/storage'
 import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createRootRoute({

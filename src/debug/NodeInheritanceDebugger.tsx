@@ -20,12 +20,8 @@ import {
 import { dayBefore } from '@/model/dateUtils'
 import { loadFile, saveFile } from '@/fileIO'
 import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern, OccurrenceMetadata } from '@/types'
-import EntryEditor from '@/editor/EntryEditor'
-import type { EntryState } from '@/editor/state'
-import RepeatDialog from '@/editor/dialogs/RepeatDialog'
-import DialogStack from '@/editor/DialogStack'
-import type { DialogHandlers } from '@/editor/useEntryEditor'
-import { applyScope, entryFromOccurrence } from '@/editor/save'
+import { EntryEditor, DialogStack, RepeatDialog, applyScope, entryFromOccurrence } from '@/editor'
+import type { EntryState, DialogHandlers } from '@/editor'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
 
