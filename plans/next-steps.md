@@ -57,18 +57,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ## 3. Findings
 
-### 4. Hidden module-level mutable caches invalidated by convention
-
-- **Category:** `architecture` `performance`
-- **Impact:** 5
-- **Breadth:** 3 caches (`presentation._fomCache`, `expansion` occId cache, `githubBackend._shas`)
-- **Fix effort:** M
-- **Evidence:** `store.ts:53` `setData` must manually call `clearOccIdCache()` + `resetFOMCache()`; `presentation.ts:174` `warmSlugInFOM` mutates `_fomCache.items`/`.roots` in place to keep a reference-identity memo valid.
-- **Problem:** Correctness depends on every store mutation remembering to warm/reset out-of-band singletons; a missed call yields stale occurrences with no type-level signal.
-- **Fix:** Make the FOM a derived selector keyed on `(items, roots)` identity (or a Zustand computed slice) so invalidation is automatic, removing `warmSlugInFOM` entirely.
-
----
-
 ### 5. GitHub personal access token stored in plaintext IndexedDB
 
 - **Category:** `security`
