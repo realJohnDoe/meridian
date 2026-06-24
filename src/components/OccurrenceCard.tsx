@@ -1,4 +1,4 @@
-import { Repeat2, Users } from 'lucide-react'
+import { Repeat2 } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import KindIcon from './KindIcon'
 import { fmtT, parseDateString } from '@/model/dateUtils'
@@ -27,8 +27,8 @@ export interface OccurrenceCardProps {
   leadingIcon: 'checkbox' | 'kind' | 'both'
   /**
    * Where to display the time:
-   *   'inline' (default) — right-aligned cyan mono in the title row
-   *   'badge'            — Badge in the meta row
+   *   'inline' (default) — chips in the title row
+   *   'badge'            — chip in the meta row
    *   'none'             — not shown
    */
   showTime?: 'inline' | 'badge' | 'none'
@@ -43,15 +43,39 @@ export interface OccurrenceCardProps {
 const titleCls = (isDone: boolean) =>
   `text-sm font-medium truncate flex-1 ${isDone ? 'line-through' : ''} text-foreground`
 
-function ParticipantsBadge({ participants }: { participants: string[] }) {
+function ParticipantAvatars({ participants }: { participants: string[] }) {
   if (!participants.length) return null
-  const names = participants.slice(0, 2).join(', ')
-  const overflow = participants.length > 2 ? ` +${participants.length - 2}` : ''
+  const shown = participants.slice(0, 3)
+  const overflow = participants.length - shown.length
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-      <Users size={11} className="shrink-0" />
-      {names}{overflow}
-    </span>
+    <div className="flex items-center self-center shrink-0 pl-1">
+      {shown.map((name, i) => {
+        const initials = name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'
+        return (
+          <div
+            key={name}
+            title={name}
+            className={cn(
+              'size-[22px] rounded-full border-2 border-card bg-secondary',
+              'flex items-center justify-center',
+              'text-[8px] font-semibold text-secondary-foreground',
+              i > 0 && '-ml-2'
+            )}
+          >
+            {initials}
+          </div>
+        )
+      })}
+      {overflow > 0 && (
+        <div className={cn(
+          'size-[22px] rounded-full border-2 border-card bg-secondary -ml-2',
+          'flex items-center justify-center',
+          'text-[8px] font-semibold text-muted-foreground'
+        )}>
+          +{overflow}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -92,7 +116,7 @@ export default function OccurrenceCard({
   ].filter(Boolean).join(' ')
 
   const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime === 'badge' && !!t)
-  const hasTagsContent      = showTagsParticipants && (tags.length > 0 || participants.length > 0 || listedOn.length > 0)
+  const hasTagsContent      = showTagsParticipants && (tags.length > 0 || listedOn.length > 0)
   const showMeta            = hasDateTimeContent || hasTagsContent
 
   return (
@@ -131,22 +155,17 @@ export default function OccurrenceCard({
 
           <span className={titleCls(isDone)}>{title}</span>
 
-          {/* Repeat icon inline when time is not in the title row */}
-          {showTime !== 'inline' && !!occ.ownerId && (
+          {/* Repeat icon directly after the title */}
+          {!!occ.ownerId && (
             <Repeat2 size={11} className="stroke-muted-foreground fill-none shrink-0" />
           )}
 
-          {/* Right-aligned time column (inline mode) */}
-          {showTime === 'inline' && (!!occ.ownerId || !!t) && (
-            <div className="flex flex-col items-end shrink-0 ml-1 gap-px">
-              <div className="flex items-end gap-1">
-                {!!occ.ownerId && <Repeat2 size={11} className="stroke-muted-foreground fill-none shrink-0" />}
-                {!!t && <span className="text-xs font-mono text-brand-cyan tracking-[.02em] leading-[1.2]">{t}</span>}
-              </div>
-              {!!t && occ.metadata.duration && (
-                <span className="text-3xs font-mono text-dim leading-[1.2]">{occ.metadata.duration}</span>
-              )}
-            </div>
+          {/* Time + duration chips (inline mode) */}
+          {showTime === 'inline' && !!t && (
+            <Badge variant="chip" className="h-auto py-0.5 px-2 text-xs font-mono shrink-0 cursor-default">{t}</Badge>
+          )}
+          {showTime === 'inline' && !!t && occ.metadata.duration && (
+            <Badge variant="chip" className="h-auto py-0.5 px-2 text-xs font-mono shrink-0 cursor-default">{occ.metadata.duration}</Badge>
           )}
         </div>
 
@@ -154,16 +173,20 @@ export default function OccurrenceCard({
         {showMeta && (
           <div className="flex flex-wrap gap-1.5">
             {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
-            {showTime === 'badge' && t && <Badge variant="tag">{t}</Badge>}
+            {showTime === 'badge' && t && <Badge variant="chip" className="h-auto py-0.5 px-2 text-xs font-mono cursor-default">{t}</Badge>}
             {showTagsParticipants && listedOn.map(label => (
               <TagChip key={label} label={label} isTopic />
             ))}
-            {showTagsParticipants && (
-              <ParticipantsBadge participants={participants} />
-            )}
           </div>
         )}
       </div>
+
+      {/* Participant avatar stack on the right */}
+      {showTagsParticipants && (
+        <div className="relative z-20 flex items-center pointer-events-none">
+          <ParticipantAvatars participants={participants} />
+        </div>
+      )}
     </Card>
   )
 }
