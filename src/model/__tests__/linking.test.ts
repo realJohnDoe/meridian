@@ -262,18 +262,10 @@ instances:
     expect(occ!.metadata.done).toBe(false)
   })
 
-  it('returns the same Map instance for identical (items, roots) references (memoization)', () => {
+  it('returns equal maps for identical inputs', () => {
     const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const map1 = fileOccurrenceMap(items, roots)
     const map2 = fileOccurrenceMap(items, roots)
-    expect(map1).toBe(map2)
-  })
-
-  it('recomputes when items reference changes', () => {
-    const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
-    const map1 = fileOccurrenceMap(items, roots)
-    // Simulate a store mutation by creating a new items array reference
-    const map2 = fileOccurrenceMap([...items], roots)
-    expect(map1).not.toBe(map2)
+    expect([...map1.entries()]).toStrictEqual([...map2.entries()])
   })
 })

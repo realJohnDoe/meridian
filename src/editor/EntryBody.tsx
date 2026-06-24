@@ -155,7 +155,6 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
         <WikilinkPopup
           popup={wlPopup}
           roots={roots}
-          items={items}
           view={viewRef.current}
           onClose={closePopup}
         />

@@ -28,41 +28,10 @@ export function fileEntries(roots: Roots): FilePickerEntry[] {
 
 // ── fileOccurrenceMap ──────────────────────────────────────────────────────────
 
-// Single-entry memo keyed on (items, roots) reference identity.
-// Zustand replaces both on every setData, so the map recomputes lazily on
-// the first read after any mutation and is otherwise returned as a stable
-// instance — safe to use as a useMemo dependency.
-// Call resetFOMCache() on setData to prevent stale state across vault switches
-// and to enable test isolation.
-let _fomCache: { items: StoreItem[]; roots: Roots; map: Map<string, Occurrence> } | null = null
-export function resetFOMCache(): void { _fomCache = null }
-
 const _3YR_MS = 365 * 3 * 86_400_000
 
 /**
- * Total map of fileSlug → best representative occurrence for every file.
- *
- * Fill order (first write per slug wins):
- *  1. Nearest dated occurrence in the ±3yr window — upcoming first, most-recent
- *     past as fallback. Covers series + dated standalones inside the window.
- *  2. Standalone items not yet filled — undated notes and out-of-window dated
- *     singles. Sourced entirely from real store items; roots used only for the
- *     metadata join.
- *  3. Series with no in-window occurrences — fallback to the series' own anchor
- *     date (the series' stored date/time). Covers recurring items whose schedule
- *     falls entirely outside ±3yr.
- *
- * Replaces both `targetOccurrence` (single-slug) and `targetOccurrenceMap`
- * (batch). All consumers read `.get(slug)` from this one map.
- *
- * **Styling ⟺ behavior invariant:** `resolveWikilink(ref, roots) !== undefined`
- * iff `.get(slug)` is non-null iff the link is rendered `wl` (not `wl-broken`)
- * iff clicking opens the existing item. The total guarantee removes any path
- * where a resolved slug lacks an occurrence.
- */
-/**
- * Shared per-slug primitive used by both `fileOccurrenceMap` (batch) and
- * `computeSlugOccurrence` (single-slug warm path).
+ * Shared per-slug resolution primitive for `fileOccurrenceMap`.
  *
  * Fill order (first match wins — all open before all done):
  *  1. Nearest upcoming undone dated occurrence in the ±3yr window.
@@ -123,11 +92,8 @@ function resolveOneSlug(
   return null
 }
 
+/** Total map of fileSlug → best representative occurrence for every file. */
 export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string, Occurrence> {
-  if (_fomCache && _fomCache.items === items && _fomCache.roots === roots) {
-    return _fomCache.map
-  }
-
   const now   = new Date(); now.setHours(0, 0, 0, 0)
   const AHEAD = new Date(now.getTime() + _3YR_MS)
   const BACK  = new Date(now.getTime() - _3YR_MS)
@@ -144,28 +110,7 @@ export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string,
     if (occ) map.set(slug, occ)
   }
 
-  _fomCache = { items, roots, map }
   return map
-}
-
-function computeSlugOccurrence(fileSlug: string, items: StoreItem[], roots: Roots): Occurrence | null {
-  const slugItems = items.filter(i => i.fileSlug === fileSlug)
-  if (slugItems.length === 0) return null
-  const now = new Date(); now.setHours(0, 0, 0, 0)
-  return resolveOneSlug(
-    fileSlug, slugItems, roots, now,
-    new Date(now.getTime() + _3YR_MS),
-    new Date(now.getTime() - _3YR_MS),
-  )
-}
-
-export function warmSlugInFOM(fileSlug: string, items: StoreItem[], roots: Roots): void {
-  if (!_fomCache) return
-  _fomCache.items = items
-  _fomCache.roots = roots
-  const occ = computeSlugOccurrence(fileSlug, items, roots)
-  if (occ) _fomCache.map.set(fileSlug, occ)
-  else     _fomCache.map.delete(fileSlug)
 }
 
 /**

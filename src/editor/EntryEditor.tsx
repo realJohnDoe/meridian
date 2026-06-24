@@ -314,7 +314,6 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onDel
           items={listItems}
           onChange={next => onChange(prev => ({ ...prev, items: next }))}
           roots={roots}
-          storeItems={items}
           onPromote={handlePromoteTask}
           onOpenWikilink={onOpenWikilink}
           onToggleDone={onToggleDoneBacklink}
