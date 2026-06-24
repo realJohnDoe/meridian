@@ -4,7 +4,7 @@ import { isSeries, isStandaloneOcc } from './types'
 import type { Occurrence, StoreItem, Roots } from './types'
 
 /** A flat, file-granular entry for the item picker and search overlay. */
-export interface FilePickerEntry {
+interface FilePickerEntry {
   fileSlug: string
   title:    string
   tags:     string[]
