@@ -1,6 +1,6 @@
+import React from 'react'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { ScrollColumn } from './ScrollColumn'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
 
 const HOURS:   number[] = Array.from({ length: 24 }, (_, i) => i)
 const MINUTES: number[] = Array.from({ length: 12 }, (_, i) => i * 5)
@@ -26,29 +26,24 @@ export function TimeWheels({ hour, minute, onHourChange, onMinuteChange }: Props
     )
   }
 
+  const timeValue = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+
+  function handleTimeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const parts = e.target.value.split(':')
+    const h = parseInt(parts[0], 10)
+    const m = parseInt(parts[1], 10)
+    if (!isNaN(h)) onHourChange(h)
+    if (!isNaN(m)) onMinuteChange(m)
+  }
+
   return (
-    <div className="flex items-center justify-center gap-2">
-      <Select value={String(hour)} onValueChange={(v) => onHourChange(parseInt(v, 10))}>
-        <SelectTrigger className="w-20 font-mono">
-          <SelectValue>{String(hour).padStart(2, '0')}</SelectValue>
-        </SelectTrigger>
-        <SelectContent className="max-h-52">
-          {HOURS.map(h => (
-            <SelectItem key={h} value={String(h)} className="font-mono">{String(h).padStart(2, '0')}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {sep}
-      <Select value={String(minute)} onValueChange={(v) => onMinuteChange(parseInt(v, 10))}>
-        <SelectTrigger className="w-20 font-mono">
-          <SelectValue>{String(minute).padStart(2, '0')}</SelectValue>
-        </SelectTrigger>
-        <SelectContent className="max-h-52">
-          {MINUTES.map(m => (
-            <SelectItem key={m} value={String(m)} className="font-mono">{String(m).padStart(2, '0')}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+    <div className="flex items-center justify-center px-4">
+      <input
+        type="time"
+        value={timeValue}
+        onChange={handleTimeChange}
+        className="bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+      />
     </div>
   )
 }

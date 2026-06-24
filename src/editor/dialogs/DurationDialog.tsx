@@ -240,11 +240,16 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
         : endDateToDuration(scheduled.date, endDate))
     : null
 
-  const intervalEndPreview = scheduled && n > 0
-    ? (hasTime
-        ? `Ends at ${fmtEndTime(durationToEndDateTime(scheduled.date, scheduled.time, serialise(n, unit)).time)}`
-        : `Ends on ${fmtEndDate(durationToEndDate(scheduled.date, serialise(n, unit)))}`)
-    : null
+  const intervalEndPreview = (() => {
+    if (!scheduled || n < 1) return null
+    const dur = serialise(n, unit)
+    if (hasTime) {
+      const { time } = durationToEndDateTime(scheduled.date, scheduled.time, dur)
+      return `Ends at ${fmtEndTime(time)}`
+    }
+    const endDateStr = durationToEndDate(scheduled.date, dur)
+    return endDateStr !== scheduled.date ? `Ends on ${fmtEndDate(endDateStr)}` : null
+  })()
 
   // ── Set ──
   function handleSet() {
@@ -287,23 +292,6 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
           {view === 'main' && (
             <div className="px-4 pt-4 pb-4 space-y-4">
 
-              {/* Quick presets */}
-              <div className="flex gap-1.5 flex-wrap">
-                {PRESETS.map(p => (
-                  <button
-                    key={p.value}
-                    className={cn(
-                      badgeVariants({ variant: 'chip' }),
-                      'cursor-pointer',
-                      value === p.value && 'bg-primary/20 text-primary border-primary',
-                    )}
-                    onClick={() => { onConfirm(p.value); onClose() }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-
               {/* Select-by toggle */}
               <div className="space-y-1.5">
                 <p className="text-xs text-muted-foreground">Select by</p>
@@ -328,6 +316,25 @@ export default function DurationDialog({ open, value, scheduled, onConfirm, onRe
                   ))}
                 </ToggleGroup>
               </div>
+
+              {/* Quick presets — shown for interval tab, or end-date tab when hasTime */}
+              {(tab === 'interval' || hasTime) && (
+                <div className="flex gap-1.5 flex-wrap">
+                  {PRESETS.map(p => (
+                    <button
+                      key={p.value}
+                      className={cn(
+                        badgeVariants({ variant: 'chip' }),
+                        'cursor-pointer',
+                        value === p.value && 'bg-primary/20 text-primary border-primary',
+                      )}
+                      onClick={() => { onConfirm(p.value); onClose() }}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Interval */}
               {tab === 'interval' && (
