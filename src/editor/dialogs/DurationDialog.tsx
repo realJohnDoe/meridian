@@ -345,7 +345,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
               </div>
 
               <p className={`text-xs ${computedDuration ? 'text-muted-foreground' : 'text-destructive'}`}>
-                {computedDuration ?? 'End must be after start'}
+                {computedDuration ? fmtDuration(computedDuration) : 'End must be after start'}
               </p>
             </div>
           )}
