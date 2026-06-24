@@ -7,19 +7,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { TimeWheels } from '@/components/ui/TimeWheels'
 
-function parseTime(hhmm: string): { h: number; m: number } {
-  const match = hhmm.match(/^(\d{1,2}):(\d{2})$/)
-  if (!match) return { h: 9, m: 0 }
-  return {
-    h: parseInt(match[1], 10) % 24,
-    m: Math.round(parseInt(match[2], 10) / 5) * 5 % 60,
-  }
-}
-
-function formatTime(h: number, m: number): string {
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+function normaliseTime(hhmm: string): string {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return '09:00'
+  return `${String(parseInt(m[1], 10)).padStart(2, '0')}:${m[2].slice(0, 2)}`
 }
 
 interface Props {
@@ -31,15 +23,10 @@ interface Props {
 }
 
 export default function TimePickerDialog({ open, value, onConfirm, onRemove, onClose }: Props) {
-  const [hour,   setHour]   = useState(9)
-  const [minute, setMinute] = useState(0)
+  const [time, setTime] = useState('09:00')
 
   useEffect(() => {
-    if (open) {
-      const p = parseTime(value || '09:00')
-      setHour(p.h)
-      setMinute(p.m)
-    }
+    if (open) setTime(normaliseTime(value || '09:00'))
   }, [open, value])
 
   return (
@@ -50,14 +37,12 @@ export default function TimePickerDialog({ open, value, onConfirm, onRemove, onC
           <DialogDescription className="sr-only">Select a time</DialogDescription>
         </DialogHeader>
 
-        <div className="py-2">
-          <TimeWheels
-            hour={hour}
-            minute={minute}
-            onHourChange={setHour}
-            onMinuteChange={setMinute}
-          />
-        </div>
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className="w-full bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+        />
 
         <div className="flex items-center justify-between pt-2">
           <Button
@@ -70,7 +55,7 @@ export default function TimePickerDialog({ open, value, onConfirm, onRemove, onC
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" onClick={() => { onConfirm(formatTime(hour, minute)); onClose() }}>Set</Button>
+            <Button size="sm" onClick={() => { onConfirm(time); onClose() }}>Set</Button>
           </div>
         </div>
       </DialogContent>
