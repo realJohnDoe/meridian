@@ -105,18 +105,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ---
 
-### 16. Occurrence view-model derivation split across `types.ts` and `presentation.ts`
-
-- **Category:** `architecture` `naming`
-- **Impact:** 3
-- **Breadth:** 2 files, many consumers
-- **Fix effort:** S
-- **Evidence:** `types.ts:204-211` owns `occKind`/`occIsRecur`/`isStandaloneOcc`; `presentation.ts:235` owns `occState` and `sortOccs` — both derive display semantics from an `Occurrence`.
-- **Problem:** The rules that classify an occurrence for display are spread between the type module and the presentation module, so "how is a task-vs-event decided" has no single home.
-- **Fix:** Consolidate all occurrence-display derivations into one `occView.ts`.
-
----
-
 ### 17. Empty `<Suspense>` fallback for the lazy editor overlay
 
 - **Category:** `ux`
