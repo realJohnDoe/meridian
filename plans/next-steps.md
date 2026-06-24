@@ -1,6 +1,5 @@
 ## Next steps
 
-- Add filter by participants in side bar
 - Update card layout with participants on right side
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
