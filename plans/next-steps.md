@@ -3,7 +3,7 @@
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
 - Add Solarized Light theme
-- Add option to show dates formatted european / first day of the week config
+- Switch to european date format
 - Investigate more secure storage options
 - Add vault retention period
 
