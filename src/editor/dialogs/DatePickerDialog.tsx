@@ -86,7 +86,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           {/* Shortcut toggles — filled when that day is selected in the grid.
               Calendar's pb-3 (12 px) keeps these closer to the grid than to
               the separator below (16 px from content div pb-4).               */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 mt-3">
             <Button
               variant={isToday ? 'default' : 'outline'}
               size="sm"
