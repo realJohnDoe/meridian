@@ -1,9 +1,9 @@
 ## Next steps
 
+- Switch to european date format
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
 - Add Solarized Light theme
-- Switch to european date format
 - Investigate more secure storage options
 - Add vault retention period
 
