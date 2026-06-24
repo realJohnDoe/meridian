@@ -1,9 +1,10 @@
 import { useState, useCallback, useMemo } from 'react'
 import { Plus, X, Tag, ChevronDown } from 'lucide-react'
-import type { Occurrence, Roots, StoreItem } from '@/types'
+import type { Occurrence, Roots } from '@/types'
 import { occKind } from '@/types'
 import { parseItemEntry, serializeTaskEntry } from './items'
-import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
+import { fileEntries } from '@/fileOccurrence'
+import { useStore } from '@/store'
 import { occState } from '@/occState'
 import { resolveWikilink } from '@/wikilinks'
 import OccurrenceCard from '@/components/OccurrenceCard'
@@ -18,7 +19,6 @@ interface Props {
   items:           string[]
   onChange:        (items: string[]) => void
   roots:           Roots
-  storeItems:      StoreItem[]
   onPromote:       (title: string, done: boolean) => string | null
   onOpenWikilink?: (ref: string) => void
   onToggleDone?:   (occ: Occurrence) => void
@@ -49,13 +49,13 @@ function rowSortKey({ entry, occ }: Row): [number, number, string] {
   return [3, entry.idx, '']
 }
 
-export default function ItemsList({ items, onChange, roots, storeItems, onPromote, onOpenWikilink, onToggleDone }: Props) {
+export default function ItemsList({ items, onChange, roots, onPromote, onOpenWikilink, onToggleDone }: Props) {
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const [editingIdx,  setEditingIdx]  = useState<number | null>(null)
   const [editText,    setEditText]    = useState('')
 
-  const occBySlug = useMemo(() => fileOccurrenceMap(storeItems, roots), [storeItems, roots])
+  const occBySlug = useStore(s => s.fom)
   const allFiles  = useMemo(() => fileEntries(roots), [roots])
   const filtered  = pickerQuery
     ? allFiles.filter(e => e.title.toLowerCase().includes(pickerQuery.toLowerCase()))

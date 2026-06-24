@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import type { Occurrence, StoreItem } from '@/types'
-import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
+import type { Occurrence } from '@/types'
+import { fileEntries } from '@/fileOccurrence'
 import OccurrenceCard from '@/components/OccurrenceCard'
 import { useStore } from '@/store'
 
@@ -24,7 +24,6 @@ function fuzzyScore(query: string, text: string): number {
 
 interface Props {
   query: string
-  items: StoreItem[]
   onOpen: (occ: Occurrence) => void
 }
 
@@ -36,13 +35,9 @@ interface Props {
  * has multiple occurrences in the range.
  * Tags and topics are matched the same way — no divergence between fields.
  */
-export default function FileResultsList({ query, items, onOpen }: Props) {
-  const roots = useStore(s => s.roots)
-
-  // One vault expansion for all files — recomputes only when vault data changes,
-  // not on every keystroke. Total map: every file slug has a .get() hit,
-  // including dateless notes and out-of-window items.
-  const occBySlug = useMemo(() => fileOccurrenceMap(items, roots), [items, roots])
+export default function FileResultsList({ query, onOpen }: Props) {
+  const roots    = useStore(s => s.roots)
+  const occBySlug = useStore(s => s.fom)
 
   const results = useMemo(() => {
     if (!query) return []

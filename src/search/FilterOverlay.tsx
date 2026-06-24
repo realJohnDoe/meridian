@@ -1,5 +1,4 @@
 import { Plus } from 'lucide-react'
-import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
 import FileResultsList from './FileResultsList'
 import { Button } from '@/components/ui/button'
@@ -11,8 +10,6 @@ interface Props {
 }
 
 export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
-  const items = useStore(s => s.items)
-
   if (!query) return null
 
   return (
@@ -32,7 +29,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
               <span>Create "<strong>{query}</strong>"</span>
             </Button>
 
-            <FileResultsList query={query} items={items} onOpen={onOpen} />
+            <FileResultsList query={query} onOpen={onOpen} />
           </div>
         </div>
       </div>

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { EditorView } from '@codemirror/view'
-import type { Roots, StoreItem } from '@/types'
+import type { Roots } from '@/types'
 import OccurrenceCard from '@/components/OccurrenceCard'
-import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
+import { fileEntries } from '@/fileOccurrence'
+import { useStore } from '@/store'
 
 export interface WlPopupState {
   query:  string
@@ -14,15 +15,14 @@ export interface WlPopupState {
 interface Props {
   popup:   WlPopupState
   roots:   Roots
-  items:   StoreItem[]
   view:    EditorView
   onClose: () => void
 }
 
-export default function WikilinkPopup({ popup, roots, items, view, onClose }: Props) {
+export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
   const [focusIdx, setFocusIdx] = useState(0)
 
-  const occBySlug = useMemo(() => fileOccurrenceMap(items, roots), [items, roots])
+  const occBySlug = useStore(s => s.fom)
 
   const matches = useMemo(() => {
     const q = popup.query.toLowerCase()
