@@ -13,9 +13,10 @@ import { fileSlugItems } from '@/model/storeOps'
 import { saveFile } from '@/fileIO'
 import type { StoreItem, Roots } from '@/types'
 import {
-  getItems, getRoots, setData, notify, warn, notifyError,
+  getItems, getRoots, setData,
   setSyncDirtyCount, setSyncError, setSyncOffline, setLastSyncedAt,
 } from '@/storeBridge'
+import { notify, warn, notifyError } from '@/notifications'
 import { getActiveBackend } from './activeBackend'
 
 // ── HELPERS ────────────────────────────────────────────────────

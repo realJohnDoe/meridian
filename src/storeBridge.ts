@@ -1,7 +1,6 @@
 import type { StoreItem, Roots } from './types'
 import type { VaultRef } from './storage/backend'
 import { useStore } from './store'
-import { toast } from 'sonner'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
 export const getItems         = (): StoreItem[]    => useStore.getState().items
@@ -28,18 +27,3 @@ export const setActiveVaultId    = (id: string | null) => {
   }
 }
 export const setPendingReconnect = (name: string | null) => useStore.setState({ pendingDirReconnect: name })
-
-// ── NOTIFICATIONS ──────────────────────────────────────────────
-export function notify(msg: string): void {
-  toast.error(msg, { duration: 5000 })
-}
-
-export function warn(msg: string): void {
-  toast.warning(msg, { duration: 7000 })
-}
-
-export function notifyError(prefix: string, e: unknown): void {
-  const err = e as Error
-  const detail = err?.message || err?.name
-  notify(detail ? `${prefix}: ${detail}` : prefix)
-}
