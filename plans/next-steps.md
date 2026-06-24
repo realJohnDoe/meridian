@@ -83,18 +83,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ---
 
-### 12. `OccurrenceCard` prop explosion (7 display flags)
-
-- **Category:** `srp` `architecture`
-- **Impact:** 3
-- **Breadth:** 1 component, 3 call sites
-- **Fix effort:** M
-- **Evidence:** `OccurrenceCardProps` carries `taskCheckbox`, `eventNoteIcon`, `showTime: 'inline'|'badge'|'none'`, `showDate`, `showTagsParticipants` — and the body has nested ternaries (`OccurrenceCard.tsx:118-132`) to reconcile them.
-- **Problem:** One component encodes several distinct card layouts via boolean combinations, making valid/invalid combinations implicit and the render logic hard to follow.
-- **Fix:** Split into a couple of presentational variants or a single `variant` enum prop.
-
----
-
 ### 13. `NodeInheritanceDebugger` (777 LOC) duplicates editor wiring; `debug/` depends on `editor/` internals
 
 - **Category:** `dead-code` `architecture`
