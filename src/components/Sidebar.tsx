@@ -144,17 +144,17 @@ export default function AppSidebar() {
               <SidebarSeparator />
               <SidebarGroup className="p-0">
                 <SidebarGroupLabel className="px-5 h-8 text-[11px] font-semibold uppercase tracking-wider">Participants</SidebarGroupLabel>
-                <div className="px-5 flex flex-col gap-1 pb-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
+                <div className="px-5 flex flex-col">
+                  <label className="flex items-center gap-2 cursor-pointer py-[11px]">
                     <Checkbox
                       checked={participantFilter.includes(NO_PARTICIPANT)}
                       onCheckedChange={() => toggleParticipantFilter(NO_PARTICIPANT)}
                       className="size-[18px] data-[state=checked]:bg-sidebar-foreground/70 data-[state=checked]:border-sidebar-foreground/70"
                     />
-                    <span className="text-[13px] text-muted-foreground italic">No participant</span>
+                    <span className="text-[13px] text-muted-foreground italic">No participants</span>
                   </label>
                   {allParticipants.map(p => (
-                    <label key={p} className="flex items-center gap-2 cursor-pointer">
+                    <label key={p} className="flex items-center gap-2 cursor-pointer py-[11px]">
                       <Checkbox
                         checked={participantFilter.includes(p)}
                         onCheckedChange={() => toggleParticipantFilter(p)}
