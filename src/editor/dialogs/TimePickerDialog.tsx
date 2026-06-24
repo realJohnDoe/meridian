@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import TimeWheels from '@/components/ui/TimeWheels'
 
 function normaliseTime(hhmm: string): string {
   const m = hhmm.match(/^(\d{1,2}):(\d{2})/)
@@ -37,12 +38,9 @@ export default function TimePickerDialog({ open, value, onConfirm, onRemove, onC
           <DialogDescription className="sr-only">Select a time</DialogDescription>
         </DialogHeader>
 
-        <input
-          type="time"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          className="w-full bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-        />
+        <div className="flex justify-center py-2">
+          <TimeWheels value={time} onChange={setTime} />
+        </div>
 
         <div className="flex items-center justify-between pt-2">
           <Button

@@ -14,6 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { badgeVariants } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
 import DatePickerDialog from './DatePickerDialog'
+import TimeWheels from '@/components/ui/TimeWheels'
 
 // ── Types / data ──────────────────────────────────────────────────────────────
 const UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
@@ -129,6 +130,19 @@ export function fmtDuration(duration: string): string {
   return duration
 }
 
+function fmtDurationCompact(duration: string): string {
+  const p = parseDurationStr(duration)
+  if (!p) return duration
+  const { n, unit } = p
+  if (unit === 'minutes') { if (n < 60) return `${n}m`; const h = Math.floor(n/60), m = n%60; return m ? `${h}h ${m}m` : `${h}h` }
+  if (unit === 'hours')   { if (n < 24) return `${n}h`; const d = Math.floor(n/24), h = n%24; return h ? `${d}d ${h}h` : `${d}d` }
+  if (unit === 'days')    return `${n}d`
+  if (unit === 'weeks')   return `${n}w`
+  if (unit === 'months')  return `${n}mo`
+  if (unit === 'years')   return `${n}y`
+  return duration
+}
+
 // ── Chip label (used by EntryEditor) ─────────────────────────────────────────
 export function formatDurationChip(duration: string, scheduled: Scheduled): string {
   const display = fmtDuration(duration)
@@ -216,16 +230,22 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
         : endDateToDuration(scheduled.date, endDate))
     : null
 
-  const intervalEndPreview = (() => {
-    if (!scheduled || n < 1) return null
-    const dur = serialise(n, unit)
-    if (hasTime) {
-      const { time } = durationToEndDateTime(scheduled.date, scheduled.time, dur)
-      return `Ends at ${fmtEndTime(time)}`
+  function getChipLabel(t: Tab): string {
+    if (t === tab || !scheduled) return t === 'interval' ? 'Interval' : endDateTabLabel
+    if (t === 'endDate' && n >= 1) {
+      const dur = serialise(n, unit)
+      if (hasTime) {
+        const end = durationToEndDateTime(scheduled.date, scheduled.time, dur)
+        return `${endDateTabLabel} (${fmtEndDate(end.date)} ${fmtEndTime(end.time)})`
+      }
+      const endDateStr = durationToEndDate(scheduled.date, dur)
+      if (endDateStr !== scheduled.date) return `${endDateTabLabel} (${fmtEndDate(endDateStr)})`
     }
-    const endDateStr = durationToEndDate(scheduled.date, dur)
-    return endDateStr !== scheduled.date ? `Ends on ${fmtEndDate(endDateStr)}` : null
-  })()
+    if (t === 'interval' && computedDuration) {
+      return `Interval (${fmtDurationCompact(computedDuration)})`
+    }
+    return t === 'interval' ? 'Interval' : endDateTabLabel
+  }
 
   function handleSet() {
     const dur = tab === 'interval' ? serialise(Math.max(1, n), unit) : computedDuration
@@ -265,7 +285,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                     'data-[state=on]:bg-background data-[state=on]:text-secondary-foreground data-[state=on]:[box-shadow:0_1px_4px_rgb(0_0_0/.35)]',
                   )}
                 >
-                  {t === 'interval' ? 'Interval' : endDateTabLabel}
+                  {getChipLabel(t)}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
@@ -314,9 +334,6 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                   </SelectContent>
                 </Select>
               </div>
-              {intervalEndPreview && (
-                <p className="text-xs text-muted-foreground">{intervalEndPreview}</p>
-              )}
             </div>
           )}
 
@@ -334,19 +351,15 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                   <CalendarIcon size={13} className="text-muted-foreground shrink-0" />
                 </button>
 
-                {hasTime && (
-                  <input
-                    type="time"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                  />
-                )}
               </div>
-
-              <p className={`text-xs ${computedDuration ? 'text-muted-foreground' : 'text-destructive'}`}>
-                {computedDuration ? fmtDuration(computedDuration) : 'End must be after start'}
-              </p>
+              {hasTime && (
+                <div className="flex justify-center pt-1">
+                  <TimeWheels value={endTime || '09:00'} onChange={setEndTime} />
+                </div>
+              )}
+              {!computedDuration && endDate && (
+                <p className="text-xs text-destructive">End must be after start</p>
+              )}
             </div>
           )}
         </div>
