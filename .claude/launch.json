@@ -14,6 +14,13 @@
       "runtimeArgs": ["-C", "C:\\Users\\johan\\code\\meridian\\.claude\\worktrees\\nostalgic-wilson-e925e0", "exec", "vite", "--host", "--port", "5199", "--strictPort"],
       "port": 5199,
       "autoPort": false
+    },
+    {
+      "name": "ecstatic-colden",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "C:\\Users\\johan\\code\\meridian\\.claude\\worktrees\\ecstatic-colden-9c83e8", "exec", "vite", "--host", "--port", "5201", "--strictPort"],
+      "port": 5201,
+      "autoPort": false
     }
   ]
 }
