@@ -1,4 +1,4 @@
-import type { StorageBackend, FileEntry, VaultKind } from './backend'
+import type { StorageBackend, RawFile, VaultKind } from './backend'
 import { fmtISO } from '@/model/dateUtils'
 import { addDays } from '@/format'
 
@@ -255,14 +255,14 @@ export class ExampleBackend implements StorageBackend {
     return m
   }
 
-  async readFiles(paths: string[]): Promise<FileEntry[]> {
+  async readFiles(paths: string[]): Promise<RawFile[]> {
     const set = new Set(paths)
     return ENTRIES
       .filter(e => set.has(e.id + '.md'))
       .map(e => ({ path: e.id + '.md', content: e.content, version: VERSION }))
   }
 
-  async readAll(): Promise<FileEntry[]> {
+  async readAll(): Promise<RawFile[]> {
     return ENTRIES.map(e => ({ path: e.id + '.md', content: e.content, version: VERSION }))
   }
 
