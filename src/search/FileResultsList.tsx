@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Occurrence } from '@/types'
-import { fileEntries } from '@/fileOccurrence'
+import { fileEntries, backlinksTo } from '@/fileOccurrence'
 import OccurrenceCard from '@/components/OccurrenceCard'
 import { useStore } from '@/store'
 
@@ -49,14 +49,17 @@ export default function FileResultsList({ query, onOpen }: Props) {
       })
       .map(e => ({ entry: e, score: fuzzyScore(query, e.title) }))
       .sort((a, b) => b.score - a.score)
-      .map(x => x.entry)
+      .map(x => ({
+        entry: x.entry,
+        listedOn: backlinksTo(x.entry.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug),
+      }))
   }, [roots, query])
 
   if (!results.length) return null
 
   return (
     <div className="flex flex-col gap-1.5 px-2 pt-2">
-      {results.map((entry, i) => {
+      {results.map(({ entry, listedOn }, i) => {
         const occ = occBySlug.get(entry.fileSlug)
         if (!occ) return null
         return (
@@ -70,6 +73,7 @@ export default function FileResultsList({ query, onOpen }: Props) {
               eventNoteIcon
               showTime="badge"
               showDate
+              listedOn={listedOn}
               onOpen={() => onOpen(occ)}
               onToggleDone={() => {}}
             />
