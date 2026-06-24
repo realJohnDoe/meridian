@@ -23,8 +23,11 @@ interface Props {
 export default function EditorShell({ entry, hooks, items, roots }: Props) {
   const {
     setEntry,
+    getBodyRef,
+    saveMeta,
     handleOpenWikilink,
     handleSave, handleDelete, handleClose, handleScopeChange,
+    handleTypeChange, handleDoneToggle,
     handleOpenDlg, handleOpenRepeatDlg,
     dialogHandlers,
     scheduleAutoSave,
@@ -42,11 +45,15 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
         onChange={setEntry}
         onSave={handleSave}
         onAutoSave={scheduleAutoSave}
+        onMetaSave={saveMeta}
+        getBodyRef={getBodyRef}
         onDelete={handleDelete}
         onClose={handleClose}
         onOpenDlg={handleOpenDlg}
         onOpenRepeatDlg={handleOpenRepeatDlg}
         onScopeChange={handleScopeChange}
+        onTypeChange={handleTypeChange}
+        onDoneToggle={handleDoneToggle}
         items={items}
         roots={roots}
         onOpenWikilink={handleOpenWikilink}
