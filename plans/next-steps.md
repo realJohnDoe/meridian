@@ -93,18 +93,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ---
 
-### 9. Two independent wikilink parsers / unwrap regexes
-
-- **Category:** `dry`
-- **Impact:** 3
-- **Breadth:** 2 files
-- **Fix effort:** S
-- **Evidence:** `wikilinks.ts:12` `WIKILINK_RE` + `unwrapRef` (`wikilinks.ts:51`, its own `/^\[\[(.+)\]\]$/`); `items.ts:11` `WIKILINK_ITEM_RE` parses the same `[[...|...]]` syntax separately.
-- **Problem:** The wikilink grammar is encoded in three regexes across two modules; a syntax change (e.g. escaping) must be made in all of them.
-- **Fix:** Centralize wikilink parsing/unwrapping in `wikilinks.ts` and have `items.ts` call it.
-
----
-
 ### 10. Naming collision: two unrelated `FileEntry` types
 
 - **Category:** `naming`
