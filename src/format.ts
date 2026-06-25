@@ -38,10 +38,10 @@ export function durationToEndDate(startStr: string, duration: string): string {
   if (!p) return fmtISO(addDays(start, 1))
   if (p.unit === 'minutes') return fmtISO(start)
   if (p.unit === 'hours')   return fmtISO(addDays(start, Math.floor(p.n / 24)))
-  if (p.unit === 'days')    return fmtISO(addDays(start, p.n))
-  if (p.unit === 'weeks')   return fmtISO(addDays(start, p.n * 7))
-  if (p.unit === 'months')  return fmtISO(addDays(start, p.n * 30))
-  if (p.unit === 'years')   return fmtISO(addDays(start, p.n * 365))
+  if (p.unit === 'days')    return fmtISO(addDays(start, p.n - 1))
+  if (p.unit === 'weeks')   return fmtISO(addDays(start, p.n * 7 - 1))
+  if (p.unit === 'months')  return fmtISO(addDays(start, p.n * 30 - 1))
+  if (p.unit === 'years')   return fmtISO(addDays(start, p.n * 365 - 1))
   return fmtISO(addDays(start, 1))
 }
 
