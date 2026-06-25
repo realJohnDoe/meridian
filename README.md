@@ -74,23 +74,23 @@ You can write and edit these files by hand if you prefer — Meridian will pick 
 
 Meridian was heavily inspired by tools we already loved, and tries to fill the gap where they didn't quite fit together.
 
-| Feature | Meridian | Obsidian + TaskNotes | Google Calendar | GitHub Issues / Projects |
-|---|---|---|---|---|
-| Great mobile UX | ✅ | Partial | ✅ | Partial |
-| Plain Markdown storage | ✅ | ✅ | ❌ | ❌ |
-| Calendar views (day / month) | ✅ | Plugin-dependent | ✅ | Partial |
-| Task management | ✅ | ✅ (TaskNotes plugin) | Limited | ✅ |
-| Wikilinks between entries | ✅ | ✅ | ❌ | ✅ (`#123` issue links) |
-| Rich recurrence rules | ✅ | Limited | ✅ | ❌ |
-| Multiple participants / assignees | ✅ | Partial | ❌ | ✅ |
-| Free & open source | ✅ | Partially (core only) | ❌ | ❌ |
-| Works in the browser | ✅ | ❌ | ✅ | ✅ |
+| Feature | Meridian | [Obsidian](https://obsidian.md) + [TaskNotes](https://tasknotes.dev/) | [Google Calendar](https://calendar.google.com) | [GitHub Issues / Projects](https://github.com/features/issues) | [Todoist](https://todoist.com) | [Google Keep](https://keep.google.com) |
+|---|---|---|---|---|---|---|
+| Great mobile UX | ✅ | Partial | ✅ | Partial | ✅ | ✅ |
+| Plain Markdown storage | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Calendar views (day / month) | ✅ | Plugin-dependent | ✅ | Partial | Partial | ❌ |
+| Task management | ✅ | ✅ (TaskNotes plugin) | Limited | ✅ | ✅ | Partial |
+| Wikilinks between entries | ✅ | ✅ | ❌ | ✅ (`#123` issue links) | ❌ | ❌ |
+| Rich recurrence rules | ✅ | Limited | ✅ | ❌ | ✅ | ❌ |
+| Multiple participants / assignees | ✅ | Partial | ❌ | ✅ | ✅ (paid) | ❌ |
+| Free & open source | ✅ | Partially (core only) | ❌ | ❌ | ❌ | ❌ |
+| Works in the browser | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
-**Obsidian and the TaskNotes plugin** inspired the wikilink system, the plain-Markdown-as-the-source-of-truth philosophy, and much of the editor UX. If you're already an Obsidian user, Meridian's vault format will feel immediately familiar.
+**[Obsidian](https://obsidian.md) and the [TaskNotes plugin](https://tasknotes.dev/)** inspired the wikilink system, the plain-Markdown-as-the-source-of-truth philosophy, and much of the editor UX. If you're already an Obsidian user, Meridian's vault format will feel immediately familiar.
 
-**Google Calendar** set the bar for what recurring events and multi-view calendar navigation should feel like.
+**[Google Calendar](https://calendar.google.com)** set the bar for what recurring events and multi-view calendar navigation should feel like.
 
-**GitHub Issues and Projects** showed how linking, labelling, and filtering structured entries can work without getting in the way of actual writing.
+**[GitHub Issues and Projects](https://github.com/features/issues)** showed how linking, labelling, and filtering structured entries can work without getting in the way of actual writing.
 
 ---
 
