@@ -14,10 +14,29 @@ import AppSidebar from '@/components/Sidebar'
 import SyncButton from '@/components/SyncButton'
 import SearchBar from '@/components/SearchBar'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import type { EditScope } from '@/types'
 
 const EntryOverlay = lazy(() => import('@/editor').then(m => ({ default: m.EntryOverlay })))
+
+function OverlaySkeleton() {
+  return (
+    <div className="absolute inset-0 z-40 bg-background flex flex-col">
+      <div className="flex items-center gap-2 px-4 h-topbar border-b border-border shrink-0">
+        <Skeleton className="h-7 w-7 rounded-full" />
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="ml-auto h-7 w-16 rounded-lg" />
+      </div>
+      <div className="flex flex-col gap-3 px-4 pt-5">
+        <Skeleton className="h-5 w-2/3" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-3/4" />
+      </div>
+    </div>
+  )
+}
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
@@ -138,7 +157,7 @@ function AppMain() {
       </div>
 
       {editor && (
-        <Suspense>
+        <Suspense fallback={<OverlaySkeleton />}>
           <EntryOverlay editor={editor} edate={edate} escope={escope} etitle={etitle} />
         </Suspense>
       )}
