@@ -56,7 +56,7 @@ function serialise(n: number, unit: Unit): string {
 function endDateToDuration(startStr: string, endDateStr: string): string | null {
   const start = parseDateString(startStr) ?? new Date()
   const end   = parseDateString(endDateStr) ?? new Date()
-  const days  = differenceInDays(end, start)
+  const days  = differenceInDays(end, start) + 1  // end date is inclusive
   if (days <= 0) return null
   if (days % 365 === 0) { const y = days / 365; return `${y} ${y === 1 ? 'year'  : 'years'}` }
   if (days % 30  === 0) { const m = days / 30;  return `${m} ${m === 1 ? 'month' : 'months'}` }
