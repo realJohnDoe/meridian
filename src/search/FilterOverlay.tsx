@@ -14,7 +14,7 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
 
   return (
     <div id="filterOverlay" className="fixed bottom-[80px] left-0 right-0 md:absolute md:bottom-full md:left-0 md:right-0 z-[25] pointer-events-auto">
-      <div className="relative max-h-[calc(100dvh-var(--th)-80px)] flex flex-col">
+      <div className="relative max-h-[calc(100dvh-var(--th)-80px)] flex flex-col [mask-image:linear-gradient(to_bottom,transparent,black_20px)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_20px)]">
         <div className="overflow-y-auto [-webkit-overflow-scrolling:touch] bg-background flex-1 min-h-0">
           <div className="lg:max-w-[720px] lg:mx-auto pb-10">
             {/* "Create" row */}
