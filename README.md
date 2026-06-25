@@ -86,7 +86,7 @@ Meridian was heavily inspired by tools we already loved, and tries to fill the g
 | Free & open source | ✅ | Partially (core only) | ❌ | ❌ | ❌ | ❌ |
 | Works in the browser | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
-**[Obsidian](https://obsidian.md) and the [TaskNotes plugin](https://github.com/supermagic124/obsidian-task-marker)** inspired the wikilink system, the plain-Markdown-as-the-source-of-truth philosophy, and much of the editor UX. If you're already an Obsidian user, Meridian's vault format will feel immediately familiar.
+**[Obsidian](https://obsidian.md) and the [TaskNotes plugin](https://tasknotes.dev/)** inspired the wikilink system, the plain-Markdown-as-the-source-of-truth philosophy, and much of the editor UX. If you're already an Obsidian user, Meridian's vault format will feel immediately familiar.
 
 **[Google Calendar](https://calendar.google.com)** set the bar for what recurring events and multi-view calendar navigation should feel like.
 
