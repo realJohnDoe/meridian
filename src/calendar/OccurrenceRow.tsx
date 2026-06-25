@@ -45,9 +45,6 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
     const hintL = hintRef.current  as HTMLDivElement
     const icon  = iconRef.current  as SVGSVGElement
 
-    // Seed the CSS var so the transform is defined before the first drag.
-    row.style.setProperty('--swipe-x', '0px')
-
     const THRESHOLD = 72
     const FULL_FRAC = 0.5
     let sx = 0, sy = 0, tracking = false, blocked = false
@@ -80,10 +77,10 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
         const prog = Math.min(absDx / fullPx, 1)
         hintL.style.setProperty('--hint-filter', `saturate(${0.3 + prog * 0.7})`)
         hintL.style.setProperty('--hint-opacity', String(0.4 + prog * 0.6))
-        hintL.style.display = 'flex'
+        hintL.classList.add('active')
         icon.style.setProperty('--icon-scale', String(0.7 + prog * 0.3))
       } else {
-        hintL.style.display = ''
+        hintL.classList.remove('active')
       }
     }
 
@@ -91,13 +88,13 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       if (blocked || !tracking) {
         row.style.transition = ''
         row.style.setProperty('--swipe-x', '0px')
-        hintL.style.display = ''
+        hintL.classList.remove('active')
         return
       }
       const dx = e.changedTouches[0].clientX - sx
       const rowW = wrap.offsetWidth || 320
       const isFull = Math.abs(dx) / rowW >= FULL_FRAC
-      hintL.style.display = ''
+      hintL.classList.remove('active')
       icon.style.setProperty('--icon-scale', '1')
       if (dx <= -THRESHOLD && isFull) {
         // Phase 1: show toast immediately (before animation completes).
@@ -138,10 +135,10 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       data-occ-key={occ.id}
       style={{ '--stagger': `${staggerRef.current * 0.025}s` } as React.CSSProperties}
     >
-      {/* Left swipe hint */}
+      {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
       <div
         ref={hintRef}
-        className="absolute inset-0 hidden items-center justify-end gap-[10px] px-5 pointer-events-none z-0 bg-destructive [opacity:var(--hint-opacity)] [filter:var(--hint-filter)]"
+        className="swipe-hint absolute inset-0 items-center justify-end gap-[10px] px-5 pointer-events-none z-0 bg-destructive"
       >
         <Trash2
           ref={iconRef}
@@ -152,11 +149,8 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
         <span className="text-xs font-bold text-primary-foreground whitespace-nowrap">Delete</span>
       </div>
 
-      {/* Main row */}
-      <div
-        ref={rowRef}
-        className="relative z-[1] bg-background touch-pan-y select-none [transform:translateX(var(--swipe-x,0px))]"
-      >
+      {/* Main row — transform driven by CSS (.swipe-row) */}
+      <div ref={rowRef} className="swipe-row relative z-[1] bg-background touch-pan-y select-none">
         <OccurrenceCard
           occ={occ}
           leadingIcon="checkbox"

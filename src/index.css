@@ -10,7 +10,7 @@
  *                                 No raw oklch(…) or #hex in component markup.
  * 4. Spacing/radius             → Tailwind scale snapped to nearest step; no arbitrary px.
  * 5. Kept signatures            → documented @layer components block at bottom of this file.
- *    Current kept set: .now-line/.now-dot, .search-bar-wrap (brand CTA glow), .save-btn.
+ *    Current kept set: .swipe-hint/.swipe-row, .now-line/.now-dot, .search-bar-wrap (brand CTA glow), .save-btn.
  * 6. @theme + :root tokens below are the design system — extend here, not in components.
  */
 
@@ -238,6 +238,11 @@
   background: color-mix(in oklab, var(--secondary), transparent 20%);
 }
 
+
+/* ── SWIPE GESTURES — kept: JS-toggled display and CSS-var-driven properties ── */
+.swipe-hint{display:none;opacity:var(--hint-opacity,0.4);filter:var(--hint-filter,saturate(0.3))}
+.swipe-hint.active{display:flex}
+.swipe-row{transform:translateX(var(--swipe-x,0px))}
 
 /* ── CURRENT-TIME LINE — functional indicator, kept ── */
 .now-line{position:absolute;left:46px;right:0;height:2px;background:var(--destructive);z-index:5;border-radius:1px}
