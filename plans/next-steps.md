@@ -72,18 +72,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 
 ---
 
-### 6. No feature public-API surface — deep cross-feature internal imports
-
-- **Category:** `architecture` `layout`
-- **Impact:** 4
-- **Breadth:** Many (no `index.ts` barrels anywhere)
-- **Fix effort:** L
-- **Evidence:** `debug/NodeInheritanceDebugger.tsx:23-28` imports `@/editor/save`, `@/editor/useEntryEditor`, `@/editor/dialogs/RepeatDialog`, `@/editor/DialogStack` directly; storage internals are imported the same way across the app.
-- **Problem:** Every consumer reaches into a feature's private files, so there is no boundary to refactor behind — moving `editor/save.ts` breaks unrelated debug + UI code.
-- **Fix:** Add per-feature `index.ts` barrels exposing the intended surface, and lint against deep imports (`eslint-plugin-import` is already installed).
-
----
-
 ### 13. `NodeInheritanceDebugger` (777 LOC) duplicates editor wiring; `debug/` depends on `editor/` internals
 
 - **Category:** `dead-code` `architecture`
