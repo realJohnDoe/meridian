@@ -1,6 +1,7 @@
 ## Next steps
 
 - Fix screen not shrinking when keyboard opens
+- Filter Overlay gradient
 - Switch to european date format
 - Change type icon to use same space as checkbox in items section
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
