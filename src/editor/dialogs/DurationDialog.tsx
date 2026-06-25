@@ -102,7 +102,6 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
   const [timeDlgOpen, setTimeDlgOpen] = useState(false)
   const isTouch = useMediaQuery('(pointer: coarse)')
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!open) return
     const parsed = value ? parseDurationStr(value) : null
@@ -121,6 +120,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
         ? durationToEndDate(scheduled.date, value)
         : fmtISO(addDays(parseDateString(scheduled.date) ?? new Date(), 1)))
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- hasTime and defaultTab() derive from deps already listed; itemType is stable for a dialog session
   }, [open, value, scheduled?.date, scheduled?.time])
 
   function switchTab(next: Tab) {

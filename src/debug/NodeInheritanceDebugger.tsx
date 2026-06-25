@@ -344,7 +344,7 @@ export default function NodeInheritanceDebugger() {
     setIsCollapsed(true)
     setSelectedIdx(null)
     setActiveAction(null)
-  }, [items])
+  }, [items, debugRoot])
 
   const handleReset = useCallback(() => {
     if (originalContent) processContent(originalContent, fileName)
@@ -419,7 +419,7 @@ export default function NodeInheritanceDebugger() {
     }
     const next = applyEdit({ items, roots: debugRoots }, selectedOcc, editScope, fields)
     applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), body)
-  }, [debugEntry, selectedOcc, items, debugRoot, debugRoots, applyItems])
+  }, [debugEntry, selectedOcc, items, debugRoots, applyItems])
 
   const handleDebugClose = useCallback(() => {
     setSelectedIdx(null); setDebugEntry(null)
