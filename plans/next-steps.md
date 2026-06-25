@@ -5,7 +5,7 @@
 - Switch to european date format
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
-- Add Solarized Light theme
+- Add Solarized Light / Dark themes and Atom One Dark
 - Investigate more secure storage options
 - Consider if name and logo are still good
 - Post about Meridian in Obsidian forums
