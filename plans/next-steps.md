@@ -102,18 +102,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 - **Problem:** Animation state lives entirely outside React in mutated inline styles, which is hard to test and reason about. The `preventDefault` need is legitimate; the style choreography is the smell.
 - **Fix:** Keep the raw `touchmove` listener but drive transforms via CSS custom properties or class toggles rather than direct multi-element style writes.
 
----
-
-### 17. Empty `<Suspense>` fallback for the lazy editor overlay
-
-- **Category:** `ux`
-- **Impact:** 2
-- **Breadth:** 1 route
-- **Fix effort:** S
-- **Evidence:** `routes/_app.tsx:141` `<Suspense>` with no `fallback` wrapping the `lazy(EntryOverlay)`.
-- **Problem:** On a cold chunk load the editor overlay renders nothing until the chunk arrives — no spinner/skeleton on a primary user flow (opening an entry).
-- **Fix:** Provide a lightweight skeleton fallback (the agenda already has `AgendaSkeleton`/`Skeleton`).
-
 # Codebase Health Survey
 
 Survey this codebase for code health issues across the categories below.
