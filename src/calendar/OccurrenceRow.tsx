@@ -24,6 +24,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   const wrapRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
+  const iconRef = useRef<SVGSVGElement>(null)
   // Lock the stagger delay at first mount so reordering never restarts the entry animation.
   const staggerRef = useRef(index)
 
@@ -36,12 +37,13 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
   // default in modern browsers), so we use raw addEventListener with passive:false.
   useEffect(() => {
     // Guard: should never be null when mounted, but required for type safety.
-    if (!wrapRef.current || !rowRef.current || !hintRef.current) return
+    if (!wrapRef.current || !rowRef.current || !hintRef.current || !iconRef.current) return
     // Non-null assertions: narrowing doesn't carry into nested closure functions,
     // so we re-bind as non-nullable types here.
-    const wrap = wrapRef.current as HTMLDivElement
-    const row  = rowRef.current  as HTMLDivElement
-    const hintL = hintRef.current as HTMLDivElement
+    const wrap  = wrapRef.current  as HTMLDivElement
+    const row   = rowRef.current   as HTMLDivElement
+    const hintL = hintRef.current  as HTMLDivElement
+    const icon  = iconRef.current  as SVGSVGElement
 
     const THRESHOLD = 72
     const FULL_FRAC = 0.5
@@ -69,34 +71,31 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
       const rowW = wrap.offsetWidth || 320
       const absDx = Math.abs(dx)
       const clamped = Math.min(Math.max(dx, -rowW), 0)
-      row.style.transform = `translateX(${clamped}px)`
+      row.style.setProperty('--swipe-x', `${clamped}px`)
       if (dx < -8) {
-        hintL.style.display = 'flex'
         const fullPx = rowW * FULL_FRAC
         const prog = Math.min(absDx / fullPx, 1)
-        const isFullReady = absDx >= fullPx
-        hintL.style.filter = `saturate(${0.3 + prog * 0.7})`
-        hintL.style.opacity = String(0.4 + prog * 0.6)
-        const iconEl = hintL.querySelector('svg')
-        if (iconEl) (iconEl as SVGElement).style.transform = isFullReady ? 'scale(1.3)' : `scale(${0.7 + prog * 0.3})`
+        hintL.style.setProperty('--hint-filter', `saturate(${0.3 + prog * 0.7})`)
+        hintL.style.setProperty('--hint-opacity', String(0.4 + prog * 0.6))
+        hintL.classList.add('active')
+        icon.style.setProperty('--icon-scale', String(0.7 + prog * 0.3))
       } else {
-        hintL.style.display = 'none'
+        hintL.classList.remove('active')
       }
     }
 
     function onTouchEnd(e: TouchEvent) {
       if (blocked || !tracking) {
         row.style.transition = ''
-        row.style.transform = ''
-        hintL.style.display = 'none'
+        row.style.setProperty('--swipe-x', '0px')
+        hintL.classList.remove('active')
         return
       }
       const dx = e.changedTouches[0].clientX - sx
       const rowW = wrap.offsetWidth || 320
       const isFull = Math.abs(dx) / rowW >= FULL_FRAC
-      hintL.style.display = 'none'
-      hintL.style.filter = ''
-      hintL.style.opacity = ''
+      hintL.classList.remove('active')
+      icon.style.setProperty('--icon-scale', '1')
       if (dx <= -THRESHOLD && isFull) {
         // Phase 1: show toast immediately (before animation completes).
         // beginSwipeDelete() returns applyDelete — the function that actually
@@ -107,7 +106,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
         wrap.style.overflow = 'hidden'
         void wrap.offsetHeight  // force reflow so the fixed height is registered
         row.style.transition = 'transform .22s cubic-bezier(.4,0,.2,1)'
-        row.style.transform = `translateX(-${rowW}px)`
+        row.style.setProperty('--swipe-x', `-${rowW}px`)
         wrap.style.transition = 'height .22s ease, opacity .22s ease'
         wrap.style.height = '0'
         wrap.style.opacity = '0'
@@ -115,7 +114,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
         setTimeout(() => applyDelete(), 230)
       } else {
         row.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1)'
-        row.style.transform = ''
+        row.style.setProperty('--swipe-x', '0px')
       }
     }
 
@@ -131,19 +130,27 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
 
   return (
     <div
-      className="swipe-wrap mx-2 mb-1.5"
+      className="relative overflow-hidden rounded-lg mx-2 mb-1.5"
       ref={wrapRef}
       data-occ-key={occ.id}
       style={{ '--stagger': `${staggerRef.current * 0.025}s` } as React.CSSProperties}
     >
-      {/* Left swipe hint */}
-      <div className="swipe-hint left" ref={hintRef} style={{ display: 'none' }}>
-        <Trash2 size={18} />
-        <span>Delete</span>
+      {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
+      <div
+        ref={hintRef}
+        className="swipe-hint absolute inset-0 items-center justify-end gap-[10px] px-5 pointer-events-none z-0 bg-destructive"
+      >
+        <Trash2
+          ref={iconRef}
+          size={18}
+          strokeWidth={2.5}
+          className="shrink-0 stroke-primary-foreground fill-none [transform:scale(var(--icon-scale,1))] transition-transform duration-150"
+        />
+        <span className="text-xs font-bold text-primary-foreground whitespace-nowrap">Delete</span>
       </div>
 
-      {/* Main row */}
-      <div className="swipe-row" ref={rowRef}>
+      {/* Main row — transform driven by CSS (.swipe-row) */}
+      <div ref={rowRef} className="swipe-row relative z-[1] bg-background touch-pan-y select-none">
         <OccurrenceCard
           occ={occ}
           leadingIcon="checkbox"
