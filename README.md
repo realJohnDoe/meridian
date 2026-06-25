@@ -74,7 +74,7 @@ You can write and edit these files by hand if you prefer — Meridian will pick 
 
 Meridian was heavily inspired by tools we already loved, and tries to fill the gap where they didn't quite fit together.
 
-| Feature | Meridian | [Obsidian](https://obsidian.md) + [TaskNotes](https://github.com/supermagic124/obsidian-task-marker) | [Google Calendar](https://calendar.google.com) | [GitHub Issues / Projects](https://github.com/features/issues) | [Todoist](https://todoist.com) | [Google Keep](https://keep.google.com) |
+| Feature | Meridian | [Obsidian](https://obsidian.md) + [TaskNotes](https://tasknotes.dev/) | [Google Calendar](https://calendar.google.com) | [GitHub Issues / Projects](https://github.com/features/issues) | [Todoist](https://todoist.com) | [Google Keep](https://keep.google.com) |
 |---|---|---|---|---|---|---|
 | Great mobile UX | ✅ | Partial | ✅ | Partial | ✅ | ✅ |
 | Plain Markdown storage | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
