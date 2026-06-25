@@ -14,10 +14,11 @@ export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
 
   return (
     <div id="filterOverlay" className="fixed bottom-[80px] left-0 right-0 md:absolute md:bottom-full md:left-0 md:right-0 z-[25] pointer-events-auto">
-      <div className="relative max-h-[calc(100dvh-var(--th)-80px)] flex flex-col">
+      <div className="relative">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-8 z-10 bg-gradient-to-b from-transparent to-background" />
-        <div className="h-8 shrink-0" />
-        <div className="overflow-y-auto [-webkit-overflow-scrolling:touch] bg-background flex-1 min-h-0">
+        {/* Transparent spacer — gradient fades over this, not over bg-background */}
+        <div className="h-8" />
+        <div className="overflow-y-auto [-webkit-overflow-scrolling:touch] bg-background max-h-[calc(100dvh-var(--th)-112px)]">
           <div className="lg:max-w-[720px] lg:mx-auto pb-10">
             {/* "Create" row */}
             <Button
