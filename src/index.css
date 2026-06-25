@@ -10,7 +10,7 @@
  *                                 No raw oklch(…) or #hex in component markup.
  * 4. Spacing/radius             → Tailwind scale snapped to nearest step; no arbitrary px.
  * 5. Kept signatures            → documented @layer components block at bottom of this file.
- *    Current kept set: .swipe-*, .now-line/.now-dot, .search-bar-wrap (brand CTA glow), .save-btn.
+ *    Current kept set: .now-line/.now-dot, .search-bar-wrap (brand CTA glow), .save-btn.
  * 6. @theme + :root tokens below are the design system — extend here, not in components.
  */
 
@@ -238,15 +238,6 @@
   background: color-mix(in oklab, var(--secondary), transparent 20%);
 }
 
-/* ── SWIPE GESTURES ── */
-.swipe-wrap{position:relative;overflow:hidden;border-radius:8px}
-.swipe-hint{position:absolute;inset:0;display:none;align-items:center;padding:0 20px;pointer-events:none;z-index:0;opacity:var(--hint-opacity,0.4);filter:var(--hint-filter,saturate(0.3))}
-.swipe-hint.active{display:flex}
-.swipe-hint.left{background:var(--destructive);justify-content:flex-end;gap:10px}
-.swipe-hint svg{width:18px;height:18px;stroke:var(--primary-foreground);fill:none;stroke-width:2.5;flex-shrink:0;transition:transform .15s}
-.swipe-hint span{font-size:12px;font-weight:700;color:var(--primary-foreground);white-space:nowrap}
-.swipe-hint.ready svg{transform:scale(1.3)}
-.swipe-row{position:relative;z-index:1;background:var(--background);touch-action:pan-y;user-select:none;-webkit-user-select:none;transform:translateX(var(--swipe-x,0px))}
 
 /* ── CURRENT-TIME LINE — functional indicator, kept ── */
 .now-line{position:absolute;left:46px;right:0;height:2px;background:var(--destructive);z-index:5;border-radius:1px}
