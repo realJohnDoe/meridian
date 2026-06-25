@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '@/types'
-import { fmtISO, parseDateString, WEEK_STARTS_ON } from '@/model/dateUtils'
-import { parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model/repeat'
+import { fmtISO, parseDateString, WEEK_STARTS_ON, parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model'
 import {
   ResponsiveModal,
   ResponsiveModalContent,

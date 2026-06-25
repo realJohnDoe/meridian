@@ -63,6 +63,48 @@ export default [
               except: ['./index.ts'],
               message: "Import from '@/editor' (the barrel), not from editor internals",
             },
+            {
+              target: './src',
+              from: './src/model',
+              except: ['./index.ts'],
+              message: "Import from '@/model' (the barrel), not from model internals",
+            },
+            {
+              target: './src',
+              from: './src/hooks',
+              except: ['./index.ts'],
+              message: "Import from '@/hooks' (the barrel), not from hooks internals",
+            },
+            {
+              target: './src',
+              from: './src/calendar',
+              except: ['./index.ts'],
+              message: "Import from '@/calendar' (the barrel), not from calendar internals",
+            },
+            {
+              target: './src',
+              from: './src/components',
+              except: ['./index.ts', './ui'],
+              message: "Import from '@/components' (the barrel), not from components internals",
+            },
+            {
+              target: './src',
+              from: './src/routes',
+              except: ['./index.ts'],
+              message: "Import from '@/routes' (the barrel), not from routes internals",
+            },
+            {
+              target: './src',
+              from: './src/search',
+              except: ['./index.ts'],
+              message: "Import from '@/search' (the barrel), not from search internals",
+            },
+            {
+              target: './src',
+              from: './src/onboarding',
+              except: ['./index.ts'],
+              message: "Import from '@/onboarding' (the barrel), not from onboarding internals",
+            },
           ],
         },
       ],
@@ -71,7 +113,17 @@ export default [
 
   // Within-feature files can freely import their own internals
   {
-    files: ['src/storage/**/*.{ts,tsx}', 'src/editor/**/*.{ts,tsx}'],
+    files: [
+      'src/storage/**/*.{ts,tsx}',
+      'src/editor/**/*.{ts,tsx}',
+      'src/model/**/*.{ts,tsx}',
+      'src/hooks/**/*.{ts,tsx}',
+      'src/calendar/**/*.{ts,tsx}',
+      'src/components/**/*.{ts,tsx}',
+      'src/routes/**/*.{ts,tsx}',
+      'src/search/**/*.{ts,tsx}',
+      'src/onboarding/**/*.{ts,tsx}',
+    ],
     rules: { 'import-x/no-restricted-paths': 'off' },
   },
 ]

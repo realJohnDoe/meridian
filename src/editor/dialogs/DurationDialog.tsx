@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useMediaQuery } from '@/hooks/use-media-query'
+import { useMediaQuery } from '@/hooks'
 import { addDays, differenceInMinutes, differenceInDays } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
-import { parseDateString, parseDateTime, fmtISO } from '@/model/dateUtils'
+import { parseDateString, parseDateTime, fmtISO } from '@/model'
 import type { Scheduled } from '@/types'
 import {
   ResponsiveModal,

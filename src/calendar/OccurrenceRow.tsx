@@ -1,7 +1,7 @@
 import { useRef, useEffect, useMemo } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '@/types'
-import OccurrenceCard from '@/components/OccurrenceCard'
+import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
 import { backlinksTo } from '@/fileOccurrence'
 

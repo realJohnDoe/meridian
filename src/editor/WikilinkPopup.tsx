@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { EditorView } from '@codemirror/view'
 import type { Roots } from '@/types'
-import OccurrenceCard from '@/components/OccurrenceCard'
+import { OccurrenceCard } from '@/components'
 import { fileEntries } from '@/fileOccurrence'
 import { useStore } from '@/store'
 

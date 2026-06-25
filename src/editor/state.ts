@@ -1,5 +1,5 @@
 import type { Occurrence, Scheduled, EditScope } from '@/types'
-import type { EditorFields } from '@/model/storeOps'
+import type { EditorFields } from '@/model'
 
 export type { Scheduled }
 

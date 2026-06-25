@@ -1,13 +1,11 @@
-import {
-  toggleDone, excludeOccurrence, deleteByFileSlug, moveOccToDate,
-} from './model/storeOps'
+import { toggleDone, excludeOccurrence, deleteByFileSlug, moveOccToDate } from '@/model'
 import { occIsRecur, occKind } from './occView'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
 import { writeEntityToCache, deleteFromBackend } from '@/storage'
 import { commitNext } from './storeCommit'
 import { showDeleteToast, showDoneMovedToast } from './undoToast'
-import { fmtISO } from './model/dateUtils'
+import { fmtISO } from '@/model'
 
 export function toggleOccDone(o: Occurrence): void {
   const newDone = !o.metadata.done

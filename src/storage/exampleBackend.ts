@@ -1,5 +1,5 @@
 import type { StorageBackend, RawFile, VaultKind } from './backend'
-import { fmtISO } from '@/model/dateUtils'
+import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 
 // ── Date helpers ────────────────────────────────────────────────

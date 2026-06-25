@@ -1,4 +1,4 @@
-import { expandRange, joinFileMeta, stableOccId } from './model/expansion'
+import { expandRange, joinFileMeta, stableOccId } from '@/model'
 import { resolveWikilink, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc } from './types'
 import type { Occurrence, StoreItem, Roots } from './types'

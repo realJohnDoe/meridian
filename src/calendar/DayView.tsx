@@ -6,18 +6,13 @@ import { Button } from '@/components/ui/button'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
-import KindIcon from '@/components/KindIcon'
-import { multidayDisplayTitle } from '@/model/expansion'
-import { useExpandWithMultiday } from '@/model/useExpandWithMultiday'
-import { fmtT } from '@/model/dateUtils'
-import { parseDurationHours } from '@/model/duration'
-import { sameDay, addDays, fmtLong } from '@/format'
+import { KindIcon } from '@/components'
+import { multidayDisplayTitle, useExpandWithMultiday, fmtT, parseDurationHours } from '@/model'
+import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
-
-import { useToday } from '@/hooks/useToday'
-import { useParticipantFilter } from '@/hooks/useParticipantFilter'
+import { useToday, useParticipantFilter } from '@/hooks'
 const SH = 7    // start hour on timeline
 const EH = 22   // end hour on timeline
 const HP = 56   // pixels per hour
@@ -280,4 +275,3 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
 }
 
 /** Exported so App.tsx toolbar can render the current date title reactively. */
-export { fmtLong }

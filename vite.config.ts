@@ -64,7 +64,7 @@ export default defineConfig({
   base: '/meridian/',
   plugins: [
     debugPagePlugin(),
-    TanStackRouterVite({ target: 'react', autoCodeSplitting: true }),
+    TanStackRouterVite({ target: 'react', autoCodeSplitting: true, routeFileIgnorePattern: '(^|/)index\\.tsx?$' }),
     react(),
     tailwindcss(),
     VitePWA({
