@@ -181,7 +181,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
     if (!sameDay(dvDate, today)) return
     const id = setInterval(() => setNowTick(t => t + 1), 60_000)
     return () => clearInterval(id)
-  }, [dvDate])
+  }, [dvDate, today])
 
   const totalCols = Math.max(cols.length, 1)
   const isToday   = sameDay(dvDate, today)
