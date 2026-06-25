@@ -44,69 +44,14 @@ export default [
       ],
 
       // ── Import boundaries (barrel enforcement) ───────────────────────────────
-      // Enforce feature barrels: external code must import from the barrel (index.ts),
-      // not from internal files. Each feature dir gets a zone added here when it gains
-      // an index.ts barrel. The matching override below exempts each dir's own files.
-      'import-x/no-restricted-paths': [
+      // Any directory with an index.ts is a feature module; external code must
+      // import via that barrel, not from internal files. New barrels are enforced
+      // automatically — no config change needed when a new index.ts is added.
+      // Exception: @/components/ui/** are shadcn primitives intentionally used
+      // as deep imports everywhere.
+      'import-x/no-internal-modules': [
         'error',
-        {
-          zones: [
-            {
-              target: './src',
-              from: './src/storage',
-              except: ['./index.ts'],
-              message: "Import from '@/storage' (the barrel), not from storage internals",
-            },
-            {
-              target: './src',
-              from: './src/editor',
-              except: ['./index.ts'],
-              message: "Import from '@/editor' (the barrel), not from editor internals",
-            },
-            {
-              target: './src',
-              from: './src/model',
-              except: ['./index.ts'],
-              message: "Import from '@/model' (the barrel), not from model internals",
-            },
-            {
-              target: './src',
-              from: './src/hooks',
-              except: ['./index.ts'],
-              message: "Import from '@/hooks' (the barrel), not from hooks internals",
-            },
-            {
-              target: './src',
-              from: './src/calendar',
-              except: ['./index.ts'],
-              message: "Import from '@/calendar' (the barrel), not from calendar internals",
-            },
-            {
-              target: './src',
-              from: './src/components',
-              except: ['./index.ts', './ui'],
-              message: "Import from '@/components' (the barrel), not from components internals",
-            },
-            {
-              target: './src',
-              from: './src/routes',
-              except: ['./index.ts'],
-              message: "Import from '@/routes' (the barrel), not from routes internals",
-            },
-            {
-              target: './src',
-              from: './src/search',
-              except: ['./index.ts'],
-              message: "Import from '@/search' (the barrel), not from search internals",
-            },
-            {
-              target: './src',
-              from: './src/onboarding',
-              except: ['./index.ts'],
-              message: "Import from '@/onboarding' (the barrel), not from onboarding internals",
-            },
-          ],
-        },
+        { allow: ['@/components/ui/**', 'react-dom/client'] },
       ],
     },
   },
@@ -124,6 +69,6 @@ export default [
       'src/search/**/*.{ts,tsx}',
       'src/onboarding/**/*.{ts,tsx}',
     ],
-    rules: { 'import-x/no-restricted-paths': 'off' },
+    rules: { 'import-x/no-internal-modules': 'off' },
   },
 ]
