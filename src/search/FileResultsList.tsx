@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { Occurrence } from '@/types'
 import { fileEntries, backlinksTo } from '@/fileOccurrence'
-import OccurrenceCard from '@/components/OccurrenceCard'
+import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
 
 function fuzzyMatch(query: string, text: string): boolean {

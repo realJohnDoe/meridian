@@ -3,12 +3,12 @@ import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil,
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { setActiveVault } from '@/storage'
-import { fmtISO, fmtMonth } from '@/model/dateUtils'
-import { useToday } from '@/hooks/useToday'
+import { fmtISO, fmtMonth } from '@/model'
+import { useToday } from '@/hooks'
 import { vaultIcon } from './vaultIcon'
 import ManageVaultsDialog from './ManageVaultsDialog'
 import { Checkbox } from './ui/checkbox'
-import { NO_PARTICIPANT } from '@/hooks/useParticipantFilter'
+import { NO_PARTICIPANT } from '@/hooks'
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
   useSidebar,
 } from './ui/sidebar'
-import { slugRoute } from '@/routes/-entryRoute'
+import { slugRoute } from '@/routes'
 
 export default function AppSidebar() {
   const [manageVaultsOpen, setManageVaultsOpen] = useState(false)

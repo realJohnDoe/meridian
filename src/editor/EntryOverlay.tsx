@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useStore } from '@/store'
 import { useEntryEditor } from './useEntryEditor'
-import { expandRange } from '@/model/expansion'
+import { expandRange } from '@/model'
 import EditorShell from './EditorShell'
 import type { Occurrence, EditScope } from '@/types'
 

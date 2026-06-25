@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, Users } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import TagChip from '@/components/TagChip'
+import { TagChip } from '@/components'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 

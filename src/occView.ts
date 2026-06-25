@@ -1,4 +1,4 @@
-import { parseDurationDays, parseDurationHours } from './model/duration'
+import { parseDurationDays, parseDurationHours } from '@/model'
 import type { Occurrence } from './types'
 import type { OccState } from './components/ui/occurrence-variants'
 

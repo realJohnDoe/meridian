@@ -1,5 +1,5 @@
 import { addDays, addMinutes, isSameDay } from 'date-fns'
-import { parseDateString, parseDateTime, fmtISO } from '@/model/dateUtils'
+import { parseDateString, parseDateTime, fmtISO } from '@/model'
 import type { Scheduled } from '@/types'
 
 export { addDays, isSameDay as sameDay }

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { StoreItem, Roots, Occurrence } from './types'
 import type { VaultRef } from '@/storage'
-import { clearOccIdCache } from './model/expansion'
+import { clearOccIdCache } from '@/model'
 import { fileOccurrenceMap } from './fileOccurrence'
 
 interface MeridianStore {

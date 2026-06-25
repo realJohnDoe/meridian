@@ -3,18 +3,17 @@ import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
 
-import { expandWithMultiday, multidayDisplayTitle } from '@/model/expansion'
+import { expandWithMultiday, multidayDisplayTitle } from '@/model'
 import { sameDay } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 
 const EMPTY: Occurrence[] = []
-import { useToday } from '@/hooks/useToday'
-import { useParticipantFilter } from '@/hooks/useParticipantFilter'
+import { useToday, useParticipantFilter } from '@/hooks'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
-import KindIcon from '@/components/KindIcon'
+import { KindIcon } from '@/components'
 
 const MONTHS = [
   'January','February','March','April','May','June',

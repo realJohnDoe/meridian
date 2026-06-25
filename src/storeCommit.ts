@@ -1,6 +1,6 @@
 import { setData } from './storeBridge'
 import { writeEntityToCache, deleteFromBackend } from '@/storage'
-import type { StoreData } from './model/storeOps'
+import type { StoreData } from '@/model'
 
 /** Commit to store and persist all slugs. */
 export function commitNext(next: StoreData, slugs: string[]): void {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { addDays } from 'date-fns'
-import { fmtISO, parseDateString, WEEK_STARTS_ON } from '@/model/dateUtils'
+import { fmtISO, parseDateString, WEEK_STARTS_ON } from '@/model'
 import {
   ResponsiveModal,
   ResponsiveModalContent,

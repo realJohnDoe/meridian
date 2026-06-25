@@ -4,20 +4,13 @@ import {
   CalendarDays, Plus, Pencil, Repeat, ChevronsRight, Trash2,
 } from 'lucide-react'
 import {
-  buildEffectiveTree, displayValue,
-  type EffectiveNode,
-} from '@/model/inheritance'
-import {
+  buildEffectiveTree, displayValue, type EffectiveNode,
   expandRange, treeHasOccurrences,
-} from '@/model/expansion'
-import { collapseToYaml } from '@/model/collapse'
-import { parseToStoreItems } from '@/model/storeItems'
-import {
-  applyEdit, excludeOccurrence, deleteFollowing,
-  findSeries, upsertOverride,
-  type EditFields,
-} from '@/model/storeOps'
-import { dayBefore } from '@/model/dateUtils'
+  collapseToYaml,
+  parseToStoreItems,
+  applyEdit, excludeOccurrence, deleteFollowing, findSeries, upsertOverride, type EditFields,
+  dayBefore,
+} from '@/model'
 import { loadFile, saveFile } from '@/fileIO'
 import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern, OccurrenceMetadata } from '@/types'
 import { EntryEditor, DialogStack, RepeatDialog, applyScope, entryFromOccurrence } from '@/editor'

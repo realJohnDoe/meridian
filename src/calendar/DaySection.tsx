@@ -3,7 +3,7 @@ import type { Occurrence } from '@/types'
 import { fmtLong } from '@/format'
 import { cn } from '@/lib/cn'
 import OccurrenceRow from './OccurrenceRow'
-import { useFlipReorder } from '@/hooks/useFlipReorder'
+import { useFlipReorder } from '@/hooks'
 
 
 interface Props {

@@ -1,6 +1,5 @@
 import { parse as parseYaml } from 'yaml'
-import { serializeRawNode } from './model/inheritance'
-import type { RawNode } from './model/nodeSchema'
+import { serializeRawNode, type RawNode } from '@/model'
 
 // ── YAML parser ───────────────────────────────────────────────
 

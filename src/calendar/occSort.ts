@@ -1,5 +1,4 @@
-import { parseDurationDays } from '@/model/duration'
-import { fmtT } from '@/model/dateUtils'
+import { parseDurationDays, fmtT } from '@/model'
 import type { Occurrence } from '@/types'
 import { occKind, occState } from '@/occView'
 

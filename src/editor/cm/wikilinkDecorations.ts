@@ -7,7 +7,7 @@ import {
 import { createElement, type MouseEvent as ReactMouseEvent } from 'react'
 import type { Roots, StoreItem } from '@/types'
 import { parseWikilinks, resolveWikilink } from '@/wikilinks'
-import TagChip from '@/components/TagChip'
+import { TagChip } from '@/components'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
 import { focusedCursorLines } from './viewUtils'

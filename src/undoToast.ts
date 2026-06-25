@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 import { format } from 'date-fns'
-import { parseDateString } from './model/dateUtils'
+import { parseDateString } from '@/model'
 
 let _toastId:       string | number | null = null
 let _pendingCommit: (() => void) | null    = null
