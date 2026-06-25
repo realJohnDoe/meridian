@@ -1,6 +1,6 @@
 # Meridian
 
-**A calm, note-centric calendar for people who like owning their data.**
+**A calm calendar, task manager, and notes app built on plain Markdown files.**
 
 Meridian is a free, open-source PWA that blends task management, event scheduling, and note-taking into a single timeline — and stores everything as plain Markdown files you can read, edit, and back up anywhere.
 
