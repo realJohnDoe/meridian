@@ -1,5 +1,5 @@
 import type { StoreItem, Roots } from './types'
-import type { VaultRef } from './storage/backend'
+import type { VaultRef } from '@/storage'
 import { useStore } from './store'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────

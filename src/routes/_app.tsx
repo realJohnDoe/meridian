@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import type { EditScope } from '@/types'
 
-const EntryOverlay = lazy(() => import('@/editor/EntryOverlay'))
+const EntryOverlay = lazy(() => import('@/editor').then(m => ({ default: m.EntryOverlay })))
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,

@@ -1,7 +1,7 @@
 import { RefreshCw } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { useStore } from '@/store'
-import { syncToBackend } from '@/storage/sync'
+import { syncToBackend } from '@/storage'
 import { Button } from './ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
 

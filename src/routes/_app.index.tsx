@@ -5,7 +5,7 @@ import { fmtISO } from '@/model/dateUtils'
 import { useOpenEntry } from '@/hooks/useOpenEntry'
 import { useToday } from '@/hooks/useToday'
 import { useStore } from '@/store'
-import { onVaultChanged } from '@/storage/vaultRegistry'
+import { onVaultChanged } from '@/storage'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const Route = createFileRoute('/_app/')({

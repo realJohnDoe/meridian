@@ -3,13 +3,11 @@ import { HardDrive, GitBranch, Trash2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
-import { addLocalVault, addGitHubVault, removeVault } from '@/storage/vaultRegistry'
-import { tokenSave } from '@/storage/cache'
-import { syncToBackend } from '@/storage/sync'
+import { addLocalVault, addGitHubVault, removeVault, tokenSave, syncToBackend } from '@/storage'
 import {
   Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import ParticipantsRow from '@/editor/ParticipantsRow'
+import { ParticipantsRow } from '@/editor'
 import {
   ResponsiveModal,
   ResponsiveModalContent,
