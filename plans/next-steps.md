@@ -90,18 +90,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 - **Problem:** A 777-line dev tool reaches into editor internals and reimplements their choreography, so it must be maintained in lockstep with the real editor despite never shipping.
 - **Fix:** Either delete it or have it mount the real `EditorShell`/`useEntryEditor` instead of duplicating their wiring.
 
----
-
-### 15. Imperative DOM-style manipulation for swipe-to-delete
-
-- **Category:** `styling` `srp`
-- **Impact:** 2
-- **Breadth:** 1 file (~80 lines)
-- **Fix effort:** M
-- **Evidence:** `calendar/OccurrenceRow.tsx:42-112` sets `row.style.transform`, `hintL.style.filter/opacity`, queries `querySelector('svg')`, and drives animation timers manually.
-- **Problem:** Animation state lives entirely outside React in mutated inline styles, which is hard to test and reason about. The `preventDefault` need is legitimate; the style choreography is the smell.
-- **Fix:** Keep the raw `touchmove` listener but drive transforms via CSS custom properties or class toggles rather than direct multi-element style writes.
-
 # Codebase Health Survey
 
 Survey this codebase for code health issues across the categories below.
