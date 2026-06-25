@@ -7,6 +7,8 @@
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
 - Add Solarized Light theme
 - Investigate more secure storage options
+- Consider if name and logo are still good
+- Post about Meridian in Obsidian forums
 - Add vault retention period
 
 # Meridian — Code Health Survey
