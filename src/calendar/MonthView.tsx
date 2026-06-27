@@ -30,7 +30,7 @@ const CalCell = memo(function CalCell({ date, other, dayOccs, today, onDayClick 
 
   const occCount = dayOccs.length
   const ariaLabel = [
-    date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }),
+    date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', ...(date.getFullYear() !== new Date().getFullYear() && { year: 'numeric' }) }),
     isToday ? 'today' : '',
     occCount ? `${occCount} event${occCount !== 1 ? 's' : ''}` : '',
   ].filter(Boolean).join(', ')

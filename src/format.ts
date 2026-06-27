@@ -4,8 +4,10 @@ import type { Scheduled } from '@/types'
 
 export { addDays, isSameDay as sameDay }
 
-export const fmtLong  = (d: Date): string => d.toLocaleDateString(undefined, { weekday: 'long',  month: 'long',  day: 'numeric' })
-export const fmtShort = (d: Date): string => d.toLocaleDateString(undefined, {                   month: 'short', day: 'numeric' })
+const thisYear = () => new Date().getFullYear()
+
+export const fmtLong  = (d: Date): string => d.toLocaleDateString(undefined, { weekday: 'long', month: 'long',  day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) })
+export const fmtShort = (d: Date): string => d.toLocaleDateString(undefined, {                  month: 'short', day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) })
 
 export function fmtTopBarDay(d: Date, today: Date): string {
   const opts: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' }
@@ -63,7 +65,7 @@ export function durationToEndDateTime(startDateStr: string, startTimeStr: string
 
 export function fmtEndDate(dateStr: string): string {
   const d = parseDateString(dateStr)
-  return d ? d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }) : dateStr
+  return d ? d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) }) : dateStr
 }
 
 export function fmtEndTime(hhmm: string, hour12 = false): string {
