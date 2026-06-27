@@ -1,7 +1,5 @@
 ## Next steps
 
-- Investigate performance bottlenecks, especially when checking items or changing metadata
-- Fix mobile today header bug
 - Reuse fom in all views
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate subdirectory / hexagonal architecture violations
