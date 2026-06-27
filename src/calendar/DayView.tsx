@@ -18,7 +18,8 @@ const EH = 22   // end hour on timeline
 const HP = 56   // pixels per hour
 
 
-function formatHour(h: number): string {
+function formatHour(h: number, hour12: boolean): string {
+  if (!hour12) return `${String(h).padStart(2, '0')}:00`
   if (h < 12)  return `${h}am`
   if (h === 12) return '12pm'
   return `${h - 12}pm`
@@ -139,9 +140,10 @@ interface Props {
 }
 
 export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props) {
-  const today = useToday()
-  const items = useStore(s => s.items)
-  const roots = useStore(s => s.roots)
+  const today  = useToday()
+  const items  = useStore(s => s.items)
+  const roots  = useStore(s => s.roots)
+  const hour12 = useStore(s => s.localePrefs.hour12)
 
   const { filterOccs } = useParticipantFilter()
 
@@ -233,7 +235,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
           {/* Hour rows */}
           {Array.from({ length: EH - SH + 1 }, (_, i) => SH + i).map(h => (
             <div key={h} className="flex items-start h-14 relative">
-              <span className="w-[46px] text-2xs font-mono text-muted-foreground text-right pr-2.5 shrink-0 -mt-1.5">{formatHour(h)}</span>
+              <span className="w-[46px] text-2xs font-mono text-muted-foreground text-right pr-2.5 shrink-0 -mt-1.5">{formatHour(h, hour12)}</span>
               <div className="flex-1 border-t border-border relative" />
             </div>
           ))}

@@ -1,7 +1,13 @@
 import { format, isValid, parseISO, addDays } from 'date-fns'
 
-/** Single source of truth for which day starts the week (1 = Monday). */
-export const WEEK_STARTS_ON = 1 as const
+import type { LocalePrefs } from '@/store'
+
+/** Convert a LocalePrefs firstDayOfWeek (Intl convention) to date-fns/react-day-picker convention (0=Sun, 1=Mon, 6=Sat). */
+export function weekStartsOn(prefs: LocalePrefs): 0 | 1 | 6 {
+  if (prefs.firstDayOfWeek === 7) return 0
+  if (prefs.firstDayOfWeek === 6) return 6
+  return 1
+}
 
 export function fmtISO(d: Date): string {
   return format(d, 'yyyy-MM-dd')
@@ -18,12 +24,21 @@ export function parseMonth(s: string): Date {
   return new Date(y, m - 1, 1)
 }
 
-export function fmtT(v: unknown): string | null {
+export function fmtT(v: unknown, hour12 = false): string | null {
   if (!v) return null
-  if (typeof v === 'string' && /^\d{1,2}:\d{2}/.test(v)) return v.slice(0, 5)
+  if (typeof v === 'string' && /^\d{1,2}:\d{2}/.test(v)) {
+    if (!hour12) return v.slice(0, 5)
+    const [hStr, mStr] = v.slice(0, 5).split(':')
+    const h = parseInt(hStr, 10), m = parseInt(mStr, 10)
+    if (!h && !m) return null
+    const d = new Date(); d.setHours(h, m, 0, 0)
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
   if (v instanceof Date) {
     const h = v.getHours(), m = v.getMinutes()
-    return (h || m) ? format(v, 'HH:mm') : null
+    if (!h && !m) return null
+    if (hour12) return v.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+    return format(v, 'HH:mm')
   }
   return null
 }

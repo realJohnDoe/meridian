@@ -4,6 +4,36 @@ import type { VaultRef } from '@/storage'
 import { clearOccIdCache } from '@/model'
 import { fileOccurrenceMap } from './fileOccurrence'
 
+export type LocalePrefs = {
+  hour12: boolean
+  firstDayOfWeek: 1 | 6 | 7  // 1=Mon, 6=Sat, 7=Sun (Intl getWeekInfo values)
+}
+
+function detectLocalePrefs(): LocalePrefs {
+  const hour12 = new Intl.DateTimeFormat(undefined, { hour: 'numeric' })
+    .resolvedOptions().hour12 ?? false
+  const locale = new Intl.Locale(navigator.language)
+  const weekInfo = (locale as unknown as { getWeekInfo?: () => { firstDay?: number } }).getWeekInfo?.()
+  const firstDayOfWeek = (weekInfo?.firstDay ?? 1) as 1 | 6 | 7
+  return { hour12, firstDayOfWeek }
+}
+
+function loadLocalePrefs(): LocalePrefs {
+  try {
+    const raw = localStorage.getItem('meridian_locale_prefs')
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<LocalePrefs>
+      const detected = detectLocalePrefs()
+      return {
+        hour12: typeof parsed.hour12 === 'boolean' ? parsed.hour12 : detected.hour12,
+        firstDayOfWeek: (parsed.firstDayOfWeek === 1 || parsed.firstDayOfWeek === 6 || parsed.firstDayOfWeek === 7)
+          ? parsed.firstDayOfWeek : detected.firstDayOfWeek,
+      }
+    }
+  } catch { /* ignore */ }
+  return detectLocalePrefs()
+}
+
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
   items: StoreItem[]
@@ -58,6 +88,11 @@ interface MeridianStore {
   loadParticipantFilter:    (vaultId: string) => void
   toggleParticipantFilter:  (name: string) => void
   clearParticipantFilter:   () => void
+
+  // ── Locale preferences ───────────────────────────────────────────
+  /** Auto-detected from browser locale; overridable by the user. Stored in localStorage (global, not vault-scoped). */
+  localePrefs:    LocalePrefs
+  setLocalePrefs: (prefs: Partial<LocalePrefs>) => void
 }
 
 export const useStore = create<MeridianStore>((set, get) => ({
@@ -147,5 +182,12 @@ export const useStore = create<MeridianStore>((set, get) => ({
     const { activeVaultId } = get()
     if (activeVaultId) localStorage.setItem(`meridian_participant_filter_${activeVaultId}`, JSON.stringify([]))
     set({ participantFilter: [] })
+  },
+
+  localePrefs: loadLocalePrefs(),
+  setLocalePrefs: (prefs: Partial<LocalePrefs>) => {
+    const next = { ...get().localePrefs, ...prefs }
+    localStorage.setItem('meridian_locale_prefs', JSON.stringify(next))
+    set({ localePrefs: next })
   },
 }))

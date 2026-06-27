@@ -3,6 +3,7 @@ import type { Occurrence } from '@/types'
 import KindIcon from './KindIcon'
 import { fmtT, parseDateString, multidayDisplayTitle } from '@/model'
 import { fmtShort } from '@/format'
+import { useStore } from '@/store'
 import { formatDurationChip, fmtDuration } from '@/format'
 import { occState } from '@/occView'
 import { Checkbox } from './ui/checkbox'
@@ -90,6 +91,7 @@ export default function OccurrenceCard({
   showTagsParticipants = true,
   listedOn = [],
 }: OccurrenceCardProps) {
+  const hour12   = useStore(s => s.localePrefs.hour12)
   const barClass = occState(occ)
   const isDone   = !!occ.metadata.done
   const isPast   = barClass === 'event-past'
@@ -97,7 +99,7 @@ export default function OccurrenceCard({
     ? multidayDisplayTitle(occ, occ.metadata.jsTime)
     : undefined) ?? occ.metadata.title
 
-  const t            = fmtT(occ.time)
+  const t            = fmtT(occ.time, hour12)
   const hasTrack     = occ.metadata.done !== undefined
   const tags         = occ.metadata.tags || []
   const participants = occ.metadata.participants || []

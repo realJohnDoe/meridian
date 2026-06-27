@@ -1,5 +1,5 @@
 export type { RawNode } from './nodeSchema'
-export { WEEK_STARTS_ON, fmtISO, fmtMonth, parseMonth, fmtT, parseDateString, parseDateTime, dayBefore } from './dateUtils'
+export { weekStartsOn, fmtISO, fmtMonth, parseMonth, fmtT, parseDateString, parseDateTime, dayBefore } from './dateUtils'
 export { multidayDisplayTitle, multidayCoversDate, hasRepeat, treeHasOccurrences, stableOccId, clearOccIdCache, expandRange, expandWithMultiday, joinFileMeta } from './expansion'
 export type { StoreData, EditorFields, EditFields } from './storeOps'
 export { fileSlugItems, findSeries, upsertOverride, applyEdit, toggleDone, moveOccToDate, excludeOccurrence, deleteByFileSlug, deleteFollowing, updateRoot } from './storeOps'
