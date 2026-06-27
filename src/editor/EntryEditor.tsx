@@ -188,7 +188,8 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
             <Checkbox
               checked={done}
               onCheckedChange={() => onDoneToggle?.()}
-              className="size-6 mt-1"
+              className="mt-1"
+              visualClassName="size-6"
             />
           )}
           <textarea
