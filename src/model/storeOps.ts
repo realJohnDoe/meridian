@@ -370,35 +370,6 @@ export function toggleDone({ items, roots }: StoreData, occ: Occurrence): StoreD
   return { items: upsertOverride(items, occ, { metadata: { ...occFromAppMeta(occ.metadata), done: newDone } }), roots }
 }
 
-/**
- * Move an occurrence to a new date without changing its done state.
- * Called after toggleDone when auto-moving a whole-day or undated task to today.
- * - Standalone: patches date in place.
- * - Recurring generated: excludes original slot and creates an explicit child at newDate.
- * - Recurring explicit: patches date in place by id.
- */
-export function moveOccToDate(items: StoreItem[], occ: Occurrence, newDate: string): StoreItem[] {
-  if (!occ.ownerId) {
-    return upsertOverride(items, occ, { date: newDate })
-  }
-  if (occ.source === 'generated') {
-    const withExcluded = upsertOverride(items, occ, { excluded: true })
-    const series = items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined
-    const moved: OccurrenceEntry<OccurrenceMetadata> = {
-      date:     newDate,
-      time:     occ.time,
-      source:   'explicit',
-      fileSlug: occ.fileSlug,
-      id:       crypto.randomUUID(),
-      ownerId:  occ.ownerId,
-      metadata: { ...(series?.metadata ?? occFromAppMeta(occ.metadata)), done: true },
-    }
-    return [...withExcluded, moved]
-  }
-  // Recurring explicit override: change date in place
-  return items.map(i => i.id === occ.id ? { ...i, date: newDate } : i)
-}
-
 // ── Exclude / delete ──────────────────────────────────────────────────────────
 
 /** Mark a recurring occurrence as excluded; remove a standalone by id. */

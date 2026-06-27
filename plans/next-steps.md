@@ -1,5 +1,8 @@
 ## Next steps
 
+- Blur in Mobile search overlay extends into results
+- Increase checkbox hit box size
+- Investigate performance bottlenecks, especially when checking items or changing metadata
 - Change type icon to use same space as checkbox in items section
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible

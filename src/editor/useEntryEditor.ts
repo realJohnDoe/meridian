@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './save'
-import { notify } from '@/notifications'
 import type { SeriesSheetConfig } from './save'
 import type { Occurrence, EditScope, Priority } from '@/types'
 import { fmtISO } from '@/model'
@@ -55,6 +54,9 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Populated by EntryEditor once CodeMirror mounts; used by saveMeta to capture current body
   const getBodyRef = useRef<() => string>(() => '')
+  // Always points to the latest entry so timer callbacks don't close over stale state
+  const entryRef = useRef(entry)
+  entryRef.current = entry
 
   function saveMeta(next: EntryState) {
     if (!next.item || next.editScope === 'add') return
@@ -62,13 +64,14 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   }
 
   const scheduleAutoSave = useCallback((body: string) => {
-    if (!entry.item) return
+    if (!entryRef.current.item) return
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     autosaveTimerRef.current = setTimeout(() => {
-      saveNode(entry.item!, entry.editScope, { ...entry, body })
+      const e = entryRef.current
+      saveNode(e.item!, e.editScope, { ...e, body })
       autosaveTimerRef.current = null
     }, 1500)
-  }, [entry])
+  }, [])
 
   const storeRoots = useStore(s => s.roots)
   const navigate = useNavigate()
@@ -91,7 +94,6 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   const handleSave = useCallback((body: string) => {
     const result = saveNode(entry.item, entry.editScope, { ...entry, body })
-    if (result === 'missing-date') notify('Please set a date for the new occurrence.')
     if (result === 'saved') router.history.back()
   }, [entry, router])
 
