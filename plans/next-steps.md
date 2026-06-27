@@ -4,6 +4,7 @@
 - Investigate performance bottlenecks, especially when checking items or changing metadata
 - Change type icon to use same space as checkbox in items section
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
+- Investigate subdirectory / hexagonal architecture violations
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
 - Add Solarized Light / Dark themes and Atom One Dark
 - Investigate more secure storage options
