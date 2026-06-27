@@ -1,5 +1,28 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`edit operations → serialized YAML > add-scope with a repeat creates a new sibling series, not a bare instance 1`] = `
+"---
+title: Test series
+instances:
+  - date: 2026-07-03
+    repeat:
+      type: schedule
+      freq: monthly
+      interval: 1
+      byweekday:
+        - fr
+      bysetpos: 1
+  - date: 2026-07-10
+    repeat:
+      type: schedule
+      freq: monthly
+      interval: 1
+      byweekday:
+        - fr
+      bysetpos: 2
+---"
+`;
+
 exports[`edit operations → serialized YAML > adding a new occurrence to an irregular-instances file keeps shared defaults 1`] = `
 "---
 defaults:
