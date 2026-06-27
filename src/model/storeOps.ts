@@ -300,13 +300,32 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
   return { items, roots }
 }
 
-/** Append a new explicit occurrence linked to the same file (and series, if any). */
+/**
+ * Append a new explicit occurrence linked to the same file (and series, if any).
+ *
+ * When the editor supplies a `repeat`, the addition is a brand-new recurring
+ * rule for the file (e.g. a "second Friday" series alongside an existing "first
+ * Friday" one). It's stored as a flat sibling RepeatPattern — never as a child
+ * of `occ`'s series — so collapse emits it as its own `instances[]` entry with
+ * its own `repeat:` block.
+ */
 function applyAdd({ items, roots }: StoreData, occ: Occurrence, fields: EditFields): StoreData {
-  const { scheduled } = fields
+  const { scheduled, repeat } = fields
   const newDate = scheduled?.date ?? occ.date
   const baseSeries = findSeries(items, occ)
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
   roots = updateRoot(roots, occ.fileSlug, fields)
+  if (repeat) {
+    const newSeries: RepeatPattern<OccurrenceMetadata> = {
+      date:     newDate,
+      time:     scheduled?.time || null,
+      repeat,
+      fileSlug: occ.fileSlug,
+      id:       crypto.randomUUID(),
+      metadata: seriesMeta(base, fields),
+    }
+    return { items: [...items, newSeries], roots }
+  }
   const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
     date:    newDate,
     time:    scheduled?.time || null,

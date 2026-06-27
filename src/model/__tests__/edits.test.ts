@@ -155,6 +155,50 @@ describe('edit operations → serialized YAML', () => {
     expect(serializeData(next)).toMatchSnapshot()
   })
 
+  it('add-scope with a repeat creates a new sibling series, not a bare instance', () => {
+    // "Every first AND second Friday": start from a first-Friday series, then add
+    // a second-Friday rule via the "Add new occurrence" scope. The repeat must be
+    // stored as its own series (collapsed to an instances[] entry with a repeat:
+    // block), not dropped onto a plain child instance.
+    const firstFriday = `---
+title: Test series
+date: 2026-07-03
+repeat:
+  type: schedule
+  freq: monthly
+  interval: 1
+  byweekday:
+    - fr
+  bysetpos: 1
+---
+`
+    const parsed = parseToStoreItems('test-series.md', firstFriday)
+    const data: StoreData = { items: parsed.items, roots: new Map([['test-series', parsed.root]]) }
+    const existing = occOn(data.items, data.roots, '2026-07-03')
+
+    const next = applyEdit(data, existing, 'add', editFields(existing, {
+      scheduled: { date: '2026-07-10', time: '' },
+      repeat: { type: 'schedule', freq: 'monthly', interval: 1, byweekday: ['fr'], bysetpos: 2 },
+    }))
+
+    // Two flat sibling series in one file — no child instance carrying the repeat.
+    const series = next.items.filter(isSeries)
+    expect(series).toHaveLength(2)
+    expect(next.items.filter(i => !isSeries(i))).toHaveLength(0)
+
+    // Both rules expand: first Friday (Jul 3) and second Friday (Jul 10).
+    const dates = expandRange(next.items, next.roots, new Date('2026-07-01'), new Date('2026-07-31'))
+      .map(o => o.date)
+    expect(dates).toContain('2026-07-03')
+    expect(dates).toContain('2026-07-10')
+
+    // The serialized file keeps both repeat blocks (bysetpos 1 and 2).
+    const yaml = serializeData(next)
+    expect(yaml).toContain('bysetpos: 1')
+    expect(yaml).toContain('bysetpos: 2')
+    expect(yaml).toMatchSnapshot()
+  })
+
   it('adding a new instance to a done task initializes the new instance as not done', () => {
     const data = fixtureData('standalone-task')
     const existing = occOn(data.items, data.roots, '2026-04-09')
