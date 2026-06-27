@@ -43,7 +43,7 @@ export default function MobileSearchOverlay({ open, query, onQueryChange, onClos
         >
           <ArrowLeft size={18} />
         </Button>
-        <div className="search-bar-wrap w-full min-w-0">
+        <div className="search-bar-wrap min-w-0" style={{ flex: '1 1 0%' }}>
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           <input
             ref={inputRef}
