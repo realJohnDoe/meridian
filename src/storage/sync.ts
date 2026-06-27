@@ -343,10 +343,10 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body)
     const tCollapse = performance.now()
-    console.debug(`[perf:cache] collapse+serialize(${fileSlug}): ${(tCollapse - t0).toFixed(2)}ms`)
+    console.log(`[perf:cache] collapse+serialize(${fileSlug}): ${(tCollapse - t0).toFixed(2)}ms`)
     const path        = fileSlugToPath(fileSlug)
     await cacheWrite(backend.id, path, content)
-    console.debug(`[perf:cache] cacheWrite(${fileSlug}): ${(performance.now() - tCollapse).toFixed(2)}ms`)
+    console.log(`[perf:cache] cacheWrite(${fileSlug}): ${(performance.now() - tCollapse).toFixed(2)}ms`)
     updateSyncUI()
     scheduleAutoPush()
   } catch (e) {

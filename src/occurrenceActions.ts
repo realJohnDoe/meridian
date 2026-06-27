@@ -11,9 +11,9 @@ export function toggleOccDone(o: Occurrence): void {
   const snapshot = { items: getItems(), roots: getRoots() }
   const next = toggleDone(snapshot, o)
   const tModel = performance.now()
-  console.debug(`[perf:toggle] model (toggleDone): ${(tModel - t0).toFixed(2)}ms`)
+  console.log(`[perf:toggle] model (toggleDone): ${(tModel - t0).toFixed(2)}ms`)
   commitNext(next, [o.fileSlug])
-  console.debug(`[perf:toggle] commitNext (setData+scheduleWrite): ${(performance.now() - tModel).toFixed(2)}ms | total sync: ${(performance.now() - t0).toFixed(2)}ms`)
+  console.log(`[perf:toggle] commitNext (setData+scheduleWrite): ${(performance.now() - tModel).toFixed(2)}ms | total sync: ${(performance.now() - t0).toFixed(2)}ms`)
 }
 
 export function beginSwipeDelete(o: Occurrence): () => void {

@@ -117,10 +117,10 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
     repeat:       fields.repeat       ?? null,
   })
   const tApply = performance.now()
-  console.debug(`[perf:save] applyEdit(${editScope}): ${(tApply - t0).toFixed(2)}ms`)
+  console.log(`[perf:save] applyEdit(${editScope}): ${(tApply - t0).toFixed(2)}ms`)
   const fileSlug = item?.fileSlug ?? titleToSlug(title)
   if (fileSlug) commitNext(nextData, [fileSlug])
-  console.debug(`[perf:save] commitNext: ${(performance.now() - tApply).toFixed(2)}ms | total sync: ${(performance.now() - t0).toFixed(2)}ms`)
+  console.log(`[perf:save] commitNext: ${(performance.now() - tApply).toFixed(2)}ms | total sync: ${(performance.now() - t0).toFixed(2)}ms`)
   return 'saved'
 }
 

@@ -57,7 +57,7 @@ function resolveOneSlug(
   for (const occ of expandRange(slugItems, roots, now, AHEAD)) {
     if (!occ.metadata.done) {
       const ms = performance.now() - t0
-      if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+      if (ms > 2) console.log(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
       return occ
     }
   }
@@ -68,7 +68,7 @@ function resolveOneSlug(
   const pastUndone = [...back].reverse().find(o => !o.metadata.done)
   if (pastUndone) {
     const ms = performance.now() - t0
-    if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+    if (ms > 2) console.log(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
     return pastUndone
   }
 
@@ -77,7 +77,7 @@ function resolveOneSlug(
   const undatedOpen = slugItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
   if (undatedOpen) {
     const ms = performance.now() - t0
-    if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+    if (ms > 2) console.log(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
     return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
   }
 
@@ -86,7 +86,7 @@ function resolveOneSlug(
   const pastDone = back[back.length - 1]
   if (pastDone) {
     const ms = performance.now() - t0
-    if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+    if (ms > 2) console.log(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
     return pastDone
   }
 
@@ -94,7 +94,7 @@ function resolveOneSlug(
   step = 5
   for (const occ of expandRange(slugItems, roots, now, AHEAD)) {
     const ms = performance.now() - t0
-    if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+    if (ms > 2) console.log(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
     return occ
   }
 
@@ -103,7 +103,7 @@ function resolveOneSlug(
   for (const item of slugItems) {
     if (isStandaloneOcc(item)) {
       const ms = performance.now() - t0
-      if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+      if (ms > 2) console.log(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
       return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) } as Occurrence
     }
   }
@@ -113,7 +113,7 @@ function resolveOneSlug(
   for (const item of slugItems) {
     if (!isSeries(item)) continue
     const ms = performance.now() - t0
-    if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+    if (ms > 2) console.log(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
     return {
       date:     item.date,
       time:     item.time,
@@ -212,7 +212,7 @@ export function updateFileOccurrenceMap(
   }
 
   const total = performance.now() - t0
-  console.debug(
+  console.log(
     `[perf:fom] updateFom: ${total.toFixed(2)}ms | total=${newBySlug.size} reused=${reused} dirty=${dirty}`,
     dirty > 0 ? `| re-resolved: ${dirtySlugMs.join(', ')}` : '',
   )
