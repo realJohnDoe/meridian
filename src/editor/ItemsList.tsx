@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
-import { Plus, X, Tag, ChevronDown } from 'lucide-react'
-import type { Occurrence, Roots } from '@/types'
+import { Plus, X, Tag, ChevronDown, RotateCcw } from 'lucide-react'
+import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots } from '@/types'
 import { occKind, occState } from '@/occView'
 import { parseItemEntry, serializeTaskEntry } from './items'
 import { fileEntries } from '@/fileOccurrence'
@@ -12,6 +12,8 @@ import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
+import { getItems, getRoots } from '@/storeBridge'
+import { commitNext } from '@/storeCommit'
 
 interface Props {
   items:           string[]
@@ -92,6 +94,12 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
     })
   }, [entries, occBySlug, roots, participantFilter])
 
+  const toggleTask = useCallback((idx: number, text: string, done: boolean) => {
+    const next = [...items]
+    next[idx] = serializeTaskEntry(text, !done)
+    onChange(next)
+  }, [items, onChange])
+
   const addTask = useCallback((text: string) => {
     const t = text.trim()
     if (!t) return
@@ -109,12 +117,6 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
 
   const remove = useCallback((idx: number) => {
     onChange(items.filter((_, i) => i !== idx))
-  }, [items, onChange])
-
-  const toggleTask = useCallback((idx: number, text: string, done: boolean) => {
-    const next = [...items]
-    next[idx] = serializeTaskEntry(text, !done)
-    onChange(next)
   }, [items, onChange])
 
   function startEdit(idx: number, text: string) {
@@ -151,6 +153,43 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
 
   const activeRows = sortedRows.filter(r => !isDoneRow(r))
   const doneRows   = sortedRows.filter(r => isDoneRow(r))
+
+  const donePickerRows = useMemo(() => {
+    const q = pickerQuery.toLowerCase()
+    return doneRows.filter(({ entry, occ }) => {
+      if (!q) return true
+      if (entry.kind === 'task') return entry.text.toLowerCase().includes(q)
+      return occ ? (occ.metadata.title ?? '').toLowerCase().includes(q) : entry.ref.toLowerCase().includes(q)
+    })
+  }, [doneRows, pickerQuery])
+
+  const redoItem = useCallback((row: Row) => {
+    const { entry, occ } = row
+    if (entry.kind === 'task') {
+      toggleTask(entry.idx, entry.text, entry.done)
+    } else if (occ) {
+      if (!occ.date) {
+        onToggleDone?.(occ)
+      } else {
+        const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
+          date:     '',
+          time:     null,
+          source:   'explicit',
+          fileSlug: occ.fileSlug,
+          id:       crypto.randomUUID(),
+          metadata: {
+            participants: occ.metadata.participants ?? [],
+            priority:     occ.metadata.priority,
+            duration:     occ.metadata.duration,
+            timezone:     occ.metadata.timezone,
+          },
+        }
+        commitNext({ items: [...getItems(), newOcc], roots: getRoots() }, [occ.fileSlug])
+      }
+    }
+    setPickerQuery('')
+    setPickerOpen(false)
+  }, [toggleTask, onToggleDone])
 
   function renderRow({ entry, occ }: Row) {
     const { idx } = entry
@@ -240,6 +279,26 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
                   }}
                 />
                 <CommandList>
+                  {donePickerRows.length > 0 && (
+                    <CommandGroup heading="Done items">
+                      {donePickerRows.slice(0, 8).map(row => {
+                        const { entry, occ } = row
+                        const label = entry.kind === 'task'
+                          ? entry.text
+                          : (occ?.metadata.title ?? entry.ref)
+                        return (
+                          <CommandItem
+                            key={entry.idx}
+                            value={`__redo__${entry.idx}`}
+                            onSelect={() => redoItem(row)}
+                          >
+                            <RotateCcw size={13} className="shrink-0 opacity-60" />
+                            <span className="truncate">{label}</span>
+                          </CommandItem>
+                        )
+                      })}
+                    </CommandGroup>
+                  )}
                   {pickerQuery.trim() && (
                     <CommandGroup heading="Item">
                       <CommandItem
@@ -267,7 +326,7 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
                       ))}
                     </CommandGroup>
                   )}
-                  {!pickerQuery && filtered.length === 0 && (
+                  {!pickerQuery && filtered.length === 0 && donePickerRows.length === 0 && (
                     <CommandEmpty>No files found</CommandEmpty>
                   )}
                 </CommandList>
