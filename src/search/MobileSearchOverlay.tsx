@@ -31,7 +31,7 @@ export default function MobileSearchOverlay({ open, query, onQueryChange, onClos
   if (!open) return null
 
   return (
-    <div className="md:hidden fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="md:hidden fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto">
       {/* Top input row — pinned, always visible */}
       <div className="shrink-0 flex items-center gap-2 px-3.5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 border-b border-border">
         <Button
@@ -43,7 +43,7 @@ export default function MobileSearchOverlay({ open, query, onQueryChange, onClos
         >
           <ArrowLeft size={18} />
         </Button>
-        <div className="search-bar-wrap flex-1 min-w-0">
+        <div className="search-bar-wrap w-full min-w-0">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           <input
             ref={inputRef}
