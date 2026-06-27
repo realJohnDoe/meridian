@@ -13,7 +13,11 @@ export function toggleOccDone(o: Occurrence): void {
   const tModel = performance.now()
   console.log(`[perf:toggle] model (toggleDone): ${(tModel - t0).toFixed(2)}ms`)
   commitNext(next, [o.fileSlug])
-  console.log(`[perf:toggle] commitNext (setData+scheduleWrite): ${(performance.now() - tModel).toFixed(2)}ms | total sync: ${(performance.now() - t0).toFixed(2)}ms`)
+  const tSync = performance.now()
+  console.log(`[perf:toggle] commitNext (setData+scheduleWrite): ${(tSync - tModel).toFixed(2)}ms | total sync: ${(tSync - t0).toFixed(2)}ms`)
+  requestAnimationFrame(() => {
+    console.log(`[perf:toggle] → time to first paint (sync + React render): ${(performance.now() - t0).toFixed(2)}ms`)
+  })
 }
 
 export function beginSwipeDelete(o: Occurrence): () => void {
