@@ -99,15 +99,12 @@ export function entryFromOccurrence(
 
 type SaveFields = EntryState & { body: string }
 
-export type SaveResult = 'saved' | 'missing-title' | 'missing-date'
+export type SaveResult = 'saved' | 'missing-title'
 
 export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields): SaveResult {
   const { title } = fields
   if (!title) return 'missing-title'
 
-  if (editScope === 'add' && item && !fields.scheduled?.date) {
-    return 'missing-date'
-  }
 
   const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
     title,
