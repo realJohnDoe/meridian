@@ -311,7 +311,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
             onMetaSave?.(next)
           }}
           roots={roots}
-          currentSlug={effectiveSlug}
+          currentSlug={effectiveSlug ?? null}
           onPromote={handlePromoteTask}
           onOpenWikilink={onOpenWikilink}
           onToggleDone={onToggleDoneBacklink}
