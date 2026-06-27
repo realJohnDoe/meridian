@@ -13,8 +13,8 @@ const Checkbox = React.forwardRef<
       'group relative shrink-0 touch-manipulation',
       // Expand touch target to 44px without affecting layout or visual size
       "before:absolute before:-inset-3 before:content-['']",
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
-      'disabled:cursor-not-allowed disabled:opacity-50',
+      'focus-visible:outline-none',
+      'disabled:cursor-not-allowed',
       className,
     )}
     {...props}
@@ -24,6 +24,7 @@ const Checkbox = React.forwardRef<
       'transition-colors duration-150',
       'group-data-[state=checked]:bg-task/60 group-data-[state=checked]:border-task/60',
       'group-disabled:opacity-50',
+      'group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-1',
       visualClassName,
     )}>
       <CheckboxPrimitive.Indicator className="flex w-full h-full items-center justify-center">
