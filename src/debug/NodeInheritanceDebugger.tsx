@@ -266,6 +266,40 @@ function DeleteConfirmForm({ message, label, onApply, onCancel }: {
   )
 }
 
+// ── Dialog state hook ─────────────────────────────────────────────────────────
+//
+// Manages the activeDialog open/close state and assembles the DialogHandlers
+// object that DialogStack expects, keeping this glue out of the main component.
+
+function useDebugDialogHandlers(
+  setEntry: React.Dispatch<React.SetStateAction<EntryState | null>>,
+) {
+  const [activeDialog, setActiveDialog] = useState<string | null>(null)
+
+  const handlers: DialogHandlers = {
+    activeDialog,
+    pendingDelete:    null,
+    seriesSheetConfig: null,
+    onClose:       () => setActiveDialog(null),
+    onDateConfirm: date => { setEntry(e => e ? { ...e, scheduled: { date, time: e.scheduled?.time || '' } } : e); setActiveDialog(null) },
+    onDateRemove:  ()   => { setEntry(e => e ? { ...e, scheduled: null, duration: '' } : e); setActiveDialog(null) },
+    onPriority:    p    => { setEntry(e => e ? { ...e, priority: p } : e); setActiveDialog(null) },
+    onTimeConfirm: time => { setEntry(e => e?.scheduled ? { ...e, scheduled: { ...e.scheduled, time } } : e) },
+    onTimeRemove:  ()   => { setEntry(e => e?.scheduled ? { ...e, scheduled: { ...e.scheduled, time: '' } } : e) },
+    onDurConfirm:  dur  => { setEntry(e => e ? { ...e, duration: dur } : e) },
+    onDurRemove:   ()   => { setEntry(e => e ? { ...e, duration: '' } : e) },
+    onRepeatConfirm: r  => { setEntry(e => e ? { ...e, repeat: r } : e); setActiveDialog(null) },
+    onRepeatRemove: ()  => { setEntry(e => e ? { ...e, repeat: null } : e); setActiveDialog(null) },
+    onSeriesClose: () => {},
+    onDeleteClose: () => {},
+  }
+
+  const openDialog      = (id: string) => setActiveDialog(id)
+  const openRepeatDialog = () => setActiveDialog('dlgRepeat')
+
+  return { handlers, openDialog, openRepeatDialog }
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function NodeInheritanceDebugger() {
@@ -283,8 +317,8 @@ export default function NodeInheritanceDebugger() {
 
   // ── 4th-column EntryEditor state ─────────────────────────────────────────
   const [debugEntry,        setDebugEntry]        = useState<EntryState | null>(null)
-  const [debugDialog,       setDebugDialog]       = useState<string | null>(null)
   const [patternDialogOpen, setPatternDialogOpen] = useState(false)
+  const { handlers: dialogHandlers, openDialog, openRepeatDialog } = useDebugDialogHandlers(setDebugEntry)
 
   // ── Effective tree for viz column — re-derived from displayContent ────────
   const results = useMemo<EffectiveNode | null>(() => {
@@ -703,32 +737,13 @@ export default function NodeInheritanceDebugger() {
                 onSave={handleDebugSave}
                 onDelete={handleDebugDelete}
                 onClose={handleDebugClose}
-                onOpenDlg={setDebugDialog}
-                onOpenRepeatDlg={() => setDebugDialog('dlgRepeat')}
+                onOpenDlg={openDialog}
+                onOpenRepeatDlg={openRepeatDialog}
                 onScopeChange={handleDebugScopeChange}
                 items={items}
                 roots={debugRoots}
               />
-              <DialogStack
-                entry={debugEntry}
-                handlers={{
-                  activeDialog: debugDialog,
-                  pendingDelete: null,
-                  seriesSheetConfig: null,
-                  onClose: () => setDebugDialog(null),
-                  onDateConfirm: date => { setDebugEntry(prev => prev ? { ...prev, scheduled: { date, time: prev.scheduled?.time || '' } } : prev); setDebugDialog(null) },
-                  onDateRemove: () => { setDebugEntry(prev => prev ? { ...prev, scheduled: null, duration: '' } : prev); setDebugDialog(null) },
-                  onPriority: p => { setDebugEntry(prev => prev ? { ...prev, priority: p } : prev); setDebugDialog(null) },
-                  onTimeConfirm: time => { setDebugEntry(prev => prev?.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time } } : prev); setDebugDialog(null) },
-                  onTimeRemove: () => { setDebugEntry(prev => prev?.scheduled ? { ...prev, scheduled: { ...prev.scheduled, time: '' } } : prev); setDebugDialog(null) },
-                  onDurConfirm: dur => { setDebugEntry(prev => prev ? { ...prev, duration: dur } : prev); setDebugDialog(null) },
-                  onDurRemove: () => { setDebugEntry(prev => prev ? { ...prev, duration: '' } : prev); setDebugDialog(null) },
-                  onRepeatConfirm: r => { setDebugEntry(prev => prev ? { ...prev, repeat: r } : prev); setDebugDialog(null) },
-                  onRepeatRemove: () => { setDebugEntry(prev => prev ? { ...prev, repeat: null } : prev); setDebugDialog(null) },
-                  onSeriesClose: () => {},
-                  onDeleteClose: () => {},
-                } satisfies DialogHandlers}
-              />
+              <DialogStack entry={debugEntry} handlers={dialogHandlers} />
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-white/20 select-none">
