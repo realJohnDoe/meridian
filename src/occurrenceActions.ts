@@ -1,34 +1,13 @@
-import { toggleDone, excludeOccurrence, deleteByFileSlug, moveOccToDate } from '@/model'
-import { occIsRecur, occKind } from './occView'
+import { toggleDone, excludeOccurrence, deleteByFileSlug } from '@/model'
+import { occIsRecur } from './occView'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
 import { writeEntityToCache, deleteFromBackend } from '@/storage'
 import { commitNext } from './storeCommit'
-import { showDeleteToast, showDoneMovedToast } from './undoToast'
-import { fmtISO } from '@/model'
+import { showDeleteToast } from './undoToast'
 
 export function toggleOccDone(o: Occurrence): void {
-  const newDone = !o.metadata.done
   const snapshot = { items: getItems(), roots: getRoots() }
-
-  if (newDone && occKind(o) === 'task') {
-    const today = fmtISO(new Date())
-    const isWholeDay = !o.time && !!o.date
-    const hasNoDate = !o.date
-
-    if ((isWholeDay || hasNoDate) && o.date !== today) {
-      const afterDone = toggleDone(snapshot, o)
-      const afterMove = { items: moveOccToDate(afterDone.items, o, today), roots: afterDone.roots }
-
-      commitNext(afterMove, [o.fileSlug])
-
-      showDoneMovedToast(o.metadata.title, o.date, () => {
-        commitNext(afterDone, [o.fileSlug])
-      })
-      return
-    }
-  }
-
   const next = toggleDone(snapshot, o)
   commitNext(next, [o.fileSlug])
 }
