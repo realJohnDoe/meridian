@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react'
-import { Plus, X, Tag, ChevronDown, RotateCcw } from 'lucide-react'
+import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots } from '@/types'
 import { occKind, occState } from '@/occView'
 import { parseItemEntry, serializeTaskEntry } from './items'
@@ -279,6 +279,15 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
                   }}
                 />
                 <CommandList>
+                  {pickerQuery.trim() && (
+                    <CommandItem
+                      value={`__task__${pickerQuery}`}
+                      onSelect={() => addTask(pickerQuery)}
+                    >
+                      <Tag size={13} className="shrink-0 opacity-60" />
+                      <span>Add <strong>"{pickerQuery.trim()}"</strong></span>
+                    </CommandItem>
+                  )}
                   {donePickerRows.length > 0 && (
                     <CommandGroup heading="Done items">
                       {donePickerRows.slice(0, 8).map(row => {
@@ -292,22 +301,11 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
                             value={`__redo__${entry.idx}`}
                             onSelect={() => redoItem(row)}
                           >
-                            <RotateCcw size={13} className="shrink-0 opacity-60" />
+                            <CircleCheck size={13} className="shrink-0 opacity-60" />
                             <span className="truncate">{label}</span>
                           </CommandItem>
                         )
                       })}
-                    </CommandGroup>
-                  )}
-                  {pickerQuery.trim() && (
-                    <CommandGroup heading="Item">
-                      <CommandItem
-                        value={`__task__${pickerQuery}`}
-                        onSelect={() => addTask(pickerQuery)}
-                      >
-                        <Tag size={13} className="shrink-0 opacity-60" />
-                        <span>Add <strong>"{pickerQuery.trim()}"</strong> as item</span>
-                      </CommandItem>
                     </CommandGroup>
                   )}
                   {filtered.length > 0 && (
