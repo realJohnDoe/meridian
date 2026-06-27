@@ -54,17 +54,12 @@ export default function SearchBar() {
       <div className="bg-background/85 backdrop-blur-sm px-3.5 py-3.5 flex flex-col gap-2">
         <div data-tour="search-bar" className="search-bar-wrap w-full max-w-[600px] mx-auto">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
-          {/*
-           * onFocus opens the mobile full-screen overlay (searchOpen only matters
-           * on mobile; MobileSearchOverlay is md:hidden so desktop ignores it).
-           * Desktop users type here directly; filterQuery drives FilterOverlay.
-           */}
           <input
             id="filterInput"
             className="flex-1 bg-transparent border-none outline-none text-foreground text-sm min-w-0 placeholder:text-muted-foreground"
             placeholder="Search or create…"
             value={filterQuery}
-            onFocus={() => setSearchOpen(true)}
+            onClick={() => setSearchOpen(true)}
             onChange={e => setFilterQuery(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && filterQuery) {
