@@ -50,35 +50,70 @@ function resolveOneSlug(
   AHEAD: Date,
   BACK: Date,
 ): Occurrence | null {
+  const t0 = performance.now()
+  let step = 1
+
   // 1. Nearest upcoming undone occurrence.
   for (const occ of expandRange(slugItems, roots, now, AHEAD)) {
-    if (!occ.metadata.done) return occ
+    if (!occ.metadata.done) {
+      const ms = performance.now() - t0
+      if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+      return occ
+    }
   }
 
   // 2. Most-recent overdue occurrence (past undone).
+  step = 2
   const back = expandRange(slugItems, roots, BACK, now)
   const pastUndone = [...back].reverse().find(o => !o.metadata.done)
-  if (pastUndone) return pastUndone
+  if (pastUndone) {
+    const ms = performance.now() - t0
+    if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+    return pastUndone
+  }
 
   // 3. Undated open standalone.
+  step = 3
   const undatedOpen = slugItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
-  if (undatedOpen) return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
+  if (undatedOpen) {
+    const ms = performance.now() - t0
+    if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+    return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
+  }
 
   // 4. Most-recent past done occurrence.
+  step = 4
   const pastDone = back[back.length - 1]
-  if (pastDone) return pastDone
+  if (pastDone) {
+    const ms = performance.now() - t0
+    if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+    return pastDone
+  }
 
   // 5. Any upcoming done occurrence.
-  for (const occ of expandRange(slugItems, roots, now, AHEAD)) return occ
+  step = 5
+  for (const occ of expandRange(slugItems, roots, now, AHEAD)) {
+    const ms = performance.now() - t0
+    if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+    return occ
+  }
 
   // 6. Any standalone (undated done or out-of-window dated single).
+  step = 6
   for (const item of slugItems) {
-    if (isStandaloneOcc(item)) return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) } as Occurrence
+    if (isStandaloneOcc(item)) {
+      const ms = performance.now() - t0
+      if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
+      return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) } as Occurrence
+    }
   }
 
   // 7. Series anchor date.
+  step = 7
   for (const item of slugItems) {
     if (!isSeries(item)) continue
+    const ms = performance.now() - t0
+    if (ms > 2) console.debug(`[perf:fom]   resolveOneSlug(${fileSlug}) step${step}: ${ms.toFixed(2)}ms`)
     return {
       date:     item.date,
       time:     item.time,
@@ -132,6 +167,7 @@ export function updateFileOccurrenceMap(
   items:     StoreItem[],
   roots:     Roots,
 ): Map<string, Occurrence> {
+  const t0  = performance.now()
   const now   = new Date(); now.setHours(0, 0, 0, 0)
   const AHEAD = new Date(now.getTime() + _3YR_MS)
   const BACK  = new Date(now.getTime() - _3YR_MS)
@@ -152,6 +188,9 @@ export function updateFileOccurrenceMap(
     group.push(item)
   }
 
+  let reused = 0, dirty = 0
+  const dirtySlugMs: string[] = []
+
   const map = new Map<string, Occurrence>()
   for (const [slug, slugItems] of newBySlug) {
     const prevGroup    = prevBySlug.get(slug)
@@ -162,12 +201,21 @@ export function updateFileOccurrenceMap(
 
     if (rootSame && groupSame) {
       const cached = prevFom.get(slug)
-      if (cached !== undefined) { map.set(slug, cached); continue }
+      if (cached !== undefined) { map.set(slug, cached); reused++; continue }
     }
 
+    dirty++
+    const tSlug = performance.now()
     const occ = resolveOneSlug(slug, slugItems, roots, now, AHEAD, BACK)
+    dirtySlugMs.push(`${slug}(${(performance.now() - tSlug).toFixed(1)}ms)`)
     if (occ) map.set(slug, occ)
   }
+
+  const total = performance.now() - t0
+  console.debug(
+    `[perf:fom] updateFom: ${total.toFixed(2)}ms | total=${newBySlug.size} reused=${reused} dirty=${dirty}`,
+    dirty > 0 ? `| re-resolved: ${dirtySlugMs.join(', ')}` : '',
+  )
 
   return map
 }

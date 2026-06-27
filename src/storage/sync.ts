@@ -335,14 +335,18 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
   try {
     const backend = getActiveBackend()
     if (!backend || backend.readOnly) return
+    const t0 = performance.now()
     const slugItems = fileSlugItems(getItems(), fileSlug)
     if (slugItems.length === 0) { await deleteFromBackend(fileSlug); return }
     const root        = getRoots().get(fileSlug)
     const frontmatter = collapseToYaml(slugItems, root)
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body)
+    const tCollapse = performance.now()
+    console.debug(`[perf:cache] collapse+serialize(${fileSlug}): ${(tCollapse - t0).toFixed(2)}ms`)
     const path        = fileSlugToPath(fileSlug)
     await cacheWrite(backend.id, path, content)
+    console.debug(`[perf:cache] cacheWrite(${fileSlug}): ${(performance.now() - tCollapse).toFixed(2)}ms`)
     updateSyncUI()
     scheduleAutoPush()
   } catch (e) {

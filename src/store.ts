@@ -100,9 +100,11 @@ export const useStore = create<MeridianStore>((set, get) => ({
   roots: new Map(),
   fom: new Map(),
   setData: ({ items, roots }) => {
+    const t0 = performance.now()
     clearOccIdCache()
     const { items: prevItems, roots: prevRoots, fom: prevFom } = get()
     set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots) })
+    console.debug(`[perf:store] setData total (sync): ${(performance.now() - t0).toFixed(2)}ms`)
   },
 
   vaults:              [],
