@@ -102,7 +102,6 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   const { title } = fields
   if (!title) return 'missing-title'
 
-
   const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
     title,
     tags:         fields.tags         ?? [],

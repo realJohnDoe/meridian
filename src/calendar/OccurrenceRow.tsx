@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect, useMemo, memo } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import { OccurrenceCard } from '@/components'
@@ -8,13 +8,13 @@ import { backlinksTo } from '@/fileOccurrence'
 interface Props {
   occ: Occurrence
   index: number
-  onOpen: () => void
-  onToggleDone: () => void
-  onSwipeDelete: () => (() => void)
+  onOpen: (occ: Occurrence) => void
+  onToggleDone: (occ: Occurrence) => void
+  onSwipeDelete: (occ: Occurrence) => (() => void)
   showDate?: boolean
 }
 
-export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
+function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
   const roots    = useStore(s => s.roots)
   const listedOn = useMemo(
     () => backlinksTo(occ.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug),
@@ -100,7 +100,7 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
         // Phase 1: show toast immediately (before animation completes).
         // beginSwipeDelete() returns applyDelete — the function that actually
         // removes the item from the store once the exit animation is done.
-        const applyDelete = onSwipeDeleteRef.current()
+        const applyDelete = onSwipeDeleteRef.current(occ)
         // Kick off slide + collapse simultaneously.
         wrap.style.height = wrap.offsetHeight + 'px'
         wrap.style.overflow = 'hidden'
@@ -154,8 +154,8 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
         <OccurrenceCard
           occ={occ}
           leadingIcon="checkbox"
-          onOpen={onOpen}
-          onToggleDone={onToggleDone}
+          onOpen={() => onOpen(occ)}
+          onToggleDone={() => onToggleDone(occ)}
           showDate={showDate}
           listedOn={listedOn}
         />
@@ -163,3 +163,5 @@ export default function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwip
     </div>
   )
 }
+
+export default memo(OccurrenceRow)

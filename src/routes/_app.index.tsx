@@ -1,8 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { AgendaView } from '@/calendar'
-import { fmtISO } from '@/model'
-import { useOpenEntry, useToday } from '@/hooks'
+import { useOpenEntry } from '@/hooks'
 import { useStore } from '@/store'
 import { onVaultChanged } from '@/storage'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -13,20 +12,6 @@ export const Route = createFileRoute('/_app/')({
 
 // Survives remounts so navigating back (e.g. from the entry editor) lands where we left off.
 let savedScrollTop = 0
-
-function findTopDate(scEl: HTMLDivElement): string | null {
-  const sections = scEl.querySelectorAll<HTMLElement>('.day-section[data-key]')
-  const containerTop = scEl.getBoundingClientRect().top
-  let best: string | null = null
-  for (const sec of sections) {
-    if (sec.getBoundingClientRect().top <= containerTop + 12) {
-      best = sec.getAttribute('data-key')
-    } else {
-      break
-    }
-  }
-  return best
-}
 
 function AgendaSkeleton() {
   return (
@@ -46,54 +31,22 @@ function AgendaSkeleton() {
 }
 
 function AgendaPage() {
-  const today = useToday()
   const vaultLoading = useStore(s => s.vaultLoading)
-  const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
-  const itemCount = useStore(s => s.items.length)
   const scRef = useRef<HTMLDivElement>(null)
-  const rafRef = useRef<number>(0)
 
-  // When a vault activates, scroll to today once data arrives.
+  // When a vault activates, scroll to today once data arrives. AgendaView owns
+  // the virtualizer and performs the actual scroll when this flag is set.
   useEffect(() => onVaultChanged(() => useStore.setState({ scrollToTodayOnce: true })), [])
 
-  // Restore saved scroll before paint (no blink); save on unmount.
+  // Restore saved scroll before paint (no blink); save on unmount. The
+  // virtualizer reports the full scroll height immediately (from size
+  // estimates), so the saved scrollTop lands correctly. Skipped when a
+  // scroll-to-today is pending so we don't fight it.
   useLayoutEffect(() => {
     const el = scRef.current
     if (el && !useStore.getState().scrollToTodayOnce) el.scrollTop = savedScrollTop
     return () => { if (el) savedScrollTop = el.scrollTop }
   }, [])
-
-  // Track topmost visible day for the top bar label.
-  useEffect(() => {
-    const el = scRef.current
-    if (!el) return
-    const update = () => {
-      cancelAnimationFrame(rafRef.current)
-      rafRef.current = requestAnimationFrame(() => {
-        const date = findTopDate(el)
-        useStore.setState({ agendaTopDate: date ?? fmtISO(today) })
-      })
-    }
-    update()
-    el.addEventListener('scroll', update, { passive: true })
-    return () => { el.removeEventListener('scroll', update); cancelAnimationFrame(rafRef.current) }
-  }, [today])
-
-  // Scroll to today when flagged (vault load or Today button). The today section is always
-  // seeded, so we wait for real data (itemCount > 0) and for the vault to finish loading
-  // before positioning — otherwise the AgendaView hasn't rendered yet (skeleton is shown)
-  // and the .day-section query finds nothing, leaving the flag stuck. vaultLoading is in
-  // the deps so the effect re-runs when the skeleton gives way to the real view.
-  useEffect(() => {
-    if (!scrollToTodayOnce || itemCount === 0 || vaultLoading) return
-    const sec =
-      document.querySelector('.day-section[data-overdue]') ??
-      document.querySelector(`.day-section[data-key="${fmtISO(today)}"]`)
-    if (!sec) return
-    useStore.setState({ scrollToTodayOnce: false })
-    sec.scrollIntoView({ behavior: 'instant', block: 'start' })
-    useStore.setState({ agendaTopDate: fmtISO(today) })
-  }, [scrollToTodayOnce, itemCount, today, vaultLoading])
 
   const onOpen = useOpenEntry()
 
@@ -107,7 +60,7 @@ function AgendaPage() {
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" id="agSc" ref={scRef}>
-      <AgendaView onOpen={onOpen} />
+      <AgendaView onOpen={onOpen} scrollRef={scRef} />
     </div>
   )
 }

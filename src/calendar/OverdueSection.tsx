@@ -16,7 +16,7 @@ function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
     <div className="day-section scroll-mt-2" data-overdue>
       <div className={cn(
         'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-yellow-500',
-        'flex items-center gap-2 sticky top-0 bg-background z-[3]',
+        'flex items-center gap-2 bg-background',
         'after:content-[""] after:flex-1 after:h-px after:bg-border',
       )}>Overdue</div>
 
@@ -26,9 +26,9 @@ function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
           occ={o}
           index={i}
           showDate={true}
-          onOpen={() => onOpen(o)}
-          onToggleDone={() => onToggleDone(o)}
-          onSwipeDelete={() => onSwipeDelete(o)}
+          onOpen={onOpen}
+          onToggleDone={onToggleDone}
+          onSwipeDelete={onSwipeDelete}
         />
       ))}
     </div>
