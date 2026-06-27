@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './save'
-import { notify } from '@/notifications'
 import type { SeriesSheetConfig } from './save'
 import type { Occurrence, EditScope, Priority } from '@/types'
 import { fmtISO } from '@/model'
@@ -91,7 +90,6 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   const handleSave = useCallback((body: string) => {
     const result = saveNode(entry.item, entry.editScope, { ...entry, body })
-    if (result === 'missing-date') notify('Please set a date for the new occurrence.')
     if (result === 'saved') router.history.back()
   }, [entry, router])
 
