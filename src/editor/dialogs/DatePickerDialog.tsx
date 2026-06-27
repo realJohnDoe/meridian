@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { addDays } from 'date-fns'
-import { fmtISO, parseDateString, WEEK_STARTS_ON } from '@/model'
+import { fmtISO, parseDateString, weekStartsOn } from '@/model'
+import { useStore } from '@/store'
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default function DatePickerDialog({ open, initialDate, onConfirm, onRemove, onClose }: Props) {
+  const localePrefs = useStore(s => s.localePrefs)
   const today    = startOfToday()
   const tomorrow = addDays(today, 1)
 
@@ -75,7 +77,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           <Calendar
             mode="single"
             fixedWeeks
-            weekStartsOn={WEEK_STARTS_ON}
+            weekStartsOn={weekStartsOn(localePrefs)}
             selected={selected}
             onSelect={setSelected}
             month={month}

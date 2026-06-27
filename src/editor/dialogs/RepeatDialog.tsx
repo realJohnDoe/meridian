@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '@/types'
-import { fmtISO, parseDateString, WEEK_STARTS_ON, parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model'
+import { fmtISO, parseDateString, weekStartsOn, parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model'
+import { useStore } from '@/store'
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -206,6 +207,15 @@ export default function RepeatDialog({
   onRemove,
   onClose,
 }: Props) {
+  const localePrefs = useStore(s => s.localePrefs)
+  // Display order for weekday toggle: rotate Mon-Sun array so first-day-of-week comes first.
+  // wdays indices are always 0=Mon..6=Sun regardless of locale.
+  const wdayDisplayOrder = (() => {
+    const ws = weekStartsOn(localePrefs) // 0=Sun, 1=Mon, 6=Sat
+    const startIdx = ws === 0 ? 6 : ws === 6 ? 5 : 0  // index in wdays array for first displayed day
+    return Array.from({ length: 7 }, (_, i) => (startIdx + i) % 7)
+  })()
+
   const hasSched = !!scheduled
   const hasTrk   = tracked && itemType !== 'event'
 
@@ -346,13 +356,13 @@ export default function RepeatDialog({
                   }}
                   className="my-1"
                 >
-                  {WDAY_LABELS.map((d, i) => (
+                  {wdayDisplayOrder.map((i) => (
                     <ToggleGroupItem
-                      key={d}
+                      key={WDAY_LABELS[i]}
                       value={String(i)}
                       className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center')}
                     >
-                      {d}
+                      {WDAY_LABELS[i]}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
@@ -492,7 +502,7 @@ export default function RepeatDialog({
               <Calendar
                 mode="single"
                 fixedWeeks
-                weekStartsOn={WEEK_STARTS_ON}
+                weekStartsOn={weekStartsOn(localePrefs)}
                 selected={parseDateString(endVal) ?? undefined}
                 onSelect={(date) => {
                   if (date) {

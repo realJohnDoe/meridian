@@ -4,19 +4,21 @@ import type { Scheduled } from '@/types'
 
 export { addDays, isSameDay as sameDay }
 
-export const fmtLong  = (d: Date): string => d.toLocaleDateString('en-US', { weekday: 'long',  month: 'long',  day: 'numeric' })
-export const fmtShort = (d: Date): string => d.toLocaleDateString('en-US', {                   month: 'short', day: 'numeric' })
+const thisYear = () => new Date().getFullYear()
+
+export const fmtLong  = (d: Date): string => d.toLocaleDateString(undefined, { weekday: 'long', month: 'long',  day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) })
+export const fmtShort = (d: Date): string => d.toLocaleDateString(undefined, {                  month: 'short', day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) })
 
 export function fmtTopBarDay(d: Date, today: Date): string {
   const opts: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' }
   if (d.getFullYear() !== today.getFullYear()) opts.year = 'numeric'
-  return d.toLocaleDateString('en-US', opts)
+  return d.toLocaleDateString(undefined, opts)
 }
 
 export function fmtTopBarMonth(d: Date, today: Date): string {
   const opts: Intl.DateTimeFormatOptions = { month: 'long' }
   if (d.getFullYear() !== today.getFullYear()) opts.year = 'numeric'
-  return d.toLocaleDateString('en-US', opts)
+  return d.toLocaleDateString(undefined, opts)
 }
 
 // ── Duration formatting ───────────────────────────────────────────────────────
@@ -63,11 +65,14 @@ export function durationToEndDateTime(startDateStr: string, startTimeStr: string
 
 export function fmtEndDate(dateStr: string): string {
   const d = parseDateString(dateStr)
-  return d ? `${d.getMonth() + 1}/${d.getDate()}` : dateStr
+  return d ? d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) }) : dateStr
 }
 
-export function fmtEndTime(hhmm: string): string {
-  return hhmm.slice(0, 5)
+export function fmtEndTime(hhmm: string, hour12 = false): string {
+  if (!hour12) return hhmm.slice(0, 5)
+  const [h, min] = hhmm.slice(0, 5).split(':').map(Number)
+  const d = new Date(); d.setHours(h, min, 0, 0)
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
 export function fmtDuration(duration: string): string {
@@ -87,11 +92,11 @@ export function fmtDuration(duration: string): string {
   return duration
 }
 
-export function formatDurationChip(duration: string, scheduled: Scheduled): string {
+export function formatDurationChip(duration: string, scheduled: Scheduled, hour12 = false): string {
   const display = fmtDuration(duration)
   if (scheduled.time) {
     const { time } = durationToEndDateTime(scheduled.date, scheduled.time, duration)
-    return `until ${fmtEndTime(time)} (${display})`
+    return `until ${fmtEndTime(time, hour12)} (${display})`
   }
   const p = parseDurationStr(duration)
   if (!p || p.unit === 'minutes' || p.unit === 'hours') return display
