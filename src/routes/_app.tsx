@@ -43,11 +43,13 @@ export const Route = createFileRoute('/_app')({
     edate?: string
     escope?: EditScope
     etitle?: string
+    sq?: string
   } => ({
     editor: typeof search.editor === 'string' ? search.editor : undefined,
     edate:  typeof search.edate  === 'string' ? search.edate  : undefined,
     escope: isEditScope(search.escope) ? search.escope : undefined,
     etitle: typeof search.etitle === 'string' ? search.etitle : undefined,
+    sq:     typeof search.sq     === 'string' ? search.sq     : undefined,
   }),
 })
 

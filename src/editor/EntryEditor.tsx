@@ -82,8 +82,9 @@ interface Props {
 }
 
 export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink, isFavorited, onToggleFavorite }: Props) {
-  const navigate  = useNavigate()
-  const hour12    = useStore(s => s.localePrefs.hour12)
+  const navigate           = useNavigate()
+  const hour12             = useStore(s => s.localePrefs.hour12)
+  const defaultParticipants = useStore(s => s.defaultParticipants)
   const titleRef  = useRef<HTMLTextAreaElement>(null)
   const viewRef   = useRef<EditorView | null>(null)
 
@@ -96,7 +97,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   function handlePromoteTask(title: string, done: boolean): string | null {
     const result = saveNode(null, 'all', {
       item: null, title, tracked: true, itemType: 'task', done,
-      body: '', tags: [], items: [], participants: [],
+      body: '', tags: [], items: [], participants: [...defaultParticipants],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
     })
