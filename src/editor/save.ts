@@ -1,8 +1,5 @@
-import {
-  fmtISO,
-  applyEdit, excludeOccurrence, deleteByFileSlug, deleteFollowing,
-  fileSlugItems, findSeries,
-} from '@/model'
+import { fmtISO } from '@/model/dateUtils'
+import { applyEdit, excludeOccurrence, deleteByFileSlug, deleteFollowing, fileSlugItems, findSeries } from '@/model/storeOps'
 import { isSeries } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import { titleToSlug } from '@/fileIO'

@@ -3,7 +3,7 @@ import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots } from '@/types'
 import { occKind, occState } from '@/occView'
 import { parseItemEntry, serializeTaskEntry } from './items'
-import { fileEntries } from '@/fileOccurrence'
+import { fileEntries, backlinksTo } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { useParticipantFilter, NO_PARTICIPANT } from '@/hooks'
 import { resolveWikilink } from '@/wikilinks'
@@ -19,6 +19,7 @@ interface Props {
   items:           string[]
   onChange:        (items: string[]) => void
   roots:           Roots
+  currentSlug:     string | null
   onPromote:       (title: string, done: boolean) => string | null
   onOpenWikilink?: (ref: string) => void
   onToggleDone?:   (occ: Occurrence) => void
@@ -49,7 +50,7 @@ function rowSortKey({ entry, occ }: Row): [number, number, string] {
   return [3, entry.idx, '']
 }
 
-export default function ItemsList({ items, onChange, roots, onPromote, onOpenWikilink, onToggleDone }: Props) {
+export default function ItemsList({ items, onChange, roots, currentSlug, onPromote, onOpenWikilink, onToggleDone }: Props) {
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const [editingIdx,  setEditingIdx]  = useState<number | null>(null)
@@ -195,6 +196,11 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
     const { idx } = entry
 
     if (entry.kind === 'link') {
+      const listedOn = occ
+        ? backlinksTo(occ.fileSlug, roots)
+            .filter(slug => slug !== currentSlug)
+            .map(slug => roots.get(slug)?.title ?? slug)
+        : []
       return (
         <div key={idx} className="flex items-start gap-1">
           <div className="flex-1 min-w-0">
@@ -202,8 +208,10 @@ export default function ItemsList({ items, onChange, roots, onPromote, onOpenWik
               <OccurrenceCard
                 occ={occ}
                 leadingIcon="both"
-                showTime="none"
-                showTagsParticipants={false}
+                showTime="badge"
+                showDate
+                showTagsParticipants
+                listedOn={listedOn}
                 onOpen={() => onOpenWikilink?.(occ.fileSlug)}
                 onToggleDone={() => onToggleDone?.(occ)}
               />
