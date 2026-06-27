@@ -102,7 +102,6 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   const { title } = fields
   if (!title) return 'missing-title'
 
-  const t0 = performance.now()
   const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
     title,
     tags:         fields.tags         ?? [],
@@ -116,11 +115,8 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
     duration:     fields.duration     ?? '',
     repeat:       fields.repeat       ?? null,
   })
-  const tApply = performance.now()
-  console.log(`[perf:save] applyEdit(${editScope}): ${(tApply - t0).toFixed(2)}ms`)
   const fileSlug = item?.fileSlug ?? titleToSlug(title)
   if (fileSlug) commitNext(nextData, [fileSlug])
-  console.log(`[perf:save] commitNext: ${(performance.now() - tApply).toFixed(2)}ms | total sync: ${(performance.now() - t0).toFixed(2)}ms`)
   return 'saved'
 }
 
