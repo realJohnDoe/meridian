@@ -1,5 +1,6 @@
 ## Next steps
 
+- Blur in Mobile search overlay extends into results
 - Increase checkbox hit box size
 - Change type icon to use same space as checkbox in items section
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
