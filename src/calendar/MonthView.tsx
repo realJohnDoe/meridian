@@ -3,7 +3,7 @@ import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
 
-import { expandWithMultiday, multidayDisplayTitle } from '@/model'
+import { expandWithMultiday, multidayDisplayTitle, weekStartsOn } from '@/model'
 import { sameDay } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
@@ -15,11 +15,6 @@ import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
 import { KindIcon } from '@/components'
 
-const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
-]
-const DAYS = ['Mo','Tu','We','Th','Fr','Sa','Su']
 
 // ── CalCell ───────────────────────────────────────────────────
 interface CalCellProps {
@@ -35,7 +30,7 @@ const CalCell = memo(function CalCell({ date, other, dayOccs, today, onDayClick 
 
   const occCount = dayOccs.length
   const ariaLabel = [
-    `${MONTHS[date.getMonth()]} ${date.getDate()}`,
+    date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }),
     isToday ? 'today' : '',
     occCount ? `${occCount} event${occCount !== 1 ? 's' : ''}` : '',
   ].filter(Boolean).join(', ')
@@ -83,10 +78,24 @@ interface Props {
 }
 
 export default function MonthView({ month, onNavigateMonth, onDayClick }: Props) {
-  const today = useToday()
-  const items = useStore(s => s.items)
-  const roots = useStore(s => s.roots)
+  const today       = useToday()
+  const items       = useStore(s => s.items)
+  const roots       = useStore(s => s.roots)
+  const localePrefs = useStore(s => s.localePrefs)
   const { filterOccs } = useParticipantFilter()
+
+  const ws = weekStartsOn(localePrefs) // 0=Sun, 1=Mon, 6=Sat
+
+  // Locale-aware weekday header labels starting from the locale's first day of week.
+  // Jan 5 2025 is a Sunday; offset by ws to get each day's label.
+  const weekdayLabels = useMemo(() => {
+    const sunday = new Date(2025, 0, 5)
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(sunday)
+      d.setDate(5 + (ws + i) % 7)
+      return d.toLocaleDateString(undefined, { weekday: 'short' })
+    })
+  }, [ws])
 
   const m = month.getMonth()
   const y = month.getFullYear()
@@ -96,7 +105,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
   const { cells, occsByDay } = useMemo(() => {
     const rawFirst = new Date(y, m, 1).getDay()
-    const first    = (rawFirst + 6) % 7
+    const first    = (rawFirst - ws + 7) % 7
     const dim      = new Date(y, m + 1, 0).getDate()
     const prev     = new Date(y, m, 0).getDate()
     const nc       = (7 - (first + dim) % 7) % 7
@@ -122,7 +131,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     for (const [k, arr] of occsByDay) occsByDay.set(k, sortOccs(arr))
 
     return { cells, occsByDay }
-  }, [items, roots, y, m, filterOccs])
+  }, [items, roots, y, m, ws, filterOccs])
 
   const wrapRef = useRef<HTMLDivElement>(null)
   useHorizontalSwipe(
@@ -134,7 +143,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   return (
     <div className="flex-1 flex flex-col overflow-hidden pb-10" ref={wrapRef}>
       <div className="grid grid-cols-7 px-1 shrink-0 pt-2">
-        {DAYS.map(d => <div key={d} className="text-center text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground py-0.75">{d}</div>)}
+        {weekdayLabels.map((d, i) => <div key={i} className="text-center text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground py-0.75">{d}</div>)}
       </div>
 
       <div className="flex-1 overflow-hidden px-1 pb-1 flex flex-col">

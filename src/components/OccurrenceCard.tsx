@@ -106,7 +106,7 @@ export default function OccurrenceCard({
   const rawDuration  = occ.metadata.duration
   const durationLabel = rawDuration
     ? (occ.time
-        ? formatDurationChip(rawDuration, { date: occ.date, time: occ.time })
+        ? formatDurationChip(rawDuration, { date: occ.date, time: occ.time }, hour12)
         : fmtDuration(rawDuration))
     : null
 

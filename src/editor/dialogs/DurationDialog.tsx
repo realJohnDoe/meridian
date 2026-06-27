@@ -18,6 +18,7 @@ import { cn } from '@/lib/cn'
 import DatePickerDialog from './DatePickerDialog'
 import TimePickerDialog from './TimePickerDialog'
 import { parseDurationStr, durationToEndDate, durationToEndDateTime, fmtEndDate, fmtEndTime } from '@/format'
+import { useStore } from '@/store'
 
 export { fmtDuration, formatDurationChip } from '@/format'
 
@@ -87,6 +88,7 @@ interface Props {
 }
 
 export default function DurationDialog({ open, value, scheduled, itemType, onConfirm, onRemove, onClose }: Props) {
+  const hour12  = useStore(s => s.localePrefs.hour12)
   const hasTime = !!scheduled?.time
 
   function defaultTab(): Tab {
@@ -158,7 +160,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
       const dur = serialise(n, unit)
       if (hasTime) {
         const end = durationToEndDateTime(scheduled.date, scheduled.time, dur)
-        return `${endDateTabLabel} (${fmtEndDate(end.date)} ${fmtEndTime(end.time)})`
+        return `${endDateTabLabel} (${fmtEndDate(end.date)} ${fmtEndTime(end.time, hour12)})`
       }
       const endDateStr = durationToEndDate(scheduled.date, dur)
       if (endDateStr !== scheduled.date) return `${endDateTabLabel} (${fmtEndDate(endDateStr)})`

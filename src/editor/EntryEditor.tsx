@@ -18,7 +18,9 @@ import { cn } from '@/lib/cn'
 import type { EntryState, ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
 import { saveNode } from './save'
-import { formatDurationChip, fmtDuration } from '@/format'
+import { formatDurationChip, fmtDuration, fmtShort } from '@/format'
+import { fmtT, parseDateString } from '@/model'
+import { useStore } from '@/store'
 import { titleToSlug } from '@/fileIO'
 import { backlinksTo } from '@/fileOccurrence'
 import { usePendingLinks } from './usePendingLinks'
@@ -80,9 +82,10 @@ interface Props {
 }
 
 export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink, isFavorited, onToggleFavorite }: Props) {
-  const navigate = useNavigate()
-  const titleRef = useRef<HTMLTextAreaElement>(null)
-  const viewRef  = useRef<EditorView | null>(null)
+  const navigate  = useNavigate()
+  const hour12    = useStore(s => s.localePrefs.hour12)
+  const titleRef  = useRef<HTMLTextAreaElement>(null)
+  const viewRef   = useRef<EditorView | null>(null)
 
   if (getBodyRef) getBodyRef.current = () => viewRef.current?.state.doc.toString().trimEnd() ?? ''
 
@@ -260,15 +263,15 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
             <div className="flex gap-1.5 flex-wrap mb-4">
               {showDateChip && (
                 <PropChip icon={Calendar} label="Date" pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}
-                  value={scheduled ? scheduled.date.slice(5).replace('-', '/') : undefined} />
+                  value={scheduled ? (fmtShort(parseDateString(scheduled.date) ?? new Date(scheduled.date))) : undefined} />
               )}
               {showDateChip && hasDate && (
                 <PropChip icon={Clock} label="Time" pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}
-                  value={hasTime ? scheduled!.time : undefined} />
+                  value={hasTime ? (fmtT(scheduled!.time, hour12) ?? undefined) : undefined} />
               )}
               {showDateChip && (
                 <PropChip icon={Timer} label="Duration" pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}
-                  value={duration ? (scheduled ? formatDurationChip(duration, scheduled) : fmtDuration(duration)) : undefined} />
+                  value={duration ? (scheduled ? formatDurationChip(duration, scheduled, hour12) : fmtDuration(duration)) : undefined} />
               )}
               {tracked && (
                 <PropChip icon={Flag} label="Priority" pressed={!!priority} onClick={() => onOpenDlg('dlgPriority')}
