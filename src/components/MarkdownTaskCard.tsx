@@ -28,7 +28,6 @@ export default function MarkdownTaskCard({
         <Checkbox
           checked={done}
           onCheckedChange={onToggle}
-          className="size-5 shrink-0"
           onPointerDown={e => e.stopPropagation()}
           onClick={e => e.stopPropagation()}
         />

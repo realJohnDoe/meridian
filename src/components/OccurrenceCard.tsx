@@ -130,7 +130,7 @@ export default function OccurrenceCard({
   return (
     <Card
       data-tour="entry-card"
-      className={`${cardCls} flex items-stretch gap-2 pl-2 pr-3.5 py-2`}
+      className={`${cardCls} flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-[44px]`}
       style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
     >
       {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-lg" />}
@@ -143,7 +143,7 @@ export default function OccurrenceCard({
 
       <span className={cn(occBarVariants({ state: barClass }), 'relative z-20')} />
 
-      <div className="relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none">
+      <div className="relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none justify-center">
         <div className="flex items-center gap-1.5">
           {/* Icon / checkbox */}
           {(() => {
@@ -153,7 +153,7 @@ export default function OccurrenceCard({
               <Checkbox
                 checked={isDone}
                 onCheckedChange={() => onToggleDone()}
-                className="size-5 shrink-0 pointer-events-auto"
+                className="pointer-events-auto"
                 onPointerDown={e => e.stopPropagation()}
                 onClick={e => e.stopPropagation()}
               />
