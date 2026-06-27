@@ -1,32 +1,38 @@
-import { useState } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
-import { useNavigate } from '@tanstack/react-router'
 import { Button } from './ui/button'
 import { FilterOverlay, MobileSearchOverlay } from '@/search'
 import { newEntryRoute } from '@/routes'
 import { useOpenEntry } from '@/hooks'
 
 export default function SearchBar() {
-  const [filterQuery, setFilterQuery] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
+  // sq present (even as '') = search overlay open; sq value = current query.
+  const { sq } = useSearch({ from: '/_app' })
   const navigate = useNavigate()
   const openEntry = useOpenEntry()
 
+  const searchOpen = sq !== undefined
+  const filterQuery = sq ?? ''
+
+  function openSearch() {
+    navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: '' }) })
+  }
+
+  function setQuery(value: string) {
+    // replace: true so typing doesn't spam the history stack
+    navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: value }), replace: true })
+  }
+
+  function closeSearch() {
+    navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: undefined }), replace: true })
+  }
+
   function handleOpen(occ: Parameters<typeof openEntry>[0]) {
-    openEntry(occ)
-    setFilterQuery('')
-    setSearchOpen(false)
+    openEntry(occ) // entryRoute clears sq internally
   }
 
   function handleCreate(title: string) {
-    navigate(newEntryRoute(title))
-    setFilterQuery('')
-    setSearchOpen(false)
-  }
-
-  function handleClose() {
-    setSearchOpen(false)
-    setFilterQuery('')
+    navigate(newEntryRoute(title)) // newEntryRoute clears sq internally
   }
 
   return (
@@ -35,8 +41,8 @@ export default function SearchBar() {
       <MobileSearchOverlay
         open={searchOpen}
         query={filterQuery}
-        onQueryChange={setFilterQuery}
-        onClose={handleClose}
+        onQueryChange={setQuery}
+        onClose={closeSearch}
         onOpen={handleOpen}
         onCreate={handleCreate}
       />
@@ -54,22 +60,23 @@ export default function SearchBar() {
       <div className="bg-background/85 backdrop-blur-sm px-3.5 py-3.5 flex flex-col gap-2">
         <div data-tour="search-bar" className="search-bar-wrap w-full max-w-[600px] mx-auto">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
+          {/*
+           * Mobile: onClick opens the full-screen overlay (router push).
+           * Desktop: typing directly updates sq via onChange (router replace).
+           */}
           <input
             id="filterInput"
             className="flex-1 bg-transparent border-none outline-none text-foreground text-sm min-w-0 placeholder:text-muted-foreground"
             placeholder="Search or create…"
             value={filterQuery}
-            onClick={() => setSearchOpen(true)}
-            onChange={e => setFilterQuery(e.target.value)}
+            onClick={openSearch}
+            onChange={e => setQuery(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter' && filterQuery) {
-                navigate(newEntryRoute(filterQuery))
-                setFilterQuery('')
-              }
+              if (e.key === 'Enter' && filterQuery) handleCreate(filterQuery)
             }}
           />
           {filterQuery && (
-            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full shrink-0 text-muted-foreground" aria-label="Clear search" onClick={() => setFilterQuery('')}>
+            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full shrink-0 text-muted-foreground" aria-label="Clear search" onClick={closeSearch}>
               <X size={13} />
             </Button>
           )}
@@ -78,10 +85,7 @@ export default function SearchBar() {
             size="icon"
             className="w-9 h-9 rounded-full shrink-0 hover:scale-[1.08] active:scale-[.93] [&_svg]:size-4"
             aria-label="New entry"
-            onClick={() => {
-              navigate(newEntryRoute(filterQuery))
-              if (filterQuery) setFilterQuery('')
-            }}
+            onClick={() => navigate(newEntryRoute(filterQuery || undefined))}
           ><Plus size={16} /></Button>
         </div>
       </div>
