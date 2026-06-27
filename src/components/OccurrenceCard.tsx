@@ -148,7 +148,7 @@ export default function OccurrenceCard({
           {/* Icon / checkbox */}
           {(() => {
             const showKind = leadingIcon === 'kind' || (leadingIcon === 'both' && !hasTrack)
-            if (showKind) return <KindIcon item={occ} size={13} className="shrink-0 text-muted-foreground" />
+            if (showKind) return <span className="shrink-0 w-5 flex items-center justify-center"><KindIcon item={occ} size={13} className="text-muted-foreground" /></span>
             if (hasTrack) return (
               <Checkbox
                 checked={isDone}
