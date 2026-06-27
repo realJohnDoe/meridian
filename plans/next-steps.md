@@ -70,18 +70,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 - **Problem:** The fine-grained PAT (repo write scope) sits unencrypted in IndexedDB, so any XSS or malicious dependency in this client-only PWA can exfiltrate a credential that can rewrite the user's repo. The UI hygiene is good (`type="password"`, `autoComplete="off"`) but storage is not.
 - **Fix:** Wrap the token with a non-extractable WebCrypto key before persisting (the app already targets environments with full WebCrypto support per `vite.config.ts`), or at minimum document the trust boundary explicitly and scope guidance toward read-only tokens where possible.
 
----
-
-### 13. `NodeInheritanceDebugger` (777 LOC) duplicates editor wiring; `debug/` depends on `editor/` internals
-
-- **Category:** `dead-code` `architecture`
-- **Impact:** 3
-- **Breadth:** 1 file (dev-only)
-- **Fix effort:** M
-- **Evidence:** `debug/NodeInheritanceDebugger.tsx` is the largest file in the repo, served only via the dev-only `debugPagePlugin` (`vite.config.ts:19`), and re-implements editor/dialog glue by importing `@/editor/save`, `useEntryEditor`, `DialogStack`.
-- **Problem:** A 777-line dev tool reaches into editor internals and reimplements their choreography, so it must be maintained in lockstep with the real editor despite never shipping.
-- **Fix:** Either delete it or have it mount the real `EditorShell`/`useEntryEditor` instead of duplicating their wiring.
-
 # Codebase Health Survey
 
 Survey this codebase for code health issues across the categories below.
