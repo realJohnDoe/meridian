@@ -71,9 +71,11 @@ function vp(vaultId: string, path: string): string {
 export async function cacheWrite(vaultId: string, path: string, content: string): Promise<void> {
   const d = await cacheInit()
   const key = vp(vaultId, path)
-  const existing = await d.files.get(key)
-  if (existing && existing.content === content) return
-  await d.files.put({ vaultPath: key, vaultId, path, content, dirty: 1, updatedAt: Date.now(), version: existing?.version })
+  await d.transaction('rw', d.files, async () => {
+    const existing = await d.files.get(key)
+    if (existing && existing.content === content) return
+    await d.files.put({ vaultPath: key, vaultId, path, content, dirty: 1, updatedAt: Date.now(), version: existing?.version })
+  })
 }
 
 export async function cacheWriteClean(vaultId: string, path: string, content: string, version?: string): Promise<void> {

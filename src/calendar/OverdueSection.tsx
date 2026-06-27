@@ -26,9 +26,9 @@ function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
           occ={o}
           index={i}
           showDate={true}
-          onOpen={() => onOpen(o)}
-          onToggleDone={() => onToggleDone(o)}
-          onSwipeDelete={() => onSwipeDelete(o)}
+          onOpen={onOpen}
+          onToggleDone={onToggleDone}
+          onSwipeDelete={onSwipeDelete}
         />
       ))}
     </div>

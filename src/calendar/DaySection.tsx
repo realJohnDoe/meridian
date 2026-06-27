@@ -42,9 +42,9 @@ function DaySection({
           key={o.id}
           occ={o}
           index={i}
-          onOpen={() => onOpen(o)}
-          onToggleDone={() => onToggleDone(o)}
-          onSwipeDelete={() => onSwipeDelete(o)}
+          onOpen={onOpen}
+          onToggleDone={onToggleDone}
+          onSwipeDelete={onSwipeDelete}
         />
       ))}
     </div>
