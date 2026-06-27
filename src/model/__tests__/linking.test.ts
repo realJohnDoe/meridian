@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
 import { resolveWikilink, unwrapRef } from '@/wikilinks'
-import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
-import type { StoreItem, Roots } from '@/types'
+import { fileEntries, fileOccurrenceMap, updateFileOccurrenceMap } from '@/fileOccurrence'
+import { toggleDone } from '@/model/storeOps'
+import type { StoreItem, Roots, Occurrence } from '@/types'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -267,5 +268,170 @@ instances:
     const map1 = fileOccurrenceMap(items, roots)
     const map2 = fileOccurrenceMap(items, roots)
     expect([...map1.entries()]).toStrictEqual([...map2.entries()])
+  })
+})
+
+// ── updateFileOccurrenceMap ───────────────────────────────────────────────────
+//
+// Guard tests: the incremental map must be semantically equivalent to a full
+// fileOccurrenceMap rebuild at every step. We compare all fields except `id`
+// (stableOccId UUIDs may diverge for reused entries after clearOccIdCache) and
+// `metadata.jsTime` (Date objects computed fresh each time).
+
+function occKey(occ: Occurrence) {
+  return {
+    fileSlug: occ.fileSlug,
+    date:     occ.date,
+    time:     occ.time,
+    source:   occ.source,
+    ownerId:  (occ as Occurrence & { ownerId?: string }).ownerId,
+    done:     occ.metadata.done,
+    title:    occ.metadata.title,
+    priority: occ.metadata.priority,
+  }
+}
+
+function assertMapsEquivalent(incremental: Map<string, Occurrence>, full: Map<string, Occurrence>) {
+  expect(incremental.size).toBe(full.size)
+  for (const [slug, fullOcc] of full) {
+    const incOcc = incremental.get(slug)
+    expect(incOcc, `slug "${slug}" missing from incremental map`).toBeDefined()
+    expect(occKey(incOcc!)).toStrictEqual(occKey(fullOcc))
+  }
+}
+
+const TASK_YAML = `---
+title: My Task
+date: "2026-07-01"
+done: false
+---
+`
+
+const FUTURE_YAML = `---
+title: Future Event
+date: "2027-01-15"
+done: false
+---
+`
+
+describe('updateFileOccurrenceMap', () => {
+  it('initial load (empty prev) matches full rebuild', () => {
+    const { items, roots } = makeStore([
+      { slug: 'project-alpha',  yaml: ALPHA_YAML  },
+      { slug: 'weekly-standup', yaml: RECUR_YAML  },
+      { slug: 'my-task',        yaml: TASK_YAML   },
+    ])
+    const prevFom:   Map<string, Occurrence> = new Map()
+    const prevItems: StoreItem[] = []
+    const prevRoots: Roots = new Map()
+
+    const incremental = updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots)
+    const full        = fileOccurrenceMap(items, roots)
+    assertMapsEquivalent(incremental, full)
+  })
+
+  it('unchanged snapshot reuses all cached entries', () => {
+    const { items, roots } = makeStore([
+      { slug: 'project-alpha',  yaml: ALPHA_YAML },
+      { slug: 'weekly-standup', yaml: RECUR_YAML },
+    ])
+    const prevFom = fileOccurrenceMap(items, roots)
+
+    const incremental = updateFileOccurrenceMap(prevFom, items, roots, items, roots)
+    // All entries reused — verify every slug resolves to the same reference.
+    for (const [slug, prevOcc] of prevFom) {
+      expect(incremental.get(slug)).toBe(prevOcc)
+    }
+  })
+
+  it('toggleDone on one slug re-resolves only that slug', () => {
+    const base = makeStore([
+      { slug: 'my-task',        yaml: TASK_YAML  },
+      { slug: 'future-event',   yaml: FUTURE_YAML },
+    ])
+    const prevFom = fileOccurrenceMap(base.items, base.roots)
+    const taskOcc = prevFom.get('my-task')!
+
+    const next = toggleDone(base, taskOcc)
+
+    const incremental = updateFileOccurrenceMap(prevFom, base.items, base.roots, next.items, next.roots)
+    const full        = fileOccurrenceMap(next.items, next.roots)
+    assertMapsEquivalent(incremental, full)
+
+    // Unchanged slug reuses the cached reference.
+    expect(incremental.get('future-event')).toBe(prevFom.get('future-event'))
+    // Changed slug has updated done value.
+    expect(incremental.get('my-task')!.metadata.done).toBe(!taskOcc.metadata.done)
+  })
+
+  it('adding a new file includes it in the incremental map', () => {
+    const base = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const prevFom = fileOccurrenceMap(base.items, base.roots)
+
+    // Extend the existing snapshot by appending the new file's items/root so
+    // project-alpha's item references remain identical (same objects).
+    const added = makeStore([{ slug: 'my-task', yaml: TASK_YAML }])
+    const nextItems = [...base.items, ...added.items]
+    const nextRoots: Roots = new Map([...base.roots, ...added.roots])
+
+    const incremental = updateFileOccurrenceMap(prevFom, base.items, base.roots, nextItems, nextRoots)
+    const full        = fileOccurrenceMap(nextItems, nextRoots)
+    assertMapsEquivalent(incremental, full)
+    expect(incremental.get('my-task')).toBeDefined()
+    // Unchanged slug reuses the cached reference (same item refs, same root ref).
+    expect(incremental.get('project-alpha')).toBe(prevFom.get('project-alpha'))
+  })
+
+  it('deleting a file removes it from the incremental map', () => {
+    // Build a base snapshot by combining two separately-parsed stores so that
+    // item references can be shared with the post-delete "next" snapshot.
+    const alpha = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const task  = makeStore([{ slug: 'my-task',       yaml: TASK_YAML  }])
+    const baseItems = [...alpha.items, ...task.items]
+    const baseRoots: Roots = new Map([...alpha.roots, ...task.roots])
+    const prevFom = fileOccurrenceMap(baseItems, baseRoots)
+
+    // "Delete" my-task — reuse the same alpha item refs in the next snapshot.
+    const incremental = updateFileOccurrenceMap(prevFom, baseItems, baseRoots, alpha.items, alpha.roots)
+    const full        = fileOccurrenceMap(alpha.items, alpha.roots)
+    assertMapsEquivalent(incremental, full)
+    expect(incremental.get('my-task')).toBeUndefined()
+  })
+
+  it('root-only change (title rename) re-resolves affected slug', () => {
+    const base = makeStore([
+      { slug: 'project-alpha', yaml: ALPHA_YAML },
+      { slug: 'my-task',       yaml: TASK_YAML  },
+    ])
+    const prevFom = fileOccurrenceMap(base.items, base.roots)
+
+    // Rename project-alpha's title — new Map entry = new reference for that slug.
+    const newRoots: Roots = new Map(base.roots)
+    newRoots.set('project-alpha', { ...base.roots.get('project-alpha')!, title: 'Project Alpha Renamed' })
+    const next = { items: base.items, roots: newRoots }
+
+    const incremental = updateFileOccurrenceMap(prevFom, base.items, base.roots, next.items, next.roots)
+    const full        = fileOccurrenceMap(next.items, next.roots)
+    assertMapsEquivalent(incremental, full)
+    expect(incremental.get('project-alpha')!.metadata.title).toBe('Project Alpha Renamed')
+    // Unaffected slug reuses cached reference.
+    expect(incremental.get('my-task')).toBe(prevFom.get('my-task'))
+  })
+
+  it('recurring series: toggle done on a generated occurrence matches full rebuild', () => {
+    const base = makeStore([
+      { slug: 'weekly-standup', yaml: RECUR_YAML },
+      { slug: 'my-task',        yaml: TASK_YAML  },
+    ])
+    const prevFom = fileOccurrenceMap(base.items, base.roots)
+    const seriesOcc = prevFom.get('weekly-standup')!
+
+    const next = toggleDone(base, seriesOcc)
+
+    const incremental = updateFileOccurrenceMap(prevFom, base.items, base.roots, next.items, next.roots)
+    const full        = fileOccurrenceMap(next.items, next.roots)
+    assertMapsEquivalent(incremental, full)
+    // Unrelated slug reuses cached reference.
+    expect(incremental.get('my-task')).toBe(prevFom.get('my-task'))
   })
 })

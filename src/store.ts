@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { StoreItem, Roots, Occurrence } from './types'
 import type { VaultRef } from '@/storage'
 import { clearOccIdCache } from '@/model'
-import { fileOccurrenceMap } from './fileOccurrence'
+import { updateFileOccurrenceMap } from './fileOccurrence'
 
 export type LocalePrefs = {
   hour12: boolean
@@ -99,7 +99,11 @@ export const useStore = create<MeridianStore>((set, get) => ({
   items: [],
   roots: new Map(),
   fom: new Map(),
-  setData: ({ items, roots }) => { clearOccIdCache(); set({ items, roots, fom: fileOccurrenceMap(items, roots) }) },
+  setData: ({ items, roots }) => {
+    clearOccIdCache()
+    const { items: prevItems, roots: prevRoots, fom: prevFom } = get()
+    set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots) })
+  },
 
   vaults:              [],
   activeVaultId:       null,

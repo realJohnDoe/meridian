@@ -114,6 +114,65 @@ export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string,
 }
 
 /**
+ * Incremental update of the fileSlug → representative Occurrence map.
+ *
+ * Re-resolves only slugs whose items group or root entry actually changed.
+ * A slug's entry is reusable when:
+ *   - its items group has the same length and the same element references, AND
+ *   - prevRoots.get(slug) === roots.get(slug)  (reference equality)
+ *
+ * Mutation helpers (upsertOverride, updateRoot, …) create new object references
+ * only for the touched slug(s), so reference checks correctly identify exactly
+ * what changed without deep comparison.
+ */
+export function updateFileOccurrenceMap(
+  prevFom:   Map<string, Occurrence>,
+  prevItems: StoreItem[],
+  prevRoots: Roots,
+  items:     StoreItem[],
+  roots:     Roots,
+): Map<string, Occurrence> {
+  const now   = new Date(); now.setHours(0, 0, 0, 0)
+  const AHEAD = new Date(now.getTime() + _3YR_MS)
+  const BACK  = new Date(now.getTime() - _3YR_MS)
+
+  // Group previous items by slug for reference comparison.
+  const prevBySlug = new Map<string, StoreItem[]>()
+  for (const item of prevItems) {
+    let group = prevBySlug.get(item.fileSlug)
+    if (!group) { group = []; prevBySlug.set(item.fileSlug, group) }
+    group.push(item)
+  }
+
+  // Group new items by slug and build the updated map.
+  const newBySlug = new Map<string, StoreItem[]>()
+  for (const item of items) {
+    let group = newBySlug.get(item.fileSlug)
+    if (!group) { group = []; newBySlug.set(item.fileSlug, group) }
+    group.push(item)
+  }
+
+  const map = new Map<string, Occurrence>()
+  for (const [slug, slugItems] of newBySlug) {
+    const prevGroup    = prevBySlug.get(slug)
+    const rootSame     = prevRoots.get(slug) === roots.get(slug)
+    const groupSame    = prevGroup !== undefined
+      && prevGroup.length === slugItems.length
+      && prevGroup.every((item, i) => item === slugItems[i])
+
+    if (rootSame && groupSame) {
+      const cached = prevFom.get(slug)
+      if (cached !== undefined) { map.set(slug, cached); continue }
+    }
+
+    const occ = resolveOneSlug(slug, slugItems, roots, now, AHEAD, BACK)
+    if (occ) map.set(slug, occ)
+  }
+
+  return map
+}
+
+/**
  * Returns the fileSlugs of all files whose items list includes a link to `targetSlug`.
  * Self-links are excluded. Memoize the result on [roots] at the call site.
  */
