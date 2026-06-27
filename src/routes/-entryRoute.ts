@@ -10,6 +10,7 @@ export function newEntryRoute(title?: string) {
       etitle: title || undefined,
       edate: undefined,
       escope: undefined,
+      sq: undefined,
     }),
   }
 }
@@ -24,6 +25,7 @@ export function entryRoute(occ: Occurrence, scope?: EditScope) {
       edate: occ.date ?? undefined,
       escope: scope ?? 'single' as EditScope,
       etitle: undefined,
+      sq: undefined,
     }),
   }
 }
@@ -38,6 +40,7 @@ export function slugRoute(fileSlug: string) {
       edate: undefined,
       escope: undefined,
       etitle: undefined,
+      sq: undefined,
     }),
   }
 }
