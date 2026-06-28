@@ -19,27 +19,32 @@ import {
 type Step = 'vault' | 'source' | 'github'
 type Source = 'local' | 'github'
 
-const THEMES: { id: string; label: string; swatches: string[] }[] = [
+// Per-theme preview colors — same semantic slots in the same order for every theme.
+// background: used as the button's own surface to give a sense of the theme's darkness.
+// swatches: [primary, event, task, note, destructive] — the five most identity-defining tokens.
+const THEMES: { id: string; label: string; background: string; swatches: string[] }[] = [
   {
     id: 'meridian',
     label: 'Meridian',
+    background: 'oklch(0.18 0.05 252)',
     swatches: [
-      'oklch(0.68 0.22 278)',  // primary / indigo
-      'oklch(0.84 0.17 145)',  // task / green
-      'oklch(0.75 0.17 215)',  // note / sky blue
-      'oklch(0.74 0.18 295)',  // brand-purple / violet
-      'oklch(0.72 0.19 22)',   // priority-1 / red
+      'oklch(0.68 0.22 278)',  // primary
+      'oklch(0.71 0.20 278)',  // event
+      'oklch(0.84 0.17 145)',  // task
+      'oklch(0.75 0.17 215)',  // note
+      'oklch(0.72 0.20 15)',   // destructive
     ],
   },
   {
     id: 'one-dark',
     label: 'One Dark',
+    background: '#1a1d23',
     swatches: [
-      '#61afef',  // primary / blue
-      '#c678dd',  // event / purple
-      '#98c379',  // task / green
-      '#56b6c2',  // note / cyan
-      '#e5c07b',  // priority-3 / yellow
+      '#61afef',  // primary
+      '#c678dd',  // event
+      '#98c379',  // task
+      '#56b6c2',  // note
+      '#e06c75',  // destructive
     ],
   },
 ]
@@ -237,16 +242,15 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
               <div className="flex flex-col gap-2">
                 <span className="text-[13px] font-medium">Appearance</span>
                 <div className="grid grid-cols-2 gap-2">
-                  {THEMES.map(({ id, label, swatches }) => (
+                  {THEMES.map(({ id, label, background, swatches }) => (
                     <button
                       key={id}
                       onClick={() => setTheme(id)}
                       className={cn(
                         'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-[13px] font-medium text-left transition-colors',
-                        activeTheme === id
-                          ? 'border-primary bg-primary/8'
-                          : 'border-border hover:bg-accent',
+                        activeTheme === id ? 'border-primary' : 'border-border hover:border-muted-foreground',
                       )}
+                      style={{ background }}
                     >
                       {label}
                       <span className="flex gap-1">
