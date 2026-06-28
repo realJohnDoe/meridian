@@ -19,9 +19,29 @@ import {
 type Step = 'vault' | 'source' | 'github'
 type Source = 'local' | 'github'
 
-const THEMES: { id: string; label: string }[] = [
-  { id: 'meridian', label: 'Meridian' },
-  { id: 'one-dark', label: 'One Dark' },
+const THEMES: { id: string; label: string; swatches: string[] }[] = [
+  {
+    id: 'meridian',
+    label: 'Meridian',
+    swatches: [
+      'oklch(0.68 0.22 278)',  // primary / indigo
+      'oklch(0.84 0.17 145)',  // task / green
+      'oklch(0.75 0.17 215)',  // note / sky blue
+      'oklch(0.74 0.18 295)',  // brand-purple / violet
+      'oklch(0.72 0.19 22)',   // priority-1 / red
+    ],
+  },
+  {
+    id: 'one-dark',
+    label: 'One Dark',
+    swatches: [
+      '#61afef',  // primary / blue
+      '#c678dd',  // event / purple
+      '#98c379',  // task / green
+      '#56b6c2',  // note / cyan
+      '#e5c07b',  // priority-3 / yellow
+    ],
+  },
 ]
 
 interface Props {
@@ -217,18 +237,27 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
               <div className="flex flex-col gap-2">
                 <span className="text-[13px] font-medium">Appearance</span>
                 <div className="grid grid-cols-2 gap-2">
-                  {THEMES.map(({ id, label }) => (
+                  {THEMES.map(({ id, label, swatches }) => (
                     <button
                       key={id}
                       onClick={() => setTheme(id)}
                       className={cn(
-                        'rounded-lg border px-3 py-2 text-[13px] font-medium text-left transition-colors',
+                        'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-[13px] font-medium text-left transition-colors',
                         activeTheme === id
                           ? 'border-primary bg-primary/8'
                           : 'border-border hover:bg-accent',
                       )}
                     >
                       {label}
+                      <span className="flex gap-1">
+                        {swatches.map((color, i) => (
+                          <span
+                            key={i}
+                            className="block size-2.5 rounded-full"
+                            style={{ background: color }}
+                          />
+                        ))}
+                      </span>
                     </button>
                   ))}
                 </div>
