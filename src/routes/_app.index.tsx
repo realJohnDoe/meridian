@@ -38,14 +38,15 @@ function AgendaPage() {
   // the virtualizer and performs the actual scroll when this flag is set.
   useEffect(() => onVaultChanged(() => useStore.setState({ scrollToTodayOnce: true })), [])
 
-  // Restore saved scroll before paint (no blink); save on unmount. The
-  // virtualizer reports the full scroll height immediately (from size
-  // estimates), so the saved scrollTop lands correctly. Skipped when a
-  // scroll-to-today is pending so we don't fight it.
+  // Restore saved scroll before paint (no blink); save on unmount. The virtualizer
+  // reports the full scroll height from estimates immediately, so the saved scrollTop
+  // lands correctly. Cleanup reads scRef.current at unmount time (not a captured el)
+  // because the skeleton renders first — scRef is null at mount and a captured el
+  // would be null forever, so the position would never be saved.
   useLayoutEffect(() => {
     const el = scRef.current
     if (el && !useStore.getState().scrollToTodayOnce) el.scrollTop = savedScrollTop
-    return () => { if (el) savedScrollTop = el.scrollTop }
+    return () => { savedScrollTop = scRef.current?.scrollTop ?? savedScrollTop }
   }, [])
 
   const onOpen = useOpenEntry()
