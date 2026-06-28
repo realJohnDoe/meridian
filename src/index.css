@@ -208,7 +208,7 @@
   --input:  color-mix(in oklab, #abb2bf, transparent 85%);
 
   /* Domain colors — three distinct hues */
-  --event:        #61afef;   /* blue — alias of primary */
+  --event:        #c678dd;   /* magenta/purple */
   --task:         #98c379;   /* green */
   --note:         #56b6c2;   /* cyan (freed up by primary swap) */
   --brand-cyan:   #56b6c2;   /* cyan — gradient accent */
