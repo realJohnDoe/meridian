@@ -5,7 +5,6 @@ import {
   OctagonX,
   TriangleAlert,
 } from "lucide-react"
-import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/cn"
@@ -13,11 +12,11 @@ import { cn } from "@/lib/cn"
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      // Both app themes (Meridian, One Dark) are dark; toast surfaces come from
+      // --card/--destructive vars, so they follow the active theme regardless.
+      theme="dark"
       position="top-center"
       richColors
       className="toaster group"

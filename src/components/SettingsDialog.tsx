@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTheme } from 'next-themes'
 import { HardDrive, GitBranch, Trash2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/cn'
@@ -18,12 +19,17 @@ import {
 type Step = 'vault' | 'source' | 'github'
 type Source = 'local' | 'github'
 
+const THEMES: { id: string; label: string }[] = [
+  { id: 'meridian', label: 'Meridian' },
+  { id: 'one-dark', label: 'One Dark' },
+]
+
 interface Props {
   open:         boolean
   onOpenChange: (open: boolean) => void
 }
 
-export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
+export default function SettingsDialog({ open, onOpenChange }: Props) {
   const [step,               setStep]               = useState<Step>('vault')
   const [source,             setSource]             = useState<Source>('local')
   const [selectedVaultId,    setSelectedVaultId]    = useState<string | null>(null)
@@ -34,6 +40,9 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
   const [busy,               setBusy]               = useState(false)
   const [syncing,            setSyncing]            = useState(false)
   const [error,              setError]              = useState<string | null>(null)
+
+  const { theme, setTheme }    = useTheme()
+  const activeTheme            = theme ?? 'meridian'
 
   const vaults                 = useStore(s => s.vaults)
   const activeVaultId          = useStore(s => s.activeVaultId)
@@ -198,13 +207,35 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
   return (
     <ResponsiveModal open={open} onOpenChange={handleOpenChange}>
       <ResponsiveModalContent className="sm:max-w-[420px]">
-        <ResponsiveModalDescription>Manage vaults</ResponsiveModalDescription>
+        <ResponsiveModalDescription>Settings</ResponsiveModalDescription>
 
         {step === 'vault' && (
           <>
-            <ResponsiveModalTitle>Manage vaults</ResponsiveModalTitle>
+            <ResponsiveModalTitle>Settings</ResponsiveModalTitle>
 
             <div className="flex flex-col gap-4 p-4">
+              <div className="flex flex-col gap-2">
+                <span className="text-[13px] font-medium">Appearance</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {THEMES.map(({ id, label }) => (
+                    <button
+                      key={id}
+                      onClick={() => setTheme(id)}
+                      className={cn(
+                        'rounded-lg border px-3 py-2 text-[13px] font-medium text-left transition-colors',
+                        activeTheme === id
+                          ? 'border-primary bg-primary/8'
+                          : 'border-border hover:bg-accent',
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <span className="text-[13px] font-medium pt-2 border-t border-border">Vaults</span>
+
               <Select value={selectedVaultId ?? ''} onValueChange={handleVaultSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select vault…" />

@@ -1,5 +1,6 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect } from 'react'
+import { ThemeProvider } from 'next-themes'
 import { restoreVaults, autoSyncTick, resetSyncBackoff } from '@/storage'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -23,11 +24,18 @@ function Root() {
   }, [])
 
   return (
-    <>
+    <ThemeProvider
+      attribute="class"
+      themes={['meridian', 'one-dark']}
+      defaultTheme="meridian"
+      enableSystem={false}
+      disableTransitionOnChange
+      storageKey="meridian_theme"
+    >
       <div id="app" className="flex flex-col">
         <Outlet />
       </div>
       <Toaster />
-    </>
+    </ThemeProvider>
   )
 }
