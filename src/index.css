@@ -176,14 +176,14 @@
    The three absolute derived tokens (--primary-dark, --brand-cyan-dark,
    --surface-raised) are not color-mix based, so they are restated here too. */
 .one-dark {
-  /* Surfaces — One Dark elevation ramp */
-  --backdrop:   #21252b;
-  --background:  #282c34;
-  --card:        #2c313c;
-  --popover:     #2c313c;
-  --secondary:   #3a3f4b;
-  --muted:       #3a3f4b;
-  --accent:      #3a3f4b;
+  /* Surfaces — One Dark elevation ramp (darkened from stock palette) */
+  --backdrop:   #13161b;
+  --background:  #1a1d23;
+  --card:        #21252b;
+  --popover:     #21252b;
+  --secondary:   #2a2f38;
+  --muted:       #2a2f38;
+  --accent:      #2a2f38;
 
   /* Text */
   --foreground:           #d7dae0;
@@ -230,7 +230,7 @@
   /* Absolute derived tokens — not color-mix off the above */
   --primary-dark:    #b85fce;
   --brand-cyan-dark: #489aa6;
-  --surface-raised:  #3a3f4b;
+  --surface-raised:  #2a2f38;
 }
 
 /* Element resets in @layer base so Tailwind utilities can override them */
