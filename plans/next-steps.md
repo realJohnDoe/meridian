@@ -5,7 +5,7 @@
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate subdirectory / hexagonal architecture violations
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
-- Add Solarized Light / Dark themes and Atom One Dark
+- Add Solarized Light Theme
 - Investigate more secure storage options
 - Consider if name and logo are still good
 - Post about Meridian in Obsidian forums
