@@ -57,10 +57,13 @@ function AgendaPage() {
   useEffect(() => onVaultChanged(() => useStore.setState({ scrollToTodayOnce: true })), [])
 
   // Restore saved scroll before paint (no blink); save on unmount.
+  // Cleanup reads scRef.current at unmount time (not captured el) because on initial
+  // load the skeleton renders first — scRef is null at mount, so a captured el would
+  // always be null and the position would never be saved.
   useLayoutEffect(() => {
     const el = scRef.current
     if (el && !useStore.getState().scrollToTodayOnce) el.scrollTop = savedScrollTop
-    return () => { if (el) savedScrollTop = el.scrollTop }
+    return () => { savedScrollTop = scRef.current?.scrollTop ?? savedScrollTop }
   }, [])
 
   // Track topmost visible day for the top bar label.
