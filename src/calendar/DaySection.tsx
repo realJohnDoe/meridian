@@ -31,7 +31,7 @@ function DaySection({
     <div className="day-section scroll-mt-2" data-key={dateKey} ref={sectionRef}>
       <div className={cn(
         'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-muted-foreground',
-        'flex items-center gap-2 sticky top-0 bg-background z-[3]',
+        'flex items-center gap-2 bg-background',
         'after:content-[""] after:flex-1 after:h-px after:bg-border',
         isToday && 'text-primary',
       )}>{label}</div>
@@ -42,9 +42,9 @@ function DaySection({
           key={o.id}
           occ={o}
           index={i}
-          onOpen={() => onOpen(o)}
-          onToggleDone={() => onToggleDone(o)}
-          onSwipeDelete={() => onSwipeDelete(o)}
+          onOpen={onOpen}
+          onToggleDone={onToggleDone}
+          onSwipeDelete={onSwipeDelete}
         />
       ))}
     </div>
@@ -54,7 +54,7 @@ function DaySection({
 function propsAreEqual(prev: Props, next: Props): boolean {
   if (prev.isToday !== next.isToday || prev.isTomorrow !== next.isTomorrow) return false
   if (prev.items.length !== next.items.length) return false
-  if (!prev.items.every((o, i) => {
+  return prev.items.every((o, i) => {
     const n = next.items[i]
     return o.id === n.id && o.ownerId === n.ownerId
         && o.fileSlug === n.fileSlug && o.date === n.date && o.time === n.time
@@ -64,8 +64,7 @@ function propsAreEqual(prev: Props, next: Props): boolean {
         && JSON.stringify(o.metadata.tags) === JSON.stringify(n.metadata.tags)
         && JSON.stringify(o.metadata.items) === JSON.stringify(n.metadata.items)
         && JSON.stringify(o.metadata.participants) === JSON.stringify(n.metadata.participants)
-  })) return false
-  return true
+  })
 }
 
 export default memo(DaySection, propsAreEqual)

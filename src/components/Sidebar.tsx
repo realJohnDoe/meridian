@@ -149,7 +149,7 @@ export default function AppSidebar() {
                     <Checkbox
                       checked={participantFilter.includes(NO_PARTICIPANT)}
                       onCheckedChange={() => toggleParticipantFilter(NO_PARTICIPANT)}
-                      className="size-[18px] data-[state=checked]:bg-sidebar-foreground/70 data-[state=checked]:border-sidebar-foreground/70"
+                      visualClassName="size-[18px] group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
                     />
                     <span className="text-[13px] text-muted-foreground italic">No participants</span>
                   </label>
@@ -158,7 +158,7 @@ export default function AppSidebar() {
                       <Checkbox
                         checked={participantFilter.includes(p)}
                         onCheckedChange={() => toggleParticipantFilter(p)}
-                        className="size-[18px] data-[state=checked]:bg-sidebar-foreground/70 data-[state=checked]:border-sidebar-foreground/70"
+                        visualClassName="size-[18px] group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
                       />
                       <span className="text-[13px]">{p}</span>
                     </label>

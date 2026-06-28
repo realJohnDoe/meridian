@@ -1,15 +1,27 @@
 ## Next steps
 
-- Increase checkbox hit box size
-- Investigate performance bottlenecks, especially when checking items or changing metadata
-- Change type icon to use same space as checkbox in items section
+- Reuse fom in all views
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
+- Investigate subdirectory / hexagonal architecture violations
 - Investigate how to change EntryEditor: Own endpoint / Top bar visible
 - Add Solarized Light / Dark themes and Atom One Dark
 - Investigate more secure storage options
 - Consider if name and logo are still good
 - Post about Meridian in Obsidian forums
+- Investigate flip animation in items section
 - Add vault retention period
+
+# Leftover from Performance optimization
+
+1. The card entrance animation now replays on every scroll-in. OccurrenceCard has animation: 'fadeUp .16s ease both' (OccurrenceCard.tsx:134). Virtualization unmounts off-screen rows and remounts them on return, so the fade-up fires every time a row scrolls into view — not just on first load. It may read as a nice reveal or as flicker during fast scrolling; either way it's a behavior change we should consciously decide on (e.g. gate the animation to first mount, or drop it for virtualized rows). The staggerRef/--stagger logic (OccurrenceRow.tsx:29) is also now semantically muddy since index is section-local.
+
+2. Dead DOM hooks left behind. findTopDate and the old scrollIntoView goToday are gone, so .day-section, data-key, data-overdue, and scroll-mt-2 (DaySection.tsx:31, OverdueSection.tsx:16) are now vestigial — the .day-section class has no CSS rule at all anymore. Harmless but misleading; worth a cleanup pass.
+
+3. Magic size estimates. HEADER_H = 40 / ROW_H = 68 in AgendaView.tsx:25 are hand-tuned guesses that can silently drift from the real card CSS (padding changes, meta rows, avatars). measureElement corrects them after render, but bad estimates cause scrollbar drift on long flings. A small comment tying them to the source-of-truth heights, or measuring once, would harden this.
+
+4. fileOccurrenceMap (the full rebuild) is now effectively dead in production — fileOccurrence.ts:102. setData only uses updateFileOccurrenceMap; the full version survives solely as the test oracle in linking.test.ts. It's ~25 lines shipped in the bundle for tests only. Either keep it but mark it test-only, or move the oracle logic into the test file.
+
+5. MonthView still expands uncached. MonthView.tsx:120 calls expandWithMultiday directly, while Agenda/Day use the cached useExpandWithMultiday. This is exactly the old plan's PR3 (unify behind one shared expansion cache). Now that virtualization fixed the real bottleneck, PR2 (adaptive window) is moot, but PR3 is still a genuine consistency win.
 
 # Meridian — Code Health Survey
 
@@ -69,18 +81,6 @@ This report is based on roughly **55–60%** of the application source (excludin
 - **Evidence:** `cache.ts:153` `tokenSave` writes the raw token to the Dexie `meta` table; `vaultRegistry.ts:111,148` read it back into `GitHubBackend`.
 - **Problem:** The fine-grained PAT (repo write scope) sits unencrypted in IndexedDB, so any XSS or malicious dependency in this client-only PWA can exfiltrate a credential that can rewrite the user's repo. The UI hygiene is good (`type="password"`, `autoComplete="off"`) but storage is not.
 - **Fix:** Wrap the token with a non-extractable WebCrypto key before persisting (the app already targets environments with full WebCrypto support per `vite.config.ts`), or at minimum document the trust boundary explicitly and scope guidance toward read-only tokens where possible.
-
----
-
-### 13. `NodeInheritanceDebugger` (777 LOC) duplicates editor wiring; `debug/` depends on `editor/` internals
-
-- **Category:** `dead-code` `architecture`
-- **Impact:** 3
-- **Breadth:** 1 file (dev-only)
-- **Fix effort:** M
-- **Evidence:** `debug/NodeInheritanceDebugger.tsx` is the largest file in the repo, served only via the dev-only `debugPagePlugin` (`vite.config.ts:19`), and re-implements editor/dialog glue by importing `@/editor/save`, `useEntryEditor`, `DialogStack`.
-- **Problem:** A 777-line dev tool reaches into editor internals and reimplements their choreography, so it must be maintained in lockstep with the real editor despite never shipping.
-- **Fix:** Either delete it or have it mount the real `EditorShell`/`useEntryEditor` instead of duplicating their wiring.
 
 # Codebase Health Survey
 

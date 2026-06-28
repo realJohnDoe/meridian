@@ -62,18 +62,24 @@ function resolveOneSlug(
 
   // 3. Undated open standalone.
   const undatedOpen = slugItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
-  if (undatedOpen) return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
+  if (undatedOpen) {
+    return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
+  }
 
   // 4. Most-recent past done occurrence.
   const pastDone = back[back.length - 1]
   if (pastDone) return pastDone
 
   // 5. Any upcoming done occurrence.
-  for (const occ of expandRange(slugItems, roots, now, AHEAD)) return occ
+  for (const occ of expandRange(slugItems, roots, now, AHEAD)) {
+    return occ
+  }
 
   // 6. Any standalone (undated done or out-of-window dated single).
   for (const item of slugItems) {
-    if (isStandaloneOcc(item)) return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) } as Occurrence
+    if (isStandaloneOcc(item)) {
+      return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) } as Occurrence
+    }
   }
 
   // 7. Series anchor date.
@@ -106,6 +112,65 @@ export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string,
     group.push(item)
   }
   for (const [slug, slugItems] of bySlug) {
+    const occ = resolveOneSlug(slug, slugItems, roots, now, AHEAD, BACK)
+    if (occ) map.set(slug, occ)
+  }
+
+  return map
+}
+
+/**
+ * Incremental update of the fileSlug → representative Occurrence map.
+ *
+ * Re-resolves only slugs whose items group or root entry actually changed.
+ * A slug's entry is reusable when:
+ *   - its items group has the same length and the same element references, AND
+ *   - prevRoots.get(slug) === roots.get(slug)  (reference equality)
+ *
+ * Mutation helpers (upsertOverride, updateRoot, …) create new object references
+ * only for the touched slug(s), so reference checks correctly identify exactly
+ * what changed without deep comparison.
+ */
+export function updateFileOccurrenceMap(
+  prevFom:   Map<string, Occurrence>,
+  prevItems: StoreItem[],
+  prevRoots: Roots,
+  items:     StoreItem[],
+  roots:     Roots,
+): Map<string, Occurrence> {
+  const now   = new Date(); now.setHours(0, 0, 0, 0)
+  const AHEAD = new Date(now.getTime() + _3YR_MS)
+  const BACK  = new Date(now.getTime() - _3YR_MS)
+
+  // Group previous items by slug for reference comparison.
+  const prevBySlug = new Map<string, StoreItem[]>()
+  for (const item of prevItems) {
+    let group = prevBySlug.get(item.fileSlug)
+    if (!group) { group = []; prevBySlug.set(item.fileSlug, group) }
+    group.push(item)
+  }
+
+  // Group new items by slug and build the updated map.
+  const newBySlug = new Map<string, StoreItem[]>()
+  for (const item of items) {
+    let group = newBySlug.get(item.fileSlug)
+    if (!group) { group = []; newBySlug.set(item.fileSlug, group) }
+    group.push(item)
+  }
+
+  const map = new Map<string, Occurrence>()
+  for (const [slug, slugItems] of newBySlug) {
+    const prevGroup    = prevBySlug.get(slug)
+    const rootSame     = prevRoots.get(slug) === roots.get(slug)
+    const groupSame    = prevGroup !== undefined
+      && prevGroup.length === slugItems.length
+      && prevGroup.every((item, i) => item === slugItems[i])
+
+    if (rootSame && groupSame) {
+      const cached = prevFom.get(slug)
+      if (cached !== undefined) { map.set(slug, cached); continue }
+    }
+
     const occ = resolveOneSlug(slug, slugItems, roots, now, AHEAD, BACK)
     if (occ) map.set(slug, occ)
   }

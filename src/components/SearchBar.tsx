@@ -57,7 +57,7 @@ export default function SearchBar() {
         onCreate={handleCreate}
       />
 
-      <div className="bg-background/85 backdrop-blur-sm px-3.5 py-3.5 flex flex-col gap-2">
+      <div className={`px-3.5 py-3.5 flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
         <div data-tour="search-bar" className="search-bar-wrap w-full max-w-[600px] mx-auto">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           {/*

@@ -28,7 +28,8 @@ class CheckboxWidget extends ReactWidget {
     return createElement(Checkbox, {
       checked: this.done,
       onCheckedChange: this.onToggle,
-      className: 'size-4 inline-flex align-middle mr-1',
+      className: 'inline-flex align-middle mr-1',
+      visualClassName: 'size-4',
     })
   }
 
