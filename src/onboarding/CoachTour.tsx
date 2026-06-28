@@ -102,7 +102,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry 
     },
     {
       title: 'Make it yours',
-      body: 'This example vault is read-only. Tap Manage vaults to add a local folder — your notes stay as plain Markdown files you own, with no lock-in.',
+      body: 'This example vault is read-only. Open Settings to add a local folder — your notes stay as plain Markdown files you own, with no lock-in.',
       target: '[data-tour="manage-vaults"]',
       before: async () => {
         navigateHome()

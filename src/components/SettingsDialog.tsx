@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useTheme } from 'next-themes'
 import { HardDrive, GitBranch, Trash2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/cn'
@@ -18,12 +19,46 @@ import {
 type Step = 'vault' | 'source' | 'github'
 type Source = 'local' | 'github'
 
+// Per-theme preview colors — same semantic slots in the same order for every theme.
+// background: used as the button's own surface to give a sense of the theme's darkness.
+// swatches: [primary, event, task, note, destructive] — the five most identity-defining tokens.
+// Per-theme preview values — same semantic slots in the same order for every theme:
+// background, foreground, then swatches: [primary, task, event, note, destructive].
+const THEMES: { id: string; label: string; background: string; foreground: string; swatches: string[] }[] = [
+  {
+    id: 'meridian',
+    label: 'Meridian',
+    background: 'oklch(0.18 0.05 252)',
+    foreground: 'oklch(0.96 0.02 270)',
+    swatches: [
+      'oklch(0.68 0.22 278)',  // primary
+      'oklch(0.84 0.17 145)',  // task
+      'oklch(0.71 0.20 278)',  // event
+      'oklch(0.75 0.17 215)',  // note
+      'oklch(0.72 0.20 15)',   // destructive
+    ],
+  },
+  {
+    id: 'one-dark',
+    label: 'One Dark',
+    background: '#1a1d23',
+    foreground: '#d7dae0',
+    swatches: [
+      '#61afef',  // primary
+      '#98c379',  // task
+      '#c678dd',  // event
+      '#56b6c2',  // note
+      '#e06c75',  // destructive
+    ],
+  },
+]
+
 interface Props {
   open:         boolean
   onOpenChange: (open: boolean) => void
 }
 
-export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
+export default function SettingsDialog({ open, onOpenChange }: Props) {
   const [step,               setStep]               = useState<Step>('vault')
   const [source,             setSource]             = useState<Source>('local')
   const [selectedVaultId,    setSelectedVaultId]    = useState<string | null>(null)
@@ -34,6 +69,9 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
   const [busy,               setBusy]               = useState(false)
   const [syncing,            setSyncing]            = useState(false)
   const [error,              setError]              = useState<string | null>(null)
+
+  const { theme, setTheme }    = useTheme()
+  const activeTheme            = theme ?? 'meridian'
 
   const vaults                 = useStore(s => s.vaults)
   const activeVaultId          = useStore(s => s.activeVaultId)
@@ -198,13 +236,43 @@ export default function ManageVaultsDialog({ open, onOpenChange }: Props) {
   return (
     <ResponsiveModal open={open} onOpenChange={handleOpenChange}>
       <ResponsiveModalContent className="sm:max-w-[420px]">
-        <ResponsiveModalDescription>Manage vaults</ResponsiveModalDescription>
+        <ResponsiveModalDescription>Settings</ResponsiveModalDescription>
 
         {step === 'vault' && (
           <>
-            <ResponsiveModalTitle>Manage vaults</ResponsiveModalTitle>
+            <ResponsiveModalTitle>Settings</ResponsiveModalTitle>
 
             <div className="flex flex-col gap-4 p-4">
+              <div className="flex flex-col gap-2">
+                <span className="text-[13px] font-medium">Appearance</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {THEMES.map(({ id, label, background, foreground, swatches }) => (
+                    <button
+                      key={id}
+                      onClick={() => setTheme(id)}
+                      className={cn(
+                        'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-[13px] font-medium text-left transition-colors',
+                        activeTheme === id ? 'border-primary' : 'border-border hover:border-muted-foreground',
+                      )}
+                      style={{ background, color: foreground }}
+                    >
+                      {label}
+                      <span className="flex gap-1">
+                        {swatches.map((color, i) => (
+                          <span
+                            key={i}
+                            className="block size-2.5 rounded-full"
+                            style={{ background: color }}
+                          />
+                        ))}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <span className="text-[13px] font-medium pt-2 border-t border-border">Vaults</span>
+
               <Select value={selectedVaultId ?? ''} onValueChange={handleVaultSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select vault…" />
