@@ -1,6 +1,5 @@
 ## Next steps
 
-- Make tasks not clutter the agenda and month view
 - Reuse fom in all views
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate subdirectory / hexagonal architecture violations
