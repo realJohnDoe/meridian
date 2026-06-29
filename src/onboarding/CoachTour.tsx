@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
-import { isTourDone, markTourDone } from './tourState'
+import { isTourDone, markTourDone, onReplayTour } from './tourState'
 import { Button } from '@/components/ui/button'
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
@@ -12,8 +11,6 @@ interface Step {
   /** CSS selector for the highlight ring, or null for a free-floating popover. */
   target: string | null
   before?: () => Promise<void> | void
-  /** Condition checked on each relevant state change to auto-advance. */
-  autoAdvance?: 'route-changed' | 'editor-opened'
 }
 
 interface TargetRect { top: number; left: number; width: number; height: number }
@@ -22,29 +19,25 @@ interface Props {
   setSidebarOpen: (open: boolean) => void
   /** Navigate to the Agenda root (closes editor, clears search params). */
   navigateHome: () => void
-  /** Deep-link the second tutorial entry in the editor. */
-  openTourEntry: () => void
 }
 
-export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry }: Props) {
+export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
   const activeVaultId = useStore(s => s.activeVaultId)
-  const pathname = useRouterState({ select: s => s.location.pathname })
-  const editorParam = useRouterState({
-    select: s => (s.location.search as Record<string, string | undefined>).editor,
-  })
 
   const [active, setActive] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
   const [rect, setRect] = useState<TargetRect | null>(null)
-  const [ready, setReady] = useState(false)
 
   const stepIndexRef = useRef(stepIndex)
   stepIndexRef.current = stepIndex
 
+  // A short spatial orientation only — concepts are taught by the vault notes
+  // themselves (open "Welcome to Meridian"). Purely Next/Back: nothing
+  // auto-advances, so trying the app out never desyncs or kills the tour.
   const steps = useMemo<Step[]>(() => [
     {
       title: 'Welcome to Meridian',
-      body: 'Meridian keeps your notes, events, and tasks as plain Markdown files in a folder you own. Let\'s take a quick look around.',
+      body: 'Meridian keeps your notes, events, and tasks as plain Markdown files in a folder you own. Here\'s a quick look at where things live.',
       target: '#mainTop',
       before: async () => {
         setSidebarOpen(false)
@@ -54,46 +47,17 @@ export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry 
     },
     {
       title: 'Your Agenda',
-      body: 'Dated events and tasks appear here, sorted by day. Scroll to travel through time — undated notes are reachable via the search bar.',
-      target: '[data-tour="main-content"]',
-      before: async () => {
-        navigateHome()
-        await sleep(100)
-      },
-    },
-    {
-      title: 'Switch views',
-      body: 'Tap Agenda, Month, or Day to change how you see your calendar. Try switching — or tap Next to continue.',
-      target: '[data-tour="nav-group"]',
-      before: async () => {
-        setSidebarOpen(true)
-        await sleep(350)
-      },
-      autoAdvance: 'route-changed',
-    },
-    {
-      title: 'Open an item',
-      body: 'Tap any card to read or edit it. Each item opens an editor right here in the app.',
+      body: 'Dated tasks and events appear here, by day. Tap any card to open it — start with “Welcome to Meridian” to learn the ideas at your own pace.',
       target: '[data-tour="entry-card"]',
       before: async () => {
         setSidebarOpen(false)
         navigateHome()
         await sleep(200)
       },
-      autoAdvance: 'editor-opened',
-    },
-    {
-      title: 'The editor',
-      body: 'Set the date, time, priority, tags, and body here. Type [[ to link another note. In your own vault, changes save automatically — this sandbox is read-only.',
-      target: null,
-      before: async () => {
-        openTourEntry()
-        await sleep(200)
-      },
     },
     {
       title: 'Search & create',
-      body: 'Type in the search bar to find any note, event, or task. Tap + to create something new. Try typing something — or tap Next.',
+      body: 'Type in the search bar to find any note, event, or task — including undated ones. Tap + to create something new.',
       target: '[data-tour="search-bar"]',
       before: async () => {
         navigateHome()
@@ -101,32 +65,36 @@ export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry 
       },
     },
     {
-      title: 'Make it yours',
-      body: 'This example vault is read-only. Open Settings to add a local folder — your notes stay as plain Markdown files you own, with no lock-in.',
-      target: '[data-tour="manage-vaults"]',
+      title: 'The menu',
+      body: 'Open the menu (☰) to switch between Agenda, Month, and Day, reach your favorites, and manage vaults in Settings. That\'s it — explore freely.',
+      target: '[data-tour="nav-group"]',
       before: async () => {
         navigateHome()
         setSidebarOpen(true)
         await sleep(350)
       },
     },
-  ], [setSidebarOpen, navigateHome, openTourEntry])
+  ], [setSidebarOpen, navigateHome])
 
-  // Start tour once on example vault (never again after Skip/Done)
+  // Auto-start once on the example vault (never again after Skip/Done)
   useEffect(() => {
     if (activeVaultId === 'example' && !isTourDone()) {
       setActive(true)
     }
   }, [activeVaultId])
 
+  // Relaunch on demand (menu → Replay tour)
+  useEffect(() => onReplayTour(() => {
+    setStepIndex(0)
+    setActive(true)
+  }), [])
+
   const advance = useCallback(() => {
     setStepIndex(i => i + 1)
-    setReady(false)
   }, [])
 
   const back = useCallback(() => {
     setStepIndex(i => Math.max(0, i - 1))
-    setReady(false)
   }, [])
 
   const dismiss = useCallback(() => {
@@ -140,7 +108,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry 
   useEffect(() => {
     if (!active) return
     const currentStep = stepIndex
-    setReady(false)
     setRect(null)
 
     const step = steps[currentStep]
@@ -155,7 +122,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry 
           setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
         }
       }
-      setReady(true)
     })()
 
     const onResize = () => {
@@ -169,18 +135,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome, openTourEntry 
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [active, stepIndex, steps])
-
-  // Auto-advance: user switched to a different view
-  useEffect(() => {
-    if (!active || !ready) return
-    if (steps[stepIndex]?.autoAdvance === 'route-changed' && pathname !== '/') advance()
-  }, [active, ready, pathname, stepIndex, steps, advance])
-
-  // Auto-advance: user opened an entry in the editor
-  useEffect(() => {
-    if (!active || !ready) return
-    if (steps[stepIndex]?.autoAdvance === 'editor-opened' && editorParam) advance()
-  }, [active, ready, editorParam, stepIndex, steps, advance])
 
   if (!active) return null
 

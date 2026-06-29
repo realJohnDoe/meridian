@@ -13,7 +13,6 @@ import { AppSidebar, SyncButton, SearchBar } from '@/components'
 import { Button } from '@/components/ui/button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
-import { slugRoute } from './-entryRoute'
 import { TopbarSlotContext } from './-topbarSlot'
 
 export const Route = createFileRoute('/_app')({
@@ -73,7 +72,6 @@ function AppMain() {
   }
 
   const navigateHome   = useCallback(() => navigate({ to: '/' }), [navigate])
-  const openTourEntry  = useCallback(() => navigate(slugRoute('02-your-first-task')), [navigate])
   const openSidebar    = () => setSidebarOpen(true)
 
   // Callback ref so the portal target is available synchronously after mount.
@@ -130,7 +128,6 @@ function AppMain() {
       <CoachTour
         setSidebarOpen={setSidebarOpen}
         navigateHome={navigateHome}
-        openTourEntry={openTourEntry}
       />
     </TopbarSlotContext.Provider>
   )
