@@ -13,7 +13,7 @@ interface Props {
 
 function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
   return (
-    <div className="day-section scroll-mt-2" data-overdue>
+    <div>
       <div className={cn(
         'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-yellow-500',
         'flex items-center gap-2 bg-background',
