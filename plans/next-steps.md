@@ -1,7 +1,6 @@
 ## Next steps
 
 - Reuse fom in all views
-- Switch font to Inter
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate subdirectory / hexagonal architecture violations
 - Add Solarized Light Theme
