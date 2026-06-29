@@ -11,10 +11,6 @@
 - Investigate flip animation in items section
 - Add vault retention period
 
-# Leftover from Performance optimization
-
-3. Magic size estimates. HEADER_H = 40 / ROW_H = 68 in AgendaView.tsx:25 are hand-tuned guesses that can silently drift from the real card CSS (padding changes, meta rows, avatars). measureElement corrects them after render, but bad estimates cause scrollbar drift on long flings. A small comment tying them to the source-of-truth heights, or measuring once, would harden this.
-
 # Meridian — Code Health Survey
 
 ## 1. Health verdict
