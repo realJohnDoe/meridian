@@ -3,7 +3,7 @@ import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
 
-import { expandWithMultiday, multidayDisplayTitle, weekStartsOn } from '@/model'
+import { useExpandWithMultiday, multidayDisplayTitle, weekStartsOn } from '@/model'
 import { sameDay } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
@@ -103,35 +103,39 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   const monthRef = useRef(month)
   useEffect(() => { monthRef.current = month }, [month])
 
-  const { cells, occsByDay } = useMemo(() => {
+  // useExpandWithMultiday caches by (fromMs, toMs, items structure, roots) so
+  // non-structural edits (done-toggle, priority change) skip re-expansion here
+  // just as they do in Agenda and Day views.
+  const allOccs = useExpandWithMultiday(items, roots, new Date(y, m, 1), new Date(y, m + 1, 0, 23, 59, 59))
+
+  // Cell grid depends only on month shape and locale week-start — independent of occurrences.
+  const cells = useMemo(() => {
     const rawFirst = new Date(y, m, 1).getDay()
     const first    = (rawFirst - ws + 7) % 7
     const dim      = new Date(y, m + 1, 0).getDate()
     const prev     = new Date(y, m, 0).getDate()
     const nc       = (7 - (first + dim) % 7) % 7
 
-    const cells: Array<{ date: Date; other: boolean }> = []
-    for (let i = first - 1; i >= 0; i--)  cells.push({ date: new Date(y, m - 1, prev - i), other: true })
-    for (let d = 1; d <= dim; d++)         cells.push({ date: new Date(y, m, d),             other: false })
-    for (let d = 1; d <= nc; d++)          cells.push({ date: new Date(y, m + 1, d),          other: true })
+    const out: Array<{ date: Date; other: boolean }> = []
+    for (let i = first - 1; i >= 0; i--)  out.push({ date: new Date(y, m - 1, prev - i), other: true })
+    for (let d = 1; d <= dim; d++)         out.push({ date: new Date(y, m, d),             other: false })
+    for (let d = 1; d <= nc; d++)          out.push({ date: new Date(y, m + 1, d),          other: true })
+    return out
+  }, [y, m, ws])
 
-    const from = new Date(y, m, 1)
-    const to   = new Date(y, m + 1, 0, 23, 59, 59)
-    const occs = filterOccs(expandWithMultiday(items, roots, from, to))
-
-    const occsByDay = new Map<string, Occurrence[]>()
-    for (const o of occs) {
+  const occsByDay = useMemo(() => {
+    const map = new Map<string, Occurrence[]>()
+    for (const o of filterOccs(allOccs)) {
       if (!o.metadata.jsTime) continue
       const d = o.metadata.jsTime
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-      const arr = occsByDay.get(key)
+      const arr = map.get(key)
       if (arr) arr.push(o)
-      else occsByDay.set(key, [o])
+      else map.set(key, [o])
     }
-    for (const [k, arr] of occsByDay) occsByDay.set(k, sortOccs(arr))
-
-    return { cells, occsByDay }
-  }, [items, roots, y, m, ws, filterOccs])
+    for (const [k, arr] of map) map.set(k, sortOccs(arr))
+    return map
+  }, [allOccs, filterOccs])
 
   const wrapRef = useRef<HTMLDivElement>(null)
   useHorizontalSwipe(
