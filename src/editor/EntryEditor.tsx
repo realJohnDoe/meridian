@@ -146,10 +146,6 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
     <>
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-[720px] lg:mx-auto">
 
-        {item && (
-          <p className="font-mono text-2xs text-muted-foreground/60 mb-3">{item.fileSlug}</p>
-        )}
-
         {/* ── FILE-LEVEL: listed-on reverse chips ── */}
         <ListedOnRow
           slugs={linkedSlugs}

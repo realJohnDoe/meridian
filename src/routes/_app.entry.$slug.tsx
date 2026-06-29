@@ -38,6 +38,7 @@ export const Route = createFileRoute('/_app/entry/$slug')({
 
 interface TopbarProps {
   title: string
+  fileSlug: string
   tracked: boolean
   done: boolean
   isFavorited: boolean
@@ -48,7 +49,7 @@ interface TopbarProps {
   onDelete: () => void
 }
 
-function EntryTopbar({ title, tracked, done, isFavorited, onTitleChange, onAutoSave, onDoneToggle, onToggleFavorite, onDelete }: TopbarProps) {
+function EntryTopbar({ title, fileSlug, tracked, done, isFavorited, onTitleChange, onAutoSave, onDoneToggle, onToggleFavorite, onDelete }: TopbarProps) {
   const slotEl = useTopbarSlot()
   const { setOpenMobile, isMobile } = useSidebar()
   if (!slotEl) return null
@@ -62,13 +63,16 @@ function EntryTopbar({ title, tracked, done, isFavorited, onTitleChange, onAutoS
       {tracked && (
         <Checkbox checked={done} onCheckedChange={onDoneToggle} className="shrink-0" />
       )}
-      <input
-        type="text"
-        className="flex-1 font-[family-name:var(--disp)] text-base text-foreground bg-transparent border-none outline-none truncate min-w-0 placeholder:text-muted-foreground"
-        value={title}
-        placeholder="Title"
-        onChange={e => { onTitleChange(e.target.value); onAutoSave() }}
-      />
+      <div className="flex-1 flex flex-col justify-center min-w-0 overflow-hidden">
+        <input
+          type="text"
+          className="font-[family-name:var(--disp)] text-base text-foreground bg-transparent border-none outline-none truncate min-w-0 placeholder:text-muted-foreground leading-tight"
+          value={title}
+          placeholder="Title"
+          onChange={e => { onTitleChange(e.target.value); onAutoSave() }}
+        />
+        <span className="font-mono text-2xs text-muted-foreground/50 truncate leading-tight">{fileSlug}.md</span>
+      </div>
       <SyncButton />
       <Button
         variant="ghost" size="icon"
@@ -99,6 +103,7 @@ function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
     <>
       <EntryTopbar
         title={hooks.entry.title}
+        fileSlug={occ.fileSlug}
         tracked={hooks.entry.tracked}
         done={hooks.entry.done}
         isFavorited={isFavorited}
