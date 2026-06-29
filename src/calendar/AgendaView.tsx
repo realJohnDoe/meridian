@@ -17,7 +17,12 @@ const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 
 // Size estimates for the virtualizer. Real sizes are measured after render
 // (measureElement); accurate estimates just keep the scrollbar/scrollToIndex
-// stable before a section has been measured.
+// stable before a section has been measured. initialMeasurementsCache means
+// returning users always get real sizes — estimates only matter on first visit.
+//
+// HEADER_H: DaySection header div — pt-3.5 (14) + pb-1.5 (6) + text-xs line (~20) ≈ 40px
+// ROW_H:    OccurrenceCard min-h-[44px] + py-2 padding + OccurrenceRow mb-1.5 (6) ≈ 68px
+// Update these if the header/card padding changes in DaySection.tsx / OccurrenceCard.tsx.
 const HEADER_H = 40
 const ROW_H = 68
 
