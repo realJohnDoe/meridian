@@ -141,9 +141,6 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   const isScheduled = !!(item && seriesRepeat?.type === 'schedule')
   const isAfterCompletion = !!(item && seriesRepeat?.type === 'after_completion')
   const hasSched = !!(item && item.date)
-  const fname = item
-    ? ((item.fileSlug || item.metadata?.title || 'untitled') + '.md').toLowerCase().replace(/\s+/g, '-')
-    : 'untitled.md'
 
   const hasDate = !!scheduled
   const hasTime = !!(scheduled?.time)
@@ -183,16 +180,6 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
             }}
           />
         </div>
-
-        {/* ── FILE-LEVEL: slug + tags ── */}
-        {(fname !== 'untitled.md' || entry.tags.length > 0) && (
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="font-mono text-2xs text-muted-foreground">{fname}</span>
-            {entry.tags.map(tag => (
-              <span key={tag} className="font-mono text-2xs text-muted-foreground opacity-70">#{tag}</span>
-            ))}
-          </div>
-        )}
 
         {/* ── FILE-LEVEL: listed-on reverse chips ── */}
         <ListedOnRow

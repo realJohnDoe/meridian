@@ -40,7 +40,7 @@ function NewEntryTopbar({ title, onSave }: { title: string; onSave: () => void }
           <Menu size={18} />
         </Button>
       )}
-      <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground truncate min-w-0">
+      <span className="flex-1 font-[family-name:var(--disp)] italic text-base text-foreground truncate min-w-0">
         {title || 'New entry'}
       </span>
       <Button variant="default" size="sm" onClick={onSave}>Save</Button>
