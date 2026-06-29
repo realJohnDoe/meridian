@@ -7,14 +7,13 @@ import { backlinksTo } from '@/fileOccurrence'
 
 interface Props {
   occ: Occurrence
-  index: number
   onOpen: (occ: Occurrence) => void
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
   showDate?: boolean
 }
 
-function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
+function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
   const roots    = useStore(s => s.roots)
   const listedOn = useMemo(
     () => backlinksTo(occ.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug),
@@ -25,8 +24,6 @@ function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete, showDa
   const rowRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
   const iconRef = useRef<SVGSVGElement>(null)
-  // Lock the stagger delay at first mount so reordering never restarts the entry animation.
-  const staggerRef = useRef(index)
 
   // Keep a stable ref to the callback so the touch-listener closure never goes stale.
   const onSwipeDeleteRef = useRef(onSwipeDelete)
@@ -133,7 +130,6 @@ function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete, showDa
       className="relative overflow-hidden rounded-lg mx-2 mb-1.5"
       ref={wrapRef}
       data-occ-key={occ.id}
-      style={{ '--stagger': `${staggerRef.current * 0.025}s` } as React.CSSProperties}
     >
       {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
       <div
@@ -158,6 +154,7 @@ function OccurrenceRow({ occ, index, onOpen, onToggleDone, onSwipeDelete, showDa
           onToggleDone={() => onToggleDone(occ)}
           showDate={showDate}
           listedOn={listedOn}
+          animate={false}
         />
       </div>
     </div>

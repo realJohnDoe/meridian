@@ -37,11 +37,10 @@ function DaySection({
       )}>{label}</div>
 
       {/* Occurrence rows */}
-      {items.map((o, i) => (
+      {items.map(o => (
         <OccurrenceRow
           key={o.id}
           occ={o}
-          index={i}
           onOpen={onOpen}
           onToggleDone={onToggleDone}
           onSwipeDelete={onSwipeDelete}
