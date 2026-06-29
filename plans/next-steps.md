@@ -14,8 +14,6 @@
 
 # Leftover from Performance optimization
 
-1. The card entrance animation now replays on every scroll-in. OccurrenceCard has animation: 'fadeUp .16s ease both' (OccurrenceCard.tsx:134). Virtualization unmounts off-screen rows and remounts them on return, so the fade-up fires every time a row scrolls into view — not just on first load. It may read as a nice reveal or as flicker during fast scrolling; either way it's a behavior change we should consciously decide on (e.g. gate the animation to first mount, or drop it for virtualized rows). The staggerRef/--stagger logic (OccurrenceRow.tsx:29) is also now semantically muddy since index is section-local.
-
 2. Dead DOM hooks left behind. findTopDate and the old scrollIntoView goToday are gone, so .day-section, data-key, data-overdue, and scroll-mt-2 (DaySection.tsx:31, OverdueSection.tsx:16) are now vestigial — the .day-section class has no CSS rule at all anymore. Harmless but misleading; worth a cleanup pass.
 
 3. Magic size estimates. HEADER_H = 40 / ROW_H = 68 in AgendaView.tsx:25 are hand-tuned guesses that can silently drift from the real card CSS (padding changes, meta rows, avatars). measureElement corrects them after render, but bad estimates cause scrollbar drift on long flings. A small comment tying them to the source-of-truth heights, or measuring once, would harden this.
