@@ -3,7 +3,6 @@
 - Reuse fom in all views
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
 - Investigate subdirectory / hexagonal architecture violations
-- Investigate how to change EntryEditor: Own endpoint / Top bar visible
 - Add Solarized Light Theme
 - Investigate more secure storage options
 - Consider if name and logo are still good
