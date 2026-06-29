@@ -7,7 +7,6 @@ import { useFlipReorder } from '@/hooks'
 
 
 interface Props {
-  dateKey: string
   date: Date
   isToday: boolean
   isTomorrow: boolean
@@ -18,7 +17,7 @@ interface Props {
 }
 
 function DaySection({
-  dateKey, date, isToday, isTomorrow,
+  date, isToday, isTomorrow,
   items,
   onOpen, onToggleDone, onSwipeDelete,
 }: Props) {
@@ -28,7 +27,7 @@ function DaySection({
   const label = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : fmtLong(date)
 
   return (
-    <div className="day-section scroll-mt-2" data-key={dateKey} ref={sectionRef}>
+    <div ref={sectionRef}>
       <div className={cn(
         'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-muted-foreground',
         'flex items-center gap-2 bg-background',
