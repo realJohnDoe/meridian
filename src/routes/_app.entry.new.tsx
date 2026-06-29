@@ -1,11 +1,12 @@
 import { lazy, Suspense, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { createFileRoute, useRouter, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft } from 'lucide-react'
+import { createFileRoute } from '@tanstack/react-router'
+import { Menu } from 'lucide-react'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor/useEntryEditor'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useSidebar } from '@/components/ui/sidebar'
 import { useTopbarSlot } from './-topbarSlot'
 
 const EditorShell = lazy(() => import('@/editor').then(m => ({ default: m.EditorShell })))
@@ -28,38 +29,37 @@ export const Route = createFileRoute('/_app/entry/new')({
   }),
 })
 
-function NewEntryTopbar({ title, onClose }: { title: string; onClose: () => void }) {
+function NewEntryTopbar({ title, onSave }: { title: string; onSave: () => void }) {
   const slotEl = useTopbarSlot()
+  const { setOpenMobile, isMobile } = useSidebar()
   if (!slotEl) return null
   return createPortal(
-    <div className="flex items-center gap-2 w-full lg:max-w-[720px] lg:mx-auto px-3.5">
-      <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={onClose}>
-        <ArrowLeft size={18} />
-      </Button>
-      <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground truncate">
+    <div className="flex items-center gap-1 w-full lg:max-w-[720px] lg:mx-auto px-3.5">
+      {isMobile && (
+        <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={() => setOpenMobile(true)} title="Menu">
+          <Menu size={18} />
+        </Button>
+      )}
+      <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground truncate min-w-0">
         {title || 'New entry'}
       </span>
+      <Button variant="default" size="sm" onClick={onSave}>Save</Button>
     </div>,
     slotEl,
   )
 }
 
 function NewEntryReady({ title }: { title?: string }) {
-  const items  = useStore(s => s.items)
-  const roots  = useStore(s => s.roots)
-  const router = useRouter()
-  const navigate = useNavigate()
-
-  const handleClose = () => {
-    if (window.history.length > 1) router.history.back()
-    else navigate({ to: '/' })
-  }
-
+  const items = useStore(s => s.items)
+  const roots = useStore(s => s.roots)
   const hooks = useEntryEditor(null, 'all', title)
 
   return (
     <>
-      <NewEntryTopbar title={hooks.entry.title} onClose={handleClose} />
+      <NewEntryTopbar
+        title={hooks.entry.title}
+        onSave={() => hooks.triggerSaveRef.current()}
+      />
       <Suspense fallback={<EntrySkeleton />}>
         <EditorShell entry={hooks.entry} hooks={hooks} items={items} roots={roots} />
       </Suspense>
@@ -69,7 +69,6 @@ function NewEntryReady({ title }: { title?: string }) {
 
 function NewEntryPage() {
   const { title } = Route.useSearch()
-  // Stable key so the entry doesn't reset if search params change
   const key = useMemo(() => `new-${title ?? ''}`, [])  // eslint-disable-line react-hooks/exhaustive-deps
   return <NewEntryReady key={key} title={title} />
 }

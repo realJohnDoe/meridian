@@ -54,6 +54,8 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Populated by EntryEditor once CodeMirror mounts; used by saveMeta to capture current body
   const getBodyRef = useRef<() => string>(() => '')
+  // Populated by EntryEditor; allows topbar Save button to trigger a full save (body + pending links)
+  const triggerSaveRef = useRef<() => void>(() => {})
   // Always points to the latest entry so timer callbacks don't close over stale state
   const entryRef = useRef(entry)
   entryRef.current = entry
@@ -232,6 +234,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   return {
     entry, setEntry,
     getBodyRef,
+    triggerSaveRef,
     saveMeta,
     handleOpenWikilink,
     handleSave,

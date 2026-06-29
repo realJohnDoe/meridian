@@ -1,13 +1,15 @@
 import { lazy, Suspense, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { createFileRoute, useRouter, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Heart, Trash2 } from 'lucide-react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { ArrowLeft, Heart, Menu, Trash2 } from 'lucide-react'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor/useEntryEditor'
 import { expandRange } from '@/model'
 import { isEditScope } from '@/types'
+import { SyncButton } from '@/components'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { useTopbarSlot } from './-topbarSlot'
 import type { Occurrence, EditScope } from '@/types'
@@ -36,22 +38,25 @@ export const Route = createFileRoute('/_app/entry/$slug')({
 interface TopbarProps {
   title: string
   isFavorited: boolean
-  onClose: () => void
   onToggleFavorite: () => void
   onDelete: () => void
 }
 
-function EntryTopbar({ title, isFavorited, onClose, onToggleFavorite, onDelete }: TopbarProps) {
+function EntryTopbar({ title, isFavorited, onToggleFavorite, onDelete }: TopbarProps) {
   const slotEl = useTopbarSlot()
+  const { setOpenMobile, isMobile } = useSidebar()
   if (!slotEl) return null
   return createPortal(
-    <div className="flex items-center gap-2 w-full lg:max-w-[720px] lg:mx-auto px-3.5">
-      <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={onClose}>
-        <ArrowLeft size={18} />
-      </Button>
-      <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground truncate">
+    <div className="flex items-center gap-1 w-full lg:max-w-[720px] lg:mx-auto px-3.5">
+      {isMobile && (
+        <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={() => setOpenMobile(true)} title="Menu">
+          <Menu size={18} />
+        </Button>
+      )}
+      <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground truncate min-w-0">
         {title}
       </span>
+      <SyncButton />
       <Button
         variant="ghost" size="icon"
         className={cn('rounded-full shrink-0', isFavorited ? 'text-rose-400' : 'text-dim')}
@@ -69,19 +74,12 @@ function EntryTopbar({ title, isFavorited, onClose, onToggleFavorite, onDelete }
 }
 
 function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
-  const items         = useStore(s => s.items)
-  const roots         = useStore(s => s.roots)
-  const favorites     = useStore(s => s.favorites)
+  const items          = useStore(s => s.items)
+  const roots          = useStore(s => s.roots)
+  const favorites      = useStore(s => s.favorites)
   const toggleFavorite = useStore(s => s.toggleFavorite)
-  const router        = useRouter()
-  const navigate      = useNavigate()
 
   const isFavorited = favorites.includes(occ.fileSlug)
-  const handleClose = () => {
-    if (window.history.length > 1) router.history.back()
-    else navigate({ to: '/' })
-  }
-
   const hooks = useEntryEditor(occ, scope ?? 'single')
 
   return (
@@ -89,7 +87,6 @@ function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
       <EntryTopbar
         title={hooks.entry.title}
         isFavorited={isFavorited}
-        onClose={handleClose}
         onToggleFavorite={() => toggleFavorite(occ.fileSlug)}
         onDelete={hooks.handleDelete}
       />
@@ -101,9 +98,9 @@ function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
 }
 
 function EntrySlugPage() {
-  const { slug }              = Route.useParams()
-  const { date, scope }       = Route.useSearch()
-  const navigate              = useNavigate()
+  const { slug }        = Route.useParams()
+  const { date, scope } = Route.useSearch()
+  const navigate        = useNavigate()
 
   const items        = useStore(s => s.items)
   const roots        = useStore(s => s.roots)
@@ -124,7 +121,7 @@ function EntrySlugPage() {
   if (!occ) return (
     <div className="flex flex-col px-3.5 pt-4 lg:max-w-[720px] lg:mx-auto w-full">
       <Button variant="ghost" size="icon" className="rounded-full text-dim mb-4 self-start"
-        onClick={() => { if (window.history.length > 1) navigate({ to: '/' }); else navigate({ to: '/' }) }}>
+        onClick={() => navigate({ to: '/' })}>
         <ArrowLeft size={18} />
       </Button>
       <p className="text-muted-foreground text-sm">Item not found.</p>

@@ -66,6 +66,7 @@ interface Props {
   onAutoSave?: (body: string) => void
   onMetaSave?: (next: EntryState) => void
   getBodyRef?: React.MutableRefObject<() => string>
+  triggerSaveRef?: React.MutableRefObject<() => void>
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: EditScope) => void
@@ -77,7 +78,7 @@ interface Props {
   onToggleDoneBacklink?: (occ: Occurrence) => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, triggerSaveRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
   const navigate           = useNavigate()
   const hour12             = useStore(s => s.localePrefs.hour12)
   const defaultParticipants = useStore(s => s.defaultParticipants)
@@ -122,6 +123,13 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
   const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(item, title)
+
+  // Updated every render so the topbar Save button always calls with current body + pending links
+  if (triggerSaveRef) triggerSaveRef.current = () => {
+    onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+    flushOnSave(titleToSlug(title))
+  }
+
   const linkedSlugs = useMemo(
     () => [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs],
     [effectiveSlug, roots, pendingSlugs],
@@ -297,15 +305,6 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
           onOpenWikilink={onOpenWikilink}
           onToggleDone={onToggleDoneBacklink}
         />
-
-        {!item && (
-          <div className="mt-6 flex justify-end">
-            <Button variant="default" onClick={() => {
-              onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
-              flushOnSave(titleToSlug(title))
-            }}>Save</Button>
-          </div>
-        )}
 
       </div></div>
     </>
