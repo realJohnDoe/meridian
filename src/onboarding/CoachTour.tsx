@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useStore } from '@/store'
-import { isTourDone, markTourDone, onReplayTour } from './tourState'
+import { isTourDone, markTourDone } from './tourState'
 import { Button } from '@/components/ui/button'
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
@@ -71,12 +71,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
       setActive(true)
     }
   }, [activeVaultId])
-
-  // Relaunch on demand (menu → Replay tour)
-  useEffect(() => onReplayTour(() => {
-    setStepIndex(0)
-    setActive(true)
-  }), [])
 
   const advance = useCallback(() => {
     setStepIndex(i => i + 1)

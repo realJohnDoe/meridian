@@ -1,12 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
-import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X, Compass } from 'lucide-react'
+import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { setActiveVault } from '@/storage'
 import { fmtISO, fmtMonth } from '@/model'
 import { useToday } from '@/hooks'
 import { vaultIcon } from './vaultIcon'
-import { replayTour } from '@/onboarding'
 import SettingsDialog from './SettingsDialog'
 import { Checkbox } from './ui/checkbox'
 import { NO_PARTICIPANT } from '@/hooks'
@@ -199,17 +198,6 @@ export default function AppSidebar() {
                 )
               })}
               <SidebarSeparator />
-              {activeVaultId === 'example' && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => { close(); replayTour() }}
-                    className="gap-[14px] px-5 h-auto py-[11px] text-[14px] font-medium rounded-none"
-                  >
-                    <Compass className="size-[17px] stroke-[1.7] shrink-0" />
-                    Replay tour
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
               <SidebarMenuItem>
                 <SidebarMenuButton
                   data-tour="manage-vaults"
