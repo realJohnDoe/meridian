@@ -10,7 +10,7 @@ import { sortOccs } from './occSort'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import DaySection from './DaySection'
 import OverdueSection from './OverdueSection'
-import { useToday, useParticipantFilter } from '@/hooks'
+import { useToday, useCalendarFilter } from '@/hooks'
 
 const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 
@@ -40,7 +40,7 @@ export default function AgendaView({ onOpen, scrollRef }: Props) {
   const roots = useStore(s => s.roots)
   const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
 
-  const { filterOccs } = useParticipantFilter()
+  const { filterOccs } = useCalendarFilter()
 
   const from = addDays(today, -365)
   const to = addDays(today, 90)

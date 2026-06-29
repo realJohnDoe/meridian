@@ -9,7 +9,7 @@ import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 
 const EMPTY: Occurrence[] = []
-import { useToday, useParticipantFilter } from '@/hooks'
+import { useToday, useCalendarFilter } from '@/hooks'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
@@ -82,7 +82,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   const items       = useStore(s => s.items)
   const roots       = useStore(s => s.roots)
   const localePrefs = useStore(s => s.localePrefs)
-  const { filterOccs } = useParticipantFilter()
+  const { filterOccs } = useCalendarFilter()
 
   const ws = weekStartsOn(localePrefs) // 0=Sun, 1=Mon, 6=Sat
 
