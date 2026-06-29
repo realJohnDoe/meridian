@@ -185,7 +185,6 @@ export default function AgendaView({ onOpen }: Props) {
                   />
                 ) : (
                   <DaySection
-                    dateKey={section.dateKey}
                     date={section.date}
                     isToday={section.isToday}
                     isTomorrow={section.isTomorrow}
