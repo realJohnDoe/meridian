@@ -77,7 +77,7 @@ export default function AppSidebar() {
             style={{ borderRadius: 5 }}
             alt="Meridian"
           />
-          <span className="font-[family-name:var(--disp)] italic text-[16px] text-sidebar-foreground">Meridian</span>
+          <span className="text-[18px] text-sidebar-foreground">Meridian</span>
         </SidebarHeader>
 
         <SidebarContent>

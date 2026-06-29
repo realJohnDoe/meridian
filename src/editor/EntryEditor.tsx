@@ -171,7 +171,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
           <div className="flex-1 min-w-0">
             <textarea
               ref={titleRef}
-              className="w-full font-[family-name:var(--disp)] text-2xl font-light text-foreground bg-transparent border-none outline-none leading-snug resize-none placeholder:text-muted-foreground"
+              className="w-full text-2xl font-light text-foreground bg-transparent border-none outline-none leading-snug resize-none placeholder:text-muted-foreground"
               placeholder="Title"
               rows={1}
               value={title}
