@@ -92,10 +92,12 @@ Every entry is a Markdown file. Here's a simple weekly task:
 ---
 title: Write weekly review
 date: 2026-06-27
-type: task
+done: false
 priority: high
 duration: 30m
-repeat: weekly
+repeat:
+  type: schedule
+  freq: weekly
 tags: [review, planning]
 participants: [alice, bob]
 ---
