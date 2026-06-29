@@ -2,16 +2,53 @@
 
 **A calm calendar, task manager, and notes app built on plain Markdown files.**
 
-Meridian is a free, open-source PWA that blends task management, event scheduling, and note-taking into a single timeline — and stores everything as plain Markdown files you can read, edit, and back up anywhere.
+Meridian blends task management, event scheduling, and note-taking into a single timeline — and stores everything as plain Markdown files you can read, edit, and back up anywhere. It's a free, open-source PWA.
 
 **[Open the app →](https://realjohndoe.github.io/meridian/)**
+
+---
+
+## 💡 The ideas behind Meridian
+
+Three principles shape everything in Meridian.
+
+### 1. Everything is a list of items
+
+Tasks, projects, events, tags, and notes look like different things, but underneath they're the same: a **list** with **items**. The more abstract concept is the list; the more concrete concepts are its items.
+
+| Entry | Is a list with… | Its items are usually… |
+|---|---|---|
+| **Task** | a `done` property | subtasks |
+| **Project** | a `done` property | tasks |
+| **Event** | a `date`, plus optional `time` and `duration` | agenda points or follow-up tasks |
+| **Tag** | — | everything tagged with it |
+| **Note** | no special properties | related entries |
+
+There are more ways to read this, and that's the point: one simple idea bends to fit how *you* think, instead of locking you into separate "task" and "event" and "note" silos.
+
+### 2. Everything is a plain Markdown file
+
+Every entry is a `.md` file with YAML frontmatter — free text for your notes, structured fields for the metadata. That gives you the best of both worlds, and three concrete benefits:
+
+- **It's yours.** Open, edit, grep, or back up your files with any tool. No lock-in, no proprietary database.
+- **It's easy to debug.** When something looks off, you can read the file and see exactly why.
+- **It syncs cleanly.** Each item is its own file, so two devices only conflict when they edit *the very same item* — not the whole calendar.
+
+### 3. A recurrence model that bends to real life
+
+Real schedules aren't tidy, so Meridian's recurrence model goes well beyond "repeats weekly":
+
+- **Cancel or shift a single occurrence** without touching the rest of the series.
+- **Irregular schedules** — pin one-off occurrences alongside a repeating pattern in the same entry.
+- **Multiple series in one entry** — e.g. something on the *first and second Friday* of every month, or a daily check-in that later switches to "2 days after I finish it."
+- **Weekday-specific, set-position, interval, and after-completion** rules, in any combination.
 
 ---
 
 ## ✨ What it does
 
 - **Agenda, day, and month views** — see your tasks and events in whatever layout suits the moment.
-- **Tasks, events, and notes in one place** — every entry lives in a Markdown file with YAML frontmatter for metadata, so it's readable outside Meridian too.
+- **Tasks, events, and notes in one place** — all the same kind of thing, all on one timeline.
 - **Rich recurrence** — daily, weekly, monthly, yearly, custom intervals, weekday-specific patterns, and "repeat N days after completion" — without fiddling with a wizard.
 - **Wikilinks** — connect entries with `[[Note Title]]` links that render as inline chips with a preview popover.
 - **Participants** — tag people on entries and filter the whole calendar to show only their items.
@@ -49,7 +86,7 @@ Files are plain `.md` files. Open them in any text editor, check them into git, 
 
 ## 📄 Entry format
 
-Every entry is a Markdown file. Here's what a task looks like:
+Every entry is a Markdown file. Here's a simple weekly task:
 
 ```markdown
 ---
@@ -64,6 +101,27 @@ participants: [alice, bob]
 ---
 
 Notes about this task go here, in plain Markdown.
+```
+
+Because an entry is a list, recurrence lives in its **occurrences**. You can override or skip any one of them, and even mix several patterns in the same entry — here, exercise repeats every Monday/Wednesday/Friday, with one occurrence already marked done:
+
+```markdown
+---
+defaults:
+  title: Exercise
+  done: false
+  tags: [health]
+date: 2026-04-06
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday: [mo, we, fr]
+instances:
+  - date: 2026-04-06
+    done: true
+---
+
+30 min run or gym. Part of [[health-habits]] tracking.
 ```
 
 You can write and edit these files by hand if you prefer — Meridian will pick up any changes on the next sync.
