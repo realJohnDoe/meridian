@@ -169,67 +169,126 @@
   --nh: 0px; --th: 54px; --r: var(--radius); --rl: 16px; --rx: 24px;
 }
 
-/* ── ONE DARK THEME ─────────────────────────────────────────── */
+/* ── TOKYO NIGHT THEME ──────────────────────────────────────────── */
 /* Class-scoped override (set by next-themes). Only the authored per-theme
    tokens are restated; the color-mix derived tokens above re-derive from these.
    The three absolute derived tokens (--primary-dark, --brand-cyan-dark,
    --surface-raised) are not color-mix based, so they are restated here too. */
-.one-dark {
-  /* Surfaces — One Dark elevation ramp (darkened from stock palette) */
-  --backdrop:   #13161b;
-  --background:  #1a1d23;
-  --card:        #21252b;
-  --popover:     #21252b;
-  --secondary:   #2a2f38;
-  --muted:       #2a2f38;
-  --accent:      #2a2f38;
+.tokyo-night {
+  /* Surfaces — Tokyo Night elevation ramp */
+  --backdrop:   #13141e;
+  --background: #1a1b2e;
+  --card:       #1f2040;
+  --popover:    #1f2040;
+  --secondary:  #292b47;
+  --muted:      #292b47;
+  --accent:     #292b47;
 
   /* Text */
-  --foreground:           #d7dae0;
-  --card-foreground:      #d7dae0;
-  --popover-foreground:   #d7dae0;
-  --accent-foreground:    #d7dae0;
-  --secondary-foreground: #abb2bf;
-  --muted-foreground:     #5c6370;
-  --dim:                  #828997;
+  --foreground:           #c0caf5;
+  --card-foreground:      #c0caf5;
+  --popover-foreground:   #c0caf5;
+  --accent-foreground:    #c0caf5;
+  --secondary-foreground: #a9b1d6;
+  --muted-foreground:     #565f89;
+  --dim:                  #737aa2;
 
-  /* Brand — One Dark blue as primary */
-  --primary:            #61afef;
-  --primary-foreground: #1a1d23;
-  --ring:               #61afef;
+  /* Brand — Tokyo Night magenta/pink as primary */
+  --primary:            #bb9af7;
+  --primary-foreground: #1a1b2e;
+  --ring:               #bb9af7;
 
   /* Destructive / warning */
-  --destructive: #e06c75;
-  --warning:     #e5c07b;
+  --destructive: #f7768e;
+  --warning:     #e0af68;
 
-  /* Borders — same color-mix recipe as default, One Dark slate */
-  --border: color-mix(in oklab, #abb2bf, transparent 92%);
-  --input:  color-mix(in oklab, #abb2bf, transparent 85%);
+  /* Borders */
+  --border: color-mix(in oklab, #565f89, transparent 80%);
+  --input:  color-mix(in oklab, #565f89, transparent 70%);
 
-  /* Domain colors — three distinct hues */
-  --event:        #c678dd;   /* magenta/purple */
-  --task:         #98c379;   /* green */
-  --note:         #56b6c2;   /* cyan (freed up by primary swap) */
-  --brand-cyan:   #56b6c2;   /* cyan — gradient accent */
-  --brand-purple: #c678dd;   /* magenta */
-  --priority-1:   #e06c75;   /* red */
-  --priority-2:   #d19a66;   /* orange */
-  --priority-3:   #e5c07b;   /* yellow */
+  /* Domain colors */
+  --event:        #bb9af7;   /* purple — alias of primary */
+  --task:         #9ece6a;   /* green */
+  --note:         #7dcfff;   /* cyan */
+  --brand-cyan:   #7dcfff;   /* cyan */
+  --brand-purple: #bb9af7;   /* purple */
+  --priority-1:   #f7768e;   /* red */
+  --priority-2:   #ff9e64;   /* orange */
+  --priority-3:   #e0af68;   /* yellow */
 
-  /* Sidebar — mirror default mapping */
-  --sidebar:                    #21252b;
-  --sidebar-foreground:         #abb2bf;
-  --sidebar-primary:            #61afef;
-  --sidebar-primary-foreground: #1a1d23;
-  --sidebar-accent:             #2a2f38;
-  --sidebar-accent-foreground:  #d7dae0;
-  --sidebar-border: color-mix(in oklab, #abb2bf, transparent 85%);
-  --sidebar-ring:               #61afef;
+  /* Sidebar */
+  --sidebar:                    #1f2040;
+  --sidebar-foreground:         #a9b1d6;
+  --sidebar-primary:            #bb9af7;
+  --sidebar-primary-foreground: #1a1b2e;
+  --sidebar-accent:             #292b47;
+  --sidebar-accent-foreground:  #c0caf5;
+  --sidebar-border: color-mix(in oklab, #565f89, transparent 70%);
+  --sidebar-ring:               #bb9af7;
 
-  /* Absolute derived tokens — not color-mix off the above */
-  --primary-dark:    #4d9fd8;
-  --brand-cyan-dark: #489aa6;
-  --surface-raised:  #2a2f38;
+  /* Absolute derived tokens */
+  --primary-dark:    #9d7de0;
+  --brand-cyan-dark: #5bb8e8;
+  --surface-raised:  #3b3f5c;
+}
+
+/* ── DRACULA THEME ──────────────────────────────────────────────── */
+.dracula {
+  /* Surfaces — Dracula elevation ramp */
+  --backdrop:   #191a21;
+  --background: #282a36;
+  --card:       #1e1f29;
+  --popover:    #1e1f29;
+  --secondary:  #373a4a;
+  --muted:      #373a4a;
+  --accent:     #373a4a;
+
+  /* Text */
+  --foreground:           #f8f8f2;
+  --card-foreground:      #f8f8f2;
+  --popover-foreground:   #f8f8f2;
+  --accent-foreground:    #f8f8f2;
+  --secondary-foreground: #cdd6f4;
+  --muted-foreground:     #6272a4;
+  --dim:                  #8b95bb;
+
+  /* Brand — Dracula purple as primary */
+  --primary:            #bd93f9;
+  --primary-foreground: #282a36;
+  --ring:               #bd93f9;
+
+  /* Destructive / warning */
+  --destructive: #ff5555;
+  --warning:     #f1fa8c;
+
+  /* Borders */
+  --border: color-mix(in oklab, #6272a4, transparent 80%);
+  --input:  color-mix(in oklab, #6272a4, transparent 70%);
+
+  /* Domain colors */
+  --event:        #bd93f9;   /* purple — alias of primary */
+  --task:         #50fa7b;   /* green */
+  --note:         #8be9fd;   /* cyan */
+  --brand-cyan:   #8be9fd;   /* cyan */
+  --brand-purple: #bd93f9;   /* purple */
+  --priority-1:   #ff5555;   /* red */
+  --priority-2:   #ffb86c;   /* orange */
+  --priority-3:   #f1fa8c;   /* yellow */
+
+  /* Sidebar */
+  --sidebar:                    #1e1f29;
+  --sidebar-foreground:         #cdd6f4;
+  --sidebar-primary:            #bd93f9;
+  --sidebar-primary-foreground: #282a36;
+  --sidebar-accent:             #373a4a;
+  --sidebar-accent-foreground:  #f8f8f2;
+  --sidebar-border: color-mix(in oklab, #6272a4, transparent 70%);
+  --sidebar-ring:               #bd93f9;
+
+  /* Absolute derived tokens */
+  --primary-dark:    #a07de0;
+  --brand-cyan-dark: #6dcfe8;
+  --surface-raised:  #44475a;
 }
 
 /* Element resets in @layer base so Tailwind utilities can override them */

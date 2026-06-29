@@ -39,16 +39,29 @@ const THEMES: { id: string; label: string; background: string; foreground: strin
     ],
   },
   {
-    id: 'one-dark',
-    label: 'One Dark',
-    background: '#1a1d23',
-    foreground: '#d7dae0',
+    id: 'tokyo-night',
+    label: 'Tokyo Night',
+    background: '#1a1b2e',
+    foreground: '#c0caf5',
     swatches: [
-      '#61afef',  // primary
-      '#98c379',  // task
-      '#c678dd',  // event
-      '#56b6c2',  // note
-      '#e06c75',  // destructive
+      '#bb9af7',  // primary
+      '#9ece6a',  // task
+      '#bb9af7',  // event
+      '#7dcfff',  // note
+      '#f7768e',  // destructive
+    ],
+  },
+  {
+    id: 'dracula',
+    label: 'Dracula',
+    background: '#282a36',
+    foreground: '#f8f8f2',
+    swatches: [
+      '#bd93f9',  // primary
+      '#50fa7b',  // task
+      '#bd93f9',  // event
+      '#8be9fd',  // note
+      '#ff5555',  // destructive
     ],
   },
 ]
