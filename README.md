@@ -98,12 +98,18 @@ duration: 30m
 repeat:
   type: schedule
   freq: weekly
-tags: [review, planning]
+items:
+  - "[[review-q3-goals]]"
+  - "[[plan-next-sprint]]"
 participants: [alice, bob]
 ---
 
 Notes about this task go here, in plain Markdown.
 ```
+
+The `items` list is the task's subtasks — wikilink references to other
+entries, just like philosophy #1 describes. Meridian fills it in for you
+as you link entries in the editor.
 
 Because an entry is a list, recurrence lives in its **occurrences**. You can override or skip any one of them, and even mix several patterns in the same entry — here, exercise repeats every Monday/Wednesday/Friday, with one occurrence already marked done:
 
@@ -112,7 +118,6 @@ Because an entry is a list, recurrence lives in its **occurrences**. You can ove
 defaults:
   title: Exercise
   done: false
-  tags: [health]
 date: 2026-04-06
 repeat:
   type: schedule
