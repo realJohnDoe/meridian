@@ -29,7 +29,7 @@ function emitVaultChanged(): void {
 
 // ── CONSTANTS ─────────────────────────────────────────────────
 
-const EXAMPLE_REF: VaultRef = { id: 'example', name: 'Example data', kind: 'example' }
+const EXAMPLE_REF: VaultRef = { id: 'example', name: 'Tutorial', kind: 'example' }
 
 // ── REGISTRY HELPER ───────────────────────────────────────────
 
