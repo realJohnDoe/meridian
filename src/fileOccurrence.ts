@@ -31,7 +31,7 @@ export function fileEntries(roots: Roots): FilePickerEntry[] {
 const _3YR_MS = 365 * 3 * 86_400_000
 
 /**
- * Shared per-slug resolution primitive for `fileOccurrenceMap`.
+ * Per-slug resolution primitive used by `updateFileOccurrenceMap`.
  *
  * Fill order (first match wins — all open before all done):
  *  1. Nearest upcoming undone dated occurrence in the ±3yr window.
@@ -98,26 +98,6 @@ function resolveOneSlug(
   return null
 }
 
-/** Total map of fileSlug → best representative occurrence for every file. */
-export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string, Occurrence> {
-  const now   = new Date(); now.setHours(0, 0, 0, 0)
-  const AHEAD = new Date(now.getTime() + _3YR_MS)
-  const BACK  = new Date(now.getTime() - _3YR_MS)
-  const map = new Map<string, Occurrence>()
-
-  const bySlug = new Map<string, StoreItem[]>()
-  for (const item of items) {
-    let group = bySlug.get(item.fileSlug)
-    if (!group) { group = []; bySlug.set(item.fileSlug, group) }
-    group.push(item)
-  }
-  for (const [slug, slugItems] of bySlug) {
-    const occ = resolveOneSlug(slug, slugItems, roots, now, AHEAD, BACK)
-    if (occ) map.set(slug, occ)
-  }
-
-  return map
-}
 
 /**
  * Incremental update of the fileSlug → representative Occurrence map.
