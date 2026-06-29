@@ -17,8 +17,6 @@
 
 4. fileOccurrenceMap (the full rebuild) is now effectively dead in production — fileOccurrence.ts:102. setData only uses updateFileOccurrenceMap; the full version survives solely as the test oracle in linking.test.ts. It's ~25 lines shipped in the bundle for tests only. Either keep it but mark it test-only, or move the oracle logic into the test file.
 
-5. MonthView still expands uncached. MonthView.tsx:120 calls expandWithMultiday directly, while Agenda/Day use the cached useExpandWithMultiday. This is exactly the old plan's PR3 (unify behind one shared expansion cache). Now that virtualization fixed the real bottleneck, PR2 (adaptive window) is moot, but PR3 is still a genuine consistency win.
-
 # Meridian — Code Health Survey
 
 ## 1. Health verdict
