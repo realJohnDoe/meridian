@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
 import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
@@ -7,6 +7,7 @@ import { isSeries } from '@/types'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import ListedOnRow from './ListedOnRow'
@@ -66,19 +67,30 @@ interface Props {
   onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: EditScope) => void
   onTypeChange?: (t: ItemType) => void
+  onDoneToggle?: () => void
   items: StoreItem[]
   roots: Roots
   onOpenWikilink?: (ref: string) => void
   onToggleDoneBacklink?: (occ: Occurrence) => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, triggerSaveRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
+function autoResize(el: HTMLTextAreaElement) {
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+
+export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, triggerSaveRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
   const navigate           = useNavigate()
   const hour12             = useStore(s => s.localePrefs.hour12)
   const defaultParticipants = useStore(s => s.defaultParticipants)
+  const titleRef  = useRef<HTMLTextAreaElement>(null)
   const viewRef   = useRef<EditorView | null>(null)
 
   if (getBodyRef) getBodyRef.current = () => viewRef.current?.state.doc.toString().trimEnd() ?? ''
+
+  useEffect(() => {
+    if (titleRef.current) autoResize(titleRef.current)
+  }, [entry.title])
 
   function handlePromoteTask(title: string, done: boolean): string | null {
     const result = saveNode(null, 'all', {
@@ -109,7 +121,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
     return [...set].sort()
   }, [items])
 
-  const { item, title, body, scheduled, duration, tracked, itemType, repeat, items: listItems, participants, priority, editScope } = entry
+  const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
   const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(item, title)
 
@@ -145,6 +157,35 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   return (
     <>
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-[720px] lg:mx-auto">
+
+        {/* ── FILE-LEVEL: title + slug ── */}
+        <div className="flex items-start gap-2.5 mb-3">
+          {tracked && (
+            <Checkbox
+              checked={done}
+              onCheckedChange={() => onDoneToggle?.()}
+              className="mt-1"
+              visualClassName="size-6"
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <textarea
+              ref={titleRef}
+              className="w-full font-[family-name:var(--disp)] text-2xl font-light text-foreground bg-transparent border-none outline-none leading-snug resize-none placeholder:text-muted-foreground"
+              placeholder="Title"
+              rows={1}
+              value={title}
+              onChange={e => {
+                onChange(prev => ({ ...prev, title: e.target.value }))
+                autoResize(e.target)
+                if (item && editScope !== 'add') onAutoSave?.(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+              }}
+            />
+            {item && (
+              <p className="font-mono text-2xs text-muted-foreground/50 mt-0.5">{item.fileSlug}.md</p>
+            )}
+          </div>
+        </div>
 
         {/* ── FILE-LEVEL: listed-on reverse chips ── */}
         <ListedOnRow

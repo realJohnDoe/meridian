@@ -29,7 +29,7 @@ export const Route = createFileRoute('/_app/entry/new')({
   }),
 })
 
-function NewEntryTopbar({ title, onTitleChange, onSave }: { title: string; onTitleChange: (t: string) => void; onSave: () => void }) {
+function NewEntryTopbar({ onSave }: { onSave: () => void }) {
   const slotEl = useTopbarSlot()
   const { setOpenMobile, isMobile } = useSidebar()
   if (!slotEl) return null
@@ -40,13 +40,7 @@ function NewEntryTopbar({ title, onTitleChange, onSave }: { title: string; onTit
           <Menu size={18} />
         </Button>
       )}
-      <input
-        type="text"
-        className="flex-1 font-[family-name:var(--disp)] text-base text-foreground bg-transparent border-none outline-none truncate min-w-0 placeholder:text-muted-foreground"
-        value={title}
-        placeholder="New entry"
-        onChange={e => onTitleChange(e.target.value)}
-      />
+      <div className="flex-1" />
       <Button variant="default" size="sm" onClick={onSave}>Save</Button>
     </div>,
     slotEl,
@@ -60,11 +54,7 @@ function NewEntryReady({ title }: { title?: string }) {
 
   return (
     <>
-      <NewEntryTopbar
-        title={hooks.entry.title}
-        onTitleChange={t => hooks.setEntry(prev => ({ ...prev, title: t }))}
-        onSave={() => hooks.triggerSaveRef.current()}
-      />
+      <NewEntryTopbar onSave={() => hooks.triggerSaveRef.current()} />
       <Suspense fallback={<EntrySkeleton />}>
         <EditorShell entry={hooks.entry} hooks={hooks} items={items} roots={roots} />
       </Suspense>

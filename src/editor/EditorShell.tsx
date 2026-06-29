@@ -22,7 +22,7 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
     saveMeta,
     handleOpenWikilink,
     handleSave, handleScopeChange,
-    handleTypeChange,
+    handleTypeChange, handleDoneToggle,
     handleOpenDlg, handleOpenRepeatDlg,
     dialogHandlers,
     scheduleAutoSave,
@@ -42,6 +42,7 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
         onOpenRepeatDlg={handleOpenRepeatDlg}
         onScopeChange={handleScopeChange}
         onTypeChange={handleTypeChange}
+        onDoneToggle={handleDoneToggle}
         items={items}
         roots={roots}
         onOpenWikilink={handleOpenWikilink}
