@@ -42,6 +42,8 @@ export default function AppSidebar() {
   const reorderFavorites        = useStore(s => s.reorderFavorites)
   const participantFilter       = useStore(s => s.participantFilter)
   const toggleParticipantFilter = useStore(s => s.toggleParticipantFilter)
+  const showTasks               = useStore(s => s.showTasks)
+  const toggleShowTasks         = useStore(s => s.toggleShowTasks)
 
   const allParticipants = useMemo(() => {
     const set = new Set<string>()
@@ -79,7 +81,46 @@ export default function AppSidebar() {
         </SidebarHeader>
 
         <SidebarContent>
-          <SidebarGroup className="p-0 pt-2" data-tour="nav-group">
+          {favorites.length > 0 && (
+            <SidebarGroup className="p-0 pt-2">
+              <SidebarGroupLabel className="flex h-auto items-center px-5 py-1">
+                <span className="flex-1 text-[11px] font-semibold uppercase tracking-wider">Favorites</span>
+                <button
+                  className="hover:text-foreground p-0.5"
+                  onClick={() => setEditingFavorites(e => !e)}
+                  title={editingFavorites ? 'Done' : 'Reorder / remove'}
+                >
+                  {editingFavorites ? <Check size={13} /> : <Pencil size={13} />}
+                </button>
+              </SidebarGroupLabel>
+              <SidebarMenu>
+                {favorites.map((slug, idx) => {
+                  const title = roots.get(slug)?.title ?? slug
+                  return (
+                    <SidebarMenuItem key={slug}>
+                      {editingFavorites ? (
+                        <div className="flex items-center gap-1 px-5 py-[11px] text-[14px] font-medium text-sidebar-foreground/60">
+                          <span className="flex-1 truncate">{title}</span>
+                          <button disabled={idx === 0} onClick={() => reorderFavorites(idx, idx - 1)} className="disabled:opacity-30 hover:text-sidebar-foreground" title="Move up"><ChevronUp size={13} /></button>
+                          <button disabled={idx === favorites.length - 1} onClick={() => reorderFavorites(idx, idx + 1)} className="disabled:opacity-30 hover:text-sidebar-foreground" title="Move down"><ChevronDown size={13} /></button>
+                          <button onClick={() => toggleFavorite(slug)} className="hover:text-destructive" title="Remove from favorites"><X size={13} /></button>
+                        </div>
+                      ) : (
+                        <SidebarMenuButton
+                          onClick={() => { close(); navigate(slugRoute(slug)) }}
+                          className="px-5 h-auto py-[11px] text-[14px] font-medium rounded-none"
+                        >
+                          <span className="truncate">{title}</span>
+                        </SidebarMenuButton>
+                      )}
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroup>
+          )}
+
+          <SidebarGroup className={favorites.length > 0 ? 'p-0 pt-2 border-t border-sidebar-border' : 'p-0 pt-2'} data-tour="nav-group">
             <SidebarMenu>
               {navItems.map(({ Icon, label, active, onClick }) => (
                 <SidebarMenuItem key={label}>
@@ -97,54 +138,20 @@ export default function AppSidebar() {
             </SidebarMenu>
           </SidebarGroup>
 
-          {favorites.length > 0 && (
-            <>
-              <SidebarSeparator />
-              <SidebarGroup className="p-0">
-                <SidebarGroupLabel className="flex h-auto items-center px-5 py-1">
-                  <span className="flex-1 text-[11px] font-semibold uppercase tracking-wider">Favorites</span>
-                  <button
-                    className="hover:text-foreground p-0.5"
-                    onClick={() => setEditingFavorites(e => !e)}
-                    title={editingFavorites ? 'Done' : 'Reorder / remove'}
-                  >
-                    {editingFavorites ? <Check size={13} /> : <Pencil size={13} />}
-                  </button>
-                </SidebarGroupLabel>
-                <SidebarMenu>
-                  {favorites.map((slug, idx) => {
-                    const title = roots.get(slug)?.title ?? slug
-                    return (
-                      <SidebarMenuItem key={slug}>
-                        {editingFavorites ? (
-                          <div className="flex items-center gap-1 px-5 py-[11px] text-[14px] font-medium text-sidebar-foreground/60">
-                            <span className="flex-1 truncate">{title}</span>
-                            <button disabled={idx === 0} onClick={() => reorderFavorites(idx, idx - 1)} className="disabled:opacity-30 hover:text-sidebar-foreground" title="Move up"><ChevronUp size={13} /></button>
-                            <button disabled={idx === favorites.length - 1} onClick={() => reorderFavorites(idx, idx + 1)} className="disabled:opacity-30 hover:text-sidebar-foreground" title="Move down"><ChevronDown size={13} /></button>
-                            <button onClick={() => toggleFavorite(slug)} className="hover:text-destructive" title="Remove from favorites"><X size={13} /></button>
-                          </div>
-                        ) : (
-                          <SidebarMenuButton
-                            onClick={() => { close(); navigate(slugRoute(slug)) }}
-                            className="px-5 h-auto py-[11px] text-[14px] font-medium rounded-none"
-                          >
-                            <span className="truncate">{title}</span>
-                          </SidebarMenuButton>
-                        )}
-                      </SidebarMenuItem>
-                    )
-                  })}
-                </SidebarMenu>
-              </SidebarGroup>
-            </>
-          )}
-
-          {allParticipants.length > 0 && (
-            <>
-              <SidebarSeparator />
-              <SidebarGroup className="p-0">
-                <SidebarGroupLabel className="px-5 h-8 text-[11px] font-semibold uppercase tracking-wider">Participants</SidebarGroupLabel>
-                <div className="px-5 flex flex-col">
+          <SidebarSeparator />
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel className="px-5 h-8 text-[11px] font-semibold uppercase tracking-wider">Calendars</SidebarGroupLabel>
+            <div className="px-5 flex flex-col">
+              <label className="flex items-center gap-2 cursor-pointer py-[11px]">
+                <Checkbox
+                  checked={showTasks}
+                  onCheckedChange={() => toggleShowTasks()}
+                  visualClassName="size-[18px] group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
+                />
+                <span className="text-[13px]">Tasks</span>
+              </label>
+              {allParticipants.length > 0 && (
+                <>
                   <label className="flex items-center gap-2 cursor-pointer py-[11px]">
                     <Checkbox
                       checked={participantFilter.includes(NO_PARTICIPANT)}
@@ -163,10 +170,10 @@ export default function AppSidebar() {
                       <span className="text-[13px]">{p}</span>
                     </label>
                   ))}
-                </div>
-              </SidebarGroup>
-            </>
-          )}
+                </>
+              )}
+            </div>
+          </SidebarGroup>
 
           <SidebarSeparator />
           <SidebarGroup className="p-0">

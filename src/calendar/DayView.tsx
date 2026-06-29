@@ -12,7 +12,7 @@ import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
-import { useToday, useParticipantFilter } from '@/hooks'
+import { useToday, useCalendarFilter } from '@/hooks'
 const SH = 7    // start hour on timeline
 const EH = 22   // end hour on timeline
 const HP = 56   // pixels per hour
@@ -145,7 +145,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
   const roots  = useStore(s => s.roots)
   const hour12 = useStore(s => s.localePrefs.hour12)
 
-  const { filterOccs } = useParticipantFilter()
+  const { filterOccs } = useCalendarFilter()
 
   const dvFrom = new Date(dvDate); dvFrom.setHours(0, 0, 0, 0)
   const dvTo   = new Date(dvDate); dvTo.setHours(23, 59, 59)

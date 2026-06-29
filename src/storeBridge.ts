@@ -22,8 +22,9 @@ export const setActiveVaultId    = (id: string | null) => {
     useStore.getState().loadFavorites(id)
     useStore.getState().loadDefaultParticipants(id)
     useStore.getState().loadParticipantFilter(id)
+    useStore.getState().loadShowTasks(id)
   } else {
-    useStore.setState({ favorites: [], defaultParticipants: [], participantFilter: [] })
+    useStore.setState({ favorites: [], defaultParticipants: [], participantFilter: [], showTasks: true })
   }
 }
 export const setPendingReconnect = (name: string | null) => useStore.setState({ pendingDirReconnect: name })

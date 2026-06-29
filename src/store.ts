@@ -89,6 +89,12 @@ interface MeridianStore {
   toggleParticipantFilter:  (name: string) => void
   clearParticipantFilter:   () => void
 
+  // ── Tasks visibility ─────────────────────────────────────────────
+  /** Whether tasks are shown in calendar views. */
+  showTasks:       boolean
+  loadShowTasks:   (vaultId: string) => void
+  toggleShowTasks: () => void
+
   // ── Locale preferences ───────────────────────────────────────────
   /** Auto-detected from browser locale; overridable by the user. Stored in localStorage (global, not vault-scoped). */
   localePrefs:    LocalePrefs
@@ -186,6 +192,22 @@ export const useStore = create<MeridianStore>((set, get) => ({
     const { activeVaultId } = get()
     if (activeVaultId) localStorage.setItem(`meridian_participant_filter_${activeVaultId}`, JSON.stringify([]))
     set({ participantFilter: [] })
+  },
+
+  showTasks: true,
+  loadShowTasks: (vaultId: string) => {
+    try {
+      const raw = localStorage.getItem(`meridian_show_tasks_${vaultId}`)
+      set({ showTasks: raw === null ? true : JSON.parse(raw) === true })
+    } catch {
+      set({ showTasks: true })
+    }
+  },
+  toggleShowTasks: () => {
+    const { showTasks, activeVaultId } = get()
+    const next = !showTasks
+    if (activeVaultId) localStorage.setItem(`meridian_show_tasks_${activeVaultId}`, JSON.stringify(next))
+    set({ showTasks: next })
   },
 
   localePrefs: loadLocalePrefs(),
