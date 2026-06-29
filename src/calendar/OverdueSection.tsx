@@ -20,11 +20,10 @@ function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
         'after:content-[""] after:flex-1 after:h-px after:bg-border',
       )}>Overdue</div>
 
-      {items.map((o, i) => (
+      {items.map(o => (
         <OccurrenceRow
           key={o.id}
           occ={o}
-          index={i}
           showDate={true}
           onOpen={onOpen}
           onToggleDone={onToggleDone}

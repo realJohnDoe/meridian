@@ -39,6 +39,12 @@ export interface OccurrenceCardProps {
   showTagsParticipants?: boolean
   /** Titles of files that link to this entry (backlinks). Computed by the caller. */
   listedOn?: string[]
+  /**
+   * Set to false to suppress the fadeUp entrance animation. Use in virtualized
+   * lists where remounting on scroll-in would replay the animation unexpectedly.
+   * Defaults to true.
+   */
+  animate?: boolean
 }
 
 const titleCls = (isDone: boolean) =>
@@ -90,6 +96,7 @@ export default function OccurrenceCard({
   showDate = false,
   showTagsParticipants = true,
   listedOn = [],
+  animate = true,
 }: OccurrenceCardProps) {
   const hour12   = useStore(s => s.localePrefs.hour12)
   const barClass = occState(occ)
@@ -131,7 +138,7 @@ export default function OccurrenceCard({
     <Card
       data-tour="entry-card"
       className={`${cardCls} flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-[44px]`}
-      style={{ animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' }}
+      style={animate ? { animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' } : undefined}
     >
       {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-lg" />}
 
