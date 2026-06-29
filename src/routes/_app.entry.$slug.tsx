@@ -8,6 +8,7 @@ import { expandRange } from '@/model'
 import { isEditScope } from '@/types'
 import { SyncButton } from '@/components'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
@@ -37,12 +38,17 @@ export const Route = createFileRoute('/_app/entry/$slug')({
 
 interface TopbarProps {
   title: string
+  tracked: boolean
+  done: boolean
   isFavorited: boolean
+  onTitleChange: (t: string) => void
+  onAutoSave: () => void
+  onDoneToggle: () => void
   onToggleFavorite: () => void
   onDelete: () => void
 }
 
-function EntryTopbar({ title, isFavorited, onToggleFavorite, onDelete }: TopbarProps) {
+function EntryTopbar({ title, tracked, done, isFavorited, onTitleChange, onAutoSave, onDoneToggle, onToggleFavorite, onDelete }: TopbarProps) {
   const slotEl = useTopbarSlot()
   const { setOpenMobile, isMobile } = useSidebar()
   if (!slotEl) return null
@@ -53,9 +59,16 @@ function EntryTopbar({ title, isFavorited, onToggleFavorite, onDelete }: TopbarP
           <Menu size={18} />
         </Button>
       )}
-      <span className="flex-1 font-[family-name:var(--disp)] italic text-base text-foreground truncate min-w-0">
-        {title}
-      </span>
+      {tracked && (
+        <Checkbox checked={done} onCheckedChange={onDoneToggle} className="shrink-0" />
+      )}
+      <input
+        type="text"
+        className="flex-1 font-[family-name:var(--disp)] text-base text-foreground bg-transparent border-none outline-none truncate min-w-0 placeholder:text-muted-foreground"
+        value={title}
+        placeholder="Title"
+        onChange={e => { onTitleChange(e.target.value); onAutoSave() }}
+      />
       <SyncButton />
       <Button
         variant="ghost" size="icon"
@@ -86,7 +99,12 @@ function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
     <>
       <EntryTopbar
         title={hooks.entry.title}
+        tracked={hooks.entry.tracked}
+        done={hooks.entry.done}
         isFavorited={isFavorited}
+        onTitleChange={t => hooks.setEntry(prev => ({ ...prev, title: t }))}
+        onAutoSave={() => { if (hooks.entry.item) hooks.scheduleAutoSave(hooks.getBodyRef.current()) }}
+        onDoneToggle={hooks.handleDoneToggle}
         onToggleFavorite={() => toggleFavorite(occ.fileSlug)}
         onDelete={hooks.handleDelete}
       />
