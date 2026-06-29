@@ -61,7 +61,7 @@ function AgendaPage() {
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" id="agSc" ref={scRef}>
-      <AgendaView onOpen={onOpen} scrollRef={scRef} />
+      <AgendaView onOpen={onOpen} scrollRef={scRef} initialScrollOffset={savedScrollTop} />
     </div>
   )
 }

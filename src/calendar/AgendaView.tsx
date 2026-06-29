@@ -32,9 +32,16 @@ interface Props {
   onOpen: (occ: Occurrence, scope?: EditScope) => void
   /** The scroll container that owns the agenda scroll (provided by AgendaPage). */
   scrollRef: React.RefObject<HTMLDivElement | null>
+  /**
+   * Saved scroll offset from the previous mount (module-level in AgendaPage).
+   * Passed here so the virtualizer can pre-position items before the first
+   * paint, avoiding a blank frame when restoring scroll position.
+   * Ignored when scrollToTodayOnce is true (we're going to scroll to today).
+   */
+  initialScrollOffset?: number
 }
 
-export default function AgendaView({ onOpen, scrollRef }: Props) {
+export default function AgendaView({ onOpen, scrollRef, initialScrollOffset = 0 }: Props) {
   const today = useToday()
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
@@ -116,6 +123,11 @@ export default function AgendaView({ onOpen, scrollRef }: Props) {
     estimateSize: i => estimateSection(sections[i]),
     getItemKey: i => sections[i].key,
     overscan: 4,
+    // Pre-position virtual items so the first paint matches the restored
+    // scrollTop set by AgendaPage's useLayoutEffect — without this the
+    // virtualizer renders items at offset 0 while the DOM is already scrolled
+    // to savedScrollTop, causing a blank frame on navigate-back.
+    initialOffset: scrollToTodayOnce ? 0 : initialScrollOffset,
   })
 
   const virtualItems = virtualizer.getVirtualItems()
