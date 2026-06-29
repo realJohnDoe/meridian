@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useStore } from '@/store'
 import { isTourDone, markTourDone, onReplayTour } from './tourState'
 import { Button } from '@/components/ui/button'
@@ -8,12 +8,9 @@ const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 interface Step {
   title: string
   body: string
-  /** CSS selector for the highlight ring, or null for a free-floating popover. */
-  target: string | null
+  /** Side-effects to run before the step shows (navigation, sidebar). */
   before?: () => Promise<void> | void
 }
-
-interface TargetRect { top: number; left: number; width: number; height: number }
 
 interface Props {
   setSidebarOpen: (open: boolean) => void
@@ -26,10 +23,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
 
   const [active, setActive] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
-  const [rect, setRect] = useState<TargetRect | null>(null)
-
-  const stepIndexRef = useRef(stepIndex)
-  stepIndexRef.current = stepIndex
 
   // A short spatial orientation only — concepts are taught by the vault notes
   // themselves (open "Welcome to Meridian"). Purely Next/Back: nothing
@@ -38,7 +31,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
     {
       title: 'Welcome to Meridian',
       body: 'Meridian keeps your notes, events, and tasks as plain Markdown files in a folder you own. Here\'s a quick look at where things live.',
-      target: '#mainTop',
       before: async () => {
         setSidebarOpen(false)
         navigateHome()
@@ -48,7 +40,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
     {
       title: 'Your Agenda',
       body: 'Dated tasks and events appear here, by day. Tap any card to open it — start with “Welcome to Meridian” to learn the ideas at your own pace.',
-      target: '[data-tour="entry-card"]',
       before: async () => {
         setSidebarOpen(false)
         navigateHome()
@@ -58,7 +49,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
     {
       title: 'Search & create',
       body: 'Type in the search bar to find any note, event, or task — including undated ones. Tap + to create something new.',
-      target: '[data-tour="search-bar"]',
       before: async () => {
         navigateHome()
         await sleep(150)
@@ -67,7 +57,6 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
     {
       title: 'The menu',
       body: 'Open the menu (☰) to switch between Agenda, Month, and Day, reach your favorites, and manage vaults in Settings. That\'s it — explore freely.',
-      target: '[data-tour="nav-group"]',
       before: async () => {
         navigateHome()
         setSidebarOpen(true)
@@ -104,36 +93,10 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
     navigateHome()
   }, [setSidebarOpen, navigateHome])
 
-  // Run before() and measure target whenever step changes
+  // Run each step's before() side-effects (navigation, sidebar) on change.
   useEffect(() => {
     if (!active) return
-    const currentStep = stepIndex
-    setRect(null)
-
-    const step = steps[currentStep]
-    ;(async () => {
-      await step.before?.()
-      if (stepIndexRef.current !== currentStep) return
-      await sleep(80)
-      if (step.target) {
-        const el = document.querySelector(step.target)
-        if (el) {
-          const r = el.getBoundingClientRect()
-          setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
-        }
-      }
-    })()
-
-    const onResize = () => {
-      if (!step.target) return
-      const el = document.querySelector(step.target)
-      if (el) {
-        const r = el.getBoundingClientRect()
-        setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
-      }
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    void steps[stepIndex]?.before?.()
   }, [active, stepIndex, steps])
 
   if (!active) return null
@@ -141,51 +104,17 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
   const step = steps[stepIndex]
   const isLast = stepIndex === steps.length - 1
 
-  // ── Popover positioning ──────────────────────────────────────
-  const W = 320
-  const GAP = 10
-  const SIDE = 16
-  const POPOVER_H_EST = 210
-
-  let popoverStyle: React.CSSProperties
-
-  if (!rect) {
-    popoverStyle = {
-      position: 'fixed',
-      bottom: 96,
-      left: '50%',
-      transform: 'translateX(-50%)',
-      width: W,
-      maxWidth: `calc(100vw - ${SIDE * 2}px)`,
-    }
-  } else {
-    const bottom = rect.top + rect.height
-    const centerX = rect.left + rect.width / 2
-    const leftX = Math.max(SIDE, Math.min(centerX - W / 2, window.innerWidth - W - SIDE))
-    if (bottom + GAP + POPOVER_H_EST < window.innerHeight) {
-      popoverStyle = { position: 'fixed', top: bottom + GAP, left: leftX, width: W }
-    } else if (rect.top - GAP - POPOVER_H_EST > 0) {
-      popoverStyle = { position: 'fixed', bottom: window.innerHeight - rect.top + GAP, left: leftX, width: W }
-    } else {
-      popoverStyle = {
-        position: 'fixed',
-        bottom: 96,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: W,
-        maxWidth: `calc(100vw - ${SIDE * 2}px)`,
-      }
-    }
-  }
-
   return (
     <>
-      {/* Popover card */}
+      {/* Popover card — pinned to a safe on-screen position via responsive
+          utilities: near-full-width above the search bar on mobile, a fixed
+          320px card bottom-centered from `sm` up. Always within the viewport. */}
       <div
         role="dialog"
         aria-label={`Tour: ${step.title}`}
-        style={{ ...popoverStyle, zIndex: 9002 }}
-        className="bg-card border border-border rounded-xl shadow-2xl p-4 flex flex-col gap-3"
+        className="fixed z-[9002] flex max-h-[70dvh] flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl
+          inset-x-4 bottom-[calc(6rem_+_env(safe-area-inset-bottom,0px))]
+          sm:inset-x-auto sm:left-1/2 sm:w-80 sm:-translate-x-1/2"
       >
         {/* Header row */}
         <div className="flex items-center justify-between">
