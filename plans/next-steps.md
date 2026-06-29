@@ -15,8 +15,6 @@
 
 3. Magic size estimates. HEADER_H = 40 / ROW_H = 68 in AgendaView.tsx:25 are hand-tuned guesses that can silently drift from the real card CSS (padding changes, meta rows, avatars). measureElement corrects them after render, but bad estimates cause scrollbar drift on long flings. A small comment tying them to the source-of-truth heights, or measuring once, would harden this.
 
-4. fileOccurrenceMap (the full rebuild) is now effectively dead in production — fileOccurrence.ts:102. setData only uses updateFileOccurrenceMap; the full version survives solely as the test oracle in linking.test.ts. It's ~25 lines shipped in the bundle for tests only. Either keep it but mark it test-only, or move the oracle logic into the test file.
-
 # Meridian — Code Health Survey
 
 ## 1. Health verdict
