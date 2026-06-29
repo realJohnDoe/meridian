@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { createFileRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   Menu, CalendarCheck2,
@@ -8,48 +8,18 @@ import { useStore } from '@/store'
 import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
-import { isEditScope } from '@/types'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar } from '@/components'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
-import type { EditScope } from '@/types'
-
-const EntryOverlay = lazy(() => import('@/editor').then(m => ({ default: m.EntryOverlay })))
-
-function OverlaySkeleton() {
-  return (
-    <div className="absolute inset-0 z-40 bg-background flex flex-col">
-      <div className="flex items-center gap-2 px-4 h-topbar border-b border-border shrink-0">
-        <Skeleton className="h-7 w-7 rounded-full" />
-        <Skeleton className="h-4 w-48" />
-        <Skeleton className="ml-auto h-7 w-16 rounded-lg" />
-      </div>
-      <div className="flex flex-col gap-3 px-4 pt-5">
-        <Skeleton className="h-5 w-2/3" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-      </div>
-    </div>
-  )
-}
+import { cn } from '@/lib/cn'
+import { slugRoute } from './-entryRoute'
+import { TopbarSlotContext } from './-topbarSlot'
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
-  validateSearch: (search: Record<string, unknown>): {
-    editor?: string
-    edate?: string
-    escope?: EditScope
-    etitle?: string
-    sq?: string
-  } => ({
-    editor: typeof search.editor === 'string' ? search.editor : undefined,
-    edate:  typeof search.edate  === 'string' ? search.edate  : undefined,
-    escope: isEditScope(search.escope) ? search.escope : undefined,
-    etitle: typeof search.etitle === 'string' ? search.etitle : undefined,
-    sq:     typeof search.sq     === 'string' ? search.sq     : undefined,
+  validateSearch: (search: Record<string, unknown>): { sq?: string } => ({
+    sq: typeof search.sq === 'string' ? search.sq : undefined,
   }),
 })
 
@@ -67,24 +37,20 @@ function AppLayout() {
 
 function AppMain() {
   const { isMobile, setOpenMobile } = useSidebar()
-  // The menu button and coach tour drive the mobile sheet only. On desktop the
-  // sidebar is persistent, so open/close requests are ignored there (users can
-  // still collapse it via the Ctrl/Cmd+B shortcut).
   const setSidebarOpen = useCallback((open: boolean) => {
     if (isMobile) setOpenMobile(open)
   }, [isMobile, setOpenMobile])
 
   const navigate = useNavigate()
   const pathname = useRouterState({ select: s => s.location.pathname })
-  const { editor, edate, escope, etitle } = Route.useSearch()
 
-  const today = useToday()
-
+  const today         = useToday()
   const agendaTopDate = useStore(s => s.agendaTopDate)
 
-  const isDayView   = pathname.startsWith('/day/')
-  const isMonthView = pathname.startsWith('/calendar')
-  const dvDate = isDayView ? new Date(pathname.split('/')[2] + 'T00:00:00') : null
+  const isEntryView  = pathname.startsWith('/entry')
+  const isDayView    = pathname.startsWith('/day/')
+  const isMonthView  = pathname.startsWith('/calendar')
+  const dvDate       = isDayView ? new Date(pathname.split('/')[2] + 'T00:00:00') : null
   const monthViewDate = isMonthView
     ? (pathname.split('/')[2] ? parseMonth(pathname.split('/')[2]) : null)
     : null
@@ -106,24 +72,27 @@ function AppMain() {
     }
   }
 
-  const navigateHome = useCallback(() => navigate({ to: '/' }), [navigate])
-  const openTourEntry = useCallback(() => navigate({
-    to: '.' as const,
-    search: (_prev: Record<string, unknown>) => ({
-      editor: '02-your-first-task',
-      escope: 'single' as EditScope,
-      edate: undefined,
-      etitle: undefined,
-    }),
-  }), [navigate])
+  const navigateHome   = useCallback(() => navigate({ to: '/' }), [navigate])
+  const openTourEntry  = useCallback(() => navigate(slugRoute('02-your-first-task')), [navigate])
+  const openSidebar    = () => setSidebarOpen(true)
 
-  const openSidebar = () => setSidebarOpen(true)
+  // Callback ref so the portal target is available synchronously after mount.
+  const [slotEl, setSlotEl] = useState<HTMLDivElement | null>(null)
 
   return (
-    <>
+    <TopbarSlotContext.Provider value={slotEl}>
       <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden">
-        <header className="h-topbar flex items-center justify-between px-3.5 border-b border-border shrink-0 bg-background z-10" id="mainTop">
-          {isDayView && dvDate ? (
+        <header
+          id="mainTop"
+          className={cn(
+            'h-topbar flex items-center border-b border-border shrink-0 bg-background z-10',
+            isEntryView ? 'overflow-hidden' : 'px-3.5 justify-between',
+          )}
+        >
+          {isEntryView ? (
+            // Portal target — entry route injects topbar controls here via createPortal
+            <div ref={setSlotEl} className="flex flex-1 items-center h-full overflow-hidden" />
+          ) : isDayView && dvDate ? (
             <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
               <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={openSidebar} title="Menu"><Menu size={18} /></Button>
               <span className="flex-1 font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{fmtTopBarDay(dvDate, today)}</span>
@@ -143,10 +112,12 @@ function AppMain() {
               <span className="font-[family-name:var(--disp)] italic text-sm text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
             </div>
           )}
-          <div className="flex items-center gap-0.5 shrink-0">
-            <SyncButton />
-            <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={handleToday} title="Today"><CalendarCheck2 size={18} /></Button>
-          </div>
+          {!isEntryView && (
+            <div className="flex items-center gap-0.5 shrink-0">
+              <SyncButton />
+              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={handleToday} title="Today"><CalendarCheck2 size={18} /></Button>
+            </div>
+          )}
         </header>
 
         <section data-tour="main-content" className="flex flex-1 flex-col overflow-hidden min-h-0">
@@ -156,17 +127,11 @@ function AppMain() {
         <SearchBar />
       </div>
 
-      {editor && (
-        <Suspense fallback={<OverlaySkeleton />}>
-          <EntryOverlay editor={editor} edate={edate} escope={escope} etitle={etitle} />
-        </Suspense>
-      )}
-
       <CoachTour
         setSidebarOpen={setSidebarOpen}
         navigateHome={navigateHome}
         openTourEntry={openTourEntry}
       />
-    </>
+    </TopbarSlotContext.Provider>
   )
 }

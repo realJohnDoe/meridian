@@ -448,10 +448,6 @@ export default function NodeInheritanceDebugger() {
     applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), body)
   }, [debugEntry, selectedOcc, items, debugRoots, applyItems])
 
-  const handleDebugClose = useCallback(() => {
-    setSelectedIdx(null); setDebugEntry(null)
-  }, [])
-
   const handleDebugScopeChange = useCallback((scope: EditScope) => {
     setDebugEntry(prev => {
       if (!prev?.item) return prev
@@ -474,12 +470,6 @@ export default function NodeInheritanceDebugger() {
       return { ...prev, editScope: scope, scheduled, repeat }
     })
   }, [selectedSeries, debugRoot, items])
-
-  const handleDebugDelete = useCallback(() => {
-    if (!selectedOcc) return
-    const next = excludeOccurrence({ items, roots: debugRoots }, selectedOcc)
-    applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), debugRoot?.body ?? '')
-  }, [selectedOcc, items, debugRoot, debugRoots, applyItems])
 
   const canEditPattern     = selectedOcc?.source === 'generated'
   const canEditFollowing   = selectedOcc !== null && selectedSeries !== null
@@ -735,8 +725,6 @@ export default function NodeInheritanceDebugger() {
                 entry={debugEntry}
                 onChange={(updater) => setDebugEntry(prev => prev ? updater(prev) : prev)}
                 onSave={handleDebugSave}
-                onDelete={handleDebugDelete}
-                onClose={handleDebugClose}
                 onOpenDlg={openDialog}
                 onOpenRepeatDlg={openRepeatDialog}
                 onScopeChange={handleDebugScopeChange}
