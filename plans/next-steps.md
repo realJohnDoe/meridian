@@ -1,6 +1,7 @@
 ## Next steps
 
 - Update Tutorial vault with new features and 'Every item is a list' paradigm
+- Filter overlay on large screens looks confusing
 - Investigate subdirectory / hexagonal architecture violations
 - Add Solarized Light or Catppuccin Latte Theme
 - Add Global Backlog View
