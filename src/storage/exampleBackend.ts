@@ -52,7 +52,15 @@ function buildEntries(): Array<{ id: string; content: string }> {
       id: '01-start-here',
       content: `---
 title: Welcome to Meridian
-items: [everything-is-a-list, tasks-and-events, recurring-events, links-and-backlinks, favorites, frontmatter-reference, install-as-an-app, make-it-yours]
+items:
+  - "[[everything-is-a-list]]"
+  - "[[tasks-and-events]]"
+  - "[[recurring-events]]"
+  - "[[links-and-backlinks]]"
+  - "[[favorites]]"
+  - "[[frontmatter-reference]]"
+  - "[[install-as-an-app]]"
+  - "[[make-it-yours]]"
 date: "${d(0)}"
 ---
 
@@ -65,7 +73,7 @@ list — its **items** (shown under the title) link to everything below. Start h
 - [[everything-is-a-list]] — the core idea
 - [[tasks-and-events]] — how tasks, events, and notes differ
 - [[recurring-events]] — repeating items, and editing one without breaking the series
-- [[links-and-backlinks]] — connect entries with \`[[wikilinks]]\`
+- [[links-and-backlinks]] — connect entries with wikilinks
 - [[favorites]] — pin the entries you reach for most
 - [[frontmatter-reference]] — every field, in one place
 - [[install-as-an-app]] — add Meridian to your home screen or desktop
@@ -79,7 +87,13 @@ This is a read-only sandbox — poke around freely. When you're ready, [[make-it
       id: 'everything-is-a-list',
       content: `---
 title: Everything is a list
-items: [tasks-and-events, recurring-events, buy-groceries]
+items:
+  - "[[tasks-and-events]]"
+  - "[[recurring-events]]"
+  - "[[buy-groceries]]"
+  - "[ ] Tick a box to see a subtask"
+  - "[ ] Notice it doesn't stick here — this sandbox is read-only"
+  - "[x] Add your own vault to make it real"
 ---
 
 The single idea Meridian is built on: **everything is a list, and the things inside it
@@ -91,13 +105,9 @@ are items.** The more abstract concept is the list; the more concrete ones are i
 - **Tag** — a list of everything tagged with it
 - **Note** — a list with no special fields; its items are related entries
 
-This note is itself a list: its **items**, shown under the title, are \`[[wikilinks]]\` to
-[[tasks-and-events]], [[recurring-events]], and a real task, [[buy-groceries]].
-
-You can also keep an informal checklist right in the body of any entry:
-- [ ] Try ticking this box
-- [ ] Notice it doesn't stick — this sandbox is read-only
-- [x] Add your own vault → [[make-it-yours]]`,
+This note is itself a list. Its **Items** section below mixes both kinds of item: links to
+other entries — [[tasks-and-events]], [[recurring-events]], and a real task,
+[[buy-groceries]] — alongside a few checkbox subtasks of its own.`,
     },
 
     // ── tasks-and-events: what the field set means ──
@@ -105,7 +115,10 @@ You can also keep an informal checklist right in the body of any entry:
       id: 'tasks-and-events',
       content: `---
 title: Tasks, events & notes
-items: [buy-groceries, book-dentist, plan-the-week]
+items:
+  - "[[buy-groceries]]"
+  - "[[book-dentist]]"
+  - "[[plan-the-week]]"
 ---
 
 Meridian has no "type" field. What an entry *is* comes from which fields it carries:
@@ -120,7 +133,7 @@ A task doesn't need a date — leave it off and it waits in your backlog, like
 > This sandbox is read-only, so ticking a checkbox won't stick. [[make-it-yours]] to make it real.`,
     },
 
-    // ── buy-groceries: dated task with an in-body checklist ──
+    // ── buy-groceries: dated task with checkbox subtask items ──
     {
       id: 'buy-groceries',
       content: `---
@@ -128,14 +141,16 @@ title: Buy groceries
 date: "${d(0)}"
 done: false
 priority: medium
+items:
+  - "[ ] Oat milk"
+  - "[ ] Coffee"
+  - "[x] Bananas"
 ---
 
 A plain **task** — it has a \`done\` field, so it shows a checkbox in the Agenda.
 
-Its subtasks are a quick checklist in the body:
-- [ ] Oat milk
-- [ ] Coffee
-- [x] Bananas
+Because a task is a list, its subtasks live in the **Items** section below — tick them
+off as you shop.
 
 (Read-only here — ticking won't stick. See [[tasks-and-events]].)`,
     },
@@ -192,7 +207,9 @@ or the **Day** view to see it on the hourly timeline.`,
       id: 'recurring-events',
       content: `---
 title: Recurring items
-items: [team-standup, morning-run]
+items:
+  - "[[team-standup]]"
+  - "[[morning-run]]"
 ---
 
 Real schedules are messy, so Meridian's recurrence goes well past "repeats weekly."
@@ -271,12 +288,13 @@ field instead of \`time\`. The \`defaults\` block sets the priority for every oc
       id: 'links-and-backlinks',
       content: `---
 title: Links & backlinks
-items: [dev-notes]
+items:
+  - "[[dev-notes]]"
 ---
 
 Connect entries two ways:
 
-- **Items** — \`[[wikilinks]]\` listed under an entry's title. They're the entry's list members (see [[everything-is-a-list]]).
+- **Items** — wikilinks listed under an entry's title. They're the entry's list members (see [[everything-is-a-list]]).
 - **Body wikilinks** — type \`[[\` anywhere in the body for autocomplete. Link by slug or title.
 
 Either way the link is two-directional: open [[dev-notes]] and you'll find this note in
@@ -310,7 +328,9 @@ Open the **Backlinks** panel (bottom of the editor) to see [[links-and-backlinks
       id: 'favorites',
       content: `---
 title: Favorites
-items: [team-standup, dev-notes]
+items:
+  - "[[team-standup]]"
+  - "[[dev-notes]]"
 ---
 
 Pin the entries you open most so they sit at the top of the menu for one-tap access.
@@ -328,7 +348,8 @@ Try favoriting [[team-standup]] or [[dev-notes]].`,
       id: 'frontmatter-reference',
       content: `---
 title: Frontmatter reference
-items: [everything-is-a-list]
+items:
+  - "[[everything-is-a-list]]"
 ---
 
 Every entry starts with a small YAML block. All fields are optional — what you include
@@ -336,7 +357,7 @@ decides whether it's a note, event, or task (see [[everything-is-a-list]]).
 
 **File-level**
 - \`title\` — display name
-- \`items\` — list members, as \`[[wikilinks]]\`
+- \`items\` — list members: linked entries or checkbox subtasks
 - \`tags\` — free-text labels
 
 **Scheduling (makes it an event)**
@@ -359,7 +380,8 @@ Recurring items add \`defaults:\` (shared across occurrences) and \`instances:\`
       id: 'install-as-an-app',
       content: `---
 title: Install as an app
-items: [make-it-yours]
+items:
+  - "[[make-it-yours]]"
 ---
 
 Meridian is a PWA — install it for a full-screen, app-like experience that works offline.
@@ -389,7 +411,8 @@ menu → **Install**.`,
       id: 'make-it-yours',
       content: `---
 title: Make it yours
-items: [install-as-an-app]
+items:
+  - "[[install-as-an-app]]"
 ---
 
 This example vault is **read-only** — edits and new entries won't be saved here.
@@ -403,7 +426,7 @@ To use Meridian for real:
    including iOS.
 
 Once you've selected a writable vault, everything works: create entries, tick tasks done,
-set up recurring events, and link files with \`[[wikilinks]]\`.
+set up recurring events, and link files with wikilinks.
 
 Then [[install-as-an-app]] for the full experience. Your files stay yours — just a folder
 full of Markdown.`,
@@ -413,7 +436,7 @@ full of Markdown.`,
 
 const ENTRIES = buildEntries()
 
-const VERSION = 'example-v3'
+const VERSION = 'example-v4'
 
 export class ExampleBackend implements StorageBackend {
   readonly id       = 'example'
