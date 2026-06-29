@@ -1,4 +1,4 @@
-export { default as EntryOverlay } from './EntryOverlay'
+export { default as EditorShell } from './EditorShell'
 export { default as ParticipantsRow } from './ParticipantsRow'
 
 // debug-only — still public surface

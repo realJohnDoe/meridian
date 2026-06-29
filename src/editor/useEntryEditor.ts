@@ -54,6 +54,8 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Populated by EntryEditor once CodeMirror mounts; used by saveMeta to capture current body
   const getBodyRef = useRef<() => string>(() => '')
+  // Populated by EntryEditor; allows topbar Save button to trigger a full save (body + pending links)
+  const triggerSaveRef = useRef<() => void>(() => {})
   // Always points to the latest entry so timer callbacks don't close over stale state
   const entryRef = useRef(entry)
   entryRef.current = entry
@@ -89,25 +91,30 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
       navigate(newEntryRoute(ref))
       return
     }
-    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: fileSlug, etitle: undefined, edate: undefined, escope: undefined }) })
+    navigate({ to: '/entry/$slug', params: { slug: fileSlug } })
   }, [storeRoots, navigate])
+
+  const goBack = useCallback(() => {
+    if (window.history.length > 1) router.history.back()
+    else navigate({ to: '/' })
+  }, [router, navigate])
 
   const handleSave = useCallback((body: string) => {
     const result = saveNode(entry.item, entry.editScope, { ...entry, body })
-    if (result === 'saved') router.history.back()
-  }, [entry, router])
+    if (result === 'saved') goBack()
+  }, [entry, goBack])
 
   const handleDelete = useCallback(() => {
     deleteNode(
       entry.item,
-      () => router.history.back(),
+      goBack,
       (config) => setSeriesSheetConfig(config),
       () => setSeriesSheetConfig(null),
       (title, onConfirm) => setPendingDelete({ title, onConfirm }),
     )
-  }, [entry.item, router])
+  }, [entry.item, goBack])
 
-  const handleClose = useCallback(() => router.history.back(), [router])
+  const handleClose = useCallback(() => goBack(), [goBack])
 
   const handleScopeChange = useCallback((scope: EditScope) => {
     if (!entry.item) return
@@ -227,6 +234,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   return {
     entry, setEntry,
     getBodyRef,
+    triggerSaveRef,
     saveMeta,
     handleOpenWikilink,
     handleSave,

@@ -1,15 +1,9 @@
-/**
- * Shared render shell for entry editor pages (existing entry + new entry).
- * Receives the entry to display (may differ from hooks.entry when a title is
- * pre-filled) and the full return value of useEntryEditor.
- */
 import type { useEntryEditor } from './useEntryEditor'
 import type { EntryState } from './state'
 import type { StoreItem, Roots } from '@/types'
 import EntryEditor from './EntryEditor'
 import DialogStack from './DialogStack'
 import { toggleOccDone } from '@/occurrenceActions'
-import { useStore } from '@/store'
 
 type Hooks = ReturnType<typeof useEntryEditor>
 
@@ -24,19 +18,15 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
   const {
     setEntry,
     getBodyRef,
+    triggerSaveRef,
     saveMeta,
     handleOpenWikilink,
-    handleSave, handleDelete, handleClose, handleScopeChange,
+    handleSave, handleScopeChange,
     handleTypeChange, handleDoneToggle,
     handleOpenDlg, handleOpenRepeatDlg,
     dialogHandlers,
     scheduleAutoSave,
   } = hooks
-
-  const favorites       = useStore(s => s.favorites)
-  const toggleFavorite  = useStore(s => s.toggleFavorite)
-  const fileSlug        = entry.item?.fileSlug
-  const isFavorited     = fileSlug ? favorites.includes(fileSlug) : false
 
   return (
     <section className="view active flex-1 min-h-0 flex flex-col">
@@ -47,8 +37,7 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
         onAutoSave={scheduleAutoSave}
         onMetaSave={saveMeta}
         getBodyRef={getBodyRef}
-        onDelete={handleDelete}
-        onClose={handleClose}
+        triggerSaveRef={triggerSaveRef}
         onOpenDlg={handleOpenDlg}
         onOpenRepeatDlg={handleOpenRepeatDlg}
         onScopeChange={handleScopeChange}
@@ -58,8 +47,6 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
         roots={roots}
         onOpenWikilink={handleOpenWikilink}
         onToggleDoneBacklink={toggleOccDone}
-        isFavorited={isFavorited}
-        onToggleFavorite={fileSlug ? () => toggleFavorite(fileSlug) : undefined}
       />
       <DialogStack entry={entry} handlers={dialogHandlers} />
     </section>

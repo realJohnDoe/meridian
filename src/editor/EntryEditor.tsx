@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
-import { ArrowLeft, Trash2, Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Heart } from 'lucide-react'
+import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import { isSeries } from '@/types'
 import { badgeVariants } from '@/components/ui/badge'
@@ -54,10 +54,6 @@ const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
   note:  'data-[state=on]:text-note',
 }
 
-function autoResize(el: HTMLTextAreaElement) {
-  el.style.height = 'auto'
-  el.style.height = el.scrollHeight + 'px'
-}
 
 interface Props {
   entry: EntryState
@@ -66,8 +62,7 @@ interface Props {
   onAutoSave?: (body: string) => void
   onMetaSave?: (next: EntryState) => void
   getBodyRef?: React.MutableRefObject<() => string>
-  onDelete: () => void
-  onClose: () => void
+  triggerSaveRef?: React.MutableRefObject<() => void>
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: EditScope) => void
@@ -77,11 +72,14 @@ interface Props {
   roots: Roots
   onOpenWikilink?: (ref: string) => void
   onToggleDoneBacklink?: (occ: Occurrence) => void
-  isFavorited?: boolean
-  onToggleFavorite?: () => void
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, onDelete, onClose, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink, isFavorited, onToggleFavorite }: Props) {
+function autoResize(el: HTMLTextAreaElement) {
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
+}
+
+export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, triggerSaveRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
   const navigate           = useNavigate()
   const hour12             = useStore(s => s.localePrefs.hour12)
   const defaultParticipants = useStore(s => s.defaultParticipants)
@@ -103,8 +101,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
     })
     if (result !== 'saved') return null
     const slug = titleToSlug(title)
-    // Navigate directly by slug — bypasses the stale storeRoots closure in onOpenWikilink
-    navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, editor: slug, etitle: undefined, edate: undefined, escope: undefined }) })
+    navigate({ to: '/entry/$slug', params: { slug } })
     return slug
   }
 
@@ -127,6 +124,13 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
   const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(item, title)
+
+  // Updated every render so the topbar Save button always calls with current body + pending links
+  if (triggerSaveRef) triggerSaveRef.current = () => {
+    onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+    flushOnSave(titleToSlug(title))
+  }
+
   const linkedSlugs = useMemo(
     () => [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs],
     [effectiveSlug, roots, pendingSlugs],
@@ -138,9 +142,6 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   const isScheduled = !!(item && seriesRepeat?.type === 'schedule')
   const isAfterCompletion = !!(item && seriesRepeat?.type === 'after_completion')
   const hasSched = !!(item && item.date)
-  const fname = item
-    ? ((item.fileSlug || item.metadata?.title || 'untitled') + '.md').toLowerCase().replace(/\s+/g, '-')
-    : 'untitled.md'
 
   const hasDate = !!scheduled
   const hasTime = !!(scheduled?.time)
@@ -155,35 +156,10 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
 
   return (
     <>
-      <div className="h-topbar flex items-center gap-2 px-3 border-b border-border shrink-0 bg-background">
-        <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={onClose}><ArrowLeft size={18} /></Button>
-        <span className="flex-1 font-mono text-2xs text-muted-foreground overflow-hidden text-ellipsis whitespace-nowrap">{fname}</span>
-        {item && onToggleFavorite && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn('rounded-full shrink-0', isFavorited ? 'text-rose-400' : 'text-dim')}
-            onClick={onToggleFavorite}
-            title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-          >
-            <Heart size={18} className={isFavorited ? 'fill-current' : ''} />
-          </Button>
-        )}
-        {item && (
-          <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete"><Trash2 size={18} /></Button>
-        )}
-        {!item && (
-          <Button variant="default" size="sm" onClick={() => {
-            onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
-            flushOnSave(titleToSlug(title))
-          }}>Save</Button>
-        )}
-      </div>
-
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-[720px] lg:mx-auto">
 
-        {/* ── FILE-LEVEL: title ── */}
-        <div className="flex items-start gap-2.5 mb-2">
+        {/* ── FILE-LEVEL: title + slug ── */}
+        <div className="flex items-start gap-2.5 mb-3">
           {tracked && (
             <Checkbox
               checked={done}
@@ -192,18 +168,23 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
               visualClassName="size-6"
             />
           )}
-          <textarea
-            ref={titleRef}
-            className="flex-1 font-[family-name:var(--disp)] text-2xl font-light text-foreground bg-transparent border-none outline-none leading-snug resize-none min-h-9 placeholder:text-muted-foreground"
-            placeholder="Title"
-            rows={1}
-            value={title}
-            onChange={e => {
-              onChange(prev => ({ ...prev, title: e.target.value }))
-              autoResize(e.target)
-              if (item && editScope !== 'add') onAutoSave?.(viewRef.current?.state.doc.toString().trimEnd() ?? '')
-            }}
-          />
+          <div className="flex-1 min-w-0">
+            <textarea
+              ref={titleRef}
+              className="w-full font-[family-name:var(--disp)] text-2xl font-light text-foreground bg-transparent border-none outline-none leading-snug resize-none placeholder:text-muted-foreground"
+              placeholder="Title"
+              rows={1}
+              value={title}
+              onChange={e => {
+                onChange(prev => ({ ...prev, title: e.target.value }))
+                autoResize(e.target)
+                if (item && editScope !== 'add') onAutoSave?.(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+              }}
+            />
+            {item && (
+              <p className="font-mono text-2xs text-muted-foreground/50 mt-0.5">{item.fileSlug}.md</p>
+            )}
+          </div>
         </div>
 
         {/* ── FILE-LEVEL: listed-on reverse chips ── */}
