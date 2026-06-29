@@ -3,7 +3,7 @@
 - Investigate lower number of color / font size / dimension constants in theme
 - Filter overlay on large screens looks confusing
 - Investigate subdirectory / hexagonal architecture violations
-- Add Solarized Light or Catppuccin Latte Theme
+- Add Tokyo Day Theme
 - Add Global Backlog View
 - Investigate more secure storage options
 - Consider if name and logo are still good
