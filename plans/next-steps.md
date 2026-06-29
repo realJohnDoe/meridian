@@ -1,5 +1,6 @@
 ## Next steps
 
+- Investigate lower number of color / font size / dimension constants in theme
 - Filter overlay on large screens looks confusing
 - Investigate subdirectory / hexagonal architecture violations
 - Add Solarized Light or Catppuccin Latte Theme
