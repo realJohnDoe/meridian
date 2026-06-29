@@ -417,7 +417,7 @@ const VERSION = 'example-v3'
 
 export class ExampleBackend implements StorageBackend {
   readonly id       = 'example'
-  readonly name     = 'Example data'
+  readonly name     = 'Tutorial'
   readonly kind: VaultKind = 'example'
   readonly readOnly = true
 
