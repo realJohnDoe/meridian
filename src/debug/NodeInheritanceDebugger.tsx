@@ -492,7 +492,7 @@ export default function NodeInheritanceDebugger() {
       {/* ── Top bar ── */}
       <header className="flex items-center gap-3 px-4 py-3 border-b border-white/10 shrink-0">
         <span className="text-sm font-semibold tracking-wide text-white/70"
-          style={{ fontFamily: 'Fraunces, serif', fontStyle: 'italic' }}>Meridian</span>
+          style={{ fontSize: '18px' }}>Meridian</span>
         <ChevronRight size={14} className="text-white/30" />
         <span className="text-sm text-white/50">Inheritance Debugger</span>
         {fileName && (<>

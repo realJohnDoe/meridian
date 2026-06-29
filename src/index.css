@@ -166,7 +166,6 @@
   --control-h: 1.75rem;
   --font: 'DM Sans', system-ui, sans-serif;
   --mono: 'DM Mono', monospace;
-  --disp: 'Fraunces', Georgia, serif;
   --nh: 0px; --th: 54px; --r: var(--radius); --rl: 16px; --rx: 24px;
 }
 
