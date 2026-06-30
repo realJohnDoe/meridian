@@ -208,8 +208,8 @@ export default function AppSidebar() {
             </SidebarMenu>
           </SidebarGroup>
 
-          <SidebarSeparator />
           <SidebarGroup className="p-0">
+            <div className="mx-2 mb-1 h-px bg-sidebar-border" />
             <SidebarGroupLabel className="px-5 h-8 text-[11px] font-semibold uppercase tracking-wider">Vaults</SidebarGroupLabel>
             <SidebarMenu>
               {vaults.map(vault => {
