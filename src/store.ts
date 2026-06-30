@@ -3,6 +3,7 @@ import type { StoreItem, Roots, Occurrence, LocalePrefs } from './types'
 import type { VaultRef } from '@/storage'
 import { clearOccIdCache } from '@/model'
 import { updateFileOccurrenceMap } from './fileOccurrence'
+import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 
 function detectLocalePrefs(): LocalePrefs {
   const hour12 = new Intl.DateTimeFormat(undefined, { hour: 'numeric' })
@@ -122,20 +123,14 @@ export const useStore = create<MeridianStore>((set, get) => ({
 
   favorites: [],
   loadFavorites: (vaultId: string) => {
-    try {
-      const raw = localStorage.getItem(`meridian_favorites_${vaultId}`)
-      const parsed: unknown = raw ? JSON.parse(raw) : []
-      set({ favorites: Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [] })
-    } catch {
-      set({ favorites: [] })
-    }
+    set({ favorites: readVaultStringArray('meridian_favorites', vaultId) })
   },
   toggleFavorite: (fileSlug: string) => {
     const { favorites, activeVaultId } = get()
     const next = favorites.includes(fileSlug)
       ? favorites.filter(s => s !== fileSlug)
       : [...favorites, fileSlug]
-    if (activeVaultId) localStorage.setItem(`meridian_favorites_${activeVaultId}`, JSON.stringify(next))
+    if (activeVaultId) writeVaultJSON('meridian_favorites', activeVaultId, next)
     set({ favorites: next })
   },
   reorderFavorites: (fromIdx: number, toIdx: number) => {
@@ -144,48 +139,35 @@ export const useStore = create<MeridianStore>((set, get) => ({
     const next = [...favorites]
     const [item] = next.splice(fromIdx, 1)
     next.splice(toIdx, 0, item)
-    if (activeVaultId) localStorage.setItem(`meridian_favorites_${activeVaultId}`, JSON.stringify(next))
+    if (activeVaultId) writeVaultJSON('meridian_favorites', activeVaultId, next)
     set({ favorites: next })
   },
 
   defaultParticipants: [],
   loadDefaultParticipants: (vaultId: string) => {
-    try {
-      const raw = localStorage.getItem(`meridian_default_participants_${vaultId}`)
-      const parsed: unknown = raw ? JSON.parse(raw) : []
-      set({ defaultParticipants: Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [] })
-    } catch {
-      set({ defaultParticipants: [] })
-    }
+    set({ defaultParticipants: readVaultStringArray('meridian_default_participants', vaultId) })
   },
   setDefaultParticipants: (participants: string[]) => {
     const { activeVaultId } = get()
-    if (activeVaultId)
-      localStorage.setItem(`meridian_default_participants_${activeVaultId}`, JSON.stringify(participants))
+    if (activeVaultId) writeVaultJSON('meridian_default_participants', activeVaultId, participants)
     set({ defaultParticipants: participants })
   },
 
   participantFilter: [],
   loadParticipantFilter: (vaultId: string) => {
-    try {
-      const raw = localStorage.getItem(`meridian_participant_filter_${vaultId}`)
-      const parsed: unknown = raw ? JSON.parse(raw) : []
-      set({ participantFilter: Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [] })
-    } catch {
-      set({ participantFilter: [] })
-    }
+    set({ participantFilter: readVaultStringArray('meridian_participant_filter', vaultId) })
   },
   toggleParticipantFilter: (name: string) => {
     const { participantFilter, activeVaultId } = get()
     const next = participantFilter.includes(name)
       ? participantFilter.filter(s => s !== name)
       : [...participantFilter, name]
-    if (activeVaultId) localStorage.setItem(`meridian_participant_filter_${activeVaultId}`, JSON.stringify(next))
+    if (activeVaultId) writeVaultJSON('meridian_participant_filter', activeVaultId, next)
     set({ participantFilter: next })
   },
   clearParticipantFilter: () => {
     const { activeVaultId } = get()
-    if (activeVaultId) localStorage.setItem(`meridian_participant_filter_${activeVaultId}`, JSON.stringify([]))
+    if (activeVaultId) writeVaultJSON('meridian_participant_filter', activeVaultId, [])
     set({ participantFilter: [] })
   },
 
@@ -201,7 +183,7 @@ export const useStore = create<MeridianStore>((set, get) => ({
   toggleShowTasks: () => {
     const { showTasks, activeVaultId } = get()
     const next = !showTasks
-    if (activeVaultId) localStorage.setItem(`meridian_show_tasks_${activeVaultId}`, JSON.stringify(next))
+    if (activeVaultId) writeVaultJSON('meridian_show_tasks', activeVaultId, next)
     set({ showTasks: next })
   },
 
