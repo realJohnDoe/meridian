@@ -140,7 +140,7 @@ export default function OccurrenceCard({
       className={`${cardCls} flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-[44px]`}
       style={animate ? { animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' } : undefined}
     >
-      {dimmed && <div className="absolute inset-0 bg-black/40 pointer-events-none z-10 rounded-lg" />}
+      {dimmed && <div className="absolute inset-0 pointer-events-none z-10 rounded-lg" style={{ background: 'var(--done-overlay)' }} />}
 
       <SurfaceButton
         className="absolute inset-0 z-[1] rounded-lg"
@@ -150,7 +150,7 @@ export default function OccurrenceCard({
 
       <span className={cn(occBarVariants({ state: barClass }), 'relative z-20')} />
 
-      <div className="relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none justify-center">
+      <div className={cn('relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none justify-center', dimmed && 'opacity-60')}>
         <div className="flex items-center gap-1.5">
           {/* Icon / checkbox */}
           {(() => {
@@ -192,7 +192,7 @@ export default function OccurrenceCard({
 
       {/* Participant avatar stack on the right */}
       {showTagsParticipants && (
-        <div className="relative z-20 flex items-center pointer-events-none">
+        <div className={cn('relative z-20 flex items-center pointer-events-none', dimmed && 'opacity-60')}>
           <ParticipantAvatars participants={participants} />
         </div>
       )}
