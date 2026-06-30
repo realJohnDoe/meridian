@@ -187,9 +187,11 @@ export default function AppSidebar() {
             </SidebarGroup>
           )}
 
+          {favorites.length > 0 && <SidebarSeparator />}
+
           {/* Backlog & Notes — content destinations. Full-weight rows; their
               position below Favorites is enough to signal lower priority. */}
-          <SidebarGroup className="p-0 pt-2">
+          <SidebarGroup className="p-0">
             <SidebarMenu>
               {collectionItems.map(({ Icon, label, active, onClick }) => (
                 <SidebarMenuItem key={label}>
