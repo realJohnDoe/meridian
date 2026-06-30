@@ -224,6 +224,130 @@
   --surface-raised:  #3b3f5c;
 }
 
+/* ── ROSÉ PINE DAWN THEME ───────────────────────────────────────── */
+.rose-pine-dawn {
+  /* Surfaces — warm parchment, darker→lighter as elevation increases */
+  --backdrop:   #e8e0d8;
+  --background: #f2e9e1;
+  --card:       #faf4ed;
+  --popover:    #faf4ed;
+  --secondary:  #fffaf3;
+  --muted:      #fffaf3;
+  --accent:     #fffaf3;
+
+  /* Text */
+  --foreground:           #575279;
+  --card-foreground:      #575279;
+  --popover-foreground:   #575279;
+  --accent-foreground:    #575279;
+  --secondary-foreground: #797593;
+  --muted-foreground:     #9893a5;
+  --dim:                  #b9b3c4;
+
+  /* Brand — iris (purple) */
+  --primary:            #907aa9;
+  --primary-foreground: #fffaf3;
+  --ring:               #907aa9;
+
+  /* Destructive / warning */
+  --destructive: #b4637a;
+  --warning:     #ea9d34;
+
+  /* Borders */
+  --border: color-mix(in oklab, #9893a5, transparent 78%);
+  --input:  color-mix(in oklab, #9893a5, transparent 68%);
+
+  /* Domain colors */
+  --event:        #907aa9;   /* iris */
+  --task:         #6a8c3a;   /* olive green */
+  --note:         #286983;   /* pine */
+  --brand-cyan:   #56949f;   /* foam */
+  --priority-1:   #b02840;   /* red */
+  --priority-2:   #c4621a;   /* orange */
+  --priority-3:   #c4a800;   /* yellow */
+
+  /* Sidebar */
+  --sidebar:                    #faf4ed;
+  --sidebar-foreground:         #797593;
+  --sidebar-primary:            #907aa9;
+  --sidebar-primary-foreground: #fffaf3;
+  --sidebar-accent:             #fffaf3;
+  --sidebar-accent-foreground:  #575279;
+  --sidebar-border: color-mix(in oklab, #9893a5, transparent 75%);
+  --sidebar-ring:               #907aa9;
+
+  /* Absolute derived tokens */
+  --primary-dark:    #7a6496;
+  --brand-cyan-dark: #3d7a86;
+  --surface-raised:  #fffaf3;
+
+  --chip-border: color-mix(in oklab, #9893a5, transparent 68%);
+  --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
+  --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+}
+
+/* ── SOLARIZED LIGHT THEME ──────────────────────────────────────── */
+.solarized-light {
+  /* Surfaces — warm cream, darker→lighter as elevation increases */
+  --backdrop:   #d5cfbc;
+  --background: #eee8d5;
+  --card:       #fdf6e3;
+  --popover:    #fdf6e3;
+  --secondary:  #f5f0e4;
+  --muted:      #f5f0e4;
+  --accent:     #f5f0e4;
+
+  /* Text */
+  --foreground:           #586e75;
+  --card-foreground:      #586e75;
+  --popover-foreground:   #586e75;
+  --accent-foreground:    #586e75;
+  --secondary-foreground: #657b83;
+  --muted-foreground:     #839496;
+  --dim:                  #93a1a1;
+
+  /* Brand — violet */
+  --primary:            #6c71c4;
+  --primary-foreground: #fdf6e3;
+  --ring:               #6c71c4;
+
+  /* Destructive / warning */
+  --destructive: #dc322f;
+  --warning:     #b58900;
+
+  /* Borders */
+  --border: color-mix(in oklab, #839496, transparent 78%);
+  --input:  color-mix(in oklab, #839496, transparent 68%);
+
+  /* Domain colors */
+  --event:        #6c71c4;   /* violet */
+  --task:         #859900;   /* green */
+  --note:         #2aa198;   /* cyan */
+  --brand-cyan:   #2aa198;
+  --priority-1:   #dc322f;   /* red */
+  --priority-2:   #cb4b16;   /* orange */
+  --priority-3:   #b58900;   /* yellow */
+
+  /* Sidebar */
+  --sidebar:                    #fdf6e3;
+  --sidebar-foreground:         #657b83;
+  --sidebar-primary:            #6c71c4;
+  --sidebar-primary-foreground: #fdf6e3;
+  --sidebar-accent:             #f5f0e4;
+  --sidebar-accent-foreground:  #586e75;
+  --sidebar-border: color-mix(in oklab, #839496, transparent 75%);
+  --sidebar-ring:               #6c71c4;
+
+  /* Absolute derived tokens */
+  --primary-dark:    #5a5fb0;
+  --brand-cyan-dark: #1d8a82;
+  --surface-raised:  #f5f0e4;
+
+  --chip-border: color-mix(in oklab, #839496, transparent 68%);
+  --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
+  --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+}
+
 /* ── DRACULA THEME ──────────────────────────────────────────────── */
 .dracula {
   /* Surfaces — Dracula elevation ramp (darker→lighter as elevation increases) */

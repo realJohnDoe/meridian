@@ -26,7 +26,7 @@ function Root() {
   return (
     <ThemeProvider
       attribute="class"
-      themes={['meridian', 'tokyo-night', 'tokyo-day', 'dracula']}
+      themes={['meridian', 'tokyo-night', 'tokyo-day', 'rose-pine-dawn', 'solarized-light', 'dracula']}
       defaultTheme="meridian"
       enableSystem={false}
       disableTransitionOnChange

@@ -52,6 +52,19 @@ const THEMES: { id: string; label: string; background: string; foreground: strin
     ],
   },
   {
+    id: 'dracula',
+    label: 'Dracula',
+    background: '#282a36',
+    foreground: '#f8f8f2',
+    swatches: [
+      '#bd93f9',  // primary
+      '#50fa7b',  // task
+      '#bd93f9',  // event
+      '#8be9fd',  // note
+      '#ff5555',  // destructive
+    ],
+  },
+  {
     id: 'tokyo-day',
     label: 'Tokyo Day',
     background: '#c9cbe0',
@@ -65,16 +78,29 @@ const THEMES: { id: string; label: string; background: string; foreground: strin
     ],
   },
   {
-    id: 'dracula',
-    label: 'Dracula',
-    background: '#282a36',
-    foreground: '#f8f8f2',
+    id: 'rose-pine-dawn',
+    label: 'Rosé Pine Dawn',
+    background: '#faf4ed',
+    foreground: '#575279',
     swatches: [
-      '#bd93f9',  // primary
-      '#50fa7b',  // task
-      '#bd93f9',  // event
-      '#8be9fd',  // note
-      '#ff5555',  // destructive
+      '#907aa9',  // primary (iris)
+      '#6a8c3a',  // task (olive green)
+      '#907aa9',  // event
+      '#286983',  // note (pine)
+      '#b4637a',  // destructive (love)
+    ],
+  },
+  {
+    id: 'solarized-light',
+    label: 'Solarized Light',
+    background: '#fdf6e3',
+    foreground: '#586e75',
+    swatches: [
+      '#6c71c4',  // primary (violet)
+      '#859900',  // task (green)
+      '#6c71c4',  // event
+      '#2aa198',  // note (cyan)
+      '#dc322f',  // destructive (red)
     ],
   },
 ]
