@@ -1,5 +1,6 @@
 ## Next steps
 
+- Fix sidebar separator paddings
 - Add Global Backlog View
 - Investigate more secure storage options
 - Consider if name and logo are still good
