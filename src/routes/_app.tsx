@@ -49,12 +49,15 @@ function AppMain() {
   const isEntryView  = pathname.startsWith('/entry')
   const isDayView    = pathname.startsWith('/day/')
   const isMonthView  = pathname.startsWith('/calendar')
+  const isListView   = pathname.startsWith('/backlog') || pathname.startsWith('/notes')
   const dvDate       = isDayView ? new Date(pathname.split('/')[2] + 'T00:00:00') : null
   const monthViewDate = isMonthView
     ? (pathname.split('/')[2] ? parseMonth(pathname.split('/')[2]) : null)
     : null
 
   const topBarLabel = (() => {
+    if (pathname.startsWith('/backlog')) return 'Backlog'
+    if (pathname.startsWith('/notes'))   return 'Notes'
     if (monthViewDate) return fmtTopBarMonth(monthViewDate, today)
     const d = agendaTopDate ? new Date(agendaTopDate + 'T00:00:00') : today
     return fmtTopBarDay(d, today)
@@ -113,7 +116,9 @@ function AppMain() {
           {!isEntryView && (
             <div className="flex items-center gap-0.5 shrink-0">
               <SyncButton />
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={handleToday} title="Today"><CalendarCheck2 size={18} /></Button>
+              {!isListView && (
+                <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={handleToday} title="Today"><CalendarCheck2 size={18} /></Button>
+              )}
             </div>
           )}
         </header>
