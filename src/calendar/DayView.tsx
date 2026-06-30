@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useRef, useState } from 'react'
+import { startOfDay } from 'date-fns'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { ChevronDown, ChevronUp, CheckSquare, Square } from 'lucide-react'
 import { useStore } from '@/store'  // items + roots only
@@ -147,7 +148,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
 
   const { filterOccs } = useCalendarFilter()
 
-  const dvFrom = new Date(dvDate); dvFrom.setHours(0, 0, 0, 0)
+  const dvFrom = startOfDay(dvDate)
   const dvTo   = new Date(dvDate); dvTo.setHours(23, 59, 59)
   const dvOccs = filterOccs(useExpandWithMultiday(items, roots, dvFrom, dvTo))
 
@@ -183,8 +184,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
   const totalCols = Math.max(cols.length, 1)
   const isToday   = sameDay(dvDate, today)
 
-  const dvMidnight = new Date(dvDate)
-  dvMidnight.setHours(0, 0, 0, 0)
+  const dvMidnight = startOfDay(dvDate)
 
   const ALL_DAY_THRESHOLD = 3
   const [allDayExpanded, setAllDayExpanded] = useState(false)

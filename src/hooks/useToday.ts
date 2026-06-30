@@ -1,10 +1,5 @@
 import { useState, useEffect } from 'react'
-
-function todayMidnight(): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
-}
+import { startOfToday } from 'date-fns'
 
 /**
  * Returns midnight of the current calendar day. Re-renders consumers at the
@@ -12,18 +7,17 @@ function todayMidnight(): Date {
  * correct date without requiring a reload.
  */
 export function useToday(): Date {
-  const [today, setToday] = useState(todayMidnight)
+  const [today, setToday] = useState(startOfToday)
 
   useEffect(() => {
     let id: ReturnType<typeof setTimeout>
 
     function scheduleNext() {
       const now  = new Date()
-      const next = new Date(now)
+      const next = startOfToday()
       next.setDate(next.getDate() + 1)
-      next.setHours(0, 0, 0, 0)
       id = setTimeout(() => {
-        setToday(todayMidnight())
+        setToday(startOfToday())
         scheduleNext()
       }, next.getTime() - now.getTime())
     }

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import { startOfToday } from 'date-fns'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './save'
@@ -14,8 +15,7 @@ export type { DialogHandlers } from './useEntryDialogs'
 
 function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryState {
   if (!item) {
-    const t = new Date(); t.setHours(0, 0, 0, 0)
-    return { ...ENTRY_DEFAULT, editScope, scheduled: { date: fmtISO(t), time: '' } }
+    return { ...ENTRY_DEFAULT, editScope, scheduled: { date: fmtISO(startOfToday()), time: '' } }
   }
   return entryFromOccurrence(item, editScope)
 }

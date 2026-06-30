@@ -11,7 +11,7 @@
 
 import {
   isValid,
-  addDays, addWeeks, addMonths, addYears, addHours, addMinutes,
+  addDays, addWeeks, addMonths, addYears, addHours, addMinutes, startOfDay,
 } from 'date-fns'
 import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
@@ -81,9 +81,9 @@ export function multidayCoversDate(occ: OccurrenceEntry<AppMetadata>, date: Date
   if (!days || days < 2) return false
   const start = parseDateString(occ.date)
   if (!start) return false
-  const s = new Date(start); s.setHours(0, 0, 0, 0)
+  const s = startOfDay(start)
   const e = new Date(s.getTime() + (days - 1) * 86_400_000); e.setHours(23, 59, 59)
-  const d = new Date(date); d.setHours(0, 0, 0, 0)
+  const d = startOfDay(date)
   return d >= s && d <= e
 }
 
@@ -156,12 +156,10 @@ function generateScheduledDates(
   let count = 0
 
   function withTime(d: Date): Date {
-    const r = new Date(d)
+    const r = startOfDay(d)
     if (anchorTimeStr) {
       const tm = anchorTimeStr.match(/^(\d{1,2}):(\d{2})/)
       if (tm) r.setHours(+tm[1], +tm[2], 0, 0)
-    } else {
-      r.setHours(0, 0, 0, 0)
     }
     return r
   }
@@ -562,8 +560,7 @@ export function expandWithMultiday(
       if (!startD) return []
       const extras: OccurrenceEntry<AppMetadata>[] = []
       for (let d = 1; d < days; d++) {
-        const coveredDate = new Date(startD.getTime() + d * 86_400_000)
-        coveredDate.setHours(0, 0, 0, 0)
+        const coveredDate = startOfDay(new Date(startD.getTime() + d * 86_400_000))
         if (coveredDate < from || coveredDate > to) continue
         extras.push({
           ...i,
