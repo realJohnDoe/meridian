@@ -192,7 +192,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     setPickerOpen(false)
   }, [toggleTask, onToggleDone])
 
-  function renderRow(row: Row, exiting = false) {
+  function renderRowContent(row: Row) {
     const { entry, occ } = row
     const { idx } = entry
 
@@ -203,7 +203,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
             .map(slug => roots.get(slug)?.title ?? slug)
         : []
       return (
-        <div key={exiting ? `exit-${idx}` : idx} className={`flex items-start gap-1${exiting ? ' item-exit' : ''}`}>
+        <>
           <div className="flex-1 min-w-0">
             {occ ? (
               <OccurrenceCard
@@ -228,19 +228,14 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           >
             <X size={13} />
           </button>
-        </div>
+        </>
       )
     }
 
-    // String task
     const { text, done } = entry
     const isEditing = editingIdx === idx
     return (
-      <div
-        key={exiting ? `exit-${idx}` : idx}
-        className={`flex items-start gap-1${exiting ? ' item-exit' : ''}`}
-        onAnimationEnd={exiting ? () => setExitingRows(prev => prev.filter(r => r.entry.idx !== idx)) : undefined}
-      >
+      <>
         <div className="flex-1 min-w-0">
           <MarkdownTaskCard
             text={text}
@@ -262,6 +257,19 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
         >
           <X size={13} />
         </button>
+      </>
+    )
+  }
+
+  function renderRow(row: Row, exiting = false) {
+    const idx = row.entry.idx
+    return (
+      <div
+        key={exiting ? `exit-${idx}` : idx}
+        className={`flex items-start gap-1${exiting ? ' item-exit' : ''}`}
+        onAnimationEnd={exiting ? () => setExitingRows(prev => prev.filter(r => r.entry.idx !== idx)) : undefined}
+      >
+        {renderRowContent(row)}
       </div>
     )
   }
