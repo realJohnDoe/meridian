@@ -192,7 +192,7 @@ export default function OccurrenceCard({
 
       {/* Participant avatar stack on the right */}
       {showTagsParticipants && (
-        <div className="relative z-20 flex items-center pointer-events-none">
+        <div className={cn('relative z-20 flex items-center pointer-events-none', dimmed && 'opacity-60')}>
           <ParticipantAvatars participants={participants} />
         </div>
       )}
