@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { startOfToday } from 'date-fns'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '@/types'
 import { fmtISO, parseDateString, weekStartsOn, parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model'
@@ -55,14 +56,6 @@ interface Props {
 
 const WDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 const WDAY_CODES: Weekday[] = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su']
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function startOfToday(): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
-}
 
 // ── Dropdown options and calculations ─────────────────────────────────────────
 

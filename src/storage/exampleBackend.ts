@@ -1,4 +1,5 @@
 import type { StorageBackend, RawFile, VaultKind } from './backend'
+import { startOfToday } from 'date-fns'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 
@@ -7,27 +8,21 @@ import { addDays } from '@/format'
 // land in the Agenda's -7d … +90d window regardless of when the app
 // is opened.
 
-function todayMidnight(): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
 /** ISO string N days offset from today. */
 function d(offset: number): string {
-  return fmtISO(addDays(todayMidnight(), offset))
+  return fmtISO(addDays(startOfToday(), offset))
 }
 
 /** Most-recent occurrence of a given weekday (0=Sun … 6=Sat) at or before today. */
 function lastWeekday(dow: number): string {
-  const t = todayMidnight()
+  const t = startOfToday()
   const diff = (t.getDay() - dow + 7) % 7
   return fmtISO(addDays(t, -diff))
 }
 
 /** N weeks before lastWeekday(dow). */
 function prevWeekday(dow: number, weeksBack: number): string {
-  const t = todayMidnight()
+  const t = startOfToday()
   const diff = (t.getDay() - dow + 7) % 7
   return fmtISO(addDays(t, -(diff + 7 * weeksBack)))
 }

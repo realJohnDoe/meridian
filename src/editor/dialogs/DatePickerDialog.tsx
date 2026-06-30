@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { addDays } from 'date-fns'
+import { addDays, startOfToday } from 'date-fns'
 import { fmtISO, parseDateString, weekStartsOn } from '@/model'
 import { useStore } from '@/store'
 import {
@@ -10,12 +10,6 @@ import {
 } from '@/components/ui/responsive-modal'
 import { Calendar } from '@/components/ui/calendar'
 import { Button } from '@/components/ui/button'
-
-function startOfToday(): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  return d
-}
 
 // ── Component ───────────────────────────────────────────────────
 interface Props {

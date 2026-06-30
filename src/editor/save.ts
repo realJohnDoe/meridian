@@ -1,3 +1,4 @@
+import { startOfToday } from 'date-fns'
 import { fmtISO, applyEdit, excludeOccurrence, deleteByFileSlug, deleteFollowing, fileSlugItems, findSeries } from '@/model'
 import { isSeries } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
@@ -60,7 +61,7 @@ export function applyScope(
   const rootTime = (parentSeries && isSeries(parentSeries)) ? parentSeries.time : occTime
   if (scope === 'single') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: null }
   if (scope === 'future') return { scheduled: occDate ? { date: occDate, time: occTime || '' } : null, repeat: seriesRepeat || null }
-  if (scope === 'add')    { const t = new Date(); t.setHours(0, 0, 0, 0); return { scheduled: { date: fmtISO(t), time: occTime || '' }, repeat: null } }
+  if (scope === 'add')    { return { scheduled: { date: fmtISO(startOfToday()), time: occTime || '' }, repeat: null } }
   return { scheduled: rootDate ? { date: rootDate, time: (rootTime as string) || '' } : null, repeat: seriesRepeat || null }
 }
 

@@ -1,3 +1,4 @@
+import { startOfToday } from 'date-fns'
 import { expandRange, joinFileMeta, stableOccId } from '@/model'
 import { resolveWikilink, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc } from './types'
@@ -118,7 +119,7 @@ export function updateFileOccurrenceMap(
   items:     StoreItem[],
   roots:     Roots,
 ): Map<string, Occurrence> {
-  const now   = new Date(); now.setHours(0, 0, 0, 0)
+  const now   = startOfToday()
   const AHEAD = new Date(now.getTime() + _3YR_MS)
   const BACK  = new Date(now.getTime() - _3YR_MS)
 
