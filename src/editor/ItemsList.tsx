@@ -55,7 +55,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const [pickerQuery, setPickerQuery] = useState('')
   const [editingIdx,  setEditingIdx]  = useState<number | null>(null)
   const [editText,    setEditText]    = useState('')
-  const [exitingRows, setExitingRows] = useState<Row[]>([])
+  const [exitingEntries, setExitingEntries] = useState<{ row: Row; position: number }[]>([])
 
   const occBySlug = useStore(s => s.fom)
   const allFiles  = useMemo(() => fileEntries(roots), [roots])
@@ -83,9 +83,10 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     })
   }, [entries, occBySlug, roots])
 
-  const toggleTask = useCallback((idx: number, text: string, done: boolean, row?: Row) => {
+  const toggleTask = useCallback((idx: number, text: string, done: boolean, row?: Row, position?: number) => {
     // Animate out when marking done; commit immediately (optimistic)
-    if (!done && row) setExitingRows(prev => [...prev, row])
+    if (!done && row != null && position != null)
+      setExitingEntries(prev => [...prev, { row, position }])
     const next = [...items]
     next[idx] = serializeTaskEntry(text, !done)
     onChange(next)
@@ -145,6 +146,17 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const activeRows = sortedRows.filter(r => !isDoneRow(r))
   const doneRows   = sortedRows.filter(r => isDoneRow(r))
 
+  // Merge exiting rows back at their original active-list positions so they
+  // animate out in-place rather than jumping to the bottom of the list.
+  const displayRows: { row: Row; exiting: boolean }[] = useMemo(() => {
+    const result: { row: Row; exiting: boolean }[] = activeRows.map(row => ({ row, exiting: false }))
+    for (const { row, position } of exitingEntries) {
+      const at = Math.min(position, result.length)
+      result.splice(at, 0, { row, exiting: true })
+    }
+    return result
+  }, [activeRows, exitingEntries])
+
   const donePickerRows = useMemo(() => {
     const q = pickerQuery.toLowerCase()
     return doneRows.filter(({ entry, occ }) => {
@@ -192,7 +204,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     setPickerOpen(false)
   }, [toggleTask, onToggleDone])
 
-  function renderRowContent(row: Row) {
+  function renderRowContent(row: Row, position?: number) {
     const { entry, occ } = row
     const { idx } = entry
 
@@ -240,7 +252,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           <MarkdownTaskCard
             text={text}
             done={done}
-            onToggle={() => toggleTask(idx, text, done, row)}
+            onToggle={() => toggleTask(idx, text, done, row, position)}
             onPromote={() => promote(idx, text, done)}
             onClickText={isEditing ? undefined : () => startEdit(idx, text)}
             editValue={isEditing ? editText : undefined}
@@ -261,15 +273,15 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     )
   }
 
-  function renderRow(row: Row, exiting = false) {
+  function renderRow(row: Row, exiting = false, position?: number) {
     const idx = row.entry.idx
     return (
       <div
         key={exiting ? `exit-${idx}` : idx}
         className={`flex items-start gap-1${exiting ? ' item-exit' : ''}`}
-        onAnimationEnd={exiting ? () => setExitingRows(prev => prev.filter(r => r.entry.idx !== idx)) : undefined}
+        onAnimationEnd={exiting ? () => setExitingEntries(prev => prev.filter(e => e.row.entry.idx !== idx)) : undefined}
       >
-        {renderRowContent(row)}
+        {renderRowContent(row, position)}
       </div>
     )
   }
@@ -356,8 +368,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           <span className="w-[21px] shrink-0" aria-hidden="true" />
         </div>
 
-        {activeRows.map(row => renderRow(row))}
-        {exitingRows.map(row => renderRow(row, true))}
+        {displayRows.map(({ row, exiting }, position) => renderRow(row, exiting, position))}
 
         {doneRows.length > 0 && (
           <Collapsible defaultOpen={false}>
