@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 import { useTheme } from 'next-themes'
 import { HardDrive, GitBranch, Trash2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -142,13 +143,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
   }, [items])
 
   function loadVaultLocals(vaultId: string) {
-    try {
-      const raw = localStorage.getItem(`meridian_default_participants_${vaultId}`)
-      const parsed: unknown = raw ? JSON.parse(raw) : []
-      setVaultParticipants(Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [])
-    } catch {
-      setVaultParticipants([])
-    }
+    setVaultParticipants(readVaultStringArray('meridian_default_participants', vaultId))
     setSelectedVaultId(vaultId)
   }
 
@@ -204,7 +199,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
   function handleParticipantsChange(next: string[]) {
     setVaultParticipants(next)
     if (selectedVaultId) {
-      localStorage.setItem(`meridian_default_participants_${selectedVaultId}`, JSON.stringify(next))
+      writeVaultJSON('meridian_default_participants', selectedVaultId, next)
       if (selectedVaultId === activeVaultId) setDefaultParticipants(next)
     }
   }
