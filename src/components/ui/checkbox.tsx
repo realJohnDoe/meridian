@@ -20,7 +20,7 @@ const Checkbox = React.forwardRef<
     {...props}
   >
     <span className={cn(
-      'size-5 rounded-full border-[1.5px] border-dim flex items-center justify-center',
+      'size-5 rounded-full border-[1.5px] border-muted-foreground flex items-center justify-center',
       'transition-colors duration-150',
       'group-data-[state=checked]:bg-task/60 group-data-[state=checked]:border-task/60',
       'group-disabled:opacity-50',
