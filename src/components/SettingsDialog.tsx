@@ -65,6 +65,32 @@ const THEMES: { id: string; label: string; background: string; foreground: strin
     ],
   },
   {
+    id: 'rose-pine-dawn',
+    label: 'Rosé Pine Dawn',
+    background: '#faf4ed',
+    foreground: '#575279',
+    swatches: [
+      '#907aa9',  // primary (iris)
+      '#286983',  // task (pine)
+      '#907aa9',  // event
+      '#56949f',  // note (foam)
+      '#b4637a',  // destructive (love)
+    ],
+  },
+  {
+    id: 'solarized-light',
+    label: 'Solarized Light',
+    background: '#fdf6e3',
+    foreground: '#586e75',
+    swatches: [
+      '#6c71c4',  // primary (violet)
+      '#859900',  // task (green)
+      '#6c71c4',  // event
+      '#2aa198',  // note (cyan)
+      '#dc322f',  // destructive (red)
+    ],
+  },
+  {
     id: 'dracula',
     label: 'Dracula',
     background: '#282a36',
