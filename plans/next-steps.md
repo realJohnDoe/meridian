@@ -48,22 +48,6 @@ The weakest areas are `store.ts` + `components/SettingsDialog.tsx` (where per-va
 
 ---
 
-### 2. Manual midnight-truncation (`setHours(0,0,0,0)`) reimplemented 23 times
-
-- **Category:** dry
-- **Impact:** 3 — **Breadth:** 23 callsites across 10 files — **Fix effort:** S
-- **Evidence:** `setHours(0, 0, 0, 0)` / local `startOfToday()` appear in `occView.ts`, `calendar/DayView.tsx`, `editor/dialogs/DatePickerDialog.tsx`, `editor/save.ts`, `fileOccurrence.ts`, `hooks/useToday.ts`, and 4 more — while `date-fns` (already a dependency) ships `startOfDay`/`startOfToday`, which the codebase never imports.
-- **Problem:** A trivial date primitive is hand-rolled everywhere, inflating each call and risking subtle off-by-one bugs (some sites truncate `now`, some truncate event dates).
-- **Fix:** Import `startOfDay`/`startOfToday` from `date-fns` (or one helper in `model/dateUtils.ts`) and replace the 23 inline truncations.
-
-### 4. `SettingsDialog.tsx` is a god-component mixing four unrelated concerns
-
-- **Category:** srp, layout
-- **Impact:** 4 — **Breadth:** 1 file (539 lines, 13 hooks, 3-step wizard) — **Fix effort:** L
-- **Evidence:** `SettingsDialog.tsx` drives a vault list + removal, an add-vault wizard (`step: 'vault' | 'source' | 'github'`, lines 293-529), GitHub token entry/connect (`handleSaveToken`, `handleConnect`), per-vault default-participants editing, and sync-now — all in one component.
-- **Problem:** Five independent settings concerns share one component's state, making each hard to change in isolation and forcing the localStorage leak in Finding 1.
-- **Fix:** Split into `VaultList`, `AddVaultWizard`, and `VaultSettings` sub-components, each owning its own state.
-
 ### 5. `ResponsiveModal` abstraction exists but is inconsistently applied
 
 - **Category:** dry, styling
