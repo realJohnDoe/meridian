@@ -56,14 +56,6 @@ The weakest areas are `store.ts` + `components/SettingsDialog.tsx` (where per-va
 - **Problem:** A trivial date primitive is hand-rolled everywhere, inflating each call and risking subtle off-by-one bugs (some sites truncate `now`, some truncate event dates).
 - **Fix:** Import `startOfDay`/`startOfToday` from `date-fns` (or one helper in `model/dateUtils.ts`) and replace the 23 inline truncations.
 
-### 3. Duration-string parsing is fragmented across layers with disagreeing grammars
-
-- **Category:** dry, architecture
-- **Impact:** 5 — **Breadth:** 2 parser implementations consumed across ~8 files — **Fix effort:** M
-- **Evidence:** `format.ts:28` `parseDurationStr` accepts **only full words** (`/(minutes?|hours?|days?|weeks?|months?|years?)/`), while `model/duration.ts:5` `parseDurationDays`/`parseDurationHours` accept **abbreviations** (`d`, `w`, `mo`). A third compact formatter `fmtDurationCompact` lives in `editor/dialogs/DurationDialog.tsx:23`.
-- **Problem:** Two parsers for the same domain string disagree on accepted input, so a duration like `"3d"` parses in the model layer but is treated as opaque by the formatting layer — a latent correctness gap, not just duplication.
-- **Fix:** Consolidate to a single `parseDuration` in `model/duration.ts` returning `{ n, unit }`, and have `format.ts`/`DurationDialog` format from that one result.
-
 ### 4. `SettingsDialog.tsx` is a god-component mixing four unrelated concerns
 
 - **Category:** srp, layout
