@@ -129,6 +129,9 @@
   --sidebar-border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);
   --sidebar-ring:               oklch(0.71 0.20 278);
 
+  /* Chip border — transparent on dark themes, visible on light */
+  --chip-border: transparent;
+
   --radius: 0.625rem;
 
   /* ── Derived — not authored per-theme ── */
@@ -290,10 +293,10 @@
   --accent:     #e1e3ef;   /* hover / selected row surfaces */
 
   /* Text — dark ink on light surfaces */
-  --foreground:           #3760bf;   /* primary text — Tokyo Day fg */
-  --card-foreground:      #3760bf;
-  --popover-foreground:   #3760bf;
-  --accent-foreground:    #3760bf;
+  --foreground:           #1e3a8a;   /* primary text — deepened for AA contrast */
+  --card-foreground:      #1e3a8a;
+  --popover-foreground:   #1e3a8a;
+  --accent-foreground:    #1e3a8a;
   --secondary-foreground: #6172b0;   /* fg_dark */
   --muted-foreground:     #848cb5;   /* comment — placeholder, labels */
   --dim:                  #a8aecb;   /* icons, unselected nav */
@@ -329,6 +332,9 @@
   --sidebar-accent-foreground:  #3760bf;
   --sidebar-border: color-mix(in oklab, #848cb5, transparent 75%);
   --sidebar-ring:               #7847bd;
+
+  /* Chip border — visible on light surfaces */
+  --chip-border: color-mix(in oklab, #848cb5, transparent 68%);
 
   /* Absolute derived tokens */
   --primary-dark:    #5e35a0;

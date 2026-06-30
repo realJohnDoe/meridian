@@ -29,7 +29,7 @@ function DaySection({
   return (
     <div ref={sectionRef}>
       <div className={cn(
-        'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-muted-foreground',
+        'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-secondary-foreground',
         'flex items-center gap-2 bg-background',
         'after:content-[""] after:flex-1 after:h-px after:bg-border',
         isToday && 'text-primary',
