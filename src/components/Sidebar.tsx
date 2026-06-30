@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X } from 'lucide-react'
+import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { setActiveVault } from '@/vaultActions'
@@ -61,10 +61,19 @@ export default function AppSidebar() {
 
   const close = () => { if (isMobile) setOpenMobile(false) }
 
+  // Calendar views — the three time-based views that the filters below scope to.
   const navItems = [
     { Icon: AlignLeft,     label: 'Agenda', active: pathname === '/',                 onClick: () => { close(); navigate({ to: '/' }) } },
     { Icon: CalendarDays,  label: 'Month',  active: pathname.startsWith('/calendar'), onClick: () => { close(); navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } }) } },
     { Icon: CalendarClock, label: 'Day',    active: isDayView,                        onClick: () => { close(); navigate({ to: '/day/$date', params: { date: fmtISO(today) } }) } },
+  ]
+
+  // Content destinations — homes for entries that live outside the calendar, so
+  // the calendar filters don't apply to them. Positioned with Favorites, below
+  // the calendar card.
+  const collectionItems = [
+    { Icon: Inbox,       label: 'Backlog', active: pathname.startsWith('/backlog'), onClick: () => { close(); navigate({ to: '/backlog' }) } },
+    { Icon: NotebookPen, label: 'Notes',   active: pathname.startsWith('/notes'),   onClick: () => { close(); navigate({ to: '/notes' }) } },
   ]
 
   return (
@@ -81,8 +90,66 @@ export default function AppSidebar() {
         </SidebarHeader>
 
         <SidebarContent>
+          {/* Calendar — views and their filters bound as one region so the
+              "Show on calendar" toggles read as scoped to all three views,
+              not to the Day row they happen to sit beneath. */}
+          <SidebarGroup className="p-0 pt-3">
+            <div className="mx-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 overflow-hidden">
+              <SidebarGroupLabel className="h-auto px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider">Calendar</SidebarGroupLabel>
+              <SidebarMenu>
+                {navItems.map(({ Icon, label, active, onClick }) => (
+                  <SidebarMenuItem key={label}>
+                    <SidebarMenuButton
+                      isActive={active}
+                      onClick={onClick}
+                      className="gap-[14px] px-3 py-[11px] h-auto text-[14px] font-medium rounded-md"
+                    >
+                      <Icon className="size-[19px] stroke-[1.7] shrink-0" />
+                      {label}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+
+              <div className="mx-3 mt-1 border-t border-sidebar-border" />
+              <div className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">Show on calendar</div>
+              <div className="px-3 pb-2 flex flex-col">
+                <label className="flex items-center gap-2 cursor-pointer py-[9px]">
+                  <Checkbox
+                    checked={showTasks}
+                    onCheckedChange={() => toggleShowTasks()}
+                    visualClassName="size-[18px] group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
+                  />
+                  <span className="text-[13px]">Tasks</span>
+                </label>
+                {allParticipants.length > 0 && (
+                  <>
+                    <label className="flex items-center gap-2 cursor-pointer py-[9px]">
+                      <Checkbox
+                        checked={participantFilter.includes(NO_PARTICIPANT)}
+                        onCheckedChange={() => toggleParticipantFilter(NO_PARTICIPANT)}
+                        visualClassName="size-[18px] group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
+                      />
+                      <span className="text-[13px] text-muted-foreground italic">No participants</span>
+                    </label>
+                    {allParticipants.map(p => (
+                      <label key={p} className="flex items-center gap-2 cursor-pointer py-[9px]">
+                        <Checkbox
+                          checked={participantFilter.includes(p)}
+                          onCheckedChange={() => toggleParticipantFilter(p)}
+                          visualClassName="size-[18px] group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
+                        />
+                        <span className="text-[13px]">{p}</span>
+                      </label>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          </SidebarGroup>
+
           {favorites.length > 0 && (
-            <SidebarGroup className="p-0 pt-2">
+            <SidebarGroup className="p-0 pt-3">
               <SidebarGroupLabel className="flex h-auto items-center px-5 py-1">
                 <span className="flex-1 text-[11px] font-semibold uppercase tracking-wider">Favorites</span>
                 <button
@@ -120,59 +187,23 @@ export default function AppSidebar() {
             </SidebarGroup>
           )}
 
-          <SidebarGroup className={favorites.length > 0 ? 'p-0 pt-2 border-t border-sidebar-border' : 'p-0 pt-2'} data-tour="nav-group">
+          {/* Backlog & Notes — content destinations. Full-weight rows; their
+              position below Favorites is enough to signal lower priority. */}
+          <SidebarGroup className="p-0 pt-2">
             <SidebarMenu>
-              {navItems.map(({ Icon, label, active, onClick }) => (
+              {collectionItems.map(({ Icon, label, active, onClick }) => (
                 <SidebarMenuItem key={label}>
                   <SidebarMenuButton
                     isActive={active}
                     onClick={onClick}
-                    className="gap-[14px] px-5 py-[13px] h-auto text-[14px] font-medium rounded-none"
-                    size="lg"
+                    className="gap-[14px] px-5 py-[11px] h-auto text-[14px] font-medium rounded-none"
                   >
-                    <Icon className="size-[19px] stroke-[1.7] shrink-0" />
+                    <Icon className="size-[18px] stroke-[1.7] shrink-0" />
                     {label}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
-          </SidebarGroup>
-
-          <SidebarSeparator />
-          <SidebarGroup className="p-0">
-            <SidebarGroupLabel className="px-5 h-8 text-[11px] font-semibold uppercase tracking-wider">Calendars</SidebarGroupLabel>
-            <div className="px-5 flex flex-col">
-              <label className="flex items-center gap-2 cursor-pointer py-[11px]">
-                <Checkbox
-                  checked={showTasks}
-                  onCheckedChange={() => toggleShowTasks()}
-                  visualClassName="size-[18px] group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
-                />
-                <span className="text-[13px]">Tasks</span>
-              </label>
-              {allParticipants.length > 0 && (
-                <>
-                  <label className="flex items-center gap-2 cursor-pointer py-[11px]">
-                    <Checkbox
-                      checked={participantFilter.includes(NO_PARTICIPANT)}
-                      onCheckedChange={() => toggleParticipantFilter(NO_PARTICIPANT)}
-                      visualClassName="size-[18px] group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
-                    />
-                    <span className="text-[13px] text-muted-foreground italic">No participants</span>
-                  </label>
-                  {allParticipants.map(p => (
-                    <label key={p} className="flex items-center gap-2 cursor-pointer py-[11px]">
-                      <Checkbox
-                        checked={participantFilter.includes(p)}
-                        onCheckedChange={() => toggleParticipantFilter(p)}
-                        visualClassName="size-[18px] group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
-                      />
-                      <span className="text-[13px]">{p}</span>
-                    </label>
-                  ))}
-                </>
-              )}
-            </div>
           </SidebarGroup>
 
           <SidebarSeparator />
