@@ -150,7 +150,7 @@ export default function OccurrenceCard({
 
       <span className={cn(occBarVariants({ state: barClass }), 'relative z-20')} />
 
-      <div className="relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none justify-center">
+      <div className={cn('relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none justify-center', dimmed && 'opacity-60')}>
         <div className="flex items-center gap-1.5">
           {/* Icon / checkbox */}
           {(() => {

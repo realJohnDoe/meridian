@@ -133,7 +133,7 @@
   --chip-border: transparent;
 
   /* Done/past card overlay — fade cards toward background so they recede */
-  --done-overlay: color-mix(in oklab, var(--background), transparent 45%);
+  --done-overlay: color-mix(in oklab, var(--background), transparent 30%);
 
   --radius: 0.625rem;
 
@@ -340,7 +340,7 @@
   --chip-border: color-mix(in oklab, #848cb5, transparent 68%);
 
   /* Done/past card overlay — fade cards toward background so they recede */
-  --done-overlay: color-mix(in oklab, var(--background), transparent 45%);
+  --done-overlay: color-mix(in oklab, var(--background), transparent 30%);
 
   /* Absolute derived tokens */
   --primary-dark:    #5e35a0;
