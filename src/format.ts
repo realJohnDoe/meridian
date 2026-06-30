@@ -1,5 +1,5 @@
 import { addDays, addMinutes, isSameDay } from 'date-fns'
-import { parseDateString, parseDateTime, fmtISO } from '@/model'
+import { parseDateString, parseDateTime, fmtISO, parseDuration } from '@/model'
 import type { Scheduled } from '@/types'
 
 export { addDays, isSameDay as sameDay }
@@ -23,20 +23,9 @@ export function fmtTopBarMonth(d: Date, today: Date): string {
 
 // ── Duration formatting ───────────────────────────────────────────────────────
 
-const DURATION_UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
-type DurationUnit = typeof DURATION_UNITS[number]
-
-export function parseDurationStr(s: string): { n: number; unit: DurationUnit } | null {
-  const m = s.match(/^(\d+)\s*(minutes?|hours?|days?|weeks?|months?|years?)$/i)
-  if (!m) return null
-  const raw  = m[2].replace(/s$/, '').toLowerCase()
-  const unit = DURATION_UNITS.find(u => u.replace(/s$/, '') === raw) ?? 'hours'
-  return { n: parseInt(m[1], 10), unit: unit as DurationUnit }
-}
-
 export function durationToEndDate(startStr: string, duration: string): string {
   const start = parseDateString(startStr) ?? new Date()
-  const p = parseDurationStr(duration)
+  const p = parseDuration(duration)
   if (!p) return fmtISO(addDays(start, 1))
   if (p.unit === 'minutes') return fmtISO(start)
   if (p.unit === 'hours')   return fmtISO(addDays(start, Math.floor(p.n / 24)))
@@ -49,7 +38,7 @@ export function durationToEndDate(startStr: string, duration: string): string {
 
 export function durationToEndDateTime(startDateStr: string, startTimeStr: string, duration: string): { date: string; time: string } {
   const start = parseDateTime(startDateStr, startTimeStr) ?? new Date()
-  const p = parseDurationStr(duration)
+  const p = parseDuration(duration)
   const end = p
     ? p.unit === 'minutes' ? addMinutes(start, p.n)
     : p.unit === 'hours'   ? addMinutes(start, p.n * 60)
@@ -76,7 +65,7 @@ export function fmtEndTime(hhmm: string, hour12 = false): string {
 }
 
 export function fmtDuration(duration: string): string {
-  const p = parseDurationStr(duration)
+  const p = parseDuration(duration)
   if (!p) return duration
   const { n, unit } = p
   if (unit === 'minutes' && n >= 60) {
@@ -98,7 +87,7 @@ export function formatDurationChip(duration: string, scheduled: Scheduled, hour1
     const { time } = durationToEndDateTime(scheduled.date, scheduled.time, duration)
     return `until ${fmtEndTime(time, hour12)} (${display})`
   }
-  const p = parseDurationStr(duration)
+  const p = parseDuration(duration)
   if (!p || p.unit === 'minutes' || p.unit === 'hours') return display
   return `until ${fmtEndDate(durationToEndDate(scheduled.date, duration))} (${display})`
 }
