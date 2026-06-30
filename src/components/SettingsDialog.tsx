@@ -52,6 +52,19 @@ const THEMES: { id: string; label: string; background: string; foreground: strin
     ],
   },
   {
+    id: 'dracula',
+    label: 'Dracula',
+    background: '#282a36',
+    foreground: '#f8f8f2',
+    swatches: [
+      '#bd93f9',  // primary
+      '#50fa7b',  // task
+      '#bd93f9',  // event
+      '#8be9fd',  // note
+      '#ff5555',  // destructive
+    ],
+  },
+  {
     id: 'tokyo-day',
     label: 'Tokyo Day',
     background: '#c9cbe0',
@@ -88,19 +101,6 @@ const THEMES: { id: string; label: string; background: string; foreground: strin
       '#6c71c4',  // event
       '#2aa198',  // note (cyan)
       '#dc322f',  // destructive (red)
-    ],
-  },
-  {
-    id: 'dracula',
-    label: 'Dracula',
-    background: '#282a36',
-    foreground: '#f8f8f2',
-    swatches: [
-      '#bd93f9',  // primary
-      '#50fa7b',  // task
-      '#bd93f9',  // event
-      '#8be9fd',  // note
-      '#ff5555',  // destructive
     ],
   },
 ]
