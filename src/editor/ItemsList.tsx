@@ -281,6 +281,13 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     return (
       <div
         key={exiting ? `exit-${idx}` : idx}
+        ref={exiting ? (el => {
+          // Capture the row's natural height so the keyframe can collapse
+          // the slot from a concrete value (CSS can't animate from `auto`).
+          if (el && !el.style.getPropertyValue('--row-h')) {
+            el.style.setProperty('--row-h', `${el.offsetHeight}px`)
+          }
+        }) : undefined}
         className={`flex items-start gap-1${exiting ? ' item-exit' : ''}`}
         onAnimationEnd={exiting ? () => setExitingEntries(prev => prev.filter(e => e.row.entry.idx !== idx)) : undefined}
       >
