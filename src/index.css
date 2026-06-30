@@ -259,12 +259,12 @@
 
   /* Domain colors */
   --event:        #907aa9;   /* iris */
-  --task:         #286983;   /* pine */
-  --note:         #56949f;   /* foam */
-  --brand-cyan:   #56949f;
+  --task:         #6a8c3a;   /* olive green */
+  --note:         #286983;   /* pine */
+  --brand-cyan:   #56949f;   /* foam */
   --priority-1:   #b4637a;   /* love — red */
-  --priority-2:   #ea9d34;   /* gold — amber */
-  --priority-3:   #6a8c3a;   /* olive green — warm yellow-green, distinct from foam/pine */
+  --priority-2:   #c4621a;   /* orange */
+  --priority-3:   #c4a800;   /* yellow */
 
   /* Sidebar */
   --sidebar:                    #faf4ed;

@@ -71,9 +71,9 @@ const THEMES: { id: string; label: string; background: string; foreground: strin
     foreground: '#575279',
     swatches: [
       '#907aa9',  // primary (iris)
-      '#286983',  // task (pine)
+      '#6a8c3a',  // task (olive green)
       '#907aa9',  // event
-      '#56949f',  // note (foam)
+      '#286983',  // note (pine)
       '#b4637a',  // destructive (love)
     ],
   },
