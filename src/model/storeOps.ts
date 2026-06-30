@@ -311,7 +311,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
  */
 function applyAdd({ items, roots }: StoreData, occ: Occurrence, fields: EditFields): StoreData {
   const { scheduled, repeat } = fields
-  const newDate = scheduled?.date ?? occ.date
+  const newDate = scheduled?.date ?? ''
   const baseSeries = findSeries(items, occ)
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
   roots = updateRoot(roots, occ.fileSlug, fields)

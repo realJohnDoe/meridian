@@ -439,9 +439,8 @@ function dedupeAndSort(occs: OccurrenceEntry<AppMetadata>[]): OccurrenceEntry<Ap
   return occs
     .filter(o => {
       if (!o.metadata.jsTime) return false
-      const k = `${o.fileSlug}|${o.metadata.jsTime.getTime()}`
-      if (seen.has(k)) return false
-      seen.add(k)
+      if (seen.has(o.id)) return false
+      seen.add(o.id)
       return true
     })
     .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
