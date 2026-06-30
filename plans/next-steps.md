@@ -1,6 +1,5 @@
 ## Next steps
 
-- Investigate subdirectory / hexagonal architecture violations
 - Add Global Backlog View
 - Investigate more secure storage options
 - Consider if name and logo are still good
@@ -101,9 +100,9 @@ Rank findings by a rough `(impact × breadth) ÷ effort` intuition — but repor
 
 **Strongly prefer systemic and structural issues over isolated, line-level ones.** A finding that affects 10 files beats one that affects 1 function. Cite real code — no generic observations.
 
-List the **top 20 findings**. Include all findings that make the top 20 regardless of their impact score — if a 1/10 ranks in (high breadth, trivial fix), include it and let its low Impact score speak for itself.
+List the **top 10 findings**. Include all findings that make the top 10 regardless of their impact score — if a 1/10 ranks in (high breadth, trivial fix), include it and let its low Impact score speak for itself.
 
-Do not pad to reach 20 — if fewer than 20 clear issues exist, stop there.
+Do not pad to reach 10 — if fewer than 10 clear issues exist, stop there.
 
 ---
 
