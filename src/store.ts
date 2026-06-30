@@ -1,13 +1,8 @@
 import { create } from 'zustand'
-import type { StoreItem, Roots, Occurrence } from './types'
+import type { StoreItem, Roots, Occurrence, LocalePrefs } from './types'
 import type { VaultRef } from '@/storage'
 import { clearOccIdCache } from '@/model'
 import { updateFileOccurrenceMap } from './fileOccurrence'
-
-export type LocalePrefs = {
-  hour12: boolean
-  firstDayOfWeek: 1 | 6 | 7  // 1=Mon, 6=Sat, 7=Sun (Intl getWeekInfo values)
-}
 
 function detectLocalePrefs(): LocalePrefs {
   const hour12 = new Intl.DateTimeFormat(undefined, { hour: 'numeric' })
