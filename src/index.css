@@ -226,11 +226,11 @@
 
 /* ── DRACULA THEME ──────────────────────────────────────────────── */
 .dracula {
-  /* Surfaces — Dracula elevation ramp */
+  /* Surfaces — Dracula elevation ramp (darker→lighter as elevation increases) */
   --backdrop:   #191a21;
-  --background: #282a36;
-  --card:       #1e1f29;
-  --popover:    #1e1f29;
+  --background: #1e1f29;
+  --card:       #282a36;
+  --popover:    #282a36;
   --secondary:  #373a4a;
   --muted:      #373a4a;
   --accent:     #373a4a;
@@ -267,7 +267,7 @@
   --priority-3:   #f1fa8c;   /* yellow */
 
   /* Sidebar */
-  --sidebar:                    #1e1f29;
+  --sidebar:                    #282a36;
   --sidebar-foreground:         #cdd6f4;
   --sidebar-primary:            #bd93f9;
   --sidebar-primary-foreground: #282a36;
