@@ -226,7 +226,10 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                 showTagsParticipants
                 listedOn={listedOn}
                 onOpen={() => onOpenWikilink?.(occ.fileSlug)}
-                onToggleDone={() => onToggleDone?.(occ)}
+                onToggleDone={() => {
+                  if (position != null) setExitingEntries(prev => [...prev, { row, position }])
+                  onToggleDone?.(occ)
+                }}
               />
             ) : (
               <TagChip label={entry.ref} isTopic className="opacity-50 line-through" />
