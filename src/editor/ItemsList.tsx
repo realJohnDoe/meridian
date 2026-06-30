@@ -156,37 +156,33 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     if (entry.kind === 'task') {
       toggleTask(entry.idx, entry.text, entry.done)
     } else if (occ) {
-      if (!occ.date) {
-        onToggleDone?.(occ)
+      const allItems = getItems()
+      const existingUndated = allItems.find(
+        i => isStandaloneOcc(i) && i.fileSlug === occ.fileSlug && i.date === '',
+      ) as OccurrenceEntry<OccurrenceMetadata> | undefined
+      if (existingUndated) {
+        commitNext({
+          items: allItems.map(i => i.id === existingUndated.id
+            ? { ...existingUndated, metadata: { ...existingUndated.metadata, done: false } }
+            : i,
+          ),
+          roots: getRoots(),
+        }, [occ.fileSlug])
       } else {
-        const allItems = getItems()
-        const existingUndated = allItems.find(
-          i => isStandaloneOcc(i) && i.fileSlug === occ.fileSlug && i.date === '',
-        ) as OccurrenceEntry<OccurrenceMetadata> | undefined
-        if (existingUndated) {
-          commitNext({
-            items: allItems.map(i => i.id === existingUndated.id
-              ? { ...existingUndated, metadata: { ...existingUndated.metadata, done: false } }
-              : i,
-            ),
-            roots: getRoots(),
-          }, [occ.fileSlug])
-        } else {
-          const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
-            date:     '',
-            time:     null,
-            source:   'explicit',
-            fileSlug: occ.fileSlug,
-            id:       crypto.randomUUID(),
-            metadata: {
-              participants: occ.metadata.participants ?? [],
-              priority:     occ.metadata.priority,
-              duration:     occ.metadata.duration,
-              timezone:     occ.metadata.timezone,
-            },
-          }
-          commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.fileSlug])
+        const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
+          date:     '',
+          time:     null,
+          source:   'explicit',
+          fileSlug: occ.fileSlug,
+          id:       crypto.randomUUID(),
+          metadata: {
+            participants: occ.metadata.participants ?? [],
+            priority:     occ.metadata.priority,
+            duration:     occ.metadata.duration,
+            timezone:     occ.metadata.timezone,
+          },
         }
+        commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.fileSlug])
       }
     }
     setPickerQuery('')
