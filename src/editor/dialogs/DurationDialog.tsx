@@ -17,13 +17,14 @@ import { badgeVariants } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
 import DatePickerDialog from './DatePickerDialog'
 import TimePickerDialog from './TimePickerDialog'
-import { parseDurationStr, durationToEndDate, durationToEndDateTime, fmtEndDate, fmtEndTime } from '@/format'
+import { parseDuration } from '@/model'
+import { durationToEndDate, durationToEndDateTime, fmtEndDate, fmtEndTime } from '@/format'
 import { useStore } from '@/store'
 
 export { fmtDuration, formatDurationChip } from '@/format'
 
 function fmtDurationCompact(duration: string): string {
-  const p = parseDurationStr(duration)
+  const p = parseDuration(duration)
   if (!p) return duration
   const { n, unit } = p
   if (unit === 'minutes') { if (n < 60) return `${n}m`; const h = Math.floor(n/60), m = n%60; return m ? `${h}h ${m}m` : `${h}h` }
@@ -106,7 +107,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
 
   useEffect(() => {
     if (!open) return
-    const parsed = value ? parseDurationStr(value) : null
+    const parsed = value ? parseDuration(value) : null
     setN(parsed?.n ?? 1)
     setUnit(parsed?.unit ?? 'hours')
     setTab(defaultTab())
@@ -142,7 +143,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
       const dur = hasTime
         ? endDateTimeToDuration(scheduled.date, scheduled.time, endDate, endTime)
         : endDateToDuration(scheduled.date, endDate)
-      const p = dur ? parseDurationStr(dur) : null
+      const p = dur ? parseDuration(dur) : null
       setN(p?.n ?? 1); setUnit(p?.unit ?? 'hours')
     }
     setTab(next)
