@@ -48,14 +48,6 @@ The weakest areas are `store.ts` + `components/SettingsDialog.tsx` (where per-va
 
 ---
 
-### 1. Per-vault `localStorage` persistence is duplicated across store slices and re-owned by SettingsDialog
-
-- **Category:** dry, architecture
-- **Impact:** 6 — **Breadth:** 4 store slices + SettingsDialog (~5 files, 9 key-string sites) — **Fix effort:** M
-- **Evidence:** `store.ts:152-166` defines `loadDefaultParticipants`/`setDefaultParticipants` for key `meridian_default_participants_${vaultId}`; `SettingsDialog.tsx:144-152` re-implements the same load, and `SettingsDialog.tsx:207` writes the same key directly. The slices `favorites`/`defaultParticipants`/`participantFilter`/`showTasks` each repeat the identical `try { getItem → JSON.parse → Array.isArray filter } catch` block.
-- **Problem:** The same persisted key has two independent owners with two parsers, so a change to the key format or shape in one place silently desyncs the other — and the boilerplate is copy-pasted across four slices.
-- **Fix:** Add a `lib/vaultStorage.ts` helper (`readVaultJSON(key, vaultId, guard)` / `writeVaultJSON`) used by all slices, and have SettingsDialog call the store actions instead of touching `localStorage`.
-
 ### 2. Manual midnight-truncation (`setHours(0,0,0,0)`) reimplemented 23 times
 
 - **Category:** dry
