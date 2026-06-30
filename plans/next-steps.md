@@ -5,7 +5,6 @@
 - Investigate more secure storage options
 - Consider if name and logo are still good
 - Post about Meridian in Obsidian forums
-- Investigate flip animation in items section
 - Add vault retention period
 
 # Meridian — Code Health Survey
