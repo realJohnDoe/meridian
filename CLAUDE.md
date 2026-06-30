@@ -67,6 +67,18 @@ Always use `pnpm run build` (which runs `tsc -b`) to verify the full project bui
 
 Do not flag these as misplaced. A future barrel PR will add `index.ts` files to each directory to formalize the public API surface.
 
+## Architecture invariants
+
+These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
+
+1. **`model/` is the domain core — no outward dependencies.** It imports only from `types.ts`, `fileIO.ts`, and `wikilinks.ts` (all cross-cutting root residents). It must never import from `store`, `storage`, `editor`, `calendar`, or any other feature.
+
+2. **Cross-feature imports go through the barrel.** Code in feature dir A that imports from feature dir B must use `@/B` (the `index.ts` barrel), never `@/B/internal-file`. Two permanent exceptions (always allowed as deep imports): `@/components/ui/**` (shadcn primitives) and `@/lib/**` (utility leaf with no barrel).
+
+3. **Core persistence goes through the port.** `storeCommit.ts` and `occurrenceActions.ts` call the `persistencePort` abstraction rather than `@/storage` functions directly. The storage adapter registers the implementation at startup.
+
+4. **Accepted cycles — do not refactor.** Feature-mesh cycles through `root` (e.g. `calendar → components → editor → routes → calendar`) are inherent to feature-sliced React. These are deliberately not targets for restructuring.
+
 ## Preview tools (gotchas — read before using `preview_*`)
 
 These bit us repeatedly; follow them to avoid a long debug loop:
