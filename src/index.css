@@ -132,8 +132,8 @@
   /* Chip border — transparent on dark themes, visible on light */
   --chip-border: transparent;
 
-  /* Done/past card overlay — semi-transparent black on dark themes */
-  --done-overlay: rgba(0,0,0,0.40);
+  /* Done/past card overlay — fade cards toward background so they recede */
+  --done-overlay: color-mix(in oklab, var(--background), transparent 45%);
 
   --radius: 0.625rem;
 
