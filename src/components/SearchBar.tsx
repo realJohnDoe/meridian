@@ -37,6 +37,9 @@ export default function SearchBar() {
 
   return (
     <div className="shrink-0 relative z-30 pointer-events-none">
+      {/* Backdrop: covers calendar/agenda behind the desktop popover; below the popover and bar in DOM order */}
+      {searchOpen && <div className="hidden md:block fixed inset-0 z-[24] bg-background/80 backdrop-blur-sm pointer-events-auto" />}
+
       {/* Mobile full-screen search overlay (md:hidden inside) */}
       <MobileSearchOverlay
         open={searchOpen}
@@ -57,7 +60,7 @@ export default function SearchBar() {
         onCreate={handleCreate}
       />
 
-      <div className={`px-3.5 py-3.5 flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
+      <div className={`relative z-[26] px-3.5 py-3.5 flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
         <div data-tour="search-bar" className="search-bar-wrap w-full max-w-[600px] mx-auto">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           {/*
