@@ -52,6 +52,19 @@ const THEMES: { id: string; label: string; background: string; foreground: strin
     ],
   },
   {
+    id: 'tokyo-day',
+    label: 'Tokyo Day',
+    background: '#c9cbe0',
+    foreground: '#3760bf',
+    swatches: [
+      '#7847bd',  // primary
+      '#486e2a',  // task
+      '#7847bd',  // event
+      '#006b8f',  // note
+      '#d4184b',  // destructive
+    ],
+  },
+  {
     id: 'dracula',
     label: 'Dracula',
     background: '#282a36',

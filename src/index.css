@@ -276,6 +276,70 @@
   --surface-raised:  #44475a;
 }
 
+/* ── TOKYO DAY THEME ────────────────────────────────────────────── */
+/* Light variant of Tokyo Night. Elevation ramp runs darker→lighter so
+   the backdrop recedes and foreground surfaces feel raised. */
+.tokyo-day {
+  /* Surfaces — darker bg, progressively lighter as elevation increases */
+  --backdrop:   #b8bbd0;   /* deepest — recedes behind column */
+  --background: #c9cbe0;   /* app column */
+  --card:       #d8daea;   /* cards, panels, filter overlay */
+  --popover:    #d8daea;
+  --secondary:  #e1e3ef;   /* chips, type-selector bg */
+  --muted:      #e1e3ef;
+  --accent:     #e1e3ef;   /* hover / selected row surfaces */
+
+  /* Text — dark ink on light surfaces */
+  --foreground:           #3760bf;   /* primary text — Tokyo Day fg */
+  --card-foreground:      #3760bf;
+  --popover-foreground:   #3760bf;
+  --accent-foreground:    #3760bf;
+  --secondary-foreground: #6172b0;   /* fg_dark */
+  --muted-foreground:     #848cb5;   /* comment — placeholder, labels */
+  --dim:                  #a8aecb;   /* icons, unselected nav */
+
+  /* Brand — purple adapted for light surfaces */
+  --primary:            #7847bd;
+  --primary-foreground: #ffffff;
+  --ring:               #7847bd;
+
+  /* Destructive / warning */
+  --destructive: #d4184b;
+  --warning:     #8c6c3e;
+
+  /* Borders */
+  --border: color-mix(in oklab, #848cb5, transparent 78%);
+  --input:  color-mix(in oklab, #848cb5, transparent 68%);
+
+  /* Domain colors — saturated but dark enough to read on light bg */
+  --event:        #7847bd;   /* purple — alias of primary */
+  --task:         #486e2a;   /* green */
+  --note:         #006b8f;   /* cyan */
+  --brand-cyan:   #006b8f;
+  --priority-1:   #d4184b;   /* red */
+  --priority-2:   #a85200;   /* orange */
+  --priority-3:   #8c6c3e;   /* amber */
+
+  /* Sidebar */
+  --sidebar:                    #d8daea;
+  --sidebar-foreground:         #6172b0;
+  --sidebar-primary:            #7847bd;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent:             #e1e3ef;
+  --sidebar-accent-foreground:  #3760bf;
+  --sidebar-border: color-mix(in oklab, #848cb5, transparent 75%);
+  --sidebar-ring:               #7847bd;
+
+  /* Absolute derived tokens */
+  --primary-dark:    #5e35a0;
+  --brand-cyan-dark: #005675;
+  --surface-raised:  #ecedf8;
+
+  /* Float shadow — lighter for a light theme */
+  --shadow-float:       0 2px 12px rgba(0,0,0,.14), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
+  --shadow-float-focus: 0 2px 12px rgba(0,0,0,.16), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+}
+
 /* Element resets in @layer base so Tailwind utilities can override them */
 @layer base {
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
