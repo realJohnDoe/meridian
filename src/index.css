@@ -262,9 +262,9 @@
   --task:         #286983;   /* pine */
   --note:         #56949f;   /* foam */
   --brand-cyan:   #56949f;
-  --priority-1:   #b4637a;   /* love */
-  --priority-2:   #ea9d34;   /* gold */
-  --priority-3:   #d7827a;   /* rose */
+  --priority-1:   #b4637a;   /* love — red */
+  --priority-2:   #ea9d34;   /* gold — amber */
+  --priority-3:   #618c6a;   /* sage green — warm, harmonizes with parchment base */
 
   /* Sidebar */
   --sidebar:                    #faf4ed;
