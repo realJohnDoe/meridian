@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots } from '@/types'
+import { isStandaloneOcc } from '@/types'
 import { occKind, occState } from '@/occView'
 import { parseItemEntry, serializeTaskEntry } from './items'
 import { fileEntries, backlinksTo } from '@/fileOccurrence'
@@ -155,8 +156,18 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     if (entry.kind === 'task') {
       toggleTask(entry.idx, entry.text, entry.done)
     } else if (occ) {
-      if (!occ.date) {
-        onToggleDone?.(occ)
+      const allItems = getItems()
+      const existingUndated = allItems.find(
+        i => isStandaloneOcc(i) && i.fileSlug === occ.fileSlug && i.date === '',
+      ) as OccurrenceEntry<OccurrenceMetadata> | undefined
+      if (existingUndated) {
+        commitNext({
+          items: allItems.map(i => i.id === existingUndated.id
+            ? { ...existingUndated, metadata: { ...existingUndated.metadata, done: false } }
+            : i,
+          ),
+          roots: getRoots(),
+        }, [occ.fileSlug])
       } else {
         const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
           date:     '',
@@ -171,7 +182,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
             timezone:     occ.metadata.timezone,
           },
         }
-        commitNext({ items: [...getItems(), newOcc], roots: getRoots() }, [occ.fileSlug])
+        commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.fileSlug])
       }
     }
     setPickerQuery('')
