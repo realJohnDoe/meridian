@@ -8,53 +8,6 @@
 
 # Meridian — Code Health Survey
 
-## 1. Health verdict
-
-Meridian is a **well-engineered codebase** with unusually disciplined lower layers: `model/` and
-`storage/` are pure, dependency-correct (they never import upward into UI), heavily commented with
-intent, and backed by real unit tests. The type system is genuinely strong — there is not a single
-`: any` or `as any` in `src/`. The weakest area is the **`src/` root directory itself**, which has
-become a flat catch-all of ~12 unrelated domain modules (DOM toasts, IndexedDB cache, YAML I/O,
-presentation logic, global Zustand state, wikilink parsing) with no layering, and within it
-**`presentation.ts`**, a 268-line god module spanning five unrelated concerns. The single biggest
-structural theme is **hidden global mutable state and hand-choreographed side effects**: a
-`mutate → warmSlugInFOM → setData → writeEntityToCache` sequence is manually repeated at ~8 call
-sites, and module-level mutable caches (`_fomCache`, `_shas`, `_syncing`) are invalidated by
-convention rather than by the type system. None of this is catastrophic — the app works and is
-tested — but the root layer's lack of boundaries is where future bugs will hide.
-
----
-
-## 2. Coverage statement
-
-**Read in full (~55%):** `store.ts`, `storeBridge.ts`, `types.ts`, `presentation.ts`, `cache.ts`,
-`items.ts`, `wikilinks.ts`, `events.ts`, `fileIO.ts`, `occurrenceActions.ts`; all of `storage/`
-except backend impls (`sync.ts`, `backend.ts`, `githubBackend.ts`, `githubApi.ts`,
-`vaultRegistry.ts` read fully); `model/storeOps.ts`, `model/dateUtils.ts`, `model/types`;
-`editor/` core (`EntryEditor`, `EntryOverlay`, `EditorShell`, `DialogStack`, `useEntryEditor`,
-`save.ts`, `state.ts`); `calendar/DayView`, `AgendaView`, `OccurrenceRow`;
-`components/OccurrenceCard`; `routes/_app.tsx`, `_app.index.tsx`; `vaults/ManageVaultsDialog`;
-`vite.config.ts`.
-
-**Sampled (headers/greps only):** `model/expansion.ts` (580 LOC — read only the header/public
-surface), `RepeatDialog.tsx` (559), `NodeInheritanceDebugger.tsx` (777), `components/ui/*`
-(shadcn-generated — checked for bypass, not audited).
-
-**Deliberately skipped:** `components/ui/*` internals (vendored/generated), all `__tests__/`,
-`model/inheritance|collapse|repeat|storeItems`, `editor/cm/*` (CodeMirror decoration plumbing),
-`onboarding/CoachTour`, `search/`, `MonthView`, `SettingsDialog`, `Sidebar`. Reasons: generated,
-or lower-risk leaf code, or budget.
-
-**Unverified (suspected issues, not investigated):** `model/expansion.ts` is the algorithmic core
-(580 LOC) and the most likely home of an undiscovered god-function/complexity problem — flag as
-unverified.
-
-This report is based on roughly **55–60%** of the application source (excluding tests and generated UI).
-
----
-
-## 3. Findings
-
 ### 5. GitHub personal access token stored in plaintext IndexedDB
 
 - **Category:** `security`
@@ -64,6 +17,106 @@ This report is based on roughly **55–60%** of the application source (excludin
 - **Evidence:** `cache.ts:153` `tokenSave` writes the raw token to the Dexie `meta` table; `vaultRegistry.ts:111,148` read it back into `GitHubBackend`.
 - **Problem:** The fine-grained PAT (repo write scope) sits unencrypted in IndexedDB, so any XSS or malicious dependency in this client-only PWA can exfiltrate a credential that can rewrite the user's repo. The UI hygiene is good (`type="password"`, `autoComplete="off"`) but storage is not.
 - **Fix:** Wrap the token with a non-extractable WebCrypto key before persisting (the app already targets environments with full WebCrypto support per `vite.config.ts`), or at minimum document the trust boundary explicitly and scope guidance toward read-only tokens where possible.
+
+# Code Health Report: Meridian
+
+## Health verdict
+
+This is a healthy, well-disciplined codebase — genuinely above average. The architecture rules in `CLAUDE.md` are real and machine-enforced: import boundaries are linted (barrels + `no-restricted-paths`), `model/` is a clean dependency-free domain core, the storage layer is properly abstracted behind a `StorageBackend` interface and a `persistencePort`, and routes are code-split with Suspense. There are zero `any` types, zero `dangerouslySetInnerHTML`, and no hardcoded secrets in app code.
+
+The weakest areas are `store.ts` + `components/SettingsDialog.tsx` (where per-vault `localStorage` persistence is hand-rolled, duplicated across slices, and re-implemented a second time inside `SettingsDialog` so the same storage key has two independent owners) and the scattering of small domain primitives (duration parsing, midnight-truncation, the "is-tracked" check) that have no single home. The single biggest structural theme is **fragmented domain logic: low-level concepts that should each have one owner are open-coded inline across many files**.
+
+## Coverage
+
+- **Examined closely (~55–60% of non-generated, non-test source):** `eslint.config.js`, all 9 barrel `index.ts` files, `store.ts`, `storeOps.ts`, `persistencePort.ts`, `vaultActions.ts`, `storage/backend.ts` + `localBackend.ts` + `activeBackend.ts`, `format.ts`, `model/duration.ts`, `occView.ts`, `fileOccurrence.ts` (partial), all 7 `editor/dialogs/*`, `components/ui/responsive-modal.tsx`, `components/SettingsDialog.tsx` (partial), route files. Repo-wide greps for `any`, XSS vectors, `localStorage`, duration parsers, `setHours`, `done !== undefined`, empty catches, TODO markers.
+- **Sampled only (headers/greps):** `model/expansion.ts` (579 lines), `calendar/` view internals, `editor/cm/*`, `storage/sync.ts` + `githubBackend.ts`.
+- **Deliberately skipped:** `components/ui/**` (shadcn/generated), `debug/NodeInheritanceDebugger.tsx` (769 lines, separate `debug.html` entry, not in app bundle), all `__tests__`, `routeTree.gen.ts` (generated).
+- **Unverified — flag for follow-up:** `model/expansion.ts` (recurrence expansion) and `storage/sync.ts` (conflict/collision sync) carry the most algorithmic complexity and were not traced; if correctness bugs exist, they are most likely there.
+
+## Findings
+
+| #   | Title                                                        | Category          | Impact | Breadth                 | Effort |
+| --- | ------------------------------------------------------------ | ----------------- | :----: | ----------------------- | :----: |
+| 1   | Per-vault `localStorage` persistence duplicated + dual-owned | dry, architecture |   6    | ~5 files / 9 sites      |   M    |
+| 2   | Manual midnight-truncation reimplemented 23×                 | dry               |   3    | 23 callsites / 10 files |   S    |
+| 3   | Duration-string parsing fragmented, disagreeing grammars     | dry, architecture |   5    | 2 parsers / ~8 files    |   M    |
+| 4   | `SettingsDialog.tsx` god-component                           | srp, layout       |   4    | 1 file (539 lines)      |   L    |
+| 5   | `ResponsiveModal` abstraction inconsistently applied         | dry, styling      |   3    | 3 dialog files          |   M    |
+| 6   | "Is-tracked" check open-coded as `done !== undefined`        | dry, naming       |   2    | 6 callsites             |   S    |
+| 7   | "Reset state on open" effect copy-pasted across dialogs      | dry               |   2    | ~5 dialogs              |   S    |
+| 8   | `CLAUDE.md` references renamed file (`occState.ts`)          | naming            |   1    | 1 doc line              |   S    |
+
+---
+
+### 1. Per-vault `localStorage` persistence is duplicated across store slices and re-owned by SettingsDialog
+
+- **Category:** dry, architecture
+- **Impact:** 6 — **Breadth:** 4 store slices + SettingsDialog (~5 files, 9 key-string sites) — **Fix effort:** M
+- **Evidence:** `store.ts:152-166` defines `loadDefaultParticipants`/`setDefaultParticipants` for key `meridian_default_participants_${vaultId}`; `SettingsDialog.tsx:144-152` re-implements the same load, and `SettingsDialog.tsx:207` writes the same key directly. The slices `favorites`/`defaultParticipants`/`participantFilter`/`showTasks` each repeat the identical `try { getItem → JSON.parse → Array.isArray filter } catch` block.
+- **Problem:** The same persisted key has two independent owners with two parsers, so a change to the key format or shape in one place silently desyncs the other — and the boilerplate is copy-pasted across four slices.
+- **Fix:** Add a `lib/vaultStorage.ts` helper (`readVaultJSON(key, vaultId, guard)` / `writeVaultJSON`) used by all slices, and have SettingsDialog call the store actions instead of touching `localStorage`.
+
+### 2. Manual midnight-truncation (`setHours(0,0,0,0)`) reimplemented 23 times
+
+- **Category:** dry
+- **Impact:** 3 — **Breadth:** 23 callsites across 10 files — **Fix effort:** S
+- **Evidence:** `setHours(0, 0, 0, 0)` / local `startOfToday()` appear in `occView.ts`, `calendar/DayView.tsx`, `editor/dialogs/DatePickerDialog.tsx`, `editor/save.ts`, `fileOccurrence.ts`, `hooks/useToday.ts`, and 4 more — while `date-fns` (already a dependency) ships `startOfDay`/`startOfToday`, which the codebase never imports.
+- **Problem:** A trivial date primitive is hand-rolled everywhere, inflating each call and risking subtle off-by-one bugs (some sites truncate `now`, some truncate event dates).
+- **Fix:** Import `startOfDay`/`startOfToday` from `date-fns` (or one helper in `model/dateUtils.ts`) and replace the 23 inline truncations.
+
+### 3. Duration-string parsing is fragmented across layers with disagreeing grammars
+
+- **Category:** dry, architecture
+- **Impact:** 5 — **Breadth:** 2 parser implementations consumed across ~8 files — **Fix effort:** M
+- **Evidence:** `format.ts:28` `parseDurationStr` accepts **only full words** (`/(minutes?|hours?|days?|weeks?|months?|years?)/`), while `model/duration.ts:5` `parseDurationDays`/`parseDurationHours` accept **abbreviations** (`d`, `w`, `mo`). A third compact formatter `fmtDurationCompact` lives in `editor/dialogs/DurationDialog.tsx:23`.
+- **Problem:** Two parsers for the same domain string disagree on accepted input, so a duration like `"3d"` parses in the model layer but is treated as opaque by the formatting layer — a latent correctness gap, not just duplication.
+- **Fix:** Consolidate to a single `parseDuration` in `model/duration.ts` returning `{ n, unit }`, and have `format.ts`/`DurationDialog` format from that one result.
+
+### 4. `SettingsDialog.tsx` is a god-component mixing four unrelated concerns
+
+- **Category:** srp, layout
+- **Impact:** 4 — **Breadth:** 1 file (539 lines, 13 hooks, 3-step wizard) — **Fix effort:** L
+- **Evidence:** `SettingsDialog.tsx` drives a vault list + removal, an add-vault wizard (`step: 'vault' | 'source' | 'github'`, lines 293-529), GitHub token entry/connect (`handleSaveToken`, `handleConnect`), per-vault default-participants editing, and sync-now — all in one component.
+- **Problem:** Five independent settings concerns share one component's state, making each hard to change in isolation and forcing the localStorage leak in Finding 1.
+- **Fix:** Split into `VaultList`, `AddVaultWizard`, and `VaultSettings` sub-components, each owning its own state.
+
+### 5. `ResponsiveModal` abstraction exists but is inconsistently applied
+
+- **Category:** dry, styling
+- **Impact:** 3 — **Breadth:** 3 dialog files diverge from the pattern — **Fix effort:** M
+- **Evidence:** `components/ui/responsive-modal.tsx` provides the desktop-Dialog/mobile-Drawer switch, used by DatePicker/Duration/Priority/Repeat/Settings. But `TimePickerDialog.tsx:3-11` bypasses it with a raw `Dialog` + manual `useMediaQuery`, and `RepeatDialog.tsx:13-19` imports **both** `ResponsiveModal` and raw `Dialog`.
+- **Problem:** The intended single responsive-modal pattern is undermined by two dialogs hand-rolling the desktop/mobile branch, so modal behavior (sizing, drag handle, a11y) drifts between dialogs.
+- **Fix:** Route TimePickerDialog and RepeatDialog's modal shell through `ResponsiveModal`, extending it if a nested-dialog case needs it.
+
+### 6. "Is-tracked task" check open-coded as `metadata.done !== undefined`
+
+- **Category:** dry, naming
+- **Impact:** 2 — **Breadth:** 6 callsites — **Fix effort:** S
+- **Evidence:** `done !== undefined` appears in `calendar/DayView.tsx:99`, `components/KindIcon.tsx:22`, `components/OccurrenceCard.tsx:110`, `editor/save.ts:74`, and twice in `occView.ts:7` — with no named predicate, even though `occView.ts` already exports `occKind`/`occState`.
+- **Problem:** A domain concept ("this occurrence is a tracked task") is expressed via a magic comparison repeated across layers, obscuring intent and inviting inconsistent variants.
+- **Fix:** Add `isTracked(occ)` to `occView.ts` and replace the six callsites.
+
+### 7. "Reset local state when dialog opens" effect copy-pasted across dialogs
+
+- **Category:** dry
+- **Impact:** 2 — **Breadth:** ~5 dialogs — **Fix effort:** S
+- **Evidence:** `useEffect(() => { if (open) setX(...) }, [open, ...])` recurs in `PriorityDrawer.tsx:36`, `TimePickerDialog.tsx:32`, `DatePickerDialog.tsx:40`, `DurationDialog.tsx:126`, `RepeatDialog.tsx:247` — three of them needing an `eslint-disable exhaustive-deps`.
+- **Problem:** The same controlled-dialog reset pattern is duplicated, and several copies suppress the deps lint, masking real dependency mistakes.
+- **Fix:** Extract a `useResetOnOpen(open, value, setter)` hook (or a `seed` prop) so the reset logic and its deps live in one place.
+
+### 8. `CLAUDE.md` directory doc references a renamed file (`occState.ts` → `occView.ts`)
+
+- **Category:** naming, dead-code
+- **Impact:** 1 — **Breadth:** 1 doc line (the file is imported as `@/occView` in 6 files) — **Fix effort:** S
+- **Evidence:** `CLAUDE.md:66` lists "`format.ts`, `fileOccurrence.ts`, `occState.ts`" as the root view-model helpers, but no `occState.ts` exists — the file is `occView.ts` (it exports `occState` as a _function_).
+- **Problem:** The architecture doc that agents and contributors rely on names a file that doesn't exist, eroding trust in the (otherwise accurate) doc.
+- **Fix:** Update the line to `occView.ts`.
+
+---
+
+## What was NOT found (clean signals)
+
+No `any`, no XSS sinks, no client-exposed secrets, no circular/upward imports past the lint-sanctioned feature mesh, no missing route code-splitting, and loading/skeleton states are present on the primary flows. The 15 empty `catch {}` blocks are intentional `localStorage`/`JSON.parse` guards, not swallowed errors.
 
 # Codebase Health Survey
 
