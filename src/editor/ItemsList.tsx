@@ -55,6 +55,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const [pickerQuery, setPickerQuery] = useState('')
   const [editingIdx,  setEditingIdx]  = useState<number | null>(null)
   const [editText,    setEditText]    = useState('')
+  const [exitingEntries, setExitingEntries] = useState<{ row: Row; position: number }[]>([])
 
   const occBySlug = useStore(s => s.fom)
   const allFiles  = useMemo(() => fileEntries(roots), [roots])
@@ -82,7 +83,10 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     })
   }, [entries, occBySlug, roots])
 
-  const toggleTask = useCallback((idx: number, text: string, done: boolean) => {
+  const toggleTask = useCallback((idx: number, text: string, done: boolean, row?: Row, position?: number) => {
+    // Animate out when marking done; commit immediately (optimistic)
+    if (!done && row != null && position != null)
+      setExitingEntries(prev => [...prev, { row, position }])
     const next = [...items]
     next[idx] = serializeTaskEntry(text, !done)
     onChange(next)
@@ -142,6 +146,17 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const activeRows = sortedRows.filter(r => !isDoneRow(r))
   const doneRows   = sortedRows.filter(r => isDoneRow(r))
 
+  // Merge exiting rows back at their original active-list positions so they
+  // animate out in-place rather than jumping to the bottom of the list.
+  const displayRows: { row: Row; exiting: boolean }[] = useMemo(() => {
+    const result: { row: Row; exiting: boolean }[] = activeRows.map(row => ({ row, exiting: false }))
+    for (const { row, position } of exitingEntries) {
+      const at = Math.min(position, result.length)
+      result.splice(at, 0, { row, exiting: true })
+    }
+    return result
+  }, [activeRows, exitingEntries])
+
   const donePickerRows = useMemo(() => {
     const q = pickerQuery.toLowerCase()
     return doneRows.filter(({ entry, occ }) => {
@@ -154,7 +169,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const redoItem = useCallback((row: Row) => {
     const { entry, occ } = row
     if (entry.kind === 'task') {
-      toggleTask(entry.idx, entry.text, entry.done)
+      toggleTask(entry.idx, entry.text, entry.done, undefined)
     } else if (occ) {
       const allItems = getItems()
       const existingUndated = allItems.find(
@@ -189,7 +204,8 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     setPickerOpen(false)
   }, [toggleTask, onToggleDone])
 
-  function renderRow({ entry, occ }: Row) {
+  function renderRowContent(row: Row, position?: number) {
+    const { entry, occ } = row
     const { idx } = entry
 
     if (entry.kind === 'link') {
@@ -199,7 +215,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
             .map(slug => roots.get(slug)?.title ?? slug)
         : []
       return (
-        <div key={idx} className="flex items-start gap-1">
+        <>
           <div className="flex-1 min-w-0">
             {occ ? (
               <OccurrenceCard
@@ -210,7 +226,10 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                 showTagsParticipants
                 listedOn={listedOn}
                 onOpen={() => onOpenWikilink?.(occ.fileSlug)}
-                onToggleDone={() => onToggleDone?.(occ)}
+                onToggleDone={() => {
+                  if (position != null) setExitingEntries(prev => [...prev, { row, position }])
+                  onToggleDone?.(occ)
+                }}
               />
             ) : (
               <TagChip label={entry.ref} isTopic className="opacity-50 line-through" />
@@ -224,20 +243,19 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           >
             <X size={13} />
           </button>
-        </div>
+        </>
       )
     }
 
-    // String task
     const { text, done } = entry
     const isEditing = editingIdx === idx
     return (
-      <div key={idx} className="flex items-start gap-1">
+      <>
         <div className="flex-1 min-w-0">
           <MarkdownTaskCard
             text={text}
             done={done}
-            onToggle={() => toggleTask(idx, text, done)}
+            onToggle={() => toggleTask(idx, text, done, row, position)}
             onPromote={() => promote(idx, text, done)}
             onClickText={isEditing ? undefined : () => startEdit(idx, text)}
             editValue={isEditing ? editText : undefined}
@@ -254,6 +272,26 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
         >
           <X size={13} />
         </button>
+      </>
+    )
+  }
+
+  function renderRow(row: Row, exiting = false, position?: number) {
+    const idx = row.entry.idx
+    return (
+      <div
+        key={exiting ? `exit-${idx}` : idx}
+        ref={exiting ? (el => {
+          // Capture the row's natural height so the keyframe can collapse
+          // the slot from a concrete value (CSS can't animate from `auto`).
+          if (el && !el.style.getPropertyValue('--row-h')) {
+            el.style.setProperty('--row-h', `${el.offsetHeight}px`)
+          }
+        }) : undefined}
+        className={`flex items-start gap-1${exiting ? ' item-exit' : ''}`}
+        onAnimationEnd={exiting ? () => setExitingEntries(prev => prev.filter(e => e.row.entry.idx !== idx)) : undefined}
+      >
+        {renderRowContent(row, position)}
       </div>
     )
   }
@@ -340,7 +378,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           <span className="w-[21px] shrink-0" aria-hidden="true" />
         </div>
 
-        {activeRows.map(row => renderRow(row))}
+        {displayRows.map(({ row, exiting }, position) => renderRow(row, exiting, position))}
 
         {doneRows.length > 0 && (
           <Collapsible defaultOpen={false}>
