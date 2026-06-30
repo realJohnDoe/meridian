@@ -71,15 +71,24 @@ export default [
       'import-x/no-restricted-paths': [
         'error',
         {
-          zones: BARREL_DIRS.map(protected_ => ({
-            target: BARREL_DIRS.filter(d => d !== protected_).map(d => `./src/${d}`),
-            from: `./src/${protected_}`,
-            // components/ui/ is the shadcn primitive layer — always allowed as deep imports.
-            except: protected_ === 'components'
-              ? ['./index.ts', './index.tsx', './ui']
-              : ['./index.ts', './index.tsx'],
-            message: `Import from @/${protected_} barrel (index.ts), not from its internals.`,
-          })),
+          zones: [
+            ...BARREL_DIRS.map(protected_ => ({
+              target: BARREL_DIRS.filter(d => d !== protected_).map(d => `./src/${d}`),
+              from: `./src/${protected_}`,
+              // components/ui/ is the shadcn primitive layer — always allowed as deep imports.
+              except: protected_ === 'components'
+                ? ['./index.ts', './index.tsx', './ui']
+                : ['./index.ts', './index.tsx'],
+              message: `Import from @/${protected_} barrel (index.ts), not from its internals.`,
+            })),
+            // UI components must not import from @/storage at all (barrel or internals).
+            // Use vaultActions.ts for vault-management commands instead.
+            {
+              target: ['./src/components', './src/calendar', './src/editor', './src/search', './src/onboarding'],
+              from: './src/storage',
+              message: 'UI components must not import from @/storage. Use @/vaultActions for vault commands.',
+            },
+          ],
         },
       ],
     },

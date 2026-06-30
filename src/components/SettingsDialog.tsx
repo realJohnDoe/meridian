@@ -4,7 +4,7 @@ import { HardDrive, GitBranch, Trash2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
-import { addLocalVault, addGitHubVault, removeVault, tokenSave, syncToBackend } from '@/storage'
+import { addLocalVault, addGitHubVault, removeVault, tokenSave, syncToBackend } from '@/vaultActions'
 import {
   Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
