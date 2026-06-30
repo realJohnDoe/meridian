@@ -206,3 +206,11 @@ export interface Scheduled {
   date: string
   time: string
 }
+
+// ── Locale preferences ─────────────────────────────────────────────────────────
+
+/** firstDayOfWeek uses Intl getWeekInfo values: 1=Mon, 6=Sat, 7=Sun. */
+export type LocalePrefs = {
+  hour12: boolean
+  firstDayOfWeek: 1 | 6 | 7
+}

@@ -1,6 +1,6 @@
 import { format, isValid, parseISO, addDays } from 'date-fns'
 
-import type { LocalePrefs } from '@/store'
+import type { LocalePrefs } from '@/types'
 
 /** Convert a LocalePrefs firstDayOfWeek (Intl convention) to date-fns/react-day-picker convention (0=Sun, 1=Mon, 6=Sat). */
 export function weekStartsOn(prefs: LocalePrefs): 0 | 1 | 6 {
