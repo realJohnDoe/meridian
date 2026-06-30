@@ -339,8 +339,8 @@
   /* Chip border — visible on light surfaces */
   --chip-border: color-mix(in oklab, #848cb5, transparent 68%);
 
-  /* Done/past card overlay — blue-lavender tint matching the theme hue */
-  --done-overlay: color-mix(in oklab, #6172b0, transparent 55%);
+  /* Done/past card overlay — fade cards toward background so they recede */
+  --done-overlay: color-mix(in oklab, var(--background), transparent 45%);
 
   /* Absolute derived tokens */
   --primary-dark:    #5e35a0;
