@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useMediaQuery } from '@/hooks/use-media-query'
+import { useMediaQuery } from '@/hooks'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './dialog'
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerActions } from './drawer'
 import { Separator } from './separator'

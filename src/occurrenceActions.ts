@@ -1,4 +1,4 @@
-import { toggleDone, excludeOccurrence, deleteByFileSlug } from '@/model/storeOps'
+import { toggleDone, excludeOccurrence, deleteByFileSlug } from '@/model'
 import { occIsRecur } from './occView'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
