@@ -130,7 +130,7 @@ export default function OccurrenceCard({
     dimmed ? 'overflow-hidden' : '',
   ].filter(Boolean).join(' ')
 
-  const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime !== 'none' && !!t)
+  const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime !== 'none' && (!!t || !!durationLabel))
   const hasTagsContent      = showTagsParticipants && (tags.length > 0 || listedOn.length > 0)
   const showMeta            = hasDateTimeContent || hasTagsContent
 
@@ -182,7 +182,7 @@ export default function OccurrenceCard({
           <div className="flex flex-wrap gap-1.5">
             {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
             {showTime !== 'none' && t && <Badge variant="tag">{t}</Badge>}
-            {showTime !== 'none' && t && durationLabel && <Badge variant="tag">{durationLabel}</Badge>}
+            {showTime !== 'none' && durationLabel && <Badge variant="tag">{durationLabel}</Badge>}
             {showTagsParticipants && listedOn.map(label => (
               <TagChip key={label} label={label} isTopic />
             ))}
