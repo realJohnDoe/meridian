@@ -50,7 +50,6 @@
   --color-task:           var(--task);
   --color-note:           var(--note);
   --color-brand-cyan:     var(--brand-cyan);
-  --color-brand-purple:   var(--brand-purple);
   --color-priority-1:     var(--priority-1);
   --color-priority-2:     var(--priority-2);
   --color-priority-3:     var(--priority-3);
@@ -116,7 +115,6 @@
   --task:         oklch(0.84 0.17 145);   /* green */
   --note:         oklch(0.75 0.17 215);   /* sky blue */
   --brand-cyan:   oklch(0.77 0.14 208);   /* sky blue — gradient accent */
-  --brand-purple: oklch(0.74 0.18 295);   /* violet */
   --priority-1:   oklch(0.72 0.19 22);    /* red */
   --priority-2:   oklch(0.76 0.17 48);    /* orange */
   --priority-3:   oklch(0.88 0.18 82);    /* yellow */
@@ -146,18 +144,8 @@
   --shadow-float:       0 2px 16px rgba(0,0,0,.55), 0 12px 48px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 90%);
   --shadow-float-focus: 0 2px 16px rgba(0,0,0,.55), 0 14px 52px color-mix(in oklab,var(--primary-dark),transparent 58%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 75%);
 
-  /* Standard tint steps: fill ~18% and border/strong ~32% */
-  --event-tint:      color-mix(in oklab, var(--event),      transparent 82%);
-  --event-border:    color-mix(in oklab, var(--event),      transparent 68%);
-  --task-tint:       color-mix(in oklab, var(--task),       transparent 82%);
-  --task-border:     color-mix(in oklab, var(--task),       transparent 68%);
-  --priority-1-tint: color-mix(in oklab, var(--priority-1), transparent 85%);
-  --priority-2-tint: color-mix(in oklab, var(--priority-2), transparent 85%);
-  --priority-3-tint: color-mix(in oklab, var(--priority-3), transparent 85%);
-
-  /* Subtle primary fills (replaces --ab / --ab2) */
-  --primary-tint:  color-mix(in oklab, var(--primary), transparent 88%);
-  --primary-tint2: color-mix(in oklab, var(--primary), transparent 78%);
+  /* event-border used in EntryBody wikilink underline */
+  --event-border: color-mix(in oklab, var(--event), transparent 68%);
 
   /* Elevated surface for past/done bars */
   --surface-raised: oklch(0.33 0.05 252);
@@ -165,8 +153,7 @@
   /* Layout & fonts (not themed) */
   --control-h: 1.75rem;
   --font: 'DM Sans', system-ui, sans-serif;
-  --mono: 'DM Mono', monospace;
-  --nh: 0px; --th: 54px; --r: var(--radius); --rl: 16px; --rx: 24px;
+  --th: 54px; --r: var(--radius);
 }
 
 /* ── TOKYO NIGHT THEME ──────────────────────────────────────────── */
@@ -211,7 +198,6 @@
   --task:         #9ece6a;   /* green */
   --note:         #7dcfff;   /* cyan */
   --brand-cyan:   #7dcfff;   /* cyan */
-  --brand-purple: #bb9af7;   /* purple */
   --priority-1:   #f7768e;   /* red */
   --priority-2:   #ff9e64;   /* orange */
   --priority-3:   #e0af68;   /* yellow */
@@ -270,7 +256,6 @@
   --task:         #50fa7b;   /* green */
   --note:         #8be9fd;   /* cyan */
   --brand-cyan:   #8be9fd;   /* cyan */
-  --brand-purple: #bd93f9;   /* purple */
   --priority-1:   #ff5555;   /* red */
   --priority-2:   #ffb86c;   /* orange */
   --priority-3:   #f1fa8c;   /* yellow */
