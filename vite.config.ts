@@ -60,10 +60,46 @@ function debugPagePlugin(): Plugin {
   }
 }
 
+/**
+ * Injects a strict Content-Security-Policy <meta> tag into the built index.html.
+ *
+ * Build-only (`apply: 'build'`): Vite's dev server injects CSS via inline
+ * <style> tags for HMR, which `style-src 'self'` blocks with no way to
+ * relax just for dev without weakening the shipped policy. The production
+ * bundle has no inline scripts/styles, so the strict policy only needs to
+ * apply there. `<meta>` CSP delivery doesn't support frame-ancestors,
+ * report-uri, or sandbox — omitted rather than silently ignored.
+ */
+function cspPlugin(): Plugin {
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data:",
+    "connect-src 'self' https://api.github.com",
+    "manifest-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+  ].join('; ')
+
+  return {
+    name: 'inject-csp',
+    apply: 'build',
+    transformIndexHtml(html) {
+      return html.replace(
+        '<meta charset="UTF-8" />',
+        `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${csp}">`,
+      )
+    },
+  }
+}
+
 export default defineConfig({
   base: '/meridian/',
   plugins: [
     debugPagePlugin(),
+    cspPlugin(),
     TanStackRouterVite({ target: 'react', autoCodeSplitting: true, routeFileIgnorePattern: '(^|/)index\\.tsx?$' }),
     react(),
     tailwindcss(),
