@@ -12,10 +12,11 @@ interface Props {
   onSwipeDelete: (occ: Occurrence) => (() => void)
   showDate?: boolean
   /**
-   * Bumped once a minute by the caller (today's section only). Not read
-   * directly — its only job is to appear in the props object so the default
-   * memo() below stops bailing and OccurrenceCard recomputes its
-   * wall-clock-dependent occState() styling.
+   * A per-render stamp from the caller (today's section only). Not read
+   * directly — its only job is to appear in the props object, always
+   * different from the previous render, so the default memo() below never
+   * bails and OccurrenceCard always recomputes its wall-clock-dependent
+   * occState() styling whenever this row's parent section rendered at all.
    */
   tick?: number
 }
