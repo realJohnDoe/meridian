@@ -287,6 +287,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                 {hasTime && !isTouch && (
                   <input
                     type="time"
+                    step={300}
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
                     className="bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
