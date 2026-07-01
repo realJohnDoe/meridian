@@ -79,6 +79,10 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 
 4. **Accepted cycles — do not refactor.** Feature-mesh cycles through `root` (e.g. `calendar → components → editor → routes → calendar`) are inherent to feature-sliced React. These are deliberately not targets for restructuring.
 
+## Manual browser verification
+
+Don't proactively start the dev server and drive it with `preview_*` tools to verify a change. Only do this when the user explicitly asks for it — they generally test UI changes themselves.
+
 ## Preview tools (gotchas — read before using `preview_*`)
 
 These bit us repeatedly; follow them to avoid a long debug loop:
