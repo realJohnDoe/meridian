@@ -64,17 +64,24 @@ function debugPagePlugin(): Plugin {
  * Injects a strict Content-Security-Policy <meta> tag into the built index.html.
  *
  * Build-only (`apply: 'build'`): Vite's dev server injects CSS via inline
- * <style> tags for HMR, which `style-src 'self'` blocks with no way to
- * relax just for dev without weakening the shipped policy. The production
- * bundle has no inline scripts/styles, so the strict policy only needs to
- * apply there. `<meta>` CSP delivery doesn't support frame-ancestors,
- * report-uri, or sandbox — omitted rather than silently ignored.
+ * <style> tags for HMR, which `style-src` blocks with no way to relax just
+ * for dev without weakening the shipped policy.
+ *
+ * `style-src` needs 'unsafe-inline': Radix UI (popovers/dialogs/tooltips),
+ * @tanstack/react-virtual, vaul, and cmdk all set inline `style` attributes
+ * via JS at runtime for positioning (transforms, offsets) — these change
+ * per-render, so a static hash/nonce allowlist isn't viable. `script-src`
+ * stays strict since that's what actually gates arbitrary code execution
+ * (and therefore token exfiltration); CSS-only injection isn't a viable
+ * channel to read IndexedDB and make network requests. `<meta>` CSP
+ * delivery doesn't support frame-ancestors, report-uri, or sandbox —
+ * omitted rather than silently ignored.
  */
 function cspPlugin(): Plugin {
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' https://fonts.googleapis.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data:",
     "connect-src 'self' https://api.github.com",
