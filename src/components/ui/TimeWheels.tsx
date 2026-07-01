@@ -65,8 +65,9 @@ function ScrollColumn({ items, value, fmt, onChange }: ScrollColumnProps) {
   )
 }
 
+const MINUTE_STEP = 5
 const HOURS   = Array.from({ length: 24 }, (_, i) => i)
-const MINUTES = Array.from({ length: 60 }, (_, i) => i)
+const MINUTES = Array.from({ length: 60 / MINUTE_STEP }, (_, i) => i * MINUTE_STEP)
 const pad2    = (n: number) => String(n).padStart(2, '0')
 
 interface Props {
@@ -77,7 +78,8 @@ interface Props {
 export default function TimeWheels({ value, onChange }: Props) {
   const parts = value.match(/^(\d{1,2}):(\d{2})/)
   const h = parts ? parseInt(parts[1], 10) : 9
-  const m = parts ? parseInt(parts[2], 10) : 0
+  const rawM = parts ? parseInt(parts[2], 10) : 0
+  const m = Math.round(rawM / MINUTE_STEP) * MINUTE_STEP % 60
 
   return (
     <div className="flex items-center gap-1">
