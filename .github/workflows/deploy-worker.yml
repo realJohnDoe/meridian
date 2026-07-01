@@ -2,7 +2,11 @@ name: Deploy Worker
 
 on:
   push:
-    branches: [main]
+    # TODO(temporary): drop worktree-worker-scaffold before merging to main —
+    # added only to test this workflow from the feature branch since
+    # workflow_dispatch doesn't show up in the UI until a workflow file
+    # exists on the default branch.
+    branches: [main, worktree-worker-scaffold]
     paths:
       - 'worker/**'
       - '.github/workflows/deploy-worker.yml'
