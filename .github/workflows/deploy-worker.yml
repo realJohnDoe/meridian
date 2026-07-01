@@ -29,6 +29,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter meridian-oauth-worker run typecheck
+      - run: pnpm --filter meridian-oauth-worker run test
       - run: pnpm --filter meridian-oauth-worker exec wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -4,3 +4,4 @@ dist
 .claude/launch.json
 src/routeTree.gen.ts
 .wrangler
+.dev.vars
