@@ -8,6 +8,7 @@
  */
 
 import { stringify } from 'yaml'
+import { wrapFrontmatter } from '@/fileIO'
 import type { RawNode } from './nodeSchema'
 
 // ── Output type ───────────────────────────────────────────────────────────────
@@ -196,4 +197,9 @@ export function serializeRawNode(node: RawNode): string {
     defaultStringType: 'PLAIN',
     defaultKeyType: 'PLAIN',
   }).trimEnd()
+}
+
+/** Serialise a raw node + body into a full file string (frontmatter + body). */
+export function saveFile(rawNode: Record<string, unknown>, body: string): string {
+  return wrapFrontmatter(serializeRawNode(rawNode as RawNode), body)
 }
