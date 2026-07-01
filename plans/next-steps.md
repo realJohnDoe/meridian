@@ -1,6 +1,5 @@
 ## Next steps
 
-- Fix build warnings while keeping hexagonal architecture intact
 - Fix linter findings
 - Check for react antipatterns / linter
 - Fix contrast in mobile month view texts
