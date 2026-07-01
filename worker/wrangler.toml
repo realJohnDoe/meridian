@@ -1,0 +1,7 @@
+name = "meridian-oauth"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+# Pinned so the CI deploy token only needs Workers Scripts:Edit — without
+# this, Wrangler needs account-enumeration permissions (Account Settings:Read
+# etc.) to figure out which account to deploy to.
+account_id = "0c9a990d5cdac68612909eceef590d10"

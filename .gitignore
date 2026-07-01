@@ -3,3 +3,4 @@ dist
 .claude/worktrees/
 .claude/launch.json
 src/routeTree.gen.ts
+.wrangler
