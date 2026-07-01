@@ -11,13 +11,7 @@ import {
   ResponsiveModalDescription,
   ResponsiveModalActions,
 } from '@/components/ui/responsive-modal'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { badgeVariants } from '@/components/ui/badge'
@@ -482,16 +476,14 @@ export default function RepeatDialog({
         />
 
         {/* Nested Calendar Dialog for End Date selection */}
-        <Dialog open={endCalOpen} onOpenChange={(o) => !o && setEndCalOpen(false)}>
-          <DialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-xs p-5">
-            <DialogHeader>
-              <DialogTitle>End Date</DialogTitle>
-              <DialogDescription className="sr-only">
-                Select the end date for this recurrence
-              </DialogDescription>
-            </DialogHeader>
+        <ResponsiveModal open={endCalOpen} onOpenChange={(o) => !o && setEndCalOpen(false)}>
+          <ResponsiveModalContent className="sm:max-w-xs">
+            <ResponsiveModalTitle>End Date</ResponsiveModalTitle>
+            <ResponsiveModalDescription>
+              Select the end date for this recurrence
+            </ResponsiveModalDescription>
 
-            <div className="flex flex-col gap-4 items-center pt-2">
+            <div className="flex flex-col gap-4 items-center px-4 pt-4 pb-4">
               <Calendar
                 mode="single"
                 fixedWeeks
@@ -509,15 +501,15 @@ export default function RepeatDialog({
               />
 
               {/* Shortcut toggles */}
-              <div className="flex gap-2 w-full mt-2">
+              <div className="flex gap-2 w-full">
                 {(() => {
                   const today = startOfToday()
                   const tomorrow = new Date(today)
                   tomorrow.setDate(today.getDate() + 1)
-                  
+
                   const isToday = endVal === fmtISO(today)
                   const isTomorrow = endVal === fmtISO(tomorrow)
-                  
+
                   return (
                     <>
                       <Button
@@ -548,13 +540,14 @@ export default function RepeatDialog({
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-border/50">
+            <Separator />
+            <div className="flex justify-end gap-2 px-4 pt-4 pb-4">
               <Button variant="outline" size="sm" onClick={() => setEndCalOpen(false)}>
                 Close
               </Button>
             </div>
-          </DialogContent>
-        </Dialog>
+          </ResponsiveModalContent>
+        </ResponsiveModal>
       </ResponsiveModalContent>
     </ResponsiveModal>
   )
