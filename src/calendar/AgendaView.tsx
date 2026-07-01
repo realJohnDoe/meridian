@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect, useRef } from 'react'
+import { useMemo, useCallback, useEffect, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useStore } from '@/store'
 import type { Occurrence, EditScope } from '@/types'
@@ -109,6 +109,26 @@ export default function AgendaView({ onOpen }: Props) {
     return out
   }, [groups, today])
 
+  // Today's occurrences can flip event-past/event-future purely from the clock
+  // advancing, with no store change to trigger a re-render. Re-sort just
+  // today's (small) item list once a minute so time-based reordering/dimming
+  // stays live — cheap, unlike re-sorting the whole (up to ~455-day) `sections`
+  // list. `tick` is threaded down to DaySection/OccurrenceRow to also force a
+  // repaint when the order doesn't change but styling still would (see
+  // DaySection's propsAreEqual and OccurrenceRow's tick prop).
+  const [nowTick, setNowTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(t => t + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const todayKey = fmtISO(today)
+  const todayItems = useMemo(
+    () => sortOccs(groups[todayKey].items),
+    // nowTick isn't read in the body — it's a timer-driven cache-buster, not a data dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [groups, todayKey, nowTick],
+  )
+
   // Stable references so DaySection's memo comparator isn't short-circuited
   // by new function identities on every AgendaView render.
   const handleToggleDone = useCallback((occ: Occurrence) => toggleOccDone(occ), [])
@@ -193,7 +213,8 @@ export default function AgendaView({ onOpen }: Props) {
                     date={section.date}
                     isToday={section.isToday}
                     isTomorrow={section.isTomorrow}
-                    items={section.items}
+                    items={section.isToday ? todayItems : section.items}
+                    tick={section.isToday ? nowTick : 0}
                     onOpen={onOpen}
                     onToggleDone={handleToggleDone}
                     onSwipeDelete={handleSwipeDelete}
