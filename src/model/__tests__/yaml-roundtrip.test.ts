@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { fixtureNames, parseFixture, serialize, normalizeIds, rootMeta, occItems } from './helpers'
 import { parseToStoreItems } from '@/model/storeItems'
-import { expandRange, multidayCoversDate } from '@/model/expansion'
+import { expandRange, expandWithMultiday, multidayCoversDate } from '@/model/expansion'
+import { fmtISO } from '@/model/dateUtils'
 import { isSeries, isStandaloneOcc } from '@/types'
 
 const names = fixtureNames()
@@ -69,6 +70,19 @@ describe('structural expectations', () => {
     expect(multidayCoversDate(occs[0], new Date('2026-04-20'))).toBe(true)
     expect(multidayCoversDate(occs[0], new Date('2026-04-21'))).toBe(true)
     expect(multidayCoversDate(occs[0], new Date('2026-04-22'))).toBe(false)
+  })
+
+  // Regression test: Month/Agenda views expand a whole range at once (unlike
+  // Day view, which queries one day at a time), so a multiday event's virtual
+  // occurrences for days 2..N must not be deduped away just because they share
+  // the start-date occurrence's id.
+  it('multiday: expandWithMultiday emits one occurrence per covered day across a range', () => {
+    const parsed = parseFixture('multiday')
+    const roots = new Map([[`multiday`, parsed.root]])
+
+    const occs = expandWithMultiday(parsed.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))
+    const dates = occs.map(o => o.metadata.jsTime && fmtISO(o.metadata.jsTime))
+    expect(dates).toEqual(['2026-04-19', '2026-04-20', '2026-04-21'])
   })
 })
 

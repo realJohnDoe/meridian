@@ -22,7 +22,7 @@ function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
 
       {items.map(o => (
         <OccurrenceRow
-          key={o.id}
+          key={`${o.id}-${o.metadata.jsTime?.getTime() ?? ''}`}
           occ={o}
           showDate={true}
           onOpen={onOpen}
@@ -39,6 +39,7 @@ function propsAreEqual(prev: Props, next: Props): boolean {
   return prev.items.every((o, i) => {
     const n = next.items[i]
     return o.id === n.id && o.date === n.date
+        && o.metadata.jsTime?.getTime() === n.metadata.jsTime?.getTime()
         && o.metadata.done === n.metadata.done
         && o.metadata.title === n.metadata.title
         && o.metadata.priority === n.metadata.priority
