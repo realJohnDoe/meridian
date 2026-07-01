@@ -1,5 +1,7 @@
 ## Next steps
 
+- Check for react antipatterns / linter
+- Fix linter findings
 - Fix sidebar separator paddings
 - Investigate more secure storage options
 - Consider if name and logo are still good
