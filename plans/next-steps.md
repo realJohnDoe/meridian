@@ -48,14 +48,6 @@ The weakest areas are `store.ts` + `components/SettingsDialog.tsx` (where per-va
 
 ---
 
-### 5. `ResponsiveModal` abstraction exists but is inconsistently applied
-
-- **Category:** dry, styling
-- **Impact:** 3 — **Breadth:** 3 dialog files diverge from the pattern — **Fix effort:** M
-- **Evidence:** `components/ui/responsive-modal.tsx` provides the desktop-Dialog/mobile-Drawer switch, used by DatePicker/Duration/Priority/Repeat/Settings. But `TimePickerDialog.tsx:3-11` bypasses it with a raw `Dialog` + manual `useMediaQuery`, and `RepeatDialog.tsx:13-19` imports **both** `ResponsiveModal` and raw `Dialog`.
-- **Problem:** The intended single responsive-modal pattern is undermined by two dialogs hand-rolling the desktop/mobile branch, so modal behavior (sizing, drag handle, a11y) drifts between dialogs.
-- **Fix:** Route TimePickerDialog and RepeatDialog's modal shell through `ResponsiveModal`, extending it if a nested-dialog case needs it.
-
 ### 6. "Is-tracked task" check open-coded as `metadata.done !== undefined`
 
 - **Category:** dry, naming
