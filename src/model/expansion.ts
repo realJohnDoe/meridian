@@ -437,8 +437,12 @@ function dedupeAndSort(occs: OccurrenceEntry<AppMetadata>[]): OccurrenceEntry<Ap
   return occs
     .filter(o => {
       if (!o.metadata.jsTime) return false
-      if (seen.has(o.id)) return false
-      seen.add(o.id)
+      // Keyed by (id, covered day) rather than id alone: a multiday standalone's
+      // virtual occurrences (one per covered day, see expandWithMultiday) share
+      // the source item's id but must all survive dedup.
+      const key = `${o.id}|${o.metadata.jsTime.getTime()}`
+      if (seen.has(key)) return false
+      seen.add(key)
       return true
     })
     .sort((a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0))
