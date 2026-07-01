@@ -5,3 +5,7 @@ compatibility_date = "2026-07-01"
 # this, Wrangler needs account-enumeration permissions (Account Settings:Read
 # etc.) to figure out which account to deploy to.
 account_id = "0c9a990d5cdac68612909eceef590d10"
+
+[vars]
+# Not secret — GITHUB_CLIENT_SECRET is set separately via `wrangler secret put`.
+GITHUB_CLIENT_ID = "Iv23liMpUq1CUQl4TcaT"

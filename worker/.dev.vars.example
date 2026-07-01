@@ -1,0 +1,4 @@
+# Copy to .dev.vars (gitignored) for local `wrangler dev` testing.
+# Get the real value from the GitHub App's settings page ("Generate a new
+# client secret") — never commit the real secret.
+GITHUB_CLIENT_SECRET=replace-with-a-real-or-dummy-value-for-local-testing

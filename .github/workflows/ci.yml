@@ -15,7 +15,7 @@ jobs:
   build:
     uses: ./.github/workflows/build.yml
 
-  worker-typecheck:
+  worker-checks:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -28,3 +28,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter meridian-oauth-worker run typecheck
+      - run: pnpm --filter meridian-oauth-worker run test
