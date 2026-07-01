@@ -1,5 +1,9 @@
 # pnpm 11+ project settings
 
+packages:
+  - '.'
+  - 'worker'
+
 # ── Supply-chain protection ───────────────────────────────────────────────────
 #
 # minimumReleaseAge (minutes): pnpm refuses to install any package version
@@ -19,7 +23,9 @@ overrides:
 # build scripts. Only add packages here after reviewing what the script does.
 # esbuild  – compiles its Go-based JS bundler binary; required for Vite
 # sharp    – compiles its libvips native image-processing binary; required for PWA icon gen
+# workerd  – downloads Cloudflare's official Workers runtime binary; required for `wrangler dev`/`deploy`
 allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+  workerd: true
