@@ -111,7 +111,7 @@ export default function AppSidebar() {
                 ))}
               </SidebarMenu>
 
-              <div className="mx-3 mt-1 border-t border-sidebar-border" />
+              <SidebarSeparator className="mx-3 mt-2" />
               <div className="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">Show on calendar</div>
               <div className="px-3 pb-2 flex flex-col">
                 <label className="flex items-center gap-2 cursor-pointer py-[9px]">
@@ -209,7 +209,7 @@ export default function AppSidebar() {
           </SidebarGroup>
 
           <SidebarGroup className="p-0">
-            <div className="mx-2 mb-1 h-px bg-sidebar-border" />
+            <SidebarSeparator className="mb-2" />
             <SidebarGroupLabel className="px-5 h-8 text-[11px] font-semibold uppercase tracking-wider">Vaults</SidebarGroupLabel>
             <SidebarMenu>
               {vaults.map(vault => {
@@ -230,7 +230,9 @@ export default function AppSidebar() {
                   </SidebarMenuItem>
                 )
               })}
-              <SidebarSeparator />
+            </SidebarMenu>
+            <SidebarSeparator className="my-2" />
+            <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   data-tour="manage-vaults"
