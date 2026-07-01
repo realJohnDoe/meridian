@@ -34,9 +34,11 @@ function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate, tic
   const hintRef = useRef<HTMLDivElement>(null)
   const iconRef = useRef<SVGSVGElement>(null)
 
-  // Keep a stable ref to the callback so the touch-listener closure never goes stale.
+  // Keep stable refs so the touch-listener closure (attached once, see below) never goes stale.
   const onSwipeDeleteRef = useRef(onSwipeDelete)
   useEffect(() => { onSwipeDeleteRef.current = onSwipeDelete }, [onSwipeDelete])
+  const occRef = useRef(occ)
+  useEffect(() => { occRef.current = occ }, [occ])
 
   // Swipe-to-delete: touchmove must call preventDefault() to block scroll while
   // the user is swiping horizontally. JSX onTouchMove cannot do that (passive by
@@ -106,7 +108,7 @@ function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate, tic
         // Phase 1: show toast immediately (before animation completes).
         // beginSwipeDelete() returns applyDelete — the function that actually
         // removes the item from the store once the exit animation is done.
-        const applyDelete = onSwipeDeleteRef.current(occ)
+        const applyDelete = onSwipeDeleteRef.current(occRef.current)
         // Kick off slide + collapse simultaneously.
         wrap.style.height = wrap.offsetHeight + 'px'
         wrap.style.overflow = 'hidden'

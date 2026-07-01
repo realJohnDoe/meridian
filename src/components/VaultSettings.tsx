@@ -5,7 +5,7 @@ import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { tokenSave, syncToBackend, removeVault } from '@/vaultActions'
 import { ParticipantsRow } from '@/editor'
-import type { VaultRef } from '@/storage'
+import type { VaultRef } from '@/vaultActions'
 
 interface Props {
   vault:    VaultRef

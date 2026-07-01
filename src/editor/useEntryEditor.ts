@@ -85,16 +85,17 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   }, [entry, goBack])
 
   const dialogs = useEntryDialogs(entry, updateEntry)
+  const { setSeriesSheetConfig, setPendingDelete } = dialogs
 
   const handleDelete = useCallback(() => {
     deleteNode(
       entry.item,
       goBack,
-      dialogs.setSeriesSheetConfig,
-      () => dialogs.setSeriesSheetConfig(null),
-      (title, onConfirm) => dialogs.setPendingDelete({ title, onConfirm }),
+      setSeriesSheetConfig,
+      () => setSeriesSheetConfig(null),
+      (title, onConfirm) => setPendingDelete({ title, onConfirm }),
     )
-  }, [entry.item, goBack, dialogs.setSeriesSheetConfig, dialogs.setPendingDelete])
+  }, [entry.item, goBack, setSeriesSheetConfig, setPendingDelete])
 
   const handleClose = useCallback(() => goBack(), [goBack])
 

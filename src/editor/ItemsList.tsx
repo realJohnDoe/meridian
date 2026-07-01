@@ -202,7 +202,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     }
     setPickerQuery('')
     setPickerOpen(false)
-  }, [toggleTask, onToggleDone])
+  }, [toggleTask])
 
   function renderRowContent(row: Row, position?: number) {
     const { entry, occ } = row
