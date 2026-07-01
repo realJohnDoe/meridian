@@ -22,6 +22,12 @@
 
 # Code Health Report: Meridian
 
+## From the Cloudflare auth flow
+
+- Got an error message, but on second try, it worked.
+- No dedup against already-connected repos. The picker shows all installed repos, including ones already connected as a vault. If the user picks a repo they've already connected, addGitHubVaultOAuth creates a second, duplicate VaultRef pointing at the same repo — confusing, not destructive, but not great.
+- Re-doing the full OAuth redirect is heavier than it needs to be. Adding a second vault currently means going through the whole GitHub consent screen again, even though we already hold a valid access token from the first sign-in. A nicer flow would skip straight to the repo picker using the existing token, only falling back to a real redirect if there's no valid session yet.
+
 ## Health verdict
 
 This is a healthy, well-disciplined codebase — genuinely above average. The architecture rules in `CLAUDE.md` are real and machine-enforced: import boundaries are linted (barrels + `no-restricted-paths`), `model/` is a clean dependency-free domain core, the storage layer is properly abstracted behind a `StorageBackend` interface and a `persistencePort`, and routes are code-split with Suspense. There are zero `any` types, zero `dangerouslySetInnerHTML`, and no hardcoded secrets in app code.
