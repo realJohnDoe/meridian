@@ -11,9 +11,17 @@ interface Props {
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
   showDate?: boolean
+  /**
+   * Bumped once a minute by the caller (today's section only). Not read
+   * directly — its only job is to appear in the props object so the default
+   * memo() below stops bailing and OccurrenceCard recomputes its
+   * wall-clock-dependent occState() styling.
+   */
+  tick?: number
 }
 
-function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
+function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate, tick }: Props) {
+  void tick
   const roots    = useStore(s => s.roots)
   const listedOn = useMemo(
     () => backlinksTo(occ.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug),
