@@ -21,7 +21,7 @@ export interface CacheRecord {
 
 export interface MetaRecord {
   key:   string
-  value: FileSystemDirectoryHandle | string | VaultRef[]
+  value: FileSystemDirectoryHandle | string | number | VaultRef[]
 }
 
 // ── Dexie DB ───────────────────────────────────────────────────
@@ -167,6 +167,44 @@ export async function tokenLoad(vaultId: string): Promise<string | null> {
 export async function tokenClear(vaultId: string): Promise<void> {
   const d = await cacheInit()
   await d.meta.delete(`token:${vaultId}`)
+}
+
+// ── Per-vault OAuth refresh-token + expiry (OAuth-managed vaults only) ────
+// Presence of a refresh token is what marks a vault as OAuth-managed rather
+// than PAT-managed — PAT vaults never have one.
+
+export async function refreshTokenSave(vaultId: string, refreshToken: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.put({ key: `refreshToken:${vaultId}`, value: refreshToken })
+}
+
+export async function refreshTokenLoad(vaultId: string): Promise<string | null> {
+  const d = await cacheInit()
+  const record = await d.meta.get(`refreshToken:${vaultId}`)
+  const v = record?.value
+  return typeof v === 'string' ? v : null
+}
+
+export async function refreshTokenClear(vaultId: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.delete(`refreshToken:${vaultId}`)
+}
+
+export async function tokenExpirySave(vaultId: string, expiresAt: number): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.put({ key: `tokenExpiry:${vaultId}`, value: expiresAt })
+}
+
+export async function tokenExpiryLoad(vaultId: string): Promise<number | null> {
+  const d = await cacheInit()
+  const record = await d.meta.get(`tokenExpiry:${vaultId}`)
+  const v = record?.value
+  return typeof v === 'number' ? v : null
+}
+
+export async function tokenExpiryClear(vaultId: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.delete(`tokenExpiry:${vaultId}`)
 }
 
 export async function cacheDeleteAll(vaultId: string): Promise<void> {

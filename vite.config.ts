@@ -84,7 +84,7 @@ function cspPlugin(): Plugin {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data:",
-    "connect-src 'self' https://api.github.com",
+    "connect-src 'self' https://api.github.com https://meridian-oauth.realjohndoe.workers.dev",
     "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
@@ -98,6 +98,26 @@ function cspPlugin(): Plugin {
         '<meta charset="UTF-8" />',
         `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${csp}">`,
       )
+    },
+  }
+}
+
+/**
+ * Copies the built index.html to 404.html — the standard GitHub Pages
+ * SPA-fallback trick. GitHub Pages does no server-side rewrites, so a fresh
+ * top-level navigation to any client-only route (e.g. GitHub's OAuth redirect
+ * landing on /meridian/auth/callback) hits the static file server directly and
+ * 404s before our JS ever loads. Serving the same app shell for 404s means the
+ * URL bar still shows the real path, and TanStack Router picks up routing
+ * from there once the app boots.
+ */
+function spaFallbackPlugin(): Plugin {
+  return {
+    name: 'spa-404-fallback',
+    apply: 'build',
+    closeBundle() {
+      const outDir = resolve(__dirname, 'dist')
+      fs.copyFileSync(resolve(outDir, 'index.html'), resolve(outDir, '404.html'))
     },
   }
 }
@@ -134,6 +154,7 @@ export default defineConfig({
         ],
       },
     }),
+    spaFallbackPlugin(),
   ],
   resolve: {
     alias: {

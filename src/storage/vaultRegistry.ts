@@ -2,6 +2,8 @@ import {
   cacheInit, cacheLoadAll, cacheBulkWriteClean, cacheDeleteAll,
   handleSave, handleLoad, handleClear,
   tokenSave, tokenLoad, tokenClear,
+  refreshTokenSave, refreshTokenClear,
+  tokenExpirySave, tokenExpiryClear,
   vaultRefsSave, vaultRefsLoad,
   activeVaultIdSave, activeVaultIdLoad,
 } from '@/storage/cache'
@@ -230,14 +232,62 @@ export async function addGitHubVault(cfg: GitHubVaultConfig): Promise<void> {
   }
 }
 
+export interface GitHubOAuthVaultConfig {
+  owner:        string
+  repo:         string
+  branch:       string
+  accessToken:  string
+  refreshToken: string
+  expiresAt:    number
+}
+
+export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<void> {
+  try {
+    await cacheInit()
+    const id = crypto.randomUUID()
+
+    const backend = new GitHubBackend(id, `${cfg.owner}/${cfg.repo}`, {
+      owner: cfg.owner, repo: cfg.repo, branch: cfg.branch, token: cfg.accessToken,
+    })
+    const perm = await backend.ensurePermission(true)
+    if (perm !== 'granted') {
+      notify('Could not connect to GitHub repository — check the App has write access to it.')
+      return
+    }
+
+    await tokenSave(id, cfg.accessToken)
+    await refreshTokenSave(id, cfg.refreshToken)
+    await tokenExpirySave(id, cfg.expiresAt)
+
+    const ref: GitHubVaultRef = {
+      id,
+      name:   `${cfg.owner}/${cfg.repo}`,
+      kind:   'github',
+      github: { owner: cfg.owner, repo: cfg.repo, branch: cfg.branch },
+    }
+    await updateVaultRefs(existing => [...existing, ref])
+
+    const files = await backend.readAll()
+    await cacheBulkWriteClean(id, files)
+    await activateWritableVault(backend)
+  } catch (e) {
+    console.error('[vault] addGitHubVaultOAuth failed:', e)
+    notifyError('Could not connect GitHub vault', e)
+  }
+}
+
 export async function removeVault(id: string): Promise<void> {
   try {
     const existing = await vaultRefsLoad()
     const ref      = existing.find(r => r.id === id)
     if (!ref) return
 
-    if (ref.kind === 'local')  await handleClear(id)
-    if (ref.kind === 'github') await tokenClear(id)
+    if (ref.kind === 'local') await handleClear(id)
+    if (ref.kind === 'github') {
+      await tokenClear(id)
+      await refreshTokenClear(id)
+      await tokenExpiryClear(id)
+    }
 
     await cacheDeleteAll(id)
     await updateVaultRefs(current => current.filter(r => r.id !== id))

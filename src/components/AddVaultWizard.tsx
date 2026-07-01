@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { HardDrive, GitBranch } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/cn'
-import { addLocalVault, addGitHubVault } from '@/vaultActions'
+import { addLocalVault, addGitHubVault, startGitHubSignIn } from '@/vaultActions'
 import {
   ResponsiveModalTitle,
 } from '@/components/ui/responsive-modal'
@@ -21,7 +21,7 @@ const SOURCE_CARDS: { id: Source; Icon: typeof HardDrive; title: string; desc: s
     id:    'github',
     Icon:  GitBranch,
     title: 'GitHub repository',
-    desc:  'Use a GitHub repo as a vault via a fine-grained access token. Works on any device and browser.',
+    desc:  'Sign in with GitHub, or connect manually with an access token. Works on any device and browser.',
   },
 ]
 
@@ -31,13 +31,20 @@ interface Props {
 }
 
 export function AddVaultWizard({ onClose, onBack }: Props) {
-  const [step,    setStep]    = useState<WizardStep>('source')
-  const [source,  setSource]  = useState<Source>('local')
-  const [repoStr, setRepoStr] = useState('')
-  const [branch,  setBranch]  = useState('main')
-  const [token,   setToken]   = useState('')
-  const [busy,    setBusy]    = useState(false)
-  const [error,   setError]   = useState<string | null>(null)
+  const [step,        setStep]        = useState<WizardStep>('source')
+  const [source,      setSource]      = useState<Source>('local')
+  const [showManual,  setShowManual]  = useState(false)
+  const [repoStr,     setRepoStr]     = useState('')
+  const [branch,      setBranch]      = useState('main')
+  const [token,       setToken]       = useState('')
+  const [busy,        setBusy]        = useState(false)
+  const [signingIn,   setSigningIn]   = useState(false)
+  const [error,       setError]       = useState<string | null>(null)
+
+  async function handleSignIn() {
+    setSigningIn(true)
+    await startGitHubSignIn() // full-page redirect — component unmounts
+  }
 
   async function handleNext() {
     if (source === 'local') {
@@ -115,69 +122,91 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
       <ResponsiveModalTitle>Connect GitHub repository</ResponsiveModalTitle>
 
       <div className="flex flex-col gap-3 p-4">
-        <p className="text-[13px] text-muted-foreground">
-          Create a{' '}
-          <a
-            href="https://github.com/settings/tokens?type=beta"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline"
-          >
-            fine-grained personal access token
-          </a>{' '}
-          on GitHub with these settings:
+        <Button onClick={handleSignIn} disabled={signingIn}>
+          {signingIn ? 'Redirecting to GitHub…' : 'Sign in with GitHub'}
+        </Button>
+        <p className="text-[12px] text-muted-foreground">
+          Choose which repository to connect after signing in — no need to create a token by hand.
         </p>
-        <ul className="ml-4 list-disc space-y-1 text-[12px] text-muted-foreground">
-          <li><strong>Repository access:</strong> Only select repositories — pick this vault&apos;s repo</li>
-          <li><strong>Permissions → Contents:</strong> Read and write</li>
-          <li>Leave all other permissions as <em>No access</em></li>
-        </ul>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[13px] font-medium">Repository</span>
-          <input
-            className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
-            placeholder="owner/repo"
-            value={repoStr}
-            onChange={e => setRepoStr(e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
+        {!showManual && (
+          <button
+            onClick={() => setShowManual(true)}
+            className="self-start text-[12px] text-muted-foreground underline"
+          >
+            Or connect manually with a personal access token
+          </button>
+        )}
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[13px] font-medium">Branch</span>
-          <input
-            className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
-            placeholder="main"
-            value={branch}
-            onChange={e => setBranch(e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
+        {showManual && (
+          <>
+            <p className="mt-2 text-[13px] text-muted-foreground">
+              Create a{' '}
+              <a
+                href="https://github.com/settings/tokens?type=beta"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                fine-grained personal access token
+              </a>{' '}
+              on GitHub with these settings:
+            </p>
+            <ul className="ml-4 list-disc space-y-1 text-[12px] text-muted-foreground">
+              <li><strong>Repository access:</strong> Only select repositories — pick this vault&apos;s repo</li>
+              <li><strong>Permissions → Contents:</strong> Read and write</li>
+              <li>Leave all other permissions as <em>No access</em></li>
+            </ul>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-[13px] font-medium">Fine-grained access token</span>
-          <input
-            type="password"
-            className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
-            placeholder="github_pat_…"
-            value={token}
-            onChange={e => setToken(e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[13px] font-medium">Repository</span>
+              <input
+                className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
+                placeholder="owner/repo"
+                value={repoStr}
+                onChange={e => setRepoStr(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[13px] font-medium">Branch</span>
+              <input
+                className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
+                placeholder="main"
+                value={branch}
+                onChange={e => setBranch(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-[13px] font-medium">Fine-grained access token</span>
+              <input
+                type="password"
+                className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
+                placeholder="github_pat_…"
+                value={token}
+                onChange={e => setToken(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+          </>
+        )}
 
         {error && <p className="text-[13px] text-destructive">{error}</p>}
       </div>
 
       <div className="flex justify-between px-4 pb-4">
-        <Button variant="ghost" onClick={() => setStep('source')} disabled={busy}>Back</Button>
-        <Button onClick={handleConnect} disabled={busy}>
-          {busy ? 'Connecting…' : 'Connect'}
-        </Button>
+        <Button variant="ghost" onClick={() => setStep('source')} disabled={busy || signingIn}>Back</Button>
+        {showManual && (
+          <Button onClick={handleConnect} disabled={busy}>
+            {busy ? 'Connecting…' : 'Connect'}
+          </Button>
+        )}
       </div>
     </>
   )
