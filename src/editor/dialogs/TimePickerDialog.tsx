@@ -32,7 +32,7 @@ export default function TimePickerDialog({ open, value, onConfirm, onRemove, onC
   }, [open, value])
 
   return (
-    <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()}>
+    <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()} forceDialog>
       <ResponsiveModalContent className="sm:max-w-xs">
         <ResponsiveModalTitle>Time</ResponsiveModalTitle>
         <ResponsiveModalDescription>Select a time</ResponsiveModalDescription>

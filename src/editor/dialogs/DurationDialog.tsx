@@ -315,6 +315,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
       onConfirm={(d) => setEndDate(d)}
       onRemove={() => setEndDate('')}
       onClose={() => setDateDlgOpen(false)}
+      forceDialog
     />
     <TimePickerDialog
       open={timeDlgOpen}

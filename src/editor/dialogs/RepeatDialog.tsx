@@ -475,8 +475,9 @@ export default function RepeatDialog({
           onSet={handleSet}
         />
 
-        {/* Nested Calendar Dialog for End Date selection */}
-        <ResponsiveModal open={endCalOpen} onOpenChange={(o) => !o && setEndCalOpen(false)}>
+        {/* Nested Calendar Dialog for End Date selection — forced to Dialog to avoid
+            stacking a second drawer on top of RepeatDialog's own mobile drawer. */}
+        <ResponsiveModal open={endCalOpen} onOpenChange={(o) => !o && setEndCalOpen(false)} forceDialog>
           <ResponsiveModalContent className="sm:max-w-xs">
             <ResponsiveModalTitle>End Date</ResponsiveModalTitle>
             <ResponsiveModalDescription>
