@@ -2,7 +2,10 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    # TODO(temporary): drop worktree-github-oauth-signin before merging to
+    # main — added only to test the live OAuth flow against the real GitHub
+    # Pages URL (redirect_uri and Worker CORS are both hardcoded to it).
+    branches: [main, worktree-github-oauth-signin]
 
 permissions:
   contents: read
