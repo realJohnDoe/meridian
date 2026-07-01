@@ -157,6 +157,19 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
       },
+      // A barrel (index.ts) re-exporting from a module that itself depends
+      // (directly or transitively) back on that barrel silently produces
+      // broken chunk execution order in production. Fail the build instead
+      // of leaving it as a warning buried in build output. Scoped to this
+      // specific code rather than the broader CIRCULAR_DEPENDENCY, which
+      // also fires on harmless ESM cycles inside third-party packages we
+      // don't control (e.g. @tanstack/router-core).
+      onwarn(warning, warn) {
+        if (warning.code === 'CYCLIC_CROSS_CHUNK_REEXPORT') {
+          throw new Error(warning.message)
+        }
+        warn(warning)
+      },
     },
   },
 })
