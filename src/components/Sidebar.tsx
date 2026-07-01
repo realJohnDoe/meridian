@@ -230,7 +230,9 @@ export default function AppSidebar() {
                   </SidebarMenuItem>
                 )
               })}
-              <SidebarSeparator />
+            </SidebarMenu>
+            <SidebarSeparator className="my-2" />
+            <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   data-tour="manage-vaults"
