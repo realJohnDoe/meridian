@@ -11,5 +11,5 @@ export { parseDuration, parseDurationDays, parseDurationHours } from './duration
 export type { IntervalParts, MonthlyWeekdaySpec } from './repeat'
 export { parseInterval, serialiseInterval, monthlyWeekdaySpec } from './repeat'
 export type { EffectiveNode } from './inheritance'
-export { buildEffectiveTree, displayValue, serializeRawNode } from './inheritance'
+export { buildEffectiveTree, displayValue, serializeRawNode, saveFile } from './inheritance'
 export { useExpandWithMultiday } from './useExpandWithMultiday'

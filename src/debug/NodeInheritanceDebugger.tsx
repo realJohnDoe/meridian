@@ -10,8 +10,9 @@ import {
   parseToStoreItems,
   applyEdit, excludeOccurrence, deleteFollowing, findSeries, upsertOverride, type EditFields,
   dayBefore,
+  saveFile,
 } from '@/model'
-import { loadFile, saveFile } from '@/fileIO'
+import { loadFile } from '@/fileIO'
 import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern, OccurrenceMetadata } from '@/types'
 import { EntryEditor, DialogStack, RepeatDialog, applyScope, entryFromOccurrence } from '@/editor'
 import type { EntryState, DialogHandlers } from '@/editor'

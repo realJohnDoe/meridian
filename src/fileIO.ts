@@ -1,5 +1,4 @@
 import { parse as parseYaml } from 'yaml'
-import { serializeRawNode, type RawNode } from '@/model'
 
 // ── YAML parser ───────────────────────────────────────────────
 
@@ -32,7 +31,7 @@ export function wrapFrontmatter(yamlFields: string, body: string): string {
   return `---\n${yamlFields}\n---${body ? '\n\n' + body : ''}`
 }
 
-// ── File parse / serialise ────────────────────────────────────
+// ── File parse ──────────────────────────────────────────────────
 
 /** Parse raw file content to a plain object + body, without any domain typing. */
 export function loadFile(
@@ -53,11 +52,6 @@ export function loadFile(
   }
   const rawNode = fm ? yamlParse(fm) : {}
   return { rawNode, body, path }
-}
-
-/** Serialise a raw node to a YAML frontmatter file string. */
-export function saveFile(rawNode: Record<string, unknown>, body: string): string {
-  return wrapFrontmatter(serializeRawNode(rawNode as RawNode), body)
 }
 
 // ── Filename utility ──────────────────────────────────────────

@@ -7,8 +7,7 @@ import type { CacheRecord } from '@/storage/cache'
 import { conflictPath } from './conflictName'
 import { ConflictError, isTransientSyncError } from './conflictError'
 import type { StorageBackend } from './backend'
-import { collapseToYaml, parseToStoreItems, fileSlugItems } from '@/model'
-import { saveFile } from '@/fileIO'
+import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile } from '@/model'
 import type { StoreItem, Roots } from '@/types'
 import {
   getItems, getRoots, setData,
