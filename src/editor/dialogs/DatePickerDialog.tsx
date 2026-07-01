@@ -19,9 +19,12 @@ interface Props {
   onConfirm: (dateStr: string) => void
   onRemove: () => void
   onClose: () => void
+  /** Force the centered Dialog shell. Used when nesting this picker inside
+   *  another drawer, to avoid stacking two bottom sheets on mobile. */
+  forceDialog?: boolean
 }
 
-export default function DatePickerDialog({ open, initialDate, onConfirm, onRemove, onClose }: Props) {
+export default function DatePickerDialog({ open, initialDate, onConfirm, onRemove, onClose, forceDialog }: Props) {
   const localePrefs = useStore(s => s.localePrefs)
   const today    = startOfToday()
   const tomorrow = addDays(today, 1)
@@ -58,7 +61,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
   // Content div  owns: gap below separator (pt-4) and gap above next separator (pb-4)
   // DrawerFooter owns: gap below separator (pt-4, built into component) and px-4
   return (
-    <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()}>
+    <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()} forceDialog={forceDialog}>
       <ResponsiveModalContent>
 
         <ResponsiveModalTitle>Date</ResponsiveModalTitle>

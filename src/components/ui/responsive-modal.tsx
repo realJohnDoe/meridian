@@ -9,12 +9,16 @@ const ModalCtx = React.createContext(false) // false = mobile (drawer)
 
 // ── Root ─────────────────────────────────────────────────────────
 
-function ResponsiveModal({ open, onOpenChange, children }: {
+function ResponsiveModal({ open, onOpenChange, forceDialog, children }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Always render the centered Dialog shell, even below the desktop breakpoint.
+   *  For pickers that read poorly as a drawer (e.g. scroll wheels) or that are
+   *  nested inside another drawer (to avoid stacking two bottom sheets). */
+  forceDialog?: boolean
   children: React.ReactNode
 }) {
-  const isDesktop = useMediaQuery("(min-width: 768px)")
+  const isDesktop = useMediaQuery("(min-width: 768px)") || !!forceDialog
   return (
     <ModalCtx.Provider value={isDesktop}>
       {isDesktop

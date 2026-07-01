@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useMediaQuery } from '@/hooks'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+  ResponsiveModal,
+  ResponsiveModalContent,
+  ResponsiveModalTitle,
+  ResponsiveModalDescription,
+  ResponsiveModalActions,
+} from '@/components/ui/responsive-modal'
 import TimeWheels from '@/components/ui/TimeWheels'
 
 function normaliseTime(hhmm: string): string {
@@ -33,42 +32,33 @@ export default function TimePickerDialog({ open, value, onConfirm, onRemove, onC
   }, [open, value])
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-xs">
-        <DialogHeader>
-          <DialogTitle>Time</DialogTitle>
-          <DialogDescription className="sr-only">Select a time</DialogDescription>
-        </DialogHeader>
+    <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()} forceDialog>
+      <ResponsiveModalContent className="sm:max-w-xs">
+        <ResponsiveModalTitle>Time</ResponsiveModalTitle>
+        <ResponsiveModalDescription>Select a time</ResponsiveModalDescription>
 
-        {isTouch ? (
-          <div className="flex justify-center py-2">
-            <TimeWheels value={time} onChange={setTime} />
-          </div>
-        ) : (
-          <input
-            type="time"
-            step={300}
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className="w-full bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-          />
-        )}
-
-        <div className="flex items-center justify-between pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => { onRemove(); onClose() }}
-          >
-            Remove
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" onClick={() => { onConfirm(time); onClose() }}>Set</Button>
-          </div>
+        <div className="px-4 pt-4 pb-4">
+          {isTouch ? (
+            <div className="flex justify-center">
+              <TimeWheels value={time} onChange={setTime} />
+            </div>
+          ) : (
+            <input
+              type="time"
+              step={300}
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="w-full bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+            />
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <ResponsiveModalActions
+          onRemove={() => { onRemove(); onClose() }}
+          onCancel={onClose}
+          onSet={() => { onConfirm(time); onClose() }}
+        />
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   )
 }
