@@ -1,10 +1,12 @@
 ## Next steps
 
+- Day view does not use localized times
 - Check if all clickable components are at least 44x44 px
 - Fix metadata dropdown look
 - Investigate split second hang when toggling tasks
 - Fix contrast in mobile month view texts
 - Show multiday events as bars spanning multiple days in month view
+- Turn day view into buttons like in Google Calendar
 - Consider if name and logo are still good
 - Post about Meridian in Obsidian forums
 - Add vault retention period
