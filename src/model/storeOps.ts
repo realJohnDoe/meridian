@@ -81,6 +81,24 @@ export function upsertOverride(
   return [...items, newOverride]
 }
 
+/**
+ * Drop any exclusion-only stub already sitting at `date` for `ownerId`.
+ *
+ * An occurrence about to occupy that date supersedes an earlier "hide this
+ * slot" marker. Without this, moving an occurrence onto a date that already
+ * carries an excluded stub (e.g. moving it back to where it started, or onto
+ * a date excluded for an unrelated reason) leaves two children on the same
+ * date; `expandNode`'s override lookup returns the first array match, which
+ * can be the stale excluded stub, silently hiding the real occurrence.
+ */
+function dropExclusionStub(items: StoreItem[], ownerId: string, date: string): StoreItem[] {
+  return items.filter(i => {
+    if (isSeries(i)) return true
+    const io = i as OccurrenceEntry<OccurrenceMetadata>
+    return !(io.ownerId === ownerId && io.date === date && io.excluded)
+  })
+}
+
 // ── Edit operations ───────────────────────────────────────────────────────────
 
 export interface EditorFields {
@@ -214,6 +232,9 @@ function applyAll({ items, roots }: StoreData, occ: Occurrence, fields: EditFiel
  * A generated occurrence moved to a different date gets excluded and a detached
  * explicit child is appended (the override key doubles as recurrence-id, so an
  * in-place date change would leave the original generated slot un-suppressed).
+ * Either way, landing on a date that already carries an exclusion stub (e.g.
+ * moving the occurrence back to where it started) clears that stub first —
+ * see `dropExclusionStub`.
  */
 function applySingle({ items, roots }: StoreData, occ: Occurrence, fields: EditFields): StoreData {
   const { scheduled, repeat } = fields
@@ -237,6 +258,7 @@ function applySingle({ items, roots }: StoreData, occ: Occurrence, fields: EditF
 
   if (occ.ownerId && occ.source === 'generated' && newDate && newDate !== occ.date) {
     items = upsertOverride(items, occ, { excluded: true })
+    items = dropExclusionStub(items, occ.ownerId, newDate)
     const moved: OccurrenceEntry<OccurrenceMetadata> = {
       date:     newDate,
       time:     newTime,
@@ -247,6 +269,10 @@ function applySingle({ items, roots }: StoreData, occ: Occurrence, fields: EditF
       metadata: occMeta(base, fields),
     }
     return { items: [...items, moved], roots }
+  }
+
+  if (occ.ownerId && newDate && newDate !== occ.date) {
+    items = dropExclusionStub(items, occ.ownerId, newDate)
   }
 
   return {

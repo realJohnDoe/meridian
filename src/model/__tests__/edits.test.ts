@@ -109,6 +109,40 @@ describe('edit operations → serialized YAML', () => {
     expect(serializeData(next)).toMatchSnapshot()
   })
 
+  it('moving an occurrence back to its original date un-hides it', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const moved = applyEdit(data, occ, 'single', editFields(occ, {
+      scheduled: { date: '2026-04-22', time: '09:00' },
+    }))
+    const movedOcc = occOn(moved.items, moved.roots, '2026-04-22')
+    const back = applyEdit(moved, movedOcc, 'single', editFields(movedOcc, {
+      scheduled: { date: '2026-04-20', time: '09:00' },
+    }))
+    const dates = expandRange(back.items, back.roots, new Date('2026-04-19'), new Date('2026-04-23'))
+      .map(o => o.date)
+    expect(dates).toContain('2026-04-20')
+    expect(dates).not.toContain('2026-04-22')
+    // No stray excluded stub left behind.
+    expect(back.items.filter(i => !isSeries(i) && (i as { excluded?: boolean }).excluded)).toHaveLength(0)
+    expect(serializeData(back)).toMatchSnapshot()
+  })
+
+  it('moving an occurrence onto a date excluded for an unrelated reason un-hides that date', () => {
+    const data = fixtureData('weekly-series')
+    const excludedOcc = occOn(data.items, data.roots, '2026-04-27')
+    const withExclusion = excludeOccurrence(data, excludedOcc)
+    const occ = occOn(withExclusion.items, withExclusion.roots, '2026-04-20')
+    const next = applyEdit(withExclusion, occ, 'single', editFields(occ, {
+      scheduled: { date: '2026-04-27', time: '09:00' },
+    }))
+    const dates = expandRange(next.items, next.roots, new Date('2026-04-19'), new Date('2026-04-28'))
+      .map(o => o.date)
+    expect(dates).toContain('2026-04-27')
+    expect(dates).not.toContain('2026-04-20')
+    expect(serializeData(next)).toMatchSnapshot()
+  })
+
   // ── split-series ────────────────────────────────────────────────────────────
 
   it('toggleDone on generated occurrence from the after_completion series targets series2', () => {

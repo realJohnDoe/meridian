@@ -253,6 +253,69 @@ Quick sync. Agenda:
 - [[weekly-log]] updates"
 `;
 
+exports[`edit operations → serialized YAML > moving an occurrence back to its original date un-hides it 1`] = `
+"---
+defaults:
+  done: false
+  duration: 30m
+title: Weekly Standup
+tags:
+  - work
+date: 2026-04-06
+time: 09:00
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday:
+    - mo
+instances:
+  - date: 2026-04-13
+    done: true
+  - date: 2026-04-14
+    done: true
+  - date: 2026-04-20
+    time: 09:00
+---
+
+Quick sync. Agenda:
+- [[project-alpha]] status
+- Blockers
+- [[weekly-log]] updates"
+`;
+
+exports[`edit operations → serialized YAML > moving an occurrence onto a date excluded for an unrelated reason un-hides that date 1`] = `
+"---
+defaults:
+  done: false
+  duration: 30m
+title: Weekly Standup
+tags:
+  - work
+date: 2026-04-06
+time: 09:00
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday:
+    - mo
+instances:
+  - date: 2026-04-13
+    done: true
+  - date: 2026-04-14
+    done: true
+  - date: 2026-04-20
+    time: 09:00
+    excluded: true
+  - date: 2026-04-27
+    time: 09:00
+---
+
+Quick sync. Agenda:
+- [[project-alpha]] status
+- Blockers
+- [[weekly-log]] updates"
+`;
+
 exports[`edit operations → serialized YAML > single-scope edit overrides one occurrence (priority) without touching the series 1`] = `
 "---
 defaults:
