@@ -90,17 +90,26 @@ No `any`, no XSS sinks, no client-exposed secrets, no circular/upward imports pa
 
 Survey this codebase for code health issues across the categories below.
 
-**Before you start**, state your scan plan, then at the end report what you actually covered. I need to trust the verdict, which means knowing what you _didn't_ look at.
+## Process
+
+- **Scan first, write second.** State your scan plan before you start, complete the full scan, and only then write the report. Do not draft the verdict early and select findings to confirm it.
+- Evaluate the code on its merits. Treat claims in CLAUDE.md, READMEs, or architecture docs (e.g. "this exception is deliberate", "a refactor is planned") as hypotheses to verify against the code, not as settled exceptions — if a documented rationale no longer holds, that is a finding.
+
+## Budget
+
+- Skim the full directory tree (listings + file names) so nothing is invisible to you.
+- Read closely: the entry points, the most-imported modules (measure this — don't guess), the 15 largest source files, and at least 2–3 representative files from every feature directory.
+- Sample the rest. Do not skip a directory entirely without recording it in the coverage statement.
 
 ## Output structure
 
-### 1. Health verdict (write this first, ~5 sentences)
+### 1. Health verdict (~5 sentences)
 
 A plain-language summary of the repo's overall health. Name the **worst one or two areas** (by directory or subsystem, e.g. "the `auth/` layer" — not individual findings) and the **single biggest structural theme** running through the findings. This is the headline answer; the list below is the supporting evidence.
 
 ### 2. Coverage statement
 
-- Which directories/files you examined, and which you deliberately skipped or only sampled (with the reason: irrelevant, generated, vendored, too large, ran out of budget, etc.).
+- Which directories/files you examined closely, which you only sampled, and which you skipped — with the reason (irrelevant, generated, vendored, too large, ran out of budget, etc.).
 - Roughly what fraction of the codebase this report is based on.
 - Any area you suspect has issues but did not have budget to investigate — flag it as "unverified."
 
@@ -109,11 +118,11 @@ A plain-language summary of the repo's overall health. Name the **worst one or t
 For each finding, output:
 
 - **Title** — short label
-- **Category** — one or more tags from: `architecture` `layout` `dry` `srp` `dead-code` `types` `error-handling` `styling` `ux` `performance` `security` `dependencies` `naming`
+- **Category** — one or more tags from: `architecture` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming`
 - **Impact** — 1–10 (10 = catastrophic/systemic; 5 = e.g. a DRY violation duplicated across ~4 files, or a missing error state on a primary user flow; 1 = trivial/cosmetic)
-- **Breadth** — number of files (or callsites) affected; cite a count, not an adjective
+- **Breadth** — number of **files** affected. Counts must come from an actual search (grep/glob), and you should be able to name the search you ran; if you estimated instead, write "est." next to the number.
 - **Fix effort** — S / M / L (S = localized edit; M = touches a few files or needs a small refactor; L = structural change across the codebase)
-- **Evidence** — at least one specific file path + line number or code snippet
+- **Evidence** — at least one file path plus a short **verbatim code quote** from that file (line number optional). The quote must be copy-pasted, not paraphrased — I will spot-check by grepping for it.
 - **Problem** — one sentence: what is wrong and why it matters
 - **Fix** — one sentence: what the concrete fix looks like
 
@@ -153,7 +162,14 @@ The category ranking is a tiebreaker, not a filter. A serious finding in any cat
 - Sensitive values hardcoded or exposed to the client bundle
 - Security-relevant logic only enforced client-side
 
-### 4. Code Health & DRY
+### 4. Testing & Error Handling
+
+- Core domain logic with no test coverage at all, or coverage concentrated on trivial code while the risky paths go untested
+- Tests that can't fail meaningfully — over-mocked tests, snapshot rot, assertions on implementation details
+- Swallowed errors — empty or log-only `catch` blocks, unhandled promise rejections, errors caught without surfacing to the user or a recovery path
+- No consistent error strategy — each layer inventing its own mix of throw / return-null / silent-default
+
+### 5. Code Health & DRY
 
 - DRY violations — duplicated logic that should be a shared utility or hook, especially across feature boundaries
 - SRP violations — functions/components doing too many unrelated things
@@ -162,19 +178,19 @@ The category ranking is a tiebreaker, not a filter. A serious finding in any cat
 - Dead code — unreachable paths, unused exports, or unused imports at module boundaries (not just individual variables)
 - Type safety — pervasive use of `any`, missing return types on public API surfaces, unsafe casts
 
-### 5. Styling & UX
+### 6. Styling & UX
 
 - Shadcn component available but bypassed in favour of a custom re-implementation
 - Raw CSS / inline styles where Tailwind classes would suffice, or Tailwind used where plain CSS is clearly better
 - UX anti-patterns: missing loading/error states, non-accessible interactive elements (no keyboard nav, missing ARIA)
 
-### 6. Performance
+### 7. Performance
 
 - React anti-patterns: object/array literals in JSX props, missing `useMemo`/`useCallback`/`memo` at component boundaries (not fine-grained)
 - Missing lazy-loading / code-splitting at route or feature boundaries
 - N+1 or waterfall data fetching patterns
 
-### 7. Dependencies & Maintainability
+### 8. Dependencies & Maintainability
 
 - Significantly outdated or abandoned dependencies
 - Functionality duplicated across two libraries
@@ -182,5 +198,3 @@ The category ranking is a tiebreaker, not a filter. A serious finding in any cat
 ---
 
 **Scoring guidance:** A finding that reveals a structural pattern affecting the whole codebase (e.g., "every feature imports from `lib/` internals instead of going through a public API") scores higher than a finding about a single misused hook. Skip findings that are purely stylistic or affect a single isolated callsite — they belong in a lint rule, not a health report.
-
-If you find a significant issue in a category not listed above, include it.
