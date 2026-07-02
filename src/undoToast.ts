@@ -15,7 +15,7 @@ export function showDeleteToast(
 
   _pendingCommit = commitFn
   const message = opts?.endsSeries
-    ? `Deleted: ${title} — this series only repeats after completion, so it ends here`
+    ? `Deleted: ${title} — this series only repeats after completion, so it ends here.`
     : `Deleted: ${title}`
   const toastFn = opts?.endsSeries ? toast.warning : toast
   _toastId = toastFn(message, {
