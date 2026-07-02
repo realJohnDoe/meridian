@@ -1,6 +1,5 @@
 ## Next steps
 
-- Check for react antipatterns / linter
 - Fix contrast in mobile month view texts
 - Show multiday events as bars spanning multiple days in month view
 - Investigate more secure storage options
@@ -8,19 +7,28 @@
 - Post about Meridian in Obsidian forums
 - Add vault retention period
 
-# Meridian — Code Health Survey
+## Recommend Linters from Fable
 
-### 5. GitHub personal access token stored in plaintext IndexedDB
+1. Enable the react-hooks v7 recommended preset (zero new dependencies)
+   You have eslint-plugin-react-hooks 7.1.1 installed, which ships the React Compiler's diagnostics as lint rules — but eslint.config.js:33 enables only the two classic rules (rules-of-hooks, exhaustive-deps). Switching to reactHooks.configs['recommended-latest'].rules activates purity, refs, set-state-in-effect, set-state-in-render, immutability, preserve-manual-memoization, and friends.
+   I dry-ran that preset on your codebase (via a temp config, deleted afterwards): 39 findings in 19 files, and the distribution is informative:
+   24 × react-hooks/refs — 18 of them in useExpandWithMultiday.ts, which mutates cacheRef.current during render. That's your deliberate expansion-cache pattern, but it's exactly the pattern that breaks under the React Compiler and concurrent rendering. The remaining 6 are scattered ref-during-render reads worth individual review.
+   12 × react-hooks/set-state-in-effect — synchronous setState in effect bodies (e.g. CoachTour.tsx:71), which cause cascading double-renders. For someone who cares about performance, this rule alone pays for the effort — these are real wasted render passes, mostly in editor/dialogs/.
+   2 × purity, 1 × incompatible-library.
+   Practical rollout: enable the preset at warn severity first, fix the 12 set-state-in-effect hits and the stray refs ones, and make a deliberate decision about useExpandWithMultiday — either refactor the cache to a compiler-safe shape or add one targeted disable with a comment. Conveniently, that file is the same one flagged in the health report (React hook inside model/), so one refactor addresses both.
+   The strategic payoff: once this preset is clean, you're React Compiler–ready — the lint preset is literally the compiler's own analysis. Adopting babel-plugin-react-compiler in Vite then gets you automatic memoization, which replaces most manual useMemo/useCallback work across calendar/ and editor/.
 
-- **Category:** `security`
-- **Impact:** 5
-- **Breadth:** `cache.ts` (`tokenSave`/`tokenLoad`) + `vaultRegistry.ts` (4 sites)
-- **Fix effort:** M
-- **Evidence:** `cache.ts:153` `tokenSave` writes the raw token to the Dexie `meta` table; `vaultRegistry.ts:111,148` read it back into `GitHubBackend`.
-- **Problem:** The fine-grained PAT (repo write scope) sits unencrypted in IndexedDB, so any XSS or malicious dependency in this client-only PWA can exfiltrate a credential that can rewrite the user's repo. The UI hygiene is good (`type="password"`, `autoComplete="off"`) but storage is not.
-- **Fix:** Wrap the token with a non-extractable WebCrypto key before persisting (the app already targets environments with full WebCrypto support per `vite.config.ts`), or at minimum document the trust boundary explicitly and scope guidance toward read-only tokens where possible.
-
-# Code Health Report: Meridian
+2. Worth adding: @eslint-react/eslint-plugin
+   Modern, TypeScript-aware, flat-config-native (the successor to legacy eslint-plugin-react for setups like yours). The rules that fit your priorities:
+   no-leaked-conditional-rendering (type-aware) — catches {count && <X/>} rendering a literal 0
+   no-unstable-context-value / no-unstable-default-props — re-render churn from inline objects
+   no-array-index-key — would flag e.g. the key={${o.fileSlug}-${o.date}-${i}} in DayView.tsx:81
+   the hooks-extra group: no-unnecessary-use-memo / no-unnecessary-use-callback
+   Not worth it
+   eslint-plugin-react-perf — largely obsoleted by the compiler rules above, and noisy.
+   Legacy eslint-plugin-react — mostly redundant given TypeScript + the two above.
+   eslint-plugin-jsx-a11y — only if accessibility becomes a goal; you already hand-write aria-labels consistently, so it would mostly confirm what you do.
+   My suggested order: preset first (it's free and its findings are the most substantive), fix the ~21 non-cache findings, decide on the expansion cache, then add @eslint-react in a second pass. Want me to wire up the preset at warn and triage the findings?
 
 ## From the Cloudflare auth flow
 
