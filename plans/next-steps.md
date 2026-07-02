@@ -1,5 +1,6 @@
 ## Next steps
 
+- Investigate split second hang when toggling tasks
 - Fix contrast in mobile month view texts
 - Show multiday events as bars spanning multiple days in month view
 - Consider if name and logo are still good
