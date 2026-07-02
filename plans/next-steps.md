@@ -1,5 +1,6 @@
 ## Next steps
 
+- Maybe use a dark on-primary color in dark themes to ensure visibility on yellow bg
 - Fix contrast in mobile month view texts
 - Fix metadata dropdown look
 - Show multiday events as bars spanning multiple days in month view
