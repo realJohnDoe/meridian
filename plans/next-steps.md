@@ -2,7 +2,6 @@
 
 - Fix contrast in mobile month view texts
 - Show multiday events as bars spanning multiple days in month view
-- Investigate more secure storage options
 - Consider if name and logo are still good
 - Post about Meridian in Obsidian forums
 - Add vault retention period
