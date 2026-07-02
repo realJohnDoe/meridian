@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { TriangleAlert } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,8 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
     config?.options[Number(selected)]?.onClick()
     onClose()
   }
+
+  const selectedWarning = config?.options[Number(selected)]?.warning
 
   return (
     <AlertDialog open={!!config} onOpenChange={(o) => !o && onClose()}>
@@ -65,6 +68,13 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
             </label>
           ))}
         </RadioGroup>
+
+        {selectedWarning && (
+          <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+            <TriangleAlert size={14} className="shrink-0 mt-0.5" />
+            <span>{selectedWarning}</span>
+          </div>
+        )}
 
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
