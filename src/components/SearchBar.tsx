@@ -28,11 +28,14 @@ export default function SearchBar() {
   }
 
   function handleOpen(occ: Parameters<typeof openEntry>[0]) {
-    openEntry(occ) // entryRoute clears sq internally
+    // replace: true so the transient "search open" entry is overwritten
+    // rather than left behind — back from the entry goes straight to the
+    // pre-search page instead of reopening the overlay.
+    openEntry(occ, undefined, { replace: true })
   }
 
   function handleCreate(title: string) {
-    navigate(newEntryRoute(title)) // newEntryRoute clears sq internally
+    navigate({ ...newEntryRoute(title), replace: true })
   }
 
   return (
@@ -88,7 +91,7 @@ export default function SearchBar() {
             size="icon"
             className="w-9 h-9 rounded-full shrink-0 hover:scale-[1.08] active:scale-[.93] [&_svg]:size-4"
             aria-label="New entry"
-            onClick={() => navigate(newEntryRoute(filterQuery || undefined))}
+            onClick={() => navigate({ ...newEntryRoute(filterQuery || undefined), replace: searchOpen })}
           ><Plus size={16} /></Button>
         </div>
       </div>
