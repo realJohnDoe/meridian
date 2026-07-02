@@ -178,7 +178,7 @@ export function deleteNode(
   const options: SeriesSheetOption[] = [
     {
       icon: 'calendar', label: 'This occurrence', sublabel: 'Remove only this occurrence', onClick: excludeThis,
-      ...(endsSeries ? { warning: 'This is the last occurrence — deleting it ends the series.' } : {}),
+      ...(endsSeries ? { warning: 'This series only creates its next occurrence when you complete the current one. Deleting this occurrence leaves nothing to complete, so the series ends here.' } : {}),
     },
   ]
   if (isScheduled) {
