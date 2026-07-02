@@ -6,7 +6,8 @@ import type { Occurrence, EditScope } from '@/types'
 export function useOpenEntry() {
   const navigate = useNavigate()
   return useCallback(
-    (occ: Occurrence, scope?: EditScope) => navigate(entryRoute(occ, scope)),
+    (occ: Occurrence, scope?: EditScope, opts?: { replace?: boolean }) =>
+      navigate({ ...entryRoute(occ, scope), replace: opts?.replace }),
     [navigate],
   )
 }
