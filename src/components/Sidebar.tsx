@@ -102,7 +102,7 @@ export default function AppSidebar() {
                     <SidebarMenuButton
                       isActive={active}
                       onClick={onClick}
-                      className="gap-[14px] px-3 py-[11px] h-auto text-[14px] font-medium rounded-md"
+                      className="gap-[14px] px-3 py-[11px] h-auto text-[14px] font-medium rounded-none"
                     >
                       <Icon className="size-[19px] stroke-[1.7] shrink-0" />
                       {label}
