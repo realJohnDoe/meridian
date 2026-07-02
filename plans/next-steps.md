@@ -4,6 +4,7 @@
 - Fix contrast in mobile month view texts
 - Fix metadata dropdown look
 - Show multiday events as bars spanning multiple days in month view
+- Add border around wikilink chips in light themes in agenda/items/filter overlay section
 - Day view does not use localized times
 - Check if all clickable components are at least 44x44 px
 - Investigate split second hang when toggling tasks
