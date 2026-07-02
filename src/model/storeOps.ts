@@ -398,6 +398,22 @@ export function toggleDone({ items, roots }: StoreData, occ: Occurrence): StoreD
 
 // ── Exclude / delete ──────────────────────────────────────────────────────────
 
+/**
+ * True when deleting `occ` would end its after_completion series: `occ` is
+ * the series' one open (undone, non-excluded) occurrence, and once it's gone
+ * there is nothing left that could trigger the next occurrence's generation.
+ */
+export function deletionEndsAfterCompletionSeries(items: StoreItem[], occ: Occurrence): boolean {
+  const series = findSeries(items, occ)
+  if (!series || series.repeat?.type !== 'after_completion') return false
+  if (occ.metadata.done) return false
+  return !items.some(i => {
+    if (isSeries(i)) return false
+    const io = i as OccurrenceEntry<OccurrenceMetadata>
+    return io.ownerId === series.id && io.id !== occ.id && !io.excluded && !io.metadata.done
+  })
+}
+
 /** Mark a recurring occurrence as excluded; remove a standalone by id. */
 export function excludeOccurrence({ items, roots }: StoreData, occ: Occurrence): StoreData {
   if (occ.ownerId) {

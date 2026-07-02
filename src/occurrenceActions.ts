@@ -1,4 +1,4 @@
-import { toggleDone, excludeOccurrence, deleteByFileSlug } from '@/model'
+import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug } from '@/model'
 import { occIsRecur } from './occView'
 import type { Occurrence } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
@@ -19,9 +19,11 @@ export function beginSwipeDelete(o: Occurrence): () => void {
 
   if (occIsRecur(o)) {
     const next = excludeOccurrence(snapshot, o)
+    const endsSeries = deletionEndsAfterCompletionSeries(snapshot.items, o)
     showDeleteToast(title,
       () => { writeEntity(o.fileSlug) },
       () => { cancelled = true; setData(snapshot) },
+      { endsSeries },
     )
     return () => { if (!cancelled) setData(next) }
   } else {
