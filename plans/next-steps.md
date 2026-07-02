@@ -28,63 +28,129 @@
 - No dedup against already-connected repos. The picker shows all installed repos, including ones already connected as a vault. If the user picks a repo they've already connected, addGitHubVaultOAuth creates a second, duplicate VaultRef pointing at the same repo — confusing, not destructive, but not great.
 - Re-doing the full OAuth redirect is heavier than it needs to be. Adding a second vault currently means going through the whole GitHub consent screen again, even though we already hold a valid access token from the first sign-in. A nicer flow would skip straight to the repo picker using the existing token, only falling back to a real redirect if there's no valid session yet.
 
-## Health verdict
+# Meridian code health report
 
-This is a healthy, well-disciplined codebase — genuinely above average. The architecture rules in `CLAUDE.md` are real and machine-enforced: import boundaries are linted (barrels + `no-restricted-paths`), `model/` is a clean dependency-free domain core, the storage layer is properly abstracted behind a `StorageBackend` interface and a `persistencePort`, and routes are code-split with Suspense. There are zero `any` types, zero `dangerouslySetInnerHTML`, and no hardcoded secrets in app code.
+## 1. Health verdict
 
-The weakest areas are `store.ts` + `components/SettingsDialog.tsx` (where per-vault `localStorage` persistence is hand-rolled, duplicated across slices, and re-implemented a second time inside `SettingsDialog` so the same storage key has two independent owners) and the scattering of small domain primitives (duration parsing, midnight-truncation, the "is-tracked" check) that have no single home. The single biggest structural theme is **fragmented domain logic: low-level concepts that should each have one owner are open-coded inline across many files**.
+This is a disciplined, well-above-average codebase: import boundaries are actually enforced by lint (not just documented), there is essentially zero `any`, the OAuth flow is done properly (PKCE + state + server-side secret in the worker), routes are code-split, and the domain core in `model/` is genuinely pure and well-tested — with one exception noted below. The two weakest areas are the **architecture documentation (CLAUDE.md), which has drifted from the code it governs**, and the **root-level view-model helper layer (`occView.ts`, `format.ts`, plus the expansion cache hook), which contains the most branch-heavy pure logic in the app with zero test coverage**. The biggest structural theme is _convention decay at the root_: the "cross-cutting root residents" rule is eroding — the documented list names a file that no longer exists, files sit at root with a single consumer directory, and `model/` purity has its first React leak. None of this is rot; it's early-stage drift in an otherwise well-defended architecture, and almost all of it is cheap to fix.
 
-## Coverage
+## 2. Coverage statement
 
-- **Examined closely (~55–60% of non-generated, non-test source):** `eslint.config.js`, all 9 barrel `index.ts` files, `store.ts`, `storeOps.ts`, `persistencePort.ts`, `vaultActions.ts`, `storage/backend.ts` + `localBackend.ts` + `activeBackend.ts`, `format.ts`, `model/duration.ts`, `occView.ts`, `fileOccurrence.ts` (partial), all 7 `editor/dialogs/*`, `components/ui/responsive-modal.tsx`, `components/SettingsDialog.tsx` (partial), route files. Repo-wide greps for `any`, XSS vectors, `localStorage`, duration parsers, `setHours`, `done !== undefined`, empty catches, TODO markers.
-- **Sampled only (headers/greps):** `model/expansion.ts` (579 lines), `calendar/` view internals, `editor/cm/*`, `storage/sync.ts` + `githubBackend.ts`.
-- **Deliberately skipped:** `components/ui/**` (shadcn/generated), `debug/NodeInheritanceDebugger.tsx` (769 lines, separate `debug.html` entry, not in app bundle), all `__tests__`, `routeTree.gen.ts` (generated).
-- **Unverified — flag for follow-up:** `model/expansion.ts` (recurrence expansion) and `storage/sync.ts` (conflict/collision sync) carry the most algorithmic complexity and were not traced; if correctness bugs exist, they are most likely there.
+**Read closely (~35 files, ~40% of hand-written source lines):** entry points (`src/main.tsx`, `src/routes/__root.tsx`, `src/routes/_app.tsx`, `src/debug/main.tsx`); all root residents (`types.ts`, `store.ts`, `occurrenceActions.ts`, `storeCommit.ts`, `occView.ts`, `format.ts`, `fileOccurrence.ts`); `model/` (expansion, storeOps, useExpandWithMultiday, index); `storage/` (sync, vaultRegistry, githubOAuth); `editor/` (save, ItemsList, RepeatDialog, useEntryEditor — partial for the large ones); `calendar/` (DayView); `components/` (OccurrenceCard); `hooks/` (useCalendarFilter); `search/` (SearchResults); `onboarding/` (tourState); `worker/` (index); `lib/` (vaultStorage); `eslint.config.js`; all 14 test files by name, 4 by content.
 
-## Findings
+**Sampled via greps and heads:** remaining routes, debug/NodeInheritanceDebugger (head only), storeItems, the import graph of every root file (measured, not guessed), `any`/catch/XSS/console/lazy-loading sweeps across the whole tree.
 
-| #   | Title                                                        | Category          | Impact | Breadth                 | Effort |
-| --- | ------------------------------------------------------------ | ----------------- | :----: | ----------------------- | :----: |
-| 1   | Per-vault `localStorage` persistence duplicated + dual-owned | dry, architecture |   6    | ~5 files / 9 sites      |   M    |
-| 2   | Manual midnight-truncation reimplemented 23×                 | dry               |   3    | 23 callsites / 10 files |   S    |
-| 3   | Duration-string parsing fragmented, disagreeing grammars     | dry, architecture |   5    | 2 parsers / ~8 files    |   M    |
-| 4   | `SettingsDialog.tsx` god-component                           | srp, layout       |   4    | 1 file (539 lines)      |   L    |
-| 5   | `ResponsiveModal` abstraction inconsistently applied         | dry, styling      |   3    | 3 dialog files          |   M    |
-| 6   | "Is-tracked" check open-coded as `done !== undefined`        | dry, naming       |   2    | 6 callsites             |   S    |
-| 7   | "Reset state on open" effect copy-pasted across dialogs      | dry               |   2    | ~5 dialogs              |   S    |
-| 8   | `CLAUDE.md` references renamed file (`occState.ts`)          | naming            |   1    | 1 doc line              |   S    |
+**Skipped:** `components/ui/**` (27 shadcn-vendored files, incl. the 771-line sidebar.tsx), `routeTree.gen.ts` (generated), `pnpm-lock.yaml`, `public/`, `scripts/process-icon.mjs`, `plans/`.
+
+**Unverified (flagging, no budget):** `storage/cache.ts` Dexie layer and the three backend implementations (`githubBackend`, `localBackend`, `exampleBackend` — only their tests and call sites were read); the `editor/cm/` CodeMirror decoration layer (6 files, only 1 has tests — plausible second test-gap hotspot); `calendar/AgendaView` virtualization/scroll-restore logic.
+
+Overall the report is based on direct reading of roughly 40% of the source and grep-level evidence over ~95% of it.
+
+## 3. Findings
 
 ---
 
-### 6. "Is-tracked task" check open-coded as `metadata.done !== undefined`
+### 1. CLAUDE.md architecture doc has drifted from the code it governs
 
-- **Category:** dry, naming
-- **Impact:** 2 — **Breadth:** 6 callsites — **Fix effort:** S
-- **Evidence:** `done !== undefined` appears in `calendar/DayView.tsx:99`, `components/KindIcon.tsx:22`, `components/OccurrenceCard.tsx:110`, `editor/save.ts:74`, and twice in `occView.ts:7` — with no named predicate, even though `occView.ts` already exports `occKind`/`occState`.
-- **Problem:** A domain concept ("this occurrence is a tracked task") is expressed via a magic comparison repeated across layers, obscuring intent and inviting inconsistent variants.
-- **Fix:** Add `isTracked(occ)` to `occView.ts` and replace the six callsites.
-
-### 7. "Reset local state when dialog opens" effect copy-pasted across dialogs
-
-- **Category:** dry
-- **Impact:** 2 — **Breadth:** ~5 dialogs — **Fix effort:** S
-- **Evidence:** `useEffect(() => { if (open) setX(...) }, [open, ...])` recurs in `PriorityDrawer.tsx:36`, `TimePickerDialog.tsx:32`, `DatePickerDialog.tsx:40`, `DurationDialog.tsx:126`, `RepeatDialog.tsx:247` — three of them needing an `eslint-disable exhaustive-deps`.
-- **Problem:** The same controlled-dialog reset pattern is duplicated, and several copies suppress the deps lint, masking real dependency mistakes.
-- **Fix:** Extract a `useResetOnOpen(open, value, setter)` hook (or a `seed` prop) so the reset logic and its deps live in one place.
-
-### 8. `CLAUDE.md` directory doc references a renamed file (`occState.ts` → `occView.ts`)
-
-- **Category:** naming, dead-code
-- **Impact:** 1 — **Breadth:** 1 doc line (the file is imported as `@/occView` in 6 files) — **Fix effort:** S
-- **Evidence:** `CLAUDE.md:66` lists "`format.ts`, `fileOccurrence.ts`, `occState.ts`" as the root view-model helpers, but no `occState.ts` exists — the file is `occView.ts` (it exports `occState` as a _function_).
-- **Problem:** The architecture doc that agents and contributors rely on names a file that doesn't exist, eroding trust in the (otherwise accurate) doc.
-- **Fix:** Update the line to `occView.ts`.
+- **Category:** `architecture` `layout`
+- **Impact:** 5 · **Breadth:** 1 doc, with claims falsified against 6+ source files (verified by `Glob src/occState.ts`, importer greps for `undoToast`/`notifications`, `ls src/*/index.ts`) · **Fix effort:** S
+- **Evidence:** `CLAUDE.md` — `` `format.ts`, `fileOccurrence.ts`, `occState.ts` — view-model helpers split from a former `presentation.ts` `` (no `src/occState.ts` exists; the file is `occView.ts`). Also: "A future barrel PR will add `index.ts` files to each directory to formalize the public API surface." — all 9 feature dirs already have barrels, enforced by eslint. Also: `` `occurrenceActions.ts` + `undoToast.ts` — user-action orchestration; used by `editor/` and `calendar/` `` — `undoToast.ts` is imported by exactly one file, `src/occurrenceActions.ts:7`. The list also omits five actual root residents (`occView.ts`, `notifications.ts`, `vaultActions.ts`, `storeCommit.ts`, `persistencePort.ts`).
+- **Problem:** This doc is the contract that agents and contributors are told OVERRIDES default behavior, and its root-resident inventory, file names, and rationale are all stale — so placement decisions get justified against fiction.
+- **Fix:** Rewrite the root-residents table from the measured import graph, delete the "future barrel PR" paragraph, and correct `occState.ts` → `occView.ts`.
 
 ---
 
-## What was NOT found (clean signals)
+### 2. The root view-model layer has zero test coverage despite dense branching
 
-No `any`, no XSS sinks, no client-exposed secrets, no circular/upward imports past the lint-sanctioned feature mesh, no missing route code-splitting, and loading/skeleton states are present on the primary flows. The 15 empty `catch {}` blocks are intentional `localStorage`/`JSON.parse` guards, not swallowed errors.
+- **Category:** `testing`
+- **Impact:** 5 · **Breadth:** 3 files (grep of `occState|formatDurationChip|hasSameStructure|useExpandWithMultiday|durationToEndDate` across `*.test.ts` returns no hits; only `updateFileOccurrenceMap` is covered, in `linking.test.ts`) · **Fix effort:** M
+- **Evidence:** `src/model/useExpandWithMultiday.ts:47` — `if (JSON.stringify(ai.repeat) !== JSON.stringify(bi.repeat)) return false` — this `hasSameStructure` function decides when the calendar may reuse a cached expansion instead of recomputing; a false positive silently renders stale data on every view. Same story for `occState` in `src/occView.ts` (9-way state derivation with time-of-day edge cases) and the duration math in `src/format.ts`.
+- **Problem:** Model and storage are well-tested, but the pure functions that decide what the user actually sees — occurrence state coloring, duration chips, and the expansion-cache invalidation predicate — are untested, and cache-invalidation bugs fail silently.
+- **Fix:** Add vitest suites for `hasSameStructure` (one case per structural field), `occState` (each branch + midnight/duration boundaries), and the `format.ts` duration helpers — all pure functions, no mocking needed.
+
+---
+
+### 3. A React hook lives inside `model/`, the documented pure domain core
+
+- **Category:** `architecture`
+- **Impact:** 4 · **Breadth:** 2 files (`src/model/useExpandWithMultiday.ts`, re-exported in `src/model/index.ts`; grep `from 'react'` in `src/model/` → 1 hit) · **Fix effort:** S
+- **Evidence:** `src/model/useExpandWithMultiday.ts:1` — `import { useRef } from 'react'` — versus CLAUDE.md: "**`model/` is the domain core — no outward dependencies.** It imports only from `types.ts`, `fileIO.ts`, and `wikilinks.ts`".
+- **Problem:** The lint rules guard against feature-dir imports but not framework imports, so React leaked into the one layer defined by not depending on anything — the caching logic (`hasSameStructure`, the overlay) is pure and belongs in model, but the `useRef` wrapper does not.
+- **Fix:** Split the pure cache logic into `model/expansionCache.ts` and move the thin `useRef` hook to `hooks/`, which already imports from `@/model`.
+
+---
+
+### 4. DayView silently hides timed events outside 07:00–22:00
+
+- **Category:** `ux`
+- **Impact:** 5 · **Breadth:** 1 file · **Fix effort:** S
+- **Evidence:** `src/calendar/DayView.tsx:260` — `return h >= SH && h <= EH` (with `const SH = 7` / `const EH = 22` hardcoded at the top). The all-day strip only catches untimed occurrences (`allDay = sorted.filter(o => !fmtT(o.time))`).
+- **Problem:** An event at 23:00 or 06:00 is filtered out of the timeline and doesn't appear in the all-day strip either — user data becomes invisible on a primary view with no indicator it exists.
+- **Fix:** Clamp out-of-window events to the timeline edges (or extend the window dynamically to cover the day's earliest/latest event) instead of filtering them out.
+
+---
+
+### 5. Root files that violate the project's own placement rule
+
+- **Category:** `layout`
+- **Impact:** 3 · **Breadth:** 2 files (importer greps: `notifications` → only `storage/sync.ts` + `storage/vaultRegistry.ts`; `undoToast` → only `occurrenceActions.ts`) · **Fix effort:** S
+- **Evidence:** `src/storage/sync.ts:18` — `import { notify, warn, notifyError } from '@/notifications'` — the only two importers of `notifications.ts` are both in `storage/`. CLAUDE.md's own rule: "a file moves into a subdirectory only when every caller already lives in that subdirectory".
+- **Problem:** Root level is documented as reserved for files imported by three or more unrelated layers, but `notifications.ts` (1 consumer dir) and `undoToast.ts` (1 consumer file) sit there anyway, diluting the convention that makes root residency meaningful.
+- **Fix:** Move `notifications.ts` into `storage/` and fold `undoToast.ts` into `occurrenceActions.ts` (or move it beside it), updating the CLAUDE.md table in the same PR.
+
+---
+
+### 6. `store.ts` hand-rolls the same persisted-slice pattern four times
+
+- **Category:** `dry` `srp`
+- **Impact:** 3 · **Breadth:** 1 file (4 repetitions: favorites, defaultParticipants, participantFilter, showTasks) · **Fix effort:** M
+- **Evidence:** `src/store.ts:161` — `const next = participantFilter.includes(name) ? participantFilter.filter(s => s !== name) : [...participantFilter, name]` — structurally identical to `toggleFavorite` at line 130; each slice repeats the load-from-vault-key / write-on-change / toggle triad. `loadShowTasks` even bypasses the `vaultStorage` helper and calls ``localStorage.getItem(`meridian_show_tasks_${vaultId}`)`` raw.
+- **Problem:** Every new per-vault preference re-implements the same persistence choreography by hand, and the fourth copy has already diverged from the helper convention (raw `localStorage` + inline `JSON.parse`).
+- **Fix:** Extract a small `persistedVaultSlice(keyPrefix, default)` factory (or at minimum a `readVaultJSON` counterpart to `writeVaultJSON`) and define the four slices declaratively.
+
+---
+
+### 7. Three near-identical vault-connection flows in `vaultRegistry.ts`
+
+- **Category:** `dry`
+- **Impact:** 3 · **Breadth:** 1 file (3 blocks: `addLocalVault`, `addGitHubVault`, `addGitHubVaultOAuth`, plus the local/github activation branches duplicated between `restoreVaultsInner` and `setActiveVault`) · **Fix effort:** M
+- **Evidence:** `src/storage/vaultRegistry.ts:225` — `await updateVaultRefs(existing => [...existing, ref])` followed by `const files = await backend.readAll()` / `await cacheBulkWriteClean(id, files)` / `await activateWritableVault(backend)` — the same four-step tail appears verbatim in `addGitHubVault` (l. 225–229) and `addGitHubVaultOAuth` (l. 269–273), and `addLocalVault` repeats it with reordered steps.
+- **Problem:** The connect-a-vault sequence (register ref → seed cache → activate) exists in three copies whose only real difference is token persistence, so a fix to one flow (e.g. ordering of cache seed vs. activation) can silently miss the others.
+- **Fix:** Extract a `registerAndActivate(ref, backend)` helper and reduce the three `add*` functions to credential-specific preambles.
+
+---
+
+### 8. Occurrence matching by ±60 s tolerance is copy-pasted six times through the expansion engine
+
+- **Category:** `dry`
+- **Impact:** 3 · **Breadth:** 1 file (`grep -c "Math.abs" src/model/expansion.ts` → 6, plus two hand-rolled year/month/day equality triplets) · **Fix effort:** M
+- **Evidence:** `src/model/expansion.ts:262` — `if (Math.abs(o.ms - jsDate.getTime()) < 60000) return o` — the same minute-tolerance match recurs at lines 311, 330, 342, 363, 367, alongside repeated `od.getFullYear() === jsDate.getFullYear() && od.getMonth() === jsDate.getMonth() && od.getDate() === jsDate.getDate()` day comparisons.
+- **Problem:** The single most intricate file in the repo encodes its core identity rule ("these two occurrences are the same slot") as six inlined copies of a magic-number comparison, so any change to the matching rule (e.g. timezone handling) must be found and applied six times.
+- **Fix:** Extract `sameMinute(a, b)` and `sameCalendarDay(a, b)` helpers in `dateUtils.ts` and use them throughout `expansion.ts` (behavior-preserving, protected by the existing model test suite).
+
+---
+
+### 9. `model/index.ts` exports symbols with zero external consumers
+
+- **Category:** `dead-code`
+- **Impact:** 2 · **Breadth:** 2 files (per-symbol grep across `src/` excluding `model/`: `buildRoot`, `parseYamlToStoreItems`, `serializeRawNode`, `hasRepeat`, `multidayCoversDate` → 0 non-model, non-test importers; `dayBefore`/`treeHasOccurrences`/`displayValue`/`buildEffectiveTree` are used only by the debug tool) · **Fix effort:** S
+- **Evidence:** `src/model/index.ts:7` — `export { parseToStoreItems, buildRoot, effectiveNodeToStoreItems, parseYamlToStoreItems } from './storeItems'` — `buildRoot` and `parseYamlToStoreItems` are consumed only inside `storeItems.ts` itself.
+- **Problem:** The barrel is supposed to be the deliberate public API surface of the domain core, but roughly a third of its exports have no consumer, which makes the real API illegible and every internal refactor look like a breaking change.
+- **Fix:** Drop the unconsumed exports from the barrel (keep them as plain module exports for the debug tool where needed) so the barrel reflects the actual API.
+
+---
+
+### 10. `OccurrenceCard` gates its meta row on tags it never renders
+
+- **Category:** `dead-code` `ux`
+- **Impact:** 2 · **Breadth:** 1 file · **Fix effort:** S
+- **Evidence:** `src/components/OccurrenceCard.tsx:134` — `const hasTagsContent      = showTagsParticipants && (tags.length > 0 || listedOn.length > 0)` — but the meta row only renders `listedOn.map(label => (<TagChip …` ; `tags` appears nowhere in the JSX.
+- **Problem:** An occurrence with tags but no time/date/backlinks renders an empty meta row (layout gap), and the dead `tags` wiring suggests tag chips were removed from the card without cleaning up the gating logic.
+- **Fix:** Either render the tag chips or remove `tags` from `hasTagsContent` and the destructuring.
+
+---
+
+**Also noted (below top-10 cutoff):** the docstring on `extractFileMetadata` in `src/types.ts:172` claims "Migrates legacy `topics` to `items`" but the implementation never reads `fields.topics` — no migration exists anywhere (grep `topics` → comments only). One-line docstring fix, same "docs claim things the code doesn't do" theme as finding 1.
 
 # Codebase Health Survey
 
