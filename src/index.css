@@ -35,6 +35,7 @@
   /* destructive is saturated like primary, so primary-foreground (already
      tuned per theme for contrast on a saturated surface) applies here too */
   --color-destructive-foreground: var(--primary-foreground);
+  --color-warning:              var(--warning);
   --color-border:               var(--border);
   --color-input:                var(--input);
   --color-ring:                 var(--ring);
