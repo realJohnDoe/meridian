@@ -5,8 +5,10 @@ import {
 } from '@/storage/cache'
 import type { CacheRecord } from '@/storage/cache'
 import { conflictPath } from './conflictName'
-import { ConflictError, isTransientSyncError } from './conflictError'
+import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend } from './backend'
+import { GitHubBackend } from './githubBackend'
+import { ensureFreshAccessToken } from './githubOAuth'
 import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile } from '@/model'
 import type { StoreItem, Roots } from '@/types'
 import {
@@ -268,11 +270,32 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
   _syncing = true
 
   const vaultId = backend.id
+  let attemptedRefresh = false
 
   try {
-    const { hadCollision, pushed } = await pushDirty(backend, vaultId)
-    if (opts.pull || hadCollision) {
-      await reconcileWithBackend(backend, vaultId, pushed)
+    // A single retry-after-refresh: a 401 here means the access token expired
+    // or was revoked despite looking fresh locally (clock skew, early
+    // revocation, etc.) — try one forced refresh before giving up. PAT-managed
+    // vaults have no refresh token, so ensureFreshAccessToken(force) is a
+    // no-op for them and the retry loop exits immediately via the thrown error.
+    while (true) {
+      try {
+        const { hadCollision, pushed } = await pushDirty(backend, vaultId)
+        if (opts.pull || hadCollision) {
+          await reconcileWithBackend(backend, vaultId, pushed)
+        }
+        break
+      } catch (e) {
+        if (e instanceof AuthSyncError && !attemptedRefresh && backend instanceof GitHubBackend) {
+          attemptedRefresh = true
+          const fresh = await ensureFreshAccessToken(vaultId, { force: true })
+          if (fresh) {
+            backend.updateToken(fresh)
+            continue
+          }
+        }
+        throw e
+      }
     }
     // ── SUCCESS ──────────────────────────────────────────────────
     setSyncError(null)

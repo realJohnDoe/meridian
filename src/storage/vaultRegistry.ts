@@ -1,7 +1,7 @@
 import {
   cacheInit, cacheLoadAll, cacheBulkWriteClean, cacheDeleteAll,
   handleSave, handleLoad, handleClear,
-  tokenSave, tokenLoad, tokenClear,
+  tokenSave, tokenClear,
   refreshTokenSave, refreshTokenClear,
   tokenExpirySave, tokenExpiryClear,
   vaultRefsSave, vaultRefsLoad,
@@ -11,6 +11,7 @@ import { diskPickDirectory } from './fs'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
 import { GitHubBackend }  from './githubBackend'
+import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend, VaultRef, GitHubVaultRef } from './backend'
 import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading } from '@/storeBridge'
 import { notify, notifyError } from '@/notifications'
@@ -120,7 +121,7 @@ async function restoreVaultsInner(): Promise<void> {
         await activateExampleVault()
       }
     } else if (targetRef.kind === 'github') {
-      const token = await tokenLoad(targetRef.id)
+      const token = await ensureFreshAccessToken(targetRef.id)
       if (!token) { await activateExampleVault(); return }
       const backend = new GitHubBackend(targetRef.id, targetRef.name, { ...targetRef.github, token })
       const perm    = await backend.ensurePermission(false)
@@ -156,7 +157,7 @@ export async function setActiveVault(id: string): Promise<void> {
 
       await activateWritableVault(backend)
     } else if (ref.kind === 'github') {
-      const token = await tokenLoad(id)
+      const token = await ensureFreshAccessToken(id)
       if (!token) { notify('GitHub token not found — try removing and re-adding this vault.'); return }
 
       const backend = new GitHubBackend(id, ref.name, { ...ref.github, token })

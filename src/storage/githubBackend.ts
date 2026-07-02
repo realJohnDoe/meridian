@@ -44,6 +44,12 @@ export class GitHubBackend implements StorageBackend {
     this._octokit = makeOctokit(cfg.token)
   }
 
+  /** Swaps in a freshly-refreshed access token without recreating the instance. */
+  updateToken(token: string): void {
+    this._cfg     = { ...this._cfg, token }
+    this._octokit = makeOctokit(token)
+  }
+
   // ── StorageBackend ─────────────────────────────────────────────
 
   async statAll(): Promise<Map<string, string>> {
