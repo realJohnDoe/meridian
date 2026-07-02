@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseFixture, serialize, rootMeta, collectUndated } from './helpers'
-import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing } from '@/model/storeOps'
+import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing, deletionEndsAfterCompletionSeries } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { parseToStoreItems } from '@/model/storeItems'
 import { expandRange } from '@/model/expansion'
@@ -86,6 +86,24 @@ describe('edit operations → serialized YAML', () => {
     const occ = occOn(data.items, data.roots, '2026-04-20')
     const next = excludeOccurrence(data, occ)
     expect(serializeData(next)).toMatchSnapshot()
+  })
+
+  it('deletionEndsAfterCompletionSeries is true for the series\' only open occurrence', () => {
+    const data = fixtureData('after-completion')
+    const occ = occOn(data.items, data.roots, '2026-05-14')
+    expect(deletionEndsAfterCompletionSeries(data.items, occ)).toBe(true)
+  })
+
+  it('deletionEndsAfterCompletionSeries is false for a done occurrence', () => {
+    const data = fixtureData('after-completion')
+    const occ = occOn(data.items, data.roots, '2026-05-11')
+    expect(deletionEndsAfterCompletionSeries(data.items, occ)).toBe(false)
+  })
+
+  it('deletionEndsAfterCompletionSeries is false for a schedule-type series', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')
+    expect(deletionEndsAfterCompletionSeries(data.items, occ)).toBe(false)
   })
 
   it('deleteFollowing caps the series end before the occurrence', () => {

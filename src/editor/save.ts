@@ -1,5 +1,5 @@
 import { startOfToday } from 'date-fns'
-import { fmtISO, applyEdit, excludeOccurrence, deleteByFileSlug, deleteFollowing, fileSlugItems, findSeries } from '@/model'
+import { fmtISO, applyEdit, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing, fileSlugItems, findSeries } from '@/model'
 import { isSeries } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import { titleToSlug } from '@/fileIO'
@@ -39,6 +39,8 @@ export type SeriesSheetOption = {
   icon: 'calendar' | 'calendar-range'
   label: string
   sublabel: string
+  /** Shown as a warning banner while this option is selected. */
+  warning?: string
   onClick: () => void
 }
 export type SeriesSheetConfig = { title: string; options: SeriesSheetOption[] }
@@ -171,8 +173,13 @@ export function deleteNode(
     return
   }
 
+  const endsSeries = deletionEndsAfterCompletionSeries(items, item)
+
   const options: SeriesSheetOption[] = [
-    { icon: 'calendar', label: 'This occurrence', sublabel: 'Remove only this occurrence', onClick: excludeThis },
+    {
+      icon: 'calendar', label: 'This occurrence', sublabel: 'Remove only this occurrence', onClick: excludeThis,
+      ...(endsSeries ? { warning: 'This series only creates its next occurrence when you complete the current one. Deleting this occurrence leaves nothing to complete, so the series ends here.' } : {}),
+    },
   ]
   if (isScheduled) {
     options.push({ icon: 'calendar-range', label: 'This and all following', sublabel: 'Remove this and all future occurrences', onClick: deleteFuture })
