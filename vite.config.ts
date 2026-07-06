@@ -128,7 +128,10 @@ export default defineConfig({
     debugPagePlugin(),
     cspPlugin(),
     TanStackRouterVite({ target: 'react', autoCodeSplitting: true, routeFileIgnorePattern: '(^|/)index\\.tsx?$' }),
-    react(),
+    // babel-plugin-react-compiler auto-memoizes components/hooks at build time.
+    // The react-hooks eslint preset (recommended-latest) already enforces the
+    // same rules the compiler relies on, so the codebase is compiler-ready.
+    react({ babel: { plugins: [['babel-plugin-react-compiler', { target: '19' }]] } }),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
