@@ -85,16 +85,6 @@ Overall the report is based on direct reading of roughly 40% of the source and g
 
 ---
 
-### 3. A React hook lives inside `model/`, the documented pure domain core
-
-- **Category:** `architecture`
-- **Impact:** 4 · **Breadth:** 2 files (`src/model/useExpandWithMultiday.ts`, re-exported in `src/model/index.ts`; grep `from 'react'` in `src/model/` → 1 hit) · **Fix effort:** S
-- **Evidence:** `src/model/useExpandWithMultiday.ts:1` — `import { useRef } from 'react'` — versus CLAUDE.md: "**`model/` is the domain core — no outward dependencies.** It imports only from `types.ts`, `fileIO.ts`, and `wikilinks.ts`".
-- **Problem:** The lint rules guard against feature-dir imports but not framework imports, so React leaked into the one layer defined by not depending on anything — the caching logic (`hasSameStructure`, the overlay) is pure and belongs in model, but the `useRef` wrapper does not.
-- **Fix:** Split the pure cache logic into `model/expansionCache.ts` and move the thin `useRef` hook to `hooks/`, which already imports from `@/model`.
-
----
-
 ### 4. DayView silently hides timed events outside 07:00–22:00
 
 - **Category:** `ux`

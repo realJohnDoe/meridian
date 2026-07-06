@@ -1,9 +1,8 @@
-import { useRef } from 'react'
 import type { StoreItem, StoreOcc, Roots, Occurrence } from '@/types'
 import { isSeries } from '@/types'
 import { expandWithMultiday } from './expansion'
 
-interface Cache {
+export interface ExpansionCache {
   items: StoreItem[]
   roots: Roots
   fromMs: number
@@ -25,7 +24,7 @@ interface Cache {
  *   - duration (multiday span)
  *   - done on after_completion series/overrides (determines the next occurrence)
  */
-function hasSameStructure(a: StoreItem[], b: StoreItem[]): boolean {
+export function hasSameStructure(a: StoreItem[], b: StoreItem[]): boolean {
   if (a === b) return true
   if (a.length !== b.length) return false
 
@@ -65,38 +64,35 @@ function hasSameStructure(a: StoreItem[], b: StoreItem[]): boolean {
 }
 
 /**
- * Cached expansion hook. Calls expandWithMultiday once per structural change,
- * and overlays non-structural metadata (done, priority, participants) onto the
- * cached result when only those fields change — avoiding a full re-expansion on
- * every done-toggle or priority edit.
+ * Computes the expansion result for the given inputs, reusing `prev` when the
+ * scheduling structure is unchanged instead of re-running expandWithMultiday.
+ * When only non-structural metadata (done, priority, participants) changed,
+ * the new values are overlaid directly onto the cached occurrences.
  */
-export function useExpandWithMultiday(
+export function computeExpansionCache(
+  prev: ExpansionCache | null,
   items: StoreItem[],
   roots: Roots,
   from: Date,
   to: Date,
-): Occurrence[] {
-  const cacheRef = useRef<Cache | null>(null)
-  const c = cacheRef.current
-
+): ExpansionCache {
   const fromMs = from.getTime()
   const toMs = to.getTime()
 
-  if (c && c.fromMs === fromMs && c.toMs === toMs && c.roots === roots && hasSameStructure(c.items, items)) {
+  if (prev && prev.fromMs === fromMs && prev.toMs === toMs && prev.roots === roots && hasSameStructure(prev.items, items)) {
     // Only non-structural metadata changed — find altered items and overlay.
     const changedById = new Map<string, StoreOcc>()
     for (let i = 0; i < items.length; i++) {
-      if (items[i] !== c.items[i] && !isSeries(items[i])) {
+      if (items[i] !== prev.items[i] && !isSeries(items[i])) {
         changedById.set(items[i].id, items[i] as StoreOcc)
       }
     }
 
     if (changedById.size === 0) {
-      cacheRef.current = { ...c, items }
-      return c.allOccs
+      return { ...prev, items }
     }
 
-    const allOccs = c.allOccs.map(occ => {
+    const allOccs = prev.allOccs.map(occ => {
       const changed = changedById.get(occ.id)
       if (!changed) return occ
       return {
@@ -109,11 +105,9 @@ export function useExpandWithMultiday(
         },
       }
     })
-    cacheRef.current = { items, roots, fromMs, toMs, allOccs }
-    return allOccs
+    return { items, roots, fromMs, toMs, allOccs }
   }
 
   const allOccs = expandWithMultiday(items, roots, from, to)
-  cacheRef.current = { items, roots, fromMs, toMs, allOccs }
-  return allOccs
+  return { items, roots, fromMs, toMs, allOccs }
 }

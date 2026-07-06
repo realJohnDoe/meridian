@@ -3,12 +3,13 @@ import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
 
-import { useExpandWithMultiday, multidayDisplayTitle, weekStartsOn } from '@/model'
+import { multidayDisplayTitle, weekStartsOn } from '@/model'
 import { sameDay } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 
 const EMPTY: Occurrence[] = []
+import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday, useCalendarFilter } from '@/hooks'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
