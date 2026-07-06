@@ -4,6 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Menu } from 'lucide-react'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor'
+import { SyncButton } from '@/components'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSidebar } from '@/components/ui/sidebar'
@@ -29,7 +30,7 @@ export const Route = createFileRoute('/_app/entry/new')({
   }),
 })
 
-function NewEntryTopbar({ onSave }: { onSave: () => void }) {
+function NewEntryTopbar() {
   const slotEl = useTopbarSlot()
   const { setOpenMobile, isMobile } = useSidebar()
   if (!slotEl) return null
@@ -41,7 +42,7 @@ function NewEntryTopbar({ onSave }: { onSave: () => void }) {
         </Button>
       )}
       <div className="flex-1" />
-      <Button variant="default" size="sm" onClick={onSave}>Save</Button>
+      <SyncButton />
     </div>,
     slotEl,
   )
@@ -54,7 +55,7 @@ function NewEntryReady({ title }: { title?: string }) {
 
   return (
     <>
-      <NewEntryTopbar onSave={() => hooks.triggerSaveRef.current()} />
+      <NewEntryTopbar />
       <Suspense fallback={<EntrySkeleton />}>
         <EditorShell entry={hooks.entry} hooks={hooks} items={items} roots={roots} />
       </Suspense>
