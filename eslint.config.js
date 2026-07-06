@@ -6,6 +6,17 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks'
 
 const BARREL_DIRS = ['calendar', 'components', 'editor', 'hooks', 'model', 'onboarding', 'routes', 'search', 'storage']
 
+// react-hooks 'recommended-latest' includes the React Compiler's diagnostics
+// (refs, set-state-in-effect, purity, immutability, …) alongside the two
+// classic rules. Land it at 'warn' first — flip individual rules to 'error'
+// as the codebase is cleaned up — except rules-of-hooks, which stays 'error'
+// as it always has been.
+const reactHooksRules = Object.fromEntries(
+  Object.entries(reactHooksPlugin.configs['recommended-latest'].rules).map(
+    ([rule, severity]) => [rule, rule === 'react-hooks/rules-of-hooks' ? severity : 'warn'],
+  ),
+)
+
 export default [
   // Auto-generated files — skip entirely
   { ignores: ['src/routeTree.gen.ts'] },
@@ -30,8 +41,7 @@ export default [
     },
     rules: {
       // ── React hooks ──────────────────────────────────────────────────────────
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      ...reactHooksRules,
 
       // ── TypeScript ───────────────────────────────────────────────────────────
       // Enforce `import type` for type-only imports (auto-fixable)
