@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
@@ -65,6 +65,14 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     if (next.editScope === 'add') return
     commitEntry({ ...next, body: getBodyRef.current() })
   }, [commitEntry])
+
+  // A new item opened with an initial title (e.g. "Add <query>" from search, or a
+  // wikilink to a not-yet-existing note) already has everything needed to create the
+  // file — don't wait for the user to make an edit that would trigger autosave.
+  useEffect(() => {
+    if (!initialOcc && entryRef.current.title) commitEntry(entryRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const updateEntry = useCallback((next: EntryState) => {
     setEntry(next)
