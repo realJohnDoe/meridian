@@ -57,7 +57,7 @@ const CalCell = memo(function CalCell({ date, other, dayOccs, today, maxVisible,
       )}>{date.getDate()}</span>
       <div className="flex flex-col gap-0.5 flex-1 overflow-hidden">
         {dayOccs.slice(0, shown).map((o, i) => (
-          <div key={i} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center rounded-none sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
+          <div key={i} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
             <span className="truncate min-w-0">{multidayDisplayTitle(o, date) ?? o.metadata.title}</span>
           </div>
         ))}
@@ -187,7 +187,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       <div
         ref={rowSentinelRef}
         aria-hidden
-        className="invisible absolute pointer-events-none flex items-center rounded-none sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium"
+        className="invisible absolute pointer-events-none flex items-center rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium"
       >
         &nbsp;
       </div>

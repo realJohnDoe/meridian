@@ -58,7 +58,7 @@ function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
     <SurfaceButton
       className={cn(
         dvBlockVariants({ state: occState(o) }),
-        'w-full flex items-center rounded-none sm:rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
+        'w-full flex items-center rounded-xs sm:rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
       )}
       onClick={() => onOpen(o)}
       aria-label={title}
