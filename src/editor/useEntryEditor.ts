@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
@@ -8,6 +8,7 @@ import { fmtISO } from '@/model'
 import { useToday } from '@/hooks'
 import { newEntryRoute } from '@/routes'
 import { resolveWikilink } from '@/wikilinks'
+import { titleToSlug } from '@/fileIO'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
 
@@ -35,15 +36,42 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Populated by EntryEditor once CodeMirror mounts; used by saveMeta to capture current body
   const getBodyRef = useRef<() => string>(() => '')
-  // Populated by EntryEditor; allows topbar Save button to trigger a full save (body + pending links)
-  const triggerSaveRef = useRef<() => void>(() => {})
+  // Populated by EntryEditor; flushes pending "listed on" links once a new item is created
+  const flushPendingLinksRef = useRef<() => void>(() => {})
   // Always points to the latest entry so timer callbacks don't close over stale state
   const entryRef = useRef(entry)
   entryRef.current = entry
 
+  const storeRoots = useStore(s => s.roots)
+  const navigate = useNavigate()
+  const router = useRouter()
+
+  // Persists an edit. For an existing item this upserts in place; for a brand-new
+  // item (item === null) it creates the file on first save, then hands off to the
+  // real entry route so subsequent autosaves upsert like any other existing item.
+  const commitEntry = useCallback((next: EntryState) => {
+    if (next.item) {
+      saveNode(next.item, next.editScope, next)
+      return
+    }
+    if (!next.title) return
+    const result = saveNode(null, next.editScope, next)
+    if (result !== 'saved') return
+    flushPendingLinksRef.current()
+    navigate({ to: '/entry/$slug', params: { slug: titleToSlug(next.title) }, replace: true })
+  }, [navigate])
+
   const saveMeta = useCallback((next: EntryState) => {
-    if (!next.item || next.editScope === 'add') return
-    saveNode(next.item, next.editScope, { ...next, body: getBodyRef.current() })
+    if (next.editScope === 'add') return
+    commitEntry({ ...next, body: getBodyRef.current() })
+  }, [commitEntry])
+
+  // A new item opened with an initial title (e.g. "Add <query>" from search, or a
+  // wikilink to a not-yet-existing note) already has everything needed to create the
+  // file — don't wait for the user to make an edit that would trigger autosave.
+  useEffect(() => {
+    if (!initialOcc && entryRef.current.title) commitEntry(entryRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const updateEntry = useCallback((next: EntryState) => {
@@ -52,18 +80,13 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   }, [saveMeta])
 
   const scheduleAutoSave = useCallback((body: string) => {
-    if (!entryRef.current.item) return
+    if (entryRef.current.editScope === 'add') return
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     autosaveTimerRef.current = setTimeout(() => {
-      const e = entryRef.current
-      saveNode(e.item!, e.editScope, { ...e, body })
+      commitEntry({ ...entryRef.current, body })
       autosaveTimerRef.current = null
     }, 1500)
-  }, [])
-
-  const storeRoots = useStore(s => s.roots)
-  const navigate = useNavigate()
-  const router = useRouter()
+  }, [commitEntry])
 
   const handleOpenWikilink = useCallback((ref: string) => {
     const fileSlug = resolveWikilink(ref, storeRoots)
@@ -125,7 +148,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   return {
     entry, setEntry,
     getBodyRef,
-    triggerSaveRef,
+    flushPendingLinksRef,
     saveMeta,
     handleOpenWikilink,
     handleSave,

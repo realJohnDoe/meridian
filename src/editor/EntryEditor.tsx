@@ -62,7 +62,7 @@ interface Props {
   onAutoSave?: (body: string) => void
   onMetaSave?: (next: EntryState) => void
   getBodyRef?: React.MutableRefObject<() => string>
-  triggerSaveRef?: React.MutableRefObject<() => void>
+  flushPendingLinksRef?: React.MutableRefObject<() => void>
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: EditScope) => void
@@ -79,7 +79,7 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = el.scrollHeight + 'px'
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, triggerSaveRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, flushPendingLinksRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
   const navigate           = useNavigate()
   const hour12             = useStore(s => s.localePrefs.hour12)
   const defaultParticipants = useStore(s => s.defaultParticipants)
@@ -125,11 +125,9 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
 
   const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(item, title)
 
-  // Updated every render so the topbar Save button always calls with current body + pending links
-  if (triggerSaveRef) triggerSaveRef.current = () => {
-    onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
-    flushOnSave(titleToSlug(title))
-  }
+  // Updated every render so commitEntry can flush pending "listed on" links once
+  // a brand-new item is actually created (first autosave), using its final slug.
+  if (flushPendingLinksRef) flushPendingLinksRef.current = () => flushOnSave(titleToSlug(title))
 
   const linkedSlugs = useMemo(
     () => [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs],
@@ -178,7 +176,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
               onChange={e => {
                 onChange(prev => ({ ...prev, title: e.target.value }))
                 autoResize(e.target)
-                if (item && editScope !== 'add') onAutoSave?.(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+                if (editScope !== 'add') onAutoSave?.(viewRef.current?.state.doc.toString().trimEnd() ?? '')
               }}
             />
             {item && (
@@ -283,7 +281,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} onChange={(item && editScope !== 'add') ? onAutoSave : undefined} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} onChange={editScope !== 'add' ? onAutoSave : undefined} />
 
         <ItemsList
           items={listItems}
