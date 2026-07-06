@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useMediaQuery } from '@/hooks'
+import { useIsTouchDevice } from '@/hooks'
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -25,7 +25,7 @@ interface Props {
 
 export default function TimePickerDialog({ open, value, onConfirm, onRemove, onClose }: Props) {
   const [time, setTime] = useState('09:00')
-  const isTouch = useMediaQuery('(pointer: coarse)')
+  const isTouch = useIsTouchDevice()
 
   useEffect(() => {
     if (open) setTime(normaliseTime(value || '09:00'))

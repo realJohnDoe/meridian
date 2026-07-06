@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useMediaQuery } from '@/hooks'
+import { useIsTouchDevice } from '@/hooks'
 import { addDays, differenceInMinutes, differenceInDays } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
 import { parseDateString, parseDateTime, fmtISO } from '@/model'
@@ -103,7 +103,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
   const [endTime, setEndTime] = useState('')   // HH:MM
   const [dateDlgOpen, setDateDlgOpen] = useState(false)
   const [timeDlgOpen, setTimeDlgOpen] = useState(false)
-  const isTouch = useMediaQuery('(pointer: coarse)')
+  const isTouch = useIsTouchDevice()
 
   useEffect(() => {
     if (!open) return
