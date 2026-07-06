@@ -1,4 +1,5 @@
 export { useToday } from './useToday'
+export { useExpandWithMultiday } from './useExpandWithMultiday'
 export { useOpenEntry } from './useOpenEntry'
 export { NO_PARTICIPANT, useParticipantFilter } from './useParticipantFilter'
 export { useCalendarFilter } from './useCalendarFilter'

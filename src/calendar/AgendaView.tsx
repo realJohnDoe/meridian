@@ -4,14 +4,14 @@ import { useStore } from '@/store'
 import type { Occurrence, EditScope } from '@/types'
 import { occKind } from '@/occView'
 
-import { fmtISO, useExpandWithMultiday } from '@/model'
+import { fmtISO } from '@/model'
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import DaySection from './DaySection'
 import OverdueSection from './OverdueSection'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
-import { useToday, useCalendarFilter } from '@/hooks'
+import { useToday, useCalendarFilter, useExpandWithMultiday } from '@/hooks'
 
 const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 
