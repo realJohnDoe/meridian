@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTheme } from 'next-themes'
 import { Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
+import { useResetOnChange } from '@/hooks'
 import {
   Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -130,12 +131,12 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
   }
 
   // If the selected vault was removed, fall back to active or first remaining vault
-  useEffect(() => {
+  useResetOnChange([vaults, open], () => {
     if (!open) return
     if (selectedVaultId && vaults.some(v => v.id === selectedVaultId)) return
     const id = activeVaultId ?? vaults[0]?.id ?? null
     setSelectedVaultId(id ?? null)
-  }, [vaults, open]) // eslint-disable-line react-hooks/exhaustive-deps
+  })
 
   function handleVaultSelect(value: string) {
     if (value === '__add__') {

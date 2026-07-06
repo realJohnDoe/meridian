@@ -1,10 +1,10 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { setActiveVault } from '@/vaultActions'
 import { fmtISO, fmtMonth } from '@/model'
-import { useToday } from '@/hooks'
+import { useToday, useResetOnChange } from '@/hooks'
 import { vaultIcon } from './vaultIcon'
 import SettingsDialog from './SettingsDialog'
 import { Checkbox } from './ui/checkbox'
@@ -55,7 +55,7 @@ export default function AppSidebar() {
     return [...set].sort()
   }, [items])
 
-  useEffect(() => { setEditingFavorites(false) }, [activeVaultId])
+  useResetOnChange([activeVaultId], () => setEditingFavorites(false))
 
   const isDayView = pathname.startsWith('/day/')
 

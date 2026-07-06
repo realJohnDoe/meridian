@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useIsTouchDevice } from '@/hooks'
+import { useState } from 'react'
+import { useIsTouchDevice, useResetOnChange } from '@/hooks'
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -27,9 +27,9 @@ export default function TimePickerDialog({ open, value, onConfirm, onRemove, onC
   const [time, setTime] = useState('09:00')
   const isTouch = useIsTouchDevice()
 
-  useEffect(() => {
+  useResetOnChange([open, value], () => {
     if (open) setTime(normaliseTime(value || '09:00'))
-  }, [open, value])
+  })
 
   return (
     <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()} forceDialog>

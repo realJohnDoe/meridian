@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useIsTouchDevice } from '@/hooks'
+import { useState } from 'react'
+import { useIsTouchDevice, useResetOnChange } from '@/hooks'
 import { addDays, differenceInMinutes, differenceInDays } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
 import { parseDateString, parseDateTime, fmtISO } from '@/model'
@@ -105,7 +105,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
   const [timeDlgOpen, setTimeDlgOpen] = useState(false)
   const isTouch = useIsTouchDevice()
 
-  useEffect(() => {
+  useResetOnChange([open, value, scheduled?.date, scheduled?.time], () => {
     if (!open) return
     const parsed = value ? parseDuration(value) : null
     setN(parsed?.n ?? 1)
@@ -123,8 +123,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
         ? durationToEndDate(scheduled.date, value)
         : fmtISO(addDays(parseDateString(scheduled.date) ?? new Date(), 1)))
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- hasTime and defaultTab() derive from deps already listed; itemType is stable for a dialog session
-  }, [open, value, scheduled?.date, scheduled?.time])
+  })
 
   function switchTab(next: Tab) {
     if (next === tab || !scheduled) return

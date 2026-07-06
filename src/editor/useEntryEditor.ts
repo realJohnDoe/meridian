@@ -40,7 +40,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const flushPendingLinksRef = useRef<() => void>(() => {})
   // Always points to the latest entry so timer callbacks don't close over stale state
   const entryRef = useRef(entry)
-  entryRef.current = entry
+  useEffect(() => { entryRef.current = entry }, [entry])
 
   const storeRoots = useStore(s => s.roots)
   const navigate = useNavigate()

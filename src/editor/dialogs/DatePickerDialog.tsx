@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { addDays, startOfToday } from 'date-fns'
 import { fmtISO, parseDateString, weekStartsOn } from '@/model'
 import { useStore } from '@/store'
+import { useResetOnChange } from '@/hooks'
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -33,13 +34,13 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
   const [month,    setMonth]    = useState<Date>(parseDateString(initialDate) ?? today)
 
   // Sync calendar to the entry's date whenever the dialog opens
-  useEffect(() => {
+  useResetOnChange([open, initialDate], () => {
     if (open) {
       const d = parseDateString(initialDate)
       setSelected(d ?? undefined)
       setMonth(d ?? today)
     }
-  }, [open, initialDate]) // eslint-disable-line react-hooks/exhaustive-deps
+  })
 
   // Selecting Today / Tomorrow highlights in the grid without closing
   function selectDate(date: Date) {

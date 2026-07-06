@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useStore } from '@/store'
 import { isTourDone, markTourDone } from './tourState'
 import { Button } from '@/components/ui/button'
+import { useResetOnChange } from '@/hooks'
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
@@ -66,11 +67,11 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
   ], [setSidebarOpen, navigateHome])
 
   // Auto-start once on the example vault (never again after Skip/Done)
-  useEffect(() => {
+  useResetOnChange([activeVaultId], () => {
     if (activeVaultId === 'example' && !isTourDone()) {
       setActive(true)
     }
-  }, [activeVaultId])
+  })
 
   const advance = useCallback(() => {
     setStepIndex(i => i + 1)

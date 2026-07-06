@@ -26,19 +26,10 @@ function DaySection({
   date, isToday, isTomorrow,
   items,
   onOpen, onToggleDone, onSwipeDelete,
+  tick,
 }: Props) {
   const sectionRef = useRef<HTMLDivElement>(null)
   useFlipReorder(sectionRef, items)
-
-  // Any time this component actually renders — whether from the minute
-  // ticker above or from an unrelated item in this day changing — every row
-  // needs to recompute its own wall-clock-dependent styling. Rows are
-  // individually memoized on `occ` identity, so forwarding the ticker's
-  // `tick` value as-is isn't enough: an untouched row's props would be
-  // unchanged on a render triggered by a SIBLING's change, and its memo
-  // would bail. A fresh per-render stamp guarantees every row's props
-  // differ from its own last render, whatever triggered this one.
-  const renderStamp = Date.now()
 
   const label = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : fmtLong(date)
 
@@ -56,7 +47,7 @@ function DaySection({
         <OccurrenceRow
           key={o.id}
           occ={o}
-          tick={renderStamp}
+          tick={tick}
           onOpen={onOpen}
           onToggleDone={onToggleDone}
           onSwipeDelete={onSwipeDelete}
