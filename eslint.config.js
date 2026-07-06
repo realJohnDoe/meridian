@@ -8,14 +8,12 @@ const BARREL_DIRS = ['calendar', 'components', 'editor', 'hooks', 'model', 'onbo
 
 // react-hooks 'recommended-latest' includes the React Compiler's diagnostics
 // (refs, set-state-in-effect, purity, immutability, …) alongside the two
-// classic rules. Land it at 'warn' first — flip individual rules to 'error'
-// as the codebase is cleaned up — except rules-of-hooks, which stays 'error'
-// as it always has been.
-const reactHooksRules = Object.fromEntries(
-  Object.entries(reactHooksPlugin.configs['recommended-latest'].rules).map(
-    ([rule, severity]) => [rule, rule === 'react-hooks/rules-of-hooks' ? severity : 'warn'],
-  ),
-)
+// classic rules, at the preset's own severities: 'error' for everything
+// actionable, 'warn' for exhaustive-deps, incompatible-library, and
+// unsupported-syntax — rules that flag real but sometimes unfixable
+// situations (e.g. a third-party hook whose API can't be memoized safely)
+// rather than bugs to fix.
+const reactHooksRules = reactHooksPlugin.configs['recommended-latest'].rules
 
 export default [
   // Auto-generated files — skip entirely
