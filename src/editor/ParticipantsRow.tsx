@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Plus, Users } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { TagChip } from '@/components'
@@ -15,12 +15,10 @@ export default function ParticipantsRow({ participants, onChange, allParticipant
   const [open,  setOpen]  = useState(false)
   const [query, setQuery] = useState('')
 
-  const existing = useMemo(() => new Set(participants.map(p => p.trim())), [participants])
+  const existing = new Set(participants.map(p => p.trim()))
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return allParticipants.filter(p => !existing.has(p) && (!q || p.toLowerCase().includes(q)))
-  }, [allParticipants, existing, query])
+  const q = query.trim().toLowerCase()
+  const filtered = allParticipants.filter(p => !existing.has(p) && (!q || p.toLowerCase().includes(q)))
 
   const canAddNew = query.trim().length > 0 && !existing.has(query.trim())
 

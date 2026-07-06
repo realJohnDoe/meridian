@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { startOfDay } from 'date-fns'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { ChevronDown, ChevronUp, CheckSquare, Square } from 'lucide-react'
@@ -150,12 +150,10 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate }: Props)
   const dvTo   = new Date(dvDate); dvTo.setHours(23, 59, 59)
   const dvOccs = filterOccs(useExpandWithMultiday(items, roots, dvFrom, dvTo))
 
-  const { allDay, cols } = useMemo(() => {
-    const sorted = sortOccs(dvOccs)
-    const allDay = sorted.filter(o => !fmtT(o.time))
-    const timed  = sorted.filter(o =>  !!fmtT(o.time))
-    return { allDay, cols: computeColumns(timed) }  // cols: LayoutEvent[][]
-  }, [dvOccs])
+  const sortedDvOccs = sortOccs(dvOccs)
+  const allDay = sortedDvOccs.filter(o => !fmtT(o.time))
+  const timed  = sortedDvOccs.filter(o =>  !!fmtT(o.time))
+  const cols   = computeColumns(timed)  // cols: LayoutEvent[][]
 
   const scRef = useRef<HTMLDivElement>(null)
   useEffect(() => {

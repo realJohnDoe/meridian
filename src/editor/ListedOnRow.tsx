@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Roots } from '@/types'
 import { fileEntries } from '@/fileOccurrence'
@@ -20,15 +20,13 @@ export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, on
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
 
-  const allFiles = useMemo(() => fileEntries(roots), [roots])
-  const filtered = useMemo(() => {
-    const alreadyLinked = new Set(slugs)
-    return allFiles.filter(e =>
-      e.fileSlug !== fileSlug &&
-      !alreadyLinked.has(e.fileSlug) &&
-      (!pickerQuery || e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
-    )
-  }, [allFiles, fileSlug, slugs, pickerQuery])
+  const allFiles = fileEntries(roots)
+  const alreadyLinked = new Set(slugs)
+  const filtered = allFiles.filter(e =>
+    e.fileSlug !== fileSlug &&
+    !alreadyLinked.has(e.fileSlug) &&
+    (!pickerQuery || e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
+  )
 
   function handleSelect(targetSlug: string) {
     if (!fileSlug) return

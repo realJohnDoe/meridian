@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, placeholder } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -76,7 +76,7 @@ const editorTheme = EditorView.theme({
 export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink, onChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [wlPopup, setWlPopup] = useState<WlPopupState | null>(null)
-  const closePopup = useCallback(() => setWlPopup(null), [])
+  const closePopup = () => setWlPopup(null)
 
   // Mirrors viewRef.current into state so the WikilinkPopup mount condition
   // below can read it during render without accessing the ref directly.

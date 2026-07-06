@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { EditorView } from '@codemirror/view'
 import type { Roots } from '@/types'
@@ -25,12 +25,10 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
 
   const occBySlug = useStore(s => s.fom)
 
-  const matches = useMemo(() => {
-    const q = popup.query.toLowerCase()
-    return fileEntries(roots)
-      .filter(e => !q || e.title.toLowerCase().includes(q))
-      .slice(0, 8)
-  }, [roots, popup.query])
+  const q = popup.query.toLowerCase()
+  const matches = fileEntries(roots)
+    .filter(e => !q || e.title.toLowerCase().includes(q))
+    .slice(0, 8)
 
   useResetOnChange([matches], () => setFocusIdx(0))
 

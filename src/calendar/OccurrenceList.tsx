@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { Occurrence, EditScope } from '@/types'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -14,10 +13,8 @@ interface Props {
 }
 
 export default function OccurrenceList({ occs, onOpen, onToggleDone, onSwipeDelete }: Props) {
-  const { active, done } = useMemo(() => ({
-    active: occs.filter(o => !o.metadata.done),
-    done:   occs.filter(o =>  o.metadata.done),
-  }), [occs])
+  const active = occs.filter(o => !o.metadata.done)
+  const done   = occs.filter(o =>  o.metadata.done)
 
   return (
     <div className="pt-2">

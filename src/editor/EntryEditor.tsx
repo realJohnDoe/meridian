@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
 import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
@@ -113,7 +113,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
     onScopeChange?.(scope)
   }
 
-  const allParticipants = useMemo(() => {
+  const allParticipants = (() => {
     const set = new Set<string>()
     for (const storeItem of items) {
       for (const p of storeItem.metadata.participants) {
@@ -122,7 +122,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
       }
     }
     return [...set].sort()
-  }, [items])
+  })()
 
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
@@ -134,10 +134,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
     if (flushPendingLinksRef) flushPendingLinksRef.current = () => flushOnSave(titleToSlug(title))
   })
 
-  const linkedSlugs = useMemo(
-    () => [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs],
-    [effectiveSlug, roots, pendingSlugs],
-  )
+  const linkedSlugs = [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs]
 
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)
@@ -203,9 +200,17 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
         {/* ── OCCURRENCE-LEVEL: scope (header) → type → metadata → participants ── */}
         <Card className="mt-3 mb-4 overflow-hidden bg-card">
           {showScopeRow && (
-            <div className="px-3 py-2.5 bg-background">
+            <div className="px-3 pt-3 pb-3 bg-background">
               <Select value={editScope} onValueChange={v => handleScopeChange(v as EditScope)}>
-                <SelectTrigger className="w-full border-0 shadow-none bg-transparent p-0 h-auto text-sm font-medium text-dim focus:ring-0 hover:bg-transparent [&>svg]:ml-auto [&>svg]:shrink-0">
+                <SelectTrigger
+                  className={cn(
+                    badgeVariants({ variant: 'chip' }),
+                    'w-fit gap-1 h-auto py-1 text-xs font-medium text-muted-foreground',
+                    'border-border shadow-sm',
+                    'hover:bg-accent focus:ring-0 focus-visible:ring-1 focus-visible:ring-ring',
+                    '[&>svg]:ml-1 [&>svg]:shrink-0 [&>svg]:size-3 [&>svg]:opacity-60',
+                  )}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
