@@ -12,15 +12,21 @@ export type OccState =
   | 'done'
 
 /**
- * Shared tint pattern for active tasks and notes: bg-{color}/opacity + text-{color}.
- * Identical across all item-display contexts — one edit here changes every view.
+ * Shared pattern for active tasks and notes: solid bg-{color} + text-primary-foreground.
+ * Full-opacity backgrounds (rather than a light tint) plus primary-foreground text
+ * (already tuned per theme for contrast on a saturated surface) is deliberate: a
+ * light tint behind colored text can't clear AA on light themes, no matter the text
+ * color. hover:bg-{color}/90 (matching the buttonVariants hover convention) and an
+ * explicit hover:text so neither gets silently overridden by SurfaceButton's own
+ * ghost-variant hover styles. Identical across all item-display contexts — one edit
+ * here changes every view.
  */
 const TINT_CLASSES = {
-  'task-open': 'bg-task/18 text-task',
-  'task-p1':   'bg-priority-1/15 text-priority-1',
-  'task-p2':   'bg-priority-2/15 text-priority-2',
-  'task-p3':   'bg-priority-3/15 text-priority-3',
-  note:        'bg-note/18 text-note',
+  'task-open': 'bg-task text-primary-foreground hover:bg-task/90 hover:text-primary-foreground',
+  'task-p1':   'bg-priority-1 text-primary-foreground hover:bg-priority-1/90 hover:text-primary-foreground',
+  'task-p2':   'bg-priority-2 text-primary-foreground hover:bg-priority-2/90 hover:text-primary-foreground',
+  'task-p3':   'bg-priority-3 text-primary-foreground hover:bg-priority-3/90 hover:text-primary-foreground',
+  note:        'bg-note text-primary-foreground hover:bg-note/90 hover:text-primary-foreground',
 }
 
 /**
@@ -70,16 +76,19 @@ export type CcBarVariants = VariantProps<typeof ccBarVariants>
 
 /**
  * DayView item colouring — all-day pills (bordered=false) and timed event
- * blocks (bordered=true).  Bordered blocks use a slightly higher opacity
- * background and softer text for readability over larger areas.
+ * blocks (bordered=true) share the same solid fill; bordered blocks add a
+ * left accent stripe for a bit of extra visual weight over larger areas.
+ * past/done items stay on the neutral bg-muted surface (not solid-colored)
+ * so they read as de-emphasized against the now fully-saturated active states,
+ * with a line-through reinforcing the "done" meaning.
  */
 export const dvBlockVariants = cva('', {
   variants: {
     state: {
       ...TINT_CLASSES,
       'event-future': '',  // both appearances set per bordered in compound variants below
-      'event-past':   'bg-muted text-muted-foreground',
-      done:           'bg-muted text-muted-foreground',
+      'event-past':   'bg-muted text-foreground line-through hover:bg-muted/90 hover:text-foreground',
+      done:           'bg-muted text-foreground line-through hover:bg-muted/90 hover:text-foreground',
     } satisfies Record<OccState, string>,
     bordered: {
       true:  'border-l-2',
@@ -87,15 +96,10 @@ export const dvBlockVariants = cva('', {
     },
   },
   compoundVariants: [
-    // event-future: lighter pill when unbounded, darker block with accent stripe when bordered
-    { state: 'event-future', bordered: false, className: 'bg-event/18 text-event' },
-    { state: 'event-future', bordered: true,  className: 'bg-event/32 border-l-event text-secondary-foreground' },
-    // all other bordered states just add the matching left accent stripe
-    { state: 'task-open',  bordered: true, className: 'border-l-task' },
-    { state: 'task-p1',    bordered: true, className: 'border-l-priority-1' },
-    { state: 'task-p2',    bordered: true, className: 'border-l-priority-2' },
-    { state: 'task-p3',    bordered: true, className: 'border-l-priority-3' },
-    { state: 'note',       bordered: true, className: 'border-l-note' },
+    { state: 'event-future', bordered: false, className: 'bg-event text-primary-foreground hover:bg-event/90 hover:text-primary-foreground' },
+    { state: 'event-future', bordered: true,  className: 'bg-event text-primary-foreground hover:bg-event/90 hover:text-primary-foreground' },
+    // active states are already fully colored, so a same-hue border stripe would be
+    // invisible — only event-past/done (neutral bg-muted) benefit from one
     { state: 'event-past', bordered: true, className: 'border-l-surface-raised' },
     { state: 'done',       bordered: true, className: 'border-l-surface-raised' },
   ],
