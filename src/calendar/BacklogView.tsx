@@ -1,4 +1,3 @@
-import { useMemo, useCallback } from 'react'
 import { Inbox } from 'lucide-react'
 import { useStore } from '@/store'
 import type { Occurrence, EditScope } from '@/types'
@@ -18,13 +17,10 @@ export default function BacklogView({ onOpen }: Props) {
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
 
-  const occs = useMemo(
-    () => sortOccs(undatedOccs(items, roots).filter(o => occKind(o) === 'task')),
-    [items, roots],
-  )
+  const occs = sortOccs(undatedOccs(items, roots).filter(o => occKind(o) === 'task'))
 
-  const handleToggleDone  = useCallback((occ: Occurrence) => toggleOccDone(occ), [])
-  const handleSwipeDelete = useCallback((occ: Occurrence) => beginSwipeDelete(occ), [])
+  const handleToggleDone  = (occ: Occurrence) => toggleOccDone(occ)
+  const handleSwipeDelete = (occ: Occurrence) => beginSwipeDelete(occ)
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]">

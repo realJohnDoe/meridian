@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
 import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
@@ -113,7 +113,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
     onScopeChange?.(scope)
   }
 
-  const allParticipants = useMemo(() => {
+  const allParticipants = (() => {
     const set = new Set<string>()
     for (const storeItem of items) {
       for (const p of storeItem.metadata.participants) {
@@ -122,7 +122,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
       }
     }
     return [...set].sort()
-  }, [items])
+  })()
 
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
@@ -134,10 +134,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
     if (flushPendingLinksRef) flushPendingLinksRef.current = () => flushOnSave(titleToSlug(title))
   })
 
-  const linkedSlugs = useMemo(
-    () => [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs],
-    [effectiveSlug, roots, pendingSlugs],
-  )
+  const linkedSlugs = [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs]
 
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)

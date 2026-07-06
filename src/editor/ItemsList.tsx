@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState } from 'react'
 import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots } from '@/types'
 import { isStandaloneOcc } from '@/types'
@@ -58,17 +58,14 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const [exitingEntries, setExitingEntries] = useState<{ row: Row; position: number }[]>([])
 
   const occBySlug = useStore(s => s.fom)
-  const allFiles  = useMemo(() => fileEntries(roots), [roots])
+  const allFiles  = fileEntries(roots)
   const filtered  = pickerQuery
     ? allFiles.filter(e => e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
     : allFiles
 
-  const entries: ParsedEntry[] = useMemo(
-    () => items.map((raw, idx) => ({ ...parseItemEntry(raw), idx })),
-    [items],
-  )
+  const entries: ParsedEntry[] = items.map((raw, idx) => ({ ...parseItemEntry(raw), idx }))
 
-  const sortedRows: Row[] = useMemo(() => {
+  const sortedRows: Row[] = (() => {
     const rows: Row[] = entries.map(entry => {
       if (entry.kind !== 'link') return { entry, occ: undefined }
       const slug = resolveWikilink(entry.ref, roots)
@@ -81,35 +78,35 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
       if (na !== nb) return na - nb
       return sa.localeCompare(sb)
     })
-  }, [entries, occBySlug, roots])
+  })()
 
-  const toggleTask = useCallback((idx: number, text: string, done: boolean, row?: Row, position?: number) => {
+  const toggleTask = (idx: number, text: string, done: boolean, row?: Row, position?: number) => {
     // Animate out when marking done; commit immediately (optimistic)
     if (!done && row != null && position != null)
       setExitingEntries(prev => [...prev, { row, position }])
     const next = [...items]
     next[idx] = serializeTaskEntry(text, !done)
     onChange(next)
-  }, [items, onChange])
+  }
 
-  const addTask = useCallback((text: string) => {
+  const addTask = (text: string) => {
     const t = text.trim()
     if (!t) return
     onChange([...items, serializeTaskEntry(t, false)])
     setPickerQuery('')
     setPickerOpen(false)
-  }, [items, onChange])
+  }
 
-  const addLink = useCallback((fileSlug: string) => {
+  const addLink = (fileSlug: string) => {
     const stored = `[[${fileSlug}]]`
     if (!items.includes(stored)) onChange([...items, stored])
     setPickerQuery('')
     setPickerOpen(false)
-  }, [items, onChange])
+  }
 
-  const remove = useCallback((idx: number) => {
+  const remove = (idx: number) => {
     onChange(items.filter((_, i) => i !== idx))
-  }, [items, onChange])
+  }
 
   function startEdit(idx: number, text: string) {
     setEditingIdx(idx)
@@ -148,25 +145,25 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
 
   // Merge exiting rows back at their original active-list positions so they
   // animate out in-place rather than jumping to the bottom of the list.
-  const displayRows: { row: Row; exiting: boolean }[] = useMemo(() => {
+  const displayRows: { row: Row; exiting: boolean }[] = (() => {
     const result: { row: Row; exiting: boolean }[] = activeRows.map(row => ({ row, exiting: false }))
     for (const { row, position } of exitingEntries) {
       const at = Math.min(position, result.length)
       result.splice(at, 0, { row, exiting: true })
     }
     return result
-  }, [activeRows, exitingEntries])
+  })()
 
-  const donePickerRows = useMemo(() => {
+  const donePickerRows = (() => {
     const q = pickerQuery.toLowerCase()
     return doneRows.filter(({ entry, occ }) => {
       if (!q) return true
       if (entry.kind === 'task') return entry.text.toLowerCase().includes(q)
       return occ ? (occ.metadata.title ?? '').toLowerCase().includes(q) : entry.ref.toLowerCase().includes(q)
     })
-  }, [doneRows, pickerQuery])
+  })()
 
-  const redoItem = useCallback((row: Row) => {
+  const redoItem = (row: Row) => {
     const { entry, occ } = row
     if (entry.kind === 'task') {
       toggleTask(entry.idx, entry.text, entry.done, undefined)
@@ -202,7 +199,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     }
     setPickerQuery('')
     setPickerOpen(false)
-  }, [toggleTask])
+  }
 
   function renderRowContent(row: Row, position?: number) {
     const { entry, occ } = row

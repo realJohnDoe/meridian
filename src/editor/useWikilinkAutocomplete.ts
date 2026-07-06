@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import type { Roots, StoreItem } from '@/types'
 import { fileEntries } from '@/fileOccurrence'
 
@@ -14,21 +14,24 @@ export function useWikilinkAutocomplete(
   const [wlPopupPos, setWlPopupPos] = useState<WlPopupPos | null>(null)
   const wlOpen = wlMatches.length > 0 && wlPopupPos !== null
 
-  const closeWlPopup = useCallback(() => {
+  const closeWlPopup = () => {
     setWlMatches([])
     setWlPopupPos(null)
-  }, [])
+  }
 
   useEffect(() => {
     if (!wlOpen) return
     const handler = (e: MouseEvent) => {
-      if (!bodyRef.current?.contains(e.target as Node)) closeWlPopup()
+      if (!bodyRef.current?.contains(e.target as Node)) {
+        setWlMatches([])
+        setWlPopupPos(null)
+      }
     }
     document.addEventListener('click', handler)
     return () => document.removeEventListener('click', handler)
-  }, [wlOpen, closeWlPopup, bodyRef])
+  }, [wlOpen, bodyRef])
 
-  const insertWikilink = useCallback((title: string) => {
+  const insertWikilink = (title: string) => {
     closeWlPopup()
     const sel = window.getSelection()
     if (!sel?.rangeCount || !bodyRef.current) return
@@ -50,7 +53,7 @@ export function useWikilinkAutocomplete(
     newRange.collapse(true)
     sel.removeAllRanges()
     sel.addRange(newRange)
-  }, [closeWlPopup, bodyRef])
+  }
 
   function handleBodyInput() {
     if (!bodyRef.current) return

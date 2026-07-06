@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo, memo } from 'react'
+import { useRef, useEffect, memo } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import { OccurrenceCard } from '@/components'
@@ -24,10 +24,7 @@ interface Props {
 function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate, tick }: Props) {
   void tick
   const roots    = useStore(s => s.roots)
-  const listedOn = useMemo(
-    () => backlinksTo(occ.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug),
-    [occ.fileSlug, roots],
-  )
+  const listedOn = backlinksTo(occ.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug)
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)

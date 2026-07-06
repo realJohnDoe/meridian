@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import type { SeriesSheetConfig } from './save'
 import type { Priority } from '@/types'
 import type { EntryState } from './state'
@@ -32,55 +32,55 @@ export function useEntryDialogs(entry: EntryState, updateEntry: (next: EntryStat
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const handleOpenDlg = useCallback((id: string) => setActiveDialog(id), [])
-  const handleOpenRepeatDlg = useCallback((_itemType?: string) => setActiveDialog('dlgRepeat'), [])
-  const closeDialog = useCallback(() => setActiveDialog(null), [])
+  const handleOpenDlg = (id: string) => setActiveDialog(id)
+  const handleOpenRepeatDlg = (_itemType?: string) => setActiveDialog('dlgRepeat')
+  const closeDialog = () => setActiveDialog(null)
 
-  const handleDateConfirm = useCallback((dateStr: string) => {
+  const handleDateConfirm = (dateStr: string) => {
     updateEntry({ ...entry, scheduled: { date: dateStr, time: entry.scheduled?.time || '' } })
     setActiveDialog(null)
-  }, [entry, updateEntry])
+  }
 
-  const handleDateRemove = useCallback(() => {
+  const handleDateRemove = () => {
     updateEntry({ ...entry, scheduled: null, duration: '' })
     setActiveDialog(null)
-  }, [entry, updateEntry])
+  }
 
-  const handleTimeConfirm = useCallback((hhmm: string) => {
+  const handleTimeConfirm = (hhmm: string) => {
     if (!entry.scheduled) return
     updateEntry({ ...entry, scheduled: { ...entry.scheduled, time: hhmm } })
-  }, [entry, updateEntry])
+  }
 
-  const handleTimeRemove = useCallback(() => {
+  const handleTimeRemove = () => {
     if (!entry.scheduled) return
     updateEntry({ ...entry, scheduled: { ...entry.scheduled, time: '' } })
-  }, [entry, updateEntry])
+  }
 
-  const handleDurConfirm = useCallback((dur: string) => {
+  const handleDurConfirm = (dur: string) => {
     updateEntry({ ...entry, duration: dur })
-  }, [entry, updateEntry])
+  }
 
-  const handleDurRemove = useCallback(() => {
+  const handleDurRemove = () => {
     updateEntry({ ...entry, duration: '' })
-  }, [entry, updateEntry])
+  }
 
-  const handleRepeatConfirm = useCallback((repeat: EntryState['repeat']) => {
+  const handleRepeatConfirm = (repeat: EntryState['repeat']) => {
     updateEntry({ ...entry, repeat })
     setActiveDialog(null)
-  }, [entry, updateEntry])
+  }
 
-  const handleRepeatRemove = useCallback(() => {
+  const handleRepeatRemove = () => {
     updateEntry({ ...entry, repeat: null })
     setActiveDialog(null)
-  }, [entry, updateEntry])
+  }
 
-  const handlePriority = useCallback((p: Priority | null) => {
+  const handlePriority = (p: Priority | null) => {
     updateEntry({ ...entry, priority: p })
     setActiveDialog(null)
-  }, [entry, updateEntry])
+  }
 
-  const handleSeriesClose = useCallback(() => setSeriesSheetConfig(null), [])
-  const handleDeleteClose = useCallback(() => setPendingDelete(null), [])
+  const handleSeriesClose = () => setSeriesSheetConfig(null)
+  const handleDeleteClose = () => setPendingDelete(null)
 
   const dialogHandlers: DialogHandlers = {
     activeDialog,
