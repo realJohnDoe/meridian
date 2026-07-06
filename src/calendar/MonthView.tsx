@@ -1,4 +1,4 @@
-import { memo, useMemo, useEffect, useRef } from 'react'
+import { memo, useMemo, useEffect, useRef, useState } from 'react'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
@@ -13,7 +13,6 @@ import { useToday, useCalendarFilter } from '@/hooks'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
-import { KindIcon } from '@/components'
 
 
 // ── CalCell ───────────────────────────────────────────────────
@@ -22,10 +21,11 @@ interface CalCellProps {
   other: boolean
   dayOccs: Occurrence[]
   today: Date
+  maxVisible: number
   onDayClick: (date: Date) => void
 }
 
-const CalCell = memo(function CalCell({ date, other, dayOccs, today, onDayClick }: CalCellProps) {
+const CalCell = memo(function CalCell({ date, other, dayOccs, today, maxVisible, onDayClick }: CalCellProps) {
   const isToday = sameDay(date, today)
 
   const occCount = dayOccs.length
@@ -34,6 +34,11 @@ const CalCell = memo(function CalCell({ date, other, dayOccs, today, onDayClick 
     isToday ? 'today' : '',
     occCount ? `${occCount} event${occCount !== 1 ? 's' : ''}` : '',
   ].filter(Boolean).join(', ')
+
+  // Reserve the last visible slot for the "+N more" line once there's overflow,
+  // so the total number of rendered lines never exceeds what CalCell measured as fitting.
+  const overflowing = dayOccs.length > maxVisible
+  const shown = overflowing ? Math.max(0, maxVisible - 1) : dayOccs.length
 
   return (
     <SurfaceButton
@@ -50,21 +55,14 @@ const CalCell = memo(function CalCell({ date, other, dayOccs, today, onDayClick 
         isToday && 'bg-primary text-primary-foreground font-bold',
       )}>{date.getDate()}</span>
       <div className="flex flex-col gap-0.5 flex-1 overflow-hidden">
-        {(() => {
-          const bars: React.ReactNode[] = []
-          dayOccs.slice(0, 3).forEach((o, i) => {
-            bars.push(
-              <div key={i} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center gap-0.5 sm:gap-1 rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
-                <KindIcon item={o} size={10} className="shrink-0 opacity-70 hidden sm:block" />
-                <span className="truncate min-w-0">{multidayDisplayTitle(o, date) ?? o.metadata.title}</span>
-              </div>
-            )
-          })
-          if (dayOccs.length > 3) bars.push(
-            <div key="more" className="text-3xs sm:text-2xs text-foreground px-0.5 sm:px-1">+{dayOccs.length - 3}</div>
-          )
-          return bars
-        })()}
+        {dayOccs.slice(0, shown).map((o, i) => (
+          <div key={i} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center rounded-none sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
+            <span className="truncate min-w-0">{multidayDisplayTitle(o, date) ?? o.metadata.title}</span>
+          </div>
+        ))}
+        {overflowing && (
+          <div className="text-3xs sm:text-2xs text-foreground px-0.5 sm:px-1">+{dayOccs.length - shown}</div>
+        )}
       </div>
     </SurfaceButton>
   )
@@ -144,14 +142,57 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     () => { const d = monthRef.current; onNavigateMonth(new Date(d.getFullYear(), d.getMonth() + 1, 1)) },
   )
 
+  // How many occurrence rows fit in a cell before falling back to "+N more" —
+  // measured live so taller cells (more vertical space per week row) show more
+  // than the historical hardcoded 3. gridRef gives the per-cell height (grid
+  // height / week rows); rowSentinelRef is an invisible row rendered with the
+  // exact same classes as a real one, so its measured height already reflects
+  // the current breakpoint's font-size/padding without hardcoding it here.
+  const weekRows = Math.ceil(cells.length / 7)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const rowSentinelRef = useRef<HTMLDivElement>(null)
+  const [maxVisible, setMaxVisible] = useState(3)
+
+  useEffect(() => {
+    const gridEl = gridRef.current
+    const rowEl = rowSentinelRef.current
+    if (!gridEl || !rowEl) return
+
+    const CELL_CHROME = 26 // day-number badge (h-5=20px) + mb-px + cell padding (p-[3px_2px_2px])
+    const ROW_GAP = 2      // gap-0.5 between rows
+
+    const compute = () => {
+      const rowH = rowEl.offsetHeight
+      if (!rowH) return
+      const cellH = gridEl.clientHeight / weekRows
+      const available = cellH - CELL_CHROME
+      const n = Math.floor((available + ROW_GAP) / (rowH + ROW_GAP))
+      setMaxVisible(Math.min(8, Math.max(1, n)))
+    }
+
+    compute()
+    const ro = new ResizeObserver(compute)
+    ro.observe(gridEl)
+    ro.observe(rowEl)
+    return () => ro.disconnect()
+  }, [weekRows])
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden pb-10" ref={wrapRef}>
+    <div className="relative flex-1 flex flex-col overflow-hidden pb-10" ref={wrapRef}>
       <div className="grid grid-cols-7 px-1 shrink-0 pt-2">
         {weekdayLabels.map((d, i) => <div key={i} className="text-center text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground py-0.75">{d}</div>)}
       </div>
 
+      <div
+        ref={rowSentinelRef}
+        aria-hidden
+        className="invisible absolute pointer-events-none flex items-center rounded-none sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium"
+      >
+        &nbsp;
+      </div>
+
       <div className="flex-1 overflow-hidden px-1 pb-1 flex flex-col">
-        <div className="grid grid-cols-7 gap-0.5 flex-1">
+        <div ref={gridRef} className="grid grid-cols-7 gap-0.5 flex-1">
           {cells.map(({ date, other }) => {
             const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
             return (
@@ -161,6 +202,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                 other={other}
                 dayOccs={occsByDay.get(key) ?? EMPTY}
                 today={today}
+                maxVisible={maxVisible}
                 onDayClick={onDayClick}
               />
             )

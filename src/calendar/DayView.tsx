@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
-import { KindIcon } from '@/components'
 import { multidayDisplayTitle, useExpandWithMultiday, fmtT, parseDurationHours } from '@/model'
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
@@ -58,12 +57,11 @@ function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
     <SurfaceButton
       className={cn(
         dvBlockVariants({ state: occState(o) }),
-        'w-full flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
+        'w-full flex items-center rounded-none sm:rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
       )}
       onClick={() => onOpen(o)}
       aria-label={title}
     >
-      <KindIcon item={o} size={11} className="shrink-0 opacity-70" />
       <span>{title}</span>
     </SurfaceButton>
   )
