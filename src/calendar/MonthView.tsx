@@ -1,4 +1,4 @@
-import { memo, useMemo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
@@ -87,14 +87,12 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
   // Locale-aware weekday header labels starting from the locale's first day of week.
   // Jan 5 2025 is a Sunday; offset by ws to get each day's label.
-  const weekdayLabels = useMemo(() => {
+  const weekdayLabels = Array.from({ length: 7 }, (_, i) => {
     const sunday = new Date(2025, 0, 5)
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(sunday)
-      d.setDate(5 + (ws + i) % 7)
-      return d.toLocaleDateString(undefined, { weekday: 'short' })
-    })
-  }, [ws])
+    const d = new Date(sunday)
+    d.setDate(5 + (ws + i) % 7)
+    return d.toLocaleDateString(undefined, { weekday: 'short' })
+  })
 
   const m = month.getMonth()
   const y = month.getFullYear()
@@ -108,7 +106,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   const allOccs = useExpandWithMultiday(items, roots, new Date(y, m, 1), new Date(y, m + 1, 0, 23, 59, 59))
 
   // Cell grid depends only on month shape and locale week-start — independent of occurrences.
-  const cells = useMemo(() => {
+  const cells = (() => {
     const rawFirst = new Date(y, m, 1).getDay()
     const first    = (rawFirst - ws + 7) % 7
     const dim      = new Date(y, m + 1, 0).getDate()
@@ -120,9 +118,9 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     for (let d = 1; d <= dim; d++)         out.push({ date: new Date(y, m, d),             other: false })
     for (let d = 1; d <= nc; d++)          out.push({ date: new Date(y, m + 1, d),          other: true })
     return out
-  }, [y, m, ws])
+  })()
 
-  const occsByDay = useMemo(() => {
+  const occsByDay = (() => {
     const map = new Map<string, Occurrence[]>()
     for (const o of filterOccs(allOccs)) {
       if (!o.metadata.jsTime) continue
@@ -134,7 +132,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     }
     for (const [k, arr] of map) map.set(k, sortOccs(arr))
     return map
-  }, [allOccs, filterOccs])
+  })()
 
   const wrapRef = useRef<HTMLDivElement>(null)
   useHorizontalSwipe(
