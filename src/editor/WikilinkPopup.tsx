@@ -5,6 +5,7 @@ import type { Roots } from '@/types'
 import { OccurrenceCard } from '@/components'
 import { fileEntries } from '@/fileOccurrence'
 import { useStore } from '@/store'
+import { useResetOnChange } from '@/hooks'
 
 export interface WlPopupState {
   query:  string
@@ -31,7 +32,7 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
       .slice(0, 8)
   }, [roots, popup.query])
 
-  useEffect(() => { setFocusIdx(0) }, [matches])
+  useResetOnChange([matches], () => setFocusIdx(0))
 
   function insertWikilink(title: string) {
     const to = view.state.selection.main.head

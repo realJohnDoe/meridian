@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Flag } from 'lucide-react'
 import {
   ResponsiveModal,
@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/responsive-modal'
 import { badgeVariants } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
+import { useResetOnChange } from '@/hooks'
 import type { Priority } from '@/types'
 
 const PRIORITY_CLASS: Record<string, string> = {
@@ -33,7 +34,7 @@ export default function PriorityDrawer({ open, value, onSelect, onClose }: Props
   const [pending, setPending] = useState<Priority | null>(value)
 
   // Sync pending to current value whenever the drawer opens
-  useEffect(() => { if (open) setPending(value) }, [open, value])
+  useResetOnChange([open, value], () => { if (open) setPending(value) })
 
   return (
     <ResponsiveModal open={open} onOpenChange={(o) => !o && onClose()}>

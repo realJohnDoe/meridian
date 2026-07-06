@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { startOfToday } from 'date-fns'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '@/types'
 import { fmtISO, parseDateString, weekStartsOn, parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model'
 import { useStore } from '@/store'
+import { useResetOnChange } from '@/hooks'
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -218,7 +219,7 @@ export default function RepeatDialog({
   const [endCalMonth,    setEndCalMonth]    = useState<Date>(new Date())
 
   // Re-initialise whenever the dialog opens (so stale state never leaks between opens)
-  useEffect(() => {
+  useResetOnChange([open], () => {
     if (!open) return
     const s = initState(repeat, scheduled, hasSched, hasTrk)
     setFreq(s.freq)
@@ -227,18 +228,18 @@ export default function RepeatDialog({
     setEndType(s.endType)
     setEndVal(s.endVal)
     setIntervalNum(s.intervalNum)
-    
+
     const parsed = parseInterval(s.interval)
     setCompletionNum(parsed.n)
     setCompletionUnit(parsed.unit)
-  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  })
 
   // Synchronize calendar grid month page whenever the end date calendar dialog opens
-  useEffect(() => {
+  useResetOnChange([endCalOpen, endVal], () => {
     if (endCalOpen) {
       setEndCalMonth(parseDateString(endVal) ?? startOfToday())
     }
-  }, [endCalOpen, endVal])
+  })
 
   const hintText =
     hasSched && hasTrk

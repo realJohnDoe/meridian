@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import {
   AlertDialog,
@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { useResetOnChange } from '@/hooks'
 import type { SeriesSheetConfig } from '@/editor/save'
 
 interface Props {
@@ -22,9 +23,9 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
   const [selected, setSelected] = useState('0')
 
   // Default to first option whenever the dialog opens
-  useEffect(() => {
+  useResetOnChange([config], () => {
     if (config) setSelected('0')
-  }, [config])
+  })
 
   function handleDelete() {
     config?.options[Number(selected)]?.onClick()
