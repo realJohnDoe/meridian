@@ -8,14 +8,15 @@ interface Props {
 }
 
 /**
- * Desktop popover: results float above the bottom search bar. Mobile uses the
- * full-screen MobileSearchOverlay instead, so this is gated to md:+.
+ * Desktop popover: results float above the bottom search bar. Touch devices
+ * (phone or tablet, e.g. iPad) use the full-screen MobileSearchOverlay
+ * instead, so this is gated to fine pointers (mouse/trackpad) only.
  */
 export default function FilterOverlay({ query, onOpen, onCreate }: Props) {
   if (!query) return null
 
   return (
-    <div id="filterOverlay" className="hidden md:block md:absolute md:bottom-full md:left-0 md:right-0 z-[25] pointer-events-auto">
+    <div id="filterOverlay" className="hidden fine:block fine:absolute fine:bottom-full fine:left-0 fine:right-0 z-[25] pointer-events-auto">
       <div className="relative max-h-[calc(100dvh-var(--th)-80px)] flex flex-col">
         <div className="overflow-y-auto [-webkit-overflow-scrolling:touch] bg-background flex-1 min-h-0">
           <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} />

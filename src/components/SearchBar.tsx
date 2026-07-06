@@ -41,9 +41,9 @@ export default function SearchBar() {
   return (
     <div className="shrink-0 relative z-30 pointer-events-none">
       {/* Backdrop: covers calendar/agenda behind the desktop popover; below the popover and bar in DOM order */}
-      {searchOpen && <div className="hidden md:block fixed inset-0 z-[24] bg-background/80 backdrop-blur-sm pointer-events-auto" />}
+      {searchOpen && <div className="hidden fine:block fixed inset-0 z-[24] bg-background/80 backdrop-blur-sm pointer-events-auto" />}
 
-      {/* Mobile full-screen search overlay (md:hidden inside) */}
+      {/* Full-screen search overlay for touch devices (fine:hidden inside) */}
       <MobileSearchOverlay
         open={searchOpen}
         query={filterQuery}

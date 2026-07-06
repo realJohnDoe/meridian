@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* fine: variant keys off pointer type (mouse/trackpad) rather than viewport
+   width, so touch devices with a software keyboard (e.g. iPad) get the same
+   touch-first search UI as phones regardless of screen size. */
+@custom-variant fine (@media (pointer: fine));
+
 /*
  * STYLING CONVENTION
  * ──────────────────

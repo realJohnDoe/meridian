@@ -17,8 +17,9 @@ interface Props {
  * Mobile full-screen search layer: input pinned at the top (auto-focused so the
  * keyboard rises), results scrolling beneath. The top→down flow means the
  * keyboard occupies the bottom of the scroll region instead of fighting the
- * input — so input and results stay usable at the same time. md:hidden; desktop
- * uses the FilterOverlay popover instead.
+ * input — so input and results stay usable at the same time. fine:hidden (any
+ * touch device — phone or tablet, e.g. iPad — keeps this layer); desktop
+ * (mouse/trackpad) uses the FilterOverlay popover instead.
  */
 export default function MobileSearchOverlay({ open, query, onQueryChange, onClose, onOpen, onCreate }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -31,7 +32,7 @@ export default function MobileSearchOverlay({ open, query, onQueryChange, onClos
   if (!open) return null
 
   return (
-    <div className="mobile-search-overlay md:hidden fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto">
+    <div className="mobile-search-overlay fine:hidden fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto">
       {/* Top input row — pinned, always visible */}
       <div className="shrink-0 flex items-center gap-2 px-3.5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 border-b border-border">
         <Button
