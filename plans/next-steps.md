@@ -1,10 +1,7 @@
 ## Next steps
 
-- Maybe use a dark on-primary color in dark themes to ensure visibility on yellow bg
-- Fix contrast in mobile month view texts
 - Fix metadata dropdown look
 - Show multiday events as bars spanning multiple days in month view
-- Show +X in Month view only if space is not enough, not always after 3
 - Add border around wikilink chips in light themes in agenda/items/filter overlay section
 - Day view does not use localized times
 - Check if all clickable components are at least 44x44 px
@@ -36,6 +33,27 @@
    Legacy eslint-plugin-react — mostly redundant given TypeScript + the two above.
    eslint-plugin-jsx-a11y — only if accessibility becomes a goal; you already hand-write aria-labels consistently, so it would mostly confirm what you do.
    My suggested order: preset first (it's free and its findings are the most substantive), fix the ~21 non-cache findings, decide on the expansion cache, then add @eslint-react in a second pass. Want me to wire up the preset at warn and triage the findings?
+
+## Dev Tool recommendations from Fable
+
+1. Type-aware lint rules (biggest gap, no new tool — just config). Your ESLint runs without type information, so it can't catch the highest-value class of bug for this codebase: floating promises. storage/ is full of fire-and-forget async — \_\_root.tsx:13 calls restoreVaults() unawaited, and the codebase's own void runSync(...) idiom shows you already care about marking these deliberately, but nothing enforces it. Enabling typescript-eslint's type-checked config (or minimally no-floating-promises + no-misused-promises with parserOptions.projectService) turns "Claude forgot an await in a sync path" from a silent data race into a lint error. Cost: lint gets a few seconds slower.
+
+2. knip — dead-code and unused-dependency detection. It finds unused exports, unreachable files, and package.json deps nothing imports. It would have mechanically produced finding #9 from the health report (the unused model/index.ts barrel exports) and it keeps that class of rot from re-accumulating. It's also ideal for an agent workflow: pnpm knip produces a precise worklist Claude can burn down. Add it as a CI step once the baseline is clean.
+
+3. Vitest coverage (@vitest/coverage-v8) — one dev-dependency, then vitest run --coverage. This makes the test-gap finding from the report measurable and lets you give Claude instructions like "get occView.ts above 90% branch coverage" instead of vibes.
+
+4. One ESLint zone, closing a known hole: your boundary rules stop model/ from importing feature dirs but not from importing React — which is exactly how useExpandWithMultiday leaked in. A no-restricted-imports block scoped to src/model/\*\* forbidding react makes the "model is pure" invariant machine-enforced instead of documented.
+
+## Custom code that should lean on a library, according to Fable
+
+1. Raw day arithmetic in expansion.ts → date-fns (already installed, already imported in that file).
+   Three spots do calendar math by adding multiples of 86_400_000 ms:
+   expansion.ts:70 — Math.round((viewDate.getTime() - startD.getTime()) / 86_400_000) + 1 (multiday "Day 3/15" label)
+   expansion.ts:85 and expansion.ts:567 — new Date(startD.getTime() + d \* 86_400_000) (multiday span cover dates)
+   In local time a "day" is not always 24 hours — you're in Europe/Berlin, so twice a year a multiday event spanning a DST switch is off by an hour, and startOfDay(+24h) can land on the wrong calendar day or double-count. date-fns's addDays and differenceInCalendarDays are DST-correct, and the file already imports addDays. This is the highest-value swap: zero new dependencies, fixes a latent correctness bug, three call sites.
+
+2. Three hand-rolled search matchers, one of them actively opting out of the library's.
+   ItemsList.tsx:313 renders <Command shouldFilter={false}> and then filters with e.title.toLowerCase().includes(pickerQuery.toLowerCase()) — i.e., you're using cmdk but disabling its command-scoring (its core feature) to substitute a weaker substring match. FileResultsList.tsx and ListedOnRow.tsx each have their own lowercase-substring logic too. At personal-vault scale substring matching is defensible — I wouldn't add fuse.js for this — but three divergent matchers is the real smell. Either re-enable cmdk's filtering where you're inside a <Command>, or extract one shared matchesQuery() used by all three, so "why does the picker find this file but search doesn't" can't happen.
 
 ## From the Cloudflare auth flow
 
