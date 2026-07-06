@@ -59,7 +59,6 @@ function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
       className={cn(
         dvBlockVariants({ state: occState(o) }),
         'w-full flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
-        'hover:brightness-110',
       )}
       onClick={() => onOpen(o)}
       aria-label={title}
@@ -110,7 +109,7 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
     <SurfaceButton
       className={cn(
         dvBlockVariants({ state: occState(o), bordered: true }),
-        'absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-opacity hover:opacity-[0.85]',
+        'absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-colors',
       )}
       style={{ top, height, left, width }}
       onClick={() => onOpen(o)}
@@ -125,7 +124,7 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
         )}
         {o.metadata.title}
       </div>
-      <div className="text-2xs font-mono opacity-70 mt-px">
+      <div className="text-2xs font-mono mt-px">
         {timeLabel}{o.metadata.duration ? ` · ${o.metadata.duration}` : ''}
       </div>
     </SurfaceButton>

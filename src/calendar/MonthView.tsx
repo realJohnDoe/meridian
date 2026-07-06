@@ -61,7 +61,7 @@ const CalCell = memo(function CalCell({ date, other, dayOccs, today, onDayClick 
             )
           })
           if (dayOccs.length > 3) bars.push(
-            <div key="more" className="text-3xs sm:text-2xs text-muted-foreground px-0.5 sm:px-1">+{dayOccs.length - 3}</div>
+            <div key="more" className="text-3xs sm:text-2xs text-foreground px-0.5 sm:px-1">+{dayOccs.length - 3}</div>
           )
           return bars
         })()}

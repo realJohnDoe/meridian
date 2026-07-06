@@ -182,7 +182,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
               }}
             />
             {item && (
-              <p className="font-mono text-2xs text-muted-foreground/50 mt-0.5">{item.fileSlug}.md</p>
+              <p className="font-mono text-2xs text-muted-foreground mt-0.5">{item.fileSlug}.md</p>
             )}
           </div>
         </div>
