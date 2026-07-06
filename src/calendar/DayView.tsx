@@ -8,11 +8,12 @@ import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
 import { KindIcon } from '@/components'
-import { multidayDisplayTitle, useExpandWithMultiday, fmtT, parseDurationHours } from '@/model'
+import { multidayDisplayTitle, fmtT, parseDurationHours } from '@/model'
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
+import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday, useCalendarFilter } from '@/hooks'
 const SH = 7    // start hour on timeline
 const EH = 22   // end hour on timeline
