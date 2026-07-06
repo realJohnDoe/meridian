@@ -103,7 +103,7 @@
 
   /* Brand */
   --primary:            oklch(0.68 0.22 278);   /* indigo — balanced for text on dark surfaces and filled button bg */
-  --primary-foreground: oklch(1 0 0);
+  --primary-foreground: var(--background);      /* near-black ink, like tokyo-night/dracula — reads better on our light pastel accents than white */
 
   /* Destructive */
   --destructive: oklch(0.72 0.20 15);   /* rose */
@@ -261,14 +261,15 @@
   --border: color-mix(in oklab, #9893a5, transparent 78%);
   --input:  color-mix(in oklab, #9893a5, transparent 68%);
 
-  /* Domain colors */
-  --event:        #907aa9;   /* iris */
-  --task:         #6a8c3a;   /* olive green */
+  /* Domain colors — darkened from the base brand hue where needed so
+     text-primary-foreground clears AA when used as a solid chip background */
+  --event:        #7e659b;   /* iris, darkened */
+  --task:         #5b7932;   /* olive green, darkened */
   --note:         #286983;   /* pine */
   --brand-cyan:   #56949f;   /* foam */
   --priority-1:   #b02840;   /* red */
-  --priority-2:   #c4621a;   /* orange */
-  --priority-3:   #c4a800;   /* yellow */
+  --priority-2:   #af5717;   /* orange, darkened */
+  --priority-3:   #816f00;   /* yellow, darkened */
 
   /* Sidebar */
   --sidebar:                    #faf4ed;
@@ -323,14 +324,15 @@
   --border: color-mix(in oklab, #839496, transparent 78%);
   --input:  color-mix(in oklab, #839496, transparent 68%);
 
-  /* Domain colors */
-  --event:        #6c71c4;   /* violet */
-  --task:         #859900;   /* green */
-  --note:         #2aa198;   /* cyan */
+  /* Domain colors — darkened from the base brand hue where needed so
+     text-primary-foreground clears AA when used as a solid chip background */
+  --event:        #5f64bf;   /* violet, darkened */
+  --task:         #657400;   /* green, darkened */
+  --note:         #207973;   /* cyan, darkened */
   --brand-cyan:   #2aa198;
-  --priority-1:   #dc322f;   /* red */
-  --priority-2:   #cb4b16;   /* orange */
-  --priority-3:   #b58900;   /* yellow */
+  --priority-1:   #d22623;   /* red, darkened */
+  --priority-2:   #bd4615;   /* orange, darkened */
+  --priority-3:   #8a6800;   /* yellow, darkened */
 
   /* Sidebar */
   --sidebar:                    #fdf6e3;
