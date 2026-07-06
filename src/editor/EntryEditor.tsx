@@ -86,7 +86,10 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   const titleRef  = useRef<HTMLTextAreaElement>(null)
   const viewRef   = useRef<EditorView | null>(null)
 
-  if (getBodyRef) getBodyRef.current = () => viewRef.current?.state.doc.toString().trimEnd() ?? ''
+  // Updated every render so the caller's ref always calls with the current view
+  useEffect(() => {
+    if (getBodyRef) getBodyRef.current = () => viewRef.current?.state.doc.toString().trimEnd() ?? ''
+  })
 
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
@@ -126,10 +129,12 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(item, title)
 
   // Updated every render so the topbar Save button always calls with current body + pending links
-  if (triggerSaveRef) triggerSaveRef.current = () => {
-    onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
-    flushOnSave(titleToSlug(title))
-  }
+  useEffect(() => {
+    if (triggerSaveRef) triggerSaveRef.current = () => {
+      onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+      flushOnSave(titleToSlug(title))
+    }
+  })
 
   const linkedSlugs = useMemo(
     () => [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs],

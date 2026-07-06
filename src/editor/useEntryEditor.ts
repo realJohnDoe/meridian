@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { startOfToday } from 'date-fns'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
@@ -39,7 +39,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const triggerSaveRef = useRef<() => void>(() => {})
   // Always points to the latest entry so timer callbacks don't close over stale state
   const entryRef = useRef(entry)
-  entryRef.current = entry
+  useEffect(() => { entryRef.current = entry }, [entry])
 
   const saveMeta = useCallback((next: EntryState) => {
     if (!next.item || next.editScope === 'add') return

@@ -78,6 +78,10 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
   const [wlPopup, setWlPopup] = useState<WlPopupState | null>(null)
   const closePopup = useCallback(() => setWlPopup(null), [])
 
+  // Mirrors viewRef.current into state so the WikilinkPopup mount condition
+  // below can read it during render without accessing the ref directly.
+  const [view, setView] = useState<EditorView | null>(null)
+
   // Stable refs so CM6 plugins always read the latest callbacks without remounting
   const onOpenRef   = useRef<(ref: string) => void>(onOpenWikilink ?? (() => {}))
   const onChangeRef = useRef<(body: string) => void>(onChange ?? (() => {}))
@@ -127,10 +131,12 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
 
     const view = new EditorView({ state, parent: containerRef.current })
     viewRef.current = view
+    setView(view)
 
     return () => {
       view.destroy()
       viewRef.current = null
+      setView(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -151,11 +157,11 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
         ref={containerRef}
         className="mt-1 text-sm leading-[1.85] text-secondary-foreground border border-input rounded-[var(--radius-md)] focus-within:ring-2 focus-within:ring-ring"
       />
-      {wlPopup && viewRef.current && (
+      {wlPopup && view && (
         <WikilinkPopup
           popup={wlPopup}
           roots={roots}
-          view={viewRef.current}
+          view={view}
           onClose={closePopup}
         />
       )}
