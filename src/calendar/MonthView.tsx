@@ -9,7 +9,8 @@ import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 
 const EMPTY: Occurrence[] = []
-import { useToday, useCalendarFilter, useExpandWithMultiday } from '@/hooks'
+import { useExpandWithMultiday } from './useExpandWithMultiday'
+import { useToday, useCalendarFilter } from '@/hooks'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'

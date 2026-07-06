@@ -11,7 +11,8 @@ import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import DaySection from './DaySection'
 import OverdueSection from './OverdueSection'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
-import { useToday, useCalendarFilter, useExpandWithMultiday } from '@/hooks'
+import { useExpandWithMultiday } from './useExpandWithMultiday'
+import { useToday, useCalendarFilter } from '@/hooks'
 
 const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 

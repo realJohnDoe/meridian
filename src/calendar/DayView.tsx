@@ -13,7 +13,8 @@ import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
-import { useToday, useCalendarFilter, useExpandWithMultiday } from '@/hooks'
+import { useExpandWithMultiday } from './useExpandWithMultiday'
+import { useToday, useCalendarFilter } from '@/hooks'
 const SH = 7    // start hour on timeline
 const EH = 22   // end hour on timeline
 const HP = 56   // pixels per hour
