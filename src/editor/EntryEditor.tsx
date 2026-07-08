@@ -197,18 +197,17 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
           onRemove={handleRemove}
         />
 
-        {/* ── OCCURRENCE-LEVEL: scope (header) → type → metadata → participants ── */}
+        {/* ── OCCURRENCE-LEVEL: scope caption → type → metadata → participants ── */}
         <Card className="mt-3 mb-4 overflow-hidden bg-card">
-          {showScopeRow && (
-            <div className="px-3 pt-3 pb-3 bg-background">
+          <CardContent className="px-3 pt-3 pb-3 bg-card">
+            {showScopeRow && (
               <Select value={editScope} onValueChange={v => handleScopeChange(v as EditScope)}>
                 <SelectTrigger
                   className={cn(
-                    badgeVariants({ variant: 'chip' }),
-                    'w-fit gap-1 h-auto py-1 text-xs font-medium text-primary',
-                    'bg-primary/20 border-primary shadow-sm',
-                    'hover:bg-primary/25 focus:ring-0 focus-visible:ring-1 focus-visible:ring-ring',
-                    '[&>svg]:ml-1 [&>svg]:shrink-0 [&>svg]:size-3 [&>svg]:opacity-80',
+                    'w-fit gap-1 h-auto py-0.5 px-0 mb-3 text-xs font-medium text-muted-foreground',
+                    'border-0 shadow-none bg-transparent rounded-none',
+                    'hover:text-foreground focus:ring-0 focus-visible:ring-1 focus-visible:ring-ring focus-visible:rounded-sm',
+                    '[&>svg]:ml-1 [&>svg]:shrink-0 [&>svg]:size-3 [&>svg]:opacity-70',
                   )}
                 >
                   <SelectValue />
@@ -220,12 +219,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
                   {(isScheduled || isAfterCompletion) && <SelectItem value="all">Edit repeat pattern</SelectItem>}
                 </SelectContent>
               </Select>
-            </div>
-          )}
-          <CardContent className={cn(
-            'px-3 pt-3 pb-3 bg-card',
-            showScopeRow && 'border-t border-input',
-          )}>
+            )}
             <ToggleGroup
               type="single"
               value={itemType}
