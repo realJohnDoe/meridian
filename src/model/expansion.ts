@@ -12,6 +12,7 @@
 import {
   isValid,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes, startOfDay,
+  differenceInCalendarDays,
 } from 'date-fns'
 import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
@@ -81,7 +82,7 @@ export function multidayDisplayTitle(
   if (days < 2) return undefined
   const startD = parseDateString(occ.date)
   if (!startD) return undefined
-  const dayIdx = Math.round((viewDate.getTime() - startD.getTime()) / 86_400_000) + 1
+  const dayIdx = differenceInCalendarDays(viewDate, startD) + 1
   return `${occ.metadata.title} (Day ${dayIdx}/${days})`
 }
 
@@ -96,7 +97,7 @@ export function multidayCoversDate(occ: OccurrenceEntry<AppMetadata>, date: Date
   const start = parseDateString(occ.date)
   if (!start) return false
   const s = startOfDay(start)
-  const e = new Date(s.getTime() + (days - 1) * 86_400_000); e.setHours(23, 59, 59)
+  const e = addDays(s, days - 1); e.setHours(23, 59, 59)
   const d = startOfDay(date)
   return d >= s && d <= e
 }
@@ -598,7 +599,7 @@ export function expandWithMultiday(
       if (!startD) return []
       const extras: OccurrenceEntry<AppMetadata>[] = []
       for (let d = 1; d < days; d++) {
-        const coveredDate = startOfDay(new Date(startD.getTime() + d * 86_400_000))
+        const coveredDate = startOfDay(addDays(startD, d))
         if (coveredDate < from || coveredDate > to) continue
         extras.push({
           ...i,
