@@ -71,7 +71,3 @@ Overall the report is based on direct reading of roughly 40% of the source and g
 - **Evidence:** `src/components/OccurrenceCard.tsx:134` — `const hasTagsContent      = showTagsParticipants && (tags.length > 0 || listedOn.length > 0)` — but the meta row only renders `listedOn.map(label => (<TagChip …` ; `tags` appears nowhere in the JSX.
 - **Problem:** An occurrence with tags but no time/date/backlinks renders an empty meta row (layout gap), and the dead `tags` wiring suggests tag chips were removed from the card without cleaning up the gating logic.
 - **Fix:** Either render the tag chips or remove `tags` from `hasTagsContent` and the destructuring.
-
----
-
-**Also noted (below top-10 cutoff):** the docstring on `extractFileMetadata` in `src/types.ts:172` claims "Migrates legacy `topics` to `items`" but the implementation never reads `fields.topics` — no migration exists anywhere (grep `topics` → comments only). One-line docstring fix, same "docs claim things the code doesn't do" theme as finding 1.
