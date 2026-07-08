@@ -1,10 +1,8 @@
 ## Next steps
 
 - Show multiday events as bars spanning multiple days in month view
-- Day view does not use localized times
 - Check if all clickable components are at least 44x44 px
 - Investigate split second hang when toggling tasks
-- Turn day view into buttons like in Google Calendar
 - Add arrows to multiday rows in month and day view
 - Consider if name and logo are still good
 - Post about Meridian in Obsidian forums
