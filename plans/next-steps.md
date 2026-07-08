@@ -81,16 +81,6 @@ Overall the report is based on direct reading of roughly 40% of the source and g
 
 ---
 
-### 6. `store.ts` hand-rolls the same persisted-slice pattern four times
-
-- **Category:** `dry` `srp`
-- **Impact:** 3 · **Breadth:** 1 file (4 repetitions: favorites, defaultParticipants, participantFilter, showTasks) · **Fix effort:** M
-- **Evidence:** `src/store.ts:161` — `const next = participantFilter.includes(name) ? participantFilter.filter(s => s !== name) : [...participantFilter, name]` — structurally identical to `toggleFavorite` at line 130; each slice repeats the load-from-vault-key / write-on-change / toggle triad. `loadShowTasks` even bypasses the `vaultStorage` helper and calls ``localStorage.getItem(`meridian_show_tasks_${vaultId}`)`` raw.
-- **Problem:** Every new per-vault preference re-implements the same persistence choreography by hand, and the fourth copy has already diverged from the helper convention (raw `localStorage` + inline `JSON.parse`).
-- **Fix:** Extract a small `persistedVaultSlice(keyPrefix, default)` factory (or at minimum a `readVaultJSON` counterpart to `writeVaultJSON`) and define the four slices declaratively.
-
----
-
 ### 8. Occurrence matching by ±60 s tolerance is copy-pasted six times through the expansion engine
 
 - **Category:** `dry`
