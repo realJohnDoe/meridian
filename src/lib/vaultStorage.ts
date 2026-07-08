@@ -19,12 +19,3 @@ export function readVaultStringArray(keyPrefix: string, vaultId: string): string
 export function writeVaultJSON(keyPrefix: string, vaultId: string, value: unknown): void {
   localStorage.setItem(`${keyPrefix}_${vaultId}`, JSON.stringify(value))
 }
-
-export function readVaultJSON<T>(keyPrefix: string, vaultId: string, defaultValue: T): T {
-  try {
-    const raw = localStorage.getItem(`${keyPrefix}_${vaultId}`)
-    return raw === null ? defaultValue : (JSON.parse(raw) as T)
-  } catch {
-    return defaultValue
-  }
-}

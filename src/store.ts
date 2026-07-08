@@ -3,7 +3,16 @@ import type { StoreItem, Roots, Occurrence, LocalePrefs } from './types'
 import type { VaultRef } from '@/storage'
 import { clearOccIdCache } from '@/model'
 import { updateFileOccurrenceMap } from './fileOccurrence'
-import { readVaultJSON, readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
+import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
+
+function readVaultJSON<T>(keyPrefix: string, vaultId: string, defaultValue: T): T {
+  try {
+    const raw = localStorage.getItem(`${keyPrefix}_${vaultId}`)
+    return raw === null ? defaultValue : (JSON.parse(raw) as T)
+  } catch {
+    return defaultValue
+  }
+}
 
 function detectLocalePrefs(): LocalePrefs {
   const hour12 = new Intl.DateTimeFormat(undefined, { hour: 'numeric' })
