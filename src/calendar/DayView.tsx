@@ -17,7 +17,6 @@ import { useToday, useCalendarFilter } from '@/hooks'
 const HOURS = 24              // hours shown on the timeline
 const HP = 56                 // pixels per hour
 const GUTTER = 64              // px reserved for the left hour-label column
-const EVENT_INSET = 3          // px gap between an event block and its hour-cell edges
 const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
 const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
 const DEFAULT_CREATE_DURATION = '1h'
@@ -102,8 +101,8 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   const isDone = !!o.metadata.done
 
   const colWidth = `(100% - ${GUTTER}px) / ${totalCols}`
-  const left  = `calc(${GUTTER}px + ${colIndex} * (${colWidth}) + ${EVENT_INSET}px)`
-  const width = `calc(${colWidth} - ${EVENT_INSET * 2}px)`
+  const left  = `calc(${GUTTER}px + ${colIndex} * (${colWidth}))`
+  const width = `calc(${colWidth})`
 
   const timeLabel = fmtT(o.time)
   const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration].filter(Boolean).join(', ')
