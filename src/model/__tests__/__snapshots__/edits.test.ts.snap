@@ -194,6 +194,7 @@ instances:
         excluded: true
       - date: 2026-04-08
         time: 10:00
+        excluded: true
   - date: 2026-05-03
     time: 10:00
     repeat:
