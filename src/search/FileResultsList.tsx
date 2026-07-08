@@ -3,24 +3,7 @@ import type { Occurrence } from '@/types'
 import { fileEntries, backlinksTo } from '@/fileOccurrence'
 import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
-
-function fuzzyMatch(query: string, text: string): boolean {
-  if (!query) return true
-  const q = query.toLowerCase(), t = text.toLowerCase()
-  let qi = 0
-  for (let i = 0; i < t.length && qi < q.length; i++) if (t[i] === q[qi]) qi++
-  return qi === q.length
-}
-
-function fuzzyScore(query: string, text: string): number {
-  const q = query.toLowerCase(), t = text.toLowerCase()
-  let score = 0, qi = 0, cons = 0
-  for (let i = 0; i < t.length && qi < q.length; i++) {
-    if (t[i] === q[qi]) { qi++; cons++; score += cons } else { cons = 0 }
-  }
-  if (t.startsWith(q)) score += 100
-  return score
-}
+import { matchesQuery, scoreQuery } from '@/lib/matching'
 
 interface Props {
   query: string
@@ -45,9 +28,9 @@ export default function FileResultsList({ query, onOpen }: Props) {
     return entries
       .filter(e => {
         const haystack = [e.title, ...e.tags, ...e.items].join(' ')
-        return fuzzyMatch(query, haystack)
+        return matchesQuery(query, haystack)
       })
-      .map(e => ({ entry: e, score: fuzzyScore(query, e.title) }))
+      .map(e => ({ entry: e, score: scoreQuery(query, e.title) }))
       .sort((a, b) => b.score - a.score)
       .map(x => ({
         entry: x.entry,
