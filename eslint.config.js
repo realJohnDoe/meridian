@@ -139,4 +139,30 @@ export default [
     files: BARREL_DIRS.flatMap(dir => [`src/${dir}/**/*.{ts,tsx}`]),
     rules: { 'import-x/no-internal-modules': 'off' },
   },
+
+  // model/ is the domain core and must stay framework-free — no React. This
+  // makes the "model is pure" invariant machine-enforced instead of just
+  // documented (previously violated by a React hook that had leaked in).
+  {
+    files: ['src/model/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react',
+              message: 'model/ is the pure domain core and must not depend on React.',
+            },
+          ],
+          patterns: [
+            {
+              group: ['react-dom', 'react-dom/*', 'react/*'],
+              message: 'model/ is the pure domain core and must not depend on React.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]
