@@ -16,7 +16,7 @@ import {
 import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
 import type { EffectiveNode } from './inheritance'
-import { fmtISO, fmtT, parseDateString, parseDateTime, sameMinute, sameCalendarDay } from './dateUtils'
+import { fmtISO, fmtT, parseDateString, parseDateTime } from './dateUtils'
 import { parseDurationDays } from './duration'
 import { parseInterval } from './repeat'
 
@@ -48,6 +48,20 @@ function nodeDateTime(node: { date: string; time: string | null }): Date | null 
 function jsDateToSpec(jsDate: Date): { date: string | null; time: string | null } {
   if (!jsDate || !isValid(jsDate)) return { date: null, time: null }
   return { date: fmtISO(jsDate), time: fmtT(jsDate) }
+}
+
+const ONE_MINUTE_MS = 60_000
+
+/** True when two instants fall within the same minute-tolerance window used for occurrence matching. */
+function sameMinute(a: Date | number, b: Date | number): boolean {
+  const at = a instanceof Date ? a.getTime() : a
+  const bt = b instanceof Date ? b.getTime() : b
+  return Math.abs(at - bt) < ONE_MINUTE_MS
+}
+
+/** True when two dates fall on the same calendar day (year/month/date), ignoring time. */
+function sameCalendarDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

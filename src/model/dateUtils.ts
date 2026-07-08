@@ -68,17 +68,3 @@ export function dayBefore(dateStr: string): string {
   const d = parseDateString(dateStr)
   return fmtISO(addDays(d ?? new Date(dateStr), -1))
 }
-
-const ONE_MINUTE_MS = 60_000
-
-/** True when two instants fall within the same minute-tolerance window used for occurrence matching. */
-export function sameMinute(a: Date | number, b: Date | number): boolean {
-  const at = a instanceof Date ? a.getTime() : a
-  const bt = b instanceof Date ? b.getTime() : b
-  return Math.abs(at - bt) < ONE_MINUTE_MS
-}
-
-/** True when two dates fall on the same calendar day (year/month/date), ignoring time. */
-export function sameCalendarDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-}
