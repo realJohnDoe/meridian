@@ -111,7 +111,7 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   return (
     <SurfaceButton
       className={cn(
-        dvBlockVariants({ state: occState(o), bordered: true }),
+        dvBlockVariants({ state: occState(o) }),
         'absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-colors',
       )}
       style={{ top, height, left, width }}
