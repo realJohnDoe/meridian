@@ -31,12 +31,6 @@
 
 ## Custom code that should lean on a library, according to Fable
 
-1. Raw day arithmetic in expansion.ts → date-fns (already installed, already imported in that file).
-   Three spots do calendar math by adding multiples of 86_400_000 ms:
-   expansion.ts:70 — Math.round((viewDate.getTime() - startD.getTime()) / 86_400_000) + 1 (multiday "Day 3/15" label)
-   expansion.ts:85 and expansion.ts:567 — new Date(startD.getTime() + d \* 86_400_000) (multiday span cover dates)
-   In local time a "day" is not always 24 hours — you're in Europe/Berlin, so twice a year a multiday event spanning a DST switch is off by an hour, and startOfDay(+24h) can land on the wrong calendar day or double-count. date-fns's addDays and differenceInCalendarDays are DST-correct, and the file already imports addDays. This is the highest-value swap: zero new dependencies, fixes a latent correctness bug, three call sites.
-
 2. Three hand-rolled search matchers, one of them actively opting out of the library's.
    ItemsList.tsx:313 renders <Command shouldFilter={false}> and then filters with e.title.toLowerCase().includes(pickerQuery.toLowerCase()) — i.e., you're using cmdk but disabling its command-scoring (its core feature) to substitute a weaker substring match. FileResultsList.tsx and ListedOnRow.tsx each have their own lowercase-substring logic too. At personal-vault scale substring matching is defensible — I wouldn't add fuse.js for this — but three divergent matchers is the real smell. Either re-enable cmdk's filtering where you're inside a <Command>, or extract one shared matchesQuery() used by all three, so "why does the picker find this file but search doesn't" can't happen.
 
