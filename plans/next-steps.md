@@ -12,15 +12,6 @@
 
 ## Recommend Linters from Fable
 
-1. Enable the react-hooks v7 recommended preset (zero new dependencies)
-   You have eslint-plugin-react-hooks 7.1.1 installed, which ships the React Compiler's diagnostics as lint rules — but eslint.config.js:33 enables only the two classic rules (rules-of-hooks, exhaustive-deps). Switching to reactHooks.configs['recommended-latest'].rules activates purity, refs, set-state-in-effect, set-state-in-render, immutability, preserve-manual-memoization, and friends.
-   I dry-ran that preset on your codebase (via a temp config, deleted afterwards): 39 findings in 19 files, and the distribution is informative:
-   24 × react-hooks/refs — 18 of them in useExpandWithMultiday.ts, which mutates cacheRef.current during render. That's your deliberate expansion-cache pattern, but it's exactly the pattern that breaks under the React Compiler and concurrent rendering. The remaining 6 are scattered ref-during-render reads worth individual review.
-   12 × react-hooks/set-state-in-effect — synchronous setState in effect bodies (e.g. CoachTour.tsx:71), which cause cascading double-renders. For someone who cares about performance, this rule alone pays for the effort — these are real wasted render passes, mostly in editor/dialogs/.
-   2 × purity, 1 × incompatible-library.
-   Practical rollout: enable the preset at warn severity first, fix the 12 set-state-in-effect hits and the stray refs ones, and make a deliberate decision about useExpandWithMultiday — either refactor the cache to a compiler-safe shape or add one targeted disable with a comment. Conveniently, that file is the same one flagged in the health report (React hook inside model/), so one refactor addresses both.
-   The strategic payoff: once this preset is clean, you're React Compiler–ready — the lint preset is literally the compiler's own analysis. Adopting babel-plugin-react-compiler in Vite then gets you automatic memoization, which replaces most manual useMemo/useCallback work across calendar/ and editor/.
-
 2. Worth adding: @eslint-react/eslint-plugin
    Modern, TypeScript-aware, flat-config-native (the successor to legacy eslint-plugin-react for setups like yours). The rules that fit your priorities:
    no-leaked-conditional-rendering (type-aware) — catches {count && <X/>} rendering a literal 0
