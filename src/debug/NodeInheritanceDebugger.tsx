@@ -566,7 +566,7 @@ export default function NodeInheritanceDebugger() {
                   <span className="text-xs font-semibold text-red-300">Parse / validation errors</span>
                 </div>
                 <ul className="space-y-1">
-                  {parseErrors.map((err, i) => <li key={i} className="text-xs font-mono text-red-300/80">{err}</li>)}
+                  {parseErrors.map((err, i) => <li key={`${i}-${err}`} className="text-xs font-mono text-red-300/80">{err}</li>)}
                 </ul>
               </div>
             )}
@@ -578,7 +578,7 @@ export default function NodeInheritanceDebugger() {
             {displayItems.map((item, i) => {
               const next   = displayItems[i + 1]
               const isLast = !next || next.depth < item.depth
-              return <NodeCard key={i} item={item} isLast={isLast} />
+              return <NodeCard key={item.label} item={item} isLast={isLast} />
             })}
           </div>
         </div>
@@ -613,7 +613,7 @@ export default function NodeInheritanceDebugger() {
               occurrences.length === 0
                 ? <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">No occurrences before {expandEndDate}</div>
                 : occurrences.map((occ, i) => (
-                    <OccurrenceRow key={i} occ={occ} isSelected={selectedIdx === i} onClick={() => handleSelectOccurrence(i)} />
+                    <OccurrenceRow key={`${occ.fileSlug}-${occ.date}`} occ={occ} isSelected={selectedIdx === i} onClick={() => handleSelectOccurrence(i)} />
                   ))
             )}
           </div>

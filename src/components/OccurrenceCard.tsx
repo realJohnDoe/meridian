@@ -14,6 +14,8 @@ import { cn } from '@/lib/cn'
 import { occBarVariants } from './ui/occurrence-variants'
 import TagChip from './TagChip'
 
+const EMPTY_LISTED_ON: string[] = []
+
 interface OccurrenceCardProps {
   occ: Occurrence
   onOpen: () => void
@@ -95,7 +97,7 @@ export default function OccurrenceCard({
   showTime = 'inline',
   showDate = false,
   showTagsParticipants = true,
-  listedOn = [],
+  listedOn = EMPTY_LISTED_ON,
   animate = true,
 }: OccurrenceCardProps) {
   const hour12   = useStore(s => s.localePrefs.hour12)

@@ -3,6 +3,7 @@ import tsPlugin from '@typescript-eslint/eslint-plugin'
 import importXPlugin from 'eslint-plugin-import-x'
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'
 import reactHooksPlugin from 'eslint-plugin-react-hooks'
+import reactPlugin from '@eslint-react/eslint-plugin'
 
 const BARREL_DIRS = ['calendar', 'components', 'editor', 'hooks', 'model', 'onboarding', 'routes', 'search', 'storage']
 
@@ -34,6 +35,7 @@ export default [
     plugins: {
       '@typescript-eslint': tsPlugin,
       'react-hooks': reactHooksPlugin,
+      '@eslint-react': reactPlugin,
       'import-x': importXPlugin,
     },
     settings: {
@@ -44,6 +46,17 @@ export default [
     rules: {
       // ── React hooks ──────────────────────────────────────────────────────────
       ...reactHooksRules,
+
+      // ── @eslint-react ────────────────────────────────────────────────────────
+      // Type-aware: catches {count && <X/>} rendering a stray 0/NaN/'' string.
+      '@eslint-react/no-leaked-conditional-rendering': 'error',
+      // Re-render churn: inline object/array literals passed as context values
+      // or default props defeat consumer memoization on every render.
+      '@eslint-react/no-unstable-context-value': 'error',
+      '@eslint-react/no-unstable-default-props': 'error',
+      // Array index as key breaks reconciliation identity when items are
+      // reordered/inserted/removed.
+      '@eslint-react/no-array-index-key': 'error',
 
       // ── TypeScript ───────────────────────────────────────────────────────────
       // Enforce `import type` for type-only imports (auto-fixable)
