@@ -168,7 +168,7 @@ function parseInlineField(spec: InlineFieldSpec, raw: unknown): unknown {
   }
 }
 
-/** Extract file-level metadata from raw YAML fields. Migrates legacy `topics` to `items`. */
+/** Extract file-level metadata from raw YAML fields. */
 export function extractFileMetadata(fields: Record<string, unknown>): FileMetadata {
   return {
     title: (fields.title ? String(fields.title) : '') as string,
