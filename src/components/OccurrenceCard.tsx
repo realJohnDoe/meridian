@@ -108,7 +108,6 @@ export default function OccurrenceCard({
 
   const t            = fmtT(occ.time, hour12)
   const hasTrack     = occ.metadata.done !== undefined
-  const tags         = occ.metadata.tags || []
   const participants = occ.metadata.participants || []
   const rawDuration  = occ.metadata.duration
   const durationLabel = rawDuration
@@ -131,7 +130,7 @@ export default function OccurrenceCard({
   ].filter(Boolean).join(' ')
 
   const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime !== 'none' && (!!t || !!durationLabel))
-  const hasTagsContent      = showTagsParticipants && (tags.length > 0 || listedOn.length > 0)
+  const hasTagsContent      = showTagsParticipants && listedOn.length > 0
   const showMeta            = hasDateTimeContent || hasTagsContent
 
   return (
