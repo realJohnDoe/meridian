@@ -79,16 +79,6 @@ Overall the report is based on direct reading of roughly 40% of the source and g
 
 ---
 
-### 8. Occurrence matching by ±60 s tolerance is copy-pasted six times through the expansion engine
-
-- **Category:** `dry`
-- **Impact:** 3 · **Breadth:** 1 file (`grep -c "Math.abs" src/model/expansion.ts` → 6, plus two hand-rolled year/month/day equality triplets) · **Fix effort:** M
-- **Evidence:** `src/model/expansion.ts:262` — `if (Math.abs(o.ms - jsDate.getTime()) < 60000) return o` — the same minute-tolerance match recurs at lines 311, 330, 342, 363, 367, alongside repeated `od.getFullYear() === jsDate.getFullYear() && od.getMonth() === jsDate.getMonth() && od.getDate() === jsDate.getDate()` day comparisons.
-- **Problem:** The single most intricate file in the repo encodes its core identity rule ("these two occurrences are the same slot") as six inlined copies of a magic-number comparison, so any change to the matching rule (e.g. timezone handling) must be found and applied six times.
-- **Fix:** Extract `sameMinute(a, b)` and `sameCalendarDay(a, b)` helpers in `dateUtils.ts` and use them throughout `expansion.ts` (behavior-preserving, protected by the existing model test suite).
-
----
-
 ### 9. `model/index.ts` exports symbols with zero external consumers
 
 - **Category:** `dead-code`
