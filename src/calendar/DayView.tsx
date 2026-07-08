@@ -17,6 +17,7 @@ import { useToday, useCalendarFilter } from '@/hooks'
 const HOURS = 24              // hours shown on the timeline
 const HP = 56                 // pixels per hour
 const GUTTER = 64              // px reserved for the left hour-label column
+const TOP_PAD = 8              // px headroom above 0:00 so its label isn't clipped
 const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
 const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
 const DEFAULT_CREATE_DURATION = '1h'
@@ -95,7 +96,7 @@ interface EventBlockProps {
 }
 function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   const h   = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
-  const top = h * HP + 1
+  const top = h * HP + TOP_PAD + 1
   const height = Math.max(dh * HP - 4, 28)
 
   const colWidth = `(100% - ${GUTTER}px) / ${totalCols}`
@@ -156,7 +157,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
 
   const scRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    setTimeout(() => scRef.current?.scrollTo({ top: DEFAULT_SCROLL_HOUR * HP, behavior: 'instant' }), 50)
+    setTimeout(() => scRef.current?.scrollTo({ top: DEFAULT_SCROLL_HOUR * HP + TOP_PAD, behavior: 'instant' }), 50)
   }, [dvDate])
 
   const dvDateRef = useRef(dvDate)
@@ -187,7 +188,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
 
   const handleGridClick = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    const minutesFromMidnight = ((e.clientY - rect.top) / HP) * 60
+    const minutesFromMidnight = ((e.clientY - rect.top - TOP_PAD) / HP) * 60
     const snapped = Math.round(minutesFromMidnight / CREATE_SNAP_MIN) * CREATE_SNAP_MIN
     const clamped = Math.min(Math.max(snapped, 0), HOURS * 60 - CREATE_SNAP_MIN)
     const time = `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`
@@ -233,14 +234,14 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
 
       {/* Scrollable timeline */}
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch] relative" id="dvSc" ref={scRef}>
-        <div className="relative" id="dvTl" ref={tlRef} style={{ height: HOURS * HP + 64 }}>
+        <div className="relative" id="dvTl" ref={tlRef} style={{ height: HOURS * HP + TOP_PAD + 64 }}>
 
           {/* Hour-boundary labels (0:00 … 24:00) */}
           {Array.from({ length: HOURS + 1 }, (_, h) => h).map(h => (
             <span
               key={h}
               className="absolute text-2xs font-mono text-muted-foreground text-right"
-              style={{ top: h * HP, left: 0, width: GUTTER - 8, transform: 'translateY(-50%)' }}
+              style={{ top: h * HP + TOP_PAD, left: 0, width: GUTTER - 8, transform: 'translateY(-50%)' }}
             >
               {formatHourBoundary(h, hour12)}
             </span>
@@ -252,7 +253,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
               <div
                 key={h}
                 className="absolute inset-x-0 rounded-lg bg-muted/40"
-                style={{ top: h * HP + 1, height: HP - 2 }}
+                style={{ top: h * HP + TOP_PAD + 1, height: HP - 2 }}
               />
             ))}
           </div>
@@ -262,7 +263,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
             const now = new Date()
             const nh  = now.getHours() + now.getMinutes() / 60
             return (
-              <div className="now-line" style={{ top: nh * HP }}>
+              <div className="now-line" style={{ top: nh * HP + TOP_PAD }}>
                 <div className="now-dot" />
               </div>
             )
