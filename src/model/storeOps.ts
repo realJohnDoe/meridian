@@ -55,9 +55,13 @@ export function upsertOverride(
         : io
     })
   }
-  // Recurring — upsert override child.
+  // Recurring — upsert override child. Match the specific child by id: an
+  // expanded occurrence carries its backing child's store id, so this targets
+  // the exact instance the user acted on even when several overrides share a
+  // date. A generated occurrence has no backing child (its id is a memoised
+  // synthetic key), so it finds nothing here and falls through to create one.
   const existing = items.find(
-    i => !isSeries(i) && (i as OccurrenceEntry<OccurrenceMetadata>).ownerId === occ.ownerId && i.date === occ.date,
+    i => !isSeries(i) && (i as OccurrenceEntry<OccurrenceMetadata>).ownerId === occ.ownerId && i.id === occ.id,
   )
   if (existing) {
     return items.map(i =>

@@ -114,6 +114,10 @@ interface ExpandNode<M = Record<string, unknown>> {
   excluded?:  boolean
   done?:      boolean
   instances?: ExpandNode<M>[]
+  /** Store id of the backing override child (passthrough — the engine only
+   *  echoes it back as `overrideId` so callers can map an emitted occurrence to
+   *  the exact child it came from, even when several children share a date). */
+  id?:        string
   metadata:   M
 }
 
@@ -125,6 +129,9 @@ interface ExpandedOcc<M = Record<string, unknown>> {
   source:    'generated' | 'explicit'
   excluded?: boolean
   done?:     boolean
+  /** Set when this occurrence was produced by an explicit override child;
+   *  carries that child's store id. Undefined for purely generated slots. */
+  overrideId?: string
   metadata:  M
 }
 
@@ -253,16 +260,17 @@ function expandNode<M>(
     }
   }).filter((o): o is NonNullable<typeof o> => o !== null)
 
-  function findOverride(jsDate: Date) {
-    for (const o of instanceOverrides) {
+  // All override children that land on `jsDate`. Returns every match — not just
+  // the first — so multiple explicit instances on the same day each surface as
+  // their own occurrence instead of one silently shadowing the others.
+  function findOverrides(jsDate: Date) {
+    return instanceOverrides.filter(o => {
       if (!o.hasTime) {
         const od = o.matchDate
-        if (od && od.getFullYear() === jsDate.getFullYear() && od.getMonth() === jsDate.getMonth() && od.getDate() === jsDate.getDate()) return o
-      } else {
-        if (Math.abs(o.ms - jsDate.getTime()) < 60000) return o
+        return !!od && od.getFullYear() === jsDate.getFullYear() && od.getMonth() === jsDate.getMonth() && od.getDate() === jsDate.getDate()
       }
-    }
-    return null
+      return Math.abs(o.ms - jsDate.getTime()) < 60000
+    })
   }
 
   function makeOcc(eff: ExpandNode<M>, jsDate: Date, baseNode: ExpandNode<M>, instOverride: { child: ExpandNode<M> } | null, source: 'generated' | 'explicit'): ExpandedOcc<M> | null {
@@ -271,14 +279,27 @@ function expandNode<M>(
     const occDate = (instOverride?.child.date && instOverride.child.date !== node.date)
       ? instOverride.child.date
       : (jsDateToSpec(jsDate).date ?? '')
-    return { date: occDate, time: occTimeStr, jsTime: jsDate, source, done: eff.done, metadata: eff.metadata }
+    return { date: occDate, time: occTimeStr, jsTime: jsDate, source, done: eff.done, overrideId: instOverride?.child.id, metadata: eff.metadata }
+  }
+
+  // Emit either the plain slot (no override) or one occurrence per override
+  // child sitting on `jsDate`. Shared by the anchor and every generated date.
+  function emitSlot(jsDate: Date, source: 'generated' | 'explicit') {
+    const ovs = findOverrides(jsDate)
+    if (ovs.length === 0) {
+      const occ = makeOcc(node, jsDate, node, null, source)
+      if (occ) occurrences.push(occ)
+      return
+    }
+    for (const ov of ovs) {
+      const occ = makeOcc(ov.eff, jsDate, node, ov, source)
+      if (occ) occurrences.push(occ)
+    }
   }
 
   if (node.repeat?.type !== 'after_completion') {
     if (anchor >= from && anchor <= to) {
-      const ov = findOverride(anchor)
-      const occ = makeOcc(ov ? ov.eff : node, anchor, node, ov, node.repeat ? 'generated' : 'explicit')
-      if (occ) occurrences.push(occ)
+      emitSlot(anchor, node.repeat ? 'generated' : 'explicit')
     }
   }
 
@@ -292,9 +313,7 @@ function expandNode<M>(
     generatedMs.add(anchor.getTime())
 
     for (const genDate of generated) {
-      const ov = findOverride(genDate)
-      const occ = makeOcc(ov ? ov.eff : node, genDate, node, ov, 'generated')
-      if (occ) occurrences.push(occ)
+      emitSlot(genDate, 'generated')
     }
 
     for (const inst of node.instances ?? []) {
@@ -318,29 +337,31 @@ function expandNode<M>(
             time: eff.time,
             jsTime: t,
             source: 'explicit',
+            overrideId: inst.id,
             metadata: eff.metadata,
           })
         }
       }
     }
   } else if (repeat.type === 'after_completion') {
-    const allTimes: Array<{ jsTime: Date; done?: boolean; metadata: M }> = []
+    const allTimes: Array<{ jsTime: Date; done?: boolean; overrideId?: string; metadata: M }> = []
     const anchorInst = (node.instances ?? []).find(i => {
       const t = nodeDateTime(i) || parseDateString(i.date)
       return t && Math.abs(t.getTime() - anchor.getTime()) < 60000
     })
     if (!anchorInst?.excluded) {
       allTimes.push({
-        jsTime:   anchor,
-        done:     anchorInst?.done ?? node.done,
-        metadata: anchorInst ? { ...node.metadata, ...anchorInst.metadata } as M : node.metadata,
+        jsTime:     anchor,
+        done:       anchorInst?.done ?? node.done,
+        overrideId: anchorInst?.id,
+        metadata:   anchorInst ? { ...node.metadata, ...anchorInst.metadata } as M : node.metadata,
       })
     }
     for (const inst of node.instances ?? []) {
       const t = nodeDateTime(inst) || parseDateString(inst.date)
       if (!t || inst.excluded) continue
       if (Math.abs(t.getTime() - anchor.getTime()) < 60000) continue
-      allTimes.push({ jsTime: t, done: inst.done ?? node.done, metadata: { ...node.metadata, ...inst.metadata } as M })
+      allTimes.push({ jsTime: t, done: inst.done ?? node.done, overrideId: inst.id, metadata: { ...node.metadata, ...inst.metadata } as M })
     }
     allTimes.sort((a, b) => a.jsTime.getTime() - b.jsTime.getTime())
 
@@ -348,12 +369,13 @@ function expandNode<M>(
       if (entry.jsTime >= from && entry.jsTime <= to) {
         const spec = jsDateToSpec(entry.jsTime)
         occurrences.push({
-          date:     spec.date ?? '',
-          time:     spec.time ?? node.time,
-          jsTime:   entry.jsTime,
-          source:   'explicit',
-          done:     entry.done,
-          metadata: entry.metadata,
+          date:       spec.date ?? '',
+          time:       spec.time ?? node.time,
+          jsTime:     entry.jsTime,
+          source:     'explicit',
+          done:       entry.done,
+          overrideId: entry.overrideId,
+          metadata:   entry.metadata,
         })
       }
     }
@@ -485,21 +507,22 @@ export function expandRange(
         time:     c.time ?? null,
         excluded: c.excluded,
         done:     c.metadata.done,
+        id:       c.id,
         metadata: c.metadata,
       })),
     }
 
     const raw = expandNode(expandable, from, to)
 
-    const childByMinute = new Map<number, StoreOcc>()
-    for (const c of children) {
-      const ct = nodeDateTime({ date: c.date, time: c.time }) || parseDateString(c.date)
-      if (ct) childByMinute.set(Math.round(ct.getTime() / 60000), c)
-    }
+    // Map each emitted occurrence back to the exact override child it came from
+    // via `overrideId`. Keying by child id (not by minute) is what lets two
+    // overrides on the same date/time each keep their own identity + metadata;
+    // a minute-keyed map would collapse them to whichever child was inserted last.
+    const childById = new Map(children.map(c => [c.id, c]))
 
     for (const occ of raw) {
       const { jsTime } = occ
-      const override = childByMinute.get(Math.round(jsTime.getTime() / 60000))
+      const override = occ.overrideId ? childById.get(occ.overrideId) : undefined
 
       const occMeta: OccurrenceMetadata = override
         ? { ...series.metadata, ...override.metadata }
