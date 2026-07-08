@@ -91,16 +91,6 @@ Overall the report is based on direct reading of roughly 40% of the source and g
 
 ---
 
-### 7. Three near-identical vault-connection flows in `vaultRegistry.ts`
-
-- **Category:** `dry`
-- **Impact:** 3 · **Breadth:** 1 file (3 blocks: `addLocalVault`, `addGitHubVault`, `addGitHubVaultOAuth`, plus the local/github activation branches duplicated between `restoreVaultsInner` and `setActiveVault`) · **Fix effort:** M
-- **Evidence:** `src/storage/vaultRegistry.ts:225` — `await updateVaultRefs(existing => [...existing, ref])` followed by `const files = await backend.readAll()` / `await cacheBulkWriteClean(id, files)` / `await activateWritableVault(backend)` — the same four-step tail appears verbatim in `addGitHubVault` (l. 225–229) and `addGitHubVaultOAuth` (l. 269–273), and `addLocalVault` repeats it with reordered steps.
-- **Problem:** The connect-a-vault sequence (register ref → seed cache → activate) exists in three copies whose only real difference is token persistence, so a fix to one flow (e.g. ordering of cache seed vs. activation) can silently miss the others.
-- **Fix:** Extract a `registerAndActivate(ref, backend)` helper and reduce the three `add*` functions to credential-specific preambles.
-
----
-
 ### 8. Occurrence matching by ±60 s tolerance is copy-pasted six times through the expansion engine
 
 - **Category:** `dry`
