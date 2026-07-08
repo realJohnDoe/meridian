@@ -13,11 +13,6 @@
 
 4. One ESLint zone, closing a known hole: your boundary rules stop model/ from importing feature dirs but not from importing React — which is exactly how useExpandWithMultiday leaked in. A no-restricted-imports block scoped to src/model/\*\* forbidding react makes the "model is pure" invariant machine-enforced instead of documented.
 
-## Custom code that should lean on a library, according to Fable
-
-2. Three hand-rolled search matchers, one of them actively opting out of the library's.
-   ItemsList.tsx:313 renders <Command shouldFilter={false}> and then filters with e.title.toLowerCase().includes(pickerQuery.toLowerCase()) — i.e., you're using cmdk but disabling its command-scoring (its core feature) to substitute a weaker substring match. FileResultsList.tsx and ListedOnRow.tsx each have their own lowercase-substring logic too. At personal-vault scale substring matching is defensible — I wouldn't add fuse.js for this — but three divergent matchers is the real smell. Either re-enable cmdk's filtering where you're inside a <Command>, or extract one shared matchesQuery() used by all three, so "why does the picker find this file but search doesn't" can't happen.
-
 # Meridian code health report
 
 ## 1. Health verdict
