@@ -23,10 +23,25 @@ function EntrySkeleton() {
   )
 }
 
+type ItemTypeSearch = 'task' | 'event' | 'note'
+const ITEM_TYPES: ItemTypeSearch[] = ['task', 'event', 'note']
+
+interface NewEntrySearch {
+  title?: string
+  date?: string
+  time?: string
+  duration?: string
+  itemType?: ItemTypeSearch
+}
+
 export const Route = createFileRoute('/_app/entry/new')({
   component: NewEntryPage,
-  validateSearch: (s: Record<string, unknown>): { title?: string } => ({
+  validateSearch: (s: Record<string, unknown>): NewEntrySearch => ({
     title: typeof s.title === 'string' ? s.title : undefined,
+    date: typeof s.date === 'string' ? s.date : undefined,
+    time: typeof s.time === 'string' ? s.time : undefined,
+    duration: typeof s.duration === 'string' ? s.duration : undefined,
+    itemType: ITEM_TYPES.includes(s.itemType as ItemTypeSearch) ? (s.itemType as ItemTypeSearch) : undefined,
   }),
 })
 
@@ -48,10 +63,10 @@ function NewEntryTopbar() {
   )
 }
 
-function NewEntryReady({ title }: { title?: string }) {
+function NewEntryReady({ title, date, time, duration, itemType }: NewEntrySearch) {
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
-  const hooks = useEntryEditor(null, 'all', title)
+  const hooks = useEntryEditor(null, 'all', title, { date, time, duration, itemType })
 
   return (
     <>
@@ -64,7 +79,8 @@ function NewEntryReady({ title }: { title?: string }) {
 }
 
 function NewEntryPage() {
-  const { title } = Route.useSearch()
+  const search = Route.useSearch()
+  const { title } = search
   const key = useMemo(() => `new-${title ?? ''}`, [])  // eslint-disable-line react-hooks/exhaustive-deps
-  return <NewEntryReady key={key} title={title} />
+  return <NewEntryReady key={key} {...search} />
 }

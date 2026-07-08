@@ -1,9 +1,22 @@
 import type { Occurrence, EditScope } from '@/types'
 
-export function newEntryRoute(title?: string) {
+export interface NewEntrySeed {
+  date?: string
+  time?: string
+  duration?: string
+  itemType?: 'task' | 'event' | 'note'
+}
+
+export function newEntryRoute(title?: string, seed?: NewEntrySeed) {
   return {
     to: '/entry/new' as const,
-    search: { title: title ?? undefined },
+    search: {
+      title: title ?? undefined,
+      date: seed?.date ?? undefined,
+      time: seed?.time ?? undefined,
+      duration: seed?.duration ?? undefined,
+      itemType: seed?.itemType ?? undefined,
+    },
   }
 }
 

@@ -564,7 +564,7 @@
 .swipe-row{transform:translateX(var(--swipe-x,0px))}
 
 /* ── CURRENT-TIME LINE — functional indicator, kept ── */
-.now-line{position:absolute;left:46px;right:0;height:2px;background:var(--destructive);z-index:5;border-radius:1px}
+.now-line{position:absolute;left:64px;right:0;height:2px;background:var(--destructive);z-index:5;border-radius:1px}
 .now-dot{position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--destructive)}
 
 /* ── OCCURRENCE CARD ENTRANCE ANIMATION ── */

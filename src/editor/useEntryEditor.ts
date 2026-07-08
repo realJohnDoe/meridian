@@ -14,19 +14,34 @@ import { useEntryDialogs } from './useEntryDialogs'
 
 export type { DialogHandlers } from './useEntryDialogs'
 
-function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryState {
+export interface NewEntrySeed {
+  date?: string
+  time?: string
+  duration?: string
+  itemType?: ItemType
+}
+
+function entryFromItem(item: Occurrence | null, editScope: EditScope, seed?: NewEntrySeed): EntryState {
   if (!item) {
-    return { ...ENTRY_DEFAULT, editScope, scheduled: { date: fmtISO(startOfToday()), time: '' } }
+    const itemType = seed?.itemType ?? ENTRY_DEFAULT.itemType
+    return {
+      ...ENTRY_DEFAULT,
+      editScope,
+      itemType,
+      tracked: itemType === 'task',
+      scheduled: { date: seed?.date ?? fmtISO(startOfToday()), time: seed?.time ?? '' },
+      duration: seed?.duration ?? '',
+    }
   }
   return entryFromOccurrence(item, editScope)
 }
 
-export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string) {
+export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string, seed?: NewEntrySeed) {
   const defaultParticipants = useStore.getState().defaultParticipants
   const today = useToday()
 
   const [entry, setEntry] = useState<EntryState>(() => {
-    const base = entryFromItem(initialOcc, initialScope)
+    const base = entryFromItem(initialOcc, initialScope, seed)
     const seeded = (!initialOcc && defaultParticipants.length > 0)
       ? { ...base, participants: [...defaultParticipants] }
       : base
