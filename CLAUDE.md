@@ -59,13 +59,16 @@ Always use `pnpm run build` (which runs `tsc -b`) to verify the full project bui
 **Root-level files are intentionally cross-cutting** — they are imported by three or more unrelated layers and have no single owning directory. The deliberate root residents are:
 
 - `types.ts` — domain types used by every layer
-- `store.ts` + `storeBridge.ts` — Zustand store; `storeBridge` is imported by `storage/`, `editor/`, and `components/`
+- `store.ts` + `storeBridge.ts` — Zustand store; `storeBridge` is imported by `storage/`, `editor/`, and `occurrenceActions.ts`/`storeCommit.ts`
 - `fileIO.ts` — YAML/frontmatter parse+serialize; used by `debug/`, `editor/`, `model/`, `storage/`
 - `wikilinks.ts` — wikilink parse+resolve; used by `editor/`, `model/`, and root
-- `occurrenceActions.ts` + `undoToast.ts` — user-action orchestration; used by `editor/` and `calendar/`
-- `format.ts`, `fileOccurrence.ts`, `occState.ts` — view-model helpers split from a former `presentation.ts`; each is used by three or more feature dirs
+- `occurrenceActions.ts` — user-action orchestration; used by `editor/` and `calendar/`. `undoToast.ts` is a helper used only by `occurrenceActions.ts` itself, not independently cross-cutting, but stays alongside it at root
+- `storeCommit.ts` + `persistencePort.ts` — persistence-port abstraction (see invariant 3 below); used by `editor/`, `storage/`, and `occurrenceActions.ts`
+- `notifications.ts` — used by `storage/`
+- `vaultActions.ts` — used by `components/` and `routes/`
+- `format.ts`, `fileOccurrence.ts`, `occView.ts` — view-model helpers; each used by three or more feature dirs (`calendar/`, `components/`, `editor/`, `hooks/`, `routes/`, `storage/`, `search/`)
 
-Do not flag these as misplaced. A future barrel PR will add `index.ts` files to each directory to formalize the public API surface.
+All feature directories already have `index.ts` barrels enforced by the import-boundary lint rules — do not propose adding them.
 
 ## Architecture invariants
 
