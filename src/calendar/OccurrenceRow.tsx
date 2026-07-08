@@ -17,6 +17,13 @@ interface Props {
    * different from the previous render, so the default memo() below never
    * bails and OccurrenceCard always recomputes its wall-clock-dependent
    * occState() styling whenever this row's parent section rendered at all.
+   *
+   * This is why memo() below must stay even under the React Compiler: the
+   * compiler's automatic memoization tracks only props actually *read* in
+   * the body, and `tick` is explicitly unread (`void tick`) — so compiler-only
+   * memoization would drop it from the comparison and this trick would stop
+   * working. memo()'s default *shallow-compare-every-prop* behavior is the
+   * whole point here, not something the compiler can be asked to replicate.
    */
   tick?: number
 }

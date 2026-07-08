@@ -57,6 +57,14 @@ function DaySection({
   )
 }
 
+// Kept under the React Compiler on purpose: `items` is rebuilt into a new
+// array every time an unrelated occurrence changes anywhere (grouping logic
+// upstream), even when this day's own entries are unchanged field-for-field.
+// The compiler's automatic memoization only compares the `items` reference
+// itself — it has no domain knowledge that two different array instances can
+// represent the same day. This comparator supplies that domain knowledge
+// (field-level equality per occurrence) and isn't something compiler-only
+// memoization can infer or replace.
 function propsAreEqual(prev: Props, next: Props): boolean {
   if (prev.isToday !== next.isToday || prev.isTomorrow !== next.isTomorrow) return false
   if (prev.tick !== next.tick) return false

@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
@@ -26,7 +26,13 @@ interface CalCellProps {
   onDayClick: (date: Date) => void
 }
 
-const CalCell = memo(function CalCell({ date, other, dayOccs, today, maxVisible, onDayClick }: CalCellProps) {
+// No memo() here — all props are read directly in the body (no unused
+// "force refresh" prop like OccurrenceRow's `tick`), and `dayOccs`/`today`
+// stay reference-stable across unrelated MonthView renders (the compiler
+// auto-caches occsByDay, and useToday only updates at midnight), so the
+// React Compiler's own per-prop memoization already skips this render when
+// nothing relevant changed.
+function CalCell({ date, other, dayOccs, today, maxVisible, onDayClick }: CalCellProps) {
   const isToday = sameDay(date, today)
 
   const occCount = dayOccs.length
@@ -67,7 +73,7 @@ const CalCell = memo(function CalCell({ date, other, dayOccs, today, maxVisible,
       </div>
     </SurfaceButton>
   )
-})
+}
 
 // ── MonthView ─────────────────────────────────────────────────
 interface Props {
