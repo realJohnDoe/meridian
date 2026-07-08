@@ -5,6 +5,15 @@ import { clearOccIdCache } from '@/model'
 import { updateFileOccurrenceMap } from './fileOccurrence'
 import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 
+function readVaultJSON<T>(keyPrefix: string, vaultId: string, defaultValue: T): T {
+  try {
+    const raw = localStorage.getItem(`${keyPrefix}_${vaultId}`)
+    return raw === null ? defaultValue : (JSON.parse(raw) as T)
+  } catch {
+    return defaultValue
+  }
+}
+
 function detectLocalePrefs(): LocalePrefs {
   const hour12 = new Intl.DateTimeFormat(undefined, { hour: 'numeric' })
     .resolvedOptions().hour12 ?? false
@@ -97,100 +106,105 @@ interface MeridianStore {
   setLocalePrefs: (prefs: Partial<LocalePrefs>) => void
 }
 
-export const useStore = create<MeridianStore>((set, get) => ({
-  items: [],
-  roots: new Map(),
-  fom: new Map(),
-  setData: ({ items, roots }) => {
-    clearOccIdCache()
-    const { items: prevItems, roots: prevRoots, fom: prevFom } = get()
-    set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots) })
-  },
+type Setter = (partial: Partial<MeridianStore>) => void
+type Getter = () => MeridianStore
 
-  vaults:              [],
-  activeVaultId:       null,
-  pendingDirReconnect: null,
+/** Persists a vault-scoped string-array field to localStorage on every write, keyed by the active vault. */
+function persistedArrayField(keyPrefix: string, field: keyof MeridianStore, set: Setter, get: Getter) {
+  return {
+    load: (vaultId: string) => set({ [field]: readVaultStringArray(keyPrefix, vaultId) } as Partial<MeridianStore>),
+    persist: (value: string[]) => {
+      const { activeVaultId } = get()
+      if (activeVaultId) writeVaultJSON(keyPrefix, activeVaultId, value)
+      set({ [field]: value } as Partial<MeridianStore>)
+    },
+  }
+}
 
-  syncDirtyCount: 0,
-  syncError:      null,
-  syncOffline:    false,
-  lastSyncedAt:   null,
+/** Persists a vault-scoped boolean field to localStorage on every write, keyed by the active vault. */
+function persistedBoolField(keyPrefix: string, field: keyof MeridianStore, defaultValue: boolean, set: Setter, get: Getter) {
+  return {
+    load: (vaultId: string) => set({ [field]: readVaultJSON(keyPrefix, vaultId, defaultValue) } as Partial<MeridianStore>),
+    persist: (value: boolean) => {
+      const { activeVaultId } = get()
+      if (activeVaultId) writeVaultJSON(keyPrefix, activeVaultId, value)
+      set({ [field]: value } as Partial<MeridianStore>)
+    },
+  }
+}
 
-  vaultLoading: true,
+export const useStore = create<MeridianStore>((set, get) => {
+  const favoritesField = persistedArrayField('meridian_favorites', 'favorites', set, get)
+  const defaultParticipantsField = persistedArrayField('meridian_default_participants', 'defaultParticipants', set, get)
+  const participantFilterField = persistedArrayField('meridian_participant_filter', 'participantFilter', set, get)
+  const showTasksField = persistedBoolField('meridian_show_tasks', 'showTasks', true, set, get)
 
-  scrollToTodayOnce: false,
-  agendaTopDate:     null,
+  return {
+    items: [],
+    roots: new Map(),
+    fom: new Map(),
+    setData: ({ items, roots }) => {
+      clearOccIdCache()
+      const { items: prevItems, roots: prevRoots, fom: prevFom } = get()
+      set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots) })
+    },
 
-  favorites: [],
-  loadFavorites: (vaultId: string) => {
-    set({ favorites: readVaultStringArray('meridian_favorites', vaultId) })
-  },
-  toggleFavorite: (fileSlug: string) => {
-    const { favorites, activeVaultId } = get()
-    const next = favorites.includes(fileSlug)
-      ? favorites.filter(s => s !== fileSlug)
-      : [...favorites, fileSlug]
-    if (activeVaultId) writeVaultJSON('meridian_favorites', activeVaultId, next)
-    set({ favorites: next })
-  },
-  reorderFavorites: (fromIdx: number, toIdx: number) => {
-    const { favorites, activeVaultId } = get()
-    if (toIdx < 0 || toIdx >= favorites.length) return
-    const next = [...favorites]
-    const [item] = next.splice(fromIdx, 1)
-    next.splice(toIdx, 0, item)
-    if (activeVaultId) writeVaultJSON('meridian_favorites', activeVaultId, next)
-    set({ favorites: next })
-  },
+    vaults:              [],
+    activeVaultId:       null,
+    pendingDirReconnect: null,
 
-  defaultParticipants: [],
-  loadDefaultParticipants: (vaultId: string) => {
-    set({ defaultParticipants: readVaultStringArray('meridian_default_participants', vaultId) })
-  },
-  setDefaultParticipants: (participants: string[]) => {
-    const { activeVaultId } = get()
-    if (activeVaultId) writeVaultJSON('meridian_default_participants', activeVaultId, participants)
-    set({ defaultParticipants: participants })
-  },
+    syncDirtyCount: 0,
+    syncError:      null,
+    syncOffline:    false,
+    lastSyncedAt:   null,
 
-  participantFilter: [],
-  loadParticipantFilter: (vaultId: string) => {
-    set({ participantFilter: readVaultStringArray('meridian_participant_filter', vaultId) })
-  },
-  toggleParticipantFilter: (name: string) => {
-    const { participantFilter, activeVaultId } = get()
-    const next = participantFilter.includes(name)
-      ? participantFilter.filter(s => s !== name)
-      : [...participantFilter, name]
-    if (activeVaultId) writeVaultJSON('meridian_participant_filter', activeVaultId, next)
-    set({ participantFilter: next })
-  },
-  clearParticipantFilter: () => {
-    const { activeVaultId } = get()
-    if (activeVaultId) writeVaultJSON('meridian_participant_filter', activeVaultId, [])
-    set({ participantFilter: [] })
-  },
+    vaultLoading: true,
 
-  showTasks: true,
-  loadShowTasks: (vaultId: string) => {
-    try {
-      const raw = localStorage.getItem(`meridian_show_tasks_${vaultId}`)
-      set({ showTasks: raw === null ? true : JSON.parse(raw) === true })
-    } catch {
-      set({ showTasks: true })
-    }
-  },
-  toggleShowTasks: () => {
-    const { showTasks, activeVaultId } = get()
-    const next = !showTasks
-    if (activeVaultId) writeVaultJSON('meridian_show_tasks', activeVaultId, next)
-    set({ showTasks: next })
-  },
+    scrollToTodayOnce: false,
+    agendaTopDate:     null,
 
-  localePrefs: loadLocalePrefs(),
-  setLocalePrefs: (prefs: Partial<LocalePrefs>) => {
-    const next = { ...get().localePrefs, ...prefs }
-    localStorage.setItem('meridian_locale_prefs', JSON.stringify(next))
-    set({ localePrefs: next })
-  },
-}))
+    favorites: [],
+    loadFavorites: favoritesField.load,
+    toggleFavorite: (fileSlug: string) => {
+      const { favorites } = get()
+      const next = favorites.includes(fileSlug)
+        ? favorites.filter(s => s !== fileSlug)
+        : [...favorites, fileSlug]
+      favoritesField.persist(next)
+    },
+    reorderFavorites: (fromIdx: number, toIdx: number) => {
+      const { favorites } = get()
+      if (toIdx < 0 || toIdx >= favorites.length) return
+      const next = [...favorites]
+      const [item] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, item)
+      favoritesField.persist(next)
+    },
+
+    defaultParticipants: [],
+    loadDefaultParticipants: defaultParticipantsField.load,
+    setDefaultParticipants: defaultParticipantsField.persist,
+
+    participantFilter: [],
+    loadParticipantFilter: participantFilterField.load,
+    toggleParticipantFilter: (name: string) => {
+      const { participantFilter } = get()
+      const next = participantFilter.includes(name)
+        ? participantFilter.filter(s => s !== name)
+        : [...participantFilter, name]
+      participantFilterField.persist(next)
+    },
+    clearParticipantFilter: () => participantFilterField.persist([]),
+
+    showTasks: true,
+    loadShowTasks: showTasksField.load,
+    toggleShowTasks: () => showTasksField.persist(!get().showTasks),
+
+    localePrefs: loadLocalePrefs(),
+    setLocalePrefs: (prefs: Partial<LocalePrefs>) => {
+      const next = { ...get().localePrefs, ...prefs }
+      localStorage.setItem('meridian_locale_prefs', JSON.stringify(next))
+      set({ localePrefs: next })
+    },
+  }
+})
