@@ -15,27 +15,27 @@ export default function SearchBar() {
   const filterQuery = sq ?? ''
 
   function openSearch() {
-    navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: '' }) })
+    void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: '' }) })
   }
 
   function setQuery(value: string) {
     // replace: true so typing doesn't spam the history stack
-    navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: value }), replace: true })
+    void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: value }), replace: true })
   }
 
   function closeSearch() {
-    navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: undefined }), replace: true })
+    void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: undefined }), replace: true })
   }
 
   function handleOpen(occ: Parameters<typeof openEntry>[0]) {
     // replace: true so the transient "search open" entry is overwritten
     // rather than left behind — back from the entry goes straight to the
     // pre-search page instead of reopening the overlay.
-    openEntry(occ, undefined, { replace: true })
+    void openEntry(occ, undefined, { replace: true })
   }
 
   function handleCreate(title: string) {
-    navigate({ ...newEntryRoute(title), replace: true })
+    void navigate({ ...newEntryRoute(title), replace: true })
   }
 
   return (

@@ -58,7 +58,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     const result = saveNode(null, next.editScope, next)
     if (result !== 'saved') return
     flushPendingLinksRef.current()
-    navigate({ to: '/entry/$slug', params: { slug: titleToSlug(next.title) }, replace: true })
+    void navigate({ to: '/entry/$slug', params: { slug: titleToSlug(next.title) }, replace: true })
   }
 
   const saveMeta = (next: EntryState) => {
@@ -91,15 +91,15 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const handleOpenWikilink = (ref: string) => {
     const fileSlug = resolveWikilink(ref, storeRoots)
     if (!fileSlug) {
-      navigate(newEntryRoute(ref))
+      void navigate(newEntryRoute(ref))
       return
     }
-    navigate({ to: '/entry/$slug', params: { slug: fileSlug } })
+    void navigate({ to: '/entry/$slug', params: { slug: fileSlug } })
   }
 
   const goBack = () => {
     if (window.history.length > 1) router.history.back()
-    else navigate({ to: '/' })
+    else void navigate({ to: '/' })
   }
 
   const handleSave = (body: string) => {

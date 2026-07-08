@@ -23,6 +23,10 @@ export default [
     files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
       parser: tsParser,
+      parserOptions: {
+        project: './tsconfig.eslint.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     linterOptions: {
       reportUnusedDisableDirectives: false,
@@ -51,6 +55,19 @@ export default [
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      // Require unhandled promises to be awaited, returned, or explicitly
+      // discarded with `void` — catches accidental fire-and-forget async
+      // (e.g. a missing `await` in a sync codepath) at lint time.
+      '@typescript-eslint/no-floating-promises': 'error',
+      // `attributes: false` because async JSX event handlers (onClick={async
+      // () => …}) are an idiomatic, harmless React pattern — React ignores
+      // the returned promise. Other misuse (e.g. an async function used
+      // where a plain boolean/void callback is required outside JSX) still
+      // gets flagged.
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: { attributes: false } },
       ],
 
       // ── Import boundaries (barrel enforcement) ───────────────────────────────

@@ -65,16 +65,16 @@ function AppMain() {
 
   const handleToday = () => {
     if (isDayView) {
-      navigate({ to: '/day/$date', params: { date: fmtISO(today) } })
+      void navigate({ to: '/day/$date', params: { date: fmtISO(today) } })
     } else if (pathname.startsWith('/calendar')) {
-      navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } })
+      void navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } })
     } else {
       useStore.setState({ scrollToTodayOnce: true })
-      navigate({ to: '/' })
+      void navigate({ to: '/' })
     }
   }
 
-  const navigateHome   = useCallback(() => navigate({ to: '/' }), [navigate])
+  const navigateHome   = useCallback(() => void navigate({ to: '/' }), [navigate])
   const openSidebar    = () => setSidebarOpen(true)
 
   // Callback ref so the portal target is available synchronously after mount.
