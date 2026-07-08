@@ -26,8 +26,6 @@
 
 ## Dev Tool recommendations from Fable
 
-1. Type-aware lint rules (biggest gap, no new tool — just config). Your ESLint runs without type information, so it can't catch the highest-value class of bug for this codebase: floating promises. storage/ is full of fire-and-forget async — \_\_root.tsx:13 calls restoreVaults() unawaited, and the codebase's own void runSync(...) idiom shows you already care about marking these deliberately, but nothing enforces it. Enabling typescript-eslint's type-checked config (or minimally no-floating-promises + no-misused-promises with parserOptions.projectService) turns "Claude forgot an await in a sync path" from a silent data race into a lint error. Cost: lint gets a few seconds slower.
-
 2. knip — dead-code and unused-dependency detection. It finds unused exports, unreachable files, and package.json deps nothing imports. It would have mechanically produced finding #9 from the health report (the unused model/index.ts barrel exports) and it keeps that class of rot from re-accumulating. It's also ideal for an agent workflow: pnpm knip produces a precise worklist Claude can burn down. Add it as a CI step once the baseline is clean.
 
 3. Vitest coverage (@vitest/coverage-v8) — one dev-dependency, then vitest run --coverage. This makes the test-gap finding from the report measurable and lets you give Claude instructions like "get occView.ts above 90% branch coverage" instead of vibes.
