@@ -17,7 +17,7 @@ import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '@/types'
-import { extractFileMetadata, extractOccurrenceMetadata, isSeries } from '@/types'
+import { extractFileMetadata, extractOccurrenceMetadata } from '@/types'
 import type { StoreItem, FileMetadata } from '@/types'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ import type { StoreItem, FileMetadata } from '@/types'
  *    explicit instances become additional standalones.
  *  - Container node (no repeat, no date) → recurse into instances.
  */
-export function effectiveNodeToStoreItems(
+function effectiveNodeToStoreItems(
   tree: EffectiveNode,
   fileSlug: string,
 ): StoreItem[] {
@@ -149,24 +149,10 @@ export function parseToStoreItems(path: string, content: string): ParseResult {
  * File-level values are read from the root frontmatter, falling back to a
  * top-level `defaults:` block for legacy files where they were nested.
  */
-export function buildRoot(
+function buildRoot(
   rawNode: Record<string, unknown>,
   body: string,
 ): FileMetadata {
   const defaults = (rawNode.defaults as Record<string, unknown> | undefined) ?? {}
   return extractFileMetadata({ ...defaults, ...rawNode, body: body || undefined })
 }
-
-/**
- * Convert a YAML string (not a file path) — used for seed data.
- * `id` becomes the fileSlug.
- */
-export function parseYamlToStoreItems(yamlWithFrontmatter: string, fileSlug: string): ParseResult {
-  const { rawNode, body } = loadFile(fileSlug + '.md', yamlWithFrontmatter)
-  const tree = buildEffectiveTree(rawNode as Parameters<typeof buildEffectiveTree>[0])
-  const items = effectiveNodeToStoreItems(tree, fileSlug)
-  return { items, root: buildRoot(rawNode, body) }
-}
-
-// Re-export isSeries so storeOps can import it from here alongside item types.
-export { isSeries }

@@ -104,7 +104,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
     })
     if (result !== 'saved') return null
     const slug = titleToSlug(title)
-    navigate({ to: '/entry/$slug', params: { slug } })
+    void navigate({ to: '/entry/$slug', params: { slug } })
     return slug
   }
 

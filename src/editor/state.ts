@@ -1,7 +1,5 @@
-import type { Occurrence, Scheduled, EditScope } from '@/types'
+import type { Occurrence, EditScope } from '@/types'
 import type { EditorFields } from '@/model'
-
-export type { Scheduled }
 
 export type ItemType = 'task' | 'event' | 'note'
 

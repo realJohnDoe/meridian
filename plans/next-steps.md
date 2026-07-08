@@ -9,6 +9,7 @@
 - Consider if name and logo are still good
 - Post about Meridian in Obsidian forums
 - Add vault retention period
+- Fix flow for adding a second vault
 
 ## Recommend Linters from Fable
 
@@ -26,30 +27,12 @@
 
 ## Dev Tool recommendations from Fable
 
-1. Type-aware lint rules (biggest gap, no new tool — just config). Your ESLint runs without type information, so it can't catch the highest-value class of bug for this codebase: floating promises. storage/ is full of fire-and-forget async — \_\_root.tsx:13 calls restoreVaults() unawaited, and the codebase's own void runSync(...) idiom shows you already care about marking these deliberately, but nothing enforces it. Enabling typescript-eslint's type-checked config (or minimally no-floating-promises + no-misused-promises with parserOptions.projectService) turns "Claude forgot an await in a sync path" from a silent data race into a lint error. Cost: lint gets a few seconds slower.
-
-2. knip — dead-code and unused-dependency detection. It finds unused exports, unreachable files, and package.json deps nothing imports. It would have mechanically produced finding #9 from the health report (the unused model/index.ts barrel exports) and it keeps that class of rot from re-accumulating. It's also ideal for an agent workflow: pnpm knip produces a precise worklist Claude can burn down. Add it as a CI step once the baseline is clean.
-
-3. Vitest coverage (@vitest/coverage-v8) — one dev-dependency, then vitest run --coverage. This makes the test-gap finding from the report measurable and lets you give Claude instructions like "get occView.ts above 90% branch coverage" instead of vibes.
-
 4. One ESLint zone, closing a known hole: your boundary rules stop model/ from importing feature dirs but not from importing React — which is exactly how useExpandWithMultiday leaked in. A no-restricted-imports block scoped to src/model/\*\* forbidding react makes the "model is pure" invariant machine-enforced instead of documented.
 
 ## Custom code that should lean on a library, according to Fable
 
-1. Raw day arithmetic in expansion.ts → date-fns (already installed, already imported in that file).
-   Three spots do calendar math by adding multiples of 86_400_000 ms:
-   expansion.ts:70 — Math.round((viewDate.getTime() - startD.getTime()) / 86_400_000) + 1 (multiday "Day 3/15" label)
-   expansion.ts:85 and expansion.ts:567 — new Date(startD.getTime() + d \* 86_400_000) (multiday span cover dates)
-   In local time a "day" is not always 24 hours — you're in Europe/Berlin, so twice a year a multiday event spanning a DST switch is off by an hour, and startOfDay(+24h) can land on the wrong calendar day or double-count. date-fns's addDays and differenceInCalendarDays are DST-correct, and the file already imports addDays. This is the highest-value swap: zero new dependencies, fixes a latent correctness bug, three call sites.
-
 2. Three hand-rolled search matchers, one of them actively opting out of the library's.
    ItemsList.tsx:313 renders <Command shouldFilter={false}> and then filters with e.title.toLowerCase().includes(pickerQuery.toLowerCase()) — i.e., you're using cmdk but disabling its command-scoring (its core feature) to substitute a weaker substring match. FileResultsList.tsx and ListedOnRow.tsx each have their own lowercase-substring logic too. At personal-vault scale substring matching is defensible — I wouldn't add fuse.js for this — but three divergent matchers is the real smell. Either re-enable cmdk's filtering where you're inside a <Command>, or extract one shared matchesQuery() used by all three, so "why does the picker find this file but search doesn't" can't happen.
-
-## From the Cloudflare auth flow
-
-- Got an error message, but on second try, it worked.
-- No dedup against already-connected repos. The picker shows all installed repos, including ones already connected as a vault. If the user picks a repo they've already connected, addGitHubVaultOAuth creates a second, duplicate VaultRef pointing at the same repo — confusing, not destructive, but not great.
-- Re-doing the full OAuth redirect is heavier than it needs to be. Adding a second vault currently means going through the whole GitHub consent screen again, even though we already hold a valid access token from the first sign-in. A nicer flow would skip straight to the repo picker using the existing token, only falling back to a real redirect if there's no valid session yet.
 
 # Meridian code health report
 
@@ -78,26 +61,6 @@ Overall the report is based on direct reading of roughly 40% of the source and g
 - **Evidence:** `src/calendar/DayView.tsx:260` — `return h >= SH && h <= EH` (with `const SH = 7` / `const EH = 22` hardcoded at the top). The all-day strip only catches untimed occurrences (`allDay = sorted.filter(o => !fmtT(o.time))`).
 - **Problem:** An event at 23:00 or 06:00 is filtered out of the timeline and doesn't appear in the all-day strip either — user data becomes invisible on a primary view with no indicator it exists.
 - **Fix:** Clamp out-of-window events to the timeline edges (or extend the window dynamically to cover the day's earliest/latest event) instead of filtering them out.
-
----
-
-### 8. Occurrence matching by ±60 s tolerance is copy-pasted six times through the expansion engine
-
-- **Category:** `dry`
-- **Impact:** 3 · **Breadth:** 1 file (`grep -c "Math.abs" src/model/expansion.ts` → 6, plus two hand-rolled year/month/day equality triplets) · **Fix effort:** M
-- **Evidence:** `src/model/expansion.ts:262` — `if (Math.abs(o.ms - jsDate.getTime()) < 60000) return o` — the same minute-tolerance match recurs at lines 311, 330, 342, 363, 367, alongside repeated `od.getFullYear() === jsDate.getFullYear() && od.getMonth() === jsDate.getMonth() && od.getDate() === jsDate.getDate()` day comparisons.
-- **Problem:** The single most intricate file in the repo encodes its core identity rule ("these two occurrences are the same slot") as six inlined copies of a magic-number comparison, so any change to the matching rule (e.g. timezone handling) must be found and applied six times.
-- **Fix:** Extract `sameMinute(a, b)` and `sameCalendarDay(a, b)` helpers in `dateUtils.ts` and use them throughout `expansion.ts` (behavior-preserving, protected by the existing model test suite).
-
----
-
-### 9. `model/index.ts` exports symbols with zero external consumers
-
-- **Category:** `dead-code`
-- **Impact:** 2 · **Breadth:** 2 files (per-symbol grep across `src/` excluding `model/`: `buildRoot`, `parseYamlToStoreItems`, `serializeRawNode`, `hasRepeat`, `multidayCoversDate` → 0 non-model, non-test importers; `dayBefore`/`treeHasOccurrences`/`displayValue`/`buildEffectiveTree` are used only by the debug tool) · **Fix effort:** S
-- **Evidence:** `src/model/index.ts:7` — `export { parseToStoreItems, buildRoot, effectiveNodeToStoreItems, parseYamlToStoreItems } from './storeItems'` — `buildRoot` and `parseYamlToStoreItems` are consumed only inside `storeItems.ts` itself.
-- **Problem:** The barrel is supposed to be the deliberate public API surface of the domain core, but roughly a third of its exports have no consumer, which makes the real API illegible and every internal refactor look like a breaking change.
-- **Fix:** Drop the unconsumed exports from the barrel (keep them as plain module exports for the debug tool where needed) so the barrel reflects the actual API.
 
 ---
 

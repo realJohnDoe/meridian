@@ -12,6 +12,7 @@
 import {
   isValid,
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes, startOfDay,
+  differenceInCalendarDays,
 } from 'date-fns'
 import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
@@ -50,6 +51,20 @@ function jsDateToSpec(jsDate: Date): { date: string | null; time: string | null 
   return { date: fmtISO(jsDate), time: fmtT(jsDate) }
 }
 
+const ONE_MINUTE_MS = 60_000
+
+/** True when two instants fall within the same minute-tolerance window used for occurrence matching. */
+function sameMinute(a: Date | number, b: Date | number): boolean {
+  const at = a instanceof Date ? a.getTime() : a
+  const bt = b instanceof Date ? b.getTime() : b
+  return Math.abs(at - bt) < ONE_MINUTE_MS
+}
+
+/** True when two dates fall on the same calendar day (year/month/date), ignoring time. */
+function sameCalendarDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MULTIDAY HELPERS  (exported — consumed by calendar views)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,7 +82,7 @@ export function multidayDisplayTitle(
   if (days < 2) return undefined
   const startD = parseDateString(occ.date)
   if (!startD) return undefined
-  const dayIdx = Math.round((viewDate.getTime() - startD.getTime()) / 86_400_000) + 1
+  const dayIdx = differenceInCalendarDays(viewDate, startD) + 1
   return `${occ.metadata.title} (Day ${dayIdx}/${days})`
 }
 
@@ -82,7 +97,7 @@ export function multidayCoversDate(occ: OccurrenceEntry<AppMetadata>, date: Date
   const start = parseDateString(occ.date)
   if (!start) return false
   const s = startOfDay(start)
-  const e = new Date(s.getTime() + (days - 1) * 86_400_000); e.setHours(23, 59, 59)
+  const e = addDays(s, days - 1); e.setHours(23, 59, 59)
   const d = startOfDay(date)
   return d >= s && d <= e
 }
@@ -267,9 +282,9 @@ function expandNode<M>(
     return instanceOverrides.filter(o => {
       if (!o.hasTime) {
         const od = o.matchDate
-        return !!od && od.getFullYear() === jsDate.getFullYear() && od.getMonth() === jsDate.getMonth() && od.getDate() === jsDate.getDate()
+        return !!od && sameCalendarDay(od, jsDate)
       }
-      return Math.abs(o.ms - jsDate.getTime()) < 60000
+      return sameMinute(o.ms, jsDate)
     })
   }
 
@@ -322,12 +337,9 @@ function expandNode<M>(
       if (!t) continue
       let isGenerated = false
       if (!inst.time) {
-        isGenerated = [...generatedMs].some(ms => {
-          const gd = new Date(ms)
-          return gd.getFullYear() === t.getFullYear() && gd.getMonth() === t.getMonth() && gd.getDate() === t.getDate()
-        })
+        isGenerated = [...generatedMs].some(ms => sameCalendarDay(new Date(ms), t))
       } else {
-        isGenerated = [...generatedMs].some(ms => Math.abs(ms - t.getTime()) < 60000)
+        isGenerated = [...generatedMs].some(ms => sameMinute(ms, t))
       }
       if (!isGenerated && t >= from && t <= to) {
         const eff = mergeNode(node, inst)
@@ -347,7 +359,7 @@ function expandNode<M>(
     const allTimes: Array<{ jsTime: Date; done?: boolean; overrideId?: string; metadata: M }> = []
     const anchorInst = (node.instances ?? []).find(i => {
       const t = nodeDateTime(i) || parseDateString(i.date)
-      return t && Math.abs(t.getTime() - anchor.getTime()) < 60000
+      return t && sameMinute(t, anchor)
     })
     if (!anchorInst?.excluded) {
       allTimes.push({
@@ -360,7 +372,7 @@ function expandNode<M>(
     for (const inst of node.instances ?? []) {
       const t = nodeDateTime(inst) || parseDateString(inst.date)
       if (!t || inst.excluded) continue
-      if (Math.abs(t.getTime() - anchor.getTime()) < 60000) continue
+      if (sameMinute(t, anchor)) continue
       allTimes.push({ jsTime: t, done: inst.done ?? node.done, overrideId: inst.id, metadata: { ...node.metadata, ...inst.metadata } as M })
     }
     allTimes.sort((a, b) => a.jsTime.getTime() - b.jsTime.getTime())
@@ -382,11 +394,11 @@ function expandNode<M>(
     const lastDone = [...allTimes].reverse().find(e => e.done === true)
     if (lastDone) {
       const nextJsTime = addInterval(lastDone.jsTime, String(repeat.interval || '1 day'))
-      const alreadyExists = allTimes.some(e => Math.abs(e.jsTime.getTime() - nextJsTime.getTime()) < 60000)
+      const alreadyExists = allTimes.some(e => sameMinute(e.jsTime, nextJsTime))
       const isExcluded = (node.instances ?? []).some(inst => {
         if (!inst.excluded) return false
         const t = parseDateString(inst.date)
-        return t !== null && Math.abs(t.getTime() - nextJsTime.getTime()) < 60000
+        return t !== null && sameMinute(t, nextJsTime)
       })
       if (!alreadyExists && !isExcluded && nextJsTime >= from && nextJsTime <= to) {
         const spec = jsDateToSpec(nextJsTime)
@@ -587,7 +599,7 @@ export function expandWithMultiday(
       if (!startD) return []
       const extras: OccurrenceEntry<AppMetadata>[] = []
       for (let d = 1; d < days; d++) {
-        const coveredDate = startOfDay(new Date(startD.getTime() + d * 86_400_000))
+        const coveredDate = startOfDay(addDays(startD, d))
         if (coveredDate < from || coveredDate > to) continue
         extras.push({
           ...i,

@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src"
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src",
+    "knip": "knip"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
@@ -62,16 +64,18 @@
     "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.61.1",
     "@vitejs/plugin-react": "^4.4.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^10.5.0",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-import-x": "^4.17.0",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "knip": "^6.25.0",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.1.0",
     "typescript": "~5.8.0",
     "vite": "^6.4.3",
     "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.10"
   }
 }

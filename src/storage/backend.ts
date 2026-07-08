@@ -11,11 +11,11 @@ interface VaultRefBase {
   name: string
 }
 
-export interface LocalVaultRef extends VaultRefBase {
+interface LocalVaultRef extends VaultRefBase {
   kind: 'local'
 }
 
-export interface ExampleVaultRef extends VaultRefBase {
+interface ExampleVaultRef extends VaultRefBase {
   kind: 'example'
 }
 

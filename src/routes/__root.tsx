@@ -10,7 +10,7 @@ export const Route = createRootRoute({
 
 function Root() {
   useEffect(() => {
-    restoreVaults()
+    void restoreVaults()
     const intervalId = setInterval(autoSyncTick, 60_000)
     const onOnline = () => { resetSyncBackoff(); autoSyncTick() }
     const onVisible = () => { if (document.visibilityState === 'visible') autoSyncTick() }

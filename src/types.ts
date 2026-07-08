@@ -6,7 +6,7 @@ export type Weekday = 'mo' | 'tu' | 'we' | 'th' | 'fr' | 'sa' | 'su'
 
 // ── Repeat ───────────────────────────────────────────────────────────────────
 
-export type RepeatEnd =
+type RepeatEnd =
   | { type: 'until'; date?: string; time?: string }
   | { type: 'count'; occurrences: number }
 
@@ -41,7 +41,7 @@ export interface OccurrenceMetadata {
 }
 
 /** Fields never persisted to YAML — computed at runtime or used only by the UI. */
-export interface ExtendedMetadata {
+interface ExtendedMetadata {
   jsTime?: Date    // computed from date+time; undefined in raw store items
 }
 
@@ -106,8 +106,7 @@ export function isSeries(item: StoreItem): item is StoreSeries {
  * An expanded occurrence produced by expandRange.
  * Carries AppMetadata (OccurrenceMetadata + FileMetadata joined in).
  */
-export type Occurrence      = OccurrenceEntry<AppMetadata>
-export type CollectedSeries = RepeatPattern<AppMetadata>
+export type Occurrence = OccurrenceEntry<AppMetadata>
 export type EditScope = 'single' | 'future' | 'all' | 'add'
 const EDIT_SCOPES: EditScope[] = ['single', 'future', 'all', 'add']
 export function isEditScope(s: unknown): s is EditScope {
@@ -129,7 +128,7 @@ interface InlineFieldSpec {
   required?: boolean
 }
 
-export const INLINE_FIELDS: readonly InlineFieldSpec[] = [
+const INLINE_FIELDS: readonly InlineFieldSpec[] = [
   { key: 'title',        kind: 'string',      level: 'file',       required: true },
   { key: 'tags',         kind: 'stringArray', level: 'file',       required: true },
   { key: 'items',        kind: 'stringArray', level: 'file',       required: true },

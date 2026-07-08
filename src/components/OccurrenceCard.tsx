@@ -14,7 +14,7 @@ import { cn } from '@/lib/cn'
 import { occBarVariants } from './ui/occurrence-variants'
 import TagChip from './TagChip'
 
-export interface OccurrenceCardProps {
+interface OccurrenceCardProps {
   occ: Occurrence
   onOpen: () => void
   onToggleDone: () => void
