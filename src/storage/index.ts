@@ -1,7 +1,10 @@
 // Register the storage adapter for the core persistence port once on first import.
 import { setEntityPersistence } from '../persistencePort'
 import { writeEntityToCache, deleteFromBackend } from './sync'
-setEntityPersistence({ writeEntity: writeEntityToCache, deleteEntity: deleteFromBackend })
+setEntityPersistence({
+  writeEntity: slug => { void writeEntityToCache(slug) },
+  deleteEntity: slug => { void deleteFromBackend(slug) },
+})
 
 export { restoreVaults, setActiveVault, addLocalVault, addGitHubVault, addGitHubVaultOAuth, removeVault, onVaultChanged } from './vaultRegistry'
 export type { GitHubVaultConfig, GitHubOAuthVaultConfig } from './vaultRegistry'

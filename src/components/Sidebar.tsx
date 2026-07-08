@@ -63,17 +63,17 @@ export default function AppSidebar() {
 
   // Calendar views — the three time-based views that the filters below scope to.
   const navItems = [
-    { Icon: AlignLeft,     label: 'Agenda', active: pathname === '/',                 onClick: () => { close(); navigate({ to: '/' }) } },
-    { Icon: CalendarDays,  label: 'Month',  active: pathname.startsWith('/calendar'), onClick: () => { close(); navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } }) } },
-    { Icon: CalendarClock, label: 'Day',    active: isDayView,                        onClick: () => { close(); navigate({ to: '/day/$date', params: { date: fmtISO(today) } }) } },
+    { Icon: AlignLeft,     label: 'Agenda', active: pathname === '/',                 onClick: () => { close(); void navigate({ to: '/' }) } },
+    { Icon: CalendarDays,  label: 'Month',  active: pathname.startsWith('/calendar'), onClick: () => { close(); void navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } }) } },
+    { Icon: CalendarClock, label: 'Day',    active: isDayView,                        onClick: () => { close(); void navigate({ to: '/day/$date', params: { date: fmtISO(today) } }) } },
   ]
 
   // Content destinations — homes for entries that live outside the calendar, so
   // the calendar filters don't apply to them. Positioned with Favorites, below
   // the calendar card.
   const collectionItems = [
-    { Icon: Inbox,       label: 'Backlog', active: pathname.startsWith('/backlog'), onClick: () => { close(); navigate({ to: '/backlog' }) } },
-    { Icon: NotebookPen, label: 'Notes',   active: pathname.startsWith('/notes'),   onClick: () => { close(); navigate({ to: '/notes' }) } },
+    { Icon: Inbox,       label: 'Backlog', active: pathname.startsWith('/backlog'), onClick: () => { close(); void navigate({ to: '/backlog' }) } },
+    { Icon: NotebookPen, label: 'Notes',   active: pathname.startsWith('/notes'),   onClick: () => { close(); void navigate({ to: '/notes' }) } },
   ]
 
   return (
@@ -174,7 +174,7 @@ export default function AppSidebar() {
                         </div>
                       ) : (
                         <SidebarMenuButton
-                          onClick={() => { close(); navigate(slugRoute(slug)) }}
+                          onClick={() => { close(); void navigate(slugRoute(slug)) }}
                           className="px-5 h-auto py-[11px] text-[14px] font-medium rounded-none"
                         >
                           <span className="truncate">{title}</span>
@@ -220,7 +220,7 @@ export default function AppSidebar() {
                   <SidebarMenuItem key={vault.id}>
                     <SidebarMenuButton
                       isActive={isActive}
-                      onClick={() => { close(); setActiveVault(vault.id) }}
+                      onClick={() => { close(); void setActiveVault(vault.id) }}
                       className="gap-[14px] px-5 h-auto py-[11px] text-[14px] font-medium rounded-none"
                     >
                       <VaultIcon className="size-[17px] stroke-[1.7] shrink-0" />

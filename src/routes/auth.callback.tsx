@@ -72,7 +72,7 @@ function AuthCallbackPage() {
       refreshToken: tokens.refreshToken,
       expiresAt:    tokens.expiresAt,
     })
-    navigate({ to: '/' })
+    void navigate({ to: '/' })
   }
 
   if (phase.kind === 'exchanging') return <CenteredMessage title="Finishing sign-in…" />
