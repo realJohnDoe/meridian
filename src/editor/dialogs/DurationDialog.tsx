@@ -21,8 +21,6 @@ import { parseDuration } from '@/model'
 import { durationToEndDate, durationToEndDateTime, fmtEndDate, fmtEndTime } from '@/format'
 import { useStore } from '@/store'
 
-export { fmtDuration, formatDurationChip } from '@/format'
-
 function fmtDurationCompact(duration: string): string {
   const p = parseDuration(duration)
   if (!p) return duration

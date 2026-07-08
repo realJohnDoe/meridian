@@ -168,7 +168,7 @@ function seriesMeta(base: Partial<OccurrenceMetadata>, f: EditFields): Occurrenc
  * fields from `fields`. The roots map is the single source of truth for a file's
  * title/tags/items/body, so every edit scope routes file-level changes here.
  */
-export function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots {
+function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots {
   const next = new Map(roots)
   next.set(fileSlug, {
     title: f.title,

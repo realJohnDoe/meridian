@@ -1,7 +1,6 @@
 export { useToday } from './useToday'
 export { useOpenEntry } from './useOpenEntry'
-export { NO_PARTICIPANT, useParticipantFilter } from './useParticipantFilter'
-export { useCalendarFilter } from './useCalendarFilter'
+export { NO_PARTICIPANT, useCalendarFilter } from './useCalendarFilter'
 export { useFlipReorder } from './useFlipReorder'
 export { useMediaQuery } from './use-media-query'
 export { useIsTouchDevice } from './use-touch-device'

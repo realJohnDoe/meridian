@@ -184,7 +184,7 @@ function prune(v: unknown): unknown {
  * fields, then `instances:`. Putting defaults first makes series files
  * read top-to-bottom as "here are the defaults, here is the schedule".
  */
-export function serializeRawNode(node: RawNode): string {
+function serializeRawNode(node: RawNode): string {
   const { defaults, instances, ...rootFields } = node
   const ordered: Record<string, unknown> = {}
   if (defaults && Object.keys(defaults as object).length > 0) ordered.defaults = defaults
