@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 import { getItems, getRoots } from '@/storeBridge'
 import { commitNext } from '@/storeCommit'
+import { matchesQuery } from '@/lib/matching'
 
 interface Props {
   items:           string[]
@@ -60,7 +61,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const occBySlug = useStore(s => s.fom)
   const allFiles  = fileEntries(roots)
   const filtered  = pickerQuery
-    ? allFiles.filter(e => e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
+    ? allFiles.filter(e => matchesQuery(pickerQuery, e.title))
     : allFiles
 
   const entries: ParsedEntry[] = items.map((raw, idx) => ({ ...parseItemEntry(raw), idx }))
