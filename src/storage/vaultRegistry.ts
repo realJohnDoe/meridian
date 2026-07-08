@@ -74,6 +74,13 @@ async function activateWritableVault(backend: StorageBackend): Promise<void> {
   emitVaultChanged()
 }
 
+async function registerAndActivate(ref: VaultRef, backend: StorageBackend): Promise<void> {
+  await updateVaultRefs(existing => [...existing, ref])
+  const files = await backend.readAll()
+  await cacheBulkWriteClean(backend.id, files)
+  await activateWritableVault(backend)
+}
+
 // ── VAULT LIFECYCLE ───────────────────────────────────────────
 
 export async function restoreVaults(): Promise<void> {
@@ -189,12 +196,8 @@ export async function addLocalVault(): Promise<void> {
     await handleSave(id, handle)
 
     const ref: VaultRef = { id, name: handle.name, kind: 'local' }
-    await updateVaultRefs(existing => [...existing, ref])
-
     const backend = new LocalBackend(id, handle.name, handle)
-    const files   = await backend.readAll()
-    await cacheBulkWriteClean(id, files)
-    await activateWritableVault(backend)
+    await registerAndActivate(ref, backend)
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
     console.error('[vault] addLocalVault failed:', e)
@@ -222,11 +225,7 @@ export async function addGitHubVault(cfg: GitHubVaultConfig): Promise<void> {
       kind:   'github',
       github: { owner: cfg.owner, repo: cfg.repo, branch: cfg.branch },
     }
-    await updateVaultRefs(existing => [...existing, ref])
-
-    const files = await backend.readAll()
-    await cacheBulkWriteClean(id, files)
-    await activateWritableVault(backend)
+    await registerAndActivate(ref, backend)
   } catch (e) {
     console.error('[vault] addGitHubVault failed:', e)
     notifyError('Could not connect GitHub vault', e)
@@ -266,11 +265,7 @@ export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<
       kind:   'github',
       github: { owner: cfg.owner, repo: cfg.repo, branch: cfg.branch },
     }
-    await updateVaultRefs(existing => [...existing, ref])
-
-    const files = await backend.readAll()
-    await cacheBulkWriteClean(id, files)
-    await activateWritableVault(backend)
+    await registerAndActivate(ref, backend)
   } catch (e) {
     console.error('[vault] addGitHubVaultOAuth failed:', e)
     notifyError('Could not connect GitHub vault', e)
