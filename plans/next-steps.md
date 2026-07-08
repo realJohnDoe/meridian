@@ -51,23 +51,3 @@ This is a disciplined, well-above-average codebase: import boundaries are actual
 **Unverified (flagging, no budget):** `storage/cache.ts` Dexie layer and the three backend implementations (`githubBackend`, `localBackend`, `exampleBackend` — only their tests and call sites were read); the `editor/cm/` CodeMirror decoration layer (6 files, only 1 has tests — plausible second test-gap hotspot); `calendar/AgendaView` virtualization/scroll-restore logic.
 
 Overall the report is based on direct reading of roughly 40% of the source and grep-level evidence over ~95% of it.
-
-## 3. Findings
-
-### 4. DayView silently hides timed events outside 07:00–22:00
-
-- **Category:** `ux`
-- **Impact:** 5 · **Breadth:** 1 file · **Fix effort:** S
-- **Evidence:** `src/calendar/DayView.tsx:260` — `return h >= SH && h <= EH` (with `const SH = 7` / `const EH = 22` hardcoded at the top). The all-day strip only catches untimed occurrences (`allDay = sorted.filter(o => !fmtT(o.time))`).
-- **Problem:** An event at 23:00 or 06:00 is filtered out of the timeline and doesn't appear in the all-day strip either — user data becomes invisible on a primary view with no indicator it exists.
-- **Fix:** Clamp out-of-window events to the timeline edges (or extend the window dynamically to cover the day's earliest/latest event) instead of filtering them out.
-
----
-
-### 10. `OccurrenceCard` gates its meta row on tags it never renders
-
-- **Category:** `dead-code` `ux`
-- **Impact:** 2 · **Breadth:** 1 file · **Fix effort:** S
-- **Evidence:** `src/components/OccurrenceCard.tsx:134` — `const hasTagsContent      = showTagsParticipants && (tags.length > 0 || listedOn.length > 0)` — but the meta row only renders `listedOn.map(label => (<TagChip …` ; `tags` appears nowhere in the JSX.
-- **Problem:** An occurrence with tags but no time/date/backlinks renders an empty meta row (layout gap), and the dead `tags` wiring suggests tag chips were removed from the card without cleaning up the gating logic.
-- **Fix:** Either render the tag chips or remove `tags` from `hasTagsContent` and the destructuring.
