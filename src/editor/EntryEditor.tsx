@@ -205,10 +205,10 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
                 <SelectTrigger
                   className={cn(
                     badgeVariants({ variant: 'chip' }),
-                    'w-fit gap-1 h-auto py-1 text-xs font-medium text-muted-foreground',
-                    'border-border shadow-sm',
-                    'hover:bg-accent focus:ring-0 focus-visible:ring-1 focus-visible:ring-ring',
-                    '[&>svg]:ml-1 [&>svg]:shrink-0 [&>svg]:size-3 [&>svg]:opacity-60',
+                    'w-fit gap-1 h-auto py-1 text-xs font-medium text-primary',
+                    'bg-primary/20 border-primary shadow-sm',
+                    'hover:bg-primary/25 focus:ring-0 focus-visible:ring-1 focus-visible:ring-ring',
+                    '[&>svg]:ml-1 [&>svg]:shrink-0 [&>svg]:size-3 [&>svg]:opacity-80',
                   )}
                 >
                   <SelectValue />
