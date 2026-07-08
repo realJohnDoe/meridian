@@ -566,7 +566,7 @@ export default function NodeInheritanceDebugger() {
                   <span className="text-xs font-semibold text-red-300">Parse / validation errors</span>
                 </div>
                 <ul className="space-y-1">
-                  {parseErrors.map((err, i) => <li key={`${i}-${err}`} className="text-xs font-mono text-red-300/80">{err}</li>)}
+                  {parseErrors.map(err => <li key={err} className="text-xs font-mono text-red-300/80">{err}</li>)}
                 </ul>
               </div>
             )}
