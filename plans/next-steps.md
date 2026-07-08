@@ -71,28 +71,6 @@ Overall the report is based on direct reading of roughly 40% of the source and g
 
 ## 3. Findings
 
----
-
-### 1. CLAUDE.md architecture doc has drifted from the code it governs
-
-- **Category:** `architecture` `layout`
-- **Impact:** 5 · **Breadth:** 1 doc, with claims falsified against 6+ source files (verified by `Glob src/occState.ts`, importer greps for `undoToast`/`notifications`, `ls src/*/index.ts`) · **Fix effort:** S
-- **Evidence:** `CLAUDE.md` — `` `format.ts`, `fileOccurrence.ts`, `occState.ts` — view-model helpers split from a former `presentation.ts` `` (no `src/occState.ts` exists; the file is `occView.ts`). Also: "A future barrel PR will add `index.ts` files to each directory to formalize the public API surface." — all 9 feature dirs already have barrels, enforced by eslint. Also: `` `occurrenceActions.ts` + `undoToast.ts` — user-action orchestration; used by `editor/` and `calendar/` `` — `undoToast.ts` is imported by exactly one file, `src/occurrenceActions.ts:7`. The list also omits five actual root residents (`occView.ts`, `notifications.ts`, `vaultActions.ts`, `storeCommit.ts`, `persistencePort.ts`).
-- **Problem:** This doc is the contract that agents and contributors are told OVERRIDES default behavior, and its root-resident inventory, file names, and rationale are all stale — so placement decisions get justified against fiction.
-- **Fix:** Rewrite the root-residents table from the measured import graph, delete the "future barrel PR" paragraph, and correct `occState.ts` → `occView.ts`.
-
----
-
-### 2. The root view-model layer has zero test coverage despite dense branching
-
-- **Category:** `testing`
-- **Impact:** 5 · **Breadth:** 3 files (grep of `occState|formatDurationChip|hasSameStructure|useExpandWithMultiday|durationToEndDate` across `*.test.ts` returns no hits; only `updateFileOccurrenceMap` is covered, in `linking.test.ts`) · **Fix effort:** M
-- **Evidence:** `src/model/useExpandWithMultiday.ts:47` — `if (JSON.stringify(ai.repeat) !== JSON.stringify(bi.repeat)) return false` — this `hasSameStructure` function decides when the calendar may reuse a cached expansion instead of recomputing; a false positive silently renders stale data on every view. Same story for `occState` in `src/occView.ts` (9-way state derivation with time-of-day edge cases) and the duration math in `src/format.ts`.
-- **Problem:** Model and storage are well-tested, but the pure functions that decide what the user actually sees — occurrence state coloring, duration chips, and the expansion-cache invalidation predicate — are untested, and cache-invalidation bugs fail silently.
-- **Fix:** Add vitest suites for `hasSameStructure` (one case per structural field), `occState` (each branch + midnight/duration boundaries), and the `format.ts` duration helpers — all pure functions, no mocking needed.
-
----
-
 ### 4. DayView silently hides timed events outside 07:00–22:00
 
 - **Category:** `ux`
