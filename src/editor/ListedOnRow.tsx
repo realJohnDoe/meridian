@@ -6,6 +6,7 @@ import { TagChip } from '@/components'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
+import { matchesQuery } from '@/lib/matching'
 
 interface Props {
   slugs:           string[]
@@ -25,7 +26,7 @@ export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, on
   const filtered = allFiles.filter(e =>
     e.fileSlug !== fileSlug &&
     !alreadyLinked.has(e.fileSlug) &&
-    (!pickerQuery || e.title.toLowerCase().includes(pickerQuery.toLowerCase()))
+    matchesQuery(pickerQuery, e.title)
   )
 
   function handleSelect(targetSlug: string) {
