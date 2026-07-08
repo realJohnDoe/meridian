@@ -1,7 +1,7 @@
 import { useMemo, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { startOfDay } from 'date-fns'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
-import { ChevronDown, ChevronUp, CheckSquare, Square } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useStore } from '@/store'  // items + roots only
 import { Button } from '@/components/ui/button'
 import { SurfaceButton } from '@/components/ui/surface-button'
@@ -97,8 +97,6 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   const h   = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
   const top = h * HP + 1
   const height = Math.max(dh * HP - 4, 28)
-  const hasTrack = o.metadata.done !== undefined
-  const isDone = !!o.metadata.done
 
   const colWidth = `(100% - ${GUTTER}px) / ${totalCols}`
   const left  = `calc(${GUTTER}px + ${colIndex} * (${colWidth}))`
@@ -117,13 +115,7 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
       onClick={() => onOpen(o)}
       aria-label={ariaLabel}
     >
-      <div className="font-semibold overflow-hidden text-ellipsis whitespace-nowrap flex items-center gap-1.5">
-        {/* Non-interactive done indicator — replaced Checkbox to avoid nested buttons */}
-        {hasTrack && (
-          isDone
-            ? <CheckSquare size={12} className="shrink-0 opacity-80" aria-hidden />
-            : <Square size={12} className="shrink-0 opacity-50" aria-hidden />
-        )}
+      <div className="font-semibold overflow-hidden text-ellipsis whitespace-nowrap">
         {o.metadata.title}
       </div>
       <div className="text-2xs font-mono mt-px">
