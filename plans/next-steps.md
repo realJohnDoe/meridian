@@ -9,6 +9,7 @@
 - Consider if name and logo are still good
 - Post about Meridian in Obsidian forums
 - Add vault retention period
+- Fix flow for adding a second vault
 
 ## Recommend Linters from Fable
 
@@ -40,12 +41,6 @@
 
 2. Three hand-rolled search matchers, one of them actively opting out of the library's.
    ItemsList.tsx:313 renders <Command shouldFilter={false}> and then filters with e.title.toLowerCase().includes(pickerQuery.toLowerCase()) — i.e., you're using cmdk but disabling its command-scoring (its core feature) to substitute a weaker substring match. FileResultsList.tsx and ListedOnRow.tsx each have their own lowercase-substring logic too. At personal-vault scale substring matching is defensible — I wouldn't add fuse.js for this — but three divergent matchers is the real smell. Either re-enable cmdk's filtering where you're inside a <Command>, or extract one shared matchesQuery() used by all three, so "why does the picker find this file but search doesn't" can't happen.
-
-## From the Cloudflare auth flow
-
-- Got an error message, but on second try, it worked.
-- No dedup against already-connected repos. The picker shows all installed repos, including ones already connected as a vault. If the user picks a repo they've already connected, addGitHubVaultOAuth creates a second, duplicate VaultRef pointing at the same repo — confusing, not destructive, but not great.
-- Re-doing the full OAuth redirect is heavier than it needs to be. Adding a second vault currently means going through the whole GitHub consent screen again, even though we already hold a valid access token from the first sign-in. A nicer flow would skip straight to the repo picker using the existing token, only falling back to a real redirect if there's no valid session yet.
 
 # Meridian code health report
 
