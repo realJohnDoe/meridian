@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
@@ -14,19 +14,34 @@ import { useEntryDialogs } from './useEntryDialogs'
 
 export type { DialogHandlers } from './useEntryDialogs'
 
-function entryFromItem(item: Occurrence | null, editScope: EditScope): EntryState {
+export interface NewEntrySeed {
+  date?: string
+  time?: string
+  duration?: string
+  itemType?: ItemType
+}
+
+function entryFromItem(item: Occurrence | null, editScope: EditScope, seed?: NewEntrySeed): EntryState {
   if (!item) {
-    return { ...ENTRY_DEFAULT, editScope, scheduled: { date: fmtISO(startOfToday()), time: '' } }
+    const itemType = seed?.itemType ?? ENTRY_DEFAULT.itemType
+    return {
+      ...ENTRY_DEFAULT,
+      editScope,
+      itemType,
+      tracked: itemType === 'task',
+      scheduled: { date: seed?.date ?? fmtISO(startOfToday()), time: seed?.time ?? '' },
+      duration: seed?.duration ?? '',
+    }
   }
   return entryFromOccurrence(item, editScope)
 }
 
-export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string) {
+export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string, seed?: NewEntrySeed) {
   const defaultParticipants = useStore.getState().defaultParticipants
   const today = useToday()
 
   const [entry, setEntry] = useState<EntryState>(() => {
-    const base = entryFromItem(initialOcc, initialScope)
+    const base = entryFromItem(initialOcc, initialScope, seed)
     const seeded = (!initialOcc && defaultParticipants.length > 0)
       ? { ...base, participants: [...defaultParticipants] }
       : base
@@ -49,7 +64,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // Persists an edit. For an existing item this upserts in place; for a brand-new
   // item (item === null) it creates the file on first save, then hands off to the
   // real entry route so subsequent autosaves upsert like any other existing item.
-  const commitEntry = (next: EntryState) => {
+  const commitEntry = useCallback((next: EntryState) => {
     if (next.item) {
       saveNode(next.item, next.editScope, next)
       return
@@ -59,12 +74,12 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     if (result !== 'saved') return
     flushPendingLinksRef.current()
     navigate({ to: '/entry/$slug', params: { slug: titleToSlug(next.title) }, replace: true })
-  }
+  }, [navigate])
 
-  const saveMeta = (next: EntryState) => {
+  const saveMeta = useCallback((next: EntryState) => {
     if (next.editScope === 'add') return
     commitEntry({ ...next, body: getBodyRef.current() })
-  }
+  }, [commitEntry])
 
   // A new item opened with an initial title (e.g. "Add <query>" from search, or a
   // wikilink to a not-yet-existing note) already has everything needed to create the
@@ -74,43 +89,43 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const updateEntry = (next: EntryState) => {
+  const updateEntry = useCallback((next: EntryState) => {
     setEntry(next)
     saveMeta(next)
-  }
+  }, [saveMeta])
 
-  const scheduleAutoSave = (body: string) => {
+  const scheduleAutoSave = useCallback((body: string) => {
     if (entryRef.current.editScope === 'add') return
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     autosaveTimerRef.current = setTimeout(() => {
       commitEntry({ ...entryRef.current, body })
       autosaveTimerRef.current = null
     }, 1500)
-  }
+  }, [commitEntry])
 
-  const handleOpenWikilink = (ref: string) => {
+  const handleOpenWikilink = useCallback((ref: string) => {
     const fileSlug = resolveWikilink(ref, storeRoots)
     if (!fileSlug) {
       navigate(newEntryRoute(ref))
       return
     }
     navigate({ to: '/entry/$slug', params: { slug: fileSlug } })
-  }
+  }, [storeRoots, navigate])
 
-  const goBack = () => {
+  const goBack = useCallback(() => {
     if (window.history.length > 1) router.history.back()
     else navigate({ to: '/' })
-  }
+  }, [router, navigate])
 
-  const handleSave = (body: string) => {
+  const handleSave = useCallback((body: string) => {
     const result = saveNode(entry.item, entry.editScope, { ...entry, body })
     if (result === 'saved') goBack()
-  }
+  }, [entry, goBack])
 
   const dialogs = useEntryDialogs(entry, updateEntry)
   const { setSeriesSheetConfig, setPendingDelete } = dialogs
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     deleteNode(
       entry.item,
       goBack,
@@ -118,17 +133,17 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
       () => setSeriesSheetConfig(null),
       (title, onConfirm) => setPendingDelete({ title, onConfirm }),
     )
-  }
+  }, [entry.item, goBack, setSeriesSheetConfig, setPendingDelete])
 
-  const handleClose = () => goBack()
+  const handleClose = useCallback(() => goBack(), [goBack])
 
-  const handleScopeChange = (scope: EditScope) => {
+  const handleScopeChange = useCallback((scope: EditScope) => {
     if (!entry.item) return
     const { scheduled, repeat } = applyScope(entry.item, scope)
     updateEntry({ ...entry, editScope: scope, scheduled, repeat })
-  }
+  }, [entry, updateEntry])
 
-  const handleTypeChange = (t: ItemType) => {
+  const handleTypeChange = useCallback((t: ItemType) => {
     updateEntry({
       ...entry,
       itemType: t,
@@ -139,11 +154,11 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
         : t === 'event' && !entry.scheduled  ? { date: fmtISO(today), time: '' }
         : entry.scheduled,
     })
-  }
+  }, [entry, today, updateEntry])
 
-  const handleDoneToggle = () => {
+  const handleDoneToggle = useCallback(() => {
     updateEntry({ ...entry, done: !entry.done })
-  }
+  }, [entry, updateEntry])
 
   return {
     entry, setEntry,
