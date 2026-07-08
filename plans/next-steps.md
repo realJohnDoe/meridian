@@ -72,16 +72,6 @@ Overall the report is based on direct reading of roughly 40% of the source and g
 
 ---
 
-### 9. `model/index.ts` exports symbols with zero external consumers
-
-- **Category:** `dead-code`
-- **Impact:** 2 · **Breadth:** 2 files (per-symbol grep across `src/` excluding `model/`: `buildRoot`, `parseYamlToStoreItems`, `serializeRawNode`, `hasRepeat`, `multidayCoversDate` → 0 non-model, non-test importers; `dayBefore`/`treeHasOccurrences`/`displayValue`/`buildEffectiveTree` are used only by the debug tool) · **Fix effort:** S
-- **Evidence:** `src/model/index.ts:7` — `export { parseToStoreItems, buildRoot, effectiveNodeToStoreItems, parseYamlToStoreItems } from './storeItems'` — `buildRoot` and `parseYamlToStoreItems` are consumed only inside `storeItems.ts` itself.
-- **Problem:** The barrel is supposed to be the deliberate public API surface of the domain core, but roughly a third of its exports have no consumer, which makes the real API illegible and every internal refactor look like a breaking change.
-- **Fix:** Drop the unconsumed exports from the barrel (keep them as plain module exports for the debug tool where needed) so the barrel reflects the actual API.
-
----
-
 ### 10. `OccurrenceCard` gates its meta row on tags it never renders
 
 - **Category:** `dead-code` `ux`
