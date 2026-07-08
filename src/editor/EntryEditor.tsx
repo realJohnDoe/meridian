@@ -204,7 +204,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
               <Select value={editScope} onValueChange={v => handleScopeChange(v as EditScope)}>
                 <SelectTrigger
                   className={cn(
-                    'w-fit gap-1 h-auto py-0.5 px-0 mb-3 text-xs font-medium text-muted-foreground',
+                    'w-fit gap-1 h-auto py-0 px-0 mb-3 text-xs font-medium text-muted-foreground',
                     'border-0 shadow-none bg-transparent rounded-none',
                     'hover:text-foreground focus:ring-0 focus-visible:ring-1 focus-visible:ring-ring focus-visible:rounded-sm',
                     '[&>svg]:ml-1 [&>svg]:shrink-0 [&>svg]:size-3 [&>svg]:opacity-70',
