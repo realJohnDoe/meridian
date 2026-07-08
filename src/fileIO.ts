@@ -10,7 +10,7 @@ import { parse as parseYaml } from 'yaml'
  * Non-mapping documents (a bare scalar or sequence) collapse to `{}` — callers
  * always expect a mapping at the frontmatter root.
  */
-export function yamlParse(text: string): Record<string, unknown> {
+function yamlParse(text: string): Record<string, unknown> {
   const parsed = parseYaml(text)
   return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
     ? (parsed as Record<string, unknown>)
@@ -20,7 +20,7 @@ export function yamlParse(text: string): Record<string, unknown> {
 // ── Frontmatter split / merge ─────────────────────────────────
 
 /** CRLF-aware frontmatter split — canonical for the whole codebase. */
-export function splitFrontmatter(content: string): { fm: string; body: string } {
+function splitFrontmatter(content: string): { fm: string; body: string } {
   const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
   if (m) return { fm: m[1], body: m[2].trim() }
   return { fm: content, body: '' }

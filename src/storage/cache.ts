@@ -19,7 +19,7 @@ export interface CacheRecord {
   version?:  string
 }
 
-export interface MetaRecord {
+interface MetaRecord {
   key:   string
   value: FileSystemDirectoryHandle | string | number | VaultRef[]
 }

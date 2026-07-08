@@ -35,7 +35,7 @@ export function removeItemLink(targetSlug: string, sourceSlug: string): void {
 
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
 
-export type SeriesSheetOption = {
+type SeriesSheetOption = {
   icon: 'calendar' | 'calendar-range'
   label: string
   sublabel: string

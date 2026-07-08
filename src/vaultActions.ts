@@ -1,5 +1,5 @@
 export { addLocalVault, addGitHubVault, addGitHubVaultOAuth, removeVault, setActiveVault } from '@/storage'
-export type { GitHubVaultConfig, GitHubOAuthVaultConfig, VaultRef } from '@/storage'
+export type { VaultRef } from '@/storage'
 export { syncToBackend, tokenSave } from '@/storage'
 
 export {

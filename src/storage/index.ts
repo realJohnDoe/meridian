@@ -7,9 +7,8 @@ setEntityPersistence({
 })
 
 export { restoreVaults, setActiveVault, addLocalVault, addGitHubVault, addGitHubVaultOAuth, removeVault, onVaultChanged } from './vaultRegistry'
-export type { GitHubVaultConfig, GitHubOAuthVaultConfig } from './vaultRegistry'
 
-export { syncToBackend, autoSyncTick, resetSyncBackoff, writeEntityToCache, deleteFromBackend } from './sync'
+export { syncToBackend, autoSyncTick, resetSyncBackoff } from './sync'
 
 export { tokenSave } from './cache'
 
@@ -19,6 +18,4 @@ export {
 } from './githubOAuth'
 export type { OAuthTokens, InstalledRepo } from './githubOAuth'
 
-export { ConflictError, TransientSyncError, AuthSyncError, isTransientSyncError } from './conflictError'
-
-export type { VaultRef, VaultKind, StorageBackend, RawFile, LocalVaultRef, ExampleVaultRef, GitHubVaultRef } from './backend'
+export type { VaultRef } from './backend'

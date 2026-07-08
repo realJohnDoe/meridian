@@ -333,7 +333,7 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
   }
 }
 
-export function scheduleAutoPush(): void {
+function scheduleAutoPush(): void {
   const backend = getActiveBackend()
   if (!backend || backend.readOnly) return
   if (_pushTimer) clearTimeout(_pushTimer)
