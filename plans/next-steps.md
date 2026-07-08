@@ -9,20 +9,6 @@
 - Add vault retention period
 - Fix flow for adding a second vault
 
-## Recommend Linters from Fable
-
-2. Worth adding: @eslint-react/eslint-plugin
-   Modern, TypeScript-aware, flat-config-native (the successor to legacy eslint-plugin-react for setups like yours). The rules that fit your priorities:
-   no-leaked-conditional-rendering (type-aware) — catches {count && <X/>} rendering a literal 0
-   no-unstable-context-value / no-unstable-default-props — re-render churn from inline objects
-   no-array-index-key — would flag e.g. the key={${o.fileSlug}-${o.date}-${i}} in DayView.tsx:81
-   the hooks-extra group: no-unnecessary-use-memo / no-unnecessary-use-callback
-   Not worth it
-   eslint-plugin-react-perf — largely obsoleted by the compiler rules above, and noisy.
-   Legacy eslint-plugin-react — mostly redundant given TypeScript + the two above.
-   eslint-plugin-jsx-a11y — only if accessibility becomes a goal; you already hand-write aria-labels consistently, so it would mostly confirm what you do.
-   My suggested order: preset first (it's free and its findings are the most substantive), fix the ~21 non-cache findings, decide on the expansion cache, then add @eslint-react in a second pass. Want me to wire up the preset at warn and triage the findings?
-
 ## Dev Tool recommendations from Fable
 
 4. One ESLint zone, closing a known hole: your boundary rules stop model/ from importing feature dirs but not from importing React — which is exactly how useExpandWithMultiday leaked in. A no-restricted-imports block scoped to src/model/\*\* forbidding react makes the "model is pure" invariant machine-enforced instead of documented.
