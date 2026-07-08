@@ -15,7 +15,7 @@ import {
   getItems, getRoots, setData,
   setSyncDirtyCount, setSyncError, setSyncOffline, setLastSyncedAt,
 } from '@/storeBridge'
-import { notify, warn, notifyError } from '@/notifications'
+import { notify, warn, notifyError } from './notifications'
 import { getActiveBackend } from './activeBackend'
 
 // ── HELPERS ────────────────────────────────────────────────────

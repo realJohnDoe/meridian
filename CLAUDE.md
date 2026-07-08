@@ -49,7 +49,7 @@ Always use `pnpm run build` (which runs `tsc -b`) to verify the full project bui
 | Directory | Scope |
 |---|---|
 | `model/` | Temporal/occurrence domain logic and YAML round-trip (expansion, collapse, inheritance, repeat, store ops). Does **not** include general file I/O or markup parsing. |
-| `storage/` | Backend abstraction (local FS, GitHub, example), IndexedDB cache, sync, vault registry. |
+| `storage/` | Backend abstraction (local FS, GitHub, example), IndexedDB cache, sync, vault registry, toast notifications. |
 | `editor/` | CodeMirror editor, entry UI, dialogs, save logic. |
 | `calendar/` | Day/month/agenda views and occurrence rendering. |
 | `components/` | Shared React components and shadcn/ui primitives (`components/ui/`). |
@@ -62,9 +62,8 @@ Always use `pnpm run build` (which runs `tsc -b`) to verify the full project bui
 - `store.ts` + `storeBridge.ts` — Zustand store; `storeBridge` is imported by `storage/`, `editor/`, and `occurrenceActions.ts`/`storeCommit.ts`
 - `fileIO.ts` — YAML/frontmatter parse+serialize; used by `debug/`, `editor/`, `model/`, `storage/`
 - `wikilinks.ts` — wikilink parse+resolve; used by `editor/`, `model/`, and root
-- `occurrenceActions.ts` — user-action orchestration; used by `editor/` and `calendar/`. `undoToast.ts` is a helper used only by `occurrenceActions.ts` itself, not independently cross-cutting, but stays alongside it at root
+- `occurrenceActions.ts` — user-action orchestration, including its delete-undo toast; used by `editor/` and `calendar/`
 - `storeCommit.ts` + `persistencePort.ts` — persistence-port abstraction (see invariant 3 below); used by `editor/`, `storage/`, and `occurrenceActions.ts`
-- `notifications.ts` — used by `storage/`
 - `vaultActions.ts` — used by `components/` and `routes/`
 - `format.ts`, `fileOccurrence.ts`, `occView.ts` — view-model helpers; each used by three or more feature dirs (`calendar/`, `components/`, `editor/`, `hooks/`, `routes/`, `storage/`, `search/`)
 
