@@ -16,7 +16,7 @@ import {
 import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
 import type { EffectiveNode } from './inheritance'
-import { fmtISO, fmtT, parseDateString, parseDateTime } from './dateUtils'
+import { fmtISO, fmtT, parseDateString, parseDateTime, sameMinute, sameCalendarDay } from './dateUtils'
 import { parseDurationDays } from './duration'
 import { parseInterval } from './repeat'
 
@@ -267,9 +267,9 @@ function expandNode<M>(
     return instanceOverrides.filter(o => {
       if (!o.hasTime) {
         const od = o.matchDate
-        return !!od && od.getFullYear() === jsDate.getFullYear() && od.getMonth() === jsDate.getMonth() && od.getDate() === jsDate.getDate()
+        return !!od && sameCalendarDay(od, jsDate)
       }
-      return Math.abs(o.ms - jsDate.getTime()) < 60000
+      return sameMinute(o.ms, jsDate)
     })
   }
 
@@ -322,12 +322,9 @@ function expandNode<M>(
       if (!t) continue
       let isGenerated = false
       if (!inst.time) {
-        isGenerated = [...generatedMs].some(ms => {
-          const gd = new Date(ms)
-          return gd.getFullYear() === t.getFullYear() && gd.getMonth() === t.getMonth() && gd.getDate() === t.getDate()
-        })
+        isGenerated = [...generatedMs].some(ms => sameCalendarDay(new Date(ms), t))
       } else {
-        isGenerated = [...generatedMs].some(ms => Math.abs(ms - t.getTime()) < 60000)
+        isGenerated = [...generatedMs].some(ms => sameMinute(ms, t))
       }
       if (!isGenerated && t >= from && t <= to) {
         const eff = mergeNode(node, inst)
@@ -347,7 +344,7 @@ function expandNode<M>(
     const allTimes: Array<{ jsTime: Date; done?: boolean; overrideId?: string; metadata: M }> = []
     const anchorInst = (node.instances ?? []).find(i => {
       const t = nodeDateTime(i) || parseDateString(i.date)
-      return t && Math.abs(t.getTime() - anchor.getTime()) < 60000
+      return t && sameMinute(t, anchor)
     })
     if (!anchorInst?.excluded) {
       allTimes.push({
@@ -360,7 +357,7 @@ function expandNode<M>(
     for (const inst of node.instances ?? []) {
       const t = nodeDateTime(inst) || parseDateString(inst.date)
       if (!t || inst.excluded) continue
-      if (Math.abs(t.getTime() - anchor.getTime()) < 60000) continue
+      if (sameMinute(t, anchor)) continue
       allTimes.push({ jsTime: t, done: inst.done ?? node.done, overrideId: inst.id, metadata: { ...node.metadata, ...inst.metadata } as M })
     }
     allTimes.sort((a, b) => a.jsTime.getTime() - b.jsTime.getTime())
@@ -382,11 +379,11 @@ function expandNode<M>(
     const lastDone = [...allTimes].reverse().find(e => e.done === true)
     if (lastDone) {
       const nextJsTime = addInterval(lastDone.jsTime, String(repeat.interval || '1 day'))
-      const alreadyExists = allTimes.some(e => Math.abs(e.jsTime.getTime() - nextJsTime.getTime()) < 60000)
+      const alreadyExists = allTimes.some(e => sameMinute(e.jsTime, nextJsTime))
       const isExcluded = (node.instances ?? []).some(inst => {
         if (!inst.excluded) return false
         const t = parseDateString(inst.date)
-        return t !== null && Math.abs(t.getTime() - nextJsTime.getTime()) < 60000
+        return t !== null && sameMinute(t, nextJsTime)
       })
       if (!alreadyExists && !isExcluded && nextJsTime >= from && nextJsTime <= to) {
         const spec = jsDateToSpec(nextJsTime)
