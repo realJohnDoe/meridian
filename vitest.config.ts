@@ -14,5 +14,18 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      // Per-file floors for modules already well-covered, so they can't
+      // silently regress. Set a few points below measured coverage to leave
+      // headroom for legitimate branches added later.
+      thresholds: {
+        'src/model/collapse.ts': { statements: 90, branches: 80, functions: 95, lines: 90 },
+        'src/editor/cm/taskLines.ts': { statements: 90, branches: 80, functions: 95, lines: 95 },
+        'src/types.ts': { statements: 90, branches: 80, functions: 85, lines: 90 },
+        'src/storage/conflictError.ts': { statements: 90, branches: 85, functions: 95, lines: 95 },
+      },
+    },
   },
 })
