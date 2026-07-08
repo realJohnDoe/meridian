@@ -14,7 +14,7 @@ import { GitHubBackend }  from './githubBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend, VaultRef, GitHubVaultRef } from './backend'
 import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading } from '@/storeBridge'
-import { notify, notifyError } from '@/notifications'
+import { notify, notifyError } from './notifications'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
 import { reconcileWithBackend, parseFiles, updateSyncUI } from './sync'
 // ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
