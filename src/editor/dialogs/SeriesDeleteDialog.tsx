@@ -47,7 +47,7 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
         <RadioGroup value={selected} onValueChange={setSelected} className="gap-1 -mx-1">
           {config?.options.map((opt, i) => (
             <label
-              key={i}
+              key={opt.label}
               htmlFor={`series-opt-${i}`}
               className="flex items-center gap-3 px-3 py-3 rounded-xl cursor-pointer transition-colors border
                          border-transparent hover:bg-white/5

@@ -173,9 +173,9 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                     >
                       {label}
                       <span className="flex gap-1">
-                        {swatches.map((color, i) => (
+                        {swatches.map(color => (
                           <span
-                            key={i}
+                            key={color}
                             className="block size-2.5 rounded-full"
                             style={{ background: color }}
                           />

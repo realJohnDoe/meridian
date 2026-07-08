@@ -62,8 +62,8 @@ function CalCell({ date, other, dayOccs, today, maxVisible, onDayClick }: CalCel
         isToday && 'bg-primary text-primary-foreground font-bold',
       )}>{date.getDate()}</span>
       <div className="flex flex-col gap-0.5 flex-1 overflow-hidden">
-        {dayOccs.slice(0, shown).map((o, i) => (
-          <div key={i} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
+        {dayOccs.slice(0, shown).map(o => (
+          <div key={`${o.fileSlug}-${o.date}`} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
             <span className="truncate min-w-0">{multidayDisplayTitle(o, date) ?? o.metadata.title}</span>
           </div>
         ))}
@@ -185,7 +185,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   return (
     <div className="relative flex-1 flex flex-col overflow-hidden pb-10" ref={wrapRef}>
       <div className="grid grid-cols-7 px-1 shrink-0 pt-2">
-        {weekdayLabels.map((d, i) => <div key={i} className="text-center text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground py-0.75">{d}</div>)}
+        {weekdayLabels.map(d => <div key={d} className="text-center text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground py-0.75">{d}</div>)}
       </div>
 
       <div

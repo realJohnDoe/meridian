@@ -101,9 +101,9 @@ export function ScrollColumn<T extends string | number>({
           '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         )}
       >
-        {items.map((item, i) => (
+        {items.map(item => (
           <div
-            key={i}
+            key={item}
             className={cn(
               'h-11 flex items-center justify-center',
               'text-xl font-mono select-none cursor-pointer',

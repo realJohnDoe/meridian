@@ -5,13 +5,15 @@ import { TagChip } from '@/components'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 
+const EMPTY_PARTICIPANTS: string[] = []
+
 interface Props {
   participants:     string[]
   onChange:         (next: string[]) => void
   allParticipants?: string[]
 }
 
-export default function ParticipantsRow({ participants, onChange, allParticipants = [] }: Props) {
+export default function ParticipantsRow({ participants, onChange, allParticipants = EMPTY_PARTICIPANTS }: Props) {
   const [open,  setOpen]  = useState(false)
   const [query, setQuery] = useState('')
 
@@ -35,7 +37,7 @@ export default function ParticipantsRow({ participants, onChange, allParticipant
       <Users size={13} className="opacity-40 self-center" />
       {participants.map((p, i) => (
         <TagChip
-          key={i}
+          key={p}
           label={p.trim()}
           interactive
           onRemove={() => onChange(participants.filter((_, j) => j !== i))}
