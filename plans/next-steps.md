@@ -9,10 +9,6 @@
 - Add vault retention period
 - Fix flow for adding a second vault
 
-## Dev Tool recommendations from Fable
-
-4. One ESLint zone, closing a known hole: your boundary rules stop model/ from importing feature dirs but not from importing React — which is exactly how useExpandWithMultiday leaked in. A no-restricted-imports block scoped to src/model/\*\* forbidding react makes the "model is pure" invariant machine-enforced instead of documented.
-
 # Meridian code health report
 
 ## 1. Health verdict
