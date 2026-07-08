@@ -81,16 +81,6 @@ Overall the report is based on direct reading of roughly 40% of the source and g
 
 ---
 
-### 5. Root files that violate the project's own placement rule
-
-- **Category:** `layout`
-- **Impact:** 3 · **Breadth:** 2 files (importer greps: `notifications` → only `storage/sync.ts` + `storage/vaultRegistry.ts`; `undoToast` → only `occurrenceActions.ts`) · **Fix effort:** S
-- **Evidence:** `src/storage/sync.ts:18` — `import { notify, warn, notifyError } from '@/notifications'` — the only two importers of `notifications.ts` are both in `storage/`. CLAUDE.md's own rule: "a file moves into a subdirectory only when every caller already lives in that subdirectory".
-- **Problem:** Root level is documented as reserved for files imported by three or more unrelated layers, but `notifications.ts` (1 consumer dir) and `undoToast.ts` (1 consumer file) sit there anyway, diluting the convention that makes root residency meaningful.
-- **Fix:** Move `notifications.ts` into `storage/` and fold `undoToast.ts` into `occurrenceActions.ts` (or move it beside it), updating the CLAUDE.md table in the same PR.
-
----
-
 ### 6. `store.ts` hand-rolls the same persisted-slice pattern four times
 
 - **Category:** `dry` `srp`
