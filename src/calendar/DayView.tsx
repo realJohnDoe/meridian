@@ -18,6 +18,7 @@ const HOURS = 24              // hours shown on the timeline
 const HP = 56                 // pixels per hour
 const GUTTER = 64              // px reserved for the left hour-label column
 const TOP_PAD = 8              // px headroom above 0:00 so its label isn't clipped
+const BOTTOM_PAD = 8           // px breathing room below 24:00
 const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
 const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
 const DEFAULT_CREATE_DURATION = '1h'
@@ -234,7 +235,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
 
       {/* Scrollable timeline */}
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch] relative" id="dvSc" ref={scRef}>
-        <div className="relative" id="dvTl" ref={tlRef} style={{ height: HOURS * HP + TOP_PAD + 64 }}>
+        <div className="relative" id="dvTl" ref={tlRef} style={{ height: HOURS * HP + TOP_PAD + BOTTOM_PAD }}>
 
           {/* Hour-boundary labels (0:00 … 24:00) */}
           {Array.from({ length: HOURS + 1 }, (_, h) => h).map(h => (
