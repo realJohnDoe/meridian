@@ -16,30 +16,20 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 
 ## 3. Findings
 
-| # | Title | Category | Impact | Breadth | Effort |
-|---|---|---|---|---|---|
-| 1 | Documented architecture invariants only partially machine-enforced | `toolchain` `architecture` | 6 | 13 files | S |
-| 2 | Unused type-checked lint preset — 124 real findings | `toolchain` `types` | 5 | 30 files | M |
-| 3 | App test files type-checked by nothing (errors exist today) | `toolchain` `testing` `types` | 4 | 17 files | S |
-| 4 | UI layer has zero tests and the test config can't run any | `testing` `toolchain` | 5 | ~70 files (est.) | L |
-| 5 | `format.ts` hand-rolls calendar math incorrectly beside date-fns | `library-fit` `dry` | 4 | 1 file | S |
-| 6 | Broken `.claude/worktrees/` silently target the wrong repo | `toolchain` | 5 | env-wide | S |
-| 7 | Hand-rolled recurrence engine — **keep-custom verdict**, one caveat | `library-fit` | 2 | 2 files | n/a |
-| 8 | `store.ts` duplicates `lib/vaultStorage.ts`'s key assembly | `dry` | 2 | 2 files | S |
-| 9 | OAuth worker returns unhandled 500s on malformed input | `error-handling` | 2 | 1 file | S |
-| 10 | `.npmrc` comment says the opposite of what the setting does | `toolchain` | 1 | 1 file | S |
+| #   | Title                                                               | Category                      | Impact | Breadth          | Effort |
+| --- | ------------------------------------------------------------------- | ----------------------------- | ------ | ---------------- | ------ |
+| 1   | Documented architecture invariants only partially machine-enforced  | `toolchain` `architecture`    | 6      | 13 files         | S      |
+| 2   | Unused type-checked lint preset — 124 real findings                 | `toolchain` `types`           | 5      | 30 files         | M      |
+| 3   | App test files type-checked by nothing (errors exist today)         | `toolchain` `testing` `types` | 4      | 17 files         | S      |
+| 4   | UI layer has zero tests and the test config can't run any           | `testing` `toolchain`         | 5      | ~70 files (est.) | L      |
+| 5   | `format.ts` hand-rolls calendar math incorrectly beside date-fns    | `library-fit` `dry`           | 4      | 1 file           | S      |
+| 6   | Broken `.claude/worktrees/` silently target the wrong repo          | `toolchain`                   | 5      | env-wide         | S      |
+| 7   | Hand-rolled recurrence engine — **keep-custom verdict**, one caveat | `library-fit`                 | 2      | 2 files          | n/a    |
+| 8   | `store.ts` duplicates `lib/vaultStorage.ts`'s key assembly          | `dry`                         | 2      | 2 files          | S      |
+| 9   | OAuth worker returns unhandled 500s on malformed input              | `error-handling`              | 2      | 1 file           | S      |
+| 10  | `.npmrc` comment says the opposite of what the setting does         | `toolchain`                   | 1      | 1 file           | S      |
 
 ---
-
-### 1. Documented architecture invariants are only partially machine-enforced
-
-- **Category:** `toolchain` `architecture`
-- **Impact:** 6 · **Breadth:** 13 files guarded (11 `model/` source files via `git ls-files src/model`, + `storeCommit.ts` + `occurrenceActions.ts`) · **Fix effort:** S
-- **Evidence:** CLAUDE.md states "These rules are enforced by the import-boundary lint rules (`pnpm run lint`)" for all four invariants, but `eslint.config.js` only restricts `model/` from React:
-  `message: 'model/ is the pure domain core and must not depend on React.'`
-  **Dry-run:** a probe file `src/model/_lintprobe.ts` containing `import { useStore } from '@/store'` and `import { syncToBackend } from '@/storage'` passed `npx eslint` with exit **0**. Nothing restricts `storeCommit.ts`/`occurrenceActions.ts` from importing `@/storage` directly either — the UI→storage zone targets only `components/calendar/editor/search/onboarding`.
-- **Problem:** Invariant 1 (model imports nothing outward) and invariant 3 (core persistence goes through `persistencePort`) are documentation-only, and git history proves the failure mode is real — commit `aaf6693` ("Enforce model/ purity against React imports via ESLint") exists because a React hook had already leaked into `model/`.
-- **Fix:** Add `no-restricted-imports` entries for `@/store`, `@/storage`, `@/storeBridge`, `@/editor`, `@/calendar`, `zustand` in the existing `src/model/**` override, and a zone forbidding `storeCommit.ts`/`occurrenceActions.ts` from `./src/storage`.
 
 ### 2. Installed lint stack ships a type-checked preset the config doesn't use — 124 real findings
 
