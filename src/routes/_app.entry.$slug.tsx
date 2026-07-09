@@ -9,7 +9,6 @@ import { isEditScope } from '@/types'
 import { SyncButton } from '@/components'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { useTopbarSlot } from './-topbarSlot'
 import type { Occurrence, EditScope } from '@/types'
@@ -44,15 +43,12 @@ interface TopbarProps {
 
 function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack }: TopbarProps) {
   const slotEl = useTopbarSlot()
-  const { isMobile } = useSidebar()
   if (!slotEl) return null
   return createPortal(
     <div className="flex items-center gap-1 w-full lg:max-w-[720px] lg:mx-auto px-3.5">
-      {isMobile && (
-        <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={onBack} title="Back" aria-label="Back">
-          <ArrowLeft size={18} />
-        </Button>
-      )}
+      <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={onBack} title="Back" aria-label="Back">
+        <ArrowLeft size={18} />
+      </Button>
       <div className="flex-1" />
       <SyncButton />
       <Button
