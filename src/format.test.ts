@@ -31,6 +31,11 @@ describe('durationToEndDate', () => {
   it('falls back to start+1 day for an unparseable duration', () => {
     expect(durationToEndDate('2026-06-01', 'nonsense')).toBe('2026-06-02')
   })
+
+  it('uses calendar-correct month arithmetic across a short month', () => {
+    // Jan 31 + 1 month should land on Feb 28, not roll into March
+    expect(durationToEndDate('2026-01-31', '1 month')).toBe('2026-02-28')
+  })
 })
 
 describe('fmtDuration', () => {
