@@ -3,7 +3,7 @@ import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
 
-import { useIsTouchDevice } from "@/hooks"
+import { useMediaQuery } from "@/hooks"
 import { cn } from "@/lib/cn"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,6 +29,7 @@ const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const SIDEBAR_MOBILE_QUERY = "(max-width: 767px)" // matches Tailwind's md breakpoint
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -71,7 +72,7 @@ const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const isMobile = useIsTouchDevice()
+    const isMobile = useMediaQuery(SIDEBAR_MOBILE_QUERY)
     const [openMobile, setOpenMobile] = React.useState(false)
 
     // This is the internal state of the sidebar.
