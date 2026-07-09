@@ -121,3 +121,16 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Dependencies** — knip is CI-gated and clean, every dependency accounted for; `resolution-mode=lowest-direct` and `verify-store-integrity` are unusually careful.
 - **Performance** — React Compiler enabled with the matching lint preset, route-level auto code-splitting, structural-change-aware expansion caching, virtualized lists.
 - **Layout** — co-change pairs from `git log --name-only` all live side by side; every CLAUDE.md root-resident claim checked against the real import graph held up.
+
+## Architecture / DIP issues
+
+1. The GitHub adapter leaks into the generic sync orchestrator — the one real hexagonal break. sync.ts:289:
+
+if (e instanceof AuthSyncError && !attemptedRefresh && backend instanceof GitHubBackend) {
+sync.ts imports the concrete GitHubBackend and ensureFreshAccessToken, then does an instanceof dispatch and calls backend.updateToken(fresh). The orchestrator that should only know StorageBackend contains one adapter's auth-recovery protocol. It's the only instanceof <Backend> in the codebase (grep confirmed), so the fix is contained: add an optional refreshAuth(): Promise<boolean> to the StorageBackend interface, move the refresh logic into GitHubBackend, and the orchestrator's retry loop becomes adapter-agnostic.
+
+3. Presentation leaks into orchestration and infrastructure (mild, arguably fine). occurrenceActions.ts:1 imports toast from sonner directly and runs the undo-toast state machine; storage/notifications.ts has infrastructure driving UI toasts. A purist would surface events and let the UI subscribe — and the store's syncError/syncOffline fields are that cleaner channel, used in parallel. At this app's scale I'd accept it; if you ever want to tidy it, occurrenceActions importing sonner directly (rather than going through a wrapper like notifications.ts) is the first thing to fix.
+
+4. VaultRef lives in the wrong layer. store.ts:3 and storeBridge.ts do import type { VaultRef } from '@/storage' — the application state layer depends on an infrastructure-owned type. It's type-only (erased at runtime, no real cycle), but "a reference to a vault" is an application concept; moving it to types.ts would fix the arrow direction.
+
+5. Port registration is an import side effect that fails silent. Registration happens when storage/index.ts is first imported, and persistencePort.ts uses \_impl?.writeEntity(slug) — if registration ever didn't run, writes would silently no-op rather than throw. A fail-fast throw in the unregistered case would be safer.
