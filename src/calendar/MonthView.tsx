@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import { differenceInCalendarDays } from 'date-fns'
 import { useHorizontalSwipe } from './useHorizontalSwipe'
 import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
 
-import { multidayDisplayTitle, weekStartsOn } from '@/model'
+import { parseDurationDays, weekStartsOn } from '@/model'
 import { sameDay } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
+import { computeMultidayLanes } from './computeMultidayLanes'
 
 const EMPTY: Occurrence[] = []
 import { useExpandWithMultiday } from './useExpandWithMultiday'
@@ -15,6 +17,18 @@ import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
 
+// The exact vertical offset where the chip list starts in the DOM, so the bar
+// overlay's `top` lines up with it precisely and the bar→chip gap equals ROW_GAP.
+// Must be exact (unlike CELL_CHROME below): cell top padding (3px) + day-number
+// badge h-5 (20px) + badge mb-px (1px) + the 8px flex `gap-2` that the cell's
+// flex column inherits from Button's base class (SurfaceButton doesn't reset it)
+// = 32px. Omitting that inherited gap is what left an extra 8px gap before.
+const BAR_TOP = 3 + 20 + 1 + 8
+// Conservative reservation for badge + cell padding, used only to estimate
+// how many chip rows fit in the remaining cell height — doesn't need to be exact.
+const CELL_CHROME = 26
+const ROW_GAP = 2 // gap-0.5 between stacked rows (chips and bars share this)
+const MAX_BAR_LANES = 2 // stacked multiday bars per week row before overflow
 
 // ── CalCell ───────────────────────────────────────────────────
 interface CalCellProps {
@@ -23,6 +37,10 @@ interface CalCellProps {
   dayOccs: Occurrence[]
   today: Date
   maxVisible: number
+  rowH: number
+  reservedLanes: number
+  hiddenBarCount: number
+  barCoverCount: number
   onDayClick: (date: Date) => void
 }
 
@@ -32,10 +50,10 @@ interface CalCellProps {
 // auto-caches occsByDay, and useToday only updates at midnight), so the
 // React Compiler's own per-prop memoization already skips this render when
 // nothing relevant changed.
-function CalCell({ date, other, dayOccs, today, maxVisible, onDayClick }: CalCellProps) {
+function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes, hiddenBarCount, barCoverCount, onDayClick }: CalCellProps) {
   const isToday = sameDay(date, today)
 
-  const occCount = dayOccs.length
+  const occCount = dayOccs.length + barCoverCount
   const ariaLabel = [
     date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', ...(date.getFullYear() !== new Date().getFullYear() && { year: 'numeric' }) }),
     isToday ? 'today' : '',
@@ -44,8 +62,10 @@ function CalCell({ date, other, dayOccs, today, maxVisible, onDayClick }: CalCel
 
   // Reserve the last visible slot for the "+N more" line once there's overflow,
   // so the total number of rendered lines never exceeds what CalCell measured as fitting.
-  const overflowing = dayOccs.length > maxVisible
-  const shown = overflowing ? Math.max(0, maxVisible - 1) : dayOccs.length
+  const capacity = Math.max(1, maxVisible - reservedLanes)
+  const overflowing = dayOccs.length > capacity || hiddenBarCount > 0
+  const shown = overflowing ? Math.max(0, capacity - 1) : dayOccs.length
+  const hiddenCount = (dayOccs.length - shown) + hiddenBarCount
 
   return (
     <SurfaceButton
@@ -61,14 +81,17 @@ function CalCell({ date, other, dayOccs, today, maxVisible, onDayClick }: CalCel
         'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px',
         isToday && 'bg-primary text-primary-foreground font-bold',
       )}>{date.getDate()}</span>
-      <div className="flex flex-col gap-0.5 flex-1 overflow-hidden">
+      <div
+        className="flex flex-col gap-0.5 flex-1 overflow-hidden"
+        style={reservedLanes ? { marginTop: reservedLanes * (rowH + ROW_GAP) } : undefined}
+      >
         {dayOccs.slice(0, shown).map(o => (
           <div key={`${o.fileSlug}-${o.date}`} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
-            <span className="truncate min-w-0">{multidayDisplayTitle(o, date) ?? o.metadata.title}</span>
+            <span className="truncate min-w-0">{o.metadata.title}</span>
           </div>
         ))}
         {overflowing && (
-          <div className="text-3xs sm:text-2xs text-foreground px-0.5 sm:px-1">+{dayOccs.length - shown}</div>
+          <div className="text-3xs sm:text-2xs text-foreground px-0.5 sm:px-1">+{hiddenCount}</div>
         )}
       </div>
     </SurfaceButton>
@@ -108,7 +131,10 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
   // useExpandWithMultiday caches by (fromMs, toMs, items structure, roots) so
   // non-structural edits (done-toggle, priority change) skip re-expansion here
-  // just as they do in Agenda and Day views.
+  // just as they do in Agenda and Day views. Multiday events emit both a root
+  // occurrence (start day) and one virtual occurrence per subsequent covered
+  // day (see expandWithMultiday) — we partition those below rather than
+  // switching data sources, since the shared cache already has everything we need.
   const allOccs = useExpandWithMultiday(items, roots, new Date(y, m, 1), new Date(y, m + 1, 0, 23, 59, 59))
 
   // Cell grid depends only on month shape and locale week-start — independent of occurrences.
@@ -126,18 +152,31 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     return out
   })()
 
-  const occsByDay = (() => {
-    const map = new Map<string, Occurrence[]>()
+  // Partition into single-day occurrences (bucketed per day, as chips) and
+  // multiday occurrences (one root entry per event, deduped from the root +
+  // per-day-virtual-occurrence set expandWithMultiday produces).
+  const { occsByDay, multidayLanes } = (() => {
+    const dayMap = new Map<string, Occurrence[]>()
+    const rootsById = new Map<string, Occurrence>()
+
     for (const o of filterOccs(allOccs)) {
-      if (!o.metadata.jsTime) continue
-      const d = o.metadata.jsTime
-      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-      const arr = map.get(key)
-      if (arr) arr.push(o)
-      else map.set(key, [o])
+      const days = parseDurationDays(o.metadata.duration) ?? 1
+      if (days < 2) {
+        if (!o.metadata.jsTime) continue
+        const d = o.metadata.jsTime
+        const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+        const arr = dayMap.get(key)
+        if (arr) arr.push(o)
+        else dayMap.set(key, [o])
+        continue
+      }
+      const existing = rootsById.get(o.id)
+      if (!existing || (o.metadata.jsTime?.getTime() ?? 0) < (existing.metadata.jsTime?.getTime() ?? 0)) {
+        rootsById.set(o.id, o)
+      }
     }
-    for (const [k, arr] of map) map.set(k, sortOccs(arr))
-    return map
+    for (const [k, arr] of dayMap) dayMap.set(k, sortOccs(arr))
+    return { occsByDay: dayMap, multidayLanes: computeMultidayLanes([...rootsById.values()]) }
   })()
 
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -153,25 +192,27 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   // height / week rows); rowSentinelRef is an invisible row rendered with the
   // exact same classes as a real one, so its measured height already reflects
   // the current breakpoint's font-size/padding without hardcoding it here.
+  // rowH (the same measured height) also sizes the multiday bar segments, so
+  // bars and chips always line up at the same row height.
   const weekRows = Math.ceil(cells.length / 7)
+  const weekRowsArr = Array.from({ length: weekRows }, (_, i) => cells.slice(i * 7, i * 7 + 7))
   const gridRef = useRef<HTMLDivElement>(null)
   const rowSentinelRef = useRef<HTMLDivElement>(null)
   const [maxVisible, setMaxVisible] = useState(3)
+  const [rowH, setRowH] = useState(0)
 
   useEffect(() => {
     const gridEl = gridRef.current
     const rowEl = rowSentinelRef.current
     if (!gridEl || !rowEl) return
 
-    const CELL_CHROME = 26 // day-number badge (h-5=20px) + mb-px + cell padding (p-[3px_2px_2px])
-    const ROW_GAP = 2      // gap-0.5 between rows
-
     const compute = () => {
-      const rowH = rowEl.offsetHeight
-      if (!rowH) return
+      const measuredRowH = rowEl.offsetHeight
+      if (!measuredRowH) return
+      setRowH(measuredRowH)
       const cellH = gridEl.clientHeight / weekRows
       const available = cellH - CELL_CHROME
-      const n = Math.floor((available + ROW_GAP) / (rowH + ROW_GAP))
+      const n = Math.floor((available + ROW_GAP) / (measuredRowH + ROW_GAP))
       setMaxVisible(Math.min(8, Math.max(1, n)))
     }
 
@@ -197,19 +238,72 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       </div>
 
       <div className="flex-1 overflow-hidden px-1 pb-1 flex flex-col">
-        <div ref={gridRef} className="grid grid-cols-7 gap-0.5 flex-1">
-          {cells.map(({ date, other }) => {
-            const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+        <div ref={gridRef} className="flex flex-col gap-0.5 flex-1">
+          {weekRowsArr.map(row => {
+            const rowStart = row[0].date
+            const rowEnd = row[6].date
+            const rowKey = `${rowStart.getFullYear()}-${rowStart.getMonth()}-${rowStart.getDate()}`
+            const rowBars = multidayLanes
+              .filter(l => l.startD <= rowEnd && l.endD >= rowStart)
+              .map(l => ({
+                ...l,
+                startCol: Math.max(0, differenceInCalendarDays(l.startD, rowStart)),
+                endCol: Math.min(6, differenceInCalendarDays(l.endD, rowStart)),
+              }))
+            const shownBars = rowBars.filter(b => b.lane < MAX_BAR_LANES)
+
             return (
-              <CalCell
-                key={key}
-                date={date}
-                other={other}
-                dayOccs={occsByDay.get(key) ?? EMPTY}
-                today={today}
-                maxVisible={maxVisible}
-                onDayClick={onDayClick}
-              />
+              <div key={rowKey} className="relative flex-1">
+                <div className="grid grid-cols-7 gap-0.5 h-full">
+                  {row.map(({ date, other }) => {
+                    const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+                    const col = differenceInCalendarDays(date, rowStart)
+                    const dayBars = rowBars.filter(b => b.startCol <= col && col <= b.endCol)
+                    // Reserve blank lanes per-day based only on the bars that cover
+                    // THIS day, so a day past the end of a multiday bar reclaims that
+                    // lane for its own single-day chips instead of leaving it blank.
+                    const dayLaneCount = dayBars.reduce((max, b) => Math.max(max, b.lane + 1), 0)
+                    const reservedLanes = Math.min(MAX_BAR_LANES, dayLaneCount)
+                    const hiddenBarCount = dayBars.filter(b => b.lane >= reservedLanes).length
+                    return (
+                      <CalCell
+                        key={key}
+                        date={date}
+                        other={other}
+                        dayOccs={occsByDay.get(key) ?? EMPTY}
+                        today={today}
+                        maxVisible={maxVisible}
+                        rowH={rowH}
+                        reservedLanes={reservedLanes}
+                        hiddenBarCount={hiddenBarCount}
+                        barCoverCount={dayBars.length}
+                        onDayClick={onDayClick}
+                      />
+                    )
+                  })}
+                </div>
+                {shownBars.length > 0 && (
+                  <div
+                    className="absolute inset-x-0 pointer-events-none grid grid-cols-7 gap-0.5"
+                    style={{ top: BAR_TOP, gridAutoRows: rowH || undefined }}
+                  >
+                    {shownBars.map(b => (
+                      <div
+                        key={b.occ.id}
+                        style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.lane + 1 }}
+                        className={cn(
+                          dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
+                          // mx-0.5 mirrors the day cell's 2px horizontal padding so a
+                          // single-column bar aligns exactly with a single-day chip.
+                          'flex items-center mx-0.5 rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
+                        )}
+                      >
+                        <span className="truncate min-w-0">{b.occ.metadata.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )
           })}
         </div>
