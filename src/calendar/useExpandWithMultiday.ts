@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { StoreItem, Roots, Occurrence } from '@/types'
-import { computeExpansionCache, type ExpansionCache } from '@/model'
+import { computeExpansionCache, weekStartsOn, type ExpansionCache } from '@/model'
+import { useStore } from '@/store'
 
 /**
  * Cached expansion hook. Calls expandWithMultiday once per structural change,
@@ -20,7 +21,8 @@ export function useExpandWithMultiday(
   to: Date,
 ): Occurrence[] {
   const [cache, setCache] = useState<ExpansionCache | null>(null)
-  const next = computeExpansionCache(cache, items, roots, from, to)
+  const weekStart = useStore(s => weekStartsOn(s.localePrefs))
+  const next = computeExpansionCache(cache, items, roots, from, to, weekStart)
   if (next.allOccs !== cache?.allOccs) {
     setCache(next)
   }

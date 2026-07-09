@@ -50,14 +50,15 @@ function resolveOneSlug(
   now: Date,
   AHEAD: Date,
   BACK: Date,
+  weekStart: 0 | 1 | 6,
 ): Occurrence | null {
   // 1. Nearest upcoming undone occurrence.
-  for (const occ of expandRange(slugItems, roots, now, AHEAD)) {
+  for (const occ of expandRange(slugItems, roots, now, AHEAD, weekStart)) {
     if (!occ.metadata.done) return occ
   }
 
   // 2. Most-recent overdue occurrence (past undone).
-  const back = expandRange(slugItems, roots, BACK, now)
+  const back = expandRange(slugItems, roots, BACK, now, weekStart)
   const pastUndone = [...back].reverse().find(o => !o.metadata.done)
   if (pastUndone) return pastUndone
 
@@ -72,7 +73,7 @@ function resolveOneSlug(
   if (pastDone) return pastDone
 
   // 5. Any upcoming done occurrence.
-  for (const occ of expandRange(slugItems, roots, now, AHEAD)) {
+  for (const occ of expandRange(slugItems, roots, now, AHEAD, weekStart)) {
     return occ
   }
 
@@ -118,6 +119,7 @@ export function updateFileOccurrenceMap(
   prevRoots: Roots,
   items:     StoreItem[],
   roots:     Roots,
+  weekStart: 0 | 1 | 6 = 1,
 ): Map<string, Occurrence> {
   const now   = startOfToday()
   const AHEAD = new Date(now.getTime() + _3YR_MS)
@@ -152,7 +154,7 @@ export function updateFileOccurrenceMap(
       if (cached !== undefined) { map.set(slug, cached); continue }
     }
 
-    const occ = resolveOneSlug(slug, slugItems, roots, now, AHEAD, BACK)
+    const occ = resolveOneSlug(slug, slugItems, roots, now, AHEAD, BACK, weekStart)
     if (occ) map.set(slug, occ)
   }
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { StoreItem, Roots, Occurrence, LocalePrefs } from './types'
 import type { VaultRef } from '@/storage'
-import { clearOccIdCache } from '@/model'
+import { clearOccIdCache, weekStartsOn } from '@/model'
 import { updateFileOccurrenceMap } from './fileOccurrence'
 import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 
@@ -145,8 +145,9 @@ export const useStore = create<MeridianStore>((set, get) => {
     fom: new Map(),
     setData: ({ items, roots }) => {
       clearOccIdCache()
-      const { items: prevItems, roots: prevRoots, fom: prevFom } = get()
-      set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots) })
+      const { items: prevItems, roots: prevRoots, fom: prevFom, localePrefs } = get()
+      const weekStart = weekStartsOn(localePrefs)
+      set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots, weekStart) })
     },
 
     vaults:              [],

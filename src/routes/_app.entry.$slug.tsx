@@ -4,7 +4,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Heart, Menu, Trash2 } from 'lucide-react'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor'
-import { expandRange } from '@/model'
+import { expandRange, weekStartsOn } from '@/model'
 import { isEditScope } from '@/types'
 import { SyncButton } from '@/components'
 import { Button } from '@/components/ui/button'
@@ -102,16 +102,17 @@ function EntrySlugPage() {
   const roots        = useStore(s => s.roots)
   const fom          = useStore(s => s.fom)
   const vaultLoading = useStore(s => s.vaultLoading)
+  const weekStart    = useStore(s => weekStartsOn(s.localePrefs))
 
   const occ = useMemo((): Occurrence | null => {
     if (date) {
       const d = new Date(date + 'T00:00:00')
       const next = new Date(d); next.setDate(next.getDate() + 1)
-      const found = expandRange(items, roots, d, next).find(o => o.fileSlug === slug)
+      const found = expandRange(items, roots, d, next, weekStart).find(o => o.fileSlug === slug)
       if (found) return found
     }
     return fom.get(slug) ?? null
-  }, [fom, items, roots, slug, date])
+  }, [fom, items, roots, slug, date, weekStart])
 
   if (vaultLoading && !occ) return <EntrySkeleton />
   if (!occ) return (
