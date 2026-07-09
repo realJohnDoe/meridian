@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Heart, Menu, Trash2 } from 'lucide-react'
+import { ArrowLeft, Heart, Trash2 } from 'lucide-react'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor'
 import { expandRange, weekStartsOn } from '@/model'
@@ -39,17 +39,18 @@ interface TopbarProps {
   isFavorited: boolean
   onToggleFavorite: () => void
   onDelete: () => void
+  onBack: () => void
 }
 
-function EntryTopbar({ isFavorited, onToggleFavorite, onDelete }: TopbarProps) {
+function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack }: TopbarProps) {
   const slotEl = useTopbarSlot()
-  const { setOpenMobile, isMobile } = useSidebar()
+  const { isMobile } = useSidebar()
   if (!slotEl) return null
   return createPortal(
     <div className="flex items-center gap-1 w-full lg:max-w-[720px] lg:mx-auto px-3.5">
       {isMobile && (
-        <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={() => setOpenMobile(true)} title="Menu">
-          <Menu size={18} />
+        <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={onBack} title="Back" aria-label="Back">
+          <ArrowLeft size={18} />
         </Button>
       )}
       <div className="flex-1" />
@@ -85,6 +86,7 @@ function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
         isFavorited={isFavorited}
         onToggleFavorite={() => toggleFavorite(occ.fileSlug)}
         onDelete={hooks.handleDelete}
+        onBack={hooks.handleClose}
       />
       <Suspense fallback={<EntrySkeleton />}>
         <EditorShell entry={hooks.entry} hooks={hooks} items={items} roots={roots} />

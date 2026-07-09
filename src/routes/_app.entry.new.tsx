@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { createFileRoute } from '@tanstack/react-router'
-import { Menu } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor'
 import { SyncButton } from '@/components'
@@ -45,15 +45,15 @@ export const Route = createFileRoute('/_app/entry/new')({
   }),
 })
 
-function NewEntryTopbar() {
+function NewEntryTopbar({ onBack }: { onBack: () => void }) {
   const slotEl = useTopbarSlot()
-  const { setOpenMobile, isMobile } = useSidebar()
+  const { isMobile } = useSidebar()
   if (!slotEl) return null
   return createPortal(
     <div className="flex items-center gap-1 w-full lg:max-w-[720px] lg:mx-auto px-3.5">
       {isMobile && (
-        <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={() => setOpenMobile(true)} title="Menu">
-          <Menu size={18} />
+        <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={onBack} title="Back" aria-label="Back">
+          <ArrowLeft size={18} />
         </Button>
       )}
       <div className="flex-1" />
@@ -70,7 +70,7 @@ function NewEntryReady({ title, date, time, duration, itemType }: NewEntrySearch
 
   return (
     <>
-      <NewEntryTopbar />
+      <NewEntryTopbar onBack={hooks.handleClose} />
       <Suspense fallback={<EntrySkeleton />}>
         <EditorShell entry={hooks.entry} hooks={hooks} items={items} roots={roots} />
       </Suspense>
