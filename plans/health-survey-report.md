@@ -39,17 +39,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Problem:** The riskiest layer of the app — parsing untrusted YAML into typed domain objects — is where the unused rules fire most, and `no-base-to-string` flags a real bug class (`[object Object]` leaking into dates/durations from malformed frontmatter).
 - **Fix:** Enable `recommended-type-checked` (or at minimum `no-base-to-string`, `no-unsafe-*`, `no-unnecessary-type-assertion`) and burn down the 124, starting with the 47 auto-fixes.
 
-### 5. `format.ts` hand-rolls calendar math incorrectly beside an installed date library
-
-- **Category:** `library-fit` `dry`
-- **Impact:** 4 · **Breadth:** 1 file, 2 functions (grep `durationToEnd` → `format.ts` + 3 UI callers) · **Fix effort:** S
-- **Evidence:** `src/format.ts`:
-  `if (p.unit === 'months')  return fmtISO(addDays(start, p.n * 30 - 1))` and
-  `: p.unit === 'days'    ? addMinutes(start, p.n * 24 * 60)`
-  — with `date-fns` (which exports calendar-correct `addMonths`/`addYears`/`addDays`) imported **in the same file**.
-- **Problem:** A "1 month" duration starting Jan 31 ends Mar 1 instead of Feb 28, and day/week durations computed as minutes shift by an hour across DST transitions (`addDays` is DST-safe; `addMinutes(start, 1440)` is not) — user-visible wrong end dates in the duration dialog.
-- **Fix:** Replace the arithmetic with `addMonths`/`addYears`/`addWeeks`/`addDays` from the already-installed library.
-
 ### 7. Hand-rolled recurrence engine — keep-custom verdict, with one caveat
 
 - **Category:** `library-fit`
@@ -96,8 +85,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Layout** — co-change pairs from `git log --name-only` all live side by side; every CLAUDE.md root-resident claim checked against the real import graph held up.
 
 ## Architecture / DIP issues
-
-3. Presentation leaks into orchestration and infrastructure (mild, arguably fine). occurrenceActions.ts:1 imports toast from sonner directly and runs the undo-toast state machine; storage/notifications.ts has infrastructure driving UI toasts. A purist would surface events and let the UI subscribe — and the store's syncError/syncOffline fields are that cleaner channel, used in parallel. At this app's scale I'd accept it; if you ever want to tidy it, occurrenceActions importing sonner directly (rather than going through a wrapper like notifications.ts) is the first thing to fix.
 
 4. VaultRef lives in the wrong layer. store.ts:3 and storeBridge.ts do import type { VaultRef } from '@/storage' — the application state layer depends on an infrastructure-owned type. It's type-only (erased at runtime, no real cycle), but "a reference to a vault" is an application concept; moving it to types.ts would fix the arrow direction.
 
