@@ -74,6 +74,11 @@ Examples (not exhaustive):
 - A concern split across too many files with no clear owner — the reader must open 4+ files to follow one behavior end to end
 - Missing or misplaced boundaries — absence of a clear API surface between subsystems (e.g., feature modules that import directly from each other's internals)
 - Circular or upward dependencies — lower-level modules importing from higher-level ones
+- Pierced abstractions — an interface/port exists but is bypassed in practice:
+  `instanceof` checks on a concrete implementation, an orchestrator importing
+  one specific adapter of an interface it otherwise consumes abstractly, or an
+  implementation-specific concern (auth, retries, caching) handled outside the
+  interface instead of behind it
 
 ### 2. Directory & File Layout _(high weight)_
 
