@@ -93,6 +93,9 @@ export default [
       // concentrated at the untyped-YAML boundary, where it's the compiler's
       // best signal that a parsed value needs a guard before use.
       '@typescript-eslint/no-unsafe-member-access': 'error',
+      // Flags `async` functions with no `await` inside — usually a stale
+      // marker left after refactoring, or a missing await the caller relies on.
+      '@typescript-eslint/require-await': 'error',
 
       // ── Import boundaries (barrel enforcement) ───────────────────────────────
       // Each directory with an index.ts is a feature module. Code outside that
@@ -222,6 +225,18 @@ export default [
           ],
         },
       ],
+    },
+  },
+
+  // ExampleBackend and the sync-collision test's FakeBackend are deliberately
+  // synchronous StorageBackend implementations (no real I/O to await) — the
+  // `async` keyword is there only so their method signatures structurally
+  // match the interface's Promise-returning contract, not because they ever
+  // await anything.
+  {
+    files: ['src/storage/exampleBackend.ts', 'src/storage/__tests__/sync-collision.test.ts'],
+    rules: {
+      '@typescript-eslint/require-await': 'off',
     },
   },
 ]
