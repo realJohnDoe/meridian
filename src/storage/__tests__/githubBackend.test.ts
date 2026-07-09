@@ -3,6 +3,17 @@ import { encodeBase64, decodeBase64, mapGitHubError } from '@/storage/githubApi'
 import { GitHubBackend } from '@/storage/githubBackend'
 import { ConflictError, AuthSyncError, TransientSyncError, isTransientSyncError } from '@/storage/conflictError'
 
+/** Shape of the JSON body GitHubBackend sends for write/delete requests. */
+interface WriteRequestBody {
+  branch:  string
+  sha?:    string
+  content: string
+}
+
+function parseRequestBody(init: RequestInit): WriteRequestBody {
+  return JSON.parse(init.body as string) as WriteRequestBody
+}
+
 // ── Base64 helpers ─────────────────────────────────────────────
 
 describe('encodeBase64 / decodeBase64', () => {
@@ -185,7 +196,7 @@ describe('GitHubBackend', () => {
     expect(url).toContain('/repos/alice/notes/contents/new.md')
     expect((init.method ?? '').toUpperCase()).toBe('PUT')
 
-    const body = JSON.parse(init.body as string)
+    const body = parseRequestBody(init)
     expect(body.branch).toBe('main')
     expect(body.sha).toBeUndefined()
     expect(decodeBase64(body.content)).toBe('# New note')
@@ -197,7 +208,7 @@ describe('GitHubBackend', () => {
     await backend.write('note.md', '# Updated', 'existingsha')
 
     const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
-    const body = JSON.parse(init.body as string)
+    const body = parseRequestBody(init)
     expect(body.sha).toBe('existingsha')
     expect(decodeBase64(body.content)).toBe('# Updated')
   })
@@ -208,7 +219,7 @@ describe('GitHubBackend', () => {
     await backend.write('new.md', '# New')
 
     const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
-    const body = JSON.parse(init.body as string)
+    const body = parseRequestBody(init)
     expect(body.sha).toBeUndefined()
   })
 
@@ -237,7 +248,7 @@ describe('GitHubBackend', () => {
     await backend.write('note.md', '# Updated', 'existingsha')
 
     const [, init] = fetchSpy.mock.calls[1] as [string, RequestInit]
-    const body = JSON.parse(init.body as string)
+    const body = parseRequestBody(init)
     expect(body.sha).toBe('existingsha')
     expect(decodeBase64(body.content)).toBe('# Updated')
   })
@@ -255,7 +266,7 @@ describe('GitHubBackend', () => {
     expect(url).toContain('/repos/alice/notes/contents/old.md')
     expect((init.method ?? '').toUpperCase()).toBe('DELETE')
 
-    const body = JSON.parse(init.body as string)
+    const body = parseRequestBody(init)
     expect(body.sha).toBe('delsha')
     expect(body.branch).toBe('main')
   })

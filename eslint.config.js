@@ -89,6 +89,10 @@ export default [
       // Flags `as` casts that assert a type the expression already has —
       // usually stale leftovers from before types were tightened.
       '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+      // Catches property access on a value TS can't prove is safe to index —
+      // concentrated at the untyped-YAML boundary, where it's the compiler's
+      // best signal that a parsed value needs a guard before use.
+      '@typescript-eslint/no-unsafe-member-access': 'error',
 
       // ── Import boundaries (barrel enforcement) ───────────────────────────────
       // Each directory with an index.ts is a feature module. Code outside that
