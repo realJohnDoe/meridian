@@ -1,6 +1,5 @@
 ## Next steps
 
-- Show multiday events as bars spanning multiple days in month view
 - Check if all clickable components are at least 44x44 px
 - Investigate split second hang when toggling tasks
 - Add arrows to multiday rows in month and day view
