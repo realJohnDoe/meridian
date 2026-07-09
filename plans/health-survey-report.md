@@ -39,18 +39,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Problem:** The riskiest layer of the app — parsing untrusted YAML into typed domain objects — is where the unused rules fire most, and `no-base-to-string` flags a real bug class (`[object Object]` leaking into dates/durations from malformed frontmatter).
 - **Fix:** Enable `recommended-type-checked` (or at minimum `no-base-to-string`, `no-unsafe-*`, `no-unnecessary-type-assertion`) and burn down the 124, starting with the 47 auto-fixes.
 
-### 10. `.npmrc` comment says the opposite of what the setting does
-
-- **Category:** `toolchain`
-- **Impact:** 1 · **Breadth:** 1 file · **Fix effort:** S
-- **Evidence:** `.npmrc`:
-  `# Enforce the lockfile in CI — pnpm install will fail if pnpm-lock.yaml is out of date`
-  directly above `frozen-lockfile=false`.
-- **Problem:** The comment claims enforcement while the value disables it — the outcome is still safe only because CI happens to pass `--frozen-lockfile` explicitly, but the file actively misleads anyone auditing the supply-chain posture.
-- **Fix:** Rewrite the comment to say local installs are unfrozen and CI enforces via the explicit flag (or delete the setting, since `false` is only meaningful locally).
-
----
-
 ## Explicitly clean areas
 
 - **Security** (threat model: client-only SPA parsing user-owned YAML/Markdown; GitHub tokens in IndexedDB behind a strict `script-src 'self'` CSP; PKCE with state+verifier checks; client secret isolated in the worker; single-origin CORS) — no findings.
