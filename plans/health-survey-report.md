@@ -50,14 +50,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Problem:** A "1 month" duration starting Jan 31 ends Mar 1 instead of Feb 28, and day/week durations computed as minutes shift by an hour across DST transitions (`addDays` is DST-safe; `addMinutes(start, 1440)` is not) — user-visible wrong end dates in the duration dialog.
 - **Fix:** Replace the arithmetic with `addMonths`/`addYears`/`addWeeks`/`addDays` from the already-installed library.
 
-### 6. Agent worktrees under `.claude/worktrees/` are broken and silently target the wrong repo
-
-- **Category:** `toolchain`
-- **Impact:** 5 · **Breadth:** environment-wide (this survey's assigned worktree confirmed; prior sessions hit the same) · **Fix effort:** S
-- **Evidence:** `.claude/worktrees/suspicious-jones-32470b/` has **no `.git` file**, so `git rev-parse --show-toplevel` from inside it returns `C:/Users/johan/code/meridian` — every git command silently operates on the parent repo. Its file copy is stale: its `package.json` lacks `@eslint-react/eslint-plugin`, and `eslint.config.js`, `index.html`, `knip.json`, and `src/occState.test.ts` are missing entirely. There is also a junk artifact directory `C:Usersjohancodemeridian.githubworkflows` (a mangled Windows path) in the repo root, untracked.
-- **Problem:** An agent editing or surveying in such a worktree reads and modifies stale code while its commits land somewhere else — this survey initially computed metrics on the stale copy before catching it.
-- **Fix:** Delete the broken worktree directories, recreate via `git worktree add` (verifying the `.git` pointer file exists), remove the junk directory, and consider a session-start check (hook) that fails fast when `git rev-parse --show-toplevel` doesn't match the cwd.
-
 ### 7. Hand-rolled recurrence engine — keep-custom verdict, with one caveat
 
 - **Category:** `library-fit`
