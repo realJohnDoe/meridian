@@ -1,6 +1,7 @@
 import { format, isValid, parseISO, addDays } from 'date-fns'
 
 import type { LocalePrefs } from '@/types'
+import { scalarToString } from '@/types'
 
 /** Convert a LocalePrefs firstDayOfWeek (Intl convention) to date-fns/react-day-picker convention (0=Sun, 1=Mon, 6=Sat). */
 export function weekStartsOn(prefs: LocalePrefs): 0 | 1 | 6 {
@@ -46,9 +47,11 @@ export function fmtT(v: unknown, hour12 = false): string | null {
 export function parseDateString(s: unknown): Date | null {
   if (!s) return null
   if (s instanceof Date) return isValid(s) ? s : null
-  const dm = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  const str = scalarToString(s)
+  if (str === undefined) return null
+  const dm = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (dm) return new Date(+dm[1], +dm[2] - 1, +dm[3])
-  const d = parseISO(String(s))
+  const d = parseISO(str)
   return isValid(d) ? d : null
 }
 

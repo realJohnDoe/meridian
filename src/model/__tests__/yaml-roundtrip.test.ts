@@ -84,6 +84,23 @@ describe('structural expectations', () => {
     const dates = occs.map(o => o.metadata.jsTime && fmtISO(o.metadata.jsTime))
     expect(dates).toEqual(['2026-04-19', '2026-04-20', '2026-04-21'])
   })
+
+  // Regression test: malformed frontmatter (a nested mapping where a scalar
+  // was expected) must not silently stringify to '[object Object]' — it
+  // should be treated as absent instead.
+  it('malformed non-scalar date/title fields are treated as absent, not "[object Object]"', () => {
+    const parsed = parseToStoreItems('malformed.md', [
+      '---',
+      'title:',
+      '  nested: yes',
+      'date:',
+      '  nested: yes',
+      '---',
+    ].join('\n'))
+
+    expect(parsed.root.title).not.toContain('[object Object]')
+    expect(parsed.items[0].date).not.toContain('[object Object]')
+  })
 })
 
 describe('split series (repeat-type change)', () => {

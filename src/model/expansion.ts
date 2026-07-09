@@ -15,7 +15,7 @@ import {
   differenceInCalendarDays,
 } from 'date-fns'
 import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
-import { isSeries, isStandaloneOcc } from '@/types'
+import { isSeries, isStandaloneOcc, scalarToString } from '@/types'
 import type { EffectiveNode } from './inheritance'
 import { fmtISO, fmtT, parseDateString, parseDateTime } from './dateUtils'
 import { parseDurationDays } from './duration'
@@ -28,7 +28,8 @@ import { parseInterval } from './repeat'
 function toDate(v: unknown): Date | null {
   if (!v) return null
   if (v instanceof Date) return isValid(v) ? v : null
-  return parseDateString(String(v))
+  const str = scalarToString(v)
+  return str === undefined ? null : parseDateString(str)
 }
 
 function addInterval(date: Date, intervalStr: string): Date {
