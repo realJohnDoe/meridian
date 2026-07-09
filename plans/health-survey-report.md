@@ -39,17 +39,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Problem:** The riskiest layer of the app — parsing untrusted YAML into typed domain objects — is where the unused rules fire most, and `no-base-to-string` flags a real bug class (`[object Object]` leaking into dates/durations from malformed frontmatter).
 - **Fix:** Enable `recommended-type-checked` (or at minimum `no-base-to-string`, `no-unsafe-*`, `no-unnecessary-type-assertion`) and burn down the 124, starting with the 47 auto-fixes.
 
-### 3. App test files are type-checked by nothing — and contain type errors today
-
-- **Category:** `toolchain` `testing` `types`
-- **Impact:** 4 · **Breadth:** 17 files (16 `src/**/*.test.ts` + `model/__tests__/helpers.ts`, counted via `find`) · **Fix effort:** S
-- **Evidence:** `tsconfig.app.json` has `"exclude": ["src/**/__tests__/**", "src/**/*.test.ts"]`, and CI runs only `lint` / `vitest` / `vite build && tsc -b --noEmit` / `knip` — none of which type-check tests (Vitest strips types without checking; ESLint reports only lint rules). **Dry-run:** `tsc -p tsconfig.eslint.json --noEmit` fails today with
-  `src/model/__tests__/edits.test.ts(477,15): error TS2352: Conversion of type 'OccurrenceMetadata' to type 'Record<string, unknown>' may be a mistake` and
-  `src/model/__tests__/helpers.ts(1,43): error TS2307: Cannot find module 'node:fs'`
-  (the eslint tsconfig lacks `"types": ["node"]`, which also degrades type-aware linting in that file). The worker is fine — its `tsc --noEmit` includes its tests.
-- **Problem:** The model test suite is the repo's main safety net, yet its own files can silently drift from the APIs they exercise.
-- **Fix:** Add a `tsconfig.test.json` (extending the app config, including tests, with node types) and run `tsc -p tsconfig.test.json --noEmit` in the build script or CI; fix the two existing errors.
-
 ### 4. The entire UI layer has zero tests and the test config cannot run any
 
 - **Category:** `testing` `toolchain`
