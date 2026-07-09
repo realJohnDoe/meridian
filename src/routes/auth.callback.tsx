@@ -34,7 +34,11 @@ function CenteredMessage({ title, description, children }: { title: string; desc
 }
 
 function AuthCallbackPage() {
-  const search = Route.useSearch()
+  // Explicit annotation (matches validateSearch above) rather than relying on
+  // inference through the generated route tree: CI lints before the build
+  // step regenerates routeTree.gen.ts, so Route.useSearch() would otherwise
+  // resolve to an unregistered/unresolved type there.
+  const search: { code?: string; state?: string; error?: string } = Route.useSearch()
   const navigate = useNavigate()
   const [phase, setPhase] = useState<Phase>({ kind: 'exchanging' })
 
