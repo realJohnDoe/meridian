@@ -171,6 +171,7 @@ function generateScheduledDates(
   sched: Extract<Repeat, { type: 'schedule' }>,
   from: Date,
   to: Date,
+  weekStart: 0 | 1 | 6 = 1,
 ): Date[] {
   const { freq, byweekday, bymonthday, bysetpos, interval = 1, end } = sched
   const results: Date[] = []
@@ -205,13 +206,13 @@ function generateScheduledDates(
         dates.push(withTime(periodStart))
       } else {
         const wd = periodStart.getDay()
-        const mondayOff = wd === 0 ? -6 : 1 - wd
-        const weekStart = new Date(periodStart)
-        weekStart.setDate(periodStart.getDate() + mondayOff)
+        const weekStartOff = -((wd - weekStart + 7) % 7)
+        const periodWeekStart = new Date(periodStart)
+        periodWeekStart.setDate(periodStart.getDate() + weekStartOff)
         for (const dStr of byweekday) {
           const target = WDAYS_MAP[dStr.toLowerCase()] ?? 0
-          const dayCandidate = new Date(weekStart)
-          dayCandidate.setDate(weekStart.getDate() + (target === 0 ? 6 : target - 1))
+          const dayCandidate = new Date(periodWeekStart)
+          dayCandidate.setDate(periodWeekStart.getDate() + (target - weekStart + 7) % 7)
           dates.push(withTime(dayCandidate))
         }
       }
@@ -257,6 +258,7 @@ function expandNode<M>(
   node: ExpandNode<M>,
   from: Date,
   to: Date,
+  weekStart: 0 | 1 | 6 = 1,
 ): ExpandedOcc<M>[] {
   const occurrences: ExpandedOcc<M>[] = []
   const anchor = nodeDateTime(node)
@@ -324,7 +326,7 @@ function expandNode<M>(
   const repeat = node.repeat
 
   if (repeat.type === 'schedule') {
-    const generated = generateScheduledDates(anchor, node.time, repeat, from, to)
+    const generated = generateScheduledDates(anchor, node.time, repeat, from, to, weekStart)
     const generatedMs = new Set(generated.map(d => d.getTime()))
     generatedMs.add(anchor.getTime())
 
@@ -418,7 +420,7 @@ function expandNode<M>(
   for (const child of node.instances ?? []) {
     if (child.repeat) {
       const effChild = mergeNode(node, child)
-      occurrences.push(...expandNode({ ...effChild, instances: [] }, from, to))
+      occurrences.push(...expandNode({ ...effChild, instances: [] }, from, to, weekStart))
     }
   }
 
@@ -496,6 +498,7 @@ export function expandRange(
   roots: Roots,
   from: Date,
   to: Date,
+  weekStart: 0 | 1 | 6 = 1,
 ): OccurrenceEntry<AppMetadata>[] {
   const result: OccurrenceEntry<AppMetadata>[] = []
 
@@ -525,7 +528,7 @@ export function expandRange(
       })),
     }
 
-    const raw = expandNode(expandable, from, to)
+    const raw = expandNode(expandable, from, to, weekStart)
 
     // Map each emitted occurrence back to the exact override child it came from
     // via `overrideId`. Keying by child id (not by minute) is what lets two
@@ -588,8 +591,9 @@ export function expandWithMultiday(
   roots: Roots,
   from: Date,
   to: Date,
+  weekStart: 0 | 1 | 6 = 1,
 ): OccurrenceEntry<AppMetadata>[] {
-  const occs = expandRange(items, roots, from, to)
+  const occs = expandRange(items, roots, from, to, weekStart)
 
   const extraMultiday = items
     .filter(isStandaloneOcc)
