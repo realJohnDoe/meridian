@@ -9,10 +9,17 @@ export function setEntityPersistence(impl: EntityPersistence): void {
   _impl = impl
 }
 
+function requireImpl(): EntityPersistence {
+  if (!_impl) {
+    throw new Error('persistencePort: no EntityPersistence registered — call setEntityPersistence() first')
+  }
+  return _impl
+}
+
 export function writeEntity(slug: string): void {
-  _impl?.writeEntity(slug)
+  requireImpl().writeEntity(slug)
 }
 
 export function deleteEntity(slug: string): void {
-  _impl?.deleteEntity(slug)
+  requireImpl().deleteEntity(slug)
 }
