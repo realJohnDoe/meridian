@@ -129,7 +129,7 @@ function initState(
   }
 
   return {
-    freq: s.freq as Freq,
+    freq: s.freq,
     wdays,
     monthly,
     endType,
@@ -156,7 +156,7 @@ function buildRepeat(
 
   const r: Repeat = { 
     type: 'schedule', 
-    freq: freq as Exclude<Repeat, { type: 'after_completion' }>['freq'],
+    freq: freq,
     interval: intervalNum,
   }
 

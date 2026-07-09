@@ -89,7 +89,7 @@ export function entryFromOccurrence(
     tags:         [...(m.tags         || [])],
     items:        [...(m.items        || [])],
     participants: [...(m.participants || [])],
-    priority:     (m.priority || null) as EntryState['priority'],
+    priority:     (m.priority || null),
     editScope,
   }
 }

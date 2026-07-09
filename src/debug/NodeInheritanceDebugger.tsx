@@ -13,7 +13,7 @@ import {
   saveFile,
 } from '@/model'
 import { loadFile } from '@/fileIO'
-import type { Occurrence, Priority, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern, OccurrenceMetadata } from '@/types'
+import type { Occurrence, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern, OccurrenceMetadata } from '@/types'
 import { EntryEditor, DialogStack, RepeatDialog, applyScope, entryFromOccurrence } from '@/editor'
 import type { EntryState, DialogHandlers } from '@/editor'
 
@@ -326,7 +326,7 @@ export default function NodeInheritanceDebugger() {
     if (!displayContent) return null
     try {
       const { rawNode } = loadFile(fileName || 'debug.md', displayContent)
-      return buildEffectiveTree(rawNode as Parameters<typeof buildEffectiveTree>[0])
+      return buildEffectiveTree(rawNode)
     } catch { return null }
   }, [displayContent, fileName])
 
@@ -452,7 +452,7 @@ export default function NodeInheritanceDebugger() {
   const handleDebugScopeChange = useCallback((scope: EditScope) => {
     setDebugEntry(prev => {
       if (!prev?.item) return prev
-      const occ = prev.item as Occurrence
+      const occ = prev.item
       const { scheduled, repeat } = applyScope(occ, scope, items)
       if (scope === 'future' || scope === 'all') {
         // File-level fields (title/tags/body) come from debugRoot; occurrence fields from series.
@@ -461,7 +461,7 @@ export default function NodeInheritanceDebugger() {
           ...prev, editScope: scope, scheduled, repeat,
           title:    debugRoot?.title ?? prev.title,
           tags:     debugRoot?.tags  ? [...debugRoot.tags] : prev.tags,
-          priority: (pm?.priority ?? prev.priority ?? null) as Priority | null,
+          priority: (pm?.priority ?? prev.priority ?? null),
           body: debugRoot?.body  ?? prev.body,
           duration: pm?.duration ?? prev.duration,
           tracked:  prev.tracked,

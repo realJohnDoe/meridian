@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { applyScope, entryFromOccurrence } from './save'
-import type { Occurrence, StoreItem, StoreSeries } from '@/types'
+import type { Occurrence, StoreSeries } from '@/types'
 
 function makeOcc(overrides: Partial<Occurrence> = {}): Occurrence {
   return {
@@ -64,7 +64,7 @@ describe('applyScope', () => {
   it('single scope keeps only this occurrence\'s date/time and drops repeat', () => {
     const occ = makeOcc({ ownerId: 'series-1' })
     const series = makeSeries()
-    const { scheduled, repeat } = applyScope(occ, 'single', [series, occ as unknown as StoreItem])
+    const { scheduled, repeat } = applyScope(occ, 'single', [series, occ])
     expect(scheduled).toEqual({ date: '2026-06-15', time: '09:00' })
     expect(repeat).toBeNull()
   })
@@ -72,7 +72,7 @@ describe('applyScope', () => {
   it('future scope keeps this occurrence\'s date but carries the series repeat', () => {
     const occ = makeOcc({ ownerId: 'series-1' })
     const series = makeSeries()
-    const { scheduled, repeat } = applyScope(occ, 'future', [series, occ as unknown as StoreItem])
+    const { scheduled, repeat } = applyScope(occ, 'future', [series, occ])
     expect(scheduled).toEqual({ date: '2026-06-15', time: '09:00' })
     expect(repeat).toEqual(series.repeat)
   })
@@ -80,21 +80,21 @@ describe('applyScope', () => {
   it('all scope rolls back to the series root date/time', () => {
     const occ = makeOcc({ ownerId: 'series-1' })
     const series = makeSeries()
-    const { scheduled, repeat } = applyScope(occ, 'all', [series, occ as unknown as StoreItem])
+    const { scheduled, repeat } = applyScope(occ, 'all', [series, occ])
     expect(scheduled).toEqual({ date: '2026-06-01', time: '09:00' })
     expect(repeat).toEqual(series.repeat)
   })
 
   it('add scope schedules a fresh occurrence for today, with no repeat', () => {
     const occ = makeOcc()
-    const { scheduled, repeat } = applyScope(occ, 'add', [occ as unknown as StoreItem])
+    const { scheduled, repeat } = applyScope(occ, 'add', [occ])
     expect(scheduled?.time).toBe('09:00')
     expect(repeat).toBeNull()
   })
 
   it('single scope on a standalone (non-recurring) item has no series to fall back to', () => {
     const occ = makeOcc()
-    const { scheduled, repeat } = applyScope(occ, 'all', [occ as unknown as StoreItem])
+    const { scheduled, repeat } = applyScope(occ, 'all', [occ])
     expect(scheduled).toEqual({ date: '2026-06-15', time: '09:00' })
     expect(repeat).toBeNull()
   })

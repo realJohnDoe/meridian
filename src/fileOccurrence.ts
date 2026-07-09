@@ -80,7 +80,7 @@ function resolveOneSlug(
   // 6. Any standalone (undated done or out-of-window dated single).
   for (const item of slugItems) {
     if (isStandaloneOcc(item)) {
-      return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) } as Occurrence
+      return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) }
     }
   }
 

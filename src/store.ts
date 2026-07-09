@@ -102,11 +102,11 @@ type Getter = () => MeridianStore
 /** Persists a vault-scoped string-array field to localStorage on every write, keyed by the active vault. */
 function persistedArrayField(keyPrefix: string, field: keyof MeridianStore, set: Setter, get: Getter) {
   return {
-    load: (vaultId: string) => set({ [field]: readVaultStringArray(keyPrefix, vaultId) } as Partial<MeridianStore>),
+    load: (vaultId: string) => set({ [field]: readVaultStringArray(keyPrefix, vaultId) }),
     persist: (value: string[]) => {
       const { activeVaultId } = get()
       if (activeVaultId) writeVaultJSON(keyPrefix, activeVaultId, value)
-      set({ [field]: value } as Partial<MeridianStore>)
+      set({ [field]: value })
     },
   }
 }
@@ -114,11 +114,11 @@ function persistedArrayField(keyPrefix: string, field: keyof MeridianStore, set:
 /** Persists a vault-scoped boolean field to localStorage on every write, keyed by the active vault. */
 function persistedBoolField(keyPrefix: string, field: keyof MeridianStore, defaultValue: boolean, set: Setter, get: Getter) {
   return {
-    load: (vaultId: string) => set({ [field]: readVaultJSON(keyPrefix, vaultId, defaultValue) } as Partial<MeridianStore>),
+    load: (vaultId: string) => set({ [field]: readVaultJSON(keyPrefix, vaultId, defaultValue) }),
     persist: (value: boolean) => {
       const { activeVaultId } = get()
       if (activeVaultId) writeVaultJSON(keyPrefix, activeVaultId, value)
-      set({ [field]: value } as Partial<MeridianStore>)
+      set({ [field]: value })
     },
   }
 }
