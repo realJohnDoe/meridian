@@ -59,6 +59,7 @@
     "@eslint-react/eslint-plugin": "^5.11.3",
     "@tailwindcss/vite": "^4.1.0",
     "@tanstack/router-plugin": "^1.168.18",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
