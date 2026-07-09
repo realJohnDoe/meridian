@@ -86,6 +86,4 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 
 ## Architecture / DIP issues
 
-4. VaultRef lives in the wrong layer. store.ts:3 and storeBridge.ts do import type { VaultRef } from '@/storage' — the application state layer depends on an infrastructure-owned type. It's type-only (erased at runtime, no real cycle), but "a reference to a vault" is an application concept; moving it to types.ts would fix the arrow direction.
-
 5. Port registration is an import side effect that fails silent. Registration happens when storage/index.ts is first imported, and persistencePort.ts uses \_impl?.writeEntity(slug) — if registration ever didn't run, writes would silently no-op rather than throw. A fail-fast throw in the unregistered case would be safer.
