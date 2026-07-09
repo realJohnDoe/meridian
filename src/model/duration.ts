@@ -12,6 +12,8 @@
  * always writes single-unit full-word strings via serialise()).
  */
 
+import { scalarToString } from '@/types'
+
 export type DurationUnit = 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'
 
 /** Canonical single-unit parse. Returns null for unrecognised or compound strings. */
@@ -32,7 +34,9 @@ export function parseDuration(s: string): { n: number; unit: DurationUnit } | nu
 /** Whole-day count for multi-day display; null for sub-day durations. */
 export function parseDurationDays(dur: unknown): number | null {
   if (!dur) return null
-  const p = parseDuration(String(dur))
+  const str = scalarToString(dur)
+  if (str === undefined) return null
+  const p = parseDuration(str)
   if (!p) return null
   if (p.unit === 'days')   return p.n
   if (p.unit === 'weeks')  return p.n * 7
@@ -44,7 +48,9 @@ export function parseDurationDays(dur: unknown): number | null {
 /** Fractional hours for timeline layout and sorting. Falls back to 0.75 for unparseable input. */
 export function parseDurationHours(dur: unknown): number {
   if (!dur) return 0.75
-  const s = String(dur).trim()
+  const str = scalarToString(dur)
+  if (str === undefined) return 0.75
+  const s = str.trim()
   const p = parseDuration(s)
   if (p) {
     if (p.unit === 'minutes') return p.n / 60

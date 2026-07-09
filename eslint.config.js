@@ -82,6 +82,10 @@ export default [
         'error',
         { checksVoidReturn: { attributes: false } },
       ],
+      // Catches values that stringify to the useless '[object Object]'
+      // instead of a real error — most often malformed YAML frontmatter
+      // leaking a non-primitive into a template string or String() call.
+      '@typescript-eslint/no-base-to-string': 'error',
 
       // ── Import boundaries (barrel enforcement) ───────────────────────────────
       // Each directory with an index.ts is a feature module. Code outside that
