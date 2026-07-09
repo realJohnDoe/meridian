@@ -39,14 +39,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Problem:** The riskiest layer of the app — parsing untrusted YAML into typed domain objects — is where the unused rules fire most, and `no-base-to-string` flags a real bug class (`[object Object]` leaking into dates/durations from malformed frontmatter).
 - **Fix:** Enable `recommended-type-checked` (or at minimum `no-base-to-string`, `no-unsafe-*`, `no-unnecessary-type-assertion`) and burn down the 124, starting with the 47 auto-fixes.
 
-### 9. OAuth worker returns unhandled 500s on malformed input
-
-- **Category:** `error-handling`
-- **Impact:** 2 · **Breadth:** 1 file · **Fix effort:** S
-- **Evidence:** `worker/src/oauthToken.ts`: `const form = await request.formData()` — a non-form-encoded POST body throws before `badRequest()` can answer; likewise `const data = await githubResponse.json()` throws if GitHub ever returns non-JSON (e.g. an HTML error page), despite the handler otherwise carefully returning structured `invalid_request` errors.
-- **Problem:** The worker's own error contract (JSON `error_description`, which the client's `exchangeForTokens` parses) breaks on exactly the inputs most likely during an outage, surfacing as an opaque failure in the sign-in flow.
-- **Fix:** Wrap both parses in try/catch returning `badRequest(...)` / a 502 JSON error.
-
 ### 10. `.npmrc` comment says the opposite of what the setting does
 
 - **Category:** `toolchain`
@@ -65,7 +57,3 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Dependencies** — knip is CI-gated and clean, every dependency accounted for; `resolution-mode=lowest-direct` and `verify-store-integrity` are unusually careful.
 - **Performance** — React Compiler enabled with the matching lint preset, route-level auto code-splitting, structural-change-aware expansion caching, virtualized lists.
 - **Layout** — co-change pairs from `git log --name-only` all live side by side; every CLAUDE.md root-resident claim checked against the real import graph held up.
-
-## Architecture / DIP issues
-
-5. Port registration is an import side effect that fails silent. Registration happens when storage/index.ts is first imported, and persistencePort.ts uses \_impl?.writeEntity(slug) — if registration ever didn't run, writes would silently no-op rather than throw. A fail-fast throw in the unregistered case would be safer.
