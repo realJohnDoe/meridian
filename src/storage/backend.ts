@@ -1,30 +1,10 @@
-export type VaultKind = 'local' | 'example' | 'github'
+import type { VaultKind } from '@/types'
 
 export interface RawFile {
   path:    string
   content: string
   version: string
 }
-
-interface VaultRefBase {
-  id:   string
-  name: string
-}
-
-interface LocalVaultRef extends VaultRefBase {
-  kind: 'local'
-}
-
-interface ExampleVaultRef extends VaultRefBase {
-  kind: 'example'
-}
-
-export interface GitHubVaultRef extends VaultRefBase {
-  kind:   'github'
-  github: { owner: string; repo: string; branch: string }
-}
-
-export type VaultRef = LocalVaultRef | ExampleVaultRef | GitHubVaultRef
 
 export interface StorageBackend {
   readonly id:       string
@@ -44,4 +24,11 @@ export interface StorageBackend {
   delete(path: string, expectedVersion?: string): Promise<void>
   /** Local: query/request FS permission. Example: always returns 'granted'. */
   ensurePermission(interactive: boolean): Promise<PermissionState>
+  /**
+   * Attempt to recover from an auth failure (e.g. refresh an expired access
+   * token) and swap the new credentials into the backend in place. Returns
+   * whether recovery succeeded and the failed operation should be retried.
+   * Backends with no such recovery path (local, example) omit this.
+   */
+  refreshAuth?(): Promise<boolean>
 }

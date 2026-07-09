@@ -1,4 +1,4 @@
-import { useRef, useEffect, memo } from 'react'
+import { useRef, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import { OccurrenceCard } from '@/components'
@@ -11,25 +11,15 @@ interface Props {
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
   showDate?: boolean
-  /**
-   * A per-render stamp from the caller (today's section only). Not read
-   * directly — its only job is to appear in the props object, always
-   * different from the previous render, so the default memo() below never
-   * bails and OccurrenceCard always recomputes its wall-clock-dependent
-   * occState() styling whenever this row's parent section rendered at all.
-   *
-   * This is why memo() below must stay even under the React Compiler: the
-   * compiler's automatic memoization tracks only props actually *read* in
-   * the body, and `tick` is explicitly unread (`void tick`) — so compiler-only
-   * memoization would drop it from the comparison and this trick would stop
-   * working. memo()'s default *shallow-compare-every-prop* behavior is the
-   * whole point here, not something the compiler can be asked to replicate.
-   */
-  tick?: number
 }
 
-function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate, tick }: Props) {
-  void tick
+// Deliberately not memoized: OccurrenceCard's styling depends on the wall
+// clock (occState()), not just on `occ` identity, so it must recompute
+// whenever this row's parent (DaySection) renders — including renders
+// triggered by a sibling occurrence changing, not just this row's own data.
+// DaySection's own memo already gates re-renders at the day level, so the
+// cost here is bounded to one day's rows.
+export default function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
   const roots    = useStore(s => s.roots)
   const listedOn = backlinksTo(occ.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug)
 
@@ -175,5 +165,3 @@ function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate, tic
     </div>
   )
 }
-
-export default memo(OccurrenceRow)

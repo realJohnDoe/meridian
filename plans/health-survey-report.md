@@ -39,33 +39,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Problem:** The riskiest layer of the app — parsing untrusted YAML into typed domain objects — is where the unused rules fire most, and `no-base-to-string` flags a real bug class (`[object Object]` leaking into dates/durations from malformed frontmatter).
 - **Fix:** Enable `recommended-type-checked` (or at minimum `no-base-to-string`, `no-unsafe-*`, `no-unnecessary-type-assertion`) and burn down the 124, starting with the 47 auto-fixes.
 
-### 4. The entire UI layer has zero tests and the test config cannot run any
-
-- **Category:** `testing` `toolchain`
-- **Impact:** 5 · **Breadth:** ~70 files est. (all `.tsx` in `calendar/`, `components/`, `editor/`, `search/`, `routes/`, `onboarding/` minus shadcn) · **Fix effort:** L
-- **Evidence:** `vitest.config.ts`: `environment: 'node'` and `include: ['src/**/*.test.ts']` — no jsdom, no testing-library installed, and the glob can never match a `.test.tsx`. Git churn concentrates in exactly this layer: `git log --name-only -100` shows `calendar/DayView.tsx` (14 changes), `editor/EntryEditor.tsx` (10), `editor/useEntryEditor.ts` (8) as the three most-modified files — all untested, including testable pure logic like `computeColumns` (greedy event-column packing) in `DayView.tsx` and the autosave/create-handoff flow in `useEntryEditor.ts`.
-- **Problem:** The model-first testing strategy is defensible and documented as deliberate, but the highest-churn code in the repo has no regression net at all, and the current config forecloses even cheap hook/logic tests colocated with UI.
-- **Fix:** Not "test everything" — extract-and-test the pure logic already sitting in churny UI files (column packing, entry-state derivation), and widen the Vitest include/environment (per-file `// @vitest-environment jsdom`) so UI tests are at least possible.
-
-### 5. `format.ts` hand-rolls calendar math incorrectly beside an installed date library
-
-- **Category:** `library-fit` `dry`
-- **Impact:** 4 · **Breadth:** 1 file, 2 functions (grep `durationToEnd` → `format.ts` + 3 UI callers) · **Fix effort:** S
-- **Evidence:** `src/format.ts`:
-  `if (p.unit === 'months')  return fmtISO(addDays(start, p.n * 30 - 1))` and
-  `: p.unit === 'days'    ? addMinutes(start, p.n * 24 * 60)`
-  — with `date-fns` (which exports calendar-correct `addMonths`/`addYears`/`addDays`) imported **in the same file**.
-- **Problem:** A "1 month" duration starting Jan 31 ends Mar 1 instead of Feb 28, and day/week durations computed as minutes shift by an hour across DST transitions (`addDays` is DST-safe; `addMinutes(start, 1440)` is not) — user-visible wrong end dates in the duration dialog.
-- **Fix:** Replace the arithmetic with `addMonths`/`addYears`/`addWeeks`/`addDays` from the already-installed library.
-
-### 6. Agent worktrees under `.claude/worktrees/` are broken and silently target the wrong repo
-
-- **Category:** `toolchain`
-- **Impact:** 5 · **Breadth:** environment-wide (this survey's assigned worktree confirmed; prior sessions hit the same) · **Fix effort:** S
-- **Evidence:** `.claude/worktrees/suspicious-jones-32470b/` has **no `.git` file**, so `git rev-parse --show-toplevel` from inside it returns `C:/Users/johan/code/meridian` — every git command silently operates on the parent repo. Its file copy is stale: its `package.json` lacks `@eslint-react/eslint-plugin`, and `eslint.config.js`, `index.html`, `knip.json`, and `src/occState.test.ts` are missing entirely. There is also a junk artifact directory `C:Usersjohancodemeridian.githubworkflows` (a mangled Windows path) in the repo root, untracked.
-- **Problem:** An agent editing or surveying in such a worktree reads and modifies stale code while its commits land somewhere else — this survey initially computed metrics on the stale copy before catching it.
-- **Fix:** Delete the broken worktree directories, recreate via `git worktree add` (verifying the `.git` pointer file exists), remove the junk directory, and consider a session-start check (hook) that fails fast when `git rev-parse --show-toplevel` doesn't match the cwd.
-
 ### 7. Hand-rolled recurrence engine — keep-custom verdict, with one caveat
 
 - **Category:** `library-fit`
@@ -73,16 +46,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Evidence:** `src/model/expansion.ts` `generateScheduledDates` reimplements RRULE-style expansion (`byweekday`, `bymonthday`, `bysetpos`, `interval`, count/until ends) that the `rrule` library covers.
 - **Problem/verdict:** **The custom engine is the right call** — `after_completion` repeats, per-instance override merging, and the YAML round-trip identity model are domain semantics `rrule` cannot express; the engine has a 500-iteration safety valve and is the best-tested code in the repo (9 test files + fixtures). One caveat: week-start is hardcoded to Monday (`const mondayOff = wd === 0 ? -6 : 1 - wd`) while the app maintains a user-facing `localePrefs.firstDayOfWeek` — for `interval ≥ 2` weekly rules, which days group into the same week depends on week-start (RFC 5545's `WKST`), so Sunday-week users can get off-by-one-week biweekly expansions.
 - **Fix:** Keep the engine; either thread `firstDayOfWeek` into `generateScheduledDates` or document Monday-week as the file format's fixed semantics.
-
-### 8. `store.ts` duplicates the localStorage helper that `lib/vaultStorage.ts` claims to own
-
-- **Category:** `dry`
-- **Impact:** 2 · **Breadth:** 2 files (grep `` `${keyPrefix}_${vaultId}` `` → both) · **Fix effort:** S
-- **Evidence:** `src/lib/vaultStorage.ts` documents "the storage key is assembled in one place", yet `src/store.ts` defines its own
-  `function readVaultJSON<T>(keyPrefix: string, vaultId: string, defaultValue: T): T`
-  assembling the same `` `${keyPrefix}_${vaultId}` `` key.
-- **Problem:** The generic reader is the natural third sibling of `readVaultStringArray`/`writeVaultJSON`; its private copy in `store.ts` violates the module's own stated contract and will drift on the next key-scheme change.
-- **Fix:** Move `readVaultJSON` into `lib/vaultStorage.ts` and import it.
 
 ### 9. OAuth worker returns unhandled 500s on malformed input
 
@@ -112,14 +75,5 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Layout** — co-change pairs from `git log --name-only` all live side by side; every CLAUDE.md root-resident claim checked against the real import graph held up.
 
 ## Architecture / DIP issues
-
-1. The GitHub adapter leaks into the generic sync orchestrator — the one real hexagonal break. sync.ts:289:
-
-if (e instanceof AuthSyncError && !attemptedRefresh && backend instanceof GitHubBackend) {
-sync.ts imports the concrete GitHubBackend and ensureFreshAccessToken, then does an instanceof dispatch and calls backend.updateToken(fresh). The orchestrator that should only know StorageBackend contains one adapter's auth-recovery protocol. It's the only instanceof <Backend> in the codebase (grep confirmed), so the fix is contained: add an optional refreshAuth(): Promise<boolean> to the StorageBackend interface, move the refresh logic into GitHubBackend, and the orchestrator's retry loop becomes adapter-agnostic.
-
-3. Presentation leaks into orchestration and infrastructure (mild, arguably fine). occurrenceActions.ts:1 imports toast from sonner directly and runs the undo-toast state machine; storage/notifications.ts has infrastructure driving UI toasts. A purist would surface events and let the UI subscribe — and the store's syncError/syncOffline fields are that cleaner channel, used in parallel. At this app's scale I'd accept it; if you ever want to tidy it, occurrenceActions importing sonner directly (rather than going through a wrapper like notifications.ts) is the first thing to fix.
-
-4. VaultRef lives in the wrong layer. store.ts:3 and storeBridge.ts do import type { VaultRef } from '@/storage' — the application state layer depends on an infrastructure-owned type. It's type-only (erased at runtime, no real cycle), but "a reference to a vault" is an application concept; moving it to types.ts would fix the arrow direction.
 
 5. Port registration is an import side effect that fails silent. Registration happens when storage/index.ts is first imported, and persistencePort.ts uses \_impl?.writeEntity(slug) — if registration ever didn't run, writes would silently no-op rather than throw. A fail-fast throw in the unregistered case would be safer.

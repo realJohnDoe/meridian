@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
-import { multidayDisplayTitle, fmtT, parseDurationHours } from '@/model'
+import { multidayDisplayTitle, fmtT } from '@/model'
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday, useCalendarFilter } from '@/hooks'
+import { computeColumns } from './computeColumns'
 const HOURS = 24              // hours shown on the timeline
 const HP = 56                 // pixels per hour
 const GUTTER = 64              // px reserved for the left hour-label column
@@ -28,29 +29,6 @@ function formatHourBoundary(h: number, hour12: boolean): string {
   if (!hour12) return h === HOURS ? '24:00' : `${String(h).padStart(2, '0')}:00`
   const d = new Date(); d.setHours(h % HOURS, 0, 0, 0)
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
-}
-
-interface LayoutEvent { occ: Occurrence; dh: number; endMs: number }
-
-/** Greedy column-packing: returns columns of layout-annotated events. */
-function computeColumns(events: Occurrence[]): LayoutEvent[][] {
-  const sorted = [...events]
-    .sort((a, b) => +(a.metadata.jsTime ?? 0) - +(b.metadata.jsTime ?? 0))
-    .map<LayoutEvent>(occ => {
-      const dh = parseDurationHours(occ.metadata.duration)
-      return { occ, dh, endMs: (occ.metadata.jsTime?.getTime() ?? 0) + dh * 3_600_000 }
-    })
-  const cols: LayoutEvent[][] = []
-  for (const ev of sorted) {
-    let placed = false
-    for (const col of cols) {
-      if ((ev.occ.metadata.jsTime?.getTime() ?? 0) >= col[col.length - 1].endMs) {
-        col.push(ev); placed = true; break
-      }
-    }
-    if (!placed) cols.push([ev])
-  }
-  return cols
 }
 
 // ── Sub-components ────────────────────────────────────────────

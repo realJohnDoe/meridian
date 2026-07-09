@@ -15,9 +15,10 @@ interface Props {
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
   /**
-   * Bumped once a minute for today's section only. Occurrence rows are
-   * memoized on `occ` identity, so without this, time-based styling
-   * (event-past/event-future) can go stale until an unrelated prop changes.
+   * Bumped once a minute for today's section only. Not read in the body —
+   * its only job is to appear in propsAreEqual below so this section is
+   * forced to re-render (and its rows recompute wall-clock styling) once a
+   * minute even when its items are otherwise unchanged.
    */
   tick?: number
 }
@@ -26,7 +27,6 @@ function DaySection({
   date, isToday, isTomorrow,
   items,
   onOpen, onToggleDone, onSwipeDelete,
-  tick,
 }: Props) {
   const sectionRef = useRef<HTMLDivElement>(null)
   useFlipReorder(sectionRef, items)
@@ -47,7 +47,6 @@ function DaySection({
         <OccurrenceRow
           key={o.id}
           occ={o}
-          tick={tick}
           onOpen={onOpen}
           onToggleDone={onToggleDone}
           onSwipeDelete={onSwipeDelete}

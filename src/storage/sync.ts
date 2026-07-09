@@ -7,8 +7,6 @@ import type { CacheRecord } from '@/storage/cache'
 import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend } from './backend'
-import { GitHubBackend } from './githubBackend'
-import { ensureFreshAccessToken } from './githubOAuth'
 import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile } from '@/model'
 import type { StoreItem, Roots } from '@/types'
 import {
@@ -286,13 +284,9 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
         }
         break
       } catch (e) {
-        if (e instanceof AuthSyncError && !attemptedRefresh && backend instanceof GitHubBackend) {
+        if (e instanceof AuthSyncError && !attemptedRefresh && backend.refreshAuth) {
           attemptedRefresh = true
-          const fresh = await ensureFreshAccessToken(vaultId, { force: true })
-          if (fresh) {
-            backend.updateToken(fresh)
-            continue
-          }
+          if (await backend.refreshAuth()) continue
         }
         throw e
       }

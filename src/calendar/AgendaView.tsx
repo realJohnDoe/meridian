@@ -114,9 +114,10 @@ export default function AgendaView({ onOpen }: Props) {
   // advancing, with no store change to trigger a re-render. Re-sort just
   // today's (small) item list once a minute so time-based reordering/dimming
   // stays live — cheap, unlike re-sorting the whole (up to ~455-day) `sections`
-  // list. `tick` is threaded down to DaySection/OccurrenceRow to also force a
-  // repaint when the order doesn't change but styling still would (see
-  // DaySection's propsAreEqual and OccurrenceRow's tick prop).
+  // list. `tick` is threaded down to DaySection to also force a repaint when
+  // the order doesn't change but styling still would (see DaySection's
+  // propsAreEqual — its rows aren't memoized, so any DaySection render
+  // refreshes every row's wall-clock styling).
   const [nowTick, setNowTick] = useState(0)
   useEffect(() => {
     const id = setInterval(() => setNowTick(t => t + 1), 60_000)

@@ -1,5 +1,7 @@
-import type { StorageBackend, RawFile, VaultKind } from './backend'
+import type { StorageBackend, RawFile } from './backend'
+import type { VaultKind } from '@/types'
 import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError } from './githubApi'
+import { ensureFreshAccessToken } from './githubOAuth'
 
 function isVaultFile(name: string): boolean {
   return name.endsWith('.md') || name.endsWith('.yaml') || name.endsWith('.yml')
@@ -48,6 +50,13 @@ export class GitHubBackend implements StorageBackend {
   updateToken(token: string): void {
     this._cfg     = { ...this._cfg, token }
     this._octokit = makeOctokit(token)
+  }
+
+  async refreshAuth(): Promise<boolean> {
+    const fresh = await ensureFreshAccessToken(this.id, { force: true })
+    if (!fresh) return false
+    this.updateToken(fresh)
+    return true
   }
 
   // ── StorageBackend ─────────────────────────────────────────────
