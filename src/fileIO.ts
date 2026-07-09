@@ -11,7 +11,7 @@ import { parse as parseYaml } from 'yaml'
  * always expect a mapping at the frontmatter root.
  */
 function yamlParse(text: string): Record<string, unknown> {
-  const parsed = parseYaml(text)
+  const parsed: unknown = parseYaml(text)
   return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
     ? (parsed as Record<string, unknown>)
     : {}

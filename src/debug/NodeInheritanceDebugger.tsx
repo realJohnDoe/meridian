@@ -311,7 +311,7 @@ export default function NodeInheritanceDebugger() {
   const [parseErrors,     setParseErrors]     = useState<string[]>([])
   const [items,           setItems]           = useState<StoreItem[]>([])
   const [debugRoot,       setDebugRoot]       = useState<FileMetadata | undefined>(undefined)
-  const debugRoots = useMemo<Roots>(() => debugRoot ? new Map([[DEBUG_FILE_SLUG, debugRoot]]) : new Map(), [debugRoot])
+  const debugRoots = useMemo<Roots>(() => debugRoot ? new Map([[DEBUG_FILE_SLUG, debugRoot]]) : new Map<string, FileMetadata>(), [debugRoot])
   const [expandEndDate,   setExpandEndDate]   = useState<string>(defaultEndDate)
   const [selectedIdx,     setSelectedIdx]     = useState<number | null>(null)
   const [activeAction,    setActiveAction]    = useState<ActionKind | null>(null)
