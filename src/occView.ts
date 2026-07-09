@@ -1,4 +1,4 @@
-import { startOfDay, startOfToday } from 'date-fns'
+import { startOfDay } from 'date-fns'
 import { parseDurationDays, parseDurationHours } from '@/model'
 import type { Occurrence } from './types'
 import type { OccState } from '@/components/ui/occurrence-variants'
@@ -13,7 +13,14 @@ export function occIsRecur(occ: Occurrence): boolean {
   return !!occ.ownerId
 }
 
-export function occState(o: Occurrence): OccState {
+/**
+ * `now` defaults to the wall clock for callers that don't have a live-updating
+ * value on hand (sorting, one-off renders). Components that stay mounted
+ * across time (e.g. OccurrenceCard in the agenda) should pass an explicit,
+ * externally-refreshed `now` instead, so this stays a pure function of its
+ * arguments and can be safely memoized by the caller.
+ */
+export function occState(o: Occurrence, now: Date = new Date()): OccState {
   if (o.metadata.done) return 'done'
   const kind = occKind(o)
   if (kind === 'note') return 'note'
@@ -24,22 +31,20 @@ export function occState(o: Occurrence): OccState {
     if (p === 'low')    return 'task-p3'
     return 'task-open'
   }
+  const today = startOfDay(now)
   if ((parseDurationDays(o.metadata.duration) ?? 0) >= 2) {
     // Use day-level comparison: past days of a multiday event get the gray shader,
     // today and future days stay purple.
     if (o.metadata.jsTime) {
-      const today  = startOfToday()
-      const day    = startOfDay(o.metadata.jsTime)
+      const day = startOfDay(o.metadata.jsTime)
       if (day < today) return 'event-past'
     }
     return 'event-future'
   }
-  const now = new Date()
   if (o.metadata.jsTime && o.metadata.jsTime < now) {
     // Whole-day events (no time) use day-level comparison — they stay colored
     // until midnight, not until 00:01 AM when jsTime (midnight) < now.
     if (!o.time) {
-      const today    = startOfToday()
       const eventDay = startOfDay(o.metadata.jsTime)
       if (eventDay >= today) return 'event-future'
     } else if (o.metadata.duration) {
