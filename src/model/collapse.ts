@@ -33,7 +33,7 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
   // Pair each series with its override children.
   const seriesBlocks = series.map(s => ({
     series:   s,
-    children: items.filter(i => !isSeries(i) && (i as AnyOcc).ownerId === s.id) as AnyOcc[],
+    children: items.filter(i => !isSeries(i) && i.ownerId === s.id) as AnyOcc[],
   }))
 
   // ── Simple flat cases (no inheritance hierarchy needed) ───────────────────
@@ -46,7 +46,7 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
   }
 
   if (series.length === 0 && standalones.length === 1) {
-    const s = standalones[0] as AnyOcc
+    const s = standalones[0]
     return { ...fileLevel, ...occMetaToYaml(s.metadata), ...(s.date ? { date: s.date } : {}), ...(s.time ? { time: s.time } : {}) }
   }
 
@@ -62,7 +62,7 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
 
   const allMetas: Partial<OccurrenceMetadata>[] = [
     ...seriesBlocks.map(b => b.series.metadata),
-    ...standalones.map(s => (s as AnyOcc).metadata),
+    ...standalones.map(s => s.metadata),
   ]
   const { rootDefaults, localDefaults } = hoistSharedMetadata(allMetas)
 
@@ -102,7 +102,7 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
     const ld = occMetaToYaml(localDefaults[offset + i])
     allInstances.push({
       ...(s.date ? { date: s.date } : {}),
-      ...((s as AnyOcc).time ? { time: (s as AnyOcc).time } : {}),
+      ...(s.time ? { time: s.time } : {}),
       ...ld,
     })
   })

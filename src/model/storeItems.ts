@@ -132,7 +132,7 @@ export interface ParseResult {
 export function parseToStoreItems(path: string, content: string): ParseResult {
   const { rawNode, body } = loadFile(path, content)
   const fileSlug = path.replace(/\.(md|yaml|yml)$/, '')
-  const tree = buildEffectiveTree(rawNode as Parameters<typeof buildEffectiveTree>[0])
+  const tree = buildEffectiveTree(rawNode)
   const items = effectiveNodeToStoreItems(tree, fileSlug)
   return { items, root: buildRoot(rawNode, body) }
 }

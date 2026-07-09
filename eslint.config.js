@@ -86,6 +86,9 @@ export default [
       // instead of a real error — most often malformed YAML frontmatter
       // leaking a non-primitive into a template string or String() call.
       '@typescript-eslint/no-base-to-string': 'error',
+      // Flags `as` casts that assert a type the expression already has —
+      // usually stale leftovers from before types were tightened.
+      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
 
       // ── Import boundaries (barrel enforcement) ───────────────────────────────
       // Each directory with an index.ts is a feature module. Code outside that

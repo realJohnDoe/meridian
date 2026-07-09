@@ -52,10 +52,10 @@ function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate, tic
     if (!wrapRef.current || !rowRef.current || !hintRef.current || !iconRef.current) return
     // Non-null assertions: narrowing doesn't carry into nested closure functions,
     // so we re-bind as non-nullable types here.
-    const wrap  = wrapRef.current  as HTMLDivElement
-    const row   = rowRef.current   as HTMLDivElement
-    const hintL = hintRef.current  as HTMLDivElement
-    const icon  = iconRef.current  as SVGSVGElement
+    const wrap  = wrapRef.current
+    const row   = rowRef.current
+    const hintL = hintRef.current
+    const icon  = iconRef.current
 
     const THRESHOLD = 72
     const FULL_FRAC = 0.5

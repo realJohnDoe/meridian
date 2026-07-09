@@ -48,7 +48,7 @@ export function hasSameStructure(a: StoreItem[], b: StoreItem[]): boolean {
       if (ai.repeat?.type === 'after_completion' && ai.metadata.done !== bi.metadata.done) return false
       if ((ai.metadata.duration ?? '') !== (bi.metadata.duration ?? '')) return false
     } else if (!isSeries(ai) && !isSeries(bi)) {
-      const oa = ai as StoreOcc, ob = bi as StoreOcc
+      const oa = ai, ob = bi
       if (oa.excluded !== ob.excluded) return false
       if (oa.ownerId !== ob.ownerId) return false
       if ((oa.metadata.duration ?? '') !== (ob.metadata.duration ?? '')) return false

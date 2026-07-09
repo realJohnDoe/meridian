@@ -14,7 +14,7 @@ import {
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes, startOfDay,
   differenceInCalendarDays,
 } from 'date-fns'
-import type { Repeat, StoreItem, StoreOcc, StoreSeries, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
+import type { Repeat, StoreItem, StoreOcc, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
 import { isSeries, isStandaloneOcc, scalarToString } from '@/types'
 import type { EffectiveNode } from './inheritance'
 import { fmtISO, fmtT, parseDateString, parseDateTime } from './dateUtils'
@@ -161,7 +161,7 @@ function mergeNode<M>(parent: ExpandNode<M>, child: ExpandNode<M>): ExpandNode<M
     excluded:  child.excluded ?? parent.excluded,
     done:      child.done ?? parent.done,
     instances: parent.instances,
-    metadata:  { ...parent.metadata, ...child.metadata } as M,
+    metadata:  { ...parent.metadata, ...child.metadata },
   }
 }
 
@@ -367,14 +367,14 @@ function expandNode<M>(
         jsTime:     anchor,
         done:       anchorInst?.done ?? node.done,
         overrideId: anchorInst?.id,
-        metadata:   anchorInst ? { ...node.metadata, ...anchorInst.metadata } as M : node.metadata,
+        metadata:   anchorInst ? { ...node.metadata, ...anchorInst.metadata } : node.metadata,
       })
     }
     for (const inst of node.instances ?? []) {
       const t = nodeDateTime(inst) || parseDateString(inst.date)
       if (!t || inst.excluded) continue
       if (sameMinute(t, anchor)) continue
-      allTimes.push({ jsTime: t, done: inst.done ?? node.done, overrideId: inst.id, metadata: { ...node.metadata, ...inst.metadata } as M })
+      allTimes.push({ jsTime: t, done: inst.done ?? node.done, overrideId: inst.id, metadata: { ...node.metadata, ...inst.metadata } })
     }
     allTimes.sort((a, b) => a.jsTime.getTime() - b.jsTime.getTime())
 
@@ -499,14 +499,14 @@ export function expandRange(
 ): OccurrenceEntry<AppMetadata>[] {
   const result: OccurrenceEntry<AppMetadata>[] = []
 
-  const seriesList = items.filter(isSeries) as StoreSeries[]
+  const seriesList = items.filter(isSeries)
   // Standalone = non-series items with no ownerId
   const standalones = items.filter(isStandaloneOcc)
 
   // ── Expand each series ────────────────────────────────────────────────────
   for (const series of seriesList) {
     const children = items.filter(
-      i => !isSeries(i) && (i as StoreOcc).ownerId === series.id,
+      i => !isSeries(i) && i.ownerId === series.id,
     ) as StoreOcc[]
 
     const expandable: ExpandNode<OccurrenceMetadata> = {

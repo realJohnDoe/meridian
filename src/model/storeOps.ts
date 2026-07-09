@@ -48,7 +48,7 @@ export function upsertOverride(
   if (!occ.ownerId) {
     return items.map(i => {
       if (isSeries(i)) return i
-      const io = i as OccurrenceEntry<OccurrenceMetadata>
+      const io = i
       if (io.ownerId) return i   // skip child overrides of a series
       return io.id === occ.id
         ? { ...io, ...patch, metadata: { ...io.metadata, ...(patch.metadata ?? {}) } }
@@ -61,7 +61,7 @@ export function upsertOverride(
   // date. A generated occurrence has no backing child (its id is a memoised
   // synthetic key), so it finds nothing here and falls through to create one.
   const existing = items.find(
-    i => !isSeries(i) && (i as OccurrenceEntry<OccurrenceMetadata>).ownerId === occ.ownerId && i.id === occ.id,
+    i => !isSeries(i) && i.ownerId === occ.ownerId && i.id === occ.id,
   )
   if (existing) {
     return items.map(i =>
@@ -98,7 +98,7 @@ export function upsertOverride(
 function dropExclusionStub(items: StoreItem[], ownerId: string, date: string): StoreItem[] {
   return items.filter(i => {
     if (isSeries(i)) return true
-    const io = i as OccurrenceEntry<OccurrenceMetadata>
+    const io = i
     return !(io.ownerId === ownerId && io.date === date && io.excluded)
   })
 }
@@ -322,7 +322,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
       return [capped, newSeries]
     }
     // Re-point overrides at/after occDate to the new series.
-    if (!isSeries(i) && (i as OccurrenceEntry<OccurrenceMetadata>).ownerId === series.id && i.date >= occDate) {
+    if (!isSeries(i) && i.ownerId === series.id && i.date >= occDate) {
       return [{ ...i, ownerId: newSeriesId }]
     }
     return [i]
@@ -413,7 +413,7 @@ export function deletionEndsAfterCompletionSeries(items: StoreItem[], occ: Occur
   if (occ.metadata.done) return false
   return !items.some(i => {
     if (isSeries(i)) return false
-    const io = i as OccurrenceEntry<OccurrenceMetadata>
+    const io = i
     return io.ownerId === series.id && io.id !== occ.id && !io.excluded && !io.metadata.done
   })
 }
@@ -457,7 +457,7 @@ export function deleteFollowing({ items, roots }: StoreData, occ: Occurrence): S
           repeat: { ...(i as RepeatPattern<OccurrenceMetadata>).repeat,
             end: { type: 'until' as const, date: dayBefore(occDate) } } }
       }
-      if (!isSeries(i) && (i as OccurrenceEntry<OccurrenceMetadata>).ownerId === series.id && i.date >= occDate) {
+      if (!isSeries(i) && i.ownerId === series.id && i.date >= occDate) {
         return { ...i, excluded: true }
       }
       return i

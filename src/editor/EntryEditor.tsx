@@ -252,7 +252,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
               )}
               {showDateChip && hasDate && (
                 <PropChip icon={Clock} label="Time" pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}
-                  value={hasTime ? (fmtT(scheduled!.time, hour12) ?? undefined) : undefined} />
+                  value={hasTime ? (fmtT(scheduled.time, hour12) ?? undefined) : undefined} />
               )}
               {showDateChip && (
                 <PropChip icon={Timer} label="Duration" pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}

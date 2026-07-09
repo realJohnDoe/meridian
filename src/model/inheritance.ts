@@ -67,8 +67,8 @@ function mergeObjects(
 function mergeValue(parent: unknown, child: unknown): unknown {
   if (parent === undefined) return child
   if (isSumType(child)) {
-    return isSumType(parent) && (child as Record<string, unknown>).type === (parent as Record<string, unknown>).type
-      ? mergeObjects(parent as Record<string, unknown>, child)
+    return isSumType(parent) && child.type === parent.type
+      ? mergeObjects(parent, child)
       : child
   }
   if (isProductDict(child) && isProductDict(parent)) {
@@ -123,7 +123,7 @@ export function buildEffectiveTree(
 
   // 3. Recurse into instances, passing down the effective defaults
   const accumulated = childDefaults(parentDefaults, node)
-  const rawInstances = Array.isArray(node.instances) ? (node.instances as RawNode[]) : []
+  const rawInstances = Array.isArray(node.instances) ? node.instances : []
   const instances    = rawInstances.map(child => buildEffectiveTree(child, accumulated))
 
   return { fields, childDefaults: accumulated, instances }
@@ -190,7 +190,7 @@ function prune(v: unknown): unknown {
 function serializeRawNode(node: RawNode): string {
   const { defaults, instances, ...rootFields } = node
   const ordered: Record<string, unknown> = {}
-  if (defaults && Object.keys(defaults as object).length > 0) ordered.defaults = defaults
+  if (defaults && Object.keys(defaults).length > 0) ordered.defaults = defaults
   Object.assign(ordered, rootFields)
   if (Array.isArray(instances) && instances.length > 0) ordered.instances = instances
 
@@ -204,5 +204,5 @@ function serializeRawNode(node: RawNode): string {
 
 /** Serialise a raw node + body into a full file string (frontmatter + body). */
 export function saveFile(rawNode: Record<string, unknown>, body: string): string {
-  return wrapFrontmatter(serializeRawNode(rawNode as RawNode), body)
+  return wrapFrontmatter(serializeRawNode(rawNode), body)
 }

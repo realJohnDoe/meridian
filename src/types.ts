@@ -172,8 +172,8 @@ export function scalarToString(v: unknown): string | undefined {
 /** Coerce a raw YAML value to the typed value for `spec`. */
 function parseInlineField(spec: InlineFieldSpec, raw: unknown): unknown {
   switch (spec.kind) {
-    case 'boolean':     return raw as boolean | undefined
-    case 'priority':    return raw as Priority | undefined
+    case 'boolean':     return raw
+    case 'priority':    return raw
     case 'stringArray': return Array.isArray(raw) ? (raw as string[]) : (spec.required ? [] : undefined)
     case 'string':      return scalarToString(raw) ?? (spec.required ? '' : undefined)
   }
@@ -207,7 +207,7 @@ export function extractOccurrenceMetadata(fields: Record<string, unknown>): Occu
  * from series overrides without reaching for an ad-hoc `ownerId` cast.
  */
 export function isStandaloneOcc(i: StoreItem): i is StoreOcc {
-  return !isSeries(i) && !(i as StoreOcc).ownerId
+  return !isSeries(i) && !(i).ownerId
 }
 
 // ── Dialog / Editor helpers ───────────────────────────────────────────────────
