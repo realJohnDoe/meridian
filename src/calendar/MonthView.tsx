@@ -17,9 +17,15 @@ import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
 
-// Day-number badge (h-5=20px) + mb-px + cell padding (p-[3px_2px_2px]) — also
-// the vertical offset where the multiday bar overlay starts, so bars line up
-// right where single-day chips would otherwise begin.
+// The exact vertical offset where the chip list starts in the DOM, so the bar
+// overlay's `top` lines up with it precisely and the bar→chip gap equals ROW_GAP.
+// Must be exact (unlike CELL_CHROME below): cell top padding (3px) + day-number
+// badge h-5 (20px) + badge mb-px (1px) + the 8px flex `gap-2` that the cell's
+// flex column inherits from Button's base class (SurfaceButton doesn't reset it)
+// = 32px. Omitting that inherited gap is what left an extra 8px gap before.
+const BAR_TOP = 3 + 20 + 1 + 8
+// Conservative reservation for badge + cell padding, used only to estimate
+// how many chip rows fit in the remaining cell height — doesn't need to be exact.
 const CELL_CHROME = 26
 const ROW_GAP = 2 // gap-0.5 between stacked rows (chips and bars share this)
 const MAX_BAR_LANES = 2 // stacked multiday bars per week row before overflow
@@ -244,9 +250,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                 startCol: Math.max(0, differenceInCalendarDays(l.startD, rowStart)),
                 endCol: Math.min(6, differenceInCalendarDays(l.endD, rowStart)),
               }))
-            const laneCount = rowBars.reduce((max, b) => Math.max(max, b.lane + 1), 0)
-            const reservedLanes = Math.min(MAX_BAR_LANES, laneCount)
-            const shownBars = rowBars.filter(b => b.lane < reservedLanes)
+            const shownBars = rowBars.filter(b => b.lane < MAX_BAR_LANES)
 
             return (
               <div key={rowKey} className="relative flex-1">
@@ -255,6 +259,11 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                     const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
                     const col = differenceInCalendarDays(date, rowStart)
                     const dayBars = rowBars.filter(b => b.startCol <= col && col <= b.endCol)
+                    // Reserve blank lanes per-day based only on the bars that cover
+                    // THIS day, so a day past the end of a multiday bar reclaims that
+                    // lane for its own single-day chips instead of leaving it blank.
+                    const dayLaneCount = dayBars.reduce((max, b) => Math.max(max, b.lane + 1), 0)
+                    const reservedLanes = Math.min(MAX_BAR_LANES, dayLaneCount)
                     const hiddenBarCount = dayBars.filter(b => b.lane >= reservedLanes).length
                     return (
                       <CalCell
@@ -276,7 +285,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                 {shownBars.length > 0 && (
                   <div
                     className="absolute inset-x-0 pointer-events-none grid grid-cols-7 gap-0.5"
-                    style={{ top: CELL_CHROME, gridAutoRows: rowH || undefined }}
+                    style={{ top: BAR_TOP, gridAutoRows: rowH || undefined }}
                   >
                     {shownBars.map(b => (
                       <div
@@ -284,7 +293,9 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                         style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.lane + 1 }}
                         className={cn(
                           dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
-                          'flex items-center rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
+                          // mx-0.5 mirrors the day cell's 2px horizontal padding so a
+                          // single-column bar aligns exactly with a single-day chip.
+                          'flex items-center mx-0.5 rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
                         )}
                       >
                         <span className="truncate min-w-0">{b.occ.metadata.title}</span>
