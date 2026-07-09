@@ -23,9 +23,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --audit-level=high
+      # build first: it regenerates src/routeTree.gen.ts (gitignored, produced
+      # by the TanStack Router vite plugin). Type-aware lint rules need it —
+      # running lint first left Route.useSearch()/useParams() unresolved on a
+      # fresh checkout, causing spurious no-unsafe-* failures.
+      - run: pnpm run build
       - run: pnpm run lint
       - run: pnpm test
-      - run: pnpm run build
       - run: pnpm run knip
       - uses: actions/upload-pages-artifact@v5
         with:

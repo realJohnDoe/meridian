@@ -16,6 +16,17 @@ const BARREL_DIRS = ['calendar', 'components', 'editor', 'hooks', 'model', 'onbo
 // rather than bugs to fix.
 const reactHooksRules = reactHooksPlugin.configs['recommended-latest'].rules
 
+// The flat preset is [languageOptions/plugins block, base-JS-rules block,
+// type-checked-rules block] — the middle block explicitly turns off the base
+// JS rules a @typescript-eslint equivalent replaces (e.g. `no-redeclare` off
+// in favor of `@typescript-eslint/no-redeclare`), so spreading both rule
+// blocks is safe and doesn't double-fire. Our own rule entries below (spread
+// after) override the preset's defaults where we need non-default options.
+const tsRecommendedTypeCheckedRules = {
+  ...tsPlugin.configs['flat/recommended-type-checked'][1].rules,
+  ...tsPlugin.configs['flat/recommended-type-checked'][2].rules,
+}
+
 export default [
   // Auto-generated files — skip entirely
   { ignores: ['src/routeTree.gen.ts'] },
@@ -59,6 +70,12 @@ export default [
       '@eslint-react/no-array-index-key': 'error',
 
       // ── TypeScript ───────────────────────────────────────────────────────────
+      // Full type-checked rule set (await-thenable, no-unsafe-*,
+      // no-explicit-any, restrict-template-expressions, unbound-method, …).
+      // Individual entries below override its defaults where we need
+      // non-default options.
+      ...tsRecommendedTypeCheckedRules,
+
       // Enforce `import type` for type-only imports (auto-fixable)
       '@typescript-eslint/consistent-type-imports': [
         'error',
@@ -69,10 +86,6 @@ export default [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
-      // Require unhandled promises to be awaited, returned, or explicitly
-      // discarded with `void` — catches accidental fire-and-forget async
-      // (e.g. a missing `await` in a sync codepath) at lint time.
-      '@typescript-eslint/no-floating-promises': 'error',
       // `attributes: false` because async JSX event handlers (onClick={async
       // () => …}) are an idiomatic, harmless React pattern — React ignores
       // the returned promise. Other misuse (e.g. an async function used
@@ -82,20 +95,6 @@ export default [
         'error',
         { checksVoidReturn: { attributes: false } },
       ],
-      // Catches values that stringify to the useless '[object Object]'
-      // instead of a real error — most often malformed YAML frontmatter
-      // leaking a non-primitive into a template string or String() call.
-      '@typescript-eslint/no-base-to-string': 'error',
-      // Flags `as` casts that assert a type the expression already has —
-      // usually stale leftovers from before types were tightened.
-      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
-      // Catches property access on a value TS can't prove is safe to index —
-      // concentrated at the untyped-YAML boundary, where it's the compiler's
-      // best signal that a parsed value needs a guard before use.
-      '@typescript-eslint/no-unsafe-member-access': 'error',
-      // Flags `async` functions with no `await` inside — usually a stale
-      // marker left after refactoring, or a missing await the caller relies on.
-      '@typescript-eslint/require-await': 'error',
 
       // ── Import boundaries (barrel enforcement) ───────────────────────────────
       // Each directory with an index.ts is a feature module. Code outside that

@@ -176,7 +176,7 @@ function generateScheduledDates(
   const { freq, byweekday, bymonthday, bysetpos, interval = 1, end } = sched
   const results: Date[] = []
   const maxDate = end?.type === 'until' ? (toDate(end.date || end.time) ?? to) : to
-  let maxCount = end?.type === 'count' ? end.occurrences : Infinity
+  const maxCount = end?.type === 'count' ? end.occurrences : Infinity
   let count = 0
 
   function withTime(d: Date): Date {
