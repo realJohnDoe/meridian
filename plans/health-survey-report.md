@@ -47,16 +47,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Problem/verdict:** **The custom engine is the right call** — `after_completion` repeats, per-instance override merging, and the YAML round-trip identity model are domain semantics `rrule` cannot express; the engine has a 500-iteration safety valve and is the best-tested code in the repo (9 test files + fixtures). One caveat: week-start is hardcoded to Monday (`const mondayOff = wd === 0 ? -6 : 1 - wd`) while the app maintains a user-facing `localePrefs.firstDayOfWeek` — for `interval ≥ 2` weekly rules, which days group into the same week depends on week-start (RFC 5545's `WKST`), so Sunday-week users can get off-by-one-week biweekly expansions.
 - **Fix:** Keep the engine; either thread `firstDayOfWeek` into `generateScheduledDates` or document Monday-week as the file format's fixed semantics.
 
-### 8. `store.ts` duplicates the localStorage helper that `lib/vaultStorage.ts` claims to own
-
-- **Category:** `dry`
-- **Impact:** 2 · **Breadth:** 2 files (grep `` `${keyPrefix}_${vaultId}` `` → both) · **Fix effort:** S
-- **Evidence:** `src/lib/vaultStorage.ts` documents "the storage key is assembled in one place", yet `src/store.ts` defines its own
-  `function readVaultJSON<T>(keyPrefix: string, vaultId: string, defaultValue: T): T`
-  assembling the same `` `${keyPrefix}_${vaultId}` `` key.
-- **Problem:** The generic reader is the natural third sibling of `readVaultStringArray`/`writeVaultJSON`; its private copy in `store.ts` violates the module's own stated contract and will drift on the next key-scheme change.
-- **Fix:** Move `readVaultJSON` into `lib/vaultStorage.ts` and import it.
-
 ### 9. OAuth worker returns unhandled 500s on malformed input
 
 - **Category:** `error-handling`
