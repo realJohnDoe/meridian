@@ -140,9 +140,11 @@ export default [
     rules: { 'import-x/no-internal-modules': 'off' },
   },
 
-  // model/ is the domain core and must stay framework-free — no React. This
-  // makes the "model is pure" invariant machine-enforced instead of just
-  // documented (previously violated by a React hook that had leaked in).
+  // model/ is the domain core and must stay framework-free — no React, and
+  // no outward dependency on store/storage/UI layers. This makes the
+  // "model has no outward dependencies" invariant machine-enforced instead
+  // of just documented (previously violated by a React hook that had
+  // leaked in). model/ may only import @/types, @/fileIO, and @/wikilinks.
   {
     files: ['src/model/**/*.{ts,tsx}'],
     rules: {
@@ -154,11 +156,57 @@ export default [
               name: 'react',
               message: 'model/ is the pure domain core and must not depend on React.',
             },
+            {
+              name: 'zustand',
+              message: 'model/ is the pure domain core and must not depend on the store.',
+            },
+            {
+              name: '@/store',
+              message: 'model/ is the pure domain core and must not depend on the store.',
+            },
+            {
+              name: '@/storeBridge',
+              message: 'model/ is the pure domain core and must not depend on the store.',
+            },
+            {
+              name: '@/storage',
+              message: 'model/ is the pure domain core and must not depend on storage.',
+            },
+            {
+              name: '@/editor',
+              message: 'model/ is the pure domain core and must not depend on editor/.',
+            },
+            {
+              name: '@/calendar',
+              message: 'model/ is the pure domain core and must not depend on calendar/.',
+            },
           ],
           patterns: [
             {
               group: ['react-dom', 'react-dom/*', 'react/*'],
               message: 'model/ is the pure domain core and must not depend on React.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // Core persistence (storeCommit.ts, occurrenceActions.ts) must call the
+  // persistencePort abstraction rather than @/storage directly — the storage
+  // adapter registers the implementation at startup. Machine-enforces the
+  // "core persistence goes through the port" invariant.
+  {
+    files: ['src/storeCommit.ts', 'src/occurrenceActions.ts'],
+    rules: {
+      'import-x/no-restricted-paths': [
+        'error',
+        {
+          zones: [
+            {
+              target: ['./src/storeCommit.ts', './src/occurrenceActions.ts'],
+              from: './src/storage',
+              message: 'Core persistence must go through @/persistencePort, not @/storage directly.',
             },
           ],
         },
