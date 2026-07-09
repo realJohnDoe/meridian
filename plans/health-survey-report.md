@@ -39,14 +39,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Problem:** The riskiest layer of the app — parsing untrusted YAML into typed domain objects — is where the unused rules fire most, and `no-base-to-string` flags a real bug class (`[object Object]` leaking into dates/durations from malformed frontmatter).
 - **Fix:** Enable `recommended-type-checked` (or at minimum `no-base-to-string`, `no-unsafe-*`, `no-unnecessary-type-assertion`) and burn down the 124, starting with the 47 auto-fixes.
 
-### 7. Hand-rolled recurrence engine — keep-custom verdict, with one caveat
-
-- **Category:** `library-fit`
-- **Impact:** 2 · **Breadth:** 2 files (`model/expansion.ts`, `model/repeat.ts`) · **Fix effort:** n/a (keep)
-- **Evidence:** `src/model/expansion.ts` `generateScheduledDates` reimplements RRULE-style expansion (`byweekday`, `bymonthday`, `bysetpos`, `interval`, count/until ends) that the `rrule` library covers.
-- **Problem/verdict:** **The custom engine is the right call** — `after_completion` repeats, per-instance override merging, and the YAML round-trip identity model are domain semantics `rrule` cannot express; the engine has a 500-iteration safety valve and is the best-tested code in the repo (9 test files + fixtures). One caveat: week-start is hardcoded to Monday (`const mondayOff = wd === 0 ? -6 : 1 - wd`) while the app maintains a user-facing `localePrefs.firstDayOfWeek` — for `interval ≥ 2` weekly rules, which days group into the same week depends on week-start (RFC 5545's `WKST`), so Sunday-week users can get off-by-one-week biweekly expansions.
-- **Fix:** Keep the engine; either thread `firstDayOfWeek` into `generateScheduledDates` or document Monday-week as the file format's fixed semantics.
-
 ### 9. OAuth worker returns unhandled 500s on malformed input
 
 - **Category:** `error-handling`
