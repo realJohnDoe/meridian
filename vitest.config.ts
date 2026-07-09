@@ -2,9 +2,9 @@ import { defineConfig } from 'vitest/config'
 import path from 'path'
 
 // Standalone Vitest config — intentionally does NOT load the app's Vite plugins
-// (PWA, the debug-page middleware, react-refresh). The model layer under test is
-// pure TS with no DOM, so a plain Node environment keeps the suite fast and
-// isolated from build-time concerns.
+// (PWA, the debug-page middleware, react-refresh). Most of the suite is pure TS
+// with no DOM, so the default environment stays 'node' for speed; UI/hook tests
+// that need a DOM opt in per-file with a `// @vitest-environment jsdom` docblock.
 export default defineConfig({
   resolve: {
     alias: {
@@ -13,7 +13,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
