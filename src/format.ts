@@ -1,4 +1,4 @@
-import { addDays, addMinutes, isSameDay } from 'date-fns'
+import { addDays, addWeeks, addMonths, addYears, addMinutes, getDate, isSameDay } from 'date-fns'
 import { parseDateString, parseDateTime, fmtISO, parseDuration } from '@/model'
 import type { Scheduled } from '@/types'
 
@@ -23,6 +23,13 @@ export function fmtTopBarMonth(d: Date, today: Date): string {
 
 // ── Duration formatting ───────────────────────────────────────────────────────
 
+// addMonths/addYears clamp to the last valid day of the target month (e.g. Jan 31 + 1
+// month -> Feb 28). When that clamp happens, the clamped date is already the inclusive
+// end of the period, so we must not subtract another day from it.
+function inclusiveCalendarEnd(start: Date, exclusiveEnd: Date): Date {
+  return getDate(exclusiveEnd) < getDate(start) ? exclusiveEnd : addDays(exclusiveEnd, -1)
+}
+
 export function durationToEndDate(startStr: string, duration: string): string {
   const start = parseDateString(startStr) ?? new Date()
   const p = parseDuration(duration)
@@ -30,9 +37,9 @@ export function durationToEndDate(startStr: string, duration: string): string {
   if (p.unit === 'minutes') return fmtISO(start)
   if (p.unit === 'hours')   return fmtISO(addDays(start, Math.floor(p.n / 24)))
   if (p.unit === 'days')    return fmtISO(addDays(start, p.n - 1))
-  if (p.unit === 'weeks')   return fmtISO(addDays(start, p.n * 7 - 1))
-  if (p.unit === 'months')  return fmtISO(addDays(start, p.n * 30 - 1))
-  if (p.unit === 'years')   return fmtISO(addDays(start, p.n * 365 - 1))
+  if (p.unit === 'weeks')   return fmtISO(addDays(addWeeks(start, p.n), -1))
+  if (p.unit === 'months')  return fmtISO(inclusiveCalendarEnd(start, addMonths(start, p.n)))
+  if (p.unit === 'years')   return fmtISO(inclusiveCalendarEnd(start, addYears(start, p.n)))
   return fmtISO(addDays(start, 1))
 }
 
@@ -42,8 +49,8 @@ export function durationToEndDateTime(startDateStr: string, startTimeStr: string
   const end = p
     ? p.unit === 'minutes' ? addMinutes(start, p.n)
     : p.unit === 'hours'   ? addMinutes(start, p.n * 60)
-    : p.unit === 'days'    ? addMinutes(start, p.n * 24 * 60)
-    : p.unit === 'weeks'   ? addMinutes(start, p.n * 7 * 24 * 60)
+    : p.unit === 'days'    ? addDays(start, p.n)
+    : p.unit === 'weeks'   ? addWeeks(start, p.n)
     : addMinutes(start, 60)
     : addMinutes(start, 60)
   return {
