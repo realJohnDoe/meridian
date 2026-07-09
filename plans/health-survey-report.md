@@ -39,14 +39,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 - **Problem:** The riskiest layer of the app — parsing untrusted YAML into typed domain objects — is where the unused rules fire most, and `no-base-to-string` flags a real bug class (`[object Object]` leaking into dates/durations from malformed frontmatter).
 - **Fix:** Enable `recommended-type-checked` (or at minimum `no-base-to-string`, `no-unsafe-*`, `no-unnecessary-type-assertion`) and burn down the 124, starting with the 47 auto-fixes.
 
-### 4. The entire UI layer has zero tests and the test config cannot run any
-
-- **Category:** `testing` `toolchain`
-- **Impact:** 5 · **Breadth:** ~70 files est. (all `.tsx` in `calendar/`, `components/`, `editor/`, `search/`, `routes/`, `onboarding/` minus shadcn) · **Fix effort:** L
-- **Evidence:** `vitest.config.ts`: `environment: 'node'` and `include: ['src/**/*.test.ts']` — no jsdom, no testing-library installed, and the glob can never match a `.test.tsx`. Git churn concentrates in exactly this layer: `git log --name-only -100` shows `calendar/DayView.tsx` (14 changes), `editor/EntryEditor.tsx` (10), `editor/useEntryEditor.ts` (8) as the three most-modified files — all untested, including testable pure logic like `computeColumns` (greedy event-column packing) in `DayView.tsx` and the autosave/create-handoff flow in `useEntryEditor.ts`.
-- **Problem:** The model-first testing strategy is defensible and documented as deliberate, but the highest-churn code in the repo has no regression net at all, and the current config forecloses even cheap hook/logic tests colocated with UI.
-- **Fix:** Not "test everything" — extract-and-test the pure logic already sitting in churny UI files (column packing, entry-state derivation), and widen the Vitest include/environment (per-file `// @vitest-environment jsdom`) so UI tests are at least possible.
-
 ### 5. `format.ts` hand-rolls calendar math incorrectly beside an installed date library
 
 - **Category:** `library-fit` `dry`
