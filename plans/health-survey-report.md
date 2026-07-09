@@ -29,16 +29,6 @@ This is an exceptionally healthy codebase for its class (client-only PWA, ~150 s
 | 9   | OAuth worker returns unhandled 500s on malformed input              | `error-handling`              | 2      | 1 file           | S      |
 | 10  | `.npmrc` comment says the opposite of what the setting does         | `toolchain`                   | 1      | 1 file           | S      |
 
----
-
-### 2. Installed lint stack ships a type-checked preset the config doesn't use — 124 real findings
-
-- **Category:** `toolchain` `types`
-- **Impact:** 5 · **Breadth:** 30 files (from the dry-run's per-file tally) · **Fix effort:** M
-- **Evidence:** `eslint.config.js` cherry-picks six `@typescript-eslint` rules (`no-floating-promises`, `no-misused-promises`, …). Dry-running the installed plugin's `recommended-type-checked` preset (minus already-enabled rules) via a temporary config: **131 hits, of which 124 are genuine** (7 were "Definition for rule … not found" artifacts from inline disables). Distribution: `no-unnecessary-type-assertion` 47 (auto-fixable — matches the heavy `as`-cast counts in `model/storeOps.ts` (22) and `model/collapse.ts` (14)), `no-base-to-string` 24 (e.g. `model/dateUtils.ts:49 's' will use Object's default stringification format ('[object Object]') when stringified.`), `no-unsafe-member-access` 15, `require-await` 11. Hits concentrate at the untyped-YAML boundary (`model/storeItems.ts` 16, `inheritance.ts` 7, `types.ts` 7).
-- **Problem:** The riskiest layer of the app — parsing untrusted YAML into typed domain objects — is where the unused rules fire most, and `no-base-to-string` flags a real bug class (`[object Object]` leaking into dates/durations from malformed frontmatter).
-- **Fix:** Enable `recommended-type-checked` (or at minimum `no-base-to-string`, `no-unsafe-*`, `no-unnecessary-type-assertion`) and burn down the 124, starting with the 47 auto-fixes.
-
 ## Explicitly clean areas
 
 - **Security** (threat model: client-only SPA parsing user-owned YAML/Markdown; GitHub tokens in IndexedDB behind a strict `script-src 'self'` CSP; PKCE with state+verifier checks; client secret isolated in the worker; single-origin CORS) — no findings.
