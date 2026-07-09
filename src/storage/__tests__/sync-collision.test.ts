@@ -6,7 +6,8 @@
  * logic without Dexie or module-level state.
  */
 import { describe, it, expect } from 'vitest'
-import type { StorageBackend, RawFile, VaultKind } from '@/storage/backend'
+import type { StorageBackend, RawFile } from '@/storage/backend'
+import type { VaultKind } from '@/types'
 import { ConflictError } from '@/storage/conflictError'
 
 // ── FakeBackend ────────────────────────────────────────────────

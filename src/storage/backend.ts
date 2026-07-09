@@ -1,7 +1,5 @@
 import type { VaultKind } from '@/types'
 
-export type { VaultKind, VaultRef, GitHubVaultRef } from '@/types'
-
 export interface RawFile {
   path:    string
   content: string
