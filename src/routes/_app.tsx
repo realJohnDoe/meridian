@@ -87,7 +87,7 @@ function AppMain() {
           id="mainTop"
           className={cn(
             'h-topbar flex items-center border-b border-border shrink-0 bg-background z-10',
-            isEntryView ? 'overflow-hidden' : 'px-3.5 justify-between',
+            isEntryView ? 'overflow-hidden' : 'justify-between',
           )}
         >
           {isEntryView ? (
