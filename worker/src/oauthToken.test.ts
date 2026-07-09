@@ -88,4 +88,32 @@ describe('handleOAuthToken', () => {
     expect(res.status).toBe(400)
     expect(exchange).not.toHaveBeenCalled()
   })
+
+  it('returns a structured 400 for a non-form-encoded body instead of throwing', async () => {
+    const exchange = vi.fn()
+    const request = new Request('https://worker.example/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"grant_type": "authorization_code"}',
+    })
+
+    const res = await handleOAuthToken(request, env, exchange)
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'invalid_request' })
+    expect(exchange).not.toHaveBeenCalled()
+  })
+
+  it('returns a structured 502 when GitHub responds with non-JSON', async () => {
+    const exchange = vi.fn(async () => new Response('<html>Service Unavailable</html>', { status: 503 }))
+
+    const res = await handleOAuthToken(
+      formRequest({ grant_type: 'authorization_code', code: 'abc123', code_verifier: 'verifier123' }),
+      env,
+      exchange,
+    )
+
+    expect(res.status).toBe(502)
+    expect(await res.json()).toMatchObject({ error: 'server_error' })
+  })
 })

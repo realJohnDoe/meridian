@@ -24,12 +24,21 @@ function badRequest(description: string): Response {
   return Response.json({ error: 'invalid_request', error_description: description }, { status: 400 })
 }
 
+function badGateway(description: string): Response {
+  return Response.json({ error: 'server_error', error_description: description }, { status: 502 })
+}
+
 export async function handleOAuthToken(
   request: Request,
   env: Env,
   exchange: GitHubTokenExchanger = exchangeWithGitHub,
 ): Promise<Response> {
-  const form = await request.formData()
+  let form: FormData
+  try {
+    form = await request.formData()
+  } catch {
+    return badRequest('Request body must be form-encoded')
+  }
   const grantType = form.get('grant_type')
 
   const params = new URLSearchParams({
@@ -58,6 +67,11 @@ export async function handleOAuthToken(
   }
 
   const githubResponse = await exchange(params)
-  const data = await githubResponse.json()
+  let data: unknown
+  try {
+    data = await githubResponse.json()
+  } catch {
+    return badGateway('GitHub returned a non-JSON response')
+  }
   return Response.json(data, { status: githubResponse.status })
 }
