@@ -1,4 +1,5 @@
-import type { StorageBackend, RawFile, VaultKind } from './backend'
+import type { StorageBackend, RawFile } from './backend'
+import type { VaultKind } from '@/types'
 import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError } from './githubApi'
 import { ensureFreshAccessToken } from './githubOAuth'
 
