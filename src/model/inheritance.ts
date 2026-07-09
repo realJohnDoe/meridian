@@ -145,6 +145,9 @@ export function displayValue(v: unknown, indent = 0): string {
     const inner = entries.map(([k, val]) => `${pad}${k}: ${displayValue(val, indent + 1)}`).join('\n')
     return `\n${inner}`
   }
+  // Only function/symbol/bigint remain here — all have meaningful, non-'[object
+  // Object]' string forms, unlike the plain-object case already handled above.
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string
   return String(v)
 }
 

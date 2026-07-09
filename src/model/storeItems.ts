@@ -17,7 +17,7 @@ import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '@/types'
-import { extractFileMetadata, extractOccurrenceMetadata } from '@/types'
+import { extractFileMetadata, extractOccurrenceMetadata, scalarToString } from '@/types'
 import type { StoreItem, FileMetadata } from '@/types'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
@@ -56,12 +56,12 @@ function effectiveNodeToStoreItems(
     const base = { ...n.childDefaults, ...n.fields }
 
     if (hasRepeat(n)) {
-      const anchorDate = n.fields.date ? String(n.fields.date) : ''
-      const anchorTime = n.fields.time ? String(n.fields.time) : ''
+      const anchorDate = scalarToString(n.fields.date) ?? ''
+      const anchorTime = scalarToString(n.fields.time) ?? ''
       const seriesId = stableId(`${fileSlug}|series|${anchorDate}|${anchorTime}`)
       result.push({
-        date:   n.fields.date ? String(n.fields.date) : '',
-        time:   n.fields.time ? String(n.fields.time) : null,
+        date:   anchorDate,
+        time:   scalarToString(n.fields.time) ?? null,
         repeat: n.fields.repeat as Repeat,
         fileSlug,
         id:     seriesId,
@@ -69,11 +69,11 @@ function effectiveNodeToStoreItems(
       })
       for (const child of n.instances) {
         if (hasRepeat(child)) { walk(child); continue }  // nested series → flat sibling
-        const childDate = child.fields.date ? String(child.fields.date) : ''
-        const childTime = child.fields.time ? String(child.fields.time) : ''
+        const childDate = scalarToString(child.fields.date) ?? ''
+        const childTime = scalarToString(child.fields.time) ?? ''
         result.push({
           date:    childDate,
-          time:    child.fields.time ? String(child.fields.time) : null,
+          time:    scalarToString(child.fields.time) ?? null,
           source:  'explicit',
           fileSlug,
           id:      stableId(`${seriesId}|inst|${childDate}|${childTime}`),
@@ -86,11 +86,11 @@ function effectiveNodeToStoreItems(
       // A node with a date, OR a leaf with none (e.g. an undated task/note),
       // becomes a standalone occurrence. The empty-date case keeps undated items
       // representable so they round-trip and stay searchable.
-      const occDate = n.fields.date !== undefined ? String(n.fields.date) : 'undated'
-      const occTime = n.fields.time ? String(n.fields.time) : ''
+      const occDate = scalarToString(n.fields.date) ?? 'undated'
+      const occTime = scalarToString(n.fields.time) ?? ''
       result.push({
-        date:   n.fields.date !== undefined ? String(n.fields.date) : '',
-        time:   n.fields.time ? String(n.fields.time) : null,
+        date:   scalarToString(n.fields.date) ?? '',
+        time:   scalarToString(n.fields.time) ?? null,
         source: 'explicit',
         fileSlug,
         id:     stableId(`${fileSlug}|occ|${occDate}|${occTime}`),
@@ -98,11 +98,11 @@ function effectiveNodeToStoreItems(
       })
       for (const child of n.instances) {
         if (child.fields.excluded === true) continue
-        const childDate = child.fields.date ? String(child.fields.date) : 'undated'
-        const childTime = child.fields.time ? String(child.fields.time) : ''
+        const childDate = scalarToString(child.fields.date) ?? 'undated'
+        const childTime = scalarToString(child.fields.time) ?? ''
         result.push({
-          date:   child.fields.date ? String(child.fields.date) : '',
-          time:   child.fields.time ? String(child.fields.time) : null,
+          date:   scalarToString(child.fields.date) ?? '',
+          time:   scalarToString(child.fields.time) ?? null,
           source: 'explicit',
           fileSlug,
           id:     stableId(`${fileSlug}|occ|${childDate}|${childTime}`),

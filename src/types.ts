@@ -158,23 +158,34 @@ export function inlineFieldEmpty(kind: InlineFieldKind, v: unknown): boolean {
 
 // ── Metadata extraction ───────────────────────────────────────────────────────
 
+/**
+ * Coerce a raw YAML value expected to be scalar text to a string. Malformed
+ * frontmatter (e.g. a nested mapping where a plain string was expected)
+ * yields `undefined` instead of silently stringifying to `[object Object]`.
+ */
+export function scalarToString(v: unknown): string | undefined {
+  if (typeof v === 'string') return v
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+  return undefined
+}
+
 /** Coerce a raw YAML value to the typed value for `spec`. */
 function parseInlineField(spec: InlineFieldSpec, raw: unknown): unknown {
   switch (spec.kind) {
     case 'boolean':     return raw as boolean | undefined
     case 'priority':    return raw as Priority | undefined
     case 'stringArray': return Array.isArray(raw) ? (raw as string[]) : (spec.required ? [] : undefined)
-    case 'string':      return raw ? String(raw) : (spec.required ? '' : undefined)
+    case 'string':      return scalarToString(raw) ?? (spec.required ? '' : undefined)
   }
 }
 
 /** Extract file-level metadata from raw YAML fields. */
 export function extractFileMetadata(fields: Record<string, unknown>): FileMetadata {
   return {
-    title: (fields.title ? String(fields.title) : '') as string,
+    title: scalarToString(fields.title) ?? '',
     tags:  Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
     items: Array.isArray(fields.items) ? (fields.items as string[]) : [],
-    body:  fields.body ? String(fields.body) : undefined,
+    body:  scalarToString(fields.body),
   }
 }
 
@@ -213,3 +224,27 @@ export type LocalePrefs = {
   hour12: boolean
   firstDayOfWeek: 1 | 6 | 7
 }
+
+// ── Vault references ─────────────────────────────────────────────────────────
+
+export type VaultKind = 'local' | 'example' | 'github'
+
+interface VaultRefBase {
+  id:   string
+  name: string
+}
+
+interface LocalVaultRef extends VaultRefBase {
+  kind: 'local'
+}
+
+interface ExampleVaultRef extends VaultRefBase {
+  kind: 'example'
+}
+
+export interface GitHubVaultRef extends VaultRefBase {
+  kind:   'github'
+  github: { owner: string; repo: string; branch: string }
+}
+
+export type VaultRef = LocalVaultRef | ExampleVaultRef | GitHubVaultRef

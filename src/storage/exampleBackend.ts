@@ -1,4 +1,5 @@
-import type { StorageBackend, RawFile, VaultKind } from './backend'
+import type { StorageBackend, RawFile } from './backend'
+import type { VaultKind } from '@/types'
 import { startOfToday } from 'date-fns'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'

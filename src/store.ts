@@ -1,6 +1,5 @@
 import { create } from 'zustand'
-import type { StoreItem, Roots, Occurrence, LocalePrefs } from './types'
-import type { VaultRef } from '@/storage'
+import type { StoreItem, Roots, Occurrence, LocalePrefs, VaultRef } from './types'
 import { clearOccIdCache, weekStartsOn } from '@/model'
 import { updateFileOccurrenceMap } from './fileOccurrence'
 import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
