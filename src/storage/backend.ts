@@ -1,30 +1,12 @@
-export type VaultKind = 'local' | 'example' | 'github'
+import type { VaultKind } from '@/types'
+
+export type { VaultKind, VaultRef, GitHubVaultRef } from '@/types'
 
 export interface RawFile {
   path:    string
   content: string
   version: string
 }
-
-interface VaultRefBase {
-  id:   string
-  name: string
-}
-
-interface LocalVaultRef extends VaultRefBase {
-  kind: 'local'
-}
-
-interface ExampleVaultRef extends VaultRefBase {
-  kind: 'example'
-}
-
-export interface GitHubVaultRef extends VaultRefBase {
-  kind:   'github'
-  github: { owner: string; repo: string; branch: string }
-}
-
-export type VaultRef = LocalVaultRef | ExampleVaultRef | GitHubVaultRef
 
 export interface StorageBackend {
   readonly id:       string

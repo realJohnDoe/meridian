@@ -213,3 +213,27 @@ export type LocalePrefs = {
   hour12: boolean
   firstDayOfWeek: 1 | 6 | 7
 }
+
+// ── Vault references ─────────────────────────────────────────────────────────
+
+export type VaultKind = 'local' | 'example' | 'github'
+
+interface VaultRefBase {
+  id:   string
+  name: string
+}
+
+interface LocalVaultRef extends VaultRefBase {
+  kind: 'local'
+}
+
+interface ExampleVaultRef extends VaultRefBase {
+  kind: 'example'
+}
+
+export interface GitHubVaultRef extends VaultRefBase {
+  kind:   'github'
+  github: { owner: string; repo: string; branch: string }
+}
+
+export type VaultRef = LocalVaultRef | ExampleVaultRef | GitHubVaultRef
