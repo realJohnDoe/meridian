@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { memo, useRef, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import { OccurrenceCard } from '@/components'
@@ -7,19 +7,27 @@ import { backlinksTo } from '@/fileOccurrence'
 
 interface Props {
   occ: Occurrence
+  /**
+   * Current time, forwarded to OccurrenceCard so occState() can be a pure
+   * function of (occ, now) instead of reading the wall clock itself. Passed
+   * down from AgendaView, refreshed once a minute for today's section only —
+   * omit for sections whose styling can't change from the clock alone (past/
+   * future days, overdue tasks).
+   */
+  now?: Date
   onOpen: (occ: Occurrence) => void
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
   showDate?: boolean
 }
 
-// Deliberately not memoized: OccurrenceCard's styling depends on the wall
-// clock (occState()), not just on `occ` identity, so it must recompute
-// whenever this row's parent (DaySection) renders — including renders
-// triggered by a sibling occurrence changing, not just this row's own data.
-// DaySection's own memo already gates re-renders at the day level, so the
-// cost here is bounded to one day's rows.
-export default function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
+// Memoized on purpose: now that `now` is an explicit, compared prop rather
+// than an unread cache-buster, the default shallow-compare memo is correct —
+// it only re-renders when `occ` or `now` actually changed, which is exactly
+// when this row's rendered output could differ. Unrelated sibling changes in
+// the same day leave `occ` reference-stable (see expansionCache.ts's overlay
+// logic), so this row correctly skips re-rendering for those.
+function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
   const roots    = useStore(s => s.roots)
   const listedOn = backlinksTo(occ.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug)
 
@@ -154,6 +162,7 @@ export default function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete
       <div ref={rowRef} className="swipe-row relative z-[1] bg-background touch-pan-y select-none">
         <OccurrenceCard
           occ={occ}
+          now={now}
           leadingIcon="checkbox"
           onOpen={() => onOpen(occ)}
           onToggleDone={() => onToggleDone(occ)}
@@ -165,3 +174,5 @@ export default function OccurrenceRow({ occ, onOpen, onToggleDone, onSwipeDelete
     </div>
   )
 }
+
+export default memo(OccurrenceRow)

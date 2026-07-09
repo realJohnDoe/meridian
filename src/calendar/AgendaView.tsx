@@ -112,23 +112,27 @@ export default function AgendaView({ onOpen }: Props) {
 
   // Today's occurrences can flip event-past/event-future purely from the clock
   // advancing, with no store change to trigger a re-render. Re-sort just
-  // today's (small) item list once a minute so time-based reordering/dimming
-  // stays live — cheap, unlike re-sorting the whole (up to ~455-day) `sections`
-  // list. `tick` is threaded down to DaySection to also force a repaint when
-  // the order doesn't change but styling still would (see DaySection's
-  // propsAreEqual — its rows aren't memoized, so any DaySection render
-  // refreshes every row's wall-clock styling).
-  const [nowTick, setNowTick] = useState(0)
+  // today's (small) item list once a minute so time-based reordering stays
+  // live — cheap, unlike re-sorting the whole (up to ~455-day) `sections`
+  // list. `now` is also threaded down through DaySection to OccurrenceRow,
+  // which uses it (alongside `occ`) as a real, comparable input to occState()
+  // — so a tick correctly repaints today's rows even when their order
+  // doesn't change. new Date() is called from the interval callback, not
+  // during render, so this stays pure.
+  const [now, setNow] = useState<Date>(() => new Date())
   useEffect(() => {
-    const id = setInterval(() => setNowTick(t => t + 1), 60_000)
+    const id = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(id)
   }, [])
   const todayKey = fmtISO(today)
   const todayItems = useMemo(
     () => sortOccs(groups[todayKey].items),
-    // nowTick isn't read in the body — it's a timer-driven cache-buster, not a data dependency.
+    // `now` isn't read in the body — sortOccs computes its own instant — but it
+    // must stay a dep so this re-sorts once a minute even when groups/todayKey
+    // haven't changed (an occurrence can cross event-past/event-future purely
+    // from the clock, moving where it belongs in the sort order).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [groups, todayKey, nowTick],
+    [groups, todayKey, now],
   )
 
   // Stable references so DaySection's memo comparator isn't short-circuited
@@ -216,7 +220,7 @@ export default function AgendaView({ onOpen }: Props) {
                     isToday={section.isToday}
                     isTomorrow={section.isTomorrow}
                     items={section.isToday ? todayItems : section.items}
-                    tick={section.isToday ? nowTick : 0}
+                    now={section.isToday ? now : undefined}
                     onOpen={onOpen}
                     onToggleDone={handleToggleDone}
                     onSwipeDelete={handleSwipeDelete}

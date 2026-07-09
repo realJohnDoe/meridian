@@ -18,6 +18,8 @@ const EMPTY_LISTED_ON: string[] = []
 
 interface OccurrenceCardProps {
   occ: Occurrence
+  /** Current time for wall-clock-dependent styling (occState()). Defaults to `new Date()` if omitted. */
+  now?: Date
   onOpen: () => void
   onToggleDone: () => void
 
@@ -91,6 +93,7 @@ function ParticipantAvatars({ participants }: { participants: string[] }) {
 
 export default function OccurrenceCard({
   occ,
+  now,
   onOpen,
   onToggleDone,
   leadingIcon,
@@ -101,7 +104,7 @@ export default function OccurrenceCard({
   animate = true,
 }: OccurrenceCardProps) {
   const hour12   = useStore(s => s.localePrefs.hour12)
-  const barClass = occState(occ)
+  const barClass = occState(occ, now)
   const isDone   = !!occ.metadata.done
   const isPast   = barClass === 'event-past'
   const title    = (occ.metadata.jsTime

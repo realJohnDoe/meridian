@@ -15,18 +15,21 @@ interface Props {
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
   /**
-   * Bumped once a minute for today's section only. Not read in the body —
-   * its only job is to appear in propsAreEqual below so this section is
-   * forced to re-render (and its rows recompute wall-clock styling) once a
-   * minute even when its items are otherwise unchanged.
+   * Current time, refreshed once a minute for today's section only (omitted
+   * for other days, whose event-past/event-future state can't change from
+   * the clock alone). Forwarded to each OccurrenceRow, and also read here in
+   * propsAreEqual: without that check, this section — and thus its rows —
+   * would never re-render on a tick when its items are otherwise unchanged,
+   * so the fresh `now` would never reach OccurrenceRow's own memo.
    */
-  tick?: number
+  now?: Date
 }
 
 function DaySection({
   date, isToday, isTomorrow,
   items,
   onOpen, onToggleDone, onSwipeDelete,
+  now,
 }: Props) {
   const sectionRef = useRef<HTMLDivElement>(null)
   useFlipReorder(sectionRef, items)
@@ -47,6 +50,7 @@ function DaySection({
         <OccurrenceRow
           key={o.id}
           occ={o}
+          now={now}
           onOpen={onOpen}
           onToggleDone={onToggleDone}
           onSwipeDelete={onSwipeDelete}
@@ -66,7 +70,7 @@ function DaySection({
 // memoization can infer or replace.
 function propsAreEqual(prev: Props, next: Props): boolean {
   if (prev.isToday !== next.isToday || prev.isTomorrow !== next.isTomorrow) return false
-  if (prev.tick !== next.tick) return false
+  if (prev.now !== next.now) return false
   if (prev.items.length !== next.items.length) return false
   return prev.items.every((o, i) => {
     const n = next.items[i]
