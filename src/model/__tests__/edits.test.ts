@@ -474,7 +474,7 @@ instances:
     expect(rootMeta(loaded).title).toBe('Original Title')
     // Raw store items carry only occurrence metadata — no title field.
     for (const i of loaded.items) {
-      expect((i.metadata as Record<string, unknown>).title).toBeUndefined()
+      expect((i.metadata as unknown as Record<string, unknown>).title).toBeUndefined()
     }
     // In YAML, title must not appear inside an instance.
     const yaml = serialize(loaded.items, loaded.root)
