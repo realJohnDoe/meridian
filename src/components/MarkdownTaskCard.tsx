@@ -1,6 +1,7 @@
 import { CircleFadingArrowUp } from 'lucide-react'
 import { Checkbox } from './ui/checkbox'
 import { Card } from './ui/card'
+import { IconButton } from './ui/icon-button'
 
 interface MarkdownTaskCardProps {
   text:          string
@@ -51,14 +52,14 @@ export default function MarkdownTaskCard({
             {text}
           </span>
         )}
-        <button
-          aria-label="Convert to item"
+        <IconButton
+          label="Convert to item"
           title="Convert to item"
-          className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+          className="text-muted-foreground hover:text-foreground"
           onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onPromote() }}
         >
           <CircleFadingArrowUp size={15} />
-        </button>
+        </IconButton>
       </div>
     </Card>
   )
