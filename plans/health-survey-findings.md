@@ -192,12 +192,6 @@ dexie 4, eslint 10, vitest 4). The real decisions are three dev-toolchain majors
 
 ## Worth acting on
 
-1. **TypeScript 5.8.3 → 7.0.2** (pinned `~5.8.0`, both workspaces) — the biggest win
-   available. TS 7 is the native (Go) compiler rewrite; the `build` script runs `tsc -b`
-   twice plus type-aware ESLint over the whole project, so this is where CI minutes go.
-   Gate: check `@typescript-eslint` (8.63) support for TS 7 first; if it doesn't fly yet,
-   at least loosen the `~5.8.0` pin to pick up 5.9/6.x. Try on a branch —
-   `pnpm run build && pnpm run lint && pnpm test` is a complete verdict.
 2. **Vite 6.4.3 → 8.1.4** plus `@vitejs/plugin-react` 4.7 → 6.0.3 (they go together). Two
    majors behind is the one place the repo drifts from the ecosystem. Risk is concentrated
    in the plugin stack — `vite-plugin-pwa`, the TanStack router plugin, and the three custom
