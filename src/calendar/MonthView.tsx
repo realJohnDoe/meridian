@@ -20,18 +20,18 @@ import { dvBlockVariants } from '@/components/ui/occurrence-variants'
 // Cell-chrome class strings, shared between CalCell and the invisible chrome
 // sentinel so the bar overlay's top offset can be MEASURED from a real replica
 // rather than hand-computed — the day-number badge, cell padding, or the flex
-// gap can change without silently breaking bar↔chip alignment (see `barTop`).
+// gap can change without silently breaking bar↔row alignment (see `barTop`).
 const CELL_CLASS = 'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] transition-colors overflow-hidden min-h-0 w-full'
 const BADGE_CLASS = 'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
-const CHIP_LIST_CLASS = 'flex flex-col gap-0.5 flex-1 overflow-hidden'
+const OCC_LIST_CLASS = 'flex flex-col gap-0.5 flex-1 overflow-hidden'
 
-// Fallback for the chip-list start offset until it's measured (cell top padding
+// Fallback for the occurrence-list start offset until it's measured (cell top padding
 // 3px + badge h-5 20px + badge mb-px 1px + the 8px flex gap inherited from Button).
 const BAR_TOP_FALLBACK = 32
 // Conservative reservation for badge + cell padding, used only to estimate
-// how many chip rows fit in the remaining cell height — doesn't need to be exact.
+// how many occurrence rows fit in the remaining cell height — doesn't need to be exact.
 const CELL_CHROME = 26
-const ROW_GAP = 2 // gap-0.5 between stacked rows (chips and bars share this)
+const ROW_GAP = 2 // gap-0.5 between stacked rows (occurrence rows and bars share this)
 const MAX_BAR_LANES = 2 // stacked multiday bars per week row before overflow
 
 // ── CalCell ───────────────────────────────────────────────────
@@ -82,7 +82,7 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
         isToday && 'bg-primary text-primary-foreground font-bold',
       )}>{date.getDate()}</span>
       <div
-        className={CHIP_LIST_CLASS}
+        className={OCC_LIST_CLASS}
         style={reservedLanes ? { marginTop: reservedLanes * (rowH + ROW_GAP) } : undefined}
       >
         {dayOccs.slice(0, shown).map(o => (
@@ -152,7 +152,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     return out
   })()
 
-  // Partition into single-day occurrences (bucketed per day, as chips) and
+  // Partition into single-day occurrences (bucketed per day, as occurrence rows) and
   // multiday occurrences (one root entry per event, deduped from the root +
   // per-day-virtual-occurrence set expandWithMultiday produces).
   const { occsByDay, multidayLanes } = (() => {
@@ -193,13 +193,13 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   // exact same classes as a real one, so its measured height already reflects
   // the current breakpoint's font-size/padding without hardcoding it here.
   // rowH (the same measured height) also sizes the multiday bar segments, so
-  // bars and chips always line up at the same row height.
+  // bars and occurrence rows always line up at the same row height.
   const weekRows = Math.ceil(cells.length / 7)
   const weekRowsArr = Array.from({ length: weekRows }, (_, i) => cells.slice(i * 7, i * 7 + 7))
   const gridRef = useRef<HTMLDivElement>(null)
   const rowSentinelRef = useRef<HTMLDivElement>(null)
   const chromeSentinelRef = useRef<HTMLButtonElement>(null)
-  const chipStartRef = useRef<HTMLDivElement>(null)
+  const occListRef = useRef<HTMLDivElement>(null)
   const [maxVisible, setMaxVisible] = useState(3)
   const [rowH, setRowH] = useState(0)
   const [barTop, setBarTop] = useState(BAR_TOP_FALLBACK)
@@ -218,12 +218,12 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       const n = Math.floor((available + ROW_GAP) / (measuredRowH + ROW_GAP))
       setMaxVisible(Math.min(8, Math.max(1, n)))
 
-      // Measure where the chip list starts within a cell (from an invisible
-      // replica) so the bar overlay lines up with real single-day chips.
+      // Measure where the occurrence list starts within a cell (from an invisible
+      // replica) so the bar overlay lines up with real single-day occurrence rows.
       const chromeEl = chromeSentinelRef.current
-      const chipStartEl = chipStartRef.current
-      if (chromeEl && chipStartEl) {
-        const offset = chipStartEl.getBoundingClientRect().top - chromeEl.getBoundingClientRect().top
+      const occListEl = occListRef.current
+      if (chromeEl && occListEl) {
+        const offset = occListEl.getBoundingClientRect().top - chromeEl.getBoundingClientRect().top
         if (offset > 0) setBarTop(offset)
       }
     }
@@ -250,10 +250,10 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       </div>
 
       {/* Invisible cell replica: measures the offset from the cell top to where
-          the chip list begins, so the bar overlay aligns with real chips. */}
+          the occurrence list begins, so the bar overlay aligns with real rows. */}
       <SurfaceButton ref={chromeSentinelRef} aria-hidden tabIndex={-1} className={cn('invisible absolute pointer-events-none', CELL_CLASS)}>
         <span className={BADGE_CLASS}>0</span>
-        <div ref={chipStartRef} className={CHIP_LIST_CLASS} />
+        <div ref={occListRef} className={OCC_LIST_CLASS} />
       </SurfaceButton>
 
       <div className="flex-1 overflow-hidden px-1 pb-1 flex flex-col">
@@ -280,7 +280,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                     const dayBars = rowBars.filter(b => b.startCol <= col && col <= b.endCol)
                     // Reserve blank lanes per-day based only on the bars that cover
                     // THIS day, so a day past the end of a multiday bar reclaims that
-                    // lane for its own single-day chips instead of leaving it blank.
+                    // lane for its own single-day occurrence rows instead of leaving it blank.
                     const dayLaneCount = dayBars.reduce((max, b) => Math.max(max, b.lane + 1), 0)
                     const reservedLanes = Math.min(MAX_BAR_LANES, dayLaneCount)
                     const hiddenBarCount = dayBars.filter(b => b.lane >= reservedLanes).length
@@ -313,7 +313,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                         className={cn(
                           dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
                           // mx-0.5 mirrors the day cell's 2px horizontal padding so a
-                          // single-column bar aligns exactly with a single-day chip.
+                          // single-column bar aligns exactly with a single-day occurrence row.
                           'flex items-center mx-0.5 rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
                         )}
                       >
