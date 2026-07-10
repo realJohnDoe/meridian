@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
-import { multidayDisplayTitle, fmtT } from '@/model'
+import { multidayDisplayTitle, fmtT, parseDateString, parseDurationDays } from '@/model'
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
+import { ContinuationChevron } from '@/components/ui/continuation-chevron'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday, useCalendarFilter } from '@/hooks'
 import { computeColumns } from './computeColumns'
@@ -33,19 +34,29 @@ function formatHourBoundary(h: number, hour12: boolean): string {
 
 // ── Sub-components ────────────────────────────────────────────
 
-interface AllDayItemProps { o: Occurrence; onOpen: (o: Occurrence) => void; displayTitle?: string }
-function AllDayItem({ o, onOpen, displayTitle }: AllDayItemProps) {
+interface AllDayItemProps {
+  o: Occurrence
+  onOpen: (o: Occurrence) => void
+  displayTitle?: string
+  continuesLeft?: boolean
+  continuesRight?: boolean
+}
+function AllDayItem({ o, onOpen, displayTitle, continuesLeft, continuesRight }: AllDayItemProps) {
   const title = displayTitle ?? o.metadata.title
   return (
     <SurfaceButton
       className={cn(
         dvBlockVariants({ state: occState(o) }),
-        'w-full flex items-center rounded-xs sm:rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
+        'relative w-full flex items-center rounded-xs sm:rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
+        continuesLeft && 'pl-4',
+        continuesRight && 'pr-4',
       )}
       onClick={() => onOpen(o)}
       aria-label={title}
     >
+      {continuesLeft && <ContinuationChevron side="left" />}
       <span>{title}</span>
+      {continuesRight && <ContinuationChevron side="right" />}
     </SurfaceButton>
   )
 }
@@ -56,12 +67,17 @@ function renderAllDayItem(
   dvMidnight: Date,
   onOpen: (o: Occurrence) => void,
 ) {
+  const days = parseDurationDays(o.metadata.duration) ?? 1
+  const startD = parseDateString(o.date)
+  const endD = startD && days > 1 ? addDays(startD, days - 1) : startD
   return (
     <AllDayItem
       key={`${o.fileSlug}-${o.date}-${i}`}
       o={o}
       onOpen={onOpen}
       displayTitle={multidayDisplayTitle(o, dvMidnight)}
+      continuesLeft={!!startD && startD < dvMidnight}
+      continuesRight={!!endD && endD > dvMidnight}
     />
   )
 }
