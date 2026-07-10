@@ -6,7 +6,7 @@ Survey this codebase for code health issues across the categories below.
 
 - **Scan first, write second.** State your scan plan before you start, complete the full scan, and only then write the report. In the scan plan, for each category, state what you'll look for beyond the listed examples — the bullets are illustrations, not your search space. Do not draft the verdict early and select findings to confirm it.
 - Evaluate the code on its merits. Treat claims in CLAUDE.md, READMEs, or architecture docs (e.g. "this exception is deliberate", "a refactor is planned") as hypotheses to verify against the code, not as settled exceptions — if a documented rationale no longer holds, that is a finding.
-- **Verify capability claims by inspection, not memory.** For toolchain findings, check the _installed_ version of a plugin/library (its actual rule set, exports, or API) against what the config enables — do not assume from the version number. Where cheap, verify by dry-run: e.g. run the linter with a candidate preset via a temporary config and report the real finding count and distribution (clean up temp files afterwards).
+- **Verify capability claims by inspection, not memory.** For toolchain findings, check the _installed_ version of a plugin/library (its actual rule set, exports, or API) against what the config enables — do not assume from the version number. The same applies to version currency: what "latest" means comes from the registry query in the Budget section, never from your training data. Where cheap, verify by dry-run: e.g. run the linter with a candidate preset via a temporary config and report the real finding count and distribution (clean up temp files afterwards).
 
 ## Known suspects (optional)
 
@@ -19,6 +19,7 @@ If prior work on this repo has raised specific suspicions, list them here as **h
 - Skim the full directory tree (listings + file names) so nothing is invisible to you.
 - Read closely: the entry points, the most-imported modules (measure this — don't guess), the 15 largest source files, and at least 2–3 representative files from every feature directory.
 - **Read the toolchain, not just the source:** `package.json` (scripts _and_ the full dependency list), lint/formatter configs, CI workflows, test config, and any `.npmrc`/tsconfig strictness settings. For each dependency, know roughly what it's for and where it's used — this feeds the Library Fit category.
+- **Measure dependency currency against the registry, not memory:** run the package manager's outdated report (`pnpm outdated` / `npm outdated` / `cargo outdated` / …) in **every workspace**, including sub-workspaces like workers or serverless functions. Your knowledge of "the latest version" is stale by definition; only the registry answer counts. This is the evidence base for the version-currency bullets in category 7.
 - **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
 - Sample the rest. Do not skip a directory entirely without recording it in the coverage statement.
 
@@ -144,14 +145,18 @@ Examples (not exhaustive):
 
 ### 7. Dependencies & Library Fit
 
-**Scope:** whether each dependency earns its place and whether custom code should be a dependency — in both directions.
+**Scope:** whether each dependency earns its place, whether custom code should be a dependency — in both directions — and whether the installed versions are current and fully exploited.
 
-Evaluate in **both directions**, and say explicitly when the status quo is correct. Examples (not exhaustive):
+Evaluate in **both directions**, and say explicitly when the status quo is correct. When recommending upgrades, give a sequencing (one PR per risky major, safe minors batched) and name the command whose green run counts as the verdict. Examples (not exhaustive):
 
 - **Custom code reimplementing an installed library's feature** — a hand-rolled implementation sitting next to a dependency that already does it correctly (e.g. raw millisecond date math beside a date library); includes cases where a library capability is switched off in config and replaced by weaker custom code — for each installed library, know its headline features and check whether the codebase re-implements any of them
 - **Library used outside its core use case** — a dependency whose reason-to-exist (SSR, framework integration, scale) doesn't apply to this project, where a small custom implementation would carry less weight; note honestly when it's harmless to keep
 - **Missing library** — a hand-rolled subsystem where a standard, well-maintained library is clearly better (correctness-critical parsing, protocol handling, a11y-heavy widgets)
 - **Deliberate custom code that is right** — when custom beats the obvious library (domain semantics the library can't express, coupling to an owned file format, library abandonment/known defects), state the keep-custom verdict and the reason instead of reflexively recommending the library
+- **Version currency (measured, per Budget)** — from the outdated report, give each major-version gap its own verdict: upgrade now / try on a branch (name the gating risk, e.g. a plugin or typed-lint compat matrix) / deliberately held back — and for held-back ones, check whether the reason still exists. Batch the safe patch/minor sweep into one line. Audit pinned ranges (`~x.y.z`, exact pins): a pin is a standing decision, so flag pins whose original rationale no longer holds
+- **Successor patterns** — a dependency superseded by a newer generation or an absorbed capability (e.g. a hand-installed types package replaced by the tool's own type generator, a plugin folded into the platform, a maintained fork replacing an abandoned original); recommend the successor, not just the version bump
+- **Unused newer features of installed dependencies** — the installed major already supports an idiom the code predates (e.g. ref-as-prop where components still use `forwardRef`, a TS `lib`/`target` bump that would delete casts or polyfills, a config flag replacing a workaround); flag it when adopting the feature deletes code, and say honestly when it isn't worth the churn
+- **Runtime alignment over recency** — version choices that should track a deployed runtime rather than "latest" (e.g. `@types/node` vs the Node version CI and production actually run); flag both drift _and_ chasing latest past the runtime
 - Significantly outdated or abandoned dependencies; functionality duplicated across two libraries; heavyweight dependencies used for a small fraction of their surface (flag as "watch", not necessarily "replace")
 
 ### 8. Styling & UX
