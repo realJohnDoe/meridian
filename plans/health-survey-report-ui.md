@@ -20,14 +20,6 @@ This report rests on close reading of roughly **60% of UI-layer code by volume**
 
 ## 3. Findings
 
-### 3. Arbitrary pixel values bypass the documented type/spacing scale — including duplicates of tokens that already exist
-
-- **Category:** `styling` `toolchain`
-- **Impact:** 5 · **Breadth:** 15 files for font sizes (`grep -rlE "text-\[[0-9.]+px\]"`); 86 font-size + 70 spacing occurrences · **Fix effort:** M
-- **Evidence:** `src/index.css:16` declares the convention — `* 4. Spacing/radius             → Tailwind scale snapped to nearest step; no arbitrary px.` — and defines `--text-2xs: 0.625rem;  /* 10px */`. Yet the codebase has 86 `text-[Npx]` occurrences (30× `text-[11px]`, 23× `text-[13px]`, 20× `text-[14px]`), of which 17 are `text-[10px]`/`text-[8px]` — literal duplicates of the existing `text-2xs`/`text-3xs` tokens (e.g. `src/editor/dialogs/RepeatDialog.tsx:275` `className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground"`). Spacing likewise: `src/components/Sidebar.tsx:105` `className="gap-[14px] px-3 py-[11px] h-auto text-[14px] font-medium rounded-none"`.
-- **Problem:** The type scale fragments into ad-hoc pixel values (9 distinct sub-`sm` sizes in use), so a future size/density change can't be made in one place — precisely what the convention block was written to prevent.
-- **Fix:** Add the missing scale steps as `@theme` tokens (11/13/14px have no Tailwind default), migrate mechanically, and enforce with a lint rule (e.g. `eslint-plugin-tailwindcss`'s `no-arbitrary-value` scoped to font-size/spacing, or better-tailwindcss's equivalent).
-
 ### 5. Two divergent scroll-wheel implementations — the exported one is dead, and `knip.json` makes `components/ui/` invisible to dead-code detection
 
 - **Category:** `dead-code` `dry` `toolchain`
