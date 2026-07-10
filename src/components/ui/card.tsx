@@ -24,13 +24,15 @@ function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement
   )
 }
 
-function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+function CardTitle({ className, children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
       data-slot="card-title"
       className={cn('text-base font-semibold leading-none tracking-tight', className)}
       {...props}
-    />
+    >
+      {children}
+    </h3>
   )
 }
 

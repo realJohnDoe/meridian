@@ -91,28 +91,43 @@ export function ScrollColumn<T extends string | number>({
 
       <div
         ref={ref}
+        role="listbox"
+        tabIndex={0}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onScroll={handleScroll}
+        onKeyDown={e => {
+          const idx = itemsRef.current.indexOf(value)
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault()
+            const next = Math.max(0, Math.min(idx + (e.key === 'ArrowDown' ? 1 : -1), itemsRef.current.length - 1))
+            onChange(itemsRef.current[next])
+            scrollToValue(itemsRef.current[next], 'smooth')
+          }
+        }}
         style={{ paddingBlock: ITEM_H }}
         className={cn(
-          'h-full overflow-y-scroll',
+          'h-full overflow-y-scroll focus-visible:outline-none',
           // No CSS snap — we handle all snapping in JS for full control
           '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         )}
       >
         {items.map(item => (
-          <div
+          <button
             key={item}
+            type="button"
+            tabIndex={-1}
+            role="option"
+            aria-selected={item === value}
             className={cn(
-              'h-11 flex items-center justify-center',
+              'w-full h-11 flex items-center justify-center',
               'text-xl font-mono select-none cursor-pointer',
               item === value ? 'text-foreground' : 'text-muted-foreground',
             )}
             onClick={() => { onChange(item); scrollToValue(item, 'smooth') }}
           >
             {format ? format(item) : String(item)}
-          </div>
+          </button>
         ))}
       </div>
     </div>
