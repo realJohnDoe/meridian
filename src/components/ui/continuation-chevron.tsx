@@ -15,12 +15,12 @@ const SIDE_ICON = {
 /**
  * Padding to reserve on a row that shows a ContinuationChevron on that side
  * — the single source of truth so MonthView bars and the DayView all-day
- * pill can't drift apart. 20px clears the chevron's own ~12px footprint
- * (2px inset + 10px icon) with a deliberate gap to the title.
+ * pill can't drift apart. 16px clears the chevron's own 12px footprint
+ * (2px inset + 10px icon) with a 4px gap to the title.
  */
 export const CONTINUES_PADDING = {
-  left:  'sm:pl-5',
-  right: 'sm:pr-5',
+  left:  'sm:pl-4',
+  right: 'sm:pr-4',
 }
 
 /**
