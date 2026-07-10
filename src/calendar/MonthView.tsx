@@ -17,13 +17,17 @@ import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
 
-// The exact vertical offset where the chip list starts in the DOM, so the bar
-// overlay's `top` lines up with it precisely and the bar→chip gap equals ROW_GAP.
-// Must be exact (unlike CELL_CHROME below): cell top padding (3px) + day-number
-// badge h-5 (20px) + badge mb-px (1px) + the 8px flex `gap-2` that the cell's
-// flex column inherits from Button's base class (SurfaceButton doesn't reset it)
-// = 32px. Omitting that inherited gap is what left an extra 8px gap before.
-const BAR_TOP = 3 + 20 + 1 + 8
+// Cell-chrome class strings, shared between CalCell and the invisible chrome
+// sentinel so the bar overlay's top offset can be MEASURED from a real replica
+// rather than hand-computed — the day-number badge, cell padding, or the flex
+// gap can change without silently breaking bar↔chip alignment (see `barTop`).
+const CELL_CLASS = 'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] transition-colors overflow-hidden min-h-0 w-full'
+const BADGE_CLASS = 'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
+const CHIP_LIST_CLASS = 'flex flex-col gap-0.5 flex-1 overflow-hidden'
+
+// Fallback for the chip-list start offset until it's measured (cell top padding
+// 3px + badge h-5 20px + badge mb-px 1px + the 8px flex gap inherited from Button).
+const BAR_TOP_FALLBACK = 32
 // Conservative reservation for badge + cell padding, used only to estimate
 // how many chip rows fit in the remaining cell height — doesn't need to be exact.
 const CELL_CHROME = 26
@@ -69,20 +73,16 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
 
   return (
     <SurfaceButton
-      className={cn(
-        'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] transition-colors overflow-hidden min-h-0 w-full',
-        'hover:bg-accent',
-        other && 'opacity-25',
-      )}
+      className={cn(CELL_CLASS, 'hover:bg-accent', other && 'opacity-25')}
       onClick={() => onDayClick(date)}
       aria-label={ariaLabel}
     >
       <span className={cn(
-        'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px',
+        BADGE_CLASS,
         isToday && 'bg-primary text-primary-foreground font-bold',
       )}>{date.getDate()}</span>
       <div
-        className="flex flex-col gap-0.5 flex-1 overflow-hidden"
+        className={CHIP_LIST_CLASS}
         style={reservedLanes ? { marginTop: reservedLanes * (rowH + ROW_GAP) } : undefined}
       >
         {dayOccs.slice(0, shown).map(o => (
@@ -198,8 +198,11 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   const weekRowsArr = Array.from({ length: weekRows }, (_, i) => cells.slice(i * 7, i * 7 + 7))
   const gridRef = useRef<HTMLDivElement>(null)
   const rowSentinelRef = useRef<HTMLDivElement>(null)
+  const chromeSentinelRef = useRef<HTMLButtonElement>(null)
+  const chipStartRef = useRef<HTMLDivElement>(null)
   const [maxVisible, setMaxVisible] = useState(3)
   const [rowH, setRowH] = useState(0)
+  const [barTop, setBarTop] = useState(BAR_TOP_FALLBACK)
 
   useEffect(() => {
     const gridEl = gridRef.current
@@ -214,6 +217,15 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       const available = cellH - CELL_CHROME
       const n = Math.floor((available + ROW_GAP) / (measuredRowH + ROW_GAP))
       setMaxVisible(Math.min(8, Math.max(1, n)))
+
+      // Measure where the chip list starts within a cell (from an invisible
+      // replica) so the bar overlay lines up with real single-day chips.
+      const chromeEl = chromeSentinelRef.current
+      const chipStartEl = chipStartRef.current
+      if (chromeEl && chipStartEl) {
+        const offset = chipStartEl.getBoundingClientRect().top - chromeEl.getBoundingClientRect().top
+        if (offset > 0) setBarTop(offset)
+      }
     }
 
     compute()
@@ -236,6 +248,13 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       >
         &nbsp;
       </div>
+
+      {/* Invisible cell replica: measures the offset from the cell top to where
+          the chip list begins, so the bar overlay aligns with real chips. */}
+      <SurfaceButton ref={chromeSentinelRef} aria-hidden tabIndex={-1} className={cn('invisible absolute pointer-events-none', CELL_CLASS)}>
+        <span className={BADGE_CLASS}>0</span>
+        <div ref={chipStartRef} className={CHIP_LIST_CLASS} />
+      </SurfaceButton>
 
       <div className="flex-1 overflow-hidden px-1 pb-1 flex flex-col">
         <div ref={gridRef} className="flex flex-col gap-0.5 flex-1">
@@ -285,7 +304,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                 {shownBars.length > 0 && (
                   <div
                     className="absolute inset-x-0 pointer-events-none grid grid-cols-7 gap-0.5"
-                    style={{ top: BAR_TOP, gridAutoRows: rowH || undefined }}
+                    style={{ top: barTop, gridAutoRows: rowH || undefined }}
                   >
                     {shownBars.map(b => (
                       <div
