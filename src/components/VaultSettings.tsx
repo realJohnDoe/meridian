@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { tokenSave, syncToBackend, removeVault } from '@/vaultActions'
@@ -94,9 +95,8 @@ export function VaultSettings({ vault, isActive }: Props) {
           </div>
           <label className="flex flex-col gap-1">
             <span className="text-[13px] font-medium">Update token</span>
-            <input
+            <Input
               type="password"
-              className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
               placeholder="github_pat_… (leave blank to keep current)"
               value={token}
               onChange={e => { setToken(e.target.value); setError(null) }}
