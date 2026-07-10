@@ -36,7 +36,7 @@ function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   return (
     <button className={cn(badgeVariants({ variant: 'chip' }), className)} aria-pressed={pressed} onClick={onClick}>
       <Icon size={13} />{label}
-      {value && <span className="text-[11px] font-mono opacity-80 ml-px">{value}</span>}
+      {value && <span className="text-2xs font-mono opacity-80 ml-px">{value}</span>}
     </button>
   )
 }
@@ -156,7 +156,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
 
   return (
     <>
-      <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-[720px] lg:mx-auto">
+      <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-3xl lg:mx-auto">
 
         {/* ── FILE-LEVEL: title + slug ── */}
         <div className="flex items-start gap-2.5 mb-3">

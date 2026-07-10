@@ -81,11 +81,11 @@ export function ScrollColumn<T extends string | number>({
   }, [snapToIndex])
 
   return (
-    <div className={cn('relative h-[132px] overflow-hidden', className)}>
+    <div className={cn('relative h-32 overflow-hidden', className)}>
       {/* top fade */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-11 z-10 bg-gradient-to-b from-background to-transparent" />
       {/* selection highlight band */}
-      <div className="pointer-events-none absolute inset-x-0 top-[44px] h-11 rounded-lg bg-white/5 border border-white/10 z-10" />
+      <div className="pointer-events-none absolute inset-x-0 top-11 h-11 rounded-lg bg-white/5 border border-white/10 z-10" />
       {/* bottom fade */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-11 z-10 bg-gradient-to-t from-background to-transparent" />
 

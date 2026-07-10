@@ -272,7 +272,7 @@ export default function RepeatDialog({
 
           {/* Topmost Dropdown for Repeat Type */}
           <div className="flex flex-col gap-1.5">
-            <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">Repeat Type</div>
+            <div className="text-2xs font-bold tracking-wider uppercase text-muted-foreground">Repeat Type</div>
             <Select
               disabled={!hasSched || !hasTrk}
               value={freq === 'after_completion' ? 'after_completion' : 'schedule'}
@@ -301,7 +301,7 @@ export default function RepeatDialog({
             <div className="flex flex-col gap-4">
               {/* Repeats every row */}
               <div className="flex flex-col gap-1.5">
-                <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
+                <div className="text-2xs font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -394,7 +394,7 @@ export default function RepeatDialog({
 
               {/* End section */}
               <div className="pt-3 border-t border-border/50">
-                <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground mb-2">Ends</div>
+                <div className="text-2xs font-bold tracking-wider uppercase text-muted-foreground mb-2">Ends</div>
                 <ToggleGroup
                   type="single"
                   value={endType}
@@ -437,7 +437,7 @@ export default function RepeatDialog({
           ) : (
             /* After completion sub-form (inline number and unit select) */
             <div className="flex flex-col gap-1.5">
-              <div className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
+              <div className="text-2xs font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
               <div className="flex gap-2">
                 <input
                   type="number"

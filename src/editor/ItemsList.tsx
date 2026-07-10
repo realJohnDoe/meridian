@@ -236,7 +236,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           </div>
           <IconButton
             label="Remove"
-            className="mt-[9px] p-1 text-muted-foreground hover:text-foreground"
+            className="mt-2.5 p-1 text-muted-foreground hover:text-foreground"
             onClick={() => remove(idx)}
           >
             <X size={13} />
@@ -264,7 +264,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
         </div>
         <IconButton
           label="Remove"
-          className="mt-[9px] p-1 text-muted-foreground hover:text-foreground"
+          className="mt-2.5 p-1 text-muted-foreground hover:text-foreground"
           onClick={() => remove(idx)}
         >
           <X size={13} />
@@ -301,9 +301,9 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
         <div className="flex items-start gap-1">
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
-              <Card className="flex-1 flex items-center gap-2 pl-[8px] pr-[10px] py-[8px] border-dashed bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground">
+              <Card className="flex-1 flex items-center gap-2 pl-2 pr-2.5 py-2 border-dashed bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground">
                 <Plus size={13} className="shrink-0" />
-                <span className="text-[13px]">Add item…</span>
+                <span className="text-sm">Add item…</span>
               </Card>
             </PopoverTrigger>
             <PopoverContent className="w-64 p-0" align="start">
@@ -358,7 +358,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                         >
                           <span className="truncate">{e.title}</span>
                           {e.tags[0] && (
-                            <span className="ml-auto text-[10px] text-muted-foreground shrink-0">{e.tags[0]}</span>
+                            <span className="ml-auto text-2xs text-muted-foreground shrink-0">{e.tags[0]}</span>
                           )}
                         </CommandItem>
                       ))}
@@ -372,7 +372,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
             </PopoverContent>
           </Popover>
           {/* Spacer matching the X button so the card aligns with cards above */}
-          <span className="w-[21px] shrink-0" aria-hidden="true" />
+          <span className="w-5 shrink-0" aria-hidden="true" />
         </div>
 
         {displayRows.map(({ row, exiting }, position) => renderRow(row, exiting, position))}

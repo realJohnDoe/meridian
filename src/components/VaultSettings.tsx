@@ -73,8 +73,8 @@ export function VaultSettings({ vault, isActive }: Props) {
       {vault.kind === 'local' && (
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
           <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-[13px] font-medium">Folder</span>
-            <span className="text-[12px] text-muted-foreground font-mono truncate">{vault.name}</span>
+            <span className="text-sm font-medium">Folder</span>
+            <span className="text-xs text-muted-foreground font-mono truncate">{vault.name}</span>
           </div>
           {isActive && (
             <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
@@ -87,16 +87,16 @@ export function VaultSettings({ vault, isActive }: Props) {
       {vault.kind === 'github' && (
         <div className="flex flex-col gap-3 pt-2 border-t border-border">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[13px] font-medium">Repository</span>
-            <span className="text-[12px] text-muted-foreground font-mono truncate">
+            <span className="text-sm font-medium">Repository</span>
+            <span className="text-xs text-muted-foreground font-mono truncate">
               {vault.github.owner}/{vault.github.repo} ({vault.github.branch})
             </span>
           </div>
           <label className="flex flex-col gap-1">
-            <span className="text-[13px] font-medium">Update token</span>
+            <span className="text-sm font-medium">Update token</span>
             <input
               type="password"
-              className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"
+              className="w-full rounded border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring"
               placeholder="github_pat_… (leave blank to keep current)"
               value={token}
               onChange={e => { setToken(e.target.value); setError(null) }}
@@ -104,7 +104,7 @@ export function VaultSettings({ vault, isActive }: Props) {
               spellCheck={false}
             />
           </label>
-          {error && <p className="text-[13px] text-destructive">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end">
             <Button
               variant="outline"
@@ -121,8 +121,8 @@ export function VaultSettings({ vault, isActive }: Props) {
       )}
 
       <div className="flex flex-col gap-2 pt-2 border-t border-border">
-        <span className="text-[13px] font-medium">Default participants</span>
-        <p className="text-[12px] text-muted-foreground">
+        <span className="text-sm font-medium">Default participants</span>
+        <p className="text-xs text-muted-foreground">
           Added to new entries in this vault automatically.
         </p>
         <ParticipantsRow
@@ -140,7 +140,7 @@ export function VaultSettings({ vault, isActive }: Props) {
             className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
             onClick={() => removeVault(vault.id)}
           >
-            <Trash2 className="size-[13px] stroke-[1.7]" />
+            <Trash2 className="size-3.5 stroke-[1.7]" />
             Remove vault
           </Button>
         </div>

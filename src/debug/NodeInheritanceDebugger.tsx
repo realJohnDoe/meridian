@@ -83,10 +83,10 @@ function NodeCard({ item, isLast }: { item: CardItem; isLast: boolean }) {
           <span className={`w-1.5 h-4 rounded-full shrink-0 ${depthColour(depth)}`} />
           <FileText size={13} className="text-white/40 shrink-0" />
           <span className="font-mono text-xs text-white/90 font-medium">{label}</span>
-          {depth === 0 && <span className="text-[10px] text-white/20 font-mono ml-1">root</span>}
-          <span className="ml-auto text-[10px] text-white/25 font-mono">depth {depth}</span>
+          {depth === 0 && <span className="text-2xs text-white/20 font-mono ml-1">root</span>}
+          <span className="ml-auto text-2xs text-white/25 font-mono">depth {depth}</span>
           {instanceCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">
+            <span className="text-2xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">
               {instanceCount} {instanceCount === 1 ? 'child' : 'children'}
             </span>
           )}
@@ -134,13 +134,13 @@ function OccurrenceRow({
       {occ.time
         ? <span className="text-white/40 shrink-0">{occ.time}</span>
         : <span className="text-white/15 shrink-0">—</span>}
-      <span className={`ml-auto text-[10px] font-sans px-1.5 py-0.5 rounded ${
+      <span className={`ml-auto text-2xs font-sans px-1.5 py-0.5 rounded ${
         occ.source === 'generated' ? 'bg-white/5 text-white/25' : 'bg-amber-500/10 text-amber-400/70'
       }`}>
         {occ.source === 'generated' ? 'sched' : 'explicit'}
       </span>
       {occ.metadata.done && (
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-sans">done</span>
+        <span className="text-2xs px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-sans">done</span>
       )}
     </div>
   )
@@ -156,7 +156,7 @@ function ActionBtn({
 }) {
   return (
     <button onClick={onClick} disabled={disabled} title={title}
-      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-[11px] transition-colors ${
+      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-2xs transition-colors ${
         disabled
           ? 'text-white/15 cursor-not-allowed'
           : active
@@ -172,7 +172,7 @@ function ActionBtn({
 
 // ── Action forms ──────────────────────────────────────────────────────────────
 
-const inputCls = 'bg-white/5 border border-white/10 rounded px-2 py-1 text-[11px] font-mono text-white/70 focus:outline-none focus:border-white/30'
+const inputCls = 'bg-white/5 border border-white/10 rounded px-2 py-1 text-2xs font-mono text-white/70 focus:outline-none focus:border-white/30'
 const btnApply = 'px-3 py-1 text-xs rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition-colors disabled:opacity-40'
 const btnCancel = 'px-3 py-1 text-xs rounded bg-white/5 text-white/40 hover:bg-white/10 transition-colors'
 
@@ -186,11 +186,11 @@ function AddOccurrenceForm({ onApply, onCancel }: {
   return (
     <div className="p-3 space-y-2 border-t border-white/5">
       <div className="flex flex-wrap gap-2 items-center">
-        <label className="text-[11px] text-white/30 w-8">date</label>
+        <label className="text-2xs text-white/30 w-8">date</label>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
-        <label className="text-[11px] text-white/30">time</label>
+        <label className="text-2xs text-white/30">time</label>
         <input type="time" value={time} onChange={e => setTime(e.target.value)} className={`${inputCls} w-28`} />
-        <label className="text-[11px] text-white/30">done</label>
+        <label className="text-2xs text-white/30">done</label>
         <input type="checkbox" checked={done} onChange={e => setDone(e.target.checked)} className="accent-emerald-500" />
       </div>
       <div className="flex gap-2">
@@ -212,11 +212,11 @@ function EditOccurrenceForm({ occ, onApply, onCancel }: {
   return (
     <div className="p-3 space-y-2 border-t border-white/5">
       <div className="flex flex-wrap gap-2 items-center">
-        <label className="text-[11px] text-white/30 w-8">date</label>
+        <label className="text-2xs text-white/30 w-8">date</label>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
-        <label className="text-[11px] text-white/30">time</label>
+        <label className="text-2xs text-white/30">time</label>
         <input type="time" value={time} onChange={e => setTime(e.target.value)} className={`${inputCls} w-28`} />
-        <label className="text-[11px] text-white/30">done</label>
+        <label className="text-2xs text-white/30">done</label>
         <input type="checkbox" checked={done} onChange={e => setDone(e.target.checked)} className="accent-emerald-500" />
       </div>
       <div className="flex gap-2">
@@ -234,7 +234,7 @@ function EditFollowingForm({ occ, onApply, onCancel }: {
 }) {
   return (
     <div className="p-3 space-y-2 border-t border-white/5">
-      <p className="text-[11px] text-white/50 leading-relaxed">
+      <p className="text-2xs text-white/50 leading-relaxed">
         The current series ends on <span className="font-mono text-white/70">{dayBefore(occ.date)}</span>.
         A new series starts at <span className="font-mono text-white/70">{occ.date}</span> with the same
         pattern — use <span className="text-white/60">Edit pattern</span> afterwards to change it.
@@ -255,7 +255,7 @@ function DeleteConfirmForm({ message, label, onApply, onCancel }: {
 }) {
   return (
     <div className="p-3 space-y-2 border-t border-white/5">
-      <p className="text-[11px] text-white/50 leading-relaxed">{message}</p>
+      <p className="text-2xs text-white/50 leading-relaxed">{message}</p>
       <div className="flex gap-2">
         <button onClick={onApply}
           className="px-3 py-1 text-xs rounded bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors">
@@ -499,7 +499,7 @@ export default function NodeInheritanceDebugger() {
         {fileName && (<>
           <ChevronRight size={14} className="text-white/30" />
           <span className="text-sm font-mono text-white/70">{fileName}</span>
-          {isCollapsed && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">collapsed</span>}
+          {isCollapsed && <span className="text-2xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">collapsed</span>}
         </>)}
         <div className="ml-auto flex items-center gap-2">
           {isCollapsed && (
@@ -520,7 +520,7 @@ export default function NodeInheritanceDebugger() {
 
         {/* LEFT: source */}
         <div className="w-[20%] flex flex-col border-r border-white/10 min-h-0">
-          <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0">
+          <div className="px-3 py-2 text-2xs uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0">
             {isCollapsed ? 'Collapsed YAML' : 'Source'}
           </div>
           <div className="flex-1 overflow-auto">
@@ -550,10 +550,10 @@ export default function NodeInheritanceDebugger() {
 
         {/* MIDDLE: effective tree */}
         <div className="w-[24%] flex flex-col border-r border-white/10 min-h-0">
-          <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
+          <div className="px-3 py-2 text-2xs uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
             Effective tree
             {displayItems.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 font-mono normal-case tracking-normal">
+              <span className="text-2xs px-1.5 py-0.5 rounded bg-white/10 text-white/50 font-mono normal-case tracking-normal">
                 {displayItems.length}
               </span>
             )}
@@ -585,17 +585,17 @@ export default function NodeInheritanceDebugger() {
 
         {/* 3RD COLUMN: occurrences */}
         <div className="w-[22%] flex flex-col min-h-0 border-r border-white/10">
-          <div className="px-3 py-2 text-[11px] uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
+          <div className="px-3 py-2 text-2xs uppercase tracking-widest text-white/30 border-b border-white/10 shrink-0 flex items-center gap-2">
             <CalendarDays size={12} className="text-white/30" />
             <span>Occurrences</span>
             {occurrences && occurrences.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 font-mono normal-case tracking-normal">
+              <span className="text-2xs px-1.5 py-0.5 rounded bg-white/10 text-white/50 font-mono normal-case tracking-normal">
                 {occurrences.length}
               </span>
             )}
             <div className="ml-auto flex items-center gap-1.5">
               <input type="date" value={expandEndDate} onChange={e => setExpandEndDate(e.target.value)}
-                className="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-[11px] font-mono text-white/60 focus:outline-none focus:border-white/25 normal-case tracking-normal" />
+                className="bg-white/5 border border-white/10 rounded px-2 py-0.5 text-2xs font-mono text-white/60 focus:outline-none focus:border-white/25 normal-case tracking-normal" />
             </div>
           </div>
 
@@ -621,7 +621,7 @@ export default function NodeInheritanceDebugger() {
           {displayContent && parseErrors.length === 0 && (
             <div className="shrink-0 border-t border-white/10 bg-[#0d1015]">
               {selectedOcc === null ? (
-                <div className="px-3 py-2.5 text-[11px] text-white/20 select-none">
+                <div className="px-3 py-2.5 text-2xs text-white/20 select-none">
                   {occurrences && occurrences.length > 0 ? 'Select an occurrence to apply actions' : nodeHasRepeat ? '' : 'Add occurrences below'}
                 </div>
               ) : (

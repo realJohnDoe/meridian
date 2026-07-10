@@ -16,11 +16,11 @@ interface Props {
  */
 export default function SearchResults({ query, onOpen, onCreate }: Props) {
   return (
-    <div className="lg:max-w-[720px] lg:mx-auto">
+    <div className="lg:max-w-3xl lg:mx-auto">
       {query && (
         <Button
           variant="ghost"
-          className="w-full justify-start gap-[10px] px-[14px] py-3 h-auto rounded-none border-b border-border text-primary hover:bg-card hover:text-primary"
+          className="w-full justify-start gap-2.5 px-3.5 py-3 h-auto rounded-none border-b border-border text-primary hover:bg-card hover:text-primary"
           onClick={() => onCreate(query)}
           aria-label={`Create "${query}"`}
         >
