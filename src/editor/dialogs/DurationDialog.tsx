@@ -14,6 +14,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { badgeVariants } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
 import DatePickerDialog from './DatePickerDialog'
 import TimePickerDialog from './TimePickerDialog'
@@ -236,10 +237,10 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
           {tab === 'interval' && (
             <div className="space-y-2">
               <div className="flex gap-2">
-                <input
+                <Input
                   type="number"
                   min={1}
-                  className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-xs font-mono text-foreground transition-colors"
+                  className="w-20"
                   value={n === 0 ? '' : n}
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => {
@@ -282,12 +283,12 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                   </button>
                 )}
                 {hasTime && !isTouch && (
-                  <input
+                  <Input
                     type="time"
                     step={300}
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                    className="bg-background text-sm appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                   />
                 )}
               </div>

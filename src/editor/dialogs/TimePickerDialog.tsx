@@ -8,6 +8,7 @@ import {
   ResponsiveModalActions,
 } from '@/components/ui/responsive-modal'
 import TimeWheels from '@/components/ui/TimeWheels'
+import { Input } from '@/components/ui/input'
 
 function normaliseTime(hhmm: string): string {
   const m = hhmm.match(/^(\d{1,2}):(\d{2})/)
@@ -43,12 +44,12 @@ export default function TimePickerDialog({ open, value, onConfirm, onRemove, onC
               <TimeWheels value={time} onChange={setTime} />
             </div>
           ) : (
-            <input
+            <Input
               type="time"
               step={300}
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              className="w-full bg-background border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+              className="bg-background text-sm appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
             />
           )}
         </div>

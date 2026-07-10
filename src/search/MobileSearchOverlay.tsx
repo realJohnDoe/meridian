@@ -3,6 +3,7 @@ import { ArrowLeft, Search, X } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import SearchResults from './SearchResults'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 interface Props {
   open: boolean
@@ -46,9 +47,10 @@ export default function MobileSearchOverlay({ open, query, onQueryChange, onClos
         </Button>
         <div className="search-bar-wrap min-w-0" style={{ flex: '1 1 0%' }}>
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
-          <input
+          <Input
             ref={inputRef}
-            className="flex-1 bg-transparent border-none outline-none text-foreground text-sm min-w-0 placeholder:text-muted-foreground"
+            variant="ghost"
+            className="flex-1 min-w-0"
             placeholder="Search or create…"
             value={query}
             onChange={e => onQueryChange(e.target.value)}

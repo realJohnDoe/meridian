@@ -2,6 +2,7 @@ import { CircleFadingArrowUp } from 'lucide-react'
 import { Checkbox } from './ui/checkbox'
 import { Card } from './ui/card'
 import { IconButton } from './ui/icon-button'
+import { Input } from './ui/input'
 
 interface MarkdownTaskCardProps {
   text:          string
@@ -33,10 +34,11 @@ export default function MarkdownTaskCard({
           onClick={e => e.stopPropagation()}
         />
         {isEditing ? (
-          <input
+          <Input
             // eslint-disable-next-line jsx-a11y/no-autofocus -- opens in response to a user click (promote to inline edit), not on page load
             autoFocus
-            className="flex-1 text-[14px] font-medium bg-transparent border-none outline-none"
+            variant="ghost"
+            className="flex-1 text-[14px] font-medium"
             value={editValue}
             onChange={e => onEditChange?.(e.target.value)}
             onBlur={onEditCommit}

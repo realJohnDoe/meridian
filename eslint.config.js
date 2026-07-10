@@ -62,9 +62,11 @@ export default [
       // Radix primitives (Checkbox, etc.) render as a styled <button> rather
       // than a native form control, so label-has-associated-control's default
       // nested-control detection can't see them — teach it the wrapper name.
+      // Input forwards straight to <input> but is a custom component so the
+      // rule needs the same hint.
       'jsx-a11y/label-has-associated-control': [
         'error',
-        { controlComponents: ['Checkbox'], depth: 3 },
+        { controlComponents: ['Checkbox', 'Input'], depth: 3 },
       ],
 
       // ── React hooks ──────────────────────────────────────────────────────────
