@@ -43,49 +43,6 @@ toolchain blind spots (coverage only measuring imported files, knip exempting al
 
 ## Findings
 
-### 2. The effectful persistence/sync layer is almost entirely untested
-
-| Category  | Impact | Breadth  | Fix effort |
-| --------- | ------ | -------- | ---------- |
-| `testing` | 6/10   | 10 files | M          |
-
-**Evidence:** `pnpm run test:coverage` output:
-`sync.ts | 11.85 | 15.38 | 8.33 | 11.37 | ...53-190,208-380`. Also: `cache.ts` 2.0%,
-`githubOAuth.ts` 9.0%, `notifications.ts` 0%, `storeCommit.ts` 0%, `persistencePort.ts`
-14.3%, `lib/vaultStorage.ts` 0%, `store.ts` 31.5%; `vaultRegistry.ts` and
-`occurrenceActions.ts` never even loaded by a test. The existing storage tests deliberately
-stop at the pure edges — `reconcile.test.ts` tests only `planReconcile`, and
-`sync-collision.test.ts` tests a `FakeBackend`'s CAS semantics, never
-`pushDirty`/`resolveCollision`/`runSync` themselves.
-
-**Problem:** the code paths that can lose user data — collision copy-out, tombstone push,
-auth-retry-after-401, backoff state — have zero automated verification (which is exactly
-how finding 1 survives), while trivially pure helpers like `types.ts` are at 93%.
-
-**Fix:** the existing `FakeBackend` plus a fake `cache` module make
-`pushDirty`/`resolveCollision`/`runSync` unit-testable today; add a suite covering
-write-conflict, delete-conflict, auth-retry, and backoff transitions, and extend the
-`vitest.config.ts` per-file thresholds to `sync.ts` once green.
-
-### 3. Coverage measurement is blind to files no test imports
-
-| Category               | Impact | Breadth    | Fix effort |
-| ---------------------- | ------ | ---------- | ---------- |
-| `toolchain`, `testing` | 4/10   | ~120 files | S          |
-
-**Evidence:** `vitest.config.ts` configures `coverage: { provider: 'v8', reporter: ['text',
-'html'] }` with thresholds but no `include`; the report's headline
-`Statements : 59.82% ( 1151/1924 )` counts only ~1.9k of the ~20.5k source lines — 157
-non-test source files exist but only ~35 appear in the report (no `.tsx` file at all, nor
-`occurrenceActions.ts`, `localBackend.ts`, `fs.ts`, `occView.ts`).
-
-**Problem:** the "60% covered" summary overstates health and hides that entire modules have
-never been executed under test, undermining the very signal `test:coverage` exists to give.
-
-**Fix:** add `coverage.include: ['src/**/*.{ts,tsx}']` (optionally excluding
-`components/ui/**` and routes) so unimported files count as 0% and the report reflects
-reality.
-
 ### 5. The worker workspace is type-checked and tested but never linted
 
 | Category    | Impact | Breadth | Fix effort |
