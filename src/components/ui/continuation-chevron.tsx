@@ -14,10 +14,12 @@ const SIDE_ICON = {
 
 /**
  * Small chevron marking that a multiday occurrence's row continues past
- * this edge (out of the visible week row / day). Absolutely positioned —
- * the parent needs `relative` and enough end padding (>=14px, this icon's
- * 10px footprint plus a couple px of clearance) to keep it clear of the
- * truncated title.
+ * this edge (out of the visible week row / day). Sits right at the row's
+ * edge (2px inset) and muted (70% opacity) so it reads as a subtle
+ * continuation cue rather than competing with the title. Absolutely
+ * positioned — the parent needs `relative` and enough end padding
+ * (>=12px for the icon's own footprint, plus a deliberate gap to the
+ * text — see the sm:pl-5/pr-5 callers) to keep it clear of the title.
  *
  * Hidden below `sm`: at the compact mobile row width there isn't room for
  * both the chevron and the title, and the chevron ends up overlapping text
@@ -31,8 +33,8 @@ export function ContinuationChevron({ side, className }: ContinuationChevronProp
       size={10}
       strokeWidth={2.5}
       className={cn(
-        'hidden sm:block absolute top-1/2 -translate-y-1/2 pointer-events-none',
-        side === 'right' ? 'right-1' : 'left-1',
+        'hidden sm:block absolute top-1/2 -translate-y-1/2 pointer-events-none opacity-70',
+        side === 'right' ? 'right-0.5' : 'left-0.5',
         className,
       )}
     />

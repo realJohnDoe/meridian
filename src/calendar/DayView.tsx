@@ -48,8 +48,9 @@ function AllDayItem({ o, onOpen, displayTitle, continuesLeft, continuesRight }: 
       className={cn(
         dvBlockVariants({ state: occState(o) }),
         'relative w-full flex items-center rounded-xs sm:rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
-        continuesLeft && 'pl-4',
-        continuesRight && 'pr-4',
+        // sm: only — the chevron itself is hidden below that breakpoint.
+        continuesLeft && 'sm:pl-5',
+        continuesRight && 'sm:pr-5',
       )}
       onClick={() => onOpen(o)}
       aria-label={title}

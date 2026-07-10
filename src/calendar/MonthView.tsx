@@ -318,11 +318,10 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                           // mx-0.5 mirrors the day cell's 2px horizontal padding so a
                           // single-column bar aligns exactly with a single-day occurrence row.
                           'relative flex items-center mx-0.5 rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
-                          // 4 (16px), not 3, to clear the chevron's rotated bounding box
-                          // (an 8px square rotated 45° paints ~1.7px wider than its own
-                          // footprint) — 12px measurably overlapped the title text.
-                          b.continuesLeft && 'sm:pl-4',
-                          b.continuesRight && 'sm:pr-4',
+                          // 5 (20px) clears the chevron's own ~12px footprint (2px inset
+                          // + 10px icon) with a deliberate gap to the title.
+                          b.continuesLeft && 'sm:pl-5',
+                          b.continuesRight && 'sm:pr-5',
                         )}
                       >
                         {b.continuesLeft && <ContinuationChevron side="left" />}
