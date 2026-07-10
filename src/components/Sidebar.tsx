@@ -8,6 +8,7 @@ import { useToday, useResetOnChange } from '@/hooks'
 import { vaultIcon } from './vaultIcon'
 import SettingsDialog from './SettingsDialog'
 import { Checkbox } from './ui/checkbox'
+import { IconButton } from './ui/icon-button'
 import { NO_PARTICIPANT } from '@/hooks'
 import {
   Sidebar,
@@ -152,13 +153,14 @@ export default function AppSidebar() {
             <SidebarGroup className="p-0 pt-3">
               <SidebarGroupLabel className="flex h-auto items-center px-5 py-1">
                 <span className="flex-1 text-[11px] font-semibold uppercase tracking-wider">Favorites</span>
-                <button
+                <IconButton
+                  label={editingFavorites ? 'Done editing favorites' : 'Reorder or remove favorites'}
+                  title={editingFavorites ? 'Done' : 'Reorder / remove'}
                   className="hover:text-foreground p-0.5"
                   onClick={() => setEditingFavorites(e => !e)}
-                  title={editingFavorites ? 'Done' : 'Reorder / remove'}
                 >
                   {editingFavorites ? <Check size={13} /> : <Pencil size={13} />}
-                </button>
+                </IconButton>
               </SidebarGroupLabel>
               <SidebarMenu>
                 {favorites.map((slug, idx) => {
@@ -168,9 +170,9 @@ export default function AppSidebar() {
                       {editingFavorites ? (
                         <div className="flex items-center gap-1 px-5 py-[11px] text-[14px] font-medium text-sidebar-foreground/60">
                           <span className="flex-1 truncate">{title}</span>
-                          <button disabled={idx === 0} onClick={() => reorderFavorites(idx, idx - 1)} className="disabled:opacity-30 hover:text-sidebar-foreground" title="Move up"><ChevronUp size={13} /></button>
-                          <button disabled={idx === favorites.length - 1} onClick={() => reorderFavorites(idx, idx + 1)} className="disabled:opacity-30 hover:text-sidebar-foreground" title="Move down"><ChevronDown size={13} /></button>
-                          <button onClick={() => toggleFavorite(slug)} className="hover:text-destructive" title="Remove from favorites"><X size={13} /></button>
+                          <IconButton hit="pad" label="Move up" title="Move up" disabled={idx === 0} onClick={() => reorderFavorites(idx, idx - 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronUp size={13} /></IconButton>
+                          <IconButton hit="pad" label="Move down" title="Move down" disabled={idx === favorites.length - 1} onClick={() => reorderFavorites(idx, idx + 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronDown size={13} /></IconButton>
+                          <IconButton hit="pad" label="Remove from favorites" title="Remove from favorites" onClick={() => toggleFavorite(slug)} className="hover:text-destructive"><X size={13} /></IconButton>
                         </div>
                       ) : (
                         <SidebarMenuButton

@@ -9,6 +9,7 @@ import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
 import { OccurrenceCard, MarkdownTaskCard, TagChip } from '@/components'
 import { Card } from '@/components/ui/card'
+import { IconButton } from '@/components/ui/icon-button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
@@ -233,14 +234,13 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
               <TagChip label={entry.ref} isTopic className="opacity-50 line-through" />
             )}
           </div>
-          <button
-            type="button"
-            className="shrink-0 mt-[9px] p-1 text-muted-foreground hover:text-foreground"
+          <IconButton
+            label="Remove"
+            className="mt-[9px] p-1 text-muted-foreground hover:text-foreground"
             onClick={() => remove(idx)}
-            aria-label="Remove"
           >
             <X size={13} />
-          </button>
+          </IconButton>
         </>
       )
     }
@@ -262,14 +262,13 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
             onEditCancel={() => setEditingIdx(null)}
           />
         </div>
-        <button
-          type="button"
-          className="shrink-0 mt-[9px] p-1 text-muted-foreground hover:text-foreground"
+        <IconButton
+          label="Remove"
+          className="mt-[9px] p-1 text-muted-foreground hover:text-foreground"
           onClick={() => remove(idx)}
-          aria-label="Remove"
         >
           <X size={13} />
-        </button>
+        </IconButton>
       </>
     )
   }
