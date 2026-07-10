@@ -292,6 +292,29 @@ describe('GitHubBackend', () => {
     await expect(backend.delete('note.md', 'somesha')).rejects.toBeInstanceOf(AuthSyncError)
   })
 
+  it('delete prefers the caller-supplied expectedVersion over a stale _shas cache entry', async () => {
+    // statAll populates _shas with a stale sha (simulates GitHub's eventually
+    // consistent listing lagging behind a remote edit that landed after).
+    mockFetch(makeTreeResponse([{ path: 'note.md', sha: 'stale-from-statall' }]))
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await backend.statAll()
+
+    mockFetch({})
+    // Tombstone carries the true base version the local delete derived from.
+    await backend.delete('note.md', 'true-base-version')
+
+    const [, init] = fetchSpy.mock.calls[1] as [string, RequestInit]
+    const body = parseRequestBody(init)
+    expect(body.sha).toBe('true-base-version')
+  })
+
+  it('delete throws ConflictError when expectedVersion has genuinely diverged (409)', async () => {
+    mockFetch({ message: 'Conflict' }, 409)
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await expect(backend.delete('note.md', 'stale-base'))
+      .rejects.toBeInstanceOf(ConflictError)
+  })
+
   it('ensurePermission returns granted when push permission is true and branch exists', async () => {
     fetchSpy
       .mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes', permissions: { push: true, pull: true, admin: false } }))
