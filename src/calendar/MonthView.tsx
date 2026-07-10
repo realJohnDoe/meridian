@@ -16,6 +16,7 @@ import { useToday, useCalendarFilter } from '@/hooks'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
+import { ContinuationChevron, CONTINUES_PADDING } from '@/components/ui/continuation-chevron'
 
 // Cell-chrome class strings, shared between CalCell and the invisible chrome
 // sentinel so the bar overlay's top offset can be MEASURED from a real replica
@@ -268,6 +269,8 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                 ...l,
                 startCol: Math.max(0, differenceInCalendarDays(l.startD, rowStart)),
                 endCol: Math.min(6, differenceInCalendarDays(l.endD, rowStart)),
+                continuesLeft: l.startD < rowStart,
+                continuesRight: l.endD > rowEnd,
               }))
             const shownBars = rowBars.filter(b => b.lane < MAX_BAR_LANES)
 
@@ -314,10 +317,14 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                           dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
                           // mx-0.5 mirrors the day cell's 2px horizontal padding so a
                           // single-column bar aligns exactly with a single-day occurrence row.
-                          'flex items-center mx-0.5 rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
+                          'relative flex items-center mx-0.5 rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
+                          b.continuesLeft && CONTINUES_PADDING.left,
+                          b.continuesRight && CONTINUES_PADDING.right,
                         )}
                       >
+                        {b.continuesLeft && <ContinuationChevron side="left" />}
                         <span className="truncate min-w-0">{b.occ.metadata.title}</span>
+                        {b.continuesRight && <ContinuationChevron side="right" />}
                       </div>
                     ))}
                   </div>
