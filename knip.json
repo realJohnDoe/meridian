@@ -1,5 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreIssues": {
+    "src/components/ui/**": ["exports", "types"]
+  },
   "workspaces": {
     ".": {
       "entry": [
@@ -7,10 +10,7 @@
         "scripts/*.mjs",
         "src/routes/**/*.tsx"
       ],
-      "project": ["src/**/*.{ts,tsx,css}", "scripts/**/*.mjs"],
-      "ignoreIssues": {
-        "src/components/ui/**": ["exports", "types"]
-      }
+      "project": ["src/**/*.{ts,tsx,css}", "scripts/**/*.mjs"]
     },
     "worker": {
       "project": ["src/**/*.ts"]
