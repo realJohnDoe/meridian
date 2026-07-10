@@ -250,13 +250,17 @@ export default [
     },
   },
 
-  // ExampleBackend and the sync-collision test's FakeBackend are deliberately
-  // synchronous StorageBackend implementations (no real I/O to await) — the
-  // `async` keyword is there only so their method signatures structurally
-  // match the interface's Promise-returning contract, not because they ever
-  // await anything.
+  // ExampleBackend and the sync-collision/sync tests' FakeBackend +
+  // in-memory cache/storeBridge mocks are deliberately synchronous (no real
+  // I/O to await) — the `async` keyword is there only so their signatures
+  // structurally match the Promise-returning contracts they stand in for,
+  // not because they ever await anything.
   {
-    files: ['src/storage/exampleBackend.ts', 'src/storage/__tests__/sync-collision.test.ts'],
+    files: [
+      'src/storage/exampleBackend.ts',
+      'src/storage/__tests__/sync-collision.test.ts',
+      'src/storage/__tests__/sync.test.ts',
+    ],
     rules: {
       '@typescript-eslint/require-await': 'off',
     },

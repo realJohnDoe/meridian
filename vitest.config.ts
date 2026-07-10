@@ -30,6 +30,7 @@ export default defineConfig({
         'src/occurrenceActions.ts': { statements: 85, branches: 75, functions: 80, lines: 88 },
         'src/editor/useEntryEditor.ts': { statements: 68, branches: 55, functions: 55, lines: 70 },
         'src/storeCommit.ts': { statements: 30, branches: 95, functions: 45, lines: 35 },
+        'src/storage/sync.ts': { statements: 68, branches: 55, functions: 55, lines: 72 },
       },
     },
   },
