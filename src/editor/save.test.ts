@@ -1,30 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { applyScope, entryFromOccurrence } from './save'
-import type { Occurrence, StoreSeries } from '@/types'
-
-function makeOcc(overrides: Partial<Occurrence> = {}): Occurrence {
-  return {
-    date: '2026-06-15',
-    time: '09:00',
-    source: 'explicit',
-    fileSlug: 'note.md',
-    id: 'occ-1',
-    metadata: { participants: [], title: 'Standup', tags: [], items: [] },
-    ...overrides,
-  }
-}
-
-function makeSeries(overrides: Partial<StoreSeries> = {}): StoreSeries {
-  return {
-    date: '2026-06-01',
-    time: '09:00',
-    fileSlug: 'note.md',
-    id: 'series-1',
-    repeat: { type: 'schedule', freq: 'daily' },
-    metadata: { participants: [] },
-    ...overrides,
-  }
-}
+import { makeOcc, makeSeries } from '@/test-utils'
 
 describe('entryFromOccurrence', () => {
   it('derives a note when the item is untracked and unscheduled', () => {

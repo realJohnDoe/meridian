@@ -43,41 +43,6 @@ toolchain blind spots (coverage only measuring imported files, knip exempting al
 
 ## Findings
 
-### 1. Sync delete path has no conflict handling — remote edits can be silently destroyed
-
-| Category                         | Impact | Breadth | Fix effort |
-| -------------------------------- | ------ | ------- | ---------- |
-| `error-handling`, data integrity | 7/10   | 3 files | S          |
-
-**Evidence:** `src/storage/sync.ts:253` — the tombstone loop, unlike the dirty-write loop
-above it, has no `ConflictError` catch:
-
-```ts
-await backend.delete(f.path, f.version);
-```
-
-and `src/storage/githubBackend.ts:141` prefers the in-memory SHA cache over the caller's
-CAS version:
-
-```ts
-const sha = this._shas.get(path) ?? expectedVersion;
-```
-
-— the exact opposite of `write()`'s documented policy ("Avoid falling back to `_shas` here —
-that cache may be stale", `githubBackend.ts:120`).
-
-**Problem:** if a file is edited remotely and then deleted locally, the DELETE either 409s
-(→ `ConflictError` escapes `pushDirty`, sync wedges in an error loop for the session because
-reconcile never runs to refresh SHAs), or — after a reload, when `reconcileWithBackend`'s
-`statAll()` refreshes `_shas` but `planReconcile` skips the tombstoned path — the delete
-retries with the _fresh_ SHA and destroys the remote edits with no conflict copy, defeating
-the data-preservation guarantee the write path implements via `resolveCollision`.
-
-**Fix:** catch `ConflictError` in the tombstone loop and route it through
-`resolveCollision`-style handling (pull the remote copy, surface it, drop the tombstone),
-and make `delete()` use `expectedVersion ?? this._shas.get(path)` to match `write()`'s CAS
-policy.
-
 ### 2. The effectful persistence/sync layer is almost entirely untested
 
 | Category  | Impact | Breadth  | Fix effort |

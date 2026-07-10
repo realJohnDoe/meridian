@@ -8,9 +8,10 @@ interface ScrollColumnProps {
   value: number
   fmt: (n: number) => string
   onChange: (v: number) => void
+  label: string
 }
 
-function ScrollColumn({ items, value, fmt, onChange }: ScrollColumnProps) {
+function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps) {
   const ref    = useRef<HTMLDivElement>(null)
   const syncing = useRef(false)
 
@@ -42,22 +43,36 @@ function ScrollColumn({ items, value, fmt, onChange }: ScrollColumnProps) {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background to-transparent z-20" />
       <div
         ref={ref}
-        className="h-full overflow-y-scroll snap-y snap-mandatory [&::-webkit-scrollbar]:hidden"
+        role="listbox"
+        aria-label={label}
+        tabIndex={0}
+        className="h-full overflow-y-scroll snap-y snap-mandatory [&::-webkit-scrollbar]:hidden focus-visible:outline-none"
         onScroll={handleScroll}
+        onKeyDown={e => {
+          const idx = items.indexOf(value)
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault()
+            onChange(items[Math.max(0, Math.min(idx + (e.key === 'ArrowDown' ? 1 : -1), items.length - 1))])
+          }
+        }}
         style={{ scrollbarWidth: 'none' }}
       >
         <div className="h-10 shrink-0" /> {/* top spacer */}
         {items.map(n => (
-          <div
+          <button
             key={n}
+            type="button"
+            role="option"
+            aria-selected={n === value}
+            tabIndex={-1}
             className={cn(
-              'h-10 flex items-center justify-center snap-center font-mono text-sm select-none cursor-pointer shrink-0',
+              'w-full h-10 flex items-center justify-center snap-center font-mono text-sm select-none cursor-pointer shrink-0',
               n === value ? 'text-foreground font-semibold' : 'text-muted-foreground',
             )}
             onClick={() => onChange(n)}
           >
             {fmt(n)}
-          </div>
+          </button>
         ))}
         <div className="h-10 shrink-0" /> {/* bottom spacer */}
       </div>
@@ -83,9 +98,9 @@ export default function TimeWheels({ value, onChange }: Props) {
 
   return (
     <div className="flex items-center gap-1">
-      <ScrollColumn items={HOURS}   value={h} fmt={pad2} onChange={nh => onChange(`${pad2(nh)}:${pad2(m)}`)} />
+      <ScrollColumn items={HOURS}   value={h} fmt={pad2} onChange={nh => onChange(`${pad2(nh)}:${pad2(m)}`)} label="Hour" />
       <span className="text-muted-foreground font-mono text-lg leading-none">:</span>
-      <ScrollColumn items={MINUTES} value={m} fmt={pad2} onChange={nm => onChange(`${pad2(h)}:${pad2(nm)}`)} />
+      <ScrollColumn items={MINUTES} value={m} fmt={pad2} onChange={nm => onChange(`${pad2(h)}:${pad2(nm)}`)} label="Minute" />
     </div>
   )
 }
