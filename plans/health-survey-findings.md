@@ -192,11 +192,6 @@ dexie 4, eslint 10, vitest 4). The real decisions are three dev-toolchain majors
 
 ## Worth acting on
 
-2. **Vite 6.4.3 → 8.1.4** plus `@vitejs/plugin-react` 4.7 → 6.0.3 (they go together). Two
-   majors behind is the one place the repo drifts from the ecosystem. Risk is concentrated
-   in the plugin stack — `vite-plugin-pwa`, the TanStack router plugin, and the three custom
-   plugins in `vite.config.ts` (those use stable hooks and should survive). Own PR; verify
-   with the build plus a manual `pnpm preview` pass on PWA/debug-page behavior.
 3. **Worker: `@cloudflare/workers-types` 4 → 5, wrangler 4.105 → 4.107.** Better: switch to
    the successor pattern — `wrangler types` generates runtime types matching the exact
    `compatibility_date`, replacing the package entirely.
