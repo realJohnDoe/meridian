@@ -170,8 +170,10 @@ export default defineConfig({
   // optimizeDeps uses its own default (es2020/chrome87/…) and fails on packages
   // like sonner@2+ that use syntax only available in later environments.
   optimizeDeps: {
-    esbuildOptions: {
-      target: 'es2022',
+    rolldownOptions: {
+      transform: {
+        target: 'es2022',
+      },
     },
   },
   build: {
