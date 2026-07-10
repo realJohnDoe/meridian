@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { coverageConfigDefaults, defineConfig } from 'vitest/config'
 import path from 'path'
 
 // Standalone Vitest config — intentionally does NOT load the app's Vite plugins
@@ -18,6 +18,18 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
+      // Count every source file, not just ones a test happens to import —
+      // otherwise whole untested modules silently vanish from the report.
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        ...coverageConfigDefaults.exclude,
+        // shadcn primitives and route registration are boilerplate, not
+        // application logic worth a coverage floor.
+        'src/components/ui/**',
+        'src/routes/**',
+        'src/routeTree.gen.ts',
+        'src/main.tsx',
+      ],
       // Per-file floors for modules already well-covered, so they can't
       // silently regress. Set a few points below measured coverage to leave
       // headroom for legitimate branches added later.
