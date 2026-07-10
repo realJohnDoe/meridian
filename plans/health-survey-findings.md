@@ -86,27 +86,6 @@ never been executed under test, undermining the very signal `test:coverage` exis
 `components/ui/**` and routes) so unimported files count as 0% and the report reflects
 reality.
 
-### 4. knip's `components/ui/**` entry exemption masks real dead code
-
-| Category                 | Impact | Breadth  | Fix effort |
-| ------------------------ | ------ | -------- | ---------- |
-| `toolchain`, `dead-code` | 3/10   | 13 files | S          |
-
-**Evidence:** `knip.json` lists `"src/components/ui/**/*.{ts,tsx}"` under `entry`.
-Re-running knip with that line removed reports:
-`Unused files (1): src/components/ui/ScrollColumn.tsx` (120 lines of _custom_, non-shadcn
-code with zero importers) and `Unused exports (46)`, including ~14 `Sidebar*` exports — the
-bulk of the 773-line `sidebar.tsx`, of which only `SidebarProvider` and `useSidebar` are
-imported (`routes/_app.tsx:14`).
-
-**Problem:** declaring the whole ui directory an entry point tells knip "everything here is
-used by definition," so dead custom components accumulate invisibly despite knip running in
-CI.
-
-**Fix:** drop the `ui/**` entry, delete `ScrollColumn.tsx`, and either trim `sidebar.tsx`
-to the two used exports or add targeted `ignoreExports` for the shadcn files whose unused
-subcomponents you want to keep as vendored surface.
-
 ### 5. The worker workspace is type-checked and tested but never linted
 
 | Category    | Impact | Breadth | Fix effort |
