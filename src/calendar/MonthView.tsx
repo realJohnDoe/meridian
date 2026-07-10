@@ -16,7 +16,7 @@ import { useToday, useCalendarFilter } from '@/hooks'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
-import { ContinuationChevron } from '@/components/ui/continuation-chevron'
+import { ContinuationChevron, CONTINUES_PADDING } from '@/components/ui/continuation-chevron'
 
 // Cell-chrome class strings, shared between CalCell and the invisible chrome
 // sentinel so the bar overlay's top offset can be MEASURED from a real replica
@@ -318,10 +318,8 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                           // mx-0.5 mirrors the day cell's 2px horizontal padding so a
                           // single-column bar aligns exactly with a single-day occurrence row.
                           'relative flex items-center mx-0.5 rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
-                          // 5 (20px) clears the chevron's own ~12px footprint (2px inset
-                          // + 10px icon) with a deliberate gap to the title.
-                          b.continuesLeft && 'sm:pl-5',
-                          b.continuesRight && 'sm:pr-5',
+                          b.continuesLeft && CONTINUES_PADDING.left,
+                          b.continuesRight && CONTINUES_PADDING.right,
                         )}
                       >
                         {b.continuesLeft && <ContinuationChevron side="left" />}
