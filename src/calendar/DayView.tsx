@@ -165,13 +165,23 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
   const [allDayExpanded, setAllDayExpanded] = useState(false)
   const hiddenCount = allDay.length - ALL_DAY_THRESHOLD
 
-  const handleGridClick = (e: MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const minutesFromMidnight = ((e.clientY - rect.top - TOP_PAD) / HP) * 60
+  // minutesWithinHour is 0 for keyboard-triggered activation (Enter/Space on
+  // the hour button), since there's no pointer position to derive it from —
+  // that lands the new event at the hour boundary, which is a sensible default.
+  const createAt = (h: number, minutesWithinHour: number) => {
+    const minutesFromMidnight = h * 60 + minutesWithinHour
     const snapped = Math.round(minutesFromMidnight / CREATE_SNAP_MIN) * CREATE_SNAP_MIN
     const clamped = Math.min(Math.max(snapped, 0), HOURS * 60 - CREATE_SNAP_MIN)
     const time = `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`
     onCreate?.(dvDate, time, DEFAULT_CREATE_DURATION)
+  }
+
+  const handleHourClick = (h: number) => (e: MouseEvent<HTMLButtonElement>) => {
+    // e.detail === 0 for a keyboard-activated click (Enter/Space) — no
+    // pointer position to read, so fall back to the top of the hour.
+    if (e.detail === 0) { createAt(h, 0); return }
+    const rect = e.currentTarget.getBoundingClientRect()
+    createAt(h, ((e.clientY - rect.top) / HP) * 60)
   }
 
   return (
@@ -226,13 +236,16 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
             </span>
           ))}
 
-          {/* Hour cells — one rounded rect per hour, click empty space to create an event */}
-          <div className="absolute inset-y-0 right-0 cursor-pointer" style={{ left: GUTTER }} onClick={handleGridClick}>
+          {/* Hour cells — one button per hour; click/tap or Enter/Space creates an event there */}
+          <div className="absolute inset-y-0 right-0" style={{ left: GUTTER }}>
             {Array.from({ length: HOURS }, (_, h) => h).map(h => (
-              <div
+              <button
                 key={h}
-                className="absolute inset-x-0 rounded-lg bg-muted/40"
+                type="button"
+                className="absolute inset-x-0 rounded-lg bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 style={{ top: h * HP + TOP_PAD + 1, height: HP - 2 }}
+                onClick={handleHourClick(h)}
+                aria-label={`Create event at ${formatHourBoundary(h, hour12)}`}
               />
             ))}
           </div>

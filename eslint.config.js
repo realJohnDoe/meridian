@@ -4,6 +4,7 @@ import importXPlugin from 'eslint-plugin-import-x'
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'
 import reactHooksPlugin from 'eslint-plugin-react-hooks'
 import reactPlugin from '@eslint-react/eslint-plugin'
+import jsxA11yPlugin from 'eslint-plugin-jsx-a11y'
 
 const BARREL_DIRS = ['calendar', 'components', 'editor', 'hooks', 'model', 'onboarding', 'routes', 'search', 'storage']
 
@@ -48,6 +49,7 @@ export default [
       'react-hooks': reactHooksPlugin,
       '@eslint-react': reactPlugin,
       'import-x': importXPlugin,
+      'jsx-a11y': jsxA11yPlugin,
     },
     settings: {
       'import-x/resolver-next': [
@@ -55,6 +57,16 @@ export default [
       ],
     },
     rules: {
+      // ── jsx-a11y ─────────────────────────────────────────────────────────────
+      ...jsxA11yPlugin.flatConfigs.recommended.rules,
+      // Radix primitives (Checkbox, etc.) render as a styled <button> rather
+      // than a native form control, so label-has-associated-control's default
+      // nested-control detection can't see them — teach it the wrapper name.
+      'jsx-a11y/label-has-associated-control': [
+        'error',
+        { controlComponents: ['Checkbox'], depth: 3 },
+      ],
+
       // ── React hooks ──────────────────────────────────────────────────────────
       ...reactHooksRules,
 
@@ -143,6 +155,15 @@ export default [
         },
       ],
     },
+  },
+
+  // src/debug/ is developer-only tooling (never shipped to end users), so
+  // jsx-a11y's recommended checks don't apply there.
+  {
+    files: ['src/debug/**/*.{ts,tsx}'],
+    rules: Object.fromEntries(
+      Object.keys(jsxA11yPlugin.flatConfigs.recommended.rules).map(rule => [rule, 'off']),
+    ),
   },
 
   // Within-feature files may use relative imports into their own subdirectories.

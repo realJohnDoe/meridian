@@ -82,6 +82,12 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
   return createPortal(
     // onMouseDown preventDefault keeps focus in the editor while clicking a card
     <div
+      role="listbox"
+      aria-label="Wikilink suggestions"
+      // Not in the tab order — arrow-key navigation is handled globally via
+      // the CodeMirror contentDOM listener above, so the popup itself never
+      // needs to receive focus directly.
+      tabIndex={-1}
       className="wl-popup flex flex-col gap-1 p-1.5 bg-popover border border-input rounded-[var(--radius)] shadow-[0_8px_32px_rgba(0,0,0,.4)] min-w-[260px] max-h-[360px] overflow-y-auto"
       style={style}
       onMouseDown={e => e.preventDefault()}
@@ -105,14 +111,18 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
             />
           </div>
         ) : (
-          <div
+          <button
             key={e.fileSlug}
-            className={`px-3.5 py-2 text-sm text-secondary-foreground cursor-pointer rounded-md hover:bg-accent ${isFocused ? 'bg-accent' : ''}`}
+            type="button"
+            role="option"
+            aria-selected={isFocused}
+            tabIndex={-1}
+            className={`w-full text-left px-3.5 py-2 text-sm text-secondary-foreground cursor-pointer rounded-md hover:bg-accent ${isFocused ? 'bg-accent' : ''}`}
             onMouseDown={() => insertWikilink(e.title)}
             onMouseEnter={() => setFocusIdx(i)}
           >
             {e.title}
-          </div>
+          </button>
         )
       })}
     </div>,
