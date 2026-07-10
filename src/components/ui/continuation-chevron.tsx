@@ -19,13 +19,17 @@ const SIDE_CLASSES = {
  * 1.5px stroke (rather than Tailwind's default 1px `border-t`/`border-r`,
  * which renders as a sub-pixel hairline at these row heights and disappears)
  * so it actually reads at a glance next to text-xs/text-3xs titles.
+ *
+ * Hidden below `sm`: at the compact mobile row width there isn't room for
+ * both the chevron and the title, and the chevron ends up overlapping text
+ * instead of just clipping it.
  */
 export function ContinuationChevron({ side, className }: ContinuationChevronProps) {
   return (
     <span
       aria-hidden
       className={cn(
-        'absolute top-1/2 -translate-y-1/2 w-2 h-2 border-current pointer-events-none',
+        'hidden sm:block absolute top-1/2 -translate-y-1/2 w-2 h-2 border-current pointer-events-none',
         SIDE_CLASSES[side],
         className,
       )}
