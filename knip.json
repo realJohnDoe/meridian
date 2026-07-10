@@ -5,10 +5,12 @@
       "entry": [
         "src/debug/main.tsx",
         "scripts/*.mjs",
-        "src/routes/**/*.tsx",
-        "src/components/ui/**/*.{ts,tsx}"
+        "src/routes/**/*.tsx"
       ],
-      "project": ["src/**/*.{ts,tsx,css}", "scripts/**/*.mjs"]
+      "project": ["src/**/*.{ts,tsx,css}", "scripts/**/*.mjs"],
+      "ignoreIssues": {
+        "src/components/ui/**": ["exports", "types"]
+      }
     },
     "worker": {
       "project": ["src/**/*.ts"]
