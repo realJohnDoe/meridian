@@ -20,22 +20,6 @@ This report rests on close reading of roughly **60% of UI-layer code by volume**
 
 ## 3. Findings
 
-### 1. No component test harness in use — 78 components, zero render tests
-
-- **Category:** `testing` `toolchain`
-- **Impact:** 6 · **Breadth:** 78 files (`find src -name "*.tsx" | grep -v test`) · **Fix effort:** L
-- **Evidence:** `vitest.config.ts` pins `environment: 'node',` and its coverage floors guard only non-UI modules: `'src/model/collapse.ts': { statements: 90, branches: 80, functions: 95, lines: 90 },`. `@testing-library/react` 16.3 and `jsdom` are installed, but `grep -rl "@testing-library" src` matches exactly one file — `src/editor/useEntryDialogs.test.ts`, a hook test.
-- **Problem:** The entire rendered UI — dialogs, editor, calendar views, undo toasts — has no automated regression net, so behavior like the delete-undo flow in `occurrenceActions.ts` or `RepeatDialog`'s state reverse-engineering can only break silently.
-- **Fix:** Stand up an RTL smoke suite for the highest-risk flows first (EntryEditor save/autosave, RepeatDialog round-trip, delete+undo toast), and add a coverage floor for `src/editor/` once it exists.
-
-### 2. Keyboard-inaccessible interactions across views — and no `jsx-a11y` lint to catch the class
-
-- **Category:** `a11y` `toolchain`
-- **Impact:** 6 · **Breadth:** 7 production files (dry-run below; +1 debug file) · **Fix effort:** M
-- **Evidence:** `src/calendar/DayView.tsx:230` — event creation is a bare clickable div: `<div className="absolute inset-y-0 right-0 cursor-pointer" style={{ left: GUTTER }} onClick={handleGridClick}>`. Same pattern in `src/components/MarkdownTaskCard.tsx:47` (`onClick={onClickText}` on a `<span>`), both scroll-wheel widgets, and `WikilinkPopup`. **Dry-run:** I temporarily installed `eslint-plugin-jsx-a11y` and ran its `recommended` preset over `src/`: **22 findings** — `label-has-associated-control` ×8, `no-static-element-interactions` ×7, `click-events-have-key-events` ×5, `no-autofocus` ×1, `heading-has-content` ×1 — in DayView, MarkdownTaskCard, Sidebar, ScrollColumn, TimeWheels, card.tsx, WikilinkPopup (+ debug). (Install and temp config reverted; tree clean.)
-- **Problem:** Core flows — creating a timed event, editing an inline task, picking a time — are mouse/touch-only, and no lint rule stops the next occurrence of the pattern.
-- **Fix:** Adopt `jsx-a11y` recommended (scoped off for `src/debug/`), fix the 15 production findings (the click-grid needs a keyboard alternative such as per-hour buttons; the wheels need `role="listbox"`/arrow-key handling or a text-input fallback).
-
 ### 3. Arbitrary pixel values bypass the documented type/spacing scale — including duplicates of tokens that already exist
 
 - **Category:** `styling` `toolchain`

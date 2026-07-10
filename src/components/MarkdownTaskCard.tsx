@@ -35,6 +35,7 @@ export default function MarkdownTaskCard({
         />
         {isEditing ? (
           <Input
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- opens in response to a user click (promote to inline edit), not on page load
             autoFocus
             variant="ghost"
             className="flex-1 text-[14px] font-medium"
@@ -46,11 +47,16 @@ export default function MarkdownTaskCard({
               if (e.key === 'Escape') { onEditCancel?.() }
             }}
           />
-        ) : (
-          <span
-            className={`flex-1 text-[14px] font-medium truncate ${onClickText ? 'cursor-pointer' : ''} ${done ? 'line-through opacity-60' : 'text-foreground'}`}
+        ) : onClickText ? (
+          <button
+            type="button"
+            className={`flex-1 min-w-0 text-left text-[14px] font-medium truncate cursor-pointer ${done ? 'line-through opacity-60' : 'text-foreground'}`}
             onClick={onClickText}
           >
+            {text}
+          </button>
+        ) : (
+          <span className={`flex-1 text-[14px] font-medium truncate ${done ? 'line-through opacity-60' : 'text-foreground'}`}>
             {text}
           </span>
         )}

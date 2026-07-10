@@ -138,7 +138,11 @@ export class GitHubBackend implements StorageBackend {
   }
 
   async delete(path: string, expectedVersion?: string): Promise<void> {
-    const sha = this._shas.get(path) ?? expectedVersion
+    // Prefer the caller-supplied expectedVersion as the CAS SHA, matching
+    // write()'s policy — avoid falling back to _shas first here, since that
+    // cache may be stale from a prior statAll() call and could mask a genuine
+    // remote edit that happened after the tombstone was staged.
+    const sha = expectedVersion ?? this._shas.get(path)
     if (!sha) return // File doesn't exist on GitHub; nothing to do
     try {
       await this._octokit.request('DELETE /repos/{owner}/{repo}/contents/{path}', {
