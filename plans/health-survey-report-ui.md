@@ -28,14 +28,6 @@ This report rests on close reading of roughly **60% of UI-layer code by volume**
 - **Problem:** The type scale fragments into ad-hoc pixel values (9 distinct sub-`sm` sizes in use), so a future size/density change can't be made in one place — precisely what the convention block was written to prevent.
 - **Fix:** Add the missing scale steps as `@theme` tokens (11/13/14px have no Tailwind default), migrate mechanically, and enforce with a lint rule (e.g. `eslint-plugin-tailwindcss`'s `no-arbitrary-value` scoped to font-size/spacing, or better-tailwindcss's equivalent).
 
-### 4. shadcn `Input` is dead code while 9 files hand-roll `<input>` with duplicated class soup
-
-- **Category:** `dry` `library-fit` `dead-code`
-- **Impact:** 4 · **Breadth:** 9 files + 1 dead file (`grep -rln "<input"` minus `ui/input.tsx`; `grep -rl "ui/input'"` → 0) · **Fix effort:** M
-- **Evidence:** `src/components/ui/input.tsx` has zero importers. Meanwhile `src/editor/dialogs/RepeatDialog.tsx:309` repeats `className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-xs font-mono text-foreground transition-colors"` twice in one file, with near-identical strings in DurationDialog, TimePickerDialog, and a different hand-rolled style in AddVaultWizard (`className="w-full rounded border border-input bg-background px-3 py-2 text-[14px] outline-none focus:ring-1 focus:ring-ring"` ×3).
-- **Problem:** Two competing text-input stylings drift independently, and the primitive that should own them ships dead weight.
-- **Fix:** Either restyle `ui/input.tsx` to the house style and migrate the 9 files to it, or delete it — currently it's the worst of both.
-
 ### 5. Two divergent scroll-wheel implementations — the exported one is dead, and `knip.json` makes `components/ui/` invisible to dead-code detection
 
 - **Category:** `dead-code` `dry` `toolchain`

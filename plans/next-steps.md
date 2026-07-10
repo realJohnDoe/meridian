@@ -1,6 +1,5 @@
 ## Next steps
 
-- Investigate split second hang when toggling tasks
 - Add arrows to multiday rows in month and day view
 - Consider if name and logo are still good
 - Post about Meridian in Obsidian forums
