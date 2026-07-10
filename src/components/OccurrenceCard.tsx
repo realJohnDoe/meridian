@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Repeat2 } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import KindIcon from './KindIcon'
@@ -112,10 +112,17 @@ export default function OccurrenceCard({
   // (strike-through, dim overlay) animate the instant the user clicks, rather
   // than waiting for the store commit — which, for after_completion repeats,
   // can be delayed several frames while the newly-generated next occurrence
-  // settles into the virtualized list. Reconciles with the store value once
-  // that commit lands (a no-op in the common case where they already match).
-  const [isDone, setIsDone] = useState(() => !!occ.metadata.done)
-  useEffect(() => { setIsDone(!!occ.metadata.done) }, [occ.metadata.done])
+  // settles into the virtualized list. Reconciled with the store value below
+  // during render (the standard "adjusting state on prop change" pattern —
+  // https://react.dev/learn/you-might-not-need-an-effect) once that commit
+  // lands (a no-op in the common case where they already match).
+  const storeDone = !!occ.metadata.done
+  const [isDone, setIsDone] = useState(storeDone)
+  const [prevStoreDone, setPrevStoreDone] = useState(storeDone)
+  if (storeDone !== prevStoreDone) {
+    setPrevStoreDone(storeDone)
+    setIsDone(storeDone)
+  }
   const title    = (occ.metadata.jsTime
     ? multidayDisplayTitle(occ, occ.metadata.jsTime)
     : undefined) ?? occ.metadata.title
