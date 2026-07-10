@@ -1,12 +1,14 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreIssues": {
+    "src/components/ui/**": ["exports", "types"]
+  },
   "workspaces": {
     ".": {
       "entry": [
         "src/debug/main.tsx",
         "scripts/*.mjs",
-        "src/routes/**/*.tsx",
-        "src/components/ui/**/*.{ts,tsx}"
+        "src/routes/**/*.tsx"
       ],
       "project": ["src/**/*.{ts,tsx,css}", "scripts/**/*.mjs"]
     },
