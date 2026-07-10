@@ -6,3 +6,4 @@ coverage
 src/routeTree.gen.ts
 .wrangler
 .dev.vars
+worker/worker-configuration.d.ts
