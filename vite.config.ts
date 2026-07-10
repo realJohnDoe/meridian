@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
-import react from '@vitejs/plugin-react'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
@@ -128,10 +129,11 @@ export default defineConfig({
     debugPagePlugin(),
     cspPlugin(),
     TanStackRouterVite({ target: 'react', autoCodeSplitting: true, routeFileIgnorePattern: '(^|/)index\\.tsx?$' }),
+    react(),
     // babel-plugin-react-compiler auto-memoizes components/hooks at build time.
     // The react-hooks eslint preset (recommended-latest) already enforces the
     // same rules the compiler relies on, so the codebase is compiler-ready.
-    react({ babel: { plugins: [['babel-plugin-react-compiler', { target: '19' }]] } }),
+    babel({ presets: [reactCompilerPreset({ target: '19' })] }),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
