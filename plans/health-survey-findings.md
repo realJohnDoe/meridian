@@ -192,9 +192,6 @@ dexie 4, eslint 10, vitest 4). The real decisions are three dev-toolchain majors
 
 ## Worth acting on
 
-3. **Worker: `@cloudflare/workers-types` 4 → 5, wrangler 4.105 → 4.107.** Better: switch to
-   the successor pattern — `wrangler types` generates runtime types matching the exact
-   `compatibility_date`, replacing the package entirely.
 4. **Patch/minor sweep** — ~25 packages, all safe (`@codemirror/*`, Radix, TanStack,
    react 19.2.6→.7, `@eslint-react` 5.11→5.13, `date-fns` 4.3→4.4, `lucide-react`
    1.17→1.23, `sharp`). One `pnpm update` commit; CI gates it.

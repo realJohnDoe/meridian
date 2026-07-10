@@ -20,14 +20,6 @@ This report rests on close reading of roughly **60% of UI-layer code by volume**
 
 ## 3. Findings
 
-### 5. Two divergent scroll-wheel implementations — the exported one is dead, and `knip.json` makes `components/ui/` invisible to dead-code detection
-
-- **Category:** `dead-code` `dry` `toolchain`
-- **Impact:** 4 · **Breadth:** 3 files (ScrollColumn.tsx, TimeWheels.tsx, knip.json; usage traced via `grep -rn "ScrollColumn"`) · **Fix effort:** S
-- **Evidence:** `src/components/ui/ScrollColumn.tsx:18` exports a 120-line generic wheel (`export function ScrollColumn<T extends string | number>({`) with **zero importers**; `src/components/ui/TimeWheels.tsx:13` defines its own private 40px-row variant (`function ScrollColumn({ items, value, fmt, onChange }: ScrollColumnProps) {`) with different snap logic. `pnpm knip` exits clean because `knip.json` lists `"src/components/ui/**/*.{ts,tsx}"` as an **entry** pattern — every ui primitive is presumed alive by definition. The dead one also hardcodes `bg-white/5 border border-white/10`, which would break on the three light themes if ever revived.
-- **Problem:** A whole directory of primitives is exempt from the repo's own dead-code tooling, and it's already accumulated two dead files (this and `input.tsx`) plus a fork of itself.
-- **Fix:** Delete `ScrollColumn.tsx` (or make TimeWheels consume it), and narrow the knip entry to the barrel-consumed surface so unused primitives get flagged.
-
 ### 6. Theme-preview swatches hardcode token values — and have already drifted from the real themes
 
 - **Category:** `styling` `dry` `ux`
