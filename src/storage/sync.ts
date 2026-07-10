@@ -248,11 +248,27 @@ async function pushDirty(
   }
 
   for (const f of tombstones) {
-    // Pass the cached version (blob SHA for GitHub) so the delete works even
-    // when the backend's in-memory SHA cache is cold after a page reload.
-    await backend.delete(f.path, f.version)
-    await cacheDelete(vaultId, f.path)
-    pushed.add(f.path)
+    try {
+      // Pass the cached version (blob SHA for GitHub) so the delete works even
+      // when the backend's in-memory SHA cache is cold after a page reload.
+      await backend.delete(f.path, f.version)
+      await cacheDelete(vaultId, f.path)
+      pushed.add(f.path)
+    } catch (e) {
+      if (e instanceof ConflictError) {
+        // The file was edited remotely after our tombstone was staged.
+        // Drop the tombstone without deleting anything — leaving no cache
+        // entry behind — and let this cycle's reconcile (triggered below via
+        // hadCollision) pull the remote edit back in, so it isn't silently
+        // destroyed. Deliberately NOT added to `pushed`: that set skips
+        // reconcile's re-pull, and here we want the opposite.
+        await cacheDelete(vaultId, f.path)
+        hadCollision = true
+        warn(`${f.path} was edited remotely — kept the remote version instead of deleting.`)
+      } else {
+        throw e
+      }
+    }
   }
 
   return { hadCollision, pushed }

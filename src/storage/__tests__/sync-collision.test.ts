@@ -71,7 +71,15 @@ class FakeBackend implements StorageBackend {
     return newVersion
   }
 
-  async delete(path: string): Promise<void> {
+  async delete(path: string, expectedVersion?: string): Promise<void> {
+    const existing = this._files.get(path)
+    if (existing === undefined) return // already gone — idempotent
+    if (expectedVersion !== undefined && existing.version !== expectedVersion) {
+      // Genuine divergence: the file was edited remotely since expectedVersion
+      // was captured. Mirrors GitHubBackend surfacing a 409 as ConflictError
+      // instead of silently deleting the newer remote content.
+      throw new ConflictError(path)
+    }
     this._files.delete(path)
   }
 
@@ -90,6 +98,26 @@ async function pushOne(backend: StorageBackend, record: DirtyRecord): Promise<Pu
   try {
     const v = await backend.write(record.path, record.content, record.version)
     return { type: 'ok', newVersion: v }
+  } catch (e) {
+    if (e instanceof ConflictError) return { type: 'conflict' }
+    throw e
+  }
+}
+
+/**
+ * Mirrors sync.ts's pushDirty tombstone-loop policy: on ConflictError, do NOT
+ * retry the delete with a fresher SHA (that would silently destroy the
+ * remote edit) — just report the conflict so the caller can drop the
+ * tombstone and let reconcile pull the remote copy back in.
+ */
+async function pushTombstone(
+  backend: StorageBackend,
+  path: string,
+  version: string | undefined,
+): Promise<PushResult> {
+  try {
+    await backend.delete(path, version)
+    return { type: 'ok', newVersion: undefined }
   } catch (e) {
     if (e instanceof ConflictError) return { type: 'conflict' }
     throw e
@@ -165,5 +193,39 @@ describe('CAS write — genuine conflict detection', () => {
 
     const result = await pushOne(backend, { path: 'task.md', content: 'local content', version: undefined })
     expect(result.type).toBe('conflict')
+  })
+})
+
+describe('CAS delete — tombstone conflict handling', () => {
+  it('deletes cleanly when the base version still matches', async () => {
+    const backend = new FakeBackend()
+    backend.seed('task.md', 'content', 'sha1')
+
+    const result = await pushTombstone(backend, 'task.md', 'sha1')
+
+    expect(result.type).toBe('ok')
+    expect((await backend.readFiles(['task.md'])).length).toBe(0)
+  })
+
+  it('reports ConflictError instead of destroying a remote edit that landed after the tombstone was staged', async () => {
+    const backend = new FakeBackend()
+    backend.seed('task.md', 'original content', 'sha1')
+
+    // A remote edit lands after the local delete was staged (tombstone still holds 'sha1').
+    await backend.write('task.md', 'remote edit', 'sha1')
+
+    const result = await pushTombstone(backend, 'task.md', 'sha1')
+
+    expect(result.type).toBe('conflict')
+    // Crucially, the remote edit must survive — not be silently deleted.
+    const [remaining] = await backend.readFiles(['task.md'])
+    expect(remaining?.content).toBe('remote edit')
+  })
+
+  it('is idempotent when the file is already gone (e.g. a stale tombstone replayed after reload)', async () => {
+    const backend = new FakeBackend()
+    // Never seeded — file doesn't exist on the backend.
+    const result = await pushTombstone(backend, 'gone.md', 'sha1')
+    expect(result.type).toBe('ok')
   })
 })
