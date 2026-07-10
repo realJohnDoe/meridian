@@ -24,7 +24,7 @@ export default function BacklogView({ onOpen }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]">
-      <div className="pb-24 lg:max-w-[720px] lg:mx-auto">
+      <div className="pb-24 lg:max-w-3xl lg:mx-auto">
         {occs.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 px-6 pt-24 text-center text-muted-foreground">
             <Inbox size={32} strokeWidth={1.5} className="opacity-60" />

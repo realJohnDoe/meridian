@@ -26,8 +26,8 @@ type Phase =
 function CenteredMessage({ title, description, children }: { title: string; description?: string; children?: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-      <h1 className="text-[18px] font-medium">{title}</h1>
-      {description && <p className="max-w-sm text-[13px] text-muted-foreground">{description}</p>}
+      <h1 className="text-lg font-medium">{title}</h1>
+      {description && <p className="max-w-sm text-sm text-muted-foreground">{description}</p>}
       {children}
     </div>
   )
@@ -110,7 +110,7 @@ function AuthCallbackPage() {
           <button
             key={`${repo.owner}/${repo.repo}`}
             onClick={() => connect(phase.tokens, repo)}
-            className="rounded-lg border border-border px-3 py-2 text-left text-[14px] transition-colors hover:bg-accent"
+            className="rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
           >
             {repo.owner}/{repo.repo}
           </button>

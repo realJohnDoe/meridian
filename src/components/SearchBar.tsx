@@ -65,7 +65,7 @@ export default function SearchBar() {
       />
 
       <div className={`relative z-[26] px-3.5 py-3.5 flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
-        <div data-tour="search-bar" className="search-bar-wrap w-full max-w-[600px] mx-auto">
+        <div data-tour="search-bar" className="search-bar-wrap w-full max-w-xl mx-auto">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           {/*
            * Mobile: onClick opens the full-screen overlay (router push).

@@ -22,7 +22,7 @@ const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 // returning users always get real sizes — estimates only matter on first visit.
 //
 // HEADER_H: DaySection header div — pt-3.5 (14) + pb-1.5 (6) + text-xs line (~20) ≈ 40px
-// ROW_H:    OccurrenceCard min-h-[44px] + py-2 padding + OccurrenceRow mb-1.5 (6) ≈ 68px
+// ROW_H:    OccurrenceCard min-h-11 + py-2 padding + OccurrenceRow mb-1.5 (6) ≈ 68px
 // Update these if the header/card padding changes in DaySection.tsx / OccurrenceCard.tsx.
 const HEADER_H = 40
 const ROW_H = 68
@@ -196,7 +196,7 @@ export default function AgendaView({ onOpen }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" ref={scRef}>
-      <div className="pb-24 lg:max-w-[720px] lg:mx-auto">
+      <div className="pb-24 lg:max-w-3xl lg:mx-auto">
         <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
           {virtualItems.map(vi => {
             const section = sections[vi.index]

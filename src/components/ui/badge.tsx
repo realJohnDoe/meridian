@@ -3,14 +3,14 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/cn'
 
 const badgeVariants = cva(
-  'inline-flex items-center gap-[5px] border font-medium whitespace-nowrap transition-colors',
+  'inline-flex items-center gap-1.5 border font-medium whitespace-nowrap transition-colors',
   {
     variants: {
       variant: {
         // Small display label — replaces .otag and .etag
-        tag: 'px-1.5 py-0.5 text-[10px] rounded-lg border-[var(--chip-border)] bg-secondary text-muted-foreground',
+        tag: 'px-1.5 py-0.5 text-2xs rounded-lg border-[var(--chip-border)] bg-secondary text-muted-foreground',
         // Wikilink / topic chip — always indigo; underline only when interactive (applied via className)
-        link: 'px-1.5 py-0.5 text-[10px] rounded-lg border-[var(--chip-border)] bg-indigo-500/15 text-indigo-400',
+        link: 'px-1.5 py-0.5 text-2xs rounded-lg border-[var(--chip-border)] bg-indigo-500/15 text-indigo-400',
         // Interactive toggle chip — replaces .fchip and .pchip
         // Active state driven by aria-pressed; priority colors via inline style override
         chip: [

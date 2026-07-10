@@ -88,7 +88,7 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
       // the CodeMirror contentDOM listener above, so the popup itself never
       // needs to receive focus directly.
       tabIndex={-1}
-      className="wl-popup flex flex-col gap-1 p-1.5 bg-popover border border-input rounded-[var(--radius)] shadow-[0_8px_32px_rgba(0,0,0,.4)] min-w-[260px] max-h-[360px] overflow-y-auto"
+      className="wl-popup flex flex-col gap-1 p-1.5 bg-popover border border-input rounded-[var(--radius)] shadow-[0_8px_32px_rgba(0,0,0,.4)] min-w-64 max-h-96 overflow-y-auto"
       style={style}
       onMouseDown={e => e.preventDefault()}
     >

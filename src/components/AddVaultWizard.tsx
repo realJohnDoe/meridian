@@ -99,10 +99,10 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
                   : 'border-border hover:bg-accent',
               )}
             >
-              <Icon className="mt-[2px] size-[18px] shrink-0 stroke-[1.7]" />
+              <Icon className="mt-0.5 size-4.5 shrink-0 stroke-[1.7]" />
               <div>
-                <div className="text-[14px] font-medium leading-snug">{title}</div>
-                <div className="mt-[3px] text-[12px] text-muted-foreground leading-snug">{desc}</div>
+                <div className="text-sm font-medium leading-snug">{title}</div>
+                <div className="mt-1 text-xs text-muted-foreground leading-snug">{desc}</div>
               </div>
             </button>
           ))}
@@ -126,14 +126,14 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
         <Button onClick={handleSignIn} disabled={signingIn}>
           {signingIn ? 'Redirecting to GitHub…' : 'Sign in with GitHub'}
         </Button>
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Choose which repository to connect after signing in — no need to create a token by hand.
         </p>
 
         {!showManual && (
           <button
             onClick={() => setShowManual(true)}
-            className="self-start text-[12px] text-muted-foreground underline"
+            className="self-start text-xs text-muted-foreground underline"
           >
             Or connect manually with a personal access token
           </button>
@@ -141,7 +141,7 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
 
         {showManual && (
           <>
-            <p className="mt-2 text-[13px] text-muted-foreground">
+            <p className="mt-2 text-sm text-muted-foreground">
               Create a{' '}
               <a
                 href="https://github.com/settings/tokens?type=beta"
@@ -153,14 +153,14 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
               </a>{' '}
               on GitHub with these settings:
             </p>
-            <ul className="ml-4 list-disc space-y-1 text-[12px] text-muted-foreground">
+            <ul className="ml-4 list-disc space-y-1 text-xs text-muted-foreground">
               <li><strong>Repository access:</strong> Only select repositories — pick this vault&apos;s repo</li>
               <li><strong>Permissions → Contents:</strong> Read and write</li>
               <li>Leave all other permissions as <em>No access</em></li>
             </ul>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[13px] font-medium">Repository</span>
+              <span className="text-sm font-medium">Repository</span>
               <Input
                 placeholder="owner/repo"
                 value={repoStr}
@@ -171,7 +171,7 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[13px] font-medium">Branch</span>
+              <span className="text-sm font-medium">Branch</span>
               <Input
                 placeholder="main"
                 value={branch}
@@ -182,7 +182,7 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-[13px] font-medium">Fine-grained access token</span>
+              <span className="text-sm font-medium">Fine-grained access token</span>
               <Input
                 type="password"
                 placeholder="github_pat_…"
@@ -195,7 +195,7 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
           </>
         )}
 
-        {error && <p className="text-[13px] text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
 
       <div className="flex justify-between px-4 pb-4">

@@ -147,7 +147,7 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
       {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
       <div
         ref={hintRef}
-        className="swipe-hint absolute inset-0 items-center justify-end gap-[10px] px-5 pointer-events-none z-0 bg-destructive"
+        className="swipe-hint absolute inset-0 items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive"
       >
         <Trash2
           ref={iconRef}

@@ -35,7 +35,7 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
   }, [items, value, onChange])
 
   return (
-    <div className="relative w-12 h-[120px]">
+    <div className="relative w-12 h-32">
       {/* selection highlight */}
       <div className="pointer-events-none absolute inset-x-0 top-10 h-10 rounded-md bg-primary/10 z-10" />
       {/* fade top / bottom */}

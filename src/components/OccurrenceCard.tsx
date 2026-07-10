@@ -68,9 +68,9 @@ function ParticipantAvatars({ participants }: { participants: string[] }) {
             key={name}
             title={name}
             className={cn(
-              'size-[22px] rounded-full border-2 border-card bg-secondary',
+              'size-5.5 rounded-full border-2 border-card bg-secondary',
               'flex items-center justify-center',
-              'text-[8px] font-semibold text-secondary-foreground',
+              'text-3xs font-semibold text-secondary-foreground',
               i > 0 && '-ml-2'
             )}
           >
@@ -80,9 +80,9 @@ function ParticipantAvatars({ participants }: { participants: string[] }) {
       })}
       {overflow > 0 && (
         <div className={cn(
-          'size-[22px] rounded-full border-2 border-card bg-secondary -ml-2',
+          'size-5.5 rounded-full border-2 border-card bg-secondary -ml-2',
           'flex items-center justify-center',
-          'text-[8px] font-semibold text-muted-foreground'
+          'text-3xs font-semibold text-muted-foreground'
         )}>
           +{overflow}
         </div>
@@ -157,7 +157,7 @@ export default function OccurrenceCard({
   return (
     <Card
       data-tour="entry-card"
-      className={`${cardCls} flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-[44px]`}
+      className={`${cardCls} flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-11`}
       style={animate ? { animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' } : undefined}
     >
       {dimmed && <div className="absolute inset-0 pointer-events-none z-10 rounded-lg" style={{ background: 'var(--done-overlay)' }} />}

@@ -68,8 +68,8 @@ function ResponsiveModalTitle({ children, className }: {
   return (
     <>
       <DialogTitle className={cn(
-        'text-[11px] font-bold tracking-[.07em] uppercase text-muted-foreground',
-        'px-[18px] pt-4 pb-2 pr-10',
+        'text-2xs font-bold tracking-[.07em] uppercase text-muted-foreground',
+        'px-4.5 pt-4 pb-2 pr-10',
         className,
       )}>
         {children}

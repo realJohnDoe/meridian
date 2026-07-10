@@ -150,7 +150,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
 
   return (
     <ResponsiveModal open={open} onOpenChange={handleOpenChange}>
-      <ResponsiveModalContent className="sm:max-w-[420px]">
+      <ResponsiveModalContent className="sm:max-w-md">
         <ResponsiveModalDescription>Settings</ResponsiveModalDescription>
 
         {step === 'vault' && (
@@ -159,14 +159,14 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
 
             <div className="flex flex-col gap-4 p-4">
               <div className="flex flex-col gap-2">
-                <span className="text-[13px] font-medium">Appearance</span>
+                <span className="text-sm font-medium">Appearance</span>
                 <div className="grid grid-cols-2 gap-2">
                   {THEMES.map(({ id, label, background, foreground, swatches }) => (
                     <button
                       key={id}
                       onClick={() => setTheme(id)}
                       className={cn(
-                        'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-[13px] font-medium text-left transition-colors',
+                        'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-left transition-colors',
                         activeTheme === id ? 'border-primary' : 'border-border hover:border-muted-foreground',
                       )}
                       style={{ background, color: foreground }}
@@ -186,7 +186,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                 </div>
               </div>
 
-              <span className="text-[13px] font-medium pt-2 border-t border-border">Vaults</span>
+              <span className="text-sm font-medium pt-2 border-t border-border">Vaults</span>
 
               <Select value={selectedVaultId ?? ''} onValueChange={handleVaultSelect}>
                 <SelectTrigger>
@@ -201,7 +201,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                   <SelectSeparator />
                   <SelectItem value="__add__">
                     <span className="flex items-center gap-1.5">
-                      <Plus className="size-[13px] stroke-[1.7]" />
+                      <Plus className="size-3.5 stroke-[1.7]" />
                       Add new vault…
                     </span>
                   </SelectItem>

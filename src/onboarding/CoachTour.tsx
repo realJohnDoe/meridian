@@ -113,11 +113,11 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
       >
         {/* Header row */}
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+          <span className="text-2xs font-semibold text-muted-foreground uppercase tracking-wide">
             {stepIndex + 1} / {steps.length}
           </span>
           <button
-            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            className="text-2xs text-muted-foreground hover:text-foreground transition-colors"
             onClick={dismiss}
             aria-label="Skip tour"
           >
@@ -127,8 +127,8 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
 
         {/* Content */}
         <div className="flex flex-col gap-1">
-          <p className="text-[15px] font-semibold text-foreground leading-snug">{step.title}</p>
-          <p className="text-[13px] text-muted-foreground leading-relaxed">{step.body}</p>
+          <p className="text-base font-semibold text-foreground leading-snug">{step.title}</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
         </div>
 
         {/* Navigation */}
@@ -136,7 +136,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-[13px] text-muted-foreground"
+            className="h-8 px-2 text-sm text-muted-foreground"
             onClick={back}
             disabled={stepIndex === 0}
           >
@@ -145,7 +145,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
           <Button
             variant="brand"
             size="sm"
-            className="h-8 px-4 text-[13px]"
+            className="h-8 px-4 text-sm"
             onClick={isLast ? dismiss : advance}
           >
             {isLast ? 'Done' : 'Next →'}
