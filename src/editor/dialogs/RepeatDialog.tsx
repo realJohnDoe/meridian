@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { badgeVariants } from '@/components/ui/badge'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Calendar } from '@/components/ui/calendar'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -303,10 +304,10 @@ export default function RepeatDialog({
               <div className="flex flex-col gap-1.5">
                 <div className="text-2xs font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     type="number"
                     min={1}
-                    className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-xs font-mono text-foreground transition-colors"
+                    className="w-20"
                     value={intervalNum === 0 ? '' : intervalNum}
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => {
@@ -424,8 +425,7 @@ export default function RepeatDialog({
                   </button>
                 )}
                 {endType === 'count' && (
-                  <input
-                    className="w-full bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-mono text-foreground placeholder:text-muted-foreground transition-colors"
+                  <Input
                     type="number"
                     placeholder="occurrences"
                     value={endVal}
@@ -439,10 +439,10 @@ export default function RepeatDialog({
             <div className="flex flex-col gap-1.5">
               <div className="text-2xs font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
               <div className="flex gap-2">
-                <input
+                <Input
                   type="number"
                   min={1}
-                  className="w-20 bg-secondary border border-border/50 focus:border-primary focus:outline-none rounded-lg px-3 h-control text-xs font-mono text-foreground transition-colors"
+                  className="w-20"
                   value={completionNum === 0 ? '' : completionNum}
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => {

@@ -1,6 +1,7 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
 import { Button } from './ui/button'
+import { Input } from './ui/input'
 import { FilterOverlay, MobileSearchOverlay } from '@/search'
 import { newEntryRoute } from '@/routes'
 import { useOpenEntry } from '@/hooks'
@@ -70,9 +71,10 @@ export default function SearchBar() {
            * Mobile: onClick opens the full-screen overlay (router push).
            * Desktop: typing directly updates sq via onChange (router replace).
            */}
-          <input
+          <Input
             id="filterInput"
-            className="flex-1 bg-transparent border-none outline-none text-foreground text-sm min-w-0 placeholder:text-muted-foreground"
+            variant="ghost"
+            className="flex-1 min-w-0"
             placeholder="Search or create…"
             value={filterQuery}
             onClick={openSearch}

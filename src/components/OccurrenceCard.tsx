@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Repeat2 } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import KindIcon from './KindIcon'
@@ -105,8 +106,23 @@ export default function OccurrenceCard({
 }: OccurrenceCardProps) {
   const hour12   = useStore(s => s.localePrefs.hour12)
   const barClass = occState(occ, now)
-  const isDone   = !!occ.metadata.done
   const isPast   = barClass === 'event-past'
+
+  // Optimistic local copy of `done` so the checkbox and its dependent styling
+  // (strike-through, dim overlay) animate the instant the user clicks, rather
+  // than waiting for the store commit — which, for after_completion repeats,
+  // can be delayed several frames while the newly-generated next occurrence
+  // settles into the virtualized list. Reconciled with the store value below
+  // during render (the standard "adjusting state on prop change" pattern —
+  // https://react.dev/learn/you-might-not-need-an-effect) once that commit
+  // lands (a no-op in the common case where they already match).
+  const storeDone = !!occ.metadata.done
+  const [isDone, setIsDone] = useState(storeDone)
+  const [prevStoreDone, setPrevStoreDone] = useState(storeDone)
+  if (storeDone !== prevStoreDone) {
+    setPrevStoreDone(storeDone)
+    setIsDone(storeDone)
+  }
   const title    = (occ.metadata.jsTime
     ? multidayDisplayTitle(occ, occ.metadata.jsTime)
     : undefined) ?? occ.metadata.title
@@ -163,7 +179,10 @@ export default function OccurrenceCard({
             if (hasTrack) return (
               <Checkbox
                 checked={isDone}
-                onCheckedChange={() => onToggleDone()}
+                onCheckedChange={() => {
+                  setIsDone(d => !d)
+                  onToggleDone()
+                }}
                 className="pointer-events-auto"
                 onPointerDown={e => e.stopPropagation()}
                 onClick={e => e.stopPropagation()}
