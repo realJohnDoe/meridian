@@ -245,29 +245,31 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
               ))}
             </ToggleGroup>
 
-            <div className="flex gap-1.5 flex-wrap mb-4">
-              {showDateChip && (
-                <PropChip icon={Calendar} label="Date" pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}
-                  value={scheduled ? (fmtShort(parseDateString(scheduled.date) ?? new Date(scheduled.date))) : undefined} />
-              )}
-              {showDateChip && hasDate && (
-                <PropChip icon={Clock} label="Time" pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}
-                  value={hasTime ? (fmtT(scheduled.time, hour12) ?? undefined) : undefined} />
-              )}
-              {showDateChip && (
-                <PropChip icon={Timer} label="Duration" pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}
-                  value={duration ? (scheduled ? formatDurationChip(duration, scheduled, hour12) : fmtDuration(duration)) : undefined} />
-              )}
-              {tracked && (
-                <PropChip icon={Flag} label="Priority" pressed={!!priority} onClick={() => onOpenDlg('dlgPriority')}
-                  value={priority ? PRIORITY_LABELS[priority] : undefined}
-                  className={priority ? PRIORITY_CLASS[priority] : undefined} />
-              )}
-              {showRepeat && (
-                <PropChip icon={Repeat} label="Repeat" pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}
-                  value={repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : undefined} />
-              )}
-            </div>
+            {(showDateChip || tracked || showRepeat) && (
+              <div className="flex gap-1.5 flex-wrap mb-4">
+                {showDateChip && (
+                  <PropChip icon={Calendar} label="Date" pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}
+                    value={scheduled ? (fmtShort(parseDateString(scheduled.date) ?? new Date(scheduled.date))) : undefined} />
+                )}
+                {showDateChip && hasDate && (
+                  <PropChip icon={Clock} label="Time" pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}
+                    value={hasTime ? (fmtT(scheduled.time, hour12) ?? undefined) : undefined} />
+                )}
+                {showDateChip && (
+                  <PropChip icon={Timer} label="Duration" pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}
+                    value={duration ? (scheduled ? formatDurationChip(duration, scheduled, hour12) : fmtDuration(duration)) : undefined} />
+                )}
+                {tracked && (
+                  <PropChip icon={Flag} label="Priority" pressed={!!priority} onClick={() => onOpenDlg('dlgPriority')}
+                    value={priority ? PRIORITY_LABELS[priority] : undefined}
+                    className={priority ? PRIORITY_CLASS[priority] : undefined} />
+                )}
+                {showRepeat && (
+                  <PropChip icon={Repeat} label="Repeat" pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}
+                    value={repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : undefined} />
+                )}
+              </div>
+            )}
 
             <ParticipantsRow participants={participants} onChange={ps => {
               const next = { ...entry, participants: ps }
