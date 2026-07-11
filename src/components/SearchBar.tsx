@@ -2,7 +2,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
-import { FilterOverlay, MobileSearchOverlay } from '@/search'
+import { SearchOverlay } from '@/search'
 import { newEntryRoute } from '@/routes'
 import { useOpenEntry } from '@/hooks'
 
@@ -41,11 +41,8 @@ export default function SearchBar() {
 
   return (
     <div className="shrink-0 relative z-30 pointer-events-none">
-      {/* Backdrop: covers calendar/agenda behind the desktop popover; below the popover and bar in DOM order */}
-      {searchOpen && <div className="hidden fine:block fixed inset-0 z-[24] bg-background/80 backdrop-blur-sm pointer-events-auto" />}
-
-      {/* Full-screen search overlay for touch devices (fine:hidden inside) */}
-      <MobileSearchOverlay
+      {/* Full-screen layer on mobile/tablet, popover + scoped backdrop on desktop */}
+      <SearchOverlay
         open={searchOpen}
         query={filterQuery}
         onQueryChange={setQuery}
@@ -56,13 +53,6 @@ export default function SearchBar() {
 
       {/* Gradient fade blending content into the sheet */}
       <div className="absolute inset-x-0 bottom-full h-10 bg-gradient-to-b from-transparent to-background/85 pointer-events-none" />
-
-      {/* Desktop popover floats above the bar (hidden md:block inside FilterOverlay) */}
-      <FilterOverlay
-        query={filterQuery}
-        onOpen={handleOpen}
-        onCreate={handleCreate}
-      />
 
       <div className={`relative z-[26] px-3.5 py-3.5 flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
         <div data-tour="search-bar" className="search-bar-wrap w-full max-w-xl mx-auto">
