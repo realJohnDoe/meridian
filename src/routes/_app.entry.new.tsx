@@ -49,7 +49,7 @@ function NewEntryTopbar({ onBack }: { onBack: () => void }) {
   if (!slotEl) return null
   return createPortal(
     <div className="flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto px-3.5">
-      <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 md:hidden" onClick={onBack} title="Back" aria-label="Back">
+      <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 lg:hidden" onClick={onBack} title="Back" aria-label="Back">
         <ArrowLeft size={18} />
       </Button>
       <div className="flex-1" />
