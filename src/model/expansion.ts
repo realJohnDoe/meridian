@@ -11,7 +11,7 @@
 
 import {
   isValid,
-  addDays, addWeeks, addMonths, addYears, addHours, addMinutes, startOfDay,
+  addDays, addWeeks, addMonths, addYears, addHours, addMinutes, startOfDay, endOfDay,
   differenceInCalendarDays,
 } from 'date-fns'
 import type { Repeat, StoreItem, StoreOcc, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
@@ -175,7 +175,10 @@ function generateScheduledDates(
 ): Date[] {
   const { freq, byweekday, bymonthday, bysetpos, interval = 1, end } = sched
   const results: Date[] = []
-  const maxDate = end?.type === 'until' ? (toDate(end.date || end.time) ?? to) : to
+  const untilDate = end?.type === 'until' ? toDate(end.date || end.time) : null
+  // `end.date` is a date-only value (no time-of-day); treat it as inclusive of
+  // the entire day so occurrences scheduled later that day are still included.
+  const maxDate = untilDate ? endOfDay(untilDate) : to
   const maxCount = end?.type === 'count' ? end.occurrences : Infinity
   let count = 0
 
