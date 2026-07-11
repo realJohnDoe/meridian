@@ -3,6 +3,7 @@ import type { VaultKind } from '@/types'
 import { startOfToday } from 'date-fns'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
+import { generateBigVault } from './devFixtures/testVaultGen'
 
 // ── Date helpers ────────────────────────────────────────────────
 // All example dates are computed relative to today so items always
@@ -430,7 +431,24 @@ full of Markdown.`,
   ]
 }
 
-const ENTRIES = buildEntries()
+/**
+ * Dev-only escape hatch for performance testing: serves a generated
+ * large vault instead of the tutorial when `localStorage.meridian_bigvault`
+ * is set to a file count. Gated on `import.meta.env.DEV` so the generator
+ * (and this branch) are dead-code-eliminated from production builds.
+ * See devFixtures/testVaultGen.ts for how to use it.
+ */
+function loadEntries(): Array<{ id: string; content: string }> {
+  if (import.meta.env.DEV) {
+    try {
+      const n = Number(localStorage.getItem('meridian_bigvault'))
+      if (n && n > 0) return generateBigVault(n)
+    } catch { /* ignore */ }
+  }
+  return buildEntries()
+}
+
+const ENTRIES = loadEntries()
 
 const VERSION = 'example-v4'
 
