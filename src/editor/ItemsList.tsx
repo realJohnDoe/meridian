@@ -190,6 +190,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           fileSlug: occ.fileSlug,
           id:       crypto.randomUUID(),
           metadata: {
+            done:         false,
             participants: occ.metadata.participants ?? [],
             priority:     occ.metadata.priority,
             duration:     occ.metadata.duration,
