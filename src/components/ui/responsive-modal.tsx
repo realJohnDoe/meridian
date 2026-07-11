@@ -42,7 +42,7 @@ function ResponsiveModalContent({ className, children }: {
     return <DrawerContent className={cn('pt-3', className)}>{children}</DrawerContent>
   }
   return (
-    <DialogContent className={cn('max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-sm p-0 gap-0 overflow-hidden', className)}>
+    <DialogContent className={cn('max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-sm p-0 gap-0', className)}>
       {children}
     </DialogContent>
   )
