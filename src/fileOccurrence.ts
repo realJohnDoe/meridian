@@ -2,6 +2,7 @@ import { startOfToday } from 'date-fns'
 import { expandRange, joinFileMeta, stableOccId } from '@/model'
 import { resolveWikilink, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc } from './types'
+import { occKind } from './occView'
 import type { Occurrence, StoreItem, Roots } from './types'
 
 /** A flat, file-granular entry for the item picker and search overlay. */
@@ -34,14 +35,15 @@ const _3YR_MS = 365 * 3 * 86_400_000
 /**
  * Per-slug resolution primitive used by `updateFileOccurrenceMap`.
  *
- * Fill order (first match wins — future events, open tasks, past events, done tasks):
+ * Fill order (first match wins — future events, open tasks, overdue tasks, past events, done tasks):
  *  1. Nearest upcoming undone dated occurrence in the ±3yr window.
  *  2. Undated open standalone.
- *  3. Most-recent overdue occurrence (past undone).
- *  4. Most-recent past done occurrence.
- *  5. Any upcoming done occurrence.
- *  6. First standalone item (undated done or out-of-window dated single).
- *  7. Series anchor date (series entirely outside the ±3yr window).
+ *  3. Most-recent overdue task (past, undone, has a `done` field).
+ *  4. Most-recent past event (past, no `done` field — not a task).
+ *  5. Most-recent past done occurrence.
+ *  6. Any upcoming done occurrence.
+ *  7. First standalone item (undated done or out-of-window dated single).
+ *  8. Series anchor date (series entirely outside the ±3yr window).
  */
 function resolveOneSlug(
   fileSlug: string,
@@ -63,28 +65,32 @@ function resolveOneSlug(
     return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
   }
 
-  // 3. Most-recent overdue occurrence (past undone).
+  // 3. Most-recent overdue task (past, undone).
   const back = expandRange(slugItems, roots, BACK, now, weekStart)
-  const pastUndone = [...back].reverse().find(o => !o.metadata.done)
-  if (pastUndone) return pastUndone
+  const overdueTask = [...back].reverse().find(o => occKind(o) === 'task' && !o.metadata.done)
+  if (overdueTask) return overdueTask
 
-  // 4. Most-recent past done occurrence.
+  // 4. Most-recent past event (not a task).
+  const pastEvent = [...back].reverse().find(o => occKind(o) !== 'task')
+  if (pastEvent) return pastEvent
+
+  // 5. Most-recent past done occurrence.
   const pastDone = back[back.length - 1]
   if (pastDone) return pastDone
 
-  // 5. Any upcoming done occurrence.
+  // 6. Any upcoming done occurrence.
   for (const occ of expandRange(slugItems, roots, now, AHEAD, weekStart)) {
     return occ
   }
 
-  // 6. Any standalone (undated done or out-of-window dated single).
+  // 7. Any standalone (undated done or out-of-window dated single).
   for (const item of slugItems) {
     if (isStandaloneOcc(item)) {
       return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) }
     }
   }
 
-  // 7. Series anchor date.
+  // 8. Series anchor date.
   for (const item of slugItems) {
     if (!isSeries(item)) continue
     return {
