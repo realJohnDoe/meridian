@@ -1,5 +1,5 @@
 import { startOfToday } from 'date-fns'
-import { expandRange, joinFileMeta, parseDateTime, stableOccId } from '@/model'
+import { expandRange, joinFileMeta, stableOccId } from '@/model'
 import { resolveWikilink, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc } from './types'
 import { occKind } from './occView'
@@ -33,62 +33,19 @@ export function fileEntries(roots: Roots): FilePickerEntry[] {
 const _3YR_MS = 365 * 3 * 86_400_000
 
 /**
- * Every item in a slug, normalized to a single representative Occurrence and
- * sorted ascending by time. In-window items get their real expanded
- * occurrence(s) from `expandRange`; anything expandRange couldn't reach — an
- * undated standalone, a standalone dated outside the ±3yr window, or a series
- * whose entire expansion falls outside it — gets one synthesized from its own
- * stored date (or no date at all). Every item ends up in this same pool, so
- * `resolveOneSlug` below never needs to special-case standalones vs. series.
- */
-function candidateOccurrences(
-  fileSlug: string,
-  slugItems: StoreItem[],
-  roots: Roots,
-  AHEAD: Date,
-  BACK: Date,
-  weekStart: 0 | 1 | 6,
-): Occurrence[] {
-  const inWindow        = expandRange(slugItems, roots, BACK, AHEAD, weekStart)
-  const standaloneIds    = new Set(inWindow.filter(o => !o.ownerId).map(o => o.id))
-  const seriesOwnerIds   = new Set(inWindow.filter(o => o.ownerId).map(o => o.ownerId))
-
-  const extra: Occurrence[] = []
-  for (const item of slugItems) {
-    if (isStandaloneOcc(item) && !standaloneIds.has(item.id)) {
-      const jsTime = parseDateTime(item.date, item.time) ?? undefined
-      extra.push({ ...item, metadata: { ...joinFileMeta(fileSlug, item.metadata, roots), jsTime } })
-    }
-    if (isSeries(item) && !seriesOwnerIds.has(item.id)) {
-      const jsTime = parseDateTime(item.date, item.time) ?? undefined
-      extra.push({
-        date:     item.date,
-        time:     item.time,
-        source:   'explicit' as const,
-        fileSlug: item.fileSlug,
-        id:       stableOccId(`${item.fileSlug}|${item.id}|anchor`),
-        ownerId:  item.id,
-        metadata: { ...joinFileMeta(item.fileSlug, item.metadata, roots), jsTime },
-      })
-    }
-  }
-
-  return [...inWindow, ...extra].sort(
-    (a, b) => (a.metadata.jsTime?.getTime() ?? 0) - (b.metadata.jsTime?.getTime() ?? 0),
-  )
-}
-
-/**
  * Per-slug resolution primitive used by `updateFileOccurrenceMap`.
  *
  * Fill order (first match wins — future events, open tasks, past events, done tasks):
- *  1. Nearest upcoming event (no `done` field).
- *  2. Undated open task.
- *  3. Earliest undone task (overdue tasks sort before future ones, since
- *     "earliest" just means smallest date).
+ *  1. Nearest upcoming event (dated, no `done` field, in the ±3yr window).
+ *  2. Undated open standalone task.
+ *  3. Earliest undone task in the ±3yr window (overdue tasks sort before future
+ *     ones, since "earliest" just means smallest date).
  *  4. Most-recent past event.
- *  5. Latest done occurrence (past or future).
- *  6. Anything left (e.g. a note) — the earliest candidate, if any.
+ *  5. Latest done occurrence in the ±3yr window (past or future).
+ *  6. Fallback for slugs with nothing in the window: the first standalone item
+ *     as-is, or — for a series entirely outside the window — a synthetic
+ *     occurrence built from the series' own anchor date (RepeatPattern isn't
+ *     itself an Occurrence, so expandRange can't hand us one).
  */
 function resolveOneSlug(
   fileSlug: string,
@@ -99,31 +56,49 @@ function resolveOneSlug(
   BACK: Date,
   weekStart: 0 | 1 | 6,
 ): Occurrence | null {
-  const nowMs      = now.getTime()
-  const candidates = candidateOccurrences(fileSlug, slugItems, roots, AHEAD, BACK, weekStart)
+  const nowMs    = now.getTime()
+  const inWindow = expandRange(slugItems, roots, BACK, AHEAD, weekStart) // ascending by time
 
   // 1. Nearest upcoming event.
-  const futureEvent = candidates.find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs)
+  const futureEvent = inWindow.find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs)
   if (futureEvent) return futureEvent
 
-  // 2. Undated open task.
-  const undatedOpen = candidates.find(o => o.date === '' && occKind(o) === 'task' && !o.metadata.done)
-  if (undatedOpen) return undatedOpen
+  // 2. Undated open standalone task.
+  const undatedOpen = slugItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
+  if (undatedOpen) {
+    return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
+  }
 
   // 3. Earliest undone task.
-  const earliestTask = candidates.find(o => occKind(o) === 'task' && !o.metadata.done)
+  const earliestTask = inWindow.find(o => occKind(o) === 'task' && !o.metadata.done)
   if (earliestTask) return earliestTask
 
   // 4. Most-recent past event.
-  const pastEvent = [...candidates].reverse().find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) < nowMs)
+  const pastEvent = [...inWindow].reverse().find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) < nowMs)
   if (pastEvent) return pastEvent
 
   // 5. Latest done occurrence.
-  const latestDone = [...candidates].reverse().find(o => o.metadata.done === true)
+  const latestDone = [...inWindow].reverse().find(o => o.metadata.done === true)
   if (latestDone) return latestDone
 
-  // 6. Anything left (e.g. a note) — the earliest candidate, if any.
-  return candidates[0] ?? null
+  // 6. Fallback: standalone as-is, or a synthesized anchor for an out-of-window series.
+  for (const item of slugItems) {
+    if (isStandaloneOcc(item)) {
+      return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) }
+    }
+    if (isSeries(item)) {
+      return {
+        date:     item.date,
+        time:     item.time,
+        source:   'explicit' as const,
+        fileSlug: item.fileSlug,
+        id:       stableOccId(`${item.fileSlug}|${item.id}|anchor`),
+        ownerId:  item.id,
+        metadata: joinFileMeta(item.fileSlug, item.metadata, roots),
+      }
+    }
+  }
+  return null
 }
 
 
