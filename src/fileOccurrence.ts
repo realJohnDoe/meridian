@@ -34,10 +34,10 @@ const _3YR_MS = 365 * 3 * 86_400_000
 /**
  * Per-slug resolution primitive used by `updateFileOccurrenceMap`.
  *
- * Fill order (first match wins — all open before all done):
+ * Fill order (first match wins — future events, open tasks, past events, done tasks):
  *  1. Nearest upcoming undone dated occurrence in the ±3yr window.
- *  2. Most-recent overdue occurrence (past undone).
- *  3. Undated open standalone.
+ *  2. Undated open standalone.
+ *  3. Most-recent overdue occurrence (past undone).
  *  4. Most-recent past done occurrence.
  *  5. Any upcoming done occurrence.
  *  6. First standalone item (undated done or out-of-window dated single).
@@ -57,16 +57,16 @@ function resolveOneSlug(
     if (!occ.metadata.done) return occ
   }
 
-  // 2. Most-recent overdue occurrence (past undone).
-  const back = expandRange(slugItems, roots, BACK, now, weekStart)
-  const pastUndone = [...back].reverse().find(o => !o.metadata.done)
-  if (pastUndone) return pastUndone
-
-  // 3. Undated open standalone.
+  // 2. Undated open standalone.
   const undatedOpen = slugItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
   if (undatedOpen) {
     return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
   }
+
+  // 3. Most-recent overdue occurrence (past undone).
+  const back = expandRange(slugItems, roots, BACK, now, weekStart)
+  const pastUndone = [...back].reverse().find(o => !o.metadata.done)
+  if (pastUndone) return pastUndone
 
   // 4. Most-recent past done occurrence.
   const pastDone = back[back.length - 1]
