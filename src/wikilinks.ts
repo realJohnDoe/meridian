@@ -63,6 +63,27 @@ export function resolveWikilink(ref: string, roots: Roots): string | undefined {
   return undefined
 }
 
+/**
+ * Build an O(1) reverse lookup for `resolveWikilink`: lowercased fileSlug|title → fileSlug.
+ * Encodes the same resolution order — fileSlug wins over title, case-insensitive, first
+ * title wins on duplicate titles — so `buildResolveIndex(roots).get(ref.toLowerCase())`
+ * equals `resolveWikilink(ref, roots)`. Callers that resolve many refs against one `roots`
+ * build this once instead of paying `resolveWikilink`'s two linear scans per ref.
+ */
+export function buildResolveIndex(roots: Roots): Map<string, string> {
+  const index = new Map<string, string>()
+  // Titles first (first-in-iteration wins), then fileSlugs overwrite so a fileSlug match
+  // always beats a title alias — matching resolveWikilink's fileSlug-before-title order.
+  for (const [fileSlug, meta] of roots) {
+    const key = meta.title.toLowerCase()
+    if (!index.has(key)) index.set(key, fileSlug)
+  }
+  for (const [fileSlug] of roots) {
+    index.set(fileSlug.toLowerCase(), fileSlug)
+  }
+  return index
+}
+
 /** Strip `[[` / `]]` brackets from a stored wikilink string, returning the raw ref. */
 export function unwrapRef(stored: string): string {
   const m = stored.match(/^\[\[(.+)\]\]$/)

@@ -3,7 +3,6 @@ import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
-import { backlinksTo } from '@/fileOccurrence'
 
 interface Props {
   occ: Occurrence
@@ -28,8 +27,9 @@ interface Props {
 // the same day leave `occ` reference-stable (see expansionCache.ts's overlay
 // logic), so this row correctly skips re-rendering for those.
 function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
-  const roots    = useStore(s => s.roots)
-  const listedOn = backlinksTo(occ.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug)
+  const roots     = useStore(s => s.roots)
+  const backlinks = useStore(s => s.backlinks)
+  const listedOn  = (backlinks.get(occ.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug)
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
