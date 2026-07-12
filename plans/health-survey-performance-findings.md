@@ -62,37 +62,6 @@ Ranked by `(impact × breadth) ÷ effort`.
 
 ---
 
-### Finding 2 — `backlinksTo` is O(files²·items) and unmemoized at its call sites
-
-- **Flows affected:** 2 (view switch / agenda mount), 3 (search), 5 (edits), 6 (cold start) — runs for **every visible occurrence row on every mount** and (via Finding 1) **every search match**.
-- **Category:** `data-and-persistence` `render-amplification` `memory-and-leak` (scaling cliff)
-- **Impact:** **8** — the shared root cause behind Findings 1 and 3; the single highest-leverage fix.
-- **Baseline measurement:** **8.9 ms per `backlinksTo` call** (2,675 ms / 300 slugs) at 300 files / 878 items. Cost is O(files²·items) because the inner `resolveWikilink` itself loops over all roots (up to twice), nested inside a loop over all roots × their items. At ~13 visible agenda rows that's ~115 ms of backlink work per agenda mount; in search it's ×299.
-- **Measurement recipe:** replicate `unwrapRef`/`resolveWikilink`/`backlinksTo` verbatim in-page, run over every slug in `useStore.getState().roots`, `performance.now()` around the loop, divide by slug count.
-- **Breadth:** 2 core functions (`src/fileOccurrence.ts`, `src/wikilinks.ts`) + 2 hot call sites (`grep backlinksTo src` → `src/calendar/OccurrenceRow.tsx:32`, `src/search/FileResultsList.tsx:37`).
-- **Fix effort:** M
-- **Evidence:** `src/fileOccurrence.ts:167` — the doc comment even says to memoize, but the call site doesn't:
-  ```js
-  // Self-links are excluded. Memoize the result on [roots] at the call site.
-  export function backlinksTo(targetSlug: string, roots: Roots): string[] {
-    const result: string[] = []
-    for (const [fileSlug, meta] of roots) {
-      if (fileSlug === targetSlug) continue
-      for (const raw of meta.items ?? []) {
-        const ref = unwrapRef(raw)
-        if (resolveWikilink(ref, roots) === targetSlug) { result.push(fileSlug); break }
-  ```
-  and `src/wikilinks.ts:56` — `resolveWikilink` is itself O(files): `for (const [fileSlug] of roots) { if (fileSlug.toLowerCase() === lower) return fileSlug }` (plus a second title loop). `src/calendar/OccurrenceRow.tsx:32` calls it inline every render:
-  ```js
-  const listedOn = backlinksTo(occ.fileSlug, roots).map(
-    (slug) => roots.get(slug)?.title ?? slug,
-  );
-  ```
-- **Problem:** Resolving "which files link here" rescans the entire vault for each target, so the per-row backlink chip does quadratic work that multiplies across rows and search results — invisible in the 16-file example vault, painful at a few hundred files.
-- **Fix:** Build one reverse-link index (`Map<targetSlug, sourceSlug[]>`) once per `roots` change — O(files·items) total with an O(1) lowercase-keyed `resolveWikilink` map — and have rows/results do an O(1) lookup. Expected effect: per-call cost **8.9 ms → ~0 ms**; agenda-mount backlink work **~115 ms → <1 ms**; removes 4.2 s from the search freeze.
-
----
-
 ### Finding 3 — Any metadata edit invalidates the expansion cache → full 8,680-occurrence re-expansion
 
 - **Flows affected:** 5 (change date/scope/title/tags/repeat), 4 (create), 6 (cold start does the first expansion) — **every edit save**.
