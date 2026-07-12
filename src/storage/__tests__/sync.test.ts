@@ -107,9 +107,11 @@ class FakeBackend implements StorageBackend {
   readonly readOnly = false
   refreshAuth?: () => Promise<boolean>
 
-  writeCallCount   = 0
-  deleteCallCount  = 0
-  statAllCallCount = 0
+  writeCallCount     = 0
+  deleteCallCount    = 0
+  statAllCallCount   = 0
+  readFilesCallCount = 0
+  readAllCallCount   = 0
 
   private _files = new Map<string, FakeFile>()
   private _versionCounter = 0
@@ -137,6 +139,7 @@ class FakeBackend implements StorageBackend {
   }
 
   async readFiles(paths: string[]): Promise<RawFile[]> {
+    this.readFilesCallCount++
     return paths.flatMap(p => {
       const f = this._files.get(p)
       return f ? [{ path: p, content: f.content, version: f.version }] : []
@@ -144,6 +147,7 @@ class FakeBackend implements StorageBackend {
   }
 
   async readAll(): Promise<RawFile[]> {
+    this.readAllCallCount++
     return Array.from(this._files.entries()).map(([p, f]) => ({ path: p, content: f.content, version: f.version }))
   }
 
@@ -422,5 +426,40 @@ describe('runSync — exponential backoff on transient failures', () => {
     } finally {
       nowSpy.mockRestore()
     }
+  })
+})
+
+// ── Large-reconcile routing (readAll vs. readFiles) ─────────────────────
+
+describe('reconcileWithBackend — large changed sets route through readAll()', () => {
+  it('uses readAll() instead of a per-file readFiles() fan-out above the threshold', async () => {
+    const backend = new FakeBackend()
+    // 51 remote-only files: none cached yet, so planReconcile marks all of them
+    // "changed" — above LARGE_RECONCILE_THRESHOLD (50), this must route through
+    // readAll() rather than reproducing a 51-request readFiles() fan-out.
+    for (let i = 0; i < 51; i++) backend.seed(`note-${i}.md`, `content ${i}`, `sha${i}`)
+    setActiveBackend(backend)
+
+    await syncToBackend()
+
+    expect(backend.readAllCallCount).toBe(1)
+    expect(backend.readFilesCallCount).toBe(0)
+    for (let i = 0; i < 51; i++) {
+      const cached = cacheStore.get(vp('fake-vault', `note-${i}.md`))
+      expect(cached?.content).toBe(`content ${i}`)
+      expect(cached?.dirty).toBe(0)
+    }
+  })
+
+  it('still uses readFiles() for small changed sets at/below the threshold', async () => {
+    const backend = new FakeBackend()
+    backend.seed('note.md', 'content', 'sha1')
+    setActiveBackend(backend)
+
+    await syncToBackend()
+
+    expect(backend.readFilesCallCount).toBe(1)
+    expect(backend.readAllCallCount).toBe(0)
+    expect(cacheStore.get(vp('fake-vault', 'note.md'))?.content).toBe('content')
   })
 })

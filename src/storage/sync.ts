@@ -6,7 +6,7 @@ import {
 import type { CacheRecord } from '@/storage/cache'
 import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
-import type { StorageBackend } from './backend'
+import type { StorageBackend, RawFile } from './backend'
 import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile } from '@/model'
 import type { StoreItem, Roots } from '@/types'
 import {
@@ -145,6 +145,12 @@ export function planReconcile(
   return { changed, deleted }
 }
 
+// Above this many changed paths, a per-file readFiles() fan-out risks the same
+// secondary-rate-limit burst readAll() avoids on initial load — e.g. a
+// collaborator's bulk push, or the first reconcile after a long offline
+// stretch. Route through readAll()'s batched fetch instead in that case.
+const LARGE_RECONCILE_THRESHOLD = 50
+
 export async function reconcileWithBackend(
   backend: StorageBackend,
   vaultId: string,
@@ -157,7 +163,13 @@ export async function reconcileWithBackend(
   const { changed, deleted } = planReconcile(diskTokens, cached, skipPaths)
 
   if (changed.length > 0) {
-    const freshFiles = await backend.readFiles(changed)
+    let freshFiles: RawFile[]
+    if (changed.length > LARGE_RECONCILE_THRESHOLD) {
+      const changedSet = new Set(changed)
+      freshFiles = (await backend.readAll()).filter(f => changedSet.has(f.path))
+    } else {
+      freshFiles = await backend.readFiles(changed)
+    }
     await cacheBulkWriteClean(vaultId, freshFiles)
     for (const f of freshFiles) {
       cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, dirty: 0, updatedAt: Date.now(), version: f.version })
