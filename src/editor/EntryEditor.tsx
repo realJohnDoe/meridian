@@ -22,7 +22,6 @@ import { formatDurationChip, fmtDuration, fmtShort } from '@/format'
 import { fmtT, parseDateString } from '@/model'
 import { useStore } from '@/store'
 import { titleToSlug } from '@/fileIO'
-import { backlinksTo } from '@/fileOccurrence'
 import { usePendingLinks } from './usePendingLinks'
 
 function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
@@ -83,6 +82,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   const navigate           = useNavigate()
   const hour12             = useStore(s => s.localePrefs.hour12)
   const defaultParticipants = useStore(s => s.defaultParticipants)
+  const backlinks          = useStore(s => s.backlinks)
   const titleRef  = useRef<HTMLTextAreaElement>(null)
   const viewRef   = useRef<EditorView | null>(null)
 
@@ -134,7 +134,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
     if (flushPendingLinksRef) flushPendingLinksRef.current = () => flushOnSave(titleToSlug(title))
   })
 
-  const linkedSlugs = [...backlinksTo(effectiveSlug ?? '', roots), ...pendingSlugs]
+  const linkedSlugs = [...(backlinks.get(effectiveSlug ?? '') ?? []), ...pendingSlugs]
 
   const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
   const isRecur = !!(item && item.ownerId)

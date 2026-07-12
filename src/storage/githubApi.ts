@@ -43,13 +43,31 @@ export function decodeBase64(b64: string): string {
 
 import { ConflictError, AuthSyncError, TransientSyncError, isTransientSyncError } from './conflictError'
 
+/**
+ * A 403 that still carries rate-limit headers means the throttling plugin's
+ * retries were exhausted (or the response leaked past it), not that the
+ * request was actually denied — e.g. a burst against a large vault. Without
+ * this check such a 403 gets misclassified as a bad token below, which is
+ * what sends users down a fruitless remove-and-re-add-the-vault path instead
+ * of just waiting out the rate limit.
+ */
+function isRateLimitError(e: unknown): boolean {
+  const headers = (e as { response?: { headers?: Record<string, string> } })?.response?.headers
+  if (!headers) return false
+  return headers['x-ratelimit-remaining'] === '0' || headers['retry-after'] !== undefined
+}
+
 export function mapGitHubError(e: unknown, path?: string): Error {
   if (e instanceof Error && 'status' in e) {
     const status = (e as { status: number }).status
     if (status === 401) return new AuthSyncError('GitHub token is invalid or expired.')
-    // 403 can mean rate-limit or permission denied; octokit retries rate limits so a
-    // surviving 403 is most likely a permission issue — treat as actionable.
-    if (status === 403) return new AuthSyncError('GitHub access denied. Check your token permissions.')
+    if (status === 403) {
+      if (isRateLimitError(e)) {
+        return new TransientSyncError('GitHub rate limit reached — will retry automatically.')
+      }
+      // A 403 without rate-limit headers is most likely a permission issue.
+      return new AuthSyncError('GitHub access denied. Check your token permissions.')
+    }
     if (status === 404) return new AuthSyncError('Repository not found or token lacks access.')
     if (status === 409 || status === 422) return new ConflictError(path ?? 'unknown')
   }

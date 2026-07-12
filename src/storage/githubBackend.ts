@@ -28,6 +28,54 @@ type ContentFile = {
   content: string
 }
 
+// ── Bulk read helpers ────────────────────────────────────────────
+
+/** Max concurrent Contents-API requests for readFiles — avoids tripping GitHub's secondary rate limit. */
+const READ_FILES_CONCURRENCY = 8
+/** Paths per GraphQL batch — stays comfortably under GraphQL query-size/node-cost limits. */
+const GRAPHQL_BATCH_SIZE = 100
+/** readAll() routes through readFiles() below this size — GraphQL batching only pays off in bulk. */
+const GRAPHQL_MIN_FILES = READ_FILES_CONCURRENCY
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  return out
+}
+
+/** Runs `fn` over `items` with at most `limit` in flight at once. */
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let next = 0
+  async function worker(): Promise<void> {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await fn(items[i])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return results
+}
+
+/** Escapes a string for embedding in a double-quoted GraphQL string literal. */
+function escapeGraphQLString(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+type BlobQueryResult = Record<string, { text: string | null } | null>
+
+/** Builds a GraphQL query that fetches the text of many blobs in one request, one per path aliased as f0, f1, … */
+function buildBlobQuery(branch: string, paths: string[]): string {
+  const fields = paths
+    .map((path, i) => `f${i}: object(expression: "${escapeGraphQLString(`${branch}:${path}`)}") { ... on Blob { text } }`)
+    .join('\n')
+  return `query($owner: String!, $name: String!) {
+    repository(owner: $owner, name: $name) {
+      ${fields}
+    }
+  }`
+}
+
 export class GitHubBackend implements StorageBackend {
   readonly kind: VaultKind = 'github'
   readonly readOnly        = false
@@ -84,34 +132,76 @@ export class GitHubBackend implements StorageBackend {
 
   async readFiles(paths: string[]): Promise<RawFile[]> {
     try {
-      const results = await Promise.all(
-        paths.map(async path => {
-          try {
-            const { data } = await this._octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
-              owner: this._cfg.owner,
-              repo:  this._cfg.repo,
-              path,
-              ref:   this._cfg.branch,
-            })
-            const file = data as ContentFile
-            const content = decodeBase64(file.content)
-            this._shas.set(path, file.sha)
-            return { path, content, version: file.sha }
-          } catch (e) {
-            console.warn('[github] could not read', path, e)
-            return null
-          }
-        })
-      )
+      // Bounded concurrency: an unbounded fan-out here reproduces the same
+      // secondary-rate-limit burst that readAll() avoids via GraphQL batching —
+      // this path is still used for incremental pulls and GraphQL fallback.
+      const results = await mapWithConcurrency(paths, READ_FILES_CONCURRENCY, async path => {
+        try {
+          const { data } = await this._octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+            owner: this._cfg.owner,
+            repo:  this._cfg.repo,
+            path,
+            ref:   this._cfg.branch,
+          })
+          const file = data as ContentFile
+          const content = decodeBase64(file.content)
+          this._shas.set(path, file.sha)
+          return { path, content, version: file.sha }
+        } catch (e) {
+          console.warn('[github] could not read', path, e)
+          return null
+        }
+      })
       return results.filter((r): r is RawFile => r !== null)
     } catch (e) {
       throw mapGitHubError(e)
     }
   }
 
+  /**
+   * Reads every vault file in a handful of requests: one tree listing plus a
+   * few GraphQL batches that alias many blobs per request. This avoids the
+   * one-Contents-request-per-file fan-out of readFiles(), which trips GitHub's
+   * secondary rate limit on vaults with hundreds of files.
+   */
   async readAll(): Promise<RawFile[]> {
     const tokens = await this.statAll()
-    return this.readFiles(Array.from(tokens.keys()))
+    const paths  = Array.from(tokens.keys())
+    if (paths.length === 0) return []
+    // Small vaults: a single GraphQL batch wouldn't beat readFiles' own request
+    // count by enough to justify the extra code path.
+    if (paths.length < GRAPHQL_MIN_FILES) return this.readFiles(paths)
+
+    const files: RawFile[] = []
+    const fallbackPaths: string[] = []
+
+    try {
+      for (const batch of chunk(paths, GRAPHQL_BATCH_SIZE)) {
+        const data = await this._octokit.graphql<{ repository: BlobQueryResult }>(
+          buildBlobQuery(this._cfg.branch, batch),
+          { owner: this._cfg.owner, name: this._cfg.repo },
+        )
+        batch.forEach((path, i) => {
+          const blob = data.repository[`f${i}`]
+          // text is null for binary/oversized blobs, or the alias is absent if the
+          // path vanished between the tree listing and this query — either way,
+          // fall back to the Contents API for just that file.
+          if (blob && blob.text !== null) {
+            files.push({ path, content: blob.text, version: tokens.get(path)! })
+          } else {
+            fallbackPaths.push(path)
+          }
+        })
+      }
+    } catch (e) {
+      throw mapGitHubError(e)
+    }
+
+    if (fallbackPaths.length > 0) {
+      files.push(...await this.readFiles(fallbackPaths))
+    }
+
+    return files
   }
 
   async write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> {

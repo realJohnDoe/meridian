@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Occurrence } from '@/types'
-import { fileEntries, backlinksTo } from '@/fileOccurrence'
+import { fileEntries } from '@/fileOccurrence'
 import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
 import { matchesQuery, scoreQuery } from '@/lib/matching'
@@ -19,8 +19,9 @@ interface Props {
  * Tags and topics are matched the same way — no divergence between fields.
  */
 export default function FileResultsList({ query, onOpen }: Props) {
-  const roots    = useStore(s => s.roots)
+  const roots     = useStore(s => s.roots)
   const occBySlug = useStore(s => s.fom)
+  const backlinks = useStore(s => s.backlinks)
 
   const results = useMemo(() => {
     if (!query) return []
@@ -34,9 +35,9 @@ export default function FileResultsList({ query, onOpen }: Props) {
       .sort((a, b) => b.score - a.score)
       .map(x => ({
         entry: x.entry,
-        listedOn: backlinksTo(x.entry.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug),
+        listedOn: (backlinks.get(x.entry.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug),
       }))
-  }, [roots, query])
+  }, [roots, backlinks, query])
 
   if (!results.length) return null
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { StoreItem, Roots, Occurrence, LocalePrefs, VaultRef } from './types'
 import { clearOccIdCache, weekStartsOn } from '@/model'
-import { updateFileOccurrenceMap } from './fileOccurrence'
+import { updateFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
 import { readVaultStringArray, writeVaultJSON, readVaultJSON } from '@/lib/vaultStorage'
 
 function detectLocalePrefs(): LocalePrefs {
@@ -35,6 +35,8 @@ interface MeridianStore {
   roots: Roots
   /** Derived: one representative Occurrence per file slug. Recomputed on every setData. */
   fom: Map<string, Occurrence>
+  /** Derived: targetSlug → sourceSlugs that link to it. Recomputed on every setData. */
+  backlinks: Map<string, string[]>
   /** Set items and roots together atomically. */
   setData: (data: { items: StoreItem[]; roots: Roots }) => void
 
@@ -133,11 +135,14 @@ export const useStore = create<MeridianStore>((set, get) => {
     items: [],
     roots: new Map(),
     fom: new Map(),
+    backlinks: new Map(),
     setData: ({ items, roots }) => {
       clearOccIdCache()
-      const { items: prevItems, roots: prevRoots, fom: prevFom, localePrefs } = get()
+      const { items: prevItems, roots: prevRoots, fom: prevFom, backlinks: prevBacklinks, localePrefs } = get()
       const weekStart = weekStartsOn(localePrefs)
-      set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots, weekStart) })
+      // backlinks depend only on roots; reuse the prior index when roots is reference-stable.
+      const backlinks = roots === prevRoots ? prevBacklinks : buildBacklinkIndex(roots)
+      set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots, weekStart), backlinks })
     },
 
     vaults:              [],

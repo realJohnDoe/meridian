@@ -4,8 +4,10 @@ import { useStore } from './store'
 // ── STORE ACCESSORS ────────────────────────────────────────────
 export const getItems         = (): StoreItem[]    => useStore.getState().items
 export const getRoots         = (): Roots          => useStore.getState().roots
+export const getBacklinks     = (): Map<string, string[]> => useStore.getState().backlinks
 export const setData          = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
 export const getVaults        = (): VaultRef[]     => useStore.getState().vaults
+export const getSyncError     = (): string | null  => useStore.getState().syncError
 
 // ── STORE WRITERS (storage layer uses these instead of useStore directly) ──
 export const setVaultLoading     = (loading: boolean)  => useStore.setState({ vaultLoading: loading })

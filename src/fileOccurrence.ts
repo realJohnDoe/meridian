@@ -1,6 +1,6 @@
 import { startOfToday } from 'date-fns'
 import { expandRange, joinFileMeta, stableOccId } from '@/model'
-import { resolveWikilink, unwrapRef } from './wikilinks'
+import { buildResolveIndex, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc } from './types'
 import { occKind } from './occView'
 import type { Occurrence, StoreItem, Roots } from './types'
@@ -163,17 +163,26 @@ export function updateFileOccurrenceMap(
 }
 
 /**
- * Returns the fileSlugs of all files whose items list includes a link to `targetSlug`.
- * Self-links are excluded. Memoize the result on [roots] at the call site.
+ * Build the whole-vault reverse-link index: targetSlug → fileSlugs that link to it.
+ * Self-links are excluded and a source is listed at most once per target (matching the
+ * old per-target `break`). Resolves each item once through a shared `buildResolveIndex`,
+ * so the total build is O(roots · items) — replacing the old per-target `backlinksTo`
+ * that was O(roots² · items) per call. Built once per `roots` change and stored on the
+ * Zustand store; call sites do an O(1) `backlinks.get(slug)` lookup.
  */
-export function backlinksTo(targetSlug: string, roots: Roots): string[] {
-  const result: string[] = []
+export function buildBacklinkIndex(roots: Roots): Map<string, string[]> {
+  const resolve = buildResolveIndex(roots)
+  const backlinks = new Map<string, string[]>()
   for (const [fileSlug, meta] of roots) {
-    if (fileSlug === targetSlug) continue
+    const seen = new Set<string>()
     for (const raw of meta.items ?? []) {
-      const ref = unwrapRef(raw)
-      if (resolveWikilink(ref, roots) === targetSlug) { result.push(fileSlug); break }
+      const target = resolve.get(unwrapRef(raw).toLowerCase())
+      if (!target || target === fileSlug || seen.has(target)) continue
+      seen.add(target)
+      const arr = backlinks.get(target)
+      if (arr) arr.push(fileSlug)
+      else backlinks.set(target, [fileSlug])
     }
   }
-  return result
+  return backlinks
 }

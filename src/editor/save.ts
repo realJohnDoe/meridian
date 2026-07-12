@@ -3,8 +3,7 @@ import { fmtISO, applyEdit, excludeOccurrence, deletionEndsAfterCompletionSeries
 import { isSeries } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import { titleToSlug } from '@/fileIO'
-import { getItems, getRoots } from '@/storeBridge'
-import { backlinksTo } from '@/fileOccurrence'
+import { getItems, getRoots, getBacklinks } from '@/storeBridge'
 import { commitNext, commitDelete } from '@/storeCommit'
 import type { EntryState, ItemType } from './state'
 
@@ -149,7 +148,7 @@ export function deleteNode(
   }
   function deleteAll() {
     if (!item) return
-    const affected = backlinksTo(item.fileSlug, getRoots())
+    const affected = getBacklinks().get(item.fileSlug) ?? []
     const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
     commitDelete(next, item.fileSlug, affected)
     hideSheet(); navigateBack()
@@ -163,7 +162,7 @@ export function deleteNode(
 
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
-      const affected = backlinksTo(item.fileSlug, getRoots())
+      const affected = getBacklinks().get(item.fileSlug) ?? []
       const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
       commitDelete(next, item.fileSlug, affected)
       navigateBack()
