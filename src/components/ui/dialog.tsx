@@ -3,7 +3,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/cn"
-import { useVisualViewportHeight } from "@/hooks"
+import { useVisualViewportHeight, useVisualViewportOffsetTop } from "@/hooks"
 
 const Dialog = DialogPrimitive.Root
 
@@ -32,10 +32,12 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, style, ...props }, ref) => {
-  // Cap height to the visual viewport so an open iOS/iPadOS keyboard (which shrinks
-  // the visual viewport but not the layout viewport this dialog centers against)
-  // can't push content below the fold — the dialog scrolls internally instead.
+  // An open iOS/iPadOS keyboard shrinks the visual viewport but not the layout
+  // viewport this dialog's `top-[50%]` centers against, so without this it stays
+  // centered on the full (partly keyboard-covered) screen. Override `top` in real
+  // pixels to center within what's actually visible, and cap height to match.
   const viewportHeight = useVisualViewportHeight()
+  const viewportOffsetTop = useVisualViewportOffsetTop()
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -43,6 +45,9 @@ const DialogContent = React.forwardRef<
         ref={ref}
         style={{
           ...(viewportHeight != null ? { maxHeight: `calc(${viewportHeight}px - 2rem)` } : {}),
+          ...(viewportHeight != null && viewportOffsetTop != null
+            ? { top: viewportOffsetTop + viewportHeight / 2 }
+            : {}),
           ...style,
         }}
         className={cn(
