@@ -11,7 +11,7 @@ import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile } from '@/mo
 import type { StoreItem, Roots } from '@/types'
 import {
   getItems, getRoots, setData,
-  setSyncDirtyCount, setSyncError, setSyncOffline, setLastSyncedAt,
+  setSyncDirtyCount, setSyncError, setSyncOffline, setLastSyncedAt, getSyncError,
 } from '@/storeBridge'
 import { notify, warn, notifyError } from './notifications'
 import { getActiveBackend } from './activeBackend'
@@ -29,6 +29,10 @@ export function updateSyncUI(): void {
     setSyncError('Read-only vault')
     return
   }
+  // Clear the read-only sentinel left over from a previous (read-only)
+  // vault — but leave a real sync error (auth failure, etc.) in place so
+  // it isn't wiped by an unrelated local edit.
+  if (getSyncError() === 'Read-only vault') setSyncError(null)
   cacheDirtyCount(backend.id).then(n => setSyncDirtyCount(n)).catch(() => {})
 }
 

@@ -85,6 +85,7 @@ vi.mock('@/storeBridge', () => ({
   }),
   setSyncDirtyCount: vi.fn((n: number) => { storeState.syncDirtyCount = n }),
   setSyncError: vi.fn((e: string | null) => { storeState.syncError = e }),
+  getSyncError: vi.fn(() => storeState.syncError),
   setSyncOffline: vi.fn((o: boolean) => { storeState.syncOffline = o }),
   setLastSyncedAt: vi.fn((ts: number | null) => { storeState.lastSyncedAt = ts }),
 }))
