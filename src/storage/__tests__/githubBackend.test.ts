@@ -39,9 +39,10 @@ describe('encodeBase64 / decodeBase64', () => {
 // ── Error mapping ──────────────────────────────────────────────
 
 describe('mapGitHubError', () => {
-  function makeErr(status: number) {
-    const e = new Error('http error') as Error & { status: number }
+  function makeErr(status: number, headers?: Record<string, string>) {
+    const e = new Error('http error') as Error & { status: number; response?: { headers: Record<string, string> } }
     e.status = status
+    if (headers) e.response = { headers }
     return e
   }
 
@@ -60,6 +61,22 @@ describe('mapGitHubError', () => {
   it('maps TypeError fetch failure to TransientSyncError', () => {
     const e = new TypeError('Failed to fetch')
     expect(mapGitHubError(e)).toBeInstanceOf(TransientSyncError)
+  })
+
+  // A 403 that survived the throttling plugin's retries but still carries
+  // rate-limit headers is a burst/limit issue, not a bad token — must not be
+  // reported to the user as "check your token permissions".
+  it('maps a 403 with x-ratelimit-remaining: 0 to TransientSyncError', () => {
+    const e = makeErr(403, { 'x-ratelimit-remaining': '0' })
+    expect(mapGitHubError(e)).toBeInstanceOf(TransientSyncError)
+  })
+  it('maps a 403 with a retry-after header to TransientSyncError', () => {
+    const e = makeErr(403, { 'retry-after': '30' })
+    expect(mapGitHubError(e)).toBeInstanceOf(TransientSyncError)
+  })
+  it('maps a plain 403 (no rate-limit headers) to AuthSyncError', () => {
+    const e = makeErr(403, { 'content-type': 'application/json' })
+    expect(mapGitHubError(e)).toBeInstanceOf(AuthSyncError)
   })
 })
 
@@ -349,7 +366,7 @@ describe('GitHubBackend', () => {
     expect(await backend.ensurePermission(false)).toBe('denied')
   })
 
-  it('readAll returns all vault files with decoded content', async () => {
+  it('readAll falls back to readFiles for small vaults (below the GraphQL batching threshold)', async () => {
     const makeResp = (body: unknown) => ({
       ok: true, status: 200,
       headers: new Headers({ 'content-type': 'application/json', 'x-ratelimit-remaining': '4999' }),
@@ -363,7 +380,7 @@ describe('GitHubBackend', () => {
         { path: 'a.md', sha: 'sha-a' },
         { path: 'b.md', sha: 'sha-b' },
       ])))
-      // readFiles responses (two parallel fetches)
+      // readFiles responses (two parallel Contents-API fetches — no GraphQL call)
       .mockResolvedValueOnce(makeResp(makeFileResponse('a.md', '# A', 'sha-a')))
       .mockResolvedValueOnce(makeResp(makeFileResponse('b.md', '# B', 'sha-b')))
 
@@ -372,5 +389,103 @@ describe('GitHubBackend', () => {
 
     expect(files).toHaveLength(2)
     expect(files.map(f => f.path).sort()).toEqual(['a.md', 'b.md'])
+    expect(fetchSpy).toHaveBeenCalledTimes(3) // tree + 2 Contents requests, no /graphql
+  })
+
+  // ── readAll — GraphQL batching (large vaults) ──────────────────────────
+
+  function makeGraphQLResp(repository: Record<string, { text: string | null } | null>) {
+    const body = { data: { repository } }
+    return {
+      ok: true, status: 200,
+      headers: new Headers({ 'content-type': 'application/json', 'x-ratelimit-remaining': '4999' }),
+      json: () => Promise.resolve(body),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    }
+  }
+
+  /** Builds an N-file tree + matching name/content pairs, e.g. note-0.md, note-1.md, … */
+  function makeManyFiles(n: number): { path: string; sha: string; content: string }[] {
+    return Array.from({ length: n }, (_, i) => ({
+      path: `note-${i}.md`, sha: `sha-${i}`, content: `# Note ${i}`,
+    }))
+  }
+
+  it('readAll batches many files into a single aliased GraphQL request', async () => {
+    const specs = makeManyFiles(10)
+    fetchSpy
+      .mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs)))
+      .mockResolvedValueOnce(makeGraphQLResp(
+        Object.fromEntries(specs.map((s, i) => [`f${i}`, { text: s.content }])),
+      ))
+
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    const files   = await backend.readAll()
+
+    expect(files).toHaveLength(10)
+    for (const s of specs) {
+      const f = files.find(f => f.path === s.path)
+      expect(f?.content).toBe(s.content)
+      expect(f?.version).toBe(s.sha)
+    }
+
+    // Exactly 2 requests total: the tree listing and one GraphQL batch —
+    // no per-file Contents requests.
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    const [graphqlUrl, graphqlInit] = fetchSpy.mock.calls[1] as [string, RequestInit]
+    expect(graphqlUrl).toContain('/graphql')
+    const sentBody = JSON.parse(graphqlInit.body as string) as { variables: { owner: string; name: string } }
+    expect(sentBody.variables).toEqual({ owner: 'alice', name: 'notes' })
+  })
+
+  it('readAll falls back to the Contents API for blobs GraphQL returns null text for', async () => {
+    const specs = makeManyFiles(8)
+    const repository = Object.fromEntries(
+      specs.map((s, i) => [`f${i}`, { text: i === 3 ? null : s.content }]),
+    )
+
+    fetchSpy
+      .mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs)))
+      .mockResolvedValueOnce(makeGraphQLResp(repository))
+      // Fallback Contents-API fetch for the one null-text path (note-3.md).
+      .mockResolvedValueOnce(makeJsonResp(makeFileResponse('note-3.md', specs[3].content, 'sha-3')))
+
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    const files   = await backend.readAll()
+
+    expect(files).toHaveLength(8)
+    const fallback = files.find(f => f.path === 'note-3.md')
+    expect(fallback?.content).toBe(specs[3].content)
+    expect(fallback?.version).toBe('sha-3')
+
+    // 1 tree + 1 GraphQL batch + 1 Contents fallback = 3 requests.
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+  })
+
+  it('readAll chunks large path lists into multiple GraphQL requests', async () => {
+    const specs = makeManyFiles(150) // > GRAPHQL_BATCH_SIZE (100) → 2 batches: 100 + 50
+    const batch1 = specs.slice(0, 100)
+    const batch2 = specs.slice(100)
+
+    fetchSpy
+      .mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs)))
+      .mockResolvedValueOnce(makeGraphQLResp(
+        Object.fromEntries(batch1.map((s, i) => [`f${i}`, { text: s.content }])),
+      ))
+      .mockResolvedValueOnce(makeGraphQLResp(
+        // Aliases restart at f0 within each batch.
+        Object.fromEntries(batch2.map((s, i) => [`f${i}`, { text: s.content }])),
+      ))
+
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    const files   = await backend.readAll()
+
+    expect(files).toHaveLength(150)
+    // Spot-check the boundary between the two batches.
+    expect(files.find(f => f.path === 'note-99.md')?.content).toBe('# Note 99')
+    expect(files.find(f => f.path === 'note-100.md')?.content).toBe('# Note 100')
+
+    // 1 tree + 2 GraphQL batches = 3 requests.
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
   })
 })
