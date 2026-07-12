@@ -39,9 +39,10 @@ describe('encodeBase64 / decodeBase64', () => {
 // ── Error mapping ──────────────────────────────────────────────
 
 describe('mapGitHubError', () => {
-  function makeErr(status: number) {
-    const e = new Error('http error') as Error & { status: number }
+  function makeErr(status: number, headers?: Record<string, string>) {
+    const e = new Error('http error') as Error & { status: number; response?: { headers: Record<string, string> } }
     e.status = status
+    if (headers) e.response = { headers }
     return e
   }
 
@@ -60,6 +61,22 @@ describe('mapGitHubError', () => {
   it('maps TypeError fetch failure to TransientSyncError', () => {
     const e = new TypeError('Failed to fetch')
     expect(mapGitHubError(e)).toBeInstanceOf(TransientSyncError)
+  })
+
+  // A 403 that survived the throttling plugin's retries but still carries
+  // rate-limit headers is a burst/limit issue, not a bad token — must not be
+  // reported to the user as "check your token permissions".
+  it('maps a 403 with x-ratelimit-remaining: 0 to TransientSyncError', () => {
+    const e = makeErr(403, { 'x-ratelimit-remaining': '0' })
+    expect(mapGitHubError(e)).toBeInstanceOf(TransientSyncError)
+  })
+  it('maps a 403 with a retry-after header to TransientSyncError', () => {
+    const e = makeErr(403, { 'retry-after': '30' })
+    expect(mapGitHubError(e)).toBeInstanceOf(TransientSyncError)
+  })
+  it('maps a plain 403 (no rate-limit headers) to AuthSyncError', () => {
+    const e = makeErr(403, { 'content-type': 'application/json' })
+    expect(mapGitHubError(e)).toBeInstanceOf(AuthSyncError)
   })
 })
 
