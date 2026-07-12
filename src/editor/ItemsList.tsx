@@ -4,7 +4,7 @@ import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots } from '@/t
 import { isStandaloneOcc } from '@/types'
 import { occKind, occState } from '@/occView'
 import { parseItemEntry, serializeTaskEntry } from './items'
-import { fileEntries, backlinksTo } from '@/fileOccurrence'
+import { fileEntries } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
 import { OccurrenceCard, MarkdownTaskCard, TagChip } from '@/components'
@@ -60,6 +60,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const [exitingEntries, setExitingEntries] = useState<{ row: Row; position: number }[]>([])
 
   const occBySlug = useStore(s => s.fom)
+  const backlinks = useStore(s => s.backlinks)
   const allFiles  = fileEntries(roots)
   const filtered  = pickerQuery
     ? allFiles.filter(e => matchesQuery(pickerQuery, e.title))
@@ -210,7 +211,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
 
     if (entry.kind === 'link') {
       const listedOn = occ
-        ? backlinksTo(occ.fileSlug, roots)
+        ? (backlinks.get(occ.fileSlug) ?? [])
             .filter(slug => slug !== currentSlug)
             .map(slug => roots.get(slug)?.title ?? slug)
         : []

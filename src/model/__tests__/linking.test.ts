@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
-import { resolveWikilink, unwrapRef } from '@/wikilinks'
-import { fileEntries, updateFileOccurrenceMap } from '@/fileOccurrence'
+import { resolveWikilink, buildResolveIndex, unwrapRef } from '@/wikilinks'
+import { fileEntries, buildBacklinkIndex, updateFileOccurrenceMap } from '@/fileOccurrence'
 import { toggleDone } from '@/model/storeOps'
 import type { StoreItem, Roots, Occurrence } from '@/types'
 
@@ -141,6 +141,71 @@ describe('fileEntries', () => {
     for (const [, count] of Object.entries(slugCounts)) {
       expect(count).toBe(1)
     }
+  })
+})
+
+// ── buildResolveIndex (parity with resolveWikilink) ──────────────────────────
+
+describe('buildResolveIndex', () => {
+  const { roots } = makeStore([
+    { slug: 'project-alpha', yaml: ALPHA_YAML },
+    { slug: 'beta-notes',    yaml: BETA_YAML  },
+  ])
+
+  it('agrees with resolveWikilink for every ref shape', () => {
+    const index = buildResolveIndex(roots)
+    const refs = [
+      'project-alpha',   // fileSlug
+      'Project-Alpha',   // fileSlug, mixed case
+      'Project Alpha',   // title alias
+      'project alpha',   // title alias, lowercased
+      'beta-notes',      // fileSlug preferred
+      'Beta Notes',      // title alias
+      'does-not-exist',  // unknown → undefined on both sides
+    ]
+    for (const ref of refs) {
+      expect(index.get(ref.toLowerCase())).toBe(resolveWikilink(ref, roots))
+    }
+  })
+})
+
+// ── buildBacklinkIndex ───────────────────────────────────────────────────────
+
+describe('buildBacklinkIndex', () => {
+  // alpha self-links and links to beta; the others link to alpha by fileSlug,
+  // by title alias, and (delta) via both — delta must still be counted once.
+  const withItems = (title: string, items: string[]) =>
+    `---\ntitle: ${title}\ntags: []\nitems: [${items.map(i => `"${i}"`).join(', ')}]\n---\n`
+  const { roots } = makeStore([
+    { slug: 'project-alpha', yaml: withItems('Project Alpha', ['[[project-alpha]]', '[[beta-notes]]']) },
+    { slug: 'beta-notes',    yaml: withItems('Beta Notes',    ['[[project-alpha]]']) },
+    { slug: 'gamma-doc',     yaml: withItems('Gamma Doc',     ['[[Project Alpha]]']) },
+    { slug: 'delta-doc',     yaml: withItems('Delta Doc',     ['[[project-alpha]]', '[[Project Alpha]]']) },
+  ])
+  const backlinks = buildBacklinkIndex(roots)
+
+  it('collects sources that link by fileSlug and by title alias', () => {
+    // beta (fileSlug), gamma (title alias), delta (both) — in roots iteration order.
+    expect(backlinks.get('project-alpha')).toEqual(['beta-notes', 'gamma-doc', 'delta-doc'])
+  })
+
+  it('excludes self-links', () => {
+    // alpha links to itself but must not appear in its own sources.
+    expect(backlinks.get('project-alpha')).not.toContain('project-alpha')
+  })
+
+  it('lists a source once even when it links the same target twice', () => {
+    // delta links to alpha via both fileSlug and title alias — counted once.
+    const alphaSources = backlinks.get('project-alpha') ?? []
+    expect(alphaSources.filter(s => s === 'delta-doc')).toHaveLength(1)
+  })
+
+  it('resolves an inbound link from alpha to beta', () => {
+    expect(backlinks.get('beta-notes')).toEqual(['project-alpha'])
+  })
+
+  it('returns an empty map for empty roots', () => {
+    expect(buildBacklinkIndex(new Map()).size).toBe(0)
   })
 })
 
