@@ -21,7 +21,7 @@ then set `localStorage.meridian_bigvault = "300"` and load the Tutorial vault.
 | --------------------------------- | ------ | ---------------------------------------- | --------------------------------------------------- |
 | 1. Toggle task                    | ✅     | ✅ live (0 long tasks)                   | **Fast** — optimistic paint + memoized rows         |
 | 2. View switch (day↔month↔agenda) | ✅     | ✅ live (0 long tasks)                   | **Fast**                                            |
-| 3. Search                         | ✅     | ✅ live (7.1 s freeze)                   | **Finding 1**                                       |
+| 3. Search                         | ✅     | ✅ live (7.1 s → ~1 s after Finding 2)   | **Finding 1** (downgraded; see re-eval)             |
 | 4. Create item                    | ✅     | ⚠️ traced only                           | Shares the roots-change cost of Finding 3           |
 | 5. Change metadata                | ✅     | ✅ (377 ms)                              | **Finding 3**                                       |
 | 6. Cold start / reload            | ✅     | ✅ prod payload + expansion              | **Findings 4 + 3** (bundle + first-paint expansion) |
@@ -35,30 +35,32 @@ then set `localStorage.meridian_bigvault = "300"` and load the Tutorial vault.
 
 Ranked by `(impact × breadth) ÷ effort`.
 
+> **Update 2026-07-14 — Finding 2 (backlink index) is FIXED** (commit `a6f6e4f`, "Replace O(files²·items) backlinksTo with a derived backlink index"). `buildBacklinkIndex` now builds a whole-vault reverse-link map once per `roots` change (O(roots·items)), stored on the Zustand store; all call sites do an O(1) `backlinks.get(slug)` lookup instead of the old per-target quadratic `backlinksTo`. This invalidates most of Finding 1 and slightly reduces Finding 3 — both re-evaluated inline below.
+
 ---
 
-### Finding 1 — Search recomputes O(files²) backlinks for every result, twice, un-virtualized
+### Finding 1 — Search mounts the full result set un-virtualized, with no debounce
+
+> **Re-evaluated 2026-07-14 after Finding 2 landed.** Two of this finding's three original causes are now gone: the per-match quadratic `backlinksTo` (~2,131 ms of the "e" long task) is replaced by an O(1) `backlinks.get`, and the "rendered twice" duplicate-overlay cost was removed by a refactor to a single `SearchOverlay` that branches on `isMobile` (only one `SearchResults` mounts). The original **7,105 ms / 608-card** baseline no longer holds. What survives is below.
 
 - **Flows affected:** 3 (Search) — **every keystroke** while the search bar is open.
-- **Category:** `search-latency` `render-amplification` `critical-path-work`
-- **Impact:** **10** — multi-second full-page freeze on an everyday path.
-- **Baseline measurement:** Typing **"e"** (299 of 300 files match the fuzzy matcher) produced a single **7,105 ms** `longtask` and mounted **608** `[data-tour="entry-card"]` nodes (≈299 results × 2 overlays + agenda behind). Isolated algorithmic cost of the `useMemo` body alone: **2,131 ms** for "e" (299 matches), **1,004 ms** for "rev" (150 matches) — because it calls `backlinksTo` (~8.9 ms each, see Finding 2) once per match. No debounce: `setQuery` fires on every `onChange`.
-- **Measurement recipe:** load big vault → click search input → install `new PerformanceObserver(l => …).observe({entryTypes:['longtask']})` → clear `window.__longtasks` → set input value to `"e"` via the native setter + dispatch `input` → after 2.5 s read `window.__longtasks` (got `[7105]`) and `document.querySelectorAll('[data-tour="entry-card"]').length` (got 608). Algorithmic isolation: replicate `fileEntries`→`matchesQuery` filter→`backlinksTo` per match against `useStore.getState().roots`, `performance.now()` around it.
-- **Breadth:** 4 files (`src/search/FileResultsList.tsx`, `src/search/SearchResults.tsx`, `src/search/FilterOverlay.tsx`, `src/search/MobileSearchOverlay.tsx`); both overlays confirmed to mount `SearchResults` simultaneously (desktop CSS-hides one with `hidden fine:block` / `fine:hidden` but it still renders).
-- **Fix effort:** M
-- **Evidence:** `src/search/FileResultsList.tsx:37` — inside `useMemo(…, [roots, query])`:
-  ```js
-  .map(x => ({
-    entry: x.entry,
-    listedOn: backlinksTo(x.entry.fileSlug, roots).map(slug => roots.get(slug)?.title ?? slug),
-  }))
+- **Category:** `search-latency` `render-amplification`
+- **Impact:** **6** (was 10) — down from a multi-second freeze to an estimated ~1 s, dominated by the un-virtualized card mount. Still an everyday path.
+- **Baseline measurement:** _Historical (survey time):_ typing **"e"** (299 of 300 files match) produced a single **7,105 ms** `longtask` and mounted **608** cards (≈299 × 2 overlays + agenda). _Current:_ the ~2,131 ms/keystroke `backlinksTo` cost and one of the two overlays are eliminated; remaining cost is a single un-virtualized mount of ~299 `OccurrenceCard`s plus no-debounce re-runs. **Not yet re-measured live** — estimated ~1 s, but should be re-driven on the big vault to confirm.
+- **Measurement recipe:** load big vault → click search input → install `new PerformanceObserver(l => …).observe({entryTypes:['longtask']})` → clear `window.__longtasks` → set input value to `"e"` via the native setter + dispatch `input` → after 2.5 s read `window.__longtasks` and `document.querySelectorAll('[data-tour="entry-card"]').length` (expect ~299 now, not 608).
+- **Breadth:** 3 files (`src/search/FileResultsList.tsx`, `src/search/SearchOverlay.tsx`, `src/components/SearchBar.tsx`). The former `FilterOverlay`/`MobileSearchOverlay` split is gone.
+- **Fix effort:** S–M (backlink-index and single-overlay work already done; only debounce + virtualization remain)
+- **Evidence:** `src/search/FileResultsList.tsx:46` — un-virtualized `results.map` over every match:
+  ```jsx
+  {results.map(({ entry, listedOn }, i) => { … <OccurrenceCard … /> … })}
   ```
-  and `src/components/SearchBar.tsx:22` — no debounce:
+  and `src/components/SearchBar.tsx:22` — still no debounce (`setQuery` fires on every `onChange`):
   ```js
   function setQuery(value: string) { void navigate({ … sq: value … , replace: true }) }
   ```
-- **Problem:** Every keystroke re-filters all files, then runs the quadratic `backlinksTo` for each of the up-to-300 matches, in two mounted overlays, then mounts hundreds of un-virtualized cards — so the user sees the whole UI lock up for seconds on the first letter typed.
-- **Fix:** Debounce the query (~150 ms); render results in only one overlay at a time; virtualize the results list (as the agenda already is); and read backlinks from a prebuilt index (Finding 2). Expected effect: per-keystroke long task **~7,100 ms → <50 ms**.
+  Note the backlink lookup at `FileResultsList.tsx:38` is now the O(1) index read — no longer a cost.
+- **Problem:** Every keystroke re-filters all files (cheap) then mounts hundreds of un-virtualized cards; with no debounce this repeats on each `onChange`, so the first letter typed still visibly hitches.
+- **Fix:** Debounce the query (~150 ms) and virtualize the results list (as the agenda already is). Expected effect: per-keystroke long task **~1 s → <50 ms**.
 
 ---
 
@@ -79,6 +81,7 @@ Ranked by `(impact × breadth) ÷ effort`.
   ```js
   function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots { const next = new Map(roots) }
   ```
+- **Note (2026-07-14):** the mechanism is independent of the Finding 2 fix — `expandWithMultiday` (the ~111 ms dominant cost) has nothing to do with backlinks, so this finding stands. Two second-order adjustments: (a) the "visible rows re-run `backlinksTo`" portion of the 377 ms is now cheaper (rows do an O(1) `backlinks.get`), so the real freeze is likely **somewhat under 377 ms** now; (b) slightly offsetting, a `roots`-identity change now also triggers one `buildBacklinkIndex` rebuild (`src/store.ts:144`, O(roots·items), ~one pass over ~878 items) on this same save path — small, but new whole-vault work. Net effect on the number is roughly a wash; re-measurement would refine it.
 - **Problem:** File-level fields (title/tags/items/body) live in `roots`; because the expansion cache keys on `roots` _identity_, changing any of them on one file discards the cached expansion for _all_ files and re-expands every series, blocking the save for ~0.4 s.
 - **Fix:** Gate the cache on structural inputs only (the `items` structure already has `hasSameStructure`; `roots` only feeds `joinFileMeta`'s title/tags), and overlay changed file-level fields onto cached occurrences the same way `done`/`priority` are overlaid today — or expand from `items` and join `roots` fields at render. Expected effect: edit long task **377 ms → <20 ms**.
 
@@ -102,4 +105,8 @@ Ranked by `(impact × breadth) ÷ effort`.
 
 ---
 
-**Net:** Findings 1–3 all trace back to the same lever — stop recomputing whole-vault backlinks and expansion on every `roots` touch. Fixing Finding 2 (backlink index) alone removes ~4.2 s from search and ~115 ms from every mount; fixing Finding 3 removes the 377 ms edit freeze; Finding 1's virtualize/debounce/single-overlay work removes the remaining ~2.9 s search-render cost.
+**Net (updated 2026-07-14):** Finding 2 (backlink index) is **done** — that alone removed ~4.2 s from search (the per-match quadratic `backlinksTo`, which also ran in the now-collapsed second overlay) and ~115 ms from every mount. What's left of the original "recompute whole-vault work on every `roots` touch" theme:
+
+- **Finding 1** is now just debounce + virtualize on the search results (single overlay already done) — estimated ~1 s → <50 ms.
+- **Finding 3** (expansion cache keyed on `roots` identity → full 8,680-occurrence re-expansion per edit) is untouched by the backlink fix and remains the ~0.4 s edit-freeze lever.
+- **Finding 4** (bundle) is unaffected.
