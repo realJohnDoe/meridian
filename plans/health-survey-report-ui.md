@@ -20,14 +20,6 @@ This report rests on close reading of roughly **60% of UI-layer code by volume**
 
 ## 3. Findings
 
-### 7. `@eslint-react` is installed but only 4 of its 65 recommended rules are enabled — the gap includes a few real-bug classes
-
-- **Category:** `toolchain` `performance`
-- **Impact:** 3 · **Breadth:** 38 files flagged by dry-run (most low-value; ~6 real-signal) · **Fix effort:** S
-- **Evidence:** `eslint.config.js` enables exactly `'@eslint-react/no-leaked-conditional-rendering': 'error',` plus three others. **Dry-run** of the installed plugin's `recommended-type-checked` preset: 117 problems — but 67 are `no-forward-ref` React-19 modernization nags in stock shadcn files and 7 are `no-use-context` style. The real-signal residue: `web-api-no-leaked-timeout` in `src/calendar/DayView.tsx:139` and `OccurrenceRow.tsx:116`, `web-api-no-leaked-event-listener` in `useFlipReorder.ts:42`, and `no-nested-component-definitions` ×3 in `ui/calendar.tsx`.
-- **Problem:** The enabled subset was hand-picked well, but the leak-detection rules (`web-api/*`, `no-nested-component-definitions`) catch genuine unmount-leak bugs this codebase already has in mild form, at near-zero noise.
-- **Fix:** Add the `web-api` config and `no-nested-component-definitions`/`static-components` to the existing rule block; skip the full preset (the forwardRef/useContext noise isn't worth it until a React-19 idiom migration is actually wanted).
-
 ### 8. Saving with an empty title silently does nothing
 
 - **Category:** `ux` `error-handling`

@@ -35,35 +35,6 @@ then set `localStorage.meridian_bigvault = "300"` and load the Tutorial vault.
 
 Ranked by `(impact × breadth) ÷ effort`.
 
-> **Update 2026-07-14 — Finding 2 (backlink index) is FIXED** (commit `a6f6e4f`, "Replace O(files²·items) backlinksTo with a derived backlink index"). `buildBacklinkIndex` now builds a whole-vault reverse-link map once per `roots` change (O(roots·items)), stored on the Zustand store; all call sites do an O(1) `backlinks.get(slug)` lookup instead of the old per-target quadratic `backlinksTo`. This invalidates most of Finding 1 and slightly reduces Finding 3 — both re-evaluated inline below.
-
----
-
-### Finding 1 — Search mounts the full result set un-virtualized, with no debounce
-
-> **Re-evaluated 2026-07-14 after Finding 2 landed.** Two of this finding's three original causes are now gone: the per-match quadratic `backlinksTo` (~2,131 ms of the "e" long task) is replaced by an O(1) `backlinks.get`, and the "rendered twice" duplicate-overlay cost was removed by a refactor to a single `SearchOverlay` that branches on `isMobile` (only one `SearchResults` mounts). The original **7,105 ms / 608-card** baseline no longer holds. What survives is below.
-
-- **Flows affected:** 3 (Search) — **every keystroke** while the search bar is open.
-- **Category:** `search-latency` `render-amplification`
-- **Impact:** **6** (was 10) — down from a multi-second freeze to an estimated ~1 s, dominated by the un-virtualized card mount. Still an everyday path.
-- **Baseline measurement:** _Historical (survey time):_ typing **"e"** (299 of 300 files match) produced a single **7,105 ms** `longtask` and mounted **608** cards (≈299 × 2 overlays + agenda). _Current:_ the ~2,131 ms/keystroke `backlinksTo` cost and one of the two overlays are eliminated; remaining cost is a single un-virtualized mount of ~299 `OccurrenceCard`s plus no-debounce re-runs. **Not yet re-measured live** — estimated ~1 s, but should be re-driven on the big vault to confirm.
-- **Measurement recipe:** load big vault → click search input → install `new PerformanceObserver(l => …).observe({entryTypes:['longtask']})` → clear `window.__longtasks` → set input value to `"e"` via the native setter + dispatch `input` → after 2.5 s read `window.__longtasks` and `document.querySelectorAll('[data-tour="entry-card"]').length` (expect ~299 now, not 608).
-- **Breadth:** 3 files (`src/search/FileResultsList.tsx`, `src/search/SearchOverlay.tsx`, `src/components/SearchBar.tsx`). The former `FilterOverlay`/`MobileSearchOverlay` split is gone.
-- **Fix effort:** S–M (backlink-index and single-overlay work already done; only debounce + virtualization remain)
-- **Evidence:** `src/search/FileResultsList.tsx:46` — un-virtualized `results.map` over every match:
-  ```jsx
-  {results.map(({ entry, listedOn }, i) => { … <OccurrenceCard … /> … })}
-  ```
-  and `src/components/SearchBar.tsx:22` — still no debounce (`setQuery` fires on every `onChange`):
-  ```js
-  function setQuery(value: string) { void navigate({ … sq: value … , replace: true }) }
-  ```
-  Note the backlink lookup at `FileResultsList.tsx:38` is now the O(1) index read — no longer a cost.
-- **Problem:** Every keystroke re-filters all files (cheap) then mounts hundreds of un-virtualized cards; with no debounce this repeats on each `onChange`, so the first letter typed still visibly hitches.
-- **Fix:** Debounce the query (~150 ms) and virtualize the results list (as the agenda already is). Expected effect: per-keystroke long task **~1 s → <50 ms**.
-
----
-
 ### Finding 3 — Any metadata edit invalidates the expansion cache → full 8,680-occurrence re-expansion
 
 - **Flows affected:** 5 (change date/scope/title/tags/repeat), 4 (create), 6 (cold start does the first expansion) — **every edit save**.
