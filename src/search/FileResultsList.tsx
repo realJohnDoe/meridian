@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState, type RefObject } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Occurrence } from '@/types'
 import { fileEntries } from '@/fileOccurrence'
 import { OccurrenceCard } from '@/components'
@@ -8,6 +9,23 @@ import { matchesQuery, scoreQuery } from '@/lib/matching'
 interface Props {
   query: string
   onOpen: (occ: Occurrence) => void
+  /** Scroll container the virtualizer measures against — owned by the caller (SearchOverlay). */
+  scrollRef: RefObject<HTMLDivElement | null>
+}
+
+// OccurrenceCard min-h-11 + py-2 padding + gap-1.5 (6) between rows ≈ 68px.
+// Update if the card padding/gap changes.
+const ROW_H = 68
+
+// Delays re-filtering/re-rendering results until typing pauses, so a fast
+// typist doesn't re-mount hundreds of cards on every keystroke.
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs)
+    return () => clearTimeout(id)
+  }, [value, delayMs])
+  return debounced
 }
 
 /**
@@ -18,38 +36,61 @@ interface Props {
  * has multiple occurrences in the range.
  * Tags and topics are matched the same way — no divergence between fields.
  */
-export default function FileResultsList({ query, onOpen }: Props) {
+export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
   const roots     = useStore(s => s.roots)
   const occBySlug = useStore(s => s.fom)
   const backlinks = useStore(s => s.backlinks)
 
+  const debouncedQuery = useDebouncedValue(query, 150)
+
   const results = useMemo(() => {
-    if (!query) return []
+    if (!debouncedQuery) return []
     const entries = fileEntries(roots)
     return entries
       .filter(e => {
         const haystack = [e.title, ...e.tags, ...e.items].join(' ')
-        return matchesQuery(query, haystack)
+        return matchesQuery(debouncedQuery, haystack)
       })
-      .map(e => ({ entry: e, score: scoreQuery(query, e.title) }))
+      .map(e => ({ entry: e, score: scoreQuery(debouncedQuery, e.title) }))
       .sort((a, b) => b.score - a.score)
       .map(x => ({
         entry: x.entry,
         listedOn: (backlinks.get(x.entry.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug),
       }))
-  }, [roots, backlinks, query])
+  }, [roots, backlinks, debouncedQuery])
+
+  const virtualizer = useVirtualizer({
+    count: results.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_H,
+    getItemKey: i => results[i].entry.fileSlug,
+    overscan: 8,
+  })
 
   if (!results.length) return null
 
+  const virtualItems = virtualizer.getVirtualItems()
+
   return (
-    <div className="flex flex-col gap-1.5 px-2 pt-2">
-      {results.map(({ entry, listedOn }, i) => {
+    <div className="px-2 pt-2" style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+      {virtualItems.map(vi => {
+        const { entry, listedOn } = results[vi.index]
         const occ = occBySlug.get(entry.fileSlug)
         if (!occ) return null
         return (
           <div
-            key={entry.fileSlug}
-            style={{ '--stagger': `${i * 0.025}s` } as React.CSSProperties}
+            key={vi.key}
+            data-index={vi.index}
+            ref={virtualizer.measureElement}
+            style={{
+              '--stagger': `${vi.index * 0.025}s`,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${vi.start}px)`,
+              paddingBottom: 6,
+            } as React.CSSProperties}
           >
             <OccurrenceCard
               occ={occ}

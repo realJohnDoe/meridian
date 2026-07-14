@@ -1,3 +1,4 @@
+import type { RefObject } from 'react'
 import { Plus } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import FileResultsList from './FileResultsList'
@@ -7,6 +8,8 @@ interface Props {
   query: string
   onOpen: (occ: Occurrence) => void
   onCreate: (title: string) => void
+  /** Scroll container the results virtualizer measures against — owned by SearchOverlay. */
+  scrollRef: RefObject<HTMLDivElement | null>
 }
 
 /**
@@ -14,7 +17,7 @@ interface Props {
  * followed by the file-granular results list. Used by both the desktop popover
  * (FilterOverlay) and the mobile full-screen layer (MobileSearchOverlay).
  */
-export default function SearchResults({ query, onOpen, onCreate }: Props) {
+export default function SearchResults({ query, onOpen, onCreate, scrollRef }: Props) {
   return (
     <div className="lg:max-w-3xl lg:mx-auto">
       {query && (
@@ -29,7 +32,7 @@ export default function SearchResults({ query, onOpen, onCreate }: Props) {
         </Button>
       )}
 
-      <FileResultsList query={query} onOpen={onOpen} />
+      <FileResultsList query={query} onOpen={onOpen} scrollRef={scrollRef} />
     </div>
   )
 }
