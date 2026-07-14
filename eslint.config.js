@@ -82,6 +82,18 @@ export default [
       // Array index as key breaks reconciliation identity when items are
       // reordered/inserted/removed.
       '@eslint-react/no-array-index-key': 'error',
+      // Leaked timers/listeners: a setTimeout/setInterval/addEventListener
+      // started in an effect (or elsewhere) must be cleaned up, or it keeps
+      // firing against an unmounted component.
+      '@eslint-react/web-api-no-leaked-timeout': 'error',
+      '@eslint-react/web-api-no-leaked-interval': 'error',
+      '@eslint-react/web-api-no-leaked-event-listener': 'error',
+      '@eslint-react/web-api-no-leaked-resize-observer': 'error',
+      '@eslint-react/web-api-no-leaked-intersection-observer': 'error',
+      // Defining a component inside another component's render body creates
+      // a new function identity every render, forcing a full remount of the
+      // child (and losing its state) instead of a normal re-render.
+      '@eslint-react/no-nested-component-definitions': 'error',
 
       // ── TypeScript ───────────────────────────────────────────────────────────
       // Full type-checked rule set (await-thenable, no-unsafe-*,

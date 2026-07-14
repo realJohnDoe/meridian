@@ -152,7 +152,8 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
 
   const scRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    setTimeout(() => scRef.current?.scrollTo({ top: DEFAULT_SCROLL_HOUR * HP + TOP_PAD, behavior: 'instant' }), 50)
+    const id = setTimeout(() => scRef.current?.scrollTo({ top: DEFAULT_SCROLL_HOUR * HP + TOP_PAD, behavior: 'instant' }), 50)
+    return () => clearTimeout(id)
   }, [dvDate])
 
   const dvDateRef = useRef(dvDate)

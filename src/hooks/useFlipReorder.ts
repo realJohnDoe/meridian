@@ -23,6 +23,16 @@ export function useFlipReorder<T>(
     const containerTop = container.getBoundingClientRect().top
     const wraps = container.querySelectorAll<HTMLElement>('[data-occ-key]')
     const newTops: Record<string, number> = {}
+    const rafs: number[] = []
+
+    // Single delegated listener instead of one per animated row — resets
+    // `transition` on whichever row's transform animation just finished.
+    function onTransitionEnd(e: TransitionEvent) {
+      if (e.propertyName === 'transform' && e.target instanceof HTMLElement) {
+        e.target.style.transition = ''
+      }
+    }
+    container.addEventListener('transitionend', onTransitionEnd)
 
     wraps.forEach(wrap => {
       const key = wrap.getAttribute('data-occ-key')!
@@ -36,11 +46,10 @@ export function useFlipReorder<T>(
             wrap.style.transition = 'none'
             wrap.style.transform = `translateY(${dy}px)`
             void wrap.offsetHeight
-            requestAnimationFrame(() => {
+            rafs.push(requestAnimationFrame(() => {
               wrap.style.transition = 'transform .35s cubic-bezier(.4,0,.2,1)'
               wrap.style.transform = ''
-              wrap.addEventListener('transitionend', () => { wrap.style.transition = '' }, { once: true })
-            })
+            }))
           }
         }
       }
@@ -49,5 +58,9 @@ export function useFlipReorder<T>(
     })
 
     prevTops.current = newTops
+    return () => {
+      rafs.forEach(id => cancelAnimationFrame(id))
+      container.removeEventListener('transitionend', onTransitionEnd)
+    }
   }, [items, containerRef])
 }
