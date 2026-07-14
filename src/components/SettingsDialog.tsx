@@ -18,91 +18,20 @@ import { VaultSettings } from '@/components/VaultSettings'
 
 type Step = 'vault' | 'adding'
 
-// Per-theme preview colors — same semantic slots in the same order for every theme.
-// background: used as the button's own surface to give a sense of the theme's darkness.
-// swatches: [primary, event, task, note, destructive] — the five most identity-defining tokens.
-// Per-theme preview values — same semantic slots in the same order for every theme:
-// background, foreground, then swatches: [primary, task, event, note, destructive].
-const THEMES: { id: string; label: string; background: string; foreground: string; swatches: string[] }[] = [
-  {
-    id: 'meridian',
-    label: 'Meridian',
-    background: 'oklch(0.18 0.05 252)',
-    foreground: 'oklch(0.96 0.02 270)',
-    swatches: [
-      'oklch(0.68 0.22 278)',  // primary
-      'oklch(0.84 0.17 145)',  // task
-      'oklch(0.71 0.20 278)',  // event
-      'oklch(0.75 0.17 215)',  // note
-      'oklch(0.72 0.20 15)',   // destructive
-    ],
-  },
-  {
-    id: 'tokyo-night',
-    label: 'Tokyo Night',
-    background: '#1a1b2e',
-    foreground: '#c0caf5',
-    swatches: [
-      '#bb9af7',  // primary
-      '#9ece6a',  // task
-      '#bb9af7',  // event
-      '#7dcfff',  // note
-      '#f7768e',  // destructive
-    ],
-  },
-  {
-    id: 'dracula',
-    label: 'Dracula',
-    background: '#282a36',
-    foreground: '#f8f8f2',
-    swatches: [
-      '#bd93f9',  // primary
-      '#50fa7b',  // task
-      '#bd93f9',  // event
-      '#8be9fd',  // note
-      '#ff5555',  // destructive
-    ],
-  },
-  {
-    id: 'tokyo-day',
-    label: 'Tokyo Day',
-    background: '#c9cbe0',
-    foreground: '#3760bf',
-    swatches: [
-      '#7847bd',  // primary
-      '#486e2a',  // task
-      '#7847bd',  // event
-      '#006b8f',  // note
-      '#d4184b',  // destructive
-    ],
-  },
-  {
-    id: 'rose-pine-dawn',
-    label: 'Rosé Pine Dawn',
-    background: '#faf4ed',
-    foreground: '#575279',
-    swatches: [
-      '#907aa9',  // primary (iris)
-      '#6a8c3a',  // task (olive green)
-      '#907aa9',  // event
-      '#286983',  // note (pine)
-      '#b4637a',  // destructive (love)
-    ],
-  },
-  {
-    id: 'solarized-light',
-    label: 'Solarized Light',
-    background: '#fdf6e3',
-    foreground: '#586e75',
-    swatches: [
-      '#6c71c4',  // primary (violet)
-      '#859900',  // task (green)
-      '#6c71c4',  // event
-      '#2aa198',  // note (cyan)
-      '#dc322f',  // destructive (red)
-    ],
-  },
+// Preview buttons render with the theme's own CSS class so `bg-*`/`text-*`
+// utilities resolve to that theme's actual tokens — no color values duplicated here.
+// `className` is omitted for 'meridian' since it's the :root default.
+const THEMES: { id: string; label: string; className?: string }[] = [
+  { id: 'meridian', label: 'Meridian' },
+  { id: 'tokyo-night', label: 'Tokyo Night', className: 'tokyo-night' },
+  { id: 'dracula', label: 'Dracula', className: 'dracula' },
+  { id: 'tokyo-day', label: 'Tokyo Day', className: 'tokyo-day' },
+  { id: 'rose-pine-dawn', label: 'Rosé Pine Dawn', className: 'rose-pine-dawn' },
+  { id: 'solarized-light', label: 'Solarized Light', className: 'solarized-light' },
 ]
+
+// The five most identity-defining domain tokens, previewed as swatches.
+const SWATCH_CLASSES = ['bg-primary', 'bg-task', 'bg-event', 'bg-note', 'bg-destructive']
 
 interface Props {
   open:         boolean
@@ -161,23 +90,22 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
               <div className="flex flex-col gap-2">
                 <span className="text-sm font-medium">Appearance</span>
                 <div className="grid grid-cols-2 gap-2">
-                  {THEMES.map(({ id, label, background, foreground, swatches }) => (
+                  {THEMES.map(({ id, label, className }) => (
                     <button
                       key={id}
                       onClick={() => setTheme(id)}
                       className={cn(
-                        'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-left transition-colors',
+                        'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-left transition-colors bg-background text-foreground',
+                        className,
                         activeTheme === id ? 'border-primary' : 'border-border hover:border-muted-foreground',
                       )}
-                      style={{ background, color: foreground }}
                     >
                       {label}
                       <span className="flex gap-1">
-                        {swatches.map(color => (
+                        {SWATCH_CLASSES.map(swatchClass => (
                           <span
-                            key={color}
-                            className="block size-2.5 rounded-full"
-                            style={{ background: color }}
+                            key={swatchClass}
+                            className={cn('block size-2.5 rounded-full', swatchClass)}
                           />
                         ))}
                       </span>
