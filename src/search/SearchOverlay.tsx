@@ -30,6 +30,8 @@ interface Props {
 export default function SearchOverlay({ open, query, onQueryChange, onClose, onOpen, onCreate }: Props) {
   const { isMobile, open: sidebarOpen } = useSidebar()
   const inputRef = useRef<HTMLInputElement>(null)
+  const mobileScrollRef = useRef<HTMLDivElement>(null)
+  const desktopScrollRef = useRef<HTMLDivElement>(null)
 
   // Focus the input whenever the mobile layer opens so the keyboard comes up immediately.
   useEffect(() => {
@@ -74,8 +76,8 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
         </div>
 
         {/* Results — scroll region; keyboard sits below this */}
-        <div className="flex-1 min-h-0 overflow-y-auto [-webkit-overflow-scrolling:touch]">
-          <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} />
+        <div ref={mobileScrollRef} className="flex-1 min-h-0 overflow-y-auto [-webkit-overflow-scrolling:touch]">
+          <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} scrollRef={mobileScrollRef} />
         </div>
       </div>
     )
@@ -91,8 +93,8 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
       />
       <div id="filterOverlay" className="absolute bottom-full left-0 right-0 z-[25] pointer-events-auto">
         <div className="relative max-h-[calc(100dvh-var(--th)-80px)] flex flex-col">
-          <div className="overflow-y-auto [-webkit-overflow-scrolling:touch] bg-background flex-1 min-h-0">
-            <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} />
+          <div ref={desktopScrollRef} className="overflow-y-auto [-webkit-overflow-scrolling:touch] bg-background flex-1 min-h-0">
+            <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} scrollRef={desktopScrollRef} />
           </div>
         </div>
       </div>
