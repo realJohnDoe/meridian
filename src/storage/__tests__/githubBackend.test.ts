@@ -107,9 +107,9 @@ describe('isTransientSyncError', () => {
 
 const BASE_CFG = { owner: 'alice', repo: 'notes', branch: 'main', token: 'ghp_test' }
 
-function makeTreeResponse(blobs: { path: string; sha: string }[]) {
+function makeTreeResponse(blobs: { path: string; sha: string; size?: number }[]) {
   return {
-    tree: blobs.map(b => ({ type: 'blob', path: b.path, sha: b.sha })),
+    tree: blobs.map(b => ({ type: 'blob', path: b.path, sha: b.sha, size: b.size ?? 100 })),
     truncated: false,
   }
 }
@@ -366,58 +366,63 @@ describe('GitHubBackend', () => {
     expect(await backend.ensurePermission(false)).toBe('denied')
   })
 
-  it('readAll falls back to readFiles for small vaults (below the GraphQL batching threshold)', async () => {
-    const makeResp = (body: unknown) => ({
-      ok: true, status: 200,
-      headers: new Headers({ 'content-type': 'application/json', 'x-ratelimit-remaining': '4999' }),
-      json: () => Promise.resolve(body),
-      text: () => Promise.resolve(JSON.stringify(body)),
-    })
-
+  it('readAll falls back to readFiles for small vaults (below the archive threshold)', async () => {
     // statAll response (git trees API)
     fetchSpy
-      .mockResolvedValueOnce(makeResp(makeTreeResponse([
+      .mockResolvedValueOnce(makeJsonResp(makeTreeResponse([
         { path: 'a.md', sha: 'sha-a' },
         { path: 'b.md', sha: 'sha-b' },
       ])))
-      // readFiles responses (two parallel Contents-API fetches — no GraphQL call)
-      .mockResolvedValueOnce(makeResp(makeFileResponse('a.md', '# A', 'sha-a')))
-      .mockResolvedValueOnce(makeResp(makeFileResponse('b.md', '# B', 'sha-b')))
+      // readFiles responses (two parallel Contents-API fetches — no zipball request)
+      .mockResolvedValueOnce(makeJsonResp(makeFileResponse('a.md', '# A', 'sha-a')))
+      .mockResolvedValueOnce(makeJsonResp(makeFileResponse('b.md', '# B', 'sha-b')))
 
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     const files   = await backend.readAll()
 
     expect(files).toHaveLength(2)
     expect(files.map(f => f.path).sort()).toEqual(['a.md', 'b.md'])
-    expect(fetchSpy).toHaveBeenCalledTimes(3) // tree + 2 Contents requests, no /graphql
+    expect(fetchSpy).toHaveBeenCalledTimes(3) // tree + 2 Contents requests, no zipball
   })
 
-  // ── readAll — GraphQL batching (large vaults) ──────────────────────────
+  // ── readAll — archive loader (large vaults) ─────────────────────────────
 
-  function makeGraphQLResp(repository: Record<string, { text: string | null } | null>) {
-    const body = { data: { repository } }
-    return {
-      ok: true, status: 200,
-      headers: new Headers({ 'content-type': 'application/json', 'x-ratelimit-remaining': '4999' }),
-      json: () => Promise.resolve(body),
-      text: () => Promise.resolve(JSON.stringify(body)),
-    }
-  }
-
-  /** Builds an N-file tree + matching name/content pairs, e.g. note-0.md, note-1.md, … */
+  /** Builds an N-file tree + matching path/content pairs, e.g. note-0.md, note-1.md, … */
   function makeManyFiles(n: number): { path: string; sha: string; content: string }[] {
     return Array.from({ length: n }, (_, i) => ({
       path: `note-${i}.md`, sha: `sha-${i}`, content: `# Note ${i}`,
     }))
   }
 
-  it('readAll batches many files into a single aliased GraphQL request', async () => {
+  /**
+   * Builds a mock zipball response for the given entries, rooted under the
+   * `owner-repo-<sha>/` prefix GitHub's archive endpoint always uses.
+   * `extraEntries` lets a test add non-vault files (e.g. images) to the zip
+   * without them appearing in the tree.
+   */
+  async function makeZipResp(
+    entries: { path: string; content: string }[],
+    extraEntries: { path: string; content: string }[] = [],
+  ) {
+    const { zipSync } = await import('fflate')
+    const prefix = 'alice-notes-abc1234/'
+    const zipInput: Record<string, Uint8Array> = {}
+    for (const e of [...entries, ...extraEntries]) {
+      zipInput[prefix + e.path] = new TextEncoder().encode(e.content)
+    }
+    const bytes = zipSync(zipInput)
+    return {
+      ok: true, status: 200,
+      headers: new Headers({ 'content-type': 'application/zip' }),
+      arrayBuffer: () => Promise.resolve(bytes.buffer),
+    }
+  }
+
+  it('readAll downloads a single archive and unzips vault files, stripping the repo prefix', async () => {
     const specs = makeManyFiles(10)
     fetchSpy
       .mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs)))
-      .mockResolvedValueOnce(makeGraphQLResp(
-        Object.fromEntries(specs.map((s, i) => [`f${i}`, { text: s.content }])),
-      ))
+      .mockResolvedValueOnce(await makeZipResp(specs))
 
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     const files   = await backend.readAll()
@@ -429,63 +434,59 @@ describe('GitHubBackend', () => {
       expect(f?.version).toBe(s.sha)
     }
 
-    // Exactly 2 requests total: the tree listing and one GraphQL batch —
-    // no per-file Contents requests.
+    // Exactly 2 requests total: the tree listing and the zipball — no per-file
+    // Contents requests.
     expect(fetchSpy).toHaveBeenCalledTimes(2)
-    const [graphqlUrl, graphqlInit] = fetchSpy.mock.calls[1] as [string, RequestInit]
-    expect(graphqlUrl).toContain('/graphql')
-    const sentBody = JSON.parse(graphqlInit.body as string) as { variables: { owner: string; name: string } }
-    expect(sentBody.variables).toEqual({ owner: 'alice', name: 'notes' })
+    const [zipUrl] = fetchSpy.mock.calls[1] as [string]
+    expect(zipUrl).toContain('/zipball/main')
   })
 
-  it('readAll falls back to the Contents API for blobs GraphQL returns null text for', async () => {
+  it('readAll ignores non-vault archive entries (e.g. images) via the unzip filter', async () => {
     const specs = makeManyFiles(8)
-    const repository = Object.fromEntries(
-      specs.map((s, i) => [`f${i}`, { text: i === 3 ? null : s.content }]),
-    )
-
     fetchSpy
       .mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs)))
-      .mockResolvedValueOnce(makeGraphQLResp(repository))
-      // Fallback Contents-API fetch for the one null-text path (note-3.md).
-      .mockResolvedValueOnce(makeJsonResp(makeFileResponse('note-3.md', specs[3].content, 'sha-3')))
+      .mockResolvedValueOnce(await makeZipResp(specs, [{ path: 'img.png', content: 'binary-ish' }]))
 
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     const files   = await backend.readAll()
 
     expect(files).toHaveLength(8)
-    const fallback = files.find(f => f.path === 'note-3.md')
-    expect(fallback?.content).toBe(specs[3].content)
-    expect(fallback?.version).toBe('sha-3')
-
-    // 1 tree + 1 GraphQL batch + 1 Contents fallback = 3 requests.
-    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    expect(files.some(f => f.path === 'img.png')).toBe(false)
   })
 
-  it('readAll chunks large path lists into multiple GraphQL requests', async () => {
-    const specs = makeManyFiles(150) // > GRAPHQL_BATCH_SIZE (100) → 2 batches: 100 + 50
-    const batch1 = specs.slice(0, 100)
-    const batch2 = specs.slice(100)
+  it('readAll falls back to the Contents API for a tree path missing from the archive', async () => {
+    const specs = makeManyFiles(8)
+    const inArchive = specs.slice(1) // omit note-0.md from the zip (tree/archive drift)
 
     fetchSpy
       .mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs)))
-      .mockResolvedValueOnce(makeGraphQLResp(
-        Object.fromEntries(batch1.map((s, i) => [`f${i}`, { text: s.content }])),
-      ))
-      .mockResolvedValueOnce(makeGraphQLResp(
-        // Aliases restart at f0 within each batch.
-        Object.fromEntries(batch2.map((s, i) => [`f${i}`, { text: s.content }])),
-      ))
+      .mockResolvedValueOnce(await makeZipResp(inArchive))
+      // Fallback Contents-API fetch for the missing path.
+      .mockResolvedValueOnce(makeJsonResp(makeFileResponse('note-0.md', specs[0].content, 'sha-0')))
 
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     const files   = await backend.readAll()
 
-    expect(files).toHaveLength(150)
-    // Spot-check the boundary between the two batches.
-    expect(files.find(f => f.path === 'note-99.md')?.content).toBe('# Note 99')
-    expect(files.find(f => f.path === 'note-100.md')?.content).toBe('# Note 100')
+    expect(files).toHaveLength(8)
+    const fallback = files.find(f => f.path === 'note-0.md')
+    expect(fallback?.content).toBe(specs[0].content)
+    expect(fallback?.version).toBe('sha-0')
 
-    // 1 tree + 2 GraphQL batches = 3 requests.
+    // 1 tree + 1 zipball + 1 Contents fallback = 3 requests.
     expect(fetchSpy).toHaveBeenCalledTimes(3)
+  })
+
+  it('readAll uses readFiles (no zipball request) when total repo size exceeds the archive cap', async () => {
+    const specs = makeManyFiles(10).map(s => ({ ...s, size: 3 * 1024 * 1024 })) // 30 MB total > 20 MB cap
+    fetchSpy.mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs)))
+    for (const s of specs) fetchSpy.mockResolvedValueOnce(makeJsonResp(makeFileResponse(s.path, s.content, s.sha)))
+
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    const files   = await backend.readAll()
+
+    expect(files).toHaveLength(10)
+    // 1 tree + 10 Contents requests, no zipball.
+    expect(fetchSpy).toHaveBeenCalledTimes(11)
+    expect(fetchSpy.mock.calls.every(([url]) => !String(url).includes('/zipball/'))).toBe(true)
   })
 })
