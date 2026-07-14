@@ -58,6 +58,7 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
     const THRESHOLD = 72
     const FULL_FRAC = 0.5
     let sx = 0, sy = 0, tracking = false, blocked = false
+    let deleteTimeout: ReturnType<typeof setTimeout> | undefined
 
     function onTouchStart(e: TouchEvent) {
       sx = e.touches[0].clientX
@@ -121,7 +122,7 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
         wrap.style.height = '0'
         wrap.style.opacity = '0'
         // Phase 2: remove from store after animation so React unmounts cleanly.
-        setTimeout(() => applyDelete(), 230)
+        deleteTimeout = setTimeout(() => applyDelete(), 230)
       } else {
         row.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1)'
         row.style.setProperty('--swipe-x', '0px')
@@ -135,6 +136,7 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
       row.removeEventListener('touchstart', onTouchStart)
       row.removeEventListener('touchmove', onTouchMove)
       row.removeEventListener('touchend', onTouchEnd)
+      clearTimeout(deleteTimeout)
     }
   }, []) // listeners are stable; callback accessed via ref
 
