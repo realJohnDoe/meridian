@@ -20,14 +20,6 @@ This report rests on close reading of roughly **60% of UI-layer code by volume**
 
 ## 3. Findings
 
-### 6. Theme-preview swatches hardcode token values — and have already drifted from the real themes
-
-- **Category:** `styling` `dry` `ux`
-- **Impact:** 3 · **Breadth:** 2 files · **Fix effort:** S
-- **Evidence:** `src/components/SettingsDialog.tsx:87` previews Rosé Pine Dawn's task color as `'#6a8c3a',  // task (olive green)` but `src/index.css:272` defines `--task:         #5b7932;   /* olive green, darkened */`; Solarized's preview says `'#859900',  // task (green)` vs the real `--task: #657400`. (Tokyo Night/Dracula/Tokyo Day still match — this is drift, not a deliberate "base-hue" preview, or it would be consistent.)
-- **Problem:** The theme picker shows colors the themes no longer use, and every future theme tweak must be made twice.
-- **Fix:** Render each preview button with the theme's own class (`<button className="rose-pine-dawn">` + `bg-task` swatches) so the CSS tokens are the single source.
-
 ### 7. `@eslint-react` is installed but only 4 of its 65 recommended rules are enabled — the gap includes a few real-bug classes
 
 - **Category:** `toolchain` `performance`
