@@ -1,3 +1,4 @@
+import { unzipSync } from 'fflate'
 import type { StorageBackend, RawFile } from './backend'
 import type { VaultKind } from '@/types'
 import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError } from './githubApi'
@@ -18,6 +19,7 @@ type TreeItem = {
   type: string
   path: string
   sha:  string
+  size?: number
 }
 
 type ContentFile = {
@@ -32,16 +34,10 @@ type ContentFile = {
 
 /** Max concurrent Contents-API requests for readFiles — avoids tripping GitHub's secondary rate limit. */
 const READ_FILES_CONCURRENCY = 8
-/** Paths per GraphQL batch — stays comfortably under GraphQL query-size/node-cost limits. */
-const GRAPHQL_BATCH_SIZE = 100
-/** readAll() routes through readFiles() below this size — GraphQL batching only pays off in bulk. */
-const GRAPHQL_MIN_FILES = READ_FILES_CONCURRENCY
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = []
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
-  return out
-}
+/** readAll() routes through readFiles() below this size — the archive's fetch+unzip overhead only pays off in bulk. */
+const ARCHIVE_MIN_FILES = READ_FILES_CONCURRENCY
+/** Above this total repo size, skip the archive (avoids pulling a binary-heavy repo's images just to read its text files). */
+const ARCHIVE_MAX_BYTES = 20 * 1024 * 1024
 
 /** Runs `fn` over `items` with at most `limit` in flight at once. */
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -57,23 +53,10 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   return results
 }
 
-/** Escapes a string for embedding in a double-quoted GraphQL string literal. */
-function escapeGraphQLString(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-}
-
-type BlobQueryResult = Record<string, { text: string | null } | null>
-
-/** Builds a GraphQL query that fetches the text of many blobs in one request, one per path aliased as f0, f1, … */
-function buildBlobQuery(branch: string, paths: string[]): string {
-  const fields = paths
-    .map((path, i) => `f${i}: object(expression: "${escapeGraphQLString(`${branch}:${path}`)}") { ... on Blob { text } }`)
-    .join('\n')
-  return `query($owner: String!, $name: String!) {
-    repository(owner: $owner, name: $name) {
-      ${fields}
-    }
-  }`
+/** GitHub archive entries are rooted under an `owner-repo-<sha>/` directory — strip it to get the repo-relative path. */
+function stripArchivePrefix(entryName: string): string {
+  const i = entryName.indexOf('/')
+  return i === -1 ? entryName : entryName.slice(i + 1)
 }
 
 export class GitHubBackend implements StorageBackend {
@@ -109,7 +92,13 @@ export class GitHubBackend implements StorageBackend {
 
   // ── StorageBackend ─────────────────────────────────────────────
 
-  async statAll(): Promise<Map<string, string>> {
+  /**
+   * Fetches the recursive tree once and returns both the vault-file path→SHA
+   * map (what statAll() exposes) and the total byte size of every blob in the
+   * repo (vault files and everything else) — used by readAll() to decide
+   * whether an archive download is worth it.
+   */
+  private async _fetchTree(): Promise<{ tokens: Map<string, string>; totalBytes: number }> {
     try {
       const { data } = await this._octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
         owner:     this._cfg.owner,
@@ -119,15 +108,22 @@ export class GitHubBackend implements StorageBackend {
       })
       const items = (data as { tree: TreeItem[] }).tree
       const tokens = new Map<string, string>()
+      let totalBytes = 0
       for (const item of items) {
-        if (item.type !== 'blob' || !isVaultFile(item.path)) continue
+        if (item.type !== 'blob') continue
+        totalBytes += item.size ?? 0
+        if (!isVaultFile(item.path)) continue
         tokens.set(item.path, item.sha)
         this._shas.set(item.path, item.sha)
       }
-      return tokens
+      return { tokens, totalBytes }
     } catch (e) {
       throw mapGitHubError(e)
     }
+  }
+
+  async statAll(): Promise<Map<string, string>> {
+    return (await this._fetchTree()).tokens
   }
 
   async readFiles(paths: string[]): Promise<RawFile[]> {
@@ -159,49 +155,69 @@ export class GitHubBackend implements StorageBackend {
   }
 
   /**
-   * Reads every vault file in a handful of requests: one tree listing plus a
-   * few GraphQL batches that alias many blobs per request. This avoids the
-   * one-Contents-request-per-file fan-out of readFiles(), which trips GitHub's
-   * secondary rate limit on vaults with hundreds of files.
+   * Reads every vault file in two requests — one tree listing plus one repo
+   * archive download, unzipped in the browser — instead of the
+   * one-Contents-request-per-file fan-out of readFiles(), which trips
+   * GitHub's secondary rate limit on vaults with hundreds of files. The
+   * archive is bound by total repo bytes rather than file count, so it stays
+   * fast even for vaults GraphQL blob-batching (the prior approach) made
+   * slow via per-blob server-side latency.
    */
   async readAll(): Promise<RawFile[]> {
-    const tokens = await this.statAll()
-    const paths  = Array.from(tokens.keys())
+    const { tokens, totalBytes } = await this._fetchTree()
+    const paths = Array.from(tokens.keys())
     if (paths.length === 0) return []
-    // Small vaults: a single GraphQL batch wouldn't beat readFiles' own request
-    // count by enough to justify the extra code path.
-    if (paths.length < GRAPHQL_MIN_FILES) return this.readFiles(paths)
+    // Small vaults: a few parallel Contents requests beat the archive's
+    // download+unzip overhead. Huge repos: skip downloading everything
+    // (images, etc.) just to read the text files.
+    if (paths.length < ARCHIVE_MIN_FILES || totalBytes > ARCHIVE_MAX_BYTES) {
+      return this.readFiles(paths)
+    }
 
-    const files: RawFile[] = []
-    const fallbackPaths: string[] = []
-
+    // Fetching the archive is a real GitHub API call — auth/permission/network
+    // failures here must map and throw exactly like every other method on this
+    // class (in particular, an AuthSyncError needs to propagate so runSync's
+    // refreshAuth-and-retry logic in sync.ts can act on it). Only the local
+    // unzip step below is treated as "this approach didn't work, fall back".
+    let archiveBytes: ArrayBuffer
     try {
-      for (const batch of chunk(paths, GRAPHQL_BATCH_SIZE)) {
-        const data = await this._octokit.graphql<{ repository: BlobQueryResult }>(
-          buildBlobQuery(this._cfg.branch, batch),
-          { owner: this._cfg.owner, name: this._cfg.repo },
-        )
-        batch.forEach((path, i) => {
-          const blob = data.repository[`f${i}`]
-          // text is null for binary/oversized blobs, or the alias is absent if the
-          // path vanished between the tree listing and this query — either way,
-          // fall back to the Contents API for just that file.
-          if (blob && blob.text !== null) {
-            files.push({ path, content: blob.text, version: tokens.get(path)! })
-          } else {
-            fallbackPaths.push(path)
-          }
-        })
-      }
+      const { data } = await this._octokit.request('GET /repos/{owner}/{repo}/zipball/{ref}', {
+        owner: this._cfg.owner,
+        repo:  this._cfg.repo,
+        ref:   this._cfg.branch,
+      })
+      archiveBytes = data as ArrayBuffer
     } catch (e) {
       throw mapGitHubError(e)
     }
 
-    if (fallbackPaths.length > 0) {
-      files.push(...await this.readFiles(fallbackPaths))
-    }
+    try {
+      const entries = unzipSync(new Uint8Array(archiveBytes), {
+        filter: entry => isVaultFile(stripArchivePrefix(entry.name)),
+      })
 
-    return files
+      const files: RawFile[] = []
+      const seen = new Set<string>()
+      for (const [entryName, bytes] of Object.entries(entries)) {
+        const path = stripArchivePrefix(entryName)
+        const version = tokens.get(path)
+        if (version === undefined) continue // not a tracked vault path (or directory entry)
+        files.push({ path, content: new TextDecoder().decode(bytes), version })
+        seen.add(path)
+      }
+
+      // Paths the tree listed but the archive didn't contain (rare tree/archive
+      // drift) — resolve individually rather than silently dropping them.
+      const missing = paths.filter(p => !seen.has(p))
+      if (missing.length > 0) files.push(...await this.readFiles(missing))
+
+      return files
+    } catch (e) {
+      // A corrupt/unparseable archive shouldn't break loading — fall back to
+      // the per-file path, which is already bounded by READ_FILES_CONCURRENCY.
+      console.warn('[github] archive unzip failed, falling back to readFiles', e)
+      return this.readFiles(paths)
+    }
   }
 
   async write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> {
