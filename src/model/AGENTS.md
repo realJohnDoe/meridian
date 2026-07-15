@@ -104,7 +104,7 @@ live in `expansion.ts` and are only used there.
 - `expandWithMultiday` — like `expandRange` but also generates virtual
   occurrences for days 2..N of multi-day events.
 - `collectUndated` — collects store items with no date.
-- `joinFileMeta`, `stableOccId` — metadata join and stable ID memo.
+- `joinFileMeta`, `stableOccId` — metadata join and deterministic occurrence ID.
 
 ### `collapse.ts`
 **Reverse-inheritance: `StoreItem[]` + `FileMetadata` → YAML object for saving.**

@@ -58,8 +58,9 @@ export function upsertOverride(
   // Recurring — upsert override child. Match the specific child by id: an
   // expanded occurrence carries its backing child's store id, so this targets
   // the exact instance the user acted on even when several overrides share a
-  // date. A generated occurrence has no backing child (its id is a memoised
-  // synthetic key), so it finds nothing here and falls through to create one.
+  // date. A generated occurrence has no backing child (its id is the
+  // deterministic stableOccId key), so it finds nothing here and falls
+  // through to create one.
   const existing = items.find(
     i => !isSeries(i) && i.ownerId === occ.ownerId && i.id === occ.id,
   )
@@ -70,14 +71,21 @@ export function upsertOverride(
         : i,
     )
   }
-  // No existing override — create one.
+  // No existing override — create one. Reuse occ.id (a generated occurrence's
+  // id is already the deterministic stableOccId key) instead of minting a
+  // fresh random one, so the occurrence's React row key stays stable across
+  // the very commit that creates its first override — otherwise the row
+  // would unmount/remount on every first toggle of a recurring occurrence.
+  // Guard against an (unexpected) id collision with an existing item so two
+  // overrides can never end up sharing an id.
   const series = items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined
+  const newId = items.some(i => i.id === occ.id) ? crypto.randomUUID() : occ.id
   const newOverride: OccurrenceEntry<OccurrenceMetadata> = {
     date:    occ.date,
     time:    occ.time,
     source:  'explicit',
     fileSlug: occ.fileSlug,
-    id:      crypto.randomUUID(),
+    id:      newId,
     ownerId: occ.ownerId,
     metadata: { ...(series?.metadata ?? occFromAppMeta(occ.metadata)), ...(patch.metadata ?? {}) },
     ...patch,

@@ -444,21 +444,20 @@ export function treeHasOccurrences(node: EffectiveNode): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// STABLE ID MEMO
+// STABLE ID
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Series-generated occurrences have no backing store row, so we memo their id
-// by logical key. The same (ownerId, date, time) always resolves to the same
-// UUID within a data snapshot's lifetime, making occ.id stable across re-expansions.
-// Call clearOccIdCache() on setData so the map doesn't grow unboundedly across
-// vault switches or long PWA sessions.
-const occIdCache = new Map<string, string>()
+/**
+ * Deterministic id for a series-generated occurrence (no backing store row).
+ * A pure function of its logical key (ownerId|date|time) rather than a
+ * memoised random UUID: the same key always yields the same id, so occ.id
+ * stays stable across re-expansions AND across store commits — required for
+ * it to double as a React row key (OccurrenceRow) that survives a done-toggle
+ * without unmounting.
+ */
 export function stableOccId(key: string): string {
-  let id = occIdCache.get(key)
-  if (!id) { id = crypto.randomUUID(); occIdCache.set(key, id) }
-  return id
+  return `occ:${key}`
 }
-export function clearOccIdCache(): void { occIdCache.clear() }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EXPANDRANGE  (main-app entry point — takes StoreItem[])
