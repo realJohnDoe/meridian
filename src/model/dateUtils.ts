@@ -25,20 +25,32 @@ export function parseMonth(s: string): Date {
   return new Date(y, m - 1, 1)
 }
 
+function toHour12(h: number, m: number): string {
+  const d = new Date(); d.setHours(h, m, 0, 0)
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
+/** Format an `HH:mm`-prefixed string per locale, either as 24h (sliced as-is) or 12h with AM/PM. */
+export function formatHHMM(hhmm: string, hour12: boolean): string {
+  const hh = hhmm.slice(0, 5)
+  if (!hour12) return hh
+  const [h, m] = hh.split(':').map(Number)
+  return toHour12(h, m)
+}
+
 export function fmtT(v: unknown, hour12 = false): string | null {
   if (!v) return null
   if (typeof v === 'string' && /^\d{1,2}:\d{2}/.test(v)) {
-    if (!hour12) return v.slice(0, 5)
-    const [hStr, mStr] = v.slice(0, 5).split(':')
-    const h = parseInt(hStr, 10), m = parseInt(mStr, 10)
-    if (!h && !m) return null
-    const d = new Date(); d.setHours(h, m, 0, 0)
-    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+    if (hour12) {
+      const [hStr, mStr] = v.slice(0, 5).split(':')
+      if (!parseInt(hStr, 10) && !parseInt(mStr, 10)) return null
+    }
+    return formatHHMM(v, hour12)
   }
   if (v instanceof Date) {
     const h = v.getHours(), m = v.getMinutes()
     if (!h && !m) return null
-    if (hour12) return v.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+    if (hour12) return toHour12(h, m)
     return format(v, 'HH:mm')
   }
   return null

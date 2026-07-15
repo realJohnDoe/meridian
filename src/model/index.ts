@@ -1,4 +1,4 @@
-export { weekStartsOn, fmtISO, fmtMonth, parseMonth, fmtT, parseDateString, parseDateTime, dayBefore } from './dateUtils'
+export { weekStartsOn, fmtISO, fmtMonth, parseMonth, fmtT, formatHHMM, parseDateString, parseDateTime, dayBefore } from './dateUtils'
 export { multidayDisplayTitle, treeHasOccurrences, stableOccId, clearOccIdCache, expandRange, joinFileMeta } from './expansion'
 export type { StoreData, EditorFields, EditFields } from './storeOps'
 export { fileSlugItems, findSeries, upsertOverride, applyEdit, toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing } from './storeOps'
