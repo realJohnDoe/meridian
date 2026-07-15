@@ -20,6 +20,7 @@ If prior work on this repo has raised specific suspicions, list them here as **h
 - Read closely: the entry points, the most-imported modules (measure this — don't guess), the 15 largest source files, and at least 2–3 representative files from every feature directory.
 - **Read the toolchain, not just the source:** `package.json` (scripts _and_ the full dependency list), lint/formatter configs, CI workflows, test config, and any `.npmrc`/tsconfig strictness settings. For each dependency, know roughly what it's for and where it's used — this feeds the Library Fit category.
 - **Measure dependency currency against the registry, not memory:** run the package manager's outdated report (`pnpm outdated` / `npm outdated` / `cargo outdated` / …) in **every workspace**, including sub-workspaces like workers or serverless functions. Your knowledge of "the latest version" is stale by definition; only the registry answer counts. This is the evidence base for the version-currency bullets in category 7.
+- **Run the existing quality gates once** — build, lint, and test (plus coverage, if the project has it configured) — and report each gate's pass/fail status in the coverage statement. A failing gate is itself a finding (usually a high-impact one), and the dry-run comparisons above need this green baseline to diff against.
 - **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
 - Sample the rest. Do not skip a directory entirely without recording it in the coverage statement.
 
@@ -32,10 +33,21 @@ A plain-language summary of the repo's overall health. Name the **worst one or t
 ### 2. Coverage statement
 
 - Which directories/files you examined closely, which you only sampled, and which you skipped — with the reason (irrelevant, generated, vendored, too large, ran out of budget, etc.).
+- The pass/fail status of each existing quality gate (build, lint, test, coverage if configured) from the single run required in the Budget section.
 - Roughly what fraction of the codebase this report is based on.
 - Any area you suspect has issues but did not have budget to investigate — flag it as "unverified."
 
-### 3. Findings
+### 3. Category verdicts
+
+One line per category (1–9), with one of three verdicts:
+
+- **clean** — the scan plan for this category was fully executed and nothing worth reporting turned up
+- **findings: #N, #M** — pointing at the numbered findings below
+- **partially assessed** — state what part of the scan was skipped and why
+
+This makes the absence of findings distinguishable from the absence of scanning. A category may only be called **clean** if its scan plan was actually executed — never as a default for categories that ran out of budget.
+
+### 4. Findings
 
 For each finding, output:
 
@@ -52,7 +64,7 @@ Rank findings by a rough `(impact × breadth) ÷ effort` intuition — but repor
 
 **Strongly prefer systemic and structural issues over isolated, line-level ones.** A finding that affects 10 files beats one that affects 1 function. Cite real code — no generic observations.
 
-List the **top 10 findings**. Include all findings that make the top 10 regardless of their impact score — if a 1/10 ranks in (high breadth, trivial fix), include it and let its low Impact score speak for itself.
+List the **top 10 findings**, numbered (the category verdicts above reference these numbers). Include all findings that make the top 10 regardless of their impact score — if a 1/10 ranks in (high breadth, trivial fix), include it and let its low Impact score speak for itself.
 
 Do not pad to reach 10 — if fewer than 10 clear issues exist, stop there.
 
