@@ -66,6 +66,20 @@
   /* Surface for past/done */
   --color-surface-raised: var(--surface-raised);
 
+  /* Occurrence surface tints (occVariants) — see the derived tokens below */
+  --color-event-tint:            var(--event-tint);
+  --color-event-tint-hover:      var(--event-tint-hover);
+  --color-task-tint:             var(--task-tint);
+  --color-task-tint-hover:       var(--task-tint-hover);
+  --color-note-tint:             var(--note-tint);
+  --color-note-tint-hover:       var(--note-tint-hover);
+  --color-priority-1-tint:       var(--priority-1-tint);
+  --color-priority-1-tint-hover: var(--priority-1-tint-hover);
+  --color-priority-2-tint:       var(--priority-2-tint);
+  --color-priority-2-tint-hover: var(--priority-2-tint-hover);
+  --color-priority-3-tint:       var(--priority-3-tint);
+  --color-priority-3-tint-hover: var(--priority-3-tint-hover);
+
   --height-control: var(--control-h);
   /* Topbar height token — used for h-topbar, and top-[var(--th)] in positioned children */
   --height-topbar: var(--th);
@@ -156,6 +170,28 @@
 
   /* Elevated surface for past/done bars */
   --surface-raised: oklch(0.33 0.05 252);
+
+  /* Occurrence surface tints (occVariants) — mixed onto the opaque --card
+     base rather than composited as a transparent color, so the result is a
+     known, predictable surface (not dependent on whatever happens to render
+     behind the element) that other content — chips, checkboxes, avatars —
+     can reliably contrast against, and so the same recipe reads consistently
+     across every context an occurrence renders in (agenda, filter overlay,
+     month cell, day block). */
+  --occ-tint:       10%;
+  --occ-tint-hover: 20%;
+  --event-tint:        color-mix(in oklab, var(--event) var(--occ-tint), var(--card));
+  --event-tint-hover:  color-mix(in oklab, var(--event) var(--occ-tint-hover), var(--card));
+  --task-tint:         color-mix(in oklab, var(--task) var(--occ-tint), var(--card));
+  --task-tint-hover:   color-mix(in oklab, var(--task) var(--occ-tint-hover), var(--card));
+  --note-tint:         color-mix(in oklab, var(--note) var(--occ-tint), var(--card));
+  --note-tint-hover:   color-mix(in oklab, var(--note) var(--occ-tint-hover), var(--card));
+  --priority-1-tint:       color-mix(in oklab, var(--priority-1) var(--occ-tint), var(--card));
+  --priority-1-tint-hover: color-mix(in oklab, var(--priority-1) var(--occ-tint-hover), var(--card));
+  --priority-2-tint:       color-mix(in oklab, var(--priority-2) var(--occ-tint), var(--card));
+  --priority-2-tint-hover: color-mix(in oklab, var(--priority-2) var(--occ-tint-hover), var(--card));
+  --priority-3-tint:       color-mix(in oklab, var(--priority-3) var(--occ-tint), var(--card));
+  --priority-3-tint-hover: color-mix(in oklab, var(--priority-3) var(--occ-tint-hover), var(--card));
 
   /* Layout & fonts (not themed) */
   --control-h: 1.75rem;

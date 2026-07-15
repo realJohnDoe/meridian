@@ -23,18 +23,24 @@ export type OccState =
  * at the small sizes month cells and day blocks render at. The frame wraps
  * the whole shape rather than just the left edge, so it can stay a thin 1px
  * stroke instead of a thicker single-side bar.
+ *
+ * The tint itself (`bg-{state}-tint`, defined in index.css) is mixed onto the
+ * opaque `--card` surface rather than applied as a transparent color — so it
+ * resolves to one predictable, known surface regardless of what actually
+ * renders behind the element, which is what lets chips/checkboxes/avatars
+ * sitting on top reliably contrast against it in every context and theme.
  */
 export const occVariants = cva(
   'border transition-colors',
   {
     variants: {
       state: {
-        'event-future': 'bg-event/15 border-event text-foreground hover:bg-event/25',
-        'task-open':    'bg-task/15 border-task text-foreground hover:bg-task/25',
-        'task-p1':      'bg-priority-1/15 border-priority-1 text-foreground hover:bg-priority-1/25',
-        'task-p2':      'bg-priority-2/15 border-priority-2 text-foreground hover:bg-priority-2/25',
-        'task-p3':      'bg-priority-3/15 border-priority-3 text-foreground hover:bg-priority-3/25',
-        note:           'bg-note/15 border-note text-foreground hover:bg-note/25',
+        'event-future': 'bg-event-tint border-event text-foreground hover:bg-event-tint-hover',
+        'task-open':    'bg-task-tint border-task text-foreground hover:bg-task-tint-hover',
+        'task-p1':      'bg-priority-1-tint border-priority-1 text-foreground hover:bg-priority-1-tint-hover',
+        'task-p2':      'bg-priority-2-tint border-priority-2 text-foreground hover:bg-priority-2-tint-hover',
+        'task-p3':      'bg-priority-3-tint border-priority-3 text-foreground hover:bg-priority-3-tint-hover',
+        note:           'bg-note-tint border-note text-foreground hover:bg-note-tint-hover',
         'event-past':   'bg-muted border-surface-raised text-muted-foreground line-through hover:bg-muted/70',
         done:           'bg-muted border-surface-raised text-muted-foreground line-through hover:bg-muted/70',
       } satisfies Record<OccState, string>,
