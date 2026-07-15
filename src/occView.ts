@@ -1,7 +1,6 @@
 import { startOfDay } from 'date-fns'
 import { parseDurationDays, parseDurationHours } from '@/model'
-import type { Occurrence } from './types'
-import type { OccState } from '@/components/ui/occurrence-variants'
+import type { Occurrence, OccState } from './types'
 
 /** Derive the display kind from occurrence data. */
 export function occKind(occ: Occurrence): 'event' | 'task' | 'note' {

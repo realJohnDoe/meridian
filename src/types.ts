@@ -100,6 +100,19 @@ export function isSeries(item: StoreItem): item is StoreSeries {
   return 'repeat' in item && item.repeat !== undefined
 }
 
+// ── Occurrence display state ──────────────────────────────────────────────────
+
+/** Canonical occurrence state — single domain vocabulary for all styling variants. */
+export type OccState =
+  | 'event-future'
+  | 'event-past'
+  | 'task-open'
+  | 'task-p1'
+  | 'task-p2'
+  | 'task-p3'
+  | 'note'
+  | 'done'
+
 // ── Occurrence ───────────────────────────────────────────────────────────────
 
 /**
