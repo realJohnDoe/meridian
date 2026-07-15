@@ -1,15 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority'
-
-/** Canonical occurrence state — single domain vocabulary for all styling variants. */
-export type OccState =
-  | 'event-future'
-  | 'event-past'
-  | 'task-open'
-  | 'task-p1'
-  | 'task-p2'
-  | 'task-p3'
-  | 'note'
-  | 'done'
+import type { OccState } from '@/types'
 
 /**
  * Shared pattern for active tasks and notes: solid bg-{color} + text-primary-foreground.
