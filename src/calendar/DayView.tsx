@@ -11,7 +11,7 @@ import { multidayDisplayTitle, fmtT, parseDateString, parseDurationDays } from '
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
-import { dvBlockVariants } from '@/components/ui/occurrence-variants'
+import { occVariants } from '@/components/ui/occurrence-variants'
 import { ContinuationChevron, CONTINUES_PADDING } from '@/components/ui/continuation-chevron'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday, useCalendarFilter } from '@/hooks'
@@ -46,7 +46,7 @@ function AllDayItem({ o, onOpen, displayTitle, continuesLeft, continuesRight }: 
   return (
     <SurfaceButton
       className={cn(
-        dvBlockVariants({ state: occState(o) }),
+        occVariants({ state: occState(o) }),
         'relative w-full flex items-center rounded-xs sm:rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
         continuesLeft && CONTINUES_PADDING.left,
         continuesRight && CONTINUES_PADDING.right,
@@ -104,7 +104,7 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   return (
     <SurfaceButton
       className={cn(
-        dvBlockVariants({ state: occState(o) }),
+        occVariants({ state: occState(o) }),
         'absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-colors',
       )}
       style={{ top, height, left, width }}

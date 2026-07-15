@@ -12,7 +12,7 @@ import { Badge } from './ui/badge'
 import { Card } from './ui/card'
 import { SurfaceButton } from './ui/surface-button'
 import { cn } from '@/lib/cn'
-import { occBarVariants } from './ui/occurrence-variants'
+import { occVariants } from './ui/occurrence-variants'
 import TagChip from './TagChip'
 
 const EMPTY_LISTED_ON: string[] = []
@@ -52,8 +52,8 @@ interface OccurrenceCardProps {
   animate?: boolean
 }
 
-const titleCls = (isDone: boolean) =>
-  `text-sm font-medium truncate ${isDone ? 'line-through' : ''} text-foreground`
+const titleCls = (struck: boolean) =>
+  `text-sm font-medium truncate ${struck ? 'line-through' : ''}`
 
 function ParticipantAvatars({ participants }: { participants: string[] }) {
   if (!participants.length) return null
@@ -109,8 +109,8 @@ export default function OccurrenceCard({
   const isPast   = barClass === 'event-past'
 
   // Optimistic local copy of `done` so the checkbox and its dependent styling
-  // (strike-through, dim overlay) animate the instant the user clicks, rather
-  // than waiting for the store commit — which, for after_completion repeats,
+  // (strike-through, receded card surface) animate the instant the user clicks,
+  // rather than waiting for the store commit — which, for after_completion repeats,
   // can be delayed several frames while the newly-generated next occurrence
   // settles into the virtualized list. Reconciled with the store value below
   // during render (the standard "adjusting state on prop change" pattern —
@@ -143,12 +143,16 @@ export default function OccurrenceCard({
   })()
 
   const dimmed  = isDone || isPast
-  const cardCls = [
-    'relative transition-colors shadow-none',
-    'bg-card border border-input rounded-lg',
-    'hover:bg-accent',
-    dimmed ? 'overflow-hidden' : '',
-  ].filter(Boolean).join(' ')
+  // `dimmed` (the optimistic local state) takes priority over `barClass` (the
+  // store-derived state) so the card's tint/edge/text recede the instant the
+  // user checks the box, not once the store commit lands (see the optimistic
+  // `isDone` comment above) — the same trick occState already applies for
+  // isPast, just generalized to the whole surface instead of only the bar.
+  const cardCls = cn(
+    'relative shadow-none rounded-lg',
+    occVariants({ state: dimmed ? 'done' : barClass }),
+    dimmed && 'overflow-hidden',
+  )
 
   const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime !== 'none' && (!!t || !!durationLabel))
   const hasTagsContent      = showTagsParticipants && listedOn.length > 0
@@ -157,18 +161,14 @@ export default function OccurrenceCard({
   return (
     <Card
       data-tour="entry-card"
-      className={`${cardCls} flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-11`}
+      className={`${cardCls} flex items-stretch gap-2 pl-3 pr-3.5 py-2 min-h-11`}
       style={animate ? { animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' } : undefined}
     >
-      {dimmed && <div className="absolute inset-0 pointer-events-none z-10 rounded-lg" style={{ background: 'var(--done-overlay)' }} />}
-
       <SurfaceButton
         className="absolute inset-0 z-[1] rounded-lg"
         aria-label={title}
         onClick={onOpen}
       />
-
-      <span className={cn(occBarVariants({ state: barClass }), 'relative z-20')} />
 
       <div className={cn('relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none justify-center', dimmed && 'opacity-60')}>
         <div className="flex items-center gap-1.5">
@@ -193,7 +193,7 @@ export default function OccurrenceCard({
 
           {/* Title + recurrence icon grouped so repeat stays left-adjacent to text */}
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className={titleCls(isDone)}>{title}</span>
+            <span className={titleCls(dimmed)}>{title}</span>
             {!!occ.ownerId && (
               <Repeat2 size={11} className="stroke-muted-foreground fill-none shrink-0" />
             )}

@@ -136,9 +136,6 @@
   /* Chip border — transparent on dark themes, visible on light */
   --chip-border: transparent;
 
-  /* Done/past card overlay — fade cards toward background so they recede */
-  --done-overlay: color-mix(in oklab, var(--background), transparent 30%);
-
   --radius: 0.625rem;
 
   /* ── Derived — not authored per-theme ── */
@@ -261,15 +258,17 @@
   --border: color-mix(in oklab, #9893a5, transparent 78%);
   --input:  color-mix(in oklab, #9893a5, transparent 68%);
 
-  /* Domain colors — darkened from the base brand hue where needed so
-     text-primary-foreground clears AA when used as a solid chip background */
-  --event:        #7e659b;   /* iris, darkened */
-  --task:         #5b7932;   /* olive green, darkened */
+  /* Domain colors — canonical Rosé Pine Dawn accent hues. Occurrence surfaces
+     now use these as a gentle tint + edge with neutral text (see
+     occVariants), not as solid fills under white text, so there's no need to
+     darken/mute them for AA the way the old solid-fill recipe required. */
+  --event:        #907aa9;   /* iris */
+  --task:         #6f9e45;   /* Rosé Pine has no canonical green — palette-harmonized moss green */
   --note:         #286983;   /* pine */
   --brand-cyan:   #56949f;   /* foam */
-  --priority-1:   #b02840;   /* red */
-  --priority-2:   #af5717;   /* orange, darkened */
-  --priority-3:   #816f00;   /* yellow, darkened */
+  --priority-1:   #b4637a;   /* love */
+  --priority-2:   #d7827e;   /* rose */
+  --priority-3:   #ea9d34;   /* gold */
 
   /* Sidebar */
   --sidebar:                    #faf4ed;
@@ -324,15 +323,17 @@
   --border: color-mix(in oklab, #839496, transparent 78%);
   --input:  color-mix(in oklab, #839496, transparent 68%);
 
-  /* Domain colors — darkened from the base brand hue where needed so
-     text-primary-foreground clears AA when used as a solid chip background */
-  --event:        #5f64bf;   /* violet, darkened */
-  --task:         #657400;   /* green, darkened */
-  --note:         #207973;   /* cyan, darkened */
+  /* Domain colors — canonical Solarized accent hues. Occurrence surfaces now
+     use these as a gentle tint + edge with neutral text (see occVariants),
+     not as solid fills under white text, so there's no need to darken/mute
+     them for AA the way the old solid-fill recipe required. */
+  --event:        #6c71c4;   /* violet */
+  --task:         #859900;   /* green */
+  --note:         #2aa198;   /* cyan */
   --brand-cyan:   #2aa198;
-  --priority-1:   #d22623;   /* red, darkened */
-  --priority-2:   #bd4615;   /* orange, darkened */
-  --priority-3:   #8a6800;   /* yellow, darkened */
+  --priority-1:   #dc322f;   /* red */
+  --priority-2:   #cb4b16;   /* orange */
+  --priority-3:   #b58900;   /* yellow */
 
   /* Sidebar */
   --sidebar:                    #fdf6e3;
@@ -447,13 +448,16 @@
   --border: color-mix(in oklab, #848cb5, transparent 78%);
   --input:  color-mix(in oklab, #848cb5, transparent 68%);
 
-  /* Domain colors — saturated but dark enough to read on light bg */
+  /* Domain colors — canonical tokyonight.nvim "day" accent hues. Occurrence
+     surfaces now use these as a gentle tint + edge with neutral text (see
+     occVariants), not as solid fills under white text, so there's no need to
+     darken/mute them for AA the way the old solid-fill recipe required. */
   --event:        #7847bd;   /* purple — alias of primary */
-  --task:         #486e2a;   /* green */
-  --note:         #006b8f;   /* cyan */
+  --task:         #587539;   /* green */
+  --note:         #007197;   /* cyan */
   --brand-cyan:   #006b8f;
-  --priority-1:   #d4184b;   /* red */
-  --priority-2:   #a85200;   /* orange */
+  --priority-1:   #c64343;   /* red */
+  --priority-2:   #b15c00;   /* orange */
   --priority-3:   #8c6c3e;   /* amber */
 
   /* Sidebar */
@@ -468,9 +472,6 @@
 
   /* Chip border — visible on light surfaces */
   --chip-border: color-mix(in oklab, #848cb5, transparent 68%);
-
-  /* Done/past card overlay — fade cards toward background so they recede */
-  --done-overlay: color-mix(in oklab, var(--background), transparent 30%);
 
   /* Absolute derived tokens */
   --primary-dark:    #5e35a0;
