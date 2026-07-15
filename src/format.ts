@@ -1,5 +1,5 @@
 import { addDays, addWeeks, addMonths, addYears, addMinutes, getDate, isSameDay } from 'date-fns'
-import { parseDateString, parseDateTime, fmtISO, parseDuration } from '@/model'
+import { parseDateString, parseDateTime, fmtISO, parseDuration, formatHHMM } from '@/model'
 import type { Scheduled } from '@/types'
 
 export { addDays, isSameDay as sameDay }
@@ -65,10 +65,7 @@ export function fmtEndDate(dateStr: string): string {
 }
 
 export function fmtEndTime(hhmm: string, hour12 = false): string {
-  if (!hour12) return hhmm.slice(0, 5)
-  const [h, min] = hhmm.slice(0, 5).split(':').map(Number)
-  const d = new Date(); d.setHours(h, min, 0, 0)
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+  return formatHHMM(hhmm, hour12)
 }
 
 export function fmtDuration(duration: string): string {
