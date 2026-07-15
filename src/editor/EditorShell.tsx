@@ -26,6 +26,8 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
     handleOpenDlg, handleOpenRepeatDlg,
     dialogHandlers,
     scheduleAutoSave,
+    titleMissing,
+    focusTitleTick,
   } = hooks
 
   return (
@@ -47,6 +49,8 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
         roots={roots}
         onOpenWikilink={handleOpenWikilink}
         onToggleDoneBacklink={toggleOccDone}
+        titleError={titleMissing}
+        focusTitleTick={focusTitleTick}
       />
       <DialogStack entry={entry} handlers={dialogHandlers} />
     </section>

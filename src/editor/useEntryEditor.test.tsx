@@ -103,4 +103,23 @@ describe('useEntryEditor', () => {
     expect(persistence.writes).toEqual([])
     expect(navigateMock).not.toHaveBeenCalled()
   })
+
+  it('handleSave with an empty title flags titleMissing and bumps focusTitleTick instead of navigating back', () => {
+    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    seedStore([occ], makeRoots('note.md'))
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.setEntry({ ...result.current.entry, title: '' }) })
+    const tickBefore = result.current.focusTitleTick
+    act(() => { result.current.handleSave('body') })
+
+    expect(result.current.titleMissing).toBe(true)
+    expect(result.current.focusTitleTick).toBe(tickBefore + 1)
+    expect(backMock).not.toHaveBeenCalled()
+
+    act(() => { result.current.setEntry({ ...result.current.entry, title: 'Standup again' }) })
+    act(() => { result.current.handleSave('body') })
+    expect(result.current.titleMissing).toBe(false)
+    expect(backMock.mock.calls.length + navigateMock.mock.calls.length).toBeGreaterThan(0)
+  })
 })

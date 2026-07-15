@@ -48,6 +48,9 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     return initialTitle ? { ...seeded, title: initialTitle } : seeded
   })
 
+  const [titleMissing, setTitleMissing] = useState(false)
+  const [focusTitleTick, setFocusTitleTick] = useState(0)
+
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Populated by EntryEditor once CodeMirror mounts; used by saveMeta to capture current body
   const getBodyRef = useRef<() => string>(() => '')
@@ -66,12 +69,14 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // real entry route so subsequent autosaves upsert like any other existing item.
   const commitEntry = (next: EntryState) => {
     if (next.item) {
-      saveNode(next.item, next.editScope, next)
+      const result = saveNode(next.item, next.editScope, next)
+      setTitleMissing(result === 'missing-title')
       return
     }
     if (!next.title) return
     const result = saveNode(null, next.editScope, next)
-    if (result !== 'saved') return
+    if (result !== 'saved') { setTitleMissing(true); return }
+    setTitleMissing(false)
     flushPendingLinksRef.current()
     void navigate({ to: '/entry/$slug', params: { slug: titleToSlug(next.title) }, replace: true })
   }
@@ -119,7 +124,9 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   const handleSave = (body: string) => {
     const result = saveNode(entry.item, entry.editScope, { ...entry, body })
-    if (result === 'saved') goBack()
+    if (result === 'saved') { setTitleMissing(false); goBack(); return }
+    setTitleMissing(true)
+    setFocusTitleTick(t => t + 1)
   }
 
   const dialogs = useEntryDialogs(entry, updateEntry)
@@ -176,5 +183,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     handleOpenRepeatDlg: dialogs.handleOpenRepeatDlg,
     dialogHandlers: dialogs.dialogHandlers,
     scheduleAutoSave,
+    titleMissing,
+    focusTitleTick,
   }
 }
