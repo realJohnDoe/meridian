@@ -28,6 +28,10 @@ jobs:
       # running lint first left Route.useSearch()/useParams() unresolved on a
       # fresh checkout, causing spurious no-unsafe-* failures.
       - run: pnpm run build
+      # worker-configuration.d.ts is gitignored and generated from wrangler.toml;
+      # the worker's type-aware lint rules need it for the same reason routeTree.gen.ts
+      # is needed above (Request/Response/Env resolve to `any` without it).
+      - run: pnpm --filter meridian-oauth-worker run cf-typegen
       - run: pnpm run lint
       - run: pnpm test
       - run: pnpm run knip
