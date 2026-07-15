@@ -20,22 +20,6 @@ This report rests on close reading of roughly **60% of UI-layer code by volume**
 
 ## 3. Findings
 
-### 8. Saving with an empty title silently does nothing
-
-- **Category:** `ux` `error-handling`
-- **Impact:** 2 · **Breadth:** 2 files (`grep -n "missing-title" src/editor`) · **Fix effort:** S
-- **Evidence:** `src/editor/save.ts:105` `if (!title) return 'missing-title'`; the caller `src/editor/useEntryEditor.ts:121` does `if (result === 'saved') goBack()` — on `'missing-title'` the Save button (and every autosave) is a no-op with no feedback.
-- **Problem:** A user who types a body but no title and hits "Save occurrence" gets nothing — no navigation, no toast, no field highlight — and may believe the entry was saved.
-- **Fix:** On `'missing-title'`, focus the title textarea and show its placeholder in the destructive color (or a small inline hint).
-
-### 9. 19 icon-only controls rely on `title=` alone for their accessible name
-
-- **Category:** `a11y`
-- **Impact:** 2 · **Breadth:** 19 occurrences across ~8 files (`grep -rn 'title="' src | grep -v aria-label`) · **Fix effort:** S
-- **Evidence:** `src/components/Sidebar.tsx:171` `<button disabled={idx === 0} onClick={() => reorderFavorites(idx, idx - 1)} className="disabled:opacity-30 hover:text-sidebar-foreground" title="Move up"><ChevronUp size={13} /></button>` — while sibling code (e.g. `_app.tsx`'s nav chevrons) correctly uses `aria-label`.
-- **Problem:** `title` is unreliable as an accessible name (and invisible on touch), so the same codebase exposes two different icon-button conventions, one of them broken for screen readers.
-- **Fix:** Mechanical pass converting icon-only `title=` to `aria-label` (keeping `title` where hover hint is wanted); `jsx-a11y` from finding 2 won't catch this, so fold it into the same sweep.
-
 ### 10. The app shell derives view state by string-parsing `pathname` instead of using router matches
 
 - **Category:** `component-architecture`

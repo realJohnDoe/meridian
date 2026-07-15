@@ -35,29 +35,6 @@ then set `localStorage.meridian_bigvault = "300"` and load the Tutorial vault.
 
 Ranked by `(impact × breadth) ÷ effort`.
 
-### Finding 3 — Any metadata edit invalidates the expansion cache → full 8,680-occurrence re-expansion
-
-- **Flows affected:** 5 (change date/scope/title/tags/repeat), 4 (create), 6 (cold start does the first expansion) — **every edit save**.
-- **Category:** `critical-path-work` `data-and-persistence`
-- **Impact:** **6** — a ~0.4 s freeze on a daily-but-not-constant action; the toggle path avoids it, edits don't.
-- **Baseline measurement:** A single `roots`-identity change (what editing one title does) produced a **377 ms** long task. Isolated: full `expandWithMultiday` over the −365…+90 window = **111 ms median** (300 files → **8,680 occurrences**), plus `dedupeAndSort` of all 8,680 + regrouping + visible rows re-running `backlinksTo` (roots identity changed). By contrast, `toggleDone` keeps `roots` referentially stable, hits the cache overlay, and measured **0 long tasks**.
-- **Measurement recipe:** `st.setData({items: st.items.slice(), roots: newMapWithOneTitleChanged})` with a longtask observer installed → read the resulting long task (377 ms). Expansion isolation: exposed `expandWithMultiday`, ran it 6×, took the median (111 ms) and `.length` (8,680).
-- **Breadth:** `src/model/expansionCache.ts` + `src/model/storeOps.ts` `updateRoot` (every edit scope routes file-level fields through it) — affects all of `applyAll`/`applySingle`/`applyFuture`/`applyAdd`/`applyNew`.
-- **Fix effort:** M–L
-- **Evidence:** `src/model/expansionCache.ts:84` — the fast path requires `roots` reference-equality:
-  ```js
-  if (prev && prev.fromMs === fromMs && prev.toMs === toMs && prev.weekStart === weekStart && prev.roots === roots && hasSameStructure(prev.items, items)) {
-  ```
-  and `src/model/storeOps.ts:171` — `updateRoot` allocates a fresh map on every edit:
-  ```js
-  function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots { const next = new Map(roots) }
-  ```
-- **Note (2026-07-14):** the mechanism is independent of the Finding 2 fix — `expandWithMultiday` (the ~111 ms dominant cost) has nothing to do with backlinks, so this finding stands. Two second-order adjustments: (a) the "visible rows re-run `backlinksTo`" portion of the 377 ms is now cheaper (rows do an O(1) `backlinks.get`), so the real freeze is likely **somewhat under 377 ms** now; (b) slightly offsetting, a `roots`-identity change now also triggers one `buildBacklinkIndex` rebuild (`src/store.ts:144`, O(roots·items), ~one pass over ~878 items) on this same save path — small, but new whole-vault work. Net effect on the number is roughly a wash; re-measurement would refine it.
-- **Problem:** File-level fields (title/tags/items/body) live in `roots`; because the expansion cache keys on `roots` _identity_, changing any of them on one file discards the cached expansion for _all_ files and re-expands every series, blocking the save for ~0.4 s.
-- **Fix:** Gate the cache on structural inputs only (the `items` structure already has `hasSameStructure`; `roots` only feeds `joinFileMeta`'s title/tags), and overlay changed file-level fields onto cached occurrences the same way `done`/`priority` are overlaid today — or expand from `items` and join `roots` fields at render. Expected effect: edit long task **377 ms → <20 ms**.
-
----
-
 ### Finding 4 — 298 kB gzip `components` chunk on the agenda's cold-start critical path
 
 - **Flows affected:** 6 (cold start / PWA launch) — **once per launch**.
