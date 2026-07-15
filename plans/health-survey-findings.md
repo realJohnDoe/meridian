@@ -43,23 +43,6 @@ toolchain blind spots (coverage only measuring imported files, knip exempting al
 
 ## Findings
 
-### 5. The worker workspace is type-checked and tested but never linted
-
-| Category    | Impact | Breadth | Fix effort |
-| ----------- | ------ | ------- | ---------- |
-| `toolchain` | 2/10   | 5 files | S          |
-
-**Evidence:** `eslint.config.js:35` scopes everything to `files: ['src/**/*.{ts,tsx}'],`,
-the root script is `"lint": "eslint src"`, and `worker/package.json` has only `"typecheck"`
-and `"test"` scripts; CI's `worker-checks` job runs just those two.
-
-**Problem:** the security-most-sensitive code in the repo (the OAuth token exchange holding
-the client secret) is exempt from the type-aware rule set (`no-floating-promises`,
-`no-misused-promises`, …) that guards everything else.
-
-**Fix:** add a config block for `worker/src/**` (parser project `worker/tsconfig.json`,
-TS rules only — no React) and change the script to cover it.
-
 ### 6. 12-hour time formatting duplicated across `model/dateUtils.ts` and `format.ts`
 
 | Category | Impact | Breadth           | Fix effort |
@@ -75,25 +58,6 @@ each preceded by the same synthetic-`Date` construction from an `HH:mm` string.
 
 **Fix:** export one `formatHHMM(hhmm, hour12)` helper from `model` and have `fmtEndTime`
 delegate to it.
-
-### 7. Root view-model helper `occView.ts` depends on the UI-variants layer
-
-| Category                 | Impact | Breadth               | Fix effort |
-| ------------------------ | ------ | --------------------- | ---------- |
-| `architecture`, `layout` | 2/10   | 1 file (10 importers) | S          |
-
-**Evidence:** `occView.ts:4`:
-
-```ts
-import type { OccState } from "@/components/ui/occurrence-variants";
-```
-
-**Problem:** a root-level, framework-free helper (documented in CLAUDE.md as a cross-cutting
-view-model module) reaches _down into_ a feature directory for its return type — type-only,
-so no runtime cycle, but `occState()`'s domain vocabulary is defined by a cva styling file.
-
-**Fix:** move the `OccState` union into `types.ts` (or `occView.ts` itself) and have
-`occurrence-variants.ts` import it.
 
 ## Verdicts on remaining categories (no findings — status quo is correct)
 
