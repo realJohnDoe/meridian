@@ -56,10 +56,11 @@ function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack }: Topbar
         className={cn('rounded-full shrink-0', isFavorited ? 'text-rose-400' : 'text-dim')}
         onClick={onToggleFavorite}
         title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+        aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
       >
         <Heart size={18} className={isFavorited ? 'fill-current' : ''} />
       </Button>
-      <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete">
+      <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete" aria-label="Delete">
         <Trash2 size={18} />
       </Button>
     </div>,
