@@ -1,4 +1,4 @@
-import type { StoreItem, StoreOcc, Roots, Occurrence } from '@/types'
+import type { StoreItem, StoreOcc, Roots, Occurrence, FileMetadata } from '@/types'
 import { isSeries } from '@/types'
 import { expandWithMultiday } from './expansion'
 
@@ -81,8 +81,12 @@ export function computeExpansionCache(
   const fromMs = from.getTime()
   const toMs = to.getTime()
 
-  if (prev && prev.fromMs === fromMs && prev.toMs === toMs && prev.weekStart === weekStart && prev.roots === roots && hasSameStructure(prev.items, items)) {
-    // Only non-structural metadata changed — find altered items and overlay.
+  if (prev && prev.fromMs === fromMs && prev.toMs === toMs && prev.weekStart === weekStart && hasSameStructure(prev.items, items)) {
+    // Only non-structural metadata changed — find altered items/files and overlay.
+    // `roots` identity is deliberately NOT part of the fast-path gate above: a
+    // title/tags/body edit on one file allocates a brand-new `roots` map (see
+    // storeOps.ts's updateRoot), but that alone is never structural, so it must
+    // not force a full re-expansion of every other file's occurrences too.
     const changedById = new Map<string, StoreOcc>()
     for (let i = 0; i < items.length; i++) {
       if (items[i] !== prev.items[i] && !isSeries(items[i])) {
@@ -90,20 +94,31 @@ export function computeExpansionCache(
       }
     }
 
-    if (changedById.size === 0) {
-      return { ...prev, items }
+    const changedFileMeta = new Map<string, FileMetadata>()
+    if (roots !== prev.roots) {
+      for (const [fileSlug, meta] of roots) {
+        if (prev.roots.get(fileSlug) !== meta) changedFileMeta.set(fileSlug, meta)
+      }
+    }
+
+    if (changedById.size === 0 && changedFileMeta.size === 0) {
+      return { ...prev, items, roots }
     }
 
     const allOccs = prev.allOccs.map(occ => {
-      const changed = changedById.get(occ.id)
-      if (!changed) return occ
+      const changedItem = changedById.get(occ.id)
+      const changedFile = changedFileMeta.get(occ.fileSlug)
+      if (!changedItem && !changedFile) return occ
       return {
         ...occ,
         metadata: {
           ...occ.metadata,
-          done:         changed.metadata.done,
-          priority:     changed.metadata.priority,
-          participants: changed.metadata.participants,
+          ...(changedFile ? { title: changedFile.title, tags: changedFile.tags, items: changedFile.items, body: changedFile.body } : null),
+          ...(changedItem ? {
+            done:         changedItem.metadata.done,
+            priority:     changedItem.metadata.priority,
+            participants: changedItem.metadata.participants,
+          } : null),
         },
       }
     })
