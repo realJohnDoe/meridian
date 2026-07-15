@@ -23,17 +23,26 @@ export const CONTINUES_PADDING = {
   right: 'sm:pr-4',
 }
 
+/** Same padding as {@link CONTINUES_PADDING}, reserved at every width — for callers that always show the chevron. */
+export const CONTINUES_PADDING_ALWAYS = {
+  left:  'pl-4',
+  right: 'pr-4',
+}
+
 /**
  * Small chevron marking that a multiday occurrence's row continues past
  * this edge (out of the visible week row / day). Sits right at the row's
  * edge (2px inset) and muted (70% opacity) so it reads as a subtle
  * continuation cue rather than competing with the title. Absolutely
- * positioned — the parent needs `relative` and CONTINUES_PADDING on the
- * matching side to keep it clear of the title.
+ * positioned — the parent needs `relative` and a matching CONTINUES_PADDING
+ * on the same side to keep it clear of the title.
  *
- * Hidden below `sm`: at the compact mobile row width there isn't room for
- * both the chevron and the title, and the chevron ends up overlapping text
- * instead of just clipping it.
+ * Always visible when rendered — whether *this* row is worth showing a
+ * chevron on at the current width is the caller's call, not this
+ * component's. MonthView's week cells are too narrow for both the chevron
+ * and the title below `sm`, so it hides its usage with
+ * `className="hidden sm:block"`; DayView's full-width all-day row has room
+ * at every width, so it renders this with no override.
  */
 export function ContinuationChevron({ side, className }: ContinuationChevronProps) {
   const Icon = SIDE_ICON[side]
@@ -50,7 +59,7 @@ export function ContinuationChevron({ side, className }: ContinuationChevronProp
       // reliably wins here.
       style={{ width: 10, height: 10 }}
       className={cn(
-        'hidden sm:block absolute top-1/2 -translate-y-1/2 pointer-events-none opacity-70',
+        'block absolute top-1/2 -translate-y-1/2 pointer-events-none opacity-70',
         side === 'right' ? 'right-0.5' : 'left-0.5',
         className,
       )}

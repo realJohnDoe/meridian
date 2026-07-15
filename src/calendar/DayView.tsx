@@ -12,7 +12,7 @@ import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
-import { ContinuationChevron, CONTINUES_PADDING } from '@/components/ui/continuation-chevron'
+import { ContinuationChevron, CONTINUES_PADDING_ALWAYS } from '@/components/ui/continuation-chevron'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday, useCalendarFilter } from '@/hooks'
 import { computeColumns } from './computeColumns'
@@ -48,8 +48,8 @@ function AllDayItem({ o, onOpen, displayTitle, continuesLeft, continuesRight }: 
       className={cn(
         dvBlockVariants({ state: occState(o) }),
         'relative w-full flex items-center rounded-xs sm:rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
-        continuesLeft && CONTINUES_PADDING.left,
-        continuesRight && CONTINUES_PADDING.right,
+        continuesLeft && CONTINUES_PADDING_ALWAYS.left,
+        continuesRight && CONTINUES_PADDING_ALWAYS.right,
       )}
       onClick={() => onOpen(o)}
       aria-label={title}

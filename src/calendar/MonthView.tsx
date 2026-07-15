@@ -322,9 +322,9 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
                           b.continuesRight && CONTINUES_PADDING.right,
                         )}
                       >
-                        {b.continuesLeft && <ContinuationChevron side="left" />}
+                        {b.continuesLeft && <ContinuationChevron side="left" className="hidden sm:block" />}
                         <span className="truncate min-w-0">{b.occ.metadata.title}</span>
-                        {b.continuesRight && <ContinuationChevron side="right" />}
+                        {b.continuesRight && <ContinuationChevron side="right" className="hidden sm:block" />}
                       </div>
                     ))}
                   </div>
