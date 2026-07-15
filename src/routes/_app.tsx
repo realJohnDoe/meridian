@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { createFileRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
+import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import {
   Menu, CalendarCheck2,
   ChevronLeft, ChevronRight,
@@ -41,23 +41,27 @@ function AppMain() {
   }, [isMobile, setOpenMobile])
 
   const navigate = useNavigate()
-  const pathname = useRouterState({ select: s => s.location.pathname })
+
+  const entrySlugMatch = useMatch({ from: '/_app/entry/$slug', shouldThrow: false })
+  const entryNewMatch  = useMatch({ from: '/_app/entry/new', shouldThrow: false })
+  const dayMatch       = useMatch({ from: '/_app/day/$date', shouldThrow: false })
+  const monthMatch     = useMatch({ from: '/_app/calendar/$month', shouldThrow: false })
+  const backlogMatch   = useMatch({ from: '/_app/backlog', shouldThrow: false })
+  const notesMatch     = useMatch({ from: '/_app/notes', shouldThrow: false })
 
   const today         = useToday()
   const agendaTopDate = useStore(s => s.agendaTopDate)
 
-  const isEntryView  = pathname.startsWith('/entry')
-  const isDayView    = pathname.startsWith('/day/')
-  const isMonthView  = pathname.startsWith('/calendar')
-  const isListView   = pathname.startsWith('/backlog') || pathname.startsWith('/notes')
-  const dvDate       = isDayView ? new Date(pathname.split('/')[2] + 'T00:00:00') : null
-  const monthViewDate = isMonthView
-    ? (pathname.split('/')[2] ? parseMonth(pathname.split('/')[2]) : null)
-    : null
+  const isEntryView  = !!entrySlugMatch || !!entryNewMatch
+  const isDayView    = !!dayMatch
+  const isMonthView  = !!monthMatch
+  const isListView   = !!backlogMatch || !!notesMatch
+  const dvDate       = dayMatch ? new Date(dayMatch.params.date + 'T00:00:00') : null
+  const monthViewDate = monthMatch ? parseMonth(monthMatch.params.month) : null
 
   const topBarLabel = (() => {
-    if (pathname.startsWith('/backlog')) return 'Backlog'
-    if (pathname.startsWith('/notes'))   return 'Notes'
+    if (backlogMatch) return 'Backlog'
+    if (notesMatch)   return 'Notes'
     if (monthViewDate) return fmtTopBarMonth(monthViewDate, today)
     const d = agendaTopDate ? new Date(agendaTopDate + 'T00:00:00') : today
     return fmtTopBarDay(d, today)
@@ -66,7 +70,7 @@ function AppMain() {
   const handleToday = () => {
     if (isDayView) {
       void navigate({ to: '/day/$date', params: { date: fmtISO(today) } })
-    } else if (pathname.startsWith('/calendar')) {
+    } else if (isMonthView) {
       void navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } })
     } else {
       useStore.setState({ scrollToTodayOnce: true })
