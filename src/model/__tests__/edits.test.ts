@@ -296,6 +296,29 @@ repeat:
     expect(serializeData(next)).toMatchSnapshot()
   })
 
+  it('committing a "new entry" create twice for the same title upserts instead of duplicating', () => {
+    // Regression test: a brand-new item's first save can be followed by a second
+    // create-scoped commit before the caller has adopted the item it just
+    // created (e.g. a debounced body autosave firing right after an in-dialog
+    // metadata save already created the file). Without a guard, applyNew would
+    // append a second item sharing the same fileSlug, producing a silent
+    // duplicate `instances[]` entry on write.
+    const emptyData: StoreData = { items: [], roots: new Map() }
+    const fields: EditFields = {
+      title: 'Board game night',
+      tags: [], items: [], participants: [],
+      body: '', tracked: false, done: false, priority: null,
+      scheduled: { date: '2026-06-05', time: '19:00' },
+      duration: '', repeat: null,
+    }
+    const afterFirst = applyEdit(emptyData, null, 'all', fields)
+    expect(afterFirst.items).toHaveLength(1)
+
+    const afterSecond = applyEdit(afterFirst, null, 'all', { ...fields, duration: '1 hour' })
+    expect(afterSecond.items).toHaveLength(1)
+    expect(afterSecond.items[0].metadata.duration).toBe('1 hour')
+  })
+
   it('creating an undated task persists and stays searchable but off the calendar', () => {
     const emptyData: StoreData = { items: [], roots: new Map() }
     const next = applyEdit(emptyData, null, 'all', {

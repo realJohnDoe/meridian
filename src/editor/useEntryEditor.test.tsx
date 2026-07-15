@@ -75,13 +75,33 @@ describe('useEntryEditor', () => {
     expect(saved?.metadata.done).toBe(true)
   })
 
-  it('a new entry with a title commits on mount and navigates to it', () => {
+  it('a new entry with a title commits on mount without navigating away', () => {
     const { result } = renderHook(() => useEntryEditor(null, 'single', 'My New Task'))
     const slug = titleToSlug('My New Task')
 
     expect(persistence.writes).toEqual([slug])
-    expect(navigateMock).toHaveBeenCalledWith({ to: '/entry/$slug', params: { slug }, replace: true })
+    // Navigating away mid-session used to tear down the editor (and any open
+    // dialog) the instant the first save landed — see the duplicate-entry
+    // investigation. The created item is now adopted internally instead, so
+    // the editor stays mounted on /entry/new for the rest of the session.
+    expect(navigateMock).not.toHaveBeenCalled()
     expect(result.current.entry.item).toBeNull()
+  })
+
+  it('a metadata save fired right after the creating save upserts instead of duplicating the item', () => {
+    // Reproduces the reported bug: typing a title arms the debounced body
+    // autosave, but confirming a dialog (date/time/duration/priority) before
+    // that timer fires calls saveMeta synchronously — landing a second
+    // create-scoped commit while the hook still thinks no item exists yet.
+    const { result } = renderHook(() => useEntryEditor(null, 'all', 'Board game night'))
+    const slug = titleToSlug('Board game night')
+
+    expect(useStore.getState().items.filter(i => i.fileSlug === slug)).toHaveLength(1)
+
+    act(() => { result.current.handleDoneToggle() })
+
+    expect(useStore.getState().items.filter(i => i.fileSlug === slug)).toHaveLength(1)
+    expect(navigateMock).not.toHaveBeenCalled()
   })
 
   it('editScope "add" suppresses both the meta save and the autosave', () => {

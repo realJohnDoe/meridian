@@ -179,10 +179,41 @@ function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots {
   return next
 }
 
-/** Create a brand-new item (series or standalone). */
+/** Apply editor fields onto an existing series or standalone item's structural + metadata fields. */
+function applyFieldsToItem(item: StoreItem, fields: EditFields): StoreItem {
+  const { scheduled, repeat } = fields
+  if (isSeries(item)) {
+    return { ...item, metadata: seriesMeta(item.metadata, fields), repeat: repeat ?? item.repeat,
+      date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
+  }
+  return { ...item, metadata: occMeta(item.metadata, fields),
+    date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
+}
+
+/**
+ * Create a brand-new item (series or standalone).
+ *
+ * Guarded against re-creating over an existing file: a "new entry" commit can
+ * run more than once for the same not-yet-adopted item (e.g. a debounced
+ * autosave firing after an in-dialog save already created the file). If a root
+ * already exists for the title's fileSlug, this upserts onto its existing
+ * series/standalone item instead of appending a sibling — otherwise two items
+ * would end up sharing one fileSlug, which collapses into a duplicate
+ * `instances[]` entry on write.
+ */
 function applyNew({ items, roots }: StoreData, fields: EditFields): StoreData {
   const { title, scheduled, repeat } = fields
   const fileSlug = titleToSlug(title) || crypto.randomUUID()
+
+  if (roots.has(fileSlug)) {
+    const existing = items.find(i => i.fileSlug === fileSlug && (isSeries(i) || isStandaloneOcc(i)))
+    if (existing) {
+      const newRoots = updateRoot(roots, fileSlug, fields)
+      const newItems = items.map(i => i.id === existing.id ? applyFieldsToItem(i, fields) : i)
+      return { items: newItems, roots: newRoots }
+    }
+  }
+
   const newRoot: FileMetadata = {
     title, tags: fields.tags, items: fields.items ?? [], body: fields.body || undefined,
   }
@@ -212,20 +243,11 @@ function applyNew({ items, roots }: StoreData, fields: EditFields): StoreData {
 
 /** Update the series (or standalone) metadata across all occurrences. */
 function applyAll({ items, roots }: StoreData, occ: Occurrence, fields: EditFields): StoreData {
-  const { scheduled, repeat } = fields
   roots = updateRoot(roots, occ.fileSlug, fields)
   const matchItem = occ.ownerId
     ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
     : (i: StoreItem) => isStandaloneOcc(i) && i.id === occ.id
-  items = items.map(i => {
-    if (!matchItem(i)) return i
-    if (isSeries(i)) {
-      return { ...i, metadata: seriesMeta(i.metadata, fields), repeat: repeat ?? i.repeat,
-        date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
-    }
-    return { ...i, metadata: occMeta(i.metadata, fields),
-      date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
-  })
+  items = items.map(i => matchItem(i) ? applyFieldsToItem(i, fields) : i)
   return { items, roots }
 }
 
