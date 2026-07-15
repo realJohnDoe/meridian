@@ -171,6 +171,40 @@ export default [
     },
   },
 
+  // worker/ is a standalone Cloudflare Worker package (its own tsconfig, no
+  // React/DOM) that holds the OAuth token exchange — the most security-
+  // sensitive code in the repo, since it handles the GitHub client secret.
+  // It gets the same type-aware TS rule set as src/ (no-floating-promises,
+  // no-misused-promises, no-unsafe-*, …) but none of the React/jsx-a11y/
+  // import-boundary rules, which don't apply to this package.
+  {
+    files: ['worker/src/**/*.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: './worker/tsconfig.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    linterOptions: {
+      reportUnusedDisableDirectives: false,
+    },
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+    },
+    rules: {
+      ...tsRecommendedTypeCheckedRules,
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
+      ],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+
   // src/debug/ is developer-only tooling (never shipped to end users), so
   // jsx-a11y's recommended checks don't apply there.
   {
@@ -273,6 +307,17 @@ export default [
       'src/storage/__tests__/sync-collision.test.ts',
       'src/storage/__tests__/sync.test.ts',
     ],
+    rules: {
+      '@typescript-eslint/require-await': 'off',
+    },
+  },
+
+  // The test doubles for GitHubTokenExchanger are deliberately synchronous
+  // (no real network I/O to await) — `async` is there only so their
+  // signatures structurally match the Promise-returning contract, not
+  // because they ever await anything.
+  {
+    files: ['worker/src/oauthToken.test.ts'],
     rules: {
       '@typescript-eslint/require-await': 'off',
     },
