@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, lazy, Suspense } from 'react'
 import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
@@ -6,7 +6,6 @@ import { setActiveVault } from '@/vaultActions'
 import { fmtISO, fmtMonth } from '@/model'
 import { useToday, useResetOnChange } from '@/hooks'
 import { vaultIcon } from './vaultIcon'
-import SettingsDialog from './SettingsDialog'
 import { Checkbox } from './ui/checkbox'
 import { IconButton } from './ui/icon-button'
 import { NO_PARTICIPANT } from '@/hooks'
@@ -24,8 +23,14 @@ import {
 } from './ui/sidebar'
 import { slugRoute } from '@/routes'
 
+// Lazy: pulls in the settings UI plus the add-vault wizard, which isn't
+// needed on the agenda's cold-start critical path — deferred until Settings
+// is actually opened.
+const SettingsDialog = lazy(() => import('./SettingsDialog'))
+
 export default function AppSidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [hasOpenedSettings, setHasOpenedSettings] = useState(false)
   const [editingFavorites, setEditingFavorites] = useState(false)
 
   const navigate  = useNavigate()
@@ -238,7 +243,7 @@ export default function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   data-tour="manage-vaults"
-                  onClick={() => { close(); setSettingsOpen(true) }}
+                  onClick={() => { close(); setSettingsOpen(true); setHasOpenedSettings(true) }}
                   className="gap-3.5 px-5 h-auto py-3 text-sm font-medium rounded-none"
                 >
                   <Settings2 className="size-4.5 stroke-[1.7] shrink-0" />
@@ -250,7 +255,11 @@ export default function AppSidebar() {
         </SidebarContent>
       </Sidebar>
 
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      {hasOpenedSettings && (
+        <Suspense fallback={null}>
+          <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+        </Suspense>
+      )}
     </>
   )
 }
