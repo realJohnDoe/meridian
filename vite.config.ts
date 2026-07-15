@@ -85,7 +85,10 @@ function cspPlugin(): Plugin {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data:",
-    "connect-src 'self' https://api.github.com https://meridian-oauth.realjohndoe.workers.dev",
+    // codeload.github.com: the repo-archive (zipball) endpoint on api.github.com
+    // 302-redirects here, and CSP is enforced against the redirected URL too — so
+    // fetching a vault as an archive needs this host explicitly allowed.
+    "connect-src 'self' https://api.github.com https://codeload.github.com https://meridian-oauth.realjohndoe.workers.dev",
     "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
