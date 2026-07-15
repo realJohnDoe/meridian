@@ -1,10 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
-import { SearchOverlay } from '@/search'
 import { newEntryRoute } from '@/routes'
 import { useOpenEntry } from '@/hooks'
+
+// Lazy: SearchResults/FileResultsList pull in enough weight that they
+// shouldn't sit on the agenda's cold-start critical path — deferred until
+// search is actually opened.
+const SearchOverlay = lazy(() => import('@/search').then(m => ({ default: m.SearchOverlay })))
 
 export default function SearchBar() {
   // sq present (even as '') = search overlay open; sq value = current query.
@@ -42,14 +47,18 @@ export default function SearchBar() {
   return (
     <div className="shrink-0 relative z-30 pointer-events-none">
       {/* Full-screen layer on mobile/tablet, popover + scoped backdrop on desktop */}
-      <SearchOverlay
-        open={searchOpen}
-        query={filterQuery}
-        onQueryChange={setQuery}
-        onClose={closeSearch}
-        onOpen={handleOpen}
-        onCreate={handleCreate}
-      />
+      {searchOpen && (
+        <Suspense fallback={null}>
+          <SearchOverlay
+            open={searchOpen}
+            query={filterQuery}
+            onQueryChange={setQuery}
+            onClose={closeSearch}
+            onOpen={handleOpen}
+            onCreate={handleCreate}
+          />
+        </Suspense>
+      )}
 
       {/* Gradient fade blending content into the sheet */}
       <div className="absolute inset-x-0 bottom-full h-10 bg-gradient-to-b from-transparent to-background/85 pointer-events-none" />
