@@ -4,6 +4,12 @@ import { cn } from '@/lib/cn'
 interface ContinuationChevronProps {
   /** Which edge of the row the occurrence continues past. */
   side: 'left' | 'right'
+  /**
+   * Show at every width, not just `sm` and up. DayView's all-day row spans
+   * the full width even on mobile, so there's always room for the chevron —
+   * unlike MonthView's narrow week cells, which need it hidden below `sm`.
+   */
+  alwaysVisible?: boolean
   className?: string
 }
 
@@ -23,6 +29,12 @@ export const CONTINUES_PADDING = {
   right: 'sm:pr-4',
 }
 
+/** Same as {@link CONTINUES_PADDING}, but reserved at every width — pair with `alwaysVisible`. */
+export const CONTINUES_PADDING_ALWAYS = {
+  left:  'pl-4',
+  right: 'pr-4',
+}
+
 /**
  * Small chevron marking that a multiday occurrence's row continues past
  * this edge (out of the visible week row / day). Sits right at the row's
@@ -35,7 +47,7 @@ export const CONTINUES_PADDING = {
  * both the chevron and the title, and the chevron ends up overlapping text
  * instead of just clipping it.
  */
-export function ContinuationChevron({ side, className }: ContinuationChevronProps) {
+export function ContinuationChevron({ side, alwaysVisible, className }: ContinuationChevronProps) {
   const Icon = SIDE_ICON[side]
   return (
     <Icon
@@ -50,7 +62,8 @@ export function ContinuationChevron({ side, className }: ContinuationChevronProp
       // reliably wins here.
       style={{ width: 10, height: 10 }}
       className={cn(
-        'hidden sm:block absolute top-1/2 -translate-y-1/2 pointer-events-none opacity-70',
+        alwaysVisible ? 'block' : 'hidden sm:block',
+        'absolute top-1/2 -translate-y-1/2 pointer-events-none opacity-70',
         side === 'right' ? 'right-0.5' : 'left-0.5',
         className,
       )}
