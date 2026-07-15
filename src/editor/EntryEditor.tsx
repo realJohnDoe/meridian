@@ -71,6 +71,8 @@ interface Props {
   roots: Roots
   onOpenWikilink?: (ref: string) => void
   onToggleDoneBacklink?: (occ: Occurrence) => void
+  titleError?: boolean
+  focusTitleTick?: number
 }
 
 function autoResize(el: HTMLTextAreaElement) {
@@ -78,7 +80,7 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = el.scrollHeight + 'px'
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, flushPendingLinksRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, flushPendingLinksRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink, titleError, focusTitleTick }: Props) {
   const navigate           = useNavigate()
   const hour12             = useStore(s => s.localePrefs.hour12)
   const defaultParticipants = useStore(s => s.defaultParticipants)
@@ -94,6 +96,10 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
   }, [entry.title])
+
+  useEffect(() => {
+    if (focusTitleTick) titleRef.current?.focus()
+  }, [focusTitleTick])
 
   function handlePromoteTask(title: string, done: boolean): string | null {
     const result = saveNode(null, 'all', {
@@ -171,7 +177,10 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
           <div className="flex-1 min-w-0">
             <textarea
               ref={titleRef}
-              className="w-full text-2xl font-light text-foreground bg-transparent border-none outline-none leading-snug resize-none placeholder:text-muted-foreground"
+              className={cn(
+                'w-full text-2xl font-light text-foreground bg-transparent border-none outline-none leading-snug resize-none',
+                titleError ? 'placeholder:text-destructive' : 'placeholder:text-muted-foreground',
+              )}
               placeholder="Title"
               rows={1}
               value={title}
