@@ -34,6 +34,10 @@ export function useFlipReorder<T>(
     }
     container.addEventListener('transitionend', onTransitionEnd)
 
+    // Phase 1 (READ): measure every row before writing anything. Interleaving
+    // reads and writes per-row here would force a synchronous reflow on each
+    // moved row instead of one reflow for the whole batch.
+    const moved: { wrap: HTMLElement; dy: number }[] = []
     wraps.forEach(wrap => {
       const key = wrap.getAttribute('data-occ-key')!
       const curr = wrap.getBoundingClientRect().top - containerTop
@@ -42,20 +46,29 @@ export function useFlipReorder<T>(
         const prev = prevTops.current[key]
         if (prev !== undefined) {
           const dy = prev - curr
-          if (Math.abs(dy) > 1) {
-            wrap.style.transition = 'none'
-            wrap.style.transform = `translateY(${dy}px)`
-            void wrap.offsetHeight
-            rafs.push(requestAnimationFrame(() => {
-              wrap.style.transition = 'transform .35s cubic-bezier(.4,0,.2,1)'
-              wrap.style.transform = ''
-            }))
-          }
+          if (Math.abs(dy) > 1) moved.push({ wrap, dy })
         }
       }
 
       newTops[key] = curr
     })
+
+    // Phase 2 (WRITE): apply the pre-animation transform to every moved row.
+    for (const { wrap, dy } of moved) {
+      wrap.style.transition = 'none'
+      wrap.style.transform = `translateY(${dy}px)`
+    }
+
+    // One forced reflow for the whole batch so the transforms above are
+    // registered before the transition is re-enabled below.
+    if (moved.length) void container.offsetHeight
+
+    for (const { wrap } of moved) {
+      rafs.push(requestAnimationFrame(() => {
+        wrap.style.transition = 'transform .35s cubic-bezier(.4,0,.2,1)'
+        wrap.style.transform = ''
+      }))
+    }
 
     prevTops.current = newTops
     return () => {
