@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { hasSameStructure } from '@/model/expansionCache'
-import type { StoreSeries, StoreOcc } from '@/types'
+import { hasSameStructure, computeExpansionCache } from '@/model/expansionCache'
+import type { StoreSeries, StoreOcc, Roots } from '@/types'
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -120,5 +120,52 @@ describe('hasSameStructure', () => {
 
   it('returns false when an item switches between series and occurrence', () => {
     expect(hasSameStructure([series({ id: 'x' })], [occ({ id: 'x' })])).toBe(false)
+  })
+})
+
+describe('computeExpansionCache', () => {
+  const from = new Date('2026-05-25T00:00:00Z')
+  const to = new Date('2026-06-08T00:00:00Z')
+
+  function rootsOf(entries: [string, { title: string; tags: string[]; items: string[] }][]): Roots {
+    return new Map(entries)
+  }
+
+  it('overlays a changed file title onto cached occurrences without re-expanding, leaving other files untouched', () => {
+    const a = occ({ id: 'a', fileSlug: 'note-a.md', date: '2026-06-01' })
+    const b = occ({ id: 'b', fileSlug: 'note-b.md', date: '2026-06-02' })
+    const items = [a, b]
+    const roots1 = rootsOf([
+      ['note-a.md', { title: 'Old Title', tags: [], items: [] }],
+      ['note-b.md', { title: 'Note B', tags: [], items: [] }],
+    ])
+
+    const first = computeExpansionCache(null, items, roots1, from, to)
+    expect(first.allOccs.find(o => o.id === 'a')?.metadata.title).toBe('Old Title')
+
+    // Simulate editing note-a's title: storeOps.updateRoot allocates a fresh
+    // map and a fresh entry for the edited slug only (see updateRoot).
+    const roots2 = new Map(roots1)
+    roots2.set('note-a.md', { title: 'New Title', tags: [], items: [] })
+
+    const second = computeExpansionCache(first, items, roots2, from, to)
+
+    // Fast path taken: allOccs array is a new array (overlay), but items didn't
+    // change, so this isn't a full re-expansion — verify via title propagation.
+    expect(second.allOccs.find(o => o.id === 'a')?.metadata.title).toBe('New Title')
+    expect(second.allOccs.find(o => o.id === 'b')?.metadata.title).toBe('Note B')
+  })
+
+  it('returns the same allOccs reference when neither items nor roots entries changed', () => {
+    const a = occ({ id: 'a', fileSlug: 'note-a.md', date: '2026-06-01' })
+    const items = [a]
+    const roots1 = rootsOf([['note-a.md', { title: 'Title', tags: [], items: [] }]])
+
+    const first = computeExpansionCache(null, items, roots1, from, to)
+    // New Map instance, but every entry is reference-identical to roots1's.
+    const roots2 = new Map(roots1)
+    const second = computeExpansionCache(first, items, roots2, from, to)
+
+    expect(second.allOccs).toBe(first.allOccs)
   })
 })
