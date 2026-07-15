@@ -9,6 +9,7 @@ import { useToday } from '@/hooks'
 import { newEntryRoute } from '@/routes'
 import { resolveWikilink } from '@/wikilinks'
 import { titleToSlug } from '@/fileIO'
+import { getFom } from '@/storeBridge'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
 
@@ -52,6 +53,9 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const [focusTitleTick, setFocusTitleTick] = useState(0)
 
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+  }, [])
   // Populated by EntryEditor once CodeMirror mounts; used by saveMeta to capture current body
   const getBodyRef = useRef<() => string>(() => '')
   // Populated by EntryEditor; flushes pending "listed on" links once a new item is created
@@ -59,18 +63,33 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // Always points to the latest entry so timer callbacks don't close over stale state
   const entryRef = useRef(entry)
   useEffect(() => { entryRef.current = entry }, [entry])
+  // Once a brand-new item's first save creates its file, this holds the resulting
+  // occurrence so later commits in the same session upsert onto it (see commitEntry)
+  // instead of calling applyNew again. Deliberately NOT stored on `entry.item` —
+  // EntryEditor derives `bodyKey`/scope-row visibility/etc. from that field, and
+  // flipping it mid-session would remount the CodeMirror body editor under the user.
+  const createdItemRef = useRef<Occurrence | null>(null)
 
   const storeRoots = useStore(s => s.roots)
   const navigate = useNavigate()
   const router = useRouter()
 
-  // Persists an edit. For an existing item this upserts in place; for a brand-new
-  // item (item === null) it creates the file on first save, then hands off to the
-  // real entry route so subsequent autosaves upsert like any other existing item.
+  // Persists an edit. For an existing item (or one already adopted via
+  // createdItemRef) this upserts in place. For a brand-new item it creates the
+  // file on first save and adopts the result, so any further commit in this
+  // session — a late debounced autosave, a dialog confirmed right after — also
+  // upserts instead of re-running applyNew (which would otherwise append a
+  // second item under the same fileSlug).
   const commitEntry = (next: EntryState) => {
-    if (next.item) {
-      const result = saveNode(next.item, next.editScope, next)
+    const item = next.item ?? createdItemRef.current
+    if (item) {
+      const result = saveNode(item, next.editScope, next)
       setTitleMissing(result === 'missing-title')
+      // No-op once `next.item` itself is set (usePendingLinks already flushes
+      // immediately in that case) — but while item only lives in
+      // createdItemRef, entry.item is still null, so pending "listed on" links
+      // added after creation would otherwise never get flushed again.
+      flushPendingLinksRef.current()
       return
     }
     if (!next.title) return
@@ -78,7 +97,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     if (result !== 'saved') { setTitleMissing(true); return }
     setTitleMissing(false)
     flushPendingLinksRef.current()
-    void navigate({ to: '/entry/$slug', params: { slug: titleToSlug(next.title) }, replace: true })
+    createdItemRef.current = getFom().get(titleToSlug(next.title)) ?? null
   }
 
   const saveMeta = (next: EntryState) => {
