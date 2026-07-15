@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { StoreItem, Roots, Occurrence, LocalePrefs, VaultRef } from './types'
-import { clearOccIdCache, weekStartsOn } from '@/model'
+import { weekStartsOn } from '@/model'
 import { updateFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
 import { readVaultStringArray, writeVaultJSON, readVaultJSON } from '@/lib/vaultStorage'
 
@@ -137,7 +137,6 @@ export const useStore = create<MeridianStore>((set, get) => {
     fom: new Map(),
     backlinks: new Map(),
     setData: ({ items, roots }) => {
-      clearOccIdCache()
       const { items: prevItems, roots: prevRoots, fom: prevFom, backlinks: prevBacklinks, localePrefs } = get()
       const weekStart = weekStartsOn(localePrefs)
       // backlinks depend only on roots; reuse the prior index when roots is reference-stable.

@@ -349,8 +349,9 @@ instances:
 //
 // Guard tests: the incremental map must be semantically equivalent to a full
 // fileOccurrenceMap rebuild at every step. We compare all fields except `id`
-// (stableOccId UUIDs may diverge for reused entries after clearOccIdCache) and
-// `metadata.jsTime` (Date objects computed fresh each time).
+// (a rebuild after an override upsert can carry a different backing item for
+// an otherwise-equivalent occurrence) and `metadata.jsTime` (Date objects
+// computed fresh each time).
 
 function occKey(occ: Occurrence) {
   return {
