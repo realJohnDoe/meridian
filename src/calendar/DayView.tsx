@@ -54,9 +54,9 @@ function AllDayItem({ o, onOpen, displayTitle, continuesLeft, continuesRight }: 
       onClick={() => onOpen(o)}
       aria-label={title}
     >
-      {continuesLeft && <ContinuationChevron side="left" alwaysVisible />}
+      {continuesLeft && <ContinuationChevron side="left" />}
       <span>{title}</span>
-      {continuesRight && <ContinuationChevron side="right" alwaysVisible />}
+      {continuesRight && <ContinuationChevron side="right" />}
     </SurfaceButton>
   )
 }
