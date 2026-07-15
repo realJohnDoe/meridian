@@ -2,21 +2,22 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import type { OccState } from '@/types'
 
 /**
- * Shared pattern for active tasks and notes: solid bg-{color} + text-primary-foreground.
- * Full-opacity backgrounds (rather than a light tint) plus primary-foreground text
- * (already tuned per theme for contrast on a saturated surface) is deliberate: a
- * light tint behind colored text can't clear AA on light themes, no matter the text
+ * Shared pattern for active tasks and notes: solid bg-{color} + text-{color}-foreground.
+ * Full-opacity backgrounds (rather than a light tint) plus a per-domain-color
+ * foreground (each theme picks whichever of its two ink colors contrasts best
+ * against that specific swatch — see index.css) is deliberate: a light tint
+ * behind colored text can't clear AA on light themes, no matter the text
  * color. hover:bg-{color}/90 (matching the buttonVariants hover convention) and an
  * explicit hover:text so neither gets silently overridden by SurfaceButton's own
  * ghost-variant hover styles. Identical across all item-display contexts — one edit
  * here changes every view.
  */
 const TINT_CLASSES = {
-  'task-open': 'bg-task text-primary-foreground hover:bg-task/90 hover:text-primary-foreground',
-  'task-p1':   'bg-priority-1 text-primary-foreground hover:bg-priority-1/90 hover:text-primary-foreground',
-  'task-p2':   'bg-priority-2 text-primary-foreground hover:bg-priority-2/90 hover:text-primary-foreground',
-  'task-p3':   'bg-priority-3 text-primary-foreground hover:bg-priority-3/90 hover:text-primary-foreground',
-  note:        'bg-note text-primary-foreground hover:bg-note/90 hover:text-primary-foreground',
+  'task-open': 'bg-task text-task-foreground hover:bg-task/90 hover:text-task-foreground',
+  'task-p1':   'bg-priority-1 text-priority-1-foreground hover:bg-priority-1/90 hover:text-priority-1-foreground',
+  'task-p2':   'bg-priority-2 text-priority-2-foreground hover:bg-priority-2/90 hover:text-priority-2-foreground',
+  'task-p3':   'bg-priority-3 text-priority-3-foreground hover:bg-priority-3/90 hover:text-priority-3-foreground',
+  note:        'bg-note text-note-foreground hover:bg-note/90 hover:text-note-foreground',
 }
 
 /**
@@ -86,8 +87,8 @@ export const dvBlockVariants = cva('', {
     },
   },
   compoundVariants: [
-    { state: 'event-future', bordered: false, className: 'bg-event text-primary-foreground hover:bg-event/90 hover:text-primary-foreground' },
-    { state: 'event-future', bordered: true,  className: 'bg-event text-primary-foreground hover:bg-event/90 hover:text-primary-foreground' },
+    { state: 'event-future', bordered: false, className: 'bg-event text-event-foreground hover:bg-event/90 hover:text-event-foreground' },
+    { state: 'event-future', bordered: true,  className: 'bg-event text-event-foreground hover:bg-event/90 hover:text-event-foreground' },
     // active states are already fully colored, so a same-hue border stripe would be
     // invisible — only event-past/done (neutral bg-muted) benefit from one
     { state: 'event-past', bordered: true, className: 'border-l-surface-raised' },

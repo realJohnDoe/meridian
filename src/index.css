@@ -61,6 +61,16 @@
   --color-p1:             var(--priority-1);
   --color-p2:             var(--priority-2);
   --color-p3:             var(--priority-3);
+  /* On-accent text for solid domain-color chips — each theme picks whichever
+     of its two ink colors (--ink-light/--ink-dark) contrasts best against
+     that specific swatch, so swatches can stay at their vivid brand hue
+     instead of being darkened/lightened to fit one universal ink. */
+  --color-event-foreground:      var(--event-foreground);
+  --color-task-foreground:       var(--task-foreground);
+  --color-note-foreground:       var(--note-foreground);
+  --color-priority-1-foreground: var(--priority-1-foreground);
+  --color-priority-2-foreground: var(--priority-2-foreground);
+  --color-priority-3-foreground: var(--priority-3-foreground);
   /* Extra text tier — icons, unselected nav */
   --color-dim:            var(--dim);
   /* Surface for past/done */
@@ -103,7 +113,11 @@
 
   /* Brand */
   --primary:            oklch(0.68 0.22 278);   /* indigo — balanced for text on dark surfaces and filled button bg */
-  --primary-foreground: var(--background);      /* near-black ink, like tokyo-night/dracula — reads better on our light pastel accents than white */
+  --primary-foreground: var(--ink-dark);        /* near-black ink, like tokyo-night/dracula — reads better on our light pastel accents than white */
+
+  /* On-accent ink pair — see --*-foreground assignments below */
+  --ink-dark:  var(--background);
+  --ink-light: oklch(1 0 0);
 
   /* Destructive */
   --destructive: oklch(0.72 0.20 15);   /* rose */
@@ -122,6 +136,14 @@
   --priority-1:   oklch(0.72 0.19 22);    /* red */
   --priority-2:   oklch(0.76 0.17 48);    /* orange */
   --priority-3:   oklch(0.88 0.18 82);    /* yellow */
+
+  /* On-accent text — all domain colors here are light pastels, so dark ink wins */
+  --event-foreground:      var(--ink-dark);
+  --task-foreground:       var(--ink-dark);
+  --note-foreground:       var(--ink-dark);
+  --priority-1-foreground: var(--ink-dark);
+  --priority-2-foreground: var(--ink-dark);
+  --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
   --sidebar:                    oklch(0.24 0.05 252);
@@ -192,8 +214,12 @@
 
   /* Brand — Tokyo Night magenta/pink as primary */
   --primary:            #bb9af7;
-  --primary-foreground: #1a1b2e;
+  --primary-foreground: var(--ink-dark);
   --ring:               #bb9af7;
+
+  /* On-accent ink pair — see --*-foreground assignments below */
+  --ink-dark:  #1a1b2e;
+  --ink-light: #ffffff;
 
   /* Destructive / warning */
   --destructive: #f7768e;
@@ -211,6 +237,14 @@
   --priority-1:   #f7768e;   /* red */
   --priority-2:   #ff9e64;   /* orange */
   --priority-3:   #e0af68;   /* yellow */
+
+  /* On-accent text — all domain colors here are light pastels, so dark ink wins */
+  --event-foreground:      var(--ink-dark);
+  --task-foreground:       var(--ink-dark);
+  --note-foreground:       var(--ink-dark);
+  --priority-1-foreground: var(--ink-dark);
+  --priority-2-foreground: var(--ink-dark);
+  --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
   --sidebar:                    #1f2040;
@@ -250,8 +284,12 @@
 
   /* Brand — iris (purple) */
   --primary:            #907aa9;
-  --primary-foreground: #fffaf3;
+  --primary-foreground: var(--ink-light);
   --ring:               #907aa9;
+
+  /* On-accent ink pair — see --*-foreground assignments below */
+  --ink-light: #fffaf3;
+  --ink-dark:  #575279;
 
   /* Destructive / warning */
   --destructive: #b4637a;
@@ -261,15 +299,23 @@
   --border: color-mix(in oklab, #9893a5, transparent 78%);
   --input:  color-mix(in oklab, #9893a5, transparent 68%);
 
-  /* Domain colors — darkened from the base brand hue where needed so
-     text-primary-foreground clears AA when used as a solid chip background */
-  --event:        #7e659b;   /* iris, darkened */
-  --task:         #5b7932;   /* olive green, darkened */
+  /* Domain colors — vivid, undarkened brand hues */
+  --event:        #907aa9;   /* iris */
+  --task:         #6a8c3a;   /* olive green */
   --note:         #286983;   /* pine */
   --brand-cyan:   #56949f;   /* foam */
   --priority-1:   #b02840;   /* red */
-  --priority-2:   #af5717;   /* orange, darkened */
-  --priority-3:   #816f00;   /* yellow, darkened */
+  --priority-2:   #c4621a;   /* orange */
+  --priority-3:   #c4a800;   /* yellow */
+
+  /* On-accent text — per-swatch pick of whichever ink clears more contrast;
+     priority-3 (yellow) is the outlier that needs dark ink instead of light */
+  --event-foreground:      var(--ink-light);
+  --task-foreground:       var(--ink-light);
+  --note-foreground:       var(--ink-light);
+  --priority-1-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-light);
+  --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
   --sidebar:                    #faf4ed;
@@ -313,8 +359,12 @@
 
   /* Brand — violet */
   --primary:            #6c71c4;
-  --primary-foreground: #fdf6e3;
+  --primary-foreground: var(--ink-light);
   --ring:               #6c71c4;
+
+  /* On-accent ink pair — see --*-foreground assignments below */
+  --ink-light: #fdf6e3;
+  --ink-dark:  #586e75;
 
   /* Destructive / warning */
   --destructive: #dc322f;
@@ -324,15 +374,22 @@
   --border: color-mix(in oklab, #839496, transparent 78%);
   --input:  color-mix(in oklab, #839496, transparent 68%);
 
-  /* Domain colors — darkened from the base brand hue where needed so
-     text-primary-foreground clears AA when used as a solid chip background */
-  --event:        #5f64bf;   /* violet, darkened */
-  --task:         #657400;   /* green, darkened */
-  --note:         #207973;   /* cyan, darkened */
+  /* Domain colors — vivid, undarkened brand hues */
+  --event:        #6c71c4;   /* violet */
+  --task:         #859900;   /* green */
+  --note:         #2aa198;   /* cyan */
   --brand-cyan:   #2aa198;
-  --priority-1:   #d22623;   /* red, darkened */
-  --priority-2:   #bd4615;   /* orange, darkened */
-  --priority-3:   #8a6800;   /* yellow, darkened */
+  --priority-1:   #dc322f;   /* red */
+  --priority-2:   #cb4b16;   /* orange */
+  --priority-3:   #b58900;   /* yellow */
+
+  /* On-accent text — light ink wins the contrast comparison for every swatch here */
+  --event-foreground:      var(--ink-light);
+  --task-foreground:       var(--ink-light);
+  --note-foreground:       var(--ink-light);
+  --priority-1-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-light);
+  --priority-3-foreground: var(--ink-light);
 
   /* Sidebar */
   --sidebar:                    #fdf6e3;
@@ -376,8 +433,12 @@
 
   /* Brand — Dracula purple as primary */
   --primary:            #bd93f9;
-  --primary-foreground: #282a36;
+  --primary-foreground: var(--ink-dark);
   --ring:               #bd93f9;
+
+  /* On-accent ink pair — see --*-foreground assignments below */
+  --ink-dark:  #282a36;
+  --ink-light: #ffffff;
 
   /* Destructive / warning */
   --destructive: #ff5555;
@@ -395,6 +456,14 @@
   --priority-1:   #ff5555;   /* red */
   --priority-2:   #ffb86c;   /* orange */
   --priority-3:   #f1fa8c;   /* yellow */
+
+  /* On-accent text — all domain colors here are light pastels, so dark ink wins */
+  --event-foreground:      var(--ink-dark);
+  --task-foreground:       var(--ink-dark);
+  --note-foreground:       var(--ink-dark);
+  --priority-1-foreground: var(--ink-dark);
+  --priority-2-foreground: var(--ink-dark);
+  --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
   --sidebar:                    #282a36;
@@ -436,8 +505,12 @@
 
   /* Brand — purple adapted for light surfaces */
   --primary:            #7847bd;
-  --primary-foreground: #ffffff;
+  --primary-foreground: var(--ink-light);
   --ring:               #7847bd;
+
+  /* On-accent ink pair — see --*-foreground assignments below */
+  --ink-light: #ffffff;
+  --ink-dark:  #1e3a8a;
 
   /* Destructive / warning */
   --destructive: #d4184b;
@@ -455,6 +528,14 @@
   --priority-1:   #d4184b;   /* red */
   --priority-2:   #a85200;   /* orange */
   --priority-3:   #8c6c3e;   /* amber */
+
+  /* On-accent text — all domain colors here are dark enough that light ink wins */
+  --event-foreground:      var(--ink-light);
+  --task-foreground:       var(--ink-light);
+  --note-foreground:       var(--ink-light);
+  --priority-1-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-light);
+  --priority-3-foreground: var(--ink-light);
 
   /* Sidebar */
   --sidebar:                    #d8daea;
