@@ -131,7 +131,7 @@ function AppMain() {
           <Outlet />
         </section>
 
-        <SearchBar />
+        {!isEntryView && <SearchBar />}
       </div>
 
       <CoachTour

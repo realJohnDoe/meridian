@@ -299,6 +299,8 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     <div className="mt-6 pt-5 border-t border-border">
       <div className="text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase mb-2.5">Items</div>
       <div className="flex flex-col gap-1.5">
+        {displayRows.map(({ row, exiting }, position) => renderRow(row, exiting, position))}
+
         {/* Add item — half-card affordance, same dimensions as item cards */}
         <div className="flex items-start gap-1">
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
@@ -376,8 +378,6 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           {/* Spacer matching the X button so the card aligns with cards above */}
           <span className="w-5 shrink-0" aria-hidden="true" />
         </div>
-
-        {displayRows.map(({ row, exiting }, position) => renderRow(row, exiting, position))}
 
         {doneRows.length > 0 && (
           <Collapsible defaultOpen={false}>
