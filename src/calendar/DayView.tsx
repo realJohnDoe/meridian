@@ -16,11 +16,17 @@ import { ContinuationChevron, CONTINUES_PADDING_ALWAYS } from '@/components/ui/c
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday, useCalendarFilter } from '@/hooks'
 import { computeColumns } from './computeColumns'
+// Layout constants below feed JS pixel math (scrollTo, pointer-offset calcs
+// for click-to-create) that must run synchronously, so they're plain numbers
+// rather than Tailwind classes/vars. Each is still snapped to a Tailwind
+// step for consistency with the rest of the app (see index.css §4).
 const HOURS = 24              // hours shown on the timeline
-const HP = 56                 // pixels per hour
-const GUTTER = 64              // px reserved for the left hour-label column
-const TOP_PAD = 8              // px headroom above 0:00 so its label isn't clipped
-const BOTTOM_PAD = 8           // px breathing room below 24:00
+const HP = 56                  // px per hour (timeline scale, not a spacing gap)
+const GUTTER = 64              // px reserved for the left hour-label column — Tailwind `16` step
+const RIGHT_PAD = 8            // px breathing room to the right edge of the screen — `2` step
+const COL_GAP = 6              // px gap between simultaneous (colliding) event columns — `1.5` step
+const TOP_PAD = 8              // px headroom above 0:00 so its label isn't clipped — `2` step
+const BOTTOM_PAD = 8           // px breathing room below 24:00 — `2` step
 const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
 const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
 const DEFAULT_CREATE_DURATION = '1h'
@@ -94,8 +100,8 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   const top = h * HP + TOP_PAD + 1
   const height = Math.max(dh * HP - 4, 28)
 
-  const colWidth = `(100% - ${GUTTER}px) / ${totalCols}`
-  const left  = `calc(${GUTTER}px + ${colIndex} * (${colWidth}))`
+  const colWidth = `(100% - ${GUTTER + RIGHT_PAD}px - ${(totalCols - 1) * COL_GAP}px) / ${totalCols}`
+  const left  = `calc(${GUTTER}px + ${colIndex} * ((${colWidth}) + ${COL_GAP}px))`
   const width = `calc(${colWidth})`
 
   const timeLabel = fmtT(o.time)
@@ -255,7 +261,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
           ))}
 
           {/* Hour cells — one button per hour; click/tap or Enter/Space creates an event there */}
-          <div className="absolute inset-y-0 right-0" style={{ left: GUTTER }}>
+          <div className="absolute inset-y-0" style={{ left: GUTTER, right: RIGHT_PAD }}>
             {Array.from({ length: HOURS }, (_, h) => h).map(h => (
               <button
                 key={h}
