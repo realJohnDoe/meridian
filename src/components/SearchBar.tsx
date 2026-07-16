@@ -63,7 +63,7 @@ export default function SearchBar() {
       {/* Gradient fade blending content into the sheet */}
       <div className="absolute inset-x-0 bottom-full h-10 bg-gradient-to-b from-transparent to-background/85 pointer-events-none" />
 
-      <div className={`relative z-[26] px-3.5 py-3.5 flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
+      <div className={`relative z-[26] px-3.5 pt-3.5 pb-[max(14px,env(safe-area-inset-bottom))] flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
         <div data-tour="search-bar" className="search-bar-wrap w-full max-w-xl mx-auto">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           {/*
