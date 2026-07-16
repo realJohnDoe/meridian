@@ -377,14 +377,13 @@
   --priority-2:   #c4621a;   /* orange */
   --priority-3:   #c4a800;   /* yellow */
 
-  /* On-accent text — per-swatch pick of whichever ink clears more contrast.
-     Now that ink-dark is a true dark-variant base rather than this theme's
-     own --foreground, it wins for event/task/priority-3 too.
-     priority-2 (c4621a) is a wash by WCAG's luminance-only math (dark
-     4.3:1 vs light 4.0:1, both short of AA) — kept on light ink since it
-     reads better in practice for this warm orange. */
-  --event-foreground:      var(--ink-dark);
-  --task-foreground:       var(--ink-dark);
+  /* On-accent text — light ink on every swatch except priority-3 (yellow),
+     which is the only one dark ink actually wins by a decisive margin.
+     WCAG's luminance-only math prefers dark ink for event/task too (this
+     theme sits chips on a light row background, which the metric doesn't
+     model), but light reads better in practice here; kept per design call. */
+  --event-foreground:      var(--ink-light);
+  --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
   --priority-2-foreground: var(--ink-light);
@@ -432,7 +431,7 @@
 
   /* Brand — violet */
   --primary:            #6c71c4;
-  --primary-foreground: var(--ink-dark);
+  --primary-foreground: var(--ink-light);
   --ring:               #6c71c4;
 
   /* On-accent ink pair — see --*-foreground assignments below.
@@ -459,12 +458,17 @@
   --priority-2:   #cb4b16;   /* orange */
   --priority-3:   #b58900;   /* yellow */
 
-  /* On-accent text — dark ink (now pure black, see above) wins every swatch here */
-  --event-foreground:      var(--ink-dark);
-  --task-foreground:       var(--ink-dark);
-  --note-foreground:       var(--ink-dark);
-  --priority-1-foreground: var(--ink-dark);
-  --priority-2-foreground: var(--ink-dark);
+  /* On-accent text — light ink on every swatch except priority-3 (yellow),
+     per design call: pure black ink (see above) technically wins every
+     swatch by WCAG's luminance-only math, but light ink reads better in
+     practice here (this theme sits chips on a light row background,
+     which the metric doesn't model). priority-3 keeps dark ink — it's
+     the one swatch where dark is a decisive, not marginal, win. */
+  --event-foreground:      var(--ink-light);
+  --task-foreground:       var(--ink-light);
+  --note-foreground:       var(--ink-light);
+  --priority-1-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
@@ -612,14 +616,16 @@
   --priority-2:   #e35d0a;   /* peach, darkened so light ink clears AA */
   --priority-3:   #df8e1d;   /* yellow */
 
-  /* On-accent text — per-swatch pick of whichever ink clears more contrast.
-     Now that ink-dark is Mocha's crust rather than this theme's own
-     --foreground, it wins for task/priority-2/priority-3 too. */
+  /* On-accent text — light ink on every swatch except priority-3 (yellow),
+     which is the only one dark ink actually wins by a decisive margin.
+     WCAG's luminance-only math prefers dark ink for task/note/priority-2
+     too (this theme sits chips on a light row background, which the
+     metric doesn't model), but light reads better in practice here. */
   --event-foreground:      var(--ink-light);
-  --task-foreground:       var(--ink-dark);
-  --note-foreground:       var(--ink-dark);
+  --task-foreground:       var(--ink-light);
+  --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
-  --priority-2-foreground: var(--ink-dark);
+  --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
