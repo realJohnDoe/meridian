@@ -185,7 +185,10 @@
   /* Layout & fonts (not themed) */
   --control-h: 1.75rem;
   --font: 'DM Sans', system-ui, sans-serif;
-  --th: 54px; --r: var(--radius);
+  /* 54px content height + top safe-area inset, so anything sized off --th
+     (main topbar, sidebar header, Sonner offset, search overlay max-height)
+     grows to clear the notch/rounded corners together */
+  --th: calc(54px + env(safe-area-inset-top, 0px)); --r: var(--radius);
 }
 
 /* ── TOKYO NIGHT THEME ──────────────────────────────────────────── */

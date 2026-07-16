@@ -90,7 +90,7 @@ function AppMain() {
         <header
           id="mainTop"
           className={cn(
-            'h-topbar flex items-center border-b border-border shrink-0 bg-background z-10',
+            'h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10',
             isEntryView ? 'overflow-hidden' : 'px-3.5 justify-between',
           )}
         >

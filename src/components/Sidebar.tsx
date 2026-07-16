@@ -85,7 +85,7 @@ export default function AppSidebar() {
   return (
     <>
       <Sidebar style={{ '--sidebar-width': '260px' } as React.CSSProperties}>
-        <SidebarHeader className="h-[var(--th)] flex-row items-center gap-2.5 px-4 border-b border-sidebar-border shrink-0 py-0">
+        <SidebarHeader className="h-[var(--th)] flex-row items-center gap-2.5 px-4 border-b border-sidebar-border shrink-0 pt-[env(safe-area-inset-top)] pb-0">
           <img
             src={`${import.meta.env.BASE_URL}icon-192.png`}
             width="26" height="26"
