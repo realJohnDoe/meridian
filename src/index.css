@@ -484,86 +484,83 @@
   --surface-raised:  #44475a;
 }
 
-/* ── TOKYO DAY THEME ────────────────────────────────────────────── */
-/* Light variant of Tokyo Night. Elevation ramp runs darker→lighter so
+/* ── CATPPUCCIN LATTE THEME ─────────────────────────────────────── */
+/* Latte flavor of Catppuccin. Elevation ramp runs darker→lighter so
    the backdrop recedes and foreground surfaces feel raised. */
-.tokyo-day {
-  /* Surfaces — darker bg, progressively lighter as elevation increases */
-  --backdrop:   #b8bbd0;   /* deepest — recedes behind column */
-  --background: #c9cbe0;   /* app column */
-  --card:       #d8daea;   /* cards, panels, filter overlay */
-  --popover:    #d8daea;
-  --secondary:  #e1e3ef;   /* chips, type-selector bg */
-  --muted:      #e1e3ef;
-  --accent:     #e1e3ef;   /* hover / selected row surfaces */
+.catppuccin-latte {
+  /* Surfaces — Crust→Mantle→Base, then a near-white lift for chips */
+  --backdrop:   #dce0e8;   /* crust — deepest, recedes behind column */
+  --background: #e6e9ef;   /* mantle — app column */
+  --card:       #eff1f5;   /* base — cards, panels, filter overlay */
+  --popover:    #eff1f5;
+  --secondary:  #f5f6f9;   /* chips, type-selector bg */
+  --muted:      #f5f6f9;
+  --accent:     #f5f6f9;   /* hover / selected row surfaces */
 
   /* Text — dark ink on light surfaces */
-  --foreground:           #1e3a8a;   /* primary text — deepened for AA contrast */
-  --card-foreground:      #1e3a8a;
-  --popover-foreground:   #1e3a8a;
-  --accent-foreground:    #1e3a8a;
-  --secondary-foreground: #6172b0;   /* fg_dark */
-  --muted-foreground:     #848cb5;   /* comment — placeholder, labels */
-  --dim:                  #a8aecb;   /* icons, unselected nav */
+  --foreground:           #4c4f69;   /* text */
+  --card-foreground:      #4c4f69;
+  --popover-foreground:   #4c4f69;
+  --accent-foreground:    #4c4f69;
+  --secondary-foreground: #5c5f77;   /* subtext1 */
+  --muted-foreground:     #6c6f85;   /* subtext0 — placeholder, labels */
+  --dim:                  #8c8fa1;   /* overlay1 — icons, unselected nav */
 
-  /* Brand — purple adapted for light surfaces */
-  --primary:            #7847bd;
+  /* Brand — mauve */
+  --primary:            #8839ef;
   --primary-foreground: var(--ink-light);
-  --ring:               #7847bd;
+  --ring:               #8839ef;
 
   /* On-accent ink pair — see --*-foreground assignments below */
-  --ink-light: #ffffff;
-  --ink-dark:  #1e3a8a;
+  --ink-light: #eff1f5;
+  --ink-dark:  #4c4f69;
 
   /* Destructive / warning */
-  --destructive: #d4184b;
-  --warning:     #8c6c3e;
+  --destructive: #d20f39;   /* red */
+  --warning:     #df8e1d;   /* yellow */
 
   /* Borders */
-  --border: color-mix(in oklab, #848cb5, transparent 78%);
-  --input:  color-mix(in oklab, #848cb5, transparent 68%);
+  --border: color-mix(in oklab, #9ca0b0, transparent 78%);
+  --input:  color-mix(in oklab, #9ca0b0, transparent 68%);
 
-  /* Domain colors — saturated but dark enough to read on light bg */
-  --event:        #7847bd;   /* purple — alias of primary */
-  --task:         #486e2a;   /* green */
-  --note:         #006b8f;   /* cyan */
-  --brand-cyan:   #006b8f;
-  --priority-1:   #d4184b;   /* red */
-  --priority-2:   #a85200;   /* orange */
-  --priority-3:   #8c6c3e;   /* amber */
+  /* Domain colors — vivid Catppuccin hues, dark enough to read on light bg */
+  --event:        #8839ef;   /* mauve — alias of primary */
+  --task:         #40a02b;   /* green */
+  --note:         #179299;   /* teal */
+  --brand-cyan:   #179299;
+  --priority-1:   #d20f39;   /* red */
+  --priority-2:   #e35d0a;   /* peach, darkened so light ink clears AA */
+  --priority-3:   #df8e1d;   /* yellow */
 
-  /* On-accent text — all domain colors here are dark enough that light ink wins */
+  /* On-accent text — light ink wins except yellow, which needs dark ink */
   --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
   --priority-2-foreground: var(--ink-light);
-  --priority-3-foreground: var(--ink-light);
+  --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
-  --sidebar:                    #d8daea;
-  --sidebar-foreground:         #6172b0;
-  --sidebar-primary:            #7847bd;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent:             #e1e3ef;
-  --sidebar-accent-foreground:  #3760bf;
-  --sidebar-border: color-mix(in oklab, #848cb5, transparent 75%);
-  --sidebar-ring:               #7847bd;
+  --sidebar:                    #eff1f5;
+  --sidebar-foreground:         #5c5f77;
+  --sidebar-primary:            #8839ef;
+  --sidebar-primary-foreground: #eff1f5;
+  --sidebar-accent:             #f5f6f9;
+  --sidebar-accent-foreground:  #4c4f69;
+  --sidebar-border: color-mix(in oklab, #9ca0b0, transparent 75%);
+  --sidebar-ring:               #8839ef;
 
   /* Chip border — visible on light surfaces */
-  --chip-border: color-mix(in oklab, #848cb5, transparent 68%);
-
-  /* Done/past card overlay — fade cards toward background so they recede */
-  --done-overlay: color-mix(in oklab, var(--background), transparent 30%);
+  --chip-border: color-mix(in oklab, #9ca0b0, transparent 68%);
 
   /* Absolute derived tokens */
-  --primary-dark:    #5e35a0;
-  --brand-cyan-dark: #005675;
-  --surface-raised:  #ecedf8;
+  --primary-dark:    #7526d3;
+  --brand-cyan-dark: #0f7378;
+  --surface-raised:  #f5f6f9;
 
   /* Float shadow — lighter for a light theme */
-  --shadow-float:       0 2px 12px rgba(0,0,0,.14), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
-  --shadow-float-focus: 0 2px 12px rgba(0,0,0,.16), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+  --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
+  --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
 }
 
 /* Element resets in @layer base so Tailwind utilities can override them */
