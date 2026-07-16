@@ -59,12 +59,15 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
     onOpenChange(v)
   }
 
-  // If the selected vault was removed, fall back to active or first remaining vault
-  useResetOnChange([vaults, open], () => {
+  // If the selected vault was removed, fall back to the active vault (only if it
+  // still exists) or the first remaining vault. `activeVaultId` is in the deps so
+  // the fallback re-runs when the active vault changes underneath us — e.g. while
+  // removing a vault, `vaults` and `activeVaultId` update in separate renders.
+  useResetOnChange([vaults, activeVaultId, open], () => {
     if (!open) return
     if (selectedVaultId && vaults.some(v => v.id === selectedVaultId)) return
-    const id = activeVaultId ?? vaults[0]?.id ?? null
-    setSelectedVaultId(id ?? null)
+    const active = vaults.find(v => v.id === activeVaultId)?.id
+    setSelectedVaultId(active ?? vaults[0]?.id ?? null)
   })
 
   function handleVaultSelect(value: string) {
