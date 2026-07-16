@@ -53,12 +53,30 @@ async function hydrateFromCache(vaultId: string): Promise<void> {
   setData({ items, roots })
 }
 
+/**
+ * The single source of truth for "which vault is active". The active-vault
+ * identity lives in three places — the non-reactive backend singleton
+ * (`activeBackend`), the reactive store field (`activeVaultId`), and the
+ * persisted IndexedDB value — and they must always agree. Every activation path
+ * funnels through here so no caller can update a subset and leave them diverged.
+ *
+ * `persist: false` is for the error-fallback path, which shows the example vault
+ * *without* clobbering the saved id, so the next reload retries the real vault.
+ */
+async function setActiveVaultIdentity(
+  backend: StorageBackend,
+  opts: { pendingReconnect?: string | null; persist?: boolean } = {},
+): Promise<void> {
+  const { pendingReconnect = null, persist = true } = opts
+  setActiveBackend(backend)
+  setActiveVaultId(backend.id)
+  setPendingReconnect(pendingReconnect)
+  if (persist) await activeVaultIdSave(backend.id)
+}
+
 async function activateExampleVault(): Promise<void> {
   const backend = new ExampleBackend()
-  setActiveBackend(backend)
-  setActiveVaultId('example')
-  setPendingReconnect(null)
-  await activeVaultIdSave('example')
+  await setActiveVaultIdentity(backend)
   const files = await backend.readAll()
   setData(parseFiles(files))
   updateSyncUI()
@@ -66,10 +84,7 @@ async function activateExampleVault(): Promise<void> {
 }
 
 async function activateWritableVault(backend: StorageBackend): Promise<void> {
-  setActiveBackend(backend)
-  setActiveVaultId(backend.id)
-  setPendingReconnect(null)
-  await activeVaultIdSave(backend.id)
+  await setActiveVaultIdentity(backend)
   await hydrateFromCache(backend.id)
   await reconcileWithBackend(backend, backend.id)
   emitVaultChanged()
@@ -101,10 +116,8 @@ export async function restoreVaults(): Promise<void> {
 async function restoreVaultsInner(): Promise<void> {
   async function fallbackToExample() {
     const backend = new ExampleBackend()
-    setActiveBackend(backend)
     setVaultList([EXAMPLE_REF])
-    setActiveVaultId('example')
-    setPendingReconnect(null)
+    await setActiveVaultIdentity(backend, { persist: false })
     setData(parseFiles(await backend.readAll()))
   }
 
@@ -126,9 +139,7 @@ async function restoreVaultsInner(): Promise<void> {
       if (perm === 'granted') {
         await activateWritableVault(backend)
       } else if (perm === 'prompt') {
-        setActiveBackend(backend)
-        setActiveVaultId(targetRef.id)
-        setPendingReconnect(targetRef.name)
+        await setActiveVaultIdentity(backend, { pendingReconnect: targetRef.name })
         await hydrateFromCache(targetRef.id)
         updateSyncUI()
       } else {
