@@ -27,6 +27,7 @@ If prior work on this repo has raised specific suspicions about the UI, list the
 - Skim the full directory tree once so nothing is invisible, then confine close reading to the UI layer.
 - Read closely: the app shell / root layout, the most-imported components and hooks (measure this — don't guess), the 15 largest component files, every file in the shared-components directory, and at least 2–3 representative components from every feature directory that renders UI.
 - **Read the UI toolchain, not just the source:** Tailwind config, global CSS / theme tokens, the shadcn component inventory (`components/ui/` or equivalent) and its divergence from upstream, lint config for React/JSX/a11y/Tailwind rules, and the component-test setup (or its absence). From `package.json`, inventory the **UI-related** dependencies (React ecosystem, radix/shadcn, styling, icons, animation, forms, a11y) and know where each is used — this feeds the Library Fit category.
+- **Run the existing quality gates once** — build, lint, and test — and report each gate's pass/fail status in the coverage statement. Before trusting lint output on a fresh worktree, generate the gitignored types it depends on (`pnpm run build` regenerates `src/routeTree.gen.ts`; `pnpm --filter meridian-oauth-worker run cf-typegen` regenerates the worker types) — without them the type-aware rules flood with ~150 spurious errors that are **not** a finding.
 - **Sample git history for co-change patterns** among components, hooks, and style files (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
 - Sample the rest of the UI. Do not skip a UI directory entirely without recording it in the coverage statement. Non-UI directories may be skipped wholesale — record them as "out of scope" rather than "skipped."
 
@@ -42,7 +43,17 @@ A plain-language summary of the UI layer's overall health. Name the **worst one 
 - Roughly what fraction of the UI layer this report is based on.
 - Any area you suspect has issues but did not have budget to investigate — flag it as "unverified."
 
-### 3. Findings
+### 3. Category verdicts
+
+One line per category (1–8), with one of three verdicts:
+
+- **clean** — the scan plan for this category was fully executed and nothing worth reporting turned up
+- **findings: #N, #M** — pointing at the numbered findings below
+- **partially assessed** — state what part of the scan was skipped and why
+
+This makes the absence of findings distinguishable from the absence of scanning. A category may only be called **clean** if its scan plan was actually executed — never as a default for categories that ran out of budget.
+
+### 4. Findings
 
 For each finding, output:
 
@@ -59,7 +70,7 @@ Rank findings by a rough `(impact × breadth) ÷ effort` intuition — but repor
 
 **Strongly prefer systemic and structural issues over isolated, line-level ones.** A pattern repeated across 10 components beats one misused hook. Cite real code — no generic observations.
 
-List the **top 10 findings**. Include all findings that make the top 10 regardless of their impact score. Do not pad to reach 10 — if fewer than 10 clear issues exist, stop there.
+List the **top 10 findings**, numbered (the category verdicts above reference these numbers). Include all findings that make the top 10 regardless of their impact score. Do not pad to reach 10 — if fewer than 10 clear issues exist, stop there.
 
 ---
 
@@ -97,12 +108,13 @@ Examples (not exhaustive):
 
 ### 3. UX States & Accessibility
 
-**Scope:** whether the UI communicates state and is usable by everyone.
+**Scope:** whether the UI communicates state and is usable by everyone — including on mobile. This app is a mobile-focused PWA, so responsive behavior, touch ergonomics, and safe-area handling are primary hunting grounds here, not edge cases.
 
 Examples (not exhaustive):
 
 - Missing loading/empty/error states on primary flows; actions with no pending or failure feedback (silent failures after a rejected promise)
 - Non-accessible interactive elements — clickable `div`s, missing keyboard handling, focus not managed in dialogs/menus, missing labels/ARIA on icon-only buttons
+- Mobile/responsive gaps — layouts that break at phone widths, touch targets below ~44px, hover-only affordances with no touch equivalent, safe-area (notch) regressions, a desktop dialog where the drawer pattern (`vaul`) is used elsewhere for the same kind of interaction
 - Destructive actions without confirmation or undo
 - Focus/scroll position lost across navigation or list updates
 - Inconsistent interaction patterns for the same operation in different screens
