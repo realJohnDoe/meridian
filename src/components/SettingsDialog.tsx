@@ -20,9 +20,10 @@ type Step = 'vault' | 'adding'
 
 // Preview buttons render with the theme's own CSS class so `bg-*`/`text-*`
 // utilities resolve to that theme's actual tokens — no color values duplicated here.
-// `className` is omitted for 'meridian' since it's the :root default.
+// Meridian also needs its own class (not just relying on :root) because :root
+// alone gets overridden globally whenever another theme is active on <html>.
 const THEMES: { id: string; label: string; className?: string }[] = [
-  { id: 'meridian', label: 'Meridian' },
+  { id: 'meridian', label: 'Meridian', className: 'meridian' },
   { id: 'tokyo-night', label: 'Tokyo Night', className: 'tokyo-night' },
   { id: 'dracula', label: 'Dracula', className: 'dracula' },
   { id: 'tokyo-day', label: 'Tokyo Day', className: 'tokyo-day' },

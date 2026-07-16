@@ -191,6 +191,69 @@
   --th: calc(54px + env(safe-area-inset-top, 0px)); --r: var(--radius);
 }
 
+/* Class-scoped restatement of the Meridian tokens above, mirroring the other
+   theme classes below. Needed so an explicitly meridian-scoped element (e.g.
+   the theme preview button) renders Meridian's own colors even while another
+   theme's class is active on <html> and has overridden :root globally. */
+.meridian {
+  --backdrop:   oklch(0.13 0.04 252);
+  --background: oklch(0.18 0.05 252);
+  --card:       oklch(0.24 0.05 252);
+  --popover:    oklch(0.24 0.05 252);
+  --secondary:  oklch(0.28 0.06 252);
+  --muted:      oklch(0.28 0.06 252);
+  --accent:     oklch(0.28 0.06 252);
+
+  --foreground:           oklch(0.96 0.02 270);
+  --card-foreground:      oklch(0.96 0.02 270);
+  --popover-foreground:   oklch(0.96 0.02 270);
+  --accent-foreground:    oklch(0.96 0.02 270);
+  --secondary-foreground: oklch(0.86 0.07 272);
+  --muted-foreground:     oklch(0.54 0.04 250);
+  --dim:                  oklch(0.69 0.03 250);
+
+  --primary:            oklch(0.68 0.22 278);
+  --primary-foreground: var(--ink-dark);
+  --ring:               oklch(0.71 0.20 278);
+
+  --ink-dark:  var(--background);
+  --ink-light: oklch(1 0 0);
+
+  --destructive: oklch(0.72 0.20 15);
+  --warning:     oklch(0.86 0.16 74);
+
+  --border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 92%);
+  --input:  color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);
+
+  --event:        oklch(0.71 0.20 278);
+  --task:         oklch(0.84 0.17 145);
+  --note:         oklch(0.75 0.17 215);
+  --brand-cyan:   oklch(0.77 0.14 208);
+  --priority-1:   oklch(0.72 0.19 22);
+  --priority-2:   oklch(0.76 0.17 48);
+  --priority-3:   oklch(0.88 0.18 82);
+
+  --event-foreground:      var(--ink-dark);
+  --task-foreground:       var(--ink-dark);
+  --note-foreground:       var(--ink-dark);
+  --priority-1-foreground: var(--ink-dark);
+  --priority-2-foreground: var(--ink-dark);
+  --priority-3-foreground: var(--ink-dark);
+
+  --sidebar:                    oklch(0.24 0.05 252);
+  --sidebar-foreground:         oklch(0.86 0.07 272);
+  --sidebar-primary:            oklch(0.71 0.20 278);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent:             oklch(0.28 0.06 252);
+  --sidebar-accent-foreground:  oklch(0.96 0.02 270);
+  --sidebar-border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);
+  --sidebar-ring:               oklch(0.71 0.20 278);
+
+  --primary-dark:    oklch(0.63 0.20 278);
+  --brand-cyan-dark: oklch(0.68 0.14 208);
+  --surface-raised:  oklch(0.33 0.05 252);
+}
+
 /* ── TOKYO NIGHT THEME ──────────────────────────────────────────── */
 /* Class-scoped override (set by next-themes). Only the authored per-theme
    tokens are restated; the color-mix derived tokens above re-derive from these.
