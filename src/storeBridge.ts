@@ -11,6 +11,8 @@ export const getSyncError     = (): string | null  => useStore.getState().syncEr
 
 // ── STORE WRITERS (storage layer uses these instead of useStore directly) ──
 export const setVaultLoading     = (loading: boolean)  => useStore.setState({ vaultLoading: loading })
+export const setVaultLoadProgress = (progress: { loaded: number; total: number } | null) =>
+  useStore.setState({ vaultLoadProgress: progress })
 export const setSyncDirtyCount   = (n: number)         => useStore.setState({ syncDirtyCount: n })
 export const setSyncError        = (error: string | null) => useStore.setState({ syncError: error })
 export const setSyncOffline      = (offline: boolean)      => useStore.setState({ syncOffline: offline })

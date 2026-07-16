@@ -59,6 +59,12 @@ interface MeridianStore {
   // ── Vault loading ─────────────────────────────────────────────────
   /** True from app start until restoreVaults() settles — distinguishes "loading" from "empty". */
   vaultLoading: boolean
+  /**
+   * Non-null while a backend's readAll() is reporting progress on a bulk load
+   * (e.g. connecting a new GitHub vault). Backends that don't report progress
+   * (local, example, or GraphQL fallback legs) simply never set this.
+   */
+  vaultLoadProgress: { loaded: number; total: number } | null
 
   // ── Agenda scroll ────────────────────────────────────────────────
   /** When true, AgendaPage will scroll to today once then clear this flag. */
@@ -155,6 +161,7 @@ export const useStore = create<MeridianStore>((set, get) => {
     lastSyncedAt:   null,
 
     vaultLoading: true,
+    vaultLoadProgress: null,
 
     scrollToTodayOnce: false,
     agendaTopDate:     null,

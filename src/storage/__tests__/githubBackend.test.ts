@@ -119,7 +119,18 @@ function makeFileResponse(name: string, content: string, sha: string) {
 }
 
 describe('GitHubBackend', () => {
-  let fetchSpy: ReturnType<typeof vi.fn>
+  // Pin the type argument explicitly: ReturnType<typeof vi.fn> (no type arg)
+  // resolves T to its full constraint (Procedure | Constructable) rather than
+  // its default, which pulls a void-returning call-signature branch into
+  // mockImplementation()'s parameter type via NormalizedProcedure — that
+  // spuriously trips @typescript-eslint/no-misused-promises on any
+  // Promise-returning mockImplementation callback (harmless everywhere else,
+  // since no earlier test here used mockImplementation on fetchSpy). Must use
+  // `any` (matching vitest's own Procedure type), not `unknown` — `unknown`
+  // parameters reject contravariant narrowing to concrete callback parameter
+  // types like `RequestInit`, which tsc (though not eslint) catches.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches vitest's own Procedure = (...args: any[]) => any
+  let fetchSpy: ReturnType<typeof vi.fn<(...args: any[]) => any>>
 
   beforeEach(() => {
     fetchSpy = vi.fn()
@@ -411,16 +422,17 @@ describe('GitHubBackend', () => {
     }))
   }
 
-  it('readAll batches many files into a single aliased GraphQL request', async () => {
-    const specs = makeManyFiles(10)
+  it('readAll batches many files into a single aliased GraphQL request and reports progress', async () => {
+    const specs = makeManyFiles(10) // fits in one batch (GRAPHQL_BATCH_SIZE = 50)
     fetchSpy
       .mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs)))
       .mockResolvedValueOnce(makeGraphQLResp(
         Object.fromEntries(specs.map((s, i) => [`f${i}`, { text: s.content }])),
       ))
 
+    const progressUpdates: Array<{ loaded: number; total: number }> = []
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
-    const files   = await backend.readAll()
+    const files   = await backend.readAll((loaded, total) => progressUpdates.push({ loaded, total }))
 
     expect(files).toHaveLength(10)
     for (const s of specs) {
@@ -436,6 +448,9 @@ describe('GitHubBackend', () => {
     expect(graphqlUrl).toContain('/graphql')
     const sentBody = JSON.parse(graphqlInit.body as string) as { variables: { owner: string; name: string } }
     expect(sentBody.variables).toEqual({ owner: 'alice', name: 'notes' })
+
+    // A single batch reports progress exactly once, at the full count.
+    expect(progressUpdates).toEqual([{ loaded: 10, total: 10 }])
   })
 
   it('readAll falls back to the Contents API for blobs GraphQL returns null text for', async () => {
@@ -462,30 +477,56 @@ describe('GitHubBackend', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(3)
   })
 
-  it('readAll chunks large path lists into multiple GraphQL requests', async () => {
-    const specs = makeManyFiles(150) // > GRAPHQL_BATCH_SIZE (100) → 2 batches: 100 + 50
-    const batch1 = specs.slice(0, 100)
-    const batch2 = specs.slice(100)
+  it('readAll splits large path lists into multiple GraphQL batches, dispatched from a pool, reporting monotonic progress', async () => {
+    // 120 files / GRAPHQL_BATCH_SIZE (50) = 3 batches (50+50+20). Kept at 3
+    // deliberately: @octokit/plugin-throttling paces real GraphQL dispatch to
+    // ~1/sec via a hard-coded Bottleneck group regardless of our own pool's
+    // concurrency (confirmed by reading its source — see the comment on
+    // GRAPHQL_BATCH_SIZE in githubBackend.ts) — this is real wall-clock time
+    // this test pays, not something we can mock away, so batch count is kept
+    // low to keep the test fast. Since dispatch order across the pool isn't
+    // guaranteed, responses are built from each request's own body (a regex
+    // extracts that batch's aliased path expressions) rather than an assumed
+    // call order.
+    const specs = makeManyFiles(120)
+    const contentByPath = new Map(specs.map(s => [s.path, s.content]))
 
     fetchSpy
-      .mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs)))
-      .mockResolvedValueOnce(makeGraphQLResp(
-        Object.fromEntries(batch1.map((s, i) => [`f${i}`, { text: s.content }])),
-      ))
-      .mockResolvedValueOnce(makeGraphQLResp(
-        // Aliases restart at f0 within each batch.
-        Object.fromEntries(batch2.map((s, i) => [`f${i}`, { text: s.content }])),
-      ))
+      .mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs))) // statAll
+      .mockImplementation((url: unknown, init?: RequestInit) => {
+        if (typeof url !== 'string' || !url.includes('/graphql')) {
+          return Promise.reject(new Error(`unexpected fetch in this test: ${String(url)}`))
+        }
+        const body = JSON.parse((init?.body as string) ?? '{}') as { query: string }
+        const repository: Record<string, { text: string }> = {}
+        const aliasRe = /f(\d+): object\(expression: "[^:"\\]*:((?:[^"\\]|\\.)*)"\)/g
+        let m: RegExpExecArray | null
+        while ((m = aliasRe.exec(body.query))) {
+          const alias = `f${m[1]}`
+          const path  = m[2].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+          repository[alias] = { text: contentByPath.get(path)! }
+        }
+        return Promise.resolve(makeGraphQLResp(repository) as unknown as ReturnType<typeof fetch>)
+      })
 
+    const progressUpdates: Array<{ loaded: number; total: number }> = []
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
-    const files   = await backend.readAll()
+    const files   = await backend.readAll((loaded, total) => progressUpdates.push({ loaded, total }))
 
-    expect(files).toHaveLength(150)
-    // Spot-check the boundary between the two batches.
-    expect(files.find(f => f.path === 'note-99.md')?.content).toBe('# Note 99')
-    expect(files.find(f => f.path === 'note-100.md')?.content).toBe('# Note 100')
+    expect(files).toHaveLength(120)
+    // Spot-check across batch boundaries (batch size 50: indices 49|50, 119 is the last).
+    expect(files.find(f => f.path === 'note-49.md')?.content).toBe('# Note 49')
+    expect(files.find(f => f.path === 'note-50.md')?.content).toBe('# Note 50')
+    expect(files.find(f => f.path === 'note-119.md')?.content).toBe('# Note 119')
 
-    // 1 tree + 2 GraphQL batches = 3 requests.
-    expect(fetchSpy).toHaveBeenCalledTimes(3)
-  })
+    // 1 tree + 3 GraphQL batches = 4 requests.
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
+
+    // One progress update per batch, monotonically increasing, ending at the total.
+    expect(progressUpdates).toHaveLength(3)
+    const loadedValues = progressUpdates.map(p => p.loaded)
+    expect(loadedValues).toEqual([...loadedValues].sort((a, b) => a - b))
+    expect(progressUpdates.every(p => p.total === 120)).toBe(true)
+    expect(progressUpdates[progressUpdates.length - 1].loaded).toBe(120)
+  }, 10000)
 })

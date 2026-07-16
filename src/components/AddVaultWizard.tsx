@@ -7,6 +7,7 @@ import { addLocalVault, addGitHubVault, startGitHubSignIn } from '@/vaultActions
 import {
   ResponsiveModalTitle,
 } from '@/components/ui/responsive-modal'
+import { useStore } from '@/store'
 
 type WizardStep = 'source' | 'github'
 type Source = 'local' | 'github'
@@ -41,6 +42,7 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
   const [busy,        setBusy]        = useState(false)
   const [signingIn,   setSigningIn]   = useState(false)
   const [error,       setError]       = useState<string | null>(null)
+  const loadProgress = useStore(s => s.vaultLoadProgress)
 
   async function handleSignIn() {
     setSigningIn(true)
@@ -202,7 +204,9 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
         <Button variant="ghost" onClick={() => setStep('source')} disabled={busy || signingIn}>Back</Button>
         {showManual && (
           <Button onClick={handleConnect} disabled={busy}>
-            {busy ? 'Connecting…' : 'Connect'}
+            {busy
+              ? (loadProgress ? `Connecting… (${loadProgress.loaded}/${loadProgress.total})` : 'Connecting…')
+              : 'Connect'}
           </Button>
         )}
       </div>
