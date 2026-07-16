@@ -26,7 +26,7 @@ const THEMES: { id: string; label: string; className?: string }[] = [
   { id: 'meridian', label: 'Meridian', className: 'meridian' },
   { id: 'tokyo-night', label: 'Tokyo Night', className: 'tokyo-night' },
   { id: 'dracula', label: 'Dracula', className: 'dracula' },
-  { id: 'tokyo-day', label: 'Tokyo Day', className: 'tokyo-day' },
+  { id: 'catppuccin-latte', label: 'Catppuccin Latte', className: 'catppuccin-latte' },
   { id: 'rose-pine-dawn', label: 'Rosé Pine Dawn', className: 'rose-pine-dawn' },
   { id: 'solarized-light', label: 'Solarized Light', className: 'solarized-light' },
 ]
