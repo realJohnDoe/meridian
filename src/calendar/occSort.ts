@@ -9,6 +9,10 @@ export function isDimmed(o: Occurrence): boolean {
   return state === 'done' || state === 'event-past'
 }
 
+export function priorityRank(priority: string | undefined): number {
+  return priority ? (_prioOrder[priority] ?? 3) : 3
+}
+
 function _sortKey(o: Occurrence): number {
   // Active items first (groups 0-3), sorted by type; dimmed (done/past)
   // items all collapse into a single trailing group (4) and are then
@@ -25,7 +29,7 @@ function _sortKey(o: Occurrence): number {
 }
 
 function _prioKey(o: Occurrence): number {
-  return o.metadata.priority ? (_prioOrder[o.metadata.priority] ?? 3) : 3
+  return priorityRank(o.metadata.priority)
 }
 
 export function sortOccs(arr: Occurrence[]): Occurrence[] {

@@ -6,7 +6,7 @@ function makeOcc(overrides: Partial<Occurrence> & { title?: string; done?: boole
   const { title = '', done, jsTime, duration, ...rest } = overrides
   return {
     date: '2020-01-01',
-    time: undefined,
+    time: null,
     source: 'explicit',
     fileSlug: 'note.md',
     id: title || 'occ',
