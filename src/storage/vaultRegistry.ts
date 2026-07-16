@@ -285,6 +285,15 @@ export async function removeVault(id: string): Promise<void> {
     const ref      = existing.find(r => r.id === id)
     if (!ref) return
 
+    // Switch away from the vault *before* removing it from the list, so the
+    // store never renders an activeVaultId that points to a vault no longer in
+    // `vaults`. Doing it in the other order leaves a transient inconsistent
+    // snapshot that downstream reconciliation (e.g. the Settings dropdown)
+    // latches onto.
+    if (getActiveBackend()?.id === id) {
+      await activateExampleVault()
+    }
+
     if (ref.kind === 'local') await handleClear(id)
     if (ref.kind === 'github') {
       await tokenClear(id)
@@ -294,10 +303,6 @@ export async function removeVault(id: string): Promise<void> {
 
     await cacheDeleteAll(id)
     await updateVaultRefs(current => current.filter(r => r.id !== id))
-
-    if (getActiveBackend()?.id === id) {
-      await activateExampleVault()
-    }
   } catch (e) {
     console.error('[vault] removeVault failed:', e)
     notifyError('Could not remove vault', e)
