@@ -16,20 +16,18 @@ import { ContinuationChevron, CONTINUES_PADDING_ALWAYS } from '@/components/ui/c
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday, useCalendarFilter } from '@/hooks'
 import { computeColumns } from './computeColumns'
-/** Tailwind's default spacing step (--spacing: 0.25rem = 4px). Layout math below
- *  needs plain px numbers (scrollTo, mouse-offset calcs), so dimensions are
- *  expressed as `spacing(n)` — the same n as the matching Tailwind class (e.g.
- *  spacing(2) = 8px = the gap in `gap-2` or `p-2`) — instead of arbitrary px. */
-const spacing = (steps: number) => steps * 4
-
-const HOURS = 24                 // hours shown on the timeline
-const HP = spacing(14)           // 56px — pixels per hour
-const GUTTER = spacing(16)       // 64px — reserved for the left hour-label column
-const RIGHT_PAD = spacing(2)     // 8px — breathing room to the right edge of the screen
-const COL_GAP = spacing(1.5)     // 6px — gap between simultaneous (colliding) event columns
-const TOP_PAD = spacing(2)       // 8px — headroom above 0:00 so its label isn't clipped
-const BOTTOM_PAD = spacing(2)    // 8px — breathing room below 24:00
-const DEFAULT_SCROLL_HOUR = 7    // hour scrolled into view on mount
+// Layout constants below feed JS pixel math (scrollTo, pointer-offset calcs
+// for click-to-create) that must run synchronously, so they're plain numbers
+// rather than Tailwind classes/vars. Each is still snapped to a Tailwind
+// step for consistency with the rest of the app (see index.css §4).
+const HOURS = 24              // hours shown on the timeline
+const HP = 56                  // px per hour (timeline scale, not a spacing gap)
+const GUTTER = 64              // px reserved for the left hour-label column — Tailwind `16` step
+const RIGHT_PAD = 8            // px breathing room to the right edge of the screen — `2` step
+const COL_GAP = 6              // px gap between simultaneous (colliding) event columns — `1.5` step
+const TOP_PAD = 8              // px headroom above 0:00 so its label isn't clipped — `2` step
+const BOTTOM_PAD = 8           // px breathing room below 24:00 — `2` step
+const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
 const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
 const DEFAULT_CREATE_DURATION = '1h'
 
