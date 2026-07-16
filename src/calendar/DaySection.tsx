@@ -3,7 +3,7 @@ import type { Occurrence } from '@/types'
 import { fmtLong } from '@/format'
 import { cn } from '@/lib/cn'
 import OccurrenceRow from './OccurrenceRow'
-import { useFlipReorder } from '@/hooks'
+import { useFlipTransition } from '@/hooks'
 
 
 interface Props {
@@ -32,7 +32,7 @@ function DaySection({
   now,
 }: Props) {
   const sectionRef = useRef<HTMLDivElement>(null)
-  useFlipReorder(sectionRef, items)
+  useFlipTransition(sectionRef, items, 'data-occ-key')
 
   const label = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : fmtLong(date)
 
