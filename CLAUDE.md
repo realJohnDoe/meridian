@@ -46,6 +46,20 @@ Always use `pnpm run build` (which runs `tsc -b`) to verify the full project bui
 
 `tsc --noEmit` runs in single-file mode and misses unused-import errors and stricter checks that the composite project build (`tsc -b`) enforces. CI runs `pnpm run build`, so failures can show up there even if `--noEmit` is clean.
 
+## Linting (generated types must exist first)
+
+The type-aware lint rules (`no-unsafe-*`, etc.) resolve types from **gitignored generated files**. On a fresh worktree these don't exist yet, so `pnpm run lint` reports a flood of spurious "type that cannot be resolved" / "error typed value" errors — the code is fine, the types just haven't been generated. **Don't hand-fix these or add `eslint-disable`s.** Generate the types first:
+
+```bash
+pnpm run build                                          # regenerates src/routeTree.gen.ts (TanStack Router)
+pnpm --filter meridian-oauth-worker run cf-typegen      # regenerates worker/worker-configuration.d.ts (wrangler types)
+```
+
+CI does exactly this before linting (`.github/workflows/build.yml`), which is why it stays green. The two known offenders:
+
+- `src/routeTree.gen.ts` — without it, `Route.useSearch()`/`useParams()` resolve to `any` and `src/` lint fails.
+- `worker/worker-configuration.d.ts` — without it, `Request`/`Response`/`HeadersInit`/`Env` resolve to `any` and **all** of `worker/src` lint fails (~150 errors).
+
 ## Directory structure
 
 **Placement rule:** a file moves into a subdirectory only when every caller already lives in that subdirectory (or a layer that naturally depends on it). Do not propose moving a file just because it "feels" like it belongs somewhere — check the actual import graph first.
