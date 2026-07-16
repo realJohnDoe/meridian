@@ -14,7 +14,7 @@ import { GitHubBackend }  from './githubBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import type { VaultRef, GitHubVaultRef } from '@/types'
-import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading } from '@/storeBridge'
+import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress } from '@/storeBridge'
 import { notify, notifyError } from './notifications'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
 import { reconcileWithBackend, parseFiles, updateSyncUI } from './sync'
@@ -77,9 +77,15 @@ async function activateWritableVault(backend: StorageBackend): Promise<void> {
 
 async function registerAndActivate(ref: VaultRef, backend: StorageBackend): Promise<void> {
   await updateVaultRefs(existing => [...existing, ref])
-  const files = await backend.readAll()
-  await cacheBulkWriteClean(backend.id, files)
-  await activateWritableVault(backend)
+  try {
+    const files = await backend.readAll((loaded, total) => setVaultLoadProgress({ loaded, total }))
+    await cacheBulkWriteClean(backend.id, files)
+    await activateWritableVault(backend)
+  } finally {
+    // Reset even on a thrown/failed load, so a retry (or the next vault) never
+    // inherits a stale "N of M" from an aborted first connect.
+    setVaultLoadProgress(null)
+  }
 }
 
 // ── VAULT LIFECYCLE ───────────────────────────────────────────

@@ -6,6 +6,7 @@ import {
   type InstalledRepo, type OAuthTokens,
 } from '@/vaultActions'
 import { Button } from '@/components/ui/button'
+import { useStore } from '@/store'
 
 export const Route = createFileRoute('/auth/callback')({
   component: AuthCallbackPage,
@@ -41,6 +42,7 @@ function AuthCallbackPage() {
   const search: { code?: string; state?: string; error?: string } = Route.useSearch()
   const navigate = useNavigate()
   const [phase, setPhase] = useState<Phase>({ kind: 'exchanging' })
+  const loadProgress = useStore(s => s.vaultLoadProgress)
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -80,7 +82,14 @@ function AuthCallbackPage() {
   }
 
   if (phase.kind === 'exchanging') return <CenteredMessage title="Finishing sign-in…" />
-  if (phase.kind === 'connecting') return <CenteredMessage title="Connecting…" />
+  if (phase.kind === 'connecting') {
+    return (
+      <CenteredMessage
+        title="Connecting…"
+        description={loadProgress ? `Loaded ${loadProgress.loaded} of ${loadProgress.total} files` : undefined}
+      />
+    )
+  }
 
   if (phase.kind === 'error') {
     return (

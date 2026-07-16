@@ -32,8 +32,31 @@ type ContentFile = {
 
 /** Max concurrent Contents-API requests for readFiles — avoids tripping GitHub's secondary rate limit. */
 const READ_FILES_CONCURRENCY = 8
-/** Paths per GraphQL batch — stays comfortably under GraphQL query-size/node-cost limits. */
-const GRAPHQL_BATCH_SIZE = 100
+/**
+ * Paths per GraphQL batch. `@octokit/plugin-throttling` hard-codes every
+ * GraphQL POST through a "write" Bottleneck group (maxConcurrent: 1,
+ * minTime: 1000ms — see its dist-bundle/index.js) — so batches can never
+ * actually dispatch concurrently; only one goes out on the wire per second,
+ * no matter how many we queue client-side. That makes the real lever for
+ * wall-clock time the number of batches, not their concurrency: fewer,
+ * larger batches mean fewer 1s dispatch gaps, at the cost of a slower last
+ * batch (server time per query is superlinear in blob count — measured
+ * ~1.4s for 50 blobs, ~5s for 100). ~50 balances the two.
+ */
+const GRAPHQL_BATCH_SIZE = 50
+/**
+ * Max in-flight batch dispatches from our own pool. This does NOT achieve
+ * true network concurrency for GraphQL — see GRAPHQL_BATCH_SIZE above, the
+ * throttling plugin's internal gate paces actual dispatch to ~1/sec
+ * regardless. What this still buys us: batches are queued for dispatch
+ * back-to-back rather than one full round-trip apart (the old `for` loop
+ * awaited each batch's full response before starting the next), so a
+ * batch's server-processing time can overlap with the next batch's 1s
+ * dispatch wait instead of adding to it serially. Set to exceed any
+ * realistic batch count so our pool is never the bottleneck below what the
+ * plugin's own gate already allows through.
+ */
+const GRAPHQL_CONCURRENCY = 10
 /** readAll() routes through readFiles() below this size — GraphQL batching only pays off in bulk. */
 const GRAPHQL_MIN_FILES = READ_FILES_CONCURRENCY
 
@@ -160,23 +183,35 @@ export class GitHubBackend implements StorageBackend {
 
   /**
    * Reads every vault file in a handful of requests: one tree listing plus a
-   * few GraphQL batches that alias many blobs per request. This avoids the
-   * one-Contents-request-per-file fan-out of readFiles(), which trips GitHub's
-   * secondary rate limit on vaults with hundreds of files.
+   * pool of GraphQL batches, each aliasing many blobs per request. Avoids the
+   * one-Contents-request-per-file fan-out of readFiles(), which trips
+   * GitHub's secondary rate limit on vaults with hundreds of files.
+   *
+   * Batches are dispatched from a pool (see GRAPHQL_CONCURRENCY) rather than
+   * one full round-trip apart, so each batch's server-processing time can
+   * overlap with the next batch's dispatch — see GRAPHQL_BATCH_SIZE for why
+   * this isn't true network parallelism.
+   *
+   * `onProgress`, if given, is called after each batch resolves with the
+   * cumulative number of files processed so far (including any that fall
+   * back to the Contents API) — lets callers show connect progress on a
+   * first load. Not called again for the (rare) Contents-API fallback leg.
    */
-  async readAll(): Promise<RawFile[]> {
+  async readAll(onProgress?: (loaded: number, total: number) => void): Promise<RawFile[]> {
     const tokens = await this.statAll()
     const paths  = Array.from(tokens.keys())
-    if (paths.length === 0) return []
+    const total  = paths.length
+    if (total === 0) return []
     // Small vaults: a single GraphQL batch wouldn't beat readFiles' own request
     // count by enough to justify the extra code path.
-    if (paths.length < GRAPHQL_MIN_FILES) return this.readFiles(paths)
+    if (total < GRAPHQL_MIN_FILES) return this.readFiles(paths)
 
     const files: RawFile[] = []
     const fallbackPaths: string[] = []
+    let loaded = 0
 
     try {
-      for (const batch of chunk(paths, GRAPHQL_BATCH_SIZE)) {
+      await mapWithConcurrency(chunk(paths, GRAPHQL_BATCH_SIZE), GRAPHQL_CONCURRENCY, async batch => {
         const data = await this._octokit.graphql<{ repository: BlobQueryResult }>(
           buildBlobQuery(this._cfg.branch, batch),
           { owner: this._cfg.owner, name: this._cfg.repo },
@@ -192,7 +227,9 @@ export class GitHubBackend implements StorageBackend {
             fallbackPaths.push(path)
           }
         })
-      }
+        loaded += batch.length
+        onProgress?.(loaded, total)
+      })
     } catch (e) {
       throw mapGitHubError(e)
     }
