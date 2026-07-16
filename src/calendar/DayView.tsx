@@ -34,6 +34,10 @@ const DEFAULT_CREATE_DURATION = '1h'
 // the title is shown — two rows can't fit legibly in a short slot (a 45-min
 // event is ~38px). ~1h and up shows the badge row.
 const EVENT_BADGE_MIN_HEIGHT = 48
+// Below this rendered block width the badge row is dropped too — when several
+// events collide their columns narrow, and the title (the more important bit)
+// should keep its space rather than fight the badges for it.
+const EVENT_BADGE_MIN_WIDTH = 90
 // Ghost pill for the time/duration badges: a translucent tint of the block's
 // own foreground ink (bg-current), so it contrasts on every block state/theme
 // without hardcoding a surface color the way Badge's `tag` variant does.
@@ -114,6 +118,19 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
   const left  = `calc(${GUTTER}px + ${colIndex} * ((${colWidth}) + ${COL_GAP}px))`
   const width = `calc(${colWidth})`
 
+  // Measures the block's own rendered width so the badge row can be dropped
+  // once collisions narrow the column below EVENT_BADGE_MIN_WIDTH — the calc()
+  // width above is a CSS expression, not a value JS can read directly.
+  const blockRef = useRef<HTMLButtonElement>(null)
+  const [blockWidth, setBlockWidth] = useState(Infinity)
+  useEffect(() => {
+    const el = blockRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setBlockWidth(entry.contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   // Same formatting the agenda OccurrenceCard uses: locale-aware start time and
   // a "until HH:MM (1 hour)" duration chip, instead of the old `10:00 · 1h` line.
   const timeLabel = fmtT(o.time, hour12)
@@ -122,14 +139,15 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
         ? formatDurationChip(o.metadata.duration, { date: o.date, time: o.time }, hour12)
         : fmtDuration(o.metadata.duration))
     : null
-  const showBadges = height >= EVENT_BADGE_MIN_HEIGHT
+  const showBadges = height >= EVENT_BADGE_MIN_HEIGHT && blockWidth >= EVENT_BADGE_MIN_WIDTH
   const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration].filter(Boolean).join(', ')
 
   return (
     <SurfaceButton
+      ref={blockRef}
       className={cn(
         dvBlockVariants({ state: occState(o) }),
-        'absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-colors',
+        'absolute flex flex-col rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-colors',
       )}
       style={{ top, height, left, width }}
       onClick={() => onOpen(o)}
