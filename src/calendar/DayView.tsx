@@ -147,17 +147,17 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
       ref={blockRef}
       className={cn(
         dvBlockVariants({ state: occState(o) }),
-        'absolute flex flex-col rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-colors',
+        'absolute flex flex-col items-start rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-colors',
       )}
       style={{ top, height, left, width }}
       onClick={() => onOpen(o)}
       aria-label={ariaLabel}
     >
-      <div className="font-semibold overflow-hidden text-ellipsis whitespace-nowrap">
+      <div className="w-full shrink-0 font-semibold overflow-hidden text-ellipsis whitespace-nowrap">
         {o.metadata.title}
       </div>
       {showBadges && (
-        <div className="flex flex-wrap gap-1 mt-0.5">
+        <div className="overflow-hidden flex flex-wrap gap-1 mt-0.5">
           {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
           {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
         </div>
