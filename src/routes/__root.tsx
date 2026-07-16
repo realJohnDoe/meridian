@@ -1,12 +1,24 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { ThemeProvider } from 'next-themes'
+import { ThemeProvider, useTheme } from 'next-themes'
 import { restoreVaults, autoSyncTick, resetSyncBackoff } from '@/storage'
 import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createRootRoute({
   component: Root,
 })
+
+// Android colors the status/nav bar from this meta tag rather than from the
+// page's own background, so it must track the active theme's --backdrop
+// or it stays on the static dark default from index.html for light themes.
+function ThemeColorSync() {
+  const { theme } = useTheme()
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]')
+    meta?.setAttribute('content', getComputedStyle(document.documentElement).backgroundColor)
+  }, [theme])
+  return null
+}
 
 function Root() {
   useEffect(() => {
@@ -32,6 +44,7 @@ function Root() {
       disableTransitionOnChange
       storageKey="meridian_theme"
     >
+      <ThemeColorSync />
       <div id="app" className="flex flex-col">
         <Outlet />
       </div>
