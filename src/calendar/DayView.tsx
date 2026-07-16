@@ -8,7 +8,7 @@ import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
 import { multidayDisplayTitle, fmtT, parseDateString, parseDurationDays } from '@/model'
-import { sameDay, addDays } from '@/format'
+import { sameDay, addDays, formatDurationChip, fmtDuration } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { dvBlockVariants } from '@/components/ui/occurrence-variants'
@@ -24,6 +24,15 @@ const BOTTOM_PAD = 8           // px breathing room below 24:00
 const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
 const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
 const DEFAULT_CREATE_DURATION = '1h'
+// Below this block height the start-time/duration badges are dropped and only
+// the title is shown — two rows can't fit legibly in a short slot (a 45-min
+// event is ~38px). ~1h and up shows the badge row.
+const EVENT_BADGE_MIN_HEIGHT = 48
+// Ghost pill for the time/duration badges: a translucent tint of the block's
+// own foreground ink (bg-current), so it contrasts on every block state/theme
+// without hardcoding a surface color the way Badge's `tag` variant does.
+const eventPillCls =
+  'inline-flex items-center rounded-md px-1.5 py-0.5 text-2xs font-medium leading-none bg-current/20 whitespace-nowrap'
 
 /** Localized hour-boundary label (0:00…24:00), matching the Intl formatting fmtT uses for event times. */
 function formatHourBoundary(h: number, hour12: boolean): string {
@@ -87,9 +96,10 @@ interface EventBlockProps {
   dh: number
   colIndex: number
   totalCols: number
+  hour12: boolean
   onOpen: (o: Occurrence) => void
 }
-function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
+function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockProps) {
   const h   = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
   const top = h * HP + TOP_PAD + 1
   const height = Math.max(dh * HP - 4, 28)
@@ -98,7 +108,15 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   const left  = `calc(${GUTTER}px + ${colIndex} * (${colWidth}))`
   const width = `calc(${colWidth})`
 
-  const timeLabel = fmtT(o.time)
+  // Same formatting the agenda OccurrenceCard uses: locale-aware start time and
+  // a "until HH:MM (1 hour)" duration chip, instead of the old `10:00 · 1h` line.
+  const timeLabel = fmtT(o.time, hour12)
+  const durationLabel = o.metadata.duration
+    ? (o.time
+        ? formatDurationChip(o.metadata.duration, { date: o.date, time: o.time }, hour12)
+        : fmtDuration(o.metadata.duration))
+    : null
+  const showBadges = height >= EVENT_BADGE_MIN_HEIGHT
   const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration].filter(Boolean).join(', ')
 
   return (
@@ -114,9 +132,12 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
       <div className="font-semibold overflow-hidden text-ellipsis whitespace-nowrap">
         {o.metadata.title}
       </div>
-      <div className="text-2xs font-mono mt-px">
-        {timeLabel}{o.metadata.duration ? ` · ${o.metadata.duration}` : ''}
-      </div>
+      {showBadges && (
+        <div className="flex flex-wrap gap-1 mt-0.5">
+          {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
+          {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
+        </div>
+      )}
     </SurfaceButton>
   )
 }
@@ -288,6 +309,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
                 dh={dh}
                 colIndex={ci}
                 totalCols={totalCols}
+                hour12={hour12}
                 onOpen={onOpen}
               />
             ))
