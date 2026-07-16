@@ -14,8 +14,16 @@ export const Route = createRootRoute({
 function ThemeColorSync() {
   const { theme } = useTheme()
   useEffect(() => {
-    const meta = document.querySelector('meta[name="theme-color"]')
-    meta?.setAttribute('content', getComputedStyle(document.documentElement).backgroundColor)
+    // next-themes applies the new theme's class in its own effect on
+    // ThemeProvider, which — being our parent — commits *after* this effect
+    // (React fires effects child-first). Reading the computed style here
+    // would therefore always see the previous theme. Deferring to the next
+    // frame lets that effect land first.
+    const raf = requestAnimationFrame(() => {
+      const meta = document.querySelector('meta[name="theme-color"]')
+      meta?.setAttribute('content', getComputedStyle(document.documentElement).backgroundColor)
+    })
+    return () => cancelAnimationFrame(raf)
   }, [theme])
   return null
 }
