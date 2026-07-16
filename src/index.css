@@ -727,16 +727,12 @@
 /* ── OCCURRENCE CARD ENTRANCE ANIMATION ── */
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 
-/* ── ITEM EXIT ANIMATION (undone → done) ── */
-/* Row slides down + fades, then its slot collapses so rows below glide up.
-   --row-h is set in JS to the row's measured height; margin-bottom:-6px
-   cancels the flex `gap-1.5` (6px) as the slot closes, avoiding a snap. */
-@keyframes itemExit{
-  0%  {opacity:1;transform:translateY(0);    max-height:var(--row-h,80px);margin-bottom:0}
-  55% {opacity:0;transform:translateY(20px); max-height:var(--row-h,80px);margin-bottom:0}
-  100%{opacity:0;transform:translateY(20px); max-height:0;                margin-bottom:-6px}
-}
-.item-exit{animation:itemExit 0.34s cubic-bezier(.4,0,.2,1) forwards;overflow:hidden;pointer-events:none}
+/* ── FLIP LEAVE ANIMATION (row removed from a useFlipTransition list) ── */
+/* The leaving row is pulled out of flow (absolutely positioned at its last
+   measured spot, see captureFlipLeaveRect) so it just fades/slides in place
+   while useFlipTransition glides the surviving siblings up to fill the gap. */
+@keyframes flipLeave{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(10px)}}
+.flip-leave{animation:flipLeave 0.3s cubic-bezier(.4,0,.2,1) forwards;pointer-events:none}
 
 /* Hide number input spinners globally for a cleaner, premium design */
 input[type="number"]::-webkit-inner-spin-button,

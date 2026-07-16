@@ -1,10 +1,10 @@
-import { useState, useMemo, lazy, Suspense } from 'react'
+import { useState, useMemo, useRef, lazy, Suspense } from 'react'
 import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { setActiveVault } from '@/vaultActions'
 import { fmtISO, fmtMonth } from '@/model'
-import { useToday, useResetOnChange } from '@/hooks'
+import { useToday, useResetOnChange, useFlipTransition } from '@/hooks'
 import { vaultIcon } from './vaultIcon'
 import { Checkbox } from './ui/checkbox'
 import { IconButton } from './ui/icon-button'
@@ -43,6 +43,9 @@ export default function AppSidebar() {
   const pendingDirReconnect     = useStore(s => s.pendingDirReconnect)
   const favorites               = useStore(s => s.favorites)
   const roots                   = useStore(s => s.roots)
+
+  const favoritesRef = useRef<HTMLUListElement>(null)
+  useFlipTransition(favoritesRef, favorites, 'data-fav-key')
   const items                   = useStore(s => s.items)
   const toggleFavorite          = useStore(s => s.toggleFavorite)
   const reorderFavorites        = useStore(s => s.reorderFavorites)
@@ -167,11 +170,11 @@ export default function AppSidebar() {
                   {editingFavorites ? <Check size={13} /> : <Pencil size={13} />}
                 </IconButton>
               </SidebarGroupLabel>
-              <SidebarMenu>
+              <SidebarMenu ref={favoritesRef}>
                 {favorites.map((slug, idx) => {
                   const title = roots.get(slug)?.title ?? slug
                   return (
-                    <SidebarMenuItem key={slug}>
+                    <SidebarMenuItem key={slug} data-fav-key={slug}>
                       {editingFavorites ? (
                         <div className="flex items-center gap-1 px-5 py-3 text-sm font-medium text-sidebar-foreground/60">
                           <span className="flex-1 truncate">{title}</span>

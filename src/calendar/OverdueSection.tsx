@@ -1,6 +1,7 @@
-import { memo } from 'react'
+import { memo, useRef } from 'react'
 import type { Occurrence, EditScope } from '@/types'
 import { cn } from '@/lib/cn'
+import { useFlipTransition } from '@/hooks'
 import OccurrenceRow from './OccurrenceRow'
 
 
@@ -12,8 +13,11 @@ interface Props {
 }
 
 function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
+  const sectionRef = useRef<HTMLDivElement>(null)
+  useFlipTransition(sectionRef, items, 'data-occ-key')
+
   return (
-    <div>
+    <div ref={sectionRef}>
       <div className={cn(
         'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-yellow-500',
         'flex items-center gap-2 bg-background',

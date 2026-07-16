@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots } from '@/types'
 import { isStandaloneOcc } from '@/types'
@@ -7,6 +7,7 @@ import { parseItemEntry, serializeTaskEntry } from './items'
 import { fileEntries } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
+import { useFlipTransition, captureFlipLeaveRect, type FlipLeaveRect } from '@/hooks'
 import { OccurrenceCard, MarkdownTaskCard, TagChip } from '@/components'
 import { isDimmed, priorityRank } from '@/calendar'
 import { Card } from '@/components/ui/card'
@@ -55,7 +56,8 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const [pickerQuery, setPickerQuery] = useState('')
   const [editingIdx,  setEditingIdx]  = useState<number | null>(null)
   const [editText,    setEditText]    = useState('')
-  const [exitingEntries, setExitingEntries] = useState<{ row: Row; position: number }[]>([])
+  const [exitingEntries, setExitingEntries] = useState<{ row: Row; rect: FlipLeaveRect }[]>([])
+  const activeRef = useRef<HTMLDivElement>(null)
 
   const occBySlug = useStore(s => s.fom)
   const backlinks = useStore(s => s.backlinks)
@@ -81,10 +83,15 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     })
   })()
 
-  const toggleTask = (idx: number, text: string, done: boolean, row?: Row, position?: number) => {
+  const beginExit = (row: Row) => {
+    const rowEl = activeRef.current?.querySelector<HTMLElement>(`[data-item-key="${row.entry.idx}"]`)
+    const rect = rowEl && captureFlipLeaveRect(activeRef, rowEl)
+    if (rect) setExitingEntries(prev => [...prev, { row, rect }])
+  }
+
+  const toggleTask = (idx: number, text: string, done: boolean, row?: Row) => {
     // Animate out when marking done; commit immediately (optimistic)
-    if (!done && row != null && position != null)
-      setExitingEntries(prev => [...prev, { row, position }])
+    if (!done && row != null) beginExit(row)
     const next = [...items]
     next[idx] = serializeTaskEntry(text, !done)
     onChange(next)
@@ -140,16 +147,10 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const activeRows = sortedRows.filter(r => !isDoneRow(r))
   const doneRows   = sortedRows.filter(r => isDoneRow(r))
 
-  // Merge exiting rows back at their original active-list positions so they
-  // animate out in-place rather than jumping to the bottom of the list.
-  const displayRows: { row: Row; exiting: boolean }[] = (() => {
-    const result: { row: Row; exiting: boolean }[] = activeRows.map(row => ({ row, exiting: false }))
-    for (const { row, position } of exitingEntries) {
-      const at = Math.min(position, result.length)
-      result.splice(at, 0, { row, exiting: true })
-    }
-    return result
-  })()
+  // Siblings glide into their new position as a row leaves; the leaving row
+  // itself is rendered separately as an absolutely-positioned overlay (see
+  // exitingEntries/renderExitingRow) so it doesn't participate in this diff.
+  useFlipTransition(activeRef, activeRows, 'data-item-key')
 
   const donePickerRows = (() => {
     const q = pickerQuery.toLowerCase()
@@ -199,7 +200,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     setPickerOpen(false)
   }
 
-  function renderRowContent(row: Row, position?: number) {
+  function renderRowContent(row: Row) {
     const { entry, occ } = row
     const { idx } = entry
 
@@ -222,7 +223,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                 listedOn={listedOn}
                 onOpen={() => onOpenWikilink?.(occ.fileSlug)}
                 onToggleDone={() => {
-                  if (position != null) setExitingEntries(prev => [...prev, { row, position }])
+                  beginExit(row)
                   onToggleDone?.(occ)
                 }}
               />
@@ -249,7 +250,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           <MarkdownTaskCard
             text={text}
             done={done}
-            onToggle={() => toggleTask(idx, text, done, row, position)}
+            onToggle={() => toggleTask(idx, text, done, row)}
             onPromote={() => promote(idx, text, done)}
             onClickText={isEditing ? undefined : () => startEdit(idx, text)}
             editValue={isEditing ? editText : undefined}
@@ -269,22 +270,28 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     )
   }
 
-  function renderRow(row: Row, exiting = false, position?: number) {
+  function renderRow(row: Row) {
+    const idx = row.entry.idx
+    return (
+      <div key={idx} data-item-key={idx} className="flex items-start gap-1">
+        {renderRowContent(row)}
+      </div>
+    )
+  }
+
+  // Rendered as an absolutely-positioned overlay pinned to the row's last
+  // measured spot, so it fades out independently while activeRef's
+  // useFlipTransition glides the surviving rows up to fill the gap.
+  function renderExitingRow(row: Row, rect: FlipLeaveRect) {
     const idx = row.entry.idx
     return (
       <div
-        key={exiting ? `exit-${idx}` : idx}
-        ref={exiting ? (el => {
-          // Capture the row's natural height so the keyframe can collapse
-          // the slot from a concrete value (CSS can't animate from `auto`).
-          if (el && !el.style.getPropertyValue('--row-h')) {
-            el.style.setProperty('--row-h', `${el.offsetHeight}px`)
-          }
-        }) : undefined}
-        className={`flex items-start gap-1${exiting ? ' item-exit' : ''}`}
-        onAnimationEnd={exiting ? () => setExitingEntries(prev => prev.filter(e => e.row.entry.idx !== idx)) : undefined}
+        key={`exit-${idx}`}
+        className="absolute flex items-start gap-1 flip-leave"
+        style={{ top: rect.top, left: rect.left, width: rect.width }}
+        onAnimationEnd={() => setExitingEntries(prev => prev.filter(e => e.row.entry.idx !== idx))}
       >
-        {renderRowContent(row, position)}
+        {renderRowContent(row)}
       </div>
     )
   }
@@ -293,7 +300,10 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     <div className="mt-6 pt-5 border-t border-border">
       <div className="text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase mb-2.5">Items</div>
       <div className="flex flex-col gap-1.5">
-        {displayRows.map(({ row, exiting }, position) => renderRow(row, exiting, position))}
+        <div ref={activeRef} className="relative flex flex-col gap-1.5">
+          {activeRows.map(row => renderRow(row))}
+          {exitingEntries.map(({ row, rect }) => renderExitingRow(row, rect))}
+        </div>
 
         {/* Add item — half-card affordance, same dimensions as item cards */}
         <div className="flex items-start gap-1">
