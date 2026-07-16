@@ -238,8 +238,9 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
         </div>
       )}
 
-      {/* Scrollable timeline */}
-      <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch] relative" id="dvSc" ref={scRef}>
+      {/* Scrollable timeline. pb-5 (20px) matches the search-bar gradient
+          height so the 24:00 boundary can scroll clear of the overlaid fade. */}
+      <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch] relative pb-5" id="dvSc" ref={scRef}>
         <div className="relative" id="dvTl" ref={tlRef} style={{ height: HOURS * HP + TOP_PAD + BOTTOM_PAD }}>
 
           {/* Hour-boundary labels (0:00 … 24:00) */}
