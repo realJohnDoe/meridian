@@ -353,9 +353,12 @@
   --primary-foreground: var(--ink-light);
   --ring:               #907aa9;
 
-  /* On-accent ink pair — see --*-foreground assignments below */
+  /* On-accent ink pair — see --*-foreground assignments below.
+     ink-dark uses Rosé Pine's own dark-variant "base" (#191724) rather than
+     this theme's --foreground: the latter only clears ~3.1:1 on priority-3
+     yellow, well under AA; the dark-variant base clears ~7.5:1. */
   --ink-light: #fffaf3;
-  --ink-dark:  #575279;
+  --ink-dark:  #191724;
 
   /* Destructive / warning */
   --destructive: #b4637a;
@@ -374,13 +377,16 @@
   --priority-2:   #c4621a;   /* orange */
   --priority-3:   #c4a800;   /* yellow */
 
-  /* On-accent text — per-swatch pick of whichever ink clears more contrast;
-     priority-3 (yellow) is the outlier that needs dark ink instead of light */
-  --event-foreground:      var(--ink-light);
-  --task-foreground:       var(--ink-light);
+  /* On-accent text — per-swatch pick of whichever ink clears more contrast.
+     Now that ink-dark is a true dark-variant base rather than this theme's
+     own --foreground, it wins for event/task/priority-2/priority-3 too
+     (priority-2 still falls short of AA at ~4.3:1 — c4621a is the best
+     available background, this is just the better of the two inks). */
+  --event-foreground:      var(--ink-dark);
+  --task-foreground:       var(--ink-dark);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
-  --priority-2-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-dark);
   --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
@@ -425,12 +431,15 @@
 
   /* Brand — violet */
   --primary:            #6c71c4;
-  --primary-foreground: var(--ink-light);
+  --primary-foreground: var(--ink-dark);
   --ring:               #6c71c4;
 
-  /* On-accent ink pair — see --*-foreground assignments below */
+  /* On-accent ink pair — see --*-foreground assignments below.
+     ink-dark was this theme's own --foreground (a muted slate), which only
+     cleared 1.2-1.7:1 against every domain swatch — nowhere near AA. Pure
+     black clears 4.5:1+ on all six swatches, so it replaces that slate here. */
   --ink-light: #fdf6e3;
-  --ink-dark:  #586e75;
+  --ink-dark:  #000000;
 
   /* Destructive / warning */
   --destructive: #dc322f;
@@ -449,13 +458,13 @@
   --priority-2:   #cb4b16;   /* orange */
   --priority-3:   #b58900;   /* yellow */
 
-  /* On-accent text — light ink wins the contrast comparison for every swatch here */
-  --event-foreground:      var(--ink-light);
-  --task-foreground:       var(--ink-light);
-  --note-foreground:       var(--ink-light);
-  --priority-1-foreground: var(--ink-light);
-  --priority-2-foreground: var(--ink-light);
-  --priority-3-foreground: var(--ink-light);
+  /* On-accent text — dark ink (now pure black, see above) wins every swatch here */
+  --event-foreground:      var(--ink-dark);
+  --task-foreground:       var(--ink-dark);
+  --note-foreground:       var(--ink-dark);
+  --priority-1-foreground: var(--ink-dark);
+  --priority-2-foreground: var(--ink-dark);
+  --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
   --sidebar:                    #fdf6e3;
@@ -502,8 +511,12 @@
   --primary-foreground: var(--ink-dark);
   --ring:               #bd93f9;
 
-  /* On-accent ink pair — see --*-foreground assignments below */
-  --ink-dark:  #282a36;
+  /* On-accent ink pair — see --*-foreground assignments below.
+     ink-dark was --card (#282a36), which leaves priority-1 at only ~4.5:1 —
+     right at the AA edge. Swapping in --backdrop (#191a21, already part of
+     this theme's own elevation ramp) widens every swatch's margin, e.g.
+     priority-1 to ~5.5:1. */
+  --ink-dark:  #191a21;
   --ink-light: #ffffff;
 
   /* Destructive / warning */
@@ -574,9 +587,12 @@
   --primary-foreground: var(--ink-light);
   --ring:               #8839ef;
 
-  /* On-accent ink pair — see --*-foreground assignments below */
+  /* On-accent ink pair — see --*-foreground assignments below.
+     ink-dark uses Catppuccin Mocha's "crust" (#11111b) rather than this
+     theme's --foreground: the latter only clears ~3.1:1 on priority-3
+     yellow, well under AA; Mocha's crust clears ~7.2:1. */
   --ink-light: #eff1f5;
-  --ink-dark:  #4c4f69;
+  --ink-dark:  #11111b;
 
   /* Destructive / warning */
   --destructive: #d20f39;   /* red */
@@ -595,12 +611,14 @@
   --priority-2:   #e35d0a;   /* peach, darkened so light ink clears AA */
   --priority-3:   #df8e1d;   /* yellow */
 
-  /* On-accent text — light ink wins except yellow, which needs dark ink */
+  /* On-accent text — per-swatch pick of whichever ink clears more contrast.
+     Now that ink-dark is Mocha's crust rather than this theme's own
+     --foreground, it wins for task/priority-2/priority-3 too. */
   --event-foreground:      var(--ink-light);
-  --task-foreground:       var(--ink-light);
-  --note-foreground:       var(--ink-light);
+  --task-foreground:       var(--ink-dark);
+  --note-foreground:       var(--ink-dark);
   --priority-1-foreground: var(--ink-light);
-  --priority-2-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-dark);
   --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
