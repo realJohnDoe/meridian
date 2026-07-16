@@ -19,6 +19,8 @@ import { computeColumns } from './computeColumns'
 const HOURS = 24              // hours shown on the timeline
 const HP = 56                 // pixels per hour
 const GUTTER = 64              // px reserved for the left hour-label column
+const RIGHT_PAD = 8            // px breathing room to the right edge of the screen
+const COL_GAP = 6              // px gap between simultaneous (colliding) event columns
 const TOP_PAD = 8              // px headroom above 0:00 so its label isn't clipped
 const BOTTOM_PAD = 8           // px breathing room below 24:00
 const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
@@ -94,8 +96,8 @@ function EventBlock({ o, dh, colIndex, totalCols, onOpen }: EventBlockProps) {
   const top = h * HP + TOP_PAD + 1
   const height = Math.max(dh * HP - 4, 28)
 
-  const colWidth = `(100% - ${GUTTER}px) / ${totalCols}`
-  const left  = `calc(${GUTTER}px + ${colIndex} * (${colWidth}))`
+  const colWidth = `(100% - ${GUTTER + RIGHT_PAD}px - ${(totalCols - 1) * COL_GAP}px) / ${totalCols}`
+  const left  = `calc(${GUTTER}px + ${colIndex} * ((${colWidth}) + ${COL_GAP}px))`
   const width = `calc(${colWidth})`
 
   const timeLabel = fmtT(o.time)
@@ -255,7 +257,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
           ))}
 
           {/* Hour cells — one button per hour; click/tap or Enter/Space creates an event there */}
-          <div className="absolute inset-y-0 right-0" style={{ left: GUTTER }}>
+          <div className="absolute inset-y-0" style={{ left: GUTTER, right: RIGHT_PAD }}>
             {Array.from({ length: HOURS }, (_, h) => h).map(h => (
               <button
                 key={h}
