@@ -237,7 +237,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   }, [weekRows])
 
   return (
-    <div className="relative flex-1 flex flex-col overflow-hidden pb-10" ref={wrapRef}>
+    <div className="relative flex-1 flex flex-col overflow-hidden pb-5" ref={wrapRef}>
       <div className="grid grid-cols-7 px-1 shrink-0 pt-2">
         {weekdayLabels.map(d => <div key={d} className="text-center text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground py-0.75">{d}</div>)}
       </div>

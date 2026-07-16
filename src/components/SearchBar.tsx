@@ -60,8 +60,10 @@ export default function SearchBar() {
         </Suspense>
       )}
 
-      {/* Gradient fade blending content into the sheet */}
-      <div className="absolute inset-x-0 bottom-full h-10 bg-gradient-to-b from-transparent to-background/85 pointer-events-none" />
+      {/* Gradient fade blending content into the sheet. Short fade (20px)
+          that reaches full sheet opacity right at the sheet's top edge; the
+          -mb-px overlap hides the backdrop-blur seam. */}
+      <div className="absolute inset-x-0 bottom-full -mb-px h-5 bg-gradient-to-b from-transparent to-background pointer-events-none" />
 
       <div className={`relative z-[26] px-3.5 py-3.5 flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
         <div data-tour="search-bar" className="search-bar-wrap w-full max-w-xl mx-auto">
