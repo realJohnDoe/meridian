@@ -157,7 +157,7 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
         {o.metadata.title}
       </div>
       {showBadges && (
-        <div className="overflow-hidden flex flex-wrap gap-1 mt-0.5">
+        <div className="overflow-hidden flex flex-wrap gap-1">
           {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
           {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
         </div>
