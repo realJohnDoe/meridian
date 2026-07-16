@@ -353,9 +353,12 @@
   --primary-foreground: var(--ink-light);
   --ring:               #907aa9;
 
-  /* On-accent ink pair — see --*-foreground assignments below */
+  /* On-accent ink pair — see --*-foreground assignments below.
+     ink-dark uses Rosé Pine's own dark-variant "base" (#191724) rather than
+     this theme's --foreground: the latter only clears ~3.1:1 on priority-3
+     yellow, well under AA; the dark-variant base clears ~7.5:1. */
   --ink-light: #fffaf3;
-  --ink-dark:  #575279;
+  --ink-dark:  #191724;
 
   /* Destructive / warning */
   --destructive: #b4637a;
@@ -574,9 +577,12 @@
   --primary-foreground: var(--ink-light);
   --ring:               #8839ef;
 
-  /* On-accent ink pair — see --*-foreground assignments below */
+  /* On-accent ink pair — see --*-foreground assignments below.
+     ink-dark uses Catppuccin Mocha's "crust" (#11111b) rather than this
+     theme's --foreground: the latter only clears ~3.1:1 on priority-3
+     yellow, well under AA; Mocha's crust clears ~7.2:1. */
   --ink-light: #eff1f5;
-  --ink-dark:  #4c4f69;
+  --ink-dark:  #11111b;
 
   /* Destructive / warning */
   --destructive: #d20f39;   /* red */
