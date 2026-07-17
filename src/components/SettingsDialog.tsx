@@ -32,7 +32,7 @@ const THEMES: { id: string; label: string; className?: string }[] = [
 ]
 
 // The five most identity-defining domain tokens, previewed as swatches.
-const SWATCH_CLASSES = ['bg-primary', 'bg-task', 'bg-event', 'bg-note', 'bg-destructive']
+const SWATCH_CLASSES = ['bg-event', 'bg-priority-1', 'bg-priority-3', 'bg-task', 'bg-note']
 
 interface Props {
   open:         boolean
