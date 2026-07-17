@@ -165,18 +165,43 @@ export default function AgendaView({ onOpen }: Props) {
   // Feed the top-bar label: the date of the topmost visible day-section.
   // Derived from the virtualizer's range (platform-agnostic — works on mobile
   // where the old DOM scroll-query left the label stuck on "today").
+  //
+  // Reads virtualizer.scrollOffset/getVirtualItems() directly inside a raw
+  // scroll listener rather than from the `virtualItems` returned by the last
+  // render — that lagged the actual scroll position by a full render-hop,
+  // stretched further under momentum (the same symptom traced on the month
+  // carousel's swipe). The virtualizer updates those synchronously in its own
+  // scroll handler, registered before this effect's listener (a layout effect
+  // inside useVirtualizer runs before this passive effect in the same mount
+  // commit), so by the time this listener runs on a later scroll event the
+  // browser has already invoked the virtualizer's — same-target listeners
+  // fire in registration order — and the values it reads are current.
   const lastTopRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!virtualItems.length) return
+  const updateTopDate = useCallback(() => {
+    const items = virtualizer.getVirtualItems()
+    if (!items.length) return
     const offset = virtualizer.scrollOffset ?? 0
-    const top = virtualItems.find(vi => vi.end > offset + 12) ?? virtualItems[0]
+    const top = items.find(vi => vi.end > offset + 12) ?? items[0]
     const s = sections[top.index]
     const key = s && s.kind === 'day' ? s.dateKey : fmtISO(today)
-    if (key !== lastTopRef.current) {
-      lastTopRef.current = key
-      useStore.setState({ agendaTopDate: key })
-    }
-  }, [virtualItems, sections, today, virtualizer])
+    if (key === lastTopRef.current) return
+    lastTopRef.current = key
+    useStore.setState({ agendaTopDate: key })
+  }, [sections, today, virtualizer])
+
+  useEffect(() => {
+    const el = scRef.current
+    if (!el) return
+    el.addEventListener('scroll', updateTopDate, { passive: true })
+    return () => el.removeEventListener('scroll', updateTopDate)
+  }, [updateTopDate])
+
+  // Covers what the scroll listener can't: the initial label on mount, and
+  // keeping it correct if `today` flips at midnight (a PWA left open
+  // overnight) or the top section shifts without a scroll (content edited).
+  useEffect(() => {
+    updateTopDate()
+  }, [updateTopDate])
 
   // goToday: scroll to the overdue section (if any) else today. Off-screen
   // sections aren't in the DOM, so we use the virtualizer index rather than a
