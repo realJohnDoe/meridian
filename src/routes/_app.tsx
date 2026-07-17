@@ -51,6 +51,7 @@ function AppMain() {
 
   const today         = useToday()
   const agendaTopDate = useStore(s => s.agendaTopDate)
+  const monthPreview  = useStore(s => s.monthPreview)
 
   const isEntryView  = !!entrySlugMatch || !!entryNewMatch
   const isDayView    = !!dayMatch
@@ -62,7 +63,10 @@ function AppMain() {
   const topBarLabel = (() => {
     if (backlogMatch) return 'Backlog'
     if (notesMatch)   return 'Notes'
-    if (monthViewDate) return fmtTopBarMonth(monthViewDate, today)
+    // monthPreview (set by the swipe carousel on touchend) shows the label the
+    // gesture is heading toward immediately, ahead of the route committing —
+    // chevron navigation and Today still key off the route's own monthViewDate.
+    if (monthViewDate) return fmtTopBarMonth(monthPreview ? parseMonth(monthPreview) : monthViewDate, today)
     const d = agendaTopDate ? new Date(agendaTopDate + 'T00:00:00') : today
     return fmtTopBarDay(d, today)
   })()
@@ -108,8 +112,12 @@ function AppMain() {
             <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
               {isMobile && <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={openSidebar} title="Menu" aria-label="Menu"><Menu size={18} /></Button>}
               <span className="flex-1 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) } })}><ChevronLeft size={18} /></Button>
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) } })}><ChevronRight size={18} /></Button>
+              {/* replace: true — mirrors the month carousel's swipe-to-page
+                  semantics (see MonthView) so chevron taps and swipes leave
+                  the same, single history entry per visit instead of chevron
+                  taps alone stacking up a back-press-per-month trail. */}
+              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}><ChevronLeft size={18} /></Button>
+              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}><ChevronRight size={18} /></Button>
             </div>
           ) : (
             <div className="flex items-center gap-2 min-w-0" id="tbDefault">
