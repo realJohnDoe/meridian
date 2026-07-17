@@ -150,6 +150,7 @@ Meridian was heavily inspired by tools we already loved, and tries to fill the g
 | Calendar views (day / month) | ✅ | Plugin-dependent | ✅ | Partial | Partial | ❌ |
 | Task management | ✅ | ✅ (TaskNotes plugin) | Limited | ✅ | ✅ | Partial |
 | Wikilinks between entries | ✅ | ✅ | ❌ | ✅ (`#123` issue links) | ❌ | ❌ |
+| Advanced note-taking (plugin ecosystem, graph view, deep linking) | Partial | ✅ | ❌ | ❌ | ❌ | Partial |
 | Rich recurrence rules | ✅ | Limited | ✅ | ❌ | ✅ | ❌ |
 | Multiple participants / assignees | ✅ | Partial | ❌ | ✅ | ✅ (paid) | ❌ |
 | Free & open source | ✅ | Partially (core only) | ❌ | ❌ | ❌ | ❌ |
