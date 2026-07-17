@@ -142,11 +142,12 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
     <SurfaceButton
       className={cn(
         dvBlockVariants({ state: occState(o) }),
-        // gap-0 overrides the gap-2 that Button's base classes apply — in this
-        // flex-col that lands between the title and the badge row, and its 8px
-        // is what pushed a 1h block's content (8+16+8+14+8 = 54px) past the
-        // 52px it has to render in.
-        '@container absolute flex flex-col items-start gap-0 rounded-md px-2 text-xs font-medium overflow-hidden transition-colors',
+        // gap-1 both matches the title/meta spacing OccurrenceCard uses and
+        // overrides the gap-2 Button's base classes apply — in this flex-col
+        // that gap lands between the title and the badge row, and its 8px is
+        // what pushed a 1h block's content (8+16+8+14+8 = 54px) past the 52px
+        // it has to render in. At gap-1 that comes to 50px and fits.
+        '@container absolute flex flex-col items-start gap-1 rounded-md px-2 text-xs font-medium overflow-hidden transition-colors',
         // Sub-hour blocks bottom out at a 28px floor, which py-2 would overflow
         // on the title's 16px line box alone (8+16+8), clipping its descenders.
         showBadges ? 'py-2' : 'py-1',
