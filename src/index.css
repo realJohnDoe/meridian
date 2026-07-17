@@ -353,9 +353,12 @@
   --primary-foreground: var(--ink-light);
   --ring:               #907aa9;
 
-  /* On-accent ink pair — see --*-foreground assignments below */
+  /* On-accent ink pair — see --*-foreground assignments below.
+     ink-dark uses Rosé Pine's own dark-variant "base" (#191724) rather than
+     this theme's --foreground: the latter only clears ~3.1:1 on priority-3
+     yellow, well under AA; the dark-variant base clears ~7.5:1. */
   --ink-light: #fffaf3;
-  --ink-dark:  #575279;
+  --ink-dark:  #191724;
 
   /* Destructive / warning */
   --destructive: #b4637a;
@@ -374,8 +377,11 @@
   --priority-2:   #c4621a;   /* orange */
   --priority-3:   #c4a800;   /* yellow */
 
-  /* On-accent text — per-swatch pick of whichever ink clears more contrast;
-     priority-3 (yellow) is the outlier that needs dark ink instead of light */
+  /* On-accent text — light ink on every swatch except priority-3 (yellow),
+     which is the only one dark ink actually wins by a decisive margin.
+     WCAG's luminance-only math prefers dark ink for event/task too (this
+     theme sits chips on a light row background, which the metric doesn't
+     model), but light reads better in practice here; kept per design call. */
   --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
@@ -428,9 +434,12 @@
   --primary-foreground: var(--ink-light);
   --ring:               #6c71c4;
 
-  /* On-accent ink pair — see --*-foreground assignments below */
+  /* On-accent ink pair — see --*-foreground assignments below.
+     ink-dark was this theme's own --foreground (a muted slate), which only
+     cleared 1.2-1.7:1 against every domain swatch — nowhere near AA. Pure
+     black clears 4.5:1+ on all six swatches, so it replaces that slate here. */
   --ink-light: #fdf6e3;
-  --ink-dark:  #586e75;
+  --ink-dark:  #000000;
 
   /* Destructive / warning */
   --destructive: #dc322f;
@@ -449,13 +458,18 @@
   --priority-2:   #cb4b16;   /* orange */
   --priority-3:   #b58900;   /* yellow */
 
-  /* On-accent text — light ink wins the contrast comparison for every swatch here */
+  /* On-accent text — light ink on every swatch except priority-3 (yellow),
+     per design call: pure black ink (see above) technically wins every
+     swatch by WCAG's luminance-only math, but light ink reads better in
+     practice here (this theme sits chips on a light row background,
+     which the metric doesn't model). priority-3 keeps dark ink — it's
+     the one swatch where dark is a decisive, not marginal, win. */
   --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
   --priority-2-foreground: var(--ink-light);
-  --priority-3-foreground: var(--ink-light);
+  --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
   --sidebar:                    #fdf6e3;
@@ -502,8 +516,12 @@
   --primary-foreground: var(--ink-dark);
   --ring:               #bd93f9;
 
-  /* On-accent ink pair — see --*-foreground assignments below */
-  --ink-dark:  #282a36;
+  /* On-accent ink pair — see --*-foreground assignments below.
+     ink-dark was --card (#282a36), which leaves priority-1 at only ~4.5:1 —
+     right at the AA edge. Swapping in --backdrop (#191a21, already part of
+     this theme's own elevation ramp) widens every swatch's margin, e.g.
+     priority-1 to ~5.5:1. */
+  --ink-dark:  #191a21;
   --ink-light: #ffffff;
 
   /* Destructive / warning */
@@ -574,9 +592,12 @@
   --primary-foreground: var(--ink-light);
   --ring:               #8839ef;
 
-  /* On-accent ink pair — see --*-foreground assignments below */
+  /* On-accent ink pair — see --*-foreground assignments below.
+     ink-dark uses Catppuccin Mocha's "crust" (#11111b) rather than this
+     theme's --foreground: the latter only clears ~3.1:1 on priority-3
+     yellow, well under AA; Mocha's crust clears ~7.2:1. */
   --ink-light: #eff1f5;
-  --ink-dark:  #4c4f69;
+  --ink-dark:  #11111b;
 
   /* Destructive / warning */
   --destructive: #d20f39;   /* red */
@@ -592,10 +613,17 @@
   --note:         #179299;   /* teal */
   --brand-cyan:   #179299;
   --priority-1:   #d20f39;   /* red */
-  --priority-2:   #e35d0a;   /* peach, darkened so light ink clears AA */
-  --priority-3:   #df8e1d;   /* yellow */
+  --priority-2:   #fe640b;   /* peach — Catppuccin's official swatch, undarkened;
+                                 vs light ink this is only ~2.6:1, well under
+                                 AA, but matches the palette's actual peach */
+  --priority-3:   #f2cc0d;   /* yellow — pushed to a clearer, more saturated
+                                 gold so it reads apart from priority-2 */
 
-  /* On-accent text — light ink wins except yellow, which needs dark ink */
+  /* On-accent text — light ink on every swatch except priority-3 (yellow),
+     which is the only one dark ink actually wins by a decisive margin.
+     WCAG's luminance-only math prefers dark ink for task/note/priority-2
+     too (this theme sits chips on a light row background, which the
+     metric doesn't model), but light reads better in practice here. */
   --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);

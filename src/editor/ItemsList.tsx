@@ -2,12 +2,13 @@ import { useRef, useState } from 'react'
 import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots } from '@/types'
 import { isStandaloneOcc } from '@/types'
-import { occKind, occState } from '@/occView'
+import { occKind } from '@/occView'
 import { parseItemEntry, serializeTaskEntry } from './items'
 import { fileEntries } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
 import { OccurrenceCard, MarkdownTaskCard, TagChip, FlipList, captureFlipLeaveRect, type FlipLeaveRect } from '@/components'
+import { isDimmed, priorityRank } from '@/calendar'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -35,17 +36,14 @@ type Row = { entry: ParsedEntry; occ: Occurrence | undefined }
 function rowSortKey({ entry, occ }: Row): [number, number, string] {
   if (entry.kind === 'link') {
     if (!occ) return [5, entry.idx, '']
-    const s = occState(occ)
-    if (s === 'done' || s === 'event-past') {
+    if (isDimmed(occ)) {
       return [4, 0, occ.metadata.title?.toLowerCase() ?? '']
     }
     const k = occKind(occ)
     if (k === 'note')  return [0, 0, occ.metadata.title?.toLowerCase() ?? '']
     if (k === 'event') return [1, occ.metadata.jsTime?.getTime() ?? 0, '']
     // task: sort by priority
-    const p = occ.metadata.priority
-    const prank = p === 'high' ? 0 : p === 'medium' ? 1 : p === 'low' ? 2 : 3
-    return [2, prank, occ.metadata.title?.toLowerCase() ?? '']
+    return [2, priorityRank(occ.metadata.priority), occ.metadata.title?.toLowerCase() ?? '']
   }
   // string task
   if (entry.done) return [4, 0, entry.text.toLowerCase()]
@@ -141,17 +139,12 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   }
 
   const isDoneRow = ({ entry, occ }: Row) => {
-    if (entry.kind === 'link') {
-      if (!occ) return false
-      const s = occState(occ)
-      return s === 'done' || s === 'event-past'
-    }
+    if (entry.kind === 'link') return !!occ && isDimmed(occ)
     return entry.done
   }
 
   const activeRows = sortedRows.filter(r => !isDoneRow(r))
   const doneRows   = sortedRows.filter(r => isDoneRow(r))
-
 
   const donePickerRows = (() => {
     const q = pickerQuery.toLowerCase()
@@ -281,8 +274,8 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   }
 
   // Rendered as an absolutely-positioned overlay pinned to the row's last
-  // measured spot, so it fades out independently while activeRef's
-  // useFlipTransition glides the surviving rows up to fill the gap.
+  // measured spot, so it fades out independently while the FlipList below
+  // glides the surviving rows up to fill the gap.
   function renderExitingRow(row: Row, rect: FlipLeaveRect) {
     const idx = row.entry.idx
     return (
