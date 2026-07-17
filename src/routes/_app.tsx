@@ -91,7 +91,13 @@ function AppMain() {
           id="mainTop"
           className={cn(
             'h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10',
-            isEntryView ? 'overflow-hidden' : 'px-3.5 justify-between',
+            isEntryView
+              ? 'overflow-hidden'
+              // Right edge (and left edge on mobile) always leads with an icon button, whose own
+              // h-10 box already insets it (54 - 40) / 2 = 7px from the bar edge — matching the
+              // vertical inset. Extra container padding there would double up. The desktop-only
+              // left edge (no button, just the label) keeps the roomier 14px.
+              : cn('justify-between pr-1.75', isMobile ? 'pl-1.75' : 'pl-3.5'),
           )}
         >
           {isEntryView ? (
