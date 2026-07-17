@@ -30,11 +30,7 @@ const BOTTOM_PAD = 8           // px breathing room below 24:00 — `2` step
 const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
 const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
 const DEFAULT_CREATE_DURATION = '1h'
-// Below this block height the start-time/duration badges are dropped and only
-// the title is shown — two rows can't fit legibly in a short slot (a 45-min
-// event is ~38px). ~1h and up shows the badge row.
-const EVENT_BADGE_MIN_HEIGHT = 48
-// Below this rendered block width the badge row is dropped too — when several
+// Below this rendered block width the badge row is dropped — when several
 // events collide their columns narrow, and the title (the more important bit)
 // should keep its space rather than fight the badges for it.
 const EVENT_BADGE_MIN_WIDTH = 90
@@ -118,15 +114,24 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
   const left  = `calc(${GUTTER}px + ${colIndex} * ((${colWidth}) + ${COL_GAP}px))`
   const width = `calc(${colWidth})`
 
-  // Measures the block's own rendered width so the badge row can be dropped
-  // once collisions narrow the column below EVENT_BADGE_MIN_WIDTH — the calc()
-  // width above is a CSS expression, not a value JS can read directly.
+  // Measures the block's own rendered width/height on every real size change
+  // (viewport resize, or a collision changing the column width) — the calc()
+  // width above is a CSS expression, not a value JS can read directly. The
+  // same pass re-checks scrollHeight vs clientHeight so the badge row gets
+  // dropped whenever it would actually overflow and get clipped, rather than
+  // guessing a height threshold up front.
   const blockRef = useRef<HTMLButtonElement>(null)
   const [blockWidth, setBlockWidth] = useState(Infinity)
+  const [badgesFit, setBadgesFit] = useState(true)
   useEffect(() => {
     const el = blockRef.current
     if (!el) return
-    const ro = new ResizeObserver(([entry]) => setBlockWidth(entry.contentRect.width))
+    const check = () => {
+      setBlockWidth(el.getBoundingClientRect().width)
+      setBadgesFit(el.scrollHeight <= el.clientHeight)
+    }
+    check()
+    const ro = new ResizeObserver(check)
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
@@ -139,7 +144,8 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
         ? formatDurationChip(o.metadata.duration, { date: o.date, time: o.time }, hour12)
         : fmtDuration(o.metadata.duration))
     : null
-  const showBadges = height >= EVENT_BADGE_MIN_HEIGHT && blockWidth >= EVENT_BADGE_MIN_WIDTH
+
+  const showBadges = blockWidth >= EVENT_BADGE_MIN_WIDTH && badgesFit
   const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration].filter(Boolean).join(', ')
 
   return (
@@ -147,7 +153,7 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
       ref={blockRef}
       className={cn(
         dvBlockVariants({ state: occState(o) }),
-        'absolute flex flex-col items-start rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-colors',
+        'absolute flex flex-col items-start rounded-md px-2 py-2 text-xs font-medium overflow-hidden transition-colors',
       )}
       style={{ top, height, left, width }}
       onClick={() => onOpen(o)}
@@ -157,7 +163,7 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
         {o.metadata.title}
       </div>
       {showBadges && (
-        <div className="overflow-hidden flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1">
           {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
           {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
         </div>
