@@ -27,8 +27,10 @@ const THEMES: { id: string; label: string; className?: string }[] = [
   { id: 'tokyo-night', label: 'Tokyo Night', className: 'tokyo-night' },
   { id: 'dracula', label: 'Dracula', className: 'dracula' },
   { id: 'catppuccin-latte', label: 'Catppuccin Latte', className: 'catppuccin-latte' },
+  { id: 'catppuccin-mocha', label: 'Catppuccin Mocha', className: 'catppuccin-mocha' },
   { id: 'rose-pine-dawn', label: 'Rosé Pine Dawn', className: 'rose-pine-dawn' },
   { id: 'solarized-light', label: 'Solarized Light', className: 'solarized-light' },
+  { id: 'solarized-dark', label: 'Solarized Dark', className: 'solarized-dark' },
 ]
 
 // The five most identity-defining domain tokens, previewed as swatches.

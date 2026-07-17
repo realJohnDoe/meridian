@@ -491,6 +491,85 @@
   --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
 }
 
+/* ── SOLARIZED DARK THEME ───────────────────────────────────────── */
+/* Same accent palette as .solarized-light — Solarized's accent hues are
+   calibrated in CIE L*a*b* to read equally well on base03 (dark) and
+   base3 (light), so only the surface/text tokens change. */
+.solarized-dark {
+  /* Surfaces — Solarized base03/base02 elevation ramp */
+  --backdrop:   #001e27;
+  --background: #002b36;
+  --card:       #073642;
+  --popover:    #073642;
+  --secondary:  #0d4552;
+  --muted:      #0d4552;
+  --accent:     #0d4552;
+
+  /* Text — base1 (content) down to base01 (comments) */
+  --foreground:           #93a1a1;
+  --card-foreground:      #93a1a1;
+  --popover-foreground:   #93a1a1;
+  --accent-foreground:    #93a1a1;
+  --secondary-foreground: #839496;
+  --muted-foreground:     #586e75;
+  --dim:                  #657b83;
+
+  /* Brand — violet, same hue as .solarized-light */
+  --primary:            #6c71c4;
+  --primary-foreground: var(--ink-light);
+  --ring:               #6c71c4;
+
+  /* On-accent ink pair — ink-dark is this theme's own background (base03),
+     which clears AA against every domain swatch without needing pure
+     black; ink-light borrows Solarized's base3 (cream white) rather than
+     pure white, to stay in-palette. */
+  --ink-light: #fdf6e3;
+  --ink-dark:  #002b36;
+
+  /* Destructive / warning */
+  --destructive: #dc322f;
+  --warning:     #b58900;
+
+  /* Borders */
+  --border: color-mix(in oklab, #586e75, transparent 80%);
+  --input:  color-mix(in oklab, #586e75, transparent 70%);
+
+  /* Domain colors — identical hexes to .solarized-light */
+  --event:        #6c71c4;   /* violet */
+  --task:         #859900;   /* green */
+  --note:         #2aa198;   /* cyan */
+  --brand-cyan:   #2aa198;
+  --priority-1:   #dc322f;   /* red */
+  --priority-2:   #cb4b16;   /* orange */
+  --priority-3:   #b58900;   /* yellow */
+
+  /* On-accent text — mirrors .solarized-light's design call: light ink on
+     every swatch except priority-3 (yellow), the one swatch where dark
+     ink wins decisively rather than marginally. */
+  --event-foreground:      var(--ink-light);
+  --task-foreground:       var(--ink-light);
+  --note-foreground:       var(--ink-light);
+  --priority-1-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-light);
+  --priority-3-foreground: var(--ink-dark);
+
+  /* Sidebar */
+  --sidebar:                    #073642;
+  --sidebar-foreground:         #839496;
+  --sidebar-primary:            #6c71c4;
+  --sidebar-primary-foreground: #fdf6e3;
+  --sidebar-accent:             #0d4552;
+  --sidebar-accent-foreground:  #93a1a1;
+  --sidebar-border: color-mix(in oklab, #586e75, transparent 70%);
+  --sidebar-ring:               #6c71c4;
+
+  /* Absolute derived tokens — same primary/brand-cyan hues as
+     .solarized-light, so the pre-darkened values match. */
+  --primary-dark:    #5a5fb0;
+  --brand-cyan-dark: #1d8a82;
+  --surface-raised:  #11505f;
+}
+
 /* ── DRACULA THEME ──────────────────────────────────────────────── */
 .dracula {
   /* Surfaces — Dracula elevation ramp (darker→lighter as elevation increases) */
@@ -652,6 +731,81 @@
   /* Float shadow — lighter for a light theme */
   --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
   --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+}
+
+/* ── CATPPUCCIN MOCHA THEME ─────────────────────────────────────── */
+/* Dark flavor of Catppuccin, pairing .catppuccin-latte. Elevation ramp
+   runs Crust→Mantle→Base→Surface0, darkest at the backdrop. */
+.catppuccin-mocha {
+  /* Surfaces */
+  --backdrop:   #11111b;   /* crust */
+  --background: #181825;   /* mantle */
+  --card:       #1e1e2e;   /* base */
+  --popover:    #1e1e2e;
+  --secondary:  #313244;   /* surface0 */
+  --muted:      #313244;
+  --accent:     #313244;
+
+  /* Text */
+  --foreground:           #cdd6f4;   /* text */
+  --card-foreground:      #cdd6f4;
+  --popover-foreground:   #cdd6f4;
+  --accent-foreground:    #cdd6f4;
+  --secondary-foreground: #bac2de;   /* subtext1 */
+  --muted-foreground:     #6c7086;   /* overlay0 */
+  --dim:                  #7f849c;   /* overlay1 — between subtext1 and overlay0 */
+
+  /* Brand — mauve */
+  --primary:            #cba6f7;
+  --primary-foreground: var(--ink-dark);
+  --ring:               #cba6f7;
+
+  /* On-accent ink pair — ink-dark is this theme's own crust (own bg);
+     ink-light borrows Catppuccin Latte's base, mirroring how
+     .catppuccin-latte borrows Mocha's crust for its own ink-dark. */
+  --ink-dark:  #11111b;
+  --ink-light: #eff1f5;
+
+  /* Destructive / warning */
+  --destructive: #f38ba8;
+  --warning:     #f9e2af;
+
+  /* Borders */
+  --border: color-mix(in oklab, #6c7086, transparent 80%);
+  --input:  color-mix(in oklab, #6c7086, transparent 70%);
+
+  /* Domain colors — vivid Catppuccin Mocha hues */
+  --event:        #cba6f7;   /* mauve — alias of primary */
+  --task:         #a6e3a1;   /* green */
+  --note:         #94e2d5;   /* teal */
+  --brand-cyan:   #94e2d5;
+  --priority-1:   #f38ba8;   /* red */
+  --priority-2:   #fab387;   /* peach */
+  --priority-3:   #f9e2af;   /* yellow */
+
+  /* On-accent text — all domain colors here are light pastels, so dark
+     ink wins on every swatch (same pattern as .tokyo-night/.dracula). */
+  --event-foreground:      var(--ink-dark);
+  --task-foreground:       var(--ink-dark);
+  --note-foreground:       var(--ink-dark);
+  --priority-1-foreground: var(--ink-dark);
+  --priority-2-foreground: var(--ink-dark);
+  --priority-3-foreground: var(--ink-dark);
+
+  /* Sidebar */
+  --sidebar:                    #1e1e2e;
+  --sidebar-foreground:         #bac2de;
+  --sidebar-primary:            #cba6f7;
+  --sidebar-primary-foreground: #11111b;
+  --sidebar-accent:             #313244;
+  --sidebar-accent-foreground:  #cdd6f4;
+  --sidebar-border: color-mix(in oklab, #6c7086, transparent 70%);
+  --sidebar-ring:               #cba6f7;
+
+  /* Absolute derived tokens */
+  --primary-dark:    #a97ee0;
+  --brand-cyan-dark: #5cc9b8;
+  --surface-raised:  #45475a;   /* surface1 */
 }
 
 /* Element resets in @layer base so Tailwind utilities can override them */
