@@ -37,6 +37,7 @@ Every entry is a `.md` file with YAML frontmatter — free text for your notes, 
 - **It's yours.** Open, edit, grep, or back up your files with any tool. No lock-in, no proprietary database.
 - **It's easy to debug.** When something looks off, you can read the file and see exactly why.
 - **It syncs cleanly.** Each item is its own file, so two devices only conflict when they edit *the very same item* — not the whole calendar.
+- **It's LLM-friendly.** Markdown with YAML frontmatter is the format nearly every LLM tool and workflow already reads and writes natively — no bespoke parser needed. Google Cloud's newly proposed [Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/) follows the same pattern: a bundle of markdown files with YAML frontmatter as a vendor-neutral way to give AI agents curated context.
 
 ### 4. A recurrence model that bends to real life
 
