@@ -14,8 +14,11 @@ function CalendarPage() {
 
   const month = useMemo(() => parseMonth(monthStr), [monthStr])
 
+  // replace: true — paging to a neighbouring month is view state, not a
+  // navigation event; mobile calendar conventions (Apple/Google/Outlook/
+  // Fantastical) don't let a paging gesture push a back-stack entry per month.
   const onNavigateMonth = useCallback(
-    (d: Date) => navigate({ to: '/calendar/$month', params: { month: fmtMonth(d) } }),
+    (d: Date) => navigate({ to: '/calendar/$month', params: { month: fmtMonth(d) }, replace: true }),
     [navigate],
   )
   const onDayClick = useCallback(
