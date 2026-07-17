@@ -30,10 +30,21 @@ const BOTTOM_PAD = 8           // px breathing room below 24:00 — `2` step
 const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
 const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
 const DEFAULT_CREATE_DURATION = '1h'
-// Below this block height the start-time/duration badges are dropped and only
-// the title is shown — two rows can't fit legibly in a short slot (a 45-min
-// event is ~38px). ~1h and up shows the badge row.
-const EVENT_BADGE_MIN_HEIGHT = 48
+// Badges take a second row, so they only render on blocks with an hour of
+// height to spare — a 45-min slot is ~38px, which the title alone fills.
+const EVENT_BADGE_MIN_HOURS = 1
+// …and only on blocks wide enough for the chips to sit on one line, since
+// colliding events narrow the columns and the title (the more important bit)
+// should win the space. Two gates because the two chip sets are wildly
+// different lengths: fmtDuration spells its length out in full, so a duration
+// chip reads "until 3:15 PM (5 hours, 30 minutes)" (~36ch), while a lone start
+// time is ~8ch — one threshold sized for the former would needlessly strip the
+// latter off perfectly roomy blocks. Enforced as container queries against the
+// block itself (see the `@container` marker on SurfaceButton below), so no JS
+// measurement is involved. These must stay literal class strings — Tailwind
+// only generates what it can see in the source.
+const BADGE_WIDTH_GATE = '@max-[280px]:hidden'      // start time + duration chip
+const TIME_ONLY_WIDTH_GATE = '@max-[96px]:hidden'   // start-time chip alone
 // Ghost pill for the time/duration badges: a translucent tint of the block's
 // own foreground ink (bg-current), so it contrasts on every block state/theme
 // without hardcoding a surface color the way Badge's `tag` variant does.
@@ -122,24 +133,34 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
         ? formatDurationChip(o.metadata.duration, { date: o.date, time: o.time }, hour12)
         : fmtDuration(o.metadata.duration))
     : null
-  const showBadges = height >= EVENT_BADGE_MIN_HEIGHT
+
+  const showBadges = dh >= EVENT_BADGE_MIN_HOURS
+  const badgeWidthGate = durationLabel ? BADGE_WIDTH_GATE : TIME_ONLY_WIDTH_GATE
   const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration].filter(Boolean).join(', ')
 
   return (
     <SurfaceButton
       className={cn(
         dvBlockVariants({ state: occState(o) }),
-        'absolute rounded-md px-2 py-1 text-xs font-medium overflow-hidden transition-colors',
+        // gap-1 both matches the title/meta spacing OccurrenceCard uses and
+        // overrides the gap-2 Button's base classes apply — in this flex-col
+        // that gap lands between the title and the badge row, and its 8px is
+        // what pushed a 1h block's content (8+16+8+14+8 = 54px) past the 52px
+        // it has to render in. At gap-1 that comes to 50px and fits.
+        '@container absolute flex flex-col items-start gap-1 rounded-md px-2 text-xs font-medium overflow-hidden transition-colors',
+        // Sub-hour blocks bottom out at a 28px floor, which py-2 would overflow
+        // on the title's 16px line box alone (8+16+8), clipping its descenders.
+        showBadges ? 'py-2' : 'py-1',
       )}
       style={{ top, height, left, width }}
       onClick={() => onOpen(o)}
       aria-label={ariaLabel}
     >
-      <div className="font-semibold overflow-hidden text-ellipsis whitespace-nowrap">
+      <div className="w-full shrink-0 font-semibold overflow-hidden text-ellipsis whitespace-nowrap">
         {o.metadata.title}
       </div>
       {showBadges && (
-        <div className="flex flex-wrap gap-1 mt-0.5">
+        <div className={cn('flex flex-wrap gap-1', badgeWidthGate)}>
           {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
           {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
         </div>
