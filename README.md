@@ -10,11 +10,15 @@ Meridian blends task management, event scheduling, and note-taking into a single
 
 ## 💡 The ideas behind Meridian
 
-Three principles shape everything in Meridian.
+Four principles shape everything in Meridian.
 
-### 1. Everything is a list of items
+### 1. Different concepts, different lifespans
 
-Tasks, projects, events, tags, and notes look like different things, but underneath they're the same: a **list** with **items**. The more abstract concept is the list; the more concrete concepts are its items.
+Tasks, projects, calendar events, notes, and tags stay relevant for different amounts of time: tasks and projects until they're marked done, calendar events until their fixed time passes, and notes and tags indefinitely. Meridian doesn't force these different lifespans into separate apps — it models all of them the same way underneath.
+
+### 2. Lists model hierarchies
+
+Lists are a flexible way to model hierarchies: the more abstract concept sits higher in the hierarchy, as a **list**, and lists the more concrete concepts below it, as **items**. Unlike a classical hierarchy, an item can sit on more than one list at once — a task can be a subtask of one project and still be tagged, or show up as a follow-up on an event — because these are references, not exclusive parent-child slots.
 
 | Entry | Is a list with… | Its items are usually… |
 |---|---|---|
@@ -26,15 +30,16 @@ Tasks, projects, events, tags, and notes look like different things, but underne
 
 There are more ways to read this, and that's the point: one simple idea bends to fit how *you* think, instead of locking you into separate "task" and "event" and "note" silos.
 
-### 2. Everything is a plain Markdown file
+### 3. Everything is a plain Markdown file
 
 Every entry is a `.md` file with YAML frontmatter — free text for your notes, structured fields for the metadata. That gives you the best of both worlds, and three concrete benefits:
 
 - **It's yours.** Open, edit, grep, or back up your files with any tool. No lock-in, no proprietary database.
 - **It's easy to debug.** When something looks off, you can read the file and see exactly why.
 - **It syncs cleanly.** Each item is its own file, so two devices only conflict when they edit *the very same item* — not the whole calendar.
+- **It's LLM-friendly.** Markdown with YAML frontmatter is the format nearly every LLM tool and workflow already reads and writes natively — no bespoke parser needed. Google Cloud's newly proposed [Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/) follows the same pattern: a bundle of markdown files with YAML frontmatter as a vendor-neutral way to give AI agents curated context.
 
-### 3. A recurrence model that bends to real life
+### 4. A recurrence model that bends to real life
 
 Real schedules aren't tidy, so Meridian's recurrence model goes well beyond "repeats weekly":
 
@@ -108,7 +113,7 @@ Notes about this task go here, in plain Markdown.
 ```
 
 The `items` list is the task's subtasks — wikilink references to other
-entries, just like philosophy #1 describes. Meridian fills it in for you
+entries, just like philosophy #2 describes. Meridian fills it in for you
 as you link entries in the editor.
 
 Because an entry is a list, recurrence lives in its **occurrences**. You can override or skip any one of them, and even mix several patterns in the same entry — here, exercise repeats every Monday/Wednesday/Friday, with one occurrence already marked done:
@@ -146,12 +151,15 @@ Meridian was heavily inspired by tools we already loved, and tries to fill the g
 | Calendar views (day / month) | ✅ | Plugin-dependent | ✅ | Partial | Partial | ❌ |
 | Task management | ✅ | ✅ (TaskNotes plugin) | Limited | ✅ | ✅ | Partial |
 | Wikilinks between entries | ✅ | ✅ | ❌ | ✅ (`#123` issue links) | ❌ | ❌ |
+| Advanced note-taking (plugin ecosystem, graph view, deep linking) | Partial | ✅ | ❌ | ❌ | ❌ | Partial |
 | Rich recurrence rules | ✅ | Limited | ✅ | ❌ | ✅ | ❌ |
 | Multiple participants / assignees | ✅ | Partial | ❌ | ✅ | ✅ (paid) | ❌ |
 | Free & open source | ✅ | Partially (core only) | ❌ | ❌ | ❌ | ❌ |
 | Works in the browser | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
 **[Obsidian](https://obsidian.md) and the [TaskNotes plugin](https://tasknotes.dev/)** inspired the wikilink system, the plain-Markdown-as-the-source-of-truth philosophy, and much of the editor UX. If you're already an Obsidian user, Meridian's vault format will feel immediately familiar.
+
+To be honest about the comparison: Meridian supports notes, but it doesn't try to be a better note-taking app than Obsidian — Obsidian's plugin ecosystem and note-linking depth are hard to beat, and Meridian doesn't aim to beat them. Meridian's focus is tasks and calendar events, which Obsidian only supports through plugins like TaskNotes; in Meridian they're first-class citizens from day one.
 
 **[Google Calendar](https://calendar.google.com)** set the bar for what recurring events and multi-view calendar navigation should feel like.
 
