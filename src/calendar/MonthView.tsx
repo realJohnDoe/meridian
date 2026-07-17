@@ -66,6 +66,9 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   const [barTop, setBarTop] = useState(BAR_TOP_FALLBACK)
 
   const syncingRef = useRef(false)
+  // Cached by the measurement ResizeObserver below so the scroll handler (fires
+  // continuously during momentum) never triggers its own layout read.
+  const paneWRef = useRef(0)
 
   // Recenters the track on the current month's pane, same shape as
   // TimeWheels' scrollTop recenter: a synchronous write, then release
@@ -118,6 +121,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
         }
       }
       setGridH(trackEl.clientHeight)
+      paneWRef.current = trackEl.getBoundingClientRect().width
       recenter()
     }
 
@@ -141,6 +145,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
     let dragging = false
     let idleTimer: ReturnType<typeof setTimeout> | undefined
+    let lastPreviewKey: string | null = null
 
     const checkSettle = () => {
       if (syncingRef.current || dragging) return
@@ -156,28 +161,33 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       idleTimer = setTimeout(checkSettle, 100)
     }
 
-    // Updates the topbar label to whichever pane the finger is nearest to at
-    // release, without waiting for momentum to fully settle — the actual
-    // navigation (and any recenter) still waits for checkSettle, so this is
-    // purely a label preview. Clamped to the pane range since a rubber-band
-    // overshoot at the track's edge could otherwise round outside it.
-    const previewLabel = () => {
-      const w = el.getBoundingClientRect().width
+    // Updates the topbar label from the live scroll position during momentum,
+    // rather than waiting for the gesture to settle and the route to commit —
+    // a Chrome trace of a real flick showed the label lagging the swipe by
+    // ~0.5s when it was only sampled at touchend (before momentum even
+    // starts) and otherwise only updated after the full settle+navigate
+    // chain completed. Uses the cached paneWRef rather than measuring here,
+    // since this runs on every scroll event during momentum. Change-guarded
+    // so the store only updates once per pane crossed, not once per frame.
+    const updatePreview = () => {
+      const w = paneWRef.current
       if (!w) return
       const idx = Math.max(0, Math.min(2, Math.round(el.scrollLeft / w)))
       const cur = monthRef.current
       const key = fmtMonth(new Date(cur.getFullYear(), cur.getMonth() + (idx - 1), 1))
+      if (key === lastPreviewKey) return
+      lastPreviewKey = key
       useStore.setState({ monthPreview: key })
     }
 
     const onScroll = () => {
       if (syncingRef.current) return
+      updatePreview()
       scheduleCheck()
     }
     const onTouchStart = () => { dragging = true }
     const onTouchEnd = () => {
       dragging = false
-      previewLabel()
       scheduleCheck()
     }
     const onScrollEnd = () => {
