@@ -18,7 +18,7 @@ Tasks, projects, calendar events, notes, and tags stay relevant for different am
 
 ### 2. Lists model hierarchies
 
-Lists are a flexible way to model hierarchies: the more abstract concept sits higher in the hierarchy, as a **list**, and lists the more concrete concepts below it, as **items**.
+Lists are a flexible way to model hierarchies: the more abstract concept sits higher in the hierarchy, as a **list**, and lists the more concrete concepts below it, as **items**. Unlike a classical hierarchy, an item can sit on more than one list at once — a task can be a subtask of one project and still be tagged, or show up as a follow-up on an event — because these are references, not exclusive parent-child slots.
 
 | Entry | Is a list with… | Its items are usually… |
 |---|---|---|
