@@ -51,6 +51,7 @@ function AppMain() {
 
   const today         = useToday()
   const agendaTopDate = useStore(s => s.agendaTopDate)
+  const monthPreview  = useStore(s => s.monthPreview)
 
   const isEntryView  = !!entrySlugMatch || !!entryNewMatch
   const isDayView    = !!dayMatch
@@ -62,7 +63,10 @@ function AppMain() {
   const topBarLabel = (() => {
     if (backlogMatch) return 'Backlog'
     if (notesMatch)   return 'Notes'
-    if (monthViewDate) return fmtTopBarMonth(monthViewDate, today)
+    // monthPreview (set by the swipe carousel on touchend) shows the label the
+    // gesture is heading toward immediately, ahead of the route committing —
+    // chevron navigation and Today still key off the route's own monthViewDate.
+    if (monthViewDate) return fmtTopBarMonth(monthPreview ? parseMonth(monthPreview) : monthViewDate, today)
     const d = agendaTopDate ? new Date(agendaTopDate + 'T00:00:00') : today
     return fmtTopBarDay(d, today)
   })()

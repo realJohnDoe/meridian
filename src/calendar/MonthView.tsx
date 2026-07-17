@@ -104,8 +104,13 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   // renders — so the pixel that was at 2×paneW is now at paneW and nothing
   // visibly moves. React runs layout effects before the browser paints, so
   // there's no frame in between where the stale position is visible.
+  //
+  // The route is authoritative again once `month` has actually committed, so
+  // clear any touchend preview here — otherwise a stale preview could linger
+  // past a commit that resolved to a different month than predicted.
   useLayoutEffect(() => {
     recenter()
+    if (useStore.getState().monthPreview !== null) useStore.setState({ monthPreview: null })
   }, [month, recenter])
 
   // Measure rowH/barTop (from the invisible replica sentinels) and gridH (from
@@ -170,6 +175,20 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       idleTimer = setTimeout(checkSettle, 100)
     }
 
+    // Updates the topbar label to whichever pane the finger is nearest to at
+    // release, without waiting for momentum to fully settle — the actual
+    // navigation (and any recenter) still waits for checkSettle, so this is
+    // purely a label preview. Clamped to the pane range since a rubber-band
+    // overshoot at the track's edge could otherwise round outside it.
+    const previewLabel = () => {
+      const w = el.getBoundingClientRect().width
+      if (!w) return
+      const idx = Math.max(0, Math.min(2, Math.round(el.scrollLeft / w)))
+      const cur = monthRef.current
+      const key = fmtMonth(new Date(cur.getFullYear(), cur.getMonth() + (idx - 1), 1))
+      useStore.setState({ monthPreview: key })
+    }
+
     const onScroll = () => {
       if (syncingRef.current) return
       scheduleCheck()
@@ -177,6 +196,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     const onTouchStart = () => { dragging = true }
     const onTouchEnd = () => {
       dragging = false
+      previewLabel()
       scheduleCheck()
     }
     const onScrollEnd = () => {
