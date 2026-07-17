@@ -1,8 +1,6 @@
 export { useToday } from './useToday'
 export { useOpenEntry } from './useOpenEntry'
 export { NO_PARTICIPANT, useCalendarFilter } from './useCalendarFilter'
-export { useFlipTransition, captureFlipLeaveRect } from './useFlipTransition'
-export type { FlipLeaveRect } from './useFlipTransition'
 export { useMediaQuery } from './use-media-query'
 export { useIsTouchDevice } from './use-touch-device'
 export { useVisualViewportHeight, useVisualViewportOffsetTop } from './use-visual-viewport'
