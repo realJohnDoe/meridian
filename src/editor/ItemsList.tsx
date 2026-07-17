@@ -325,7 +325,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                     }
                   }}
                 />
-                <CommandList>
+                <CommandList className="min-h-[12rem]">
                   {pickerQuery.trim() && (
                     <CommandItem
                       value={`__task__${pickerQuery}`}
