@@ -1,7 +1,7 @@
-import { memo, useRef } from 'react'
+import { memo } from 'react'
 import type { Occurrence, EditScope } from '@/types'
 import { cn } from '@/lib/cn'
-import { useFlipTransition } from '@/hooks'
+import { FlipList } from '@/components'
 import OccurrenceRow from './OccurrenceRow'
 
 
@@ -13,11 +13,12 @@ interface Props {
 }
 
 function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
-  const sectionRef = useRef<HTMLDivElement>(null)
-  useFlipTransition(sectionRef, items, 'data-occ-key')
-
+  // Completing an overdue task drops it from this section, so its height does
+  // snap — but animateHeight can't fix that here: AgendaView virtualizes and
+  // measures these sections, and this one sits above today, where a resize
+  // per frame would drag the library's scroll compensation along with it.
   return (
-    <div ref={sectionRef}>
+    <FlipList items={items} itemAttr="data-occ-key">
       <div className={cn(
         'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-yellow-500',
         'flex items-center gap-2 bg-background',
@@ -34,7 +35,7 @@ function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
           onSwipeDelete={onSwipeDelete}
         />
       ))}
-    </div>
+    </FlipList>
   )
 }
 

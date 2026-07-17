@@ -1,8 +1,7 @@
-import { useRef } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { Occurrence, EditScope } from '@/types'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { useFlipTransition } from '@/hooks'
+import { FlipList } from '@/components'
 import OccurrenceRow from './OccurrenceRow'
 
 interface Props {
@@ -18,12 +17,9 @@ export default function OccurrenceList({ occs, onOpen, onToggleDone, onSwipeDele
   const active = occs.filter(o => !o.metadata.done)
   const done   = occs.filter(o =>  o.metadata.done)
 
-  const activeRef = useRef<HTMLDivElement>(null)
-  useFlipTransition(activeRef, active, 'data-occ-key')
-
   return (
     <div className="pt-2">
-      <div ref={activeRef}>
+      <FlipList items={active} itemAttr="data-occ-key">
         {active.map(o => (
           <OccurrenceRow
             key={o.id}
@@ -33,7 +29,7 @@ export default function OccurrenceList({ occs, onOpen, onToggleDone, onSwipeDele
             onSwipeDelete={onSwipeDelete}
           />
         ))}
-      </div>
+      </FlipList>
 
       {done.length > 0 && (
         <Collapsible defaultOpen={false} className="mt-2">

@@ -7,8 +7,7 @@ import { parseItemEntry, serializeTaskEntry } from './items'
 import { fileEntries } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
-import { useFlipTransition, captureFlipLeaveRect, type FlipLeaveRect } from '@/hooks'
-import { OccurrenceCard, MarkdownTaskCard, TagChip } from '@/components'
+import { OccurrenceCard, MarkdownTaskCard, TagChip, FlipList, captureFlipLeaveRect, type FlipLeaveRect } from '@/components'
 import { isDimmed, priorityRank } from '@/calendar'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
@@ -147,12 +146,6 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const activeRows = sortedRows.filter(r => !isDoneRow(r))
   const doneRows   = sortedRows.filter(r => isDoneRow(r))
 
-  // Siblings glide into their new position as a row leaves, and the section
-  // folds to its new height on the same clock. The leaving row itself is
-  // rendered separately as an absolutely-positioned overlay (see
-  // exitingEntries/renderExitingRow) so it doesn't participate in this diff.
-  useFlipTransition(activeRef, activeRows, 'data-item-key', { animateHeight: true })
-
   const donePickerRows = (() => {
     const q = pickerQuery.toLowerCase()
     return doneRows.filter(({ entry, occ }) => {
@@ -281,8 +274,8 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   }
 
   // Rendered as an absolutely-positioned overlay pinned to the row's last
-  // measured spot, so it fades out independently while activeRef's
-  // useFlipTransition glides the surviving rows up to fill the gap.
+  // measured spot, so it fades out independently while the FlipList below
+  // glides the surviving rows up to fill the gap.
   function renderExitingRow(row: Row, rect: FlipLeaveRect) {
     const idx = row.entry.idx
     return (
@@ -301,15 +294,15 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     <div className="mt-6 pt-5 border-t border-border">
       <div className="text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase mb-2.5">Items</div>
       <div className="flex flex-col gap-1.5">
-        {/* Block box, laid out by the inner wrapper: useFlipTransition animates
-            this element's height, and a flex column would answer that by
-            squashing the rows instead of clipping them. */}
-        <div ref={activeRef} className="relative">
+        {/* Siblings glide into place as a row leaves and the section folds to
+            its new height on the same clock; the leaving row is an overlay
+            (renderExitingRow), out of flow and out of the FlipList's diff. */}
+        <FlipList items={activeRows} itemAttr="data-item-key" animateHeight containerRef={activeRef}>
           <div className="flex flex-col gap-1.5">
             {activeRows.map(row => renderRow(row))}
           </div>
           {exitingEntries.map(({ row, rect }) => renderExitingRow(row, rect))}
-        </div>
+        </FlipList>
 
         {/* Add item — half-card affordance, same dimensions as item cards */}
         <div className="flex items-start gap-1">

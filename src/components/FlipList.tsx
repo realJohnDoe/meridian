@@ -4,37 +4,60 @@ import type React from 'react'
 const DURATION = 350
 const EASING   = 'cubic-bezier(.4,0,.2,1)'
 
-interface FlipOptions {
+interface Props {
+  /** The rows currently in the list — a new value is what triggers a re-measure. */
+  items: readonly unknown[]
+  /** Attribute identifying each row, e.g. `data-occ-key`. Values must be stable per row. */
+  itemAttr: string
   /**
-   * Also animate the container's own height to its new value, on the same
-   * clock as the rows, so the section folds up around a leaving row instead
-   * of snapping to its new height. Requires the container to be a block box
-   * whose children are laid out by an inner wrapper — animating the height of
-   * a flex column would let the flex algorithm squash the rows themselves.
-   * Leave off for lists inside a virtualizer, which owns their height.
+   * Fold the list to its new height, on the same clock as the rows, whenever
+   * one enters or leaves — otherwise the rows glide but the list snaps.
+   * Don't turn this on inside a virtualizer: it measures the list itself and
+   * would fight an animated height, one resize notification per frame.
    */
   animateHeight?: boolean
+  /** Only when the caller needs to measure against the box — see captureFlipLeaveRect. */
+  containerRef?: React.RefObject<HTMLDivElement | null>
+  children: React.ReactNode
 }
 
 /**
- * FLIP transition for rows identified by `[attr]` inside a container.
- * Whenever a row's position shifts between renders — because it moved within
- * the list, or because a sibling entered/left — it animates from its previous
- * position to its new one. The diff is purely per-key (no same-count
- * requirement), so removing or adding a row elsewhere in the container makes
- * the rest of the list glide into place instead of snapping.
+ * Animates a list so rows glide between positions rather than jumping there.
+ * Any row carrying `itemAttr` is tracked by that attribute's value, and moves
+ * from wherever it was to wherever this render put it — whether it moved
+ * within the list or a sibling entered or left around it.
  *
+ * Renders a plain block box and deliberately does not lay the rows out
+ * itself: whatever arranges them (a flex column, a `<ul>`, …) goes inside as
+ * a child. That split is what `animateHeight` rests on — pinning a *flex*
+ * container to a height below its content makes the flex algorithm squash the
+ * rows, where a block box clips them, which is the fold we're after.
+ */
+export function FlipList({
+  items,
+  itemAttr,
+  animateHeight = false,
+  containerRef,
+  children,
+}: Props) {
+  const ownRef = useRef<HTMLDivElement>(null)
+  const ref = containerRef ?? ownRef
+  useFlipTransition(ref, items, itemAttr, animateHeight)
+  return <div ref={ref} className="relative">{children}</div>
+}
+
+/**
  * Uses the Web Animations API rather than toggling CSS transitions: driving a
  * transition from a layout effect means disabling it, forcing a reflow, then
  * re-enabling it a frame later, and whether that actually starts a transition
- * comes down to engine-specific style-flush timing (Firefox routinely drops
+ * comes down to engine-specific style-flush timing (Firefox routinely dropped
  * it). `animate()` states the from/to explicitly and has no such race.
  */
-export function useFlipTransition<T>(
+function useFlipTransition(
   containerRef: React.RefObject<HTMLElement | null>,
-  items: T[],
+  items: readonly unknown[],
   attr: string,
-  { animateHeight = false }: FlipOptions = {},
+  animateHeight: boolean,
 ) {
   const prevTops   = useRef<Record<string, number> | null>(null)
   const prevHeight = useRef<number | null>(null)
@@ -100,7 +123,7 @@ export function useFlipTransition<T>(
       if ((keysChanged || running) && from !== null && Math.abs(from - target) > 1) {
         // Rows glide on the same duration and easing, so the bottom-most one
         // tracks the closing edge exactly and never gets cut off; clipping is
-        // what turns the leaving row's fade into a fold.
+        // what turns a leaving row's fade into a fold.
         container.style.overflow = 'hidden'
         const anim = container.animate(
           [{ height: `${from}px` }, { height: `${target}px` }],
@@ -142,12 +165,12 @@ export interface FlipLeaveRect {
 }
 
 /**
- * Measures `rowEl` relative to `containerRef`'s current box, for rendering a
- * row that's about to leave the list as an absolutely-positioned overlay.
- * Pulling the leaving row out of flow this way — instead of shrinking it in
- * place — means the container's layout settles immediately, so the
- * `useFlipTransition` pass on the surviving rows sees one clean before/after
- * diff and glides them into place while the overlay fades out on top.
+ * Measures `rowEl` relative to a FlipList's box, for rendering a row that's
+ * about to leave as an absolutely-positioned overlay among the list's
+ * children. Pulling the leaving row out of flow this way — instead of
+ * shrinking it in place — means the layout settles immediately, so the
+ * FlipList sees one clean before/after diff and glides the surviving rows
+ * into place while the overlay fades out on top.
  */
 export function captureFlipLeaveRect(
   containerRef: React.RefObject<HTMLElement | null>,

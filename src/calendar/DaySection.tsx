@@ -1,9 +1,9 @@
-import { memo, useRef } from 'react'
+import { memo } from 'react'
 import type { Occurrence } from '@/types'
 import { fmtLong } from '@/format'
 import { cn } from '@/lib/cn'
 import OccurrenceRow from './OccurrenceRow'
-import { useFlipTransition } from '@/hooks'
+import { FlipList } from '@/components'
 
 
 interface Props {
@@ -31,13 +31,13 @@ function DaySection({
   onOpen, onToggleDone, onSwipeDelete,
   now,
 }: Props) {
-  const sectionRef = useRef<HTMLDivElement>(null)
-  useFlipTransition(sectionRef, items, 'data-occ-key')
-
   const label = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : fmtLong(date)
 
+  // animateHeight stays off: AgendaView virtualizes these sections and
+  // measures them itself, so an animated height would feed the virtualizer a
+  // resize per frame and set it fighting the animation.
   return (
-    <div ref={sectionRef}>
+    <FlipList items={items} itemAttr="data-occ-key">
       <div className={cn(
         'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-secondary-foreground',
         'flex items-center gap-2 bg-background',
@@ -56,7 +56,7 @@ function DaySection({
           onSwipeDelete={onSwipeDelete}
         />
       ))}
-    </div>
+    </FlipList>
   )
 }
 
