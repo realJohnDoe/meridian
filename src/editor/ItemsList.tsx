@@ -147,10 +147,11 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const activeRows = sortedRows.filter(r => !isDoneRow(r))
   const doneRows   = sortedRows.filter(r => isDoneRow(r))
 
-  // Siblings glide into their new position as a row leaves; the leaving row
-  // itself is rendered separately as an absolutely-positioned overlay (see
+  // Siblings glide into their new position as a row leaves, and the section
+  // folds to its new height on the same clock. The leaving row itself is
+  // rendered separately as an absolutely-positioned overlay (see
   // exitingEntries/renderExitingRow) so it doesn't participate in this diff.
-  useFlipTransition(activeRef, activeRows, 'data-item-key')
+  useFlipTransition(activeRef, activeRows, 'data-item-key', { animateHeight: true })
 
   const donePickerRows = (() => {
     const q = pickerQuery.toLowerCase()
@@ -300,8 +301,13 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     <div className="mt-6 pt-5 border-t border-border">
       <div className="text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase mb-2.5">Items</div>
       <div className="flex flex-col gap-1.5">
-        <div ref={activeRef} className="relative flex flex-col gap-1.5">
-          {activeRows.map(row => renderRow(row))}
+        {/* Block box, laid out by the inner wrapper: useFlipTransition animates
+            this element's height, and a flex column would answer that by
+            squashing the rows instead of clipping them. */}
+        <div ref={activeRef} className="relative">
+          <div className="flex flex-col gap-1.5">
+            {activeRows.map(row => renderRow(row))}
+          </div>
           {exitingEntries.map(({ row, rect }) => renderExitingRow(row, rect))}
         </div>
 

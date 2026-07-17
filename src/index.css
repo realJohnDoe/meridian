@@ -739,7 +739,7 @@
    measured spot, see captureFlipLeaveRect) so it just fades/slides in place
    while useFlipTransition glides the surviving siblings up to fill the gap. */
 @keyframes flipLeave{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(10px)}}
-.flip-leave{animation:flipLeave 0.3s cubic-bezier(.4,0,.2,1) forwards;pointer-events:none}
+.flip-leave{animation:flipLeave 0.35s cubic-bezier(.4,0,.2,1) forwards;pointer-events:none}
 
 /* Hide number input spinners globally for a cleaner, premium design */
 input[type="number"]::-webkit-inner-spin-button,
