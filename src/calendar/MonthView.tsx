@@ -67,36 +67,17 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
   const syncingRef = useRef(false)
 
-  // Recenters the track on the current month's pane. Scroll-snap is toggled
-  // off for the write (then a reflow is forced before restoring it) so the
-  // snap engine doesn't fight the programmatic scrollLeft write; the retry
-  // loop covers iOS Safari occasionally dropping a scrollLeft write that
-  // lands mid-momentum after a rapid second swipe.
+  // Recenters the track on the current month's pane, same shape as
+  // TimeWheels' scrollTop recenter: a synchronous write, then release
+  // `syncing` on the next frame so the write isn't mistaken for a user scroll.
   const recenter = useCallback(() => {
     const el = trackRef.current
     if (!el) return
     const paneW = el.getBoundingClientRect().width
     if (!paneW) return
     syncingRef.current = true
-    const prevSnap = el.style.scrollSnapType
-    el.style.scrollSnapType = 'none'
     el.scrollLeft = paneW
-    void el.offsetWidth // force reflow so the write lands before snap is restored
-    el.style.scrollSnapType = prevSnap
-    let attempts = 0
-    const verify = () => {
-      const cur = trackRef.current
-      if (!cur) { syncingRef.current = false; return }
-      const w = cur.getBoundingClientRect().width
-      if (w && Math.abs(cur.scrollLeft - w) > 2 && attempts < 3) {
-        attempts++
-        cur.scrollLeft = w
-        requestAnimationFrame(verify)
-      } else {
-        syncingRef.current = false
-      }
-    }
-    requestAnimationFrame(verify)
+    requestAnimationFrame(() => { syncingRef.current = false })
   }, [])
 
   // The seam: recenter synchronously before paint whenever the committed month
