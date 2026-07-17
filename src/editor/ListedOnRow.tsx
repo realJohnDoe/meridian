@@ -65,19 +65,19 @@ export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, on
             </Badge>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-0" align="start">
-            <Command>
+            <Command shouldFilter={false}>
               <CommandInput
                 placeholder="Search files…"
                 value={pickerQuery}
                 onValueChange={setPickerQuery}
               />
-              <CommandList>
+              <CommandList className="min-h-[12rem]">
                 <CommandEmpty>No files found</CommandEmpty>
                 <CommandGroup>
-                  {filtered.map(e => (
+                  {filtered.slice(0, 8).map(e => (
                     <CommandItem
                       key={e.fileSlug}
-                      value={e.title}
+                      value={e.fileSlug}
                       onSelect={() => handleSelect(e.fileSlug)}
                     >
                       {e.title}
