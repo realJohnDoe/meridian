@@ -10,11 +10,15 @@ Meridian blends task management, event scheduling, and note-taking into a single
 
 ## 💡 The ideas behind Meridian
 
-Three principles shape everything in Meridian.
+Four principles shape everything in Meridian.
 
-### 1. Everything is a list of items
+### 1. Different concepts, different lifespans
 
-Tasks, projects, events, tags, and notes look like different things, but underneath they're the same: a **list** with **items**. The more abstract concept is the list; the more concrete concepts are its items.
+Tasks, projects, calendar events, notes, and tags stay relevant for different amounts of time: tasks and projects until they're marked done, calendar events until their fixed time passes, and notes and tags indefinitely. Meridian doesn't force these different lifespans into separate apps — it models all of them the same way underneath.
+
+### 2. Lists model hierarchies
+
+Lists are a flexible way to model hierarchies: the more abstract concept sits higher in the hierarchy, as a **list**, and lists the more concrete concepts below it, as **items**.
 
 | Entry | Is a list with… | Its items are usually… |
 |---|---|---|
@@ -26,7 +30,7 @@ Tasks, projects, events, tags, and notes look like different things, but underne
 
 There are more ways to read this, and that's the point: one simple idea bends to fit how *you* think, instead of locking you into separate "task" and "event" and "note" silos.
 
-### 2. Everything is a plain Markdown file
+### 3. Everything is a plain Markdown file
 
 Every entry is a `.md` file with YAML frontmatter — free text for your notes, structured fields for the metadata. That gives you the best of both worlds, and three concrete benefits:
 
@@ -34,7 +38,7 @@ Every entry is a `.md` file with YAML frontmatter — free text for your notes, 
 - **It's easy to debug.** When something looks off, you can read the file and see exactly why.
 - **It syncs cleanly.** Each item is its own file, so two devices only conflict when they edit *the very same item* — not the whole calendar.
 
-### 3. A recurrence model that bends to real life
+### 4. A recurrence model that bends to real life
 
 Real schedules aren't tidy, so Meridian's recurrence model goes well beyond "repeats weekly":
 
@@ -108,7 +112,7 @@ Notes about this task go here, in plain Markdown.
 ```
 
 The `items` list is the task's subtasks — wikilink references to other
-entries, just like philosophy #1 describes. Meridian fills it in for you
+entries, just like philosophy #2 describes. Meridian fills it in for you
 as you link entries in the editor.
 
 Because an entry is a list, recurrence lives in its **occurrences**. You can override or skip any one of them, and even mix several patterns in the same entry — here, exercise repeats every Monday/Wednesday/Friday, with one occurrence already marked done:
@@ -152,6 +156,8 @@ Meridian was heavily inspired by tools we already loved, and tries to fill the g
 | Works in the browser | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
 **[Obsidian](https://obsidian.md) and the [TaskNotes plugin](https://tasknotes.dev/)** inspired the wikilink system, the plain-Markdown-as-the-source-of-truth philosophy, and much of the editor UX. If you're already an Obsidian user, Meridian's vault format will feel immediately familiar.
+
+To be honest about the comparison: Meridian supports notes, but it doesn't try to be a better note-taking app than Obsidian — Obsidian's plugin ecosystem and note-linking depth are hard to beat, and Meridian doesn't aim to beat them. Meridian's focus is tasks and calendar events, which Obsidian only supports through plugins like TaskNotes; in Meridian they're first-class citizens from day one.
 
 **[Google Calendar](https://calendar.google.com)** set the bar for what recurring events and multi-view calendar navigation should feel like.
 
