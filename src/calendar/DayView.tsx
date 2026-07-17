@@ -30,10 +30,21 @@ const BOTTOM_PAD = 8           // px breathing room below 24:00 — `2` step
 const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
 const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
 const DEFAULT_CREATE_DURATION = '1h'
-// Below this rendered block width the badge row is dropped — when several
-// events collide their columns narrow, and the title (the more important bit)
-// should keep its space rather than fight the badges for it.
-const EVENT_BADGE_MIN_WIDTH = 90
+// Badges take a second row, so they only render on blocks with an hour of
+// height to spare — a 45-min slot is ~38px, which the title alone fills.
+const EVENT_BADGE_MIN_HOURS = 1
+// …and only on blocks wide enough for the chips to sit on one line, since
+// colliding events narrow the columns and the title (the more important bit)
+// should win the space. Two gates because the two chip sets are wildly
+// different lengths: fmtDuration spells its length out in full, so a duration
+// chip reads "until 3:15 PM (5 hours, 30 minutes)" (~36ch), while a lone start
+// time is ~8ch — one threshold sized for the former would needlessly strip the
+// latter off perfectly roomy blocks. Enforced as container queries against the
+// block itself (see the `@container` marker on SurfaceButton below), so no JS
+// measurement is involved. These must stay literal class strings — Tailwind
+// only generates what it can see in the source.
+const BADGE_WIDTH_GATE = '@max-[280px]:hidden'      // start time + duration chip
+const TIME_ONLY_WIDTH_GATE = '@max-[96px]:hidden'   // start-time chip alone
 // Ghost pill for the time/duration badges: a translucent tint of the block's
 // own foreground ink (bg-current), so it contrasts on every block state/theme
 // without hardcoding a surface color the way Badge's `tag` variant does.
@@ -114,28 +125,6 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
   const left  = `calc(${GUTTER}px + ${colIndex} * ((${colWidth}) + ${COL_GAP}px))`
   const width = `calc(${colWidth})`
 
-  // Measures the block's own rendered width/height on every real size change
-  // (viewport resize, or a collision changing the column width) — the calc()
-  // width above is a CSS expression, not a value JS can read directly. The
-  // same pass re-checks scrollHeight vs clientHeight so the badge row gets
-  // dropped whenever it would actually overflow and get clipped, rather than
-  // guessing a height threshold up front.
-  const blockRef = useRef<HTMLButtonElement>(null)
-  const [blockWidth, setBlockWidth] = useState(Infinity)
-  const [badgesFit, setBadgesFit] = useState(true)
-  useEffect(() => {
-    const el = blockRef.current
-    if (!el) return
-    const check = () => {
-      setBlockWidth(el.getBoundingClientRect().width)
-      setBadgesFit(el.scrollHeight <= el.clientHeight)
-    }
-    check()
-    const ro = new ResizeObserver(check)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
   // Same formatting the agenda OccurrenceCard uses: locale-aware start time and
   // a "until HH:MM (1 hour)" duration chip, instead of the old `10:00 · 1h` line.
   const timeLabel = fmtT(o.time, hour12)
@@ -145,15 +134,22 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
         : fmtDuration(o.metadata.duration))
     : null
 
-  const showBadges = blockWidth >= EVENT_BADGE_MIN_WIDTH && badgesFit
+  const showBadges = dh >= EVENT_BADGE_MIN_HOURS
+  const badgeWidthGate = durationLabel ? BADGE_WIDTH_GATE : TIME_ONLY_WIDTH_GATE
   const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration].filter(Boolean).join(', ')
 
   return (
     <SurfaceButton
-      ref={blockRef}
       className={cn(
         dvBlockVariants({ state: occState(o) }),
-        'absolute flex flex-col items-start rounded-md px-2 py-2 text-xs font-medium overflow-hidden transition-colors',
+        // gap-0 overrides the gap-2 that Button's base classes apply — in this
+        // flex-col that lands between the title and the badge row, and its 8px
+        // is what pushed a 1h block's content (8+16+8+14+8 = 54px) past the
+        // 52px it has to render in.
+        '@container absolute flex flex-col items-start gap-0 rounded-md px-2 text-xs font-medium overflow-hidden transition-colors',
+        // Sub-hour blocks bottom out at a 28px floor, which py-2 would overflow
+        // on the title's 16px line box alone (8+16+8), clipping its descenders.
+        showBadges ? 'py-2' : 'py-1',
       )}
       style={{ top, height, left, width }}
       onClick={() => onOpen(o)}
@@ -163,7 +159,7 @@ function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockPr
         {o.metadata.title}
       </div>
       {showBadges && (
-        <div className="flex flex-wrap gap-1">
+        <div className={cn('flex flex-wrap gap-1', badgeWidthGate)}>
           {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
           {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
         </div>
