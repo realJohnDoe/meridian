@@ -24,9 +24,10 @@ export default function MarkdownTaskCard({
   const isEditing = editValue !== undefined
 
   return (
-    <Card className="flex items-stretch gap-2.5 pl-2 pr-2.5 py-2 shadow-none bg-card border border-input rounded-lg transition-colors hover:bg-accent">
+    <Card className={`relative flex items-stretch gap-2.5 pl-2 pr-2.5 py-2 shadow-none bg-card border border-input rounded-lg transition-colors hover:bg-accent ${done ? 'overflow-hidden' : ''}`}>
+      {done && <div className="absolute inset-0 pointer-events-none z-10 rounded-lg" style={{ background: 'var(--done-overlay)' }} />}
       <span className="w-1 self-stretch rounded-full shrink-0 min-h-5 bg-muted-foreground/20" />
-      <div className="flex flex-1 min-w-0 items-center gap-1.5 py-0.5">
+      <div className={`relative z-20 flex flex-1 min-w-0 items-center gap-1.5 py-0.5 ${done ? 'opacity-60' : ''}`}>
         <Checkbox
           checked={done}
           onCheckedChange={onToggle}
@@ -50,13 +51,13 @@ export default function MarkdownTaskCard({
         ) : onClickText ? (
           <button
             type="button"
-            className={`flex-1 min-w-0 text-left text-sm font-medium truncate cursor-pointer ${done ? 'line-through opacity-60' : 'text-foreground'}`}
+            className={`flex-1 min-w-0 text-left text-sm font-medium truncate cursor-pointer ${done ? 'line-through' : 'text-foreground'}`}
             onClick={onClickText}
           >
             {text}
           </button>
         ) : (
-          <span className={`flex-1 text-sm font-medium truncate ${done ? 'line-through opacity-60' : 'text-foreground'}`}>
+          <span className={`flex-1 text-sm font-medium truncate ${done ? 'line-through' : 'text-foreground'}`}>
             {text}
           </span>
         )}
