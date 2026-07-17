@@ -214,10 +214,10 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
     () => { onNavigateDate?.(addDays(dvDateRef.current,  1)) },
   )
 
-  const [, setNowTick] = useState(0)
+  const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     if (!sameDay(dvDate, today)) return
-    const id = setInterval(() => setNowTick(t => t + 1), 60_000)
+    const id = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(id)
   }, [dvDate, today])
 
@@ -318,8 +318,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
 
           {/* Current-time indicator */}
           {isToday && (() => {
-            const now = new Date()
-            const nh  = now.getHours() + now.getMinutes() / 60
+            const nh = now.getHours() + now.getMinutes() / 60
             return (
               <div className="now-line" style={{ top: nh * HP + TOP_PAD }}>
                 <div className="now-dot" />
