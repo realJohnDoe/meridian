@@ -613,8 +613,11 @@
   --note:         #179299;   /* teal */
   --brand-cyan:   #179299;
   --priority-1:   #d20f39;   /* red */
-  --priority-2:   #e35d0a;   /* peach, darkened so light ink clears AA */
-  --priority-3:   #df8e1d;   /* yellow */
+  --priority-2:   #fe640b;   /* peach — Catppuccin's official swatch, undarkened;
+                                 vs light ink this is only ~2.6:1, well under
+                                 AA, but matches the palette's actual peach */
+  --priority-3:   #f2cc0d;   /* yellow — pushed to a clearer, more saturated
+                                 gold so it reads apart from priority-2 */
 
   /* On-accent text — light ink on every swatch except priority-3 (yellow),
      which is the only one dark ink actually wins by a decisive margin.
