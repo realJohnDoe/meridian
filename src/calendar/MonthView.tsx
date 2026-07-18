@@ -5,22 +5,27 @@ import MonthGrid, { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS } from './MonthGrid'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { useSnapCarousel } from './useSnapCarousel'
+import { PANE_COUNT } from './snapCarousel'
 
 // Fallback for the occurrence-list start offset until it's measured (cell top padding
 // 3px + badge h-5 20px + badge mb-px 1px + the 8px flex gap inherited from Button).
 const BAR_TOP_FALLBACK = 32
+const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 
 // ── MonthView ─────────────────────────────────────────────────
-// A 3-pane horizontal scroll-snap carousel: month-1, month, month+1. The
-// route param `month` is the source of truth; useSnapCarousel commits a
-// navigation once a swipe settles, and recenters itself (pre-paint) whenever
-// `month` changes, so the pixel that was at pane 2 is now at pane 1 and
-// nothing visibly jumps. See MonthGrid for the per-pane rendering — it's kept
-// separate so React can key panes by month string, which is load-bearing:
-// browsers track the *snapped element* across DOM changes, and only a keyed
-// pane moves with its month rather than staying pinned to a screen position,
-// which is what lets the recenter write agree with the snap engine instead of
-// fighting it.
+// A horizontal scroll-snap carousel of PANE_COUNT months centered on the
+// current one. The route param `month` is the source of truth;
+// useSnapCarousel commits a navigation once a swipe settles, and recenters
+// itself (pre-paint) whenever `month` changes, so the pixel the current pane
+// occupied is occupied by the new current pane and nothing visibly jumps.
+// Keeping more than one pane either side mounted means a fast second swipe
+// always has somewhere to go rather than waiting for the first to commit
+// (and a single long drag can span more than one month at once). See
+// MonthGrid for the per-pane rendering — it's kept separate so React can key
+// panes by month string, which is load-bearing: browsers track the *snapped
+// element* across DOM changes, and only a keyed pane moves with its month
+// rather than staying pinned to a screen position, which is what lets the
+// recenter write agree with the snap engine instead of fighting it.
 interface Props {
   month: Date
   onNavigateMonth: (d: Date) => void
@@ -43,7 +48,8 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
   const { trackRef, paneKeys, recenter } = useSnapCarousel({
     unitKey: fmtMonth(month),
-    unitAt: idx => fmtMonth(new Date(month.getFullYear(), month.getMonth() + (idx - 1), 1)),
+    paneCount: PANE_COUNT,
+    unitAt: offset => fmtMonth(new Date(month.getFullYear(), month.getMonth() + offset, 1)),
     onCommit: key => onNavigateMonth(parseMonth(key)),
     onPreview: key => useStore.setState({ monthPreview: key }),
     // The route is authoritative again once `month` has actually committed,
@@ -126,7 +132,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
             <div
               key={key}
               className="shrink-0 basis-full snap-center min-h-0 overflow-hidden px-1 flex flex-col"
-              inert={i === 1 ? undefined : true}
+              inert={i === CENTER_PANE ? undefined : true}
             >
               <MonthGrid
                 monthKey={key}

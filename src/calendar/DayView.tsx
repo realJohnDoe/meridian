@@ -5,14 +5,18 @@ import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 import DayPane, { HP, TOP_PAD, DEFAULT_SCROLL_HOUR } from './DayPane'
 import { useSnapCarousel } from './useSnapCarousel'
+import { PANE_COUNT } from './snapCarousel'
+
+const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 
 // ── DayView ───────────────────────────────────────────────────
-// A 3-pane horizontal scroll-snap carousel: day-1, day, day+1 — the same
-// mechanism as MonthView's carousel (see useSnapCarousel and MonthView's
-// header comment for the full seam explanation), plus a vertical scroll-sync
-// layer MonthView doesn't need: each pane owns its own timeline scroller, and
-// scrolling one mirrors the position to its siblings, so the time of day you
-// were looking at carries across a swipe instead of resetting to 7am.
+// A horizontal scroll-snap carousel of PANE_COUNT days centered on the
+// current one — the same mechanism as MonthView's carousel (see
+// useSnapCarousel and MonthView's header comment for the full seam
+// explanation), plus a vertical scroll-sync layer MonthView doesn't need:
+// each pane owns its own timeline scroller, and scrolling one mirrors the
+// position to its siblings, so the time of day you were looking at carries
+// across a swipe instead of resetting to 7am.
 interface Props {
   date: Date
   onOpen: (occ: Occurrence, scope?: EditScope) => void
@@ -24,7 +28,8 @@ interface Props {
 export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate }: Props) {
   const { trackRef, paneKeys } = useSnapCarousel({
     unitKey: fmtISO(dvDate),
-    unitAt: idx => fmtISO(addDays(dvDate, idx - 1)),
+    paneCount: PANE_COUNT,
+    unitAt: offset => fmtISO(addDays(dvDate, offset)),
     onCommit: key => onNavigateDate?.(parseDateKey(key)),
     onPreview: key => useStore.setState({ dayPreview: key }),
     // The route is authoritative again once the date has actually committed,
@@ -70,7 +75,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
         <div
           key={key}
           className="shrink-0 basis-full snap-center min-h-0 overflow-hidden flex flex-col"
-          inert={i === 1 ? undefined : true}
+          inert={i === CENTER_PANE ? undefined : true}
         >
           <DayPane
             dateKey={key}
