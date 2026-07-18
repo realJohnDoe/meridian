@@ -151,7 +151,7 @@ export default defineConfig({
       manifest: {
         name: 'Meridian',
         short_name: 'Meridian',
-        description: 'A calm calendar and task app',
+        description: 'A calm calendar, task manager, and notes app built on plain Markdown files.',
         theme_color: '#111318',
         background_color: '#111318',
         display: 'standalone',
