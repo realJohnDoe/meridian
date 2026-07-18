@@ -32,12 +32,16 @@ type ParsedEntry = ReturnType<typeof parseItemEntry> & { idx: number }
 type Row = { entry: ParsedEntry; occ: Occurrence | undefined }
 
 // Sort order: notes α → events chronologically → open tasks by priority →
-// open string tasks (stored) → done tasks + done string tasks α → broken links (stored)
+// open string tasks (stored) → done tasks + done string tasks (notes α → events α → tasks α) → broken links (stored)
+function doneKindOrder(k: 'note' | 'event' | 'task'): number {
+  return k === 'note' ? 0 : k === 'event' ? 1 : 2
+}
+
 function rowSortKey({ entry, occ }: Row): [number, number, string] {
   if (entry.kind === 'link') {
     if (!occ) return [5, entry.idx, '']
     if (isDimmed(occ)) {
-      return [4, 0, occ.metadata.title?.toLowerCase() ?? '']
+      return [4, doneKindOrder(occKind(occ)), occ.metadata.title?.toLowerCase() ?? '']
     }
     const k = occKind(occ)
     if (k === 'note')  return [0, 0, occ.metadata.title?.toLowerCase() ?? '']
@@ -45,8 +49,8 @@ function rowSortKey({ entry, occ }: Row): [number, number, string] {
     // task: sort by priority
     return [2, priorityRank(occ.metadata.priority), occ.metadata.title?.toLowerCase() ?? '']
   }
-  // string task
-  if (entry.done) return [4, 0, entry.text.toLowerCase()]
+  // string task (always kind 'task')
+  if (entry.done) return [4, doneKindOrder('task'), entry.text.toLowerCase()]
   return [3, entry.idx, '']
 }
 

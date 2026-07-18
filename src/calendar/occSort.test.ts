@@ -16,14 +16,14 @@ function makeOcc(overrides: Partial<Occurrence> & { title?: string; done?: boole
 }
 
 describe('sortOccs', () => {
-  it('sorts done/past items alphabetically, ignoring their type', () => {
+  it('groups done/past items by type (events before tasks) before sorting alphabetically', () => {
     const pastEvent = makeOcc({ title: 'Zebra event', jsTime: new Date(2020, 0, 1, 9, 0) })
     const doneTaskB = makeOcc({ title: 'Banana task', done: true })
     const doneTaskA = makeOcc({ title: 'Apple task', done: true })
 
     const sorted = sortOccs([pastEvent, doneTaskB, doneTaskA])
 
-    expect(sorted.map(o => o.metadata.title)).toEqual(['Apple task', 'Banana task', 'Zebra event'])
+    expect(sorted.map(o => o.metadata.title)).toEqual(['Zebra event', 'Apple task', 'Banana task'])
   })
 
   it('keeps active items grouped ahead of done/past items', () => {
