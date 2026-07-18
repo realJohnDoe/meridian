@@ -78,6 +78,8 @@ interface MeridianStore {
    * is authoritative again (see MonthView's month-change effect).
    */
   monthPreview: string | null
+  /** `YYYY-MM-DD` of the date the day-view swipe carousel is settling toward — same shape as monthPreview. */
+  dayPreview: string | null
 
   // ── Favorites ────────────────────────────────────────────────────
   /** Ordered fileSlug array for the active vault. Stored in localStorage, never written to files. */
@@ -172,6 +174,7 @@ export const useStore = create<MeridianStore>((set, get) => {
     scrollToTodayOnce: false,
     agendaTopDate:     null,
     monthPreview:      null,
+    dayPreview:        null,
 
     favorites: [],
     loadFavorites: favoritesField.load,

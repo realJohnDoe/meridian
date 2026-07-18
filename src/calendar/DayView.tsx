@@ -1,176 +1,18 @@
-import { useMemo, useEffect, useRef, useState, type MouseEvent } from 'react'
-import { startOfDay } from 'date-fns'
-import { useHorizontalSwipe } from './useHorizontalSwipe'
-import { ChevronDown, ChevronUp } from 'lucide-react'
-import { useStore } from '@/store'  // items + roots only
-import { Button } from '@/components/ui/button'
-import { SurfaceButton } from '@/components/ui/surface-button'
-import { cn } from '@/lib/cn'
+import { useCallback, useRef } from 'react'
+import { useStore } from '@/store'
 import type { Occurrence, EditScope } from '@/types'
-import { multidayDisplayTitle, fmtT, parseDateString, parseDurationDays } from '@/model'
-import { sameDay, addDays, formatDurationChip, fmtDuration } from '@/format'
-import { sortOccs } from './occSort'
-import { occState } from '@/occView'
-import { dvBlockVariants } from '@/components/ui/occurrence-variants'
-import { ContinuationChevron, CONTINUES_PADDING_ALWAYS } from '@/components/ui/continuation-chevron'
-import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useToday, useCalendarFilter } from '@/hooks'
-import { computeColumns } from './computeColumns'
-// Layout constants below feed JS pixel math (scrollTo, pointer-offset calcs
-// for click-to-create) that must run synchronously, so they're plain numbers
-// rather than Tailwind classes/vars. Each is still snapped to a Tailwind
-// step for consistency with the rest of the app (see index.css §4).
-const HOURS = 24              // hours shown on the timeline
-const HP = 56                  // px per hour (timeline scale, not a spacing gap)
-const GUTTER = 64              // px reserved for the left hour-label column — Tailwind `16` step
-const RIGHT_PAD = 8            // px breathing room to the right edge of the screen — `2` step
-const COL_GAP = 6              // px gap between simultaneous (colliding) event columns — `1.5` step
-const TOP_PAD = 8              // px headroom above 0:00 so its label isn't clipped — `2` step
-const BOTTOM_PAD = 8           // px breathing room below 24:00 — `2` step
-const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
-const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
-const DEFAULT_CREATE_DURATION = '1h'
-// Badges take a second row, so they only render on blocks with an hour of
-// height to spare — a 45-min slot is ~38px, which the title alone fills.
-const EVENT_BADGE_MIN_HOURS = 1
-// …and only on blocks wide enough for the chips to sit on one line, since
-// colliding events narrow the columns and the title (the more important bit)
-// should win the space. Two gates because the two chip sets are wildly
-// different lengths: fmtDuration spells its length out in full, so a duration
-// chip reads "until 3:15 PM (5 hours, 30 minutes)" (~36ch), while a lone start
-// time is ~8ch — one threshold sized for the former would needlessly strip the
-// latter off perfectly roomy blocks. Enforced as container queries against the
-// block itself (see the `@container` marker on SurfaceButton below), so no JS
-// measurement is involved. These must stay literal class strings — Tailwind
-// only generates what it can see in the source.
-const BADGE_WIDTH_GATE = '@max-[280px]:hidden'      // start time + duration chip
-const TIME_ONLY_WIDTH_GATE = '@max-[96px]:hidden'   // start-time chip alone
-// Ghost pill for the time/duration badges: a translucent tint of the block's
-// own foreground ink (bg-current), so it contrasts on every block state/theme
-// without hardcoding a surface color the way Badge's `tag` variant does.
-const eventPillCls =
-  'inline-flex items-center rounded-md px-1.5 py-0.5 text-2xs font-medium leading-none bg-current/20 whitespace-nowrap'
-
-/** Localized hour-boundary label (0:00…24:00), matching the Intl formatting fmtT uses for event times. */
-function formatHourBoundary(h: number, hour12: boolean): string {
-  if (!hour12) return h === HOURS ? '24:00' : `${String(h).padStart(2, '0')}:00`
-  const d = new Date(); d.setHours(h % HOURS, 0, 0, 0)
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
-}
-
-// ── Sub-components ────────────────────────────────────────────
-
-interface AllDayItemProps {
-  o: Occurrence
-  onOpen: (o: Occurrence) => void
-  displayTitle?: string
-  continuesLeft?: boolean
-  continuesRight?: boolean
-}
-function AllDayItem({ o, onOpen, displayTitle, continuesLeft, continuesRight }: AllDayItemProps) {
-  const title = displayTitle ?? o.metadata.title
-  return (
-    <SurfaceButton
-      className={cn(
-        dvBlockVariants({ state: occState(o) }),
-        'relative w-full flex items-center rounded-xs sm:rounded-sm px-2 py-0.5 text-xs font-medium truncate mb-0.5',
-        continuesLeft && CONTINUES_PADDING_ALWAYS.left,
-        continuesRight && CONTINUES_PADDING_ALWAYS.right,
-      )}
-      onClick={() => onOpen(o)}
-      aria-label={title}
-    >
-      {continuesLeft && <ContinuationChevron side="left" />}
-      <span>{title}</span>
-      {continuesRight && <ContinuationChevron side="right" />}
-    </SurfaceButton>
-  )
-}
-
-function renderAllDayItem(
-  o: Occurrence,
-  i: number,
-  dvMidnight: Date,
-  onOpen: (o: Occurrence) => void,
-) {
-  const days = parseDurationDays(o.metadata.duration) ?? 1
-  const startD = parseDateString(o.date)
-  const endD = startD && days > 1 ? addDays(startD, days - 1) : startD
-  return (
-    <AllDayItem
-      key={`${o.fileSlug}-${o.date}-${i}`}
-      o={o}
-      onOpen={onOpen}
-      displayTitle={multidayDisplayTitle(o, dvMidnight)}
-      continuesLeft={!!startD && startD < dvMidnight}
-      continuesRight={!!endD && endD > dvMidnight}
-    />
-  )
-}
-
-interface EventBlockProps {
-  o: Occurrence
-  dh: number
-  colIndex: number
-  totalCols: number
-  hour12: boolean
-  onOpen: (o: Occurrence) => void
-}
-function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockProps) {
-  const h   = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
-  const top = h * HP + TOP_PAD + 1
-  const height = Math.max(dh * HP - 4, 28)
-
-  const colWidth = `(100% - ${GUTTER + RIGHT_PAD}px - ${(totalCols - 1) * COL_GAP}px) / ${totalCols}`
-  const left  = `calc(${GUTTER}px + ${colIndex} * ((${colWidth}) + ${COL_GAP}px))`
-  const width = `calc(${colWidth})`
-
-  // Same formatting the agenda OccurrenceCard uses: locale-aware start time and
-  // a "until HH:MM (1 hour)" duration chip, instead of the old `10:00 · 1h` line.
-  const timeLabel = fmtT(o.time, hour12)
-  const durationLabel = o.metadata.duration
-    ? (o.time
-        ? formatDurationChip(o.metadata.duration, { date: o.date, time: o.time }, hour12)
-        : fmtDuration(o.metadata.duration))
-    : null
-
-  const showBadges = dh >= EVENT_BADGE_MIN_HOURS
-  const badgeWidthGate = durationLabel ? BADGE_WIDTH_GATE : TIME_ONLY_WIDTH_GATE
-  const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration].filter(Boolean).join(', ')
-
-  return (
-    <SurfaceButton
-      className={cn(
-        dvBlockVariants({ state: occState(o) }),
-        // gap-1 both matches the title/meta spacing OccurrenceCard uses and
-        // overrides the gap-2 Button's base classes apply — in this flex-col
-        // that gap lands between the title and the badge row, and its 8px is
-        // what pushed a 1h block's content (8+16+8+14+8 = 54px) past the 52px
-        // it has to render in. At gap-1 that comes to 50px and fits.
-        '@container absolute flex flex-col items-start gap-1 rounded-md px-2 text-xs font-medium overflow-hidden transition-colors',
-        // Sub-hour blocks bottom out at a 28px floor, which py-2 would overflow
-        // on the title's 16px line box alone (8+16+8), clipping its descenders.
-        showBadges ? 'py-2' : 'py-1',
-      )}
-      style={{ top, height, left, width }}
-      onClick={() => onOpen(o)}
-      aria-label={ariaLabel}
-    >
-      <div className="w-full shrink-0 font-semibold overflow-hidden text-ellipsis whitespace-nowrap">
-        {o.metadata.title}
-      </div>
-      {showBadges && (
-        <div className={cn('flex flex-wrap gap-1', badgeWidthGate)}>
-          {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
-          {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
-        </div>
-      )}
-    </SurfaceButton>
-  )
-}
+import { fmtISO } from '@/model'
+import { addDays } from '@/format'
+import DayPane, { HP, TOP_PAD, DEFAULT_SCROLL_HOUR } from './DayPane'
+import { useSnapCarousel } from './useSnapCarousel'
 
 // ── DayView ───────────────────────────────────────────────────
-
+// A 3-pane horizontal scroll-snap carousel: day-1, day, day+1 — the same
+// mechanism as MonthView's carousel (see useSnapCarousel and MonthView's
+// header comment for the full seam explanation), plus a vertical scroll-sync
+// layer MonthView doesn't need: each pane owns its own timeline scroller, and
+// scrolling one mirrors the position to its siblings, so the time of day you
+// were looking at carries across a swipe instead of resetting to 7am.
 interface Props {
   date: Date
   onOpen: (occ: Occurrence, scope?: EditScope) => void
@@ -180,170 +22,82 @@ interface Props {
 }
 
 export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate }: Props) {
-  const today  = useToday()
-  const items  = useStore(s => s.items)
-  const roots  = useStore(s => s.roots)
-  const hour12 = useStore(s => s.localePrefs.hour12)
+  const { trackRef, paneKeys } = useSnapCarousel({
+    unitKey: fmtISO(dvDate),
+    unitAt: idx => fmtISO(addDays(dvDate, idx - 1)),
+    onCommit: key => onNavigateDate?.(parseDateKey(key)),
+    onPreview: key => useStore.setState({ dayPreview: key }),
+    // The route is authoritative again once the date has actually committed,
+    // so clear any touchend preview here — mirrors MonthView's monthPreview.
+    onRecentered: () => {
+      if (useStore.getState().dayPreview !== null) useStore.setState({ dayPreview: null })
+    },
+  })
 
-  const { filterOccs } = useCalendarFilter()
+  // Vertical scroll position syncs across days (scroll to 6pm, swipe, still
+  // at 6pm): panes register their scroller here, and any pane's scroll
+  // mirrors to its siblings, guarded against feedback the same way TimeWheels
+  // guards its own scrollTop write. A pane preserved across a swipe (keyed
+  // reconciliation — see useSnapCarousel) simply keeps its own scrollTop
+  // untouched; a freshly-mounted pane seeds from sharedTopRef (see DayPane's
+  // mount effect), so there's nothing to correct on commit either way.
+  const scrollersRef = useRef(new Map<string, HTMLDivElement>())
+  const sharedTopRef = useRef(DEFAULT_SCROLL_HOUR * HP + TOP_PAD)
+  const vSyncingRef = useRef(false)
 
-  const dvFrom = startOfDay(dvDate)
-  const dvTo   = new Date(dvDate); dvTo.setHours(23, 59, 59)
-  const dvOccs = filterOccs(useExpandWithMultiday(items, roots, dvFrom, dvTo))
+  const registerScroller = useCallback((key: string, el: HTMLDivElement | null) => {
+    if (el) scrollersRef.current.set(key, el)
+    else scrollersRef.current.delete(key)
+  }, [])
 
-  const { allDay, cols } = useMemo(() => {
-    const sorted = sortOccs(dvOccs)
-    const allDay = sorted.filter(o => !fmtT(o.time))
-    const timed  = sorted.filter(o =>  !!fmtT(o.time))
-    return { allDay, cols: computeColumns(timed) }  // cols: LayoutEvent[][]
-  }, [dvOccs])
+  const handleVerticalScroll = useCallback((key: string, scrollTop: number) => {
+    if (vSyncingRef.current) return
+    sharedTopRef.current = scrollTop
+    vSyncingRef.current = true
+    mirrorScrollTop(scrollersRef.current, key, scrollTop)
+    requestAnimationFrame(() => { vSyncingRef.current = false })
+  }, [])
 
-  const scRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const id = setTimeout(() => scRef.current?.scrollTo({ top: DEFAULT_SCROLL_HOUR * HP + TOP_PAD, behavior: 'instant' }), 50)
-    return () => clearTimeout(id)
-  }, [dvDate])
-
-  const dvDateRef = useRef(dvDate)
-  useEffect(() => { dvDateRef.current = dvDate }, [dvDate])
-
-  const tlRef = useRef<HTMLDivElement>(null)
-  useHorizontalSwipe(
-    tlRef,
-    () => { onNavigateDate?.(addDays(dvDateRef.current, -1)) },
-    () => { onNavigateDate?.(addDays(dvDateRef.current,  1)) },
-  )
-
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    if (!sameDay(dvDate, today)) return
-    const id = setInterval(() => setNow(new Date()), 60_000)
-    return () => clearInterval(id)
-  }, [dvDate, today])
-
-  const totalCols = Math.max(cols.length, 1)
-  const isToday   = sameDay(dvDate, today)
-
-  const dvMidnight = startOfDay(dvDate)
-
-  const ALL_DAY_THRESHOLD = 3
-  const [allDayExpanded, setAllDayExpanded] = useState(false)
-  const hiddenCount = allDay.length - ALL_DAY_THRESHOLD
-
-  // minutesWithinHour is 0 for keyboard-triggered activation (Enter/Space on
-  // the hour button), since there's no pointer position to derive it from —
-  // that lands the new event at the hour boundary, which is a sensible default.
-  const createAt = (h: number, minutesWithinHour: number) => {
-    const minutesFromMidnight = h * 60 + minutesWithinHour
-    const snapped = Math.round(minutesFromMidnight / CREATE_SNAP_MIN) * CREATE_SNAP_MIN
-    const clamped = Math.min(Math.max(snapped, 0), HOURS * 60 - CREATE_SNAP_MIN)
-    const time = `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`
-    onCreate?.(dvDate, time, DEFAULT_CREATE_DURATION)
-  }
-
-  const handleHourClick = (h: number) => (e: MouseEvent<HTMLButtonElement>) => {
-    // e.detail === 0 for a keyboard-activated click (Enter/Space) — no
-    // pointer position to read, so fall back to the top of the hour.
-    if (e.detail === 0) { createAt(h, 0); return }
-    const rect = e.currentTarget.getBoundingClientRect()
-    createAt(h, ((e.clientY - rect.top) / HP) * 60)
-  }
+  const getInitialScrollTop = useCallback(() => sharedTopRef.current, [])
 
   return (
-    <>
-      {/* All-day / multiday strip */}
-      {allDay.length > 0 && (
-        <div className="px-3 py-1.5 border-b border-input bg-card shrink-0" id="dvAllDay">
-          <div className="text-2xs font-semibold tracking-[.07em] uppercase text-muted-foreground mb-1">All day</div>
-
-          {/* Always-visible first N items */}
-          {allDay.slice(0, ALL_DAY_THRESHOLD).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
-
-          {/* Animated overflow */}
-          {hiddenCount > 0 && (
-            <div className={`dv-adoverflow${allDayExpanded ? ' open' : ''}`}>
-              <div>
-                {allDay.slice(ALL_DAY_THRESHOLD).map((o, i) =>
-                  renderAllDayItem(o, ALL_DAY_THRESHOLD + i, dvMidnight, onOpen)
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Expand / collapse toggle */}
-          {hiddenCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 py-0 text-xs text-muted-foreground hover:text-secondary-foreground gap-1 self-start"
-              onClick={() => setAllDayExpanded(v => !v)}
-            >
-              {allDayExpanded
-                ? <><ChevronUp size={11} />Show less</>
-                : <><ChevronDown size={11} />{hiddenCount} more</>}
-            </Button>
-          )}
+    <div
+      ref={trackRef}
+      className="flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-x-contain"
+      style={{ scrollbarWidth: 'none' }}
+    >
+      {paneKeys.map((key, i) => (
+        <div
+          key={key}
+          className="shrink-0 basis-full snap-center min-h-0 overflow-hidden flex flex-col"
+          inert={i === 1 ? undefined : true}
+        >
+          <DayPane
+            dateKey={key}
+            onOpen={onOpen}
+            onCreate={onCreate}
+            registerScroller={registerScroller}
+            onVerticalScroll={handleVerticalScroll}
+            getInitialScrollTop={getInitialScrollTop}
+          />
         </div>
-      )}
-
-      {/* Scrollable timeline. pb-5 (20px) matches the search-bar gradient
-          height so the 24:00 boundary can scroll clear of the overlaid fade. */}
-      <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch] relative pb-5" id="dvSc" ref={scRef}>
-        <div className="relative" id="dvTl" ref={tlRef} style={{ height: HOURS * HP + TOP_PAD + BOTTOM_PAD }}>
-
-          {/* Hour-boundary labels (0:00 … 24:00) */}
-          {Array.from({ length: HOURS + 1 }, (_, h) => h).map(h => (
-            <span
-              key={h}
-              className="absolute text-2xs font-mono text-muted-foreground text-right"
-              style={{ top: h * HP + TOP_PAD, left: 0, width: GUTTER - 8, transform: 'translateY(-50%)' }}
-            >
-              {formatHourBoundary(h, hour12)}
-            </span>
-          ))}
-
-          {/* Hour cells — one button per hour; click/tap or Enter/Space creates an event there */}
-          <div className="absolute inset-y-0" style={{ left: GUTTER, right: RIGHT_PAD }}>
-            {Array.from({ length: HOURS }, (_, h) => h).map(h => (
-              <button
-                key={h}
-                type="button"
-                className="absolute inset-x-0 rounded-lg bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                style={{ top: h * HP + TOP_PAD + 1, height: HP - 2 }}
-                onClick={handleHourClick(h)}
-                aria-label={`Create event at ${formatHourBoundary(h, hour12)}`}
-              />
-            ))}
-          </div>
-
-          {/* Current-time indicator */}
-          {isToday && (() => {
-            const nh = now.getHours() + now.getMinutes() / 60
-            return (
-              <div className="now-line" style={{ top: nh * HP + TOP_PAD }}>
-                <div className="now-dot" />
-              </div>
-            )
-          })()}
-
-          {/* Timed event blocks */}
-          {cols.flatMap((col, ci) =>
-            col.map(({ occ, dh }) => (
-              <EventBlock
-                key={occ.id}
-                o={occ}
-                dh={dh}
-                colIndex={ci}
-                totalCols={totalCols}
-                hour12={hour12}
-                onOpen={onOpen}
-              />
-            ))
-          )}
-        </div>
-      </div>
-    </>
+      ))}
+    </div>
   )
 }
 
-/** Exported so App.tsx toolbar can render the current date title reactively. */
+function parseDateKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+// Plain helper, deliberately outside the component: writing to a DOM element
+// pulled out of a ref-held Map inside a useCallback trips the React
+// Compiler's immutability analysis (it treats the element as a frozen "hook
+// argument" once it's flowed through registerScroller's callback param) —
+// moving the actual mutation into an ordinary function sidesteps that.
+function mirrorScrollTop(scrollers: Map<string, HTMLDivElement>, exceptKey: string, scrollTop: number) {
+  for (const [k, el] of scrollers) {
+    if (k !== exceptKey) el.scrollTop = scrollTop
+  }
+}
