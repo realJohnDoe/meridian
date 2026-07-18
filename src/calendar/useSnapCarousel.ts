@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { snapIndex } from './snapCarousel'
 
-// Shared mechanics behind both calendar carousels (MonthView, DayView): a
-// 3-pane horizontal scroll-snap track — previous/current/next — where the
-// route's current unit (a month or a date) is the source of truth and the
-// carousel commits a navigation once a swipe settles. See MonthView's header
-// comment for the full seam explanation (keyed panes, no-flash recenter);
-// this hook is that mechanism made generic over what a "unit" is.
+// Shared mechanics behind both calendar carousels (MonthView, DayView): an
+// N-pane horizontal scroll-snap track centered on the route's current unit
+// (a month or a date), which stays the source of truth — the carousel
+// commits a navigation once a swipe settles. See MonthView's header comment
+// for the full seam explanation (keyed panes, no-flash recenter); this hook
+// is that mechanism made generic over what a "unit" is and how many panes
+// surround it.
 interface UseSnapCarouselOptions {
   /** The currently committed unit (e.g. a `YYYY-MM` month key or `YYYY-MM-DD` date key). */
   unitKey: string
-  /** Maps a pane index (0 = previous, 1 = current, 2 = next) to its unit key. */
-  unitAt: (idx: number) => string
-  /** Called once a swipe settles on a pane other than the current one. */
+  /** Number of simultaneously-mounted panes — must be odd. Expected to be a stable constant, not a value that changes across renders. */
+  paneCount: number
+  /** Maps an offset from the current unit (e.g. -2..+2 for paneCount=5) to its unit key. */
+  unitAt: (offset: number) => string
+  /** Called once a swipe settles on a pane other than the current one — the key is the committed offset's unit, which may be more than one unit away if a single drag spanned multiple panes. */
   onCommit: (key: string) => void
   /**
    * Called from the live scroll position during a gesture or momentum, so a
@@ -30,18 +33,23 @@ interface UseSnapCarouselOptions {
 
 interface UseSnapCarouselResult {
   trackRef: React.RefObject<HTMLDivElement | null>
-  paneKeys: [string, string, string]
+  paneKeys: string[]
   recenter: () => void
 }
 
 export function useSnapCarousel({
-  unitKey, unitAt, onCommit, onPreview, onRecentered,
+  unitKey, paneCount, unitAt, onCommit, onPreview, onRecentered,
 }: UseSnapCarouselOptions): UseSnapCarouselResult {
   const trackRef = useRef<HTMLDivElement>(null)
   const syncingRef = useRef(false)
   // Cached by the resize-driven recenter below so the scroll handler (fires
   // continuously during momentum) never triggers its own layout read.
   const paneWRef = useRef(0)
+
+  // paneCount is assumed static (a constant the caller passes, not a value
+  // that varies across renders), so it's safely closed over directly below —
+  // including inside the swipe-commit effect, which only runs once on mount.
+  const half = Math.floor(paneCount / 2)
 
   // Callbacks are kept in refs and re-synced every render rather than
   // required to be memoized by the caller — callers just pass fresh
@@ -55,7 +63,7 @@ export function useSnapCarousel({
   const onRecenteredRef = useRef(onRecentered)
   useEffect(() => { onRecenteredRef.current = onRecentered })
 
-  const paneKeys: [string, string, string] = [unitAt(0), unitAt(1), unitAt(2)]
+  const paneKeys = Array.from({ length: paneCount }, (_, i) => unitAt(i - half))
 
   // Recenters the track on the current pane, same shape as TimeWheels'
   // scrollTop recenter: a synchronous write, then release `syncing` on the
@@ -67,15 +75,16 @@ export function useSnapCarousel({
     if (!paneW) return
     paneWRef.current = paneW
     syncingRef.current = true
-    el.scrollLeft = paneW
+    el.scrollLeft = half * paneW
     requestAnimationFrame(() => { syncingRef.current = false })
-  }, [])
+  }, [half])
 
   // The seam: recenter synchronously before paint whenever the committed
   // unit changes, in the same commit that shifts which key each pane
-  // renders — so the pixel that was at 2×paneW is now at paneW and nothing
-  // visibly moves. React runs layout effects before the browser paints, so
-  // there's no frame in between where the stale position is visible.
+  // renders — so the pixel the current pane occupied is occupied by the
+  // (possibly different) new current pane and nothing visibly moves. React
+  // runs layout effects before the browser paints, so there's no frame in
+  // between where the stale position is visible.
   useLayoutEffect(() => {
     recenter()
     onRecenteredRef.current?.()
@@ -113,8 +122,8 @@ export function useSnapCarousel({
       if (syncingRef.current || dragging) return
       const w = el.getBoundingClientRect().width
       const idx = snapIndex(el.scrollLeft, w)
-      if (idx === null || idx === 1) return
-      onCommitRef.current(unitAtRef.current(idx))
+      if (idx === null || idx === half) return
+      onCommitRef.current(unitAtRef.current(idx - half))
     }
 
     const scheduleCheck = () => {
@@ -130,8 +139,8 @@ export function useSnapCarousel({
     const updatePreview = () => {
       const w = paneWRef.current
       if (!w) return
-      const idx = Math.max(0, Math.min(2, Math.round(el.scrollLeft / w)))
-      const key = unitAtRef.current(idx)
+      const idx = Math.max(0, Math.min(paneCount - 1, Math.round(el.scrollLeft / w)))
+      const key = unitAtRef.current(idx - half)
       if (key === lastPreviewKey) return
       lastPreviewKey = key
       onPreviewRef.current(key)
@@ -167,7 +176,7 @@ export function useSnapCarousel({
       el.removeEventListener('touchcancel', onTouchEnd)
       if (supportsScrollend) el.removeEventListener('scrollend', onScrollEnd)
     }
-  }, [])
+  }, [half, paneCount])
 
   return { trackRef, paneKeys, recenter }
 }

@@ -5,6 +5,14 @@ const CELL_CHROME = 26
 // reserved multiday-bar lanes, since bars and occurrence rows must line up.
 export const ROW_GAP = 2
 
+// Panes either side of the current one, kept simultaneously mounted so a
+// swipe always has somewhere to go without waiting for the previous one to
+// commit — a single continuous drag can also span more than one pane, in
+// which case the commit lands more than one unit forward/back at once. Must
+// stay odd (a well-defined center pane). Shared by both calendar carousels
+// (MonthView, DayView) via useSnapCarousel.
+export const PANE_COUNT = 5
+
 /**
  * Resolves a scroll-snap track's scrollLeft to a pane index, or null if the
  * track isn't currently settled on a snap point (mid-drag, or paneW unknown).
