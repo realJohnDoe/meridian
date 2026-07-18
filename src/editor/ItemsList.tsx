@@ -8,7 +8,7 @@ import { fileEntries } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
 import { OccurrenceCard, MarkdownTaskCard, TagChip, FlipList, captureFlipLeaveRect, type FlipLeaveRect } from '@/components'
-import { isDimmed, priorityRank } from '@/calendar'
+import { isDimmed, priorityRank, doneKindOrder } from '@/calendar'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -33,10 +33,6 @@ type Row = { entry: ParsedEntry; occ: Occurrence | undefined }
 
 // Sort order: notes α → events chronologically → open tasks by priority →
 // open string tasks (stored) → done tasks + done string tasks (notes α → events α → tasks α) → broken links (stored)
-function doneKindOrder(k: 'note' | 'event' | 'task'): number {
-  return k === 'note' ? 0 : k === 'event' ? 1 : 2
-}
-
 function rowSortKey({ entry, occ }: Row): [number, number, string] {
   if (entry.kind === 'link') {
     if (!occ) return [5, entry.idx, '']

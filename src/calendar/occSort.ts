@@ -33,8 +33,7 @@ function _prioKey(o: Occurrence): number {
 }
 
 // Within the dimmed (done/past) group, cluster by kind before alphabetizing.
-function _doneKindOrder(o: Occurrence): number {
-  const k = occKind(o)
+export function doneKindOrder(k: 'note' | 'event' | 'task'): number {
   return k === 'note' ? 0 : k === 'event' ? 1 : 2
 }
 
@@ -42,7 +41,7 @@ export function sortOccs(arr: Occurrence[]): Occurrence[] {
   return [...arr].sort((a: Occurrence, b: Occurrence) => {
     const sd = _sortKey(a) - _sortKey(b); if (sd) return sd
     if (isDimmed(a) && isDimmed(b)) {
-      const kd = _doneKindOrder(a) - _doneKindOrder(b); if (kd) return kd
+      const kd = doneKindOrder(occKind(a)) - doneKindOrder(occKind(b)); if (kd) return kd
       return (a.metadata.title || '').localeCompare(b.metadata.title || '')
     }
     const pd = _prioKey(a) - _prioKey(b); if (pd) return pd
