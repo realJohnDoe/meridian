@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useStore } from '@/store'
 import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
-import { fmtISO, fmtMonth, parseMonth } from '@/model'
+import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar } from '@/components'
@@ -52,6 +52,7 @@ function AppMain() {
   const today         = useToday()
   const agendaTopDate = useStore(s => s.agendaTopDate)
   const monthPreview  = useStore(s => s.monthPreview)
+  const dayPreview    = useStore(s => s.dayPreview)
 
   const isEntryView  = !!entrySlugMatch || !!entryNewMatch
   const isDayView    = !!dayMatch
@@ -110,9 +111,16 @@ function AppMain() {
           ) : isDayView && dvDate ? (
             <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
               {isMobile && <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={openSidebar} title="Menu" aria-label="Menu"><Menu size={18} /></Button>}
-              <span className="flex-1 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{fmtTopBarDay(dvDate, today)}</span>
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) } })}><ChevronLeft size={18} /></Button>
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) } })}><ChevronRight size={18} /></Button>
+              {/* dayPreview (set by the swipe carousel as a swipe crosses the
+                  halfway point) shows the label the gesture is heading toward
+                  immediately, ahead of the route committing — mirrors monthPreview. */}
+              <span className="flex-1 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{fmtTopBarDay(dayPreview ? (parseDateString(dayPreview) ?? dvDate) : dvDate, today)}</span>
+              {/* replace: true — mirrors the day carousel's swipe-to-page
+                  semantics (see DayView) so chevron taps and swipes leave the
+                  same, single history entry per visit instead of chevron taps
+                  alone stacking up a back-press-per-day trail. */}
+              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}><ChevronLeft size={18} /></Button>
+              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}><ChevronRight size={18} /></Button>
             </div>
           ) : isMonthView && monthViewDate ? (
             <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">

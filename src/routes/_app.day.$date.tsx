@@ -17,8 +17,10 @@ function DayPage() {
   const dvDate = useMemo(() => new Date(date + 'T00:00:00'), [date])
 
   const onOpen = useOpenEntry()
+  // replace: true — paging to a neighbouring day is view state, not a
+  // navigation event; mirrors the month carousel's onNavigateMonth.
   const onNavigateDate = useCallback(
-    (d: Date) => navigate({ to: '/day/$date', params: { date: fmtISO(d) } }),
+    (d: Date) => navigate({ to: '/day/$date', params: { date: fmtISO(d) }, replace: true }),
     [navigate],
   )
   const onCreate = useCallback(

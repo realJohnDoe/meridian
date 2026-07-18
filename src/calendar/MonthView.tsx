@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '@/store'
-import { fmtMonth, weekStartsOn } from '@/model'
+import { fmtMonth, parseMonth, weekStartsOn } from '@/model'
 import MonthGrid, { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS } from './MonthGrid'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
-import { snapIndex } from './snapCarousel'
+import { useSnapCarousel } from './useSnapCarousel'
 
 // Fallback for the occurrence-list start offset until it's measured (cell top padding
 // 3px + badge h-5 20px + badge mb-px 1px + the 8px flex gap inherited from Button).
@@ -12,7 +12,7 @@ const BAR_TOP_FALLBACK = 32
 
 // ── MonthView ─────────────────────────────────────────────────
 // A 3-pane horizontal scroll-snap carousel: month-1, month, month+1. The
-// route param `month` is the source of truth; the carousel commits a
+// route param `month` is the source of truth; useSnapCarousel commits a
 // navigation once a swipe settles, and recenters itself (pre-paint) whenever
 // `month` changes, so the pixel that was at pane 2 is now at pane 1 and
 // nothing visibly jumps. See MonthGrid for the per-pane rendering — it's kept
@@ -41,22 +41,19 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     return d.toLocaleDateString(undefined, { weekday: 'short' })
   })
 
-  const monthKeys = useMemo(() => {
-    const y = month.getFullYear()
-    const m = month.getMonth()
-    return [
-      fmtMonth(new Date(y, m - 1, 1)),
-      fmtMonth(month),
-      fmtMonth(new Date(y, m + 1, 1)),
-    ]
-  }, [month])
+  const { trackRef, paneKeys, recenter } = useSnapCarousel({
+    unitKey: fmtMonth(month),
+    unitAt: idx => fmtMonth(new Date(month.getFullYear(), month.getMonth() + (idx - 1), 1)),
+    onCommit: key => onNavigateMonth(parseMonth(key)),
+    onPreview: key => useStore.setState({ monthPreview: key }),
+    // The route is authoritative again once `month` has actually committed,
+    // so clear any touchend preview here — otherwise a stale preview could
+    // linger past a commit that resolved to a different month than predicted.
+    onRecentered: () => {
+      if (useStore.getState().monthPreview !== null) useStore.setState({ monthPreview: null })
+    },
+  })
 
-  const monthRef = useRef(month)
-  useEffect(() => { monthRef.current = month }, [month])
-  const onNavigateMonthRef = useRef(onNavigateMonth)
-  useEffect(() => { onNavigateMonthRef.current = onNavigateMonth }, [onNavigateMonth])
-
-  const trackRef = useRef<HTMLDivElement>(null)
   const rowSentinelRef = useRef<HTMLDivElement>(null)
   const chromeSentinelRef = useRef<HTMLButtonElement>(null)
   const occListRef = useRef<HTMLDivElement>(null)
@@ -65,45 +62,12 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   const [gridH, setGridH] = useState(0)
   const [barTop, setBarTop] = useState(BAR_TOP_FALLBACK)
 
-  const syncingRef = useRef(false)
-  // Cached by the measurement ResizeObserver below so the scroll handler (fires
-  // continuously during momentum) never triggers its own layout read.
-  const paneWRef = useRef(0)
-
-  // Recenters the track on the current month's pane, same shape as
-  // TimeWheels' scrollTop recenter: a synchronous write, then release
-  // `syncing` on the next frame so the write isn't mistaken for a user scroll.
-  const recenter = useCallback(() => {
-    const el = trackRef.current
-    if (!el) return
-    const paneW = el.getBoundingClientRect().width
-    if (!paneW) return
-    syncingRef.current = true
-    el.scrollLeft = paneW
-    requestAnimationFrame(() => { syncingRef.current = false })
-  }, [])
-
-  // The seam: recenter synchronously before paint whenever the committed month
-  // changes, in the same commit that shifts which month string each pane
-  // renders — so the pixel that was at 2×paneW is now at paneW and nothing
-  // visibly moves. React runs layout effects before the browser paints, so
-  // there's no frame in between where the stale position is visible.
-  //
-  // The route is authoritative again once `month` has actually committed, so
-  // clear any touchend preview here — otherwise a stale preview could linger
-  // past a commit that resolved to a different month than predicted.
-  useLayoutEffect(() => {
-    recenter()
-    if (useStore.getState().monthPreview !== null) useStore.setState({ monthPreview: null })
-  }, [month, recenter])
-
-  // Measure rowH/barTop (from the invisible replica sentinels) and gridH (from
-  // the track itself) once; both are month-independent, so a single shared
-  // ResizeObserver serves all three panes instead of each pane running its
-  // own. Also re-centers on any track resize (e.g. the desktop sidebar's
-  // animated width transition, or a viewport rotation), since a stale paneW
-  // is no longer a real snap point and would otherwise let the engine
-  // re-snap to an arbitrary neighbour.
+  // Measures rowH/barTop (from the invisible replica sentinels) and gridH
+  // (from the track itself) once; both are month-independent, so a single
+  // shared ResizeObserver serves all three panes instead of each pane running
+  // its own. Calls the shared hook's recenter() too — redundant with the
+  // hook's own resize-driven recenter on the same track element, but cheap
+  // and harmless, and keeps this effect's own resize handling self-contained.
   useEffect(() => {
     const trackEl = trackRef.current
     const rowEl = rowSentinelRef.current
@@ -121,7 +85,6 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
         }
       }
       setGridH(trackEl.clientHeight)
-      paneWRef.current = trackEl.getBoundingClientRect().width
       recenter()
     }
 
@@ -130,87 +93,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     ro.observe(trackEl)
     ro.observe(rowEl)
     return () => ro.disconnect()
-  }, [recenter])
-
-  // Swipe commit. Gesture-gated rather than purely geometric, so a finger
-  // held stationary mid-drag on a snap point doesn't commit a navigation
-  // underneath it. `syncing` is checked in the raw scroll handler rather than
-  // inside the debounced callback, since the recenter's rAF release can beat
-  // a ~100ms debounce to the punch. `scrollend` (where supported) is a more
-  // precise trigger than the debounce and is preferred when available; the
-  // debounce remains as the fallback (Safari only shipped `scrollend` in 18.2).
-  useEffect(() => {
-    const el = trackRef.current
-    if (!el) return
-
-    let dragging = false
-    let idleTimer: ReturnType<typeof setTimeout> | undefined
-    let lastPreviewKey: string | null = null
-
-    const checkSettle = () => {
-      if (syncingRef.current || dragging) return
-      const w = el.getBoundingClientRect().width
-      const idx = snapIndex(el.scrollLeft, w)
-      if (idx === null || idx === 1) return
-      const cur = monthRef.current
-      onNavigateMonthRef.current(new Date(cur.getFullYear(), cur.getMonth() + (idx - 1), 1))
-    }
-
-    const scheduleCheck = () => {
-      clearTimeout(idleTimer)
-      idleTimer = setTimeout(checkSettle, 100)
-    }
-
-    // Updates the topbar label from the live scroll position during momentum,
-    // rather than waiting for the gesture to settle and the route to commit —
-    // a Chrome trace of a real flick showed the label lagging the swipe by
-    // ~0.5s when it was only sampled at touchend (before momentum even
-    // starts) and otherwise only updated after the full settle+navigate
-    // chain completed. Uses the cached paneWRef rather than measuring here,
-    // since this runs on every scroll event during momentum. Change-guarded
-    // so the store only updates once per pane crossed, not once per frame.
-    const updatePreview = () => {
-      const w = paneWRef.current
-      if (!w) return
-      const idx = Math.max(0, Math.min(2, Math.round(el.scrollLeft / w)))
-      const cur = monthRef.current
-      const key = fmtMonth(new Date(cur.getFullYear(), cur.getMonth() + (idx - 1), 1))
-      if (key === lastPreviewKey) return
-      lastPreviewKey = key
-      useStore.setState({ monthPreview: key })
-    }
-
-    const onScroll = () => {
-      if (syncingRef.current) return
-      updatePreview()
-      scheduleCheck()
-    }
-    const onTouchStart = () => { dragging = true }
-    const onTouchEnd = () => {
-      dragging = false
-      scheduleCheck()
-    }
-    const onScrollEnd = () => {
-      clearTimeout(idleTimer)
-      checkSettle()
-    }
-
-    const supportsScrollend = 'onscrollend' in window
-    el.addEventListener('scroll', onScroll, { passive: true })
-    el.addEventListener('touchstart', onTouchStart, { passive: true })
-    el.addEventListener('touchend', onTouchEnd, { passive: true })
-    el.addEventListener('touchcancel', onTouchEnd, { passive: true })
-    if (supportsScrollend) el.addEventListener('scrollend', onScrollEnd)
-
-    return () => {
-      clearTimeout(idleTimer)
-      el.removeEventListener('scroll', onScroll)
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchend', onTouchEnd)
-      el.removeEventListener('touchcancel', onTouchEnd)
-      if (supportsScrollend) el.removeEventListener('scrollend', onScrollEnd)
-    }
-  }, [])
+  }, [trackRef, recenter])
 
   return (
     <div className="relative flex-1 flex flex-col overflow-hidden pb-5">
@@ -239,7 +122,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
           className="flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-x-contain touch-pan-x"
           style={{ scrollbarWidth: 'none' }}
         >
-          {monthKeys.map((key, i) => (
+          {paneKeys.map((key, i) => (
             <div
               key={key}
               className="shrink-0 basis-full snap-center min-h-0 overflow-hidden px-1 flex flex-col"
