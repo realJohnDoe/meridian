@@ -23,7 +23,7 @@ import { ContinuationChevron, CONTINUES_PADDING } from '@/components/ui/continua
 // rather than hand-computed — the day-number badge, cell padding, or the flex
 // gap can change without silently breaking bar↔row alignment (see `barTop`,
 // hoisted and measured once in MonthView since it's month-independent).
-export const CELL_CLASS = 'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] transition-colors overflow-hidden min-h-0 w-full'
+export const CELL_CLASS = 'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] bg-muted/40 transition-colors overflow-hidden min-h-0 w-full'
 export const BADGE_CLASS = 'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
 export const OCC_LIST_CLASS = 'flex flex-col gap-0.5 flex-1 overflow-hidden'
 
