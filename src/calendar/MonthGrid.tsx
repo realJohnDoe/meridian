@@ -81,7 +81,7 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
         style={reservedLanes ? { marginTop: reservedLanes * (rowH + ROW_GAP) } : undefined}
       >
         {dayOccs.slice(0, shown).map(o => (
-          <div key={`${o.fileSlug}-${o.date}`} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
+          <div key={`${o.fileSlug}-${o.date}`} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center rounded-sm sm:rounded-md px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
             <span className="truncate min-w-0">{o.metadata.title}</span>
           </div>
         ))}
@@ -233,7 +233,7 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
                       dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
                       // mx-0.5 mirrors the day cell's 2px horizontal padding so a
                       // single-column bar aligns exactly with a single-day occurrence row.
-                      'relative flex items-center mx-0.5 rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
+                      'relative flex items-center mx-0.5 rounded-sm sm:rounded-md px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
                       b.continuesLeft && CONTINUES_PADDING.left,
                       b.continuesRight && CONTINUES_PADDING.right,
                     )}

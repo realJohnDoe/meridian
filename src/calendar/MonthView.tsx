@@ -104,7 +104,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       <div
         ref={rowSentinelRef}
         aria-hidden
-        className="invisible absolute pointer-events-none flex items-center rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium"
+        className="invisible absolute pointer-events-none flex items-center rounded-sm sm:rounded-md px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium"
       >
         &nbsp;
       </div>
