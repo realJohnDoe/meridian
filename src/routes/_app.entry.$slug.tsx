@@ -9,6 +9,7 @@ import { isEditScope } from '@/types'
 import { SyncButton } from '@/components'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { useTopbarSlot } from './-topbarSlot'
 import type { Occurrence, EditScope } from '@/types'
@@ -43,9 +44,14 @@ interface TopbarProps {
 
 function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack }: TopbarProps) {
   const slotEl = useTopbarSlot()
+  const { isMobile } = useSidebar()
   if (!slotEl) return null
   return createPortal(
-    <div className="flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto px-3.5">
+    // Both edges lead with an icon button, whose own h-10 box already insets it (54 - 40) / 2 = 7px
+    // from the bar edge — matching the vertical inset. Full px-3.5 here would double up (see
+    // the non-entry header in _app.tsx for the same fix). Desktop hides the back button, so its
+    // left edge has no button to match and keeps the roomier 14px.
+    <div className={cn('flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto pr-1.75', isMobile ? 'pl-1.75' : 'pl-3.5')}>
       <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 lg:hidden" onClick={onBack} title="Back" aria-label="Back">
         <ArrowLeft size={18} />
       </Button>
