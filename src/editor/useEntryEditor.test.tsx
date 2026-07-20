@@ -75,6 +75,47 @@ describe('useEntryEditor', () => {
     expect(saved?.metadata.done).toBe(true)
   })
 
+  it('goBack flushes a still-pending autosave immediately instead of dropping it', () => {
+    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md' })
+    seedStore([occ], makeRoots('note.md'))
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.scheduleAutoSave('unsaved draft') })
+    // Navigate away (e.g. tapping back) before the 1500ms debounce elapses.
+    act(() => { result.current.handleClose() })
+
+    expect(persistence.writes).toEqual(['note.md'])
+    expect(useStore.getState().roots.get('note.md')?.body).toBe('unsaved draft')
+  })
+
+  it('commits a brand-new item on close even when the creating edit never got a chance to debounce', () => {
+    // Reproduces the reported bug: typing a title arms the debounced autosave
+    // (see EntryEditor's title onChange), but navigating back immediately —
+    // well within the 1500ms window — used to just clearTimeout the pending
+    // commit, silently dropping the brand-new item.
+    const { result } = renderHook(() => useEntryEditor(null))
+    const slug = titleToSlug('Brand new task')
+
+    act(() => { result.current.setEntry({ ...result.current.entry, title: 'Brand new task' }) })
+    act(() => { result.current.scheduleAutoSave('') })
+    act(() => { result.current.handleClose() })
+
+    expect(persistence.writes).toEqual([slug])
+    expect(useStore.getState().items.filter(i => i.fileSlug === slug)).toHaveLength(1)
+  })
+
+  it('flushes a still-pending autosave on unmount (e.g. navigating to a wikilink)', () => {
+    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md' })
+    seedStore([occ], makeRoots('note.md'))
+    const { result, unmount } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.scheduleAutoSave('draft body') })
+    act(() => { unmount() })
+
+    expect(persistence.writes).toEqual(['note.md'])
+    expect(useStore.getState().roots.get('note.md')?.body).toBe('draft body')
+  })
+
   it('a new entry with a title commits on mount without navigating away', () => {
     const { result } = renderHook(() => useEntryEditor(null, 'single', 'My New Task'))
     const slug = titleToSlug('My New Task')
