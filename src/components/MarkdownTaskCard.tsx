@@ -39,7 +39,7 @@ export default function MarkdownTaskCard({
             // eslint-disable-next-line jsx-a11y/no-autofocus -- opens in response to a user click (promote to inline edit), not on page load
             autoFocus
             variant="ghost"
-            className="flex-1 text-sm font-medium"
+            className="flex-1 text-base sm:text-sm font-medium"
             value={editValue}
             onChange={e => onEditChange?.(e.target.value)}
             onBlur={onEditCommit}
