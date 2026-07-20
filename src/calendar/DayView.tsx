@@ -74,7 +74,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
       {paneKeys.map((key, i) => (
         <div
           key={key}
-          className="shrink-0 basis-full snap-center min-h-0 overflow-hidden flex flex-col"
+          className="shrink-0 basis-full snap-center snap-always min-h-0 overflow-hidden flex flex-col"
           inert={i === CENTER_PANE ? undefined : true}
         >
           <DayPane
