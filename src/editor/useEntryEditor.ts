@@ -53,9 +53,10 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const [focusTitleTick, setFocusTitleTick] = useState(0)
 
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => () => {
-    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
-  }, [])
+  // Body captured by the most recent scheduleAutoSave call — read by flushAutoSave
+  // so a pending edit can be committed even after EntryBody's CM6 view (and thus
+  // getBodyRef) has already been torn down (e.g. mid-unmount).
+  const pendingBodyRef = useRef<string | null>(null)
   // Populated by EntryEditor once CodeMirror mounts; used by saveMeta to capture current body
   const getBodyRef = useRef<() => string>(() => '')
   // Populated by EntryEditor; flushes pending "listed on" links once a new item is created
@@ -105,6 +106,33 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     commitEntry({ ...next, body: getBodyRef.current() })
   }
 
+  // Commits a still-pending debounced autosave immediately instead of letting it
+  // fire late (or never — the cleanup below would otherwise just clearTimeout it).
+  // Read pendingBodyRef first: on unmount, EntryBody's CM6 view may already be
+  // destroyed, so getBodyRef.current() would return '' instead of the real body.
+  const flushAutoSave = () => {
+    if (!autosaveTimerRef.current) return
+    clearTimeout(autosaveTimerRef.current)
+    autosaveTimerRef.current = null
+    const body = pendingBodyRef.current ?? getBodyRef.current()
+    pendingBodyRef.current = null
+    commitEntry({ ...entryRef.current, body })
+  }
+
+  // Drops a still-pending autosave without committing it — used right before a
+  // delete so goBack's flushAutoSave (called from deleteNode's navigateBack
+  // callback) can't resurrect the item that's about to be removed via a stale
+  // commitEntry.
+  const cancelAutoSave = () => {
+    if (autosaveTimerRef.current) { clearTimeout(autosaveTimerRef.current); autosaveTimerRef.current = null }
+    pendingBodyRef.current = null
+  }
+
+  useEffect(() => () => {
+    flushAutoSave()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // A new item opened with an initial title (e.g. "Add <query>" from search, or a
   // wikilink to a not-yet-existing note) already has everything needed to create the
   // file — don't wait for the user to make an edit that would trigger autosave.
@@ -121,9 +149,11 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const scheduleAutoSave = (body: string) => {
     if (entryRef.current.editScope === 'add') return
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
+    pendingBodyRef.current = body
     autosaveTimerRef.current = setTimeout(() => {
       commitEntry({ ...entryRef.current, body })
       autosaveTimerRef.current = null
+      pendingBodyRef.current = null
     }, 1500)
   }
 
@@ -137,6 +167,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   }
 
   const goBack = () => {
+    flushAutoSave()
     if (window.history.length > 1) router.history.back()
     else void navigate({ to: '/' })
   }
@@ -152,6 +183,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const { setSeriesSheetConfig, setPendingDelete } = dialogs
 
   const handleDelete = () => {
+    cancelAutoSave()
     deleteNode(
       entry.item,
       goBack,
