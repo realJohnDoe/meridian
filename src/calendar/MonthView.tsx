@@ -18,10 +18,12 @@ const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 // useSnapCarousel commits a navigation once a swipe settles, and recenters
 // itself (pre-paint) whenever `month` changes, so the pixel the current pane
 // occupied is occupied by the new current pane and nothing visibly jumps.
-// Keeping more than one pane either side mounted means a fast second swipe
-// always has somewhere to go rather than waiting for the first to commit
-// (and a single long drag can span more than one month at once). See
-// MonthGrid for the per-pane rendering — it's kept separate so React can key
+// `snap-always` (scroll-snap-stop: always) on each pane makes a fling of any
+// velocity stop at the very next page rather than coasting across several —
+// the "one page per swipe" behaviour every calendar app has. Keeping more
+// than one pane either side mounted then means a *deliberate* rapid second
+// swipe still has somewhere to go rather than waiting for the first to
+// commit. See MonthGrid for the per-pane rendering — it's kept separate so React can key
 // panes by month string, which is load-bearing: browsers track the *snapped
 // element* across DOM changes, and only a keyed pane moves with its month
 // rather than staying pinned to a screen position, which is what lets the
@@ -131,7 +133,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
           {paneKeys.map((key, i) => (
             <div
               key={key}
-              className="shrink-0 basis-full snap-center min-h-0 overflow-hidden px-1 flex flex-col"
+              className="shrink-0 basis-full snap-center snap-always min-h-0 overflow-hidden px-1 flex flex-col"
               inert={i === CENTER_PANE ? undefined : true}
             >
               <MonthGrid

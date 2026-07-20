@@ -6,11 +6,12 @@ const CELL_CHROME = 26
 export const ROW_GAP = 2
 
 // Panes either side of the current one, kept simultaneously mounted so a
-// swipe always has somewhere to go without waiting for the previous one to
-// commit — a single continuous drag can also span more than one pane, in
-// which case the commit lands more than one unit forward/back at once. Must
-// stay odd (a well-defined center pane). Shared by both calendar carousels
-// (MonthView, DayView) via useSnapCarousel.
+// *deliberate* rapid second swipe has somewhere to go without waiting for the
+// previous one to commit. A single fling only ever advances one pane
+// (scroll-snap-stop: always on the panes — see MonthView/DayView), so the
+// extra width buys chaining, not multi-page flings. Must stay odd (a
+// well-defined center pane). Shared by both calendar carousels via
+// useSnapCarousel.
 export const PANE_COUNT = 5
 
 /**
