@@ -9,9 +9,10 @@ const inputVariants = cva(
     variants: {
       variant: {
         // Boxed control — the house style used across dialogs and forms
-        default: "h-control rounded-lg border border-border/50 bg-secondary px-3 text-xs font-mono focus:border-primary",
+        // text-base below sm: iOS Safari auto-zooms on focus of inputs under 16px
+        default: "h-control rounded-lg border border-border/50 bg-secondary px-3 text-base sm:text-xs font-mono focus:border-primary",
         // Chromeless — for inputs embedded in an already-styled wrapper (e.g. a search bar)
-        ghost: "border-none bg-transparent text-sm",
+        ghost: "border-none bg-transparent text-base sm:text-sm",
       },
     },
     defaultVariants: { variant: "default" },

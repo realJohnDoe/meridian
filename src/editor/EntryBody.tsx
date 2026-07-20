@@ -155,7 +155,8 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
     <>
       <div
         ref={containerRef}
-        className="mt-1 text-sm leading-[1.85] text-secondary-foreground border border-input rounded-[var(--radius-md)] focus-within:ring-2 focus-within:ring-ring"
+        // text-base below sm: iOS Safari auto-zooms on focus of editable content under 16px
+        className="mt-1 text-base sm:text-sm leading-[1.85] text-secondary-foreground border border-input rounded-[var(--radius-md)] focus-within:ring-2 focus-within:ring-ring"
       />
       {wlPopup && view && (
         <WikilinkPopup

@@ -27,7 +27,8 @@ const CommandInput = React.forwardRef<
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        'flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none',
+        // text-base below sm: iOS Safari auto-zooms on focus of inputs under 16px
+        'flex h-10 w-full rounded-md bg-transparent py-3 text-base sm:text-sm outline-none',
         'placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
