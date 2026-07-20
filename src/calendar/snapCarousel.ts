@@ -5,31 +5,12 @@ const CELL_CHROME = 26
 // reserved multiday-bar lanes, since bars and occurrence rows must line up.
 export const ROW_GAP = 2
 
-// Panes either side of the current one, kept simultaneously mounted so a
-// *deliberate* rapid second swipe has somewhere to go without waiting for the
-// previous one to commit. A single fling only ever advances one pane
-// (scroll-snap-stop: always on the panes — see MonthView/DayView), so the
-// extra width buys chaining, not multi-page flings. Must stay odd (a
-// well-defined center pane). Shared by both calendar carousels via
-// useSnapCarousel.
+// Panes either side of the current one, kept simultaneously mounted so a rapid
+// second swipe has somewhere to go before the first has committed and the
+// window recentered. Embla caps each swipe to one pane (skipSnaps: false), so
+// the extra width buys chaining, not multi-page flings. Must stay odd (a
+// well-defined center pane). Shared by both calendar carousels via useCarousel.
 export const PANE_COUNT = 5
-
-/**
- * Resolves a scroll-snap track's scrollLeft to a pane index, or null if the
- * track isn't currently settled on a snap point (mid-drag, or paneW unknown).
- *
- * paneW must come from a fractional measurement (getBoundingClientRect().width),
- * not clientWidth — on a fractional-CSS-px viewport (e.g. 393.5px at 3x DPR),
- * an integer-rounded paneW accumulates enough error by idx 2 to permanently
- * fail a tight tolerance, silently breaking navigation in one direction only
- * on a subset of devices.
- */
-export function snapIndex(scrollLeft: number, paneW: number, tolerance = 2): number | null {
-  if (!paneW) return null
-  const idx = Math.round(scrollLeft / paneW)
-  if (Math.abs(scrollLeft - idx * paneW) > tolerance) return null
-  return idx
-}
 
 /**
  * How many occurrence rows fit in a month cell before falling back to "+N more",
