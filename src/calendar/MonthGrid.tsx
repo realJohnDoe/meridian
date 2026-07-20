@@ -23,7 +23,7 @@ import { ContinuationChevron, CONTINUES_PADDING } from '@/components/ui/continua
 // rather than hand-computed — the day-number badge, cell padding, or the flex
 // gap can change without silently breaking bar↔row alignment (see `barTop`,
 // hoisted and measured once in MonthView since it's month-independent).
-export const CELL_CLASS = 'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] transition-colors overflow-hidden min-h-0 w-full'
+export const CELL_CLASS = 'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] bg-muted/40 transition-colors overflow-hidden min-h-0 w-full'
 export const BADGE_CLASS = 'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
 export const OCC_LIST_CLASS = 'flex flex-col gap-0.5 flex-1 overflow-hidden'
 
@@ -68,7 +68,7 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
 
   return (
     <SurfaceButton
-      className={cn(CELL_CLASS, 'hover:bg-accent', other && 'opacity-25')}
+      className={cn(CELL_CLASS, 'hover:bg-muted/70', other && 'opacity-25')}
       onClick={() => onDayClick(date)}
       aria-label={ariaLabel}
     >
@@ -81,7 +81,7 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
         style={reservedLanes ? { marginTop: reservedLanes * (rowH + ROW_GAP) } : undefined}
       >
         {dayOccs.slice(0, shown).map(o => (
-          <div key={`${o.fileSlug}-${o.date}`} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
+          <div key={`${o.fileSlug}-${o.date}`} className={cn(dvBlockVariants({ state: occState(o) }), 'flex items-center rounded-sm sm:rounded-md px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
             <span className="truncate min-w-0">{o.metadata.title}</span>
           </div>
         ))}
@@ -233,7 +233,7 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
                       dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
                       // mx-0.5 mirrors the day cell's 2px horizontal padding so a
                       // single-column bar aligns exactly with a single-day occurrence row.
-                      'relative flex items-center mx-0.5 rounded-xs sm:rounded-sm px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
+                      'relative flex items-center mx-0.5 rounded-sm sm:rounded-md px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
                       b.continuesLeft && CONTINUES_PADDING.left,
                       b.continuesRight && CONTINUES_PADDING.right,
                     )}
