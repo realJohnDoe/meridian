@@ -1,7 +1,9 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { startOfToday } from 'date-fns'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { restoreVaults, autoSyncTick, resetSyncBackoff } from '@/storage'
+import { useStore } from '@/store'
 import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createRootRoute({
@@ -29,11 +31,25 @@ function ThemeColorSync() {
 }
 
 function Root() {
+  // Tracks the calendar day the app was last known to be on, so a resume
+  // after a multi-day background suspend (mobile PWAs freeze timers rather
+  // than reload) can tell "today changed while we were away" from an
+  // ordinary tab switch and re-scroll the agenda to today accordingly.
+  const lastActiveDayRef = useRef(startOfToday().getTime())
+
   useEffect(() => {
     void restoreVaults()
     const intervalId = setInterval(autoSyncTick, 60_000)
     const onOnline = () => { resetSyncBackoff(); autoSyncTick() }
-    const onVisible = () => { if (document.visibilityState === 'visible') autoSyncTick() }
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      autoSyncTick()
+      const day = startOfToday().getTime()
+      if (day !== lastActiveDayRef.current) {
+        lastActiveDayRef.current = day
+        useStore.setState({ scrollToTodayOnce: true })
+      }
+    }
     window.addEventListener('online', onOnline)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
