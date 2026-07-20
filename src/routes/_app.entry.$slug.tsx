@@ -9,8 +9,10 @@ import { isEditScope } from '@/types'
 import { SyncButton } from '@/components'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { useTopbarSlot } from './-topbarSlot'
+import { topbarEdgePadding } from './-topbarEdgePadding'
 import type { Occurrence, EditScope } from '@/types'
 
 const EditorShell = lazy(() => import('@/editor').then(m => ({ default: m.EditorShell })))
@@ -43,9 +45,12 @@ interface TopbarProps {
 
 function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack }: TopbarProps) {
   const slotEl = useTopbarSlot()
+  const { isMobile } = useSidebar()
   if (!slotEl) return null
   return createPortal(
-    <div className="flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto px-3.5">
+    // Right edge always leads with an icon button; left edge only does on mobile (back button) —
+    // desktop hides it, leaving nothing leading the left edge.
+    <div className={cn('flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto', topbarEdgePadding(isMobile, true))}>
       <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 lg:hidden" onClick={onBack} title="Back" aria-label="Back">
         <ArrowLeft size={18} />
       </Button>

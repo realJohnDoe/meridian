@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { TopbarSlotContext } from './-topbarSlot'
+import { topbarEdgePadding } from './-topbarEdgePadding'
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
@@ -98,11 +99,9 @@ function AppMain() {
             'h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10',
             isEntryView
               ? 'overflow-hidden'
-              // Right edge (and left edge on mobile) always leads with an icon button, whose own
-              // h-10 box already insets it (54 - 40) / 2 = 7px from the bar edge — matching the
-              // vertical inset. Extra container padding there would double up. The desktop-only
-              // left edge (no button, just the label) keeps the roomier 14px.
-              : cn('justify-between pr-1.75', isMobile ? 'pl-1.75' : 'pl-3.5'),
+              // Right edge always leads with an icon button; left edge only does on mobile
+              // (hamburger) — desktop's left edge is a plain text label.
+              : cn('justify-between', topbarEdgePadding(isMobile, true)),
           )}
         >
           {isEntryView ? (
