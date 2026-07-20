@@ -12,8 +12,8 @@ import { isDimmed, priorityRank } from '@/calendar'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
+import { CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
+import InlineCombobox, { comboboxInputClassName, comboboxListClassName } from './InlineCombobox'
 import { getItems, getRoots } from '@/storeBridge'
 import { commitNext } from '@/storeCommit'
 import { matchesQuery } from '@/lib/matching'
@@ -304,80 +304,103 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           {exitingEntries.map(({ row, rect }) => renderExitingRow(row, rect))}
         </FlipList>
 
-        {/* Add item — half-card affordance, same dimensions as item cards */}
+        {/* Add item — half-card affordance, same dimensions as item cards.
+            The card itself becomes the trigger that reveals an in-flow
+            input (see InlineCombobox) so the mobile keyboard doesn't cover it. */}
         <div className="flex items-start gap-1">
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger asChild>
-              <Card className="flex-1 flex items-center gap-2 pl-2 pr-2.5 py-2 border-dashed bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground">
+          <div className="flex-1">
+            {pickerOpen ? (
+              <InlineCombobox
+                open={pickerOpen}
+                onClose={() => setPickerOpen(false)}
+                shouldFilter={false}
+                className={comboboxInputClassName}
+              >
+                {({ side, maxHeightPx, inputRef }) => (
+                  <>
+                    <CommandInput
+                      ref={inputRef}
+                      className="border-b-0"
+                      placeholder="Add item or link file…"
+                      value={pickerQuery}
+                      onValueChange={setPickerQuery}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && pickerQuery.trim() && filtered.length === 0) {
+                          addTask(pickerQuery)
+                        }
+                      }}
+                    />
+                    <CommandList
+                      className={comboboxListClassName(side, 'left-0 right-0')}
+                      style={{ maxHeight: maxHeightPx }}
+                    >
+                      {pickerQuery.trim() && (
+                        <CommandItem
+                          value={`__task__${pickerQuery}`}
+                          onSelect={() => addTask(pickerQuery)}
+                        >
+                          <Tag size={13} className="shrink-0 opacity-60" />
+                          <span>Add <strong>"{pickerQuery.trim()}"</strong></span>
+                        </CommandItem>
+                      )}
+                      {donePickerRows.length > 0 && (
+                        <CommandGroup heading="Done items">
+                          {donePickerRows.slice(0, 8).map(row => {
+                            const { entry, occ } = row
+                            const label = entry.kind === 'task'
+                              ? entry.text
+                              : (occ?.metadata.title ?? entry.ref)
+                            return (
+                              <CommandItem
+                                key={entry.idx}
+                                value={`__redo__${entry.idx}`}
+                                onSelect={() => redoItem(row)}
+                              >
+                                <CircleCheck size={13} className="shrink-0 opacity-60" />
+                                <span className="truncate">{label}</span>
+                              </CommandItem>
+                            )
+                          })}
+                        </CommandGroup>
+                      )}
+                      {filtered.length > 0 && (
+                        <CommandGroup heading="Link file">
+                          {filtered.slice(0, 8).map(e => (
+                            <CommandItem
+                              key={e.fileSlug}
+                              value={e.fileSlug}
+                              onSelect={() => addLink(e.fileSlug)}
+                            >
+                              <span className="truncate">{e.title}</span>
+                              {e.tags[0] && (
+                                <span className="ml-auto text-2xs text-muted-foreground shrink-0">{e.tags[0]}</span>
+                              )}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {!pickerQuery && filtered.length === 0 && donePickerRows.length === 0 && (
+                        <CommandEmpty>No files found</CommandEmpty>
+                      )}
+                    </CommandList>
+                  </>
+                )}
+              </InlineCombobox>
+            ) : (
+              <Card
+                role="button"
+                tabIndex={0}
+                className="flex items-center gap-2 pl-2 pr-2.5 py-2 border-dashed bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
+                onClick={() => setPickerOpen(true)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPickerOpen(true) }
+                }}
+              >
                 <Plus size={13} className="shrink-0" />
                 <span className="text-sm">Add item…</span>
               </Card>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-0" align="start">
-              <Command shouldFilter={false}>
-                <CommandInput
-                  placeholder="Add item or link file…"
-                  value={pickerQuery}
-                  onValueChange={setPickerQuery}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && pickerQuery.trim() && filtered.length === 0) {
-                      addTask(pickerQuery)
-                    }
-                  }}
-                />
-                <CommandList className="min-h-[12rem]">
-                  {pickerQuery.trim() && (
-                    <CommandItem
-                      value={`__task__${pickerQuery}`}
-                      onSelect={() => addTask(pickerQuery)}
-                    >
-                      <Tag size={13} className="shrink-0 opacity-60" />
-                      <span>Add <strong>"{pickerQuery.trim()}"</strong></span>
-                    </CommandItem>
-                  )}
-                  {donePickerRows.length > 0 && (
-                    <CommandGroup heading="Done items">
-                      {donePickerRows.slice(0, 8).map(row => {
-                        const { entry, occ } = row
-                        const label = entry.kind === 'task'
-                          ? entry.text
-                          : (occ?.metadata.title ?? entry.ref)
-                        return (
-                          <CommandItem
-                            key={entry.idx}
-                            value={`__redo__${entry.idx}`}
-                            onSelect={() => redoItem(row)}
-                          >
-                            <CircleCheck size={13} className="shrink-0 opacity-60" />
-                            <span className="truncate">{label}</span>
-                          </CommandItem>
-                        )
-                      })}
-                    </CommandGroup>
-                  )}
-                  {filtered.length > 0 && (
-                    <CommandGroup heading="Link file">
-                      {filtered.slice(0, 8).map(e => (
-                        <CommandItem
-                          key={e.fileSlug}
-                          value={e.fileSlug}
-                          onSelect={() => addLink(e.fileSlug)}
-                        >
-                          <span className="truncate">{e.title}</span>
-                          {e.tags[0] && (
-                            <span className="ml-auto text-2xs text-muted-foreground shrink-0">{e.tags[0]}</span>
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-                  {!pickerQuery && filtered.length === 0 && donePickerRows.length === 0 && (
-                    <CommandEmpty>No files found</CommandEmpty>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+            )}
+          </div>
           {/* Spacer matching the X button so the card aligns with cards above */}
           <span className="w-5 shrink-0" aria-hidden="true" />
         </div>
