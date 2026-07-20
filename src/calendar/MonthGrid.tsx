@@ -68,7 +68,7 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
 
   return (
     <SurfaceButton
-      className={cn(CELL_CLASS, 'hover:bg-accent', other && 'opacity-25')}
+      className={cn(CELL_CLASS, 'hover:bg-muted/70', other && 'opacity-25')}
       onClick={() => onDayClick(date)}
       aria-label={ariaLabel}
     >
