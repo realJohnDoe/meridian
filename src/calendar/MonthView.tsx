@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '@/store'
 import { fmtMonth, parseMonth, weekStartsOn } from '@/model'
 import MonthGrid, { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS } from './MonthGrid'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
-import { useSnapCarousel } from './useSnapCarousel'
+import { useCarousel } from './useCarousel'
 import { PANE_COUNT } from './snapCarousel'
 
 // Fallback for the occurrence-list start offset until it's measured (cell top padding
@@ -13,21 +13,14 @@ const BAR_TOP_FALLBACK = 32
 const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 
 // ── MonthView ─────────────────────────────────────────────────
-// A horizontal scroll-snap carousel of PANE_COUNT months centered on the
-// current one. The route param `month` is the source of truth;
-// useSnapCarousel commits a navigation once a swipe settles, and recenters
-// itself (pre-paint) whenever `month` changes, so the pixel the current pane
-// occupied is occupied by the new current pane and nothing visibly jumps.
-// `snap-always` (scroll-snap-stop: always) on each pane makes a fling of any
-// velocity stop at the very next page rather than coasting across several —
-// the "one page per swipe" behaviour every calendar app has. Keeping more
-// than one pane either side mounted then means a *deliberate* rapid second
-// swipe still has somewhere to go rather than waiting for the first to
-// commit. See MonthGrid for the per-pane rendering — it's kept separate so React can key
-// panes by month string, which is load-bearing: browsers track the *snapped
-// element* across DOM changes, and only a keyed pane moves with its month
-// rather than staying pinned to a screen position, which is what lets the
-// recenter write agree with the snap engine instead of fighting it.
+// A horizontal carousel of PANE_COUNT months centered on the current one,
+// driven by Embla (see useCarousel). The route param `month` is the source of
+// truth; useCarousel commits a navigation once a swipe settles and recenters
+// the pane window (pre-paint) whenever `month` changes, so nothing visibly
+// jumps. See MonthGrid for the per-pane rendering — it's kept separate so
+// React can key panes by month string, which is load-bearing: Embla is
+// reInit-ed on each commit and the keyed panes preserve the two instances
+// that survive the shift (only one new month is expanded per swipe).
 interface Props {
   month: Date
   onNavigateMonth: (d: Date) => void
@@ -48,19 +41,27 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     return d.toLocaleDateString(undefined, { weekday: 'short' })
   })
 
-  const { trackRef, paneKeys, recenter } = useSnapCarousel({
+  const { emblaRef, paneKeys } = useCarousel({
     unitKey: fmtMonth(month),
     paneCount: PANE_COUNT,
     unitAt: offset => fmtMonth(new Date(month.getFullYear(), month.getMonth() + offset, 1)),
     onCommit: key => onNavigateMonth(parseMonth(key)),
     onPreview: key => useStore.setState({ monthPreview: key }),
     // The route is authoritative again once `month` has actually committed,
-    // so clear any touchend preview here — otherwise a stale preview could
-    // linger past a commit that resolved to a different month than predicted.
+    // so clear any preview here — otherwise a stale preview could linger past
+    // a commit that resolved to a different month than predicted.
     onRecentered: () => {
       if (useStore.getState().monthPreview !== null) useStore.setState({ monthPreview: null })
     },
   })
+
+  // The Embla viewport also serves as the gridH measurement target, so its node
+  // is captured alongside Embla's own ref via this merged callback.
+  const viewportNodeRef = useRef<HTMLElement | null>(null)
+  const setViewport = useCallback((node: HTMLElement | null) => {
+    viewportNodeRef.current = node
+    emblaRef(node)
+  }, [emblaRef])
 
   const rowSentinelRef = useRef<HTMLDivElement>(null)
   const chromeSentinelRef = useRef<HTMLButtonElement>(null)
@@ -71,15 +72,12 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   const [barTop, setBarTop] = useState(BAR_TOP_FALLBACK)
 
   // Measures rowH/barTop (from the invisible replica sentinels) and gridH
-  // (from the track itself) once; both are month-independent, so a single
-  // shared ResizeObserver serves all three panes instead of each pane running
-  // its own. Calls the shared hook's recenter() too — redundant with the
-  // hook's own resize-driven recenter on the same track element, but cheap
-  // and harmless, and keeps this effect's own resize handling self-contained.
+  // (from the Embla viewport) once; all are month-independent, so a single
+  // shared ResizeObserver feeds every pane rather than each measuring its own.
   useEffect(() => {
-    const trackEl = trackRef.current
+    const viewportEl = viewportNodeRef.current
     const rowEl = rowSentinelRef.current
-    if (!trackEl || !rowEl) return
+    if (!viewportEl || !rowEl) return
 
     const compute = () => {
       const measuredRowH = rowEl.offsetHeight
@@ -92,16 +90,15 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
           if (offset > 0) setBarTop(offset)
         }
       }
-      setGridH(trackEl.clientHeight)
-      recenter()
+      setGridH(viewportEl.clientHeight)
     }
 
     compute()
     const ro = new ResizeObserver(compute)
-    ro.observe(trackEl)
+    ro.observe(viewportEl)
     ro.observe(rowEl)
     return () => ro.disconnect()
-  }, [trackRef, recenter])
+  }, [])
 
   return (
     <div className="relative flex-1 flex flex-col overflow-hidden pb-5">
@@ -125,27 +122,28 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       </SurfaceButton>
 
       <div className="flex-1 overflow-hidden pb-1 flex flex-col">
-        <div
-          ref={trackRef}
-          className="flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory overscroll-x-contain touch-pan-x"
-          style={{ scrollbarWidth: 'none' }}
-        >
-          {paneKeys.map((key, i) => (
-            <div
-              key={key}
-              className="shrink-0 basis-full snap-center snap-always min-h-0 overflow-hidden px-1 flex flex-col"
-              inert={i === CENTER_PANE ? undefined : true}
-            >
-              <MonthGrid
-                monthKey={key}
-                ws={ws}
-                rowH={rowH}
-                barTop={barTop}
-                gridH={gridH}
-                onDayClick={onDayClick}
-              />
-            </div>
-          ))}
+        {/* Embla viewport → container → panes. touch-pan-y lets a vertical drag
+            fall through (harmless here — no vertical scroll — but consistent
+            with DayView); Embla owns the horizontal axis. */}
+        <div ref={setViewport} className="flex-1 overflow-hidden touch-pan-y">
+          <div className="flex h-full">
+            {paneKeys.map((key, i) => (
+              <div
+                key={key}
+                className="flex-[0_0_100%] min-w-0 overflow-hidden px-1 flex flex-col"
+                inert={i === CENTER_PANE ? undefined : true}
+              >
+                <MonthGrid
+                  monthKey={key}
+                  ws={ws}
+                  rowH={rowH}
+                  barTop={barTop}
+                  gridH={gridH}
+                  onDayClick={onDayClick}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
