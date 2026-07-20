@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Plus, Users } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { TagChip } from '@/components'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
+import { CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
+import { cn } from '@/lib/cn'
+import InlineCombobox, { comboboxInputClassName, comboboxListClassName } from './InlineCombobox'
 
 const EMPTY_PARTICIPANTS: string[] = []
 
@@ -24,12 +25,16 @@ export default function ParticipantsRow({ participants, onChange, allParticipant
 
   const canAddNew = query.trim().length > 0 && !existing.has(query.trim())
 
+  function close() {
+    setOpen(false)
+    setQuery('')
+  }
+
   function add(name: string) {
     const trimmed = name.trim()
     if (!trimmed || existing.has(trimmed)) return
     onChange([...participants, trimmed])
-    setQuery('')
-    setOpen(false)
+    close()
   }
 
   return (
@@ -43,43 +48,63 @@ export default function ParticipantsRow({ participants, onChange, allParticipant
           onRemove={() => onChange(participants.filter((_, j) => j !== i))}
         />
       ))}
-      <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) setQuery('') }}>
-        <PopoverTrigger asChild>
-          <Badge variant="tag" className="cursor-pointer text-primary bg-primary/12 gap-1">
-            <Plus size={9} />person
-          </Badge>
-        </PopoverTrigger>
-        <PopoverContent className="w-48 p-0" align="start">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="Name…"
-              value={query}
-              onValueChange={setQuery}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && canAddNew) {
-                  e.preventDefault()
-                  add(query)
-                }
-              }}
-            />
-            <CommandList>
-              <CommandEmpty>No suggestions</CommandEmpty>
-              <CommandGroup>
-                {canAddNew && (
-                  <CommandItem value="__new__" onSelect={() => add(query)}>
-                    Add "{query.trim()}"
-                  </CommandItem>
-                )}
-                {filtered.map(p => (
-                  <CommandItem key={p} value={p} onSelect={() => add(p)}>
-                    {p}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+      {open ? (
+        <InlineCombobox
+          open={open}
+          onClose={close}
+          shouldFilter={false}
+          className={cn('w-40', comboboxInputClassName)}
+        >
+          {({ side, maxHeightPx, inputRef }) => (
+            <>
+              <CommandInput
+                ref={inputRef}
+                className="border-b-0"
+                placeholder="Name…"
+                value={query}
+                onValueChange={setQuery}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && canAddNew) {
+                    e.preventDefault()
+                    add(query)
+                  }
+                }}
+              />
+              <CommandList
+                className={comboboxListClassName(side, 'left-0 w-48')}
+                style={{ maxHeight: maxHeightPx }}
+              >
+                <CommandEmpty>No suggestions</CommandEmpty>
+                <CommandGroup>
+                  {canAddNew && (
+                    <CommandItem value="__new__" onSelect={() => add(query)}>
+                      Add "{query.trim()}"
+                    </CommandItem>
+                  )}
+                  {filtered.map(p => (
+                    <CommandItem key={p} value={p} onSelect={() => add(p)}>
+                      {p}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </>
+          )}
+        </InlineCombobox>
+      ) : (
+        <Badge
+          variant="tag"
+          role="button"
+          tabIndex={0}
+          className="cursor-pointer text-primary bg-primary/12 gap-1"
+          onClick={() => setOpen(true)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true) }
+          }}
+        >
+          <Plus size={9} />person
+        </Badge>
+      )}
     </div>
   )
 }
