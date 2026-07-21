@@ -61,6 +61,12 @@ export function parseFiles(
  *  1. Re-pull the backend's copy → overwrite the original path in cache (clean).
  *  2. Write the local content to a timestamped copy on the backend immediately.
  *  3. Cache the copy (clean) and notify the user.
+ *
+ * Returns the copy's path plus a `merges` list of the path+content pairs this
+ * resolved (the re-pulled original, the new copy, or both) — the caller merges
+ * these into the store immediately (see mergeChangedIntoStore) rather than
+ * leaving them to a same-cycle reconcile, which deliberately skips paths this
+ * cycle already resolved (see planReconcile's skipPaths).
  */
 async function resolveCollision(
   backend: StorageBackend,
@@ -68,10 +74,13 @@ async function resolveCollision(
   path: string,
   localContent: string,
   cacheMap?: Map<string, CacheRecord>,
-): Promise<string> {
+): Promise<{ copy: string; merges: Array<{ path: string; content: string }> }> {
+  const merges: Array<{ path: string; content: string }> = []
+
   const [fresh] = await backend.readFiles([path])
   if (fresh) {
     await cacheWriteClean(vaultId, path, fresh.content, fresh.version)
+    merges.push({ path, content: fresh.content })
     if (cacheMap) {
       cacheMap.set(path, {
         vaultPath: `${vaultId}::${path}`,
@@ -92,6 +101,7 @@ async function resolveCollision(
   if (copyFresh) copyVersion = copyFresh.version
 
   await cacheWriteClean(vaultId, copy, localContent, copyVersion)
+  merges.push({ path: copy, content: localContent })
   if (cacheMap && copyVersion !== undefined) {
     cacheMap.set(copy, {
       vaultPath: `${vaultId}::${copy}`,
@@ -104,7 +114,7 @@ async function resolveCollision(
   }
 
   warn(`Conflict on ${path} — your version saved as ${copy}.`)
-  return copy
+  return { copy, merges }
 }
 
 // ── RECONCILE ─────────────────────────────────────────────────
@@ -149,6 +159,28 @@ export function planReconcile(
   return { changed, deleted }
 }
 
+/**
+ * Merge freshly-fetched file records into the store, keeping items/roots for
+ * every other file untouched. Each record's own slug counts as affected
+ * automatically; pass `alsoAffected` for slugs to evict with no replacement
+ * record (e.g. a delete with nothing to parse in its place).
+ */
+function mergeChangedIntoStore(
+  records: Array<{ path: string; content: string }>,
+  alsoAffected: Iterable<string> = [],
+): void {
+  const affectedSlugs = new Set(alsoAffected)
+  for (const r of records) affectedSlugs.add(r.path.replace(/\.(md|yaml|yml)$/, ''))
+
+  const keptItems = getItems().filter(item => !affectedSlugs.has(item.fileSlug))
+  const keptRoots: Roots = new Map(
+    [...getRoots()].filter(([slug]) => !affectedSlugs.has(slug)),
+  )
+
+  const { items: newItems, roots: newRoots } = parseFiles(records)
+  setData({ items: [...keptItems, ...newItems], roots: new Map([...keptRoots, ...newRoots]) })
+}
+
 // Above this many changed paths, a per-file readFiles() fan-out risks the same
 // secondary-rate-limit burst readAll() avoids on initial load — e.g. a
 // collaborator's bulk push, or the first reconcile after a long offline
@@ -185,24 +217,14 @@ export async function reconcileWithBackend(
 
   if (changed.length === 0 && deleted.length === 0) { updateSyncUI(); return }
 
-  // Collect slugs that were changed or deleted so we can evict them from the store.
-  const affectedSlugs = new Set<string>()
-  for (const p of changed) affectedSlugs.add(p.replace(/\.(md|yaml|yml)$/, ''))
-  for (const p of deleted) affectedSlugs.add(p.replace(/\.(md|yaml|yml)$/, ''))
-
-  // Keep items/roots that belong to untouched files.
-  const keptItems = getItems().filter(item => !affectedSlugs.has(item.fileSlug))
-  const keptRoots: Roots = new Map(
-    [...getRoots()].filter(([slug]) => !affectedSlugs.has(slug)),
-  )
-
-  // Parse only the changed files and merge into the kept state.
+  // Parse only the changed files; deleted paths have no replacement record and
+  // are evicted via alsoAffected.
   const changedRecords = changed
     .map(p => cacheMap.get(p))
     .filter((r): r is NonNullable<typeof r> => r != null)
-  const { items: newItems, roots: newRoots } = parseFiles(changedRecords)
+  const deletedSlugs = deleted.map(p => p.replace(/\.(md|yaml|yml)$/, ''))
 
-  setData({ items: [...keptItems, ...newItems], roots: new Map([...keptRoots, ...newRoots]) })
+  mergeChangedIntoStore(changedRecords, deletedSlugs)
   updateSyncUI()
 }
 
@@ -249,6 +271,12 @@ async function pushDirty(
   if (!dirty.length && !tombstones.length) return { hadCollision: false, pushed }
 
   let hadCollision = false
+  // Path+content pairs resolveCollision produced this cycle — merged into the
+  // store below instead of left to a same-cycle reconcile, which skips these
+  // exact paths (see planReconcile's skipPaths) and would otherwise leave the
+  // conflict copy invisible until a later reconcile happens to see it as
+  // changed, or a full restart re-hydrates from cache.
+  const collisionMerges: Array<{ path: string; content: string }> = []
 
   for (const f of dirty) {
     try {
@@ -260,10 +288,11 @@ async function pushDirty(
       pushed.add(f.path)
     } catch (e) {
       if (e instanceof ConflictError) {
-        const copy = await resolveCollision(backend, vaultId, f.path, f.content)
+        const { copy, merges } = await resolveCollision(backend, vaultId, f.path, f.content)
         hadCollision = true
         pushed.add(f.path)
         pushed.add(copy)
+        collisionMerges.push(...merges)
       } else {
         throw e
       }
@@ -293,6 +322,8 @@ async function pushDirty(
       }
     }
   }
+
+  if (collisionMerges.length > 0) mergeChangedIntoStore(collisionMerges)
 
   return { hadCollision, pushed }
 }
