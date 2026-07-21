@@ -184,8 +184,14 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   const handleDelete = () => {
     cancelAutoSave()
+    // A new item's file may already exist (via createdItemRef) even though entry.item is
+    // deliberately kept null — see the comment on createdItemRef above. Fall back to it so
+    // delete works once autosave has created the file. If neither exists yet, there's nothing
+    // to delete — just discard the draft and close.
+    const target = entry.item ?? createdItemRef.current
+    if (!target) { goBack(); return }
     deleteNode(
-      entry.item,
+      target,
       goBack,
       setSeriesSheetConfig,
       () => setSeriesSheetConfig(null),
