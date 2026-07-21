@@ -10,17 +10,36 @@ const PopoverAnchor = PopoverPrimitive.Anchor
 const PopoverContent = React.forwardRef<
   React.ComponentRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'start', sideOffset = 4, style, ...props }, ref) => {
+>(({ className, align = 'start', sideOffset = 4, collisionPadding, style, ...props }, ref) => {
   // Same iOS/iPadOS keyboard issue as dialog.tsx: cap against the visual viewport,
   // not just Radix's own collision detection, so the combobox never renders taller
   // than what's actually visible above the keyboard.
   const viewportHeight = useVisualViewportHeight()
+
+  // The on-screen keyboard shrinks the *visual* viewport but not the *layout*
+  // viewport that Radix's collision detection measures against — so by default a
+  // popover anchored to a low trigger opens straight into the keyboard. Feed the
+  // keyboard-covered strip in as bottom collision padding so Radix flips the
+  // popover above the trigger instead. The input lives at the top of the
+  // Command, so a flipped-up popover keeps it in the visible band.
+  //
+  // The 120px floor distinguishes a real keyboard from the small viewport/layout
+  // delta desktop browsers show (scrollbars, chrome) so those don't add padding.
+  const rawInset =
+    viewportHeight != null && typeof window !== 'undefined'
+      ? window.innerHeight - viewportHeight
+      : 0
+  const keyboardInset = rawInset > 120 ? rawInset : 0
+  const resolvedCollisionPadding =
+    keyboardInset > 0 ? { top: 8, bottom: keyboardInset + 8, left: 8, right: 8 } : collisionPadding
+
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
         ref={ref}
         align={align}
         sideOffset={sideOffset}
+        collisionPadding={resolvedCollisionPadding}
         style={{
           ...(viewportHeight != null ? { maxHeight: `calc(${viewportHeight}px - 2rem)` } : {}),
           ...style,
