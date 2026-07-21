@@ -411,8 +411,20 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     const backend = getActiveBackend()
     if (!backend || backend.readOnly) return
     const slugItems = fileSlugItems(getItems(), fileSlug)
-    if (slugItems.length === 0) { await deleteFromBackend(fileSlug); return }
-    const root        = getRoots().get(fileSlug)
+    const root       = getRoots().get(fileSlug)
+    if (slugItems.length === 0) {
+      // Only genuinely delete when the root is gone too (the real
+      // deleteByFileSlug outcome). getItems()/getRoots() here can be a
+      // snapshot that lags the commit that triggered this call — e.g. a
+      // second setData landing in between — so a root surviving with zero
+      // items is a transient inconsistency, not a real delete. Treating it as
+      // one would silently tombstone a brand-new item whose creating commit
+      // just hadn't landed in this snapshot yet. Skip: a subsequent commit
+      // will write the real content.
+      if (!root) { await deleteFromBackend(fileSlug); return }
+      console.warn('[vault] writeEntityToCache: skipping — root exists but no items yet for', fileSlug)
+      return
+    }
     const frontmatter = collapseToYaml(slugItems, root)
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body)

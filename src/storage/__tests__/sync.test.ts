@@ -94,7 +94,7 @@ vi.mock('@/storage/notifications', () => notifyFns)
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush } from '@/storage/sync'
+import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, writeEntityToCache } from '@/storage/sync'
 import { setActiveBackend } from '@/storage/activeBackend'
 
 // ── FakeBackend ──────────────────────────────────────────────────────────
@@ -525,5 +525,41 @@ describe('flushPendingPush', () => {
 
     expect(backend.writeCallCount).toBe(0)
     expect(backend.statAllCallCount).toBe(0) // pull:false — no reconcile triggered either
+  })
+})
+
+// ── writeEntityToCache — self-heal delete guard ─────────────────────────
+//
+// getItems()/getRoots() here can be a snapshot that lags the commit that
+// triggered the call (e.g. a second setData landing in between), so a slug
+// with zero items but a surviving root must NOT be treated as "the file was
+// deleted" — that would tombstone a brand-new item whose creating commit
+// simply hadn't landed in this snapshot yet. Only a slug with neither items
+// nor a root reflects a real delete.
+
+describe('writeEntityToCache — self-heal delete guard', () => {
+  it('does not tombstone a slug that has no items yet but still has a root (stale snapshot)', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    storeState.items = []
+    storeState.roots = new Map([['note', { title: 'Note', tags: [], items: [] }]])
+
+    await writeEntityToCache('note')
+
+    expect(cacheStore.has(vp('fake-vault', 'note.md'))).toBe(false)
+    expect(notifyFns.notifyError).not.toHaveBeenCalled()
+  })
+
+  it('tombstones a slug that has neither items nor a root (a real delete)', async () => {
+    const backend = new FakeBackend()
+    backend.seed('note.md', 'existing content', 'sha1')
+    setActiveBackend(backend)
+    storeState.items = []
+    storeState.roots = new Map()
+
+    await writeEntityToCache('note')
+
+    const cached = cacheStore.get(vp('fake-vault', 'note.md'))
+    expect(cached?.dirty).toBe(2)
   })
 })
