@@ -53,7 +53,7 @@ interface OccurrenceCardProps {
 }
 
 const titleCls = (isDone: boolean) =>
-  `text-base sm:text-sm font-medium truncate ${isDone ? 'line-through' : ''} text-foreground`
+  `text-sm font-medium truncate ${isDone ? 'line-through' : ''} text-foreground`
 
 function ParticipantAvatars({ participants }: { participants: string[] }) {
   if (!participants.length) return null
