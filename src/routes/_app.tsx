@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import {
   Menu, CalendarCheck2,
@@ -8,6 +8,8 @@ import { useStore } from '@/store'
 import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
+import { onVaultChanged } from '@/storage'
+import { resetAgendaScroll } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar } from '@/components'
 import { Button } from '@/components/ui/button'
@@ -42,6 +44,19 @@ function AppMain() {
   }, [isMobile, setOpenMobile])
 
   const navigate = useNavigate()
+
+  // When a vault activates, discard the previous vault's saved agenda scroll
+  // (its offset/measurements are meaningless for different content) and flag a
+  // scroll-to-today. Registered here — not in AgendaPage — because AppMain stays
+  // mounted across every app route: a vault switch made while in the editor,
+  // month, day, or a list view would otherwise be missed (AgendaPage is
+  // unmounted then), leaving the next agenda visit to restore a stale, cross-
+  // vault offset near the top. AgendaView owns the virtualizer and performs the
+  // actual scroll when the flag is set.
+  useEffect(() => onVaultChanged(() => {
+    resetAgendaScroll()
+    useStore.setState({ scrollToTodayOnce: true })
+  }), [])
 
   const entrySlugMatch = useMatch({ from: '/_app/entry/$slug', shouldThrow: false })
   const entryNewMatch  = useMatch({ from: '/_app/entry/new', shouldThrow: false })
