@@ -2,7 +2,7 @@ import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { ThemeProvider, useTheme } from 'next-themes'
-import { restoreVaults, autoSyncTick, resetSyncBackoff } from '@/storage'
+import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush } from '@/storage'
 import { useStore } from '@/store'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -42,7 +42,14 @@ function Root() {
     const intervalId = setInterval(autoSyncTick, 60_000)
     const onOnline = () => { resetSyncBackoff(); autoSyncTick() }
     const onVisible = () => {
-      if (document.visibilityState !== 'visible') return
+      if (document.visibilityState !== 'visible') {
+        // Best-effort: push anything dirty before the tab is backgrounded (or
+        // closed) instead of waiting up to 60s for the next autoSyncTick.
+        // vault-activation's own flushPendingPush() is the guarantee — this
+        // just narrows the window in the common case.
+        flushPendingPush()
+        return
+      }
       autoSyncTick()
       const day = startOfToday().getTime()
       if (day !== lastActiveDayRef.current) {
@@ -52,10 +59,15 @@ function Root() {
     }
     window.addEventListener('online', onOnline)
     document.addEventListener('visibilitychange', onVisible)
+    // visibilitychange doesn't always fire reliably before a tab/PWA is
+    // actually torn down (notably iOS Safari) — pagehide is the more reliable
+    // "about to go away" signal, so back it up here too.
+    window.addEventListener('pagehide', flushPendingPush)
     return () => {
       clearInterval(intervalId)
       window.removeEventListener('online', onOnline)
       document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('pagehide', flushPendingPush)
     }
   }, [])
 

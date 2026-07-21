@@ -210,6 +210,13 @@ export async function reconcileWithBackend(
 
 let _syncing = false
 let _pushTimer: ReturnType<typeof setTimeout> | null = null
+// Set when a push was requested (scheduleAutoPush's timer firing, or an
+// explicit flushPendingPush()) while a sync was already in flight. runSync's
+// early `if (_syncing) return` would otherwise silently drop that request —
+// there's no rescheduling on that path today — stranding the write until the
+// next 60s autoSyncTick. Re-armed from runSync's `finally` once the in-flight
+// sync settles.
+let _pushQueued = false
 
 // ── BACKOFF STATE ─────────────────────────────────────────────────────
 const BACKOFF_BASE_MS  = 60_000
@@ -356,14 +363,34 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
     }
   } finally {
     _syncing = false
+    // A push that arrived mid-sync was queued (see attemptPush) instead of
+    // dropped — re-arm the debounced push now that this sync has settled.
+    if (_pushQueued) { _pushQueued = false; scheduleAutoPush() }
   }
+}
+
+/** Push pending local changes, or queue the request if a sync is already running. */
+function attemptPush(): void {
+  if (_syncing) { _pushQueued = true; return }
+  void runSync({ silent: true, pull: false })
 }
 
 function scheduleAutoPush(): void {
   const backend = getActiveBackend()
   if (!backend || backend.readOnly) return
   if (_pushTimer) clearTimeout(_pushTimer)
-  _pushTimer = setTimeout(() => { _pushTimer = null; void runSync({ silent: true, pull: false }) }, 1000)
+  _pushTimer = setTimeout(() => { _pushTimer = null; attemptPush() }, 1000)
+}
+
+/**
+ * Push anything still dirty in the cache right now — bypassing the 1s debounce —
+ * without waiting for the next 60s autoSyncTick. Used to rescue writes stranded
+ * by a prior session (vault activation) or about to be stranded by the page
+ * going away (tab hidden/backgrounded). A no-op when nothing is dirty: pushDirty
+ * returns immediately if the cache has no dirty/tombstoned records.
+ */
+export function flushPendingPush(): void {
+  attemptPush()
 }
 
 export function autoSyncTick(): void {

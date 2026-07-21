@@ -8,7 +8,7 @@ setEntityPersistence({
 
 export { restoreVaults, setActiveVault, addLocalVault, addGitHubVault, addGitHubVaultOAuth, removeVault, onVaultChanged } from './vaultRegistry'
 
-export { syncToBackend, autoSyncTick, resetSyncBackoff } from './sync'
+export { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush } from './sync'
 
 export { tokenSave } from './cache'
 

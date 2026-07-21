@@ -94,7 +94,7 @@ vi.mock('@/storage/notifications', () => notifyFns)
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { syncToBackend, autoSyncTick, resetSyncBackoff } from '@/storage/sync'
+import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush } from '@/storage/sync'
 import { setActiveBackend } from '@/storage/activeBackend'
 
 // ── FakeBackend ──────────────────────────────────────────────────────────
@@ -462,5 +462,68 @@ describe('reconcileWithBackend — large changed sets route through readAll()', 
     expect(backend.readFilesCallCount).toBe(1)
     expect(backend.readAllCallCount).toBe(0)
     expect(cacheStore.get(vp('fake-vault', 'note.md'))?.content).toBe('content')
+  })
+})
+
+// ── Debounced push queued (not dropped) while a sync is already running ────
+
+describe('scheduleAutoPush / attemptPush — never strand a push dropped mid-sync', () => {
+  it('queues a push requested while a sync is in flight and retries it once that sync settles', async () => {
+    vi.useFakeTimers()
+    try {
+      const backend = new FakeBackend()
+      setActiveBackend(backend)
+
+      // runSync sets the module-private `_syncing` flag synchronously, before
+      // its first internal await — so this captures the "sync already
+      // running" window without needing to artificially block the backend.
+      const syncPromise = syncToBackend()
+
+      // A dirty write lands (and its debounced auto-push timer fires) while
+      // the first sync above is still in flight. Before this fix, runSync's
+      // `if (_syncing) return` silently dropped this request; it wouldn't be
+      // retried until the next 60s autoSyncTick.
+      seedDirty('fake-vault', 'task.md', 'queued content', undefined)
+      flushPendingPush()
+
+      await syncPromise
+      expect(backend.writeCallCount).toBe(0) // queued, not yet pushed
+
+      await vi.advanceTimersByTimeAsync(1000) // the re-armed debounce timer fires
+
+      expect(backend.writeCallCount).toBe(1)
+      expect(backend.get('task.md')?.content).toBe('queued content')
+      expect(cacheStore.get(vp('fake-vault', 'task.md'))?.dirty).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// ── flushPendingPush ─────────────────────────────────────────────────────
+
+describe('flushPendingPush', () => {
+  it('pushes a pre-seeded dirty file immediately, bypassing the 1s debounce', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    seedDirty('fake-vault', 'task.md', 'rescued content', undefined)
+
+    flushPendingPush()
+    await flush()
+
+    expect(backend.writeCallCount).toBe(1)
+    expect(backend.get('task.md')?.content).toBe('rescued content')
+    expect(cacheStore.get(vp('fake-vault', 'task.md'))?.dirty).toBe(0)
+  })
+
+  it('is a no-op when nothing is dirty', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+
+    flushPendingPush()
+    await flush()
+
+    expect(backend.writeCallCount).toBe(0)
+    expect(backend.statAllCallCount).toBe(0) // pull:false — no reconcile triggered either
   })
 })

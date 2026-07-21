@@ -17,7 +17,7 @@ import type { VaultRef, GitHubVaultRef } from '@/types'
 import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress } from '@/storeBridge'
 import { notify, notifyError } from './notifications'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
-import { reconcileWithBackend, parseFiles, updateSyncUI } from './sync'
+import { reconcileWithBackend, parseFiles, updateSyncUI, flushPendingPush } from './sync'
 // ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
 
 const _vaultChangedListeners = new Set<() => void>()
@@ -87,6 +87,9 @@ async function activateWritableVault(backend: StorageBackend): Promise<void> {
   await setActiveVaultIdentity(backend)
   await hydrateFromCache(backend.id)
   await reconcileWithBackend(backend, backend.id)
+  // Rescue anything a previous session left dirty in the cache instead of
+  // waiting up to 60s for the first autoSyncTick.
+  flushPendingPush()
   emitVaultChanged()
 }
 
