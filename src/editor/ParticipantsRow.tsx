@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Plus, Users } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { TagChip } from '@/components'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
+import { FloatingComboboxList } from '@/components/ui/floating-combobox-list'
+import { useFloatingCombobox } from '@/hooks'
 
 const EMPTY_PARTICIPANTS: string[] = []
 
@@ -16,6 +17,7 @@ interface Props {
 export default function ParticipantsRow({ participants, onChange, allParticipants = EMPTY_PARTICIPANTS }: Props) {
   const [open,  setOpen]  = useState(false)
   const [query, setQuery] = useState('')
+  const { anchorRef, listRef, placement } = useFloatingCombobox(open, o => { setOpen(o); if (!o) setQuery('') })
 
   const existing = new Set(participants.map(p => p.trim()))
 
@@ -43,25 +45,33 @@ export default function ParticipantsRow({ participants, onChange, allParticipant
           onRemove={() => onChange(participants.filter((_, j) => j !== i))}
         />
       ))}
-      <Popover open={open} onOpenChange={o => { setOpen(o); if (!o) setQuery('') }}>
-        <PopoverTrigger asChild>
-          <Badge variant="tag" className="cursor-pointer text-primary bg-primary/12 gap-1">
-            <Plus size={9} />person
-          </Badge>
-        </PopoverTrigger>
-        <PopoverContent className="w-48 p-0" align="start">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="Name…"
-              value={query}
-              onValueChange={setQuery}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && canAddNew) {
-                  e.preventDefault()
-                  add(query)
-                }
-              }}
-            />
+      <div ref={anchorRef} className="inline-block">
+        <Command shouldFilter={false} className="contents">
+          {open ? (
+            <div className="flex items-center rounded-md border border-input bg-background">
+              <CommandInput
+                wrapperClassName="border-b-0"
+                placeholder="Name…"
+                value={query}
+                onValueChange={setQuery}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && canAddNew) {
+                    e.preventDefault()
+                    add(query)
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            <Badge
+              variant="tag"
+              className="cursor-pointer text-primary bg-primary/12 gap-1"
+              onClick={() => setOpen(true)}
+            >
+              <Plus size={9} />person
+            </Badge>
+          )}
+          <FloatingComboboxList placement={placement} listRef={listRef} className="w-48">
             <CommandList>
               <CommandEmpty>No suggestions</CommandEmpty>
               <CommandGroup>
@@ -77,9 +87,9 @@ export default function ParticipantsRow({ participants, onChange, allParticipant
                 ))}
               </CommandGroup>
             </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+          </FloatingComboboxList>
+        </Command>
+      </div>
     </div>
   )
 }

@@ -12,11 +12,12 @@ import { isDimmed, priorityRank, doneKindOrder } from '@/calendar'
 import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/ui/icon-button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
+import { FloatingComboboxList } from '@/components/ui/floating-combobox-list'
 import { getItems, getRoots } from '@/storeBridge'
 import { commitNext } from '@/storeCommit'
 import { matchesQuery } from '@/lib/matching'
+import { useFloatingCombobox } from '@/hooks'
 
 interface Props {
   items:           string[]
@@ -57,6 +58,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const [editText,    setEditText]    = useState('')
   const [exitingEntries, setExitingEntries] = useState<{ row: Row; rect: FlipLeaveRect }[]>([])
   const activeRef = useRef<HTMLDivElement>(null)
+  const { anchorRef, listRef, placement } = useFloatingCombobox(pickerOpen, setPickerOpen)
 
   const occBySlug = useStore(s => s.fom)
   const backlinks = useStore(s => s.backlinks)
@@ -304,27 +306,36 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
           {exitingEntries.map(({ row, rect }) => renderExitingRow(row, rect))}
         </FlipList>
 
-        {/* Add item — half-card affordance, same dimensions as item cards */}
+        {/* Add item — half-card affordance, same dimensions as item cards.
+            The input never moves once opened (see useFloatingCombobox); only
+            the suggestion list floats above or below it. */}
         <div className="flex items-start gap-1">
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger asChild>
-              <Card className="flex-1 flex items-center gap-2 pl-2 pr-2.5 py-2 border-dashed bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground">
-                <Plus size={13} className="shrink-0" />
-                <span className="text-sm">Add item…</span>
-              </Card>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-0" align="start">
-              <Command shouldFilter={false}>
-                <CommandInput
-                  placeholder="Add item or link file…"
-                  value={pickerQuery}
-                  onValueChange={setPickerQuery}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && pickerQuery.trim() && filtered.length === 0) {
-                      addTask(pickerQuery)
-                    }
-                  }}
-                />
+          <div ref={anchorRef} className="flex-1">
+            <Command shouldFilter={false} className="contents">
+              {pickerOpen ? (
+                <div className="rounded-lg border border-input bg-background">
+                  <CommandInput
+                    wrapperClassName="border-b-0"
+                    placeholder="Add item or link file…"
+                    value={pickerQuery}
+                    onValueChange={setPickerQuery}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && pickerQuery.trim() && filtered.length === 0) {
+                        addTask(pickerQuery)
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <Card
+                  className="flex items-center gap-2 pl-2 pr-2.5 py-2 border-dashed bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <Plus size={13} className="shrink-0" />
+                  <span className="text-sm">Add item…</span>
+                </Card>
+              )}
+              <FloatingComboboxList placement={placement} listRef={listRef} className="w-64">
                 <CommandList className="min-h-[12rem]">
                   {pickerQuery.trim() && (
                     <CommandItem
@@ -375,9 +386,9 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                     <CommandEmpty>No files found</CommandEmpty>
                   )}
                 </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+              </FloatingComboboxList>
+            </Command>
+          </div>
           {/* Spacer matching the X button so the card aligns with cards above */}
           <span className="w-5 shrink-0" aria-hidden="true" />
         </div>
