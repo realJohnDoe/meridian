@@ -4,10 +4,9 @@ import type { Roots } from '@/types'
 import { fileEntries } from '@/fileOccurrence'
 import { TagChip } from '@/components'
 import { Badge } from '@/components/ui/badge'
-import { CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 import { matchesQuery } from '@/lib/matching'
-import { cn } from '@/lib/cn'
-import InlineCombobox, { comboboxInputClassName, comboboxListClassName } from './InlineCombobox'
 
 interface Props {
   slugs:           string[]
@@ -56,56 +55,39 @@ export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, on
         )
       })}
       {fileSlug && (
-        pickerOpen ? (
-          <InlineCombobox
-            open={pickerOpen}
-            onClose={() => { setPickerOpen(false); setPickerQuery('') }}
-            shouldFilter={false}
-            className={cn('w-40', comboboxInputClassName)}
-          >
-            {({ side, maxHeightPx, inputRef }) => (
-              <>
-                <CommandInput
-                  ref={inputRef}
-                  className="border-b-0"
-                  placeholder="Search files…"
-                  value={pickerQuery}
-                  onValueChange={setPickerQuery}
-                />
-                <CommandList
-                  className={comboboxListClassName(side, 'left-0 w-64')}
-                  style={{ maxHeight: maxHeightPx }}
-                >
-                  <CommandEmpty>No files found</CommandEmpty>
-                  <CommandGroup>
-                    {filtered.slice(0, 8).map(e => (
-                      <CommandItem
-                        key={e.fileSlug}
-                        value={e.fileSlug}
-                        onSelect={() => handleSelect(e.fileSlug)}
-                      >
-                        {e.title}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </>
-            )}
-          </InlineCombobox>
-        ) : (
-          <Badge
-            variant="tag"
-            role="button"
-            tabIndex={0}
-            className="cursor-pointer text-primary bg-primary/12 gap-1"
-            onClick={() => setPickerOpen(true)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPickerOpen(true) }
-            }}
-          >
-            <Plus size={9} />add to list
-          </Badge>
-        )
+        <Popover open={pickerOpen} onOpenChange={open => { setPickerOpen(open); if (!open) setPickerQuery('') }}>
+          <PopoverTrigger asChild>
+            <Badge
+              variant="tag"
+              className="cursor-pointer text-primary bg-primary/12 gap-1"
+            >
+              <Plus size={9} />add to list
+            </Badge>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-0" align="start">
+            <Command shouldFilter={false}>
+              <CommandInput
+                placeholder="Search files…"
+                value={pickerQuery}
+                onValueChange={setPickerQuery}
+              />
+              <CommandList className="min-h-[12rem]">
+                <CommandEmpty>No files found</CommandEmpty>
+                <CommandGroup>
+                  {filtered.slice(0, 8).map(e => (
+                    <CommandItem
+                      key={e.fileSlug}
+                      value={e.fileSlug}
+                      onSelect={() => handleSelect(e.fileSlug)}
+                    >
+                      {e.title}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
       )}
     </div>
   )
