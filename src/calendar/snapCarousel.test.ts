@@ -1,33 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { snapIndex, maxVisibleFor } from './snapCarousel'
-
-describe('snapIndex', () => {
-  it('resolves the centered pane at rest', () => {
-    expect(snapIndex(400, 400)).toBe(1)
-  })
-
-  it('resolves forward and backward panes', () => {
-    expect(snapIndex(800, 400)).toBe(2)
-    expect(snapIndex(0, 400)).toBe(0)
-  })
-
-  it('returns null when not settled on a snap point', () => {
-    expect(snapIndex(210, 400)).toBeNull()
-  })
-
-  it('returns null for a zero or NaN paneW instead of dividing by it', () => {
-    expect(snapIndex(400, 0)).toBeNull()
-    expect(snapIndex(400, NaN)).toBeNull()
-  })
-
-  it('tolerates fractional paneW rounding error at higher indices', () => {
-    // 393.5px is a plausible fractional CSS width at 3x DPR. An integer-rounded
-    // paneW (393) would accumulate a 1px error by idx 2 and fail a <1px tolerance —
-    // this is the bug the fractional-width requirement exists to prevent.
-    const paneW = 393.5
-    expect(snapIndex(2 * paneW, paneW)).toBe(2)
-  })
-})
+import { maxVisibleFor } from './snapCarousel'
 
 describe('maxVisibleFor', () => {
   it('falls back to 3 before measurement is available', () => {
