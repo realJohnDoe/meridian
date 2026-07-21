@@ -7,22 +7,19 @@ import useEmblaCarousel from 'embla-carousel-react'
 // gesture — finger-synced transform drag, one-page-per-swipe snapping
 // (skipSnaps: false, so even a hard fling can't skip past the adjacent pane),
 // axis-locking (vertical drags pass through to a pane's own scroller), and
-// edge resistance — none of which native CSS scroll-snap could do reliably
-// (Chromium ignores scroll-snap-stop for flings, and its momentum coasts
-// across multiple pages). We drive the route from Embla's events and recenter
-// the pane window after each commit.
+// edge resistance.
 //
-// Timing of the two events matters and is deliberate:
-//   • `select` fires the instant the finger lifts and Embla picks a target
-//     pane — used only to update the preview label immediately, ahead of the
-//     route commit.
-//   • `settle` fires when the snap animation has fully landed, i.e. the target
-//     pane is exactly centered — used to commit the route. Committing here
-//     (not on select) is what lets the recenter below be pixel-identical: the
-//     just-committed pane is already centered, so re-keying the panes and
-//     jumping the window back to center moves nothing on screen.
+// The label preview updates on Embla's `select` (fires the instant the finger
+// lifts and a target pane is locked). The route commits once the snap has
+// landed — on `settle`, OR a short fallback timer if `settle` doesn't arrive
+// (Embla's settle is emitted from its rAF render loop, and we saw it fail to
+// reach us on a real device, which stranded the pane window at ±2 panes and
+// made anything further unreachable by swipe). Committing after the animation
+// (rather than on select) keeps the panes from re-rendering mid-swipe, so the
+// snap animation runs uninterrupted and the post-commit recenter — reInit +
+// jump to center, with the committed pane already centered — moves nothing.
 interface UseCarouselOptions {
-  /** The currently committed unit (e.g. a `YYYY-MM` month key or `YYYY-MM-DD` date key). */
+  /** The route's current unit (e.g. a `YYYY-MM` month key or `YYYY-MM-DD` date key). */
   unitKey: string
   /** Number of simultaneously-mounted panes — must be odd. Expected to be a stable constant. */
   paneCount: number
@@ -32,7 +29,7 @@ interface UseCarouselOptions {
   onCommit: (key: string) => void
   /** Update a preview label from the pane the gesture just picked, ahead of the commit. */
   onPreview: (key: string) => void
-  /** Called after the post-commit recenter — lets the caller clear its preview state now the route is authoritative again. */
+  /** Called after the post-commit recenter — lets the caller clear its preview state. */
   onRecentered?: () => void
 }
 
@@ -41,6 +38,12 @@ interface UseCarouselResult {
   emblaRef: (node: HTMLElement | null) => void
   paneKeys: string[]
 }
+
+// Fallback delay for the commit if Embla's `settle` event doesn't arrive.
+// Comfortably longer than the snap animation so it never commits mid-animation
+// (which would recenter mid-slide and flash). `settle` normally beats it; the
+// timer is insurance so a missed settle can't strand the window at its edge.
+const COMMIT_FALLBACK_MS = 500
 
 export function useCarousel({
   unitKey, paneCount, unitAt, onCommit, onPreview, onRecentered,
@@ -54,7 +57,7 @@ export function useCarousel({
     containScroll: false,   // allow scrolling all the way to the edge panes
     skipSnaps: false,       // one pane per swipe, even on a hard fling
     loop: false,
-    watchSlides: false,     // we reInit manually on unitKey change (below)
+    watchSlides: false,     // panes are keyed off the route; we reInit manually
     duration: 18,           // snap animation speed (Embla units) — snappy but smooth
   })
 
@@ -71,36 +74,44 @@ export function useCarousel({
 
   const paneKeys = Array.from({ length: paneCount }, (_, i) => unitAt(i - center))
 
-  // Preview on select — fires at pointer-release, so the label flips to the
-  // target month/day immediately, before the settle-driven route commit.
   useEffect(() => {
     if (!emblaApi) return
-    const onSelect = () => {
-      const sel = emblaApi.selectedScrollSnap()
-      if (sel === center) return
-      onPreviewRef.current(unitAtRef.current(sel - center))
-    }
-    emblaApi.on('select', onSelect)
-    return () => { emblaApi.off('select', onSelect) }
-  }, [emblaApi, center])
+    let fallbackId: ReturnType<typeof setTimeout> | undefined
 
-  // Commit on settle — the animation has landed, target pane is exactly
-  // centered. The center guard also makes the recenter's own settle a no-op.
-  useEffect(() => {
-    if (!emblaApi) return
-    const onSettle = () => {
-      const sel = emblaApi.selectedScrollSnap()
-      if (sel === center) return
-      onCommitRef.current(unitAtRef.current(sel - center))
+    // Commit the settled pane's unit. Guarded so the recenter's own
+    // scrollTo(center) — which lands on the center pane — is a no-op, and so a
+    // stray fire while already centered does nothing.
+    const commit = () => {
+      clearTimeout(fallbackId)
+      const offset = emblaApi.selectedScrollSnap() - center
+      if (offset === 0) return
+      onCommitRef.current(unitAtRef.current(offset))
     }
-    emblaApi.on('settle', onSettle)
-    return () => { emblaApi.off('settle', onSettle) }
+
+    const onSelect = () => {
+      const offset = emblaApi.selectedScrollSnap() - center
+      if (offset === 0) return
+      onPreviewRef.current(unitAtRef.current(offset))
+      // Commit when the snap settles; the timer is a fallback if `settle`
+      // doesn't arrive. A follow-up swipe reschedules it, so during a rapid
+      // burst the commit waits for the last swipe.
+      clearTimeout(fallbackId)
+      fallbackId = setTimeout(commit, COMMIT_FALLBACK_MS)
+    }
+
+    emblaApi.on('select', onSelect)
+    emblaApi.on('settle', commit)
+    return () => {
+      clearTimeout(fallbackId)
+      emblaApi.off('select', onSelect)
+      emblaApi.off('settle', commit)
+    }
   }, [emblaApi, center])
 
   // Recenter seam: once the committed unit changes, the keyed panes have
   // shifted so the just-committed pane sits at `center`. reInit picks up the
-  // new pane set and the jump to center lands on the identical pixel position
-  // (the committed pane was already centered at settle), so nothing visibly
+  // new pane set and the jump to center lands on the identical pixel (the
+  // committed pane was already centered at commit time), so nothing visibly
   // moves. Layout effect → runs before paint.
   useLayoutEffect(() => {
     if (!emblaApi) return
