@@ -17,6 +17,17 @@ let saved: { offset: number; measurements: VirtualItem[] } = { offset: 0, measur
 type AgendaVirtualizer = Virtualizer<HTMLDivElement, Element>
 
 /**
+ * Discards the saved scroll snapshot. Call when the content the snapshot refers
+ * to is no longer valid — notably on a vault change: the old vault's offset and
+ * measured section sizes are meaningless for a different vault's agenda, and
+ * restoring them lands the user at an arbitrary position (often near the top,
+ * showing months-old done tasks). Pairs with setting `scrollToTodayOnce`.
+ */
+export function resetAgendaScroll(): void {
+  saved = { offset: 0, measurements: [] }
+}
+
+/**
  * Returns the values to seed `useVirtualizer` with so a remount restores the
  * previous scroll position. Call **before** creating the virtualizer.
  *
