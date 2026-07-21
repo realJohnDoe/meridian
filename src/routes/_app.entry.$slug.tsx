@@ -1,18 +1,13 @@
 import { lazy, Suspense, useMemo } from 'react'
-import { createPortal } from 'react-dom'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Heart, Trash2 } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor'
 import { expandRange, weekStartsOn } from '@/model'
 import { isEditScope } from '@/types'
-import { SyncButton } from '@/components'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useSidebar } from '@/components/ui/sidebar'
-import { cn } from '@/lib/cn'
-import { useTopbarSlot } from './-topbarSlot'
-import { topbarEdgePadding } from './-topbarEdgePadding'
+import { EntryTopbar } from './-entryTopbar'
 import type { Occurrence, EditScope } from '@/types'
 
 const EditorShell = lazy(() => import('@/editor').then(m => ({ default: m.EditorShell })))
@@ -35,43 +30,6 @@ export const Route = createFileRoute('/_app/entry/$slug')({
     scope: isEditScope(s.scope) ? s.scope : undefined,
   }),
 })
-
-interface TopbarProps {
-  isFavorited: boolean
-  onToggleFavorite: () => void
-  onDelete: () => void
-  onBack: () => void
-}
-
-function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack }: TopbarProps) {
-  const slotEl = useTopbarSlot()
-  const { isMobile } = useSidebar()
-  if (!slotEl) return null
-  return createPortal(
-    // Right edge always leads with an icon button; left edge only does on mobile (back button) —
-    // desktop hides it, leaving nothing leading the left edge.
-    <div className={cn('flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto', topbarEdgePadding(isMobile, true))}>
-      <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 lg:hidden" onClick={onBack} title="Back" aria-label="Back">
-        <ArrowLeft size={18} />
-      </Button>
-      <div className="flex-1" />
-      <SyncButton />
-      <Button
-        variant="ghost" size="icon"
-        className={cn('rounded-full shrink-0', isFavorited ? 'text-rose-400' : 'text-dim')}
-        onClick={onToggleFavorite}
-        title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-        aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-      >
-        <Heart size={18} className={isFavorited ? 'fill-current' : ''} />
-      </Button>
-      <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete" aria-label="Delete">
-        <Trash2 size={18} />
-      </Button>
-    </div>,
-    slotEl,
-  )
-}
 
 function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
   const items          = useStore(s => s.items)

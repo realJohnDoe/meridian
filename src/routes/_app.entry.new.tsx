@@ -1,13 +1,10 @@
 import { lazy, Suspense, useMemo } from 'react'
-import { createPortal } from 'react-dom'
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor'
-import { SyncButton } from '@/components'
-import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useTopbarSlot } from './-topbarSlot'
+import { titleToSlug } from '@/fileIO'
+import { EntryTopbar } from './-entryTopbar'
 
 const EditorShell = lazy(() => import('@/editor').then(m => ({ default: m.EditorShell })))
 
@@ -44,29 +41,27 @@ export const Route = createFileRoute('/_app/entry/new')({
   }),
 })
 
-function NewEntryTopbar({ onBack }: { onBack: () => void }) {
-  const slotEl = useTopbarSlot()
-  if (!slotEl) return null
-  return createPortal(
-    <div className="flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto px-3.5">
-      <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 lg:hidden" onClick={onBack} title="Back" aria-label="Back">
-        <ArrowLeft size={18} />
-      </Button>
-      <div className="flex-1" />
-      <SyncButton />
-    </div>,
-    slotEl,
-  )
-}
-
 function NewEntryReady({ title, date, time, duration, itemType }: NewEntrySearch) {
-  const items = useStore(s => s.items)
-  const roots = useStore(s => s.roots)
+  const items          = useStore(s => s.items)
+  const roots          = useStore(s => s.roots)
+  const favorites      = useStore(s => s.favorites)
+  const toggleFavorite = useStore(s => s.toggleFavorite)
   const hooks = useEntryEditor(null, 'all', title, { date, time, duration, itemType })
+
+  // A brand-new item has no file yet, but once it has a title its eventual fileSlug is
+  // already determined (see save.ts's `fileSlug = item?.fileSlug ?? titleToSlug(title)`),
+  // so favoriting can target that slug immediately rather than waiting for autosave.
+  const effectiveSlug = hooks.entry.item?.fileSlug ?? (hooks.entry.title ? titleToSlug(hooks.entry.title) : null)
+  const isFavorited = !!effectiveSlug && favorites.includes(effectiveSlug)
 
   return (
     <>
-      <NewEntryTopbar onBack={hooks.handleClose} />
+      <EntryTopbar
+        isFavorited={isFavorited}
+        onToggleFavorite={effectiveSlug ? () => toggleFavorite(effectiveSlug) : null}
+        onDelete={hooks.handleDelete}
+        onBack={hooks.handleClose}
+      />
       <Suspense fallback={<EntrySkeleton />}>
         <EditorShell entry={hooks.entry} hooks={hooks} items={items} roots={roots} />
       </Suspense>
