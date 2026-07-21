@@ -16,8 +16,13 @@ minimumReleaseAge: 1440
 # Force patched versions of vulnerable transitive dependencies.
 # esbuild <0.28.1 has GHSA-gv7w-rqvm-qjhr (missing binary integrity in Deno
 # module, RCE via NPM_CONFIG_REGISTRY). All paths run through vite.
+# brace-expansion has GHSA-3jxr-9vmj-r5cp (DoS via exponential-time expansion
+# of consecutive non-expanding {} groups). Pulled in transitively (dev-only,
+# via vite-plugin-pwa and the eslint toolchain) at two vulnerable major lines.
 overrides:
   esbuild: ">=0.28.1"
+  brace-expansion@2: ">=2.1.2 <3.0.0"
+  brace-expansion@5: ">=5.0.7 <6.0.0"
 
 # allowBuilds: explicit allowlist for packages permitted to run install-time
 # build scripts. Only add packages here after reviewing what the script does.
