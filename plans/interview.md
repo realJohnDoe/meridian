@@ -9,16 +9,38 @@ A. Origin & motivation (the "why")
    Personally, I used Obsidian for notes, the TaskNotes plugin for my own tasks, Todoist for tasks shared with my wife, and Proton Calendar for events. However, I don't like Todoist being able to do whatever they want with my private data and Proton Calendar had some features missing that we need regularly, e.g. moving or cancelling single series occurrences. I really liked the wikilink in Obsidian and I am a big fan of tags, but I always wanted a system where tags are first class citizens, i.e. also notes that can have their own description and also tags. In Meridian, this turned into the 'everything is a list' mindset in the end.
 
 3. Was there a particular thing that no existing tool did — the one feature that justified building from scratch rather than adopting an existing app?
+
+   As mentioned above in 2: Tags as first class citizens
+
 4. Who is Meridian for — just you, or a specific kind of person? Who did you have in mind?
+
+   People who like Obsidian but are not satisfied with it's mobile task / calendar capabilities.
+
 5. How long have you been using it yourself, and what do you use it for day-to-day now?
+
+   I started using it experimentally 2 months ago and am using it for tasks productively since 1 month, still fixing bugs and ironing out edges and corners regularly. For the calendar, we have not migrated away from Proton yet.
 
 B. Product
 
 6. If you had to explain Meridian to a friend in one sentence (not the README tagline), what would you say?
+
+   That one is really hard because Meridian is really about the unique combination of mostly existing features. Maybe "It allows you to structure your tasks very flexibly by attaching them to multiple other items, like calendar events, notes, or other tasks". Or "it allows you to manage tasks and calendar events from a single place without giving up privacy" (like you have to when using Google Calendar)
+
 7. The README calls it "a calm calendar." What does calm mean to you here — what did you deliberately leave out to keep it calm?
+
+   I did not think about this concretely yet. But I think avoiding switching between different apps contributes to it. I also like to have it as a guideline for the UI style.
+
 8. What's the single most-used feature for you personally?
+   1. Quickly adding a task.
+   2. Adding a task to a list / an event.
+
 9. What's a workflow in Meridian that would feel impossible or clumsy in Google Calendar / Todoist?
+
+   We have a list called 'This Week' where we put tasks that we don't want to schedule on a specific day yet but aim to close them this week. Sometimes, those tasks also belong to another list. For example, we would like to cook Pizza this week, so 'Pizza' will be a task that is linked on both 'Cooking' and 'This Week'. The only other system which can model this are tags, but then we are back to my point above regarding tags as first-class citicens.
+
 10. Is Meridian "done," or what's the current rough edge you're most aware of?
+
+    It is 'mostly feature-complete'. There are a few things like other storage options or using color for participants instead of types / priorities but mostly it is about bugfixing now.
 
 C. Philosophy
 
