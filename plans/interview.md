@@ -51,11 +51,42 @@ B. Product
 C. Philosophy
 
 11. The README's first principle is "different concepts, different lifespans." Where did that idea come from — did you discover it while building, or start with it?
+
+    I noticed the parallels between task scheduling and calendar events, and was wondering why no existing app except Google Calendar exploits this.
+    Of course, Obsidian and it's TaskNotes plugin also contributed to this way of thinking and showed me how much can be done with just markdown + frontmatter yaml.
+
 12. "Lists model hierarchies" and "a task is a list with a done property" is a genuinely unusual mental model. How would you defend it to a skeptic who thinks it's over-abstraction?
+
+    When I started Meridian, I supported tags and had wikilink tags, which implemented the 'tags as first-class citizens' mentioned above.
+    I also found backlinks are a feature that is underexplored so far, so each page had a prominent backlink section at the bottom.
+    But this raised the question: Since wikilink-tags are usually more important than just wikilinks inside the description, should they both appear in the backlink section? Should they be visually separated?
+    And I thought: Maybe some users don't even know about wikilinks and backlinks yet and to them, those might be quite abstract concepts. On the other hand. Everybody knows lists and has used them.
+    So why not just say: Everything is a list and instead of tags, we display all the lists an item is listed on. This is what Meridian does now.
+
+    Futhermore, Most Todo Apps have some notion of projects or subtasks. Lists are just a generalization of this which does not require you to answer the question "Is this a task, a subtask or a project". You only need to answer the question "Is this done at some point and do you want to track if its done?" which I find more pragmatic.
+
 13. Why Markdown specifically, over a database or JSON or a proprietary format? What's the emotional core of "it's yours"?
+
+    I always found markdown hits quite a sweet spot between technical systems and being user-friendly and even understandable to non-techies.
+    Obsidian showed me how much can be done with just markdown.
+    There is just some elegant and pragmatic charme about being able to open a file and understand it, without requiring some special program to open a database.
+    And with AI and LLMs now all over the place, markdown seems to become even more important.
+
 14. Have you ever actually needed the "read the file to debug it" property in real life? A story here would land well.
+
+    Yepp, a lot. Meridian's recurrence schema is quite sophisticated, and because all the code was written with AI, there were a lot of bugs to hunt down.
+    I even wrote a separate debug page to visualize how the yaml is converted to repeat patterns and single occurrences, and how the repeat patterns are expanded.
+    In the beginning, moving occurrences to different times did not work properly, cancelling occurrences sometimes did not work, or an expansion would end on the wrong date.
+    As mentioned, there were _many_ bugs.
+
 15. How much does the "LLM-friendly format" angle matter to you personally vs. it being a nice bonus? (I'll weight it accordingly.)
+
+    It is more of a nice bonus.
+
 16. Do you see Markdown-first as a philosophical/ethical stance (data ownership, longevity) or a practical one (sync, tooling)? Or both?
+
+    I think longevity and data ownership are practical stances: Once the owner of the platform starts to monetize it in ways that you don't like, lock-in becomes a real problem.
+    And history tells us this happens sooner or later for most platforms.
 
 D. Architecture
 
