@@ -28,10 +28,11 @@ B. Product
 6. If you had to explain Meridian to a friend in one sentence (not the README tagline), what would you say?
 
    That one is really hard because Meridian is really about the unique combination of mostly existing features. Maybe "It allows you to structure your tasks very flexibly by attaching them to multiple other items, like calendar events, notes, or other tasks". Or "it allows you to manage tasks and calendar events from a single place without giving up privacy" (like you have to when using Google Calendar)
+   Thinking about 3, maybe 'The Todo / calendar app that adapts to how you think'?
 
 7. The README calls it "a calm calendar." What does calm mean to you here — what did you deliberately leave out to keep it calm?
 
-   I did not think about this concretely yet. But I think avoiding switching between different apps contributes to it. I also like to have it as a guideline for the UI style.
+   I did not think about this concretely yet. But I think avoiding switching between different apps contributes to it. I also like to have it as a guideline for the UI style. Part of it is also that I like to run it as an open source project and not as a paid product which might require some more aggressive branding.
 
 8. What's the single most-used feature for you personally?
    1. Quickly adding a task.
@@ -40,10 +41,12 @@ B. Product
 9. What's a workflow in Meridian that would feel impossible or clumsy in Google Calendar / Todoist?
 
    We have a list called 'This Week' where we put tasks that we don't want to schedule on a specific day yet but aim to close them this week. Sometimes, those tasks also belong to another list. For example, we would like to cook Pizza this week, so 'Pizza' will be a task that is linked on both 'Cooking' and 'This Week'. The only other system which can model this are tags, but then we are back to my point above regarding tags as first-class citicens.
+   See also 3 for some more examples.
 
 10. Is Meridian "done," or what's the current rough edge you're most aware of?
 
     It is 'mostly feature-complete'. There are a few things like other storage options or using color for participants instead of types / priorities but mostly it is about bugfixing now.
+    I am also thinking about multi-vault support or iCal import / sync.
 
 C. Philosophy
 
