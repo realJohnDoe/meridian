@@ -29,22 +29,6 @@ This is one of the healthiest UI layers surveyed: quality gates all pass (build 
 
 ## 4. Findings
 
-### #3 — "Remove vault" discards unsynced changes with no confirmation
-
-`ux` · **Impact 6** · **Breadth 1** · **Effort S**
-
-- **Evidence:** `src/components/VaultSettings.tsx:141` — `onClick={() => removeVault(vault.id)}`; `removeVault` calls `cacheDeleteAll(id)` (`src/storage/vaultRegistry.ts:315`), which drops the IndexedDB cache including dirty, never-synced edits.
-- **Problem:** the app's most destructive action is one tap with no confirm and no undo, while the far less destructive entry deletion gets both a confirmation dialog and an undo toast — an inconsistent destructive-action pattern on a data-loss path.
-- **Fix:** reuse the existing `alert-dialog`/`DeleteDialog` pattern, and mention pending unsynced changes (`syncDirtyCount`) in the prompt when the vault is active.
-
-### #5 — Raw Tailwind palette colors bypass the theme system in 3 places
-
-`styling` `a11y` · **Impact 4** · **Breadth 3** (grep `(text|bg|border)-(rose|yellow|indigo|…)-[0-9]` excluding `debug/`: exactly 3 hits) · **Effort S**
-
-- **Evidence:** `src/calendar/OverdueSection.tsx:18` — `'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-yellow-500',`; also `src/components/ui/badge.tsx:13` (`bg-indigo-500/15 text-indigo-400`) and `src/routes/_app.entry.$slug.tsx:56` (`text-rose-400`).
-- **Problem:** these fixed palette colors ignore the six-theme token system (violating `index.css` convention §3) and have poor contrast on the three light themes — `text-yellow-500` for the "Overdue" heading is near-illegible on Solarized Light, and semantic tokens (`--warning`, `--primary`, `--destructive`) already exist for all three.
-- **Fix:** swap to `text-warning`, a token-based badge variant, and a token color for the favorited heart.
-
 ### #6 — No component tests outside `editor/`, despite a working harness
 
 `testing` `toolchain` · **Impact 5** · **Breadth ~25 est.** (find `*.test.*`: `components/` 0 of 10 components, `calendar/` 0 component tests — only 2 pure-helper tests, `search/` 0, `onboarding/` 0, `hooks/` 0; `editor/` has 7) · **Effort L**
@@ -52,22 +36,6 @@ This is one of the healthiest UI layers surveyed: quality gates all pass (build 
 - **Evidence:** `find src -name "*.test.*"` → `3 src, 2 src/calendar, 5 src/editor, 1 src/editor/cm, 1 src/editor/dialogs, 11 src/model/__tests__, …` — nothing under `src/components` or `src/search`.
 - **Problem:** the RTL + jsdom setup exists and works (`EditorShell.test.tsx`, `RepeatDialog.test.tsx` prove the pattern), but the most-reused component (`OccurrenceCard` — rendered by agenda, day, search, wikilink popup, and items list) and the entire calendar/search surface have zero regression coverage; the DaySection `propsAreEqual` comparator and `ItemsList` sort/exit-animation logic are exactly the kind of logic that silently breaks.
 - **Fix:** start with `OccurrenceCard` (prop-matrix render test) and `DaySection.propsAreEqual`; grow outward from the highest-fan-in components rather than aiming for blanket coverage.
-
-### #7 — Segmented-pill control styling duplicated instead of a `cva` variant
-
-`styling` `dry` · **Impact 3** · **Breadth 2** (grep `data-[state=on]:bg-background`: `EntryEditor.tsx:245`, `DurationDialog.tsx:208`; container string `rounded-full p-0.75 border border-input` duplicated at both call sites too) · **Effort S**
-
-- **Evidence:** `src/editor/dialogs/DurationDialog.tsx:208` — `'data-[state=on]:bg-background data-[state=on]:text-secondary-foreground data-[state=on]:[box-shadow:0_1px_4px_rgb(0_0_0/.35)]',`
-- **Problem:** the app's signature segmented control (type selector, interval/end-date tabs) is two hand-copied multi-line class strings; the project's own convention (`index.css` §2) says repeated variant patterns become `cva` in `components/ui/` — RepeatDialog's hand-styled option buttons (lines 379–390) show a third spot already drifting from the pattern.
-- **Fix:** a `segmentedGroup`/`segmentedItem` cva pair in `components/ui/` used by both ToggleGroups.
-
-### #8 — "Number + unit" input block triplicated across dialogs
-
-`dry` · **Impact 3** · **Breadth 2** (3 sites: RepeatDialog lines 307–332 and 442–467, DurationDialog lines 240–258 — same `value={n === 0 ? '' : n}`, `onFocus select`, `Math.max(1, parseInt)`, unit `Select`) · **Effort S**
-
-- **Evidence:** `src/editor/dialogs/RepeatDialog.tsx:318` — `setIntervalNum(Math.max(1, parseInt(val, 10) || 1));` with the near-identical block at line 453 (`setCompletionNum(...)`) and DurationDialog:248.
-- **Problem:** three hand-copied ~20-line "repeats every N units" widgets with subtly independent clamping/empty-state logic — a fix to one (e.g. the `0`-means-empty dance) won't reach the others.
-- **Fix:** extract a `NumberUnitInput` component in `editor/dialogs/` (or `components/ui/`) taking `{n, unit, units, onChange}`.
 
 ### #9 — Imperative ref-channel plumbing between `useEntryEditor` and `EntryEditor`
 
