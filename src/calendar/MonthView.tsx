@@ -6,6 +6,7 @@ import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { useCarousel } from './useCarousel'
 import { PANE_COUNT } from './snapCarousel'
+import { occPillRounded } from '@/components/ui/occurrence-variants'
 
 // Fallback for the occurrence-list start offset until it's measured (cell top padding
 // 3px + badge h-5 20px + badge mb-px 1px + the 8px flex gap inherited from Button).
@@ -109,7 +110,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       <div
         ref={rowSentinelRef}
         aria-hidden
-        className="invisible absolute pointer-events-none flex items-center rounded-sm sm:rounded-md px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium"
+        className={cn('invisible absolute pointer-events-none flex items-center px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium', occPillRounded)}
       >
         &nbsp;
       </div>

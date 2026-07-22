@@ -45,6 +45,15 @@ export const occBarVariants = cva(
 export type OccBarVariants = VariantProps<typeof occBarVariants>
 
 /**
+ * Shared small corner radius for occurrence "pill" elements — month-view day
+ * cell chips/bars and day-view all-day items. Kept in one place so the two
+ * views can't drift apart the way they did when month view's chips were
+ * bumped to rounded-sm/md without updating this radius (see git history on
+ * MonthGrid.tsx) — they ended up more rounded than their day-view counterpart.
+ */
+export const occPillRounded = 'rounded-xs sm:rounded-sm'
+
+/**
  * Mini colour-coded label bars in MonthView calendar cells.
  * Past events and done tasks show struck through.
  */

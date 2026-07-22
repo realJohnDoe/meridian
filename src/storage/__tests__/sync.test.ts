@@ -236,6 +236,17 @@ describe('pushDirty — write-conflict collision', () => {
     expect(cacheStore.get(vp('fake-vault', 'task.md'))?.content).toBe('remote v2')
     expect(cacheStore.get(vp('fake-vault', copyPath!))?.dirty).toBe(0)
 
+    // Both the reverted original and the new conflict copy must be visible in
+    // the store immediately — not just the cache — since a same-cycle
+    // reconcile deliberately skips paths this cycle already resolved (see
+    // planReconcile's skipPaths) and would otherwise leave them invisible
+    // until a later reconcile or a full restart re-hydrate.
+    const taskRoot = storeState.roots.get('task') as { body?: string } | undefined
+    expect(taskRoot?.body).toBe('remote v2')
+    const copySlug = copyPath!.replace(/\.md$/, '')
+    const copyRoot = storeState.roots.get(copySlug) as { body?: string } | undefined
+    expect(copyRoot?.body).toBe('local edit')
+
     expect(notifyFns.warn).toHaveBeenCalledTimes(1)
     expect(notifyFns.warn.mock.calls[0][0]).toContain('task.md')
 

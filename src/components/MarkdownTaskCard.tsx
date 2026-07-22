@@ -39,7 +39,9 @@ export default function MarkdownTaskCard({
             // eslint-disable-next-line jsx-a11y/no-autofocus -- opens in response to a user click (promote to inline edit), not on page load
             autoFocus
             variant="ghost"
-            className="flex-1 text-base sm:text-sm font-medium"
+            // leading-5 fixes line-height in px (not em) so the row doesn't grow when the
+            // font bumps to 16px on mobile — see text-base comment below.
+            className="flex-1 text-base sm:text-sm leading-5 font-medium"
             value={editValue}
             onChange={e => onEditChange?.(e.target.value)}
             onBlur={onEditCommit}
@@ -51,13 +53,13 @@ export default function MarkdownTaskCard({
         ) : onClickText ? (
           <button
             type="button"
-            className={`flex-1 min-w-0 text-left text-base sm:text-sm font-medium truncate cursor-pointer ${done ? 'line-through' : 'text-foreground'}`}
+            className={`flex-1 min-w-0 text-left text-sm leading-5 font-medium truncate cursor-pointer ${done ? 'line-through' : 'text-foreground'}`}
             onClick={onClickText}
           >
             {text}
           </button>
         ) : (
-          <span className={`flex-1 text-base sm:text-sm font-medium truncate ${done ? 'line-through' : 'text-foreground'}`}>
+          <span className={`flex-1 text-sm leading-5 font-medium truncate ${done ? 'line-through' : 'text-foreground'}`}>
             {text}
           </span>
         )}
