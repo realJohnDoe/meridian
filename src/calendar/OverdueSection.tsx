@@ -20,7 +20,7 @@ function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
   return (
     <FlipList items={items} itemAttr="data-occ-key">
       <div className={cn(
-        'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-yellow-500',
+        'px-3.5 pt-3.5 pb-1.5 text-xs font-bold tracking-[.08em] uppercase text-warning',
         'flex items-center gap-2 bg-background',
         'after:content-[""] after:flex-1 after:h-px after:bg-border',
       )}>Overdue</div>

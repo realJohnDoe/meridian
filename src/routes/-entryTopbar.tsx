@@ -31,7 +31,7 @@ export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack }:
       <SyncButton />
       <Button
         variant="ghost" size="icon"
-        className={cn('rounded-full shrink-0', isFavorited ? 'text-rose-400' : 'text-dim')}
+        className={cn('rounded-full shrink-0', isFavorited ? 'text-destructive' : 'text-dim')}
         onClick={onToggleFavorite ?? undefined}
         disabled={!onToggleFavorite}
         title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
