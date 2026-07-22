@@ -7,6 +7,7 @@ import { isSeries } from '@/types'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { segmentedGroupVariants, segmentedItemVariants } from '@/components/ui/segmented-group'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
@@ -225,18 +226,13 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
               type="single"
               value={itemType}
               onValueChange={(v) => { if (v) onTypeChange?.(v as ItemType) }}
-              className="flex gap-0.75 mb-4 bg-secondary rounded-full p-0.75 border border-input w-fit"
+              className={cn(segmentedGroupVariants(), 'mb-4')}
             >
               {(['task', 'event', 'note'] as ItemType[]).map(t => (
                 <ToggleGroupItem
                   key={t}
                   value={t}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium text-muted-foreground',
-                    'cursor-pointer transition-all whitespace-nowrap capitalize h-auto min-w-0',
-                    'data-[state=on]:bg-background data-[state=on]:text-secondary-foreground data-[state=on]:[box-shadow:0_1px_4px_rgb(0_0_0/.35)]',
-                    TYPE_CHIP_ACTIVE_CLS[t],
-                  )}
+                  className={cn(segmentedItemVariants(), 'capitalize', TYPE_CHIP_ACTIVE_CLS[t])}
                 >
                   {t === 'task' && <CheckSquare size={13} />}
                   {t === 'event' && <CalendarDays size={13} />}

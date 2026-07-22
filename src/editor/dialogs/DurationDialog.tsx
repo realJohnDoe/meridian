@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/responsive-modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { segmentedGroupVariants, segmentedItemVariants } from '@/components/ui/segmented-group'
 import { badgeVariants } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
@@ -158,17 +159,13 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
               type="single"
               value={tab}
               onValueChange={(v) => { if (v) switchTab(v as Tab) }}
-              className="flex gap-0.75 bg-secondary rounded-full p-0.75 border border-input w-fit"
+              className={segmentedGroupVariants()}
             >
               {(['interval', 'endDate'] as Tab[]).map(t => (
                 <ToggleGroupItem
                   key={t}
                   value={t}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium text-muted-foreground',
-                    'cursor-pointer transition-all whitespace-nowrap h-auto min-w-0',
-                    'data-[state=on]:bg-background data-[state=on]:text-secondary-foreground data-[state=on]:[box-shadow:0_1px_4px_rgb(0_0_0/.35)]',
-                  )}
+                  className={segmentedItemVariants()}
                 >
                   {getChipLabel(t)}
                 </ToggleGroupItem>
