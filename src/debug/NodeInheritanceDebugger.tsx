@@ -14,7 +14,7 @@ import {
 } from '@/model'
 import { loadFile } from '@/fileIO'
 import type { Occurrence, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern, OccurrenceMetadata } from '@/types'
-import { EntryEditor, DialogStack, RepeatDialog, applyScope, entryFromOccurrence } from '@/editor'
+import { EntryEditor, DialogStack, RepeatDialog, applyScope, entryFromOccurrence, usePendingLinks } from '@/editor'
 import type { EntryState, DialogHandlers } from '@/editor'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
@@ -320,6 +320,7 @@ export default function NodeInheritanceDebugger() {
   const [debugEntry,        setDebugEntry]        = useState<EntryState | null>(null)
   const [patternDialogOpen, setPatternDialogOpen] = useState(false)
   const { handlers: dialogHandlers, openDialog, openRepeatDialog } = useDebugDialogHandlers(setDebugEntry)
+  const debugPendingLinks = usePendingLinks(debugEntry?.item ?? null, debugEntry?.title ?? '')
 
   // ── Effective tree for viz column — re-derived from displayContent ────────
   const results = useMemo<EffectiveNode | null>(() => {
@@ -729,6 +730,7 @@ export default function NodeInheritanceDebugger() {
                 onOpenDlg={openDialog}
                 onOpenRepeatDlg={openRepeatDialog}
                 onScopeChange={handleDebugScopeChange}
+                pendingLinks={debugPendingLinks}
                 items={items}
                 roots={debugRoots}
               />
