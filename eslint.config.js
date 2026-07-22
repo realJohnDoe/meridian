@@ -135,12 +135,14 @@ export default [
       //    the target lists every OTHER feature dir as the restriction source.
       //
       // Global exceptions (always allowed as deep imports):
-      //   @/components/ui/** — shadcn primitives, always consumed as deep paths.
-      //   @/lib/**           — utility leaf, no barrel (lib/ has no index.ts).
-      //   react-dom/client   — node_modules deep import needed at the entry point.
+      //   @/components/ui/**              — shadcn primitives, always consumed as deep paths.
+      //   @/lib/**                        — utility leaf, no barrel (lib/ has no index.ts).
+      //   react-dom/client                — node_modules deep import needed at the entry point.
+      //   @testing-library/jest-dom/vitest — node_modules deep import; the subpath is how
+      //     jest-dom registers its matchers on vitest's `expect` (see test-utils/setup.ts).
       'import-x/no-internal-modules': [
         'error',
-        { allow: ['@/components/ui/**', '@/lib/**', 'react-dom/client'] },
+        { allow: ['@/components/ui/**', '@/lib/**', 'react-dom/client', '@testing-library/jest-dom/vitest'] },
       ],
 
       // For each barrel module, forbid deep imports into it from any OTHER

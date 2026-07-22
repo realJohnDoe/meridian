@@ -49,7 +49,7 @@ describe('beginSwipeDelete', () => {
 
     expect(items().find(i => i.id === 'occ-1')).toBeUndefined()
     expect(persistence.deletes).toEqual([])
-    expect(screen.getByText('Deleted: Standup')).toBeTruthy()
+    expect(screen.getByText('Deleted: Standup')).toBeInTheDocument()
 
     act(() => { vi.advanceTimersByTime(4100) })
 
@@ -147,6 +147,6 @@ describe('beginSwipeDelete', () => {
     act(() => apply())
     flushToastMount()
 
-    expect(screen.getByText(/this series only repeats after completion/)).toBeTruthy()
+    expect(screen.getByText(/this series only repeats after completion/)).toBeInTheDocument()
   })
 })
