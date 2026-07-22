@@ -53,12 +53,11 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const [focusTitleTick, setFocusTitleTick] = useState(0)
 
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Body captured by the most recent scheduleAutoSave call — read by flushAutoSave
-  // so a pending edit can be committed even after EntryBody's CM6 view (and thus
-  // getBodyRef) has already been torn down (e.g. mid-unmount).
-  const pendingBodyRef = useRef<string | null>(null)
-  // Populated by EntryEditor once CodeMirror mounts; used by saveMeta to capture current body
-  const getBodyRef = useRef<() => string>(() => '')
+  // Always holds the latest body: initialized from entry.body, then kept current by
+  // every scheduleAutoSave call (which fires synchronously on each CM6 doc change,
+  // independent of the debounced commit). Read by saveMeta/flushAutoSave so a
+  // meta-only save can capture the current body without reaching into CodeMirror.
+  const bodyRef = useRef(entry.body)
   // Populated by EntryEditor; flushes pending "listed on" links once a new item is created
   const flushPendingLinksRef = useRef<() => void>(() => {})
   // Always points to the latest entry so timer callbacks don't close over stale state
@@ -103,20 +102,16 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   const saveMeta = (next: EntryState) => {
     if (next.editScope === 'add') return
-    commitEntry({ ...next, body: getBodyRef.current() })
+    commitEntry({ ...next, body: bodyRef.current })
   }
 
   // Commits a still-pending debounced autosave immediately instead of letting it
   // fire late (or never — the cleanup below would otherwise just clearTimeout it).
-  // Read pendingBodyRef first: on unmount, EntryBody's CM6 view may already be
-  // destroyed, so getBodyRef.current() would return '' instead of the real body.
   const flushAutoSave = () => {
     if (!autosaveTimerRef.current) return
     clearTimeout(autosaveTimerRef.current)
     autosaveTimerRef.current = null
-    const body = pendingBodyRef.current ?? getBodyRef.current()
-    pendingBodyRef.current = null
-    commitEntry({ ...entryRef.current, body })
+    commitEntry({ ...entryRef.current, body: bodyRef.current })
   }
 
   // Drops a still-pending autosave without committing it — used right before a
@@ -125,7 +120,6 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // commitEntry.
   const cancelAutoSave = () => {
     if (autosaveTimerRef.current) { clearTimeout(autosaveTimerRef.current); autosaveTimerRef.current = null }
-    pendingBodyRef.current = null
   }
 
   useEffect(() => () => {
@@ -149,11 +143,10 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const scheduleAutoSave = (body: string) => {
     if (entryRef.current.editScope === 'add') return
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
-    pendingBodyRef.current = body
+    bodyRef.current = body
     autosaveTimerRef.current = setTimeout(() => {
       commitEntry({ ...entryRef.current, body })
       autosaveTimerRef.current = null
-      pendingBodyRef.current = null
     }, 1500)
   }
 
@@ -226,7 +219,6 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   return {
     entry, setEntry,
-    getBodyRef,
     flushPendingLinksRef,
     saveMeta,
     handleOpenWikilink,

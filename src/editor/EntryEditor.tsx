@@ -62,7 +62,6 @@ interface Props {
   onSave: (body: string) => void
   onAutoSave?: (body: string) => void
   onMetaSave?: (next: EntryState) => void
-  getBodyRef?: React.MutableRefObject<() => string>
   flushPendingLinksRef?: React.MutableRefObject<() => void>
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
@@ -82,18 +81,13 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = el.scrollHeight + 'px'
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, getBodyRef, flushPendingLinksRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink, titleError, focusTitleTick }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, flushPendingLinksRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink, titleError, focusTitleTick }: Props) {
   const navigate           = useNavigate()
   const hour12             = useStore(s => s.localePrefs.hour12)
   const defaultParticipants = useStore(s => s.defaultParticipants)
   const backlinks          = useStore(s => s.backlinks)
   const titleRef  = useRef<HTMLTextAreaElement>(null)
   const viewRef   = useRef<EditorView | null>(null)
-
-  // Updated every render so the caller's ref always calls with the current view
-  useEffect(() => {
-    if (getBodyRef) getBodyRef.current = () => viewRef.current?.state.doc.toString().trimEnd() ?? ''
-  })
 
   useEffect(() => {
     if (titleRef.current) autoResize(titleRef.current)
