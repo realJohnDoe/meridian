@@ -10,7 +10,7 @@ export { restoreVaults, setActiveVault, addLocalVault, addGitHubVault, addGitHub
 
 export { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush } from './sync'
 
-export { tokenSave } from './cache'
+export { tokenSave, cacheDirtyCount } from './cache'
 
 export {
   startGitHubSignIn, completeGitHubSignIn, fetchInstalledRepos,
