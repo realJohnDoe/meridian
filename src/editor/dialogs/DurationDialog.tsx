@@ -11,12 +11,12 @@ import {
   ResponsiveModalDescription,
   ResponsiveModalActions,
 } from '@/components/ui/responsive-modal'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { segmentedGroupVariants, segmentedItemVariants } from '@/components/ui/segmented-group'
 import { badgeVariants } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
+import { NumberUnitInput } from './NumberUnitInput'
 import DatePickerDialog from './DatePickerDialog'
 import TimePickerDialog from './TimePickerDialog'
 import { parseDuration } from '@/model'
@@ -195,27 +195,14 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
           {/* Interval */}
           {tab === 'interval' && (
             <div className="space-y-2">
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  className="w-20"
-                  value={n === 0 ? '' : n}
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setN(v === '' ? 0 : Math.max(1, parseInt(v, 10) || 1))
-                  }}
-                />
-                <Select value={unit} onValueChange={(v) => setUnit(v as Unit)}>
-                  <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {UNITS.map(u => (
-                      <SelectItem key={u} value={u}>{n === 1 ? u.replace(/s$/, '') : u}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <NumberUnitInput
+                n={n}
+                onNChange={setN}
+                unit={unit}
+                units={UNITS}
+                onUnitChange={setUnit}
+                unitLabel={(u, count) => (count === 1 ? u.replace(/s$/, '') : u)}
+              />
             </div>
           )}
 

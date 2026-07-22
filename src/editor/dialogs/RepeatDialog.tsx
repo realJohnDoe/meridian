@@ -20,10 +20,12 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
+import { NumberUnitInput } from './NumberUnitInput'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Freq = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'after_completion'
+type ScheduleFreq = Exclude<Freq, 'after_completion'>
 type EndType = 'never' | 'until' | 'count'
 type MonthlyMode = 'same-day' | 'weekday-pattern'
 
@@ -52,6 +54,16 @@ interface Props {
 
 const WDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 const WDAY_CODES: Weekday[] = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su']
+
+const FREQ_UNITS: readonly ScheduleFreq[] = ['daily', 'weekly', 'monthly', 'yearly']
+const FREQ_UNIT_LABELS: Record<ScheduleFreq, string> = {
+  daily: 'days', weekly: 'weeks', monthly: 'months', yearly: 'years',
+}
+
+const COMPLETION_UNITS: readonly string[] = ['days', 'weeks', 'months', 'years']
+function completionUnitLabel(unit: string, n: number): string {
+  return n === 1 ? unit.replace(/s$/, '') : unit
+}
 
 // ── Dropdown options and calculations ─────────────────────────────────────────
 
@@ -303,34 +315,14 @@ export default function RepeatDialog({
               {/* Repeats every row */}
               <div className="flex flex-col gap-1.5">
                 <div className="text-2xs font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    min={1}
-                    className="w-20"
-                    value={intervalNum === 0 ? '' : intervalNum}
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === '') {
-                        setIntervalNum(0);
-                      } else {
-                        setIntervalNum(Math.max(1, parseInt(val, 10) || 1));
-                      }
-                    }}
-                  />
-                  <Select value={freq} onValueChange={(v) => setFreq(v as Freq)}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">days</SelectItem>
-                      <SelectItem value="weekly">weeks</SelectItem>
-                      <SelectItem value="monthly">months</SelectItem>
-                      <SelectItem value="yearly">years</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <NumberUnitInput
+                  n={intervalNum}
+                  onNChange={setIntervalNum}
+                  unit={freq}
+                  units={FREQ_UNITS}
+                  onUnitChange={setFreq}
+                  unitLabel={(u) => FREQ_UNIT_LABELS[u]}
+                />
               </div>
 
               {/* Weekly: day-of-week picker */}
@@ -438,34 +430,14 @@ export default function RepeatDialog({
             /* After completion sub-form (inline number and unit select) */
             <div className="flex flex-col gap-1.5">
               <div className="text-2xs font-bold tracking-wider uppercase text-muted-foreground">Repeats every</div>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  className="w-20"
-                  value={completionNum === 0 ? '' : completionNum}
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '') {
-                      setCompletionNum(0);
-                    } else {
-                      setCompletionNum(Math.max(1, parseInt(val, 10) || 1));
-                    }
-                  }}
-                />
-                <Select value={completionUnit} onValueChange={setCompletionUnit}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="days">{completionNum === 1 ? 'day' : 'days'}</SelectItem>
-                    <SelectItem value="weeks">{completionNum === 1 ? 'week' : 'weeks'}</SelectItem>
-                    <SelectItem value="months">{completionNum === 1 ? 'month' : 'months'}</SelectItem>
-                    <SelectItem value="years">{completionNum === 1 ? 'year' : 'years'}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <NumberUnitInput
+                n={completionNum}
+                onNChange={setCompletionNum}
+                unit={completionUnit}
+                units={COMPLETION_UNITS}
+                onUnitChange={setCompletionUnit}
+                unitLabel={completionUnitLabel}
+              />
             </div>
           )}
         </div>
