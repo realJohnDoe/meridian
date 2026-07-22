@@ -1,10 +1,10 @@
-import { useState, useMemo, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { setActiveVault } from '@/vaultActions'
 import { fmtISO, fmtMonth } from '@/model'
-import { useToday, useResetOnChange } from '@/hooks'
+import { useToday, useResetOnChange, useAllParticipants } from '@/hooks'
 import { FlipList } from './FlipList'
 import { vaultIcon } from './vaultIcon'
 import { Checkbox } from './ui/checkbox'
@@ -52,15 +52,7 @@ export default function AppSidebar() {
   const showTasks               = useStore(s => s.showTasks)
   const toggleShowTasks         = useStore(s => s.toggleShowTasks)
 
-  const allParticipants = useMemo(() => {
-    const set = new Set<string>()
-    for (const item of items) {
-      for (const p of item.metadata.participants) {
-        const t = p.trim(); if (t) set.add(t)
-      }
-    }
-    return [...set].sort()
-  }, [items])
+  const allParticipants = useAllParticipants(items)
 
   useResetOnChange([activeVaultId], () => setEditingFavorites(false))
 
