@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useIsTouchDevice, useResetOnChange } from '@/hooks'
-import { addDays, differenceInMinutes, differenceInDays } from 'date-fns'
+import { addDays } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
-import { parseDateString, parseDateTime, fmtISO } from '@/model'
+import { parseDateString, fmtISO, serialiseInterval } from '@/model'
 import type { Scheduled } from '@/types'
 import {
   ResponsiveModal,
@@ -19,21 +19,11 @@ import { cn } from '@/lib/cn'
 import DatePickerDialog from './DatePickerDialog'
 import TimePickerDialog from './TimePickerDialog'
 import { parseDuration } from '@/model'
-import { durationToEndDate, durationToEndDateTime, fmtEndDate, fmtEndTime } from '@/format'
+import {
+  durationToEndDate, durationToEndDateTime, fmtEndDate, fmtEndTime,
+  endDateToDuration, endDateTimeToDuration, fmtDurationCompact,
+} from '@/format'
 import { useStore } from '@/store'
-
-function fmtDurationCompact(duration: string): string {
-  const p = parseDuration(duration)
-  if (!p) return duration
-  const { n, unit } = p
-  if (unit === 'minutes') { if (n < 60) return `${n}m`; const h = Math.floor(n/60), m = n%60; return m ? `${h}h ${m}m` : `${h}h` }
-  if (unit === 'hours')   { if (n < 24) return `${n}h`; const d = Math.floor(n/24), h = n%24; return h ? `${d}d ${h}h` : `${d}d` }
-  if (unit === 'days')    return `${n}d`
-  if (unit === 'weeks')   return `${n}w`
-  if (unit === 'months')  return `${n}mo`
-  if (unit === 'years')   return `${n}y`
-  return duration
-}
 
 // ── Types / data ──────────────────────────────────────────────────────────────
 const UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
@@ -47,34 +37,6 @@ const PRESETS: { label: string; value: string }[] = [
   { label: '1h',  value: '1 hour'    },
   { label: '2h',  value: '2 hours'   },
 ]
-
-// ── Local helpers ─────────────────────────────────────────────────────────────
-function serialise(n: number, unit: Unit): string {
-  const label = n === 1 ? unit.replace(/s$/, '') : unit
-  return `${n} ${label}`
-}
-
-function endDateToDuration(startStr: string, endDateStr: string): string | null {
-  const start = parseDateString(startStr) ?? new Date()
-  const end   = parseDateString(endDateStr) ?? new Date()
-  const days  = differenceInDays(end, start) + 1  // end date is inclusive
-  if (days <= 0) return null
-  if (days % 365 === 0) { const y = days / 365; return `${y} ${y === 1 ? 'year'  : 'years'}` }
-  if (days % 30  === 0) { const m = days / 30;  return `${m} ${m === 1 ? 'month' : 'months'}` }
-  if (days % 7   === 0) { const w = days / 7;   return `${w} ${w === 1 ? 'week'  : 'weeks'}` }
-  return `${days} ${days === 1 ? 'day' : 'days'}`
-}
-
-function endDateTimeToDuration(startDateStr: string, startTimeStr: string, endDateStr: string, endTimeStr: string): string | null {
-  const start = parseDateTime(startDateStr, startTimeStr) ?? new Date()
-  const end   = parseDateTime(endDateStr, endTimeStr)     ?? new Date()
-  const mins  = differenceInMinutes(end, start)
-  if (mins <= 0) return null
-  if (mins % (7 * 24 * 60) === 0) { const w = mins / (7*24*60); return `${w} ${w === 1 ? 'week'  : 'weeks'}` }
-  if (mins % (24 * 60)     === 0) { const d = mins / (24*60);   return `${d} ${d === 1 ? 'day'   : 'days'}` }
-  if (mins % 60            === 0) { const h = mins / 60;         return `${h} ${h === 1 ? 'hour'  : 'hours'}` }
-  return `${mins} ${mins === 1 ? 'minute' : 'minutes'}`
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 interface Props {
@@ -127,7 +89,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
   function switchTab(next: Tab) {
     if (next === tab || !scheduled) return
     if (next === 'endDate') {
-      const dur = serialise(Math.max(1, n), unit)
+      const dur = serialiseInterval(Math.max(1, n), unit)
       if (hasTime) {
         const end = durationToEndDateTime(scheduled.date, scheduled.time, dur)
         setEndDate(end.date); setEndTime(end.time)
@@ -156,7 +118,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
   function getChipLabel(t: Tab): string {
     if (t === tab || !scheduled) return t === 'interval' ? 'Interval' : endDateTabLabel
     if (t === 'endDate' && n >= 1) {
-      const dur = serialise(n, unit)
+      const dur = serialiseInterval(n, unit)
       if (hasTime) {
         const end = durationToEndDateTime(scheduled.date, scheduled.time, dur)
         return `${endDateTabLabel} (${fmtEndDate(end.date)} ${fmtEndTime(end.time, hour12)})`
@@ -171,7 +133,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
   }
 
   function handleSet() {
-    const dur = tab === 'interval' ? serialise(Math.max(1, n), unit) : computedDuration
+    const dur = tab === 'interval' ? serialiseInterval(Math.max(1, n), unit) : computedDuration
     if (!dur) return
     onConfirm(dur); onClose()
   }
@@ -223,7 +185,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                   className={cn(
                     badgeVariants({ variant: 'chip' }),
                     'cursor-pointer',
-                    serialise(Math.max(1, n), unit) === p.value && 'bg-primary/20 text-primary border-primary',
+                    serialiseInterval(Math.max(1, n), unit) === p.value && 'bg-primary/20 text-primary border-primary',
                   )}
                   onClick={() => { onConfirm(p.value); onClose() }}
                 >
