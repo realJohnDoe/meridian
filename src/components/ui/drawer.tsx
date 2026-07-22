@@ -25,7 +25,7 @@ function DrawerOverlay({
 
 // ── Content ──────────────────────────────────────────────────────
 // Centered and width-capped to match the app shell (430 px).
-// No drag handle — this app is not a native-style swipe drawer.
+// Includes a drag handle for mobile swipe-to-dismiss affordance.
 function DrawerContent({
   className,
   children,

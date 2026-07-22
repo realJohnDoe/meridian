@@ -39,19 +39,19 @@ export default function SyncButton() {
         <p className="text-xs text-muted-foreground">{lastSyncedText}</p>
 
         {syncDirtyCount > 0 && (
-          <p className="text-xs" style={{ color: 'var(--warning)' }}>
+          <p className="text-xs text-warning">
             {syncDirtyCount} change{syncDirtyCount > 1 ? 's' : ''} waiting to sync
           </p>
         )}
 
         {syncOffline && !syncError && (
-          <p className="text-xs" style={{ color: 'var(--warning)' }}>
+          <p className="text-xs text-warning">
             Offline — changes are saved locally and will sync when you reconnect.
           </p>
         )}
 
         {syncError && (
-          <p className="text-xs" style={{ color: 'var(--destructive)' }}>
+          <p className="text-xs text-destructive">
             {syncError}
           </p>
         )}
