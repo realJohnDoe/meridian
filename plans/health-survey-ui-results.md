@@ -37,22 +37,6 @@ This is one of the healthiest UI layers surveyed: quality gates all pass (build 
 - **Problem:** the RTL + jsdom setup exists and works (`EditorShell.test.tsx`, `RepeatDialog.test.tsx` prove the pattern), but the most-reused component (`OccurrenceCard` — rendered by agenda, day, search, wikilink popup, and items list) and the entire calendar/search surface have zero regression coverage; the DaySection `propsAreEqual` comparator and `ItemsList` sort/exit-animation logic are exactly the kind of logic that silently breaks.
 - **Fix:** start with `OccurrenceCard` (prop-matrix render test) and `DaySection.propsAreEqual`; grow outward from the highest-fan-in components rather than aiming for blanket coverage.
 
-### #9 — Imperative ref-channel plumbing between `useEntryEditor` and `EntryEditor`
-
-`component-architecture` · **Impact 4** · **Breadth 3** (`useEntryEditor.ts`, `EditorShell.tsx`, `EntryEditor.tsx` — grep `getBodyRef|flushPendingLinksRef`) · **Effort M**
-
-- **Evidence:** `src/editor/EntryEditor.tsx:92` — `useEffect(() => { if (getBodyRef) getBodyRef.current = () => viewRef.current?.state.doc.toString().trimEnd() ?? '' })` (an every-render effect assigning a mutable ref supplied by the hook two layers up).
-- **Problem:** two write-back ref channels (`getBodyRef`, `flushPendingLinksRef`) threaded through a 17-prop component let the hook reach into CM6 state imperatively; it works, but it's the least declarative seam in the codebase and each new "the hook needs something from the editor" requirement adds another ref prop.
-- **Fix:** invert once — have `EntryBody` report the doc through the existing `onChange`/`entryRef` path, or consolidate the channels into a single `editorApiRef` handle registered by `EntryBody`.
-
-### #10 — React 19 modernization rules absent from an otherwise-complete lint setup
-
-`toolchain` · **Impact 2** · **Breadth 18** (grep `forwardRef` in `src`: 18 files; dry run below) · **Effort M** (largely auto-fixable)
-
-- **Evidence:** dry-run of the installed `@eslint-react/eslint-plugin` `recommended-type-checked` preset via a temporary config (removed afterwards): **115 findings — 68 `no-forward-ref`, 7 `no-use-context`, 3 `no-context-provider`**, rest noise/overlap with already-enabled rules.
-- **Problem:** the project targets React 19 (`reactCompilerPreset({ target: '19' })` in vite.config) where `forwardRef` is obsolete (ref-as-prop), but the curated rule list doesn't include the modernization rules, so new components keep copying the legacy pattern from `components/ui/`.
-- **Fix:** enable `@eslint-react/no-forward-ref` (autofix handles most of the 68) — or explicitly document the "stay on forwardRef until shadcn upstream migrates" decision; either resolves the drift. No Tailwind class-sorting plugin is installed, and adding one is **not** recommended: class strings here are hand-grouped semantically (layout / state / theme) with explanatory comments, which sorting would destroy.
-
 ---
 
 **Known suspects:** none were listed, so no suspect verdicts to report.
