@@ -4,9 +4,10 @@ import type { Roots } from '@/types'
 import { fileEntries } from '@/fileOccurrence'
 import { TagChip } from '@/components'
 import { Badge } from '@/components/ui/badge'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
+import { FloatingComboboxList } from '@/components/ui/floating-combobox-list'
 import { matchesQuery } from '@/lib/matching'
+import { useFloatingCombobox } from '@/hooks'
 
 interface Props {
   slugs:           string[]
@@ -20,6 +21,7 @@ interface Props {
 export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, onAdd, onRemove }: Props) {
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
+  const { anchorRef, listRef, placement } = useFloatingCombobox(pickerOpen, open => { setPickerOpen(open); if (!open) setPickerQuery('') })
 
   const allFiles = fileEntries(roots)
   const alreadyLinked = new Set(slugs)
@@ -55,22 +57,27 @@ export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, on
         )
       })}
       {fileSlug && (
-        <Popover open={pickerOpen} onOpenChange={open => { setPickerOpen(open); if (!open) setPickerQuery('') }}>
-          <PopoverTrigger asChild>
-            <Badge
-              variant="tag"
-              className="cursor-pointer text-primary bg-primary/12 gap-1"
-            >
-              <Plus size={9} />add to list
-            </Badge>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-0" align="start">
-            <Command shouldFilter={false}>
-              <CommandInput
-                placeholder="Search files…"
-                value={pickerQuery}
-                onValueChange={setPickerQuery}
-              />
+        <div ref={anchorRef} className="inline-block">
+          <Command shouldFilter={false} className="contents">
+            {pickerOpen ? (
+              <div className="flex items-center rounded-md border border-input bg-background">
+                <CommandInput
+                  wrapperClassName="border-b-0"
+                  placeholder="Search files…"
+                  value={pickerQuery}
+                  onValueChange={setPickerQuery}
+                />
+              </div>
+            ) : (
+              <Badge
+                variant="tag"
+                className="cursor-pointer text-primary bg-primary/12 gap-1"
+                onClick={() => setPickerOpen(true)}
+              >
+                <Plus size={9} />add to list
+              </Badge>
+            )}
+            <FloatingComboboxList placement={placement} listRef={listRef} className="w-64">
               <CommandList className="min-h-[12rem]">
                 <CommandEmpty>No files found</CommandEmpty>
                 <CommandGroup>
@@ -85,9 +92,9 @@ export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, on
                   ))}
                 </CommandGroup>
               </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+            </FloatingComboboxList>
+          </Command>
+        </div>
       )}
     </div>
   )
