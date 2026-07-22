@@ -1,10 +1,20 @@
 import { useState, useMemo } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
-import { tokenSave, syncToBackend, removeVault } from '@/vaultActions'
+import { tokenSave, syncToBackend, removeVault, cacheDirtyCount } from '@/vaultActions'
 import { ParticipantsRow } from '@/editor'
 import type { VaultRef } from '@/vaultActions'
 
@@ -21,6 +31,8 @@ export function VaultSettings({ vault, isActive }: Props) {
   const [participants, setParticipants] = useState<string[]>(
     () => readVaultStringArray('meridian_default_participants', vault.id),
   )
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [dirtyCount,  setDirtyCount]  = useState(0)
 
   const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
   const activeVaultId          = useStore(s => s.activeVaultId)
@@ -50,6 +62,11 @@ export function VaultSettings({ vault, isActive }: Props) {
     } finally {
       setSyncing(false)
     }
+  }
+
+  async function handleRemoveClick() {
+    setDirtyCount(await cacheDirtyCount(vault.id).catch(() => 0))
+    setConfirmOpen(true)
   }
 
   async function handleSaveToken() {
@@ -138,13 +155,43 @@ export function VaultSettings({ vault, isActive }: Props) {
             variant="ghost"
             size="sm"
             className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
-            onClick={() => removeVault(vault.id)}
+            onClick={handleRemoveClick}
           >
             <Trash2 className="size-3.5 stroke-[1.7]" />
             Remove vault
           </Button>
         </div>
       )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove vault</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove &ldquo;{vault.name}&rdquo;? This deletes it from this device.
+              {vault.kind === 'github' && ' The GitHub repository itself is not affected.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {dirtyCount > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+              <TriangleAlert size={14} className="shrink-0 mt-0.5" />
+              <span>
+                {dirtyCount} unsynced {dirtyCount === 1 ? 'change has' : 'changes have'} not been backed up and will be lost.
+              </span>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
+              onClick={() => { setConfirmOpen(false); void removeVault(vault.id) }}
+            >
+              <Trash2 size={13} />
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
