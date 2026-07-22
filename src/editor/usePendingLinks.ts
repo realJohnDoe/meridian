@@ -31,3 +31,7 @@ export function usePendingLinks(item: Occurrence | null, title: string) {
 
   return { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave }
 }
+
+// The subset consumed by EntryEditor; flushOnSave stays hook-internal (useEntryEditor
+// triggers it directly from commitEntry, it's not part of the child's rendering needs).
+export type PendingLinks = Pick<ReturnType<typeof usePendingLinks>, 'effectiveSlug' | 'pendingSlugs' | 'handleAdd' | 'handleRemove'>

@@ -23,7 +23,7 @@ import { formatDurationChip, fmtDuration, fmtShort } from '@/format'
 import { fmtT, parseDateString } from '@/model'
 import { useStore } from '@/store'
 import { titleToSlug } from '@/fileIO'
-import { usePendingLinks } from './usePendingLinks'
+import type { PendingLinks } from './usePendingLinks'
 import { useAllParticipants } from '@/hooks'
 
 function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
@@ -62,7 +62,7 @@ interface Props {
   onSave: (body: string) => void
   onAutoSave?: (body: string) => void
   onMetaSave?: (next: EntryState) => void
-  flushPendingLinksRef?: React.MutableRefObject<() => void>
+  pendingLinks: PendingLinks
   onOpenDlg: (id: string) => void
   onOpenRepeatDlg: (itemType: ItemType) => void
   onScopeChange?: (scope: EditScope) => void
@@ -81,7 +81,7 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = el.scrollHeight + 'px'
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, flushPendingLinksRef, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink, titleError, focusTitleTick }: Props) {
+export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, pendingLinks, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink, titleError, focusTitleTick }: Props) {
   const navigate           = useNavigate()
   const hour12             = useStore(s => s.localePrefs.hour12)
   const defaultParticipants = useStore(s => s.defaultParticipants)
@@ -119,13 +119,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
 
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
-  const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(item, title)
-
-  // Updated every render so commitEntry can flush pending "listed on" links once
-  // a brand-new item is actually created (first autosave), using its final slug.
-  useEffect(() => {
-    if (flushPendingLinksRef) flushPendingLinksRef.current = () => flushOnSave(titleToSlug(title))
-  })
+  const { effectiveSlug, pendingSlugs, handleAdd, handleRemove } = pendingLinks
 
   const linkedSlugs = [...(backlinks.get(effectiveSlug ?? '') ?? []), ...pendingSlugs]
 

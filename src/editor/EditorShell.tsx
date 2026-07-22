@@ -17,7 +17,7 @@ interface Props {
 export default function EditorShell({ entry, hooks, items, roots }: Props) {
   const {
     setEntry,
-    flushPendingLinksRef,
+    pendingLinks,
     saveMeta,
     handleOpenWikilink,
     handleSave, handleScopeChange,
@@ -37,7 +37,7 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
         onSave={handleSave}
         onAutoSave={scheduleAutoSave}
         onMetaSave={saveMeta}
-        flushPendingLinksRef={flushPendingLinksRef}
+        pendingLinks={pendingLinks}
         onOpenDlg={handleOpenDlg}
         onOpenRepeatDlg={handleOpenRepeatDlg}
         onScopeChange={handleScopeChange}

@@ -12,6 +12,7 @@ import { titleToSlug } from '@/fileIO'
 import { getFom } from '@/storeBridge'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
+import { usePendingLinks } from './usePendingLinks'
 
 export type { DialogHandlers } from './useEntryDialogs'
 
@@ -58,8 +59,14 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // independent of the debounced commit). Read by saveMeta/flushAutoSave so a
   // meta-only save can capture the current body without reaching into CodeMirror.
   const bodyRef = useRef(entry.body)
-  // Populated by EntryEditor; flushes pending "listed on" links once a new item is created
-  const flushPendingLinksRef = useRef<() => void>(() => {})
+
+  const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(entry.item, entry.title)
+  // Mirrors the latest flushOnSave (its closure changes every render as pendingSlugs/item
+  // change) so timer/dialog-driven commits — which may fire after several re-renders —
+  // flush against the current pending links instead of a stale render's closure.
+  const flushLinksRef = useRef(flushOnSave)
+  useEffect(() => { flushLinksRef.current = flushOnSave })
+
   // Always points to the latest entry so timer callbacks don't close over stale state
   const entryRef = useRef(entry)
   useEffect(() => { entryRef.current = entry }, [entry])
@@ -89,14 +96,14 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
       // immediately in that case) — but while item only lives in
       // createdItemRef, entry.item is still null, so pending "listed on" links
       // added after creation would otherwise never get flushed again.
-      flushPendingLinksRef.current()
+      flushLinksRef.current(titleToSlug(next.title))
       return
     }
     if (!next.title) return
     const result = saveNode(null, next.editScope, next)
     if (result !== 'saved') { setTitleMissing(true); return }
     setTitleMissing(false)
-    flushPendingLinksRef.current()
+    flushLinksRef.current(titleToSlug(next.title))
     createdItemRef.current = getFom().get(titleToSlug(next.title)) ?? null
   }
 
@@ -219,7 +226,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   return {
     entry, setEntry,
-    flushPendingLinksRef,
+    pendingLinks: { effectiveSlug, pendingSlugs, handleAdd, handleRemove },
     saveMeta,
     handleOpenWikilink,
     handleSave,
