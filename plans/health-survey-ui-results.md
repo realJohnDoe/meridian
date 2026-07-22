@@ -16,34 +16,18 @@ This is one of the healthiest UI layers surveyed: quality gates all pass (build 
 
 ## 3. Category verdicts
 
-| # | Category | Verdict |
-|---|---|---|
-| 1 | Component architecture & boundaries | **findings: #1, #2, #9** |
-| 2 | Styling system consistency | **findings: #5, #7** — otherwise exceptionally strong (documented convention in `index.css`, greps confirm ~zero hex/palette leakage outside 3 spots) |
-| 3 | UX states & accessibility | **findings: #3** (+ two sub-minor: `ui/calendar.tsx` nav button and the `entry.$slug` not-found back button lack aria-labels — 18 of 20 icon buttons are labelled) |
-| 4 | Security (UI-facing) | **clean** — threat model: vault markdown/frontmatter/wikilinks and GitHub-sourced content render only through React text nodes and CM6 text decorations; zero `dangerouslySetInnerHTML`/`innerHTML`; the only two `href`s are static GitHub URLs with correct `rel="noopener noreferrer"`; search params validated in `validateSearch`; build injects a strict CSP (`script-src 'self'`) |
-| 5 | Code health & DRY | **findings: #4, #8** — knip clean, no `any` outside generated files |
-| 6 | React performance | **clean** — all `useStore` calls use selectors (grep: zero bare `useStore()`), agenda/search virtualized, editor/search/settings lazy-loaded, React Compiler + hand-written domain-aware memo comparators where the compiler can't help (DaySection) |
-| 7 | UI toolchain & feedback loops | **findings: #6, #10** — the config itself is a model: jsx-a11y recommended, react-hooks `recommended-latest` (compiler diagnostics), full type-checked TS, machine-enforced barrel/layer boundaries |
-| 8 | UI dependencies & library fit | **clean** — no overlapping libraries (one icon set, one animation approach, one modal stack); **keep-custom verdicts**: `TimeWheels` (snap-scroll wheel with listbox a11y — no maintained radix equivalent), swipe-to-delete in `OccurrenceRow` (needs `passive:false` touchmove, correctly reasoned), `responsive-modal` (dialog/drawer switcher — this *is* the shadcn-recommended pattern), `CoachTour` (4 static steps; a tour library would be heavier than the component) |
+| #   | Category                            | Verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Component architecture & boundaries | **findings: #1, #2, #9**                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2   | Styling system consistency          | **findings: #5, #7** — otherwise exceptionally strong (documented convention in `index.css`, greps confirm ~zero hex/palette leakage outside 3 spots)                                                                                                                                                                                                                                                                                                                           |
+| 3   | UX states & accessibility           | **findings: #3** (+ two sub-minor: `ui/calendar.tsx` nav button and the `entry.$slug` not-found back button lack aria-labels — 18 of 20 icon buttons are labelled)                                                                                                                                                                                                                                                                                                              |
+| 4   | Security (UI-facing)                | **clean** — threat model: vault markdown/frontmatter/wikilinks and GitHub-sourced content render only through React text nodes and CM6 text decorations; zero `dangerouslySetInnerHTML`/`innerHTML`; the only two `href`s are static GitHub URLs with correct `rel="noopener noreferrer"`; search params validated in `validateSearch`; build injects a strict CSP (`script-src 'self'`)                                                                                        |
+| 5   | Code health & DRY                   | **findings: #4, #8** — knip clean, no `any` outside generated files                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 6   | React performance                   | **clean** — all `useStore` calls use selectors (grep: zero bare `useStore()`), agenda/search virtualized, editor/search/settings lazy-loaded, React Compiler + hand-written domain-aware memo comparators where the compiler can't help (DaySection)                                                                                                                                                                                                                            |
+| 7   | UI toolchain & feedback loops       | **findings: #6, #10** — the config itself is a model: jsx-a11y recommended, react-hooks `recommended-latest` (compiler diagnostics), full type-checked TS, machine-enforced barrel/layer boundaries                                                                                                                                                                                                                                                                             |
+| 8   | UI dependencies & library fit       | **clean** — no overlapping libraries (one icon set, one animation approach, one modal stack); **keep-custom verdicts**: `TimeWheels` (snap-scroll wheel with listbox a11y — no maintained radix equivalent), swipe-to-delete in `OccurrenceRow` (needs `passive:false` touchmove, correctly reasoned), `responsive-modal` (dialog/drawer switcher — this _is_ the shadcn-recommended pattern), `CoachTour` (4 static steps; a tour library would be heavier than the component) |
 
 ## 4. Findings
-
-### #1 — Store-commit and entity-construction logic inline in `ItemsList`
-
-`component-architecture` `srp` · **Impact 5** · **Breadth 1** (grep `commitNext` in `.tsx`: only this file) · **Effort S**
-
-- **Evidence:** `src/editor/ItemsList.tsx:201` — `commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.fileSlug])`, with `id: crypto.randomUUID()` constructing an `OccurrenceEntry` in the component (lines 187–200).
-- **Problem:** the "re-open a done occurrence" operation builds store entities and commits them directly inside a React component, while every sibling operation (toggle, delete-with-undo) lives in `occurrenceActions.ts` — this is the only place in the UI that bypasses that layer.
-- **Fix:** move `redoItem`'s store logic into `occurrenceActions.ts` (e.g. `reopenOcc(occ)`) beside `toggleOccDone`.
-
-### #2 — Duration/date domain math implemented inside `DurationDialog`
-
-`component-architecture` `dry` · **Impact 4** · **Breadth 2** (grep: `serialise(`/`endDateToDuration` in `DurationDialog.tsx`; `serialiseInterval` already exists in `model/repeat.ts`) · **Effort S**
-
-- **Evidence:** `src/editor/dialogs/DurationDialog.tsx:62` — `` if (days % 365 === 0) { const y = days / 365; return `${y} ${y === 1 ? 'year'  : 'years'}` } ``
-- **Problem:** `endDateToDuration`, `endDateTimeToDuration`, `fmtDurationCompact`, and a local `serialise` (duplicating `model`'s exported `serialiseInterval`) encode calendar-approximation rules (365-day years, 30-day months) inside a dialog, where they can silently diverge from `model/duration.ts`.
-- **Fix:** move the four pure converters into `model/duration.ts` / `format.ts` and delete the local `serialise` in favor of `serialiseInterval`.
 
 ### #3 — "Remove vault" discards unsynced changes with no confirmation
 
@@ -52,14 +36,6 @@ This is one of the healthiest UI layers surveyed: quality gates all pass (build 
 - **Evidence:** `src/components/VaultSettings.tsx:141` — `onClick={() => removeVault(vault.id)}`; `removeVault` calls `cacheDeleteAll(id)` (`src/storage/vaultRegistry.ts:315`), which drops the IndexedDB cache including dirty, never-synced edits.
 - **Problem:** the app's most destructive action is one tap with no confirm and no undo, while the far less destructive entry deletion gets both a confirmation dialog and an undo toast — an inconsistent destructive-action pattern on a data-loss path.
 - **Fix:** reuse the existing `alert-dialog`/`DeleteDialog` pattern, and mention pending unsynced changes (`syncDirtyCount`) in the prompt when the vault is active.
-
-### #4 — `allParticipants` derivation copy-pasted into three components
-
-`dry` · **Impact 4** · **Breadth 3** (grep `allParticipants` + read: identical Set-build-and-sort in `Sidebar.tsx:54`, `EntryEditor.tsx:122`, `VaultSettings.tsx:29`) · **Effort S**
-
-- **Evidence:** `src/components/VaultSettings.tsx:29` — `const allParticipants = useMemo(() => { const set = new Set<string>()` … identical body in the other two files.
-- **Problem:** the same derived index over `items` is rebuilt (once without memo, in EntryEditor's render body) in three features; a change to participant normalization (e.g. case-folding) must be made three times.
-- **Fix:** a shared `useAllParticipants()` hook in `hooks/`, or a derived map computed once in `setData` beside `fom`/`backlinks`.
 
 ### #5 — Raw Tailwind palette colors bypass the theme system in 3 places
 

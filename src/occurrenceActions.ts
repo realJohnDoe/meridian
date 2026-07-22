@@ -1,7 +1,8 @@
 import { toast } from 'sonner'
 import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug } from '@/model'
 import { occIsRecur } from './occView'
-import type { Occurrence } from './types'
+import { isStandaloneOcc } from './types'
+import type { Occurrence, OccurrenceEntry, OccurrenceMetadata } from './types'
 import { getItems, getRoots, setData } from './storeBridge'
 import { writeEntity, deleteEntity } from './persistencePort'
 import { commitNext } from './storeCommit'
@@ -49,6 +50,41 @@ export function toggleOccDone(o: Occurrence): void {
   const snapshot = { items: getItems(), roots: getRoots() }
   const next = toggleDone(snapshot, o)
   commitNext(next, [o.fileSlug])
+}
+
+// Re-opens a done, undated occurrence: reuses an existing undated entry for
+// the file if one exists, otherwise creates a fresh undated entry.
+export function reopenOcc(occ: Occurrence): void {
+  const allItems = getItems()
+  const existingUndated = allItems.find(
+    i => isStandaloneOcc(i) && i.fileSlug === occ.fileSlug && i.date === '',
+  ) as OccurrenceEntry<OccurrenceMetadata> | undefined
+
+  if (existingUndated) {
+    commitNext({
+      items: allItems.map(i => i.id === existingUndated.id
+        ? { ...existingUndated, metadata: { ...existingUndated.metadata, done: false } }
+        : i,
+      ),
+      roots: getRoots(),
+    }, [occ.fileSlug])
+  } else {
+    const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
+      date:     '',
+      time:     null,
+      source:   'explicit',
+      fileSlug: occ.fileSlug,
+      id:       crypto.randomUUID(),
+      metadata: {
+        done:         false,
+        participants: occ.metadata.participants ?? [],
+        priority:     occ.metadata.priority,
+        duration:     occ.metadata.duration,
+        timezone:     occ.metadata.timezone,
+      },
+    }
+    commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.fileSlug])
+  }
 }
 
 export function beginSwipeDelete(o: Occurrence): () => void {

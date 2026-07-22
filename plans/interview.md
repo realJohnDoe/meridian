@@ -6,15 +6,18 @@ A. Origin & motivation (the "why")
 
 2. Before Meridian, what was your actual setup? (e.g. Google Calendar + Todoist + Obsidian + …?) What broke about juggling them?
 
-   Personally, I used Obsidian for notes, the TaskNotes plugin for my own tasks, Todoist for tasks shared with my wife, and Proton Calendar for events. However, I don't like Todoist being able to do whatever they want with my private data and Proton Calendar had some features missing that we need regularly, e.g. moving or cancelling single series occurrences. I really liked the wikilink in Obsidian and I am a big fan of tags, but I always wanted a system where tags are first class citizens, i.e. also notes that can have their own description and also tags. In Meridian, this turned into the 'everything is a list' mindset in the end.
+   Personally, I used Obsidian for notes, the TaskNotes plugin for my own tasks, Todoist for tasks shared with my wife, and Proton Calendar for events. We also use Google Keep for shopping lists. However, I don't like Todoist and Google being able to do whatever they want with my private data and Proton Calendar had some features missing that we need regularly, e.g. moving or cancelling single series occurrences. I really liked the wikilink in Obsidian and I am a big fan of tags, but I always wanted a system where tags are first class citizens, i.e. also notes that can have their own description and also tags. In Meridian, this turned into the 'everything is a list' mindset in the end.
 
 3. Was there a particular thing that no existing tool did — the one feature that justified building from scratch rather than adopting an existing app?
 
-   As mentioned above in 2: Tags as first class citizens
+   First, As mentioned above in 2: Tags as first class citizens.
+   Second, I found it surprisingly hacky to have a calendar for our child without requiring a separate account for her. I am not aware of any system that allows this. I wanted something closer to a paper calendar where everyone can edit all events, and see what other family members plan. This is very similar to an issue I also encounter at work with Outlook regularly: A series event is created by one team member, which goes on vacation and then the event cannot be edited by someone else. I wanted to try how a system feels where calendar events are just shared documents, not owned by a single person.
+   And third, I have some events that appear multiple times but not following a strict schedule. Meridian just has an 'Add occurrence' button wher users can add a new occurrence to an existing items, not needing to follow any schedule.
 
 4. Who is Meridian for — just you, or a specific kind of person? Who did you have in mind?
 
    People who like Obsidian but are not satisfied with it's mobile task / calendar capabilities.
+   Teams / Families who trust each other enough to read and write their calendar / tasks.
 
 5. How long have you been using it yourself, and what do you use it for day-to-day now?
 
@@ -25,10 +28,11 @@ B. Product
 6. If you had to explain Meridian to a friend in one sentence (not the README tagline), what would you say?
 
    That one is really hard because Meridian is really about the unique combination of mostly existing features. Maybe "It allows you to structure your tasks very flexibly by attaching them to multiple other items, like calendar events, notes, or other tasks". Or "it allows you to manage tasks and calendar events from a single place without giving up privacy" (like you have to when using Google Calendar)
+   Thinking about 3, maybe 'The Todo / calendar app that adapts to how you think'?
 
 7. The README calls it "a calm calendar." What does calm mean to you here — what did you deliberately leave out to keep it calm?
 
-   I did not think about this concretely yet. But I think avoiding switching between different apps contributes to it. I also like to have it as a guideline for the UI style.
+   I did not think about this concretely yet. But I think avoiding switching between different apps contributes to it. I also like to have it as a guideline for the UI style. Part of it is also that I like to run it as an open source project and not as a paid product which might require some more aggressive branding.
 
 8. What's the single most-used feature for you personally?
    1. Quickly adding a task.
@@ -37,19 +41,52 @@ B. Product
 9. What's a workflow in Meridian that would feel impossible or clumsy in Google Calendar / Todoist?
 
    We have a list called 'This Week' where we put tasks that we don't want to schedule on a specific day yet but aim to close them this week. Sometimes, those tasks also belong to another list. For example, we would like to cook Pizza this week, so 'Pizza' will be a task that is linked on both 'Cooking' and 'This Week'. The only other system which can model this are tags, but then we are back to my point above regarding tags as first-class citicens.
+   See also 3 for some more examples.
 
 10. Is Meridian "done," or what's the current rough edge you're most aware of?
 
     It is 'mostly feature-complete'. There are a few things like other storage options or using color for participants instead of types / priorities but mostly it is about bugfixing now.
+    I am also thinking about multi-vault support or iCal import / sync.
 
 C. Philosophy
 
 11. The README's first principle is "different concepts, different lifespans." Where did that idea come from — did you discover it while building, or start with it?
+
+    I noticed the parallels between task scheduling and calendar events, and was wondering why no existing app except Google Calendar exploits this.
+    Of course, Obsidian and it's TaskNotes plugin also contributed to this way of thinking and showed me how much can be done with just markdown + frontmatter yaml.
+
 12. "Lists model hierarchies" and "a task is a list with a done property" is a genuinely unusual mental model. How would you defend it to a skeptic who thinks it's over-abstraction?
+
+    When I started Meridian, I supported tags and had wikilink tags, which implemented the 'tags as first-class citizens' mentioned above.
+    I also found backlinks are a feature that is underexplored so far, so each page had a prominent backlink section at the bottom.
+    But this raised the question: Since wikilink-tags are usually more important than just wikilinks inside the description, should they both appear in the backlink section? Should they be visually separated?
+    And I thought: Maybe some users don't even know about wikilinks and backlinks yet and to them, those might be quite abstract concepts. On the other hand. Everybody knows lists and has used them.
+    So why not just say: Everything is a list and instead of tags, we display all the lists an item is listed on. This is what Meridian does now.
+
+    Futhermore, Most Todo Apps have some notion of projects or subtasks. Lists are just a generalization of this which does not require you to answer the question "Is this a task, a subtask or a project". You only need to answer the question "Is this done at some point and do you want to track if its done?" which I find more pragmatic.
+
 13. Why Markdown specifically, over a database or JSON or a proprietary format? What's the emotional core of "it's yours"?
+
+    I always found markdown hits quite a sweet spot between technical systems and being user-friendly and even understandable to non-techies.
+    Obsidian showed me how much can be done with just markdown.
+    There is just some elegant and pragmatic charme about being able to open a file and understand it, without requiring some special program to open a database.
+    And with AI and LLMs now all over the place, markdown seems to become even more important.
+
 14. Have you ever actually needed the "read the file to debug it" property in real life? A story here would land well.
+
+    Yepp, a lot. Meridian's recurrence schema is quite sophisticated, and because all the code was written with AI, there were a lot of bugs to hunt down.
+    I even wrote a separate debug page to visualize how the yaml is converted to repeat patterns and single occurrences, and how the repeat patterns are expanded.
+    In the beginning, moving occurrences to different times did not work properly, cancelling occurrences sometimes did not work, or an expansion would end on the wrong date.
+    As mentioned, there were _many_ bugs.
+
 15. How much does the "LLM-friendly format" angle matter to you personally vs. it being a nice bonus? (I'll weight it accordingly.)
+
+    It is more of a nice bonus.
+
 16. Do you see Markdown-first as a philosophical/ethical stance (data ownership, longevity) or a practical one (sync, tooling)? Or both?
+
+    I think longevity and data ownership are practical stances: Once the owner of the platform starts to monetize it in ways that you don't like, lock-in becomes a real problem.
+    And history tells us this happens sooner or later for most platforms.
 
 D. Architecture
 

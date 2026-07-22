@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Trash2, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
+import { useAllParticipants } from '@/hooks'
 import { tokenSave, syncToBackend, removeVault, cacheDirtyCount } from '@/vaultActions'
 import { ParticipantsRow } from '@/editor'
 import type { VaultRef } from '@/vaultActions'
@@ -38,16 +39,7 @@ export function VaultSettings({ vault, isActive }: Props) {
   const activeVaultId          = useStore(s => s.activeVaultId)
   const items                  = useStore(s => s.items)
 
-  const allParticipants = useMemo(() => {
-    const set = new Set<string>()
-    for (const item of items) {
-      for (const p of item.metadata.participants) {
-        const trimmed = p.trim()
-        if (trimmed) set.add(trimmed)
-      }
-    }
-    return [...set].sort()
-  }, [items])
+  const allParticipants = useAllParticipants(items)
 
   function handleParticipantsChange(next: string[]) {
     setParticipants(next)

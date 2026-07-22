@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
 import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
-import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots } from '@/types'
-import { isStandaloneOcc } from '@/types'
+import type { Occurrence, Roots } from '@/types'
 import { occKind } from '@/occView'
 import { parseItemEntry, serializeTaskEntry } from './items'
 import { fileEntries } from '@/fileOccurrence'
@@ -14,8 +13,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 import { FloatingComboboxList } from '@/components/ui/floating-combobox-list'
-import { getItems, getRoots } from '@/storeBridge'
-import { commitNext } from '@/storeCommit'
+import { reopenOcc } from '@/occurrenceActions'
 import { matchesQuery } from '@/lib/matching'
 import { useFloatingCombobox } from '@/hooks'
 
@@ -162,35 +160,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     if (entry.kind === 'task') {
       toggleTask(entry.idx, entry.text, entry.done, undefined)
     } else if (occ) {
-      const allItems = getItems()
-      const existingUndated = allItems.find(
-        i => isStandaloneOcc(i) && i.fileSlug === occ.fileSlug && i.date === '',
-      ) as OccurrenceEntry<OccurrenceMetadata> | undefined
-      if (existingUndated) {
-        commitNext({
-          items: allItems.map(i => i.id === existingUndated.id
-            ? { ...existingUndated, metadata: { ...existingUndated.metadata, done: false } }
-            : i,
-          ),
-          roots: getRoots(),
-        }, [occ.fileSlug])
-      } else {
-        const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
-          date:     '',
-          time:     null,
-          source:   'explicit',
-          fileSlug: occ.fileSlug,
-          id:       crypto.randomUUID(),
-          metadata: {
-            done:         false,
-            participants: occ.metadata.participants ?? [],
-            priority:     occ.metadata.priority,
-            duration:     occ.metadata.duration,
-            timezone:     occ.metadata.timezone,
-          },
-        }
-        commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.fileSlug])
-      }
+      reopenOcc(occ)
     }
     setPickerQuery('')
     setPickerOpen(false)
@@ -336,7 +306,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                 </Card>
               )}
               <FloatingComboboxList placement={placement} listRef={listRef} className="w-64">
-                <CommandList className="min-h-[12rem]">
+                <CommandList>
                   {pickerQuery.trim() && (
                     <CommandItem
                       value={`__task__${pickerQuery}`}
