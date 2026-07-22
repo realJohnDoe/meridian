@@ -68,7 +68,7 @@ function DaySection({
 // represent the same day. This comparator supplies that domain knowledge
 // (field-level equality per occurrence) and isn't something compiler-only
 // memoization can infer or replace.
-function propsAreEqual(prev: Props, next: Props): boolean {
+export function propsAreEqual(prev: Props, next: Props): boolean {
   if (prev.isToday !== next.isToday || prev.isTomorrow !== next.isTomorrow) return false
   if (prev.now !== next.now) return false
   if (prev.items.length !== next.items.length) return false
