@@ -30,4 +30,6 @@ if (typeof window !== 'undefined') {
 
   const { cleanup } = await import('@testing-library/react')
   afterEach(cleanup) // vitest globals are off, so RTL's auto-cleanup never registers
+
+  await import('@testing-library/jest-dom/vitest') // registers toBeInTheDocument, toHaveClass, etc.
 }
