@@ -1,4 +1,4 @@
-import { addDays, addWeeks, addMonths, addYears, addMinutes, getDate, isSameDay } from 'date-fns'
+import { addDays, addWeeks, addMonths, addYears, addMinutes, getDate, isSameDay, differenceInDays, differenceInMinutes } from 'date-fns'
 import { parseDateString, parseDateTime, fmtISO, parseDuration, formatHHMM } from '@/model'
 import type { Scheduled } from '@/types'
 
@@ -59,6 +59,28 @@ export function durationToEndDateTime(startDateStr: string, startTimeStr: string
   }
 }
 
+export function endDateToDuration(startStr: string, endDateStr: string): string | null {
+  const start = parseDateString(startStr) ?? new Date()
+  const end   = parseDateString(endDateStr) ?? new Date()
+  const days  = differenceInDays(end, start) + 1  // end date is inclusive
+  if (days <= 0) return null
+  if (days % 365 === 0) { const y = days / 365; return `${y} ${y === 1 ? 'year'  : 'years'}` }
+  if (days % 30  === 0) { const m = days / 30;  return `${m} ${m === 1 ? 'month' : 'months'}` }
+  if (days % 7   === 0) { const w = days / 7;   return `${w} ${w === 1 ? 'week'  : 'weeks'}` }
+  return `${days} ${days === 1 ? 'day' : 'days'}`
+}
+
+export function endDateTimeToDuration(startDateStr: string, startTimeStr: string, endDateStr: string, endTimeStr: string): string | null {
+  const start = parseDateTime(startDateStr, startTimeStr) ?? new Date()
+  const end   = parseDateTime(endDateStr, endTimeStr)     ?? new Date()
+  const mins  = differenceInMinutes(end, start)
+  if (mins <= 0) return null
+  if (mins % (7 * 24 * 60) === 0) { const w = mins / (7*24*60); return `${w} ${w === 1 ? 'week'  : 'weeks'}` }
+  if (mins % (24 * 60)     === 0) { const d = mins / (24*60);   return `${d} ${d === 1 ? 'day'   : 'days'}` }
+  if (mins % 60            === 0) { const h = mins / 60;         return `${h} ${h === 1 ? 'hour'  : 'hours'}` }
+  return `${mins} ${mins === 1 ? 'minute' : 'minutes'}`
+}
+
 export function fmtEndDate(dateStr: string): string {
   const d = parseDateString(dateStr)
   return d ? d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) }) : dateStr
@@ -82,6 +104,19 @@ export function fmtDuration(duration: string): string {
     const dStr = `${d} ${d === 1 ? 'day' : 'days'}`
     return h > 0 ? `${dStr}, ${h} ${h === 1 ? 'hour' : 'hours'}` : dStr
   }
+  return duration
+}
+
+export function fmtDurationCompact(duration: string): string {
+  const p = parseDuration(duration)
+  if (!p) return duration
+  const { n, unit } = p
+  if (unit === 'minutes') { if (n < 60) return `${n}m`; const h = Math.floor(n/60), m = n%60; return m ? `${h}h ${m}m` : `${h}h` }
+  if (unit === 'hours')   { if (n < 24) return `${n}h`; const d = Math.floor(n/24), h = n%24; return h ? `${d}d ${h}h` : `${d}d` }
+  if (unit === 'days')    return `${n}d`
+  if (unit === 'weeks')   return `${n}w`
+  if (unit === 'months')  return `${n}mo`
+  if (unit === 'years')   return `${n}y`
   return duration
 }
 
