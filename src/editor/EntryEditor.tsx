@@ -23,6 +23,7 @@ import { fmtT, parseDateString } from '@/model'
 import { useStore } from '@/store'
 import { titleToSlug } from '@/fileIO'
 import { usePendingLinks } from './usePendingLinks'
+import { useAllParticipants } from '@/hooks'
 
 function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   icon: LucideIcon
@@ -119,16 +120,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
     onScopeChange?.(scope)
   }
 
-  const allParticipants = (() => {
-    const set = new Set<string>()
-    for (const storeItem of items) {
-      for (const p of storeItem.metadata.participants) {
-        const trimmed = p.trim()
-        if (trimmed) set.add(trimmed)
-      }
-    }
-    return [...set].sort()
-  })()
+  const allParticipants = useAllParticipants(items)
 
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
