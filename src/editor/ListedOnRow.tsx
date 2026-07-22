@@ -78,7 +78,7 @@ export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, on
               </Badge>
             )}
             <FloatingComboboxList placement={placement} listRef={listRef} className="w-64">
-              <CommandList className="min-h-[12rem]">
+              <CommandList>
                 <CommandEmpty>No files found</CommandEmpty>
                 <CommandGroup>
                   {filtered.slice(0, 8).map(e => (

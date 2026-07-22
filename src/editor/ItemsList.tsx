@@ -306,7 +306,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                 </Card>
               )}
               <FloatingComboboxList placement={placement} listRef={listRef} className="w-64">
-                <CommandList className="min-h-[12rem]">
+                <CommandList>
                   {pickerQuery.trim() && (
                     <CommandItem
                       value={`__task__${pickerQuery}`}
