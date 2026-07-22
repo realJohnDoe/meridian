@@ -6,15 +6,18 @@ A. Origin & motivation (the "why")
 
 2. Before Meridian, what was your actual setup? (e.g. Google Calendar + Todoist + Obsidian + …?) What broke about juggling them?
 
-   Personally, I used Obsidian for notes, the TaskNotes plugin for my own tasks, Todoist for tasks shared with my wife, and Proton Calendar for events. However, I don't like Todoist being able to do whatever they want with my private data and Proton Calendar had some features missing that we need regularly, e.g. moving or cancelling single series occurrences. I really liked the wikilink in Obsidian and I am a big fan of tags, but I always wanted a system where tags are first class citizens, i.e. also notes that can have their own description and also tags. In Meridian, this turned into the 'everything is a list' mindset in the end.
+   Personally, I used Obsidian for notes, the TaskNotes plugin for my own tasks, Todoist for tasks shared with my wife, and Proton Calendar for events. We also use Google Keep for shopping lists. However, I don't like Todoist and Google being able to do whatever they want with my private data and Proton Calendar had some features missing that we need regularly, e.g. moving or cancelling single series occurrences. I really liked the wikilink in Obsidian and I am a big fan of tags, but I always wanted a system where tags are first class citizens, i.e. also notes that can have their own description and also tags. In Meridian, this turned into the 'everything is a list' mindset in the end.
 
 3. Was there a particular thing that no existing tool did — the one feature that justified building from scratch rather than adopting an existing app?
 
-   As mentioned above in 2: Tags as first class citizens
+   First, As mentioned above in 2: Tags as first class citizens.
+   Second, I found it surprisingly hacky to have a calendar for our child without requiring a separate account for her. I am not aware of any system that allows this. I wanted something closer to a paper calendar where everyone can edit all events, and see what other family members plan. This is very similar to an issue I also encounter at work with Outlook regularly: A series event is created by one team member, which goes on vacation and then the event cannot be edited by someone else. I wanted to try how a system feels where calendar events are just shared documents, not owned by a single person.
+   And third, I have some events that appear multiple times but not following a strict schedule. Meridian just has an 'Add occurrence' button wher users can add a new occurrence to an existing items, not needing to follow any schedule.
 
 4. Who is Meridian for — just you, or a specific kind of person? Who did you have in mind?
 
    People who like Obsidian but are not satisfied with it's mobile task / calendar capabilities.
+   Teams / Families who trust each other enough to read and write their calendar / tasks.
 
 5. How long have you been using it yourself, and what do you use it for day-to-day now?
 
