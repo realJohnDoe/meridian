@@ -36,9 +36,3 @@ This is one of the healthiest UI layers surveyed: quality gates all pass (build 
 - **Evidence:** `find src -name "*.test.*"` → `3 src, 2 src/calendar, 5 src/editor, 1 src/editor/cm, 1 src/editor/dialogs, 11 src/model/__tests__, …` — nothing under `src/components` or `src/search`.
 - **Problem:** the RTL + jsdom setup exists and works (`EditorShell.test.tsx`, `RepeatDialog.test.tsx` prove the pattern), but the most-reused component (`OccurrenceCard` — rendered by agenda, day, search, wikilink popup, and items list) and the entire calendar/search surface have zero regression coverage; the DaySection `propsAreEqual` comparator and `ItemsList` sort/exit-animation logic are exactly the kind of logic that silently breaks.
 - **Fix:** start with `OccurrenceCard` (prop-matrix render test) and `DaySection.propsAreEqual`; grow outward from the highest-fan-in components rather than aiming for blanket coverage.
-
----
-
-**Known suspects:** none were listed, so no suspect verdicts to report.
-
-**Sub-minor observations** (not top-10 worthy): `SyncButton` styles status colors via `style={{ color: 'var(--warning)' }}` where `text-warning` exists (works, just off-convention); `drawer.tsx`'s comment "No drag handle" sits directly above the code that renders one; `DayView.tsx` ends with a stale comment referencing a no-longer-existing `App.tsx`.
