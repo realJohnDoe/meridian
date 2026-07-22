@@ -106,7 +106,7 @@ function AppMain() {
   const [slotEl, setSlotEl] = useState<HTMLDivElement | null>(null)
 
   return (
-    <TopbarSlotContext.Provider value={slotEl}>
+    <TopbarSlotContext value={slotEl}>
       <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden">
         <header
           id="mainTop"
@@ -174,6 +174,6 @@ function AppMain() {
         setSidebarOpen={setSidebarOpen}
         navigateHome={navigateHome}
       />
-    </TopbarSlotContext.Provider>
+    </TopbarSlotContext>
   )
 }

@@ -13,12 +13,11 @@ import * as React from 'react'
 import { Button } from './button'
 import { cn } from '@/lib/cn'
 
-export type SurfaceButtonProps = React.ComponentPropsWithoutRef<typeof Button>
+export type SurfaceButtonProps = React.ComponentProps<typeof Button>
 
-const SurfaceButton = React.forwardRef<HTMLButtonElement, SurfaceButtonProps>(
-  ({ className, ...props }, ref) => (
+function SurfaceButton({ className, ...props }: SurfaceButtonProps) {
+  return (
     <Button
-      ref={ref}
       variant="ghost"
       className={cn(
         // reset Button's opinionated defaults
@@ -29,8 +28,7 @@ const SurfaceButton = React.forwardRef<HTMLButtonElement, SurfaceButtonProps>(
       )}
       {...props}
     />
-  ),
-)
-SurfaceButton.displayName = 'SurfaceButton'
+  )
+}
 
 export { SurfaceButton }

@@ -20,12 +20,12 @@ function ResponsiveModal({ open, onOpenChange, forceDialog, children }: {
 }) {
   const isDesktop = useMediaQuery("(min-width: 768px)") || !!forceDialog
   return (
-    <ModalCtx.Provider value={isDesktop}>
+    <ModalCtx value={isDesktop}>
       {isDesktop
         ? <Dialog open={open} onOpenChange={onOpenChange}>{children}</Dialog>
         : <Drawer open={open} onOpenChange={onOpenChange}>{children}</Drawer>
       }
-    </ModalCtx.Provider>
+    </ModalCtx>
   )
 }
 
@@ -37,7 +37,7 @@ function ResponsiveModalContent({ className, children }: {
   className?: string
   children: React.ReactNode
 }) {
-  const isDesktop = React.useContext(ModalCtx)
+  const isDesktop = React.use(ModalCtx)
   if (!isDesktop) {
     return <DrawerContent className={cn('pt-3', className)}>{children}</DrawerContent>
   }
@@ -56,7 +56,7 @@ function ResponsiveModalTitle({ children, className }: {
   children: React.ReactNode
   className?: string
 }) {
-  const isDesktop = React.useContext(ModalCtx)
+  const isDesktop = React.use(ModalCtx)
   if (!isDesktop) {
     return (
       <>
@@ -82,7 +82,7 @@ function ResponsiveModalTitle({ children, className }: {
 // ── Description (always sr-only) ──────────────────────────────────
 
 function ResponsiveModalDescription({ children }: { children: React.ReactNode }) {
-  const isDesktop = React.useContext(ModalCtx)
+  const isDesktop = React.use(ModalCtx)
   if (!isDesktop) {
     return <DrawerDescription className="sr-only">{children}</DrawerDescription>
   }
@@ -103,7 +103,7 @@ interface ResponsiveModalActionsProps {
 function ResponsiveModalActions({
   onRemove, onCancel, onSet, removeLabel = 'Remove', setDisabled,
 }: ResponsiveModalActionsProps) {
-  const isDesktop = React.useContext(ModalCtx)
+  const isDesktop = React.use(ModalCtx)
   return (
     <DrawerActions
       onRemove={onRemove}
