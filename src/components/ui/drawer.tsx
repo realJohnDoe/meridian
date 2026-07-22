@@ -11,44 +11,45 @@ const DrawerPortal = DrawerPrimitive.Portal
 const DrawerClose = DrawerPrimitive.Close
 
 // ── Overlay ─────────────────────────────────────────────────────
-const DrawerOverlay = React.forwardRef<
-  React.ComponentRef<typeof DrawerPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Overlay
-    ref={ref}
-    className={cn('fixed inset-0 z-50 bg-black/70', className)}
-    {...props}
-  />
-))
-DrawerOverlay.displayName = 'DrawerOverlay'
+function DrawerOverlay({
+  className,
+  ...props
+}: React.ComponentProps<typeof DrawerPrimitive.Overlay>) {
+  return (
+    <DrawerPrimitive.Overlay
+      className={cn('fixed inset-0 z-50 bg-black/70', className)}
+      {...props}
+    />
+  )
+}
 
 // ── Content ──────────────────────────────────────────────────────
 // Centered and width-capped to match the app shell (430 px).
 // No drag handle — this app is not a native-style swipe drawer.
-const DrawerContent = React.forwardRef<
-  React.ComponentRef<typeof DrawerPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DrawerPortal>
-    <DrawerOverlay />
-    <DrawerPrimitive.Content
-      ref={ref}
-      className={cn(
-        'fixed bottom-0 left-1/2 z-50 -translate-x-1/2',
-        'w-full max-w-md lg:max-w-lg',
-        'bg-background border-t border-border rounded-t-3xl',
-        'pb-6 focus:outline-none',
-        className,
-      )}
-      {...props}
-    >
-      <div className="mx-auto mt-2 h-1 w-24 rounded-full bg-muted" />
-      {children}
-    </DrawerPrimitive.Content>
-  </DrawerPortal>
-))
-DrawerContent.displayName = 'DrawerContent'
+function DrawerContent({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof DrawerPrimitive.Content>) {
+  return (
+    <DrawerPortal>
+      <DrawerOverlay />
+      <DrawerPrimitive.Content
+        className={cn(
+          'fixed bottom-0 left-1/2 z-50 -translate-x-1/2',
+          'w-full max-w-md lg:max-w-lg',
+          'bg-background border-t border-border rounded-t-3xl',
+          'pb-6 focus:outline-none',
+          className,
+        )}
+        {...props}
+      >
+        <div className="mx-auto mt-2 h-1 w-24 rounded-full bg-muted" />
+        {children}
+      </DrawerPrimitive.Content>
+    </DrawerPortal>
+  )
+}
 
 // ── Layout helpers ───────────────────────────────────────────────
 const DrawerHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
@@ -65,34 +66,34 @@ const DrawerFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 DrawerFooter.displayName = 'DrawerFooter'
 
 // ── Title ────────────────────────────────────────────────────────
-const DrawerTitle = React.forwardRef<
-  React.ComponentRef<typeof DrawerPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Title>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Title
-    ref={ref}
-    className={cn(
-      'text-2xs font-bold tracking-[.07em] uppercase text-muted-foreground',
-      'px-4.5 pt-1 pb-2',
-      className,
-    )}
-    {...props}
-  />
-))
-DrawerTitle.displayName = 'DrawerTitle'
+function DrawerTitle({
+  className,
+  ...props
+}: React.ComponentProps<typeof DrawerPrimitive.Title>) {
+  return (
+    <DrawerPrimitive.Title
+      className={cn(
+        'text-2xs font-bold tracking-[.07em] uppercase text-muted-foreground',
+        'px-4.5 pt-1 pb-2',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
 
 // ── Description (sr-only by default) ────────────────────────────
-const DrawerDescription = React.forwardRef<
-  React.ComponentRef<typeof DrawerPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Description>
->(({ className, ...props }, ref) => (
-  <DrawerPrimitive.Description
-    ref={ref}
-    className={cn('sr-only', className)}
-    {...props}
-  />
-))
-DrawerDescription.displayName = 'DrawerDescription'
+function DrawerDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof DrawerPrimitive.Description>) {
+  return (
+    <DrawerPrimitive.Description
+      className={cn('sr-only', className)}
+      {...props}
+    />
+  )
+}
 
 // ── Actions footer ───────────────────────────────────────────────
 // Renders Separator + the standard Remove / Cancel / Set row.

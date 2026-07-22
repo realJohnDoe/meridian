@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, use } from 'react'
 
 export const TopbarSlotContext = createContext<HTMLDivElement | null>(null)
-export const useTopbarSlot = () => useContext(TopbarSlotContext)
+export const useTopbarSlot = () => use(TopbarSlotContext)

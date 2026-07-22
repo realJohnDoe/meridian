@@ -17,16 +17,15 @@
 import * as React from 'react'
 import { cn } from '@/lib/cn'
 
-export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface IconButtonProps extends React.ComponentProps<'button'> {
   /** Accessible name, rendered as `aria-label`. */
   label: string
   hit?: 'expand' | 'pad'
 }
 
-const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
-  ({ label, hit = 'expand', className, type, children, ...props }, ref) => (
+function IconButton({ label, hit = 'expand', className, type, children, ...props }: IconButtonProps) {
+  return (
     <button
-      ref={ref}
       type={type ?? 'button'}
       aria-label={label}
       className={cn(
@@ -43,8 +42,7 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
     >
       {children}
     </button>
-  ),
-)
-IconButton.displayName = 'IconButton'
+  )
+}
 
 export { IconButton }

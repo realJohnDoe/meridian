@@ -7,10 +7,14 @@ const Popover = PopoverPrimitive.Root
 const PopoverTrigger = PopoverPrimitive.Trigger
 const PopoverAnchor = PopoverPrimitive.Anchor
 
-const PopoverContent = React.forwardRef<
-  React.ComponentRef<typeof PopoverPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'start', sideOffset = 4, collisionPadding, style, ...props }, ref) => {
+function PopoverContent({
+  className,
+  align = 'start',
+  sideOffset = 4,
+  collisionPadding,
+  style,
+  ...props
+}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
   // Same iOS/iPadOS keyboard issue as dialog.tsx: cap against the visual viewport,
   // not just Radix's own collision detection, so the combobox never renders taller
   // than what's actually visible above the keyboard.
@@ -36,7 +40,6 @@ const PopoverContent = React.forwardRef<
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
-        ref={ref}
         align={align}
         sideOffset={sideOffset}
         collisionPadding={resolvedCollisionPadding}
@@ -56,7 +59,6 @@ const PopoverContent = React.forwardRef<
       />
     </PopoverPrimitive.Portal>
   )
-})
-PopoverContent.displayName = PopoverPrimitive.Content.displayName
+}
 
 export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor }

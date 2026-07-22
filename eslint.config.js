@@ -94,6 +94,13 @@ export default [
       // a new function identity every render, forcing a full remount of the
       // child (and losing its state) instead of a normal re-render.
       '@eslint-react/no-nested-component-definitions': 'error',
+      // React 19 modernization: ref is a regular prop now, so forwardRef,
+      // useContext, and <Context.Provider> are all obsolete. shadcn's own
+      // upstream templates have already dropped forwardRef in favor of
+      // ref-as-prop, so there's no vendor-legacy reason to keep it here either.
+      '@eslint-react/no-forward-ref': 'error',
+      '@eslint-react/no-use-context': 'error',
+      '@eslint-react/no-context-provider': 'error',
 
       // ── TypeScript ───────────────────────────────────────────────────────────
       // Full type-checked rule set (await-thenable, no-unsafe-*,
