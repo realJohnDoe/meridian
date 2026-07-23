@@ -315,6 +315,8 @@ export default [
       'src/storage/exampleBackend.ts',
       'src/storage/__tests__/sync-collision.test.ts',
       'src/storage/__tests__/sync.test.ts',
+      'src/storage/__tests__/vaultRegistry.test.ts',
+      'src/storage/__tests__/githubOAuth.test.ts',
     ],
     rules: {
       '@typescript-eslint/require-await': 'off',
