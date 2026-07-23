@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useStore } from '@/store'
 import { occKind } from '@/occView'
 import type { Occurrence } from '@/types'
@@ -21,4 +21,17 @@ export function useCalendarFilter() {
   }, [filter, showTasks])
 
   return { filter, showTasks, filterOccs }
+}
+
+/**
+ * Memoized wrapper around useCalendarFilter's filterOccs. filterOccs only
+ * returns its input by reference when showTasks is on and no participant
+ * filter is set — with either active, it allocates a new array every call,
+ * so callers that feed the result into their own useMemo deps (e.g.
+ * AgendaView's day grouping) would otherwise recompute on every render
+ * whenever a filter is active.
+ */
+export function useFilteredOccs(occs: Occurrence[]): Occurrence[] {
+  const { filterOccs } = useCalendarFilter()
+  return useMemo(() => filterOccs(occs), [occs, filterOccs])
 }

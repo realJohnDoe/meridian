@@ -13,7 +13,7 @@ import { occState } from '@/occView'
 import { dvBlockVariants, occPillRounded } from '@/components/ui/occurrence-variants'
 import { ContinuationChevron, CONTINUES_PADDING_ALWAYS } from '@/components/ui/continuation-chevron'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useToday, useCalendarFilter } from '@/hooks'
+import { useToday, useFilteredOccs } from '@/hooks'
 import { computeColumns } from './computeColumns'
 
 // Layout constants below feed JS pixel math (scrollTo, pointer-offset calcs
@@ -200,11 +200,9 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
   const roots  = useStore(s => s.roots)
   const hour12 = useStore(s => s.localePrefs.hour12)
 
-  const { filterOccs } = useCalendarFilter()
-
   const dvFrom = startOfDay(dvDate)
   const dvTo   = new Date(dvDate); dvTo.setHours(23, 59, 59)
-  const dvOccs = filterOccs(useExpandWithMultiday(items, roots, dvFrom, dvTo))
+  const dvOccs = useFilteredOccs(useExpandWithMultiday(items, roots, dvFrom, dvTo))
 
   const { allDay, cols } = useMemo(() => {
     const sorted = sortOccs(dvOccs)
