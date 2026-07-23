@@ -156,19 +156,60 @@ E. Features
     Maybe I will add an '@' alternative so wikilinks are easier to create in the description fields.
 
 26. Participants/filtering — is Meridian meant to be used collaboratively, or is that for personal "who's involved" tracking?
+
+    Kind-of, but without requiring an account for everybody. I imagine it like a shared calendar wall or family calendar where everyone can edit everything, still it is useful to know who will take part where.
+    Similar to how we also collaborate on other artifacts like presentations or text documents.
+
 27. Offline-first + installable: how much does "feels like a native app" matter to the pitch?
+
+    The Mobile UX is definately one of the key USPs and why I switched away from Obsidian+Tasknotes.
+    The PWA approach is mostly due to maintaineability: I need iOS and Android support and the DevOps effort with native apps would be much higher.
+    I definately want the app to feel as native as possible, meaning fast and with good UX.
+
 28. Is there a feature you're tempted to show off that most people won't initially understand the value of?
+
+    I think mostly the using lists for hierarchies: You can create a task for a project whose items are tasks in that project, and those can have subtasks (items) on their own.
+    Another use is to have lists that are by time.
+    For example, we have a 'This week' list where we put stuff that we want to do this week but don't want to commit to a specific day yet.
+    Items on that list can still be on a topic list, e.g. 'Cooking'.
+    A strict hierarchy would not allow for such things.
 
 F. Comparisons & positioning
 
 29. The README compares to Obsidian+TaskNotes, Google Calendar, Todoist, etc. In the article, do you want to lean into comparisons or mostly stand on your own?
+
+    I think it makes sense to mention that I took inspiration from them, especially Obsidian for the whole markdown / frontmatter idea and Google calendar for Task/Calendar UX.
+    But I don't want to dig into those comparisons deeply.
+
 30. You concede Obsidian wins at note-taking. How honest/humble do you want the article's tone to be about what Meridian doesn't do?
+
+    I want it to be honest. I don't want to oversell Meridian, but still position it as a strong contender.
+    My goal was not to write a better note-taking app, but to extend Obsidians strenghts beyond note into the Todo/Calendar mobile app territory.
+
 31. What's the one misconception you expect readers to have that you'd like to preempt?
+
+    Oh, just another geeky productivity app written from a Software Engineer.
 
 G. Tone, framing & logistics
 
 32. Who's the audience for the article — developers, productivity nerds, potential users, Show HN / Hacker News crowd? This shapes vocabulary and depth.
+
+    I think the main target audience will be existing Obsidian Users and Software Developers.
+
 33. First person "I" or "we"? (README uses "we" in places.) Which do you want?
+
+    I makes more sense, since I worked alone so far, only with Claude. But Claude is a tool, so I don't want to anthropomorphize it.
+
 34. What do you want a reader to do or feel by the end — try it, star the repo, rethink their tools, or just "huh, neat"?
+
+    I would like users to try it out and let me know what they like and dislike about it.
+    Probably, the Tutorial also needs some rework either before or after the first feedback comes in.
+
 35. Any tone to emulate or avoid? (e.g. earnest indie-hacker, dry/technical, playful, manifesto-ish.) Any writers/posts whose style you like?
+
+    I don't want to sound too smart, like "Here is the better productivity app because of my philosophical reasons"
+
 36. Is there anything true about Meridian that the README doesn't say that you want in the article?
+
+    I think the philosophy points capture the important part pretty well.
+    I mostly want the article to tell a story, not just document Meridian.
