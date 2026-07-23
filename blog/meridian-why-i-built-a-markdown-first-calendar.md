@@ -191,54 +191,53 @@ place, a year and several rewrites earlier.
 That's the arc, really: the idea I'd have put on a landing page in May was the one I
 found in June, by trying to explain the app to an imaginary user and failing.
 
-## Why plain files were worth it
+## The part I don't put on the landing page
 
-Every entry is a `.md` file with YAML frontmatter. Free text for your thoughts,
-structured fields for the metadata.
+A data model clicking into place is the fun part — and, conveniently, the part that fits
+in a blog post. The rest of that summer was the other kind of work: making the thing
+trustworthy enough that I'd keep my actual life in it.
 
-I'm not going to make a moral argument out of this. Data ownership and longevity are
-practical concerns: sooner or later most platforms need to monetize in ways you didn't
-sign up for, and by then lock-in is a real cost. Plain files are the cheapest insurance I
-know.
-
-The property I underestimated is debuggability. Recurrence is the most intricate part of
-the app and it produced a long tail of bugs — occurrences that wouldn't move,
-cancellations that didn't stick, series that expanded one day too far. Debugging a normal
-calendar means reasoning about a database you can't see. Debugging this one meant opening
-a file and saying "here's what it does, here's what it should do." That, plus the
-debugger, made most of those bugs mechanical to fix.
-
-One concept per file also means two devices only collide when they edit _the same entry_,
-not the whole calendar. I still hit conflicts. They just stay small.
-
-## No backend, mostly
-
-Meridian doesn't run a server that holds your notes. I tried hard to reach zero backend
-and got close: there's a single stateless Cloudflare Worker whose only job is exchanging
-OAuth tokens, because you can't do safe authentication without one.
-
-Finding somewhere to put the files was harder than expected. What I wanted was a
-password-protected folder in the cloud with an API, easy enough for a non-technical person
-to set up. That sounds solved. It isn't — most options either hand the app access to
-_everything_ in your account, or don't send CORS headers, so a browser app can't reach
-them at all. The full comparison is in
+First the files had to leave my laptop. Meridian still runs no server that holds your
+notes — I got that down to a single stateless Cloudflare Worker whose only job is trading
+OAuth tokens — but on 2026-06-11 the files themselves moved to GitHub, and the
+`failed to fetch` from the phone prototype came back, this time for keeps. "A
+password-protected folder in the cloud with an API" turns out to be a surprisingly
+unsolved problem: most options either want access to _everything_ in your account, or
+don't send the CORS headers a browser app needs, so it can't reach them at all. I wrote
+the whole hunt up in
 [plans/storage-backend-survey.md](https://github.com/realJohnDoe/meridian/blob/main/plans/storage-backend-survey.md);
-Dropbox and OneDrive are the strongest future candidates. GitHub won for now because it
-gives you a real repository, free version history, and works on every device including
-iOS.
+Dropbox and OneDrive are the best of the also-rans. GitHub won because it hands you a real
+repository — free history, every device, iOS included — and because it's genuinely
+_yours_: the day GitHub, or I, or anyone else does something you don't like, you can walk
+with every byte and open the files in any editor. That's not a moral stance, just cheap
+insurance. Platforms monetize against their users eventually; plain files are how you
+keep the exits open.
 
-## Where it actually stands
+Then came the layers. Between a keystroke and a file on GitHub there are now four or five
+of them — editor state, an in-memory store, a local cache, the sync loop, the backend —
+and each is a fresh chance for them to quietly disagree. This is where "plain files, one
+concept each" stopped being a philosophy and started paying rent. When something broke I
+could open the offending `.md`, read exactly what it claimed, and hand Claude "here's
+what it does, here's what it should do." Recurrence alone — occurrences that wouldn't
+move, cancellations that didn't stick, a series that expanded one day too far — would
+have been miserable to chase through an opaque database. Against a file you can read, most
+of those bugs turned mechanical. (One file per concept has a quieter payoff too: two
+devices only collide when they edit _the same entry_, so the conflicts that survive all
+that state stay small.)
+
+I won't pretend it's finished. I've run my own tasks on Meridian for about a month; we
+haven't moved the family calendar off Proton yet. Caching is still the weakest code in
+the repo — scroll the last few weeks of commits and most are variations on a single
+theme, _never lose a file_. Which is, in the end, the whole distance between a prototype
+that dazzles you for an afternoon and something you'd trust with the only copy of your
+week.
+
+## Where it fits
 
 It is not a better note-taking app than Obsidian, and it isn't trying to be. Obsidian's
 plugin ecosystem and linking depth are hard to beat. Meridian borrows the idea that
 Markdown is the source of truth and pushes it the other way — into the tasks-and-calendar
 territory where Google Calendar and Todoist still win on mobile.
-
-It's also young. I've used it for tasks for about a month; we haven't moved our calendar
-off Proton yet. Caching is the weakest part of the code — there are several layers of
-state between a keystroke and a file on GitHub, and keeping them honest has produced more
-bugs than anything else. Looking at the last few weeks of commits, most of them are
-variations on "never lose a file," which tells you where the risk is.
 
 If any of this sounds like the thing you've been assembling out of four apps, the
 [example vault](https://realjohndoe.github.io/meridian/) runs in your browser with no
