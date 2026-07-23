@@ -37,6 +37,12 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
  * Tags and topics are matched the same way — no divergence between fields.
  */
 export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
+  'use no memo' // TanStack Virtual's useVirtualizer() returns imperative
+  // methods over mutable internal state, which the compiler can't safely
+  // memoize around — react-hooks/incompatible-library. The compiler already
+  // auto-skips memoizing this function for the same reason, so this directive
+  // is explicit documentation rather than a functional change; the eslint
+  // warning here is expected and permanent, see eslint.config.js.
   const roots     = useStore(s => s.roots)
   const occBySlug = useStore(s => s.fom)
   const backlinks = useStore(s => s.backlinks)

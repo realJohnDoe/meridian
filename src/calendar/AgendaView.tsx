@@ -40,6 +40,19 @@ interface Props {
 }
 
 export default function AgendaView({ onOpen }: Props) {
+  'use no memo' // TanStack Virtual's useVirtualizer() reads mutable internal
+  // state (scroll offset, measured sizes) through imperative methods rather
+  // than props/state the compiler can track — react-hooks/incompatible-library.
+  // This component also drives a raw scroll listener off virtualizer.scrollOffset
+  // directly (see updateTopDate below), which is exactly the pattern the rule
+  // warns about. Opting out here only affects this function — DaySection and
+  // everything it renders still gets compiled/memoized normally.
+  //
+  // Note: the compiler already auto-skips memoizing this function because it
+  // detects the incompatible library, so this directive doesn't change
+  // compiled output or silence the lint warning — it just makes the opt-out
+  // explicit and future-proofs against that auto-detection changing. The
+  // eslint warning here is expected and permanent; see eslint.config.js.
   const today = useToday()
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
