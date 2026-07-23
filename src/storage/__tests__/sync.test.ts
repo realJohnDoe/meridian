@@ -103,7 +103,7 @@ vi.mock('@/storage/notifications', () => notifyFns)
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, writeEntityToCache } from '@/storage/sync'
+import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, writeEntityToCache, reconcileWithBackend } from '@/storage/sync'
 import { setActiveBackend } from '@/storage/activeBackend'
 import { cacheWrite, cacheWriteTombstone } from '@/storage/cache'
 
@@ -706,5 +706,105 @@ describe('writeEntityToCache — self-heal delete guard', () => {
 
     const cached = cacheStore.get(vp('fake-vault', 'note.md'))
     expect(cached?.dirty).toBe(2)
+  })
+})
+
+// ── In-flight write registry ──────────────────────────────────────────────
+//
+// setData updates the store synchronously, but the matching Dexie write
+// lands later (a real IndexedDB round trip in production). A reconcile
+// landing in that gap sees dirty===0 for a path that is, in fact, about to
+// change — and could merge remote content over it, or worse, resurrect a
+// note whose delete is still in flight (mergeChangedIntoStore would re-add
+// it and nothing would ever evict it again). _inFlightPaths closes that gap:
+// marked synchronously, before writeEntityToCache/deleteFromBackend's first
+// await, so it is never observably absent while a write is outstanding.
+
+describe('in-flight write registry — protects against a concurrent reconcile', () => {
+  const oneItem = () => [{ date: '', time: null, source: 'explicit' as const, fileSlug: 'note', id: 'i1', metadata: {} }]
+
+  it('a reconcile landing mid-write does not pull remote content over the pending write', async () => {
+    const backend = new FakeBackend()
+    backend.seed('note.md', 'remote content', 'v2') // genuinely absent from (not yet reflected in) the cache
+    setActiveBackend(backend)
+    storeState.items = oneItem()
+    storeState.roots = new Map([['note', { title: 'Note', tags: [], items: [] }]])
+
+    const originalCacheWrite = vi.mocked(cacheWrite).getMockImplementation()!
+    let releaseWrite!: () => void
+    const gate = new Promise<void>(resolve => { releaseWrite = resolve })
+    vi.mocked(cacheWrite).mockImplementationOnce(async (...args: Parameters<typeof cacheWrite>) => {
+      await gate
+      return originalCacheWrite(...args)
+    })
+
+    // markInFlight('note.md') fires synchronously inside writeEntityToCache,
+    // before its first await — so it is already in effect the instant this
+    // call returns control here, well before cacheWrite's gated write settles.
+    const writePromise = writeEntityToCache('note')
+
+    await reconcileWithBackend(backend, 'fake-vault')
+    expect(backend.readFilesCallCount).toBe(0)
+    expect(backend.readAllCallCount).toBe(0)
+
+    releaseWrite()
+    await writePromise
+
+    // The write itself still lands once released.
+    expect(cacheStore.get(vp('fake-vault', 'note.md'))?.dirty).toBe(1)
+  })
+
+  it('overlapping writes for the same slug both settle safely, with reconcile blocked throughout', async () => {
+    // Not a Set-vs-Map discriminating test: once either write's cacheWrite
+    // call actually lands, planReconcile's own dirty!==0 check already
+    // protects the record independently of skipPaths, so this passes either
+    // way. It still pins the sane outcome for the overlap the refcount
+    // targets — no crash, reconcile still blocked mid-overlap, last write
+    // wins — see _inFlightPaths' doc comment for why the refcount is kept
+    // anyway (the nested self-heal case, and not relying on that coincidence).
+    const backend = new FakeBackend()
+    backend.seed('note.md', 'remote content', 'v2')
+    setActiveBackend(backend)
+    storeState.items = oneItem()
+    storeState.roots = new Map([['note', { title: 'Note', tags: [], items: [] }]])
+
+    const originalCacheWrite = vi.mocked(cacheWrite).getMockImplementation()!
+    let releaseA!: () => void
+    let releaseB!: () => void
+    const gateA = new Promise<void>(resolve => { releaseA = resolve })
+    const gateB = new Promise<void>(resolve => { releaseB = resolve })
+    vi.mocked(cacheWrite)
+      .mockImplementationOnce(async (...args: Parameters<typeof cacheWrite>) => { await gateA; return originalCacheWrite(...args) })
+      .mockImplementationOnce(async (...args: Parameters<typeof cacheWrite>) => { await gateB; return originalCacheWrite(...args) })
+
+    const writeA = writeEntityToCache('note')
+    const writeB = writeEntityToCache('note')
+
+    releaseA()
+    await writeA // the first write settles; the second is still in flight
+
+    await reconcileWithBackend(backend, 'fake-vault')
+    expect(backend.readFilesCallCount).toBe(0) // still blocked
+
+    releaseB()
+    await writeB
+
+    expect(cacheStore.get(vp('fake-vault', 'note.md'))?.dirty).toBe(1)
+  })
+
+  it('clears its mark on the self-heal skip path (root exists, no items yet)', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    storeState.items = [] // no items yet
+    storeState.roots = new Map([['note', { title: 'Note', tags: [], items: [] }]]) // root already exists
+
+    await writeEntityToCache('note') // takes the self-heal "skip" branch — warns and returns
+
+    // A leaked mark here would keep 'note.md' in skipPaths forever, hiding a
+    // genuine remote delete from ever being reconciled.
+    seedClean('fake-vault', 'note.md', 'old content', 'v1', 0) // long-past updatedAt — outside PR1's grace window
+    await syncToBackend()
+
+    expect(cacheStore.has(vp('fake-vault', 'note.md'))).toBe(false)
   })
 })
