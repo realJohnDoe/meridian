@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useLayoutEffect, useRef, useState, useCallback, type MouseEvent } from 'react'
+import { useMemo, useLayoutEffect, useRef, useState, useCallback, type MouseEvent } from 'react'
 import { startOfDay } from 'date-fns'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useStore } from '@/store'
@@ -13,7 +13,7 @@ import { occState } from '@/occView'
 import { dvBlockVariants, occPillRounded } from '@/components/ui/occurrence-variants'
 import { ContinuationChevron, CONTINUES_PADDING_ALWAYS } from '@/components/ui/continuation-chevron'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useToday, useFilteredOccs } from '@/hooks'
+import { useToday, useFilteredOccs, useNow } from '@/hooks'
 import { computeColumns } from './computeColumns'
 
 // Layout constants below feed JS pixel math (scrollTo, pointer-offset calcs
@@ -69,6 +69,12 @@ interface AllDayItemProps {
   continuesLeft?: boolean
   continuesRight?: boolean
 }
+// occState(o) here intentionally keeps its default (true wall clock), not the
+// pane's clockValue — clockValue freezes at `today` midnight for non-today
+// panes (see clockValue's own comment below), which would misclassify a
+// cross-midnight timed duration in this pane's own day. sortOccs (below) has
+// no such fallback available since it runs inside a memo, so it accepts that
+// rare imprecision; painting doesn't need to.
 function AllDayItem({ o, onOpen, displayTitle, continuesLeft, continuesRight }: AllDayItemProps) {
   const title = displayTitle ?? o.metadata.title
   return (
@@ -119,6 +125,8 @@ interface EventBlockProps {
   hour12: boolean
   onOpen: (o: Occurrence) => void
 }
+// See AllDayItem's comment above: occState(o) intentionally keeps its
+// default wall-clock instant rather than the pane's clockValue.
 function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen }: EventBlockProps) {
   const h   = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
   const top = h * HP + TOP_PAD + 1
@@ -204,12 +212,23 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
   const dvTo   = new Date(dvDate); dvTo.setHours(23, 59, 59)
   const dvOccs = useFilteredOccs(useExpandWithMultiday(items, roots, dvFrom, dvTo))
 
+  // Only ticks for the pane showing today — other panes don't need a live
+  // clock for the current-time indicator below, and keep whatever value they
+  // mounted with for clockValue's sake.
+  const now = useNow(60_000, sameDay(dvDate, today))
+  // The value sortOccs (below) requires: the live tick for today's pane,
+  // otherwise `today`. Safe for sortOccs's own day-granular grouping/ordering
+  // in every case except a cross-midnight timed duration in this exact pane's
+  // day — see AllDayItem's comment for why painting doesn't inherit this
+  // same imprecision (it keeps using the true wall clock instead).
+  const clockValue = sameDay(dvDate, today) ? now : today
+
   const { allDay, cols } = useMemo(() => {
-    const sorted = sortOccs(dvOccs)
+    const sorted = sortOccs(dvOccs, clockValue)
     const allDay = sorted.filter(o => !fmtT(o.time))
     const timed  = sorted.filter(o =>  !!fmtT(o.time))
     return { allDay, cols: computeColumns(timed) }  // cols: LayoutEvent[][]
-  }, [dvOccs])
+  }, [dvOccs, clockValue])
 
   const scRef = useRef<HTMLDivElement | null>(null)
   const setScrollerRef = useCallback((el: HTMLDivElement | null) => {
@@ -234,13 +253,6 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
     // cross-pane mirror in DayView, not by getInitialScrollTop changing later.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    if (!sameDay(dvDate, today)) return
-    const id = setInterval(() => setNow(new Date()), 60_000)
-    return () => clearInterval(id)
-  }, [dvDate, today])
 
   const totalCols = Math.max(cols.length, 1)
   const isToday   = sameDay(dvDate, today)

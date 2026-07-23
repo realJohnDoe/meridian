@@ -165,7 +165,12 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
         rootsById.set(o.id, o)
       }
     }
-    for (const [k, arr] of dayMap) dayMap.set(k, sortOccs(arr))
+    // Unlike AgendaView/DayPane, this partition isn't inside a useMemo — it
+    // reruns on every render — so calling the wall clock directly here is
+    // exactly as fresh as occState(o)'s own default below, with no memo
+    // dependency to keep honest and no need for a ticking clock.
+    const now = new Date()
+    for (const [k, arr] of dayMap) dayMap.set(k, sortOccs(arr, now))
     return { occsByDay: dayMap, multidayLanes: computeMultidayLanes([...rootsById.values()]) }
   })()
 

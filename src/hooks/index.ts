@@ -1,4 +1,5 @@
 export { useToday } from './useToday'
+export { useNow } from './useNow'
 export { useOpenEntry } from './useOpenEntry'
 export { NO_PARTICIPANT, useCalendarFilter, useFilteredOccs } from './useCalendarFilter'
 export { useMediaQuery } from './use-media-query'

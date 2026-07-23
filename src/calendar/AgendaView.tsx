@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect, useRef, useState } from 'react'
+import { useMemo, useCallback, useEffect, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useStore } from '@/store'
 import type { Occurrence, EditScope } from '@/types'
@@ -12,7 +12,7 @@ import DaySection from './DaySection'
 import OverdueSection from './OverdueSection'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useToday, useFilteredOccs } from '@/hooks'
+import { useToday, useFilteredOccs, useNow } from '@/hooks'
 
 const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 
@@ -62,6 +62,14 @@ export default function AgendaView({ onOpen }: Props) {
   const to = addDays(today, 90)
   const allOccs = useFilteredOccs(useExpandWithMultiday(items, roots, from, to))
 
+  // Today's occurrences (and any occurrence whose event-past/event-future
+  // state is instant-sensitive, e.g. a cross-midnight timed duration) can
+  // flip purely from the clock advancing, with no store change to trigger a
+  // re-render — so `sections` below depends on this ticking value to stay
+  // honestly sorted, at the cost of a full re-sort once a minute (measured
+  // negligible even at ~455 sections; see occSort's decorate-sort-undecorate).
+  const now = useNow(60_000)
+
   // Group occurrences by day.
   const groups = useMemo(() => {
     const result: Record<string, { date: Date; items: Occurrence[] }> = {}
@@ -98,11 +106,11 @@ export default function AgendaView({ onOpen }: Props) {
     const sortedKeys = Object.keys(groups).sort()
     const pastKeys = sortedKeys.filter(k => k < todayKey)
     const currentKeys = sortedKeys.filter(k => k >= todayKey)
-    const overdueItems = sortOccs(pastKeys.flatMap(k => groups[k].items.filter(isOverdue)))
+    const overdueItems = sortOccs(pastKeys.flatMap(k => groups[k].items.filter(isOverdue)), now)
 
     const out: Section[] = []
     for (const k of pastKeys) {
-      const dayItems = sortOccs(groups[k].items.filter(o => !isOverdue(o)))
+      const dayItems = sortOccs(groups[k].items.filter(o => !isOverdue(o)), now)
       if (!dayItems.length) continue
       out.push({ kind: 'day', key: k, dateKey: k, date: groups[k].date, isToday: false, isTomorrow: false, items: dayItems })
     }
@@ -115,36 +123,11 @@ export default function AgendaView({ onOpen }: Props) {
         kind: 'day', key: k, dateKey: k, date: g.date,
         isToday: sameDay(g.date, today),
         isTomorrow: sameDay(g.date, addDays(today, 1)),
-        items: sortOccs(g.items),
+        items: sortOccs(g.items, now),
       })
     }
     return out
-  }, [groups, today])
-
-  // Today's occurrences can flip event-past/event-future purely from the clock
-  // advancing, with no store change to trigger a re-render. Re-sort just
-  // today's (small) item list once a minute so time-based reordering stays
-  // live — cheap, unlike re-sorting the whole (up to ~455-day) `sections`
-  // list. `now` is also threaded down through DaySection to OccurrenceRow,
-  // which uses it (alongside `occ`) as a real, comparable input to occState()
-  // — so a tick correctly repaints today's rows even when their order
-  // doesn't change. new Date() is called from the interval callback, not
-  // during render, so this stays pure.
-  const [now, setNow] = useState<Date>(() => new Date())
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60_000)
-    return () => clearInterval(id)
-  }, [])
-  const todayKey = fmtISO(today)
-  const todayItems = useMemo(
-    () => sortOccs(groups[todayKey].items),
-    // `now` isn't read in the body — sortOccs computes its own instant — but it
-    // must stay a dep so this re-sorts once a minute even when groups/todayKey
-    // haven't changed (an occurrence can cross event-past/event-future purely
-    // from the clock, moving where it belongs in the sort order).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [groups, todayKey, now],
-  )
+  }, [groups, today, now])
 
   // Stable references so DaySection's memo comparator isn't short-circuited
   // by new function identities on every AgendaView render.
@@ -255,7 +238,7 @@ export default function AgendaView({ onOpen }: Props) {
                     date={section.date}
                     isToday={section.isToday}
                     isTomorrow={section.isTomorrow}
-                    items={section.isToday ? todayItems : section.items}
+                    items={section.items}
                     now={section.isToday ? now : undefined}
                     onOpen={onOpen}
                     onToggleDone={handleToggleDone}
