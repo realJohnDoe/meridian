@@ -113,9 +113,31 @@ D. Architecture
     In the end, the best contenders were GitHub, Dropbox and Microsoft OneDrive. See also ./storage-backend-survey.md for more details.
 
 20. What was the single hardest architectural problem to get right? (recurrence? sync? the occurrence model?)
+
+    I think caching is still the weakest point.
+    We have Zustand for some UI caches (please correct me if I got this wrong), and a DexieDB to cache file content while we are not synced with the storage backend.
+    Together with the storage backend and React states, that makes for 4-5 layers of state that need to sync correctly.
+    This produced many bugs and I am still not fully confident that I wont find some more.
+
 21. The recurrence model sounds deep. Why did you invest so much there — was existing recurrence really that bad?
+
+    The industry standard is iCal (RFC 5545).
+    I just found that the rdate and rrule strings are really hard to parse inside a yml frontmatter for a non-techie.
+    But if compatibility with iCal turn out to be showstoppers, I am all fine with adding support for it or even completely migrating to it.
+
 22. Anything about the architecture you're quietly proud of that a normal user would never notice?
+
+    I took particular care of making dependencies local, i.e. trying to put closely connected code in the same directory, nest low-connected code deeper in directories and put code that couples to a lot of places higher in the directory hierarchy.
+    This results in a quite intuitive code structure from my experience.
+    I also ran some AI health surveys regularly, see e.g. ./health-survey.md.
+    These uncovered a lot of problems and improved the architecture a lot over time.
+
 23. Are there architectural trade-offs you consciously accepted (e.g. no server means no X)?
+
+    I think the biggest one is the design decision to only link against files, not against single occurrences, because inventing a link format for single occurrences felt too hacky.
+    The difference between a file and an occurrence is something that reappears multiple times through the app, e.g. the editing scopes, the file to occurrence map used to decide which occurrence to show in the UI etc.
+    I accepted this friction because showing all occurrences for a file to the user seemed like an even worse idea.
+    Maybe, I will find a way to resolve this in the future, but for now, the compromise holds up quite well I would say.
 
 E. Features
 
