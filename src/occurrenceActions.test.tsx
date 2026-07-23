@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { beginSwipeDelete } from './occurrenceActions'
+import { beginSwipeDelete, toggleOccDone, reopenOcc } from './occurrenceActions'
 import { Toaster } from '@/components/ui/sonner'
 import { useStore } from '@/store'
 import { setupStore, seedStore, installFakePersistence, makeOcc, makeSeries, makeRoots } from '@/test-utils'
-import type { Roots, StoreItem } from '@/types'
+import type { Roots, StoreItem, StoreOcc } from '@/types'
 
 setupStore()
 const persistence = installFakePersistence()
@@ -148,5 +148,71 @@ describe('beginSwipeDelete', () => {
     flushToastMount()
 
     expect(screen.getByText(/this series only repeats after completion/)).toBeInTheDocument()
+  })
+})
+
+describe('toggleOccDone', () => {
+  it('flips done to true and persists the file', () => {
+    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    seedStore([occ], makeRoots('note.md'))
+
+    toggleOccDone(occ)
+
+    expect((items().find(i => i.id === 'occ-1') as StoreOcc).metadata.done).toBe(true)
+    expect(persistence.writes).toEqual(['note.md'])
+  })
+
+  it('flips done back to false', () => {
+    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    seedStore([occ], makeRoots('note.md'))
+
+    toggleOccDone(occ)
+
+    expect((items().find(i => i.id === 'occ-1') as StoreOcc).metadata.done).toBe(false)
+  })
+})
+
+describe('reopenOcc', () => {
+  it('reuses an existing undated standalone entry for the same file', () => {
+    const dated = makeOcc({ id: 'occ-1', fileSlug: 'note.md', date: '2026-06-15', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    const undated = makeOcc({ id: 'occ-2', fileSlug: 'note.md', date: '', time: null, metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    seedStore([dated, undated], makeRoots('note.md'))
+
+    reopenOcc(dated)
+
+    expect(items()).toHaveLength(2)
+    expect((items().find(i => i.id === 'occ-2') as StoreOcc).metadata.done).toBe(false)
+    expect(persistence.writes).toEqual(['note.md'])
+  })
+
+  it('creates a fresh undated entry when none exists for the file', () => {
+    const occ = makeOcc({
+      id: 'occ-1', fileSlug: 'note.md', date: '2026-06-15',
+      metadata: { participants: ['alice'], title: 'Standup', tags: [], items: [], done: true, priority: 'high' },
+    })
+    seedStore([occ], makeRoots('note.md'))
+
+    reopenOcc(occ)
+
+    const created = items().find(i => i.id !== 'occ-1') as StoreOcc
+    expect(created).toBeDefined()
+    expect(created.date).toBe('')
+    expect(created.metadata.done).toBe(false)
+    expect(created.metadata.participants).toEqual(['alice'])
+    expect(created.metadata.priority).toBe('high')
+    expect(persistence.writes).toEqual(['note.md'])
+  })
+
+  it('does not reuse an undated entry belonging to a different file', () => {
+    const occA = makeOcc({ id: 'occ-1', fileSlug: 'a.md', date: '2026-06-15', metadata: { participants: [], title: 'A', tags: [], items: [], done: true } })
+    const undatedB = makeOcc({ id: 'occ-2', fileSlug: 'b.md', date: '', time: null, metadata: { participants: [], title: 'B', tags: [], items: [], done: true } })
+    const roots: Roots = makeRoots('a.md', { title: 'A' })
+    roots.set('b.md', { title: 'B', tags: [], items: [] })
+    seedStore([occA, undatedB], roots)
+
+    reopenOcc(occA)
+
+    expect(items()).toHaveLength(3)
+    expect((items().find(i => i.id === 'occ-2') as StoreOcc).metadata.done).toBe(true)
   })
 })

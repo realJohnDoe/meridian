@@ -33,7 +33,7 @@ jobs:
       # is needed above (Request/Response/Env resolve to `any` without it).
       - run: pnpm --filter meridian-oauth-worker run cf-typegen
       - run: pnpm run lint
-      - run: pnpm test
+      - run: pnpm run test:coverage
       - run: pnpm run knip
       - uses: actions/upload-pages-artifact@v5
         with:
