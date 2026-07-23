@@ -54,6 +54,7 @@ C. Philosophy
 
     I noticed the parallels between task scheduling and calendar events, and was wondering why no existing app except Google Calendar exploits this.
     Of course, Obsidian and it's TaskNotes plugin also contributed to this way of thinking and showed me how much can be done with just markdown + frontmatter yaml.
+    Ny strong Python background with it's duck typing probably also contributed unconsciously.
 
 12. "Lists model hierarchies" and "a task is a list with a done property" is a genuinely unusual mental model. How would you defend it to a skeptic who thinks it's over-abstraction?
 
@@ -63,7 +64,7 @@ C. Philosophy
     And I thought: Maybe some users don't even know about wikilinks and backlinks yet and to them, those might be quite abstract concepts. On the other hand. Everybody knows lists and has used them.
     So why not just say: Everything is a list and instead of tags, we display all the lists an item is listed on. This is what Meridian does now.
 
-    Futhermore, Most Todo Apps have some notion of projects or subtasks. Lists are just a generalization of this which does not require you to answer the question "Is this a task, a subtask or a project". You only need to answer the question "Is this done at some point and do you want to track if its done?" which I find more pragmatic.
+    Futhermore, Most Todo Apps have some notion of projects or subtasks. Lists are just a generalization of such hierarchies, which do not require you to answer the question "Is this a task, a subtask or a project". You only need to answer the question "Is this done at some point and do I want to track if its done?" which I find more pragmatic.
 
 13. Why Markdown specifically, over a database or JSON or a proprietary format? What's the emotional core of "it's yours"?
 
@@ -75,8 +76,10 @@ C. Philosophy
 14. Have you ever actually needed the "read the file to debug it" property in real life? A story here would land well.
 
     Yepp, a lot. Meridian's recurrence schema is quite sophisticated, and because all the code was written with AI, there were a lot of bugs to hunt down.
+    A handful of times, I just told Claude "Here is the file, here is what Meridian does and here is what should happen instead".
+    Such a starting point makes debugging quite easy.
     I even wrote a separate debug page to visualize how the yaml is converted to repeat patterns and single occurrences, and how the repeat patterns are expanded.
-    In the beginning, moving occurrences to different times did not work properly, cancelling occurrences sometimes did not work, or an expansion would end on the wrong date.
+    For example, in the beginning, moving occurrences to different times did not work properly, cancelling occurrences sometimes did not work, or an expansion would end on the wrong date.
     As mentioned, there were _many_ bugs.
 
 15. How much does the "LLM-friendly format" angle matter to you personally vs. it being a nice bonus? (I'll weight it accordingly.)
