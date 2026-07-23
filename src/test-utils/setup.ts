@@ -7,6 +7,7 @@ if (typeof window !== 'undefined') {
   // useMediaQuery) calls window.matchMedia directly, so any render throws
   // without a stub. Default to "matches" for min-width queries so
   // ResponsiveModal renders the Radix Dialog branch, not the Vaul drawer.
+  // eslint-disable-next-line @typescript-eslint/unbound-method -- polyfill assignment, never called unbound
   window.matchMedia ??= ((query: string) =>
     ({
       matches: query.includes('min-width'),
