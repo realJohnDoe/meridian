@@ -15,7 +15,7 @@ lists lived in [Google Keep](https://keep.google.com).
 None of these apps are bad. What bothered me was the seams between them — and two
 things I couldn't fix by switching to a different combination.
 
-The first: I want to keep track of our child's calendar, but she doesn't need a Google account. Every
+The first: I want to keep track of our daugther's calendar, but she doesn't need a Google account. Every
 system I tried wanted her to _be a user_ before she could _have a calendar_. I wanted
 something closer to the paper calendar on the kitchen wall: everyone writes on it,
 everyone reads it, nobody owns it. The corporate version of the same problem shows up at
@@ -83,7 +83,7 @@ Occurrences that wouldn't move. Cancellations that didn't stick. Series that exp
 day past where they should. Debugging a normal calendar app means reasoning about a
 database you can't see. Debugging this one meant pasting a file into a chat and saying
 "here's what happens, here's what should happen." I eventually built a
-[debug page](https://github.com/realJohnDoe/meridian/blob/main/debug.html) that
+[debug page](https://github.com/realJohnDoe/meridian/blob/main/src/debug/NodeInheritanceDebugger.tsx) that
 visualizes how the YAML becomes repeat patterns and occurrences, which made the rest
 almost mechanical.
 
@@ -104,8 +104,7 @@ either hand the app access to _everything_ in your account, or don't send CORS h
 a browser app simply can't talk to them. I wrote the whole comparison up in
 [plans/storage-backend-survey.md](https://github.com/realJohnDoe/meridian/blob/main/plans/storage-backend-survey.md) —
 Dropbox and OneDrive are the strongest future candidates. GitHub won for now because it
-gives you a real repository, free version history, and works on every device including
-iOS.
+is already used by a lot of developers and gives you a real repository with free version history.
 
 The part I'm quietly happy about is invisible: the code is organized so that tightly
 coupled things live close together and widely used things live high up. That, plus
