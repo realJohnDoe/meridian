@@ -12,8 +12,8 @@ import type { CacheRecord } from '@/storage/cache'
 
 // ── Helpers ────────────────────────────────────────────────────
 
-function rec(path: string, version: string | undefined, dirty: number): CacheRecord {
-  return { vaultPath: `v::${path}`, vaultId: 'v', path, content: '', dirty, updatedAt: 0, version }
+function rec(path: string, version: string | undefined, dirty: number, updatedAt = 0): CacheRecord {
+  return { vaultPath: `v::${path}`, vaultId: 'v', path, content: '', dirty, updatedAt, version }
 }
 
 // ── Tests ──────────────────────────────────────────────────────
@@ -129,5 +129,63 @@ describe('planReconcile — dropping vanished files', () => {
 
     const { deleted } = planReconcile(diskTokens, cache)
     expect(deleted).toEqual([])
+  })
+})
+
+describe('planReconcile — grace window for recently-written records', () => {
+  // GitHub's git-trees listing is eventually consistent: right after a push,
+  // statAll can omit the file entirely for a while. Without a grace window
+  // that silence reads as "deleted remotely" and evicts the slug from the
+  // cache and the store, breaking anything that links to it.
+
+  it('does not drop a clean record written moments ago that the listing omits', () => {
+    const diskTokens = new Map<string, string>()
+    const cache = [rec('new.md', 'sha1', 0, 1_000_000)]
+
+    const { deleted } = planReconcile(diskTokens, cache, new Set(), 1_030_000)
+    expect(deleted).toEqual([])
+  })
+
+  it('drops it once the grace window has elapsed', () => {
+    const diskTokens = new Map<string, string>()
+    const cache = [rec('new.md', 'sha1', 0, 1_000_000)]
+
+    const { deleted } = planReconcile(diskTokens, cache, new Set(), 1_000_000 + 5 * 60_000 + 1)
+    expect(deleted).toEqual(['new.md'])
+  })
+
+  it('drops it exactly at the window boundary', () => {
+    const diskTokens = new Map<string, string>()
+    const cache = [rec('new.md', 'sha1', 0, 1_000_000)]
+
+    const { deleted } = planReconcile(diskTokens, cache, new Set(), 1_000_000 + 5 * 60_000)
+    expect(deleted).toEqual(['new.md'])
+  })
+
+  it('does not suppress the changed branch for a recently-written record', () => {
+    // The grace window is delete-only: the changed branch confirms itself via
+    // a fresh read, so a stale listing there costs a redundant read, not a
+    // wrong outcome — it must never be exempted from re-pulling.
+    const diskTokens = new Map([['task.md', 'sha2']])
+    const cache = [rec('task.md', 'sha1', 0, 1_000_000)]
+
+    const { changed } = planReconcile(diskTokens, cache, new Set(), 1_030_000)
+    expect(changed).toEqual(['task.md'])
+  })
+
+  it('still drops a record last touched long ago (genuine remote delete)', () => {
+    const diskTokens = new Map<string, string>()
+    const cache = [rec('gone.md', 'sha1', 0)] // updatedAt: 0 (default)
+
+    const { deleted } = planReconcile(diskTokens, cache, new Set(), Date.now())
+    expect(deleted).toEqual(['gone.md'])
+  })
+
+  it('defaults `now` to the current clock when omitted', () => {
+    const diskTokens = new Map<string, string>()
+    const cache = [rec('gone.md', 'sha1', 0)] // updatedAt: 0, always outside the window
+
+    const { deleted } = planReconcile(diskTokens, cache)
+    expect(deleted).toEqual(['gone.md'])
   })
 })
