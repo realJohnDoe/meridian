@@ -44,16 +44,6 @@ This is one of the healthiest codebases I've surveyed: the documented architectu
 
 **Fix:** Resolve the decision this branch's name implies: either swap these two lists to a component-API virtualizer that doesn't fight the compiler (e.g. react-virtuoso — verify its compiler compatibility empirically, not from its README), or add `'use no memo'` directives to the two components and record that as the accepted trade-off.
 
-### #6 — TS language target lags the declared es2022 runtime
-
-**Category:** `toolchain` `dependencies` · **Impact:** 2 · **Breadth:** 2 config files · **Fix effort:** S
-
-**Evidence:** [tsconfig.app.json](../tsconfig.app.json) — `"target": "ES2020",` / `"lib": ["ES2020", "DOM", "DOM.Iterable"]` vs [vite.config.ts:186](../vite.config.ts#L186) — `target: ['es2022', 'chrome102', 'firefox102', 'safari16'],` with the comment "aligns with the actual runtime requirements."
-
-**Problem:** The type system forbids ES2021/22 idioms (`.at()`, `Object.hasOwn`, error `cause`, top-level await typing) that the build and every supported browser already accept — an "unused newer feature" of the installed toolchain per the project's own runtime declaration.
-
-**Fix:** Bump `target`/`lib` to `ES2022` in `tsconfig.app.json` (and the worker's tsconfig if it lags too); zero runtime effect since `noEmit`.
-
 ### #7 — Vault activation logic duplicated between restore and switch paths
 
 **Category:** `dry` `srp` · **Impact:** 3 · **Breadth:** 1 file (4 near-duplicate blocks) · **Fix effort:** M
