@@ -42,14 +42,19 @@ interface Props {
 }
 
 export default function SettingsDialog({ open, onOpenChange }: Props) {
-  const [step,            setStep]            = useState<Step>('vault')
-  const [selectedVaultId, setSelectedVaultId] = useState<string | null>(null)
-
   const { theme, setTheme } = useTheme()
   const activeTheme         = theme ?? 'meridian'
 
   const vaults        = useStore(s => s.vaults)
   const activeVaultId = useStore(s => s.activeVaultId)
+
+  const [step,            setStep]            = useState<Step>('vault')
+  // Lazy-initialized because this component mounts already `open` (gated behind
+  // `hasOpenedSettings` in Sidebar), so there's no false->true transition for
+  // `useResetOnChange` below to react to on the first render.
+  const [selectedVaultId, setSelectedVaultId] = useState<string | null>(
+    () => activeVaultId ?? vaults[0]?.id ?? null,
+  )
 
   function handleOpenChange(v: boolean) {
     if (v) {
