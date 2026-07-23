@@ -124,8 +124,7 @@ is its own story, and its own article.)_
 Here's the part I want to be honest about, because it's the real shape of the project.
 
 Four days in, I stopped building features and built a
-[debugger](https://github.com/realJohnDoe/meridian/blob/main/src/debug/NodeInheritanceDebugger.tsx)
-instead: a page
+[debugger](https://github.com/realJohnDoe/meridian/tree/main/src/debug) instead: a page
 that shows how a YAML file becomes repeat patterns, how those patterns expand into
 occurrences, and what happens to the file when you cancel or move one. That felt like a
 detour. It was the single highest-leverage thing I built.
