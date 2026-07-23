@@ -44,16 +44,6 @@ This is one of the healthiest codebases I've surveyed: the documented architectu
 
 **Fix:** Resolve the decision this branch's name implies: either swap these two lists to a component-API virtualizer that doesn't fight the compiler (e.g. react-virtuoso — verify its compiler compatibility empirically, not from its README), or add `'use no memo'` directives to the two components and record that as the accepted trade-off.
 
-### #4 — TypeScript 7 major available; the rest is one safe minor sweep
-
-**Category:** `dependencies` · **Impact:** 4 · **Breadth:** 2 workspaces (`pnpm outdated`: 28 outdated rows in root, 3 in `worker/`) · **Fix effort:** M
-
-**Evidence:** [package.json:85](../package.json#L85) — `"typescript": "~6.0.0"` — registry reports 6.0.3 current vs **7.0.2 latest** (both workspaces).
-
-**Problem:** The only real version gaps are one major (TS 7) and a pile of in-range minors/patches; nothing is abandoned or vulnerable (audit: 1 low), but the tilde pin means TS stays on 6.0.x until someone acts deliberately.
-
-**Fix (sequencing):** PR 1 — batch the safe sweep (`pnpm update` both workspaces: all Radix/CodeMirror/TanStack/react/vite/tailwind minors + `@eslint-react` 5.17, `@typescript-eslint` 8.65, `eslint` 10.7, `wrangler` 4.113), gated by `pnpm run build && pnpm run lint && pnpm test && pnpm --filter meridian-oauth-worker test`; PR 2 — try TS 7 on a branch, gating risk being `@typescript-eslint@8.65`'s TS-7 support matrix and `tsc -b` behavior, same green command as verdict; leave `@types/node` at 22 (CI/production run Node 22 — upgrading past the runtime would be drift in the other direction).
-
 ### #5 — `tsconfig.app.json` excludes `*.test.ts` but not `*.test.tsx`
 
 **Category:** `toolchain` · **Impact:** 2 · **Breadth:** 7 files (`git ls-files 'src/**/*.test.tsx'`) · **Fix effort:** S
