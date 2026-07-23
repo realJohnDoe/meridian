@@ -34,15 +34,20 @@ ones I started with.
 
 ## What I knew before I wrote any code
 
-Not much, and all of it small.
+Not much, and all of it small — but I wrote it down. The first message of the chat that
+became Meridian asked for "a markdown / yaml based web app for notes, tasks and calendar
+events," where each entry is a Markdown file with frontmatter (or just YAML, when it has
+no body). The important part was a negative: I did _not_ want to model the entity types
+explicitly. A thing would be a task because it had a `done` field, an event because it
+had a `date`, a note because it had neither. Type was something you read off the
+metadata, never something you declared.
 
-I knew I wanted tasks and calendar events as Markdown files with YAML frontmatter. Once
-you have those two, notes come for free: a note is just an entry without a due date or a
-done flag. I knew I wanted `[[wikilinks]]` between entries, because wikis rise and fall
-on how well they're interlinked. And I knew I wanted those first-class tags.
+On top of that: `[[wikilinks]]` between entries, because wikis rise and fall on how well
+they're interlinked; nested tasks shown inline; and one message later, tags that are
+themselves entries, so a tag can carry its own description and body.
 
 That's the whole premise. Everything else in this article is a consequence of it that I
-didn't see coming.
+didn't see coming — including the idea I now put first.
 
 ## A prototype, and a year of not building it
 
@@ -73,14 +78,17 @@ me, and no amount of plugin configuration was going to close it.
 
 ## A hundred versions on a phone
 
-So this spring I started over, on my phone, in a single very long chat session — just
-Markdown files in a directory and a hand-written HTML app. I spent something like a
-hundred iterations there, almost all of them on one question: what should the frontmatter
-actually look like?
+So this spring I started over on my phone, in a single very long chat session, and built
+a prototype I called **plaintext-os**. I iterated on it something like a hundred times —
+most of those on one question, what the frontmatter should actually look like, and the
+rest on making it usable. Somewhere in the middle it got the name Meridian.
 
 It worked. That was the problem. It worked well enough that I could see the real version
-of this app, and simultaneously that a giant pile of generated HTML was never going to
-survive contact with it.
+of the app — and that a single ever-growing generated file was never going to survive
+contact with it. It gave me one other preview, too: the first time I pointed it at a real
+GitHub repo it died with `failed to fetch`. A sandboxed prototype can't call the GitHub
+API from the browser — a small foretaste of a wall I'd hit again, for real, when it came
+time to choose where the files actually live.
 
 On **2026-05-22** I moved to a desktop, set the prototype aside, and started a proper
 repository: React, TypeScript, Tailwind, shadcn/ui, Vite. The first day's commits
