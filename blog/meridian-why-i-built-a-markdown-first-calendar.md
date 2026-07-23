@@ -36,7 +36,8 @@ I'd tried this before. In spring 2025 I built a prototype called
 used it happily for a year instead. What sent me back was mobile. Obsidian is built for
 notes, and on a phone, tasks and events feel like second-class citizens next to what
 [Google Calendar](https://calendar.google.com) or Todoist do. So this spring I started a
-second prototype and spent about a hundred iterations grinding on one thing: the schema.
+second prototype spent about a hundred iterations grinding on the frontmatter schema and
+a few more hundred iterations on the frontend.
 
 The early version had wikilinks, and tags implemented _as_ wikilinks, and a prominent
 backlinks section on every entry. Then the questions started. A wikilink-as-tag is more
