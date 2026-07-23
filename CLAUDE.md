@@ -60,6 +60,10 @@ CI does exactly this before linting (`.github/workflows/build.yml`), which is wh
 - `src/routeTree.gen.ts` — without it, `Route.useSearch()`/`useParams()` resolve to `any` and `src/` lint fails.
 - `worker/worker-configuration.d.ts` — without it, `Request`/`Response`/`HeadersInit`/`Env` resolve to `any` and **all** of `worker/src` lint fails (~150 errors).
 
+## TypeScript pinned to 6.0.x
+
+`typescript` is intentionally pinned below the TS 7 major in both `package.json` (root) and `worker/package.json`. `typescript-eslint` (even at latest, 8.65.0) hard-refuses to run against TS 7: `eslint` exits with `typescript-eslint does not support TS 7.0`. `vite build`/`tsc -b` themselves are fine under TS 7 — only the lint step breaks. Tracked upstream: https://github.com/typescript-eslint/typescript-eslint/issues/10940 (support for TS ≥7.1). Don't attempt the TS 7 bump again until that lands — re-check the issue first.
+
 ## Directory structure
 
 **Placement rule:** a file moves into a subdirectory only when every caller already lives in that subdirectory (or a layer that naturally depends on it). Do not propose moving a file just because it "feels" like it belongs somewhere — check the actual import graph first.
