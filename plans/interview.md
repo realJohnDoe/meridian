@@ -45,7 +45,7 @@ B. Product
 
 10. Is Meridian "done," or what's the current rough edge you're most aware of?
 
-    It is 'mostly feature-complete'. There are a few things like other storage options or using color for participants instead of types / priorities but mostly it is about bugfixing now.
+    It is 'mostly feature-complete'. There are a few things like file retention periods, other storage options, or using color for participants instead of types / priorities but mostly it is about bugfixing now.
     I am also thinking about multi-vault support or iCal import / sync.
 
 C. Philosophy
