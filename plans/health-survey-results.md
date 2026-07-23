@@ -44,16 +44,6 @@ This is one of the healthiest codebases I've surveyed: the documented architectu
 
 **Fix:** Resolve the decision this branch's name implies: either swap these two lists to a component-API virtualizer that doesn't fight the compiler (e.g. react-virtuoso — verify its compiler compatibility empirically, not from its README), or add `'use no memo'` directives to the two components and record that as the accepted trade-off.
 
-### #5 — `tsconfig.app.json` excludes `*.test.ts` but not `*.test.tsx`
-
-**Category:** `toolchain` · **Impact:** 2 · **Breadth:** 7 files (`git ls-files 'src/**/*.test.tsx'`) · **Fix effort:** S
-
-**Evidence:** [tsconfig.app.json](../tsconfig.app.json) — `"exclude": ["src/**/__tests__/**", "src/**/*.test.ts"]`.
-
-**Problem:** The seven `.test.tsx` files silently fall into the _app_ project (compiled by `tsc -b` alongside production code, contrary to the exclude's evident intent), duplicating work with `tsconfig.test.json` which includes all of `src`.
-
-**Fix:** Change the pattern to `"src/**/*.test.*"` (or `*.test.{ts,tsx}`).
-
 ### #6 — TS language target lags the declared es2022 runtime
 
 **Category:** `toolchain` `dependencies` · **Impact:** 2 · **Breadth:** 2 config files · **Fix effort:** S
