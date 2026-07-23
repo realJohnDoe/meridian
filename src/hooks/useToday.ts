@@ -12,12 +12,24 @@ export function useToday(): Date {
   useEffect(() => {
     let id: ReturnType<typeof setTimeout>
 
+    // Keeps the previous Date reference when the calendar day hasn't actually
+    // changed. startOfToday() always allocates a fresh Date, and React's
+    // bail-out is Object.is, so without this every call below would commit a
+    // new reference and cascade a full re-derivation through every consumer
+    // that depends on `today` (e.g. AgendaView's day grouping/sorting).
+    function setTodayIfChanged() {
+      setToday(prev => {
+        const next = startOfToday()
+        return prev.getTime() === next.getTime() ? prev : next
+      })
+    }
+
     function scheduleNext() {
       const now  = new Date()
       const next = startOfToday()
       next.setDate(next.getDate() + 1)
       id = setTimeout(() => {
-        setToday(startOfToday())
+        setTodayIfChanged()
         scheduleNext()
       }, next.getTime() - now.getTime())
     }
@@ -29,7 +41,7 @@ export function useToday(): Date {
     // missed entirely. Recompute eagerly whenever the tab regains visibility
     // so `today` never stays stuck on a stale date after a long suspend.
     function onVisible() {
-      if (document.visibilityState === 'visible') setToday(startOfToday())
+      if (document.visibilityState === 'visible') setTodayIfChanged()
     }
     document.addEventListener('visibilitychange', onVisible)
 
