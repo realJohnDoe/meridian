@@ -25,7 +25,12 @@ export function FloatingComboboxList({ placement, listRef, className, children }
       // same pattern as editor/WikilinkPopup.tsx.
       onMouseDown={e => e.preventDefault()}
       className={cn(
-        'fixed z-50 rounded-lg border border-input bg-popover p-0 shadow-lg overflow-y-auto',
+        // Radix's modal Dialog/Drawer sets `body { pointer-events: none }` while open and
+        // re-enables it only on its own (registered) layers. This list portals straight to
+        // document.body outside that system, so without an explicit override here it silently
+        // inherits `pointer-events: none` from body and swallows every click when open inside
+        // a modal — the list still renders, but selecting an item does nothing.
+        'pointer-events-auto fixed z-50 rounded-lg border border-input bg-popover p-0 shadow-lg overflow-y-auto',
         'outline-none animate-in fade-in-0 zoom-in-95',
         'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
         className,
