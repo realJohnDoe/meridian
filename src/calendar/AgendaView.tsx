@@ -12,7 +12,7 @@ import DaySection from './DaySection'
 import OverdueSection from './OverdueSection'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useToday, useCalendarFilter } from '@/hooks'
+import { useToday, useFilteredOccs } from '@/hooks'
 
 const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 
@@ -58,11 +58,9 @@ export default function AgendaView({ onOpen }: Props) {
   const roots = useStore(s => s.roots)
   const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
 
-  const { filterOccs } = useCalendarFilter()
-
   const from = addDays(today, -365)
   const to = addDays(today, 90)
-  const allOccs = filterOccs(useExpandWithMultiday(items, roots, from, to))
+  const allOccs = useFilteredOccs(useExpandWithMultiday(items, roots, from, to))
 
   // Group occurrences by day.
   const groups = useMemo(() => {

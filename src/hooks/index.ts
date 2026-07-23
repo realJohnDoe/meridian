@@ -1,6 +1,6 @@
 export { useToday } from './useToday'
 export { useOpenEntry } from './useOpenEntry'
-export { NO_PARTICIPANT, useCalendarFilter } from './useCalendarFilter'
+export { NO_PARTICIPANT, useCalendarFilter, useFilteredOccs } from './useCalendarFilter'
 export { useMediaQuery } from './use-media-query'
 export { useIsTouchDevice } from './use-touch-device'
 export { useVisualViewportHeight, useVisualViewportOffsetTop } from './use-visual-viewport'
