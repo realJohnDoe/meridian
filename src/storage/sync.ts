@@ -1,6 +1,6 @@
 import {
   cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
-  cacheWriteClean, cacheDirtyCount, cacheLoadAll,
+  cacheWriteClean, cacheMarkPushed, cacheDirtyCount, cacheLoadAll,
   cacheWriteTombstone, cacheGetTombstones,
 } from '@/storage/cache'
 import type { CacheRecord } from '@/storage/cache'
@@ -307,7 +307,11 @@ async function pushDirty(
       // throws ConflictError only when the content genuinely diverged — it
       // never false-positives due to stale listing tokens.
       const newVersion = await backend.write(f.path, f.content, f.version)
-      await cacheWriteClean(vaultId, f.path, f.content, newVersion)
+      // cacheMarkPushed (not cacheWriteClean): f.content was captured before
+      // this network round trip, and another edit to this same path may have
+      // landed in the meantime. An unconditional clean write would silently
+      // discard that edit — see its doc comment in cache.ts.
+      await cacheMarkPushed(vaultId, f.path, f.content, newVersion)
       pushed.add(f.path)
     } catch (e) {
       if (e instanceof ConflictError) {

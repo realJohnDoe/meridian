@@ -48,6 +48,15 @@ vi.mock('@/storage/cache', () => ({
     const key = vp(vaultId, path)
     cacheStore.set(key, { vaultPath: key, vaultId, path, content, dirty: 0, updatedAt: Date.now(), version })
   }),
+  cacheMarkPushed: vi.fn(async (vaultId: string, path: string, pushedContent: string, version?: string) => {
+    const key = vp(vaultId, path)
+    const existing = cacheStore.get(key)
+    if (existing && existing.content !== pushedContent) {
+      cacheStore.set(key, { ...existing, version, updatedAt: Date.now() })
+      return
+    }
+    cacheStore.set(key, { vaultPath: key, vaultId, path, content: pushedContent, dirty: 0, updatedAt: Date.now(), version })
+  }),
   cacheBulkWriteClean: vi.fn(async (vaultId: string, records: Array<{ path: string; content: string; version?: string }>) => {
     for (const r of records) {
       const key = vp(vaultId, r.path)
@@ -96,6 +105,7 @@ vi.mock('@/storage/notifications', () => notifyFns)
 // come after the vi.mock calls above.
 import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, writeEntityToCache } from '@/storage/sync'
 import { setActiveBackend } from '@/storage/activeBackend'
+import { cacheWrite, cacheWriteTombstone } from '@/storage/cache'
 
 // ── FakeBackend ──────────────────────────────────────────────────────────
 
@@ -120,6 +130,7 @@ class FakeBackend implements StorageBackend {
   private _deleteErrorQueue:  Error[] = []
   private _statAllErrorQueue: Error[] = []
   private _hidden = new Set<string>()
+  private _pendingWriteGate: Promise<void> | null = null
 
   seed(path: string, content: string, version: string): void {
     this._files.set(path, { content, version })
@@ -137,6 +148,15 @@ class FakeBackend implements StorageBackend {
    * but readFiles()/get() still serve it, matching the real API's split
    * between the trees endpoint and the Contents API. */
   hideFromListing(path: string): void { this._hidden.add(path) }
+
+  /** Holds the next write() call pending until the returned function is
+   * called — simulates a slow network round trip so a test can land a
+   * concurrent local edit while the push is still in flight. */
+  blockNextWrite(): () => void {
+    let release!: () => void
+    this._pendingWriteGate = new Promise<void>(resolve => { release = resolve })
+    return release
+  }
 
   async statAll(): Promise<Map<string, string>> {
     this.statAllCallCount++
@@ -165,6 +185,11 @@ class FakeBackend implements StorageBackend {
   async write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> {
     this.writeCallCount++
     if (this._writeErrorQueue.length) throw this._writeErrorQueue.shift()!
+    if (this._pendingWriteGate) {
+      const gate = this._pendingWriteGate
+      this._pendingWriteGate = null
+      await gate
+    }
     const existing = this._files.get(path)
     if (expectedVersion !== undefined) {
       if (existing === undefined || existing.version !== expectedVersion) throw new ConflictError(path)
@@ -309,6 +334,62 @@ describe('pushDirty — delete-conflict tombstone handling', () => {
     expect(cacheStore.has(vp('fake-vault', 'gone.md'))).toBe(false)
     expect(notifyFns.warn).not.toHaveBeenCalled()
     expect(storeState.syncError).toBeNull()
+  })
+})
+
+// ── Post-push clean write must not clobber a concurrent edit ────────────
+//
+// pushDirty captures a dirty record's content before awaiting backend.write()
+// — a real network round trip. If another edit to that same path lands
+// during the wait, the post-push write must not silently discard it (or
+// resurrect it as clean) just because the push that started earlier
+// finishes later. See cacheMarkPushed's doc comment in cache.ts.
+
+describe('pushDirty — post-push write does not clobber a concurrent edit', () => {
+  it('keeps an edit that lands while the push is still in flight', async () => {
+    const backend = new FakeBackend()
+    backend.seed('task.md', 'original', 'sha1')
+    setActiveBackend(backend)
+    seedDirty('fake-vault', 'task.md', 'C1', 'sha1')
+
+    const release = backend.blockNextWrite()
+    const syncPromise = syncToBackend()
+    await flush() // let pushDirty capture its dirty/tombstone snapshots and reach the blocked write
+
+    // Lands while backend.write('task.md', 'C1', ...) is still pending.
+    await cacheWrite('fake-vault', 'task.md', 'C2')
+    release()
+    await syncPromise
+
+    const cached = cacheStore.get(vp('fake-vault', 'task.md'))
+    expect(cached?.content).toBe('C2')
+    expect(cached?.dirty).toBe(1)
+    // The base version still advances, so the next push CASes against what
+    // was actually written to the backend.
+    expect(cached?.version).toBe('v1')
+  })
+
+  it('keeps a tombstone staged while the push is still in flight, with the fresh version', async () => {
+    const backend = new FakeBackend()
+    backend.seed('task.md', 'original', 'sha1')
+    setActiveBackend(backend)
+    seedDirty('fake-vault', 'task.md', 'C1', 'sha1')
+
+    const release = backend.blockNextWrite()
+    const syncPromise = syncToBackend()
+    await flush() // let pushDirty capture its dirty/tombstone snapshots and reach the blocked write
+
+    // The file is deleted locally while the earlier edit's push is in flight —
+    // after pushDirty already captured its (empty) tombstone snapshot, so this
+    // tombstone is NOT swept into the same pushDirty call's tombstone loop.
+    await cacheWriteTombstone('fake-vault', 'task.md')
+    release()
+    await syncPromise
+
+    const cached = cacheStore.get(vp('fake-vault', 'task.md'))
+    expect(cached?.dirty).toBe(2)
+    expect(cached?.content).toBe('')
+    expect(cached?.version).toBe('v1')
   })
 })
 
