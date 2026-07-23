@@ -1,7 +1,20 @@
-import { useLayoutEffect, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { cn } from '@/lib/cn'
 
+// The column geometry is load-bearing and must stay consistent: the viewport is
+// exactly three rows tall (h-30 = 120px), rows and spacers are one row (h-10),
+// and the highlight sits on the middle row (top-10 h-10). Because the
+// viewport is a whole number of rows, `snap-center` resolves to exactly
+// `idx * ITEM_H` — the same offset the programmatic scroll writes and the same
+// one the highlight is drawn at. A viewport height that isn't a multiple of
+// ITEM_H shifts every snap point by half the remainder, which leaves the wheel
+// permanently resting off its highlight.
 const ITEM_H = 40 // px per visible row
+
+// How long the scroller has to be quiet before we consider it settled. Snap
+// normally lands it on a row by itself; this is the safety net for a snap that
+// got interrupted (a tap landing mid-fling on iOS) and left it between rows.
+const SETTLE_MS = 120
 
 interface ScrollColumnProps {
   items: number[]
@@ -12,30 +25,44 @@ interface ScrollColumnProps {
 }
 
 function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps) {
-  const ref    = useRef<HTMLDivElement>(null)
-  const syncing = useRef(false)
+  const ref = useRef<HTMLDivElement>(null)
+  // Index this column last reported upward. `value` echoing that index back is
+  // our own scroll coming home, not an external change — writing scrollTop for
+  // it would fight the in-flight momentum/snap animation and strand the wheel
+  // between rows.
+  const emitted = useRef<number | null>(null)
+  const settleId = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const idx = items.indexOf(value)
-    if (idx < 0) return
-    syncing.current = true
+    if (idx < 0 || idx === emitted.current) return
     el.scrollTop = idx * ITEM_H
-    requestAnimationFrame(() => { syncing.current = false })
   }, [value, items])
 
+  useEffect(() => () => clearTimeout(settleId.current), [])
+
   const handleScroll = useCallback(() => {
-    if (syncing.current) return
     const el = ref.current
     if (!el) return
-    const idx = Math.round(el.scrollTop / ITEM_H)
-    const v = items[Math.max(0, Math.min(idx, items.length - 1))]
-    if (v !== value) onChange(v)
+    const idx = Math.max(0, Math.min(Math.round(el.scrollTop / ITEM_H), items.length - 1))
+
+    clearTimeout(settleId.current)
+    settleId.current = setTimeout(() => {
+      const node = ref.current
+      if (!node) return
+      const target = Math.max(0, Math.min(Math.round(node.scrollTop / ITEM_H), items.length - 1)) * ITEM_H
+      if (Math.abs(node.scrollTop - target) > 0.5) node.scrollTo({ top: target, behavior: 'smooth' })
+    }, SETTLE_MS)
+
+    if (items[idx] === value) return
+    emitted.current = idx
+    onChange(items[idx])
   }, [items, value, onChange])
 
   return (
-    <div className="relative w-12 h-32">
+    <div className="relative w-12 h-30">
       {/* selection highlight */}
       <div className="pointer-events-none absolute inset-x-0 top-10 h-10 rounded-md bg-primary/10 z-10" />
       {/* fade top / bottom */}
