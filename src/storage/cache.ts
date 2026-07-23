@@ -83,6 +83,31 @@ export async function cacheWriteClean(vaultId: string, path: string, content: st
   await d.files.put({ vaultPath: vp(vaultId, path), vaultId, path, content, dirty: 0, updatedAt: Date.now(), version })
 }
 
+/**
+ * Mark a pushed record clean — but only if it still holds the content we
+ * pushed. A local edit can land during the push's network round trip; an
+ * unconditional put would overwrite it AND clear its dirty flag, losing it
+ * silently (the store keeps it, so nothing looks wrong until a reload).
+ * When the content moved on, keep dirty/content as-is and only advance
+ * `version`, so the next push CASes against what we just wrote. Also does the
+ * right thing for a tombstone staged mid-push: content '' !== the pushed
+ * content, so the tombstone survives and inherits the fresh blob SHA.
+ */
+export async function cacheMarkPushed(
+  vaultId: string, path: string, pushedContent: string, version?: string,
+): Promise<void> {
+  const d = await cacheInit()
+  const key = vp(vaultId, path)
+  await d.transaction('rw', d.files, async () => {
+    const existing = await d.files.get(key)
+    if (existing && existing.content !== pushedContent) {
+      await d.files.put({ ...existing, version, updatedAt: Date.now() })
+      return
+    }
+    await d.files.put({ vaultPath: key, vaultId, path, content: pushedContent, dirty: 0, updatedAt: Date.now(), version })
+  })
+}
+
 export async function cacheBulkWriteClean(
   vaultId: string,
   records: Array<{ path: string; content: string; version?: string }>,
