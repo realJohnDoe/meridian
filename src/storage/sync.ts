@@ -120,6 +120,20 @@ async function resolveCollision(
 // ── RECONCILE ─────────────────────────────────────────────────
 
 /**
+ * A cache record written this recently is not trusted to be absent from the
+ * backend's listing: GitHub's git-trees API is eventually consistent and can
+ * omit a just-pushed file for a while. Acting on that silence evicts the slug
+ * from the store and breaks wikilinks pointing at it. The opposite error — a
+ * file deleted on another device lingering locally a few extra minutes — is
+ * invisible and benign, and barely ever fires: a genuinely remote-deleted file
+ * has an old updatedAt, so the window is not even consulted for it.
+ *
+ * Deliberately applied to the delete branch only (see below) — not to the
+ * changed branch, which confirms itself via a fresh read.
+ */
+const RECONCILE_DELETE_GRACE_MS = 5 * 60_000
+
+/**
  * Pure reconciliation planner: given the backend's listing tokens and the local
  * cache records, decide which paths to pull (`changed`) and which to drop
  * (`deleted`). Extracted as a side-effect-free function so the branching logic
@@ -129,6 +143,7 @@ export function planReconcile(
   diskTokens: Map<string, string>,
   cacheRecords: CacheRecord[],
   skipPaths: Set<string> = new Set(),
+  now: number = Date.now(),
 ): { changed: string[]; deleted: string[] } {
   const cacheMap = new Map(cacheRecords.map(r => [r.path, r]))
   const changed: string[] = []
@@ -144,7 +159,10 @@ export function planReconcile(
     // Pull a file the cache has never seen, OR one whose backend version drifted
     // while we hold no pending local change. Skip dirty entries (pending write)
     // and tombstones (pending delete) — any genuine divergence on those is caught
-    // by the CAS write in pushDirty.
+    // by the CAS write in pushDirty. Deliberately no grace-window check here:
+    // this branch re-reads the file through a fresher endpoint (the Contents
+    // API) before trusting anything, so a stale listing here costs a redundant
+    // read rather than a wrong outcome.
     if (!entry || (entry.version !== diskToken && entry.dirty === 0)) {
       changed.push(path)
     }
@@ -152,8 +170,13 @@ export function planReconcile(
   for (const entry of cacheRecords) {
     if (skipPaths.has(entry.path)) continue
     // Drop locally-cached files that vanished from the backend — but don't
-    // clobber pending local changes (dirty) or pending deletes (tombstone).
-    if (!diskTokens.has(entry.path) && entry.dirty === 0) deleted.push(entry.path)
+    // clobber pending local changes (dirty), pending deletes (tombstone), or a
+    // file we wrote recently enough that the listing's silence about it isn't
+    // trustworthy yet (see RECONCILE_DELETE_GRACE_MS). Unlike the changed
+    // branch above, there is no confirming read here — deleting is the only
+    // action available — so silence alone must not be enough to trigger it.
+    const recentlyWritten = now - entry.updatedAt < RECONCILE_DELETE_GRACE_MS
+    if (!diskTokens.has(entry.path) && entry.dirty === 0 && !recentlyWritten) deleted.push(entry.path)
   }
 
   return { changed, deleted }
@@ -196,7 +219,7 @@ export async function reconcileWithBackend(
   const cached     = await cacheLoadAll(vaultId)
   const cacheMap   = new Map(cached.map(r => [r.path, r]))
 
-  const { changed, deleted } = planReconcile(diskTokens, cached, skipPaths)
+  const { changed, deleted } = planReconcile(diskTokens, cached, skipPaths, Date.now())
 
   if (changed.length > 0) {
     let freshFiles: RawFile[]

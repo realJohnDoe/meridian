@@ -140,7 +140,12 @@ export class GitHubBackend implements StorageBackend {
         tree_sha:  this._cfg.branch,
         recursive: '1',
       })
-      const items = (data as { tree: TreeItem[] }).tree
+      const { tree: items, truncated } = data as { tree: TreeItem[]; truncated?: boolean }
+      // A truncated tree silently omits paths past the API's size/entry limit,
+      // which would make statAll() look like every omitted file was deleted —
+      // reconcile would then evict them from the cache and the store. Refuse
+      // instead of acting on a listing known to be incomplete.
+      if (truncated) throw new Error('Repository tree listing was truncated — skipping sync to avoid mass deletion.')
       const tokens = new Map<string, string>()
       for (const item of items) {
         if (item.type !== 'blob' || !isVaultFile(item.path)) continue

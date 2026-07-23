@@ -119,6 +119,7 @@ class FakeBackend implements StorageBackend {
   private _writeErrorQueue:   Error[] = []
   private _deleteErrorQueue:  Error[] = []
   private _statAllErrorQueue: Error[] = []
+  private _hidden = new Set<string>()
 
   seed(path: string, content: string, version: string): void {
     this._files.set(path, { content, version })
@@ -131,11 +132,20 @@ class FakeBackend implements StorageBackend {
   queueDeleteError(e: Error): void { this._deleteErrorQueue.push(e) }
   queueStatAllError(e: Error): void { this._statAllErrorQueue.push(e) }
 
+  /** Simulates GitHub's eventually-consistent git-trees listing omitting a
+   * file that genuinely exists on the backend — statAll() won't report it,
+   * but readFiles()/get() still serve it, matching the real API's split
+   * between the trees endpoint and the Contents API. */
+  hideFromListing(path: string): void { this._hidden.add(path) }
+
   async statAll(): Promise<Map<string, string>> {
     this.statAllCallCount++
     if (this._statAllErrorQueue.length) throw this._statAllErrorQueue.shift()!
     const m = new Map<string, string>()
-    for (const [p, f] of this._files) m.set(p, f.version)
+    for (const [p, f] of this._files) {
+      if (this._hidden.has(p)) continue
+      m.set(p, f.version)
+    }
     return m
   }
 
@@ -184,6 +194,10 @@ function seedDirty(vaultId: string, path: string, content: string, version: stri
 
 function seedTombstone(vaultId: string, path: string, version: string | undefined): void {
   cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content: '', dirty: 2, updatedAt: Date.now(), version })
+}
+
+function seedClean(vaultId: string, path: string, content: string, version: string | undefined, updatedAt: number): void {
+  cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content, dirty: 0, updatedAt, version })
 }
 
 // autoSyncTick fires runSync fire-and-forget (`void runSync(...)`), so it
@@ -438,6 +452,45 @@ describe('runSync — exponential backoff on transient failures', () => {
     } finally {
       nowSpy.mockRestore()
     }
+  })
+})
+
+// ── Grace window protects a just-pushed file from a stale listing ───────
+
+describe('reconcileWithBackend — an eventually-consistent listing must not delete a just-pushed file', () => {
+  it('keeps a just-pushed record the listing has not caught up to yet', async () => {
+    const backend = new FakeBackend()
+    backend.seed('new.md', 'content', 'v1')
+    backend.hideFromListing('new.md') // simulates the trees API lagging behind the push
+
+    let now = 1_000_000
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+
+    try {
+      seedClean('fake-vault', 'new.md', 'content', 'v1', now)
+      storeState.roots.set('new', { title: 'New', tags: [], items: [] })
+      setActiveBackend(backend)
+
+      now += 60_000 // one autoSyncTick interval later — well inside the 5-minute grace window
+      await syncToBackend()
+
+      expect(cacheStore.has(vp('fake-vault', 'new.md'))).toBe(true)
+      expect(storeState.roots.has('new')).toBe(true)
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
+
+  it('still propagates a genuine remote delete (old updatedAt, absent from the backend)', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    seedClean('fake-vault', 'old.md', 'content', 'v1', 0) // written long ago, well outside the window
+    storeState.roots.set('old', { title: 'Old', tags: [], items: [] })
+
+    await syncToBackend()
+
+    expect(cacheStore.has(vp('fake-vault', 'old.md'))).toBe(false)
+    expect(storeState.roots.has('old')).toBe(false)
   })
 })
 

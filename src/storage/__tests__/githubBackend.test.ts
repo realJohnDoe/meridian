@@ -201,6 +201,20 @@ describe('GitHubBackend', () => {
     expect(tokens.get('archive/old.yaml')).toBe('sha-old')
   })
 
+  it('statAll rejects a truncated tree listing instead of returning a partial map', async () => {
+    // Past the API's size/entry limit, git/trees silently omits paths rather
+    // than erroring — returning what it has would make reconcile treat every
+    // omitted file as deleted. Refusing outright is safer than acting on a
+    // listing known to be incomplete.
+    mockFetch({
+      tree: [{ type: 'blob', path: 'note.md', sha: 'sha1' }],
+      truncated: true,
+    })
+
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await expect(backend.statAll()).rejects.toThrow(/truncated/i)
+  })
+
   it('readFiles fetches each file and decodes content', async () => {
     const content = '# Hello\nWorld'
     mockFetch(makeFileResponse('note.md', content, 'sha1'))
