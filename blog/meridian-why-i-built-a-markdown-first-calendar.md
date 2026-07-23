@@ -76,12 +76,31 @@ at that. But on a phone, tasks and events feel like second-class citizens next t
 [Google Calendar](https://calendar.google.com) or Todoist do. That gap never closed for
 me, and no amount of plugin configuration was going to close it.
 
+## The app I almost didn't build
+
+For a while I didn't want to build an app at all. TaskNotes is open source, actively
+maintained, and has a real spec — and its file format is almost exactly mine. My plan was
+smaller and more polite: write up the "infer the type from the metadata" idea as an
+extension to their format, ideally get TaskNotes itself to adopt it, and keep living in
+Obsidian. The most defensible thing I had wasn't a UI; it was a data model, and a data
+model is the kind of thing you contribute, not the kind of thing you fork a whole
+ecosystem over.
+
+What tipped me the other way was, again, the phone. Everything I actually wanted to fix —
+the mobile task and calendar UX, a shared family calendar with no accounts, a browser URL
+I could open on a locked-down work machine — lived _outside_ the file format, in
+territory an Obsidian plugin couldn't reach without becoming its own app anyway. So the
+"just propose a format" plan quietly became "build the thing and let the format prove
+itself."
+
 ## A hundred versions on a phone
 
-So this spring I started over on my phone, in a single very long chat session, and built
-a prototype I called **plaintext-os**. I iterated on it something like a hundred times —
-most of those on one question, what the frontmatter should actually look like, and the
-rest on making it usable. Somewhere in the middle it got the name Meridian.
+So this spring I started over on my phone, in a single very long chat session with
+[Claude](https://claude.ai) — which turned out to be good enough at spinning up working
+web prototypes that I could design by using, not just by sketching. I built one I called
+**plaintext-os** and iterated on it something like a hundred times — most of those on one
+question, what the frontmatter should actually look like, and the rest on making it
+usable. Somewhere in the middle it got the name Meridian.
 
 It worked. That was the problem. It worked well enough that I could see the real version
 of the app — and that a single ever-growing generated file was never going to survive
