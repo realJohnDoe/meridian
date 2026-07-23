@@ -32,7 +32,7 @@ type Row = { entry: ParsedEntry; occ: Occurrence | undefined }
 
 // Sort order: notes α → events chronologically → open tasks by priority →
 // open string tasks (stored) → done tasks + done string tasks (notes α → events α → tasks α) → broken links (stored)
-function rowSortKey({ entry, occ }: Row): [number, number, string] {
+export function rowSortKey({ entry, occ }: Row): [number, number, string] {
   if (entry.kind === 'link') {
     if (!occ) return [5, entry.idx, '']
     if (isDimmed(occ)) {
