@@ -34,16 +34,6 @@ This is one of the healthiest codebases I've surveyed: the documented architectu
 
 ## 4. Findings
 
-### #1 — Vault lifecycle & auth-refresh layer is effectively untested
-
-**Category:** `testing` · **Impact:** 6 · **Breadth:** 6 files (coverage rows <10%: `vaultRegistry.ts` 1.1%, `cache.ts` 2.0%, `githubOAuth.ts` 9.0%, `localBackend.ts`, `fs.ts`, `notifications.ts` 0%) · **Fix effort:** M
-
-**Evidence:** [vaultRegistry.ts:167](../src/storage/vaultRegistry.ts#L167) — `await fallbackToExample().catch(() => {})`; measured coverage from `pnpm run test:coverage`.
-
-**Problem:** The code that keeps vault identity consistent across "three places [that] must always agree" (its own words), decides token-refresh recovery (`ensureFreshAccessToken`'s force/PAT/margin branching), and persists everything to IndexedDB has near-zero coverage, while the neighboring sync engine is at 87% — the riskiest orchestration in `storage/` is the one part nothing guards.
-
-**Fix:** Unit-test `ensureFreshAccessToken`'s decision matrix (its storage calls are already injectable-shaped) and the `restoreVaultsInner`/`setActiveVault` branch logic against a fake backend + `fake-indexeddb`, mirroring how `sync.test.ts` already fakes its dependencies.
-
 ### #3 — TanStack Virtual is flagged incompatible with the enabled React Compiler
 
 **Category:** `library-fit` `performance` · **Impact:** 5 · **Breadth:** 2 files (grep `useVirtualizer`: `calendar/AgendaView.tsx`, `search/FileResultsList.tsx`) · **Fix effort:** M
