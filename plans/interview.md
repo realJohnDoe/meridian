@@ -147,6 +147,14 @@ E. Features
     3. Everything is a list allows for flexible hierarchies where needed
 
 25. Wikilinks-between-entries: is this central to how you think, or a power-user nicety?
+
+    From my experience, wikis and knowledge bases rise and fall with how good they are interlinked.
+    So having a very quick way to link other pages, such as wikilinks, is quite valuable.
+    I also think that links / dependencies are the starting point of structure and often help to derive a good hierarchy.
+    I think many people start with a hierarchy too early because they think they need to use one where just linking is often enough and building hierarchies before knowing what is tightly connected often results in bad structures.
+    I am just not a super big fan of the double square bracked syntax on mobile.
+    Maybe I will add an '@' alternative so wikilinks are easier to create in the description fields.
+
 26. Participants/filtering — is Meridian meant to be used collaboratively, or is that for personal "who's involved" tracking?
 27. Offline-first + installable: how much does "feels like a native app" matter to the pitch?
 28. Is there a feature you're tempted to show off that most people won't initially understand the value of?
