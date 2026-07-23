@@ -219,7 +219,14 @@ export async function reconcileWithBackend(
   const cached     = await cacheLoadAll(vaultId)
   const cacheMap   = new Map(cached.map(r => [r.path, r]))
 
-  const { changed, deleted } = planReconcile(diskTokens, cached, skipPaths, Date.now())
+  // Union in any path with a write/delete currently in flight (see
+  // _inFlightPaths above) — snapshotted here, immediately before planning, so
+  // it reflects everything in flight at the moment this cycle decides.
+  const effectiveSkip = _inFlightPaths.size === 0
+    ? skipPaths
+    : new Set([...skipPaths, ..._inFlightPaths.keys()])
+
+  const { changed, deleted } = planReconcile(diskTokens, cached, effectiveSkip, Date.now())
 
   if (changed.length > 0) {
     let freshFiles: RawFile[]
@@ -464,7 +471,39 @@ export async function syncToBackend(): Promise<void> {
 
 // ── CACHE WRITE / DELETE ──────────────────────────────────────
 
+/**
+ * Paths with a cache write/delete in flight — marked synchronously, before the
+ * first await, so the interval between `setData` updating the store and Dexie
+ * recording dirty=1/2 is never observable to a concurrent reconcile. Without
+ * this, a reconcile landing in that interval sees dirty===0 and can merge
+ * remote content over an edit still only in the store — or, worse, resurrect
+ * a note whose delete is still in flight: mergeChangedIntoStore would re-add
+ * it to the store and nothing would ever evict it again.
+ *
+ * Refcounted rather than a Set: two commits for the same slug can overlap
+ * (e.g. rapid checkbox toggles), and writeEntityToCache's self-heal path
+ * below nests a deleteFromBackend call for the same path. In both cases a
+ * plain Set's `finally` would clear the shared mark as soon as either call
+ * settles, while the other is still outstanding — a structural gap even
+ * though today's planReconcile happens to guard the same records another
+ * way once one write has actually landed (see its own dirty!==0 checks). The
+ * refcount removes the dependence on that coincidence.
+ */
+const _inFlightPaths = new Map<string, number>()
+
+function markInFlight(path: string): void {
+  _inFlightPaths.set(path, (_inFlightPaths.get(path) ?? 0) + 1)
+}
+
+function clearInFlight(path: string): void {
+  const n = (_inFlightPaths.get(path) ?? 0) - 1
+  if (n > 0) _inFlightPaths.set(path, n)
+  else _inFlightPaths.delete(path)
+}
+
 export async function writeEntityToCache(fileSlug: string): Promise<void> {
+  const path = fileSlugToPath(fileSlug)
+  markInFlight(path)
   try {
     const backend = getActiveBackend()
     if (!backend || backend.readOnly) return
@@ -486,26 +525,30 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     const frontmatter = collapseToYaml(slugItems, root)
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body)
-    const path        = fileSlugToPath(fileSlug)
     await cacheWrite(backend.id, path, content)
     updateSyncUI()
     scheduleAutoPush()
   } catch (e) {
     console.error('[vault] writeEntityToCache failed:', e)
     notifyError('Save failed', e)
+  } finally {
+    clearInFlight(path)
   }
 }
 
 export async function deleteFromBackend(fileSlug: string): Promise<void> {
+  const path = fileSlugToPath(fileSlug)
+  markInFlight(path)
   try {
     const backend = getActiveBackend()
     if (!backend || backend.readOnly) return
-    const path = fileSlugToPath(fileSlug)
     await cacheWriteTombstone(backend.id, path)
     updateSyncUI()
     scheduleAutoPush()
   } catch (e) {
     console.error('[vault] deleteFromBackend failed:', e)
     notifyError('Delete failed', e)
+  } finally {
+    clearInFlight(path)
   }
 }
