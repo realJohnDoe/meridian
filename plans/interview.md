@@ -142,6 +142,10 @@ D. Architecture
 E. Features
 
 24. Of the feature list, which three would you put on the article's "highlight reel," and which are just table-stakes?
+    1. Seamless work across Tasks, Calendar Events, and Notes
+    2. Everything stored as Markdown w/ frontmatter, under your control
+    3. Everything is a list allows for flexible hierarchies where needed
+
 25. Wikilinks-between-entries: is this central to how you think, or a power-user nicety?
 26. Participants/filtering — is Meridian meant to be used collaboratively, or is that for personal "who's involved" tracking?
 27. Offline-first + installable: how much does "feels like a native app" matter to the pitch?
