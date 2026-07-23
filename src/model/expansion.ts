@@ -362,7 +362,7 @@ function expandNode<M>(
       }
     }
   } else if (repeat.type === 'after_completion') {
-    const allTimes: Array<{ jsTime: Date; done?: boolean; overrideId?: string; metadata: M }> = []
+    const allTimes: Array<{ jsTime: Date; timed: boolean; done?: boolean; overrideId?: string; metadata: M }> = []
     const anchorInst = (node.instances ?? []).find(i => {
       const t = nodeDateTime(i) || parseDateString(i.date)
       return t && sameMinute(t, anchor)
@@ -370,6 +370,7 @@ function expandNode<M>(
     if (!anchorInst?.excluded) {
       allTimes.push({
         jsTime:     anchor,
+        timed:      !!node.time,
         done:       anchorInst?.done ?? node.done,
         overrideId: anchorInst?.id,
         metadata:   anchorInst ? { ...node.metadata, ...anchorInst.metadata } : node.metadata,
@@ -379,9 +380,26 @@ function expandNode<M>(
       const t = nodeDateTime(inst) || parseDateString(inst.date)
       if (!t || inst.excluded) continue
       if (sameMinute(t, anchor)) continue
-      allTimes.push({ jsTime: t, done: inst.done ?? node.done, overrideId: inst.id, metadata: { ...node.metadata, ...inst.metadata } })
+      allTimes.push({ jsTime: t, timed: !!inst.time, done: inst.done ?? node.done, overrideId: inst.id, metadata: { ...node.metadata, ...inst.metadata } })
     }
     allTimes.sort((a, b) => a.jsTime.getTime() - b.jsTime.getTime())
+
+    // The slot the completion rule projects next, computed *before* emitting so an
+    // instance already sitting on it is reported as 'generated' — the same way the
+    // schedule branch reports an override that lands on a generated date. That
+    // source is what tells applySingle to suppress the slot when the occurrence is
+    // moved off it; calling such an instance 'explicit' leaves the slot free and it
+    // re-appears alongside the moved occurrence on the next expansion.
+    const lastDone = [...allTimes].reverse().find(e => e.done === true)
+    const nextJsTime = lastDone
+      ? addInterval(lastDone.jsTime, String(repeat.interval || '1 day'))
+      : null
+
+    /** Date-only records match the whole day, timed ones the minute — cf. findOverrides. */
+    function onNextSlot(t: Date, timed: boolean): boolean {
+      if (!nextJsTime) return false
+      return timed ? sameMinute(t, nextJsTime) : sameCalendarDay(t, nextJsTime)
+    }
 
     for (const entry of allTimes) {
       if (entry.jsTime >= from && entry.jsTime <= to) {
@@ -390,21 +408,19 @@ function expandNode<M>(
           date:       spec.date ?? '',
           time:       spec.time ?? node.time,
           jsTime:     entry.jsTime,
-          source:     'explicit',
+          source:     onNextSlot(entry.jsTime, entry.timed) ? 'generated' : 'explicit',
           done:       entry.done,
           overrideId: entry.overrideId,
           metadata:   entry.metadata,
         })
       }
     }
-    const lastDone = [...allTimes].reverse().find(e => e.done === true)
-    if (lastDone) {
-      const nextJsTime = addInterval(lastDone.jsTime, String(repeat.interval || '1 day'))
-      const alreadyExists = allTimes.some(e => sameMinute(e.jsTime, nextJsTime))
+    if (nextJsTime) {
+      const alreadyExists = allTimes.some(e => onNextSlot(e.jsTime, e.timed))
       const isExcluded = (node.instances ?? []).some(inst => {
         if (!inst.excluded) return false
-        const t = parseDateString(inst.date)
-        return t !== null && sameMinute(t, nextJsTime)
+        const t = nodeDateTime(inst) || parseDateString(inst.date)
+        return t !== null && onNextSlot(t, !!inst.time)
       })
       if (!alreadyExists && !isExcluded && nextJsTime >= from && nextJsTime <= to) {
         const spec = jsDateToSpec(nextJsTime)

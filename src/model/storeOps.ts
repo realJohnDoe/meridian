@@ -11,6 +11,7 @@ import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots
 import { isSeries, isStandaloneOcc } from '@/types'
 import { titleToSlug } from '@/fileIO'
 import { dayBefore } from './dateUtils'
+import { stableOccId } from './expansion'
 import { resolveWikilink, unwrapRef } from '../wikilinks'
 
 export interface StoreData {
@@ -293,16 +294,27 @@ function applySingle({ items, roots }: StoreData, occ: Occurrence, fields: EditF
   if (occ.ownerId && occ.source === 'generated' && newDate && newDate !== occ.date) {
     items = upsertOverride(items, occ, { excluded: true })
     items = dropExclusionStub(items, occ.ownerId, newDate)
+    // Keyed by target slot rather than a fresh UUID so re-running the same move is
+    // idempotent. The editor pins `entry.item` to the pre-move occurrence for the
+    // whole session (useEntryEditor's useState initialiser), so every later save —
+    // a debounced body autosave, the flush on close — replays this branch with the
+    // same `occ`; a random id would append a second occurrence on the target date
+    // each time.
+    const movedId = stableOccId(`${occ.ownerId}|${newDate}|${newTime ?? ''}`)
     const moved: OccurrenceEntry<OccurrenceMetadata> = {
       date:     newDate,
       time:     newTime,
       source:   'explicit',
       fileSlug: occ.fileSlug,
-      id:       crypto.randomUUID(),
+      id:       movedId,
       ownerId:  occ.ownerId,
       metadata: occMeta(base, fields),
     }
-    return { items: [...items, moved], roots }
+    const already = items.some(i => i.id === movedId)
+    return {
+      items: already ? items.map(i => i.id === movedId ? moved : i) : [...items, moved],
+      roots,
+    }
   }
 
   if (occ.ownerId && newDate && newDate !== occ.date) {
