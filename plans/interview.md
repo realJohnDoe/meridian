@@ -94,8 +94,24 @@ C. Philosophy
 D. Architecture
 
 17. Meridian is a client-only PWA with no server holding data — was that a deliberate principle from day one, or a discovery?
+
+    I wanted to give users control over their data and so a heavy backend is not needed if not contradictory to that.
+    So yes, I pushed in that direction from day 1 and really tried to get away completely without a backend but learned that you cannot do really safe authentication without a slim one.
+
 18. The "each item is its own file, so conflicts only happen on the same item" point — how important is that in practice? Have you hit real conflicts?
+
+    Yes, even with each item in it's own file, I hit conflicts several times.
+    The persistence / caching code is still one of the weakest parts of the code base.
+    So I think it actually makes the app more robust.
+    And, I think it also is really nice philosophically: One concept per file, the same way that Obsidian works and curiously also similar to Googles new open knowledge format.
+
 19. Why GitHub-as-a-backend? That's an unusual choice — what made it click?
+
+    I wanted some way to get a 'password protected directory' that is somewhat userfriendly to set up even for non-techies, so I stayed away from some S3 bucket or so.
+    It was surprisingly hard to find a solution because all solutions either have coarse-grained access permissions where Meridian would get access to almost all of the users permissions on that system, e.g. with Google Drive,
+    or there were password protected folders but those were not available via API.
+    In the end, the best contenders were GitHub, Dropbox and Microsoft OneDrive. See also ./storage-backend-survey.md for more details.
+
 20. What was the single hardest architectural problem to get right? (recurrence? sync? the occurrence model?)
 21. The recurrence model sounds deep. Why did you invest so much there — was existing recurrence really that bad?
 22. Anything about the architecture you're quietly proud of that a normal user would never notice?
