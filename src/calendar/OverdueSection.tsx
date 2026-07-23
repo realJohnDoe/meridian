@@ -44,7 +44,7 @@ function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
 // occurrence change, and only per-field equality (not array identity) can
 // tell whether this section's own content actually changed. The compiler's
 // automatic memoization compares the `items` reference, not its contents.
-function propsAreEqual(prev: Props, next: Props): boolean {
+export function propsAreEqual(prev: Props, next: Props): boolean {
   if (prev.items.length !== next.items.length) return false
   return prev.items.every((o, i) => {
     const n = next.items[i]
