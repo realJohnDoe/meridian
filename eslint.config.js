@@ -231,6 +231,36 @@ export default [
     rules: { 'import-x/no-internal-modules': 'off' },
   },
 
+  // Exactly one file may import each of these two libraries: the store
+  // singleton (src/store.ts) and the Dexie cache (src/storage/cache.ts).
+  // Everything else goes through @/storeBridge and @/storage/cache's exported
+  // functions. Machine-enforces what was previously only a convention.
+  //
+  // ORDERING: this block must stay ABOVE the src/model/** block below. Flat
+  // config replaces a rule's options wholesale rather than merging them, so a
+  // later block naming this same rule id would silently drop model's own
+  // restriction list (react, @/store, @/storage, ...). model's list therefore
+  // repeats `zustand` and `dexie` itself.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/store.ts', 'src/storage/cache.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'zustand', message: 'Only src/store.ts may import zustand. Use @/store or @/storeBridge.' },
+            { name: 'dexie',   message: 'Only src/storage/cache.ts may import dexie. Use the cache* functions from @/storage/cache.' },
+          ],
+          patterns: [
+            { group: ['zustand/*'], message: 'Only src/store.ts may import zustand. Use @/store or @/storeBridge.' },
+            { group: ['dexie/*'],   message: 'Only src/storage/cache.ts may import dexie. Use the cache* functions from @/storage/cache.' },
+          ],
+        },
+      ],
+    },
+  },
+
   // model/ is the domain core and must stay framework-free — no React, and
   // no outward dependency on store/storage/UI layers. This makes the
   // "model has no outward dependencies" invariant machine-enforced instead
@@ -250,6 +280,10 @@ export default [
             {
               name: 'zustand',
               message: 'model/ is the pure domain core and must not depend on the store.',
+            },
+            {
+              name: 'dexie',
+              message: 'model/ is the pure domain core and must not depend on storage.',
             },
             {
               name: '@/store',
