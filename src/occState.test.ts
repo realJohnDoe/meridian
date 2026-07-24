@@ -141,4 +141,31 @@ describe('occState', () => {
     })
     expect(occState(o)).toBe('event-future')
   })
+
+  // Cross-midnight timed duration: started the previous day, ends today. This
+  // is the one case where truncating `now` to day granularity (as e.g. a
+  // sort's stable "today" placeholder would) disagrees with the true instant
+  // — see the AgendaView/DayPane/MonthGrid callers of sortOccs, none of which
+  // may take that shortcut for this reason.
+  it('keeps a cross-midnight timed duration future while still ongoing after midnight', () => {
+    vi.setSystemTime(new Date(2026, 5, 15, 1, 0)) // 1:00 AM, still within the window below
+    const o = makeOcc({
+      date: '2026-06-14',
+      time: '22:00',
+      metadata: { participants: [], title: '', tags: [], items: [], duration: '4 hours', jsTime: new Date(2026, 5, 14, 22, 0) },
+    })
+    // 22:00 (previous day) + 4h = 02:00 today, which is after 01:00 -> still future
+    expect(occState(o)).toBe('event-future')
+  })
+
+  it('marks a cross-midnight timed duration as past once it has truly ended, using the day it started rather than the day it ends', () => {
+    const o = makeOcc({
+      date: '2026-06-14',
+      time: '22:00',
+      metadata: { participants: [], title: '', tags: [], items: [], duration: '4 hours', jsTime: new Date(2026, 5, 14, 22, 0) },
+    })
+    // 22:00 (previous day) + 4h = 02:00 today, which is before NOW (12:00) -> past.
+    // A day-truncated `now` (midnight today) would wrongly read this as future.
+    expect(occState(o)).toBe('event-past')
+  })
 })

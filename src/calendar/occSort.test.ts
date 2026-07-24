@@ -2,6 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { sortOccs } from './occSort'
 import type { Occurrence } from '@/types'
 
+// Fixed clock well after every fixture's jsTime below, so `event-past`/
+// `event-future` classification is deterministic regardless of when the
+// test suite actually runs (sortOccs takes `now` as a required argument
+// instead of reading the wall clock itself).
+const NOW = new Date(2026, 5, 15, 12, 0)
+
 function makeOcc(overrides: Partial<Occurrence> & { title?: string; done?: boolean; jsTime?: Date; duration?: string } = {}): Occurrence {
   const { title = '', done, jsTime, duration, ...rest } = overrides
   return {
@@ -21,7 +27,7 @@ describe('sortOccs', () => {
     const doneTaskB = makeOcc({ title: 'Banana task', done: true })
     const doneTaskA = makeOcc({ title: 'Apple task', done: true })
 
-    const sorted = sortOccs([pastEvent, doneTaskB, doneTaskA])
+    const sorted = sortOccs([pastEvent, doneTaskB, doneTaskA], NOW)
 
     expect(sorted.map(o => o.metadata.title)).toEqual(['Zebra event', 'Apple task', 'Banana task'])
   })
@@ -30,7 +36,7 @@ describe('sortOccs', () => {
     const doneTask = makeOcc({ title: 'Aardvark done', done: true })
     const openTask = makeOcc({ title: 'Zoo open task' })
 
-    const sorted = sortOccs([doneTask, openTask])
+    const sorted = sortOccs([doneTask, openTask], NOW)
 
     expect(sorted.map(o => o.metadata.title)).toEqual(['Zoo open task', 'Aardvark done'])
   })

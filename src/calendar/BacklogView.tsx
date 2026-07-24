@@ -6,6 +6,7 @@ import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import { sortOccs } from './occSort'
 import { undatedOccs } from './undatedOccs'
 import OccurrenceList from './OccurrenceList'
+import { useToday } from '@/hooks'
 
 interface Props {
   onOpen: (occ: Occurrence, scope?: EditScope) => void
@@ -16,8 +17,11 @@ interface Props {
 export default function BacklogView({ onOpen }: Props) {
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
+  // Tasks resolve to task-p*/task-open before occState ever reads the clock,
+  // so any value works here — useToday is cheaper than a ticking clock of our own.
+  const today = useToday()
 
-  const occs = sortOccs(undatedOccs(items, roots).filter(o => occKind(o) === 'task'))
+  const occs = sortOccs(undatedOccs(items, roots).filter(o => occKind(o) === 'task'), today)
 
   const handleToggleDone  = (occ: Occurrence) => toggleOccDone(occ)
   const handleSwipeDelete = (occ: Occurrence) => beginSwipeDelete(occ)
