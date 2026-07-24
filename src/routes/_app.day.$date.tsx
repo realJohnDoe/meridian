@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO } from '@/model'
 import { useOpenEntry } from '@/hooks'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 import { newEntryRoute } from './-entryRoute'
 
 const DayView = lazy(() => import('@/calendar').then(m => ({ default: m.DayView })))
@@ -30,7 +31,7 @@ function DayPage() {
   )
 
   return (
-    <Suspense>
+    <Suspense fallback={<PageSkeleton />}>
       <DayView
         date={dvDate}
         onOpen={onOpen}
