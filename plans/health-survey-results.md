@@ -44,16 +44,6 @@ This is one of the healthiest codebases I've surveyed: the documented architectu
 
 **Fix:** Resolve the decision this branch's name implies: either swap these two lists to a component-API virtualizer that doesn't fight the compiler (e.g. react-virtuoso — verify its compiler compatibility empirically, not from its README), or add `'use no memo'` directives to the two components and record that as the accepted trade-off.
 
-### #7 — Vault activation logic duplicated between restore and switch paths
-
-**Category:** `dry` `srp` · **Impact:** 3 · **Breadth:** 1 file (4 near-duplicate blocks) · **Fix effort:** M
-
-**Evidence:** [vaultRegistry.ts:154](../src/storage/vaultRegistry.ts#L154) — `const backend = new GitHubBackend(targetRef.id, targetRef.name, { ...targetRef.github, token })` vs [vaultRegistry.ts:191](../src/storage/vaultRegistry.ts#L191) — `const backend = new GitHubBackend(id, ref.name, { ...ref.github, token })`.
-
-**Problem:** `restoreVaultsInner` and `setActiveVault` each hand-build the local/GitHub backend + permission + token flow with subtly different interactivity flags and failure messages, so a future change to activation semantics must be made twice and the divergences (silent fallback vs. toast) are easy to miss — and this interweaving is part of why the file is untestable (#1).
-
-**Fix:** Extract a single `buildAndActivate(ref, { interactive })` helper that both paths call, with the restore path supplying its fallback-to-example policy as the failure handler.
-
 ### #8 — Undocumented exact pin on `@lezer/markdown`
 
 **Category:** `dependencies` · **Impact:** 2 · **Breadth:** 1 file · **Fix effort:** S
