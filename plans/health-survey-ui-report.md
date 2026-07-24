@@ -39,16 +39,8 @@ The UI layer is **healthy and unusually well-disciplined** — strong token syst
 
 ## 4. Findings
 
-### 1. No error boundary anywhere — a render throw white-screens the whole PWA
-- **Category:** `error-handling` `ux`
-- **Impact:** 7
-- **Breadth:** ~10 files (every module under `src/routes/`; grep for `errorComponent|ErrorBoundary|getDerivedStateFromError` across `src/` → **0** matches)
-- **Fix effort:** M
-- **Evidence:** `src/routes/_app.day.$date.tsx:9` — `export const Route = createFileRoute('/_app/day/$date')({ component: DayPage, })` (no `errorComponent`); same for `__root.tsx` (`createRootRoute({ component: Root })`).
-- **Problem:** TanStack Router supports `errorComponent`/`notFoundComponent` and none is defined at any level, and there is no React error boundary — so any render-time throw (a malformed occurrence, an unexpected frontmatter shape, a bad wikilink resolution) unmounts the entire app to a blank screen with no recovery path, which is especially bad for an offline-first PWA.
-- **Fix:** Add a root `errorComponent` on `__root.tsx` (reload / "report" affordance) plus a lightweight `errorComponent` on the heavy view routes (editor, day, month).
-
 ### 2. Two parallel icon-button systems; top-bar chrome forks a class string at sub-44px targets
+
 - **Category:** `a11y` `library-fit` `dry`
 - **Impact:** 5
 - **Breadth:** 6 files use the raw pattern (`grep -l 'size="icon"'` → `_app.tsx`, `-entryTopbar.tsx`, `_app.entry.$slug.tsx`, `SearchBar.tsx`, `SyncButton.tsx`, `SearchOverlay.tsx`); the string `rounded-full … shrink-0` recurs 13×. `IconButton` is used in only 3 files.
@@ -57,16 +49,8 @@ The UI layer is **healthy and unusually well-disciplined** — strong token syst
 - **Problem:** The team built an accessible `IconButton` (type-enforced `label`, guaranteed 44px hit area) but the most prominent, always-visible surface — the top bar, entry top bar, and search — bypasses it for a hand-repeated `Button size="icon"` (40px, and 36px/28px in `SearchOverlay`) that relies on remembering `aria-label` manually; jsx-a11y can't catch a missing label on a custom `Button`, so the safe path is the unused one.
 - **Fix:** Route the ghost-round icon buttons through `IconButton` (or add a `ghost-round` size to it) so touch target and labeling are enforced in one place.
 
-### 3. Route loading fallbacks are inconsistent (and the skeleton is copy-pasted)
-- **Category:** `ux` `dry`
-- **Impact:** 4
-- **Breadth:** 4 routes render `<Suspense>` with no fallback (`_app.day.$date`, `_app.calendar.$month`, `_app.backlog`, `_app.notes`); `EntrySkeleton` is duplicated byte-for-byte across 2 files.
-- **Fix effort:** S
-- **Evidence:** `src/routes/_app.day.$date.tsx:33` — `<Suspense>` (no `fallback`) vs `src/routes/_app.entry.$slug.tsx:51` — `<Suspense fallback={<EntrySkeleton />}>`; `EntrySkeleton` defined identically at `_app.entry.$slug.tsx:15` and `_app.entry.new.tsx:11`.
-- **Problem:** The entry routes show a skeleton while their lazy chunk loads, but day/month/backlog/notes render nothing (a blank flash on first navigation / slow connections), and the one skeleton that exists is duplicated instead of shared.
-- **Fix:** Extract a shared skeleton to `components/ui/` and give each lazy route a fallback (skeleton or spinner) consistent with the entry routes.
-
 ### 4. Duplicated "dimmable card shell" across the two task-card components
+
 - **Category:** `dry` `styling`
 - **Impact:** 4
 - **Breadth:** 2 files (`OccurrenceCard.tsx`, `MarkdownTaskCard.tsx`)
@@ -76,6 +60,7 @@ The UI layer is **healthy and unusually well-disciplined** — strong token syst
 - **Fix:** Extract a `DimmableCard` (or a `cva` card variant carrying `dimmed`/`overlay`) and compose both cards from it.
 
 ### 5. Z-index layering has no scale — ad-hoc escalating magic numbers
+
 - **Category:** `styling`
 - **Impact:** 3
 - **Breadth:** 6 files (`grep 'z-\[[0-9]+\]'`): values `z-[1]`, `z-[24]`, `z-[25]`, `z-[26]`, `z-[300]`, `z-[9002]`, intermixed with Tailwind's `z-10/20/50`.
@@ -85,6 +70,7 @@ The UI layer is **healthy and unusually well-disciplined** — strong token syst
 - **Fix:** Define a small set of layer tokens in `@theme` (e.g. `--z-overlay`, `--z-dialog`, `--z-tour`) and reference those instead of raw values.
 
 ### 6. Duplicated day/month branches in the app-shell top bar
+
 - **Category:** `dry` `component-architecture`
 - **Impact:** 3
 - **Breadth:** 1 file (`src/routes/_app.tsx`, the app shell)
@@ -94,15 +80,17 @@ The UI layer is **healthy and unusually well-disciplined** — strong token syst
 - **Fix:** Extract a `<PagedTopbar label prevLabel nextLabel onPrev onNext />` used by both, parameterized by unit.
 
 ### 7. Conditional classNames built by string concatenation, bypassing `cn`
+
 - **Category:** `styling` `dry`
 - **Impact:** 2
-- **Breadth:** 7 files (`grep 'className={`'` with conditionals): `MarkdownTaskCard`, `OccurrenceCard`, `SearchBar`, `WikilinkPopup`, `SearchOverlay`, `DayPane`, plus `OccurrenceCard`'s array-join.
+- **Breadth:** 7 files (`grep 'className={`'`with conditionals):`MarkdownTaskCard`, `OccurrenceCard`, `SearchBar`, `WikilinkPopup`, `SearchOverlay`, `DayPane`, plus `OccurrenceCard`'s array-join.
 - **Fix effort:** S
-- **Evidence:** `src/components/OccurrenceCard.tsx:146-151` — `const cardCls = [ … , dimmed ? 'overflow-hidden' : '' ].filter(Boolean).join(' ')`; `src/components/MarkdownTaskCard.tsx:56` — `` className={`… ${done ? 'line-through' : 'text-foreground'}`} ``.
+- **Evidence:** `src/components/OccurrenceCard.tsx:146-151` — `const cardCls = [ … , dimmed ? 'overflow-hidden' : '' ].filter(Boolean).join(' ')`; `src/components/MarkdownTaskCard.tsx:56` — ``className={`… ${done ? 'line-through' : 'text-foreground'}`}``.
 - **Problem:** The project standardizes on `cn()` (clsx + tailwind-merge) and uses it almost everywhere, but a handful of hot components hand-roll template-literal / array-join class logic, losing conflict-resolution and consistency — and it's not machine-enforced.
 - **Fix:** Convert these to `cn(...)`; optionally add a lint rule flagging template-literal `className` containing a ternary.
 
 ### 8. `RepeatDialog` state sprawl — 10 `useState` hooks shadowing a `DialogState` type
+
 - **Category:** `component-architecture` `srp`
 - **Impact:** 3
 - **Breadth:** 1 file (`src/editor/dialogs/RepeatDialog.tsx`, 528 lines — the largest non-vendored component)
@@ -112,6 +100,7 @@ The UI layer is **healthy and unusually well-disciplined** — strong token syst
 - **Fix:** Collapse the related fields into a `useReducer` (or a single `DialogState` object with one setter) so `initState` seeds it in one assignment.
 
 ### 9. Vendored shadcn `sidebar.tsx` is ~60% unused surface area
+
 - **Category:** `dead-code` `library-fit`
 - **Impact:** 2
 - **Breadth:** 1 file (`src/components/ui/sidebar.tsx`, 722 lines — the single largest UI file)
