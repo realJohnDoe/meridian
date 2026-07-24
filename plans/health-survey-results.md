@@ -34,16 +34,6 @@ This is one of the healthiest codebases I've surveyed: the documented architectu
 
 ## 4. Findings
 
-### #3 — TanStack Virtual is flagged incompatible with the enabled React Compiler
-
-**Category:** `library-fit` `performance` · **Impact:** 5 · **Breadth:** 2 files (grep `useVirtualizer`: `calendar/AgendaView.tsx`, `search/FileResultsList.tsx`) · **Fix effort:** M
-
-**Evidence:** lint output at [AgendaView.tsx:151](../src/calendar/AgendaView.tsx#L151) (`const virtualizer = useVirtualizer({`): _"TanStack Virtual's `useVirtualizer()` API returns functions that cannot be memoized safely — react-hooks/incompatible-library"_ — the only 2 warnings in an otherwise clean lint run.
-
-**Problem:** `babel-plugin-react-compiler` is enabled globally, but the compiler cannot safely memoize the two virtualized components — one being the agenda, the app's home view — leaving a standing correctness risk (stale virtualizer state under memoization) that the config comment explicitly labels "real but sometimes unfixable."
-
-**Fix:** Resolve the decision this branch's name implies: either swap these two lists to a component-API virtualizer that doesn't fight the compiler (e.g. react-virtuoso — verify its compiler compatibility empirically, not from its README), or add `'use no memo'` directives to the two components and record that as the accepted trade-off.
-
 ### #9 — `use-visual-viewport` violates the project's own placement rule
 
 **Category:** `layout` · **Impact:** 1 · **Breadth:** 3 files (grep `useVisualViewport`: the hook + `components/ui/dialog.tsx`, `components/ui/popover.tsx`) · **Fix effort:** S
