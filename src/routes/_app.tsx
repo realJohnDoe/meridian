@@ -1,9 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
-import {
-  Menu, CalendarCheck2,
-  ChevronLeft, ChevronRight,
-} from 'lucide-react'
+import { Menu, CalendarCheck2 } from 'lucide-react'
 import { useStore } from '@/store'
 import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
@@ -17,6 +14,7 @@ import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { TopbarSlotContext } from './-topbarSlot'
 import { topbarEdgePadding } from './-topbarEdgePadding'
+import { PagedTopbar } from './-pagedTopbar'
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
@@ -123,30 +121,36 @@ function AppMain() {
             // Portal target — entry route injects topbar controls here via createPortal
             <div ref={setSlotEl} className="flex flex-1 items-center h-full overflow-hidden" />
           ) : isDayView && dvDate ? (
-            <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
-              {isMobile && <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={openSidebar} title="Menu" aria-label="Menu"><Menu size={18} /></Button>}
-              {/* dayPreview (set by the swipe carousel as a swipe crosses the
-                  halfway point) shows the label the gesture is heading toward
-                  immediately, ahead of the route committing — mirrors monthPreview. */}
-              <span className="flex-1 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{fmtTopBarDay(dayPreview ? (parseDateString(dayPreview) ?? dvDate) : dvDate, today)}</span>
-              {/* replace: true — mirrors the day carousel's swipe-to-page
-                  semantics (see DayView) so chevron taps and swipes leave the
-                  same, single history entry per visit instead of chevron taps
-                  alone stacking up a back-press-per-day trail. */}
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}><ChevronLeft size={18} /></Button>
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}><ChevronRight size={18} /></Button>
-            </div>
+            // dayPreview (set by the swipe carousel as a swipe crosses the
+            // halfway point) shows the label the gesture is heading toward
+            // immediately, ahead of the route committing — mirrors monthPreview.
+            // replace: true on nav — mirrors the day carousel's swipe-to-page
+            // semantics (see DayView) so chevron taps and swipes leave the
+            // same, single history entry per visit instead of chevron taps
+            // alone stacking up a back-press-per-day trail.
+            <PagedTopbar
+              isMobile={isMobile}
+              openSidebar={openSidebar}
+              label={fmtTopBarDay(dayPreview ? (parseDateString(dayPreview) ?? dvDate) : dvDate, today)}
+              prevLabel="Previous day"
+              nextLabel="Next day"
+              onPrev={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}
+              onNext={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}
+            />
           ) : isMonthView && monthViewDate ? (
-            <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
-              {isMobile && <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={openSidebar} title="Menu" aria-label="Menu"><Menu size={18} /></Button>}
-              <span className="flex-1 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
-              {/* replace: true — mirrors the month carousel's swipe-to-page
-                  semantics (see MonthView) so chevron taps and swipes leave
-                  the same, single history entry per visit instead of chevron
-                  taps alone stacking up a back-press-per-month trail. */}
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}><ChevronLeft size={18} /></Button>
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}><ChevronRight size={18} /></Button>
-            </div>
+            // replace: true on nav — mirrors the month carousel's swipe-to-page
+            // semantics (see MonthView) so chevron taps and swipes leave
+            // the same, single history entry per visit instead of chevron
+            // taps alone stacking up a back-press-per-month trail.
+            <PagedTopbar
+              isMobile={isMobile}
+              openSidebar={openSidebar}
+              label={topBarLabel}
+              prevLabel="Previous month"
+              nextLabel="Next month"
+              onPrev={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}
+              onNext={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}
+            />
           ) : (
             <div className="flex items-center gap-2 min-w-0" id="tbDefault">
               {isMobile && <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={openSidebar} title="Menu" aria-label="Menu"><Menu size={18} /></Button>}
