@@ -6,13 +6,13 @@
  *   DaySection's memo comparator did not check id/ownerId, so it skipped
  *   re-renders and left OccurrenceRow children with stale occurrences whose
  *   ownerId no longer matched any series in the store. Toggling such a stale
- *   occurrence was a no-op in the model, yet cacheWrite still marked the file
- *   dirty, producing a phantom commit.
+ *   occurrence was a no-op in the model, yet cacheWrite (now recordLocalEdit)
+ *   still marked the file dirty, producing a phantom commit.
  *
  * Fix A (DaySection propsAreEqual) adds id/ownerId to the memo comparator so
  * any identity change forces a re-render and children always close over live
  * occurrences.
- * Fix B (cacheWrite) short-circuits when content is unchanged, eliminating
+ * Fix B (cacheWrite, now recordLocalEdit) short-circuits when content is unchanged, eliminating
  * phantom commits from no-op toggles.
  * Fix C (storeItems deterministic IDs, this PR) eliminates ID churn entirely:
  * re-parsing identical content now yields identical IDs, so a "stale" ownerId

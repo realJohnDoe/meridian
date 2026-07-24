@@ -1,7 +1,8 @@
 import {
-  cacheWrite, cacheBulkWriteClean, cacheDelete, cacheGetDirty,
-  cacheWriteClean, cacheMarkPushed, cacheDirtyCount, cacheLoadAll,
-  cacheWriteTombstone, cacheGetTombstones,
+  recordLocalEdit, applyRemoteBatch, confirmDeleted, cacheGetDirty,
+  setResolvedClean, markPushed, cacheDirtyCount, cacheLoadAll,
+  recordLocalDelete, cacheGetTombstones,
+  markInFlight, clearInFlight, getInFlightPaths,
 } from '@/storage/cache'
 import type { CacheRecord } from '@/storage/cache'
 import { conflictPath } from './conflictName'
@@ -79,14 +80,14 @@ async function resolveCollision(
 
   const [fresh] = await backend.readFiles([path])
   if (fresh) {
-    await cacheWriteClean(vaultId, path, fresh.content, fresh.version)
+    await setResolvedClean(vaultId, path, fresh.content, fresh.version)
     merges.push({ path, content: fresh.content })
     if (cacheMap) {
       cacheMap.set(path, {
         vaultPath: `${vaultId}::${path}`,
         vaultId, path,
         content: fresh.content,
-        dirty: 0,
+        status: 'clean',
         updatedAt: Date.now(),
         version: fresh.version,
       })
@@ -100,14 +101,14 @@ async function resolveCollision(
   const [copyFresh] = await backend.readFiles([copy])
   if (copyFresh) copyVersion = copyFresh.version
 
-  await cacheWriteClean(vaultId, copy, localContent, copyVersion)
+  await setResolvedClean(vaultId, copy, localContent, copyVersion)
   merges.push({ path: copy, content: localContent })
   if (cacheMap && copyVersion !== undefined) {
     cacheMap.set(copy, {
       vaultPath: `${vaultId}::${copy}`,
       vaultId, path: copy,
       content: localContent,
-      dirty: 0,
+      status: 'clean',
       updatedAt: Date.now(),
       version: copyVersion,
     })
@@ -163,7 +164,7 @@ export function planReconcile(
     // this branch re-reads the file through a fresher endpoint (the Contents
     // API) before trusting anything, so a stale listing here costs a redundant
     // read rather than a wrong outcome.
-    if (!entry || (entry.version !== diskToken && entry.dirty === 0)) {
+    if (!entry || (entry.version !== diskToken && entry.status === 'clean')) {
       changed.push(path)
     }
   }
@@ -176,7 +177,7 @@ export function planReconcile(
     // branch above, there is no confirming read here — deleting is the only
     // action available — so silence alone must not be enough to trigger it.
     const recentlyWritten = now - entry.updatedAt < RECONCILE_DELETE_GRACE_MS
-    if (!diskTokens.has(entry.path) && entry.dirty === 0 && !recentlyWritten) deleted.push(entry.path)
+    if (!diskTokens.has(entry.path) && entry.status === 'clean' && !recentlyWritten) deleted.push(entry.path)
   }
 
   return { changed, deleted }
@@ -220,15 +221,17 @@ export async function reconcileWithBackend(
   const cacheMap   = new Map(cached.map(r => [r.path, r]))
 
   // Union in any path with a write/delete currently in flight (see
-  // _inFlightPaths above) — snapshotted here, immediately before planning, so
-  // it reflects everything in flight at the moment this cycle decides.
-  const effectiveSkip = _inFlightPaths.size === 0
+  // markInFlight/getInFlightPaths in cache.ts) — snapshotted here, immediately
+  // before planning, so it reflects everything in flight at the moment this
+  // cycle decides.
+  const inFlight = getInFlightPaths()
+  const effectiveSkip = inFlight.size === 0
     ? skipPaths
-    : new Set([...skipPaths, ..._inFlightPaths.keys()])
+    : new Set([...skipPaths, ...inFlight])
 
   const { changed, deleted } = planReconcile(diskTokens, cached, effectiveSkip, Date.now())
 
-  // Paths cacheBulkWriteClean actually wrote — it skips any path a local edit
+  // Paths applyRemoteBatch actually wrote — it skips any path a local edit
   // or delete touched since the cacheLoadAll snapshot above (readFiles/readAll
   // below is a real await, and a genuine window). A skipped path's cache and
   // store both stay untouched this cycle rather than being merged from either
@@ -242,14 +245,14 @@ export async function reconcileWithBackend(
     } else {
       freshFiles = await backend.readFiles(changed)
     }
-    written = new Set(await cacheBulkWriteClean(vaultId, freshFiles))
+    written = new Set(await applyRemoteBatch(vaultId, freshFiles))
     for (const f of freshFiles) {
       if (!written.has(f.path)) continue
-      cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, dirty: 0, updatedAt: Date.now(), version: f.version })
+      cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, status: 'clean', updatedAt: Date.now(), version: f.version })
     }
   }
 
-  await Promise.all(deleted.map(p => cacheDelete(vaultId, p)))
+  await Promise.all(deleted.map(p => confirmDeleted(vaultId, p)))
   for (const p of deleted) cacheMap.delete(p)
 
   const changedWritten = changed.filter(p => written.has(p))
@@ -322,11 +325,11 @@ async function pushDirty(
       // throws ConflictError only when the content genuinely diverged — it
       // never false-positives due to stale listing tokens.
       const newVersion = await backend.write(f.path, f.content, f.version)
-      // cacheMarkPushed (not cacheWriteClean): f.content was captured before
+      // markPushed (not setResolvedClean): f.content was captured before
       // this network round trip, and another edit to this same path may have
       // landed in the meantime. An unconditional clean write would silently
       // discard that edit — see its doc comment in cache.ts.
-      await cacheMarkPushed(vaultId, f.path, f.content, newVersion)
+      await markPushed(vaultId, f.path, f.content, newVersion)
       pushed.add(f.path)
     } catch (e) {
       if (e instanceof ConflictError) {
@@ -346,7 +349,7 @@ async function pushDirty(
       // Pass the cached version (blob SHA for GitHub) so the delete works even
       // when the backend's in-memory SHA cache is cold after a page reload.
       await backend.delete(f.path, f.version)
-      await cacheDelete(vaultId, f.path)
+      await confirmDeleted(vaultId, f.path)
       pushed.add(f.path)
     } catch (e) {
       if (e instanceof ConflictError) {
@@ -356,7 +359,7 @@ async function pushDirty(
         // hadCollision) pull the remote edit back in, so it isn't silently
         // destroyed. Deliberately NOT added to `pushed`: that set skips
         // reconcile's re-pull, and here we want the opposite.
-        await cacheDelete(vaultId, f.path)
+        await confirmDeleted(vaultId, f.path)
         hadCollision = true
         warn(`${f.path} was edited remotely — kept the remote version instead of deleting.`)
       } else {
@@ -478,36 +481,10 @@ export async function syncToBackend(): Promise<void> {
 }
 
 // ── CACHE WRITE / DELETE ──────────────────────────────────────
-
-/**
- * Paths with a cache write/delete in flight — marked synchronously, before the
- * first await, so the interval between `setData` updating the store and Dexie
- * recording dirty=1/2 is never observable to a concurrent reconcile. Without
- * this, a reconcile landing in that interval sees dirty===0 and can merge
- * remote content over an edit still only in the store — or, worse, resurrect
- * a note whose delete is still in flight: mergeChangedIntoStore would re-add
- * it to the store and nothing would ever evict it again.
- *
- * Refcounted rather than a Set: two commits for the same slug can overlap
- * (e.g. rapid checkbox toggles), and writeEntityToCache's self-heal path
- * below nests a deleteFromBackend call for the same path. In both cases a
- * plain Set's `finally` would clear the shared mark as soon as either call
- * settles, while the other is still outstanding — a structural gap even
- * though today's planReconcile happens to guard the same records another
- * way once one write has actually landed (see its own dirty!==0 checks). The
- * refcount removes the dependence on that coincidence.
- */
-const _inFlightPaths = new Map<string, number>()
-
-function markInFlight(path: string): void {
-  _inFlightPaths.set(path, (_inFlightPaths.get(path) ?? 0) + 1)
-}
-
-function clearInFlight(path: string): void {
-  const n = (_inFlightPaths.get(path) ?? 0) - 1
-  if (n > 0) _inFlightPaths.set(path, n)
-  else _inFlightPaths.delete(path)
-}
+//
+// The in-flight write registry (markInFlight/clearInFlight/getInFlightPaths)
+// lives in cache.ts now, alongside the persisted status it overlays — see its
+// doc comment there for why marking is refcounted.
 
 export async function writeEntityToCache(fileSlug: string): Promise<void> {
   const path = fileSlugToPath(fileSlug)
@@ -533,7 +510,7 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     const frontmatter = collapseToYaml(slugItems, root)
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body)
-    await cacheWrite(backend.id, path, content)
+    await recordLocalEdit(backend.id, path, content)
     updateSyncUI()
     scheduleAutoPush()
   } catch (e) {
@@ -550,7 +527,7 @@ export async function deleteFromBackend(fileSlug: string): Promise<void> {
   try {
     const backend = getActiveBackend()
     if (!backend || backend.readOnly) return
-    await cacheWriteTombstone(backend.id, path)
+    await recordLocalDelete(backend.id, path)
     updateSyncUI()
     scheduleAutoPush()
   } catch (e) {
