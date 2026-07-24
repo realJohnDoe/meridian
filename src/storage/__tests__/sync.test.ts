@@ -58,10 +58,15 @@ vi.mock('@/storage/cache', () => ({
     cacheStore.set(key, { vaultPath: key, vaultId, path, content: pushedContent, dirty: 0, updatedAt: Date.now(), version })
   }),
   cacheBulkWriteClean: vi.fn(async (vaultId: string, records: Array<{ path: string; content: string; version?: string }>) => {
+    const written: string[] = []
     for (const r of records) {
       const key = vp(vaultId, r.path)
+      const existing = cacheStore.get(key)
+      if (existing && existing.dirty !== 0) continue
       cacheStore.set(key, { vaultPath: key, vaultId, path: r.path, content: r.content, dirty: 0, updatedAt: Date.now(), version: r.version })
+      written.push(r.path)
     }
+    return written
   }),
   cacheLoadAll: vi.fn(async (vaultId: string) => {
     return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId)
@@ -131,6 +136,7 @@ class FakeBackend implements StorageBackend {
   private _statAllErrorQueue: Error[] = []
   private _hidden = new Set<string>()
   private _pendingWriteGate: Promise<void> | null = null
+  private _pendingReadFilesGate: Promise<void> | null = null
 
   seed(path: string, content: string, version: string): void {
     this._files.set(path, { content, version })
@@ -158,6 +164,16 @@ class FakeBackend implements StorageBackend {
     return release
   }
 
+  /** Holds the next readFiles() call pending — simulates the network read a
+   * reconcile does between its cacheLoadAll snapshot and writing the fresh
+   * content back clean, so a test can land a concurrent local edit in that
+   * window. */
+  blockNextReadFiles(): () => void {
+    let release!: () => void
+    this._pendingReadFilesGate = new Promise<void>(resolve => { release = resolve })
+    return release
+  }
+
   async statAll(): Promise<Map<string, string>> {
     this.statAllCallCount++
     if (this._statAllErrorQueue.length) throw this._statAllErrorQueue.shift()!
@@ -171,6 +187,11 @@ class FakeBackend implements StorageBackend {
 
   async readFiles(paths: string[]): Promise<RawFile[]> {
     this.readFilesCallCount++
+    if (this._pendingReadFilesGate) {
+      const gate = this._pendingReadFilesGate
+      this._pendingReadFilesGate = null
+      await gate
+    }
     return paths.flatMap(p => {
       const f = this._files.get(p)
       return f ? [{ path: p, content: f.content, version: f.version }] : []
@@ -607,6 +628,63 @@ describe('reconcileWithBackend — large changed sets route through readAll()', 
     expect(backend.readFilesCallCount).toBe(1)
     expect(backend.readAllCallCount).toBe(0)
     expect(cacheStore.get(vp('fake-vault', 'note.md'))?.content).toBe('content')
+  })
+})
+
+// ── Bulk clean write must not clobber a concurrent edit ──────────────────
+//
+// reconcileWithBackend snapshots the cache (cacheLoadAll), decides what's
+// changed, then awaits a real network read (readFiles/readAll) before
+// writing the fresh content back clean. A local edit landing in that window
+// must not be silently overwritten — same class of bug as PR 3's
+// cacheMarkPushed, just on the pull side and across a whole batch.
+
+describe('reconcileWithBackend — a local edit landing mid-reconcile is not clobbered by the bulk clean write', () => {
+  it('does not merge stale remote content over a local edit that lands between the cache snapshot and the write-back', async () => {
+    const backend = new FakeBackend()
+    backend.seed('note.md', 'remote v2', 'v2')
+    setActiveBackend(backend)
+    seedClean('fake-vault', 'note.md', 'remote v1', 'v1', Date.now()) // clean, version drifted → planReconcile marks it "changed"
+    storeState.roots = new Map([['note', { title: 'Local Edit', tags: [], items: [] }]])
+
+    const release = backend.blockNextReadFiles()
+    const reconcilePromise = reconcileWithBackend(backend, 'fake-vault')
+    await flush() // let reconcile capture its cacheLoadAll snapshot and reach the blocked readFiles call
+
+    // Lands while backend.readFiles(['note.md']) is still pending — after
+    // reconcile's cacheLoadAll snapshot but before it writes fresh content back.
+    await cacheWrite('fake-vault', 'note.md', 'local edit')
+    release()
+    await reconcilePromise
+
+    const cached = cacheStore.get(vp('fake-vault', 'note.md'))
+    expect(cached?.dirty).toBe(1)
+    expect(cached?.content).toBe('local edit')
+    // The store must still show the local edit — not overwritten by the
+    // now-stale remote pull.
+    expect((storeState.roots.get('note') as { title?: string } | undefined)?.title).toBe('Local Edit')
+  })
+
+  it('still writes and merges other paths in the same batch that were not touched locally', async () => {
+    const backend = new FakeBackend()
+    backend.seed('untouched.md', 'remote content', 'v2')
+    backend.seed('edited.md', 'remote content 2', 'v2')
+    setActiveBackend(backend)
+    seedClean('fake-vault', 'untouched.md', 'old content', 'v1', Date.now())
+    seedClean('fake-vault', 'edited.md', 'old content 2', 'v1', Date.now())
+
+    const release = backend.blockNextReadFiles()
+    const reconcilePromise = reconcileWithBackend(backend, 'fake-vault')
+    await flush() // let reconcile capture its cacheLoadAll snapshot and reach the blocked readFiles call
+
+    await cacheWrite('fake-vault', 'edited.md', 'local edit')
+    release()
+    await reconcilePromise
+
+    expect(cacheStore.get(vp('fake-vault', 'untouched.md'))?.dirty).toBe(0)
+    expect(cacheStore.get(vp('fake-vault', 'untouched.md'))?.content).toBe('remote content')
+    expect(cacheStore.get(vp('fake-vault', 'edited.md'))?.dirty).toBe(1)
+    expect(cacheStore.get(vp('fake-vault', 'edited.md'))?.content).toBe('local edit')
   })
 })
 
