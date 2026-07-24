@@ -44,16 +44,6 @@ This is one of the healthiest codebases I've surveyed: the documented architectu
 
 **Fix:** Resolve the decision this branch's name implies: either swap these two lists to a component-API virtualizer that doesn't fight the compiler (e.g. react-virtuoso — verify its compiler compatibility empirically, not from its README), or add `'use no memo'` directives to the two components and record that as the accepted trade-off.
 
-### #8 — Undocumented exact pin on `@lezer/markdown`
-
-**Category:** `dependencies` · **Impact:** 2 · **Breadth:** 1 file · **Fix effort:** S
-
-**Evidence:** [package.json:24](../package.json#L24) — `"@lezer/markdown": "1.6.4",` (only exact pin among 39 deps; registry latest 1.7.2; introduced in commit `508a684` with no stated rationale).
-
-**Problem:** A pin is a standing decision, and this one's rationale is recorded nowhere — nobody can tell whether 1.7.x breaks the link-widget rendering the pinning commit touched or whether the pin is just stale.
-
-**Fix:** Either try `^1.7.2` on a branch (gate: `pnpm test` + manual check of body-editor link rendering) or add a one-line comment stating what 1.7.x broke.
-
 ### #9 — `use-visual-viewport` violates the project's own placement rule
 
 **Category:** `layout` · **Impact:** 1 · **Breadth:** 3 files (grep `useVisualViewport`: the hook + `components/ui/dialog.tsx`, `components/ui/popover.tsx`) · **Fix effort:** S
