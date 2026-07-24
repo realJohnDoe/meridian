@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { ArrowLeft, Search, X } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import SearchResults from './SearchResults'
-import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { useSidebar } from '@/components/ui/sidebar'
 
@@ -45,15 +45,14 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
       <div className="mobile-search-overlay fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto">
         {/* Top input row — pinned, always visible */}
         <div className="shrink-0 flex items-center gap-2 px-3.5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 border-b border-border">
-          <Button
+          <IconButton
             variant="ghost"
-            size="icon"
-            className="w-9 h-9 rounded-full shrink-0 text-muted-foreground"
-            aria-label="Close search"
+            className="w-9 h-9 text-muted-foreground"
+            label="Close search"
             onClick={onClose}
           >
             <ArrowLeft size={18} />
-          </Button>
+          </IconButton>
           <div className="search-bar-wrap min-w-0" style={{ flex: '1 1 0%' }}>
             <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
             <Input
@@ -68,9 +67,9 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
               }}
             />
             {query && (
-              <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full shrink-0 text-muted-foreground" aria-label="Clear search" onClick={() => onQueryChange('')}>
+              <IconButton variant="ghost" hit="pad" className="w-7 h-7 text-muted-foreground" label="Clear search" onClick={() => onQueryChange('')}>
                 <X size={13} />
-              </Button>
+              </IconButton>
             )}
           </div>
         </div>
