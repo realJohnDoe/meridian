@@ -3,6 +3,7 @@ import type { Occurrence, EditScope } from '@/types'
 import { cn } from '@/lib/cn'
 import { FlipList } from '@/components'
 import OccurrenceRow from './OccurrenceRow'
+import { occArraysEqual } from './occEqual'
 
 
 interface Props {
@@ -45,15 +46,7 @@ function OverdueSection({ items, onOpen, onToggleDone, onSwipeDelete }: Props) {
 // tell whether this section's own content actually changed. The compiler's
 // automatic memoization compares the `items` reference, not its contents.
 export function propsAreEqual(prev: Props, next: Props): boolean {
-  if (prev.items.length !== next.items.length) return false
-  return prev.items.every((o, i) => {
-    const n = next.items[i]
-    return o.id === n.id && o.date === n.date
-        && o.metadata.jsTime?.getTime() === n.metadata.jsTime?.getTime()
-        && o.metadata.done === n.metadata.done
-        && o.metadata.title === n.metadata.title
-        && o.metadata.priority === n.metadata.priority
-  })
+  return occArraysEqual(prev.items, next.items)
 }
 
 export default memo(OverdueSection, propsAreEqual)

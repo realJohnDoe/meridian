@@ -68,15 +68,39 @@ describe('OverdueSection.propsAreEqual', () => {
     expect(propsAreEqual(baseProps([occ]), baseProps([next]))).toBe(false)
   })
 
-  it('is equal when only metadata.participants differs — not part of this comparator', () => {
+  // OccurrenceRow renders tags/participants/duration here too (OccurrenceCard's
+  // showTagsParticipants defaults to true and OverdueSection never overrides
+  // it), so this comparator must catch changes to them the same as DaySection's
+  // does — see occEqual, now shared by both.
+  it('is unequal when metadata.participants differs (deep)', () => {
     const occ = makeOcc({ metadata: { participants: [], title: 'Standup', tags: [], items: [] } })
     const next = { ...occ, metadata: { ...occ.metadata, participants: ['Alice'] } }
-    expect(propsAreEqual(baseProps([occ]), baseProps([next]))).toBe(true)
+    expect(propsAreEqual(baseProps([occ]), baseProps([next]))).toBe(false)
   })
 
-  it('is equal when only metadata.tags differs — not part of this comparator', () => {
+  it('is unequal when metadata.tags differs (deep)', () => {
     const occ = makeOcc({ metadata: { participants: [], title: 'Standup', tags: [], items: [] } })
     const next = { ...occ, metadata: { ...occ.metadata, tags: ['urgent'] } }
+    expect(propsAreEqual(baseProps([occ]), baseProps([next]))).toBe(false)
+  })
+
+  it('is unequal when metadata.duration differs', () => {
+    const occ = makeOcc()
+    const next = { ...occ, metadata: { ...occ.metadata, duration: '30 minutes' } }
+    expect(propsAreEqual(baseProps([occ]), baseProps([next]))).toBe(false)
+  })
+
+  it('treats equal-value tags/items/participants as equal even when the arrays are different instances', () => {
+    const occ = makeOcc({ metadata: { participants: ['Alice'], title: 'Standup', tags: ['x'], items: ['y'] } })
+    const next: Occurrence = {
+      ...occ,
+      metadata: {
+        ...occ.metadata,
+        participants: [...occ.metadata.participants],
+        tags: [...occ.metadata.tags],
+        items: [...occ.metadata.items],
+      },
+    }
     expect(propsAreEqual(baseProps([occ]), baseProps([next]))).toBe(true)
   })
 })
