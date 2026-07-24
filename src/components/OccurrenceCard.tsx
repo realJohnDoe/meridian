@@ -163,7 +163,7 @@ export default function OccurrenceCard({
       {dimmed && <div className="absolute inset-0 pointer-events-none z-10 rounded-lg" style={{ background: 'var(--done-overlay)' }} />}
 
       <SurfaceButton
-        className="absolute inset-0 z-[1] rounded-lg"
+        className="absolute inset-0 z-0 rounded-lg"
         aria-label={title}
         onClick={onOpen}
       />
