@@ -93,6 +93,51 @@ async function activateWritableVault(backend: StorageBackend): Promise<void> {
   emitVaultChanged()
 }
 
+/** Builds the backend for a local/github ref, fetching its stored credential
+ * (file handle or token). Returns `null` if the credential is missing. */
+async function buildBackend(ref: VaultRef): Promise<StorageBackend | null> {
+  if (ref.kind === 'local') {
+    const handle = await handleLoad(ref.id)
+    return handle ? new LocalBackend(ref.id, ref.name, handle) : null
+  }
+  if (ref.kind === 'github') {
+    const token = await ensureFreshAccessToken(ref.id)
+    return token ? new GitHubBackend(ref.id, ref.name, { ...ref.github, token }) : null
+  }
+  return null
+}
+
+type ActivationOutcome = 'granted' | 'prompt' | 'denied' | 'no-credential'
+
+/**
+ * Shared local/github activation flow used by both the restore-on-load path
+ * and the user-initiated switch path. Builds the backend, checks permission,
+ * and activates on success; callers only need to react to the outcome for
+ * their own fallback/notification policy.
+ *
+ * `interactive: false` (restore) surfaces a `'prompt'` outcome by parking the
+ * vault in pending-reconnect state instead of activating it. `interactive:
+ * true` (user switch) actively requests permission, which never resolves to
+ * `'prompt'`.
+ */
+async function activateVaultRef(ref: VaultRef, interactive: boolean): Promise<ActivationOutcome> {
+  const backend = await buildBackend(ref)
+  if (!backend) return 'no-credential'
+
+  const perm = await backend.ensurePermission(interactive)
+  if (perm === 'granted') {
+    await activateWritableVault(backend)
+    return 'granted'
+  }
+  if (perm === 'prompt' && !interactive) {
+    await setActiveVaultIdentity(backend, { pendingReconnect: ref.name })
+    await hydrateFromCache(ref.id)
+    updateSyncUI()
+    return 'prompt'
+  }
+  return 'denied'
+}
+
 async function registerAndActivate(ref: VaultRef, backend: StorageBackend): Promise<void> {
   await updateVaultRefs(existing => [...existing, ref])
   try {
@@ -134,29 +179,13 @@ async function restoreVaultsInner(): Promise<void> {
     const savedActiveId = await activeVaultIdLoad()
     const targetRef     = allRefs.find(r => r.id === savedActiveId) ?? EXAMPLE_REF
 
-    if (targetRef.kind === 'local') {
-      const handle = await handleLoad(targetRef.id)
-      if (!handle) { await activateExampleVault(); return }
-      const backend = new LocalBackend(targetRef.id, targetRef.name, handle)
-      const perm    = await backend.ensurePermission(false)
-      if (perm === 'granted') {
-        await activateWritableVault(backend)
-      } else if (perm === 'prompt') {
-        await setActiveVaultIdentity(backend, { pendingReconnect: targetRef.name })
-        await hydrateFromCache(targetRef.id)
-        updateSyncUI()
-      } else {
-        await activateExampleVault()
-      }
-    } else if (targetRef.kind === 'github') {
-      const token = await ensureFreshAccessToken(targetRef.id)
-      if (!token) { await activateExampleVault(); return }
-      const backend = new GitHubBackend(targetRef.id, targetRef.name, { ...targetRef.github, token })
-      const perm    = await backend.ensurePermission(false)
-      if (perm === 'granted') {
-        await activateWritableVault(backend)
-      } else {
-        notify(`Could not reconnect GitHub vault "${targetRef.name}" — check your token.`)
+    if (targetRef.kind === 'local' || targetRef.kind === 'github') {
+      const outcome = await activateVaultRef(targetRef, false)
+      if (outcome === 'no-credential') { await activateExampleVault(); return }
+      if (outcome === 'denied') {
+        if (targetRef.kind === 'github') {
+          notify(`Could not reconnect GitHub vault "${targetRef.name}" — check your token.`)
+        }
         await activateExampleVault()
       }
     } else {
@@ -175,24 +204,20 @@ export async function setActiveVault(id: string): Promise<void> {
     const ref = getVaults().find(v => v.id === id)
     if (!ref) return
 
-    if (ref.kind === 'local') {
-      const handle = await handleLoad(id)
-      if (!handle) { notify('Vault handle not found — try removing and re-adding it.'); return }
-
-      const backend = new LocalBackend(id, ref.name, handle)
-      const perm    = await backend.ensurePermission(true)
-      if (perm !== 'granted') { notify(`Permission denied for vault "${ref.name}".`); return }
-
-      await activateWritableVault(backend)
-    } else if (ref.kind === 'github') {
-      const token = await ensureFreshAccessToken(id)
-      if (!token) { notify('GitHub token not found — try removing and re-adding this vault.'); return }
-
-      const backend = new GitHubBackend(id, ref.name, { ...ref.github, token })
-      const perm    = await backend.ensurePermission(true)
-      if (perm !== 'granted') { notify(`Could not connect to GitHub vault "${ref.name}" — check your token.`); return }
-
-      await activateWritableVault(backend)
+    if (ref.kind === 'local' || ref.kind === 'github') {
+      const outcome = await activateVaultRef(ref, true)
+      if (outcome === 'no-credential') {
+        notify(ref.kind === 'local'
+          ? 'Vault handle not found — try removing and re-adding it.'
+          : 'GitHub token not found — try removing and re-adding this vault.')
+        return
+      }
+      if (outcome !== 'granted') {
+        notify(ref.kind === 'local'
+          ? `Permission denied for vault "${ref.name}".`
+          : `Could not connect to GitHub vault "${ref.name}" — check your token.`)
+        return
+      }
     }
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
