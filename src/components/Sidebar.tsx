@@ -9,7 +9,7 @@ import { FlipList } from './FlipList'
 import { vaultIcon } from './vaultIcon'
 import { Checkbox } from './ui/checkbox'
 import { IconButton } from './ui/icon-button'
-import { NO_PARTICIPANT } from '@/hooks'
+import { NO_PARTICIPANT } from '@/calendar'
 import {
   Sidebar,
   SidebarContent,

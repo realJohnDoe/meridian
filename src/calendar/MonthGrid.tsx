@@ -12,7 +12,8 @@ import { maxVisibleFor, ROW_GAP } from './snapCarousel'
 
 const EMPTY: Occurrence[] = []
 import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useToday, useCalendarFilter } from '@/hooks'
+import { useToday } from '@/hooks'
+import { useCalendarFilter } from './useCalendarFilter'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants, occPillRounded } from '@/components/ui/occurrence-variants'

@@ -6,7 +6,7 @@ import { fmtISO } from '@/model'
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useFilteredOccs } from '@/hooks'
+import { useFilteredOccs } from './useCalendarFilter'
 
 const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 

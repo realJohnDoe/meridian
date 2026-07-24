@@ -9,7 +9,8 @@ import DaySection from './DaySection'
 import OverdueSection from './OverdueSection'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
 import { useAgendaSections, estimateSection } from './useAgendaSections'
-import { useToday, useNow } from '@/hooks'
+import { useToday } from '@/hooks'
+import { useNow } from './useNow'
 
 interface Props {
   onOpen: (occ: Occurrence, scope?: EditScope) => void
