@@ -108,13 +108,41 @@ export async function cacheMarkPushed(
   })
 }
 
+/**
+ * Bulk-write freshly-pulled remote content as clean — but skip any record a
+ * local edit or delete has touched since the caller's cacheLoadAll snapshot
+ * (reconcileWithBackend awaits a network read between that snapshot and this
+ * call, a real window). Overwriting such a record would clean-stamp
+ * now-stale remote content over it, discarding the local change the same way
+ * the single-record cacheWriteClean used to (see cacheMarkPushed). Skipped
+ * records keep their stale base `version`, so the next push CASes against it
+ * and correctly detects the conflict rather than silently winning.
+ *
+ * Returns the paths actually written, so the caller only merges those into
+ * the store — a skipped path's cache and store both keep whatever they held
+ * (typically the user's still-in-progress edit) rather than either the
+ * pre-edit snapshot or the now-superseded remote content.
+ */
 export async function cacheBulkWriteClean(
   vaultId: string,
   records: Array<{ path: string; content: string; version?: string }>,
-): Promise<void> {
+): Promise<string[]> {
   const d = await cacheInit()
   const now = Date.now()
-  await d.files.bulkPut(records.map(r => ({ vaultPath: vp(vaultId, r.path), vaultId, ...r, dirty: 0, updatedAt: now })))
+  const written: string[] = []
+  await d.transaction('rw', d.files, async () => {
+    const keys = records.map(r => vp(vaultId, r.path))
+    const existingRecords = await d.files.bulkGet(keys)
+    const toPut: CacheRecord[] = []
+    records.forEach((r, i) => {
+      const existing = existingRecords[i]
+      if (existing && existing.dirty !== 0) return
+      toPut.push({ vaultPath: vp(vaultId, r.path), vaultId, ...r, dirty: 0, updatedAt: now })
+      written.push(r.path)
+    })
+    if (toPut.length > 0) await d.files.bulkPut(toPut)
+  })
+  return written
 }
 
 export async function cacheLoadAll(vaultId: string): Promise<CacheRecord[]> {

@@ -228,6 +228,12 @@ export async function reconcileWithBackend(
 
   const { changed, deleted } = planReconcile(diskTokens, cached, effectiveSkip, Date.now())
 
+  // Paths cacheBulkWriteClean actually wrote — it skips any path a local edit
+  // or delete touched since the cacheLoadAll snapshot above (readFiles/readAll
+  // below is a real await, and a genuine window). A skipped path's cache and
+  // store both stay untouched this cycle rather than being merged from either
+  // stale snapshot.
+  let written = new Set<string>()
   if (changed.length > 0) {
     let freshFiles: RawFile[]
     if (changed.length > LARGE_RECONCILE_THRESHOLD) {
@@ -236,8 +242,9 @@ export async function reconcileWithBackend(
     } else {
       freshFiles = await backend.readFiles(changed)
     }
-    await cacheBulkWriteClean(vaultId, freshFiles)
+    written = new Set(await cacheBulkWriteClean(vaultId, freshFiles))
     for (const f of freshFiles) {
+      if (!written.has(f.path)) continue
       cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, dirty: 0, updatedAt: Date.now(), version: f.version })
     }
   }
@@ -245,11 +252,12 @@ export async function reconcileWithBackend(
   await Promise.all(deleted.map(p => cacheDelete(vaultId, p)))
   for (const p of deleted) cacheMap.delete(p)
 
-  if (changed.length === 0 && deleted.length === 0) { updateSyncUI(); return }
+  const changedWritten = changed.filter(p => written.has(p))
+  if (changedWritten.length === 0 && deleted.length === 0) { updateSyncUI(); return }
 
   // Parse only the changed files; deleted paths have no replacement record and
   // are evicted via alsoAffected.
-  const changedRecords = changed
+  const changedRecords = changedWritten
     .map(p => cacheMap.get(p))
     .filter((r): r is NonNullable<typeof r> => r != null)
   const deletedSlugs = deleted.map(p => p.replace(/\.(md|yaml|yml)$/, ''))
