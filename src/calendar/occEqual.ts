@@ -19,7 +19,7 @@ function arrayEq(a: string[], b: string[]): boolean {
  * comparator) means a new Occurrence field that affects rendering only needs
  * adding once.
  */
-export function occEqual(a: Occurrence, b: Occurrence): boolean {
+function occEqual(a: Occurrence, b: Occurrence): boolean {
   if (a === b) return true
   return a.id === b.id
       && a.ownerId === b.ownerId
