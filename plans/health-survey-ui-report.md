@@ -39,16 +39,6 @@ The UI layer is **healthy and unusually well-disciplined** — strong token syst
 
 ## 4. Findings
 
-### 2. Two parallel icon-button systems; top-bar chrome forks a class string at sub-44px targets
-
-- **Category:** `a11y` `library-fit` `dry`
-- **Impact:** 5
-- **Breadth:** 6 files use the raw pattern (`grep -l 'size="icon"'` → `_app.tsx`, `-entryTopbar.tsx`, `_app.entry.$slug.tsx`, `SearchBar.tsx`, `SyncButton.tsx`, `SearchOverlay.tsx`); the string `rounded-full … shrink-0` recurs 13×. `IconButton` is used in only 3 files.
-- **Fix effort:** M
-- **Evidence:** `src/routes/_app.tsx:127` — `<Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={openSidebar} title="Menu" aria-label="Menu">`; `src/components/ui/button.tsx:27` — `icon: "h-10 w-10"` (40px); vs `src/components/ui/icon-button.tsx` whose own doc says icons are "well under the 24px WCAG 2.5.8 (AA) floor and the 44px thumb-friendly target" and guarantees a 44px hit zone.
-- **Problem:** The team built an accessible `IconButton` (type-enforced `label`, guaranteed 44px hit area) but the most prominent, always-visible surface — the top bar, entry top bar, and search — bypasses it for a hand-repeated `Button size="icon"` (40px, and 36px/28px in `SearchOverlay`) that relies on remembering `aria-label` manually; jsx-a11y can't catch a missing label on a custom `Button`, so the safe path is the unused one.
-- **Fix:** Route the ghost-round icon buttons through `IconButton` (or add a `ghost-round` size to it) so touch target and labeling are enforced in one place.
-
 ### 4. Duplicated "dimmable card shell" across the two task-card components
 
 - **Category:** `dry` `styling`
