@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { VirtualItem } from '@tanstack/react-virtual'
 import type { StoreItem, Roots, Occurrence, LocalePrefs, VaultRef } from './types'
 import { weekStartsOn } from '@/model'
 import { updateFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
@@ -71,6 +72,16 @@ interface MeridianStore {
   scrollToTodayOnce: boolean
   /** ISO date string of the topmost visible day in the agenda view. */
   agendaTopDate: string | null
+  /**
+   * Scroll position snapshot so AgendaView restores it across remounts (e.g.
+   * navigating to month/day and back) instead of resetting to the top. Written
+   * on unmount, read to seed the virtualizer's initial* options on the next
+   * mount — see useAgendaScrollRestore/useSaveAgendaScroll and
+   * resetAgendaScroll (cleared on vault change, since a snapshot from a
+   * different vault's agenda is meaningless).
+   */
+  agendaScrollOffset: number
+  agendaScrollMeasurements: VirtualItem[]
   /**
    * `YYYY-MM` of the month the swipe carousel is settling toward, set on
    * touchend so the topbar label updates immediately instead of waiting for
@@ -171,10 +182,12 @@ export const useStore = create<MeridianStore>((set, get) => {
     vaultLoading: true,
     vaultLoadProgress: null,
 
-    scrollToTodayOnce: false,
-    agendaTopDate:     null,
-    monthPreview:      null,
-    dayPreview:        null,
+    scrollToTodayOnce:        false,
+    agendaTopDate:            null,
+    agendaScrollOffset:       0,
+    agendaScrollMeasurements: [],
+    monthPreview:             null,
+    dayPreview:               null,
 
     favorites: [],
     loadFavorites: favoritesField.load,

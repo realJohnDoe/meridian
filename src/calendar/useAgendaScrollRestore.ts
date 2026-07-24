@@ -1,18 +1,6 @@
 import { useLayoutEffect } from 'react'
 import type { Virtualizer, VirtualItem } from '@tanstack/react-virtual'
-
-/**
- * Persists the agenda's scroll position across remounts (e.g. navigating to the
- * month/day view and back). Lives module-level so it survives unmount.
- *
- * Two pieces are stored together:
- *   - `offset`       — the scroll position, fed to the virtualizer's initialOffset.
- *   - `measurements` — the measured section sizes (takeSnapshot), fed to
- *     initialMeasurementsCache. Without these the fresh virtualizer re-estimates
- *     every off-screen section, so the same pixel offset maps to different content
- *     and the list drifts ~one section per round-trip.
- */
-let saved: { offset: number; measurements: VirtualItem[] } = { offset: 0, measurements: [] }
+import { useStore } from '@/store'
 
 type AgendaVirtualizer = Virtualizer<HTMLDivElement, Element>
 
@@ -24,12 +12,17 @@ type AgendaVirtualizer = Virtualizer<HTMLDivElement, Element>
  * showing months-old done tasks). Pairs with setting `scrollToTodayOnce`.
  */
 export function resetAgendaScroll(): void {
-  saved = { offset: 0, measurements: [] }
+  useStore.setState({ agendaScrollOffset: 0, agendaScrollMeasurements: [] })
 }
 
 /**
  * Returns the values to seed `useVirtualizer` with so a remount restores the
  * previous scroll position. Call **before** creating the virtualizer.
+ *
+ * Reads the store snapshot once via getState() rather than subscribing —
+ * these values only ever matter as useVirtualizer's initial* options, which
+ * it only honors on the very first render, so there's nothing for a
+ * subscription to usefully re-render this component for.
  *
  * @param skip when true (scroll-to-today pending) restore is suppressed — the
  *   virtualizer starts at offset 0 and the caller scrolls to today instead.
@@ -38,9 +31,10 @@ export function useAgendaScrollRestore(skip: boolean): {
   initialOffset: number
   initialMeasurementsCache: VirtualItem[]
 } {
+  const { agendaScrollOffset, agendaScrollMeasurements } = useStore.getState()
   return {
-    initialOffset: skip ? 0 : saved.offset,
-    initialMeasurementsCache: saved.measurements,
+    initialOffset: skip ? 0 : agendaScrollOffset,
+    initialMeasurementsCache: agendaScrollMeasurements,
   }
 }
 
@@ -53,9 +47,9 @@ export function useSaveAgendaScroll(
   virtualizer: AgendaVirtualizer,
 ): void {
   useLayoutEffect(() => () => {
-    saved = {
-      offset: scrollRef.current?.scrollTop ?? saved.offset,
-      measurements: virtualizer.takeSnapshot(),
-    }
+    useStore.setState({
+      agendaScrollOffset: scrollRef.current?.scrollTop ?? useStore.getState().agendaScrollOffset,
+      agendaScrollMeasurements: virtualizer.takeSnapshot(),
+    })
   }, [scrollRef, virtualizer])
 }
