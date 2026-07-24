@@ -6,22 +6,11 @@ import { useEntryEditor } from '@/editor'
 import { expandRange, weekStartsOn } from '@/model'
 import { isEditScope } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
+import { EntrySkeleton } from '@/components/ui/entry-skeleton'
 import { EntryTopbar } from './-entryTopbar'
 import type { Occurrence, EditScope } from '@/types'
 
 const EditorShell = lazy(() => import('@/editor').then(m => ({ default: m.EditorShell })))
-
-function EntrySkeleton() {
-  return (
-    <div className="flex-1 flex flex-col gap-3 px-3.5 pt-5 lg:max-w-3xl lg:mx-auto w-full">
-      <Skeleton className="h-7 w-2/3" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-3/4" />
-    </div>
-  )
-}
 
 export const Route = createFileRoute('/_app/entry/$slug')({
   component: EntrySlugPage,
