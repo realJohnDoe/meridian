@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useIsTouchDevice, useResetOnChange } from '@/hooks'
+import { useResetOnChange } from '@/hooks'
+import { useIsTouchDevice } from '../use-touch-device'
 import { addDays } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
 import { parseDateString, fmtISO, serialiseInterval } from '@/model'

@@ -12,7 +12,9 @@ import DaySection from './DaySection'
 import OverdueSection from './OverdueSection'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useToday, useFilteredOccs, useNow } from '@/hooks'
+import { useToday } from '@/hooks'
+import { useFilteredOccs } from './useCalendarFilter'
+import { useNow } from './useNow'
 
 const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 

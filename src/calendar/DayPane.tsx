@@ -13,7 +13,9 @@ import { occState } from '@/occView'
 import { dvBlockVariants, occPillRounded } from '@/components/ui/occurrence-variants'
 import { ContinuationChevron, CONTINUES_PADDING_ALWAYS } from '@/components/ui/continuation-chevron'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useToday, useFilteredOccs, useNow } from '@/hooks'
+import { useToday } from '@/hooks'
+import { useFilteredOccs } from './useCalendarFilter'
+import { useNow } from './useNow'
 import { computeColumns } from './computeColumns'
 
 // Layout constants below feed JS pixel math (scrollTo, pointer-offset calcs
