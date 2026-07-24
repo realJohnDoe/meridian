@@ -34,26 +34,6 @@ This is one of the healthiest codebases I've surveyed: the documented architectu
 
 ## 4. Findings
 
-### #3 — TanStack Virtual is flagged incompatible with the enabled React Compiler
-
-**Category:** `library-fit` `performance` · **Impact:** 5 · **Breadth:** 2 files (grep `useVirtualizer`: `calendar/AgendaView.tsx`, `search/FileResultsList.tsx`) · **Fix effort:** M
-
-**Evidence:** lint output at [AgendaView.tsx:151](../src/calendar/AgendaView.tsx#L151) (`const virtualizer = useVirtualizer({`): _"TanStack Virtual's `useVirtualizer()` API returns functions that cannot be memoized safely — react-hooks/incompatible-library"_ — the only 2 warnings in an otherwise clean lint run.
-
-**Problem:** `babel-plugin-react-compiler` is enabled globally, but the compiler cannot safely memoize the two virtualized components — one being the agenda, the app's home view — leaving a standing correctness risk (stale virtualizer state under memoization) that the config comment explicitly labels "real but sometimes unfixable."
-
-**Fix:** Resolve the decision this branch's name implies: either swap these two lists to a component-API virtualizer that doesn't fight the compiler (e.g. react-virtuoso — verify its compiler compatibility empirically, not from its README), or add `'use no memo'` directives to the two components and record that as the accepted trade-off.
-
-### #8 — Undocumented exact pin on `@lezer/markdown`
-
-**Category:** `dependencies` · **Impact:** 2 · **Breadth:** 1 file · **Fix effort:** S
-
-**Evidence:** [package.json:24](../package.json#L24) — `"@lezer/markdown": "1.6.4",` (only exact pin among 39 deps; registry latest 1.7.2; introduced in commit `508a684` with no stated rationale).
-
-**Problem:** A pin is a standing decision, and this one's rationale is recorded nowhere — nobody can tell whether 1.7.x breaks the link-widget rendering the pinning commit touched or whether the pin is just stale.
-
-**Fix:** Either try `^1.7.2` on a branch (gate: `pnpm test` + manual check of body-editor link rendering) or add a one-line comment stating what 1.7.x broke.
-
 ### #9 — `use-visual-viewport` violates the project's own placement rule
 
 **Category:** `layout` · **Impact:** 1 · **Breadth:** 3 files (grep `useVisualViewport`: the hook + `components/ui/dialog.tsx`, `components/ui/popover.tsx`) · **Fix effort:** S

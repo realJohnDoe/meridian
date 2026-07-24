@@ -4,6 +4,7 @@ import { fmtLong } from '@/format'
 import { cn } from '@/lib/cn'
 import OccurrenceRow from './OccurrenceRow'
 import { FlipList } from '@/components'
+import { occArraysEqual } from './occEqual'
 
 
 interface Props {
@@ -66,23 +67,22 @@ function DaySection({
 // The compiler's automatic memoization only compares the `items` reference
 // itself — it has no domain knowledge that two different array instances can
 // represent the same day. This comparator supplies that domain knowledge
-// (field-level equality per occurrence) and isn't something compiler-only
-// memoization can infer or replace.
+// (field-level equality per occurrence, via occEqual) and isn't something
+// compiler-only memoization can infer or replace.
+//
+// Two props are safely left uncompared here:
+//   - `date` (this section's own day): AgendaView keys each section by a
+//     stable date string (see its `key: k`), so a change to the day a
+//     section represents always produces a different React key — i.e. a
+//     remount, never a prop update this comparator would need to catch.
+//   - `onOpen`/`onToggleDone`/`onSwipeDelete`: safe to omit only because
+//     AgendaView passes `useCallback`-stable references for the two it
+//     controls (see its own comment) — if a caller ever passed unstable
+//     handlers, a genuinely changed handler would be silently ignored here.
 export function propsAreEqual(prev: Props, next: Props): boolean {
   if (prev.isToday !== next.isToday || prev.isTomorrow !== next.isTomorrow) return false
   if (prev.now !== next.now) return false
-  if (prev.items.length !== next.items.length) return false
-  return prev.items.every((o, i) => {
-    const n = next.items[i]
-    return o.id === n.id && o.ownerId === n.ownerId
-        && o.fileSlug === n.fileSlug && o.date === n.date && o.time === n.time
-        && o.metadata.done === n.metadata.done && o.metadata.title === n.metadata.title
-        && o.metadata.priority === n.metadata.priority
-        && o.metadata.duration === n.metadata.duration
-        && JSON.stringify(o.metadata.tags) === JSON.stringify(n.metadata.tags)
-        && JSON.stringify(o.metadata.items) === JSON.stringify(n.metadata.items)
-        && JSON.stringify(o.metadata.participants) === JSON.stringify(n.metadata.participants)
-  })
+  return occArraysEqual(prev.items, next.items)
 }
 
 export default memo(DaySection, propsAreEqual)

@@ -51,7 +51,7 @@ const { metaStore, storeState, notifyFns, syncFns, backendConfig } = vi.hoisted(
 vi.mock('@/storage/cache', () => ({
   cacheInit: vi.fn(async () => {}),
   cacheLoadAll: vi.fn(async () => []),
-  cacheBulkWriteClean: vi.fn(async () => {}),
+  applyRemoteBatch: vi.fn(async () => []),
   cacheDeleteAll: vi.fn(async (vaultId: string) => {
     for (const k of Array.from(metaStore.keys())) if (k.startsWith(`files:${vaultId}:`)) metaStore.delete(k)
   }),
