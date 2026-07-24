@@ -34,19 +34,19 @@ turned up along the way.
 
 ## What I knew before I wrote any code
 
-A handful of things, and I'd been turning them over for a while. I wanted a Markdown/YAML
-app for notes, tasks, and calendar events, where each entry is a Markdown file with
-frontmatter — or just YAML, when it has no body. The important part was a negative: I did
-_not_ want to model the entity types explicitly. A thing would be a task because it had a
-`done` field, an event because it had a `date`, a note because it had neither. Type was
-something you read off the metadata, not something you declared.
+A handful of things, and I'd been turning them over for a while. I wanted a Markdown-based
+app for notes, tasks, and calendar events, where every entry is a Markdown file with YAML
+frontmatter. The important part was a negative: I did _not_ want to model the entity types
+explicitly. A thing would be a task because it had a `done` field, an event because it had
+a `date`, a note because it had neither. Type was something you read off the metadata, not
+something you declared.
 
 On top of that: `[[wikilinks]]` between entries, because links are what turn a collection
 of notes into something you can actually navigate; nested tasks shown inline; and tags
 that are themselves entries, so a tag can carry its own description and body.
 
-These were the ideas I set out with, and I still like them. The one I now reach for first
-only turned up later — much further along, and by surprise.
+These were the ideas I set out with, and I still like them. One nice principle only
+surfaced later, unplanned, as I built — and it's the one this article builds toward.
 
 ## A prototype, and a year of not building it
 
@@ -80,11 +80,11 @@ me, whatever plugins I tried.
 
 For a while I didn't want to build an app at all. TaskNotes is open source, actively
 maintained, and has a real spec — and its file format is almost exactly mine. My plan was
-smaller and more polite: write up the "infer the type from the metadata" idea as an
-extension to their format, ideally get TaskNotes itself to adopt it, and keep living in
-Obsidian. The most defensible thing I had wasn't a UI; it was a data model, and a data
-model is the sort of thing you propose as a contribution, not the sort of thing you build
-a whole separate app around.
+smaller and more polite: propose my recurrence model — the readable one, with irregular
+dates and several patterns in a single entry — as an extension to their format, ideally
+get TaskNotes itself to adopt it, and keep living in Obsidian. The most defensible thing I
+had wasn't a UI; it was a format, and a format is the sort of thing you propose as a
+contribution, not the sort of thing you build a whole separate app around.
 
 What tipped me the other way was, again, the phone. Everything I actually wanted to fix —
 the mobile task and calendar UX, a shared family calendar with no accounts, a browser URL
@@ -113,8 +113,8 @@ On **2026-05-22** I moved to a desktop, set the prototype aside, and started a p
 repository: React, TypeScript, Tailwind, shadcn/ui, Vite. The first day's commits
 scaffold the app, wire up GitHub Pages, and
 [turn it into a PWA](https://github.com/realJohnDoe/meridian/commit/a23d5ab) — a
-progressive web app rather than native ones, because I need iOS and Android and I am one
-person.
+progressive web app rather than native ones: I need to support both iOS and Android, and a
+single PWA is far less to maintain than two native apps.
 
 _(How that rewrite actually went — and what two months of building this way taught me —
 is its own story, and its own article.)_
@@ -162,8 +162,9 @@ tags. And I had a backlinks panel on every entry. Then the questions started. A
 wikilink-as-tag matters more than a wikilink buried in a paragraph — should both appear in
 backlinks? Should they look different? Do they need separate sections?
 
-And underneath those, a harder one: most people have never heard of a backlink. I was
-about to ship an app whose central concept needed a glossary.
+And underneath those, a harder one: most people have never heard of a backlink — or a
+wikilink, for that matter. I was about to ship an app whose central concepts needed a
+glossary.
 
 So on **2026-06-20** I decided to remove vocabulary rather than add it. The frontmatter
 field `topics` was
@@ -228,17 +229,20 @@ history and lets you download everything in one click. The real protection is th
 Your data is Markdown with YAML frontmatter, readable in any editor, so if a platform
 ever turns against its users, plain files are what let you walk away.
 
-Then came the layers. Between a keystroke and a file on GitHub there are now four of them
-— the UI, a React store (Zustand), an on-device cache (Dexie/IndexedDB), and the storage
-backend — and each is a fresh chance for them to quietly disagree. This is where "plain
-files, one concept each" stopped being a philosophy and became a practical advantage. When
-something broke I could open the offending `.md`, read exactly what it claimed, and hand
-Claude "here's what it does, here's what it should do." Recurrence alone — occurrences
-that wouldn't move, cancellations that didn't stick, a series that expanded one day too
-far — would have been miserable to chase through an opaque database. Against a file you
-can read, most of those bugs turned mechanical. (One file per concept has a quieter payoff
-too: two devices only collide when they edit _the same entry_, so the conflicts that
-survive all that state stay small.)
+The recurrence engine was where readable files paid off most. When it misbehaved —
+occurrences that wouldn't move, cancellations that didn't stick, a series that expanded
+one day too far — I could open the offending `.md`, read exactly what it claimed, and tell
+Claude "here's what it does, here's what it should do." Against a file you can read, most
+of those bugs turned mechanical.
+
+The layers were a different kind of trouble. Between a keystroke and a file on GitHub
+there are now four of them — the UI, a React store (Zustand), an on-device cache
+(Dexie/IndexedDB), and the storage backend — and each is a fresh chance for them to
+quietly disagree. Readable files didn't help much there; those bugs I chased the ordinary
+way, from a bug report down to a root cause, with Claude reading through the code until it
+found what had actually fallen out of sync. (One file per concept does have a quieter
+payoff, though: two devices only collide when they edit _the same entry_, so the conflicts
+that survive all that state stay small.)
 
 I won't pretend it's finished. I've used Meridian for my own tasks for about a month; we
 haven't moved the family calendar off Proton yet. The caching and sync layer is still the
@@ -253,6 +257,10 @@ It is not a better note-taking app than Obsidian, and it isn't trying to be. Obs
 plugin ecosystem and linking depth are hard to beat. Meridian borrows the idea that
 Markdown is the source of truth and pushes it the other way — into the tasks-and-calendar
 territory where Google Calendar and Todoist still win on mobile.
+
+One note for the Obsidian crowd, since our audiences overlap: there's also an Obsidian
+theme called [Meridian](https://github.com/mvahaste/meridian), by someone else entirely.
+Same word, different project — this Meridian is the calendar app.
 
 If any of this sounds like the thing you've been assembling out of four apps, the
 [example vault](https://realjohndoe.github.io/meridian/) runs in your browser with no
