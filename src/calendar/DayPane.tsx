@@ -296,7 +296,7 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
 
           {/* Animated overflow */}
           {hiddenCount > 0 && (
-            <div className={`dv-adoverflow${allDayExpanded ? ' open' : ''}`}>
+            <div className={cn('dv-adoverflow', allDayExpanded && 'open')}>
               <div>
                 {allDay.slice(ALL_DAY_THRESHOLD).map((o, i) =>
                   renderAllDayItem(o, ALL_DAY_THRESHOLD + i, dvMidnight, onOpen)

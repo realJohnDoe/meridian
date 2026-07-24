@@ -5,6 +5,7 @@ import SearchResults from './SearchResults'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useSidebar } from '@/components/ui/sidebar'
+import { cn } from '@/lib/cn'
 
 interface Props {
   open: boolean
@@ -89,7 +90,7 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
     <>
       {/* Backdrop: covers the content area behind the popover, not the sidebar */}
       <div
-        className={`fixed inset-y-0 right-0 z-[24] bg-background/80 backdrop-blur-sm pointer-events-auto transition-[left] duration-200 ease-linear ${sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0'}`}
+        className={cn('fixed inset-y-0 right-0 z-[24] bg-background/80 backdrop-blur-sm pointer-events-auto transition-[left] duration-200 ease-linear', sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0')}
       />
       <div id="filterOverlay" className="absolute bottom-full left-0 right-0 z-[25] pointer-events-auto">
         <div className="relative max-h-[calc(100dvh-var(--th)-80px)] flex flex-col">

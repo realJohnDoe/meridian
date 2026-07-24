@@ -53,7 +53,7 @@ interface OccurrenceCardProps {
 }
 
 const titleCls = (isDone: boolean) =>
-  `text-sm font-medium truncate ${isDone ? 'line-through' : ''} text-foreground`
+  cn('text-sm font-medium truncate text-foreground', isDone && 'line-through')
 
 function ParticipantAvatars({ participants }: { participants: string[] }) {
   if (!participants.length) return null
@@ -143,12 +143,12 @@ export default function OccurrenceCard({
   })()
 
   const dimmed  = isDone || isPast
-  const cardCls = [
+  const cardCls = cn(
     'relative transition-colors shadow-none',
     'bg-card border border-input rounded-lg',
     'hover:bg-accent',
-    dimmed ? 'overflow-hidden' : '',
-  ].filter(Boolean).join(' ')
+    dimmed && 'overflow-hidden'
+  )
 
   const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime !== 'none' && (!!t || !!durationLabel))
   const hasTagsContent      = showTagsParticipants && listedOn.length > 0
@@ -157,7 +157,7 @@ export default function OccurrenceCard({
   return (
     <Card
       data-tour="entry-card"
-      className={`${cardCls} flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-11`}
+      className={cn(cardCls, 'flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-11')}
       style={animate ? { animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' } : undefined}
     >
       {dimmed && <div className="absolute inset-0 pointer-events-none z-10 rounded-lg" style={{ background: 'var(--done-overlay)' }} />}
