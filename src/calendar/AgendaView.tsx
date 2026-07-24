@@ -129,8 +129,11 @@ export default function AgendaView({ onOpen }: Props) {
     return out
   }, [groups, today, now])
 
-  // Stable references so DaySection's memo comparator isn't short-circuited
-  // by new function identities on every AgendaView render.
+  // DaySection's propsAreEqual doesn't check these handler props at all (see
+  // its own comment), so an unstable reference here wouldn't fail the memo —
+  // it would just be silently ignored, leaving DaySection/OccurrenceRow bound
+  // to whichever handler closure happened to be current when they last
+  // re-rendered. useCallback keeps that closure correct across renders too.
   const handleToggleDone = useCallback((occ: Occurrence) => toggleOccDone(occ), [])
   const handleSwipeDelete = useCallback((occ: Occurrence) => beginSwipeDelete(occ), [])
 
