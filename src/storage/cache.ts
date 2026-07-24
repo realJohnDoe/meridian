@@ -9,9 +9,11 @@ import type { VaultRef } from '@/types'
  * need a re-import — but every call site outside this file's mapping
  * functions deals only in this named union, so TypeScript can
  * exhaustiveness-check status branches instead of a magic 0/1/2 scattered
- * across sync.ts and its tests.
+ * across sync.ts and its tests. Not exported: external code narrows via
+ * `CacheRecord['status']` (see reconcile.test.ts) rather than importing this
+ * type name directly, so there's no outside reference to it.
  */
-export type SyncStatus = 'clean' | 'dirty' | 'deleted'
+type SyncStatus = 'clean' | 'dirty' | 'deleted'
 
 const DIRTY_BY_STATUS: Record<SyncStatus, number> = { clean: 0, dirty: 1, deleted: 2 }
 const STATUS_BY_DIRTY: Record<number, SyncStatus> = { 0: 'clean', 1: 'dirty', 2: 'deleted' }
