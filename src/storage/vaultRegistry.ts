@@ -1,5 +1,5 @@
 import {
-  cacheInit, cacheLoadAll, cacheBulkWriteClean, cacheDeleteAll,
+  cacheInit, cacheLoadAll, applyRemoteBatch, cacheDeleteAll,
   handleSave, handleLoad, handleClear,
   tokenSave, tokenClear,
   refreshTokenSave, refreshTokenClear,
@@ -142,7 +142,7 @@ async function registerAndActivate(ref: VaultRef, backend: StorageBackend): Prom
   await updateVaultRefs(existing => [...existing, ref])
   try {
     const files = await backend.readAll((loaded, total) => setVaultLoadProgress({ loaded, total }))
-    await cacheBulkWriteClean(backend.id, files)
+    await applyRemoteBatch(backend.id, files)
     await activateWritableVault(backend)
   } finally {
     // Reset even on a thrown/failed load, so a retry (or the next vault) never

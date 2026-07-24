@@ -20,7 +20,7 @@ import { ConflictError, AuthSyncError, TransientSyncError } from '@/storage/conf
 const { cacheStore, storeState, notifyFns } = vi.hoisted(() => ({
   cacheStore: new Map<string, {
     vaultPath: string; vaultId: string; path: string; content: string
-    dirty: number; updatedAt: number; version?: string
+    status: 'clean' | 'dirty' | 'deleted'; updatedAt: number; version?: string
   }>(),
   storeState: {
     items: [] as unknown[],
@@ -37,58 +37,74 @@ function vp(vaultId: string, path: string): string {
   return `${vaultId}::${path}`
 }
 
-vi.mock('@/storage/cache', () => ({
-  cacheWrite: vi.fn(async (vaultId: string, path: string, content: string) => {
-    const key = vp(vaultId, path)
-    const existing = cacheStore.get(key)
-    if (existing && existing.content === content) return
-    cacheStore.set(key, { vaultPath: key, vaultId, path, content, dirty: 1, updatedAt: Date.now(), version: existing?.version })
-  }),
-  cacheWriteClean: vi.fn(async (vaultId: string, path: string, content: string, version?: string) => {
-    const key = vp(vaultId, path)
-    cacheStore.set(key, { vaultPath: key, vaultId, path, content, dirty: 0, updatedAt: Date.now(), version })
-  }),
-  cacheMarkPushed: vi.fn(async (vaultId: string, path: string, pushedContent: string, version?: string) => {
-    const key = vp(vaultId, path)
-    const existing = cacheStore.get(key)
-    if (existing && existing.content !== pushedContent) {
-      cacheStore.set(key, { ...existing, version, updatedAt: Date.now() })
-      return
-    }
-    cacheStore.set(key, { vaultPath: key, vaultId, path, content: pushedContent, dirty: 0, updatedAt: Date.now(), version })
-  }),
-  cacheBulkWriteClean: vi.fn(async (vaultId: string, records: Array<{ path: string; content: string; version?: string }>) => {
-    const written: string[] = []
-    for (const r of records) {
-      const key = vp(vaultId, r.path)
+// The mock's own in-flight registry mirrors cache.ts's real one — declared
+// inside the factory body (rather than the object-literal shorthand used
+// before PR 6) so it can hold this closed-over Map.
+vi.mock('@/storage/cache', () => {
+  const _inFlightPaths = new Map<string, number>()
+
+  return {
+    recordLocalEdit: vi.fn(async (vaultId: string, path: string, content: string) => {
+      const key = vp(vaultId, path)
       const existing = cacheStore.get(key)
-      if (existing && existing.dirty !== 0) continue
-      cacheStore.set(key, { vaultPath: key, vaultId, path: r.path, content: r.content, dirty: 0, updatedAt: Date.now(), version: r.version })
-      written.push(r.path)
-    }
-    return written
-  }),
-  cacheLoadAll: vi.fn(async (vaultId: string) => {
-    return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId)
-  }),
-  cacheDelete: vi.fn(async (vaultId: string, path: string) => {
-    cacheStore.delete(vp(vaultId, path))
-  }),
-  cacheGetDirty: vi.fn(async (vaultId: string) => {
-    return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId && r.dirty === 1)
-  }),
-  cacheWriteTombstone: vi.fn(async (vaultId: string, path: string) => {
-    const key = vp(vaultId, path)
-    const existing = cacheStore.get(key)
-    cacheStore.set(key, { vaultPath: key, vaultId, path, content: '', dirty: 2, updatedAt: Date.now(), version: existing?.version })
-  }),
-  cacheGetTombstones: vi.fn(async (vaultId: string) => {
-    return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId && r.dirty === 2)
-  }),
-  cacheDirtyCount: vi.fn(async (vaultId: string) => {
-    return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId && (r.dirty === 1 || r.dirty === 2)).length
-  }),
-}))
+      if (existing && existing.content === content) return
+      cacheStore.set(key, { vaultPath: key, vaultId, path, content, status: 'dirty', updatedAt: Date.now(), version: existing?.version })
+    }),
+    setResolvedClean: vi.fn(async (vaultId: string, path: string, content: string, version?: string) => {
+      const key = vp(vaultId, path)
+      cacheStore.set(key, { vaultPath: key, vaultId, path, content, status: 'clean', updatedAt: Date.now(), version })
+    }),
+    markPushed: vi.fn(async (vaultId: string, path: string, pushedContent: string, version?: string) => {
+      const key = vp(vaultId, path)
+      const existing = cacheStore.get(key)
+      if (existing && existing.content !== pushedContent) {
+        cacheStore.set(key, { ...existing, version, updatedAt: Date.now() })
+        return
+      }
+      cacheStore.set(key, { vaultPath: key, vaultId, path, content: pushedContent, status: 'clean', updatedAt: Date.now(), version })
+    }),
+    applyRemoteBatch: vi.fn(async (vaultId: string, records: Array<{ path: string; content: string; version?: string }>) => {
+      const written: string[] = []
+      for (const r of records) {
+        const key = vp(vaultId, r.path)
+        const existing = cacheStore.get(key)
+        if (existing && existing.status !== 'clean') continue
+        cacheStore.set(key, { vaultPath: key, vaultId, path: r.path, content: r.content, status: 'clean', updatedAt: Date.now(), version: r.version })
+        written.push(r.path)
+      }
+      return written
+    }),
+    cacheLoadAll: vi.fn(async (vaultId: string) => {
+      return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId)
+    }),
+    confirmDeleted: vi.fn(async (vaultId: string, path: string) => {
+      cacheStore.delete(vp(vaultId, path))
+    }),
+    cacheGetDirty: vi.fn(async (vaultId: string) => {
+      return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId && r.status === 'dirty')
+    }),
+    recordLocalDelete: vi.fn(async (vaultId: string, path: string) => {
+      const key = vp(vaultId, path)
+      const existing = cacheStore.get(key)
+      cacheStore.set(key, { vaultPath: key, vaultId, path, content: '', status: 'deleted', updatedAt: Date.now(), version: existing?.version })
+    }),
+    cacheGetTombstones: vi.fn(async (vaultId: string) => {
+      return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId && r.status === 'deleted')
+    }),
+    cacheDirtyCount: vi.fn(async (vaultId: string) => {
+      return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId && (r.status === 'dirty' || r.status === 'deleted')).length
+    }),
+    markInFlight: vi.fn((path: string) => {
+      _inFlightPaths.set(path, (_inFlightPaths.get(path) ?? 0) + 1)
+    }),
+    clearInFlight: vi.fn((path: string) => {
+      const n = (_inFlightPaths.get(path) ?? 0) - 1
+      if (n > 0) _inFlightPaths.set(path, n)
+      else _inFlightPaths.delete(path)
+    }),
+    getInFlightPaths: vi.fn(() => new Set(_inFlightPaths.keys())),
+  }
+})
 
 vi.mock('@/storeBridge', () => ({
   getItems: vi.fn(() => storeState.items),
@@ -110,7 +126,7 @@ vi.mock('@/storage/notifications', () => notifyFns)
 // come after the vi.mock calls above.
 import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, writeEntityToCache, reconcileWithBackend } from '@/storage/sync'
 import { setActiveBackend } from '@/storage/activeBackend'
-import { cacheWrite, cacheWriteTombstone } from '@/storage/cache'
+import { recordLocalEdit, recordLocalDelete } from '@/storage/cache'
 
 // ── FakeBackend ──────────────────────────────────────────────────────────
 
@@ -235,15 +251,15 @@ class FakeBackend implements StorageBackend {
 }
 
 function seedDirty(vaultId: string, path: string, content: string, version: string | undefined): void {
-  cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content, dirty: 1, updatedAt: Date.now(), version })
+  cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content, status: 'dirty', updatedAt: Date.now(), version })
 }
 
 function seedTombstone(vaultId: string, path: string, version: string | undefined): void {
-  cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content: '', dirty: 2, updatedAt: Date.now(), version })
+  cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content: '', status: 'deleted', updatedAt: Date.now(), version })
 }
 
 function seedClean(vaultId: string, path: string, content: string, version: string | undefined, updatedAt: number): void {
-  cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content, dirty: 0, updatedAt, version })
+  cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content, status: 'clean', updatedAt, version })
 }
 
 // autoSyncTick fires runSync fire-and-forget (`void runSync(...)`), so it
@@ -292,9 +308,9 @@ describe('pushDirty — write-conflict collision', () => {
     expect(backend.get(copyPath!)?.content).toBe('local edit')
 
     // Cache reflects both paths as clean (no more dirty edit lost or left dangling).
-    expect(cacheStore.get(vp('fake-vault', 'task.md'))?.dirty).toBe(0)
+    expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('clean')
     expect(cacheStore.get(vp('fake-vault', 'task.md'))?.content).toBe('remote v2')
-    expect(cacheStore.get(vp('fake-vault', copyPath!))?.dirty).toBe(0)
+    expect(cacheStore.get(vp('fake-vault', copyPath!))?.status).toBe('clean')
 
     // Both the reverted original and the new conflict copy must be visible in
     // the store immediately — not just the cache — since a same-cycle
@@ -338,7 +354,7 @@ describe('pushDirty — delete-conflict tombstone handling', () => {
     // hadCollision triggers a same-cycle reconcile that pulls the surviving
     // remote edit back into the cache as a clean record.
     const cached = cacheStore.get(vp('fake-vault', 'task.md'))
-    expect(cached?.dirty).toBe(0)
+    expect(cached?.status).toBe('clean')
     expect(cached?.content).toBe('remote edit after delete staged')
 
     expect(storeState.syncError).toBeNull()
@@ -364,7 +380,7 @@ describe('pushDirty — delete-conflict tombstone handling', () => {
 // — a real network round trip. If another edit to that same path lands
 // during the wait, the post-push write must not silently discard it (or
 // resurrect it as clean) just because the push that started earlier
-// finishes later. See cacheMarkPushed's doc comment in cache.ts.
+// finishes later. See markPushed's doc comment in cache.ts.
 
 describe('pushDirty — post-push write does not clobber a concurrent edit', () => {
   it('keeps an edit that lands while the push is still in flight', async () => {
@@ -378,13 +394,13 @@ describe('pushDirty — post-push write does not clobber a concurrent edit', () 
     await flush() // let pushDirty capture its dirty/tombstone snapshots and reach the blocked write
 
     // Lands while backend.write('task.md', 'C1', ...) is still pending.
-    await cacheWrite('fake-vault', 'task.md', 'C2')
+    await recordLocalEdit('fake-vault', 'task.md', 'C2')
     release()
     await syncPromise
 
     const cached = cacheStore.get(vp('fake-vault', 'task.md'))
     expect(cached?.content).toBe('C2')
-    expect(cached?.dirty).toBe(1)
+    expect(cached?.status).toBe('dirty')
     // The base version still advances, so the next push CASes against what
     // was actually written to the backend.
     expect(cached?.version).toBe('v1')
@@ -403,12 +419,12 @@ describe('pushDirty — post-push write does not clobber a concurrent edit', () 
     // The file is deleted locally while the earlier edit's push is in flight —
     // after pushDirty already captured its (empty) tombstone snapshot, so this
     // tombstone is NOT swept into the same pushDirty call's tombstone loop.
-    await cacheWriteTombstone('fake-vault', 'task.md')
+    await recordLocalDelete('fake-vault', 'task.md')
     release()
     await syncPromise
 
     const cached = cacheStore.get(vp('fake-vault', 'task.md'))
-    expect(cached?.dirty).toBe(2)
+    expect(cached?.status).toBe('deleted')
     expect(cached?.content).toBe('')
     expect(cached?.version).toBe('v1')
   })
@@ -432,7 +448,7 @@ describe('runSync — auth retry after 401', () => {
     expect(refreshAuth).toHaveBeenCalledTimes(1)
     expect(backend.writeCallCount).toBe(2) // failed attempt + retry
     expect(backend.get('task.md')?.content).toBe('local edit')
-    expect(cacheStore.get(vp('fake-vault', 'task.md'))?.dirty).toBe(0)
+    expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('clean')
     expect(storeState.syncError).toBeNull()
     expect(storeState.lastSyncedAt).not.toBeNull()
   })
@@ -453,7 +469,7 @@ describe('runSync — auth retry after 401', () => {
     expect(storeState.syncError).toBe('401 unauthorized')
     expect(notifyFns.notifyError).toHaveBeenCalledTimes(1)
     // The dirty edit is preserved locally rather than lost.
-    expect(cacheStore.get(vp('fake-vault', 'task.md'))?.dirty).toBe(1)
+    expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('dirty')
   })
 
   it('does not attempt a retry when the backend has no refreshAuth recovery path', async () => {
@@ -614,7 +630,7 @@ describe('reconcileWithBackend — large changed sets route through readAll()', 
     for (let i = 0; i < 51; i++) {
       const cached = cacheStore.get(vp('fake-vault', `note-${i}.md`))
       expect(cached?.content).toBe(`content ${i}`)
-      expect(cached?.dirty).toBe(0)
+      expect(cached?.status).toBe('clean')
     }
   })
 
@@ -637,7 +653,7 @@ describe('reconcileWithBackend — large changed sets route through readAll()', 
 // changed, then awaits a real network read (readFiles/readAll) before
 // writing the fresh content back clean. A local edit landing in that window
 // must not be silently overwritten — same class of bug as PR 3's
-// cacheMarkPushed, just on the pull side and across a whole batch.
+// markPushed, just on the pull side and across a whole batch.
 
 describe('reconcileWithBackend — a local edit landing mid-reconcile is not clobbered by the bulk clean write', () => {
   it('does not merge stale remote content over a local edit that lands between the cache snapshot and the write-back', async () => {
@@ -653,12 +669,12 @@ describe('reconcileWithBackend — a local edit landing mid-reconcile is not clo
 
     // Lands while backend.readFiles(['note.md']) is still pending — after
     // reconcile's cacheLoadAll snapshot but before it writes fresh content back.
-    await cacheWrite('fake-vault', 'note.md', 'local edit')
+    await recordLocalEdit('fake-vault', 'note.md', 'local edit')
     release()
     await reconcilePromise
 
     const cached = cacheStore.get(vp('fake-vault', 'note.md'))
-    expect(cached?.dirty).toBe(1)
+    expect(cached?.status).toBe('dirty')
     expect(cached?.content).toBe('local edit')
     // The store must still show the local edit — not overwritten by the
     // now-stale remote pull.
@@ -677,13 +693,13 @@ describe('reconcileWithBackend — a local edit landing mid-reconcile is not clo
     const reconcilePromise = reconcileWithBackend(backend, 'fake-vault')
     await flush() // let reconcile capture its cacheLoadAll snapshot and reach the blocked readFiles call
 
-    await cacheWrite('fake-vault', 'edited.md', 'local edit')
+    await recordLocalEdit('fake-vault', 'edited.md', 'local edit')
     release()
     await reconcilePromise
 
-    expect(cacheStore.get(vp('fake-vault', 'untouched.md'))?.dirty).toBe(0)
+    expect(cacheStore.get(vp('fake-vault', 'untouched.md'))?.status).toBe('clean')
     expect(cacheStore.get(vp('fake-vault', 'untouched.md'))?.content).toBe('remote content')
-    expect(cacheStore.get(vp('fake-vault', 'edited.md'))?.dirty).toBe(1)
+    expect(cacheStore.get(vp('fake-vault', 'edited.md'))?.status).toBe('dirty')
     expect(cacheStore.get(vp('fake-vault', 'edited.md'))?.content).toBe('local edit')
   })
 })
@@ -716,7 +732,7 @@ describe('scheduleAutoPush / attemptPush — never strand a push dropped mid-syn
 
       expect(backend.writeCallCount).toBe(1)
       expect(backend.get('task.md')?.content).toBe('queued content')
-      expect(cacheStore.get(vp('fake-vault', 'task.md'))?.dirty).toBe(0)
+      expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('clean')
     } finally {
       vi.useRealTimers()
     }
@@ -736,7 +752,7 @@ describe('flushPendingPush', () => {
 
     expect(backend.writeCallCount).toBe(1)
     expect(backend.get('task.md')?.content).toBe('rescued content')
-    expect(cacheStore.get(vp('fake-vault', 'task.md'))?.dirty).toBe(0)
+    expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('clean')
   })
 
   it('is a no-op when nothing is dirty', async () => {
@@ -783,7 +799,7 @@ describe('writeEntityToCache — self-heal delete guard', () => {
     await writeEntityToCache('note')
 
     const cached = cacheStore.get(vp('fake-vault', 'note.md'))
-    expect(cached?.dirty).toBe(2)
+    expect(cached?.status).toBe('deleted')
   })
 })
 
@@ -791,12 +807,13 @@ describe('writeEntityToCache — self-heal delete guard', () => {
 //
 // setData updates the store synchronously, but the matching Dexie write
 // lands later (a real IndexedDB round trip in production). A reconcile
-// landing in that gap sees dirty===0 for a path that is, in fact, about to
-// change — and could merge remote content over it, or worse, resurrect a
+// landing in that gap sees a clean status for a path that is, in fact, about
+// to change — and could merge remote content over it, or worse, resurrect a
 // note whose delete is still in flight (mergeChangedIntoStore would re-add
-// it and nothing would ever evict it again). _inFlightPaths closes that gap:
-// marked synchronously, before writeEntityToCache/deleteFromBackend's first
-// await, so it is never observably absent while a write is outstanding.
+// it and nothing would ever evict it again). The in-flight registry closes
+// that gap: marked synchronously, before writeEntityToCache/
+// deleteFromBackend's first await, so it is never observably absent while a
+// write is outstanding.
 
 describe('in-flight write registry — protects against a concurrent reconcile', () => {
   const oneItem = () => [{ date: '', time: null, source: 'explicit' as const, fileSlug: 'note', id: 'i1', metadata: {} }]
@@ -808,17 +825,17 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     storeState.items = oneItem()
     storeState.roots = new Map([['note', { title: 'Note', tags: [], items: [] }]])
 
-    const originalCacheWrite = vi.mocked(cacheWrite).getMockImplementation()!
+    const originalRecordLocalEdit = vi.mocked(recordLocalEdit).getMockImplementation()!
     let releaseWrite!: () => void
     const gate = new Promise<void>(resolve => { releaseWrite = resolve })
-    vi.mocked(cacheWrite).mockImplementationOnce(async (...args: Parameters<typeof cacheWrite>) => {
+    vi.mocked(recordLocalEdit).mockImplementationOnce(async (...args: Parameters<typeof recordLocalEdit>) => {
       await gate
-      return originalCacheWrite(...args)
+      return originalRecordLocalEdit(...args)
     })
 
     // markInFlight('note.md') fires synchronously inside writeEntityToCache,
     // before its first await — so it is already in effect the instant this
-    // call returns control here, well before cacheWrite's gated write settles.
+    // call returns control here, well before recordLocalEdit's gated write settles.
     const writePromise = writeEntityToCache('note')
 
     await reconcileWithBackend(backend, 'fake-vault')
@@ -829,31 +846,32 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     await writePromise
 
     // The write itself still lands once released.
-    expect(cacheStore.get(vp('fake-vault', 'note.md'))?.dirty).toBe(1)
+    expect(cacheStore.get(vp('fake-vault', 'note.md'))?.status).toBe('dirty')
   })
 
   it('overlapping writes for the same slug both settle safely, with reconcile blocked throughout', async () => {
-    // Not a Set-vs-Map discriminating test: once either write's cacheWrite
-    // call actually lands, planReconcile's own dirty!==0 check already
+    // Not a Set-vs-Map discriminating test: once either write's recordLocalEdit
+    // call actually lands, planReconcile's own status!=='clean' check already
     // protects the record independently of skipPaths, so this passes either
     // way. It still pins the sane outcome for the overlap the refcount
     // targets — no crash, reconcile still blocked mid-overlap, last write
-    // wins — see _inFlightPaths' doc comment for why the refcount is kept
-    // anyway (the nested self-heal case, and not relying on that coincidence).
+    // wins — see the in-flight registry's doc comment for why the refcount is
+    // kept anyway (the nested self-heal case, and not relying on that
+    // coincidence).
     const backend = new FakeBackend()
     backend.seed('note.md', 'remote content', 'v2')
     setActiveBackend(backend)
     storeState.items = oneItem()
     storeState.roots = new Map([['note', { title: 'Note', tags: [], items: [] }]])
 
-    const originalCacheWrite = vi.mocked(cacheWrite).getMockImplementation()!
+    const originalRecordLocalEdit = vi.mocked(recordLocalEdit).getMockImplementation()!
     let releaseA!: () => void
     let releaseB!: () => void
     const gateA = new Promise<void>(resolve => { releaseA = resolve })
     const gateB = new Promise<void>(resolve => { releaseB = resolve })
-    vi.mocked(cacheWrite)
-      .mockImplementationOnce(async (...args: Parameters<typeof cacheWrite>) => { await gateA; return originalCacheWrite(...args) })
-      .mockImplementationOnce(async (...args: Parameters<typeof cacheWrite>) => { await gateB; return originalCacheWrite(...args) })
+    vi.mocked(recordLocalEdit)
+      .mockImplementationOnce(async (...args: Parameters<typeof recordLocalEdit>) => { await gateA; return originalRecordLocalEdit(...args) })
+      .mockImplementationOnce(async (...args: Parameters<typeof recordLocalEdit>) => { await gateB; return originalRecordLocalEdit(...args) })
 
     const writeA = writeEntityToCache('note')
     const writeB = writeEntityToCache('note')
@@ -867,7 +885,7 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     releaseB()
     await writeB
 
-    expect(cacheStore.get(vp('fake-vault', 'note.md'))?.dirty).toBe(1)
+    expect(cacheStore.get(vp('fake-vault', 'note.md'))?.status).toBe('dirty')
   })
 
   it('clears its mark on the self-heal skip path (root exists, no items yet)', async () => {

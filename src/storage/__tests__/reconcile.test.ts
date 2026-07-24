@@ -12,8 +12,13 @@ import type { CacheRecord } from '@/storage/cache'
 
 // ── Helpers ────────────────────────────────────────────────────
 
+// Kept as a numeric `dirty` param (0/1/2) so every call site below stays
+// untouched by the PR 6 rename (CacheRecord.dirty: number → status:
+// SyncStatus) — only this helper's internals needed to change.
+const STATUS_BY_DIRTY: Record<number, CacheRecord['status']> = { 0: 'clean', 1: 'dirty', 2: 'deleted' }
+
 function rec(path: string, version: string | undefined, dirty: number, updatedAt = 0): CacheRecord {
-  return { vaultPath: `v::${path}`, vaultId: 'v', path, content: '', dirty, updatedAt, version }
+  return { vaultPath: `v::${path}`, vaultId: 'v', path, content: '', status: STATUS_BY_DIRTY[dirty], updatedAt, version }
 }
 
 // ── Tests ──────────────────────────────────────────────────────
