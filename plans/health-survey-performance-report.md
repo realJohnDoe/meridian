@@ -71,24 +71,6 @@ Ranked by (impact × breadth) ÷ effort. **Recommended model** replaces a plain 
 
 ---
 
-### F3 — Switching to the agenda (and cold start) re-expands + re-groups + re-sorts from scratch
-
-- **Flows affected:** 2 (every switch back to agenda), 6 (first agenda paint on cold start). Hit **every navigation into the agenda.**
-- **Category:** `critical-path-work` `bundle-and-startup`
-- **Impact:** **6** — a ~145 ms (dev) stall each time you return to the agenda from month/day/an entry.
-- **Baseline measurement:** On agenda re-mount (300 files): full `expandWithMultiday` **≈ 82 ms** + group **≈ 45 ms** + sort **≈ 18 ms** = **~145 ms** synchronous before first agenda paint. The expansion is redone in full because the cache is per-component `useState` and was discarded on the previous unmount (month view's cache is separate and only covers one month).
-- **Measurement recipe:**
-  1. Big vault loaded. In `useExpandWithMultiday`, record `computeExpansionCache` duration and whether `next.allOccs===cache?.allOccs` → `window.__expFull` (only set when _not_ reused). Time the `groups`/`sections` memos as in F2.
-  2. In the page: click **Month**, wait 400 ms, click **Agenda**, read `window.__expFull` (**{allOccs:8685, computeMs:81.8}**), `window.__grp` (**45.3**), `window.__sec.ms` (**17.8**).
-  3. After fix, re-run: the switch back should reuse a persisted expansion/group (computeMs ~0).
-- **Breadth:** whole agenda pipeline on each mount. Files: `src/calendar/useExpandWithMultiday.ts`, `src/calendar/useAgendaSections.ts`.
-- **Recommended model:** **Sonnet 5** if the cache key is specified for it; else **Opus 5**. The trap to put in the prompt: a naive module-level singleton will thrash, because `useExpandWithMultiday` is shared with `MonthGrid` and the month carousel keeps **three** panes alive, so four different `(from, to)` windows are live simultaneously. It needs a small keyed cache (keyed on `items`, `roots`, `fromMs`, `toMs`, `weekStart`) with vault-change invalidation — `resetAgendaScroll` on `onVaultChanged` is the existing precedent to follow. Name that in the task and Sonnet 5 handles it; leave it implicit and give it to Opus 5.
-- **Evidence:** The expansion cache lives in component state and dies with the component — `src/calendar/useExpandWithMultiday.ts:23`: `const [cache, setCache] = useState<ExpansionCache | null>(null)` — so there is no cross-navigation reuse; the grouping/sorting downstream (`src/calendar/useAgendaSections.ts:55`) then rebuilds from that fresh expansion every mount.
-- **Problem:** Because the derived agenda (expand→group→sort) is thrown away on unmount, leaving the agenda and coming back pays the full ~145 ms recompute even though the data is unchanged.
-- **Fix:** Hoist the expansion+group cache to a module/store-level singleton keyed on `(items, roots, window, weekStart)` so navigation reuses it. Expected: re-entry expansion/group cost ~145 ms → ~0 when the vault is unchanged.
-
----
-
 ### F4 — Editor decorations rebuild over the whole document on every keystroke
 
 - **Flows affected:** 7 (typing in the editor). Hit **every keystroke**, but the cost scales with note length — negligible on typical short entries, painful on long ones.
