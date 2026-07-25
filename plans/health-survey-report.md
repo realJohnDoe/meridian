@@ -65,14 +65,6 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 - **Problem:** The most bug-prone CM6 code (decoration range computation, position mapping, widget lifecycle) is the least tested, and the coverage gate structurally can't flag newly-added untested modules.
 - **Fix:** Add unit tests for the decoration builders (testable against an `EditorState` without a live DOM, as `taskLines.test.ts` shows), and add a modest **global** coverage floor so future untested logic fails CI.
 
-### #5 — The `{ items: getItems(), roots: getRoots() }` store snapshot is reconstructed inline everywhere
-
-- **Category:** `dry`
-- **Impact:** 2 · **Breadth:** 2 files (grep: `items: getItems(), roots: getRoots()` ×8) · **Recommended model:** Haiku 4.5 — mechanical; a wrong `getSnapshot()` signature breaks the type-check _loudly_. No load-bearing hazard.
-- **Evidence:** `editor/save.ts` rebuilds it 5 times (lines 106, 145, 152, 158, 166) and `occurrenceActions.ts` 3 times (50, 91, 113) — e.g. `applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, …)`.
-- **Problem:** The "current `StoreData` snapshot" is an ad-hoc literal repeated 8 times; if the store's shape gains a third field, every call site must be found and updated.
-- **Fix:** Export `getSnapshot()` from `storeBridge` returning `{ items, roots }` and call it at each site.
-
 ### #6 — Path↔slug conversion is scattered with no shared owner
 
 - **Category:** `dry`
@@ -104,14 +96,6 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 - **Evidence:** `store.ts:83-93` — the app-global Zustand store carries calendar-view-local scroll/carousel state: `agendaScrollOffset: number`, `agendaScrollMeasurements: VirtualItem[]`, `monthPreview: string | null`, `dayPreview: string | null` — alongside vault data (`items`, `roots`), sync status, favorites, and locale.
 - **Problem:** Ephemeral `calendar/` concerns live in the cross-cutting store, so a reader tracing calendar-view state must go through the global store and `storeBridge`. Idiomatic single-store Zustand and low-severity — but it's the one place the otherwise-crisp layer boundaries blur.
 - **Fix:** Move the agenda/carousel ephemeral fields into a dedicated `calendar/` store slice or co-located hook; leave durable vault/sync/prefs state in the global store. (Genuinely optional — weigh against the churn.)
-
-### #10 — Dead redundant branch in `occState`
-
-- **Category:** `dead-code`
-- **Impact:** 1 · **Breadth:** 1 file · **Recommended model:** Haiku 4.5 — mechanical removal; `occState` is well-covered, so a mistake fails _loudly_. No hazard.
-- **Evidence:** `occView.ts:26` — `if (kind === 'task' || o.metadata.done !== undefined) {`. But `occKind` (line 7) returns `'task'` **exactly when** `done !== undefined`, so by the time `kind` is computed the second clause is unreachable.
-- **Problem:** A dead disjunct restates a condition already folded into `kind`, mildly obscuring the state machine and inviting a reader to think the two can diverge.
-- **Fix:** Drop the `|| o.metadata.done !== undefined` — `if (kind === 'task')` is exactly equivalent.
 
 ---
 
