@@ -6,7 +6,7 @@ import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
 import { onVaultChanged } from '@/storage'
-import { resetAgendaScroll } from '@/calendar'
+import { resetAgendaScroll, resetExpansionCache, resetAgendaSectionsCache } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar } from '@/components'
 import { IconButton } from '@/components/ui/icon-button'
@@ -44,8 +44,10 @@ function AppMain() {
   const navigate = useNavigate()
 
   // When a vault activates, discard the previous vault's saved agenda scroll
-  // (its offset/measurements are meaningless for different content) and flag a
-  // scroll-to-today. Registered here — not in AgendaPage — because AppMain stays
+  // (its offset/measurements are meaningless for different content), drop the
+  // cached occurrence expansions and grouped agenda sections (same reason —
+  // see resetExpansionCache/resetAgendaSectionsCache), and flag a scroll-to-
+  // today. Registered here — not in AgendaPage — because AppMain stays
   // mounted across every app route: a vault switch made while in the editor,
   // month, day, or a list view would otherwise be missed (AgendaPage is
   // unmounted then), leaving the next agenda visit to restore a stale, cross-
@@ -53,6 +55,8 @@ function AppMain() {
   // actual scroll when the flag is set.
   useEffect(() => onVaultChanged(() => {
     resetAgendaScroll()
+    resetExpansionCache()
+    resetAgendaSectionsCache()
     useStore.setState({ scrollToTodayOnce: true })
   }), [])
 
