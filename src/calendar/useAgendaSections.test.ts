@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { setupStore, seedStore, makeOcc, makeRoots } from '@/test-utils'
 import { useAgendaSections } from './useAgendaSections'
 
@@ -67,5 +67,33 @@ describe('useAgendaSections', () => {
     const todaySection = sections[goToIndex]!
     expect(todaySection.kind).toBe('day')
     expect(todaySection.kind === 'day' && todaySection.isToday).toBe(true)
+  })
+
+  it('hands back untouched day sections by reference when a task is toggled done', () => {
+    const roots = makeRoots('note.md')
+    const task = makeOcc({
+      id: 'today-task',
+      date: '2026-06-15',
+      time: '09:00',
+      metadata: { participants: [], title: 'Task', tags: [], items: [], done: false },
+    })
+    const future = makeOcc({ id: 'future-1', date: '2026-06-20', time: '09:00' })
+    seedStore([task, future], roots)
+
+    const { result, rerender } = renderHook(() => useAgendaSections(TODAY, NOW))
+    const futureBefore = result.current.sections.find(s => s.kind === 'day' && s.dateKey === '2026-06-20')
+    expect(futureBefore).toBeDefined()
+
+    act(() => {
+      seedStore([{ ...task, metadata: { ...task.metadata, done: true } }, future], roots)
+    })
+    rerender()
+
+    // The toggled day carries the new value…
+    const todayAfter = result.current.sections.find(s => s.kind === 'day' && s.isToday)
+    expect(todayAfter?.items[0]!.metadata.done).toBe(true)
+    // …while every other day-section is the very same object, so DaySection's
+    // memo skips it instead of re-rendering the whole vault.
+    expect(result.current.sections.find(s => s.kind === 'day' && s.dateKey === '2026-06-20')).toBe(futureBefore)
   })
 })
