@@ -94,7 +94,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
 }
 
 function parseDateKey(key: string): Date {
-  const [y, m, d] = key.split('-').map(Number)
+  const [y = NaN, m = NaN, d = NaN] = key.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
 

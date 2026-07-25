@@ -316,7 +316,7 @@ repeat:
 
     const afterSecond = applyEdit(afterFirst, null, 'all', { ...fields, duration: '1 hour' })
     expect(afterSecond.items).toHaveLength(1)
-    expect(afterSecond.items[0].metadata.duration).toBe('1 hour')
+    expect(afterSecond.items[0]!.metadata.duration).toBe('1 hour')
   })
 
   it('creating an undated task persists and stays searchable but off the calendar', () => {
@@ -348,7 +348,7 @@ repeat:
     // …but collectUndated surfaces it with the file-level title joined on.
     const undated = collectUndated(reloaded.items, reloadedRoots)
     expect(undated).toHaveLength(1)
-    expect(undated[0].metadata.title).toBe('Buy milk')
+    expect(undated[0]!.metadata.title).toBe('Buy milk')
   })
 
   // ── File-level identity ──────────────────────────────────────────────────────
@@ -362,7 +362,7 @@ repeat:
       items: ['[[project-alpha]]'],
     }))
     // The per-file root carries the new title, tags, and items.
-    const root = [...next.roots.values()][0]
+    const root = [...next.roots.values()][0]!
     expect(root.title).toBe('Team Standup Renamed')
     expect(root.tags).toEqual(['work', 'renamed'])
     expect(root.items).toEqual(['[[project-alpha]]'])
@@ -380,7 +380,7 @@ repeat:
     const next = applyEdit(data, occ, 'single', editFields(occ, { priority: 'high', done: true }))
     const series = next.items.filter(isSeries)
     // Series root priority unchanged (was undefined)
-    expect(series[0].metadata.priority).toBeUndefined()
+    expect(series[0]!.metadata.priority).toBeUndefined()
     // Override carries the priority
     const overrides = next.items.filter(i => !isSeries(i))
     const override = overrides.find(o => o.date === '2026-04-20')
@@ -404,7 +404,7 @@ repeat:
     })
     const series = next.items.filter(isSeries)
     expect(series).toHaveLength(1)
-    expect(series[0].metadata.done).toBe(false)
+    expect(series[0]!.metadata.done).toBe(false)
   })
 
   it('all-scope edit on a done occurrence does not poison the series root with done: true', () => {
@@ -418,7 +418,7 @@ repeat:
       scheduled: { date: '2026-04-06', time: '09:00' },
     }))
     const series = next.items.filter(isSeries)
-    expect(series[0].metadata.done).toBe(false)
+    expect(series[0]!.metadata.done).toBe(false)
   })
 
   it('future-scope split keeps the new series root at done: false', () => {
@@ -526,7 +526,7 @@ instances:
     const occs = expandRange(items, roots, new Date('2026-01-01'), new Date('2026-12-31'))
     const sameDay = occs.filter(o => o.date === '2026-06-01')
     expect(sameDay).toHaveLength(2)
-    expect(sameDay[0].id).not.toBe(sameDay[1].id)
+    expect(sameDay[0]!.id).not.toBe(sameDay[1]!.id)
   })
 
   it('editing one standalone leaves the other unchanged', () => {

@@ -39,5 +39,5 @@ function occEqual(a: Occurrence, b: Occurrence): boolean {
 /** Same-length, per-index occEqual — the shape both sections' `items` arrays need compared as. */
 export function occArraysEqual(a: Occurrence[], b: Occurrence[]): boolean {
   if (a.length !== b.length) return false
-  return a.every((o, i) => occEqual(o, b[i]))
+  return a.every((o, i) => occEqual(o, b[i]!))  // lengths equal-checked above
 }

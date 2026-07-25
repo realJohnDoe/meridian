@@ -92,7 +92,7 @@ describe('two override instances on the same date (recurring series)', () => {
     const next = excludeOccurrence({ items: parsed.items, roots }, undone)
     const after = occsOn(next.items, next.roots, '2026-07-08')
     expect(after).toHaveLength(1)
-    expect(after[0].metadata.done).toBe(true)  // the completed one survives
+    expect(after[0]!.metadata.done).toBe(true)  // the completed one survives
   })
 
   it('round-trips: two same-date overrides survive collapse + reparse', () => {

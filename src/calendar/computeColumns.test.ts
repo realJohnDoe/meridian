@@ -23,7 +23,7 @@ describe('computeColumns', () => {
     const cols = computeColumns([a, b])
 
     expect(cols).toHaveLength(1)
-    expect(cols[0].map(e => e.occ.id)).toEqual(['a', 'b'])
+    expect(cols[0]!.map(e => e.occ.id)).toEqual(['a', 'b'])
   })
 
   it('splits overlapping events into separate columns', () => {
@@ -33,8 +33,8 @@ describe('computeColumns', () => {
     const cols = computeColumns([a, b])
 
     expect(cols).toHaveLength(2)
-    expect(cols[0][0].occ.id).toBe('a')
-    expect(cols[1][0].occ.id).toBe('b')
+    expect(cols[0]![0]!.occ.id).toBe('a')
+    expect(cols[1]![0]!.occ.id).toBe('b')
   })
 
   it('reuses a column once its last event has ended', () => {
@@ -45,8 +45,8 @@ describe('computeColumns', () => {
     const cols = computeColumns([a, b, c])
 
     expect(cols).toHaveLength(2)
-    expect(cols[0].map(e => e.occ.id)).toEqual(['a', 'b'])
-    expect(cols[1].map(e => e.occ.id)).toEqual(['c'])
+    expect(cols[0]!.map(e => e.occ.id)).toEqual(['a', 'b'])
+    expect(cols[1]!.map(e => e.occ.id)).toEqual(['c'])
   })
 
   it('sorts input events by start time before packing', () => {
@@ -56,7 +56,7 @@ describe('computeColumns', () => {
     const cols = computeColumns([late, early])
 
     expect(cols).toHaveLength(1)
-    expect(cols[0].map(e => e.occ.id)).toEqual(['early', 'late'])
+    expect(cols[0]!.map(e => e.occ.id)).toEqual(['early', 'late'])
   })
 
   it('returns an empty array for no events', () => {

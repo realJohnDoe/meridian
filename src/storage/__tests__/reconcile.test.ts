@@ -18,7 +18,7 @@ import type { CacheRecord } from '@/storage/cache'
 const STATUS_BY_DIRTY: Record<number, CacheRecord['status']> = { 0: 'clean', 1: 'dirty', 2: 'deleted' }
 
 function rec(path: string, version: string | undefined, dirty: number, updatedAt = 0): CacheRecord {
-  return { vaultPath: `v::${path}`, vaultId: 'v', path, content: '', status: STATUS_BY_DIRTY[dirty], updatedAt, version }
+  return { vaultPath: `v::${path}`, vaultId: 'v', path, content: '', status: STATUS_BY_DIRTY[dirty]!, updatedAt, version }
 }
 
 // ── Tests ──────────────────────────────────────────────────────

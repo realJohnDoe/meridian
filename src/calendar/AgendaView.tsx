@@ -62,8 +62,9 @@ export default function AgendaView({ onOpen }: Props) {
   const virtualizer = useVirtualizer({
     count: sections.length,
     getScrollElement: () => scRef.current,
-    estimateSize: i => estimateSection(sections[i]),
-    getItemKey: i => sections[i].key,
+    // `count` is sections.length, so the virtualizer only ever asks for i in range.
+    estimateSize: i => estimateSection(sections[i]!),
+    getItemKey: i => sections[i]!.key,
     overscan: 4,
     initialOffset,
     initialMeasurementsCache,
@@ -92,7 +93,7 @@ export default function AgendaView({ onOpen }: Props) {
     const items = virtualizer.getVirtualItems()
     if (!items.length) return
     const offset = virtualizer.scrollOffset ?? 0
-    const top = items.find(vi => vi.end > offset + 12) ?? items[0]
+    const top = items.find(vi => vi.end > offset + 12) ?? items[0]!  // items.length checked above
     const s = sections[top.index]
     const key = s && s.kind === 'day' ? s.dateKey : fmtISO(today)
     if (key === lastTopRef.current) return
@@ -126,7 +127,10 @@ export default function AgendaView({ onOpen }: Props) {
       <div className="pb-24 lg:max-w-3xl lg:mx-auto">
         <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
           {virtualItems.map(vi => {
-            const section = sections[vi.index]
+            // Same-render read: virtualItems came from this render's `sections`
+            // (count === sections.length), so vi.index is in range. The scroll
+            // listener above can't assume that — it reads a captured `sections`.
+            const section = sections[vi.index]!
             return (
               <div
                 key={vi.key}

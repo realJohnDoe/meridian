@@ -18,8 +18,8 @@ interface OccOpts {
 
 /** A minimal expanded occurrence — computeAgendaSections only reads id/date/time/metadata. */
 function occ(id: string, date: string, opts: OccOpts = {}): Occurrence {
-  const [y, m, d] = date.split('-').map(Number)
-  const [hh, mm] = (opts.time ?? '00:00').split(':').map(Number)
+  const [y = NaN, m = NaN, d = NaN] = date.split('-').map(Number)
+  const [hh = NaN, mm = NaN] = (opts.time ?? '00:00').split(':').map(Number)
   return {
     date,
     time: opts.time ?? null,
@@ -77,7 +77,7 @@ describe('computeAgendaSections', () => {
 
     expect(dayKeys(sections)).toEqual(['2026-06-15'])
     expect(sections[goToIndex]).toBe(sections[0])
-    expect(sections[0].items).toEqual([])
+    expect(sections[0]!.items).toEqual([])
   })
 
   it('returns the identical cache when nothing changed', () => {
@@ -113,7 +113,7 @@ describe('computeAgendaSections', () => {
 
     const second = computeAgendaSections(first, overlay(all, 'today-task-a', { done: true }), TODAY, NOW, noFilter)
     expect(itemIds(findDay(second.sections, '2026-06-15'))).toEqual(['today-event', 'today-task-b', 'today-task-a'])
-    expect(findDay(second.sections, '2026-06-15')?.items[2].metadata.done).toBe(true)
+    expect(findDay(second.sections, '2026-06-15')?.items[2]!.metadata.done).toBe(true)
   })
 
   it('moves a completed overdue task out of the overdue pool and into its own day', () => {

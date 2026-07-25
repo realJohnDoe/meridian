@@ -73,7 +73,7 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   async function worker(): Promise<void> {
     while (next < items.length) {
       const i = next++
-      results[i] = await fn(items[i])
+      results[i] = await fn(items[i]!)  // i < items.length, checked by the loop
     }
   }
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))

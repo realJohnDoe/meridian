@@ -15,7 +15,8 @@ export function computeColumns(events: Occurrence[]): LayoutEvent[][] {
   for (const ev of sorted) {
     let placed = false
     for (const col of cols) {
-      if ((ev.occ.metadata.jsTime?.getTime() ?? 0) >= col[col.length - 1].endMs) {
+      // Columns are only ever created as [ev], so they are never empty.
+      if ((ev.occ.metadata.jsTime?.getTime() ?? 0) >= col[col.length - 1]!.endMs) {
         col.push(ev); placed = true; break
       }
     }

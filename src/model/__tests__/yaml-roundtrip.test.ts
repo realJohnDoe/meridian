@@ -39,14 +39,14 @@ describe('structural expectations', () => {
     const overrides = parsed.items.filter(i => !isSeries(i))
     expect(series).toHaveLength(1)
     expect(overrides).toHaveLength(2)
-    expect(series[0].repeat).toMatchObject({ type: 'schedule', freq: 'weekly', byweekday: ['mo'] })
+    expect(series[0]!.repeat).toMatchObject({ type: 'schedule', freq: 'weekly', byweekday: ['mo'] })
   })
 
   it('preserves the after_completion repeat type and interval', () => {
     const parsed = parseFixture('after-completion')
     const series = parsed.items.filter(isSeries)
     expect(series).toHaveLength(1)
-    expect(series[0].repeat).toMatchObject({ type: 'after_completion', interval: '1 day' })
+    expect(series[0]!.repeat).toMatchObject({ type: 'after_completion', interval: '1 day' })
   })
 
   it('keeps the markdown body on the per-file root', () => {
@@ -57,19 +57,19 @@ describe('structural expectations', () => {
   it('multiday emits a single occurrence; span is inferred via multidayCoversDate', () => {
     const parsed = parseFixture('multiday')
     const roots = new Map([[`multiday`, parsed.root]])
-    expect(occItems(parsed)[0].metadata.duration).toBe('3d')
+    expect(occItems(parsed)[0]!.metadata.duration).toBe('3d')
 
     // expandRange emits ONE occurrence on the start date — not one per day.
     const occs = expandRange(parsed.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))
     expect(occs).toHaveLength(1)
-    expect(occs[0].date).toBe('2026-04-19')
+    expect(occs[0]!.date).toBe('2026-04-19')
 
     // multidayCoversDate spans all three days and stops at the boundary.
-    expect(multidayCoversDate(occs[0], new Date('2026-04-18'))).toBe(false)
-    expect(multidayCoversDate(occs[0], new Date('2026-04-19'))).toBe(true)
-    expect(multidayCoversDate(occs[0], new Date('2026-04-20'))).toBe(true)
-    expect(multidayCoversDate(occs[0], new Date('2026-04-21'))).toBe(true)
-    expect(multidayCoversDate(occs[0], new Date('2026-04-22'))).toBe(false)
+    expect(multidayCoversDate(occs[0]!, new Date('2026-04-18'))).toBe(false)
+    expect(multidayCoversDate(occs[0]!, new Date('2026-04-19'))).toBe(true)
+    expect(multidayCoversDate(occs[0]!, new Date('2026-04-20'))).toBe(true)
+    expect(multidayCoversDate(occs[0]!, new Date('2026-04-21'))).toBe(true)
+    expect(multidayCoversDate(occs[0]!, new Date('2026-04-22'))).toBe(false)
   })
 
   // Regression test: Month/Agenda views expand a whole range at once (unlike
@@ -99,7 +99,7 @@ describe('structural expectations', () => {
     ].join('\n'))
 
     expect(parsed.root.title).not.toContain('[object Object]')
-    expect(parsed.items[0].date).not.toContain('[object Object]')
+    expect(parsed.items[0]!.date).not.toContain('[object Object]')
   })
 })
 
@@ -108,10 +108,10 @@ describe('split series (repeat-type change)', () => {
     const parsed = parseFixture('split-series')
     const series = parsed.items.filter(isSeries)
     expect(series).toHaveLength(2)
-    expect(series[0].repeat).toMatchObject({ type: 'schedule', freq: 'daily' })
-    expect(series[1].repeat).toMatchObject({ type: 'after_completion' })
+    expect(series[0]!.repeat).toMatchObject({ type: 'schedule', freq: 'daily' })
+    expect(series[1]!.repeat).toMatchObject({ type: 'after_completion' })
     // Both series belong to the same file
-    expect(series[0].fileSlug).toBe(series[1].fileSlug)
+    expect(series[0]!.fileSlug).toBe(series[1]!.fileSlug)
   })
 
   it('file-level title/tags live on the root; series keep occurrence fields', () => {
@@ -137,9 +137,9 @@ describe('task-to-event', () => {
     const series = parsed.items.filter(isSeries)
     const overrides = parsed.items.filter(i => !isSeries(i))
     expect(series).toHaveLength(1)
-    expect(series[0].metadata.done).toBeUndefined()
+    expect(series[0]!.metadata.done).toBeUndefined()
     expect(overrides).toHaveLength(1)
-    expect(overrides[0].metadata.done).toBe(true)
+    expect(overrides[0]!.metadata.done).toBe(true)
   })
 
   it('generates future occurrences that are events (no done)', () => {
@@ -189,7 +189,7 @@ describe('mixed series and standalone instances', () => {
     const days = series.flatMap(s => (s.repeat as { byweekday?: string[] }).byweekday ?? []).sort()
     expect(days).toEqual(['fr', 'mo'])
     // First series is capped
-    expect((series[0].repeat as { end?: unknown }).end).toBeDefined()
+    expect((series[0]!.repeat as { end?: unknown }).end).toBeDefined()
   })
 
   it('standalone has no ownerId; duration stays on it, title on the root', () => {
@@ -215,10 +215,10 @@ describe('YAML scalar handling', () => {
   it('parses dates as strings, not Date objects', () => {
     const quoted = parseToStoreItems('q.md', '---\ntitle: A\ndate: "2026-04-08"\n---\n')
     const bare = parseToStoreItems('b.md', '---\ntitle: A\ndate: 2026-04-08\n---\n')
-    expect(typeof quoted.items[0].date).toBe('string')
-    expect(quoted.items[0].date).toBe('2026-04-08')
-    expect(typeof bare.items[0].date).toBe('string')
-    expect(bare.items[0].date).toBe('2026-04-08')
+    expect(typeof quoted.items[0]!.date).toBe('string')
+    expect(quoted.items[0]!.date).toBe('2026-04-08')
+    expect(typeof bare.items[0]!.date).toBe('string')
+    expect(bare.items[0]!.date).toBe('2026-04-08')
   })
 
   it('round-trips titles that need quoting', () => {

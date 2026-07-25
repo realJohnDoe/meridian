@@ -91,8 +91,10 @@ function useFlipTransition(
 
     const prev        = prevTops.current
     const keysChanged = prev === null || !sameKeys(prev, tops)
-    const anyMoved    = prev !== null && measured.some(m =>
-      prev[m.key] !== undefined && Math.abs(prev[m.key] - m.layout) > 1)
+    const anyMoved    = prev !== null && measured.some(m => {
+      const prevTop = prev[m.key]
+      return prevTop !== undefined && Math.abs(prevTop - m.layout) > 1
+    })
 
     // An unrelated re-render (a keystroke in a row, a store tick) commits the
     // same layout. Leave any in-flight animation alone rather than restarting

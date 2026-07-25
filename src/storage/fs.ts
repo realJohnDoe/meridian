@@ -45,7 +45,7 @@ async function resolveFileHandle(
   for (const part of parts.slice(0, -1)) {
     dir = await dir.getDirectoryHandle(part, { create })
   }
-  return dir.getFileHandle(parts[parts.length - 1], { create })
+  return dir.getFileHandle(parts[parts.length - 1]!, { create })  // split() always yields ≥1 part
 }
 
 async function resolveParentDir(
@@ -57,7 +57,7 @@ async function resolveParentDir(
   for (const part of parts.slice(0, -1)) {
     dir = await dir.getDirectoryHandle(part)
   }
-  return [dir, parts[parts.length - 1]]
+  return [dir, parts[parts.length - 1]!]
 }
 
 // ── Public API ─────────────────────────────────────────────────

@@ -79,7 +79,8 @@ function changedIndices(prev: Occurrence[], next: Occurrence[]): number[] | null
   if (prev.length !== next.length) return null
   const out: number[] = []
   for (let i = 0; i < next.length; i++) {
-    const a = prev[i], b = next[i]
+    // Both in range: i < next.length and the lengths were equal-checked above.
+    const a = prev[i]!, b = next[i]!
     if (a === b) continue
     if ((a.metadata.jsTime?.getTime() ?? null) !== (b.metadata.jsTime?.getTime() ?? null)) return null
     out.push(i)
@@ -144,7 +145,7 @@ function groupByDay(allOccs: Occurrence[], today: Date, todayKey: string) {
   })
 
   for (let i = 0; i < allOccs.length; i++) {
-    const occ = allOccs[i]
+    const occ = allOccs[i]!  // i < allOccs.length
     const jsTime = occ.metadata.jsTime
     if (!jsTime) continue
     const k = fmtISO(jsTime)
@@ -233,7 +234,7 @@ export function computeAgendaSections(
     // known-aligned, so the index lists still point at the right occurrences.
     for (const k of touched) {
       const b = buckets.get(k)
-      if (b) buckets.set(k, { ...b, occs: b.indices.map(i => allOccs[i]) })
+      if (b) buckets.set(k, { ...b, occs: b.indices.map(i => allOccs[i]!) })
     }
     dirty = sectionsReusable ? touched : null
   } else {

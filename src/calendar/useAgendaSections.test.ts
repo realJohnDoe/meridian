@@ -64,7 +64,7 @@ describe('useAgendaSections', () => {
     const { sections, goToIndex } = result.current
 
     expect(sections.find(s => s.kind === 'overdue')).toBeUndefined()
-    const todaySection = sections[goToIndex]
+    const todaySection = sections[goToIndex]!
     expect(todaySection.kind).toBe('day')
     expect(todaySection.kind === 'day' && todaySection.isToday).toBe(true)
   })
@@ -91,7 +91,7 @@ describe('useAgendaSections', () => {
 
     // The toggled day carries the new value…
     const todayAfter = result.current.sections.find(s => s.kind === 'day' && s.isToday)
-    expect(todayAfter?.items[0].metadata.done).toBe(true)
+    expect(todayAfter?.items[0]!.metadata.done).toBe(true)
     // …while every other day-section is the very same object, so DaySection's
     // memo skips it instead of re-rendering the whole vault.
     expect(result.current.sections.find(s => s.kind === 'day' && s.dateKey === '2026-06-20')).toBe(futureBefore)
