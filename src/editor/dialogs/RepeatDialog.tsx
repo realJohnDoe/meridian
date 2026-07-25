@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useReducer, useState } from 'react'
 import { startOfToday } from 'date-fns'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '@/types'
@@ -35,8 +35,20 @@ interface DialogState {
   monthly: MonthlyMode
   endType: EndType
   endVal: string
-  interval: string
   intervalNum: number
+  completionNum: number
+  completionUnit: string
+}
+
+type DialogAction =
+  | { type: 'reset'; state: DialogState }
+  | { type: 'set'; patch: Partial<DialogState> }
+
+function dialogReducer(state: DialogState, action: DialogAction): DialogState {
+  switch (action.type) {
+    case 'reset': return action.state
+    case 'set': return { ...state, ...action.patch }
+  }
 }
 
 interface Props {
@@ -94,26 +106,30 @@ function initState(
   const defaultFreq: Freq = hasTrk && !hasSched ? 'after_completion' : 'weekly'
 
   if (!repeat) {
+    const { n: completionNum, unit: completionUnit } = parseInterval('1 day')
     return {
       freq: defaultFreq,
       wdays: defaultWdays(scheduled?.date),
       monthly: 'same-day',
       endType: 'never',
       endVal: '',
-      interval: '1 day',
       intervalNum: 1,
+      completionNum,
+      completionUnit,
     }
   }
 
   if (repeat.type === 'after_completion') {
+    const { n: completionNum, unit: completionUnit } = parseInterval(repeat.interval ?? '1 day')
     return {
       freq: 'after_completion',
       wdays: defaultWdays(scheduled?.date),
       monthly: 'same-day',
       endType: 'never',
       endVal: '',
-      interval: repeat.interval ?? '1 day',
       intervalNum: 1,
+      completionNum,
+      completionUnit,
     }
   }
 
@@ -141,14 +157,16 @@ function initState(
     endVal = String(s.end.occurrences)
   }
 
+  const { n: completionNum, unit: completionUnit } = parseInterval('1 day')
   return {
     freq: s.freq,
     wdays,
     monthly,
     endType,
     endVal,
-    interval: '1 day',
     intervalNum: s.interval ?? 1,
+    completionNum,
+    completionUnit,
   }
 }
 
@@ -220,31 +238,28 @@ export default function RepeatDialog({
   const hasSched = !!scheduled
   const hasTrk   = tracked && itemType !== 'event'
 
-  const [freq,           setFreq]           = useState<Freq>('weekly')
-  const [wdays,          setWdays]          = useState<boolean[]>([false, false, false, false, false, false, false])
-  const [monthly,        setMonthly]        = useState<MonthlyMode>('same-day')
-  const [endType,        setEndType]        = useState<EndType>('never')
-  const [endVal,         setEndVal]         = useState('')
-  const [intervalNum,    setIntervalNum]    = useState<number>(1)
-  const [completionNum,  setCompletionNum]  = useState<number>(1)
-  const [completionUnit, setCompletionUnit] = useState<string>('days')
-  const [endCalOpen,     setEndCalOpen]     = useState(false)
-  const [endCalMonth,    setEndCalMonth]    = useState<Date>(new Date())
+  const [state, dispatch] = useReducer(
+    dialogReducer,
+    { repeat, scheduled, hasSched, hasTrk },
+    ({ repeat, scheduled, hasSched, hasTrk }) => initState(repeat, scheduled, hasSched, hasTrk),
+  )
+  const { freq, wdays, monthly, endType, endVal, intervalNum, completionNum, completionUnit } = state
+  const setFreq           = (freq: Freq)          => dispatch({ type: 'set', patch: { freq } })
+  const setWdays          = (wdays: boolean[])    => dispatch({ type: 'set', patch: { wdays } })
+  const setMonthly        = (monthly: MonthlyMode)=> dispatch({ type: 'set', patch: { monthly } })
+  const setEndType        = (endType: EndType)    => dispatch({ type: 'set', patch: { endType } })
+  const setEndVal         = (endVal: string)      => dispatch({ type: 'set', patch: { endVal } })
+  const setIntervalNum    = (intervalNum: number) => dispatch({ type: 'set', patch: { intervalNum } })
+  const setCompletionNum  = (completionNum: number) => dispatch({ type: 'set', patch: { completionNum } })
+  const setCompletionUnit = (completionUnit: string) => dispatch({ type: 'set', patch: { completionUnit } })
+
+  const [endCalOpen,  setEndCalOpen]  = useState(false)
+  const [endCalMonth, setEndCalMonth] = useState<Date>(new Date())
 
   // Re-initialise whenever the dialog opens (so stale state never leaks between opens)
   useResetOnChange([open], () => {
     if (!open) return
-    const s = initState(repeat, scheduled, hasSched, hasTrk)
-    setFreq(s.freq)
-    setWdays(s.wdays)
-    setMonthly(s.monthly)
-    setEndType(s.endType)
-    setEndVal(s.endVal)
-    setIntervalNum(s.intervalNum)
-
-    const parsed = parseInterval(s.interval)
-    setCompletionNum(parsed.n)
-    setCompletionUnit(parsed.unit)
+    dispatch({ type: 'reset', state: initState(repeat, scheduled, hasSched, hasTrk) })
   })
 
   // Synchronize calendar grid month page whenever the end date calendar dialog opens
