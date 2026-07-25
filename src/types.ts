@@ -223,6 +223,15 @@ export function isStandaloneOcc(i: StoreItem): i is StoreOcc {
   return !isSeries(i) && !(i).ownerId
 }
 
+/**
+ * True when an item/occurrence is a tracked task — i.e. its `done` field is
+ * present (not undefined). This is a presence check, not truthiness: a task
+ * with `done: false` is still tracked. Do not simplify to `!!done`.
+ */
+export function isTracked(item: { metadata: { done?: boolean } } | null | undefined): boolean {
+  return item?.metadata.done !== undefined
+}
+
 // ── Dialog / Editor helpers ───────────────────────────────────────────────────
 
 export interface Scheduled {

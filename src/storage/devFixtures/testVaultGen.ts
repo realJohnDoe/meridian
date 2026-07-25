@@ -50,9 +50,9 @@ export function generateBigVault(count: number): Array<{ id: string; content: st
 
   const entries: Array<{ id: string; content: string }> = []
   for (let i = 0; i < count; i++) {
-    const slug = slugs[i]
+    const slug = slugs[i]!  // slugs was filled with exactly `count` entries above
     const r = rng()
-    const title = slug.split('-').slice(0, 2).map(s => s[0].toUpperCase() + s.slice(1)).join(' ') + ` ${i}`
+    const title = slug.split('-').slice(0, 2).map(s => s[0]!.toUpperCase() + s.slice(1)).join(' ') + ` ${i}`
 
     // 2–4 wikilinks to other random files (exercises backlinks/resolveWikilink).
     const linkCount = 2 + Math.floor(rng() * 3)

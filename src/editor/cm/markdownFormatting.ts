@@ -183,7 +183,7 @@ function buildHideDecorations(view: EditorView): DecorationSet {
         if (urlNode) {
           const marks = node.node.getChildren('LinkMark')
           const label = marks.length >= 2
-            ? doc.sliceString(marks[0].to, marks[1].from)
+            ? doc.sliceString(marks[0]!.to, marks[1]!.from)  // length >= 2 checked
             : ''
           const url = doc.sliceString(urlNode.from, urlNode.to)
           builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(label || url, url) }))

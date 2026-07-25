@@ -13,7 +13,7 @@ const WIKILINK_RE = /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g
 
 function matchToRef(m: RegExpExecArray): WikilinkRef {
   return {
-    ref:   m[1].trim(),
+    ref:   m[1]!.trim(),  // group 1 is not optional in WIKILINK_RE
     label: m[2]?.trim(),
     start: m.index,
     end:   m.index + m[0].length,
@@ -87,5 +87,5 @@ export function buildResolveIndex(roots: Roots): Map<string, string> {
 /** Strip `[[` / `]]` brackets from a stored wikilink string, returning the raw ref. */
 export function unwrapRef(stored: string): string {
   const m = stored.match(/^\[\[(.+)\]\]$/)
-  return m ? m[1] : stored
+  return m ? m[1]! : stored
 }

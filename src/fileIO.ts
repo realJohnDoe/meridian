@@ -22,7 +22,7 @@ function yamlParse(text: string): Record<string, unknown> {
 /** CRLF-aware frontmatter split — canonical for the whole codebase. */
 function splitFrontmatter(content: string): { fm: string; body: string } {
   const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
-  if (m) return { fm: m[1], body: m[2].trim() }
+  if (m) return { fm: m[1]!, body: m[2]!.trim() }  // both groups are mandatory
   return { fm: content, body: '' }
 }
 

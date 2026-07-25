@@ -201,7 +201,7 @@ interface Props {
 
 export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, onVerticalScroll, getInitialScrollTop }: Props) {
   const dvDate = useMemo(() => {
-    const [y, m, d] = dateKey.split('-').map(Number)
+    const [y = NaN, m = NaN, d = NaN] = dateKey.split('-').map(Number)
     return new Date(y, m - 1, d)
   }, [dateKey])
 

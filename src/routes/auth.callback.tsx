@@ -56,7 +56,7 @@ function AuthCallbackPage() {
         const repos = await fetchInstalledRepos(tokens.accessToken)
         if (cancelled) return
         if (repos.length === 0) setPhase({ kind: 'no-installations' })
-        else if (repos.length === 1) await connect(tokens, repos[0])
+        else if (repos.length === 1) await connect(tokens, repos[0]!)
         else setPhase({ kind: 'picking', tokens, repos })
       })
       .catch(e => {

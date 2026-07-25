@@ -40,13 +40,14 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
   // A single item with no override children is emitted as a flat YAML node —
   // metadata at root alongside the structural fields.
 
-  if (series.length === 1 && standalones.length === 0 && seriesBlocks[0].children.length === 0) {
-    const s = series[0]
+  // series.length === 1 guards every [0] below; seriesBlocks is 1:1 with series.
+  if (series.length === 1 && standalones.length === 0 && seriesBlocks[0]!.children.length === 0) {
+    const s = series[0]!
     return { ...fileLevel, ...occMetaToYaml(s.metadata), date: s.date, ...(s.time ? { time: s.time } : {}), repeat: s.repeat }
   }
 
   if (series.length === 0 && standalones.length === 1) {
-    const s = standalones[0]
+    const s = standalones[0]!
     return { ...fileLevel, ...occMetaToYaml(s.metadata), ...(s.date ? { date: s.date } : {}), ...(s.time ? { time: s.time } : {}) }
   }
 
@@ -68,7 +69,7 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
 
   // ── Single series with instances (flat root, no outer instances wrapper) ──
   if (series.length === 1 && standalones.length === 0) {
-    const { series: s, children } = seriesBlocks[0]
+    const { series: s, children } = seriesBlocks[0]!
     const instances = serializeChildren(children, s.metadata)
     const result: Record<string, unknown> = {}
     Object.assign(result, fileLevel)
@@ -85,7 +86,8 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
   const allInstances: Record<string, unknown>[] = []
 
   seriesBlocks.forEach(({ series: s, children }, i) => {
-    const ld = occMetaToYaml(localDefaults[i])
+    // localDefaults is 1:1 with allMetas = [...seriesBlocks, ...standalones].
+    const ld = occMetaToYaml(localDefaults[i]!)
     const inst: Record<string, unknown> = {
       date:   s.date,
       ...(s.time ? { time: s.time } : {}),
@@ -99,7 +101,7 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
 
   standalones.forEach((s, i) => {
     const offset = seriesBlocks.length
-    const ld = occMetaToYaml(localDefaults[offset + i])
+    const ld = occMetaToYaml(localDefaults[offset + i]!)
     allInstances.push({
       ...(s.date ? { date: s.date } : {}),
       ...(s.time ? { time: s.time } : {}),

@@ -36,7 +36,8 @@ export function hasSameStructure(a: StoreItem[], b: StoreItem[]): boolean {
   }
 
   for (let i = 0; i < a.length; i++) {
-    const ai = a[i], bi = b[i]
+    // Both indices are in range: i < a.length and the lengths were equal-checked above.
+    const ai = a[i]!, bi = b[i]!
     if (ai === bi) continue  // same reference → nothing changed
 
     // Fields present on both RepeatPattern and OccurrenceEntry
@@ -89,8 +90,9 @@ export function computeExpansionCache(
     // not force a full re-expansion of every other file's occurrences too.
     const changedById = new Map<string, StoreOcc>()
     for (let i = 0; i < items.length; i++) {
-      if (items[i] !== prev.items[i] && !isSeries(items[i])) {
-        changedById.set(items[i].id, items[i] as StoreOcc)
+      const item = items[i]!  // i < items.length
+      if (item !== prev.items[i] && !isSeries(item)) {
+        changedById.set(item.id, item)
       }
     }
 

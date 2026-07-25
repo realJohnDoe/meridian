@@ -271,7 +271,7 @@ describe('restoreVaults — github vault', () => {
     await restoreVaults()
 
     expect(notifyFns.notify).toHaveBeenCalledTimes(1)
-    expect(notifyFns.notify.mock.calls[0][0]).toContain(GITHUB_REF.name)
+    expect(notifyFns.notify.mock.calls[0]![0]).toContain(GITHUB_REF.name)
     expect(storeState.activeVaultId).toBe('example')
   })
 })
@@ -424,7 +424,7 @@ describe('setActiveVault', () => {
     await setActiveVault(LOCAL_REF.id)
 
     expect(notifyFns.notifyError).toHaveBeenCalledTimes(1)
-    expect(notifyFns.notifyError.mock.calls[0][0]).toBe('Could not switch vault')
+    expect(notifyFns.notifyError.mock.calls[0]![0]).toBe('Could not switch vault')
     spy.mockRestore()
     permSpy.mockRestore()
   })

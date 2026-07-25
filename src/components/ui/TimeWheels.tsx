@@ -58,7 +58,7 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
 
     if (items[idx] === value) return
     emitted.current = idx
-    onChange(items[idx])
+    onChange(items[idx]!)  // idx is clamped to [0, items.length - 1] above
   }, [items, value, onChange])
 
   return (
@@ -79,7 +79,7 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
           const idx = items.indexOf(value)
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault()
-            onChange(items[Math.max(0, Math.min(idx + (e.key === 'ArrowDown' ? 1 : -1), items.length - 1))])
+            onChange(items[Math.max(0, Math.min(idx + (e.key === 'ArrowDown' ? 1 : -1), items.length - 1))]!)
           }
         }}
         style={{ scrollbarWidth: 'none' }}
@@ -119,8 +119,8 @@ interface Props {
 
 export default function TimeWheels({ value, onChange }: Props) {
   const parts = value.match(/^(\d{1,2}):(\d{2})/)
-  const h = parts ? parseInt(parts[1], 10) : 9
-  const rawM = parts ? parseInt(parts[2], 10) : 0
+  const h = parts ? parseInt(parts[1]!, 10) : 9
+  const rawM = parts ? parseInt(parts[2]!, 10) : 0
   const m = Math.round(rawM / MINUTE_STEP) * MINUTE_STEP % 60
 
   return (
