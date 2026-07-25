@@ -1,6 +1,6 @@
 import { startOfToday } from 'date-fns'
 import { fmtISO, applyEdit, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing, fileSlugItems, findSeries } from '@/model'
-import { isSeries } from '@/types'
+import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import { titleToSlug } from '@/fileIO'
 import { getItems, getRoots, getBacklinks } from '@/storeBridge'
@@ -73,7 +73,7 @@ export function entryFromOccurrence(
 ): EntryState {
   const m = item.metadata
   const { scheduled, repeat } = applyScope(item, editScope, items)
-  const tracked  = m.done !== undefined
+  const tracked  = isTracked(item)
   const itemType: ItemType = tracked ? 'task' : scheduled ? 'event' : 'note'
   return {
     item,

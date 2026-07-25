@@ -1,10 +1,10 @@
 import { startOfDay } from 'date-fns'
 import { parseDurationDays, parseDurationHours } from '@/model'
-import type { Occurrence, OccState } from './types'
+import { isTracked, type Occurrence, type OccState } from './types'
 
 /** Derive the display kind from occurrence data. */
 export function occKind(occ: Occurrence): 'event' | 'task' | 'note' {
-  return occ.metadata.done !== undefined ? 'task' : occ.date ? 'event' : 'note'
+  return isTracked(occ) ? 'task' : occ.date ? 'event' : 'note'
 }
 
 /** True when the occurrence belongs to a recurring series (has an ownerId). */

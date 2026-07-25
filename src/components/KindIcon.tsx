@@ -1,4 +1,5 @@
 import { CheckSquare, CalendarDays, FileText } from 'lucide-react'
+import { isTracked } from '@/types'
 
 /** Minimal shape satisfied by both Occurrence and StoreItem. */
 interface Kindable {
@@ -19,7 +20,7 @@ interface Props {
  * Treats undefined item as a note.
  */
 export default function KindIcon({ item, size = 13, className }: Props) {
-  if (item?.metadata.done !== undefined)
+  if (isTracked(item))
     return <CheckSquare size={size} className={className} />
   if (item?.date)
     return <CalendarDays size={size} className={className} />

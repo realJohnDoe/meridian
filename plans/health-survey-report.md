@@ -34,18 +34,18 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 
 **Summary (ranked by a rough `(impact × breadth) ÷ effort`, effort = model tier as ordinal; severity sanity applied so latent data-loss isn't buried under tidy-up):**
 
-| Rank | Finding | Recommended model |
-|---|---|---|
-| 1 | **#1** — `noUncheckedIndexedAccess` disabled | Opus 5 |
-| 2 | **#2** — vault-file extension asymmetry / duplicated `isVaultFile` | Opus 5 |
-| 3 | **#3** — inlined `done !== undefined` tracked-task predicate | Sonnet 5 |
-| 4 | **#4** — `editor/cm/` decoration layer at 0% coverage | Opus 5 |
-| 5 | **#5** — `{ items, roots }` store snapshot reconstructed inline | Haiku 4.5 |
-| 6 | **#6** — path↔slug conversion scattered, no shared helper | Sonnet 5 |
-| 7 | **#7** — `diskDelete` bare `catch {}` swallows failed local deletes | Sonnet 5 |
-| 8 | **#8** — repeated inline pluralization in `format.ts` | Haiku 4.5 |
-| 9 | **#9** — `store.ts` mixes view-ephemeral UI state with domain state | Opus 5 (plan mode) |
-| 10 | **#10** — dead redundant branch in `occState` | Haiku 4.5 |
+| Rank | Finding                                                             | Recommended model  |
+| ---- | ------------------------------------------------------------------- | ------------------ |
+| 1    | **#1** — `noUncheckedIndexedAccess` disabled                        | Opus 5             |
+| 2    | **#2** — vault-file extension asymmetry / duplicated `isVaultFile`  | Opus 5             |
+| 3    | **#3** — inlined `done !== undefined` tracked-task predicate        | Sonnet 5           |
+| 4    | **#4** — `editor/cm/` decoration layer at 0% coverage               | Opus 5             |
+| 5    | **#5** — `{ items, roots }` store snapshot reconstructed inline     | Haiku 4.5          |
+| 6    | **#6** — path↔slug conversion scattered, no shared helper           | Sonnet 5           |
+| 7    | **#7** — `diskDelete` bare `catch {}` swallows failed local deletes | Sonnet 5           |
+| 8    | **#8** — repeated inline pluralization in `format.ts`               | Haiku 4.5          |
+| 9    | **#9** — `store.ts` mixes view-ephemeral UI state with domain state | Opus 5 (plan mode) |
+| 10   | **#10** — dead redundant branch in `occState`                       | Haiku 4.5          |
 
 **Sequencing note (findings sharing a file):** #1 & #9 both edit `calendar/AgendaView.tsx` (index-access guards vs. moving agenda scroll state out of the store) — land #1 first or bundle them. #2 & #6 both edit `storage/sync.ts` (write-path extension fix vs. the path↔slug helper) — do them together, since #6's shared helper is where #2's fix belongs. #3 & #5 both edit `editor/save.ts` (tracked predicate vs. snapshot helper) — batch to avoid rebasing it twice.
 
@@ -64,14 +64,6 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 - **Evidence:** Reads accept three extensions — `storage/fs.ts:20` and `storage/githubBackend.ts:7` each define, **identically**, `return name.endsWith('.md') || name.endsWith('.yaml') || name.endsWith('.yml')`. But every write hardcodes `.md` — `storage/sync.ts:23` `return fileSlug + '.md'`. `fileIO.ts:49` confirms non-`.md` files parse as pure-frontmatter entries.
 - **Problem:** A `.yaml`/`.yml` vault entry is read and gets slug `foo`, but saving it writes `foo.md` — leaving the original `foo.yaml` untouched, producing a duplicate/orphaned pair that a later reconcile double-loads into the store. The duplicated predicate also means the two backends can drift.
 - **Fix:** Hoist one shared `isVaultFile`/`slugToPath` (see #6) into `storage/backend.ts` and make the write path preserve the source extension — or, if only `.md` is truly supported, narrow `isVaultFile` to `.md` so reads and writes agree.
-
-### #3 — The "tracked task" domain predicate is inlined as raw `done !== undefined` across layers
-
-- **Category:** `dry` `naming`
-- **Impact:** 3 · **Breadth:** 5 files (grep: `done !== undefined`, excluding dev-only `debug/`) · **Recommended model:** Sonnet 5 — the predicate encodes a domain decision (`tracked` = the `done` _field is present_, i.e. `!== undefined`, **not** truthiness); a refactor that "tidies" it to `!!done` or `done != null` silently changes behavior for `done: false` tasks and the type-check won't catch it. **Haiku 4.5** if the exact predicate is pinned in the task.
-- **Evidence:** The same check appears under three different local names and inline: `occView.ts:7` `occ.metadata.done !== undefined ? 'task' : …`, `editor/save.ts:76` `const tracked = m.done !== undefined`, `components/OccurrenceCard.tsx:131` `const hasTrack = occ.metadata.done !== undefined`, `components/KindIcon.tsx:22` `if (item?.metadata.done !== undefined)`. `types.ts` already hosts sibling predicates (`isSeries`, `isStandaloneOcc`, `isEditScope`) — the natural home.
-- **Problem:** A core domain concept ("is this a trackable task") is hand-inlined in 5 places with inconsistent naming, so the invariant has no single owner and a future change to how tasks are marked touches every copy.
-- **Fix:** Add `isTracked(occ)` (or `hasTaskState`) to `types.ts` and replace the inline checks.
 
 ### #4 — `editor/cm/` decoration layer at 0% coverage (no global floor to catch it)
 
@@ -109,7 +101,7 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 
 - **Category:** `dry`
 - **Impact:** 2 · **Breadth:** 1 file (grep: `=== 1 ?` ×12 in `format.ts`) · **Recommended model:** Haiku 4.5 — purely mechanical, single file; a wrong extraction breaks `format.test.ts` _loudly_. No load-bearing hazard.
-- **Evidence:** `format.ts` repeats `${x} ${x === 1 ? 'year' : 'years'}` (and `month`/`week`/`day`/`hour`/`minute`) 12 times across `endDateToDuration`, `endDateTimeToDuration`, `fmtDuration`, `fmtDurationCompact` — e.g. line 67 `return \`${y} ${y === 1 ? 'year'  : 'years'}\``.
+- **Evidence:** `format.ts` repeats `${x} ${x === 1 ? 'year' : 'years'}` (and `month`/`week`/`day`/`hour`/`minute`) 12 times across `endDateToDuration`, `endDateTimeToDuration`, `fmtDuration`, `fmtDurationCompact` — e.g. line 67 `return \`${y} ${y === 1 ? 'year' : 'years'}\``.
 - **Problem:** The same unit-pluralization rule is hand-inlined a dozen times; a new unit or an i18n change touches all of them.
 - **Fix:** Extract a single `pluralize(n, unit)` (or a `{unit: [singular, plural]}` table) and call it from each site.
 
