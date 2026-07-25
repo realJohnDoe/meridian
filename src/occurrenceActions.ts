@@ -3,7 +3,7 @@ import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, delet
 import { occIsRecur } from './occView'
 import { isStandaloneOcc } from './types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata } from './types'
-import { getItems, getRoots, setData } from './storeBridge'
+import { getSnapshot, getItems, getRoots, setData } from './storeBridge'
 import { writeEntity, deleteEntity } from './persistencePort'
 import { commitNext } from './storeCommit'
 
@@ -47,7 +47,7 @@ function showDeleteToast(
 }
 
 export function toggleOccDone(o: Occurrence): void {
-  const snapshot = { items: getItems(), roots: getRoots() }
+  const snapshot = getSnapshot()
   const next = toggleDone(snapshot, o)
   commitNext(next, [o.fileSlug])
 }
@@ -88,7 +88,7 @@ export function reopenOcc(occ: Occurrence): void {
 }
 
 export function beginSwipeDelete(o: Occurrence): () => void {
-  const snapshot = { items: getItems(), roots: getRoots() }
+  const snapshot = getSnapshot()
   const title    = o.metadata.title
   let cancelled  = false
 
@@ -110,7 +110,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
       },
     )
     return () => {
-      if (!cancelled) setData(deleteByFileSlug({ items: getItems(), roots: getRoots() }, o.fileSlug))
+      if (!cancelled) setData(deleteByFileSlug(getSnapshot(), o.fileSlug))
     }
   }
 }
