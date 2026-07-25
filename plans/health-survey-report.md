@@ -49,14 +49,6 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 
 **Sequencing note (findings sharing a file):** #1 & #9 both edit `calendar/AgendaView.tsx` (index-access guards vs. moving agenda scroll state out of the store) — land #1 first or bundle them. #2 & #6 both edit `storage/sync.ts` (write-path extension fix vs. the path↔slug helper) — do them together, since #6's shared helper is where #2's fix belongs. #3 & #5 both edit `editor/save.ts` (tracked predicate vs. snapshot helper) — batch to avoid rebasing it twice.
 
-### #1 — `noUncheckedIndexedAccess` disabled across an index-heavy domain
-
-- **Category:** `toolchain` `types`
-- **Impact:** 5 · **Breadth:** 29 files (grep: distinct `src/*` paths in a `tsc` dry-run with the flag on) · **Recommended model:** Opus 5 — the ~10 genuine spots (virtualizer index math in `AgendaView`) need real reasoning and fail _silently_ (wrong row rendered), while a blanket `!` sweep would re-hide the exact bug class the flag exists to surface; **Sonnet 5** for the mechanical bulk if those genuine spots are pre-listed in the task.
-- **Evidence:** `tsconfig.app.json` enables `"strict": true, "noUnusedLocals": true, "noUnusedParameters": true, "noFallthroughCasesInSwitch": true` — but not `noUncheckedIndexedAccess`. A dry-run enabling it yields **125 errors** concentrated in the domain core (`model/expansionCache.ts` ×24, `model/collapse.ts` ×15, `model/dateUtils.ts` ×10, `expansion.ts`, `repeat.ts`, `duration.ts`) and calendar layout (`calendar/AgendaView.tsx` ×14, `useAgendaSections.ts` ×7, `OccurrenceRow.tsx` ×5, `MonthGrid.tsx`, `DayView.tsx`). Real-fragility example — `AgendaView.tsx(137): 'section' is possibly 'undefined'` (virtualizer index lookup).
-- **Problem:** Array/Map index access is silently typed as non-`undefined` in precisely the paths (recurrence expansion, virtualized layout) where an out-of-range index would flow an `undefined` through as if it were a value — the one strictness class this otherwise-maximally-strict config leaves off.
-- **Fix:** Enable the flag, fix the ~10 genuine spots (mostly `AgendaView`) with guards and the rest with justified `!`/`.at()`, sequenced as one dedicated PR.
-
 ### #2 — Vault-file extension asymmetry orphans `.yaml`/`.yml` entries; `isVaultFile` duplicated verbatim
 
 - **Category:** `dry` `error-handling`
