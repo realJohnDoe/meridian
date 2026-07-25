@@ -6,6 +6,7 @@ import { IconButton } from './ui/icon-button'
 import { Input } from './ui/input'
 import { newEntryRoute } from '@/routes'
 import { useOpenEntry } from '@/hooks'
+import { cn } from '@/lib/cn'
 
 // Lazy: SearchResults/FileResultsList pull in enough weight that they
 // shouldn't sit on the agenda's cold-start critical path — deferred until
@@ -66,7 +67,7 @@ export default function SearchBar() {
           -mb-px overlap hides the backdrop-blur seam. */}
       <div className="absolute inset-x-0 bottom-full -mb-px h-5 bg-gradient-to-b from-transparent to-background pointer-events-none" />
 
-      <div className={`relative z-search-bar px-3.5 pt-3.5 pb-[max(14px,env(safe-area-inset-bottom))] flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
+      <div className={cn('relative z-search-bar px-3.5 pt-3.5 pb-[max(14px,env(safe-area-inset-bottom))] flex flex-col gap-2', searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm')}>
         <div data-tour="search-bar" className="search-bar-wrap w-full max-w-xl mx-auto">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           {/*

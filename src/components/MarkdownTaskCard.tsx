@@ -3,6 +3,7 @@ import { Checkbox } from './ui/checkbox'
 import { DimmableCard } from './ui/dimmable-card'
 import { IconButton } from './ui/icon-button'
 import { Input } from './ui/input'
+import { cn } from '@/lib/cn'
 
 interface MarkdownTaskCardProps {
   text:          string
@@ -26,7 +27,7 @@ export default function MarkdownTaskCard({
   return (
     <DimmableCard dimmed={done} className="flex items-stretch gap-2.5 pl-2 pr-2.5 py-2">
       <span className="w-1 self-stretch rounded-full shrink-0 min-h-5 bg-muted-foreground/20" />
-      <div className={`relative z-20 flex flex-1 min-w-0 items-center gap-1.5 py-0.5 ${done ? 'opacity-60' : ''}`}>
+      <div className={cn('relative z-20 flex flex-1 min-w-0 items-center gap-1.5 py-0.5', done && 'opacity-60')}>
         <Checkbox
           checked={done}
           onCheckedChange={onToggle}
@@ -52,13 +53,13 @@ export default function MarkdownTaskCard({
         ) : onClickText ? (
           <button
             type="button"
-            className={`flex-1 min-w-0 text-left text-sm leading-5 font-medium truncate cursor-pointer ${done ? 'line-through' : 'text-foreground'}`}
+            className={cn('flex-1 min-w-0 text-left text-sm leading-5 font-medium truncate cursor-pointer', done ? 'line-through' : 'text-foreground')}
             onClick={onClickText}
           >
             {text}
           </button>
         ) : (
-          <span className={`flex-1 text-sm leading-5 font-medium truncate ${done ? 'line-through' : 'text-foreground'}`}>
+          <span className={cn('flex-1 text-sm leading-5 font-medium truncate', done ? 'line-through' : 'text-foreground')}>
             {text}
           </span>
         )}

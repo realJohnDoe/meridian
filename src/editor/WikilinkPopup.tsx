@@ -6,6 +6,7 @@ import { OccurrenceCard } from '@/components'
 import { fileEntries } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { useResetOnChange } from '@/hooks'
+import { cn } from '@/lib/cn'
 
 export interface WlPopupState {
   query:  string
@@ -117,7 +118,7 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
             role="option"
             aria-selected={isFocused}
             tabIndex={-1}
-            className={`w-full text-left px-3.5 py-2 text-sm text-secondary-foreground cursor-pointer rounded-md hover:bg-accent ${isFocused ? 'bg-accent' : ''}`}
+            className={cn('w-full text-left px-3.5 py-2 text-sm text-secondary-foreground cursor-pointer rounded-md hover:bg-accent', isFocused && 'bg-accent')}
             onMouseDown={() => insertWikilink(e.title)}
             onMouseEnter={() => setFocusIdx(i)}
           >
