@@ -39,26 +39,6 @@ The UI layer is **healthy and unusually well-disciplined** — strong token syst
 
 ## 4. Findings
 
-### 4. Duplicated "dimmable card shell" across the two task-card components
-
-- **Category:** `dry` `styling`
-- **Impact:** 4
-- **Breadth:** 2 files (`OccurrenceCard.tsx`, `MarkdownTaskCard.tsx`)
-- **Fix effort:** M
-- **Evidence:** `src/components/MarkdownTaskCard.tsx:27` — `bg-card border border-input rounded-lg transition-colors hover:bg-accent …` + `:28` `style={{ background: 'var(--done-overlay)' }}`; near-identical shell + overlay + `opacity-60` dim at `src/components/OccurrenceCard.tsx:160` / `:163` / `:173`.
-- **Problem:** Both cards independently re-implement the same visual contract (surface, border, hover, `done` overlay via `--done-overlay`, dimmed opacity), so a change to the card look must be made in two places and can drift.
-- **Fix:** Extract a `DimmableCard` (or a `cva` card variant carrying `dimmed`/`overlay`) and compose both cards from it.
-
-### 5. Z-index layering has no scale — ad-hoc escalating magic numbers
-
-- **Category:** `styling`
-- **Impact:** 3
-- **Breadth:** 6 files (`grep 'z-\[[0-9]+\]'`): values `z-[1]`, `z-[24]`, `z-[25]`, `z-[26]`, `z-[300]`, `z-[9002]`, intermixed with Tailwind's `z-10/20/50`.
-- **Fix effort:** M
-- **Evidence:** `src/onboarding/CoachTour.tsx:110` — `className="fixed z-[9002] …"`; `src/search/SearchOverlay.tsx:92` — `z-[24]` / `:94` `z-[25]`; `src/components/ui/alert-dialog.tsx:37` — `z-[300]`.
-- **Problem:** Stacking order is expressed as arbitrary literals with no shared reference, so `z-[9002]` (tour) vs `z-[300]` (dialog) vs `z-[24-26]` (search) can only be reasoned about by grepping, and the next overlay will guess another number.
-- **Fix:** Define a small set of layer tokens in `@theme` (e.g. `--z-overlay`, `--z-dialog`, `--z-tour`) and reference those instead of raw values.
-
 ### 6. Duplicated day/month branches in the app-shell top bar
 
 - **Category:** `dry` `component-architecture`

@@ -161,7 +161,7 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
       </div>
 
       {/* Main row — transform driven by CSS (.swipe-row) */}
-      <div ref={rowRef} className="swipe-row relative z-[1] bg-background touch-pan-y select-none">
+      <div ref={rowRef} className="swipe-row relative z-10 bg-background touch-pan-y select-none">
         <OccurrenceCard
           occ={occ}
           now={now}
