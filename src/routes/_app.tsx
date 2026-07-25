@@ -12,7 +12,7 @@ import { onVaultChanged } from '@/storage'
 import { resetAgendaScroll } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar } from '@/components'
-import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { TopbarSlotContext } from './-topbarSlot'
@@ -124,7 +124,7 @@ function AppMain() {
             <div ref={setSlotEl} className="flex flex-1 items-center h-full overflow-hidden" />
           ) : isDayView && dvDate ? (
             <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
-              {isMobile && <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={openSidebar} title="Menu" aria-label="Menu"><Menu size={18} /></Button>}
+              {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
               {/* dayPreview (set by the swipe carousel as a swipe crosses the
                   halfway point) shows the label the gesture is heading toward
                   immediately, ahead of the route committing — mirrors monthPreview. */}
@@ -133,23 +133,23 @@ function AppMain() {
                   semantics (see DayView) so chevron taps and swipes leave the
                   same, single history entry per visit instead of chevron taps
                   alone stacking up a back-press-per-day trail. */}
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}><ChevronLeft size={18} /></Button>
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}><ChevronRight size={18} /></Button>
+              <IconButton variant="ghost" className="text-dim" label="Previous day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}><ChevronLeft size={18} /></IconButton>
+              <IconButton variant="ghost" className="text-dim" label="Next day" onClick={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}><ChevronRight size={18} /></IconButton>
             </div>
           ) : isMonthView && monthViewDate ? (
             <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
-              {isMobile && <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={openSidebar} title="Menu" aria-label="Menu"><Menu size={18} /></Button>}
+              {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
               <span className="flex-1 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
               {/* replace: true — mirrors the month carousel's swipe-to-page
                   semantics (see MonthView) so chevron taps and swipes leave
                   the same, single history entry per visit instead of chevron
                   taps alone stacking up a back-press-per-month trail. */}
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Previous month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}><ChevronLeft size={18} /></Button>
-              <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" aria-label="Next month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}><ChevronRight size={18} /></Button>
+              <IconButton variant="ghost" className="text-dim" label="Previous month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}><ChevronLeft size={18} /></IconButton>
+              <IconButton variant="ghost" className="text-dim" label="Next month" onClick={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}><ChevronRight size={18} /></IconButton>
             </div>
           ) : (
             <div className="flex items-center gap-2 min-w-0" id="tbDefault">
-              {isMobile && <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={openSidebar} title="Menu" aria-label="Menu"><Menu size={18} /></Button>}
+              {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
               <span className="text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
             </div>
           )}
@@ -157,7 +157,7 @@ function AppMain() {
             <div className="flex items-center gap-0.5 shrink-0">
               <SyncButton />
               {!isListView && (
-                <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={handleToday} title="Today" aria-label="Today"><CalendarCheck2 size={18} /></Button>
+                <IconButton variant="ghost" className="text-dim" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>
               )}
             </div>
           )}

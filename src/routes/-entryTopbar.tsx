@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Heart, Trash2 } from 'lucide-react'
 import { SyncButton } from '@/components'
-import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { useTopbarSlot } from './-topbarSlot'
@@ -24,24 +24,24 @@ export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack }:
     // Right edge always leads with an icon button; left edge only does on mobile (back button) —
     // desktop hides it, leaving nothing leading the left edge.
     <div className={cn('flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto', topbarEdgePadding(isMobile, true))}>
-      <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0 lg:hidden" onClick={onBack} title="Back" aria-label="Back">
+      <IconButton variant="ghost" className="text-dim lg:hidden" onClick={onBack} title="Back" label="Back">
         <ArrowLeft size={18} />
-      </Button>
+      </IconButton>
       <div className="flex-1" />
       <SyncButton />
-      <Button
-        variant="ghost" size="icon"
-        className={cn('rounded-full shrink-0', isFavorited ? 'text-destructive' : 'text-dim')}
+      <IconButton
+        variant="ghost"
+        className={isFavorited ? 'text-destructive' : 'text-dim'}
         onClick={onToggleFavorite ?? undefined}
         disabled={!onToggleFavorite}
         title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-        aria-label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+        label={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
       >
         <Heart size={18} className={isFavorited ? 'fill-current' : ''} />
-      </Button>
-      <Button variant="ghost" size="icon" className="rounded-full shrink-0 text-destructive" onClick={onDelete} title="Delete" aria-label="Delete">
+      </IconButton>
+      <IconButton variant="ghost" className="text-destructive" onClick={onDelete} title="Delete" label="Delete">
         <Trash2 size={18} />
-      </Button>
+      </IconButton>
     </div>,
     slotEl,
   )

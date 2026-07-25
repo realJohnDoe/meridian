@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useOpenEntry } from '@/hooks'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
 
 const NotesView = lazy(() => import('@/calendar').then(m => ({ default: m.NotesView })))
 
@@ -11,7 +12,7 @@ export const Route = createFileRoute('/_app/notes')({
 function NotesPage() {
   const onOpen = useOpenEntry()
   return (
-    <Suspense>
+    <Suspense fallback={<PageSkeleton />}>
       <NotesView onOpen={onOpen} />
     </Suspense>
   )

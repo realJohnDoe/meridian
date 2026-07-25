@@ -107,7 +107,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
       <div
         role="dialog"
         aria-label={`Tour: ${step.title}`}
-        className="fixed z-[9002] flex max-h-[70dvh] flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl
+        className="fixed z-tour flex max-h-[70dvh] flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl
           inset-x-4 bottom-[calc(6rem_+_env(safe-area-inset-bottom,0px))]
           sm:inset-x-auto sm:left-1/2 sm:w-80 sm:-translate-x-1/2"
       >

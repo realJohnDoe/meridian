@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
 import { Button } from './ui/button'
+import { IconButton } from './ui/icon-button'
 import { Input } from './ui/input'
 import { newEntryRoute } from '@/routes'
 import { useOpenEntry } from '@/hooks'
@@ -65,7 +66,7 @@ export default function SearchBar() {
           -mb-px overlap hides the backdrop-blur seam. */}
       <div className="absolute inset-x-0 bottom-full -mb-px h-5 bg-gradient-to-b from-transparent to-background pointer-events-none" />
 
-      <div className={`relative z-[26] px-3.5 pt-3.5 pb-[max(14px,env(safe-area-inset-bottom))] flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
+      <div className={`relative z-search-bar px-3.5 pt-3.5 pb-[max(14px,env(safe-area-inset-bottom))] flex flex-col gap-2 ${searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm'}`}>
         <div data-tour="search-bar" className="search-bar-wrap w-full max-w-xl mx-auto">
           <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
           {/*
@@ -85,9 +86,9 @@ export default function SearchBar() {
             }}
           />
           {filterQuery && (
-            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full shrink-0 text-muted-foreground" aria-label="Clear search" onClick={closeSearch}>
+            <IconButton variant="ghost" hit="pad" className="w-7 h-7 text-muted-foreground" label="Clear search" onClick={closeSearch}>
               <X size={13} />
-            </Button>
+            </IconButton>
           )}
           <Button
             variant="brand"
