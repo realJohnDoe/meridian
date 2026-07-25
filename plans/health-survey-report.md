@@ -32,10 +32,22 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 
 ## 4. Findings
 
+**Summary (ranked by `(impact × breadth) ÷ effort`, effort = model tier as ordinal):**
+
+| Rank | Finding | Recommended model |
+|---|---|---|
+| 1 | **#1** — `noUncheckedIndexedAccess` disabled | Opus 5 |
+| 2 | **#2** — vault-file extension asymmetry / duplicated `isVaultFile` | Opus 5 |
+| 3 | **#3** — `editor/cm/` decoration layer at 0% coverage | Opus 5 |
+| 4 | **#5** — repeated inline pluralization in `format.ts` | Haiku 4.5 |
+| 5 | **#4** — `store.ts` mixes view-ephemeral UI state with domain state | Opus 5 (plan mode) |
+
+**Sequencing note:** #1 and #4 both edit `calendar/AgendaView.tsx` (index-access guards vs. moving agenda scroll state out of the store) — land #1's guards first, or bundle the two, so `AgendaView.tsx` isn't rebased twice.
+
 ### #1 — `noUncheckedIndexedAccess` disabled across an index-heavy domain
 
 - **Category:** `toolchain` `types`
-- **Impact:** 5 · **Breadth:** 29 files (grep: distinct `src/*` paths in a `tsc` dry-run with the flag on) · **Fix effort:** M
+- **Impact:** 5 · **Breadth:** 29 files (grep: distinct `src/*` paths in a `tsc` dry-run with the flag on) · **Recommended model:** Opus 5 — the ~10 genuine spots (virtualizer index math in `AgendaView`) need real reasoning and fail _silently_ (wrong row rendered), while a blanket `!` sweep would re-hide the exact bug class the flag exists to surface; **Sonnet 5** for the mechanical bulk if those genuine spots are pre-listed in the task.
 - **Evidence:** `tsconfig.app.json` enables `"strict": true, "noUnusedLocals": true, "noUnusedParameters": true, "noFallthroughCasesInSwitch": true` — but not `noUncheckedIndexedAccess`. A dry-run enabling it yields **125 errors** concentrated in the domain core (`model/expansionCache.ts` ×24, `model/collapse.ts` ×15, `model/dateUtils.ts` ×10, `expansion.ts`, `repeat.ts`, `duration.ts`) and calendar layout (`calendar/AgendaView.tsx` ×14, `useAgendaSections.ts` ×7, `OccurrenceRow.tsx` ×5, `MonthGrid.tsx`, `DayView.tsx`). Real-fragility example — `AgendaView.tsx(137): 'section' is possibly 'undefined'` (virtualizer index lookup).
 - **Problem:** Array/Map index access silently typed as non-`undefined` in precisely the paths (recurrence expansion, virtualized layout) where an out-of-range index would flow an `undefined` through as if it were a value — the one strictness class this otherwise-maximally-strict config leaves off.
 - **Fix:** Enable the flag, fix the ~10 genuine spots (mostly `AgendaView`) with guards and the rest with justified `!`/`.at()`, sequenced as one dedicated PR.
@@ -43,7 +55,7 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 ### #2 — Vault-file extension asymmetry orphans `.yaml`/`.yml` entries; `isVaultFile` duplicated verbatim
 
 - **Category:** `dry` `error-handling`
-- **Impact:** 5 · **Breadth:** 4 files (grep: `isVaultFile` defs ×2; `fileSlugToPath`; strip-regex sites) · **Fix effort:** S
+- **Impact:** 5 · **Breadth:** 4 files (grep: `isVaultFile` defs ×2; `fileSlugToPath`; strip-regex sites) · **Recommended model:** Opus 5 — a plausible-but-wrong fix (dedup `isVaultFile` without aligning the write path, or narrow reads while a real vault still holds `.yaml`) fails _silently_ as data orphaning; **Sonnet 5** if the task specifies the resolution to take (narrow-to-`.md` vs preserve-extension).
 - **Evidence:** Reads accept three extensions — `storage/fs.ts:20` and `storage/githubBackend.ts:7` each define, **identically**, `return name.endsWith('.md') || name.endsWith('.yaml') || name.endsWith('.yml')`. But every write hardcodes `.md` — `storage/sync.ts:23` `return fileSlug + '.md'`. `fileIO.ts:49` confirms non-`.md` files parse as pure-frontmatter entries.
 - **Problem:** A `.yaml`/`.yml` vault entry is read and gets slug `foo` (extension stripped by `path.replace(/\.(md|yaml|yml)$/, '')`), but saving it writes `foo.md` — leaving the original `foo.yaml` untouched, producing a duplicate/orphaned pair that a later reconcile double-loads into the store. The duplicated predicate also means the two backends can drift.
 - **Fix:** Hoist one shared `isVaultFile`/`stripVaultExt`/`slugToPath` into `storage/backend.ts` (or `fileIO.ts`) and make the write path preserve the source extension — or, if only `.md` is truly supported, narrow `isVaultFile` to `.md` so reads and writes agree.
@@ -51,7 +63,7 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 ### #3 — `editor/cm/` decoration layer at 0% coverage (no global floor to catch it)
 
 - **Category:** `testing` `toolchain`
-- **Impact:** 4 · **Breadth:** 5 files (coverage report: 0%-covered `editor/cm/*` with logic) · **Fix effort:** M
+- **Impact:** 4 · **Breadth:** 5 files (coverage report: 0%-covered `editor/cm/*` with logic) · **Recommended model:** Opus 5 — an over-mocked decoration test passes without exercising real position-mapping, failing _silently_ (green suite, no protection); **Sonnet 5** if the specific behaviors to assert are enumerated in the task. The global-floor config edit alone is **Haiku 4.5**.
 - **Evidence:** Coverage report shows `markdownFormatting.ts` (251 lines), `taskDecorations.ts`, `wikilinkDecorations.ts`, `ReactWidget.ts`, `viewUtils.ts` all at `0 | 0 | 0 | 0`. Meanwhile the _pure_ helper beneath them, `taskLines.ts`, is held to a 90% floor in `vitest.config.ts`. `vitest.config.ts` sets only **per-file** thresholds — there is no global floor, so a new untested logic module (as these were) slips through the gate.
 - **Problem:** The most bug-prone CM6 code (decoration range computation, position mapping, widget lifecycle) is the least tested, and the coverage gate structurally can't flag newly-added untested modules.
 - **Fix:** Add unit tests for the decoration builders (they're testable against an `EditorState` without a live DOM, as `taskLines.test.ts` shows), and add a modest **global** coverage floor so future untested logic fails CI.
@@ -59,7 +71,7 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 ### #4 — `store.ts` mixes view-ephemeral UI state with vault/domain state
 
 - **Category:** `architecture`
-- **Impact:** 3 · **Breadth:** 1 file (source) · **Fix effort:** M
+- **Impact:** 3 · **Breadth:** 1 file (source) · **Recommended model:** Opus 5 in plan mode, multi-PR — gated on a product decision (whether to do it at all, given the churn) plus a store-boundary change whose failure is _silent_ (broken agenda scroll-restore, subscription churn) rather than a loud build/test break.
 - **Evidence:** `store.ts:83-93` — the app-global Zustand store carries calendar-view-local scroll/carousel state: `agendaScrollOffset: number`, `agendaScrollMeasurements: VirtualItem[]`, `monthPreview: string | null`, `dayPreview: string | null` — alongside vault data (`items`, `roots`), sync status, favorites, and locale.
 - **Problem:** Agenda scroll measurements and month/day carousel previews are ephemeral `calendar/` concerns living in the cross-cutting store, so a reader tracing calendar-view state must go through the global store and `storeBridge`. This is idiomatic single-store Zustand and low-severity — but it's the one place the otherwise-crisp layer boundaries blur.
 - **Fix:** Move the agenda/carousel ephemeral fields into a dedicated `calendar/` store slice or co-located hook; leave durable vault/sync/prefs state in the global store. (Genuinely optional — weigh against the churn.)
@@ -67,11 +79,11 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 ### #5 — Repeated inline pluralization in `format.ts`
 
 - **Category:** `dry`
-- **Impact:** 2 · **Breadth:** 1 file (grep: `=== 1 ?` ×12 in `format.ts`) · **Fix effort:** S
+- **Impact:** 2 · **Breadth:** 1 file (grep: `=== 1 ?` ×12 in `format.ts`) · **Recommended model:** Haiku 4.5 — purely mechanical, single file; a wrong extraction breaks `format.test.ts` _loudly_. No load-bearing hazard.
 - **Evidence:** `format.ts` repeats `${x} ${x === 1 ? 'year' : 'years'}` (and `month`/`week`/`day`/`hour`/`minute`) 12 times across `endDateToDuration`, `endDateTimeToDuration`, `fmtDuration`, `fmtDurationCompact` — e.g. line 67 `return \`${y} ${y === 1 ? 'year'  : 'years'}\``.
 - **Problem:** The same unit-pluralization rule is hand-inlined a dozen times; a new unit or an i18n change touches all of them.
 - **Fix:** Extract a single `pluralize(n, unit)` (or a `{unit: [singular, plural]}` table) and call it from each site.
 
 ---
 
-**Bottom line:** No high-severity defects. The two findings worth acting on soon are **#1** (cheap, systemic, preventive) and **#2** (a genuine latent data-loss path, small fix). #3–#5 are polish. This repo is in the top decile for engineering discipline — the survey's main service is confirming that, with receipts.
+**Bottom line:** No high-severity defects. The two findings worth acting on soon are **#1** (systemic, preventive) and **#2** (a genuine latent data-loss path, small in code even if it warrants Opus-5 judgment on the resolution). #3–#5 are polish. #5 is a Haiku-tier freebie. This repo is in the top decile for engineering discipline — the survey's main service is confirming that, with receipts.
