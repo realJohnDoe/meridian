@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { ArrowLeft, Search, X } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import SearchResults from './SearchResults'
-import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
@@ -46,15 +46,14 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
       <div className="mobile-search-overlay fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto">
         {/* Top input row — pinned, always visible */}
         <div className="shrink-0 flex items-center gap-2 px-3.5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 border-b border-border">
-          <Button
+          <IconButton
             variant="ghost"
-            size="icon"
-            className="w-9 h-9 rounded-full shrink-0 text-muted-foreground"
-            aria-label="Close search"
+            className="w-9 h-9 text-muted-foreground"
+            label="Close search"
             onClick={onClose}
           >
             <ArrowLeft size={18} />
-          </Button>
+          </IconButton>
           <div className="search-bar-wrap min-w-0" style={{ flex: '1 1 0%' }}>
             <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
             <Input
@@ -69,9 +68,9 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
               }}
             />
             {query && (
-              <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full shrink-0 text-muted-foreground" aria-label="Clear search" onClick={() => onQueryChange('')}>
+              <IconButton variant="ghost" hit="pad" className="w-7 h-7 text-muted-foreground" label="Clear search" onClick={() => onQueryChange('')}>
                 <X size={13} />
-              </Button>
+              </IconButton>
             )}
           </div>
         </div>
@@ -90,9 +89,9 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
     <>
       {/* Backdrop: covers the content area behind the popover, not the sidebar */}
       <div
-        className={cn('fixed inset-y-0 right-0 z-[24] bg-background/80 backdrop-blur-sm pointer-events-auto transition-[left] duration-200 ease-linear', sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0')}
+        className={cn('fixed inset-y-0 right-0 z-search-backdrop bg-background/80 backdrop-blur-sm pointer-events-auto transition-[left] duration-200 ease-linear', sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0')}
       />
-      <div id="filterOverlay" className="absolute bottom-full left-0 right-0 z-[25] pointer-events-auto">
+      <div id="filterOverlay" className="absolute bottom-full left-0 right-0 z-search-panel pointer-events-auto">
         <div className="relative max-h-[calc(100dvh-var(--th)-80px)] flex flex-col">
           <div ref={desktopScrollRef} className="overflow-y-auto [-webkit-overflow-scrolling:touch] bg-background flex-1 min-h-0">
             <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} scrollRef={desktopScrollRef} />

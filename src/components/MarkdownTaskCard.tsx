@@ -1,6 +1,6 @@
 import { CircleFadingArrowUp } from 'lucide-react'
 import { Checkbox } from './ui/checkbox'
-import { Card } from './ui/card'
+import { DimmableCard } from './ui/dimmable-card'
 import { IconButton } from './ui/icon-button'
 import { Input } from './ui/input'
 import { cn } from '@/lib/cn'
@@ -25,8 +25,7 @@ export default function MarkdownTaskCard({
   const isEditing = editValue !== undefined
 
   return (
-    <Card className={cn('relative flex items-stretch gap-2.5 pl-2 pr-2.5 py-2 shadow-none bg-card border border-input rounded-lg transition-colors hover:bg-accent', done && 'overflow-hidden')}>
-      {done && <div className="absolute inset-0 pointer-events-none z-10 rounded-lg" style={{ background: 'var(--done-overlay)' }} />}
+    <DimmableCard dimmed={done} className="flex items-stretch gap-2.5 pl-2 pr-2.5 py-2">
       <span className="w-1 self-stretch rounded-full shrink-0 min-h-5 bg-muted-foreground/20" />
       <div className={cn('relative z-20 flex flex-1 min-w-0 items-center gap-1.5 py-0.5', done && 'opacity-60')}>
         <Checkbox
@@ -73,6 +72,6 @@ export default function MarkdownTaskCard({
           <CircleFadingArrowUp size={15} />
         </IconButton>
       </div>
-    </Card>
+    </DimmableCard>
   )
 }

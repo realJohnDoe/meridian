@@ -13,6 +13,13 @@
  *   'pad'              — real padding that clears the 24px AA floor. Use for
  *                        buttons clustered side-by-side, where overlapping 44px
  *                        zones would cause mis-taps.
+ *
+ * `variant` picks the visual chrome:
+ *   'plain' (default) — no baked-in look; caller supplies size/hover via className.
+ *   'ghost'            — the topbar/search chrome look: a 40px circle that fills
+ *                        with `hover:bg-accent` on hover (mirrors what call sites
+ *                        used to hand-assemble from `Button variant="ghost"
+ *                        size="icon"` plus a manual `rounded-full`).
  */
 import * as React from 'react'
 import { cn } from '@/lib/cn'
@@ -21,9 +28,10 @@ export interface IconButtonProps extends React.ComponentProps<'button'> {
   /** Accessible name, rendered as `aria-label`. */
   label: string
   hit?: 'expand' | 'pad'
+  variant?: 'plain' | 'ghost'
 }
 
-function IconButton({ label, hit = 'expand', className, type, children, ...props }: IconButtonProps) {
+function IconButton({ label, hit = 'expand', variant = 'plain', className, type, children, ...props }: IconButtonProps) {
   return (
     <button
       type={type ?? 'button'}
@@ -36,6 +44,7 @@ function IconButton({ label, hit = 'expand', className, type, children, ...props
           // Centered 44px hit zone, size-independent of the icon it wraps.
           ? "before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
           : 'p-1.5',
+        variant === 'ghost' && 'h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground',
         className,
       )}
       {...props}

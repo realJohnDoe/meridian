@@ -89,6 +89,26 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Z-index layers.
+     Component-local stacking (card overlays, sidebar rail, popovers, dialogs…)
+     uses Tailwind's default z-0/10/20/30/50 scale directly — that's already a
+     shared reference, so plain z-10/z-20/z-50 stay as-is.
+     These named tiers exist only where a raw number would otherwise be
+     invented ad hoc:
+       - z-search-*  is a self-contained 3-layer micro-stack nested inside
+         SearchBar's own z-30 wrapper (backdrop < results panel < bar itself),
+         so it starts back at 1 rather than continuing the outer scale.
+       - z-critical / z-tour are true global tiers: critical confirmations
+         must sit above every regular dialog/sheet/popover (z-50), and the
+         onboarding tour must sit above literally everything, including
+         critical confirmations. Reach for one of these before adding a new
+         arbitrary z-[N]. */
+  --z-index-search-backdrop: 1;
+  --z-index-search-panel:    2;
+  --z-index-search-bar:      3;
+  --z-index-critical:        60;
+  --z-index-tour:            70;
 }
 
 /* ── MERIDIAN THEME ─────────────────────────────────────────── */

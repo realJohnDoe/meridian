@@ -9,7 +9,7 @@ import { formatDurationChip, fmtDuration } from '@/format'
 import { occState } from '@/occView'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
-import { Card } from './ui/card'
+import { DimmableCard } from './ui/dimmable-card'
 import { SurfaceButton } from './ui/surface-button'
 import { cn } from '@/lib/cn'
 import { occBarVariants } from './ui/occurrence-variants'
@@ -143,27 +143,20 @@ export default function OccurrenceCard({
   })()
 
   const dimmed  = isDone || isPast
-  const cardCls = cn(
-    'relative transition-colors shadow-none',
-    'bg-card border border-input rounded-lg',
-    'hover:bg-accent',
-    dimmed && 'overflow-hidden'
-  )
 
   const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime !== 'none' && (!!t || !!durationLabel))
   const hasTagsContent      = showTagsParticipants && listedOn.length > 0
   const showMeta            = hasDateTimeContent || hasTagsContent
 
   return (
-    <Card
+    <DimmableCard
       data-tour="entry-card"
-      className={cn(cardCls, 'flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-11')}
+      dimmed={dimmed}
+      className="flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-11"
       style={animate ? { animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' } : undefined}
     >
-      {dimmed && <div className="absolute inset-0 pointer-events-none z-10 rounded-lg" style={{ background: 'var(--done-overlay)' }} />}
-
       <SurfaceButton
-        className="absolute inset-0 z-[1] rounded-lg"
+        className="absolute inset-0 z-0 rounded-lg"
         aria-label={title}
         onClick={onOpen}
       />
@@ -219,6 +212,6 @@ export default function OccurrenceCard({
           <ParticipantAvatars participants={participants} />
         </div>
       )}
-    </Card>
+    </DimmableCard>
   )
 }
