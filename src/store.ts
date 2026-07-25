@@ -201,9 +201,12 @@ export const useStore = create<MeridianStore>((set, get) => {
     reorderFavorites: (fromIdx: number, toIdx: number) => {
       const { favorites } = get()
       if (toIdx < 0 || toIdx >= favorites.length) return
+      // fromIdx needs the same bounds check: an out-of-range splice() returns
+      // [] and would otherwise insert `undefined` into the favorites list.
+      if (fromIdx < 0 || fromIdx >= favorites.length) return
       const next = [...favorites]
       const [item] = next.splice(fromIdx, 1)
-      next.splice(toIdx, 0, item)
+      next.splice(toIdx, 0, item!)
       favoritesField.persist(next)
     },
 

@@ -64,7 +64,7 @@ describe('useAgendaSections', () => {
     const { sections, goToIndex } = result.current
 
     expect(sections.find(s => s.kind === 'overdue')).toBeUndefined()
-    const todaySection = sections[goToIndex]
+    const todaySection = sections[goToIndex]!
     expect(todaySection.kind).toBe('day')
     expect(todaySection.kind === 'day' && todaySection.isToday).toBe(true)
   })

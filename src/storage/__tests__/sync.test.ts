@@ -324,7 +324,7 @@ describe('pushDirty — write-conflict collision', () => {
     expect(copyRoot?.body).toBe('local edit')
 
     expect(notifyFns.warn).toHaveBeenCalledTimes(1)
-    expect(notifyFns.warn.mock.calls[0][0]).toContain('task.md')
+    expect(notifyFns.warn.mock.calls[0]![0]).toContain('task.md')
 
     // The collision doesn't surface as a sync failure — it's a handled outcome.
     expect(storeState.syncError).toBeNull()
@@ -349,7 +349,7 @@ describe('pushDirty — delete-conflict tombstone handling', () => {
     // The remote file must survive, not be deleted.
     expect(backend.get('task.md')?.content).toBe('remote edit after delete staged')
     expect(notifyFns.warn).toHaveBeenCalledTimes(1)
-    expect(notifyFns.warn.mock.calls[0][0]).toContain('task.md')
+    expect(notifyFns.warn.mock.calls[0]![0]).toContain('task.md')
 
     // hadCollision triggers a same-cycle reconcile that pulls the surviving
     // remote edit back into the cache as a clean record.

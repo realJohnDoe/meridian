@@ -60,8 +60,8 @@ describe('deterministic ID format', () => {
     const seriesId = items.find(isSeries)!.id
     const overrides = items.filter(i => !isSeries(i) && (i as { ownerId?: string }).ownerId)
     // weekly-series has two explicit overrides (2026-04-13 and 2026-04-14, no time)
-    expect(overrides[0].id).toBe(`${seriesId}|inst|2026-04-13|`)
-    expect(overrides[1].id).toBe(`${seriesId}|inst|2026-04-14|`)
+    expect(overrides[0]!.id).toBe(`${seriesId}|inst|2026-04-13|`)
+    expect(overrides[1]!.id).toBe(`${seriesId}|inst|2026-04-14|`)
   })
 
   it('standalone ID encodes fileSlug and date', () => {
@@ -69,7 +69,7 @@ describe('deterministic ID format', () => {
     const { items } = parseToStoreItems('single-event.md', content)
     expect(items).toHaveLength(1)
     // ID starts with the fileSlug|occ| prefix
-    expect(items[0].id).toMatch(/^single-event\|occ\|/)
+    expect(items[0]!.id).toMatch(/^single-event\|occ\|/)
   })
 
   it('multi-series fixture: two series get distinct IDs', () => {
@@ -86,7 +86,7 @@ describe('deterministic ID format', () => {
     const yaml = `---\ninstances:\n  - date: 2026-01-01\n  - date: 2026-01-01\n---\n`
     const { items } = parseToStoreItems('dup.md', yaml)
     expect(items).toHaveLength(2)
-    expect(items[0].id).toBe('dup|occ|2026-01-01|')
-    expect(items[1].id).toBe('dup|occ|2026-01-01|#2')
+    expect(items[0]!.id).toBe('dup|occ|2026-01-01|')
+    expect(items[1]!.id).toBe('dup|occ|2026-01-01|#2')
   })
 })

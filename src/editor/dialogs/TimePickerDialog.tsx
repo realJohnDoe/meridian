@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 function normaliseTime(hhmm: string): string {
   const m = hhmm.match(/^(\d{1,2}):(\d{2})/)
   if (!m) return '09:00'
-  return `${String(parseInt(m[1], 10)).padStart(2, '0')}:${m[2].slice(0, 2)}`
+  return `${String(parseInt(m[1]!, 10)).padStart(2, '0')}:${m[2]!.slice(0, 2)}`
 }
 
 interface Props {

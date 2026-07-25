@@ -21,7 +21,8 @@ export function fmtMonth(d: Date): string {
 
 /** Parse a `YYYY-MM` calendar route param into the first day of that month. */
 export function parseMonth(s: string): Date {
-  const [y, m] = s.split('-').map(Number)
+  // Defaulting to NaN keeps a malformed param producing an Invalid Date, as before.
+  const [y = NaN, m = NaN] = s.split('-').map(Number)
   return new Date(y, m - 1, 1)
 }
 
@@ -34,7 +35,7 @@ function toHour12(h: number, m: number): string {
 export function formatHHMM(hhmm: string, hour12: boolean): string {
   const hh = hhmm.slice(0, 5)
   if (!hour12) return hh
-  const [h, m] = hh.split(':').map(Number)
+  const [h = NaN, m = NaN] = hh.split(':').map(Number)
   return toHour12(h, m)
 }
 
@@ -42,7 +43,8 @@ export function fmtT(v: unknown, hour12 = false): string | null {
   if (!v) return null
   if (typeof v === 'string' && /^\d{1,2}:\d{2}/.test(v)) {
     if (hour12) {
-      const [hStr, mStr] = v.slice(0, 5).split(':')
+      // Both halves exist: the /^\d{1,2}:\d{2}/ test above guarantees the colon.
+      const [hStr, mStr] = v.slice(0, 5).split(':') as [string, string]
       if (!parseInt(hStr, 10) && !parseInt(mStr, 10)) return null
     }
     return formatHHMM(v, hour12)
@@ -62,7 +64,7 @@ export function parseDateString(s: unknown): Date | null {
   const str = scalarToString(s)
   if (str === undefined) return null
   const dm = str.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (dm) return new Date(+dm[1], +dm[2] - 1, +dm[3])
+  if (dm) return new Date(+dm[1]!, +dm[2]! - 1, +dm[3]!)  // 3 capture groups, all matched
   const d = parseISO(str)
   return isValid(d) ? d : null
 }
@@ -73,7 +75,7 @@ export function parseDateTime(date: string, time: string | null): Date | null {
   if (!d) return null
   if (time) {
     const tm = time.match(/^(\d{1,2}):(\d{2})/)
-    if (tm) return new Date(d.getFullYear(), d.getMonth(), d.getDate(), +tm[1], +tm[2], 0, 0)
+    if (tm) return new Date(d.getFullYear(), d.getMonth(), d.getDate(), +tm[1]!, +tm[2]!, 0, 0)
   }
   return d
 }

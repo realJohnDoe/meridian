@@ -97,6 +97,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
   if (!active) return null
 
   const step = steps[stepIndex]
+  if (!step) return null
   const isLast = stepIndex === steps.length - 1
 
   return (

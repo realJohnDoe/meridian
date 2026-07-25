@@ -20,8 +20,8 @@ export type DurationUnit = 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | '
 export function parseDuration(s: string): { n: number; unit: DurationUnit } | null {
   const m = s.trim().match(/^(\d+)\s*(.+)$/i)
   if (!m) return null
-  const n   = parseInt(m[1], 10)
-  const raw = m[2].trim().toLowerCase()
+  const n   = parseInt(m[1]!, 10)  // both capture groups matched
+  const raw = m[2]!.trim().toLowerCase()
   if (/^min(ute)?s?$/.test(raw) || raw === 'm')           return { n, unit: 'minutes' }
   if (/^h(our)?s?$/.test(raw)   || /^hrs?$/.test(raw))   return { n, unit: 'hours'   }
   if (/^d(ay)?s?$/.test(raw))                             return { n, unit: 'days'    }
@@ -65,7 +65,7 @@ export function parseDurationHours(dur: unknown): number {
   const hm = sl.match(/(\d+(?:\.\d+)?)\s*h(?:our)?r?s?/)
   const mm = sl.match(/(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?/)
   if (hm || mm) {
-    const total = (hm ? parseFloat(hm[1]) : 0) + (mm ? parseFloat(mm[1]) / 60 : 0)
+    const total = (hm ? parseFloat(hm[1]!) : 0) + (mm ? parseFloat(mm[1]!) / 60 : 0)
     return total > 0 ? total : 0.75
   }
   // Bare number → hours

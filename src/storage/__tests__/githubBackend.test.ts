@@ -223,9 +223,9 @@ describe('GitHubBackend', () => {
     const files   = await backend.readFiles(['note.md'])
 
     expect(files).toHaveLength(1)
-    expect(files[0].path).toBe('note.md')
-    expect(files[0].content).toBe(content)
-    expect(files[0].version).toBe('sha1')
+    expect(files[0]!.path).toBe('note.md')
+    expect(files[0]!.content).toBe(content)
+    expect(files[0]!.version).toBe('sha1')
   })
 
   it('write sends PUT with base64-encoded content (new file, no sha)', async () => {
@@ -477,14 +477,14 @@ describe('GitHubBackend', () => {
       .mockResolvedValueOnce(makeJsonResp(makeTreeResponse(specs)))
       .mockResolvedValueOnce(makeGraphQLResp(repository))
       // Fallback Contents-API fetch for the one null-text path (note-3.md).
-      .mockResolvedValueOnce(makeJsonResp(makeFileResponse('note-3.md', specs[3].content, 'sha-3')))
+      .mockResolvedValueOnce(makeJsonResp(makeFileResponse('note-3.md', specs[3]!.content, 'sha-3')))
 
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     const files   = await backend.readAll()
 
     expect(files).toHaveLength(8)
     const fallback = files.find(f => f.path === 'note-3.md')
-    expect(fallback?.content).toBe(specs[3].content)
+    expect(fallback?.content).toBe(specs[3]!.content)
     expect(fallback?.version).toBe('sha-3')
 
     // 1 tree + 1 GraphQL batch + 1 Contents fallback = 3 requests.
@@ -517,7 +517,7 @@ describe('GitHubBackend', () => {
         let m: RegExpExecArray | null
         while ((m = aliasRe.exec(body.query))) {
           const alias = `f${m[1]}`
-          const path  = m[2].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+          const path  = m[2]!.replace(/\\"/g, '"').replace(/\\\\/g, '\\')
           repository[alias] = { text: contentByPath.get(path)! }
         }
         return Promise.resolve(makeGraphQLResp(repository) as unknown as ReturnType<typeof fetch>)
@@ -541,6 +541,6 @@ describe('GitHubBackend', () => {
     const loadedValues = progressUpdates.map(p => p.loaded)
     expect(loadedValues).toEqual([...loadedValues].sort((a, b) => a - b))
     expect(progressUpdates.every(p => p.total === 120)).toBe(true)
-    expect(progressUpdates[progressUpdates.length - 1].loaded).toBe(120)
+    expect(progressUpdates[progressUpdates.length - 1]!.loaded).toBe(120)
   }, 10000)
 })

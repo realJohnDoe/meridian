@@ -22,7 +22,7 @@ export function parseItemEntry(raw: string): ItemEntry {
   const wl = parseSingleWikilink(trimmed)
   if (wl) return { kind: 'link', ref: wl.ref, raw }
   const task = TASK_ITEM_RE.exec(trimmed)
-  if (task) return { kind: 'task', text: task[2].trim(), done: task[1] !== ' ', raw }
+  if (task) return { kind: 'task', text: task[2]!.trim(), done: task[1] !== ' ', raw }
   return { kind: 'task', text: trimmed, done: false, raw }
 }
 

@@ -186,7 +186,7 @@ function generateScheduledDates(
     const r = startOfDay(d)
     if (anchorTimeStr) {
       const tm = anchorTimeStr.match(/^(\d{1,2}):(\d{2})/)
-      if (tm) r.setHours(+tm[1], +tm[2], 0, 0)
+      if (tm) r.setHours(+tm[1]!, +tm[2]!, 0, 0)  // both groups matched
     }
     return r
   }

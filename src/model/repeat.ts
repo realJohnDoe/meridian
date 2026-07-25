@@ -19,8 +19,8 @@ export function parseInterval(s: string): IntervalParts {
   if (!s) return { n: 1, unit: 'days' }
   const m = s.trim().match(/^(\d+)\s*(day|week|month|year|hour|minute)s?$/i)
   if (!m) return { n: 1, unit: 'days' }
-  const unit = m[2].toLowerCase() + 's'
-  return { n: parseInt(m[1], 10), unit }
+  const unit = m[2]!.toLowerCase() + 's'  // both capture groups matched
+  return { n: parseInt(m[1]!, 10), unit }
 }
 
 /** Serialise { n: 2, unit: 'weeks' } → "2 weeks" (singular when n === 1). */
@@ -45,7 +45,7 @@ export interface MonthlyWeekdaySpec {
  */
 export function monthlyWeekdaySpec(jsDate: Date): MonthlyWeekdaySpec {
   const jsDay = jsDate.getDay()
-  const wdayCode = WDAY_CODE_BY_JS_DAY[jsDay]
+  const wdayCode = WDAY_CODE_BY_JS_DAY[jsDay]!  // getDay() is always 0–6
   const wdayLabel = WDAY_NAME_BY_JS_DAY[jsDay]
 
   const year = jsDate.getFullYear()

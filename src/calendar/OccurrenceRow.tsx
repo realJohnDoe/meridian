@@ -61,8 +61,9 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
     let deleteTimeout: ReturnType<typeof setTimeout> | undefined
 
     function onTouchStart(e: TouchEvent) {
-      sx = e.touches[0].clientX
-      sy = e.touches[0].clientY
+      const t = e.touches[0]!  // a touch event always carries at least one touch
+      sx = t.clientX
+      sy = t.clientY
       tracking = false
       blocked = false
       row.style.animation = 'none'
@@ -70,8 +71,9 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
     }
 
     function onTouchMove(e: TouchEvent) {
-      const dx = e.touches[0].clientX - sx
-      const dy = e.touches[0].clientY - sy
+      const t = e.touches[0]!
+      const dx = t.clientX - sx
+      const dy = t.clientY - sy
       if (!tracking) {
         if (Math.abs(dy) > Math.abs(dx)) { blocked = true; return }
         if (dx > 0) { blocked = true; return }
@@ -102,7 +104,7 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
         hintL.classList.remove('active')
         return
       }
-      const dx = e.changedTouches[0].clientX - sx
+      const dx = e.changedTouches[0]!.clientX - sx
       const rowW = wrap.offsetWidth || 320
       const isFull = Math.abs(dx) / rowW >= FULL_FRAC
       hintL.classList.remove('active')

@@ -77,13 +77,11 @@ export function useAgendaSections(today: Date, now: Date): { sections: Section[]
       const jsTime = o.metadata.jsTime
       if (!jsTime) return
       const k = fmtISO(jsTime)
-      if (!result[k]) {
-        result[k] = {
-          date: new Date(jsTime.getFullYear(), jsTime.getMonth(), jsTime.getDate()),
-          items: [],
-        }
-      }
-      result[k].items.push(o)
+      const group = (result[k] ??= {
+        date: new Date(jsTime.getFullYear(), jsTime.getMonth(), jsTime.getDate()),
+        items: [],
+      })
+      group.items.push(o)
     })
 
     return result
@@ -96,19 +94,21 @@ export function useAgendaSections(today: Date, now: Date): { sections: Section[]
     const sortedKeys = Object.keys(groups).sort()
     const pastKeys = sortedKeys.filter(k => k < todayKey)
     const currentKeys = sortedKeys.filter(k => k >= todayKey)
-    const overdueItems = sortOccs(pastKeys.flatMap(k => groups[k].items.filter(isOverdue)), now)
+    // pastKeys/currentKeys are both filtered from Object.keys(groups), so every
+    // groups[k] lookup below is present by construction.
+    const overdueItems = sortOccs(pastKeys.flatMap(k => groups[k]!.items.filter(isOverdue)), now)
 
     const out: Section[] = []
     for (const k of pastKeys) {
-      const dayItems = sortOccs(groups[k].items.filter(o => !isOverdue(o)), now)
+      const dayItems = sortOccs(groups[k]!.items.filter(o => !isOverdue(o)), now)
       if (!dayItems.length) continue
-      out.push({ kind: 'day', key: k, dateKey: k, date: groups[k].date, isToday: false, isTomorrow: false, items: dayItems })
+      out.push({ kind: 'day', key: k, dateKey: k, date: groups[k]!.date, isToday: false, isTomorrow: false, items: dayItems })
     }
     if (overdueItems.length > 0) {
       out.push({ kind: 'overdue', key: '__overdue__', items: overdueItems })
     }
     for (const k of currentKeys) {
-      const g = groups[k]
+      const g = groups[k]!
       out.push({
         kind: 'day', key: k, dateKey: k, date: g.date,
         isToday: sameDay(g.date, today),

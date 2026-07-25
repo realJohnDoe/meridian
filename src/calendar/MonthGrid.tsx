@@ -182,8 +182,9 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
   return (
     <div className="flex flex-col gap-0.5 flex-1">
       {weekRowsArr.map(row => {
-        const rowStart = row[0].date
-        const rowEnd = row[6].date
+        // `nc` above pads cells to a whole multiple of 7, so every row is full.
+        const rowStart = row[0]!.date
+        const rowEnd = row[6]!.date
         const rowKey = `${rowStart.getFullYear()}-${rowStart.getMonth()}-${rowStart.getDate()}`
         const rowBars = multidayLanes
           .filter(l => l.startD <= rowEnd && l.endD >= rowStart)
