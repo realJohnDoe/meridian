@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreIssues": {
-    "src/components/ui/**": ["exports", "types"]
+    "src/components/ui/!(sidebar).{ts,tsx}": ["exports", "types"]
   },
   "workspaces": {
     ".": {
