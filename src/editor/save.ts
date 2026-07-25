@@ -3,7 +3,7 @@ import { fmtISO, applyEdit, excludeOccurrence, deletionEndsAfterCompletionSeries
 import { isSeries } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import { titleToSlug } from '@/fileIO'
-import { getItems, getRoots, getBacklinks } from '@/storeBridge'
+import { getSnapshot, getItems, getRoots, getBacklinks } from '@/storeBridge'
 import { commitNext, commitDelete } from '@/storeCommit'
 import type { EntryState, ItemType } from './state'
 
@@ -103,7 +103,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   const { title } = fields
   if (!title) return 'missing-title'
 
-  const nextData = applyEdit({ items: getItems(), roots: getRoots() }, item, editScope, {
+  const nextData = applyEdit(getSnapshot(), item, editScope, {
     title,
     tags:         fields.tags         ?? [],
     items:        fields.items        ?? [],
@@ -142,20 +142,20 @@ export function deleteNode(
 
   function excludeThis() {
     if (!item) return
-    const next = excludeOccurrence({ items: getItems(), roots: getRoots() }, item)
+    const next = excludeOccurrence(getSnapshot(), item)
     commitNext(next, [item.fileSlug])
     hideSheet(); navigateBack()
   }
   function deleteAll() {
     if (!item) return
     const affected = getBacklinks().get(item.fileSlug) ?? []
-    const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
+    const next = deleteByFileSlug(getSnapshot(), item.fileSlug)
     commitDelete(next, item.fileSlug, affected)
     hideSheet(); navigateBack()
   }
   function deleteFuture() {
     if (!item) return
-    const next = deleteFollowing({ items: getItems(), roots: getRoots() }, item)
+    const next = deleteFollowing(getSnapshot(), item)
     commitNext(next, [item.fileSlug])
     hideSheet(); navigateBack()
   }
@@ -163,7 +163,7 @@ export function deleteNode(
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
       const affected = getBacklinks().get(item.fileSlug) ?? []
-      const next = deleteByFileSlug({ items: getItems(), roots: getRoots() }, item.fileSlug)
+      const next = deleteByFileSlug(getSnapshot(), item.fileSlug)
       commitDelete(next, item.fileSlug, affected)
       navigateBack()
     }
