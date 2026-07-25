@@ -156,7 +156,7 @@ export default function OccurrenceCard({
       style={animate ? { animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' } : undefined}
     >
       <SurfaceButton
-        className="absolute inset-0 z-[1] rounded-lg"
+        className="absolute inset-0 z-0 rounded-lg"
         aria-label={title}
         onClick={onOpen}
       />
