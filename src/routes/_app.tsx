@@ -9,7 +9,7 @@ import { onVaultChanged } from '@/storage'
 import { resetAgendaScroll } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar } from '@/components'
-import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { TopbarSlotContext } from './-topbarSlot'
@@ -153,7 +153,7 @@ function AppMain() {
             />
           ) : (
             <div className="flex items-center gap-2 min-w-0" id="tbDefault">
-              {isMobile && <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={openSidebar} title="Menu" aria-label="Menu"><Menu size={18} /></Button>}
+              {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
               <span className="text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
             </div>
           )}
@@ -161,7 +161,7 @@ function AppMain() {
             <div className="flex items-center gap-0.5 shrink-0">
               <SyncButton />
               {!isListView && (
-                <Button variant="ghost" size="icon" className="rounded-full text-dim shrink-0" onClick={handleToday} title="Today" aria-label="Today"><CalendarCheck2 size={18} /></Button>
+                <IconButton variant="ghost" className="text-dim" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>
               )}
             </div>
           )}

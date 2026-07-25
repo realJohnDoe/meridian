@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
 import { Button } from './ui/button'
+import { IconButton } from './ui/icon-button'
 import { Input } from './ui/input'
 import { newEntryRoute } from '@/routes'
 import { useOpenEntry } from '@/hooks'
@@ -85,9 +86,9 @@ export default function SearchBar() {
             }}
           />
           {filterQuery && (
-            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-full shrink-0 text-muted-foreground" aria-label="Clear search" onClick={closeSearch}>
+            <IconButton variant="ghost" hit="pad" className="w-7 h-7 text-muted-foreground" label="Clear search" onClick={closeSearch}>
               <X size={13} />
-            </Button>
+            </IconButton>
           )}
           <Button
             variant="brand"
