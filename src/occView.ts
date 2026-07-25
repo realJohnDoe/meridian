@@ -23,7 +23,7 @@ export function occState(o: Occurrence, now: Date = new Date()): OccState {
   if (o.metadata.done) return 'done'
   const kind = occKind(o)
   if (kind === 'note') return 'note'
-  if (kind === 'task' || isTracked(o)) {
+  if (kind === 'task') {
     const p = o.metadata.priority
     if (p === 'high')   return 'task-p1'
     if (p === 'medium') return 'task-p2'
