@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useStore } from '@/store'
 import { addDays } from '@/format'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
@@ -15,6 +14,23 @@ export { estimateSection, type Section } from './agendaSections'
 const PAST_WINDOW_DAYS = 365
 const FUTURE_WINDOW_DAYS = 90
 
+// The agenda is a singleton view (only one instance mounted at a time), so a
+// single cache slot — unlike useExpandWithMultiday's per-window map, which
+// has to serve several concurrent callers (month's three panes, day's
+// carousel) — is enough here. Stored as a one-entry Map, not a `let` or a
+// plain object's `.current` field: the React Compiler's purity check
+// (react-hooks/immutability / react-hooks/globals) flags both reassigning a
+// module binding during render and writing a property on one, but a method
+// call like Map.set() on a const-bound object is the same pattern
+// useExpandWithMultiday's cacheByWindow already uses, and passes.
+const SECTIONS_CACHE_KEY = 'agenda'
+const sectionsCacheSlot = new Map<typeof SECTIONS_CACHE_KEY, AgendaSectionCache>()
+
+/** Drops the cached grouped/sorted sections. Call on vault change (see resetExpansionCache). */
+export function resetAgendaSectionsCache(): void {
+  sectionsCacheSlot.clear()
+}
+
 /**
  * The agenda's data pipeline: expand occurrences over the agenda window, then
  * group by day, filter, sort, and flatten into one ordered list of
@@ -25,11 +41,12 @@ const FUTURE_WINDOW_DAYS = 90
  * AgendaView itself carries a `'use no memo'` opt-out because of its
  * useVirtualizer() usage; that opt-out no longer reaches this logic.
  *
- * The grouping/sorting cache lives in state rather than a ref (mirroring
- * useExpandWithMultiday): computeAgendaSections returns `prev` by reference
- * whenever nothing changed, so gating the state update on that keeps the
- * during-render setState to genuine changes — and the immediate re-render it
- * triggers hits computeAgendaSections' O(1) fast path.
+ * The grouping/sorting cache lives in the module-level `sectionsCacheSlot`
+ * above, not component state: computeAgendaSections returns `prev` by
+ * reference whenever nothing changed, and storing that at module scope means
+ * remounting AgendaView (leaving and returning to the agenda, or a cold
+ * start) reuses the prior grouping/sort instead of paying for it again from
+ * scratch — component state would otherwise reset to null on every remount.
  *
  * The calendar filter is applied per day inside computeAgendaSections rather
  * than up front via useFilteredOccs: filtering the whole array first would
@@ -49,10 +66,17 @@ export function useAgendaSections(today: Date, now: Date): { sections: Section[]
   const allOccs = useExpandWithMultiday(items, roots, from, to)
   const { filterOccs } = useCalendarFilter()
 
-  const [cache, setCache] = useState<AgendaSectionCache | null>(null)
-  const next = computeAgendaSections(cache, allOccs, today, now, filterOccs)
-  if (next !== cache) {
-    setCache(next)
+  // now ticks once a minute (see useNow), but a remounted AgendaView
+  // allocates a fresh Date even within the same tick — bucket to that same
+  // granularity before it reaches computeAgendaSections' exact-match check,
+  // so a remount within the same minute still hits the fully-cached fast
+  // path instead of missing on nowMs alone.
+  const nowBucket = new Date(Math.floor(now.getTime() / 60_000) * 60_000)
+
+  const cached = sectionsCacheSlot.get(SECTIONS_CACHE_KEY) ?? null
+  const next = computeAgendaSections(cached, allOccs, today, nowBucket, filterOccs)
+  if (next !== cached) {
+    sectionsCacheSlot.set(SECTIONS_CACHE_KEY, next)
   }
 
   return { sections: next.sections, goToIndex: next.goToIndex }
