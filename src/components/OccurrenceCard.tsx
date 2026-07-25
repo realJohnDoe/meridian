@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Repeat2 } from 'lucide-react'
+import { isTracked } from '@/types'
 import type { Occurrence } from '@/types'
 import KindIcon from './KindIcon'
 import { fmtT, parseDateString, multidayDisplayTitle } from '@/model'
@@ -128,7 +129,7 @@ export default function OccurrenceCard({
     : undefined) ?? occ.metadata.title
 
   const t            = fmtT(occ.time, hour12)
-  const hasTrack     = occ.metadata.done !== undefined
+  const hasTrack     = isTracked(occ)
   const participants = occ.metadata.participants || []
   const rawDuration  = occ.metadata.duration
   const durationLabel = rawDuration

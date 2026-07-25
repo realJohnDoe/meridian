@@ -4,7 +4,7 @@ _Report generated 2026-07-25. Branch: `claude/pwa-snappiness-survey-2f54a3`. Com
 
 ## 1. Snappiness verdict
 
-The app's React memoization is genuinely good — the toggle path re-renders exactly one row, persistence is async and off the paint path, and search is debounced and cheap. The problem is entirely in the **derivation layer**: the agenda re-derives its *entire* occurrence set on every change instead of incrementally, and one section — **Overdue** — is a single un-row-virtualized block. On the 300-file test vault that section holds **6,789 occurrences**, and forcing it into the viewport mounted **6,937 `OccurrenceRow` components in one synchronous commit that blocked the main thread for ~12.9 s** (dev mode). That is the single worst flow — **scrolling up in the agenda / pressing "Today"** (which explicitly targets the overdue section). The second-worst is any **task toggle**, which re-groups + re-sorts all ~8,685 occurrences (~54 ms) even though only one row changed. The single biggest structural theme: **agenda derivation is whole-vault, not incremental — expansion, grouping, and sorting all run over every occurrence on every mutation and every mount, and the Overdue "section" has no per-row virtualization to cap what mounts.**
+The app's React memoization is genuinely good — the toggle path re-renders exactly one row, persistence is async and off the paint path, and search is debounced and cheap. The problem is entirely in the **derivation layer**: the agenda re-derives its _entire_ occurrence set on every change instead of incrementally, and one section — **Overdue** — is a single un-row-virtualized block. On the 300-file test vault that section holds **6,789 occurrences**, and forcing it into the viewport mounted **6,937 `OccurrenceRow` components in one synchronous commit that blocked the main thread for ~12.9 s** (dev mode). That is the single worst flow — **scrolling up in the agenda / pressing "Today"** (which explicitly targets the overdue section). The second-worst is any **task toggle**, which re-groups + re-sorts all ~8,685 occurrences (~54 ms) even though only one row changed. The single biggest structural theme: **agenda derivation is whole-vault, not incremental — expansion, grouping, and sorting all run over every occurrence on every mutation and every mount, and the Overdue "section" has no per-row virtualization to cap what mounts.**
 
 ## 2. Coverage statement
 
@@ -37,23 +37,23 @@ The app's React memoization is genuinely good — the toggle path re-renders exa
 
 Ranked by (impact × breadth) ÷ effort. **Recommended model** replaces a plain effort label: it reflects how much of each fix is load-bearing judgment versus mechanical edit, and whether a wrong-but-plausible fix would fail loudly (build/test) or silently (wrong pixels, stale state).
 
-| # | Finding | Recommended model |
-|---|---|---|
-| F1 | Overdue section not row-virtualized | **Opus 5, plan mode (multi-PR)** |
-| F2 | Toggle re-groups + re-sorts all 8,685 occs | **Opus 5** (single PR) |
-| F3 | Agenda re-expands on every mount | **Sonnet 5** if cache key specified; else **Opus 5** |
-| F4 | CM decorations rebuild whole doc per keystroke | **Sonnet 5** |
-| F5 | Octokit eagerly bundled | **Sonnet 5** (Haiku 4.5 with an exact file list) |
+| #   | Finding                                        | Recommended model                                    |
+| --- | ---------------------------------------------- | ---------------------------------------------------- |
+| F1  | Overdue section not row-virtualized            | **Opus 5, plan mode (multi-PR)**                     |
+| F2  | Toggle re-groups + re-sorts all 8,685 occs     | **Opus 5** (single PR)                               |
+| F3  | Agenda re-expands on every mount               | **Sonnet 5** if cache key specified; else **Opus 5** |
+| F4  | CM decorations rebuild whole doc per keystroke | **Sonnet 5**                                         |
+| F5  | Octokit eagerly bundled                        | **Sonnet 5** (Haiku 4.5 with an exact file list)     |
 
-**Where Haiku 4.5 actually fits:** none of the five fixes, but it's well-suited to *re-running the measurement recipes* after each fix lands — they're fully scripted (patch counter, drive the interaction, read `window.__last`/`__rc`, revert). A good cheap verification pass between PRs.
+**Where Haiku 4.5 actually fits:** none of the five fixes, but it's well-suited to _re-running the measurement recipes_ after each fix lands — they're fully scripted (patch counter, drive the interaction, read `window.__last`/`__rc`, revert). A good cheap verification pass between PRs.
 
-**Sequencing note:** F1 and F3 both rework the same hook (`useExpandWithMultiday` / `AgendaView`'s virtualizer), and F2 changes the identity contract that F3's cache would key on. If doing all three, **F2 → F3 → F1** avoids rebasing the same code twice; the F1 plan should be written *after* F2 lands so it plans against the new identity model.
+**Sequencing note:** F1 and F3 both rework the same hook (`useExpandWithMultiday` / `AgendaView`'s virtualizer), and F2 changes the identity contract that F3's cache would key on. If doing all three, **F2 → F3 → F1** avoids rebasing the same code twice; the F1 plan should be written _after_ F2 lands so it plans against the new identity model.
 
 ---
 
 ### F1 — The Overdue section is one un-row-virtualized block; thousands of rows mount in a single commit
 
-- **Flows affected:** 2 (scrolling up through the agenda, and the **Today** button — `goToday` targets the overdue index), 6 (cold start when that scroll fires), 1 (toggling a task *inside* overdue). Hit **every time the overdue section enters the viewport.**
+- **Flows affected:** 2 (scrolling up through the agenda, and the **Today** button — `goToday` targets the overdue index), 6 (cold start when that scroll fires), 1 (toggling a task _inside_ overdue). Hit **every time the overdue section enters the viewport.**
 - **Category:** `render-amplification` `memory-and-leak` (scaling cliff that worsens as undone recurring/overdue tasks accumulate over a vault's life)
 - **Impact:** **10** — a multi-second full freeze on an everyday navigation.
 - **Baseline measurement:** On the 300-file vault the single overdue section contains **6,789 occurrences**. Dispatching a scroll that brought it into view mounted **6,937 `OccurrenceRow` components** (counted via a body-level render counter) in **one synchronous commit measured at ~12,900 ms** of blocked main thread (dev). Repeated attempts to read the DOM during the mount timed out (tab frozen). By contrast, the agenda at rest holds **12** rows.
@@ -65,28 +65,9 @@ Ranked by (impact × breadth) ÷ effort. **Recommended model** replaces a plain 
   5. Re-measure after fix: the same scroll should mount **≤ (viewport rows + overscan)**, i.e. tens, not thousands.
 - **Breadth:** 1 section component fans out to ~6,900 rows (count from the render counter). Files: `src/calendar/OverdueSection.tsx`, `src/calendar/AgendaView.tsx`, `src/calendar/useAgendaSections.ts`.
 - **Recommended model:** **Opus 5, plan mode (multi-PR)** — two of the three hard parts aren't code. First, a genuine product call: cap the overdue section with a "show more" (small, ships this week, leaves the cliff at the cap) versus flattening sections+rows into one virtual list (correct, much larger). Second, flattening ripples through things that are load-bearing and non-obvious: `estimateSection`, the persisted `agendaScrollOffset`/`agendaScrollMeasurements` restore, `goToIndex`'s scroll-to-today, the `updateTopDate` scroll listener that maps a virtual index back to a section's `dateKey`, and the `FlipList` animations that currently assume a section owns its rows. That wants a written plan and staged PRs, not one pass.
-- **Evidence:** The virtualizer counts **sections**, not rows — `src/calendar/AgendaView.tsx:62`: `const virtualizer = useVirtualizer({` / `count: sections.length,` — and the overdue section renders every item with no inner cap, `src/calendar/OverdueSection.tsx:29`: `{items.map(o => (` … while `src/calendar/useAgendaSections.ts:107` pours *all* overdue occurrences into that one section: `if (overdueItems.length > 0) {` / `out.push({ kind: 'overdue', key: '__overdue__', items: overdueItems })` / `}`
+- **Evidence:** The virtualizer counts **sections**, not rows — `src/calendar/AgendaView.tsx:62`: `const virtualizer = useVirtualizer({` / `count: sections.length,` — and the overdue section renders every item with no inner cap, `src/calendar/OverdueSection.tsx:29`: `{items.map(o => (` … while `src/calendar/useAgendaSections.ts:107` pours _all_ overdue occurrences into that one section: `if (overdueItems.length > 0) {` / `out.push({ kind: 'overdue', key: '__overdue__', items: overdueItems })` / `}`
 - **Problem:** Because virtualization is section-granular and the overdue section is unbounded, the moment it scrolls into view React mounts one row component per overdue occurrence at once — thousands of touch-listener effects, `useState`s and backlink lookups in a single commit — freezing the app for seconds.
-- **Fix:** Virtualize *rows* (flatten sections+rows into one flat virtual list, or paginate/cap the overdue section with a "show more"). Expected: rows mounted per scroll should drop from **~6,937 to a few dozen**, and the freeze from seconds to one frame.
-
----
-
-### F2 — Every task toggle re-groups + re-sorts all ~8,685 occurrences
-
-- **Flows affected:** 1 (toggling a task in agenda). Hit **every toggle.**
-- **Category:** `critical-path-work` `render-amplification` (derivation, not React)
-- **Impact:** **7** — masked from *perceived* latency by the optimistic checkbox (paints in ~16 ms), but it blocks the main thread ~54 ms (dev) on every toggle, delaying the FLIP animation and any follow-up interaction; scales linearly with vault size.
-- **Baseline measurement:** On a single checkbox toggle (300 files, agenda view): re-group of all occurrences **groupMs ≈ 42 ms**, re-sort of all 136 sections **sectionsMs ≈ 12 ms** (≈ **54 ms** render-phase work), while React re-rendered only **1** `DaySection`, **1** `OccurrenceRow`, **1** `OccurrenceCard` (memoization is working — the cost is pure derivation). Expansion-overlay itself was cheap (`expandMs ≈ 0.1`), `setData` (fom+backlinks) ≈ 3 ms.
-- **Measurement recipe:**
-  1. Big vault loaded, agenda visible.
-  2. Wrap the `groups` and `sections` `useMemo` bodies in `performance.now()` deltas → `window.__last.groupMs` / `.sectionsMs`; reset `window.__rc={}` at the top of `toggleOccDone`; bump per-component counters in `OccurrenceRow`/`DaySection`/`OccurrenceCard` bodies.
-  3. In the page: click a visible `[data-occ-key] [role="checkbox"]`, then read `window.__last` + `window.__rc` after 600 ms.
-  4. After fix, re-run: `groupMs` and `sectionsMs` should collapse to near-zero (only the touched day re-sorted).
-- **Breadth:** the whole agenda pipeline; 8,685 occurrences reprocessed per toggle (occurrence count from the instrumented `allOccs.length`). Files: `src/calendar/useAgendaSections.ts`, `src/model/expansionCache.ts`.
-- **Recommended model:** **Opus 5** (single PR) — the fix is to stop the metadata overlay from allocating a new `allOccs` identity that invalidates the day-group memo, i.e. separating structural expansion identity from the overlay, then re-sorting only touched days. Every failure mode here is silent: a stale `done` flag, a row in the wrong order, a multiday event that loses a covered day, or the `now`-dependent sort quietly going dishonest. The existing invariants in `expansionCache.ts` are intricate and heavily commented for a reason. Tests exist (`expansionCache.test.ts`, `useAgendaSections.test.ts`) but won't catch ordering regressions on their own.
-- **Evidence:** The metadata overlay allocates a brand-new `allOccs` array on every toggle — `src/model/expansionCache.ts:108`: `const allOccs = prev.allOccs.map(occ => {` — whose new identity invalidates the day-group memo wholesale, `src/calendar/useAgendaSections.ts:90`: `}, [allOccs, today])` (and the section memo keyed on `[groups, today, now]` then re-sorts every section).
-- **Problem:** A done-toggle changes one occurrence's metadata but produces a fresh full occurrence array, so the agenda re-buckets all ~8,685 occurrences by day and re-sorts every day-section — work proportional to the whole vault for a one-row change.
-- **Fix:** Group/sort incrementally — key the day-group memo on the *structural* expansion (pre-overlay) so a metadata-only change reuses the buckets, and re-sort only the affected day(s). Expected: per-toggle `groupMs` ~42 → ~0, `sectionsMs` ~12 → <1.
+- **Fix:** Virtualize _rows_ (flatten sections+rows into one flat virtual list, or paginate/cap the overdue section with a "show more"). Expected: rows mounted per scroll should drop from **~6,937 to a few dozen**, and the freeze from seconds to one frame.
 
 ---
 
@@ -97,7 +78,7 @@ Ranked by (impact × breadth) ÷ effort. **Recommended model** replaces a plain 
 - **Impact:** **6** — a ~145 ms (dev) stall each time you return to the agenda from month/day/an entry.
 - **Baseline measurement:** On agenda re-mount (300 files): full `expandWithMultiday` **≈ 82 ms** + group **≈ 45 ms** + sort **≈ 18 ms** = **~145 ms** synchronous before first agenda paint. The expansion is redone in full because the cache is per-component `useState` and was discarded on the previous unmount (month view's cache is separate and only covers one month).
 - **Measurement recipe:**
-  1. Big vault loaded. In `useExpandWithMultiday`, record `computeExpansionCache` duration and whether `next.allOccs===cache?.allOccs` → `window.__expFull` (only set when *not* reused). Time the `groups`/`sections` memos as in F2.
+  1. Big vault loaded. In `useExpandWithMultiday`, record `computeExpansionCache` duration and whether `next.allOccs===cache?.allOccs` → `window.__expFull` (only set when _not_ reused). Time the `groups`/`sections` memos as in F2.
   2. In the page: click **Month**, wait 400 ms, click **Agenda**, read `window.__expFull` (**{allOccs:8685, computeMs:81.8}**), `window.__grp` (**45.3**), `window.__sec.ms` (**17.8**).
   3. After fix, re-run: the switch back should reuse a persisted expansion/group (computeMs ~0).
 - **Breadth:** whole agenda pipeline on each mount. Files: `src/calendar/useExpandWithMultiday.ts`, `src/calendar/useAgendaSections.ts`.
@@ -137,7 +118,7 @@ Ranked by (impact × breadth) ÷ effort. **Recommended model** replaces a plain 
   2. Temporarily replace `makeOctokit`'s body in `src/storage/githubApi.ts` with a stub (drop the two `@octokit/*` imports); `npx vite build`; record new `main` gzip (**129.59 kB**). Delta = Octokit's footprint. Revert.
   3. After fix (lazy GitHub backend), re-run step 1: `main` should drop by ~15 kB gzip and Octokit should appear only in a github-specific async chunk.
 - **Breadth:** static import chain `restoreVaults` → `vaultRegistry` → `githubBackend` → `githubApi` → `@octokit/*` (found via grep of the built `main` chunk: 31× `octokit`, 3× `throttling`). Files: `src/storage/githubApi.ts`, `src/storage/vaultRegistry.ts:13`.
-- **Recommended model:** **Sonnet 5**, or **Haiku 4.5** if handed the exact file list plus the build-diff gate. The trap that voids the fix: lazying `GitHubBackend` in `vaultRegistry`'s three call sites is *not sufficient* — `storage/index.ts` re-exports `startGitHubSignIn`/`completeGitHubSignIn`/`fetchInstalledRepos` from `githubOAuth.ts`, which itself does `import { makeOctokit } from './githubApi'`, and `__root.tsx` imports that barrel eagerly for `restoreVaults`. So Octokit stays in the entry chunk unless the OAuth module is lazied too. Note also that `vite.config.ts` hard-throws on `CYCLIC_CROSS_CHUNK_REEXPORT`, so a sloppy barrel edit fails the build rather than degrading quietly.
+- **Recommended model:** **Sonnet 5**, or **Haiku 4.5** if handed the exact file list plus the build-diff gate. The trap that voids the fix: lazying `GitHubBackend` in `vaultRegistry`'s three call sites is _not sufficient_ — `storage/index.ts` re-exports `startGitHubSignIn`/`completeGitHubSignIn`/`fetchInstalledRepos` from `githubOAuth.ts`, which itself does `import { makeOctokit } from './githubApi'`, and `__root.tsx` imports that barrel eagerly for `restoreVaults`. So Octokit stays in the entry chunk unless the OAuth module is lazied too. Note also that `vite.config.ts` hard-throws on `CYCLIC_CROSS_CHUNK_REEXPORT`, so a sloppy barrel edit fails the build rather than degrading quietly.
 - **Evidence:** `src/storage/githubApi.ts:1`: `import { Octokit } from '@octokit/core'` pulled eagerly via `src/storage/vaultRegistry.ts:13`: `import { GitHubBackend }  from './githubBackend'` (and `vaultRegistry`'s `restoreVaults`/`buildBackend` run at startup from `__root`).
 - **Problem:** The GitHub client is in the initial critical-path bundle for everyone, so users who never touch GitHub still pay ~15 kB gzip of download + parse on every launch.
 - **Fix:** `await import('./githubBackend')` inside `buildBackend`/`addGitHubVault` (all already async) and lazy-import `ensureFreshAccessToken`, so Octokit moves to a GitHub-only chunk. Expected: `main` gzip 144.7 → ~129.6 kB.
@@ -148,5 +129,5 @@ Ranked by (impact × breadth) ÷ effort. **Recommended model** replaces a plain 
 
 - **Toggle React re-renders** — memoization holds: 1 row re-rendered per toggle, not the visible screen (refutes "missing memo" concerns; `OccurrenceRow`/`DaySection` `occArraysEqual` + the overlay's reference-stable occs work as designed).
 - **Search** — 2.2 ms per debounced query over 300 files → 90 results; the 150 ms debounce and file-granular scan are fine.
-- **Persistence timing** — `writeEntity` is fired *after* `setData` and is async; YAML serialize + IndexedDB write never block the toggle paint (and short-circuit on the read-only example backend).
+- **Persistence timing** — `writeEntity` is fired _after_ `setData` and is async; YAML serialize + IndexedDB write never block the toggle paint (and short-circuit on the read-only example backend).
 - **Title-edit metadata path** — title keystrokes don't reach `setData`/`buildBacklinkIndex` (no per-keystroke backlink rebuild); `buildBacklinkIndex` itself is ~1.2 ms.
