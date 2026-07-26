@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush } from '@/storage'
-import { useStore } from '@/store'
+import { requestScrollToToday } from '@/calendar'
 import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createRootRoute({
@@ -54,7 +54,7 @@ function Root() {
       const day = startOfToday().getTime()
       if (day !== lastActiveDayRef.current) {
         lastActiveDayRef.current = day
-        useStore.setState({ scrollToTodayOnce: true })
+        requestScrollToToday()
       }
     }
     window.addEventListener('online', onOnline)

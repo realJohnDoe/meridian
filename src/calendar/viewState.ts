@@ -22,6 +22,10 @@ interface CalendarViewState {
   monthPreview: string | null
   /** `YYYY-MM-DD` of the date the day-view swipe carousel is settling toward — same shape as monthPreview. */
   dayPreview: string | null
+  /** When true, AgendaView will scroll to today once then clear this flag. */
+  scrollToTodayOnce: boolean
+  /** ISO date string of the topmost visible day in the agenda view. */
+  agendaTopDate: string | null
 }
 
 /** Calendar-view-local ephemeral state — scroll position, carousel previews.
@@ -32,6 +36,8 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   agendaScrollMeasurements: [],
   monthPreview: null,
   dayPreview: null,
+  scrollToTodayOnce: false,
+  agendaTopDate: null,
 }))
 
 export function resetCalendarViewState(): void {
@@ -52,4 +58,28 @@ export function setMonthPreview(key: string | null): void {
 
 export function setDayPreview(key: string | null): void {
   calendarView.setState({ dayPreview: key })
+}
+
+export function useScrollToTodayOnce(): boolean {
+  return useZustandStore(calendarView, s => s.scrollToTodayOnce)
+}
+
+export function useAgendaTopDate(): string | null {
+  return useZustandStore(calendarView, s => s.agendaTopDate)
+}
+
+/** Flags AgendaView to scroll to today on its next render. */
+export function requestScrollToToday(): void {
+  calendarView.setState({ scrollToTodayOnce: true })
+}
+
+export function setAgendaTopDate(key: string): void {
+  calendarView.setState({ agendaTopDate: key })
+}
+
+/** Clears the scroll-to-today flag and records the date scrolled to, in one
+ * write — splitting this into two setState calls would notify subscribers
+ * twice, flashing the stale top date before it settles. */
+export function markScrolledToToday(topDate: string): void {
+  calendarView.setState({ scrollToTodayOnce: false, agendaTopDate: topDate })
 }
