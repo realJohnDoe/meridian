@@ -42,7 +42,7 @@ something you declared.
 
 On top of that: `[[wikilinks]]` between entries, because links are what turn a collection
 of notes into something you can actually navigate; nested tasks shown inline; and tags
-that are themselves entries, so a tag can carry its own description and body.
+that are entries in their own right, not just labels.
 
 These were the ideas I set out with, and I still like them. Most of what came next I
 didn't plan.
@@ -57,20 +57,19 @@ building and used it for a year instead.
 That year turned out to be important groundwork. It taught me two things I couldn't have
 reasoned my way to from a blank page.
 
-**Recurrence has to stay readable.** The industry standard is iCal
-([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)), and it's capable enough that
-my whole calendar could probably be expressed as a pile of its `RRULE`, `RDATE`, and
-`EXDATE` strings — irregular dates alongside a pattern, two patterns in one entry, a
-single occurrence cancelled or moved. The catch is that those strings are built for
-machines: `FREQ=MONTHLY;BYDAY=1FR,2FR` is not something you want to hand-edit, and the
-messy real-world cases only get worse. Since "plain files you can read" was the point, I
-wanted recurrence I could read and edit in the file too. (If iCal compatibility ever
-matters, I'm not against supporting it underneath — it just wasn't the place to start.)
+**Mobile is where this is decided.** Obsidian is excellent on the desktop, but I live in
+these tools on a phone — and there, tasks and events feel like second-class citizens next
+to what [Google Calendar](https://calendar.google.com) or Todoist do. Editing a task
+buried in a Markdown note is fiddly on a small screen; a month view you can swipe through
+is a different thing entirely. That gap stayed open for me, whatever plugins I tried, and
+it's the biggest single reason I eventually built something of my own.
 
-**Mobile is where this is decided.** Obsidian is built for notes, and it's excellent at
-that. But on a phone, tasks and events feel like second-class citizens next to what
-[Google Calendar](https://calendar.google.com) or Todoist do. That gap stayed open for
-me, whatever plugins I tried.
+**Recurrence has to stay readable.** iCal ([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545))
+is the standard, and it's capable — my whole calendar could probably be encoded as its
+`RRULE`, `RDATE`, and `EXDATE` strings. But those strings are built for machines:
+`FREQ=MONTHLY;BYDAY=1FR,2FR` is no fun to hand-edit, and the messy real cases only get
+worse. Since the point was files you can read, I wanted recurrence I could read too. (If
+iCal compatibility ever matters, I can add it underneath.)
 
 ## A hundred versions on a phone
 
@@ -147,13 +146,13 @@ And underneath those, a harder one: most people have never heard of a backlink �
 wikilink, for that matter. I was about to ship an app whose central concepts needed a
 glossary.
 
-So on **2026-06-20** I removed vocabulary rather than adding it — and inverted the links
+So on **2026-06-20** I removed vocabulary rather than adding it, and inverted the links
 while I was at it. The old `topics` field had each entry point _up_ to the categories it
 belonged to; the new
 [`items` field](https://github.com/realJohnDoe/meridian/commit/d6d9f39) has each entry
-point _down_ to the concrete entries under it. The backlinks panel became a row labelled
-_listed on_ — the same relationship read backwards — and the whole model collapsed into
-one sentence: **every entry is a list**.
+point _down_ to the entries beneath it. So an entry now simply shows its items, plus a
+_listed on_ row for the lists it appears on — and the whole model collapsed into one
+sentence: **every entry is a list**.
 
 | Entry       | Is a list with…                               | Its items are usually…      |
 | ----------- | --------------------------------------------- | --------------------------- |
@@ -174,11 +173,12 @@ _do I want to track whether this is done?_ — which is a question you can actua
 An entry can also sit on several lists at once, and that makes possible something I use
 constantly. We keep a list called **This Week** for things we want to finish this week
 but don't want to pin to a day yet. "Pizza" sits on _This Week_ and on _Cooking_ at the
-same time. A strict hierarchy can't do that — Pizza would have to live in one place;
-lists let it live in both.
+same time. A strict hierarchy can't do that — Pizza would have to live in one place. Tags
+always could, which is exactly why I loved them and wanted them to be first-class; in
+Meridian, lists do the same job.
 
-None of this is what I'd put on a landing page. That would be the promise on the surface:
-tasks and calendar in one app, stored as Markdown, with flexible hierarchies and flexible
+None of this is really the pitch. The pitch is the promise on the surface: tasks and
+calendar in one app, stored as Markdown, with flexible hierarchies and flexible
 recurrence. "Everything is a list" is the quieter idea underneath that makes those
 promises hold together. I didn't design it up front — I backed into it while trying to
 keep the app simple to explain.
@@ -190,17 +190,14 @@ in a blog post. The rest of that summer was the other kind of work: making it re
 enough to actually use day to day.
 
 First the files needed to live somewhere I could reach from any device. I started with
-GitHub and fine-grained access tokens — you paste a token, and Meridian reads and writes
-a repository you own. GitHub because the readers I care about first are developers, and
-they already have an account there and trust it. Pasting a token is a pain on a phone,
-though, so later I added one small, stateless Cloudflare Worker that does nothing but
-trade OAuth tokens, so most people can just click _connect_.
-
-Finding a backend at all was harder than I expected. I wanted a password-protected folder
-in the cloud with an API, simple enough for a non-technical person to set up — which
-sounds like it should exist, and mostly doesn't. Most options either want access to
-_everything_ in your account, or don't send the CORS headers a browser app needs, so they
-can't be reached from the browser at all. I compared the candidates in
+GitHub and fine-grained access tokens — you paste a token, and Meridian reads and writes a
+repository you own — because the readers I care about first are developers, and they
+already have a GitHub account they trust. (Pasting a token is a pain on a phone, so I later
+added one small, stateless Cloudflare Worker that trades OAuth tokens, turning setup into a
+single _connect_ click.) Finding a backend at all was harder than I expected: I wanted a
+password-protected folder in the cloud with an API, and most options either want access to
+_everything_ in your account or don't send the CORS headers a browser app needs. I
+compared the candidates in
 [plans/storage-backend-survey.md](https://github.com/realJohnDoe/meridian/blob/main/plans/storage-backend-survey.md);
 Dropbox and OneDrive are the strongest alternatives, and I may add them.
 
