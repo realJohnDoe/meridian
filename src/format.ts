@@ -23,6 +23,21 @@ export function fmtTopBarMonth(d: Date, today: Date): string {
 
 // ── Duration formatting ───────────────────────────────────────────────────────
 
+function pluralize(n: number, unit: string): string {
+  const units: Record<string, [string, string]> = {
+    minute: ['minute', 'minutes'],
+    hour: ['hour', 'hours'],
+    day: ['day', 'days'],
+    week: ['week', 'weeks'],
+    month: ['month', 'months'],
+    year: ['year', 'years'],
+  }
+  const entry = units[unit]
+  if (!entry) return `${n} ${unit}`
+  const [singular, plural] = entry
+  return `${n} ${n === 1 ? singular : plural}`
+}
+
 // addMonths/addYears clamp to the last valid day of the target month (e.g. Jan 31 + 1
 // month -> Feb 28). When that clamp happens, the clamped date is already the inclusive
 // end of the period, so we must not subtract another day from it.
@@ -64,10 +79,10 @@ export function endDateToDuration(startStr: string, endDateStr: string): string 
   const end   = parseDateString(endDateStr) ?? new Date()
   const days  = differenceInDays(end, start) + 1  // end date is inclusive
   if (days <= 0) return null
-  if (days % 365 === 0) { const y = days / 365; return `${y} ${y === 1 ? 'year'  : 'years'}` }
-  if (days % 30  === 0) { const m = days / 30;  return `${m} ${m === 1 ? 'month' : 'months'}` }
-  if (days % 7   === 0) { const w = days / 7;   return `${w} ${w === 1 ? 'week'  : 'weeks'}` }
-  return `${days} ${days === 1 ? 'day' : 'days'}`
+  if (days % 365 === 0) { const y = days / 365; return pluralize(y, 'year') }
+  if (days % 30  === 0) { const m = days / 30;  return pluralize(m, 'month') }
+  if (days % 7   === 0) { const w = days / 7;   return pluralize(w, 'week') }
+  return pluralize(days, 'day')
 }
 
 export function endDateTimeToDuration(startDateStr: string, startTimeStr: string, endDateStr: string, endTimeStr: string): string | null {
@@ -75,10 +90,10 @@ export function endDateTimeToDuration(startDateStr: string, startTimeStr: string
   const end   = parseDateTime(endDateStr, endTimeStr)     ?? new Date()
   const mins  = differenceInMinutes(end, start)
   if (mins <= 0) return null
-  if (mins % (7 * 24 * 60) === 0) { const w = mins / (7*24*60); return `${w} ${w === 1 ? 'week'  : 'weeks'}` }
-  if (mins % (24 * 60)     === 0) { const d = mins / (24*60);   return `${d} ${d === 1 ? 'day'   : 'days'}` }
-  if (mins % 60            === 0) { const h = mins / 60;         return `${h} ${h === 1 ? 'hour'  : 'hours'}` }
-  return `${mins} ${mins === 1 ? 'minute' : 'minutes'}`
+  if (mins % (7 * 24 * 60) === 0) { const w = mins / (7*24*60); return pluralize(w, 'week') }
+  if (mins % (24 * 60)     === 0) { const d = mins / (24*60);   return pluralize(d, 'day') }
+  if (mins % 60            === 0) { const h = mins / 60;         return pluralize(h, 'hour') }
+  return pluralize(mins, 'minute')
 }
 
 export function fmtEndDate(dateStr: string): string {
@@ -96,13 +111,13 @@ export function fmtDuration(duration: string): string {
   const { n, unit } = p
   if (unit === 'minutes' && n >= 60) {
     const h = Math.floor(n / 60), m = n % 60
-    const hStr = `${h} ${h === 1 ? 'hour' : 'hours'}`
-    return m > 0 ? `${hStr}, ${m} ${m === 1 ? 'minute' : 'minutes'}` : hStr
+    const hStr = pluralize(h, 'hour')
+    return m > 0 ? `${hStr}, ${pluralize(m, 'minute')}` : hStr
   }
   if (unit === 'hours' && n >= 24) {
     const d = Math.floor(n / 24), h = n % 24
-    const dStr = `${d} ${d === 1 ? 'day' : 'days'}`
-    return h > 0 ? `${dStr}, ${h} ${h === 1 ? 'hour' : 'hours'}` : dStr
+    const dStr = pluralize(d, 'day')
+    return h > 0 ? `${dStr}, ${pluralize(h, 'hour')}` : dStr
   }
   return duration
 }
