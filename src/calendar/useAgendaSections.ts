@@ -2,9 +2,9 @@ import { useStore } from '@/store'
 import { addDays } from '@/format'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useCalendarFilter } from './useCalendarFilter'
-import { computeAgendaSections, type AgendaSectionCache, type Section, type AgendaRow } from './agendaSections'
+import { computeAgendaSections, type AgendaSectionCache, type AgendaRow } from './agendaSections'
 
-export { estimateSection, type Section, type AgendaRow } from './agendaSections'
+export { estimateRow, type AgendaRow } from './agendaSections'
 
 // Asymmetric on purpose: overdue tasks can be arbitrarily old (see the fix
 // that expanded this from 7 to 365 days so old tasks would still surface in
@@ -34,7 +34,13 @@ export function resetAgendaSectionsCache(): void {
 /**
  * The agenda's data pipeline: expand occurrences over the agenda window, then
  * group by day, filter, sort, and flatten into one ordered list of
- * virtualizable sections (past days → overdue → current/future days).
+ * virtualizable rows (past days → overdue → current/future days, each a
+ * header row followed by its occurrence rows).
+ *
+ * Sections remain the *cache* unit inside computeAgendaSections — that's what
+ * makes a single toggle rebuild one day instead of the whole vault — but they
+ * aren't what AgendaView virtualizes. It counts `rows`, so an unbounded
+ * section (notably overdue) can't mount thousands of components at once.
  *
  * Pulled out of AgendaView so this derivation — pure of the virtualizer, the
  * scroll listener, and the scroll-to-today effect — can be cached normally.
@@ -60,7 +66,7 @@ export function resetAgendaSectionsCache(): void {
 export function useAgendaSections(
   today: Date,
   now: Date,
-): { sections: Section[]; goToIndex: number; rows: AgendaRow[]; goToRowIndex: number } {
+): { rows: AgendaRow[]; goToRowIndex: number } {
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
 
@@ -82,5 +88,5 @@ export function useAgendaSections(
     sectionsCacheSlot.set(SECTIONS_CACHE_KEY, next)
   }
 
-  return { sections: next.sections, goToIndex: next.goToIndex, rows: next.rows, goToRowIndex: next.goToRowIndex }
+  return { rows: next.rows, goToRowIndex: next.goToRowIndex }
 }

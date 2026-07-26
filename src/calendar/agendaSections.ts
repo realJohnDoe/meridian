@@ -11,9 +11,16 @@ const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 // stable before a row has been measured. initialMeasurementsCache means
 // returning users always get real sizes — estimates only matter on first visit.
 //
-// HEADER_H: DaySection header div — pt-3.5 (14) + pb-1.5 (6) + text-xs line (~20) ≈ 40px
+// HEADER_H: AgendaHeaderRow div — pt-3.5 (14) + pb-1.5 (6) + text-xs line (~20) ≈ 40px
 // ROW_H:    OccurrenceCard min-h-11 + py-2 padding + OccurrenceRow mb-1.5 (6) ≈ 68px
-// Update these if the header/card padding changes in DaySection.tsx / OccurrenceCard.tsx.
+// Update these if the header/card padding changes in AgendaHeaderRow.tsx /
+// OccurrenceCard.tsx.
+//
+// One ROW_H for every occurrence row, not two: it already assumes a meta row
+// is present, which is exactly right for overdue rows (they all pass
+// showDate, so OccurrenceCard's showMeta is always true). Day rows without a
+// time, duration or backlink are ~50px, but they come in small groups, so the
+// drift stays bounded — don't split this speculatively.
 const HEADER_H = 40
 const ROW_H = 68
 
@@ -32,11 +39,8 @@ export type Section =
   | { kind: 'day'; key: string; dateKey: string; date: Date; isToday: boolean; isTomorrow: boolean; items: Occurrence[]; rows: AgendaRow[] }
   | { kind: 'overdue'; key: string; items: Occurrence[]; rows: AgendaRow[] }
 
-// TODO(F1 PR2): AgendaView still virtualizes `Section[]` and calls this. Once
-// it switches to virtualizing the flat `rows` list, this is replaced by a
-// per-row estimator (`r.kind === 'header' ? HEADER_H : ROW_H`) and deleted.
-export function estimateSection(s: Section): number {
-  return HEADER_H + s.items.length * ROW_H
+export function estimateRow(r: AgendaRow): number {
+  return r.kind === 'header' ? HEADER_H : ROW_H
 }
 
 function headerRow(key: string, dateKey: string, label: string, tone: 'default' | 'today' | 'overdue'): AgendaRow {

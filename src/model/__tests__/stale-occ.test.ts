@@ -11,7 +11,10 @@
  *
  * Fix A (DaySection propsAreEqual) adds id/ownerId to the memo comparator so
  * any identity change forces a re-render and children always close over live
- * occurrences.
+ * occurrences. (DaySection and its comparator are gone since the agenda moved
+ * to row-level virtualization: OccurrenceRow now compares the `occ` object
+ * itself, so any identity change reaches it directly. Fix C is what makes
+ * that safe — see below.)
  * Fix B (cacheWrite, now recordLocalEdit) short-circuits when content is unchanged, eliminating
  * phantom commits from no-op toggles.
  * Fix C (storeItems deterministic IDs, this PR) eliminates ID churn entirely:
