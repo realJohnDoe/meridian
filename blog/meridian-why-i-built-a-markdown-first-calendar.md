@@ -6,7 +6,7 @@ date: 2026-07-23
 
 # Meridian: Why I built a Markdown-first calendar
 
-Until a few months ago, one ordinary week of my life was spread across five apps.
+Until a few months ago, I kept my life in five different apps.
 Notes lived in [Obsidian](https://obsidian.md). My own tasks lived in the
 [TaskNotes](https://tasknotes.dev/) plugin inside Obsidian. Tasks I share with my wife
 lived in [Todoist](https://todoist.com). Appointments lived in
@@ -16,7 +16,7 @@ lived in [Todoist](https://todoist.com). Appointments lived in
 None of these apps are bad. What bothered me was the seams between them — and two things
 I couldn't fix by switching to a different combination.
 
-The first: I want to keep track of our child's calendar, but she doesn't need a Google
+The first: I want to keep track of our child's calendar, but she doesn't need a Proton
 account. Every system I tried wanted her to _be a user_ before she could _have a
 calendar_. I wanted something closer to the paper calendar on the kitchen wall: everyone
 writes on it, everyone reads it, nobody owns it. The corporate version of the same
@@ -29,8 +29,7 @@ that can have its own description, its own notes, and its own tags.
 So I built [Meridian](https://realjohndoe.github.io/meridian/): a calendar, task manager,
 and notes app where every entry is a plain Markdown file.
 
-What follows is roughly how that went — the ideas I set out with, and the one that only
-turned up along the way.
+What follows is roughly how that went, from those first ideas to the app I use today.
 
 ## What I knew before I wrote any code
 
@@ -45,8 +44,8 @@ On top of that: `[[wikilinks]]` between entries, because links are what turn a c
 of notes into something you can actually navigate; nested tasks shown inline; and tags
 that are themselves entries, so a tag can carry its own description and body.
 
-These were the ideas I set out with, and I still like them. One nice principle only
-surfaced later, unplanned, as I built — and it's the one this article builds toward.
+These were the ideas I set out with, and I still like them. Most of what came next I
+didn't plan.
 
 ## A prototype, and a year of not building it
 
@@ -55,45 +54,30 @@ In spring 2025 I built a first prototype called
 which already did much of what I was sketching, and did the sensible thing: I stopped
 building and used it for a year instead.
 
-That year turned out to be important groundwork. It taught me three things I could not
-have reasoned my way to from a blank page.
+That year turned out to be important groundwork. It taught me two things I couldn't have
+reasoned my way to from a blank page.
 
-**iCal's recurrence rules are hard to read in a text file.** The industry standard is
-[RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545), and its `RRULE` strings are
-built for machines: `FREQ=MONTHLY;BYDAY=1FR,2FR` is not something I enjoy hand-editing.
-Since "plain files you can read" was the point, I wanted recurrence I could read too. (If
-iCal compatibility ever matters, I'm not against supporting it — it just wasn't the place
-to start.)
-
-**One rule per entry isn't enough.** Real schedules are messy. I wanted a list of fixed
-dates _and_ a repeating pattern in the same entry. I wanted two patterns at once —
-something on the first _and_ second Friday of the month. I wanted to cancel one
-occurrence, move another by an hour, and leave the rest alone. Most tools treat these as
-edge cases; in our household they come up regularly.
+**Recurrence has to stay readable.** The industry standard is iCal
+([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545)), and it's capable enough that
+my whole calendar could probably be expressed as a pile of its `RRULE`, `RDATE`, and
+`EXDATE` strings — irregular dates alongside a pattern, two patterns in one entry, a
+single occurrence cancelled or moved. The catch is that those strings are built for
+machines: `FREQ=MONTHLY;BYDAY=1FR,2FR` is not something you want to hand-edit, and the
+messy real-world cases only get worse. Since "plain files you can read" was the point, I
+wanted recurrence I could read and edit in the file too. (If iCal compatibility ever
+matters, I'm not against supporting it underneath — it just wasn't the place to start.)
 
 **Mobile is where this is decided.** Obsidian is built for notes, and it's excellent at
 that. But on a phone, tasks and events feel like second-class citizens next to what
 [Google Calendar](https://calendar.google.com) or Todoist do. That gap stayed open for
 me, whatever plugins I tried.
 
-## The app I almost didn't build
-
-For a while I didn't want to build an app at all. TaskNotes is open source, actively
-maintained, and has a real spec — and its file format is almost exactly mine. My plan was
-smaller and more polite: propose my recurrence model — the readable one, with irregular
-dates and several patterns in a single entry — as an extension to their format, ideally
-get TaskNotes itself to adopt it, and keep living in Obsidian. The most defensible thing I
-had wasn't a UI; it was a format, and a format is the sort of thing you propose as a
-contribution, not the sort of thing you build a whole separate app around.
-
-What tipped me the other way was, again, the phone. Everything I actually wanted to fix —
-the mobile task and calendar UX, a shared family calendar with no accounts, a browser URL
-I could open on a locked-down work machine — lived _outside_ the file format, in
-territory an Obsidian plugin couldn't reach without becoming its own app anyway. So the
-"just propose a format" plan quietly became "build the thing and let the format prove
-itself."
-
 ## A hundred versions on a phone
+
+For a moment I considered not building an app at all — just proposing my recurrence format
+to TaskNotes and staying in Obsidian. But everything I really wanted to fix, from the
+mobile UX to a shared calendar without accounts, lived outside the file format, where a
+plugin couldn't reach.
 
 So this spring I started over on my phone, in a single very long chat session with
 [Claude](https://claude.ai) — which turned out to be good enough at spinning up working
@@ -104,10 +88,7 @@ usable. Somewhere in the middle it got the name Meridian.
 
 It worked. That was the problem. It worked well enough to show me the real version of the
 app — and that a single generated file, growing with every change, wasn't a foundation I
-could keep building on. It gave me one other preview, too: the first time I pointed it at
-a real GitHub repo it failed with `failed to fetch`. A sandboxed prototype can't call the
-GitHub API from the browser — a small foretaste of a wall I'd meet again, for real, when
-it came time to choose where the files actually live.
+could keep building on.
 
 On **2026-05-22** I moved to a desktop, set the prototype aside, and started a proper
 repository: React, TypeScript, Tailwind, shadcn/ui, Vite. The first day's commits
@@ -143,8 +124,8 @@ followed within days by auto-sync, conflict detection, and a vault switcher.
 
 On **2026-06-16** the description field
 [became a real editor](https://github.com/realJohnDoe/meridian/commit/4e7b9f1) —
-CodeMirror 6, with wikilinks rendering as inline chips and checkboxes you can actually
-click.
+[CodeMirror 6](https://codemirror.net/), with wikilinks rendering as inline chips and
+checkboxes you can actually click.
 
 None of this came from a master plan, but none of it fell from the sky either. Some of
 it I'd been carrying since idea-craft — I already knew I wanted GitHub as a backend, and
@@ -166,10 +147,12 @@ And underneath those, a harder one: most people have never heard of a backlink �
 wikilink, for that matter. I was about to ship an app whose central concepts needed a
 glossary.
 
-So on **2026-06-20** I decided to remove vocabulary rather than add it. The frontmatter
-field `topics` was
-[renamed to `items`](https://github.com/realJohnDoe/meridian/commit/d6d9f39), the
-backlinks panel became a row that says _listed on_, and the whole model collapsed into
+So on **2026-06-20** I removed vocabulary rather than adding it — and inverted the links
+while I was at it. The old `topics` field had each entry point _up_ to the categories it
+belonged to; the new
+[`items` field](https://github.com/realJohnDoe/meridian/commit/d6d9f39) has each entry
+point _down_ to the concrete entries under it. The backlinks panel became a row labelled
+_listed on_ — the same relationship read backwards — and the whole model collapsed into
 one sentence: **every entry is a list**.
 
 | Entry       | Is a list with…                               | Its items are usually…      |
@@ -197,8 +180,8 @@ lists let it live in both.
 None of this is what I'd put on a landing page. That would be the promise on the surface:
 tasks and calendar in one app, stored as Markdown, with flexible hierarchies and flexible
 recurrence. "Everything is a list" is the quieter idea underneath that makes those
-promises hold together — and I only found it by trying to explain the app to an imaginary
-user and running out of words that didn't need a glossary.
+promises hold together. I didn't design it up front — I backed into it while trying to
+keep the app simple to explain.
 
 ## The part I don't put on the landing page
 
@@ -216,18 +199,10 @@ trade OAuth tokens, so most people can just click _connect_.
 Finding a backend at all was harder than I expected. I wanted a password-protected folder
 in the cloud with an API, simple enough for a non-technical person to set up — which
 sounds like it should exist, and mostly doesn't. Most options either want access to
-_everything_ in your account, or don't send the CORS headers a browser app needs (the
-same `failed to fetch` the phone prototype hit), so they can't be reached from the browser
-at all. I compared the candidates in
+_everything_ in your account, or don't send the CORS headers a browser app needs, so they
+can't be reached from the browser at all. I compared the candidates in
 [plans/storage-backend-survey.md](https://github.com/realJohnDoe/meridian/blob/main/plans/storage-backend-survey.md);
 Dropbox and OneDrive are the strongest alternatives, and I may add them.
-
-The independence people worry about doesn't actually come from the backend. A local-only
-app on your own disk would be safest there — but then nothing syncs between devices or
-people. So the trade I made is a backend you can trust and also leave: GitHub keeps full
-history and lets you download everything in one click. The real protection is the format.
-Your data is Markdown with YAML frontmatter, readable in any editor, so if a platform
-ever turns against its users, plain files are what let you walk away.
 
 The recurrence engine was where readable files paid off most. When it misbehaved —
 occurrences that wouldn't move, cancellations that didn't stick, a series that expanded
@@ -246,10 +221,10 @@ that survive all that state stay small.)
 
 I won't pretend it's finished. I've used Meridian for my own tasks for about a month; we
 haven't moved the family calendar off Proton yet. The caching and sync layer is still the
-weakest code in the repo — it's where the subtle bugs keep coming from, even now that most
-of my day-to-day work has shifted to tests and polish. Getting those four layers to agree,
-every time, is most of the distance between a prototype that works in a demo and something
-you'd rely on.
+weakest code in the repo, and keeping those four layers in agreement is where the subtle
+bugs live. Much of the recent work has been the unshowy kind: tests, and performance —
+keeping the calendar smooth on a phone as a vault fills up with entries. That polish is
+most of the distance between a prototype that works in a demo and something you'd rely on.
 
 ## Where it fits
 
@@ -262,8 +237,11 @@ One note for the Obsidian crowd, since our audiences overlap: there's also an Ob
 theme called [Meridian](https://github.com/mvahaste/meridian), by someone else entirely.
 Same word, different project — this Meridian is the calendar app.
 
-If any of this sounds like the thing you've been assembling out of four apps, the
-[example vault](https://realjohndoe.github.io/meridian/) runs in your browser with no
-account and nothing to install. Try it and tell me what works and what doesn't — the best
-place for that is a [GitHub issue](https://github.com/realJohnDoe/meridian/issues). The
-code lives in the [same repository](https://github.com/realJohnDoe/meridian).
+If any of this sounds like the thing you've been assembling out of separate apps, try it:
+the whole app runs in your browser, with nothing to install and no account. The built-in
+[example vault](https://realjohndoe.github.io/meridian/) needs nothing at all; to keep
+your own data, you point Meridian at a GitHub repository, or at a local folder if your
+browser supports it (Chrome or Edge on desktop, or Android). Tell me what works and what
+doesn't — the best place for that is a
+[GitHub issue](https://github.com/realJohnDoe/meridian/issues) — and the code lives in the
+[same repository](https://github.com/realJohnDoe/meridian).
