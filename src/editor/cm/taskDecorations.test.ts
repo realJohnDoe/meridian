@@ -4,7 +4,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { markdown } from '@codemirror/lang-markdown'
 import { Autolink } from '@lezer/markdown'
-import { ensureSyntaxTree } from '@codemirror/language'
+import { forceParsing } from '@codemirror/language'
 import { build } from './taskDecorations'
 import { visibleLineRanges } from './viewUtils'
 
@@ -20,12 +20,15 @@ function mkView(doc: string): EditorView {
     doc,
     extensions: [markdown({ extensions: [Autolink] })],
   })
-  // Force the incremental lezer parser to finish before querying, same as
-  // taskLines.test.ts — otherwise the syntax tree may be incomplete.
-  ensureSyntaxTree(state, state.doc.length, 5000)
   const view = new EditorView({ state })
   document.body.appendChild(view.dom)
   views.push(view)
+  // `EditorState.create` parses only within a 20 ms budget and keeps a partial
+  // tree if that runs out, so on a loaded machine later lines can be missing.
+  // `forceParsing` finishes the parse *and* dispatches the empty transaction
+  // that makes the result visible to `syntaxTree(view.state)` — see the note in
+  // taskLines.test.ts for why `ensureSyntaxTree` alone is not enough.
+  forceParsing(view, view.state.doc.length, Infinity)
   return view
 }
 

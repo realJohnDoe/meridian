@@ -34,8 +34,19 @@ export default defineConfig({
       // silently regress. Set a few points below measured coverage to leave
       // headroom for legitimate branches added later.
       thresholds: {
+        // Global floor. Per-file thresholds only guard the files they name, so
+        // a brand-new untested logic module used to slip through the gate
+        // entirely. This catches that: adding a sizeable unexercised module
+        // drags the project total below the floor and fails CI. Kept a few
+        // points under the measured total so ordinary UI work doesn't trip it.
+        statements: 50,
+        branches: 47,
+        functions: 42,
+        lines: 52,
         'src/model/collapse.ts': { statements: 90, branches: 80, functions: 95, lines: 90 },
         'src/editor/cm/taskLines.ts': { statements: 90, branches: 80, functions: 95, lines: 95 },
+        'src/editor/cm/markdownFormatting.ts': { statements: 88, branches: 78, functions: 70, lines: 87 },
+        'src/editor/cm/ReactWidget.ts': { statements: 78, branches: 90, functions: 50, lines: 77 },
         'src/types.ts': { statements: 90, branches: 80, functions: 85, lines: 90 },
         'src/storage/conflictError.ts': { statements: 90, branches: 85, functions: 95, lines: 95 },
         'src/editor/dialogs/RepeatDialog.tsx': { statements: 75, branches: 60, functions: 65, lines: 75 },

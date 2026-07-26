@@ -5,15 +5,25 @@ import { Autolink } from '@lezer/markdown'
 import { ensureSyntaxTree } from '@codemirror/language'
 import { buildTaskLineMap } from './taskLines'
 
-/** Create an EditorState with the same markdown language config as the app. */
+/**
+ * Create an EditorState with the same markdown language config as the app, with
+ * a guaranteed-complete syntax tree.
+ *
+ * `EditorState.create` only parses within a 20 ms budget and keeps whatever
+ * partial tree it has when that runs out, so on a loaded machine `syntaxTree`
+ * can be missing later lines. `ensureSyntaxTree` alone does not fix this: it
+ * advances the parse *context* but `LanguageState.tree` is captured at
+ * construction, so `syntaxTree(state)` still returns the stale partial tree.
+ * Dispatching an empty transaction rebuilds `LanguageState` from the advanced
+ * context — the same trick `forceParsing` uses for views.
+ */
 function mkState(doc: string): EditorState {
   const state = EditorState.create({
     doc,
     extensions: [markdown({ extensions: [Autolink] })],
   })
-  // Force the incremental lezer parser to finish before querying.
-  ensureSyntaxTree(state, state.doc.length, 5000)
-  return state
+  ensureSyntaxTree(state, state.doc.length, Infinity)
+  return state.update({}).state
 }
 
 describe('buildTaskLineMap', () => {
