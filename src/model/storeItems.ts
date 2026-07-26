@@ -12,7 +12,7 @@
  * and belong in the store's roots map keyed by fileSlug.
  */
 
-import { loadFile } from '@/fileIO'
+import { loadFile, pathToSlug } from '@/fileIO'
 import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
@@ -131,7 +131,7 @@ export interface ParseResult {
  */
 export function parseToStoreItems(path: string, content: string): ParseResult {
   const { rawNode, body } = loadFile(path, content)
-  const fileSlug = path.replace(/\.md$/, '')
+  const fileSlug = pathToSlug(path)
   const tree = buildEffectiveTree(rawNode)
   const items = effectiveNodeToStoreItems(tree, fileSlug)
   return { items, root: buildRoot(rawNode, body) }

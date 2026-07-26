@@ -61,3 +61,13 @@ export function titleToSlug(title: string): string {
     .replace(/^-|-$/g, '')
     .slice(0, 60) || 'untitled'
 }
+
+/** Canonical vault path → store slug mapping. Inverse of `slugToPath`. */
+export function pathToSlug(path: string): string {
+  return path.replace(/\.md$/, '')
+}
+
+/** Canonical store slug → vault path mapping. Inverse of `pathToSlug`. */
+export function slugToPath(slug: string): string {
+  return slug + '.md'
+}
