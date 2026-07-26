@@ -49,14 +49,6 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 
 **Sequencing note (findings sharing a file):** #1 & #9 both edit `calendar/AgendaView.tsx` (index-access guards vs. moving agenda scroll state out of the store) — land #1 first or bundle them. #2 & #6 both edit `storage/sync.ts` (write-path extension fix vs. the path↔slug helper) — do them together, since #6's shared helper is where #2's fix belongs. #3 & #5 both edit `editor/save.ts` (tracked predicate vs. snapshot helper) — batch to avoid rebasing it twice.
 
-### #2 — Vault-file extension asymmetry orphans `.yaml`/`.yml` entries; `isVaultFile` duplicated verbatim
-
-- **Category:** `dry` `error-handling`
-- **Impact:** 5 · **Breadth:** 4 files (grep: `isVaultFile` defs ×2; `fileSlugToPath`; strip-regex sites) · **Recommended model:** Opus 5 — a plausible-but-wrong fix (dedup `isVaultFile` without aligning the write path, or narrow reads while a real vault still holds `.yaml`) fails _silently_ as data orphaning; **Sonnet 5** if the task specifies the resolution to take (narrow-to-`.md` vs preserve-extension).
-- **Evidence:** Reads accept three extensions — `storage/fs.ts:20` and `storage/githubBackend.ts:7` each define, **identically**, `return name.endsWith('.md') || name.endsWith('.yaml') || name.endsWith('.yml')`. But every write hardcodes `.md` — `storage/sync.ts:23` `return fileSlug + '.md'`. `fileIO.ts:49` confirms non-`.md` files parse as pure-frontmatter entries.
-- **Problem:** A `.yaml`/`.yml` vault entry is read and gets slug `foo`, but saving it writes `foo.md` — leaving the original `foo.yaml` untouched, producing a duplicate/orphaned pair that a later reconcile double-loads into the store. The duplicated predicate also means the two backends can drift.
-- **Fix:** Hoist one shared `isVaultFile`/`slugToPath` (see #6) into `storage/backend.ts` and make the write path preserve the source extension — or, if only `.md` is truly supported, narrow `isVaultFile` to `.md` so reads and writes agree.
-
 ### #4 — `editor/cm/` decoration layer at 0% coverage (no global floor to catch it)
 
 - **Category:** `testing` `toolchain`
