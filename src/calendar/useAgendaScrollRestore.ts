@@ -1,6 +1,6 @@
 import { useLayoutEffect } from 'react'
 import type { Virtualizer, VirtualItem } from '@tanstack/react-virtual'
-import { useStore } from '@/store'
+import { calendarView } from './viewState'
 
 type AgendaVirtualizer = Virtualizer<HTMLDivElement, Element>
 
@@ -12,7 +12,7 @@ type AgendaVirtualizer = Virtualizer<HTMLDivElement, Element>
  * showing months-old done tasks). Pairs with setting `scrollToTodayOnce`.
  */
 export function resetAgendaScroll(): void {
-  useStore.setState({ agendaScrollOffset: 0, agendaScrollMeasurements: [] })
+  calendarView.setState({ agendaScrollOffset: 0, agendaScrollMeasurements: [] })
 }
 
 /**
@@ -31,7 +31,7 @@ export function useAgendaScrollRestore(skip: boolean): {
   initialOffset: number
   initialMeasurementsCache: VirtualItem[]
 } {
-  const { agendaScrollOffset, agendaScrollMeasurements } = useStore.getState()
+  const { agendaScrollOffset, agendaScrollMeasurements } = calendarView.getState()
   return {
     initialOffset: skip ? 0 : agendaScrollOffset,
     initialMeasurementsCache: agendaScrollMeasurements,
@@ -47,8 +47,8 @@ export function useSaveAgendaScroll(
   virtualizer: AgendaVirtualizer,
 ): void {
   useLayoutEffect(() => () => {
-    useStore.setState({
-      agendaScrollOffset: scrollRef.current?.scrollTop ?? useStore.getState().agendaScrollOffset,
+    calendarView.setState({
+      agendaScrollOffset: scrollRef.current?.scrollTop ?? calendarView.getState().agendaScrollOffset,
       agendaScrollMeasurements: virtualizer.takeSnapshot(),
     })
   }, [scrollRef, virtualizer])

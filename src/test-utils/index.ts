@@ -1,7 +1,7 @@
 import { afterEach, beforeEach } from 'vitest'
 import { useStore } from '@/store'
 import { setEntityPersistence } from '@/persistencePort'
-import { resetExpansionCache, resetAgendaSectionsCache } from '@/calendar'
+import { resetExpansionCache, resetAgendaSectionsCache, resetCalendarViewState } from '@/calendar'
 import type { Occurrence, StoreSeries, StoreItem, Roots, FileMetadata } from '@/types'
 
 const initialStoreState = useStore.getInitialState()
@@ -14,12 +14,14 @@ export function setupStore(): void {
   afterEach(() => {
     useStore.setState(initialStoreState, true)
     // The expansion and agenda-sections caches (src/calendar/useExpandWithMultiday.ts,
-    // src/calendar/useAgendaSections.ts) are now module-level singletons shared
-    // across renders, so they survive past a single test unless cleared —
-    // without this, one test's cached window/sections could leak into the
-    // next when both use structurally-identical items.
+    // src/calendar/useAgendaSections.ts) and the calendar view-state store
+    // (src/calendar/viewState.ts) are module-level singletons shared across
+    // renders, so they survive past a single test unless cleared — without
+    // this, one test's cached window/sections/scroll snapshot could leak into
+    // the next when both use structurally-identical items.
     resetExpansionCache()
     resetAgendaSectionsCache()
+    resetCalendarViewState()
   })
 }
 
