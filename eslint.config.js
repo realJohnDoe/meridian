@@ -231,10 +231,15 @@ export default [
     rules: { 'import-x/no-internal-modules': 'off' },
   },
 
-  // Exactly one file may import each of these two libraries: the store
-  // singleton (src/store.ts) and the Dexie cache (src/storage/cache.ts).
+  // The global app store (src/store.ts) and the Dexie cache (src/storage/cache.ts)
+  // are each singletons: exactly one file may import their underlying library.
   // Everything else goes through @/storeBridge and @/storage/cache's exported
-  // functions. Machine-enforces what was previously only a convention.
+  // functions. src/calendar/viewState.ts is a second, deliberately separate
+  // Zustand store scoped to calendar-view-local ephemeral state (scroll
+  // position, carousel previews) — not the global store, so it's exempted
+  // here too, but it must still be reached through the @/calendar barrel like
+  // any other feature-internal state (enforced by no-restricted-paths above).
+  // Machine-enforces what was previously only a convention.
   //
   // ORDERING: this block must stay ABOVE the src/model/** block below. Flat
   // config replaces a rule's options wholesale rather than merging them, so a
@@ -243,7 +248,7 @@ export default [
   // repeats `zustand` and `dexie` itself.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/store.ts', 'src/storage/cache.ts'],
+    ignores: ['src/store.ts', 'src/storage/cache.ts', 'src/calendar/viewState.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
