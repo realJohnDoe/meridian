@@ -71,24 +71,6 @@ Ranked by (impact × breadth) ÷ effort. **Recommended model** replaces a plain 
 
 ---
 
-### F4 — Editor decorations rebuild over the whole document on every keystroke
-
-- **Flows affected:** 7 (typing in the editor). Hit **every keystroke**, but the cost scales with note length — negligible on typical short entries, painful on long ones.
-- **Category:** `editor-latency`
-- **Impact:** **5** — imperceptible on the common short note (0.1 ms), but a clear scaling cliff: a large note drops well below the 60 fps budget on every keypress, and the task plugin has the same shape (doubling it).
-- **Baseline measurement:** Tiny generated body (1 line, 2 links, 84 chars): wikilink `build()` **≈ 0.1 ms/keystroke**. After replacing the body with a **400-line / ~32 KB / 400-wikilink** doc: **~20–31 ms/keystroke, spiking to 84–99 ms** (10 consecutive inserts logged: `[26.3, 99.2, 21.9, 25.9, 24.2, 21.7, 20.4, 84.2, 31.3, 24.8]`).
-- **Measurement recipe:**
-  1. Open any entry. In `wikilinkDecorations.ts` `build()`, wrap the body in a `performance.now()` delta pushed to `window.__wlLog`.
-  2. In the page, get the view (`document.querySelector('.cm-content')` → CM `EditorView`), `dispatch` a 400-line doc with `[[link-N]]` per line, then dispatch 10 single-char inserts; read `window.__wlLog`.
-  3. After fix, re-run on the same doc: per-keystroke should be flat (viewport-bounded), not O(doc).
-- **Breadth:** 2 plugins, both whole-doc-per-keystroke. Files: `src/editor/cm/wikilinkDecorations.ts`, `src/editor/cm/taskDecorations.ts`.
-- **Recommended model:** **Sonnet 5** — restricting to `view.visibleRanges` is an idiomatic CM6 pattern, but the hazard is that it means parsing substrings instead of `doc.toString()`, and the position offsets have to be re-based correctly or chips render over the wrong text (visually obvious, but easy to ship if nobody looks). `RangeSetBuilder` also requires ranges added in ascending order. Worth asking for a decoration-position test alongside the change, since `taskLines.test.ts` covers the line map but not the resulting ranges.
-- **Evidence:** `src/editor/cm/wikilinkDecorations.ts:92`: `const allLinks = parseWikilinks(doc.toString())` (re-parses the entire document) followed by `src/editor/cm/wikilinkDecorations.ts:100`: `for (let i = 1; i <= doc.lines; i++) {` (iterates every line), rebuilt whenever `update.docChanged` fires.
-- **Problem:** Each keystroke re-parses and re-scans the whole document to rebuild decorations, so editing a long note stutters even though only the edited line changed.
-- **Fix:** Scope the rebuild to the viewport + changed ranges (`update.view.visibleRanges`, `update.changes`), or cache the parse per doc-version. Expected: per-keystroke ~25 ms → ~1 ms on the 400-line doc, independent of length.
-
----
-
 ### F5 — Octokit (GitHub backend) is eagerly bundled into the main entry chunk
 
 - **Flows affected:** 6 (cold start). Paid on **every launch**, by every user, regardless of backend.
