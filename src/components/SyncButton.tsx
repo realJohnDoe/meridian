@@ -9,6 +9,7 @@ export default function SyncButton() {
   const syncDirtyCount = useStore(s => s.syncDirtyCount)
   const syncError      = useStore(s => s.syncError)
   const syncOffline    = useStore(s => s.syncOffline)
+  const syncInProgress = useStore(s => s.syncInProgress)
   const lastSyncedAt   = useStore(s => s.lastSyncedAt)
 
   const isPending = syncOffline || syncDirtyCount > 0
@@ -32,11 +33,15 @@ export default function SyncButton() {
           style={{ color }}
           aria-label="Sync status"
         >
-          <RefreshCw size={18} />
+          <RefreshCw size={18} className={syncInProgress ? 'animate-spin' : undefined} />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3 space-y-2" align="end">
         <p className="text-xs text-muted-foreground">{lastSyncedText}</p>
+
+        {syncInProgress && (
+          <p className="text-xs text-muted-foreground">Syncing…</p>
+        )}
 
         {syncDirtyCount > 0 && (
           <p className="text-xs text-warning">

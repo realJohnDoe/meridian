@@ -53,11 +53,21 @@ interface MeridianStore {
   syncError: string | null
   /** True when the last sync attempt failed due to a transient network/offline error. */
   syncOffline: boolean
+  /**
+   * True while a sync cycle is running. Distinct from `vaultLoading`: content
+   * is already on screen, it's just being refreshed in the background.
+   */
+  syncInProgress: boolean
   /** Timestamp (ms) of the last successful sync, or null if never synced this session. */
   lastSyncedAt: number | null
 
   // ── Vault loading ─────────────────────────────────────────────────
-  /** True from app start until restoreVaults() settles — distinguishes "loading" from "empty". */
+  /**
+   * True while there is nothing to show yet. Cleared as soon as the vault's
+   * cached content is painted (which happens before any network work), so a
+   * previously-loaded vault never sits behind a skeleton waiting on a sync.
+   * Only stays true through activation when the cache was empty.
+   */
   vaultLoading: boolean
   /**
    * Non-null while a backend's readAll() is reporting progress on a bulk load
@@ -151,6 +161,7 @@ export const useStore = create<MeridianStore>((set, get) => {
     syncDirtyCount: 0,
     syncError:      null,
     syncOffline:    false,
+    syncInProgress: false,
     lastSyncedAt:   null,
 
     vaultLoading: true,
