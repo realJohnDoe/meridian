@@ -119,7 +119,7 @@ occurrences, and what happens to the file when you cancel or move one. It was ge
 useful for about a week, while I chased the worst of the recurrence bugs; afterwards I
 half-considered deleting it again.
 
-![The inheritance debugger — source YAML on the left, the effective tree in the middle, and the expanded list of occurrences on the right.](images/inheritance-debugger.png)
+![The inheritance debugger — source YAML on the left, the effective tree in the middle, and the expanded list of occurrences on the right.](images/inheritance-debugger.webp)
 
 _The recurrence debugger: source YAML on the left, its expanded occurrences on the right. Cheap to build, and it turned opaque expansion bugs into something I could just look at._
 
