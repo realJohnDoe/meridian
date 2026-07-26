@@ -73,14 +73,6 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 - **Problem:** The mapping between on-disk path and store slug — a genuine domain rule — has four inline copies and no canonical function, which is also what lets #2's read/write asymmetry hide.
 - **Fix:** Introduce `pathToSlug`/`slugToPath` next to `titleToSlug` in `fileIO.ts` and route all four sites (and #2's write path) through them.
 
-### #7 — `diskDelete` swallows every error, silently masking failed local-vault deletes
-
-- **Category:** `error-handling`
-- **Impact:** 3 · **Breadth:** 1 file · **Recommended model:** Sonnet 5 — a naive re-throw breaks idempotent delete of an already-gone file (`removeEntry` throws `NotFoundError`), wedging sync in a retry loop; the fix must mirror the GitHub backend's 404-as-success handling and surface only _real_ errors. The hazard is exactly that silent-vs-loud boundary.
-- **Evidence:** `storage/fs.ts:185-188` — `try { const [dir, name] = await resolveParentDir(dh, path); await dir.removeEntry(name) } catch { }`. Compare `githubBackend.ts:290-299`, which treats a 404 as success but re-throws real errors, and `sync.ts`/`deleteFromBackend`, which `notifyError` on failure.
-- **Problem:** A local delete that fails for a real reason (permission, locked file) is swallowed, so `pushDirty` treats it as success and confirms the tombstone — the file lingers on disk while the app forgets it, inconsistent with every other delete path.
-- **Fix:** Catch and swallow only `NotFoundError` (already-gone = success); re-throw everything else so the existing sync error surface handles it.
-
 ### #8 — Repeated inline pluralization in `format.ts`
 
 - **Category:** `dry`
