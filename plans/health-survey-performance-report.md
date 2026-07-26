@@ -51,26 +51,6 @@ Ranked by (impact × breadth) ÷ effort. **Recommended model** replaces a plain 
 
 ---
 
-### F1 — The Overdue section is one un-row-virtualized block; thousands of rows mount in a single commit
-
-- **Flows affected:** 2 (scrolling up through the agenda, and the **Today** button — `goToday` targets the overdue index), 6 (cold start when that scroll fires), 1 (toggling a task _inside_ overdue). Hit **every time the overdue section enters the viewport.**
-- **Category:** `render-amplification` `memory-and-leak` (scaling cliff that worsens as undone recurring/overdue tasks accumulate over a vault's life)
-- **Impact:** **10** — a multi-second full freeze on an everyday navigation.
-- **Baseline measurement:** On the 300-file vault the single overdue section contains **6,789 occurrences**. Dispatching a scroll that brought it into view mounted **6,937 `OccurrenceRow` components** (counted via a body-level render counter) in **one synchronous commit measured at ~12,900 ms** of blocked main thread (dev). Repeated attempts to read the DOM during the mount timed out (tab frozen). By contrast, the agenda at rest holds **12** rows.
-- **Measurement recipe:**
-  1. Enable big vault (`localStorage.setItem('meridian_bigvault','300')`), reload, skip tour.
-  2. In `useAgendaSections`'s `sections` memo, temporarily record `out.find(s=>s.kind==='overdue').items.length` → `window.__sec.overdueRows` (read: **6789**).
-  3. In `OccurrenceRow` body: `window.__rc.OccurrenceRow = (…||0)+1`.
-  4. In the page: `const sc=document.querySelector('.overflow-y-auto'); window.__rc={}; const t0=performance.now(); sc.scrollTop=30000; sc.dispatchEvent(new Event('scroll')); void sc.offsetHeight; /* → tSyncMs≈12921, rows=6937 */`.
-  5. Re-measure after fix: the same scroll should mount **≤ (viewport rows + overscan)**, i.e. tens, not thousands.
-- **Breadth:** 1 section component fans out to ~6,900 rows (count from the render counter). Files: `src/calendar/OverdueSection.tsx`, `src/calendar/AgendaView.tsx`, `src/calendar/useAgendaSections.ts`.
-- **Recommended model:** **Opus 5, plan mode (multi-PR)** — two of the three hard parts aren't code. First, a genuine product call: cap the overdue section with a "show more" (small, ships this week, leaves the cliff at the cap) versus flattening sections+rows into one virtual list (correct, much larger). Second, flattening ripples through things that are load-bearing and non-obvious: `estimateSection`, the persisted `agendaScrollOffset`/`agendaScrollMeasurements` restore, `goToIndex`'s scroll-to-today, the `updateTopDate` scroll listener that maps a virtual index back to a section's `dateKey`, and the `FlipList` animations that currently assume a section owns its rows. That wants a written plan and staged PRs, not one pass.
-- **Evidence:** The virtualizer counts **sections**, not rows — `src/calendar/AgendaView.tsx:62`: `const virtualizer = useVirtualizer({` / `count: sections.length,` — and the overdue section renders every item with no inner cap, `src/calendar/OverdueSection.tsx:29`: `{items.map(o => (` … while `src/calendar/useAgendaSections.ts:107` pours _all_ overdue occurrences into that one section: `if (overdueItems.length > 0) {` / `out.push({ kind: 'overdue', key: '__overdue__', items: overdueItems })` / `}`
-- **Problem:** Because virtualization is section-granular and the overdue section is unbounded, the moment it scrolls into view React mounts one row component per overdue occurrence at once — thousands of touch-listener effects, `useState`s and backlink lookups in a single commit — freezing the app for seconds.
-- **Fix:** Virtualize _rows_ (flatten sections+rows into one flat virtual list, or paginate/cap the overdue section with a "show more"). Expected: rows mounted per scroll should drop from **~6,937 to a few dozen**, and the freeze from seconds to one frame.
-
----
-
 ### F5 — Octokit (GitHub backend) is eagerly bundled into the main entry chunk
 
 - **Flows affected:** 6 (cold start). Paid on **every launch**, by every user, regardless of backend.
