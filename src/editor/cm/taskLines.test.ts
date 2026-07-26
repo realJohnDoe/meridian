@@ -103,4 +103,40 @@ describe('buildTaskLineMap', () => {
     expect(map.size).toBe(1)
     expect(map.get(0)!.done).toBe(false)
   })
+
+  describe('ranges param (viewport scoping)', () => {
+    it('only finds tasks whose line falls inside the given ranges', () => {
+      const doc = '- [ ] first\n- [x] second\n- [ ] third'
+      const state = mkState(doc)
+      const line1 = state.doc.line(1)
+
+      // Restrict the walk to line 1 only — line 3's task must not appear.
+      const map = buildTaskLineMap(state, [{ from: line1.from, to: line1.to }])
+      expect([...map.keys()]).toEqual([line1.from])
+      expect(map.get(line1.from)!.done).toBe(false)
+    })
+
+    it('covers every task when the ranges union spans the whole document', () => {
+      const doc = '- [ ] first\n- [x] second\n- [ ] third'
+      const state = mkState(doc)
+      const full = buildTaskLineMap(state)
+      const ranged = buildTaskLineMap(state, [{ from: 0, to: state.doc.length }])
+      expect([...ranged.entries()]).toEqual([...full.entries()])
+    })
+
+    it('does not use or pollute the whole-document WeakMap cache', () => {
+      const state = mkState('- [ ] first\n- [ ] second')
+      const line2 = state.doc.line(2)
+
+      // A ranged call scoped to line 2 only should not see line 1's task…
+      const ranged = buildTaskLineMap(state, [{ from: line2.from, to: line2.to }])
+      expect(ranged.size).toBe(1)
+      expect(ranged.has(line2.from)).toBe(true)
+
+      // …and must not have cached that partial result under the plain
+      // (no-range) call, which should still see both tasks.
+      const full = buildTaskLineMap(state)
+      expect(full.size).toBe(2)
+    })
+  })
 })

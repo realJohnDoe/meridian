@@ -7,7 +7,7 @@ import {
 import { syntaxTree } from '@codemirror/language'
 import { createElement } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
-import { focusedCursorLines } from './viewUtils'
+import { focusedCursorLines, visibleLineRanges } from './viewUtils'
 import { buildTaskLineMap } from './taskLines'
 import { ReactWidget } from './ReactWidget'
 
@@ -40,11 +40,11 @@ class CheckboxWidget extends ReactWidget {
 
 // ── Build decorations ─────────────────────────────────────────────
 
-function build(view: EditorView): DecorationSet {
+export function build(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   const { doc } = view.state
   const cursorLines = focusedCursorLines(view)
-  const taskLineMap = buildTaskLineMap(view.state)
+  const taskLineMap = buildTaskLineMap(view.state, visibleLineRanges(view))
 
   for (const [lineFrom, info] of taskLineMap) {
     const line = doc.lineAt(lineFrom)
