@@ -4,7 +4,7 @@ import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useCalendarFilter } from './useCalendarFilter'
 import { computeAgendaSections, type AgendaSectionCache, type Section, type AgendaRow } from './agendaSections'
 
-export { estimateSection, estimateRow, type Section, type AgendaRow } from './agendaSections'
+export { estimateSection, type Section, type AgendaRow } from './agendaSections'
 
 // Asymmetric on purpose: overdue tasks can be arbitrarily old (see the fix
 // that expanded this from 7 to 365 days so old tasks would still surface in

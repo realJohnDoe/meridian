@@ -32,15 +32,11 @@ export type Section =
   | { kind: 'day'; key: string; dateKey: string; date: Date; isToday: boolean; isTomorrow: boolean; items: Occurrence[]; rows: AgendaRow[] }
   | { kind: 'overdue'; key: string; items: Occurrence[]; rows: AgendaRow[] }
 
-// TODO(F1 PR2): AgendaView still virtualizes `Section[]` and calls this: once
-// it switches to virtualizing the flat `rows` list, this is replaced by
-// estimateRow below and can be deleted.
+// TODO(F1 PR2): AgendaView still virtualizes `Section[]` and calls this. Once
+// it switches to virtualizing the flat `rows` list, this is replaced by a
+// per-row estimator (`r.kind === 'header' ? HEADER_H : ROW_H`) and deleted.
 export function estimateSection(s: Section): number {
   return HEADER_H + s.items.length * ROW_H
-}
-
-export function estimateRow(r: AgendaRow): number {
-  return r.kind === 'header' ? HEADER_H : ROW_H
 }
 
 function headerRow(key: string, dateKey: string, label: string, tone: 'default' | 'today' | 'overdue'): AgendaRow {
