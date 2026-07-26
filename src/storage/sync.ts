@@ -14,6 +14,7 @@ import type { StoreItem, Roots } from '@/types'
 import {
   getItems, getRoots, setData,
   setSyncDirtyCount, setSyncError, setSyncOffline, setLastSyncedAt, getSyncError,
+  setSyncInProgress,
 } from '@/storeBridge'
 import { notify, warn, notifyError } from './notifications'
 import { getActiveBackend } from './activeBackend'
@@ -214,6 +215,13 @@ export async function reconcileWithBackend(
   skipPaths: Set<string> = new Set(),
 ): Promise<void> {
   const diskTokens = await backend.statAll()
+  // Deliberately re-read rather than reusing the snapshot activation already
+  // loaded (hydrateFromCache): planReconcile branches on `status === 'clean'`
+  // and on `updatedAt`, and the gap between that hydrate and this call is
+  // unbounded (a token refresh, two round trips, and the user actively
+  // editing the whole time). A stale snapshot could report a record as clean
+  // that has since gone dirty — exactly what planReconcile's freshness checks
+  // exist to prevent. Not an optimisation target.
   const cached     = await cacheLoadAll(vaultId)
   const cacheMap   = new Map(cached.map(r => [r.path, r]))
 
@@ -251,6 +259,13 @@ export async function reconcileWithBackend(
 
   await Promise.all(deleted.map(p => confirmDeleted(vaultId, p)))
   for (const p of deleted) cacheMap.delete(p)
+
+  // Cache writes above are keyed by vaultId and stay correct regardless — but
+  // the store belongs to whichever vault is active *now*. Since activation no
+  // longer awaits the first sync (see syncOnActivate), a sync started at
+  // activation can still be in flight when the user switches vaults; merging
+  // its results would paint the old vault's content over the new one.
+  if (getActiveBackend()?.id !== vaultId) return
 
   const changedWritten = changed.filter(p => written.has(p))
   if (changedWritten.length === 0 && deleted.length === 0) { updateSyncUI(); return }
@@ -378,6 +393,7 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
   }
   if (_syncing) return
   _syncing = true
+  setSyncInProgress(true)
 
   const vaultId = backend.id
   let attemptedRefresh = false
@@ -436,6 +452,7 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
     }
   } finally {
     _syncing = false
+    setSyncInProgress(false)
     // A push that arrived mid-sync was queued (see attemptPush) instead of
     // dropped — re-arm the debounced push now that this sync has settled.
     if (_pushQueued) { _pushQueued = false; scheduleAutoPush() }
@@ -464,6 +481,33 @@ function scheduleAutoPush(): void {
  */
 export function flushPendingPush(): void {
   attemptPush()
+}
+
+/**
+ * The first sync after a vault activates. Replaces the old
+ * `reconcileWithBackend(...)` + `flushPendingPush()` pair at the activation
+ * site, and is deliberately routed through runSync rather than calling
+ * reconcile directly, because runSync is where all four of these live:
+ *
+ *  - pushDirty runs *before* reconcile and feeds its `pushed` set into
+ *    planReconcile's skipPaths — the two used to be independent cycles racing
+ *    each other over an eventually-consistent listing;
+ *  - transient-vs-actionable classification (isTransientSyncError) and the
+ *    retry backoff, so an offline activation degrades instead of throwing;
+ *  - setLastSyncedAt — reconcileWithBackend never set it, which is why
+ *    SyncButton read "Not synced yet" for 60s after every startup;
+ *  - the retry-after-401 forced token refresh.
+ *
+ * `silent: true`: an offline start must not toast. The backoff is reset
+ * first — a fresh activation is a deliberate user-visible moment and deserves
+ * an attempt regardless of the previous session's failures.
+ *
+ * Never rejects (runSync swallows everything in its own catch), so callers can
+ * fire-and-forget without risking an unhandled rejection.
+ */
+export async function syncOnActivate(): Promise<void> {
+  resetSyncBackoff()
+  await runSync({ silent: true, pull: true })
 }
 
 export function autoSyncTick(): void {

@@ -28,6 +28,7 @@ const { cacheStore, storeState, notifyFns } = vi.hoisted(() => ({
     syncDirtyCount: 0,
     syncError: null as string | null,
     syncOffline: false,
+    syncInProgress: false,
     lastSyncedAt: null as number | null,
   },
   notifyFns: { notify: vi.fn(), warn: vi.fn(), notifyError: vi.fn() },
@@ -117,6 +118,7 @@ vi.mock('@/storeBridge', () => ({
   setSyncError: vi.fn((e: string | null) => { storeState.syncError = e }),
   getSyncError: vi.fn(() => storeState.syncError),
   setSyncOffline: vi.fn((o: boolean) => { storeState.syncOffline = o }),
+  setSyncInProgress: vi.fn((r: boolean) => { storeState.syncInProgress = r }),
   setLastSyncedAt: vi.fn((ts: number | null) => { storeState.lastSyncedAt = ts }),
 }))
 
@@ -124,7 +126,7 @@ vi.mock('@/storage/notifications', () => notifyFns)
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, writeEntityToCache, reconcileWithBackend } from '@/storage/sync'
+import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend } from '@/storage/sync'
 import { setActiveBackend } from '@/storage/activeBackend'
 import { recordLocalEdit, recordLocalDelete } from '@/storage/cache'
 
@@ -276,6 +278,7 @@ beforeEach(() => {
   storeState.syncDirtyCount = 0
   storeState.syncError = null
   storeState.syncOffline = false
+  storeState.syncInProgress = false
   storeState.lastSyncedAt = null
   notifyFns.notify.mockClear()
   notifyFns.warn.mockClear()
@@ -704,6 +707,39 @@ describe('reconcileWithBackend — a local edit landing mid-reconcile is not clo
   })
 })
 
+// ── reconcileWithBackend — vault switched underneath an in-flight sync ───
+//
+// Newly reachable now that activation fires its first sync un-awaited: the
+// user can switch vaults while it is still running. The cache writes stay
+// correct either way (they are keyed by vaultId), but merging into the store
+// would paint the old vault's content over the newly-selected one.
+
+describe('reconcileWithBackend — the active vault changing mid-flight', () => {
+  it('still writes the cache but does not merge into the store when the active vault changed', async () => {
+    const backend = new FakeBackend()
+    backend.seed('note.md', 'remote v2', 'v2')
+    setActiveBackend(backend)
+    seedClean('fake-vault', 'note.md', 'remote v1', 'v1', Date.now())
+    storeState.items = [{ fileSlug: 'belongs-to-the-other-vault' }]
+
+    const release = backend.blockNextReadFiles()
+    const reconcilePromise = reconcileWithBackend(backend, 'fake-vault')
+    await flush()
+
+    // The user switches vaults while readFiles is still in flight.
+    const other = new FakeBackend()
+    Object.defineProperty(other, 'id', { value: 'other-vault' })
+    setActiveBackend(other)
+    release()
+    await reconcilePromise
+
+    // Cache write completed — it is keyed by vaultId and stays correct.
+    expect(cacheStore.get(vp('fake-vault', 'note.md'))?.content).toBe('remote v2')
+    // ...but the store still belongs to whichever vault is active now.
+    expect(storeState.items).toEqual([{ fileSlug: 'belongs-to-the-other-vault' }])
+  })
+})
+
 // ── Debounced push queued (not dropped) while a sync is already running ────
 
 describe('scheduleAutoPush / attemptPush — never strand a push dropped mid-sync', () => {
@@ -764,6 +800,80 @@ describe('flushPendingPush', () => {
 
     expect(backend.writeCallCount).toBe(0)
     expect(backend.statAllCallCount).toBe(0) // pull:false — no reconcile triggered either
+  })
+})
+
+// ── syncOnActivate ──────────────────────────────────────────────────────
+//
+// The first sync after a vault activates. Routed through runSync rather than
+// calling reconcileWithBackend directly, which is what gives it pushDirty
+// (subsuming the activation-site flushPendingPush), transient classification,
+// and setLastSyncedAt. Activation fires it un-awaited on the painted path, so
+// "never rejects" is a hard requirement, not a nicety.
+
+describe('syncOnActivate', () => {
+  it('pushes a previous session\'s dirty record and pulls remote changes in one cycle', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    // Stranded by a previous session — the old flushPendingPush()'s job.
+    seedDirty('fake-vault', 'stranded.md', 'written while offline', undefined)
+    // Landed on the backend since we last looked — the reconcile's job.
+    backend.seed('remote.md', '# From another device', 'v-remote')
+
+    await syncOnActivate()
+
+    expect(backend.writeCallCount).toBe(1)
+    expect(backend.get('stranded.md')?.content).toBe('written while offline')
+    expect(cacheStore.get(vp('fake-vault', 'remote.md'))?.content).toBe('# From another device')
+  })
+
+  it('sets lastSyncedAt, so the sync status does not read "Not synced yet" right after startup', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+
+    await syncOnActivate()
+
+    expect(storeState.lastSyncedAt).not.toBeNull()
+  })
+
+  it('resolves rather than rejecting when the backend is unreachable, and does not notify', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    backend.queueStatAllError(new TransientSyncError('offline'))
+
+    // Activation fires this un-awaited; a rejection here would surface as an
+    // unhandled rejection rather than a degraded-to-offline vault.
+    await expect(syncOnActivate()).resolves.toBeUndefined()
+
+    expect(storeState.syncOffline).toBe(true)
+    expect(notifyFns.notify).not.toHaveBeenCalled()
+  })
+
+  it('bypasses the backoff gate that would silence an autoSyncTick', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    // Arm the backoff with a failed sync.
+    backend.queueStatAllError(new TransientSyncError('offline'))
+    await syncToBackend()
+    expect(backend.statAllCallCount).toBe(1)
+
+    // A tick is gated by the backoff...
+    autoSyncTick()
+    await flush()
+    expect(backend.statAllCallCount).toBe(1)
+
+    // ...but a fresh activation is a deliberate moment and always attempts.
+    await syncOnActivate()
+    expect(backend.statAllCallCount).toBe(2)
+  })
+
+  it('clears syncInProgress once the cycle settles', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+
+    await syncOnActivate()
+
+    expect(storeState.syncInProgress).toBe(false)
   })
 })
 

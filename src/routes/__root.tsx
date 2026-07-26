@@ -45,8 +45,9 @@ function Root() {
       if (document.visibilityState !== 'visible') {
         // Best-effort: push anything dirty before the tab is backgrounded (or
         // closed) instead of waiting up to 60s for the next autoSyncTick.
-        // vault-activation's own flushPendingPush() is the guarantee — this
-        // just narrows the window in the common case.
+        // The next activation's own syncOnActivate() is the guarantee (its
+        // pushDirty leg rescues whatever this missed) — this just narrows the
+        // window in the common case.
         flushPendingPush()
         return
       }

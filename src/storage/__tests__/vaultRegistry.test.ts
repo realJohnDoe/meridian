@@ -16,22 +16,41 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { VaultRef } from '@/types'
 import type { PermissionOutcome } from '@/storage/backend'
-import { TransientSyncError } from '@/storage/conflictError'
 
-const { metaStore, storeState, notifyFns, syncFns, backendConfig } = vi.hoisted(() => {
+/** A promise plus its resolver, for tests that need to hold an await open. */
+interface Gate { promise: Promise<void>; release: () => void }
+
+/** Builds a gate a test can hold closed, then release to let an await proceed. */
+function makeGate(): Gate {
+  let release!: () => void
+  const promise = new Promise<void>(res => { release = res })
+  return { promise, release }
+}
+
+const {
+  metaStore, storeState, notifyFns, syncFns, backendConfig, cacheConfig, callOrder,
+} = vi.hoisted(() => {
   const backendConfig: {
     localPermission: PermissionOutcome
     githubPermission: PermissionOutcome
     exampleReadAllError: Error | null
-    reconcileError: Error | null
+    /** When set, ensurePermission awaits this before answering. */
+    permissionGate: Gate | null
   } = {
     localPermission: 'granted',
     githubPermission: 'granted',
     exampleReadAllError: null,
-    reconcileError: null,
+    permissionGate: null,
   }
   return {
+    backendConfig,
     metaStore: new Map<string, unknown>(),
+    /** Records which collaborator ran when, for ordering assertions. */
+    callOrder: [] as string[],
+    cacheConfig: {
+      /** Cached rows per vault id, as cacheLoadAll would return them. */
+      rows: new Map<string, Array<{ path: string; content: string }>>(),
+    },
     storeState: {
       items: [] as unknown[],
       roots: new Map<string, unknown>(),
@@ -44,20 +63,26 @@ const { metaStore, storeState, notifyFns, syncFns, backendConfig } = vi.hoisted(
     },
     notifyFns: { notify: vi.fn(), notifyError: vi.fn(), warn: vi.fn() },
     syncFns: {
-      reconcileWithBackend: vi.fn(async () => {
-        if (backendConfig.reconcileError) throw backendConfig.reconcileError
-      }),
-      parseFiles: vi.fn((_files: Array<{ path: string; content: string }>) => ({ items: [], roots: new Map() })),
+      // Stands in for the real syncOnActivate, which never rejects (runSync
+      // swallows its own errors) — so this never throws either.
+      syncOnActivate: vi.fn(async () => {}),
+      // Echo one item/root per file so "did the cache paint?" is observable
+      // via storeState.items.length.
+      parseFiles: vi.fn((files: Array<{ path: string; content: string }>) => ({
+        items: files.map(f => ({ fileSlug: f.path })),
+        roots: new Map(files.map(f => [f.path, { body: f.content }])),
+      })),
       updateSyncUI: vi.fn(),
-      flushPendingPush: vi.fn(),
     },
-    backendConfig,
   }
 })
 
 vi.mock('@/storage/cache', () => ({
   cacheInit: vi.fn(async () => {}),
-  cacheLoadAll: vi.fn(async () => []),
+  cacheLoadAll: vi.fn(async (vaultId: string) => {
+    callOrder.push('cacheLoadAll')
+    return cacheConfig.rows.get(vaultId) ?? []
+  }),
   applyRemoteBatch: vi.fn(async () => []),
   cacheDeleteAll: vi.fn(async (vaultId: string) => {
     for (const k of Array.from(metaStore.keys())) if (k.startsWith(`files:${vaultId}:`)) metaStore.delete(k)
@@ -87,7 +112,11 @@ vi.mock('@/storage/localBackend', () => ({
     readonly kind = 'local'
     readonly readOnly = false
     constructor(public id: string, public name: string, public handle: unknown) {}
-    async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> { return backendConfig.localPermission }
+    async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> {
+      callOrder.push('ensurePermission')
+      if (backendConfig.permissionGate) await backendConfig.permissionGate.promise
+      return backendConfig.localPermission
+    }
     async statAll() { return new Map<string, string>() }
     async readFiles() { return [] }
     async readAll() { return [] }
@@ -101,7 +130,11 @@ vi.mock('@/storage/githubBackend', () => ({
     readonly kind = 'github'
     readonly readOnly = false
     constructor(public id: string, public name: string, public cfg: unknown) {}
-    async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> { return backendConfig.githubPermission }
+    async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> {
+      callOrder.push('ensurePermission')
+      if (backendConfig.permissionGate) await backendConfig.permissionGate.promise
+      return backendConfig.githubPermission
+    }
     async statAll() { return new Map<string, string>() }
     async readFiles() { return [] }
     async readAll() { return [] }
@@ -170,17 +203,18 @@ beforeEach(() => {
   storeState.vaultLoading = false
   storeState.vaultLoadProgress = null
   storeState.syncOffline = false
+  cacheConfig.rows.clear()
+  callOrder.length = 0
   notifyFns.notify.mockClear()
   notifyFns.notifyError.mockClear()
   notifyFns.warn.mockClear()
-  syncFns.reconcileWithBackend.mockClear()
+  syncFns.syncOnActivate.mockClear()
   syncFns.parseFiles.mockClear()
   syncFns.updateSyncUI.mockClear()
-  syncFns.flushPendingPush.mockClear()
   backendConfig.localPermission = 'granted'
   backendConfig.githubPermission = 'granted'
   backendConfig.exampleReadAllError = null
-  backendConfig.reconcileError = null
+  backendConfig.permissionGate = null
   vi.mocked(ensureFreshAccessToken).mockReset()
   setActiveBackend(null)
 })
@@ -209,7 +243,7 @@ describe('restoreVaults — local vault', () => {
     await restoreVaults()
 
     expect(storeState.activeVaultId).toBe('example')
-    expect(syncFns.reconcileWithBackend).not.toHaveBeenCalled()
+    expect(syncFns.syncOnActivate).not.toHaveBeenCalled()
   })
 
   it('activates the vault as writable when permission is already granted', async () => {
@@ -220,8 +254,10 @@ describe('restoreVaults — local vault', () => {
 
     expect(storeState.activeVaultId).toBe(LOCAL_REF.id)
     expect(metaStore.get('activeVaultId')).toBe(LOCAL_REF.id)
-    expect(syncFns.reconcileWithBackend).toHaveBeenCalledTimes(1)
-    expect(syncFns.flushPendingPush).toHaveBeenCalledTimes(1)
+    // No separate flushPendingPush assertion: syncOnActivate subsumes it —
+    // it routes through runSync, whose pushDirty leg rescues a previous
+    // session's dirty records in the same cycle as the reconcile.
+    expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
   })
 
   it('marks a pending reconnect (without reconciling) when permission needs a user gesture', async () => {
@@ -235,7 +271,9 @@ describe('restoreVaults — local vault', () => {
     // Persisted even on the "prompt" path — persist:false is only for the
     // error-fallback path, not for this one.
     expect(metaStore.get('activeVaultId')).toBe(LOCAL_REF.id)
-    expect(syncFns.reconcileWithBackend).not.toHaveBeenCalled()
+    // Parked, not activated: no sync is started for a vault still waiting on
+    // a user gesture to re-grant permission.
+    expect(syncFns.syncOnActivate).not.toHaveBeenCalled()
     expect(syncFns.updateSyncUI).toHaveBeenCalledTimes(1)
   })
 
@@ -272,7 +310,7 @@ describe('restoreVaults — github vault', () => {
     await restoreVaults()
 
     expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
-    expect(syncFns.reconcileWithBackend).toHaveBeenCalledTimes(1)
+    expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
   })
 
   it('notifies and falls back to example when permission is not granted', async () => {
@@ -312,28 +350,88 @@ describe('restoreVaults — github vault', () => {
     expect(getActiveBackend()?.readOnly).toBe(false)
   })
 
-  it('a transient reconcile failure leaves the vault active and sets syncOffline, instead of falling back to example', async () => {
+  // Transient-vs-actionable classification now lives in runSync, which
+  // syncOnActivate routes through and which never rethrows — see the
+  // syncOnActivate suite in sync.test.ts. What still matters *here* is that a
+  // background sync blowing up cannot tear down an already-painted vault,
+  // which is what the `void … .catch()` in activateWritableVault guarantees.
+  it('a rejecting activation sync does not tear down an already-painted vault', async () => {
     vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
     backendConfig.githubPermission = 'granted'
-    backendConfig.reconcileError = new TransientSyncError('offline')
-
-    await restoreVaults()
-
-    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
-    expect(storeState.syncOffline).toBe(true)
-    expect(notifyFns.notify).not.toHaveBeenCalled()
-  })
-
-  it('an actionable reconcile failure still falls back to example', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
-    backendConfig.githubPermission = 'granted'
-    backendConfig.reconcileError = new Error('boom')
+    cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'note.md', content: '# Note' }])
+    syncFns.syncOnActivate.mockRejectedValueOnce(new Error('boom'))
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     await restoreVaults()
 
-    expect(storeState.activeVaultId).toBe('example')
+    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
+    expect(storeState.items).toHaveLength(1)
     spy.mockRestore()
+  })
+})
+
+// ── restoreVaults — cache-first paint ────────────────────────────────────
+//
+// The startup complaint these cover: the skeleton used to stay up for the
+// whole serial chain (token refresh → 2 permission round trips → statAll +
+// readFiles), even though the cache already held complete, correct content.
+
+describe('restoreVaults — cache-first paint', () => {
+  beforeEach(() => {
+    metaStore.set('vaults', [GITHUB_REF])
+    metaStore.set('activeVaultId', GITHUB_REF.id)
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    storeState.vaultLoading = true
+  })
+
+  it('paints cached content and clears the skeleton without waiting on ensurePermission', async () => {
+    cacheConfig.rows.set(GITHUB_REF.id, [
+      { path: 'a.md', content: '# A' },
+      { path: 'b.md', content: '# B' },
+    ])
+    const gate = makeGate()
+    backendConfig.permissionGate = gate
+
+    const restoring = restoreVaults()
+
+    // While the permission probe is still blocked, the agenda must already
+    // have real content and no skeleton. This is the load-bearing assertion:
+    // it fails if hydrateFromCache ever moves back below the network work.
+    await vi.waitFor(() => { expect(storeState.items).toHaveLength(2) })
+    expect(storeState.vaultLoading).toBe(false)
+
+    gate.release()
+    await restoring
+    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
+  })
+
+  it('reads the cache before probing permission, and only once', async () => {
+    cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
+
+    await restoreVaults()
+
+    // Ordering, not just presence: a future refactor that hydrates after the
+    // permission check would still pass a "was it called?" assertion.
+    expect(callOrder.indexOf('cacheLoadAll')).toBeLessThan(callOrder.indexOf('ensurePermission'))
+    // prePainted threads through activateVaultRef, so the same rows are not
+    // re-read on the way into activateWritableVault.
+    expect(callOrder.filter(c => c === 'cacheLoadAll')).toHaveLength(1)
+  })
+
+  it('keeps the skeleton up until the first sync settles when the cache is empty', async () => {
+    // No cached rows — the skeleton is the only thing on screen, so clearing
+    // it before the sync fills the store would flash an empty agenda.
+    const gate = makeGate()
+    syncFns.syncOnActivate.mockImplementationOnce(async () => { await gate.promise })
+
+    const restoring = restoreVaults()
+
+    await vi.waitFor(() => { expect(syncFns.syncOnActivate).toHaveBeenCalled() })
+    expect(storeState.vaultLoading).toBe(true)
+
+    gate.release()
+    await restoring
+    expect(storeState.vaultLoading).toBe(false)
   })
 })
 
@@ -424,7 +522,7 @@ describe('setActiveVault', () => {
       await setActiveVault(LOCAL_REF.id)
 
       expect(storeState.activeVaultId).toBe(LOCAL_REF.id)
-      expect(syncFns.reconcileWithBackend).toHaveBeenCalledTimes(1)
+      expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -457,7 +555,7 @@ describe('setActiveVault', () => {
       await setActiveVault(GITHUB_REF.id)
 
       expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
-      expect(syncFns.reconcileWithBackend).toHaveBeenCalledTimes(1)
+      expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
     })
 
     it('activates as writable and warns instead of blaming the token when offline', async () => {
@@ -470,6 +568,21 @@ describe('setActiveVault', () => {
       expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining(GITHUB_REF.name))
       expect(notifyFns.notify).not.toHaveBeenCalled()
     })
+  })
+
+  it('does not leak the previous vault\'s entries when switching to a never-loaded vault', async () => {
+    // hydrateFromCache used to return early on an empty cache, leaving the
+    // old vault's items in the store — and the reconcile that follows won't
+    // evict them, since mergeChangedIntoStore preserves unaffected slugs.
+    storeState.vaults = [LOCAL_REF, GITHUB_REF]
+    storeState.items = [{ fileSlug: 'stale-from-previous-vault.md' }]
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    backendConfig.githubPermission = 'granted'
+
+    await setActiveVault(GITHUB_REF.id)
+
+    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
+    expect(storeState.items).toHaveLength(0)
   })
 
   it('silently ignores an AbortError (e.g. a directory-picker style cancel)', async () => {

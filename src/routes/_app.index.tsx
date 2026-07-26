@@ -27,9 +27,13 @@ function AgendaSkeleton() {
 
 function AgendaPage() {
   const vaultLoading = useStore(s => s.vaultLoading)
+  const items = useStore(s => s.items)
   const onOpen = useOpenEntry()
 
-  if (vaultLoading) {
+  // Skeleton only when there is genuinely nothing to show. Once the cache has
+  // painted, the agenda renders immediately and the background sync refines it
+  // in place — matching the entry route's `vaultLoading && !occ` guard.
+  if (vaultLoading && items.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]">
         <AgendaSkeleton />
