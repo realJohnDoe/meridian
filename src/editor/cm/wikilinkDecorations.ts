@@ -10,7 +10,7 @@ import { parseWikilinks, resolveWikilink } from '@/wikilinks'
 import { TagChip } from '@/components'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/cn'
-import { focusedCursorLines } from './viewUtils'
+import { focusedCursorLines, visibleLineRanges } from './viewUtils'
 import { ReactWidget } from './ReactWidget'
 
 // ── State fields ──────────────────────────────────────────────────
@@ -80,7 +80,7 @@ class ChipWidget extends ReactWidget {
 
 // ── Build decorations ─────────────────────────────────────────────
 
-function build(
+export function build(
   view: EditorView,
   onOpenRef: { current: (ref: string) => void },
 ): DecorationSet {
@@ -89,35 +89,29 @@ function build(
   const roots = view.state.field(rootsField)
   const cursorLines = focusedCursorLines(view)
 
-  const allLinks = parseWikilinks(doc.toString())
-  const linksByLineFrom = new Map<number, typeof allLinks>()
-  for (const wl of allLinks) {
-    const lf = doc.lineAt(wl.start).from
-    if (!linksByLineFrom.has(lf)) linksByLineFrom.set(lf, [])
-    linksByLineFrom.get(lf)!.push(wl)
-  }
-
-  for (let i = 1; i <= doc.lines; i++) {
-    const line = doc.line(i)
-    const isCursor = cursorLines.has(i)
-    for (const wl of linksByLineFrom.get(line.from) ?? []) {
+  for (const { from, to } of visibleLineRanges(view)) {
+    const links = parseWikilinks(doc.sliceString(from, to))
+    for (const wl of links) {
+      const start = from + wl.start
+      const end = from + wl.end
+      const isCursor = cursorLines.has(doc.lineAt(start).number)
       const fileSlug = resolveWikilink(wl.ref, roots)
       const title = fileSlug ? (roots.get(fileSlug)?.title ?? wl.ref) : wl.ref
       const displayLabel = wl.label ?? title
 
       if (isCursor) {
         builder.add(
-          wl.start, wl.end,
+          start, end,
           Decoration.mark({ class: fileSlug ? 'wl' : 'wl-broken', attributes: { 'data-ref': wl.ref } }),
         )
       } else if (fileSlug) {
         builder.add(
-          wl.start, wl.end,
+          start, end,
           Decoration.replace({ widget: new ChipWidget(displayLabel, true, wl.ref, () => onOpenRef.current(wl.ref)) }),
         )
       } else {
         builder.add(
-          wl.start, wl.end,
+          start, end,
           Decoration.replace({ widget: new ChipWidget(wl.ref, false, wl.ref, () => onOpenRef.current(wl.ref)) }),
         )
       }
