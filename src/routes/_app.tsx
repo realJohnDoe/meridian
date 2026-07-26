@@ -7,7 +7,7 @@ import { useToday } from '@/hooks'
 import { onVaultChanged } from '@/storage'
 import { resetAgendaScroll, resetExpansionCache, resetAgendaSectionsCache, useMonthPreview, useDayPreview, useAgendaTopDate, requestScrollToToday } from '@/calendar'
 import { CoachTour } from '@/onboarding'
-import { AppSidebar, SyncButton, SearchBar } from '@/components'
+import { AppSidebar, SyncButton, SearchBar, ParticipantFilterButton } from '@/components'
 import { IconButton } from '@/components/ui/icon-button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
@@ -162,6 +162,7 @@ function AppMain() {
           )}
           {!isEntryView && (
             <div className="flex items-center gap-0.5 shrink-0">
+              <ParticipantFilterButton />
               <SyncButton />
               {!isListView && (
                 <IconButton variant="ghost" className="text-dim" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>

@@ -5,6 +5,8 @@ import { occKind } from '@/occView'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import { sortOccs } from './occSort'
 import { undatedOccs } from './undatedOccs'
+import { useParticipantFilteredOccs } from './useCalendarFilter'
+import ListEmptyState from './ListEmptyState'
 import OccurrenceList from './OccurrenceList'
 import { useToday } from '@/hooks'
 
@@ -21,7 +23,8 @@ export default function NotesView({ onOpen }: Props) {
   // value works here — useToday is cheaper than a ticking clock of our own.
   const today = useToday()
 
-  const occs = sortOccs(undatedOccs(items, roots).filter(o => occKind(o) === 'note'), today)
+  const all  = undatedOccs(items, roots).filter(o => occKind(o) === 'note')
+  const occs = sortOccs(useParticipantFilteredOccs(all), today)
 
   const handleToggleDone  = (occ: Occurrence) => toggleOccDone(occ)
   const handleSwipeDelete = (occ: Occurrence) => beginSwipeDelete(occ)
@@ -30,11 +33,12 @@ export default function NotesView({ onOpen }: Props) {
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]">
       <div className="pb-24 lg:max-w-3xl lg:mx-auto">
         {occs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 px-6 pt-24 text-center text-muted-foreground">
-            <NotebookPen size={32} strokeWidth={1.5} className="opacity-60" />
-            <p className="text-base text-foreground">No notes yet</p>
-            <p className="text-sm">Notes without a date show up here.</p>
-          </div>
+          <ListEmptyState
+            Icon={NotebookPen}
+            title="No notes yet"
+            hint="Notes without a date show up here."
+            filtered={all.length > 0}
+          />
         ) : (
           <OccurrenceList
             occs={occs}
