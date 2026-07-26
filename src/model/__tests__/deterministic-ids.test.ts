@@ -4,9 +4,10 @@
  * Before this fix, effectiveNodeToStoreItems called crypto.randomUUID() for
  * every item on every parse. Each reconcile (60s tick, tab-focus, online)
  * re-parsed all cached files and issued fresh UUIDs, causing:
- *   - DaySection to receive new items that appeared identical by content but
- *     had different ids — when the memo comparator didn't check identity, the
- *     component skipped re-render and children kept stale pre-reconcile occs.
+ *   - DaySection (since replaced by row-level virtualization) to receive new
+ *     items that appeared identical by content but had different ids — when
+ *     the memo comparator didn't check identity, the component skipped
+ *     re-render and children kept stale pre-reconcile occs.
  *   - stableOccId's cache to grow unboundedly (new series.id → new cache entry
  *     each reconcile, old entries never evicted).
  *

@@ -6,9 +6,10 @@
  * commit (setData). Any commit that forced a full re-expansion — e.g.
  * toggling a *generated* occurrence, which appends its first override and
  * changes the item count — handed out fresh UUIDs to every other generated
- * occurrence too. Because occ.id doubles as the React row key
- * (OccurrenceRow, keyed in DaySection), this unmounted and remounted every
- * visible recurring row on a single toggle.
+ * occurrence too. Because occ.id doubles as the React row key (then keyed in
+ * DaySection; today it's a component of the AgendaRow key built in
+ * agendaSections.ts), this unmounted and remounted every visible recurring
+ * row on a single toggle.
  *
  * On top of that, upsertOverride minted its own crypto.randomUUID() for a
  * newly-created override, so even the toggled occurrence's own id changed

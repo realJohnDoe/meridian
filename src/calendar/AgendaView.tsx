@@ -5,10 +5,10 @@ import type { Occurrence, EditScope } from '@/types'
 
 import { fmtISO } from '@/model'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
-import DaySection from './DaySection'
-import OverdueSection from './OverdueSection'
+import AgendaHeaderRow from './AgendaHeaderRow'
+import OccurrenceRow from './OccurrenceRow'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
-import { useAgendaSections, estimateSection } from './useAgendaSections'
+import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useToday } from '@/hooks'
 import { useNow } from './useNow'
 
@@ -22,7 +22,7 @@ export default function AgendaView({ onOpen }: Props) {
   // than props/state the compiler can track — react-hooks/incompatible-library.
   // This component also drives a raw scroll listener off virtualizer.scrollOffset
   // directly (see updateTopDate below), which is exactly the pattern the rule
-  // warns about. Opting out here only affects this function — DaySection,
+  // warns about. Opting out here only affects this function — OccurrenceRow,
   // useAgendaSections, and everything else still gets compiled/memoized normally.
   //
   // Note: the compiler already auto-skips memoizing this function because it
@@ -41,13 +41,14 @@ export default function AgendaView({ onOpen }: Props) {
   // negligible even at ~455 sections; see occSort's decorate-sort-undecorate).
   const now = useNow(60_000)
 
-  const { sections, goToIndex } = useAgendaSections(today, now)
+  const { rows, goToRowIndex } = useAgendaSections(today, now)
 
-  // DaySection's propsAreEqual doesn't check these handler props at all (see
-  // its own comment), so an unstable reference here wouldn't fail the memo —
-  // it would just be silently ignored, leaving DaySection/OccurrenceRow bound
-  // to whichever handler closure happened to be current when they last
-  // re-rendered. useCallback keeps that closure correct across renders too.
+  // OccurrenceRow is memoized with React's default shallow compare, so these
+  // handlers are genuinely part of its props comparison: an unstable reference
+  // here would re-render every mounted row on every AgendaView render.
+  // (Before row virtualization, DaySection's custom comparator ignored them
+  // entirely, so instability was silently absorbed instead — the failure mode
+  // has inverted, but useCallback is required either way.)
   const handleToggleDone = useCallback((occ: Occurrence) => toggleOccDone(occ), [])
   const handleSwipeDelete = useCallback((occ: Occurrence) => beginSwipeDelete(occ), [])
 
@@ -59,13 +60,18 @@ export default function AgendaView({ onOpen }: Props) {
   const scRef = useRef<HTMLDivElement>(null)
   const { initialOffset, initialMeasurementsCache } = useAgendaScrollRestore(scrollToTodayOnce)
 
+  // Counts *rows*, not sections. Section-granular virtualization mounted every
+  // row a section owned the moment it entered the viewport, and the overdue
+  // section pools every undone past task with no cap — on a large vault that
+  // was thousands of OccurrenceRows (each with three touch listeners, two
+  // store subscriptions and a backlink lookup) in one synchronous commit.
   const virtualizer = useVirtualizer({
-    count: sections.length,
+    count: rows.length,
     getScrollElement: () => scRef.current,
-    // `count` is sections.length, so the virtualizer only ever asks for i in range.
-    estimateSize: i => estimateSection(sections[i]!),
-    getItemKey: i => sections[i]!.key,
-    overscan: 4,
+    // `count` is rows.length, so the virtualizer only ever asks for i in range.
+    estimateSize: i => estimateRow(rows[i]!),
+    getItemKey: i => rows[i]!.key,
+    overscan: 8,
     initialOffset,
     initialMeasurementsCache,
   })
@@ -74,7 +80,7 @@ export default function AgendaView({ onOpen }: Props) {
 
   const virtualItems = virtualizer.getVirtualItems()
 
-  // Feed the top-bar label: the date of the topmost visible day-section.
+  // Feed the top-bar label: the date of the topmost visible row.
   // Derived from the virtualizer's range (platform-agnostic — works on mobile
   // where the old DOM scroll-query left the label stuck on "today").
   //
@@ -94,12 +100,15 @@ export default function AgendaView({ onOpen }: Props) {
     if (!items.length) return
     const offset = virtualizer.scrollOffset ?? 0
     const top = items.find(vi => vi.end > offset + 12) ?? items[0]!  // items.length checked above
-    const s = sections[top.index]
-    const key = s && s.kind === 'day' ? s.dateKey : fmtISO(today)
+    // `?? fmtISO(today)` guards a stale `rows` capture: this listener closes
+    // over the render's rows while the virtualizer's items may be newer.
+    // Overdue rows carry todayKey (see agendaSections.ts), so the label reads
+    // "Today" over that block without a special case here.
+    const key = rows[top.index]?.dateKey ?? fmtISO(today)
     if (key === lastTopRef.current) return
     lastTopRef.current = key
     useStore.setState({ agendaTopDate: key })
-  }, [sections, today, virtualizer])
+  }, [rows, today, virtualizer])
 
   useEffect(() => {
     const el = scRef.current
@@ -110,27 +119,27 @@ export default function AgendaView({ onOpen }: Props) {
 
   // Covers what the scroll listener can't: the initial label on mount, and
   // keeping it correct if `today` flips at midnight (a PWA left open
-  // overnight) or the top section shifts without a scroll (content edited).
+  // overnight) or the top row shifts without a scroll (content edited).
   useEffect(() => {
     updateTopDate()
   }, [updateTopDate])
 
   useEffect(() => {
-    if (!scrollToTodayOnce || goToIndex < 0 || !scRef.current) return
-    virtualizer.scrollToIndex(goToIndex, { align: 'start' })
+    if (!scrollToTodayOnce || goToRowIndex < 0 || !scRef.current) return
+    virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })
     lastTopRef.current = fmtISO(today)
     useStore.setState({ scrollToTodayOnce: false, agendaTopDate: fmtISO(today) })
-  }, [scrollToTodayOnce, goToIndex, today, virtualizer])
+  }, [scrollToTodayOnce, goToRowIndex, today, virtualizer])
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" ref={scRef}>
       <div className="pb-24 lg:max-w-3xl lg:mx-auto">
         <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
           {virtualItems.map(vi => {
-            // Same-render read: virtualItems came from this render's `sections`
-            // (count === sections.length), so vi.index is in range. The scroll
-            // listener above can't assume that — it reads a captured `sections`.
-            const section = sections[vi.index]!
+            // Same-render read: virtualItems came from this render's `rows`
+            // (count === rows.length), so vi.index is in range. The scroll
+            // listener above can't assume that — it reads a captured `rows`.
+            const row = rows[vi.index]!
             return (
               <div
                 key={vi.key}
@@ -138,20 +147,17 @@ export default function AgendaView({ onOpen }: Props) {
                 ref={virtualizer.measureElement}
                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)` }}
               >
-                {section.kind === 'overdue' ? (
-                  <OverdueSection
-                    items={section.items}
-                    onOpen={onOpen}
-                    onToggleDone={handleToggleDone}
-                    onSwipeDelete={handleSwipeDelete}
-                  />
+                {row.kind === 'header' ? (
+                  <AgendaHeaderRow label={row.label} tone={row.tone} />
                 ) : (
-                  <DaySection
-                    date={section.date}
-                    isToday={section.isToday}
-                    isTomorrow={section.isTomorrow}
-                    items={section.items}
-                    now={section.isToday ? now : undefined}
+                  <OccurrenceRow
+                    occ={row.occ}
+                    // Only today's rows track the clock; every other row's
+                    // event-past/event-future state can't change from the
+                    // clock alone, and passing `now` would re-render them all
+                    // once a minute for nothing.
+                    now={row.isToday ? now : undefined}
+                    showDate={row.showDate}
                     onOpen={onOpen}
                     onToggleDone={handleToggleDone}
                     onSwipeDelete={handleSwipeDelete}
