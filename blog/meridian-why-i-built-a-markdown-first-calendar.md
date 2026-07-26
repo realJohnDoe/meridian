@@ -237,8 +237,8 @@ Same word, different project — this Meridian is the calendar app.
 If any of this sounds like the thing you've been assembling out of separate apps, try it:
 the whole app runs in your browser, with nothing to install and no account. The built-in
 [example vault](https://realjohndoe.github.io/meridian/) needs nothing at all; to keep
-your own data, you point Meridian at a GitHub repository, or at a local folder if your
-browser supports it (Chrome or Edge on desktop, or Android). Tell me what works and what
+your own data, you point Meridian at a GitHub repository, or at a local folder in a
+Chromium browser (Chrome or Edge on the desktop). Tell me what works and what
 doesn't — the best place for that is a
 [GitHub issue](https://github.com/realJohnDoe/meridian/issues) — and the code lives in the
 [same repository](https://github.com/realJohnDoe/meridian).
