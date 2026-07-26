@@ -104,6 +104,12 @@ describe('computeAgendaSections', () => {
     // The grouping itself survived — no re-bucketing.
     expect(second.keyByIndex).toBe(first.keyByIndex)
     expect(second.sortedKeys).toBe(first.sortedKeys)
+    // Untouched sections' `rows` arrays are reference-stable too — this is
+    // what lets a flat-list virtualizer skip remeasuring rows the toggle
+    // didn't touch (see the AgendaRow doc comment in agendaSections.ts).
+    expect(findDay(second.sections, '2026-06-10')?.rows).toBe(findDay(first.sections, '2026-06-10')?.rows)
+    expect(findDay(second.sections, '2026-06-20')?.rows).toBe(findDay(first.sections, '2026-06-20')?.rows)
+    expect(findOverdue(second.sections)?.rows).toBe(findOverdue(first.sections)?.rows)
   })
 
   it('re-sorts the touched day so a completed task sinks below the open one', () => {
@@ -226,5 +232,64 @@ describe('computeAgendaSections', () => {
     // Pooled overdue is sorted by priority first, so the older task lands last.
     expect(itemIds(findOverdue(second.sections))).toEqual(['today-task-a', 'today-task-b', 'overdue-task'])
     expect(findDay(second.sections, '2026-06-16')?.items).toEqual([])
+  })
+})
+
+describe('computeAgendaSections — flat rows (F1)', () => {
+  it('flattens every section into header-then-occ rows, in section order', () => {
+    const { sections, rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
+
+    // Row-for-row, the flat list is just every section's own `rows` concatenated.
+    expect(rows).toEqual(sections.flatMap(s => s.rows))
+
+    expect(rows.map(r => r.kind)).toEqual([
+      'header', 'occ',               // 2026-06-10 (past-event)
+      'header', 'occ',               // __overdue__ (overdue-task)
+      'header', 'occ', 'occ', 'occ',  // 2026-06-15 (today-event, today-task-a, today-task-b)
+      'header', 'occ',               // 2026-06-20 (future-event)
+    ])
+    // Every section's own rows: header first, occurrences after.
+    for (const s of sections) {
+      expect(s.rows[0]!.kind).toBe('header')
+      expect(s.rows.slice(1).every(r => r.kind === 'occ')).toBe(true)
+    }
+  })
+
+  it("carries todayKey on overdue rows, not each occurrence's own past day", () => {
+    const { rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
+
+    const overdueHeader = rows.find(r => r.kind === 'header' && r.tone === 'overdue')
+    const overdueOccRow = rows.find(r => r.kind === 'occ' && r.occ.id === 'overdue-task')
+    expect(overdueHeader?.dateKey).toBe('2026-06-15')
+    expect(overdueOccRow?.dateKey).toBe('2026-06-15')
+  })
+
+  it('gives every row a globally-unique key, including a multiday task pooled into overdue from two past days', () => {
+    // A multiday task's occurrences share one id across every day it spans —
+    // the two below are what an undone multiday task pooled into overdue
+    // from two separate past days looks like.
+    const day1 = occ('multi-task', '2026-06-10', { done: false })
+    const day2 = occ('multi-task', '2026-06-11', { done: false })
+    const { rows } = computeAgendaSections(null, [day1, day2, ...baseOccs()], TODAY, NOW, noFilter)
+
+    const keys = rows.map(r => r.key)
+    expect(new Set(keys).size).toBe(keys.length)
+
+    const multidayRows = rows.filter(r => r.kind === 'occ' && r.occ.id === 'multi-task')
+    expect(multidayRows).toHaveLength(2)
+    expect(multidayRows[0]!.key).not.toBe(multidayRows[1]!.key)
+  })
+
+  it('points goToRowIndex at the overdue header when present, else at today\'s header', () => {
+    const withOverdue = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
+    const overdueTarget = withOverdue.rows[withOverdue.goToRowIndex]
+    expect(overdueTarget?.kind).toBe('header')
+    expect(overdueTarget?.kind === 'header' && overdueTarget.tone).toBe('overdue')
+
+    const onlyToday = [occ('today-event', '2026-06-15', { time: '11:00' })]
+    const noOverdue = computeAgendaSections(null, onlyToday, TODAY, NOW, noFilter)
+    const todayTarget = noOverdue.rows[noOverdue.goToRowIndex]
+    expect(todayTarget?.kind).toBe('header')
+    expect(todayTarget?.kind === 'header' && todayTarget.tone).toBe('today')
   })
 })

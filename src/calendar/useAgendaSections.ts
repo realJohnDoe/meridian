@@ -2,9 +2,9 @@ import { useStore } from '@/store'
 import { addDays } from '@/format'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useCalendarFilter } from './useCalendarFilter'
-import { computeAgendaSections, type AgendaSectionCache, type Section } from './agendaSections'
+import { computeAgendaSections, type AgendaSectionCache, type Section, type AgendaRow } from './agendaSections'
 
-export { estimateSection, type Section } from './agendaSections'
+export { estimateSection, type Section, type AgendaRow } from './agendaSections'
 
 // Asymmetric on purpose: overdue tasks can be arbitrarily old (see the fix
 // that expanded this from 7 to 365 days so old tasks would still surface in
@@ -57,7 +57,10 @@ export function resetAgendaSectionsCache(): void {
  * since AgendaView needs both for its own scroll-to-today and per-row
  * live-repaint logic too — one ticking source shared by both, not two.
  */
-export function useAgendaSections(today: Date, now: Date): { sections: Section[]; goToIndex: number } {
+export function useAgendaSections(
+  today: Date,
+  now: Date,
+): { sections: Section[]; goToIndex: number; rows: AgendaRow[]; goToRowIndex: number } {
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
 
@@ -79,5 +82,5 @@ export function useAgendaSections(today: Date, now: Date): { sections: Section[]
     sectionsCacheSlot.set(SECTIONS_CACHE_KEY, next)
   }
 
-  return { sections: next.sections, goToIndex: next.goToIndex }
+  return { sections: next.sections, goToIndex: next.goToIndex, rows: next.rows, goToRowIndex: next.goToRowIndex }
 }
