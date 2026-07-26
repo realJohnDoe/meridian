@@ -165,7 +165,7 @@ describe('GitHubBackend', () => {
       tree: [
         { type: 'blob', path: 'note.md',      sha: 'sha1' },
         { type: 'blob', path: 'image.png',    sha: 'sha2' }, // non-vault — filtered
-        { type: 'blob', path: 'data.yaml',    sha: 'sha3' },
+        { type: 'blob', path: 'data.yaml',    sha: 'sha3' }, // non-vault — filtered
         { type: 'tree', path: 'subdir',       sha: 'sha-dir' }, // dir entry — filtered
         { type: 'blob', path: 'subdir/deep.md', sha: 'sha4' },
       ],
@@ -175,11 +175,11 @@ describe('GitHubBackend', () => {
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     const tokens  = await backend.statAll()
 
-    expect(tokens.size).toBe(3)
+    expect(tokens.size).toBe(2)
     expect(tokens.get('note.md')).toBe('sha1')
-    expect(tokens.get('data.yaml')).toBe('sha3')
     expect(tokens.get('subdir/deep.md')).toBe('sha4')
     expect(tokens.has('image.png')).toBe(false)
+    expect(tokens.has('data.yaml')).toBe(false)
     expect(tokens.has('subdir')).toBe(false)
 
     const [url] = fetchSpy.mock.calls[0] as [string]
@@ -189,8 +189,8 @@ describe('GitHubBackend', () => {
 
   it('statAll keys by full path so subdirectory files are not lost', async () => {
     mockFetch(makeTreeResponse([
-      { path: 'root.md',          sha: 'sha-root' },
-      { path: 'archive/old.yaml', sha: 'sha-old'  },
+      { path: 'root.md',        sha: 'sha-root' },
+      { path: 'archive/old.md', sha: 'sha-old'  },
     ]))
 
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
@@ -198,7 +198,7 @@ describe('GitHubBackend', () => {
 
     expect(tokens.size).toBe(2)
     expect(tokens.get('root.md')).toBe('sha-root')
-    expect(tokens.get('archive/old.yaml')).toBe('sha-old')
+    expect(tokens.get('archive/old.md')).toBe('sha-old')
   })
 
   it('statAll rejects a truncated tree listing instead of returning a partial map', async () => {

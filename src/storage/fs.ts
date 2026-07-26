@@ -13,12 +13,9 @@ declare global {
 }
 
 import { ConflictError } from './conflictError'
+import { isVaultFile } from './backend'
 
 // ── Helpers ────────────────────────────────────────────────────
-
-function isVaultFile(name: string): boolean {
-  return name.endsWith('.md') || name.endsWith('.yaml') || name.endsWith('.yml')
-}
 
 async function collectVaultFiles(
   dh: FileSystemDirectoryHandle,

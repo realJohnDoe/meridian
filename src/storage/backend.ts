@@ -1,5 +1,10 @@
 import type { VaultKind } from '@/types'
 
+/** Whether `name` is a vault entry file (markdown with YAML frontmatter). */
+export function isVaultFile(name: string): boolean {
+  return name.endsWith('.md')
+}
+
 export interface RawFile {
   path:    string
   content: string

@@ -43,12 +43,9 @@ export function loadFile(
   const hasFrontmatter = /^---\r?\n/.test(content)
   if (hasFrontmatter) {
     ;({ fm, body } = splitFrontmatter(content))
-  } else if (path.endsWith('.md')) {
+  } else {
     fm = ''
     body = content.trim()
-  } else {
-    fm = content
-    body = ''
   }
   const rawNode = fm ? yamlParse(fm) : {}
   return { rawNode, body, path }

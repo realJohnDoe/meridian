@@ -1,11 +1,8 @@
 import type { StorageBackend, RawFile } from './backend'
+import { isVaultFile } from './backend'
 import type { VaultKind } from '@/types'
 import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError } from './githubApi'
 import { ensureFreshAccessToken } from './githubOAuth'
-
-function isVaultFile(name: string): boolean {
-  return name.endsWith('.md') || name.endsWith('.yaml') || name.endsWith('.yml')
-}
 
 interface GitHubConfig {
   owner:  string
