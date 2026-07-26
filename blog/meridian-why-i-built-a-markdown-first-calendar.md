@@ -29,9 +29,10 @@ that can have its own description, its own notes, and its own tags.
 So I built [Meridian](https://realjohndoe.github.io/meridian/): a calendar, task manager,
 and notes app where every entry is a plain Markdown file.
 
-![Meridian's agenda view on a phone, showing tasks, events, and notes grouped by day.](images/agenda-view.png)
-
-_The agenda view: tasks, events, and notes on a single timeline._
+<figure class="post-figure post-figure--phone">
+  <img src="images/agenda-view.png" width="340" alt="Meridian's agenda view on a phone, showing tasks, events, and notes grouped by day." />
+  <figcaption>The agenda view: tasks, events, and notes on a single timeline.</figcaption>
+</figure>
 
 What follows is roughly how that went, from those first ideas to the app I use today.
 
@@ -93,9 +94,10 @@ It worked. That was the problem. It worked well enough to show me the real versi
 app — and that a single generated file, growing with every change, wasn't a foundation I
 could keep building on.
 
-![An early mobile prototype of the app — an agenda list of standups and tasks in a dark theme.](images/plaintext-os-prototype.png)
-
-_One of the early prototypes — **plaintext-os**, built and reshaped a hundred times in a single Claude chat on my phone._
+<figure class="post-figure post-figure--phone">
+  <img src="images/plaintext-os-prototype.png" width="340" alt="An early mobile prototype of the app — an agenda list of standups and tasks in a dark theme." />
+  <figcaption>One of the early prototypes — <strong>plaintext-os</strong>, built and reshaped a hundred times in a single Claude chat on my phone.</figcaption>
+</figure>
 
 On **2026-05-22** I moved to a desktop, set the prototype aside, and started a proper
 repository: React, TypeScript, Tailwind, shadcn/ui, Vite. The first day's commits
@@ -119,9 +121,10 @@ occurrences, and what happens to the file when you cancel or move one. It was ge
 useful for about a week, while I chased the worst of the recurrence bugs; afterwards I
 half-considered deleting it again.
 
-![The inheritance debugger — source YAML on the left, the effective tree in the middle, and the expanded list of occurrences on the right.](images/inheritance-debugger.webp)
-
-_The recurrence debugger: source YAML on the left, its expanded occurrences on the right. Cheap to build, and it turned opaque expansion bugs into something I could just look at._
+<figure class="post-figure post-figure--wide">
+  <img src="images/inheritance-debugger.webp" alt="The inheritance debugger — source YAML on the left, the effective tree in the middle, and the expanded list of occurrences on the right." />
+  <figcaption>The recurrence debugger: source YAML on the left, its expanded occurrences on the right. Cheap to build, and it turned opaque expansion bugs into something I could just look at.</figcaption>
+</figure>
 
 On **2026-06-03** entries gained
 [participants](https://github.com/realJohnDoe/meridian/commit/48506fb) — you tag people
@@ -174,9 +177,10 @@ sentence: **every entry is a list**.
 | **Tag**     | —                                             | everything tagged with it   |
 | **Note**    | no special properties                         | related entries             |
 
-![An entry open in Meridian's editor, with a "listed on" row near the top and an "items" section at the bottom.](images/entry-editor-listed-on.png)
-
-_An entry in the editor: the **listed on** row shows the lists it appears on; the **items** section at the bottom shows what it lists._
+<figure class="post-figure post-figure--phone">
+  <img src="images/entry-editor-listed-on.png" width="340" alt="An entry open in Meridian's editor, with a listed-on row near the top and an items section at the bottom." />
+  <figcaption>An entry in the editor: the <strong>listed on</strong> row shows the lists it appears on; the <strong>items</strong> section at the bottom shows what it lists.</figcaption>
+</figure>
 
 A project is a task whose items are tasks. A tag is simply a list of everything filed
 under it. A backlink is just "the lists this appears on" — a phrase that needs no
