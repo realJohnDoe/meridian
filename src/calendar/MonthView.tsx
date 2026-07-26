@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn'
 import { useCarousel } from './useCarousel'
 import { PANE_COUNT } from './snapCarousel'
 import { occPillRounded } from '@/components/ui/occurrence-variants'
+import { calendarView, setMonthPreview } from './viewState'
 
 // Fallback for the occurrence-list start offset until it's measured (cell top padding
 // 3px + badge h-5 20px + badge mb-px 1px + the 8px flex gap inherited from Button).
@@ -47,14 +48,20 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     paneCount: PANE_COUNT,
     unitAt: offset => fmtMonth(new Date(month.getFullYear(), month.getMonth() + offset, 1)),
     onCommit: key => onNavigateMonth(parseMonth(key)),
-    onPreview: key => useStore.setState({ monthPreview: key }),
+    onPreview: key => setMonthPreview(key),
     // The route is authoritative again once `month` has actually committed,
     // so clear any preview here — otherwise a stale preview could linger past
     // a commit that resolved to a different month than predicted.
     onRecentered: () => {
-      if (useStore.getState().monthPreview !== null) useStore.setState({ monthPreview: null })
+      if (calendarView.getState().monthPreview !== null) setMonthPreview(null)
     },
   })
+
+  // If a swipe is left in flight (e.g. the user navigates away via the
+  // sidebar before the gesture settles and onRecentered fires), the preview
+  // would otherwise survive in the shared store and briefly mislabel the
+  // topbar on the next visit to this route.
+  useEffect(() => () => setMonthPreview(null), [])
 
   // The Embla viewport also serves as the gridH measurement target, so its node
   // is captured alongside Embla's own ref via this merged callback.

@@ -6,7 +6,7 @@ import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
 import { onVaultChanged } from '@/storage'
-import { resetAgendaScroll, resetExpansionCache, resetAgendaSectionsCache } from '@/calendar'
+import { resetAgendaScroll, resetExpansionCache, resetAgendaSectionsCache, useMonthPreview, useDayPreview } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar } from '@/components'
 import { IconButton } from '@/components/ui/icon-button'
@@ -69,8 +69,8 @@ function AppMain() {
 
   const today         = useToday()
   const agendaTopDate = useStore(s => s.agendaTopDate)
-  const monthPreview  = useStore(s => s.monthPreview)
-  const dayPreview    = useStore(s => s.dayPreview)
+  const monthPreview  = useMonthPreview()
+  const dayPreview    = useDayPreview()
 
   const isEntryView  = !!entrySlugMatch || !!entryNewMatch
   const isDayView    = !!dayMatch

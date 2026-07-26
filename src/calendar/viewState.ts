@@ -1,4 +1,5 @@
 import { createStore } from 'zustand/vanilla'
+import { useStore as useZustandStore } from 'zustand/react'
 import type { VirtualItem } from '@tanstack/react-virtual'
 
 interface CalendarViewState {
@@ -12,6 +13,15 @@ interface CalendarViewState {
    */
   agendaScrollOffset: number
   agendaScrollMeasurements: VirtualItem[]
+  /**
+   * `YYYY-MM` of the month the swipe carousel is settling toward, set on
+   * touchend so the topbar label updates immediately instead of waiting for
+   * the gesture to fully settle and the route to commit. Null once the route
+   * is authoritative again (see MonthView's month-change effect).
+   */
+  monthPreview: string | null
+  /** `YYYY-MM-DD` of the date the day-view swipe carousel is settling toward — same shape as monthPreview. */
+  dayPreview: string | null
 }
 
 /** Calendar-view-local ephemeral state — scroll position, carousel previews.
@@ -20,8 +30,26 @@ interface CalendarViewState {
 export const calendarView = createStore<CalendarViewState>(() => ({
   agendaScrollOffset: 0,
   agendaScrollMeasurements: [],
+  monthPreview: null,
+  dayPreview: null,
 }))
 
 export function resetCalendarViewState(): void {
   calendarView.setState(calendarView.getInitialState(), true)
+}
+
+export function useMonthPreview(): string | null {
+  return useZustandStore(calendarView, s => s.monthPreview)
+}
+
+export function useDayPreview(): string | null {
+  return useZustandStore(calendarView, s => s.dayPreview)
+}
+
+export function setMonthPreview(key: string | null): void {
+  calendarView.setState({ monthPreview: key })
+}
+
+export function setDayPreview(key: string | null): void {
+  calendarView.setState({ dayPreview: key })
 }

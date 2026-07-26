@@ -71,15 +71,6 @@ interface MeridianStore {
   scrollToTodayOnce: boolean
   /** ISO date string of the topmost visible day in the agenda view. */
   agendaTopDate: string | null
-  /**
-   * `YYYY-MM` of the month the swipe carousel is settling toward, set on
-   * touchend so the topbar label updates immediately instead of waiting for
-   * the gesture to fully settle and the route to commit. Null once the route
-   * is authoritative again (see MonthView's month-change effect).
-   */
-  monthPreview: string | null
-  /** `YYYY-MM-DD` of the date the day-view swipe carousel is settling toward — same shape as monthPreview. */
-  dayPreview: string | null
 
   // ── Favorites ────────────────────────────────────────────────────
   /** Ordered fileSlug array for the active vault. Stored in localStorage, never written to files. */
@@ -173,8 +164,6 @@ export const useStore = create<MeridianStore>((set, get) => {
 
     scrollToTodayOnce: false,
     agendaTopDate:     null,
-    monthPreview:      null,
-    dayPreview:        null,
 
     favorites: [],
     loadFavorites: favoritesField.load,
