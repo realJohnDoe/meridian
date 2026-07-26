@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useStore } from '@/store'
 import { setupStore, makeOcc } from '@/test-utils'
-import { useFilteredOccs } from './useCalendarFilter'
+import { useFilteredOccs, useParticipantFilteredOccs, NO_PARTICIPANT } from './useCalendarFilter'
 
 setupStore()
 
@@ -40,5 +40,36 @@ describe('useFilteredOccs', () => {
     const { result } = renderHook(() => useFilteredOccs([task, event]))
 
     expect(result.current.map(o => o.id)).toEqual(['e'])
+  })
+})
+
+describe('useParticipantFilteredOccs', () => {
+  it('ignores showTasks — a hidden-tasks calendar must not blank the backlog', () => {
+    useStore.setState({ showTasks: false, participantFilter: [] })
+    const task = makeOcc({ id: 't', metadata: { participants: [], title: 'Task', tags: [], items: [], done: false } })
+
+    const { result } = renderHook(() => useParticipantFilteredOccs([task]))
+
+    expect(result.current.map(o => o.id)).toEqual(['t'])
+  })
+
+  it('applies the participant filter', () => {
+    useStore.setState({ showTasks: false, participantFilter: ['alice'] })
+    const mine   = makeOcc({ id: 'a', metadata: { participants: ['alice'], title: 'Mine', tags: [], items: [], done: false } })
+    const theirs = makeOcc({ id: 'b', metadata: { participants: ['bob'],   title: 'Theirs', tags: [], items: [], done: false } })
+
+    const { result } = renderHook(() => useParticipantFilteredOccs([mine, theirs]))
+
+    expect(result.current.map(o => o.id)).toEqual(['a'])
+  })
+
+  it('matches unassigned items via NO_PARTICIPANT', () => {
+    useStore.setState({ showTasks: true, participantFilter: [NO_PARTICIPANT] })
+    const none = makeOcc({ id: 'n', metadata: { participants: [],        title: 'Loose', tags: [], items: [], done: false } })
+    const some = makeOcc({ id: 's', metadata: { participants: ['alice'], title: 'Owned', tags: [], items: [], done: false } })
+
+    const { result } = renderHook(() => useParticipantFilteredOccs([none, some]))
+
+    expect(result.current.map(o => o.id)).toEqual(['n'])
   })
 })

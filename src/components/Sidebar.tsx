@@ -4,12 +4,11 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { setActiveVault } from '@/vaultActions'
 import { fmtISO, fmtMonth } from '@/model'
-import { useToday, useResetOnChange, useAllParticipants } from '@/hooks'
+import { useToday, useResetOnChange } from '@/hooks'
 import { FlipList } from './FlipList'
 import { vaultIcon } from './vaultIcon'
 import { Checkbox } from './ui/checkbox'
 import { IconButton } from './ui/icon-button'
-import { NO_PARTICIPANT } from '@/calendar'
 import {
   Sidebar,
   SidebarContent,
@@ -44,15 +43,10 @@ export default function AppSidebar() {
   const pendingDirReconnect     = useStore(s => s.pendingDirReconnect)
   const favorites               = useStore(s => s.favorites)
   const roots                   = useStore(s => s.roots)
-  const items                   = useStore(s => s.items)
   const toggleFavorite          = useStore(s => s.toggleFavorite)
   const reorderFavorites        = useStore(s => s.reorderFavorites)
-  const participantFilter       = useStore(s => s.participantFilter)
-  const toggleParticipantFilter = useStore(s => s.toggleParticipantFilter)
   const showTasks               = useStore(s => s.showTasks)
   const toggleShowTasks         = useStore(s => s.toggleShowTasks)
-
-  const allParticipants = useAllParticipants(items)
 
   useResetOnChange([activeVaultId], () => setEditingFavorites(false))
 
@@ -60,16 +54,17 @@ export default function AppSidebar() {
 
   const close = () => { if (isMobile) setOpenMobile(false) }
 
-  // Calendar views — the three time-based views that the filters below scope to.
+  // Calendar views — the three time-based views the tasks toggle below scopes to.
   const navItems = [
     { Icon: AlignLeft,     label: 'Agenda', active: pathname === '/',                 onClick: () => { close(); void navigate({ to: '/' }) } },
     { Icon: CalendarDays,  label: 'Month',  active: pathname.startsWith('/calendar'), onClick: () => { close(); void navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } }) } },
     { Icon: CalendarClock, label: 'Day',    active: isDayView,                        onClick: () => { close(); void navigate({ to: '/day/$date', params: { date: fmtISO(today) } }) } },
   ]
 
-  // Content destinations — homes for entries that live outside the calendar, so
-  // the calendar filters don't apply to them. Positioned with Favorites, below
-  // the calendar card.
+  // Content destinations — homes for entries that live outside the calendar.
+  // The participant filter (topbar) applies to them; the tasks toggle does not,
+  // since each of these is already single-kind. Positioned with Favorites,
+  // below the calendar card.
   const collectionItems = [
     { Icon: Inbox,       label: 'Backlog', active: pathname.startsWith('/backlog'), onClick: () => { close(); void navigate({ to: '/backlog' }) } },
     { Icon: NotebookPen, label: 'Notes',   active: pathname.startsWith('/notes'),   onClick: () => { close(); void navigate({ to: '/notes' }) } },
@@ -89,9 +84,9 @@ export default function AppSidebar() {
         </SidebarHeader>
 
         <SidebarContent>
-          {/* Calendar — views and their filters bound as one region so the
-              "Show on calendar" toggles read as scoped to all three views,
-              not to the Day row they happen to sit beneath. */}
+          {/* Calendar — views and the tasks toggle bound as one region so the
+              toggle reads as scoped to all three views, not to the Day row it
+              happens to sit beneath. */}
           <SidebarGroup className="p-0 pt-3">
             <div className="mx-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 overflow-hidden">
               <SidebarGroupLabel className="h-auto px-3 pt-2 pb-1 text-2xs font-semibold uppercase tracking-wider">Calendar</SidebarGroupLabel>
@@ -110,39 +105,20 @@ export default function AppSidebar() {
                 ))}
               </SidebarMenu>
 
+              {/* Not a filter — a calendar composition option, which is why it
+                  stays here while the participant filter lives in the topbar.
+                  Label spelled out in full so it needs no group heading and
+                  can't be mistaken for scoping Backlog or Notes. */}
               <SidebarSeparator className="mx-3 mt-2" />
-              <div className="px-3 pt-2 pb-1 text-2xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">Show on calendar</div>
-              <div className="px-3 pb-2 flex flex-col">
+              <div className="px-3 py-1">
                 <label className="flex items-center gap-2 cursor-pointer py-2.5">
                   <Checkbox
                     checked={showTasks}
                     onCheckedChange={() => toggleShowTasks()}
                     visualClassName="size-4.5 group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
                   />
-                  <span className="text-sm">Tasks</span>
+                  <span className="text-sm">Show tasks on calendar</span>
                 </label>
-                {allParticipants.length > 0 && (
-                  <>
-                    <label className="flex items-center gap-2 cursor-pointer py-2.5">
-                      <Checkbox
-                        checked={participantFilter.includes(NO_PARTICIPANT)}
-                        onCheckedChange={() => toggleParticipantFilter(NO_PARTICIPANT)}
-                        visualClassName="size-4.5 group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
-                      />
-                      <span className="text-sm text-muted-foreground italic">No participants</span>
-                    </label>
-                    {allParticipants.map(p => (
-                      <label key={p} className="flex items-center gap-2 cursor-pointer py-2.5">
-                        <Checkbox
-                          checked={participantFilter.includes(p)}
-                          onCheckedChange={() => toggleParticipantFilter(p)}
-                          visualClassName="size-4.5 group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
-                        />
-                        <span className="text-sm">{p}</span>
-                      </label>
-                    ))}
-                  </>
-                )}
               </div>
             </div>
           </SidebarGroup>
