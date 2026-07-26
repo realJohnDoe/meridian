@@ -57,14 +57,6 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 - **Problem:** The most bug-prone CM6 code (decoration range computation, position mapping, widget lifecycle) is the least tested, and the coverage gate structurally can't flag newly-added untested modules.
 - **Fix:** Add unit tests for the decoration builders (testable against an `EditorState` without a live DOM, as `taskLines.test.ts` shows), and add a modest **global** coverage floor so future untested logic fails CI.
 
-### #9 — `store.ts` mixes view-ephemeral UI state with vault/domain state
-
-- **Category:** `architecture`
-- **Impact:** 3 · **Breadth:** 1 file (source) · **Recommended model:** Opus 5 in plan mode, multi-PR — gated on a product decision (whether to do it at all, given the churn) plus a store-boundary change whose failure is _silent_ (broken agenda scroll-restore, subscription churn) rather than a loud build/test break.
-- **Evidence:** `store.ts:83-93` — the app-global Zustand store carries calendar-view-local scroll/carousel state: `agendaScrollOffset: number`, `agendaScrollMeasurements: VirtualItem[]`, `monthPreview: string | null`, `dayPreview: string | null` — alongside vault data (`items`, `roots`), sync status, favorites, and locale.
-- **Problem:** Ephemeral `calendar/` concerns live in the cross-cutting store, so a reader tracing calendar-view state must go through the global store and `storeBridge`. Idiomatic single-store Zustand and low-severity — but it's the one place the otherwise-crisp layer boundaries blur.
-- **Fix:** Move the agenda/carousel ephemeral fields into a dedicated `calendar/` store slice or co-located hook; leave durable vault/sync/prefs state in the global store. (Genuinely optional — weigh against the churn.)
-
 ---
 
 **Bottom line:** No high-severity defects. The two worth acting on soon are **#1** (systemic, preventive) and **#2** (a genuine latent data-loss path, small in code even if it warrants Opus-5 judgment on the resolution). #3–#7 are a cluster of small, mostly-Sonnet DRY/consistency cleanups that share a few files (see sequencing note); #8/#10 are Haiku-tier freebies and #9 is an optional, user-gated architecture call. This repo is in the top decile for engineering discipline — the survey's main service is confirming that, with receipts.
