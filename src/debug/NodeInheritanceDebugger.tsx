@@ -514,7 +514,7 @@ export default function NodeInheritanceDebugger() {
           )}
           <label className="cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-xs text-white/80 transition-colors">
             <Upload size={13} /> Load file
-            <input type="file" accept=".md,.yaml,.yml" className="hidden" onChange={handleFileChange} />
+            <input type="file" accept=".md" className="hidden" onChange={handleFileChange} />
           </label>
         </div>
       </header>
@@ -531,7 +531,7 @@ export default function NodeInheritanceDebugger() {
             {isEmpty ? (
               <div className="flex flex-col items-center justify-center h-full gap-3 text-white/25 select-none">
                 <Upload size={32} strokeWidth={1.2} />
-                <span className="text-sm">Drop a .md / .yaml file here</span>
+                <span className="text-sm">Drop a .md file here</span>
                 <span className="text-xs">or use the Load file button</span>
               </div>
             ) : (
