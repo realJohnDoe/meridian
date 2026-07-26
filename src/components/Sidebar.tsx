@@ -83,7 +83,7 @@ export default function AppSidebar() {
           <span className="text-lg text-sidebar-foreground">Meridian</span>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent className="pb-[max(calc(var(--spacing)*2),env(safe-area-inset-bottom))]">
           {/* Calendar — views and the tasks toggle bound as one region so the
               toggle reads as scoped to all three views, not to the Day row it
               happens to sit beneath. */}

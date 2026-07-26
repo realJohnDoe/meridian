@@ -13,11 +13,10 @@ import { ExampleBackend } from './exampleBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import type { VaultRef, GitHubVaultRef } from '@/types'
-import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress, setSyncOffline } from '@/storeBridge'
+import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress } from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
-import { reconcileWithBackend, parseFiles, updateSyncUI, flushPendingPush } from './sync'
-import { isTransientSyncError } from './conflictError'
+import { syncOnActivate, parseFiles, updateSyncUI } from './sync'
 // ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
 
 const _vaultChangedListeners = new Set<() => void>()
@@ -46,11 +45,24 @@ async function updateVaultRefs(mutate: (current: VaultRef[]) => VaultRef[]): Pro
 
 // ── ACTIVATION HELPERS ─────────────────────────────────────────
 
-async function hydrateFromCache(vaultId: string): Promise<void> {
+/**
+ * Paints the store from the Dexie cache. Returns whether there was anything
+ * to paint — the caller uses that to decide whether the skeleton can come
+ * down now or must stay up until the first sync fills the store.
+ */
+async function hydrateFromCache(vaultId: string): Promise<boolean> {
   const cached = await cacheLoadAll(vaultId)
-  if (cached.length === 0) return
+  if (cached.length === 0) {
+    // Clear rather than return early: leaving the previous vault's items in
+    // the store makes a switch to a never-loaded vault show the old vault's
+    // entries, and the reconcile that follows won't evict them
+    // (mergeChangedIntoStore preserves unaffected slugs).
+    setData({ items: [], roots: new Map() })
+    return false
+  }
   const { items, roots } = parseFiles(cached)
   setData({ items, roots })
+  return true
 }
 
 /**
@@ -90,23 +102,38 @@ async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<v
   emitVaultChanged()
 }
 
-async function activateWritableVault(backend: StorageBackend): Promise<void> {
+/**
+ * Activate a writable backend: claim the identity, paint whatever the cache
+ * holds, then sync in the background.
+ *
+ * `prePainted` means the caller already ran hydrateFromCache for this vault
+ * id *before* the network work started (the whole point of the cache-first
+ * restore) — so we don't read the same rows out of Dexie twice.
+ *
+ * The first sync is deliberately not awaited when something is on screen:
+ * statAll + readFiles + Dexie writes take seconds on a large vault, and the
+ * user is already looking at correct content — the sync only refines it. It
+ * IS awaited when the cache was empty, because then the skeleton is the only
+ * thing on screen and clearing it early would flash an empty agenda.
+ *
+ * syncOnActivate also subsumes the old flushPendingPush() call here: its
+ * pushDirty leg rescues anything a previous session left dirty, in the same
+ * cycle as the reconcile rather than as a second racing one.
+ */
+async function activateWritableVault(backend: StorageBackend, prePainted = false): Promise<void> {
   await setActiveVaultIdentity(backend)
-  await hydrateFromCache(backend.id)
-  try {
-    await reconcileWithBackend(backend, backend.id)
-  } catch (e) {
-    // A transient failure must not abort activation: the cache is already
-    // painted and the vault is writable, so the right outcome is
-    // offline-with-cache, retried by autoSyncTick's existing backoff.
-    // Anything actionable still propagates to the caller's error handling.
-    if (!isTransientSyncError(e)) throw e
-    setSyncOffline(true)
-  }
-  // Rescue anything a previous session left dirty in the cache instead of
-  // waiting up to 60s for the first autoSyncTick.
-  flushPendingPush()
+  const painted = prePainted || await hydrateFromCache(backend.id)
+  updateSyncUI()
   emitVaultChanged()
+
+  if (painted) {
+    setVaultLoading(false)
+    // .catch is belt-and-braces: runSync swallows its own errors, so this can
+    // only ever fire if that invariant is broken later.
+    void syncOnActivate().catch(e => console.warn('[vault] activation sync failed:', e))
+  } else {
+    await syncOnActivate()
+  }
 }
 
 /** Builds the backend for a local/github ref, fetching its stored credential
@@ -137,8 +164,14 @@ type ActivationOutcome = 'granted' | 'offline' | 'prompt' | 'denied' | 'no-crede
  * vault in pending-reconnect state instead of activating it. `interactive:
  * true` (user switch) actively requests permission, which never resolves to
  * `'prompt'`.
+ *
+ * `prePainted` says the caller already hydrated this vault from cache (the
+ * restore path does, before any network work) so neither branch below reads
+ * the same Dexie rows a second time.
  */
-async function activateVaultRef(ref: VaultRef, interactive: boolean): Promise<ActivationOutcome> {
+async function activateVaultRef(
+  ref: VaultRef, interactive: boolean, prePainted = false,
+): Promise<ActivationOutcome> {
   const backend = await buildBackend(ref)
   if (!backend) return 'no-credential'
 
@@ -146,16 +179,16 @@ async function activateVaultRef(ref: VaultRef, interactive: boolean): Promise<Ac
   // 'unreachable' is emphatically not 'denied': the credential is fine, the
   // network isn't. Activate exactly as for 'granted' — writable, hydrated
   // from cache — so offline edits are recorded as dirty in Dexie and pushed
-  // on reconnect. syncOffline and the retry backoff are set by the
-  // reconcile's own transient classification (see activateWritableVault),
-  // not here, so there stays exactly one writer for that state.
+  // on reconnect. syncOffline and the retry backoff are set by the background
+  // sync's own transient classification in runSync, not here, so there stays
+  // exactly one writer for that state.
   if (perm === 'granted' || perm === 'unreachable') {
-    await activateWritableVault(backend)
+    await activateWritableVault(backend, prePainted)
     return perm === 'granted' ? 'granted' : 'offline'
   }
   if (perm === 'prompt' && !interactive) {
     await setActiveVaultIdentity(backend, { pendingReconnect: ref.name })
-    await hydrateFromCache(ref.id)
+    if (!prePainted) await hydrateFromCache(ref.id)
     updateSyncUI()
     return 'prompt'
   }
@@ -202,7 +235,21 @@ async function restoreVaultsInner(): Promise<void> {
     const targetRef     = allRefs.find(r => r.id === savedActiveId) ?? EXAMPLE_REF
 
     if (targetRef.kind === 'local' || targetRef.kind === 'github') {
-      const outcome = await activateVaultRef(targetRef, false)
+      // ── Cache-first paint ──────────────────────────────────────────
+      // One indexed Dexie query; no network, no credential, no permission
+      // check. Everything after this line — buildBackend's possible OAuth
+      // refresh POST to the Worker (GitHub App tokens last 8h, so most
+      // first-open-of-the-day restores hit it), ensurePermission's two round
+      // trips, then statAll + readFiles — only *refines* content the user can
+      // already see. None of it may gate first paint.
+      //
+      // Only the store's items/roots are written here: the active-vault
+      // identity is still claimed by activateVaultRef after the permission
+      // check, so nothing observes a half-activated vault.
+      const prePainted = await hydrateFromCache(targetRef.id)
+      if (prePainted) setVaultLoading(false)
+
+      const outcome = await activateVaultRef(targetRef, false, prePainted)
       // persist: false on both fallback branches below — a bad token or
       // missing credential must not cost the user their vault selection.
       // Persisting 'example' here would strand them on the tutorial even
