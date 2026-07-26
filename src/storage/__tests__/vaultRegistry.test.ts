@@ -15,16 +15,20 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { VaultRef } from '@/types'
+import type { PermissionOutcome } from '@/storage/backend'
+import { TransientSyncError } from '@/storage/conflictError'
 
 const { metaStore, storeState, notifyFns, syncFns, backendConfig } = vi.hoisted(() => {
   const backendConfig: {
-    localPermission: PermissionState
-    githubPermission: PermissionState
+    localPermission: PermissionOutcome
+    githubPermission: PermissionOutcome
     exampleReadAllError: Error | null
+    reconcileError: Error | null
   } = {
     localPermission: 'granted',
     githubPermission: 'granted',
     exampleReadAllError: null,
+    reconcileError: null,
   }
   return {
     metaStore: new Map<string, unknown>(),
@@ -36,10 +40,13 @@ const { metaStore, storeState, notifyFns, syncFns, backendConfig } = vi.hoisted(
       pendingDirReconnect: null as string | null,
       vaultLoading: false,
       vaultLoadProgress: null as { loaded: number; total: number } | null,
+      syncOffline: false,
     },
-    notifyFns: { notify: vi.fn(), notifyError: vi.fn() },
+    notifyFns: { notify: vi.fn(), notifyError: vi.fn(), warn: vi.fn() },
     syncFns: {
-      reconcileWithBackend: vi.fn(async () => {}),
+      reconcileWithBackend: vi.fn(async () => {
+        if (backendConfig.reconcileError) throw backendConfig.reconcileError
+      }),
       parseFiles: vi.fn((_files: Array<{ path: string; content: string }>) => ({ items: [], roots: new Map() })),
       updateSyncUI: vi.fn(),
       flushPendingPush: vi.fn(),
@@ -80,7 +87,7 @@ vi.mock('@/storage/localBackend', () => ({
     readonly kind = 'local'
     readonly readOnly = false
     constructor(public id: string, public name: string, public handle: unknown) {}
-    async ensurePermission(_interactive: boolean): Promise<PermissionState> { return backendConfig.localPermission }
+    async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> { return backendConfig.localPermission }
     async statAll() { return new Map<string, string>() }
     async readFiles() { return [] }
     async readAll() { return [] }
@@ -94,7 +101,7 @@ vi.mock('@/storage/githubBackend', () => ({
     readonly kind = 'github'
     readonly readOnly = false
     constructor(public id: string, public name: string, public cfg: unknown) {}
-    async ensurePermission(_interactive: boolean): Promise<PermissionState> { return backendConfig.githubPermission }
+    async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> { return backendConfig.githubPermission }
     async statAll() { return new Map<string, string>() }
     async readFiles() { return [] }
     async readAll() { return [] }
@@ -110,7 +117,7 @@ vi.mock('@/storage/exampleBackend', () => ({
     readonly name = 'Tutorial'
     readonly kind = 'example'
     readonly readOnly = true
-    async ensurePermission(): Promise<PermissionState> { return 'granted' }
+    async ensurePermission(): Promise<PermissionOutcome> { return 'granted' }
     async statAll() { return new Map<string, string>() }
     async readFiles() { return [] }
     async readAll() {
@@ -137,6 +144,7 @@ vi.mock('@/storeBridge', () => ({
   setPendingReconnect: vi.fn((name: string | null) => { storeState.pendingDirReconnect = name }),
   setVaultLoading: vi.fn((loading: boolean) => { storeState.vaultLoading = loading }),
   setVaultLoadProgress: vi.fn((p: { loaded: number; total: number } | null) => { storeState.vaultLoadProgress = p }),
+  setSyncOffline: vi.fn((offline: boolean) => { storeState.syncOffline = offline }),
 }))
 
 vi.mock('@/storage/notifications', () => notifyFns)
@@ -145,7 +153,7 @@ vi.mock('@/storage/sync', () => syncFns)
 
 // Imports of the module under test (and its non-mocked collaborators — the
 // trivial in-memory activeBackend singleton) must come after the vi.mock calls.
-import { restoreVaults, setActiveVault, removeVault } from '@/storage/vaultRegistry'
+import { restoreVaults, setActiveVault, removeVault, addGitHubVault } from '@/storage/vaultRegistry'
 import { getActiveBackend, setActiveBackend } from '@/storage/activeBackend'
 import { ensureFreshAccessToken } from '@/storage/githubOAuth'
 
@@ -161,8 +169,10 @@ beforeEach(() => {
   storeState.pendingDirReconnect = null
   storeState.vaultLoading = false
   storeState.vaultLoadProgress = null
+  storeState.syncOffline = false
   notifyFns.notify.mockClear()
   notifyFns.notifyError.mockClear()
+  notifyFns.warn.mockClear()
   syncFns.reconcileWithBackend.mockClear()
   syncFns.parseFiles.mockClear()
   syncFns.updateSyncUI.mockClear()
@@ -170,6 +180,7 @@ beforeEach(() => {
   backendConfig.localPermission = 'granted'
   backendConfig.githubPermission = 'granted'
   backendConfig.exampleReadAllError = null
+  backendConfig.reconcileError = null
   vi.mocked(ensureFreshAccessToken).mockReset()
   setActiveBackend(null)
 })
@@ -273,6 +284,56 @@ describe('restoreVaults — github vault', () => {
     expect(notifyFns.notify).toHaveBeenCalledTimes(1)
     expect(notifyFns.notify.mock.calls[0]![0]).toContain(GITHUB_REF.name)
     expect(storeState.activeVaultId).toBe('example')
+  })
+
+  // Regression test for the lost-vault-selection defect: activateExampleVault
+  // used to persist unconditionally, so a bad token would overwrite the saved
+  // activeVaultId with 'example' — stranding the user on the tutorial even
+  // after they fixed the token, until they manually re-selected the vault.
+  it('a denied vault shows the tutorial but leaves the persisted active-vault id alone', async () => {
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    backendConfig.githubPermission = 'denied'
+
+    await restoreVaults()
+
+    expect(storeState.activeVaultId).toBe('example')
+    expect(metaStore.get('activeVaultId')).toBe(GITHUB_REF.id)
+  })
+
+  it('activates the vault as writable and offline when the network is unreachable, and does not notify', async () => {
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    backendConfig.githubPermission = 'unreachable'
+
+    await restoreVaults()
+
+    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
+    expect(metaStore.get('activeVaultId')).toBe(GITHUB_REF.id)
+    expect(notifyFns.notify).not.toHaveBeenCalled()
+    expect(getActiveBackend()?.readOnly).toBe(false)
+  })
+
+  it('a transient reconcile failure leaves the vault active and sets syncOffline, instead of falling back to example', async () => {
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    backendConfig.githubPermission = 'granted'
+    backendConfig.reconcileError = new TransientSyncError('offline')
+
+    await restoreVaults()
+
+    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
+    expect(storeState.syncOffline).toBe(true)
+    expect(notifyFns.notify).not.toHaveBeenCalled()
+  })
+
+  it('an actionable reconcile failure still falls back to example', async () => {
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    backendConfig.githubPermission = 'granted'
+    backendConfig.reconcileError = new Error('boom')
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await restoreVaults()
+
+    expect(storeState.activeVaultId).toBe('example')
+    spy.mockRestore()
   })
 })
 
@@ -398,6 +459,17 @@ describe('setActiveVault', () => {
       expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
       expect(syncFns.reconcileWithBackend).toHaveBeenCalledTimes(1)
     })
+
+    it('activates as writable and warns instead of blaming the token when offline', async () => {
+      vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+      backendConfig.githubPermission = 'unreachable'
+
+      await setActiveVault(GITHUB_REF.id)
+
+      expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
+      expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining(GITHUB_REF.name))
+      expect(notifyFns.notify).not.toHaveBeenCalled()
+    })
   })
 
   it('silently ignores an AbortError (e.g. a directory-picker style cancel)', async () => {
@@ -427,6 +499,22 @@ describe('setActiveVault', () => {
     expect(notifyFns.notifyError.mock.calls[0]![0]).toBe('Could not switch vault')
     spy.mockRestore()
     permSpy.mockRestore()
+  })
+})
+
+// ── addGitHubVault ────────────────────────────────────────────────────────
+
+describe('addGitHubVault', () => {
+  it('reports offline rather than a bad token when the network is unreachable', async () => {
+    backendConfig.githubPermission = 'unreachable'
+
+    await addGitHubVault({ owner: 'me', repo: 'repo', branch: 'main', token: 'ghp_test' })
+
+    expect(notifyFns.notify).toHaveBeenCalledTimes(1)
+    const msg = notifyFns.notify.mock.calls[0]![0] as string
+    expect(msg).not.toMatch(/token/i)
+    expect(msg).toMatch(/offline/i)
+    expect(storeState.activeVaultId).toBeNull()
   })
 })
 

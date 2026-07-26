@@ -14,10 +14,11 @@ import { GitHubBackend }  from './githubBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import type { VaultRef, GitHubVaultRef } from '@/types'
-import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress } from '@/storeBridge'
-import { notify, notifyError } from './notifications'
+import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress, setSyncOffline } from '@/storeBridge'
+import { notify, notifyError, warn } from './notifications'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
 import { reconcileWithBackend, parseFiles, updateSyncUI, flushPendingPush } from './sync'
+import { isTransientSyncError } from './conflictError'
 // ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
 
 const _vaultChangedListeners = new Set<() => void>()
@@ -74,9 +75,16 @@ async function setActiveVaultIdentity(
   if (persist) await activeVaultIdSave(backend.id)
 }
 
-async function activateExampleVault(): Promise<void> {
+/**
+ * `persist: false` shows the tutorial content *without* overwriting the
+ * saved active-vault id. Every "your real vault is temporarily unusable"
+ * path must use it: the saved id is the user's choice and has to survive a
+ * bad token or a mid-restore crash, so the next reload goes straight back to
+ * their vault rather than being stuck on the tutorial forever.
+ */
+async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<void> {
   const backend = new ExampleBackend()
-  await setActiveVaultIdentity(backend)
+  await setActiveVaultIdentity(backend, { persist: opts.persist ?? true })
   const files = await backend.readAll()
   setData(parseFiles(files))
   updateSyncUI()
@@ -86,7 +94,16 @@ async function activateExampleVault(): Promise<void> {
 async function activateWritableVault(backend: StorageBackend): Promise<void> {
   await setActiveVaultIdentity(backend)
   await hydrateFromCache(backend.id)
-  await reconcileWithBackend(backend, backend.id)
+  try {
+    await reconcileWithBackend(backend, backend.id)
+  } catch (e) {
+    // A transient failure must not abort activation: the cache is already
+    // painted and the vault is writable, so the right outcome is
+    // offline-with-cache, retried by autoSyncTick's existing backoff.
+    // Anything actionable still propagates to the caller's error handling.
+    if (!isTransientSyncError(e)) throw e
+    setSyncOffline(true)
+  }
   // Rescue anything a previous session left dirty in the cache instead of
   // waiting up to 60s for the first autoSyncTick.
   flushPendingPush()
@@ -107,7 +124,7 @@ async function buildBackend(ref: VaultRef): Promise<StorageBackend | null> {
   return null
 }
 
-type ActivationOutcome = 'granted' | 'prompt' | 'denied' | 'no-credential'
+type ActivationOutcome = 'granted' | 'offline' | 'prompt' | 'denied' | 'no-credential'
 
 /**
  * Shared local/github activation flow used by both the restore-on-load path
@@ -125,9 +142,15 @@ async function activateVaultRef(ref: VaultRef, interactive: boolean): Promise<Ac
   if (!backend) return 'no-credential'
 
   const perm = await backend.ensurePermission(interactive)
-  if (perm === 'granted') {
+  // 'unreachable' is emphatically not 'denied': the credential is fine, the
+  // network isn't. Activate exactly as for 'granted' — writable, hydrated
+  // from cache — so offline edits are recorded as dirty in Dexie and pushed
+  // on reconnect. syncOffline and the retry backoff are set by the
+  // reconcile's own transient classification (see activateWritableVault),
+  // not here, so there stays exactly one writer for that state.
+  if (perm === 'granted' || perm === 'unreachable') {
     await activateWritableVault(backend)
-    return 'granted'
+    return perm === 'granted' ? 'granted' : 'offline'
   }
   if (perm === 'prompt' && !interactive) {
     await setActiveVaultIdentity(backend, { pendingReconnect: ref.name })
@@ -163,10 +186,8 @@ export async function restoreVaults(): Promise<void> {
 
 async function restoreVaultsInner(): Promise<void> {
   async function fallbackToExample() {
-    const backend = new ExampleBackend()
     setVaultList([EXAMPLE_REF])
-    await setActiveVaultIdentity(backend, { persist: false })
-    setData(parseFiles(await backend.readAll()))
+    await activateExampleVault({ persist: false })
   }
 
   try {
@@ -181,13 +202,18 @@ async function restoreVaultsInner(): Promise<void> {
 
     if (targetRef.kind === 'local' || targetRef.kind === 'github') {
       const outcome = await activateVaultRef(targetRef, false)
-      if (outcome === 'no-credential') { await activateExampleVault(); return }
+      // persist: false on both fallback branches below — a bad token or
+      // missing credential must not cost the user their vault selection.
+      // Persisting 'example' here would strand them on the tutorial even
+      // after they fix the token, until they manually re-select the vault.
+      if (outcome === 'no-credential') { await activateExampleVault({ persist: false }); return }
       if (outcome === 'denied') {
         if (targetRef.kind === 'github') {
           notify(`Could not reconnect GitHub vault "${targetRef.name}" — check your token.`)
         }
-        await activateExampleVault()
+        await activateExampleVault({ persist: false })
       }
+      // 'granted' | 'offline' | 'prompt' — nothing further to do.
     } else {
       await activateExampleVault()
     }
@@ -210,6 +236,12 @@ export async function setActiveVault(id: string): Promise<void> {
         notify(ref.kind === 'local'
           ? 'Vault handle not found — try removing and re-adding it.'
           : 'GitHub token not found — try removing and re-adding this vault.')
+        return
+      }
+      if (outcome === 'offline') {
+        // The vault IS active and writable — opened from its local copy. A
+        // warning, not an error: nothing is broken and nothing is lost.
+        warn(`You're offline — "${ref.name}" opened from your local copy. Changes will sync when you reconnect.`)
         return
       }
       if (outcome !== 'granted') {
@@ -258,6 +290,10 @@ export async function addGitHubVault(cfg: GitHubVaultConfig): Promise<void> {
 
     const backend = new GitHubBackend(id, `${cfg.owner}/${cfg.repo}`, cfg)
     const perm    = await backend.ensurePermission(true)
+    if (perm === 'unreachable') {
+      notify("You're offline — connecting a GitHub vault needs a network connection.")
+      return
+    }
     if (perm !== 'granted') {
       notify('Could not connect to GitHub repository — check your token and repo name.')
       return
@@ -296,6 +332,10 @@ export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<
       owner: cfg.owner, repo: cfg.repo, branch: cfg.branch, token: cfg.accessToken,
     })
     const perm = await backend.ensurePermission(true)
+    if (perm === 'unreachable') {
+      notify("You're offline — connecting a GitHub vault needs a network connection.")
+      return
+    }
     if (perm !== 'granted') {
       notify('Could not connect to GitHub repository — check the App has write access to it.')
       return

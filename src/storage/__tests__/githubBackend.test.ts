@@ -391,6 +391,49 @@ describe('GitHubBackend', () => {
     expect(await backend.ensurePermission(false)).toBe('denied')
   })
 
+  it('ensurePermission returns unreachable on a network error (offline)', async () => {
+    fetchSpy.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    expect(await backend.ensurePermission(false)).toBe('unreachable')
+  })
+
+  it('ensurePermission returns unreachable on a network error from the branch check (second request)', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes', permissions: { push: true, pull: true, admin: false } }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    expect(await backend.ensurePermission(false)).toBe('unreachable')
+  })
+
+  it('ensurePermission returns unreachable on a rate-limited 403 (not a bad token)', async () => {
+    const rateLimited = {
+      ok: false, status: 403,
+      headers: new Headers({ 'content-type': 'application/json', 'x-ratelimit-remaining': '0' }),
+      json: () => Promise.resolve({ message: 'API rate limit exceeded' }),
+      text: () => Promise.resolve(JSON.stringify({ message: 'API rate limit exceeded' })),
+    }
+    // The throttling plugin retries a rate-limited response (up to 2 times,
+    // see makeOctokit's onRateLimit) before letting it through as a thrown
+    // error — mockResolvedValue (not Once) keeps returning 403 across those
+    // retries so the request ultimately fails with the rate-limit headers
+    // still attached, matching what actually happens once retries exhaust.
+    fetchSpy.mockResolvedValue(rateLimited)
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    expect(await backend.ensurePermission(false)).toBe('unreachable')
+  })
+
+  it('ensurePermission still returns denied for a 403 with no rate-limit headers', async () => {
+    const forbidden = {
+      ok: false, status: 403,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: () => Promise.resolve({ message: 'Forbidden' }),
+      text: () => Promise.resolve(JSON.stringify({ message: 'Forbidden' })),
+    }
+    fetchSpy.mockResolvedValueOnce(forbidden)
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    expect(await backend.ensurePermission(false)).toBe('denied')
+  })
+
   it('readAll falls back to readFiles for small vaults (below the GraphQL batching threshold)', async () => {
     const makeResp = (body: unknown) => ({
       ok: true, status: 200,

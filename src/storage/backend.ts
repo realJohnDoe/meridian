@@ -11,6 +11,15 @@ export interface RawFile {
   version: string
 }
 
+/**
+ * Result of a backend's permission probe. Deliberately a superset of the
+ * DOM's `PermissionState`: a network-backed vault has a third possible
+ * answer — the backend could not be reached at all, which is neither granted
+ * nor denied. Local/example backends do no I/O and keep `PermissionState` as
+ * their own return type, which documents that in the signature.
+ */
+export type PermissionOutcome = PermissionState | 'unreachable'
+
 export interface StorageBackend {
   readonly id:       string
   readonly name:     string
@@ -33,8 +42,10 @@ export interface StorageBackend {
    */
   write(path: string, content: string, expectedVersion?: string): Promise<string | undefined>
   delete(path: string, expectedVersion?: string): Promise<void>
-  /** Local: query/request FS permission. Example: always returns 'granted'. */
-  ensurePermission(interactive: boolean): Promise<PermissionState>
+  /** Local: query/request FS permission. GitHub: probe repo access — may
+   *  answer 'unreachable' when the network is down. Example: always
+   *  'granted'. */
+  ensurePermission(interactive: boolean): Promise<PermissionOutcome>
   /**
    * Attempt to recover from an auth failure (e.g. refresh an expired access
    * token) and swap the new credentials into the backend in place. Returns
