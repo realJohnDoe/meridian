@@ -6,7 +6,7 @@ date: 2026-07-23
 
 # Meridian: Why I built a Markdown-first calendar
 
-Until a few months ago, I kept my life in five different apps.
+Until a few months ago, my notes, tasks, and appointments were spread across five apps.
 Notes lived in [Obsidian](https://obsidian.md). My own tasks lived in the
 [TaskNotes](https://tasknotes.dev/) plugin inside Obsidian. Tasks I share with my wife
 lived in [Todoist](https://todoist.com). Appointments lived in
@@ -24,7 +24,7 @@ problem shows up at work regularly — a colleague creates a recurring meeting, 
 vacation, and now nobody can move it.
 
 The second: I wanted tags to be real things. In Obsidian a tag is a label. I wanted a tag
-that can have its own description, its own notes, and its own tags.
+that can have its own description and its own tags.
 
 So I built [Meridian](https://realjohndoe.github.io/meridian/): a calendar, task manager,
 and notes app where every entry is a plain Markdown file.
@@ -62,12 +62,12 @@ building and used it for a year instead.
 That year turned out to be important groundwork. It taught me two things I couldn't have
 reasoned my way to from a blank page.
 
-**Mobile is where this is decided.** Obsidian is excellent on the desktop, but I live in
-these tools on a phone — and there, tasks and events feel like second-class citizens next
-to what [Google Calendar](https://calendar.google.com) or Todoist do. Editing a task
-buried in a Markdown note is fiddly on a small screen; a month view you can swipe through
-is a different thing entirely. That gap stayed open for me, whatever plugins I tried, and
-it's the biggest single reason I eventually built something of my own.
+**Mobile is where this is decided.** Obsidian is excellent on the desktop, but I use these
+tools mostly on a phone. TaskNotes does a good job there — the limit isn't the plugin, it's
+that a plugin has to work through Obsidian's own interface. Small things end up taking a
+couple of taps more than they would in [Google Calendar](https://calendar.google.com) or
+Todoist, and those taps add up when you're capturing something quickly. That gap is the
+biggest single reason I eventually built something of my own.
 
 **Recurrence has to stay readable.** iCal ([RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545))
 is the standard, and it's capable — my whole calendar could probably be encoded as its
@@ -199,9 +199,9 @@ Meridian, lists do the same job.
 
 None of this is really the pitch. The pitch is the promise on the surface: tasks and
 calendar in one app, stored as Markdown, with flexible hierarchies and flexible
-recurrence. "Everything is a list" is the quieter idea underneath that makes those
-promises hold together. I didn't design it up front — I backed into it while trying to
-keep the app simple to explain.
+recurrence. "Everything is a list" is just how I ended up building the flexible-hierarchy
+part — the rest would work without it. I didn't design it up front either; I backed into
+it while trying to keep the app simple to explain.
 
 ## The part I don't put on the landing page
 
