@@ -57,22 +57,6 @@ This is an **exceptionally healthy codebase** — among the best-engineered surv
 - **Problem:** The most bug-prone CM6 code (decoration range computation, position mapping, widget lifecycle) is the least tested, and the coverage gate structurally can't flag newly-added untested modules.
 - **Fix:** Add unit tests for the decoration builders (testable against an `EditorState` without a live DOM, as `taskLines.test.ts` shows), and add a modest **global** coverage floor so future untested logic fails CI.
 
-### #6 — Path↔slug conversion is scattered with no shared owner
-
-- **Category:** `dry`
-- **Impact:** 2 · **Breadth:** 2 files (grep: `replace(/\.(md|yaml|yml)$/, '')` ×4) · **Recommended model:** Sonnet 5 — entangled with #2: a `pathToSlug`/`slugToPath` pair must agree on extension handling or it silently re-introduces the #2 asymmetry; **Haiku 4.5** for the read-side `pathToSlug` regex alone.
-- **Evidence:** `model/storeItems.ts:134` `const fileSlug = path.replace(/\.(md|yaml|yml)$/, '')` and `storage/sync.ts` lines 49, 197, 266 all repeat the same extension-stripping regex, while the inverse (`fileSlugToPath`, `sync.ts:23`) hardcodes `+ '.md'`.
-- **Problem:** The mapping between on-disk path and store slug — a genuine domain rule — has four inline copies and no canonical function, which is also what lets #2's read/write asymmetry hide.
-- **Fix:** Introduce `pathToSlug`/`slugToPath` next to `titleToSlug` in `fileIO.ts` and route all four sites (and #2's write path) through them.
-
-### #8 — Repeated inline pluralization in `format.ts`
-
-- **Category:** `dry`
-- **Impact:** 2 · **Breadth:** 1 file (grep: `=== 1 ?` ×12 in `format.ts`) · **Recommended model:** Haiku 4.5 — purely mechanical, single file; a wrong extraction breaks `format.test.ts` _loudly_. No load-bearing hazard.
-- **Evidence:** `format.ts` repeats `${x} ${x === 1 ? 'year' : 'years'}` (and `month`/`week`/`day`/`hour`/`minute`) 12 times across `endDateToDuration`, `endDateTimeToDuration`, `fmtDuration`, `fmtDurationCompact` — e.g. line 67 `return \`${y} ${y === 1 ? 'year' : 'years'}\``.
-- **Problem:** The same unit-pluralization rule is hand-inlined a dozen times; a new unit or an i18n change touches all of them.
-- **Fix:** Extract a single `pluralize(n, unit)` (or a `{unit: [singular, plural]}` table) and call it from each site.
-
 ### #9 — `store.ts` mixes view-ephemeral UI state with vault/domain state
 
 - **Category:** `architecture`
