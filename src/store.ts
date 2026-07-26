@@ -66,12 +66,6 @@ interface MeridianStore {
    */
   vaultLoadProgress: { loaded: number; total: number } | null
 
-  // ── Agenda scroll ────────────────────────────────────────────────
-  /** When true, AgendaPage will scroll to today once then clear this flag. */
-  scrollToTodayOnce: boolean
-  /** ISO date string of the topmost visible day in the agenda view. */
-  agendaTopDate: string | null
-
   // ── Favorites ────────────────────────────────────────────────────
   /** Ordered fileSlug array for the active vault. Stored in localStorage, never written to files. */
   favorites:        string[]
@@ -161,9 +155,6 @@ export const useStore = create<MeridianStore>((set, get) => {
 
     vaultLoading: true,
     vaultLoadProgress: null,
-
-    scrollToTodayOnce: false,
-    agendaTopDate:     null,
 
     favorites: [],
     loadFavorites: favoritesField.load,

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { useStore } from '@/store'
 import type { Occurrence, EditScope } from '@/types'
 
 import { fmtISO } from '@/model'
@@ -12,6 +11,7 @@ import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useToday } from '@/hooks'
 import { useNow } from './useNow'
+import { useScrollToTodayOnce, setAgendaTopDate, markScrolledToToday } from './viewState'
 
 interface Props {
   onOpen: (occ: Occurrence, scope?: EditScope) => void
@@ -32,7 +32,7 @@ export default function AgendaView({ onOpen }: Props) {
   // explicit and future-proofs against that auto-detection changing. The
   // eslint warning here is expected and permanent; see eslint.config.js.
   const today = useToday()
-  const scrollToTodayOnce = useStore(s => s.scrollToTodayOnce)
+  const scrollToTodayOnce = useScrollToTodayOnce()
 
   // Today's occurrences (and any occurrence whose event-past/event-future
   // state is instant-sensitive, e.g. a cross-midnight timed duration) can
@@ -113,7 +113,7 @@ export default function AgendaView({ onOpen }: Props) {
     const key = rows[top.index]?.dateKey ?? fmtISO(today)
     if (key === lastTopRef.current) return
     lastTopRef.current = key
-    useStore.setState({ agendaTopDate: key })
+    setAgendaTopDate(key)
   }, [rows, today, virtualizer])
 
   useEffect(() => {
@@ -134,7 +134,7 @@ export default function AgendaView({ onOpen }: Props) {
     if (!scrollToTodayOnce || goToRowIndex < 0 || !scRef.current) return
     virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })
     lastTopRef.current = fmtISO(today)
-    useStore.setState({ scrollToTodayOnce: false, agendaTopDate: fmtISO(today) })
+    markScrolledToToday(fmtISO(today))
   }, [scrollToTodayOnce, goToRowIndex, today, virtualizer])
 
   return (

@@ -1,12 +1,11 @@
 import { useState, useCallback, useEffect } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import { Menu, CalendarCheck2 } from 'lucide-react'
-import { useStore } from '@/store'
 import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
 import { onVaultChanged } from '@/storage'
-import { resetAgendaScroll, resetExpansionCache, resetAgendaSectionsCache, useMonthPreview, useDayPreview } from '@/calendar'
+import { resetAgendaScroll, resetExpansionCache, resetAgendaSectionsCache, useMonthPreview, useDayPreview, useAgendaTopDate, requestScrollToToday } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar } from '@/components'
 import { IconButton } from '@/components/ui/icon-button'
@@ -57,7 +56,7 @@ function AppMain() {
     resetAgendaScroll()
     resetExpansionCache()
     resetAgendaSectionsCache()
-    useStore.setState({ scrollToTodayOnce: true })
+    requestScrollToToday()
   }), [])
 
   const entrySlugMatch = useMatch({ from: '/_app/entry/$slug', shouldThrow: false })
@@ -68,7 +67,7 @@ function AppMain() {
   const notesMatch     = useMatch({ from: '/_app/notes', shouldThrow: false })
 
   const today         = useToday()
-  const agendaTopDate = useStore(s => s.agendaTopDate)
+  const agendaTopDate = useAgendaTopDate()
   const monthPreview  = useMonthPreview()
   const dayPreview    = useDayPreview()
 
@@ -96,7 +95,7 @@ function AppMain() {
     } else if (isMonthView) {
       void navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } })
     } else {
-      useStore.setState({ scrollToTodayOnce: true })
+      requestScrollToToday()
       void navigate({ to: '/' })
     }
   }

@@ -81,7 +81,7 @@ CI does exactly this before linting (`.github/workflows/build.yml`), which is wh
 **Root-level files are intentionally cross-cutting** — they are imported by three or more unrelated layers and have no single owning directory. The deliberate root residents are:
 
 - `types.ts` — domain types used by every layer
-- `store.ts` + `storeBridge.ts` — Zustand store; `storeBridge` is imported by `storage/`, `editor/`, and `occurrenceActions.ts`/`storeCommit.ts`
+- `store.ts` + `storeBridge.ts` — Zustand store for durable, cross-cutting state (vault data, sync status, favorites, prefs); `storeBridge` is imported by `storage/`, `editor/`, and `occurrenceActions.ts`/`storeCommit.ts`. View-local ephemeral state does not belong here — see invariant 5 below.
 - `fileIO.ts` — YAML/frontmatter parse+serialize; used by `debug/`, `editor/`, `model/`, `storage/`
 - `wikilinks.ts` — wikilink parse+resolve; used by `editor/`, `model/`, and root
 - `occurrenceActions.ts` — user-action orchestration, including its delete-undo toast; used by `editor/` and `calendar/`
@@ -102,6 +102,8 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 3. **Core persistence goes through the port.** `storeCommit.ts` and `occurrenceActions.ts` call the `persistencePort` abstraction rather than `@/storage` functions directly. The storage adapter registers the implementation at startup.
 
 4. **Accepted cycles — do not refactor.** Feature-mesh cycles through `root` (e.g. `calendar → components → editor → routes → calendar`) are inherent to feature-sliced React. These are deliberately not targets for restructuring.
+
+5. **View-ephemeral state lives with its view.** `store.ts` holds durable vault/sync/prefs state only. `calendar/viewState.ts` owns calendar view ephemera (agenda scroll position, carousel swipe previews, scroll-to-today) in its own Zustand store, reached through the `@/calendar` barrel like any other feature-internal state — not through `store.ts`/`storeBridge`. `zustand` is otherwise restricted to `store.ts`; `calendar/viewState.ts` is the one named exception in `eslint.config.js`.
 
 ## Manual browser verification
 

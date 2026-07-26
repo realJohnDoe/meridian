@@ -2,7 +2,11 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { setupStore } from '@/test-utils'
-import { calendarView, resetCalendarViewState, useMonthPreview, useDayPreview, setMonthPreview, setDayPreview } from './viewState'
+import {
+  calendarView, resetCalendarViewState,
+  useMonthPreview, useDayPreview, setMonthPreview, setDayPreview,
+  useScrollToTodayOnce, useAgendaTopDate, requestScrollToToday, setAgendaTopDate, markScrolledToToday,
+} from './viewState'
 
 setupStore()
 
@@ -20,6 +24,8 @@ describe('calendarView', () => {
       agendaScrollMeasurements: [{ index: 0, start: 0, end: 10, size: 10, key: 'a', lane: 0 }],
       monthPreview: '2026-07',
       dayPreview: '2026-07-26',
+      scrollToTodayOnce: true,
+      agendaTopDate: '2026-07-26',
     })
 
     resetCalendarViewState()
@@ -29,6 +35,8 @@ describe('calendarView', () => {
     expect(calendarView.getState().agendaScrollMeasurements).toEqual([])
     expect(calendarView.getState().monthPreview).toBeNull()
     expect(calendarView.getState().dayPreview).toBeNull()
+    expect(calendarView.getState().scrollToTodayOnce).toBe(false)
+    expect(calendarView.getState().agendaTopDate).toBeNull()
   })
 })
 
@@ -63,5 +71,35 @@ describe('useMonthPreview / useDayPreview', () => {
 
     expect(calendarView.getState().monthPreview).toBe('2026-08')
     expect(calendarView.getState().dayPreview).toBe('2026-08-01')
+  })
+})
+
+describe('useScrollToTodayOnce / useAgendaTopDate', () => {
+  it('requestScrollToToday flips the flag reactively', () => {
+    const { result } = renderHook(() => useScrollToTodayOnce())
+    expect(result.current).toBe(false)
+
+    act(() => requestScrollToToday())
+    expect(result.current).toBe(true)
+  })
+
+  it('setAgendaTopDate updates reactively', () => {
+    const { result } = renderHook(() => useAgendaTopDate())
+    expect(result.current).toBeNull()
+
+    act(() => setAgendaTopDate('2026-07-26'))
+    expect(result.current).toBe('2026-07-26')
+  })
+
+  it('markScrolledToToday clears the flag and sets the date in one write', () => {
+    act(() => requestScrollToToday())
+
+    const { result: flagResult } = renderHook(() => useScrollToTodayOnce())
+    const { result: dateResult } = renderHook(() => useAgendaTopDate())
+
+    act(() => markScrolledToToday('2026-07-26'))
+
+    expect(flagResult.current).toBe(false)
+    expect(dateResult.current).toBe('2026-07-26')
   })
 })
