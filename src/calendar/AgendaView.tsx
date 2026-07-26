@@ -9,6 +9,7 @@ import AgendaHeaderRow from './AgendaHeaderRow'
 import OccurrenceRow from './OccurrenceRow'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
 import { useAgendaSections, estimateRow } from './useAgendaSections'
+import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useToday } from '@/hooks'
 import { useNow } from './useNow'
 
@@ -80,6 +81,11 @@ export default function AgendaView({ onOpen }: Props) {
 
   const virtualItems = virtualizer.getVirtualItems()
 
+  // Glide rows between positions when the list's contents change (a task
+  // completed, deleted, re-sorted). Keyed on `rows` identity, so scrolling
+  // — which shifts `start` as unmeasured rows get measured — doesn't animate.
+  useVirtualFlip(scRef, virtualItems, rows, virtualizer.isScrolling)
+
   // Feed the top-bar label: the date of the topmost visible row.
   // Derived from the virtualizer's range (platform-agnostic — works on mobile
   // where the old DOM scroll-query left the label stuck on "today").
@@ -147,22 +153,29 @@ export default function AgendaView({ onOpen }: Props) {
                 ref={virtualizer.measureElement}
                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)` }}
               >
-                {row.kind === 'header' ? (
-                  <AgendaHeaderRow label={row.label} tone={row.tone} />
-                ) : (
-                  <OccurrenceRow
-                    occ={row.occ}
-                    // Only today's rows track the clock; every other row's
-                    // event-past/event-future state can't change from the
-                    // clock alone, and passing `now` would re-render them all
-                    // once a minute for nothing.
-                    now={row.isToday ? now : undefined}
-                    showDate={row.showDate}
-                    onOpen={onOpen}
-                    onToggleDone={handleToggleDone}
-                    onSwipeDelete={handleSwipeDelete}
-                  />
-                )}
+                {/* useVirtualFlip animates this inner element, never the
+                    positioned one above: a WAAPI animation outranks inline
+                    style, so gliding the outer div would override the
+                    virtualizer's own translateY and stack every row at the
+                    top of the list. */}
+                <div {...{ [FLIP_KEY_ATTR]: vi.key }}>
+                  {row.kind === 'header' ? (
+                    <AgendaHeaderRow label={row.label} tone={row.tone} />
+                  ) : (
+                    <OccurrenceRow
+                      occ={row.occ}
+                      // Only today's rows track the clock; every other row's
+                      // event-past/event-future state can't change from the
+                      // clock alone, and passing `now` would re-render them all
+                      // once a minute for nothing.
+                      now={row.isToday ? now : undefined}
+                      showDate={row.showDate}
+                      onOpen={onOpen}
+                      onToggleDone={handleToggleDone}
+                      onSwipeDelete={handleSwipeDelete}
+                    />
+                  )}
+                </div>
               </div>
             )
           })}

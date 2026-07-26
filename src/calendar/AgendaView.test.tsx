@@ -20,17 +20,27 @@ setupStore()
 // mount-empty-then-rerender dance is needed here.
 let offsetHeightDescriptor: PropertyDescriptor | undefined
 let offsetWidthDescriptor: PropertyDescriptor | undefined
+let animateDescriptor: PropertyDescriptor | undefined
 
 beforeEach(() => {
   offsetHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
   offsetWidthDescriptor  = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 600 })
   Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 600 })
+  // jsdom has no Web Animations API. useVirtualFlip feature-detects and skips
+  // without it, but stub it anyway so these tests exercise the real path
+  // rather than passing only because the glide was skipped.
+  animateDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'animate')
+  Object.defineProperty(Element.prototype, 'animate', {
+    configurable: true, writable: true, value: () => ({ cancel: () => {} }),
+  })
 })
 
 afterEach(() => {
   if (offsetHeightDescriptor) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeightDescriptor)
   if (offsetWidthDescriptor) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidthDescriptor)
+  if (animateDescriptor) Object.defineProperty(Element.prototype, 'animate', animateDescriptor)
+  else delete (Element.prototype as { animate?: unknown }).animate
 })
 
 const today = new Date()
