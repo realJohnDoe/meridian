@@ -10,7 +10,6 @@ import {
 import { diskPickDirectory } from './fs'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
-import { GitHubBackend }  from './githubBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import type { VaultRef, GitHubVaultRef } from '@/types'
@@ -102,7 +101,9 @@ async function buildBackend(ref: VaultRef): Promise<StorageBackend | null> {
   }
   if (ref.kind === 'github') {
     const token = await ensureFreshAccessToken(ref.id)
-    return token ? new GitHubBackend(ref.id, ref.name, { ...ref.github, token }) : null
+    if (!token) return null
+    const { GitHubBackend } = await import('./githubBackend')
+    return new GitHubBackend(ref.id, ref.name, { ...ref.github, token })
   }
   return null
 }
@@ -256,6 +257,7 @@ export async function addGitHubVault(cfg: GitHubVaultConfig): Promise<void> {
     await cacheInit()
     const id = crypto.randomUUID()
 
+    const { GitHubBackend } = await import('./githubBackend')
     const backend = new GitHubBackend(id, `${cfg.owner}/${cfg.repo}`, cfg)
     const perm    = await backend.ensurePermission(true)
     if (perm !== 'granted') {
@@ -292,6 +294,7 @@ export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<
     await cacheInit()
     const id = crypto.randomUUID()
 
+    const { GitHubBackend } = await import('./githubBackend')
     const backend = new GitHubBackend(id, `${cfg.owner}/${cfg.repo}`, {
       owner: cfg.owner, repo: cfg.repo, branch: cfg.branch, token: cfg.accessToken,
     })

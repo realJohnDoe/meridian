@@ -1,4 +1,3 @@
-import { makeOctokit } from './githubApi'
 import { tokenLoad, tokenSave, refreshTokenLoad, refreshTokenSave, tokenExpiryLoad, tokenExpirySave } from './cache'
 
 const GITHUB_CLIENT_ID = 'Iv23liMpUq1CUQl4TcaT'
@@ -162,6 +161,7 @@ type RepositoriesResponse = { repositories: InstalledRepository[] }
 
 /** Repos the GitHub App is installed on, across all of the user's installations. */
 export async function fetchInstalledRepos(accessToken: string): Promise<InstalledRepo[]> {
+  const { makeOctokit } = await import('./githubApi')
   const octokit = makeOctokit(accessToken)
   const { data: installData } = await octokit.request('GET /user/installations')
   const installations = (installData as InstallationsResponse).installations
