@@ -88,7 +88,7 @@ export default function AppSidebar() {
           <span className="text-lg text-sidebar-foreground">Meridian</span>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent className="pb-[max(calc(var(--spacing)*2),env(safe-area-inset-bottom))]">
           {/* Calendar — views and their filters bound as one region so the
               "Show on calendar" toggles read as scoped to all three views,
               not to the Day row they happen to sit beneath. */}
