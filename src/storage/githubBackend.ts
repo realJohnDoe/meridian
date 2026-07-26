@@ -1,8 +1,9 @@
-import type { StorageBackend, RawFile } from './backend'
+import type { StorageBackend, RawFile, PermissionOutcome } from './backend'
 import { isVaultFile } from './backend'
 import type { VaultKind } from '@/types'
 import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError } from './githubApi'
 import { ensureFreshAccessToken } from './githubOAuth'
+import { isTransientSyncError } from './conflictError'
 
 interface GitHubConfig {
   owner:  string
@@ -296,7 +297,7 @@ export class GitHubBackend implements StorageBackend {
     }
   }
 
-  async ensurePermission(_interactive: boolean): Promise<PermissionState> {
+  async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> {
     try {
       const { data } = await this._octokit.request('GET /repos/{owner}/{repo}', {
         owner: this._cfg.owner,
@@ -311,8 +312,13 @@ export class GitHubBackend implements StorageBackend {
         branch: this._cfg.branch,
       })
       return 'granted'
-    } catch {
-      return 'denied'
+    } catch (e) {
+      // Route through the same classifier every other GitHub call already
+      // uses (statAll/readFiles/write all `throw mapGitHubError(e)`), so an
+      // offline "Failed to fetch" or a rate-limited 403 is never reported as
+      // a bad token. A blanket 'denied' here is what sent offline users down
+      // the remove-and-re-add-the-vault path.
+      return isTransientSyncError(mapGitHubError(e)) ? 'unreachable' : 'denied'
     }
   }
 }
