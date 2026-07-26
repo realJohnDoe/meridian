@@ -9,6 +9,7 @@ import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
 import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile } from '@/model'
+import { pathToSlug, slugToPath } from '@/fileIO'
 import type { StoreItem, Roots } from '@/types'
 import {
   getItems, getRoots, setData,
@@ -18,10 +19,6 @@ import { notify, warn, notifyError } from './notifications'
 import { getActiveBackend } from './activeBackend'
 
 // ── HELPERS ────────────────────────────────────────────────────
-
-function fileSlugToPath(fileSlug: string): string {
-  return fileSlug + '.md'
-}
 
 export function updateSyncUI(): void {
   const backend = getActiveBackend()
@@ -46,7 +43,7 @@ export function parseFiles(
     try {
       const parsed = parseToStoreItems(path, content)
       loaded.push(...parsed.items)
-      roots.set(path.replace(/\.(md|yaml|yml)$/, ''), parsed.root)
+      roots.set(pathToSlug(path), parsed.root)
     } catch (e) { console.warn('[vault] parse failed for', path, e) }
   }
   return { items: loaded, roots }
@@ -194,7 +191,7 @@ function mergeChangedIntoStore(
   alsoAffected: Iterable<string> = [],
 ): void {
   const affectedSlugs = new Set(alsoAffected)
-  for (const r of records) affectedSlugs.add(r.path.replace(/\.(md|yaml|yml)$/, ''))
+  for (const r of records) affectedSlugs.add(pathToSlug(r.path))
 
   const keptItems = getItems().filter(item => !affectedSlugs.has(item.fileSlug))
   const keptRoots: Roots = new Map(
@@ -263,7 +260,7 @@ export async function reconcileWithBackend(
   const changedRecords = changedWritten
     .map(p => cacheMap.get(p))
     .filter((r): r is NonNullable<typeof r> => r != null)
-  const deletedSlugs = deleted.map(p => p.replace(/\.(md|yaml|yml)$/, ''))
+  const deletedSlugs = deleted.map(pathToSlug)
 
   mergeChangedIntoStore(changedRecords, deletedSlugs)
   updateSyncUI()
@@ -487,7 +484,7 @@ export async function syncToBackend(): Promise<void> {
 // doc comment there for why marking is refcounted.
 
 export async function writeEntityToCache(fileSlug: string): Promise<void> {
-  const path = fileSlugToPath(fileSlug)
+  const path = slugToPath(fileSlug)
   markInFlight(path)
   try {
     const backend = getActiveBackend()
@@ -522,7 +519,7 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
 }
 
 export async function deleteFromBackend(fileSlug: string): Promise<void> {
-  const path = fileSlugToPath(fileSlug)
+  const path = slugToPath(fileSlug)
   markInFlight(path)
   try {
     const backend = getActiveBackend()
