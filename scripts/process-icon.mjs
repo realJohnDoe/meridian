@@ -1,15 +1,15 @@
 import sharp from 'sharp'
 
-// Source is an iOS-style rounded-square icon (navy body, cream "M") sitting on a
-// black field. We knock out that black field so the rounded corners become
-// transparent, matching how the icon renders elsewhere in the app.
+// Source is an iOS-style rounded-square icon sitting on a pure black field. We
+// knock out that field so the rounded corners become transparent, matching how
+// the icon renders elsewhere in the app.
 //
-// The body's darkest colour is the navy fill (max channel ≈ 48), while the field
-// is pure black (max channel ≈ 0). We map the per-pixel max channel through a
-// ramp so the field goes fully transparent and the antialiased corner edge is
-// feathered instead of left with a hard fringe.
-const LO = 10 // max channel at/below this → fully transparent
-const HI = 44 // max channel at/above this → fully opaque (navy and brighter)
+// The body itself can dip into near-black tones near its edges (e.g. a glow
+// vignette), so a global luminance threshold would wrongly punch holes in the
+// design. Instead we flood-fill from the four image corners through
+// near-black pixels only — this reaches the corner cutouts (which touch the
+// corners) without touching similarly dark pixels deeper inside the body.
+const THRESHOLD = 4 // max channel at/below this counts as "field" during flood fill
 
 const { data, info } = await sharp('public/icon.png')
   .ensureAlpha()
@@ -17,13 +17,40 @@ const { data, info } = await sharp('public/icon.png')
   .toBuffer({ resolveWithObject: true })
 
 const pixels = new Uint8ClampedArray(data)
+const { width, height } = info
+const isField = (i) => Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) <= THRESHOLD
 
-for (let i = 0; i < pixels.length; i += 4) {
-  const max = Math.max(pixels[i], pixels[i + 1], pixels[i + 2])
-  if (max <= LO) {
-    pixels[i + 3] = 0
-  } else if (max < HI) {
-    pixels[i + 3] = Math.round(((max - LO) / (HI - LO)) * 255)
+const visited = new Uint8Array(width * height)
+const stack = []
+for (const [x, y] of [
+  [0, 0],
+  [width - 1, 0],
+  [0, height - 1],
+  [width - 1, height - 1],
+]) {
+  const p = y * width + x
+  visited[p] = 1
+  stack.push(p)
+}
+
+while (stack.length) {
+  const p = stack.pop()
+  const i = p * 4
+  if (!isField(i)) continue
+  pixels[i + 3] = 0
+
+  const x = p % width
+  const y = (p - x) / width
+  const neighbors = []
+  if (x > 0) neighbors.push(p - 1)
+  if (x < width - 1) neighbors.push(p + 1)
+  if (y > 0) neighbors.push(p - width)
+  if (y < height - 1) neighbors.push(p + width)
+  for (const n of neighbors) {
+    if (!visited[n]) {
+      visited[n] = 1
+      stack.push(n)
+    }
   }
 }
 
