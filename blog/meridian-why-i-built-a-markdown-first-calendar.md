@@ -30,8 +30,8 @@ So I built [Meridian](https://realjohndoe.github.io/meridian/): a calendar, task
 and notes app where every entry is a plain Markdown file.
 
 <figure class="post-figure post-figure--phone">
-  <img src="images/agenda-view.png" width="340" alt="Meridian's agenda view on a phone, showing tasks, events, and notes grouped by day." />
-  <figcaption>The agenda view: tasks, events, and notes on a single timeline.</figcaption>
+  <img src="images/agenda-view.png" width="340" alt="Meridian's agenda view on a phone, showing scheduled tasks and events grouped by day." />
+  <figcaption>The agenda view: scheduled tasks and events on a single timeline.</figcaption>
 </figure>
 
 What follows is roughly how that went, from those first ideas to the app I use today.
@@ -96,7 +96,7 @@ could keep building on.
 
 <figure class="post-figure post-figure--phone">
   <img src="images/plaintext-os-prototype.png" width="340" alt="An early mobile prototype of the app — an agenda list of standups and tasks in a dark theme." />
-  <figcaption>One of the early prototypes — <strong>plaintext-os</strong>, built and reshaped a hundred times in a single Claude chat on my phone.</figcaption>
+  <figcaption>An early version from that chat, by then already called Meridian — one of about a hundred iterations built on my phone.</figcaption>
 </figure>
 
 On **2026-05-22** I moved to a desktop, set the prototype aside, and started a proper
