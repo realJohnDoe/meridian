@@ -29,6 +29,10 @@ that can have its own description, its own notes, and its own tags.
 So I built [Meridian](https://realjohndoe.github.io/meridian/): a calendar, task manager,
 and notes app where every entry is a plain Markdown file.
 
+![Meridian's agenda view on a phone, showing tasks, events, and notes grouped by day.](images/agenda-view.png)
+
+_The agenda view: tasks, events, and notes on a single timeline._
+
 What follows is roughly how that went, from those first ideas to the app I use today.
 
 ## What I knew before I wrote any code
@@ -89,6 +93,10 @@ It worked. That was the problem. It worked well enough to show me the real versi
 app — and that a single generated file, growing with every change, wasn't a foundation I
 could keep building on.
 
+![An early mobile prototype of the app — an agenda list of standups and tasks in a dark theme.](images/plaintext-os-prototype.png)
+
+_One of the early prototypes — **plaintext-os**, built and reshaped a hundred times in a single Claude chat on my phone._
+
 On **2026-05-22** I moved to a desktop, set the prototype aside, and started a proper
 repository: React, TypeScript, Tailwind, shadcn/ui, Vite. The first day's commits
 scaffold the app, wire up GitHub Pages, and
@@ -110,6 +118,10 @@ shows how a YAML file becomes repeat patterns, how those patterns expand into
 occurrences, and what happens to the file when you cancel or move one. It was genuinely
 useful for about a week, while I chased the worst of the recurrence bugs; afterwards I
 half-considered deleting it again.
+
+![The inheritance debugger — source YAML on the left, the effective tree in the middle, and the expanded list of occurrences on the right.](images/inheritance-debugger.png)
+
+_The recurrence debugger: source YAML on the left, its expanded occurrences on the right. Cheap to build, and it turned opaque expansion bugs into something I could just look at._
 
 On **2026-06-03** entries gained
 [participants](https://github.com/realJohnDoe/meridian/commit/48506fb) — you tag people
@@ -161,6 +173,10 @@ sentence: **every entry is a list**.
 | **Event**   | a `date`, plus optional `time` and `duration` | agenda points or follow-ups |
 | **Tag**     | —                                             | everything tagged with it   |
 | **Note**    | no special properties                         | related entries             |
+
+![An entry open in Meridian's editor, with a "listed on" row near the top and an "items" section at the bottom.](images/entry-editor-listed-on.png)
+
+_An entry in the editor: the **listed on** row shows the lists it appears on; the **items** section at the bottom shows what it lists._
 
 A project is a task whose items are tasks. A tag is simply a list of everything filed
 under it. A backlink is just "the lists this appears on" — a phrase that needs no
