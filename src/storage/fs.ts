@@ -185,5 +185,12 @@ export async function diskDelete(
   try {
     const [dir, name] = await resolveParentDir(dh, path)
     await dir.removeEntry(name)
-  } catch { }
+  } catch (e) {
+    // Idempotent delete: the file (or an ancestor directory) is already gone —
+    // the desired end state. Treat it as success so a stale tombstone doesn't
+    // wedge sync in a permanent retry loop. Any other error is real (e.g. a
+    // permission error or a locked file) and must surface to the caller.
+    if ((e as { name?: string }).name === 'NotFoundError') return
+    throw e
+  }
 }
