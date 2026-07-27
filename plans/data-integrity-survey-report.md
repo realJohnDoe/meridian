@@ -16,8 +16,8 @@ is **`applyNew`'s slug guard**: creating a new entry whose title slugifies onto 
 existing file silently replaces that file's tags, items, date, `done` state and body
 with the new entry's, because the guard was written to make a re-entrant autosave
 idempotent and cannot tell that case apart from "different entry, same slug." The
-structural theme behind both: *the store, not the file, is treated as the source of
-truth* — the file is a projection of a closed domain model rather than a document the
+structural theme behind both: _the store, not the file, is treated as the source of
+truth_ — the file is a projection of a closed domain model rather than a document the
 model annotates, so anything the model can't express has nowhere to survive. The same
 theme reappears one layer down, where the reconcile/CAS machinery is carefully correct
 against a contract that only one of the three backends actually implements. The temporal
@@ -31,28 +31,28 @@ lands on the 1st.
 
 **Probed with real reproductions** (ran the code, captured output):
 
-| Invariant | How |
-|---|---|
-| 1 Round-trip fidelity | Adversarial hand-authored files through the real `parseToStoreItems` → `collapseToYaml` → `saveFile` pipeline: unknown keys, comments, block scalars, aliases, CRLF, unicode/RTL/emoji, numeric- and boolean-looking strings, wrong-typed known fields |
-| 2 Edit locality | All four `applyEdit` scopes (`all`/`single`/`future`/`add`) plus `applyNew` on a weekly series with two overrides; byte-diffed the serialized output before/after |
-| 3 Expansion ↔ collapse | All 13 fixtures via the existing round-trip suite, plus adversarial multi-series and post-`future`-split re-parse → re-expand |
-| 4 No lost update | The **real** `src/storage/fs.ts` driven against an in-memory `FileSystemDirectoryHandle` stand-in (not a mock of `fs.ts` — the actual `diskWrite`/`diskDelete`) |
-| 7 Recoverability | Swipe-delete undo window with an interleaved unrelated edit, through the real `occurrenceActions` + store + persistence port |
-| 8 Temporal | `end.type: count`, the 500-iteration cap, `bymonthday` month-end overflow, yearly-from-Feb-29, DST spring-forward/fall-back in `Europe/Berlin` |
-| — Validation | Five malformed/hostile files through the real `parseFiles` load path |
+| Invariant              | How                                                                                                                                                                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 Round-trip fidelity  | Adversarial hand-authored files through the real `parseToStoreItems` → `collapseToYaml` → `saveFile` pipeline: unknown keys, comments, block scalars, aliases, CRLF, unicode/RTL/emoji, numeric- and boolean-looking strings, wrong-typed known fields |
+| 2 Edit locality        | All four `applyEdit` scopes (`all`/`single`/`future`/`add`) plus `applyNew` on a weekly series with two overrides; byte-diffed the serialized output before/after                                                                                      |
+| 3 Expansion ↔ collapse | All 13 fixtures via the existing round-trip suite, plus adversarial multi-series and post-`future`-split re-parse → re-expand                                                                                                                          |
+| 4 No lost update       | The **real** `src/storage/fs.ts` driven against an in-memory `FileSystemDirectoryHandle` stand-in (not a mock of `fs.ts` — the actual `diskWrite`/`diskDelete`)                                                                                        |
+| 7 Recoverability       | Swipe-delete undo window with an interleaved unrelated edit, through the real `occurrenceActions` + store + persistence port                                                                                                                           |
+| 8 Temporal             | `end.type: count`, the 500-iteration cap, `bymonthday` month-end overflow, yearly-from-Feb-29, DST spring-forward/fall-back in `Europe/Berlin`                                                                                                         |
+| — Validation           | Five malformed/hostile files through the real `parseFiles` load path                                                                                                                                                                                   |
 
 **Reasoned about statically only** (no reproduction):
 
 - Invariant 5 (cache coherence) below the store level and invariant 6 (durability):
   `cache.ts`'s Dexie transactions. Every sync test replaces `@/storage/cache` with a
-  hand-written in-memory re-implementation, so I could exercise the *policy* but not
+  hand-written in-memory re-implementation, so I could exercise the _policy_ but not
   the real `markPushed` / `applyRemoteBatch` preconditions. Measured coverage confirms
   it: **`cache.ts` is at 3.73% statements**. Nothing I could see there is wrong — the
   six transitions each carry their precondition and the reasoning in the comments holds
   up — but "I read it" is the whole basis.
 - IndexedDB quota exhaustion / `QuotaExceededError`. `recordLocalEdit` has no catch;
   a quota failure would reject into `writeEntityToCache`'s catch → `notifyError('Save
-  failed')`. That is the right shape (loud), so I did not pursue it. **Unverified.**
+failed')`. That is the right shape (loud), so I did not pursue it. **Unverified.**
 - Two tabs of the same vault. The in-flight registry is per-tab module state and Dexie
   is shared, so two tabs can each hold a `version` for the same path and each CAS
   successfully in turn — the second's write is based on content the first never saw.
@@ -66,11 +66,11 @@ real device, not this harness.
 
 **Backends:**
 
-| Backend | Exercised how |
-|---|---|
-| Example | Read end-to-end (it is `readOnly`, so no write path exists to test) |
+| Backend  | Exercised how                                                                                                                                                                                                                                                                          |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Example  | Read end-to-end (it is `readOnly`, so no write path exists to test)                                                                                                                                                                                                                    |
 | Local FS | **Exercised** — `diskWrite`/`diskDelete` run for real against a fake directory handle. Could not exercise `LocalBackend` itself (no File System Access API in Node, no permission grant in the automated browser), but it is a 20-line delegation to `fs.ts` and was read line by line |
-| GitHub | **Traced only** — no OAuth flow available. Read `githubBackend.ts` + `githubApi.ts` end to end; its behaviour is inferred from the Contents API semantics its code relies on. Existing tests cover it at 89% |
+| GitHub   | **Traced only** — no OAuth flow available. Read `githubBackend.ts` + `githubApi.ts` end to end; its behaviour is inferred from the Contents API semantics its code relies on. Existing tests cover it at 89%                                                                           |
 
 **Vaults used:** the 17-entry Tutorial vault (`exampleBackend.ts`) and hand-written
 adversarial fixtures. I did **not** use `testVaultGen.ts`'s 300-file vault: nothing
@@ -80,12 +80,12 @@ correctness paths.
 
 **Quality gates** (single run each):
 
-| Gate | Status |
-|---|---|
-| `pnpm run build` | **pass** — `tsc -b` + vite, built in 10.08s |
-| `pnpm run lint` | **pass** — 0 errors, 2 pre-existing `react-hooks/incompatible-library` warnings (`AgendaList.tsx`, `FileResultsList.tsx`). Generated types were produced first (`pnpm run build`, `pnpm --filter meridian-oauth-worker run cf-typegen`) |
-| `pnpm test` | **pass** — 53 files, 642 tests |
-| `pnpm run test:coverage` | 57.56% statements overall; integrity-critical files below |
+| Gate                     | Status                                                                                                                                                                                                                                  |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm run build`         | **pass** — `tsc -b` + vite, built in 10.08s                                                                                                                                                                                             |
+| `pnpm run lint`          | **pass** — 0 errors, 2 pre-existing `react-hooks/incompatible-library` warnings (`AgendaList.tsx`, `FileResultsList.tsx`). Generated types were produced first (`pnpm run build`, `pnpm --filter meridian-oauth-worker run cf-typegen`) |
+| `pnpm test`              | **pass** — 53 files, 642 tests                                                                                                                                                                                                          |
+| `pnpm run test:coverage` | 57.56% statements overall; integrity-critical files below                                                                                                                                                                               |
 
 Coverage on the integrity surface, used only as a pointer to where to look:
 
@@ -111,15 +111,15 @@ repo, multi-tab.
 
 ## 3. Category verdicts
 
-| # | Category | Verdict |
-|---|---|---|
-| 1 | Round-trip fidelity & edit locality | **findings: #1, #2** |
-| 2 | Lost updates & conflict handling | **findings: #3** |
-| 3 | Cache coherence & durability | **findings: #4** — and *partially assessed*: real `cache.ts` transactions and the two-tab case were reasoned about, not reproduced (see coverage statement) |
-| 4 | Atomicity & partial failure | **clean** — threat plan executed. `applyRemoteBatch` is a single Dexie transaction; `pushDirty` leaves un-pushed files dirty and pushed ones clean on a mid-loop throw; `markInFlight` is refcounted and cleared in a `finally` on both paths; `applyFuture`'s series split is a pure single-file operation, so it cannot half-apply. The one wart — a throw late in `pushDirty` skips `mergeChangedIntoStore(collisionMerges)`, leaving an already-written conflict copy invisible until the next reconcile — is recoverable and loses nothing, so it is below the bar for this report |
-| 5 | Destruction & recoverability | **findings: #4, #7** — `removeVault` was a suspect and is **refuted**: `VaultSettings.tsx` shows an explicit "N unsynced changes … will be lost" warning before `cacheDeleteAll` |
-| 6 | Temporal correctness | **findings: #5, #6, #8** — DST specifically **refuted**: `withTime`'s `startOfDay` + `setHours` keeps local wall-clock time across both Berlin transitions |
-| 7 | Input validation & untrusted files | **findings: #7** |
+| #   | Category                            | Verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Round-trip fidelity & edit locality | **findings: #1, #2**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 2   | Lost updates & conflict handling    | **findings: #3**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 3   | Cache coherence & durability        | **findings: #4** — and _partially assessed_: real `cache.ts` transactions and the two-tab case were reasoned about, not reproduced (see coverage statement)                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 4   | Atomicity & partial failure         | **clean** — threat plan executed. `applyRemoteBatch` is a single Dexie transaction; `pushDirty` leaves un-pushed files dirty and pushed ones clean on a mid-loop throw; `markInFlight` is refcounted and cleared in a `finally` on both paths; `applyFuture`'s series split is a pure single-file operation, so it cannot half-apply. The one wart — a throw late in `pushDirty` skips `mergeChangedIntoStore(collisionMerges)`, leaving an already-written conflict copy invisible until the next reconcile — is recoverable and loses nothing, so it is below the bar for this report |
+| 5   | Destruction & recoverability        | **findings: #4, #7** — `removeVault` was a suspect and is **refuted**: `VaultSettings.tsx` shows an explicit "N unsynced changes … will be lost" warning before `cacheDeleteAll`                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 6   | Temporal correctness                | **findings: #5, #6, #8** — DST specifically **refuted**: `withTime`'s `startOfDay` + `setHours` keeps local wall-clock time across both Berlin transitions                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 7   | Input validation & untrusted files  | **findings: #7**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ---
 
@@ -127,16 +127,16 @@ repo, multi-tab.
 
 ### Summary table
 
-| # | Finding | Invariant | Failure mode | Impact | Recommended model |
-|---|---|---|---|---|---|
-| 1 | Every save discards frontmatter outside the 8-field model | 1, 2 | **silent** | 9 | Opus 5, plan mode, multi-PR |
-| 2 | New entry on a colliding slug overwrites the existing file | 2, 7 | **silent** | 9 | Opus 5 (Sonnet 5 if scoped) |
-| 3 | Local FS backend ignores the CAS contract on create and delete | 4 | **silent** | 8 | Sonnet 5 if scoped, else Opus 5 |
-| 4 | Delete-undo restores a whole-store snapshot | 2, 5, 6 | **silent** | 7 | Sonnet 5 |
-| 5 | `end: {type: count}` is counted per query window | 8 | **silent** | 6 | Sonnet 5 if scoped, else Opus 5 |
-| 6 | Month-end overflow moves and skips monthly/yearly occurrences | 8 | **silent** | 6 | Sonnet 5 |
-| 7 | One YAML typo removes a file from the vault, signal-free | 7, validation | **silent** (console only) | 5 | Sonnet 5 |
-| 8 | 500-iteration cap hides daily series past ~16 months | 8 | **silent** | 5 | Haiku 4.5 if scoped, else Sonnet 5 |
+| #   | Finding                                                        | Invariant     | Failure mode              | Impact | Recommended model                  |
+| --- | -------------------------------------------------------------- | ------------- | ------------------------- | ------ | ---------------------------------- |
+| 1   | Every save discards frontmatter outside the 8-field model      | 1, 2          | **silent**                | 9      | Opus 5, plan mode, multi-PR        |
+| 2   | New entry on a colliding slug overwrites the existing file     | 2, 7          | **silent**                | 9      | Opus 5 (Sonnet 5 if scoped)        |
+| 3   | Local FS backend ignores the CAS contract on create and delete | 4             | **silent**                | 8      | Sonnet 5 if scoped, else Opus 5    |
+| 4   | Delete-undo restores a whole-store snapshot                    | 2, 5, 6       | **silent**                | 7      | Sonnet 5                           |
+| 5   | `end: {type: count}` is counted per query window               | 8             | **silent**                | 6      | Sonnet 5 if scoped, else Opus 5    |
+| 6   | Month-end overflow moves and skips monthly/yearly occurrences  | 8             | **silent**                | 6      | Sonnet 5                           |
+| 7   | One YAML typo removes a file from the vault, signal-free       | 7, validation | **silent** (console only) | 5      | Sonnet 5                           |
+| 8   | 500-iteration cap hides daily series past ~16 months           | 8             | **silent**                | 5      | Haiku 4.5 if scoped, else Sonnet 5 |
 
 **Sequencing note.** #5, #6 and #8 all live inside `generateScheduledDates`
 (`src/model/expansion.ts:168–258`) — land them as one PR in the order **#6 → #5 → #8**
@@ -146,147 +146,6 @@ budget, which has to be re-derived once the cursor is correct). #1 changes what
 do **#1 before #2**, since #1's raw-node passthrough is what gives #2's "this slug is
 already taken" check something to preserve when it forks the file. #3, #4 and #7 are
 independent of everything else.
-
----
-
-### #1 — Every save discards frontmatter outside the 8-field model
-
-- **Invariant violated:** 1 (round-trip fidelity) and 2 (edit locality). **Every save**,
-  on any file carrying anything Meridian has no name for. Hand-authored files are
-  squarely in scope: the README promises hand-created files are picked up.
-- **Category:** `round-trip` `edit-locality` `testing-gap`
-- **Failure mode:** **silent.** No error, no toast, no console line. A user notices weeks
-  later in a `git diff`, or never — on a local-folder vault there is no diff to notice.
-- **Impact:** **9** — silent, unrecoverable loss of user-authored content on the most
-  common path in the app.
-
-**Repro.** Starting file `qr.md`, verbatim:
-
-```markdown
----
-# my own notes about this file
-title: Quarterly review
-project: apollo
-url: https://example.com/ticket/42
-estimate: 3
-date: "2026-04-08"
-aliases:
-  - QR
-  - "Q review"
----
-
-Body text here.
-```
-
-Operation: `parseToStoreItems('qr.md', src)` → `saveFile(collapseToYaml(items, root), root.body)`
-— i.e. exactly what `writeEntityToCache` does on any edit (tick a checkbox, type one
-character in the body).
-
-Observed output:
-
-```markdown
----
-title: Quarterly review
-date: 2026-04-08
----
-
-Body text here.
-```
-
-Expected: `project`, `url`, `estimate`, `aliases` and the comment preserved.
-
-The same pass also drops, in separate runs: a `defaults:` block's `owner: alice`, a
-per-instance `note: |` block scalar, and — the sharpest case — **known fields carrying
-an unexpected type**. `duration: [1, 2]` and `tags: "not-a-list"` are both silently
-erased rather than round-tripped, because `parseInlineField` coerces to `undefined`/`[]`
-and `inlineFieldEmpty` then omits them.
-
-Failing test to commit with the fix:
-
-```ts
-it('preserves frontmatter keys the model does not know about', () => {
-  const src = [
-    '---',
-    'title: Quarterly review',
-    'project: apollo',
-    'url: https://example.com/ticket/42',
-    'aliases:',
-    '  - QR',
-    '---',
-    '',
-    'Body text here.',
-  ].join('\n')
-  const p = parseToStoreItems('qr.md', src)
-  const out = saveFile(collapseToYaml(p.items, p.root), p.root.body ?? '')
-  expect(out).toContain('project: apollo')
-  expect(out).toContain('url: https://example.com/ticket/42')
-  expect(out).toContain('- QR')
-})
-```
-
-- **Breadth:** one production write site — `grep -rn "collapseToYaml" src` returns
-  `src/storage/sync.ts:551` plus the debug view and tests. Every `.md` file in every
-  vault flows through it. The persisted vocabulary is 8 keys (`INLINE_FIELDS`,
-  `src/types.ts:144–153`) plus 5 structural ones (`date`, `time`, `repeat`, `excluded`,
-  `instances`); **everything else in every file is exposed on its first edit.**
-- **Recommended model:** **Opus 5 in plan mode, for a plan spanning multiple PRs.** Two
-  reasons. First, it needs a product decision the user should make and I should not:
-  *preserve unknown keys and comments* (requires keeping a `yaml` Document/AST per file
-  through the store, which is a real architectural change) versus *declare the file
-  format normalized on save and say so in the README*. Second, the naive fix is a trap:
-  stashing the raw frontmatter on `FileMetadata` and spreading it back over the collapse
-  output re-emits `date` / `repeat` / `instances` / `defaults` — once fresh from the
-  model and once stale from the raw node — so the file gains a duplicate, wrong schedule.
-  "Unknown" has to be computed **per node**, not per file, because the four edit scopes
-  relocate occurrence metadata between the root, `defaults:`, and `instances[]`. The
-  hazard that sets the tier: **the existing round-trip suite will pass either way** (see
-  the testing-gap note below), so a wrong fix ships green.
-- **Evidence:** `src/model/collapse.ts:170` — the whole serializer only ever reads the
-  registry:
-
-  ```ts
-  function occMetaToYaml(m: Partial<OccurrenceMetadata>): Record<string, unknown> {
-    const result: Record<string, unknown> = {}
-    for (const spec of OCCURRENCE_FIELDS) {
-  ```
-
-  and `src/storage/sync.ts:551`, where that output becomes the file:
-
-  ```ts
-      const frontmatter = collapseToYaml(slugItems, root)
-      const body        = root?.body ?? ''
-      const content     = saveFile(frontmatter, body)
-      await recordLocalEdit(backend.id, path, content)
-  ```
-
-- **Problem:** the file is regenerated from a closed domain model rather than edited, so
-  every byte the model cannot represent is deleted on the next save — the user loses
-  their own frontmatter, their comments, and any known field they typed in an
-  unsupported shape.
-- **Fix:** carry the unparsed remainder of each YAML node (root, each `defaults:`, each
-  `instances[]` entry) alongside the typed metadata and re-emit it under the recognised
-  keys during collapse — **or** make the normalization deliberate and documented. After
-  the fix the repro above must round-trip `project`, `url`, `estimate` and `aliases`
-  byte-for-byte, and emit `date:` exactly once.
-
-**Testing-gap note (why this survived a 1:1 test-to-source ratio).**
-`yaml-roundtrip.test.ts:15` asserts a *fixed point on Meridian's own output*:
-
-```ts
-const parsed1 = parseFixture(name)
-const yaml1 = serialize(parsed1.items, parsed1.root)
-const parsed2 = parseToStoreItems(`${name}.md`, yaml1)
-const yaml2 = serialize(parsed2.items, parsed2.root)
-expect(yaml2).toBe(yaml1)
-```
-
-It never asserts `serialize(parse(f)) === f`. The loss happens on the *first* pass, so
-by the time the assertion runs, both sides have already been stripped identically. And
-all 13 fixtures in `__tests__/fixtures/` are Meridian-shaped — not one carries an unknown
-key, a comment, a block scalar, or CRLF. The same applies to
-`__snapshots__/edits.test.ts.snap`: 15 baselines that lock output *stability*, not
-correctness; a fix that changed the emitted shape would show as a snapshot diff, and a
-regression that dropped a key would not show at all.
 
 ---
 
@@ -348,20 +207,30 @@ plus any two titles agreeing in their first 60 slug characters (the `.slice(0, 6
 Failing test to commit with the fix:
 
 ```ts
-it('creating an entry on a taken slug does not overwrite the existing file', () => {
-  const existing = parseToStoreItems('buy-groceries.md',
-    '---\ntitle: Buy groceries\ntags: [errands]\ndone: false\ndate: "2026-04-08"\n---\n\nRemember the bags.')
-  const roots: Roots = new Map([['buy-groceries', existing.root]])
+it("creating an entry on a taken slug does not overwrite the existing file", () => {
+  const existing = parseToStoreItems(
+    "buy-groceries.md",
+    '---\ntitle: Buy groceries\ntags: [errands]\ndone: false\ndate: "2026-04-08"\n---\n\nRemember the bags.',
+  );
+  const roots: Roots = new Map([["buy-groceries", existing.root]]);
 
-  const next = applyEdit({ items: existing.items, roots }, null, 'add', {
-    title: 'Buy groceries!', tags: [], items: [], participants: [], tracked: false,
-    done: false, priority: null, scheduled: null, duration: '', repeat: null,
-    body: 'totally different note',
-  })
+  const next = applyEdit({ items: existing.items, roots }, null, "add", {
+    title: "Buy groceries!",
+    tags: [],
+    items: [],
+    participants: [],
+    tracked: false,
+    done: false,
+    priority: null,
+    scheduled: null,
+    duration: "",
+    repeat: null,
+    body: "totally different note",
+  });
 
-  expect(next.roots.get('buy-groceries')!.title).toBe('Buy groceries')
-  expect(next.roots.get('buy-groceries')!.body).toContain('Remember the bags')
-})
+  expect(next.roots.get("buy-groceries")!.title).toBe("Buy groceries");
+  expect(next.roots.get("buy-groceries")!.body).toContain("Remember the bags");
+});
 ```
 
 - **Breadth:** one function, `applyNew` (`src/model/storeOps.ts:213–224`), reachable from
@@ -375,32 +244,36 @@ it('creating an entry on a taken slug does not overwrite the existing file', () 
   for the same not-yet-adopted item (e.g. a debounced autosave firing after an in-dialog
   save already created the file)" — deleting it re-introduces two items sharing one
   `fileSlug`, which collapses into a duplicate `instances[]` entry. So the fix must
-  *distinguish* re-entrant autosave from a genuine collision, and the only identity
+  _distinguish_ re-entrant autosave from a genuine collision, and the only identity
   available at that point is threaded through `useEntryEditor`'s `createdItemRef`
   (`src/editor/useEntryEditor.ts:107`). Name those two things and Sonnet 5 is enough;
   without them the plausible fix silently swaps one corruption for another.
 - **Evidence:** `src/model/storeOps.ts:217`:
 
   ```ts
-    if (roots.has(fileSlug)) {
-      const existing = items.find(i => i.fileSlug === fileSlug && (isSeries(i) || isStandaloneOcc(i)))
-      if (existing) {
-        const newRoots = updateRoot(roots, fileSlug, fields)
-        const newItems = items.map(i => i.id === existing.id ? applyFieldsToItem(i, fields) : i)
-        return { items: newItems, roots: newRoots }
-      }
+  if (roots.has(fileSlug)) {
+    const existing = items.find(
+      (i) => i.fileSlug === fileSlug && (isSeries(i) || isStandaloneOcc(i)),
+    );
+    if (existing) {
+      const newRoots = updateRoot(roots, fileSlug, fields);
+      const newItems = items.map((i) =>
+        i.id === existing.id ? applyFieldsToItem(i, fields) : i,
+      );
+      return { items: newItems, roots: newRoots };
     }
+  }
   ```
 
   `updateRoot` is a wholesale replacement, not a merge (`src/model/storeOps.ts:182`):
 
   ```ts
-    next.set(fileSlug, {
-      title: f.title,
-      tags:  f.tags,
-      items: f.items ?? [],
-      body:  f.body || undefined,
-    })
+  next.set(fileSlug, {
+    title: f.title,
+    tags: f.tags,
+    items: f.items ?? [],
+    body: f.body || undefined,
+  });
   ```
 
 - **Problem:** a new entry silently adopts and overwrites an unrelated existing file
@@ -411,7 +284,7 @@ it('creating an entry on a taken slug does not overwrite the existing file', () 
   `buy-groceries.md` untouched and put the new entry elsewhere.
 
   Note this compounds with **#7**: a file that fails to parse is absent from `roots`, so
-  `roots.has(fileSlug)` is `false` and the *fresh-root* branch runs — a YAML typo plus a
+  `roots.has(fileSlug)` is `false` and the _fresh-root_ branch runs — a YAML typo plus a
   same-titled new entry destroys the file outright.
 
 ---
@@ -424,7 +297,7 @@ it('creating an entry on a taken slug does not overwrite the existing file', () 
   and pushes on the next activation, which can be days later.
 - **Category:** `lost-update` `atomicity` `testing-gap`
 - **Failure mode:** **silent.** The code has a user-facing warning for exactly this
-  situation — `` warn(`${f.path} was edited remotely — kept the remote version instead of deleting.`) ``
+  situation — ``warn(`${f.path} was edited remotely — kept the remote version instead of deleting.`)``
   — which is unreachable on a local vault, because the `ConflictError` that triggers it is
   never thrown there.
 - **Impact:** **8** — silent, unrecoverable overwrite/destruction of content the app
@@ -432,7 +305,7 @@ it('creating an entry on a taken slug does not overwrite the existing file', () 
 
 **Repro** (against the real `src/storage/fs.ts`, in-memory `FileSystemDirectoryHandle`):
 
-*Case A — create-over-existing.* Disk holds `meeting-notes.md` with `HAND WRITTEN
+_Case A — create-over-existing._ Disk holds `meeting-notes.md` with `HAND WRITTEN
 CONTENT`. The cache has never seen it, so its record's `version` is `undefined`
 (`recordLocalEdit` preserves `existing?.version`). `pushDirty` calls
 `backend.write(f.path, f.content, f.version)`:
@@ -446,7 +319,7 @@ diskWrite(dh, 'meeting-notes.md', 'APP CONTENT', undefined)
 Observed: silent overwrite. Expected (and what GitHub does — `PUT` without `sha` onto an
 existing path returns 422 → `ConflictError` → conflict copy + `warn`): a `ConflictError`.
 
-*Case B — delete-over-remote-edit.* Disk holds `a.md`, hand-edited after the tombstone was
+_Case B — delete-over-remote-edit._ Disk holds `a.md`, hand-edited after the tombstone was
 staged. `pushDirty` calls `backend.delete(f.path, f.version)` with the stale base version:
 
 ```
@@ -460,17 +333,25 @@ tombstone-conflict branch in `pushDirty` fires and keeps the remote version.
 Failing test to commit with the fix (uses the same in-memory handle stand-in):
 
 ```ts
-it('write with no expectedVersion must not clobber an existing file', async () => {
-  const dh = makeHandle({ 'meeting-notes.md': { content: 'HAND WRITTEN', lastModified: 1000 } })
-  await expect(diskWrite(dh, 'meeting-notes.md', 'APP', undefined)).rejects.toBeInstanceOf(ConflictError)
-  expect(dh.files.get('meeting-notes.md')!.content).toBe('HAND WRITTEN')
-})
+it("write with no expectedVersion must not clobber an existing file", async () => {
+  const dh = makeHandle({
+    "meeting-notes.md": { content: "HAND WRITTEN", lastModified: 1000 },
+  });
+  await expect(
+    diskWrite(dh, "meeting-notes.md", "APP", undefined),
+  ).rejects.toBeInstanceOf(ConflictError);
+  expect(dh.files.get("meeting-notes.md")!.content).toBe("HAND WRITTEN");
+});
 
-it('delete honours expectedVersion', async () => {
-  const dh = makeHandle({ 'a.md': { content: 'EDITED AFTER TOMBSTONE', lastModified: 9999 } })
-  await expect(diskDelete(dh, 'a.md', '1000:5')).rejects.toBeInstanceOf(ConflictError)
-  expect(dh.files.has('a.md')).toBe(true)
-})
+it("delete honours expectedVersion", async () => {
+  const dh = makeHandle({
+    "a.md": { content: "EDITED AFTER TOMBSTONE", lastModified: 9999 },
+  });
+  await expect(diskDelete(dh, "a.md", "1000:5")).rejects.toBeInstanceOf(
+    ConflictError,
+  );
+  expect(dh.files.has("a.md")).toBe(true);
+});
 ```
 
 - **Breadth:** 2 methods in 1 of 3 backends (`grep -rln "implements StorageBackend" src`
@@ -478,7 +359,7 @@ it('delete honours expectedVersion', async () => {
   `readOnly`). Affects 100% of writes on local-folder vaults where a second writer exists.
 - **Recommended model:** **Sonnet 5 if the task spells out the two preconditions to
   preserve; else Opus 5.** The preconditions: (a) an `undefined` `expectedVersion` means
-  *"create"*, so the CAS must be on **absence**, not on a token — a fix that simply
+  _"create"_, so the CAS must be on **absence**, not on a token — a fix that simply
   rejects when the file exists breaks legitimate first writes only if it forgets the
   create case, and a fix that requires a token breaks every new file; (b) `diskDelete`'s
   `NotFoundError`-is-success idempotency must survive, or a stale tombstone wedges sync in
@@ -516,13 +397,13 @@ it('delete honours expectedVersion', async () => {
   `ConflictError`, which routes case A into `resolveCollision`'s conflict copy and case B
   into the existing "kept the remote version" warning.
 
-**Testing-gap note.** `sync-collision.test.ts` already asserts *exactly* the two
+**Testing-gap note.** `sync-collision.test.ts` already asserts _exactly_ the two
 behaviours the local backend lacks — "reports ConflictError for a new file whose path
 already exists on the backend" and "reports ConflictError instead of destroying a remote
 edit that landed after the tombstone was staged" — but against a `FakeBackend` declared
 `readonly kind: VaultKind = 'local'` whose own comments say it "mirrors GitHub returning
 422" and "mirrors GitHubBackend surfacing a 409". The suite proves the contract against a
-fake labelled *local* that behaves like *GitHub*, while the real local backend implements
+fake labelled _local_ that behaves like _GitHub_, while the real local backend implements
 neither check and sits at **0% coverage**.
 
 ---
@@ -560,27 +441,60 @@ Expected: `a` restored, `b done = true` untouched.
 Failing test to commit with the fix:
 
 ```ts
-it('undoing a delete does not revert an unrelated edit made during the toast window', () => {
+it("undoing a delete does not revert an unrelated edit made during the toast window", () => {
   seedStore(
     [
-      { date: '2026-06-15', time: null, source: 'explicit', fileSlug: 'a', id: 'a1', metadata: { participants: [] } },
-      { date: '2026-06-16', time: null, source: 'explicit', fileSlug: 'b', id: 'b1', metadata: { participants: [], done: false } },
+      {
+        date: "2026-06-15",
+        time: null,
+        source: "explicit",
+        fileSlug: "a",
+        id: "a1",
+        metadata: { participants: [] },
+      },
+      {
+        date: "2026-06-16",
+        time: null,
+        source: "explicit",
+        fileSlug: "b",
+        id: "b1",
+        metadata: { participants: [], done: false },
+      },
     ],
     new Map([
-      ['a', { title: 'A', tags: [], items: [] }],
-      ['b', { title: 'B', tags: [], items: [] }],
+      ["a", { title: "A", tags: [], items: [] }],
+      ["b", { title: "B", tags: [], items: [] }],
     ]),
-  )
+  );
 
-  beginSwipeDelete(makeOcc({ fileSlug: 'a', id: 'a1', date: '2026-06-15', time: null }))()
-  toggleOccDone(makeOcc({ fileSlug: 'b', id: 'b1', date: '2026-06-16', time: null,
-    metadata: { participants: [], title: 'B', tags: [], items: [], done: false } }))
+  beginSwipeDelete(
+    makeOcc({ fileSlug: "a", id: "a1", date: "2026-06-15", time: null }),
+  )();
+  toggleOccDone(
+    makeOcc({
+      fileSlug: "b",
+      id: "b1",
+      date: "2026-06-16",
+      time: null,
+      metadata: {
+        participants: [],
+        title: "B",
+        tags: [],
+        items: [],
+        done: false,
+      },
+    }),
+  );
 
-  lastToast!.action.onClick()   // Undo
+  lastToast!.action.onClick(); // Undo
 
-  expect(getItems().map(i => i.fileSlug).sort()).toEqual(['a', 'b'])
-  expect(getItems().find(i => i.id === 'b1')!.metadata.done).toBe(true)
-})
+  expect(
+    getItems()
+      .map((i) => i.fileSlug)
+      .sort(),
+  ).toEqual(["a", "b"]);
+  expect(getItems().find((i) => i.id === "b1")!.metadata.done).toBe(true);
+});
 ```
 
 - **Breadth:** one file, `src/occurrenceActions.ts`, two undo closures (lines 100 and
@@ -589,7 +503,7 @@ it('undoing a delete does not revert an unrelated edit made during the toast win
   snapshot to the deleted file is only half the fix and the other half fails silently —
   today's undo path issues **no** `writeEntity` at all, so even a perfectly scoped restore
   leaves the cache holding the deleted state while the store shows it restored. The fix
-  must both scope the restore to `o.fileSlug` *and* persist the restored slug. A change
+  must both scope the restore to `o.fileSlug` _and_ persist the restored slug. A change
   that only does the first passes any test that asserts on the store and still corrupts
   on reload.
 - **Evidence:** `src/occurrenceActions.ts:90–103`:
@@ -600,24 +514,33 @@ it('undoing a delete does not revert an unrelated edit made during the toast win
   ```
 
   ```ts
-      showDeleteToast(title,
-        () => { writeEntity(o.fileSlug) },
-        () => { cancelled = true; setData(snapshot) },
-        { endsSeries },
-      )
+  showDeleteToast(
+    title,
+    () => {
+      writeEntity(o.fileSlug);
+    },
+    () => {
+      cancelled = true;
+      setData(snapshot);
+    },
+    { endsSeries },
+  );
   ```
 
   `getSnapshot()` is the entire store (`src/storeBridge.ts:10`):
 
   ```ts
-  export const getSnapshot      = (): { items: StoreItem[]; roots: Roots } => ({ items: getItems(), roots: getRoots() })
+  export const getSnapshot = (): { items: StoreItem[]; roots: Roots } => ({
+    items: getItems(),
+    roots: getRoots(),
+  });
   ```
 
 - **Problem:** undoing one delete rolls the whole vault back four seconds, so any edit
   made in that window is reverted in the UI but not in the cache — and is then destroyed
   for real by the next save of that file.
 - **Fix:** restore only the deleted slug's items and root from the snapshot (merging them
-  into the *current* store, not replacing it) and call `writeEntity(o.fileSlug)` on the
+  into the _current_ store, not replacing it) and call `writeEntity(o.fileSlug)` on the
   undo path. After the fix the repro must end with both slugs present **and** `b done = true`.
 
 ---
@@ -668,19 +591,44 @@ counting loop, so `occurrences: 3` yields four.
 Failing test to commit with the fix:
 
 ```ts
-it('a count-bounded series yields the same occurrences regardless of the query window', () => {
-  const p = parseToStoreItems('s.md', [
-    '---', 'title: Physio', 'date: "2026-01-05"', 'time: "09:00"',
-    'repeat:', '  type: schedule', '  freq: weekly', '  byweekday: [mo]',
-    '  end:', '    type: count', '    occurrences: 3', '---',
-  ].join('\n'))
-  const roots: Roots = new Map([['s', p.root]])
-  const all = expandRange(p.items, roots, new Date(2026, 0, 1), new Date(2026, 11, 31))
+it("a count-bounded series yields the same occurrences regardless of the query window", () => {
+  const p = parseToStoreItems(
+    "s.md",
+    [
+      "---",
+      "title: Physio",
+      'date: "2026-01-05"',
+      'time: "09:00"',
+      "repeat:",
+      "  type: schedule",
+      "  freq: weekly",
+      "  byweekday: [mo]",
+      "  end:",
+      "    type: count",
+      "    occurrences: 3",
+      "---",
+    ].join("\n"),
+  );
+  const roots: Roots = new Map([["s", p.root]]);
+  const all = expandRange(
+    p.items,
+    roots,
+    new Date(2026, 0, 1),
+    new Date(2026, 11, 31),
+  );
 
-  expect(all.map(o => o.date)).toEqual(['2026-01-05', '2026-01-12', '2026-01-19'])
-  expect(expandRange(p.items, roots, new Date(2026, 2, 1), new Date(2026, 2, 31))).toEqual([])
-  expect(expandRange(p.items, roots, new Date(2030, 0, 1), new Date(2030, 0, 31))).toEqual([])
-})
+  expect(all.map((o) => o.date)).toEqual([
+    "2026-01-05",
+    "2026-01-12",
+    "2026-01-19",
+  ]);
+  expect(
+    expandRange(p.items, roots, new Date(2026, 2, 1), new Date(2026, 2, 31)),
+  ).toEqual([]);
+  expect(
+    expandRange(p.items, roots, new Date(2030, 0, 1), new Date(2030, 0, 31)),
+  ).toEqual([]);
+});
 ```
 
 - **Breadth:** one function, `generateScheduledDates` (`src/model/expansion.ts:249–256`).
@@ -705,7 +653,7 @@ it('a count-bounded series yields the same occurrences regardless of the query w
       }
   ```
 
-- **Problem:** a series the user bounded at N occurrences generates N *more* occurrences
+- **Problem:** a series the user bounded at N occurrences generates N _more_ occurrences
   in every window they scroll to, forever, and interacting with one writes a bogus
   override into the file.
 - **Fix:** enumerate candidate dates from the anchor without the window filter, take the
@@ -763,17 +711,27 @@ a Feb-29 birthday lands on March 1 in non-leap years.
 Failing test to commit with the fix:
 
 ```ts
-it('monthly bymonthday:[31] never lands on a day that is not the 31st', () => {
-  const p = parseToStoreItems('rent.md', [
-    '---', 'title: Rent', 'date: "2026-01-31"',
-    'repeat: { type: schedule, freq: monthly, bymonthday: [31] }', '---',
-  ].join('\n'))
-  const dates = expandRange(p.items, new Map([['rent', p.root]]),
-    new Date(2026, 0, 1), new Date(2026, 5, 30)).map(o => o.date)
+it("monthly bymonthday:[31] never lands on a day that is not the 31st", () => {
+  const p = parseToStoreItems(
+    "rent.md",
+    [
+      "---",
+      "title: Rent",
+      'date: "2026-01-31"',
+      "repeat: { type: schedule, freq: monthly, bymonthday: [31] }",
+      "---",
+    ].join("\n"),
+  );
+  const dates = expandRange(
+    p.items,
+    new Map([["rent", p.root]]),
+    new Date(2026, 0, 1),
+    new Date(2026, 5, 30),
+  ).map((o) => o.date);
 
-  expect(dates.every(d => d.endsWith('-31'))).toBe(true)
-  expect(dates).not.toContain('2026-05-01')
-})
+  expect(dates.every((d) => d.endsWith("-31"))).toBe(true);
+  expect(dates).not.toContain("2026-05-01");
+});
 ```
 
 - **Breadth:** four `new Date(y, m, d)` overflow sites in one function —
@@ -819,18 +777,18 @@ it('monthly bymonthday:[31] never lands on a day that is not the 31st', () => {
 - **Failure mode:** **silent** in every sense that matters: a `console.warn` in a PWA the
   user has no devtools open for. The entry vanishes from the agenda, from search, and from
   wikilink resolution.
-- **Impact:** **5** — the bytes are still on disk, so it is recoverable *if the user
-  realises what happened*; but see the compounding path below, which makes it
+- **Impact:** **5** — the bytes are still on disk, so it is recoverable _if the user
+  realises what happened_; but see the compounding path below, which makes it
   unrecoverable.
 
 **Repro.** Five files loaded through the real `parseFiles`:
 
 ```markdown
-good.md       ---\ntitle: Good\ndate: "2026-04-08"\n---\n\nfine
-bad.md        ---\ntitle: Bad: with a colon\ndate: "2026-04-08"\n---\n\noops
-tabs.md       ---\ntitle: Tabs\ndefaults:\n\tdone: false\n---
-dup.md        ---\ntitle: A\ntitle: B\n---
-also-good.md  ---\ntitle: Also good\n---
+good.md ---\ntitle: Good\ndate: "2026-04-08"\n---\n\nfine
+bad.md ---\ntitle: Bad: with a colon\ndate: "2026-04-08"\n---\n\noops
+tabs.md ---\ntitle: Tabs\ndefaults:\n\tdone: false\n---
+dup.md ---\ntitle: A\ntitle: B\n---
+also-good.md ---\ntitle: Also good\n---
 ```
 
 Observed:
@@ -850,19 +808,21 @@ one bad file does **not** block the others.
   path for cache hydration (`hydrateFromCache`), reconcile merges (`mergeChangedIntoStore`)
   and every backend's initial read. Exposure is any vault file the user hand-edits.
 - **Recommended model:** **Sonnet 5.** The hazard: a failed parse must not leave the slug
-  looking *free*. Today an unparseable file is absent from `roots`, which is precisely what
+  looking _free_. Today an unparseable file is absent from `roots`, which is precisely what
   sends `applyNew` down its fresh-root branch (#2) and destroys the file. So the fix has to
-  do two things — surface the error *and* record the slug as occupied-but-unreadable — and
+  do two things — surface the error _and_ record the slug as occupied-but-unreadable — and
   the second one is invisible to any test that only checks the toast. A fix that adds
   error reporting and stops there looks complete and leaves the destructive path open.
 - **Evidence:** `src/storage/sync.ts:44`:
 
   ```ts
-      try {
-        const parsed = parseToStoreItems(path, content)
-        loaded.push(...parsed.items)
-        roots.set(pathToSlug(path), parsed.root)
-      } catch (e) { console.warn('[vault] parse failed for', path, e) }
+  try {
+    const parsed = parseToStoreItems(path, content);
+    loaded.push(...parsed.items);
+    roots.set(pathToSlug(path), parsed.root);
+  } catch (e) {
+    console.warn("[vault] parse failed for", path, e);
+  }
   ```
 
   Worth noting alongside this: `src/model/AGENTS.md` describes `nodeSchema.ts` as a "Zod
@@ -872,6 +832,7 @@ one bad file does **not** block the others.
   (The same file's layering table is stale in the way the survey brief suspected: it points
   persistence at `src/meridian.ts` and React state at `src/App.tsx`, neither of which
   exists.)
+
 - **Problem:** a single typo in hand-edited frontmatter makes the entry disappear from the
   app with no explanation, and leaves its slug free for a later new entry to overwrite.
 - **Fix:** collect per-file parse failures into store state, surface them in the UI, and
@@ -885,7 +846,7 @@ one bad file does **not** block the others.
 - **Invariant violated:** 8 (temporal correctness). Any high-frequency series (daily, or
   short-interval) once the queried window is more than `LIMIT` periods from the anchor.
 - **Category:** `temporal`
-- **Failure mode:** **silent** — no error — though the *consequence* is visible: the entry
+- **Failure mode:** **silent** — no error — though the _consequence_ is visible: the entry
   is simply missing from the calendar.
 - **Impact:** **5** — no bytes are lost and the file is intact, but a daily habit created
   18 months ago renders zero occurrences today, which reads to the user as data loss.
@@ -917,15 +878,26 @@ empty.
 Failing test to commit with the fix:
 
 ```ts
-it('a daily series still expands far beyond its anchor', () => {
-  const p = parseToStoreItems('meds.md', [
-    '---', 'title: Meds', 'date: "2026-01-01"', 'time: "08:00"',
-    'repeat: { type: schedule, freq: daily }', '---',
-  ].join('\n'))
-  const occs = expandRange(p.items, new Map([['meds', p.root]]),
-    new Date(2029, 6, 1), new Date(2029, 6, 31, 23, 59))
-  expect(occs).toHaveLength(31)
-})
+it("a daily series still expands far beyond its anchor", () => {
+  const p = parseToStoreItems(
+    "meds.md",
+    [
+      "---",
+      "title: Meds",
+      'date: "2026-01-01"',
+      'time: "08:00"',
+      "repeat: { type: schedule, freq: daily }",
+      "---",
+    ].join("\n"),
+  );
+  const occs = expandRange(
+    p.items,
+    new Map([["meds", p.root]]),
+    new Date(2029, 6, 1),
+    new Date(2029, 6, 31, 23, 59),
+  );
+  expect(occs).toHaveLength(31);
+});
 ```
 
 - **Breadth:** one constant and one loop, `src/model/expansion.ts:248–249`. Affects every
@@ -959,13 +931,13 @@ it('a daily series still expands far beyond its anchor', () => {
 
 ## 5. Verdicts on the brief's known suspects
 
-| Suspect | Verdict |
-|---|---|
-| The `collapseToYaml` contract | **Confirmed as written, but the contract is the wrong one.** All three hoisting branches and `hoistSharedMetadata` round-trip correctly for everything the store can represent — verified across all 13 fixtures plus adversarial multi-series input and post-`single`/`future` re-parse → re-expand. Its promise is "the most compact object that round-trips back to *the same store state*", and it keeps that promise. The loss (finding #1) happens upstream, before collapse ever runs: the store state itself has already discarded everything outside the 8-field registry. Hoisting specifically is **refuted** as a corruption source — a hand-authored per-instance `priority: high` on two sibling series is promoted to a shared root `defaults:`, but that is semantically identical and recomputed correctly when a third series diverges |
-| Unknown / hand-authored frontmatter | **Confirmed** — finding #1. Survives: `title`, `tags`, `items`, `done`, `participants`, `priority`, `duration`, `timezone`, `date`, `time`, `repeat`, `excluded`, `instances`, unicode/emoji/RTL, quoting-sensitive strings (`"2026"`, `"true"` stay strings). Does not survive: any other key at any nesting level, YAML comments, aliases, block scalars, the trailing newline, CRLF in the frontmatter (the body's CRLF is kept, giving a mixed-ending file), and known fields carrying an unexpected type |
-| `src/model/AGENTS.md` is stale | **Confirmed, and worse than described.** The layering table still points persistence at `src/meridian.ts` and React state at `src/App.tsx`, neither of which exists. Beyond that, it describes `nodeSchema.ts` as "Zod schema and TypeScript type" — the file has no Zod and no runtime validation whatsoever, which is load-bearing for finding #7 |
-| No property-based testing (`fast-check`) | **Worth adopting, but not where the brief expected.** A generator over `RawNode` shapes asserting round-trip stability would **not** have found #1: the loss is a fixed point, and a generator that only emits representable shapes never produces an unknown key. Example-based fixtures are sufficient there — what was missing was one adversarial *fixture*, not a generator. Where fast-check would pay: the temporal engine. A single property — `expand(item, W₁ ∪ W₂) ⊇ expand(item, W₁)`, i.e. expansion is monotone in the query window — is ~20 lines and finds **#5 and #8 immediately**, and a second property (every generated date's day-of-month matches the rule) finds **#6**. Recommend `fast-check` scoped to `expansion.ts`, not to round-trip |
-| `planReconcile` tests only cover happy paths | **Refuted.** `reconcile.test.ts` enumerates 17 cases across the real decision table: dirty-file-vs-remote-drift, tombstone-vs-still-listed, just-pushed skip, just-created skip, just-deleted-no-resurrection, and four cases around the delete grace window including its exact boundary. This is the best-tested logic in the codebase. The gap is one layer down — the CAS contract those decisions delegate to is verified only against a fake that behaves like GitHub while being labelled `kind: 'local'` (finding #3) |
+| Suspect                                      | Verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The `collapseToYaml` contract                | **Confirmed as written, but the contract is the wrong one.** All three hoisting branches and `hoistSharedMetadata` round-trip correctly for everything the store can represent — verified across all 13 fixtures plus adversarial multi-series input and post-`single`/`future` re-parse → re-expand. Its promise is "the most compact object that round-trips back to _the same store state_", and it keeps that promise. The loss (finding #1) happens upstream, before collapse ever runs: the store state itself has already discarded everything outside the 8-field registry. Hoisting specifically is **refuted** as a corruption source — a hand-authored per-instance `priority: high` on two sibling series is promoted to a shared root `defaults:`, but that is semantically identical and recomputed correctly when a third series diverges |
+| Unknown / hand-authored frontmatter          | **Confirmed** — finding #1. Survives: `title`, `tags`, `items`, `done`, `participants`, `priority`, `duration`, `timezone`, `date`, `time`, `repeat`, `excluded`, `instances`, unicode/emoji/RTL, quoting-sensitive strings (`"2026"`, `"true"` stay strings). Does not survive: any other key at any nesting level, YAML comments, aliases, block scalars, the trailing newline, CRLF in the frontmatter (the body's CRLF is kept, giving a mixed-ending file), and known fields carrying an unexpected type                                                                                                                                                                                                                                                                                                                                            |
+| `src/model/AGENTS.md` is stale               | **Confirmed, and worse than described.** The layering table still points persistence at `src/meridian.ts` and React state at `src/App.tsx`, neither of which exists. Beyond that, it describes `nodeSchema.ts` as "Zod schema and TypeScript type" — the file has no Zod and no runtime validation whatsoever, which is load-bearing for finding #7                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| No property-based testing (`fast-check`)     | **Worth adopting, but not where the brief expected.** A generator over `RawNode` shapes asserting round-trip stability would **not** have found #1: the loss is a fixed point, and a generator that only emits representable shapes never produces an unknown key. Example-based fixtures are sufficient there — what was missing was one adversarial _fixture_, not a generator. Where fast-check would pay: the temporal engine. A single property — `expand(item, W₁ ∪ W₂) ⊇ expand(item, W₁)`, i.e. expansion is monotone in the query window — is ~20 lines and finds **#5 and #8 immediately**, and a second property (every generated date's day-of-month matches the rule) finds **#6**. Recommend `fast-check` scoped to `expansion.ts`, not to round-trip                                                                                      |
+| `planReconcile` tests only cover happy paths | **Refuted.** `reconcile.test.ts` enumerates 17 cases across the real decision table: dirty-file-vs-remote-drift, tombstone-vs-still-listed, just-pushed skip, just-created skip, just-deleted-no-resurrection, and four cases around the delete grace window including its exact boundary. This is the best-tested logic in the codebase. The gap is one layer down — the CAS contract those decisions delegate to is verified only against a fake that behaves like GitHub while being labelled `kind: 'local'` (finding #3)                                                                                                                                                                                                                                                                                                                            |
 
 ---
 
