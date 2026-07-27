@@ -232,15 +232,16 @@ there are now four of them — the UI, a React store (Zustand), an on-device cac
 (Dexie/IndexedDB), and the storage backend — and each is a fresh chance for them to
 quietly disagree. Readable files didn't help much there; those bugs I chased the ordinary
 way, from a bug report down to a root cause, with Claude reading through the code until it
-found what had actually fallen out of sync. (One file per concept does have a quieter
-payoff, though: two devices only collide when they edit _the same entry_, so the conflicts
-that survive all that state stay small.)
+found what had actually fallen out of sync. (One file per concept does help here too: two
+devices only collide when they edit _the same entry_, so a conflict affects one entry
+instead of the whole calendar.)
 
-I won't pretend it's finished. I've used Meridian for my own tasks for about a month; we
-haven't moved the family calendar off Proton yet. The caching and sync layer is still the
-weakest code in the repo, and keeping those four layers in agreement is where the subtle
-bugs live. Much of the recent work has been the unshowy kind: tests, and performance —
-keeping the calendar smooth on a phone as a vault fills up with entries. That polish is
+I won't pretend it's finished. I've used Meridian for my own tasks for about two months
+now, and my wife is just starting to keep hers in it; we haven't moved the family calendar
+off Proton yet. The most useful missing piece is probably iCal import — until you can pull
+an existing calendar in, switching means retyping it, which is a lot to ask. Most of the
+recent work has been the unshowy kind, spread across sync, layout, and UX, plus enough
+performance work to keep the calendar smooth on a phone as a vault fills up. That polish is
 most of the distance between a prototype that works in a demo and something you'd rely on.
 
 ## Where it fits
