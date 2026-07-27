@@ -215,7 +215,6 @@ export default function AppSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  data-tour="manage-vaults"
                   onClick={() => { close(); setSettingsOpen(true); setHasOpenedSettings(true) }}
                   className="gap-3.5 px-5 h-auto py-3 text-sm font-medium rounded-none"
                 >

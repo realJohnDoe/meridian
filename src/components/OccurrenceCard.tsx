@@ -151,7 +151,7 @@ export default function OccurrenceCard({
 
   return (
     <DimmableCard
-      data-tour="entry-card"
+      data-testid="entry-card"
       dimmed={dimmed}
       className="flex items-stretch gap-2 pl-2 pr-3.5 py-2 min-h-11"
       style={animate ? { animation: 'fadeUp .16s ease both', animationDelay: 'var(--stagger, 0s)' } : undefined}

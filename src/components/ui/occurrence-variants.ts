@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority'
-import type { OccState } from '@/types'
+import type { OccState, Priority } from '@/types'
 
 /**
  * Shared pattern for active tasks and notes: solid bg-{color} + text-{color}-foreground.
@@ -107,3 +107,13 @@ export const dvBlockVariants = cva('', {
 })
 
 export type DvBlockVariants = VariantProps<typeof dvBlockVariants>
+
+/**
+ * Priority chip active-state colouring — shared between the entry editor's
+ * inline priority chip and the priority selection drawer.
+ */
+export const PRIORITY_CLASS: Record<Priority, string> = {
+  high:   'aria-[pressed=true]:bg-p1/15 aria-[pressed=true]:border-p1 aria-[pressed=true]:text-p1',
+  medium: 'aria-[pressed=true]:bg-p2/15 aria-[pressed=true]:border-p2 aria-[pressed=true]:text-p2',
+  low:    'aria-[pressed=true]:bg-p3/15 aria-[pressed=true]:border-p3 aria-[pressed=true]:text-p3',
+}

@@ -5,6 +5,7 @@ import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileTe
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import { isSeries } from '@/types'
 import { badgeVariants } from '@/components/ui/badge'
+import { PRIORITY_CLASS } from '@/components/ui/occurrence-variants'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { segmentedGroupVariants, segmentedItemVariants } from '@/components/ui/segmented-group'
@@ -44,11 +45,6 @@ function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
 
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
-const PRIORITY_CLASS: Record<string, string> = {
-  high:   'aria-[pressed=true]:bg-p1/15 aria-[pressed=true]:border-p1 aria-[pressed=true]:text-p1',
-  medium: 'aria-[pressed=true]:bg-p2/15 aria-[pressed=true]:border-p2 aria-[pressed=true]:text-p2',
-  low:    'aria-[pressed=true]:bg-p3/15 aria-[pressed=true]:border-p3 aria-[pressed=true]:text-p3',
-}
 const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
   task:  'data-[state=on]:text-task',
   event: 'data-[state=on]:text-event',

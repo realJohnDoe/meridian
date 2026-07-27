@@ -127,6 +127,6 @@ These bit us repeatedly; follow them to avoid a long debug loop:
 - **Don't use `pnpm dev -- --port N`.** The extra `--` is forwarded to vite and silently breaks `--port` (vite stays on 5173). Use `pnpm exec vite --port N --strictPort` instead.
 - **Trust `preview_logs`, not the MCP's reported port.** The MCP reports the *configured* port; vite prints the real `Local:` URL in its logs. Check there.
 - **To verify which code is actually being served**, assert on a feature only the target branch has (e.g. for PR 3, that off-cursor wikilinks render as chips, not `.wl` marks).
-- **Don't hard-navigate (`window.location`) straight to `?editor=<slug>`** — it races vault loading and opens a blank `untitled.md` draft. Instead load `/meridian/`, wait for `[data-tour="entry-card"]` to appear, then click the card's `button[aria-label="<title>"]` (SPA nav, no reload).
+- **Don't hard-navigate (`window.location`) straight to `?editor=<slug>`** — it races vault loading and opens a blank `untitled.md` draft. Instead load `/meridian/`, wait for `[data-testid="entry-card"]` to appear, then click the card's `button[aria-label="<title>"]` (SPA nav, no reload).
 - **Example-vault slugs:** "Welcome to Meridian" = `01-start-here`; its linked notes are `02-your-first-task`, `03-plan-your-week`, `04-link-your-notes`, `05-make-it-yours`.
 - **Inspect CM6 state from the page:** `document.querySelector('.cm-content').cmTile.view` gives the `EditorView` (read `view.state`, `dispatch`, etc.).
