@@ -19,3 +19,20 @@ export function scoreQuery(query: string, text: string): number {
   if (t.startsWith(q)) score += 100
   return score
 }
+
+/**
+ * Filters `items` to those whose `getFilterText` matches `query` (subsequence),
+ * then sorts by `scoreQuery` on `getScoreText` (defaults to `getFilterText`),
+ * best match first. Shared by every free-text file/item picker so ranking
+ * stays consistent across surfaces.
+ */
+export function rankByQuery<T>(
+  query:          string,
+  items:          T[],
+  getFilterText:  (item: T) => string,
+  getScoreText:   (item: T) => string = getFilterText,
+): T[] {
+  return items
+    .filter(item => matchesQuery(query, getFilterText(item)))
+    .sort((a, b) => scoreQuery(query, getScoreText(b)) - scoreQuery(query, getScoreText(a)))
+}

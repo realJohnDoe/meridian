@@ -4,7 +4,7 @@ import type { Occurrence } from '@/types'
 import { fileEntries } from '@/fileOccurrence'
 import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
-import { matchesQuery, scoreQuery } from '@/lib/matching'
+import { rankByQuery } from '@/lib/matching'
 
 interface Props {
   query: string
@@ -52,17 +52,16 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
   const results = useMemo(() => {
     if (!debouncedQuery) return []
     const entries = fileEntries(roots)
-    return entries
-      .filter(e => {
-        const haystack = [e.title, ...e.tags, ...e.items].join(' ')
-        return matchesQuery(debouncedQuery, haystack)
-      })
-      .map(e => ({ entry: e, score: scoreQuery(debouncedQuery, e.title) }))
-      .sort((a, b) => b.score - a.score)
-      .map(x => ({
-        entry: x.entry,
-        listedOn: (backlinks.get(x.entry.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug),
-      }))
+    const ranked = rankByQuery(
+      debouncedQuery,
+      entries,
+      e => [e.title, ...e.tags, ...e.items].join(' '),
+      e => e.title,
+    )
+    return ranked.map(entry => ({
+      entry,
+      listedOn: (backlinks.get(entry.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug),
+    }))
   }, [roots, backlinks, debouncedQuery])
 
   const virtualizer = useVirtualizer({

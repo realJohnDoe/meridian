@@ -14,7 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 import { FloatingComboboxList } from '@/components/ui/floating-combobox-list'
 import { reopenOcc } from '@/occurrenceActions'
-import { matchesQuery, scoreQuery } from '@/lib/matching'
+import { rankByQuery } from '@/lib/matching'
 import { useFloatingCombobox } from '@/hooks'
 
 interface Props {
@@ -61,11 +61,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const occBySlug = useStore(s => s.fom)
   const backlinks = useStore(s => s.backlinks)
   const allFiles  = fileEntries(roots)
-  const filtered  = pickerQuery
-    ? allFiles
-        .filter(e => matchesQuery(pickerQuery, e.title))
-        .sort((a, b) => scoreQuery(pickerQuery, b.title) - scoreQuery(pickerQuery, a.title))
-    : allFiles
+  const filtered  = pickerQuery ? rankByQuery(pickerQuery, allFiles, e => e.title) : allFiles
 
   const entries: ParsedEntry[] = items.map((raw, idx) => ({ ...parseItemEntry(raw), idx }))
 
