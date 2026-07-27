@@ -1,7 +1,7 @@
 import { afterEach, beforeEach } from 'vitest'
 import { useStore } from '@/store'
 import { setEntityPersistence } from '@/persistencePort'
-import { resetExpansionCache, resetAgendaSectionsCache, resetCalendarViewState } from '@/calendar'
+import { resetCalendarOnVaultChange } from '@/calendar'
 import type { Occurrence, StoreSeries, StoreItem, Roots, FileMetadata } from '@/types'
 
 const initialStoreState = useStore.getInitialState()
@@ -19,9 +19,7 @@ export function setupStore(): void {
     // renders, so they survive past a single test unless cleared — without
     // this, one test's cached window/sections/scroll snapshot could leak into
     // the next when both use structurally-identical items.
-    resetExpansionCache()
-    resetAgendaSectionsCache()
-    resetCalendarViewState()
+    resetCalendarOnVaultChange()
   })
 }
 

@@ -1,6 +1,8 @@
 import { createStore } from 'zustand/vanilla'
 import { useStore as useZustandStore } from 'zustand/react'
 import type { VirtualItem } from '@tanstack/react-virtual'
+import { resetExpansionCache } from './useExpandWithMultiday'
+import { resetAgendaSectionsCache } from './useAgendaSections'
 
 interface CalendarViewState {
   /**
@@ -8,7 +10,7 @@ interface CalendarViewState {
    * navigating to month/day and back) instead of resetting to the top. Written
    * on unmount, read to seed the virtualizer's initial* options on the next
    * mount — see useAgendaScrollRestore/useSaveAgendaScroll and
-   * resetAgendaScroll (cleared on vault change, since a snapshot from a
+   * resetCalendarOnVaultChange (cleared on vault change, since a snapshot from a
    * different vault's agenda is meaningless).
    */
   agendaScrollOffset: number
@@ -42,6 +44,25 @@ export const calendarView = createStore<CalendarViewState>(() => ({
 
 export function resetCalendarViewState(): void {
   calendarView.setState(calendarView.getInitialState(), true)
+}
+
+/**
+ * Drops every piece of calendar-view state that belongs to the vault that
+ * just deactivated — cached occurrence expansions, cached agenda sections,
+ * and the view-local scroll/preview state. Call once on vault change; nothing
+ * else needs to hand-enumerate these.
+ *
+ * Deliberately does not also call requestScrollToToday() — the caller does
+ * that itself, after this returns. Folding it in here would mean this reset
+ * (a full-state replace, see resetCalendarViewState above) always stomps the
+ * flag right back to false, and it would leave test cleanup (which wants a
+ * clean *initial* state, not a pending scroll) with scrollToTodayOnce stuck
+ * true for the next test.
+ */
+export function resetCalendarOnVaultChange(): void {
+  resetExpansionCache()
+  resetAgendaSectionsCache()
+  resetCalendarViewState()
 }
 
 export function useMonthPreview(): string | null {
