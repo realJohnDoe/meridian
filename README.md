@@ -83,7 +83,7 @@ Files are plain `.md` files. Open them in any text editor, check them into git, 
 1. **Open the app** at [realjohndoe.github.io/meridian](https://realjohndoe.github.io/meridian/).
 2. Try the **Example vault** to get a feel for the interface — click through the onboarding tour.
 3. When you're ready, connect your own storage:
-   - **GitHub** (recommended) — click "Connect GitHub repo", paste a repo URL, and enter a personal access token with `repo` scope. Meridian will read and write files directly — and you can access your vault from any device.
+   - **GitHub** (recommended) — click "Connect GitHub repo", **Sign in with GitHub**, and pick the repository to use — no token to create by hand. (You can also connect manually with a [fine-grained personal access token](https://github.com/settings/tokens?type=beta) scoped to that one repo with **Contents: Read and write**.) Meridian reads and writes files directly, so you can reach your vault from any device.
    - **Local folder** — click "Connect local folder" and pick a directory. Chrome and Edge only; not supported on iOS or Firefox.
 4. Create your first entry with the **+** button and start building your calendar.
 
