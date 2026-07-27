@@ -197,9 +197,28 @@ here: metadata on excluded instances (`serializeChildren` emits only
 hang a remainder on), markdown-body leading/trailing whitespace (`fileIO.ts`
 trims), and absent-vs-empty for required arrays.
 
-The invariant is enforced by `__tests__/unknown-keys.test.ts` — `collectKeyValues`
-asserts **set containment** of every source key/value pair in the saved output,
-since collapse legitimately relocates keys and changes how often they appear.
+**On the edit side, an edit never mints unknown keys** — they originate only at
+parse time and flow through. Every bag reaching `storeOps.ts` is therefore
+derived from some parsed base, which is what lets `mergeOccMeta` use a single
+rule: typed fields take the patch (the newer, editor-supplied value), unknown
+keys take the base (so a series' `owner: alice` cannot overwrite an override's
+own `owner: bob` when a scope-`single` edit rebuilds that override from its
+series). `storeOps.ts` keeps metadata construction to four functions for this
+reason; see the "Metadata constructors" section there before adding a fifth.
+
+The invariant is enforced by two test files:
+
+- `__tests__/unknown-keys.test.ts` — `collectKeyValues` asserts **set
+  containment** of every source key/value pair in the saved output, since
+  collapse legitimately relocates keys and changes how often they appear.
+- `__tests__/extras-preservation.test.ts` — asserts that any item or root
+  **surviving an operation under the same id** keeps the unknown keys it had,
+  across every exported `storeOps` operation, and fails when a newly exported
+  one is neither exercised nor exempted. Its cases deliberately target an
+  instance whose key *diverges* from its series: an operation that merges the
+  two bags the wrong way round still looks correct on an instance that agrees
+  with its series, so an agreeing target would let a clobbering merge pass.
+
 Note that `yaml-roundtrip.test.ts` cannot catch a loss here: it asserts a fixed
 point on Meridian's *own* output, and the loss happens on the first pass.
 
