@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { EditorView } from '@codemirror/view'
 import type { Roots } from '@/types'
@@ -27,9 +27,13 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
   const occBySlug = useStore(s => s.fom)
 
   const q = popup.query.toLowerCase()
-  const matches = fileEntries(roots)
-    .filter(e => !q || e.title.toLowerCase().includes(q))
-    .slice(0, 8)
+  // Memoized so the array reference is stable across renders when roots/query
+  // haven't changed — otherwise useResetOnChange below sees a "new" array on
+  // every render and setFocusIdx loops forever (React error #301).
+  const matches = useMemo(
+    () => fileEntries(roots).filter(e => !q || e.title.toLowerCase().includes(q)).slice(0, 8),
+    [roots, q],
+  )
 
   useResetOnChange([matches], () => setFocusIdx(0))
 
