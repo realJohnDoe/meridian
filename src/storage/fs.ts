@@ -45,6 +45,26 @@ async function resolveFileHandle(
   return dir.getFileHandle(parts[parts.length - 1]!, { create })  // split() always yields ≥1 part
 }
 
+/**
+ * Current version token for `path`, or `undefined` when it does not exist.
+ * Same `${lastModified}:${size}` shape statAll/readFiles hand out, so a token
+ * from either can be compared against a fresh stat here.
+ */
+async function statVersion(
+  dh: FileSystemDirectoryHandle,
+  path: string,
+): Promise<string | undefined> {
+  try {
+    const fh   = await resolveFileHandle(dh, path)
+    const file = await fh.getFile()
+    return `${file.lastModified}:${file.size}`
+  } catch (e) {
+    // The file, or an ancestor directory, is not there — both mean "absent".
+    if ((e as { name?: string }).name === 'NotFoundError') return undefined
+    throw e
+  }
+}
+
 async function resolveParentDir(
   dh: FileSystemDirectoryHandle,
   path: string,
@@ -142,25 +162,17 @@ export async function diskWrite(
     if (ask !== 'granted') throw new Error('Write permission denied')
   }
 
-  // CAS check: if the caller supplied an expectedVersion, verify the current
-  // file token matches before writing. The local FS is always consistent so
-  // this stat is authoritative (no eventual-consistency lag).
-  if (expectedVersion !== undefined) {
-    try {
-      const fhExisting = await resolveFileHandle(dh, path)
-      const existing   = await fhExisting.getFile()
-      const cur = `${existing.lastModified}:${existing.size}`
-      if (cur !== expectedVersion) {
-        throw new ConflictError(path)
-      }
-    } catch (e) {
-      // File does not exist yet — mismatch against a supplied expectedVersion.
-      if ((e as { name?: string }).name === 'NotFoundError') {
-        throw new ConflictError(path)
-      }
-      throw e
-    }
-  }
+  // CAS check — the current token must equal the precondition, and `undefined`
+  // is a precondition too: it means *"create"*, so the file must be absent.
+  // Both halves matter. Without the token half a remote edit is overwritten;
+  // without the absence half a first push of a path the cache has never seen
+  // silently clobbers whatever a second writer left there (another device via
+  // Dropbox/iCloud/Syncthing, or the user in another editor) — which is what
+  // GitHub's Contents API rejects with a 422 on a `PUT` with no `sha`.
+  // The local FS is always consistent, so this stat is authoritative (no
+  // eventual-consistency lag).
+  const cur = await statVersion(dh, path)
+  if (cur !== expectedVersion) throw new ConflictError(path)
 
   const fh = await resolveFileHandle(dh, path, true)
   const w  = await fh.createWritable()
@@ -178,7 +190,16 @@ export async function diskWrite(
 export async function diskDelete(
   dh: FileSystemDirectoryHandle,
   path: string,
+  expectedVersion?: string,
 ): Promise<void> {
+  // CAS check, mirroring diskWrite's. A tombstone survives reloads and may not
+  // push until days later, so the file it was staged against can have been
+  // edited meanwhile — deleting then destroys content the app never read.
+  // An absent file is deliberately not a mismatch: the removeEntry below is
+  // idempotent by design (see its catch) and must stay that way.
+  const cur = await statVersion(dh, path)
+  if (cur !== undefined && cur !== expectedVersion) throw new ConflictError(path)
+
   try {
     const [dir, name] = await resolveParentDir(dh, path)
     await dir.removeEntry(name)
