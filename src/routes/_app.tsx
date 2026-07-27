@@ -5,7 +5,7 @@ import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
 import { onVaultChanged } from '@/storage'
-import { resetAgendaScroll, resetExpansionCache, resetAgendaSectionsCache, useMonthPreview, useDayPreview, useAgendaTopDate, requestScrollToToday } from '@/calendar'
+import { resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useAgendaTopDate, requestScrollToToday } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ParticipantFilterButton } from '@/components'
 import { IconButton } from '@/components/ui/icon-button'
@@ -42,20 +42,17 @@ function AppMain() {
 
   const navigate = useNavigate()
 
-  // When a vault activates, discard the previous vault's saved agenda scroll
-  // (its offset/measurements are meaningless for different content), drop the
-  // cached occurrence expansions and grouped agenda sections (same reason —
-  // see resetExpansionCache/resetAgendaSectionsCache), and flag a scroll-to-
-  // today. Registered here — not in AgendaPage — because AppMain stays
-  // mounted across every app route: a vault switch made while in the editor,
-  // month, day, or a list view would otherwise be missed (AgendaPage is
-  // unmounted then), leaving the next agenda visit to restore a stale, cross-
-  // vault offset near the top. AgendaView owns the virtualizer and performs the
+  // When a vault activates, discard the previous vault's calendar-view state
+  // (saved agenda scroll, cached occurrence expansions, cached agenda
+  // sections — see resetCalendarOnVaultChange) and flag a scroll-to-today.
+  // Registered here — not in AgendaPage — because AppMain stays mounted
+  // across every app route: a vault switch made while in the editor, month,
+  // day, or a list view would otherwise be missed (AgendaPage is unmounted
+  // then), leaving the next agenda visit to restore a stale, cross-vault
+  // offset near the top. AgendaView owns the virtualizer and performs the
   // actual scroll when the flag is set.
   useEffect(() => onVaultChanged(() => {
-    resetAgendaScroll()
-    resetExpansionCache()
-    resetAgendaSectionsCache()
+    resetCalendarOnVaultChange()
     requestScrollToToday()
   }), [])
 
