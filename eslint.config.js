@@ -84,6 +84,11 @@ export default [
       '@eslint-react/set-state-in-effect': 'off',
       '@eslint-react/static-components': 'off',
       '@eslint-react/use-state': 'off',
+      // Impure render (e.g. `new Date()` called directly in a component body)
+      // breaks React Compiler's memoization assumptions. Matches the 'error'
+      // severity already used for react-hooks/purity above; the two catches
+      // this rule found on enabling it have been fixed, so this starts clean.
+      '@eslint-react/purity': 'error',
       // Type-aware: catches {count && <X/>} rendering a stray 0/NaN/'' string.
       '@eslint-react/no-leaked-conditional-rendering': 'error',
       // Re-render churn: inline object/array literals passed as context values
