@@ -11,6 +11,8 @@ Produce the **top 8 findings** across both, each anchored to a verbatim quote fr
 
 Code quality, UI implementation, speed, and data safety belong to the other surveys ([health-survey.md](health-survey.md), [health-survey-ui.md](health-survey-ui.md), [health-survey-performance.md](health-survey-performance.md), [health-survey-data-integrity.md](health-survey-data-integrity.md)) — cite them, don't duplicate them. A feature gap matters here only when it changes whether the target user can adopt the product.
 
+**Visual design is in scope here, but from the opposite side of the UI survey.** That survey reads the same files — theme tokens, Tailwind usage, `components/ui/` — and asks whether the styling system is *internally consistent*. This survey asks whether the styling system says the *right thing about who this product is for*. A palette can be perfectly consistent and still address the wrong audience; a layout can be flawlessly systematic and still look like a different category of product. Same files, different question — when a finding is about consistency, hand it to the UI survey and say so.
+
 ## Phase 0 — establish the three niches (do this first, state it explicitly)
 
 Everything else in this survey is a gap between these three. Write each as one or two sentences naming a **person**, the **job** they're hiring the product for, and the **alternative** they'd otherwise use.
@@ -31,6 +33,9 @@ Then state the gaps plainly. **Declared vs. revealed** is a strategy question �
   - **Niche-signal audit.** For each claim and adjective in the positioning copy, name the audience it selects *and* the audience it excludes. The headline is `**A calm calendar, task manager, and notes app built on plain Markdown files.**` — "calm" turns away the gamified-productivity crowd, "plain Markdown files" strongly attracts people who know what that implies and means nothing to people who don't. Report which signals do real selection work and which are noise.
   - **Term census.** Count the words each surface uses for the same concept across README, in-app copy, tutorial entries, and blog. Vocabulary that fractures ("vault" ~45× in UI source but 5× in README; the tour says "a folder you own"; getting-started says "repo") makes a product harder to recognise, because the reader can't tell whether they're being sold one thing or three.
   - **Emphasis map.** Compare the space each surface gives a capability against how central that capability is to the declared niche's job. A capability argued at length that the niche doesn't need, and a niche-defining capability mentioned once, are both findings.
+  - **Blind visual read.** Screenshot the running app — mobile and desktop width, every theme it ships — and, *before* re-reading any positioning copy, write down what kind of product it looks like, who it looks like it's for, what it looks like it costs, and which existing tool it most resembles. Visual identity is the fastest-read positioning signal there is: it lands before a single word is processed. Like the cold README read, this impression is unrepeatable — capture it first.
+  - **Visual signal inventory.** Enumerate the concrete decisions — background lightness and hue, accent hue and saturation, corner radius, density and whitespace, typography, iconography, motion, use of badges, counts, and colour-coded urgency — and for each, name the audience it signals to and the product category it borrows from. Then check each against the declared niche. `src/index.css` is the primary evidence; quote the tokens.
+  - **Adjacency test.** Put the product's look mentally beside the alternatives the README names. Does it read as belonging to that set, as belonging to a *different* set, or as generic? Any of the three can be right — a deliberate outlier is a positioning choice — but it should be deliberate, and the report should say which it is.
 - **Distinguish "doesn't fit the niche" from "isn't finished."** An immature feature that clearly serves the target job is execution debt, not a positioning problem. Call something a fit finding only when the product's *direction* and the target's *needs* diverge.
 - **Say when the status quo is right.** A deliberately narrow niche, a feature deliberately not built, an audience deliberately turned away — these are strategy, and the report should confirm them as such when the evidence supports it, rather than reflexively recommending expansion. `Meridian supports notes, but it doesn't try to be a better note-taking app than Obsidian` is exactly this kind of decision: test whether the product honours it, don't second-guess it.
 - Treat every copy claim as a hypothesis to verify against the code and the product.
@@ -46,6 +51,9 @@ Hypotheses to verify or refute. The report must state a verdict on each (confirm
 - **The real beachhead may be Obsidian-adjacent.** `If you're already an Obsidian user, Meridian's vault format will feel immediately familiar` suggests the natural first user is someone who already keeps a Markdown vault and wants tasks and calendar to be first-class. Check whether the product and its onboarding treat that person as primary — and whether any surface says so near the top.
 - **An emerging niche signal appears exactly once.** The LLM-friendliness argument (Markdown + YAML frontmatter as the format LLM tooling already reads, citing the Open Knowledge Format) sits inside idea #3 and appears in no headline, no comparison row, and no in-app surface. Decide whether that's an under-sold differentiator for a real and growing audience, or a distraction from the declared niche.
 - **The comparison table's competitor claims can rot.** Its rows assert current facts about six other products. Verify each claim a reasonable reader would check; a wrong "❌" against a competitor costs more credibility than an honest gap.
+- **The palette speaks developer-tool, and says so in its own comment.** `src/index.css` sets `--background: oklch(0.18 0.05 252)` — a deep blue-black — and justifies a token with `near-black ink, like tokyo-night/dracula`. Those are code-editor themes: the visual identity is fluent in the dialect of developer tooling and Obsidian-adjacent apps, not of Google Calendar or Todoist. Determine which audience the look actually addresses, and whether that matches the declared niche. If the answer is "the Obsidian-adjacent user," that's evidence about the real beachhead, and the copy should probably catch up with the palette rather than the reverse.
+- **Which theme is the default, and what does that choose?** `next-themes` is installed and `index.css` carries more than one token block. Establish what a first-time visitor actually sees, because a dark default and a light default recruit noticeably different audiences.
+- **"Calm" is a visual claim, and `overdue` is an urgency signal.** The word appears ~14× across the UI source, alongside a rose `--destructive` token. Audit every urgency and pressure cue the interface can show — colour-coded lateness, counts, badges, empty-state nagging — against the promise in the headline. A calm product is allowed to show overdue items; the question is whether the visual weight it gives them matches the character it sells.
 - **The conceptual model may be a bigger adoption gate than the copy admits.** "Lists model hierarchies" is a genuinely different mental model, taught as principle #2. Assess how much a target user must absorb before the product pays off, and whether the surfaces make that investment feel worthwhile or merely mandatory.
 
 ## Budget
@@ -54,6 +62,7 @@ Hypotheses to verify or refute. The report must state a verdict on each (confirm
 - **Derive the revealed niche from the product, not the docs:** the feature surface (which capabilities are deep — recurrence, wikilinks, participants, search — and which are thin), the storage options and what each demands of a user (`src/storage/`, plus the trade-offs already recorded in [storage-backend-survey.md](storage-backend-survey.md)), platform and browser constraints, the entry-format surface area in `src/types.ts` (`INLINE_FIELDS`) and `src/model/`, and what the default first-run path optimises for.
 - **Walk the first-run experience** on the example vault via the preview tools (follow the preview gotchas in `CLAUDE.md`: worktree-specific launch config, unique port, base path `/meridian/`). Judge it as a visitor deciding whether this product is for them. Note honestly that the automated browser **cannot complete GitHub OAuth or grant File System Access permissions**, so the real setup path can only be assessed from code and copy — state that limitation up front rather than discovering it mid-pass.
 - **Check the app's own front door**: `index.html`, the PWA manifest, the app name, and the icons (`public/icon*.png`). The install prompt and the home-screen icon are positioning surfaces too, and often the only ones a returning user sees.
+- **Read the visual identity as evidence, not decoration:** the theme tokens and their comments in `src/index.css` (colour, radius, density), the typography, the icon set (`lucide-react` — one family, consistently used?), the interaction vocabulary the dependencies imply (`vaul` drawers signal a mobile-native product; heavy dialog use would signal a desktop one), and the app icons. Capture screenshots at mobile and desktop width in every theme the app ships — the blind visual read above depends on them, so take them before analysing anything else.
 - **Bounded competitor verification only**, per the scope note: confirm the comparison table's specific factual claims, nothing further.
 - Skim the rest so nothing is invisible. Record anything skipped in the coverage statement.
 
@@ -72,7 +81,7 @@ State the three niches from Phase 0 in one line each, then answer the two headli
 
 ### 3. Category verdicts
 
-One line per category (1–6): **clean** (the walk for this category was executed and nothing turned up), **findings: #N, #M**, or **partially assessed** (say what was skipped and why). Clean is only available to categories actually walked.
+One line per category (1–7): **clean** (the walk for this category was executed and nothing turned up), **findings: #N, #M**, or **partially assessed** (say what was skipped and why). Clean is only available to categories actually walked.
 
 ### 4. Findings — top 8
 
@@ -81,7 +90,7 @@ For each finding:
 - **Title** — short label
 - **Gap** — which of the three: `declared-vs-revealed` (strategy), `revealed-vs-served` (execution), or `declared-vs-served` (credibility)
 - **Question** — `fit` or `communication` (or both)
-- **Category** — one or more of: `niche-definition` `differentiation` `recognition` `audience-selection` `feature-fit` `adoption-gate` `proof` `identity`
+- **Category** — one or more of: `niche-definition` `differentiation` `recognition` `visual-language` `aesthetic-fit` `audience-selection` `feature-fit` `adoption-gate` `proof` `identity`
 - **Who it costs us** — the person who bounces, misjudges, or churns because of it, and roughly what share of arrivals are that person
 - **Impact** — 1–10, where 10 = the product targets a niche it cannot serve, or the right visitor cannot tell the product is for them; 5 = a real differentiator goes unrecognised, or a segment is attracted and then disappointed; 1 = a wording nit with no selection consequence
 - **Evidence** — verbatim quote(s) with file paths; for fit findings, also the product evidence (feature, constraint, or code) that creates the gap
@@ -126,7 +135,19 @@ The ranking is a tiebreaker, not a filter. Bullets are illustrative, not the bou
 - Whether the app's own first screen communicates a niche or only an interface
 - Whether name, icon, and install metadata reinforce a recognisable identity or stay generic
 
-### 3. Differentiation & alternatives
+### 3. Visual identity & aesthetic fit
+
+**Scope:** whether the look — layout, colour, density, typography, motion — signals the niche the product targets. This is the positioning question about the same files the UI survey reads for consistency; keep the two apart.
+
+- **Category dialect:** whether the palette, chrome, and density place the product in the family it wants to be read as (local-first tools for thought, consumer calendar, developer utility, enterprise dashboard) — and whether that family is the declared niche's family. Colour choices carry this fastest; a code-editor palette and a consumer-calendar palette recruit different people before a word is read
+- **Layout as a claim about the job:** what the default view's information density, hierarchy, and whitespace assert about how the user is expected to work — a dense grid says power tool, a spacious single column says calm daily companion — and whether that matches the promise
+- **Mobile-first proof, visually:** if great mobile UX is the lead differentiator, whether the app *looks* mobile-native at phone width (drawers, thumb reach, one-handed layout) rather than a desktop layout that merely reflows
+- **Character-versus-promise mismatches:** urgency and pressure cues (colour-coded overdue states, counts, badges, streaks, nagging empty states) weighed against a promise of calm; or the reverse — a product promising rigour that looks unserious
+- **Theming as audience selection:** which theme a first-time visitor sees by default, and who that recruits or repels
+- **Distinctiveness versus genericness:** whether the interface is recognisable as *this* product, or is default-styled to the point of being unmemorable — and whether the app icon and home-screen presence carry the same identity as the app itself
+- **Deliberate divergence:** where the look intentionally breaks from the category, whether that reads as a point of view or as an accident — and say so when it's working
+
+### 4. Differentiation & alternatives
 
 **Scope:** whether the reason to choose this over the obvious alternative is clear and credible.
 
@@ -136,7 +157,7 @@ The ranking is a tiebreaker, not a filter. Bullets are illustrative, not the bou
 - Claims a competitor could match trivially, presented as a moat
 - Honest limitations stated well — where conceding something earns credibility, note it as working
 
-### 4. Audience selection — attracting and repelling
+### 5. Audience selection — attracting and repelling
 
 **Scope:** whether the surfaces sort visitors correctly, in both directions.
 
@@ -146,7 +167,7 @@ The ranking is a tiebreaker, not a filter. Bullets are illustrative, not the bou
 - Mismatch between the register of the pitch and the register of the setup instructions
 - Whether the free/open-source/no-server story is positioned as a benefit to the target user or merely stated as a fact about the architecture
 
-### 5. Adoption gates
+### 6. Adoption gates
 
 **Scope:** what a target user must accept, learn, or configure before the product pays off.
 
@@ -156,7 +177,7 @@ The ranking is a tiebreaker, not a filter. Bullets are illustrative, not the bou
 - Where the product asks for commitment before it has demonstrated value
 - Whether a try-before-committing path exists, is discoverable, and is convincing
 
-### 6. Niche drift & emerging signals
+### 7. Niche drift & emerging signals
 
 **Scope:** whether the positioning still matches where the product and its context are going.
 
