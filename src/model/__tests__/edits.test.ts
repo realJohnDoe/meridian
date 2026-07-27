@@ -506,6 +506,72 @@ instances:
   })
 })
 
+// ── unknown-key preservation through the edit path ────────────────────────────
+//
+// PR1 threaded the `extra` bag through parse → collapse; these guard the edit
+// path (storeOps.ts), which rebuilds metadata from scratch at several sites and
+// can silently drop the bag if a spread is missing.
+
+describe('unknown keys survive every edit scope', () => {
+  it.each(['single', 'future', 'all', 'add'] as const)(
+    '%s-scope edit keeps the series\' unknown keys',
+    (scope) => {
+      const data = fixtureData('unknown-keys-series')
+      const occ = occOn(data.items, data.roots, '2026-04-06')
+      const next = applyEdit(data, occ, scope, editFields(occ, { duration: '45m' }))
+      const reparsed = parseToStoreItems('unknown-keys-series.md', serializeData(next))
+
+      // The file root never owns these keys here — the series root is itself an item.
+      expect(reparsed.root.extra).toBeUndefined()
+      // owner: alice must still reach every series (original, or both halves of a split).
+      for (const s of reparsed.items.filter(isSeries)) {
+        expect(s.metadata.extra?.owner).toBe('alice')
+      }
+    },
+  )
+
+  it('single-scope edit on a diverging override keeps its own unknown key ("target wins")', () => {
+    const data = fixtureData('unknown-keys-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')  // override carries owner: bob
+    expect(occ.metadata.extra?.owner).toBe('bob')
+    const next = applyEdit(data, occ, 'single', editFields(occ, { duration: '45m' }))
+
+    const override = next.items.find(i => !isSeries(i) && i.date === '2026-04-20')!
+    expect(override.metadata.extra?.owner).toBe('bob')
+
+    const reparsed = parseToStoreItems('unknown-keys-series.md', serializeData(next))
+    const reparsedOverride = reparsed.items.find(i => !isSeries(i) && i.date === '2026-04-20')!
+    expect(reparsedOverride.metadata.extra?.owner).toBe('bob')
+  })
+
+  it('updateRoot keeps a container root\'s unknown key across an edit', () => {
+    const data = fixtureData('unknown-keys-container')
+    const occ = occOn(data.items, data.roots, '2026-04-06')
+    const next = applyEdit(data, occ, 'all', editFields(occ, { duration: '45m' }))
+    const root = [...next.roots.values()][0]!
+    expect(root.extra).toEqual({ project: 'apollo' })
+  })
+
+  it('toggleDone preserves an override\'s unknown key (upsertOverride merge)', () => {
+    const data = fixtureData('unknown-keys-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const next = toggleDone(data, occ)
+    const override = next.items.find(i => !isSeries(i) && i.date === '2026-04-20')!
+    expect(override.metadata.extra?.owner).toBe('bob')
+  })
+
+  it('excludeOccurrence does not touch a preserved override\'s unknown key on the store item', () => {
+    // The store item still carries the key; collapse deliberately does not emit
+    // metadata on excluded instances (documented non-goal), so this only guards
+    // that excludeOccurrence itself isn't an additional loss site.
+    const data = fixtureData('unknown-keys-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const next = excludeOccurrence(data, occ)
+    const override = next.items.find(i => !isSeries(i) && i.date === '2026-04-20')!
+    expect(override.metadata.extra?.owner).toBe('bob')
+  })
+})
+
 describe('stable occurrence ids', () => {
   it('two standalones in the same file on the same date have distinct ids', () => {
     // Two explicit instances on the same date — the old (fileSlug, date) matching

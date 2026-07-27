@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug } from '@/model'
+import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, occFromAppMeta } from '@/model'
 import { occIsRecur } from './occView'
 import { isStandaloneOcc } from './types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata } from './types'
@@ -75,13 +75,7 @@ export function reopenOcc(occ: Occurrence): void {
       source:   'explicit',
       fileSlug: occ.fileSlug,
       id:       crypto.randomUUID(),
-      metadata: {
-        done:         false,
-        participants: occ.metadata.participants ?? [],
-        priority:     occ.metadata.priority,
-        duration:     occ.metadata.duration,
-        timezone:     occ.metadata.timezone,
-      },
+      metadata: { ...occFromAppMeta(occ.metadata), done: false },
     }
     commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.fileSlug])
   }

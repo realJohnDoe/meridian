@@ -1,7 +1,7 @@
 export { weekStartsOn, fmtISO, fmtMonth, parseMonth, fmtT, formatHHMM, parseDateString, parseDateTime, dayBefore } from './dateUtils'
 export { multidayDisplayTitle, treeHasOccurrences, stableOccId, expandRange, joinFileMeta } from './expansion'
 export type { StoreData, EditorFields, EditFields } from './storeOps'
-export { fileSlugItems, findSeries, upsertOverride, applyEdit, toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing } from './storeOps'
+export { fileSlugItems, findSeries, upsertOverride, applyEdit, toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing, occFromAppMeta } from './storeOps'
 export { parseToStoreItems } from './storeItems'
 export { collapseToYaml } from './collapse'
 export { parseDuration, parseDurationDays, parseDurationHours } from './duration'
