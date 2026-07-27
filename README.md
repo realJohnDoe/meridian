@@ -138,6 +138,8 @@ instances:
 
 You can write and edit these files by hand if you prefer — Meridian will pick up any changes on the next sync.
 
+Frontmatter keys Meridian doesn't use (`aliases`, `cssclasses`, or anything of your own) are kept as they are, so a file stays yours. Saving does rewrite the frontmatter into Meridian's canonical form: comments are dropped, and keys may be reordered, requoted, or moved between the root and a `defaults:` block. The markdown body below the frontmatter is kept as written, apart from trimming blank lines at either end.
+
 ---
 
 ## 🙏 Inspiration and comparisons

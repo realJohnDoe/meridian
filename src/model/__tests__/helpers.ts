@@ -6,7 +6,8 @@ import type { ParseResult } from '@/model/storeItems'
 import { collapseToYaml } from '@/model/collapse'
 import { saveFile } from '@/model/inheritance'
 import { joinFileMeta } from '@/model/expansion'
-import { isSeries } from '@/types'
+import { loadFile } from '@/fileIO'
+import { isSeries, STRUCTURAL_KEYS } from '@/types'
 import type { StoreItem, FileMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -39,6 +40,34 @@ export function serialize(items: StoreItem[], root?: FileMetadata): string {
   const frontmatter = collapseToYaml(items, root)
   const body = root?.body ?? ''
   return saveFile(frontmatter, body)
+}
+
+/**
+ * Every non-structural `key → value` pair anywhere in a parsed frontmatter tree,
+ * recursing through `defaults:` and `instances:`. Pairs are stringified so they
+ * can be compared as sets: collapse legitimately RELOCATES a key (root ↔
+ * `defaults:`) and changes how many times it appears (one hoisted key ↔ N
+ * per-instance copies), so containment is the only invariant that holds — but
+ * losing a pair entirely never is.
+ */
+export function collectKeyValues(node: unknown): string[] {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return []
+  const out: string[] = []
+  for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+    if (k === 'defaults') { out.push(...collectKeyValues(v)); continue }
+    if (k === 'instances') {
+      if (Array.isArray(v)) for (const child of v) out.push(...collectKeyValues(child))
+      continue
+    }
+    if (STRUCTURAL_KEYS.has(k)) continue
+    out.push(`${k}=${JSON.stringify(v)}`)
+  }
+  return out
+}
+
+/** Parsed frontmatter of a file's raw content. */
+export function frontmatterOf(content: string): Record<string, unknown> {
+  return loadFile('x.md', content).rawNode
 }
 
 /** The per-file root metadata (title/tags/items/body). */

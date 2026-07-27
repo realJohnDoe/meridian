@@ -160,17 +160,21 @@ export function displayValue(v: unknown, indent = 0): string {
 // ── YAML serialiser ───────────────────────────────────────────────────────────
 
 /**
- * Recursively drop `null`/`undefined` values and empty arrays so the emitted
- * frontmatter stays free of `key: null` / `key: []` noise — matching the
- * behaviour callers relied on from the previous hand-rolled serialiser.
+ * Recursively drop `undefined` values so the emitted frontmatter stays free of
+ * `key: null` noise from fields the model left unset.
+ *
+ * `null` and `[]` are deliberately NOT dropped: an unknown key holding an
+ * explicit `reviewer: null` or `aliases: []` is user-authored data, and by the
+ * time this runs it is indistinguishable from a model field. Model fields never
+ * reach here empty anyway — `inlineFieldEmpty` suppresses them upstream in
+ * collapse.ts.
  */
 function prune(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(prune)
   if (v && typeof v === 'object') {
     const out: Record<string, unknown> = {}
     for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-      if (val === null || val === undefined) continue
-      if (Array.isArray(val) && val.length === 0) continue
+      if (val === undefined) continue
       out[k] = prune(val)
     }
     return out

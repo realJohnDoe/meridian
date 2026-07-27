@@ -26,6 +26,12 @@ export interface FileMetadata {
   tags:  string[]
   items: string[]
   body?: string
+  /**
+   * Frontmatter keys the model has no name for, kept verbatim so a save never
+   * deletes hand-authored data. Owned by the file root ONLY when the root node
+   * is not itself an item — see `nodeIsItem` in model/storeItems.ts.
+   */
+  extra?: Record<string, unknown>
 }
 
 /**
@@ -38,6 +44,8 @@ export interface OccurrenceMetadata {
   priority?:    Priority
   duration?:    string
   timezone?:    string
+  /** Unknown frontmatter keys for this node — see FileMetadata.extra. */
+  extra?:       Record<string, unknown>
 }
 
 /** Fields never persisted to YAML — computed at runtime or used only by the UI. */
@@ -50,7 +58,14 @@ interface ExtendedMetadata {
  * Raw store items carry OccurrenceMetadata only; AppMetadata only appears after
  * expandRange has joined the file-level fields.
  */
-export type AppMetadata = OccurrenceMetadata & FileMetadata & ExtendedMetadata
+/*
+ * `extra` is Omit-ted from the file half deliberately: joinFileMeta spreads the
+ * root under the occurrence metadata, so without this an occurrence carrying no
+ * extras of its own would inherit the FILE's extras — and the edit path would
+ * then write them back as occurrence-level keys, emitting them twice.
+ * AppMetadata.extra is always the occurrence bag.
+ */
+export type AppMetadata = OccurrenceMetadata & Omit<FileMetadata, 'extra'> & ExtendedMetadata
 
 // ── Expansion model types ─────────────────────────────────────────────────────
 
@@ -158,6 +173,53 @@ export const OCCURRENCE_FIELDS = INLINE_FIELDS.filter(s => s.level === 'occurren
 /** File-level inline field specs (derived from level; replaces FILE_LEVEL_FIELDS). */
 export const FILE_LEVEL_SPECS = INLINE_FIELDS.filter(s => s.level === 'file')
 
+// ── Unknown-key preservation ──────────────────────────────────────────────────
+// Everything outside this vocabulary is carried verbatim in an `extra` bag so a
+// save never deletes frontmatter the model has no name for. See
+// src/model/AGENTS.md for the ownership rule and the exactly-once guarantee.
+
+/** Keys the YAML shape itself owns — never metadata, never part of `extra`. */
+export const STRUCTURAL_KEYS: ReadonlySet<string> = new Set([
+  'date', 'time', 'repeat', 'excluded', 'instances', 'defaults',
+])
+
+/** Structural keys plus every registry key, at both levels. */
+const RESERVED_KEYS: ReadonlySet<string> = new Set([
+  ...STRUCTURAL_KEYS,
+  ...INLINE_FIELDS.map(s => s.key as string),
+])
+
+/**
+ * Structural equality for arbitrary YAML values. `inlineFieldEqual` is `a === b`
+ * for non-array kinds, which cannot compare the nested mappings and sequences an
+ * unknown key may hold.
+ */
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+    return a.every((v, i) => deepEqual(v, b[i]))
+  }
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  const ae = Object.entries(a as Record<string, unknown>)
+  const be = b as Record<string, unknown>
+  if (ae.length !== Object.keys(be).length) return false
+  return ae.every(([k, v]) => k in be && deepEqual(v, be[k]))
+}
+
+/**
+ * The remainder of a node: every key outside the reserved vocabulary.
+ * Returns `undefined` rather than `{}` when there is nothing to carry, so files
+ * without unknown keys keep metadata objects byte-identical to before.
+ */
+export function unknownKeys(fields: Record<string, unknown>): Record<string, unknown> | undefined {
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(fields)) {
+    if (!RESERVED_KEYS.has(k)) out[k] = v
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 /** Value equality for an inline field, comparing array fields structurally. */
 export function inlineFieldEqual(kind: InlineFieldKind, a: unknown, b: unknown): boolean {
   return kind === 'stringArray' ? JSON.stringify(a) === JSON.stringify(b) : a === b
@@ -192,13 +254,23 @@ function parseInlineField(spec: InlineFieldSpec, raw: unknown): unknown {
   }
 }
 
-/** Extract file-level metadata from raw YAML fields. */
-export function extractFileMetadata(fields: Record<string, unknown>): FileMetadata {
+/**
+ * Extract file-level metadata from raw YAML fields.
+ *
+ * `remainder` is the file's unknown-key bag. The caller supplies it because only
+ * the parse pipeline knows whether the file root is itself an item (in which
+ * case the root's unknown keys belong to that item, not to the file).
+ */
+export function extractFileMetadata(
+  fields: Record<string, unknown>,
+  remainder?: Record<string, unknown>,
+): FileMetadata {
   return {
     title: scalarToString(fields.title) ?? '',
     tags:  Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
     items: Array.isArray(fields.items) ? (fields.items as string[]) : [],
     body:  scalarToString(fields.body),
+    ...(remainder ? { extra: remainder } : {}),
   }
 }
 
@@ -209,6 +281,8 @@ export function extractOccurrenceMetadata(fields: Record<string, unknown>): Occu
   for (const spec of OCCURRENCE_FIELDS) {
     sink[spec.key] = parseInlineField(spec, fields[spec.key])
   }
+  const extra = unknownKeys(fields)
+  if (extra) meta.extra = extra
   return meta
 }
 

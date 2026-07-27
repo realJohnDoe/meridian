@@ -1,5 +1,5 @@
 import type { StoreItem, OccurrenceMetadata, FileMetadata, OccurrenceEntry } from '@/types'
-import { isSeries, isStandaloneOcc, OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, inlineFieldEqual, inlineFieldEmpty } from '@/types'
+import { isSeries, isStandaloneOcc, OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, STRUCTURAL_KEYS, inlineFieldEqual, inlineFieldEmpty, deepEqual } from '@/types'
 
 type AnyOcc = OccurrenceEntry<OccurrenceMetadata>
 
@@ -156,13 +156,32 @@ function serializeChildren(
   })
 }
 
+/**
+ * Copy a metadata bag's unknown keys onto the emitted node.
+ *
+ * Structural keys are skipped defensively — the parse side can never put one in
+ * the bag, but a hand-built StoreItem (tests, the debug view) could, and letting
+ * one through would overwrite the schedule this node is emitting.
+ */
+function emitExtra(extra: Record<string, unknown> | undefined, out: Record<string, unknown>): void {
+  if (!extra) return
+  for (const [k, v] of Object.entries(extra)) {
+    if (!STRUCTURAL_KEYS.has(k)) out[k] = v
+  }
+}
+
 /** Emit file-level fields as a YAML-serializable object. */
 function fileMetaToYaml(root: FileMetadata): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const spec of FILE_LEVEL_SPECS) {
+    // A registry key present in `extra` was written in a shape the model can't
+    // represent; the raw value wins so it round-trips (the typed field holds the
+    // ''/[] fallback, which inlineFieldEmpty does not always suppress).
+    if (root.extra && spec.key in root.extra) continue
     const v = (root as unknown as Record<string, unknown>)[spec.key as string]
     if (!inlineFieldEmpty(spec.kind, v)) out[spec.key] = v
   }
+  emitExtra(root.extra, out)
   return out
 }
 
@@ -170,9 +189,11 @@ function fileMetaToYaml(root: FileMetadata): Record<string, unknown> {
 function occMetaToYaml(m: Partial<OccurrenceMetadata>): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const spec of OCCURRENCE_FIELDS) {
+    if (m.extra && spec.key in m.extra) continue
     const v = (m as Record<string, unknown>)[spec.key as string]
     if (!inlineFieldEmpty(spec.kind, v)) result[spec.key] = v
   }
+  emitExtra(m.extra, result)
   return result
 }
 
@@ -186,6 +207,15 @@ function computeSharedFields(metas: Partial<OccurrenceMetadata>[]): Partial<Occu
     if (metas.every(m => inlineFieldEqual(spec.kind, (m as Record<string, unknown>)[spec.key as string], first)))
       (shared as Record<string, unknown>)[spec.key] = first
   }
+  // Unknown keys hoist on the same rule, by structural equality: every item must
+  // carry the key with an equal value. Hoisting is an optimisation — a key that
+  // fails to hoist stays on each item and still round-trips.
+  const sharedExtra: Record<string, unknown> = {}
+  for (const [key, first] of Object.entries(metas[0]?.extra ?? {})) {
+    if (metas.every(m => m.extra && key in m.extra && deepEqual(m.extra[key], first)))
+      sharedExtra[key] = first
+  }
+  if (Object.keys(sharedExtra).length > 0) shared.extra = sharedExtra
   return shared
 }
 
@@ -198,5 +228,10 @@ function diffMetadata(meta: Partial<OccurrenceMetadata>, defaults: Partial<Occur
     if (!inlineFieldEqual(spec.kind, v, (defaults as Record<string, unknown>)[spec.key as string]))
       (diff as Record<string, unknown>)[spec.key] = v
   }
+  const diffExtra: Record<string, unknown> = {}
+  for (const [key, v] of Object.entries(meta.extra ?? {})) {
+    if (!deepEqual(v, defaults.extra?.[key])) diffExtra[key] = v
+  }
+  if (Object.keys(diffExtra).length > 0) diff.extra = diffExtra
   return diff
 }
