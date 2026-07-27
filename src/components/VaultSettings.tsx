@@ -132,7 +132,8 @@ export function VaultSettings({ vault, isActive }: Props) {
       <div className="flex flex-col gap-2 pt-2 border-t border-border">
         <span className="text-sm font-medium">Default participants</span>
         <p className="text-xs text-muted-foreground">
-          Added to new entries in this vault automatically.
+          Added to new entries in this vault automatically. Stored on this device only,
+          so each device (and each person sharing the vault) can set its own.
         </p>
         <ParticipantsRow
           participants={participants}
