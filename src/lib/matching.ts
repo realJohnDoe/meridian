@@ -2,7 +2,7 @@
 // (search overlay, item picker, "listed on" picker) so results stay consistent
 // across surfaces.
 
-export function matchesQuery(query: string, text: string): boolean {
+function matchesQuery(query: string, text: string): boolean {
   if (!query) return true
   const q = query.toLowerCase(), t = text.toLowerCase()
   let qi = 0
@@ -10,7 +10,7 @@ export function matchesQuery(query: string, text: string): boolean {
   return qi === q.length
 }
 
-export function scoreQuery(query: string, text: string): number {
+function scoreQuery(query: string, text: string): number {
   const q = query.toLowerCase(), t = text.toLowerCase()
   let score = 0, qi = 0, cons = 0
   for (let i = 0; i < t.length && qi < q.length; i++) {
