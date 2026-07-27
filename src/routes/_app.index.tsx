@@ -10,10 +10,13 @@ export const Route = createFileRoute('/_app/')({
 
 function AgendaSkeleton() {
   return (
-    <div className="flex flex-col gap-0 px-4 pt-3 pb-8 lg:max-w-3xl lg:mx-auto">
+    // px-2 matches OccurrenceRow's mx-2 and the header bars are nudged the
+    // further 6px to AgendaHeaderRow's px-3.5, so the real agenda lands on the
+    // same two edges the skeleton drew — no sideways jump when it swaps in.
+    <div className="flex flex-col gap-0 px-2 pt-3 pb-8 lg:max-w-3xl lg:mx-auto">
       {[0, 1, 2].map(i => (
         <div key={i} className="mb-5">
-          <Skeleton className="h-4 w-28 mb-3" />
+          <Skeleton className="h-4 w-28 mb-3 ml-1.5" />
           <div className="flex flex-col gap-2">
             <Skeleton className="h-10 w-full rounded-xl" />
             <Skeleton className="h-10 w-full rounded-xl" />

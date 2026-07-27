@@ -286,9 +286,10 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
 
   return (
     <>
-      {/* All-day / multiday strip */}
+      {/* All-day / multiday strip. px-2 = RIGHT_PAD, so the all-day items
+          share a right edge with the timeline's event blocks beneath them. */}
       {allDay.length > 0 && (
-        <div className="px-3 py-1.5 border-b border-input bg-card shrink-0">
+        <div className="px-2 py-1.5 border-b border-input bg-card shrink-0">
           <div className="text-2xs font-semibold tracking-[.07em] uppercase text-muted-foreground mb-1">All day</div>
 
           {/* Always-visible first N items */}

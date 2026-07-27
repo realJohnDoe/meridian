@@ -78,38 +78,46 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
   const virtualItems = virtualizer.getVirtualItems()
 
   return (
-    <div className="px-2 pt-2" style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-      {virtualItems.map(vi => {
-        const { entry, listedOn } = results[vi.index]!
-        const occ = occBySlug.get(entry.fileSlug)
-        if (!occ) return null
-        return (
-          <div
-            key={vi.key}
-            data-index={vi.index}
-            ref={virtualizer.measureElement}
-            style={{
-              '--stagger': `${vi.index * 0.025}s`,
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              transform: `translateY(${vi.start}px)`,
-              paddingBottom: 6,
-            } as React.CSSProperties}
-          >
-            <OccurrenceCard
-              occ={occ}
-              leadingIcon="kind"
-              showTime="badge"
-              showDate
-              listedOn={listedOn}
-              onOpen={() => onOpen(occ)}
-              onToggleDone={() => {}}
-            />
-          </div>
-        )
-      })}
+    // The padding sits on a wrapper, never on the positioned spacer below: the
+    // rows are absolutely positioned, so their containing block is the spacer's
+    // *padding* box — `left: 0; width: 100%` would resolve against the padded
+    // width and cancel the inset entirely, leaving the cards flush against the
+    // overlay (and, on mobile, the screen) edge. px-2 matches OccurrenceRow's
+    // mx-2, so results sit on the same 8px card edge as every other list.
+    <div className="px-2 pt-2">
+      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+        {virtualItems.map(vi => {
+          const { entry, listedOn } = results[vi.index]!
+          const occ = occBySlug.get(entry.fileSlug)
+          if (!occ) return null
+          return (
+            <div
+              key={vi.key}
+              data-index={vi.index}
+              ref={virtualizer.measureElement}
+              style={{
+                '--stagger': `${vi.index * 0.025}s`,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${vi.start}px)`,
+                paddingBottom: 6,
+              } as React.CSSProperties}
+            >
+              <OccurrenceCard
+                occ={occ}
+                leadingIcon="kind"
+                showTime="badge"
+                showDate
+                listedOn={listedOn}
+                onOpen={() => onOpen(occ)}
+                onToggleDone={() => {}}
+              />
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
