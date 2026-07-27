@@ -55,7 +55,7 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
 
   const occCount = dayOccs.length + barCoverCount
   const ariaLabel = [
-    date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', ...(date.getFullYear() !== new Date().getFullYear() && { year: 'numeric' }) }),
+    date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', ...(date.getFullYear() !== today.getFullYear() && { year: 'numeric' }) }),
     isToday ? 'today' : '',
     occCount ? `${occCount} event${occCount !== 1 ? 's' : ''}` : '',
   ].filter(Boolean).join(', ')
