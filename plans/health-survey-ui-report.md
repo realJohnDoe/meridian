@@ -81,16 +81,16 @@ instructed; no spurious type-resolution flood.
 
 ## 3. Category verdicts
 
-| # | Category | Verdict |
-|---|---|---|
-| 1 | Component Architecture & Boundaries | **findings: #3, #5, #7, #8** |
-| 2 | Styling System Consistency | **clean** — full scan executed: 8 non-token color classes tree-wide (7 are upstream shadcn `bg-black/80` overlays), 11 arbitrary-value classes total, `cn` used universally, `cva` used where warranted, no `@apply`, no raw CSS file outside `index.css`. Two sub-threshold items noted below but not worth a report entry. |
-| 3 | UX States & Accessibility | **findings: #6, #9** |
-| 4 | Security (UI-facing) | **clean** — see threat model below. |
-| 5 | Code Health & DRY | **findings: #7, #10** |
-| 6 | React Performance | **findings: #3, #4** |
-| 7 | UI Toolchain & Feedback Loops | **findings: #1, #2, #3** |
-| 8 | UI Dependencies & Library Fit | **findings: #6, #7, #9** — plus explicit keep-custom verdicts below. |
+| #   | Category                            | Verdict                                                                                                                                                                                                                                                                                                                      |
+| --- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Component Architecture & Boundaries | **findings: #3, #5, #7, #8**                                                                                                                                                                                                                                                                                                 |
+| 2   | Styling System Consistency          | **clean** — full scan executed: 8 non-token color classes tree-wide (7 are upstream shadcn `bg-black/80` overlays), 11 arbitrary-value classes total, `cn` used universally, `cva` used where warranted, no `@apply`, no raw CSS file outside `index.css`. Two sub-threshold items noted below but not worth a report entry. |
+| 3   | UX States & Accessibility           | **findings: #6, #9**                                                                                                                                                                                                                                                                                                         |
+| 4   | Security (UI-facing)                | **clean** — see threat model below.                                                                                                                                                                                                                                                                                          |
+| 5   | Code Health & DRY                   | **findings: #7, #10**                                                                                                                                                                                                                                                                                                        |
+| 6   | React Performance                   | **findings: #3, #4**                                                                                                                                                                                                                                                                                                         |
+| 7   | UI Toolchain & Feedback Loops       | **findings: #1, #2, #3**                                                                                                                                                                                                                                                                                                     |
+| 8   | UI Dependencies & Library Fit       | **findings: #6, #7, #9** — plus explicit keep-custom verdicts below.                                                                                                                                                                                                                                                         |
 
 ### Category 4 threat model
 
@@ -112,7 +112,7 @@ build injects a strict CSP with `script-src 'self'` and `object-src 'none'`. Not
   and the touch behavior is domain-specific; keep.
 - **`FlipList`** — WAAPI FLIP with an explicit, documented reason for not using CSS transitions; no
   maintained primitive covers the virtualizer-aware variant; keep.
-- **`floating-combobox-list`** — deliberately portals *outside* Radix's layer system with a
+- **`floating-combobox-list`** — deliberately portals _outside_ Radix's layer system with a
   documented `pointer-events` fix for exactly that; a Radix Popover would reintroduce the problem it
   solves; keep.
 - **`IconButton` / `SurfaceButton` / `DimmableCard`** — thin, well-scoped wrappers over shadcn
@@ -137,18 +137,18 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
 
 ### Summary table
 
-| # | Finding | Recommended model |
-|---|---|---|
-| 1 | `@eslint-react` used as a 13-rule subset of an installed 66-rule preset | **Sonnet 5** |
-| 2 | `components/ui/` + `routes/` exempt from coverage as "boilerplate" | **Opus 5 in plan mode, multi-PR** |
-| 3 | React Compiler enabled; render-phase impurity and stale "reruns every render" rationales | **Opus 5** |
-| 4 | Backlog and Notes render every row unvirtualized | **Opus 5** |
-| 5 | Calendar cache-reset API fragmented; single entry point is test-only and has drifted | **Sonnet 5** |
-| 6 | Overlay dismissal handled ad hoc — one overlay has none, another duplicates Radix | **Opus 5** |
-| 7 | `RepeatDialog` hand-rolls a second date picker; `DatePickerDialog.forceDialog` is dead | **Sonnet 5** |
-| 8 | Repeat/series domain rules embedded in editor components | **Opus 5** |
-| 9 | Global `Cmd/Ctrl+B` steals bold inside the Markdown editor | **Haiku 4.5** |
-| 10 | Duplicated UI constants and dead `data-tour` markup | **Haiku 4.5** |
+| #   | Finding                                                                                  | Recommended model                 |
+| --- | ---------------------------------------------------------------------------------------- | --------------------------------- |
+| 1   | `@eslint-react` used as a 13-rule subset of an installed 66-rule preset                  | **Sonnet 5**                      |
+| 2   | `components/ui/` + `routes/` exempt from coverage as "boilerplate"                       | **Opus 5 in plan mode, multi-PR** |
+| 3   | React Compiler enabled; render-phase impurity and stale "reruns every render" rationales | **Opus 5**                        |
+| 4   | Backlog and Notes render every row unvirtualized                                         | **Opus 5**                        |
+| 5   | Calendar cache-reset API fragmented; single entry point is test-only and has drifted     | **Sonnet 5**                      |
+| 6   | Overlay dismissal handled ad hoc — one overlay has none, another duplicates Radix        | **Opus 5**                        |
+| 7   | `RepeatDialog` hand-rolls a second date picker; `DatePickerDialog.forceDialog` is dead   | **Sonnet 5**                      |
+| 8   | Repeat/series domain rules embedded in editor components                                 | **Opus 5**                        |
+| 9   | Global `Cmd/Ctrl+B` steals bold inside the Markdown editor                               | **Haiku 4.5**                     |
+| 10  | Duplicated UI constants and dead `data-tour` markup                                      | **Haiku 4.5**                     |
 
 ### Sequencing notes
 
@@ -172,7 +172,7 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
 - **Recommended model** **Sonnet 5.** The hazard is that turning on the full preset in one go mixes
   signal with noise: 7 of the 35 raw hits are `@eslint-react/exhaustive-deps` firing on lines that
   already carry `// eslint-disable-next-line react-hooks/exhaustive-deps` — the disable comment names
-  the *other* plugin's rule id, so it doesn't suppress these, and a naive fix would either delete
+  the _other_ plugin's rule id, so it doesn't suppress these, and a naive fix would either delete
   deliberate opt-outs or bury the config in duplicate disables. Sonnet 5 handles this correctly if
   the task says: enable the preset, then explicitly turn **off** the rules that duplicate
   `react-hooks` (`exhaustive-deps`, `set-state-in-effect`, `static-components`, `use-state`), keeping
@@ -187,8 +187,8 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   ```
 
   Probing the installed package directly: `TOTAL RULES: 140`, and `preset recommended-type-checked →
-  66 rules`. Dry-run of that preset over `src/` (temp config, since removed) reported **35 findings**,
-  of which these are in rules *not* already covered by `react-hooks`:
+66 rules`. Dry-run of that preset over `src/` (temp config, since removed) reported **35 findings**,
+  of which these are in rules _not_ already covered by `react-hooks`:
 
   ```
   @eslint-react/purity | src/calendar/MonthGrid.tsx:58 | Do not call 'new Date()' during render. Components and hooks must be pure.
@@ -200,6 +200,7 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   Notably `react-hooks/purity` **is** enabled at `'error'` (confirmed by printing
   `recommended-latest`: 17 rules, `react-hooks/purity = "error"`) and reported zero — so the two
   implementations do not overlap, and the stricter one is the one that's off.
+
 - **Problem** The config cherry-picks 13 rules with careful per-rule justifications, but the installed
   preset's remaining 53 include `purity`, which catches two genuine impure-render calls the current
   gate lets through — exactly the class of bug that matters most now the React Compiler is on.
@@ -214,7 +215,7 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
 - **Category** `testing` `toolchain`
 - **Impact** 6
 - **Breadth** 11 first-party files in `components/ui/` (of 33 total, counted via `git ls-files
-  'src/components/ui/*'`) + 16 files in `src/routes/`; 78 of 88 non-test, non-debug `.tsx` files have
+'src/components/ui/*'`) + 16 files in `src/routes/`; 78 of 88 non-test, non-debug `.tsx` files have
   no direct test (counted by globbing for a sibling `.test.tsx`)
 - **Recommended model** **Opus 5 in plan mode, for a plan spanning multiple PRs.** Two reasons this
   can't be handed down. First it's a product decision the user owns: which of the 11 first-party
@@ -222,8 +223,8 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   smoke-test harness at all. Second, the hazard in the mechanical part fails silently:
   `ResponsiveModal` branches on `useMediaQuery("(min-width: 768px)")`, and jsdom's `matchMedia`
   returns `matches: false` with no listener support unless stubbed — a test written without that stub
-  passes while only ever exercising the drawer branch, so the desktop Dialog path stays untested *and
-  looks covered*. Same trap for `IconButton`'s `hit="expand"` mode, which is a `::before`
+  passes while only ever exercising the drawer branch, so the desktop Dialog path stays untested _and
+  looks covered_. Same trap for `IconButton`'s `hit="expand"` mode, which is a `::before`
   pseudo-element that jsdom does not compute, so a naive assertion on hit-area size passes vacuously.
 - **Evidence** `vitest.config.ts`:
 
@@ -243,9 +244,11 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   ```
   // The column geometry is load-bearing and must stay consistent: the viewport is
   ```
+
   ```
   // exactly three rows tall (h-30 = 120px), rows and spacers are one row (h-10),
   ```
+
 - **Problem** The exclusion's stated rationale ("boilerplate") is false for a third of the directory,
   so the most reused, hardest-to-eyeball UI logic in the app — the responsive drawer/dialog switch
   every property dialog depends on, the touch-target strategy, the scroll-wheel picker — is
@@ -262,10 +265,10 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
 - **Category** `performance` `component-architecture` `toolchain`
 - **Impact** 6
 - **Breadth** 3 source files + 2 config files (`grep -rn "use no memo" src` for the opt-outs; `grep -c
-  memo_cache_sentinel dist/assets/calendar-*.js` to confirm the compiler is live)
+memo_cache_sentinel dist/assets/calendar-*.js` to confirm the compiler is live)
 - **Recommended model** **Opus 5.** The hazard is that every failure mode here is invisible:
   memoization staleness produces a correct-looking render with an old wall clock, and the LRU
-  bookkeeping being skipped produces a *slower* app, never a wrong one — no build break, no type
+  bookkeeping being skipped produces a _slower_ app, never a wrong one — no build break, no type
   error, no failing test. Worse, the obvious "fix" (wrap the block in `useMemo` to make the
   memoization explicit) makes the staleness permanent instead of fixing it; the right move is to
   decide per site whether the clock should be a ticking `useNow` prop, and to move the cache write out
@@ -279,8 +282,8 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   ```
 
   and the built bundle confirms it is actively memoizing — `grep -o "react.memo_cache_sentinel"
-  dist/assets/calendar-*.js | wc -l` → **41**. Only `AgendaView` and `FileResultsList` opt out (`'use
-  no memo'`), so `MonthGrid` is compiled. Yet `MonthGrid.tsx:169` still reasons as if it weren't:
+dist/assets/calendar-*.js | wc -l` → **41**. Only `AgendaView` and `FileResultsList` opt out (`'use
+no memo'`), so `MonthGrid` is compiled. Yet `MonthGrid.tsx:169` still reasons as if it weren't:
 
   ```
       // Unlike AgendaView/DayPane, this partition isn't inside a useMemo — it
@@ -304,7 +307,8 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   Neither `react-hooks/purity` (enabled, `'error'`) nor the enabled `@eslint-react` subset flags any
   of this; `@eslint-react/purity` catches the `new Date()` cases (see #1) and still misses the cache
   write.
-- **Problem** The compiler now memoizes blocks whose comments explicitly justify themselves by *not*
+
+- **Problem** The compiler now memoizes blocks whose comments explicitly justify themselves by _not_
   being memoized, so `MonthGrid`'s sort clock freezes until occurrence data changes and the expansion
   cache's LRU-recency bookkeeping is skipped whenever inputs are stable — degrading exactly the
   eviction targeting it was written to guarantee.
@@ -323,8 +327,8 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
 - **Breadth** 3 files (`BacklogView.tsx`, `NotesView.tsx`, `calendar/OccurrenceList.tsx` — found by
   grepping which components render `OccurrenceRow` outside `AgendaView`)
 - **Recommended model** **Opus 5.** The hazard is a documented incompatibility between the two
-  mechanisms: `FlipList`'s own doc comment says *"Don't turn this on inside a virtualizer: it measures
-  the list itself and would fight an animated height, one resize notification per frame"* — and
+  mechanisms: `FlipList`'s own doc comment says _"Don't turn this on inside a virtualizer: it measures
+  the list itself and would fight an animated height, one resize notification per frame"_ — and
   `OccurrenceList` wraps its active rows in exactly that `FlipList`. So dropping a `useVirtualizer` in
   naively either loses the swipe-delete glide animation or produces a per-frame resize loop that only
   shows up on a real device under momentum scrolling, never in a test. `AgendaView` already solved
@@ -353,60 +357,13 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
 
   and `OccurrenceList.tsx:23` maps all of them: `{active.map(o => (`. Each `OccurrenceRow` attaches
   three raw touch listeners in an effect and subscribes to `s.roots` and `s.backlinks`.
+
 - **Problem** Backlog is by definition where undated tasks accumulate without bound, so the one view
   most likely to grow to thousands of rows is the one that mounts them all in a single synchronous
   commit — the precise failure the agenda was restructured to avoid.
 - **Fix** Reuse `AgendaView`'s row-granular virtualizer + `useVirtualFlip` path in `OccurrenceList`
   (flattening the Done collapsible into the same row list), so both undated views inherit the fix
   rather than growing a second virtualization strategy.
-
----
-
-### 5. The app shell hand-enumerates calendar cache resets; the single-entry-point API exists but is test-only, and the two lists have already diverged
-
-- **Category** `component-architecture` `dry`
-- **Impact** 5
-- **Breadth** 7 files (`routes/_app.tsx`, `calendar/index.ts`, `calendar/viewState.ts`,
-  `calendar/useExpandWithMultiday.ts`, `calendar/useAgendaSections.ts`,
-  `calendar/useAgendaScrollRestore.ts`, `test-utils/index.ts` — from `grep -rn
-  "resetCalendarViewState|resetAgendaScroll|resetExpansionCache|resetAgendaSectionsCache" src`). Git
-  history corroborates: `calendar/index.ts + routes/_app.tsx` is the single most frequent UI
-  co-change pair in the last 300 commits (4 occurrences, via `git log --name-only` pair counting).
-- **Recommended model** **Sonnet 5.** The hazard is one ordering constraint that is easy to miss:
-  `markScrolledToToday` exists specifically because *"splitting this into two setState calls would
-  notify subscribers twice, flashing the stale top date before it settles"* — so the consolidated
-  reset must remain a single `calendarView.setState` write, and must fire `requestScrollToToday()`
-  **after** the caches are dropped, not as part of the same state write. Once that constraint is
-  stated, this is a mechanical consolidation with a passing test suite as the check.
-- **Evidence** `calendar/viewState.ts:43` provides the entry point:
-
-  ```
-  export function resetCalendarViewState(): void {
-    calendarView.setState(calendarView.getInitialState(), true)
-  }
-  ```
-
-  It is exported from the barrel — and called only by `viewState.test.ts` and `test-utils/index.ts`.
-  Production instead names three internals one by one, in `routes/_app.tsx:55`:
-
-  ```
-    useEffect(() => onVaultChanged(() => {
-      resetAgendaScroll()
-      resetExpansionCache()
-      resetAgendaSectionsCache()
-      requestScrollToToday()
-    }), [])
-  ```
-
-  while `test-utils/index.ts:22` resets a *different* set — `resetExpansionCache()`,
-  `resetAgendaSectionsCache()`, `resetCalendarViewState()`.
-- **Problem** There is no single "the vault changed, drop calendar state" call, so the app shell has
-  to know which caches `calendar/` keeps and the barrel widens every time one is added; the test
-  harness and production already reset different combinations, meaning tests do not exercise the reset
-  path production actually takes.
-- **Fix** Export one `resetCalendarOnVaultChange()` from `@/calendar` that internally drops all four
-  pieces of state, call it from both `_app.tsx` and `test-utils`, and narrow the barrel back to that
-  single name.
 
 ---
 
@@ -419,9 +376,9 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   every Escape handler in the tree)
 - **Recommended model** **Opus 5.** Two hazards, both silent. First, the obvious fix for the search
   overlay — wrap it in a Radix `Dialog` — would regress deliberate behavior: the desktop variant is a
-  popover whose backdrop *intentionally* stops at the sidebar (`sidebarOpen ?
-  'left-[var(--sidebar-width)]' : 'left-0'`), and Radix's modal Dialog sets `body { pointer-events:
-  none }`, which `floating-combobox-list.tsx` already documents as silently swallowing clicks for
+  popover whose backdrop _intentionally_ stops at the sidebar (`sidebarOpen ?
+'left-[var(--sidebar-width)]' : 'left-0'`), and Radix's modal Dialog sets `body { pointer-events:
+none }`, which `floating-combobox-list.tsx` already documents as silently swallowing clicks for
   anything portalled outside its layer. Second, removing the redundant listener in `useEntryDialogs`
   looks safe but is load-bearing for at least one nesting case — `RepeatDialog`'s nested end-date
   `ResponsiveModal` — and getting it wrong leaves a dialog that renders but no longer closes, which no
@@ -446,6 +403,7 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
 
   Every other overlay in the app — `WikilinkPopup`, `use-floating-combobox`, `MarkdownTaskCard`'s
   inline edit, and all the Radix dialogs — handles Escape correctly and locally.
+
 - **Problem** The search overlay is a full-screen modal layer on mobile with no Escape key, no
   backdrop dismissal, no focus trap and no `aria-modal`, while the editor's dialogs carry a redundant
   document-level Escape that can close a property dialog from inside a nested Select — the same
@@ -488,8 +446,9 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   ```
 
   The 70 lines that follow re-implement the same `<Calendar mode="single" fixedWeeks
-  weekStartsOn={weekStartsOn(localePrefs)} … className="w-full [--cell-size:2.25rem] p-0" />` and the
+weekStartsOn={weekStartsOn(localePrefs)} … className="w-full [--cell-size:2.25rem] p-0" />` and the
   same Today/Tomorrow shortcut pair that `DatePickerDialog.tsx:89` already renders.
+
 - **Problem** The app's one date picker exists twice with divergent commit semantics and layout, so
   any change to date selection — locale week start, a keyboard affordance, the `--cell-size` contract
   — has to be made in two places or the two drift, and the purpose-built `forceDialog` prop is dead
@@ -507,7 +466,7 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   100–142)
 - **Recommended model** **Opus 5.** The hazard is that `initState`/`buildRepeat` are a lossy
   round-trip, not a bijection, and the lossiness is deliberate: `initState` reconstructs `monthly:
-  'weekday-pattern'` only when `s.byweekday && s.bysetpos !== undefined`, and `buildRepeat` re-derives
+'weekday-pattern'` only when `s.byweekday && s.bysetpos !== undefined`, and `buildRepeat` re-derives
   `bymonthday`/`bysetpos` from `scheduledDate` rather than from the value it parsed — so a mechanical
   "move these two functions into `model/`" that tidies them into a symmetric pair changes which
   `Repeat` values survive an open-and-Set cycle. That breaks recurring-series expansion for existing
@@ -538,8 +497,9 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   ```
 
   `model/index.ts` already owns the neighbouring primitives — `export { parseInterval,
-  serialiseInterval, monthlyWeekdaySpec } from './repeat'` — so the boundary exists and this logic
+serialiseInterval, monthlyWeekdaySpec } from './repeat'` — so the boundary exists and this logic
   sits on the wrong side of it.
+
 - **Problem** Recurrence semantics — which `Repeat` shapes are representable, how a series' scope
   options are derived — live in a dialog and a render body rather than `model/`, so they can only be
   tested through the UI and cannot be reused by the other surfaces that need the same rules.
@@ -556,7 +516,7 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
 - **Impact** 5
 - **Breadth** 1 file (`components/ui/sidebar.tsx`); affects every entry route. Confirmed no competing
   binding exists: `grep -rn "Mod-|keymap.of" src/editor` returns only `keymap.of([...defaultKeymap,
-  ...historyKeymap])`, and CodeMirror's `defaultKeymap` does not bind `Mod-b`.
+...historyKeymap])`, and CodeMirror's `defaultKeymap` does not bind `Mod-b`.
 - **Recommended model** **Haiku 4.5.** The fix is a guarded early-return in one `keydown` handler and
   the failure mode is loud — get the guard wrong and the shortcut visibly stops working everywhere,
   which is immediately obvious rather than silent. Name the guard condition in the task (skip when the
@@ -568,6 +528,7 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   ```
   const SIDEBAR_KEYBOARD_SHORTCUT = "b"
   ```
+
   ```
     // Adds a keyboard shortcut to toggle the sidebar.
     React.useEffect(() => {
@@ -584,6 +545,7 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
 
   It is registered on `window` with no target check, so it fires — and `preventDefault()`s — while the
   caret is in the CodeMirror body.
+
 - **Problem** In an app whose premise is Markdown editing, the universal "bold" chord is silently
   consumed by an unreviewed component-library default and instead slides the sidebar out from under
   the writer.
@@ -598,8 +560,8 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
 - **Category** `dry` `dead-code` `naming`
 - **Impact** 3
 - **Breadth** 9 files — `PRIORITY_CLASS` duplicated verbatim in 2 (`grep -rn
-  "aria-\[pressed=true\]:bg-p1/15" src`), `data-tour` in 4 production files plus 1 test (`grep -rn
-  "data-tour" src`), `BacklogView.tsx`/`NotesView.tsx` near-identical, `TagChip.tsx`'s remove-button
+"aria-\[pressed=true\]:bg-p1/15" src`), `data-tour` in 4 production files plus 1 test (`grep -rn
+"data-tour" src`), `BacklogView.tsx`/`NotesView.tsx` near-identical, `TagChip.tsx`'s remove-button
   block written twice
 - **Recommended model** **Haiku 4.5.** All four items are mechanical and fail loudly — a bad constant
   extraction breaks the build or the type-check, a bad JSX de-duplication breaks `TagChip.test.tsx`.
@@ -617,9 +579,10 @@ at `lg:max-w-3xl`. Cosmetic staleness, but a further instance of the report's ma
   `data-tour` survives on four elements — `OccurrenceCard.tsx:154`, `SearchBar.tsx:71`,
   `Sidebar.tsx:218`, `routes/_app.tsx:174` — but `onboarding/CoachTour.tsx` no longer reads any of
   them; the tour became a plain centred popover in commit `d20aed3 feat: slim the coach tour to
-  spatial orientation`, and `grep -rn "data-tour" src/onboarding` returns nothing. Separately,
+spatial orientation`, and `grep -rn "data-tour" src/onboarding` returns nothing. Separately,
   `OccurrenceCard`'s `showTagsParticipants` prop gates `listedOn.length > 0` and the participant
   avatars — no tags are rendered under it at all.
+
 - **Problem** Small duplications of exactly the kind lint cannot see: a priority-colour map that will
   drift the moment one theme token changes, an attribute contract kept alive only by a test and a doc
   line after its consumer was rewritten, and two views differing only in icon and copy.
