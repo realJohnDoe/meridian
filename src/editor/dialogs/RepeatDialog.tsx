@@ -254,7 +254,7 @@ export default function RepeatDialog({
   const setCompletionUnit = (completionUnit: string) => dispatch({ type: 'set', patch: { completionUnit } })
 
   const [endCalOpen,  setEndCalOpen]  = useState(false)
-  const [endCalMonth, setEndCalMonth] = useState<Date>(new Date())
+  const [endCalMonth, setEndCalMonth] = useState<Date>(() => new Date())
 
   // Re-initialise whenever the dialog opens (so stale state never leaks between opens)
   useResetOnChange([open], () => {
