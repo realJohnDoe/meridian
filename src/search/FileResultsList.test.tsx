@@ -138,7 +138,7 @@ describe('FileResultsList', () => {
     type('stand')
     flushDebounce()
 
-    expect(container.querySelectorAll('[data-tour="entry-card"]')).toHaveLength(1)
+    expect(container.querySelectorAll('[data-testid="entry-card"]')).toHaveLength(1)
   })
 
   it('calls onOpen with the underlying occurrence when a result is clicked', () => {

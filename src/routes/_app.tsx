@@ -168,7 +168,7 @@ function AppMain() {
           )}
         </header>
 
-        <section data-tour="main-content" className="flex flex-1 flex-col overflow-hidden min-h-0">
+        <section className="flex flex-1 flex-col overflow-hidden min-h-0">
           <Outlet />
         </section>
 

@@ -7,15 +7,10 @@ import {
   ResponsiveModalActions,
 } from '@/components/ui/responsive-modal'
 import { badgeVariants } from '@/components/ui/badge'
+import { PRIORITY_CLASS } from '@/components/ui/occurrence-variants'
 import { cn } from '@/lib/cn'
 import { useResetOnChange } from '@/hooks'
 import type { Priority } from '@/types'
-
-const PRIORITY_CLASS: Record<string, string> = {
-  high:   'aria-[pressed=true]:bg-p1/15 aria-[pressed=true]:border-p1 aria-[pressed=true]:text-p1',
-  medium: 'aria-[pressed=true]:bg-p2/15 aria-[pressed=true]:border-p2 aria-[pressed=true]:text-p2',
-  low:    'aria-[pressed=true]:bg-p3/15 aria-[pressed=true]:border-p3 aria-[pressed=true]:text-p3',
-}
 
 const PRIORITIES: { value: Priority; label: string }[] = [
   { value: 'high',   label: 'High'   },

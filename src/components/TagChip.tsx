@@ -27,6 +27,17 @@ interface TagChipProps {
  * Interactive mode (entry editor): underline on topics (nav link), ✕ on both.
  */
 export default function TagChip({ label, isTopic, interactive, onRemove, onNavigate, className }: TagChipProps) {
+  const removeButton = interactive && onRemove && (
+    <button
+      type="button"
+      className="p-0 flex items-center rounded-sm opacity-60 hover:opacity-100 focus:outline-none"
+      onClick={e => { e.stopPropagation(); onRemove() }}
+      aria-label={`Remove ${label}`}
+    >
+      <X size={9} />
+    </button>
+  )
+
   if (isTopic) {
     return (
       <Badge
@@ -38,36 +49,15 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
         onClick={interactive && onNavigate ? onNavigate : undefined}
       >
         {label}
-        {interactive && onRemove && (
-          <button
-            type="button"
-            className="p-0 flex items-center rounded-sm opacity-60 hover:opacity-100 focus:outline-none"
-            onClick={e => { e.stopPropagation(); onRemove() }}
-            aria-label={`Remove ${label}`}
-          >
-            <X size={9} />
-          </button>
-        )}
+        {removeButton}
       </Badge>
     )
   }
 
   return (
-    <Badge
-      variant="tag"
-      className={cn(className)}
-    >
+    <Badge variant="tag" className={cn(className)}>
       {label}
-      {interactive && onRemove && (
-        <button
-          type="button"
-          className="p-0 flex items-center rounded-sm opacity-60 hover:opacity-100 focus:outline-none"
-          onClick={e => { e.stopPropagation(); onRemove() }}
-          aria-label={`Remove ${label}`}
-        >
-          <X size={9} />
-        </button>
-      )}
+      {removeButton}
     </Badge>
   )
 }
