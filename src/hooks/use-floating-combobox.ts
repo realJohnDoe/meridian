@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { computeFloatingPlacement, type FloatingPlacement } from '@/lib/floatingPlacement'
 import { useVisualViewportHeight, useVisualViewportOffsetTop } from './use-visual-viewport'
 
-export interface FloatingComboboxPlacement {
-  side:      'bottom' | 'top'
-  left:      number
-  maxWidth:  number
-  maxHeight: number
-  top?:      number
-  bottom?:   number
-}
+export type FloatingComboboxPlacement = FloatingPlacement
 
 function findScrollParent(el: HTMLElement): Element | null {
   let node = el.parentElement
@@ -47,33 +41,15 @@ export function useFloatingCombobox(open: boolean, onOpenChange: (open: boolean)
       const rect = el.getBoundingClientRect()
       const visibleTop    = viewportOffsetTop ?? 0
       const visibleBottom = visibleTop + (viewportHeight ?? window.innerHeight)
-      const gap = 6
-      const minList = 160
-      const margin = 8
-      const spaceBelow = visibleBottom - rect.bottom
-      const spaceAbove = rect.top - visibleTop
-      const maxWidth = Math.max(160, window.innerWidth - rect.left - margin)
-
-      if (spaceBelow >= minList || spaceBelow >= spaceAbove) {
-        setPlacement({
-          side: 'bottom',
-          left: rect.left,
-          maxWidth,
-          top: rect.bottom + gap,
-          maxHeight: Math.max(120, spaceBelow - gap - margin),
-        })
-        return
-      }
-
-      setPlacement({
-        side: 'top',
-        left: rect.left,
-        maxWidth,
-        bottom: window.innerHeight - rect.top + gap,
-        maxHeight: Math.max(120, spaceAbove - gap - margin),
+      const placement = computeFloatingPlacement(rect, {
+        visibleTop,
+        visibleBottom,
+        innerWidth:  window.innerWidth,
+        innerHeight: window.innerHeight,
       })
+      setPlacement(placement)
 
-      if (!scrolledRef.current) {
+      if (placement.side === 'top' && !scrolledRef.current) {
         scrolledRef.current = true
         const targetBottom = visibleBottom - 16
         const delta = rect.bottom - targetBottom
