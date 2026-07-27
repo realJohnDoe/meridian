@@ -82,9 +82,9 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
     // rows are absolutely positioned, so their containing block is the spacer's
     // *padding* box — `left: 0; width: 100%` would resolve against the padded
     // width and cancel the inset entirely, leaving the cards flush against the
-    // overlay (and, on mobile, the screen) edge. px-2 matches OccurrenceRow's
-    // mx-2, so results sit on the same 8px card edge as every other list.
-    <div className="px-2 pt-2">
+    // overlay (and, on mobile, the screen) edge. px-3.5 matches OccurrenceRow's
+    // mx-3.5, so results sit on the same screen edge as every other list.
+    <div className="px-3.5 pt-2">
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
         {virtualItems.map(vi => {
           const { entry, listedOn } = results[vi.index]!
