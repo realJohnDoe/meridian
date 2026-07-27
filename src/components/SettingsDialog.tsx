@@ -23,14 +23,14 @@ type Step = 'vault' | 'adding'
 // Meridian also needs its own class (not just relying on :root) because :root
 // alone gets overridden globally whenever another theme is active on <html>.
 const THEMES: { id: string; label: string; className?: string }[] = [
-  { id: 'meridian', label: 'Meridian', className: 'meridian' },
-  { id: 'tokyo-night', label: 'Tokyo Night', className: 'tokyo-night' },
-  { id: 'dracula', label: 'Dracula', className: 'dracula' },
   { id: 'catppuccin-latte', label: 'Catppuccin Latte', className: 'catppuccin-latte' },
   { id: 'catppuccin-mocha', label: 'Catppuccin Mocha', className: 'catppuccin-mocha' },
+  { id: 'dracula', label: 'Dracula', className: 'dracula' },
+  { id: 'meridian', label: 'Meridian', className: 'meridian' },
   { id: 'rose-pine-dawn', label: 'Rosé Pine Dawn', className: 'rose-pine-dawn' },
-  { id: 'solarized-light', label: 'Solarized Light', className: 'solarized-light' },
   { id: 'solarized-dark', label: 'Solarized Dark', className: 'solarized-dark' },
+  { id: 'solarized-light', label: 'Solarized Light', className: 'solarized-light' },
+  { id: 'tokyo-night', label: 'Tokyo Night', className: 'tokyo-night' },
 ]
 
 // The five most identity-defining domain tokens, previewed as swatches.
