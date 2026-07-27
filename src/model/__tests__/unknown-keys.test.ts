@@ -14,6 +14,8 @@ import {
 import { parseToStoreItems } from '@/model/storeItems'
 import { collapseToYaml } from '@/model/collapse'
 import { saveFile } from '@/model/inheritance'
+import { applyEdit } from '@/model/storeOps'
+import { expandRange } from '@/model/expansion'
 import { isSeries, isStandaloneOcc } from '@/types'
 
 const names = fixtureNames()
@@ -165,5 +167,50 @@ describe('values the serialiser used to prune', () => {
     const out = saveFile(collapseToYaml(p.items, p.root), '')
     expect(out).toContain('reviewer: null')
     expect(out).toContain('aliases: []')
+  })
+})
+
+describe('known fields carrying an unexpected type', () => {
+  it('keeps the typed field honest while the raw value round-trips', () => {
+    const p = parseFixture('malformed-known')
+    // The typed fields fall back to their usual absent/empty value...
+    expect(p.items[0]!.metadata.duration).toBeUndefined()
+    expect(p.root.tags).toEqual([])
+    // ...priority is untouched: parseInlineField returns it verbatim regardless
+    // of shape, so it is NOT a malformed-value case and must not be rerouted.
+    expect(p.items[0]!.metadata.priority).toBe(7)
+    expect(p.items[0]!.metadata.extra?.priority).toBeUndefined()
+    // ...but the raw values for duration/tags survive under their own key.
+    expect(p.items[0]!.metadata.extra?.duration).toEqual([1, 2])
+    expect(p.root.extra?.tags).toBe('not-a-list')
+  })
+
+  it('emits the raw value exactly once, in place of the typed fallback', () => {
+    const out = roundTrip('malformed-known')
+    const fm = frontmatterOf(out)
+    expect(fm.duration).toEqual([1, 2])
+    expect(fm.tags).toBe('not-a-list')
+    expect(fm.priority).toBe(7)
+    expect(out.match(/^duration:/gm)).toHaveLength(1)
+    expect(out.match(/^tags:/gm)).toHaveLength(1)
+  })
+
+  it('a retyped value from the editor is not shadowed by the stale raw one', () => {
+    // Regression guard for the storeOps registry-key strip (PR2): once a
+    // malformed value is parked in extra, an edit that writes a well-shaped
+    // value for the same field must not have the stale raw value re-win.
+    const p = parseFixture('malformed-known')
+    const roots = new Map([['malformed-known', p.root]])
+    const occ = expandRange(p.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))[0]!
+    const next = applyEdit({ items: p.items, roots }, occ, 'all', {
+      title: 'Malformed fields', tags: ['work'], items: [], participants: [],
+      tracked: false, done: false, priority: null,
+      scheduled: { date: '2026-04-08', time: '' }, duration: '30m', repeat: null,
+      body: '',
+    })
+    const yaml = serialize(next.items.filter(i => i.fileSlug === 'malformed-known'), next.roots.get('malformed-known'))
+    const fm = frontmatterOf(yaml)
+    expect(fm.duration).toBe('30m')
+    expect(fm.tags).toEqual(['work'])
   })
 })

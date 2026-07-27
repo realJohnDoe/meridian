@@ -255,6 +255,42 @@ function parseInlineField(spec: InlineFieldSpec, raw: unknown): unknown {
 }
 
 /**
+ * Route a known field's raw value into `extra` when its shape didn't match the
+ * registry's expected kind (e.g. `duration: [1, 2]`, `tags: "not-a-list"`),
+ * instead of silently discarding it. The typed field still falls back to its
+ * usual `undefined`/`''`/`[]` — domain types stay honest — but the raw value
+ * survives a save under its own key, and `fileMetaToYaml`/`occMetaToYaml`
+ * prefer it over the typed fallback on emission.
+ *
+ * `boolean` and `priority` are excluded: `parseInlineField` returns them
+ * verbatim regardless of shape, so they already round-trip via the typed
+ * field and rerouting would double-handle the same value.
+ */
+function malformedKnownFields(
+  fields: Record<string, unknown>,
+  specs: readonly InlineFieldSpec[],
+): Record<string, unknown> | undefined {
+  const out: Record<string, unknown> = {}
+  for (const spec of specs) {
+    const raw = fields[spec.key]
+    if (raw === undefined) continue
+    const malformed = spec.kind === 'string' ? scalarToString(raw) === undefined
+      : spec.kind === 'stringArray' ? !Array.isArray(raw)
+      : false
+    if (malformed) out[spec.key] = raw
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
+/** Merge two optional bags into one, or `undefined` when both are empty. */
+function mergeBags(
+  a: Record<string, unknown> | undefined,
+  b: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  return a || b ? { ...a, ...b } : undefined
+}
+
+/**
  * Extract file-level metadata from raw YAML fields.
  *
  * `remainder` is the file's unknown-key bag. The caller supplies it because only
@@ -265,12 +301,13 @@ export function extractFileMetadata(
   fields: Record<string, unknown>,
   remainder?: Record<string, unknown>,
 ): FileMetadata {
+  const extra = mergeBags(remainder, malformedKnownFields(fields, FILE_LEVEL_SPECS))
   return {
     title: scalarToString(fields.title) ?? '',
     tags:  Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
     items: Array.isArray(fields.items) ? (fields.items as string[]) : [],
     body:  scalarToString(fields.body),
-    ...(remainder ? { extra: remainder } : {}),
+    ...(extra ? { extra } : {}),
   }
 }
 
@@ -281,7 +318,7 @@ export function extractOccurrenceMetadata(fields: Record<string, unknown>): Occu
   for (const spec of OCCURRENCE_FIELDS) {
     sink[spec.key] = parseInlineField(spec, fields[spec.key])
   }
-  const extra = unknownKeys(fields)
+  const extra = mergeBags(unknownKeys(fields), malformedKnownFields(fields, OCCURRENCE_FIELDS))
   if (extra) meta.extra = extra
   return meta
 }
