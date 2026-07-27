@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { EditorView } from '@codemirror/view'
 import type { Roots } from '@/types'
 import { OccurrenceCard } from '@/components'
 import { fileEntries } from '@/fileOccurrence'
 import { useStore } from '@/store'
-import { useResetOnChange } from '@/hooks'
+import { useResetOnChange, useVisualViewportHeight, useVisualViewportOffsetTop } from '@/hooks'
 import { cn } from '@/lib/cn'
 
 export interface WlPopupState {
@@ -21,8 +21,19 @@ interface Props {
   onClose: () => void
 }
 
+interface Placement {
+  left:     number
+  maxWidth: number
+  top?:     number
+  bottom?:  number
+}
+
+const MARGIN = 8
+const GAP = 6
+
 export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
   const [focusIdx, setFocusIdx] = useState(0)
+  const popupRef = useRef<HTMLDivElement>(null)
 
   const occBySlug = useStore(s => s.fom)
 
@@ -77,16 +88,63 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose])
 
+  // Keep the popup inside the viewport: open below the cursor by default,
+  // flip above when there isn't room, and clamp horizontally so it never
+  // runs off the right edge. Mirrors useFloatingCombobox's flip/clamp
+  // approach, anchored to a point (the cursor coords) instead of an element.
+  const viewportHeight    = useVisualViewportHeight()
+  const viewportOffsetTop = useVisualViewportOffsetTop()
+  const [placement, setPlacement] = useState<Placement>(() => ({
+    left:     Math.max(MARGIN, popup.coords.left),
+    top:      popup.coords.bottom + GAP,
+    maxWidth: window.innerWidth - MARGIN * 2,
+  }))
+
+  useLayoutEffect(() => {
+    const el = popupRef.current
+    if (!el) return
+    function recompute() {
+      const rect = el!.getBoundingClientRect()
+      const visibleTop    = viewportOffsetTop ?? 0
+      const visibleBottom = visibleTop + (viewportHeight ?? window.innerHeight)
+
+      const left = Math.min(
+        Math.max(MARGIN, popup.coords.left),
+        Math.max(MARGIN, window.innerWidth - MARGIN - rect.width),
+      )
+
+      const spaceBelow = visibleBottom - popup.coords.bottom - GAP
+      const spaceAbove = popup.coords.top - visibleTop - GAP
+      const opensBelow = spaceBelow >= rect.height || spaceBelow >= spaceAbove
+
+      setPlacement({
+        left,
+        maxWidth: window.innerWidth - MARGIN * 2,
+        ...(opensBelow
+          ? { top: popup.coords.bottom + GAP }
+          : { bottom: window.innerHeight - popup.coords.top + GAP }),
+      })
+    }
+    recompute()
+    const ro = new ResizeObserver(recompute)
+    ro.observe(el)
+    window.addEventListener('resize', recompute)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', recompute)
+    }
+  }, [popup.coords.top, popup.coords.bottom, popup.coords.left, viewportHeight, viewportOffsetTop])
+
   const style = {
     position: 'fixed' as const,
-    top:  popup.coords.bottom + 6,
-    left: Math.max(8, popup.coords.left),
     zIndex: 45,
+    ...placement,
   }
 
   return createPortal(
     // onMouseDown preventDefault keeps focus in the editor while clicking a card
     <div
+      ref={popupRef}
       role="listbox"
       aria-label="Wikilink suggestions"
       // Not in the tab order — arrow-key navigation is handled globally via
