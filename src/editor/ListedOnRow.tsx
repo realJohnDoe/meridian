@@ -6,7 +6,7 @@ import { TagChip } from '@/components'
 import { Badge } from '@/components/ui/badge'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 import { FloatingComboboxList } from '@/components/ui/floating-combobox-list'
-import { matchesQuery } from '@/lib/matching'
+import { matchesQuery, scoreQuery } from '@/lib/matching'
 import { useFloatingCombobox } from '@/hooks'
 
 interface Props {
@@ -25,11 +25,13 @@ export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, on
 
   const allFiles = fileEntries(roots)
   const alreadyLinked = new Set(slugs)
-  const filtered = allFiles.filter(e =>
-    e.fileSlug !== fileSlug &&
-    !alreadyLinked.has(e.fileSlug) &&
-    matchesQuery(pickerQuery, e.title)
-  )
+  const filtered = allFiles
+    .filter(e =>
+      e.fileSlug !== fileSlug &&
+      !alreadyLinked.has(e.fileSlug) &&
+      matchesQuery(pickerQuery, e.title)
+    )
+    .sort((a, b) => scoreQuery(pickerQuery, b.title) - scoreQuery(pickerQuery, a.title))
 
   function handleSelect(targetSlug: string) {
     if (!fileSlug) return
