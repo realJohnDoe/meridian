@@ -1,8 +1,7 @@
 import { useReducer, useState } from 'react'
-import { startOfToday } from 'date-fns'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled, Weekday } from '@/types'
-import { fmtISO, parseDateString, weekStartsOn, parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model'
+import { parseDateString, weekStartsOn, parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model'
 import { useStore } from '@/store'
 import { useResetOnChange } from '@/hooks'
 import {
@@ -12,15 +11,13 @@ import {
   ResponsiveModalDescription,
   ResponsiveModalActions,
 } from '@/components/ui/responsive-modal'
-import { Separator } from '@/components/ui/separator'
-import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { badgeVariants } from '@/components/ui/badge'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
 import { NumberUnitInput } from './NumberUnitInput'
+import DatePickerDialog from './DatePickerDialog'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -253,20 +250,12 @@ export default function RepeatDialog({
   const setCompletionNum  = (completionNum: number) => dispatch({ type: 'set', patch: { completionNum } })
   const setCompletionUnit = (completionUnit: string) => dispatch({ type: 'set', patch: { completionUnit } })
 
-  const [endCalOpen,  setEndCalOpen]  = useState(false)
-  const [endCalMonth, setEndCalMonth] = useState<Date>(new Date())
+  const [endCalOpen, setEndCalOpen] = useState(false)
 
   // Re-initialise whenever the dialog opens (so stale state never leaks between opens)
   useResetOnChange([open], () => {
     if (!open) return
     dispatch({ type: 'reset', state: initState(repeat, scheduled, hasSched, hasTrk) })
-  })
-
-  // Synchronize calendar grid month page whenever the end date calendar dialog opens
-  useResetOnChange([endCalOpen, endVal], () => {
-    if (endCalOpen) {
-      setEndCalMonth(parseDateString(endVal) ?? startOfToday())
-    }
   })
 
   const hintText =
@@ -463,80 +452,16 @@ export default function RepeatDialog({
           onSet={handleSet}
         />
 
-        {/* Nested Calendar Dialog for End Date selection — forced to Dialog to avoid
-            stacking a second drawer on top of RepeatDialog's own mobile drawer. */}
-        <ResponsiveModal open={endCalOpen} onOpenChange={(o) => !o && setEndCalOpen(false)} forceDialog>
-          <ResponsiveModalContent className="sm:max-w-xs">
-            <ResponsiveModalTitle>End Date</ResponsiveModalTitle>
-            <ResponsiveModalDescription>
-              Select the end date for this recurrence
-            </ResponsiveModalDescription>
-
-            <div className="flex flex-col gap-4 items-center px-4 pt-4 pb-4">
-              <Calendar
-                mode="single"
-                fixedWeeks
-                weekStartsOn={weekStartsOn(localePrefs)}
-                selected={parseDateString(endVal) ?? undefined}
-                onSelect={(date) => {
-                  if (date) {
-                    setEndVal(fmtISO(date))
-                  }
-                  setEndCalOpen(false)
-                }}
-                month={endCalMonth}
-                onMonthChange={setEndCalMonth}
-                className="w-full [--cell-size:2.25rem] p-0"
-              />
-
-              {/* Shortcut toggles */}
-              <div className="flex gap-2 w-full">
-                {(() => {
-                  const today = startOfToday()
-                  const tomorrow = new Date(today)
-                  tomorrow.setDate(today.getDate() + 1)
-
-                  const isToday = endVal === fmtISO(today)
-                  const isTomorrow = endVal === fmtISO(tomorrow)
-
-                  return (
-                    <>
-                      <Button
-                        variant={isToday ? 'default' : 'outline'}
-                        size="sm"
-                        className="flex-1 text-xs"
-                        onClick={() => {
-                          setEndVal(fmtISO(today))
-                          setEndCalMonth(today)
-                        }}
-                      >
-                        Today
-                      </Button>
-                      <Button
-                        variant={isTomorrow ? 'default' : 'outline'}
-                        size="sm"
-                        className="flex-1 text-xs"
-                        onClick={() => {
-                          setEndVal(fmtISO(tomorrow))
-                          setEndCalMonth(tomorrow)
-                        }}
-                      >
-                        Tomorrow
-                      </Button>
-                    </>
-                  )
-                })()}
-              </div>
-            </div>
-
-            <Separator />
-            <div className="flex justify-end gap-2 px-4 pt-4 pb-4">
-              <Button variant="outline" size="sm" onClick={() => setEndCalOpen(false)}>
-                Close
-              </Button>
-            </div>
-          </ResponsiveModalContent>
-        </ResponsiveModal>
+        {/* Forced to Dialog to avoid stacking a second drawer on top of
+            RepeatDialog's own mobile drawer. */}
+        <DatePickerDialog
+          open={endCalOpen}
+          initialDate={endVal}
+          onConfirm={setEndVal}
+          onRemove={() => setEndVal('')}
+          onClose={() => setEndCalOpen(false)}
+          forceDialog
+        />
       </ResponsiveModalContent>
     </ResponsiveModal>
   )
