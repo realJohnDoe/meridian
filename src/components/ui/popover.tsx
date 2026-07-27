@@ -13,9 +13,9 @@ function PopoverContent({
   sideOffset = 4,
   // Radix defaults this to 0, which lets a collision-shifted popover come to
   // rest exactly on the viewport edge — no breathing room at all on a phone,
-  // where the trigger is usually near an edge to begin with. 8px matches the
-  // card edge (OccurrenceRow's mx-2) the rest of the app sits on.
-  collisionPadding = 8,
+  // where the trigger is usually near an edge to begin with. 14px matches the
+  // screen edge (OccurrenceRow's mx-3.5) the rest of the app sits on.
+  collisionPadding = 14,
   style,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
@@ -39,7 +39,7 @@ function PopoverContent({
       : 0
   const keyboardInset = rawInset > 120 ? rawInset : 0
   const resolvedCollisionPadding =
-    keyboardInset > 0 ? { top: 8, bottom: keyboardInset + 8, left: 8, right: 8 } : collisionPadding
+    keyboardInset > 0 ? { top: 14, bottom: keyboardInset + 14, left: 14, right: 14 } : collisionPadding
 
   return (
     <PopoverPrimitive.Portal>

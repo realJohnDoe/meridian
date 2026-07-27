@@ -144,7 +144,7 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
 
   return (
     <div
-      className="relative overflow-hidden rounded-lg mx-2 mb-1.5"
+      className="relative overflow-hidden rounded-lg mx-3.5 mb-1.5"
       ref={wrapRef}
       data-occ-key={occ.id}
     >
