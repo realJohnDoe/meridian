@@ -98,6 +98,10 @@ function SidebarProvider({
         event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
         (event.metaKey || event.ctrlKey)
       ) {
+        const target = event.target as HTMLElement | null
+        if (target?.closest(".cm-editor, input, textarea, [contenteditable]")) {
+          return
+        }
         event.preventDefault()
         toggleSidebar()
       }
