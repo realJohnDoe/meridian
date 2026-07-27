@@ -11,7 +11,11 @@ function PopoverContent({
   className,
   align = 'start',
   sideOffset = 4,
-  collisionPadding,
+  // Radix defaults this to 0, which lets a collision-shifted popover come to
+  // rest exactly on the viewport edge — no breathing room at all on a phone,
+  // where the trigger is usually near an edge to begin with. 8px matches the
+  // card edge (OccurrenceRow's mx-2) the rest of the app sits on.
+  collisionPadding = 8,
   style,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
