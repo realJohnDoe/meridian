@@ -17,10 +17,23 @@ import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '@/types'
-import { extractFileMetadata, extractOccurrenceMetadata, scalarToString } from '@/types'
+import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, unknownKeys } from '@/types'
 import type { StoreItem, FileMetadata } from '@/types'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
+
+/**
+ * True when this node materialises as a StoreItem of its own (series or
+ * standalone occurrence) rather than acting as a pure container for `instances`.
+ *
+ * Also decides who owns the file root's unknown frontmatter keys: when the root
+ * IS an item, its keys ride on that item's metadata; only a container root hands
+ * them to FileMetadata. Either way exactly one of the two emits them — see
+ * `buildRoot` and src/model/AGENTS.md.
+ */
+function nodeIsItem(n: EffectiveNode): boolean {
+  return hasRepeat(n) || n.fields.date !== undefined || n.instances.length === 0
+}
 
 /**
  * Walk an inheritance-resolved EffectiveNode tree and emit StoreItems.
@@ -82,7 +95,7 @@ function effectiveNodeToStoreItems(
           metadata: extractOccurrenceMetadata({ ...base, ...child.fields }),
         })
       }
-    } else if (n.fields.date !== undefined || n.instances.length === 0) {
+    } else if (nodeIsItem(n)) {
       // A node with a date, OR a leaf with none (e.g. an undated task/note),
       // becomes a standalone occurrence. The empty-date case keeps undated items
       // representable so they round-trip and stay searchable.
@@ -134,7 +147,7 @@ export function parseToStoreItems(path: string, content: string): ParseResult {
   const fileSlug = pathToSlug(path)
   const tree = buildEffectiveTree(rawNode)
   const items = effectiveNodeToStoreItems(tree, fileSlug)
-  return { items, root: buildRoot(rawNode, body) }
+  return { items, root: buildRoot(rawNode, body, nodeIsItem(tree)) }
 }
 
 /**
@@ -148,11 +161,21 @@ export function parseToStoreItems(path: string, content: string): ParseResult {
  *
  * File-level values are read from the root frontmatter, falling back to a
  * top-level `defaults:` block for legacy files where they were nested.
+ *
+ * The unknown-key remainder does NOT use that fallback: it is read from the
+ * root's own keys only, and only when the root is a container. Keys inside the
+ * root `defaults:` block are inherited by the items, which carry them and hoist
+ * them back into `defaults:` on collapse — reading them here too would emit them
+ * a second time at the root.
  */
 function buildRoot(
   rawNode: Record<string, unknown>,
   body: string,
+  rootIsItem: boolean,
 ): FileMetadata {
   const defaults = (rawNode.defaults as Record<string, unknown> | undefined) ?? {}
-  return extractFileMetadata({ ...defaults, ...rawNode, body: body || undefined })
+  return extractFileMetadata(
+    { ...defaults, ...rawNode, body: body || undefined },
+    rootIsItem ? undefined : unknownKeys(rawNode),
+  )
 }

@@ -479,12 +479,17 @@ export function stableOccId(key: string): string {
 // EXPANDRANGE  (main-app entry point — takes StoreItem[])
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Merge file-level root fields (title/tags/items/body) with occurrence metadata. */
+/**
+ * Merge file-level root fields (title/tags/items/body) with occurrence metadata.
+ *
+ * The file's unknown-key bag is dropped rather than merged: an occurrence with
+ * no extras of its own would otherwise inherit the file's, and the edit path
+ * would write them back as occurrence-level keys — emitting them twice.
+ * AppMetadata.extra is always the occurrence bag (see the type's Omit).
+ */
 export function joinFileMeta(fileSlug: string, meta: OccurrenceMetadata, roots: Roots): AppMetadata {
-  return {
-    ...(roots.get(fileSlug) ?? { title: '', tags: [], items: [] }),
-    ...meta,
-  }
+  const { extra: _fileExtra, ...file } = roots.get(fileSlug) ?? { title: '', tags: [], items: [] }
+  return { ...file, ...meta }
 }
 
 function dedupeAndSort(occs: OccurrenceEntry<AppMetadata>[]): OccurrenceEntry<AppMetadata>[] {

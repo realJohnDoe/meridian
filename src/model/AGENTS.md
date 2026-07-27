@@ -134,6 +134,77 @@ live in `expansion.ts` and are only used there.
 - `serializeChildren(children, seriesMeta)` — serialises override instances,
   diffing each against the series metadata.
 
+---
+
+## Unknown-key preservation
+
+A file is regenerated from the store on every save, so anything the model has no
+name for would be deleted on the first edit. To prevent that, each node's
+**remainder** — its keys outside the reserved vocabulary — is carried verbatim in
+an `extra` bag on `OccurrenceMetadata` / `FileMetadata` and re-emitted on collapse.
+
+**Reserved vocabulary** (`src/types.ts`): `STRUCTURAL_KEYS` = `date`, `time`,
+`repeat`, `excluded`, `instances`, `defaults` — plus every `INLINE_FIELDS` key at
+both levels. `unknownKeys(fields)` returns everything else, or `undefined` when
+there is nothing to carry (never `{}`, so files without unknown keys keep
+byte-identical metadata).
+
+**Ownership rule — the root is an item, or the file owns it, never both.** The
+remainder is computed **per node**, not per file; a per-file remainder spread back
+over the collapse output re-emits `date`/`repeat`/`instances` twice (once fresh
+from the model, once stale from the raw node) and gives the file a duplicate,
+wrong schedule. The only node with two candidate homes is the file root, which
+maps to `FileMetadata` *and*, in three of the four collapse shapes, to a
+`StoreItem`. `nodeIsItem()` in `storeItems.ts` decides:
+
+- **root is an item** → `FileMetadata.extra` stays empty; the root's keys (its own
+  and its `defaults:` block's) ride on that item's metadata via
+  `base = { ...childDefaults, ...fields }`.
+- **container root** → `FileMetadata.extra` = the root's **own** keys only, read
+  from `rawNode` without the legacy `defaults:` fallback that `buildRoot` uses for
+  `title`/`tags`/`items`. Keys inside the root `defaults:` reach the items by
+  inheritance and hoist back into `defaults:` on collapse.
+- **every other node** → remainder of `{ ...childDefaults, ...fields }`.
+
+**Exactly-once emission**, by collapse shape:
+
+| Shape | file extra | occurrence extra |
+|---|---|---|
+| flat single series | ∅ | root, via `occMetaToYaml` |
+| flat single standalone | ∅ | root |
+| single series + `instances:` | ∅ | `defaults:`; children diffed away |
+| container | root, via `fileMetaToYaml` | shared → root `defaults:`; divergent → local `defaults:` / instance |
+
+Extras hoist and diff on the same rules as typed fields, but with `deepEqual`
+(`inlineFieldEqual` is `===` for non-array kinds and cannot compare nested YAML
+values). Hoisting is an optimisation — a key that fails to hoist stays on each
+item and still round-trips. `emitExtra` skips `STRUCTURAL_KEYS` defensively so a
+hand-built `StoreItem` can never overwrite the schedule it is emitting.
+
+A registry key present in `extra` (a known field written in a shape the model
+can't represent, e.g. `duration: [1, 2]`) **wins over the typed field** on
+emission, because the typed field holds only the `''`/`[]` fallback. The edit path
+must therefore strip a registry key out of `extra` whenever it writes that field —
+see `storeOps.ts`. The same applies if `INLINE_FIELDS` ever grows: a new entry
+must be stripped from existing `extra` bags on load, or a stale raw value shadows
+the new typed field forever.
+
+**Deliberate non-goals.** These are normalised away and are *not* bugs: comments,
+key order, quoting style, blank lines, CRLF; a key's position when collapse
+relocates it between the root and `defaults:`. Still-open losses, out of scope
+here: metadata on excluded instances (`serializeChildren` emits only
+`date`/`time`/`excluded`), fields on nested container nodes (no `StoreItem` to
+hang a remainder on), markdown-body leading/trailing whitespace (`fileIO.ts`
+trims), and absent-vs-empty for required arrays.
+
+The invariant is enforced by `__tests__/unknown-keys.test.ts` — `collectKeyValues`
+asserts **set containment** of every source key/value pair in the saved output,
+since collapse legitimately relocates keys and changes how often they appear.
+Note that `yaml-roundtrip.test.ts` cannot catch a loss here: it asserts a fixed
+point on Meridian's *own* output, and the loss happens on the first pass.
+
+---
+
 ### `storeOps.ts`
 **Pure edit operations on `StoreData = { items: StoreItem[], roots: Roots }`.**
 
