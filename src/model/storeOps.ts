@@ -38,6 +38,25 @@ export function findSeries(
 // ── Upsert helper ─────────────────────────────────────────────────────────────
 
 /**
+ * Merge two extra bags with the target's own keys winning.
+ *
+ * Used where an override's metadata is rebuilt from an inherited base (the
+ * owning series, or `occFromAppMeta` of the expanded occurrence): the base is
+ * what the *typed* fields inherit, but an override's own unknown keys must not
+ * be clobbered by the series' — a scope-`single` edit must not silently rewrite
+ * an instance's `owner: bob` back to the series' `owner: alice`. This is a
+ * deliberate divergence from how typed fields behave at the same call sites,
+ * where the base IS meant to win until the editor supplies its own value.
+ */
+function targetWinsExtra(
+  base: Record<string, unknown> | undefined,
+  target: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!base && !target) return undefined
+  return { ...base, ...target }
+}
+
+/**
  * Upsert an explicit OccurrenceEntry for `occ.date` within `occ.ownerId`'s children.
  * If an override already exists for that date, it's replaced; otherwise appended.
  */
@@ -52,7 +71,8 @@ export function upsertOverride(
       const io = i
       if (io.ownerId) return i   // skip child overrides of a series
       return io.id === occ.id
-        ? { ...io, ...patch, metadata: { ...io.metadata, ...(patch.metadata ?? {}) } }
+        ? { ...io, ...patch, metadata: { ...io.metadata, ...(patch.metadata ?? {}),
+            extra: targetWinsExtra(patch.metadata?.extra, io.metadata.extra) } }
         : io
     })
   }
@@ -68,7 +88,8 @@ export function upsertOverride(
   if (existing) {
     return items.map(i =>
       i.id === existing.id
-        ? { ...i, ...patch, metadata: { ...i.metadata, ...(patch.metadata ?? {}) } }
+        ? { ...i, ...patch, metadata: { ...i.metadata, ...(patch.metadata ?? {}),
+            extra: targetWinsExtra(patch.metadata?.extra, i.metadata.extra) } }
         : i,
     )
   }
@@ -81,6 +102,10 @@ export function upsertOverride(
   // overrides can never end up sharing an id.
   const series = items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined
   const newId = items.some(i => i.id === occ.id) ? crypto.randomUUID() : occ.id
+  // Existing-item branches above merge extras with the target winning over the
+  // patch (see targetWinsExtra); here there is no existing target yet, so the
+  // new override simply inherits the series' extras, which diffMetadata then
+  // diffs away at collapse time if they agree.
   const newOverride: OccurrenceEntry<OccurrenceMetadata> = {
     date:    occ.date,
     time:    occ.time,
@@ -131,20 +156,36 @@ export interface EditFields extends EditorFields {
   body: string
 }
 
+/** Strip specific keys out of an extra bag, e.g. before writing a field the bag might shadow. */
+function withoutKeys(extra: Record<string, unknown> | undefined, keys: readonly string[]): Record<string, unknown> | undefined {
+  if (!extra) return undefined
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(extra)) {
+    if (!keys.includes(k)) out[k] = v
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 /** Extract OccurrenceMetadata from expanded AppMetadata (strips file-level fields). */
-function occFromAppMeta(m: { done?: boolean; participants?: string[]; priority?: Priority; duration?: string; timezone?: string }): OccurrenceMetadata {
+export function occFromAppMeta(m: { done?: boolean; participants?: string[]; priority?: Priority; duration?: string; timezone?: string; extra?: Record<string, unknown> }): OccurrenceMetadata {
   return {
     done:         m.done,
     participants: m.participants ?? [],
     priority:     m.priority,
     duration:     m.duration,
     timezone:     m.timezone,
+    ...(m.extra ? { extra: m.extra } : {}),
   }
 }
 
 /**
  * Build occurrence-level metadata from editor fields.
  * File-level fields (title/tags/items/body) never appear here — they go to roots.
+ *
+ * Strips the registry keys this function writes out of `base.extra`: a
+ * malformed known field (e.g. `duration: [1, 2]`) is preserved in `extra` under
+ * its own key, and that stale raw value must not shadow a value the editor just
+ * wrote for the same field.
  */
 function occMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMetadata {
   return {
@@ -153,6 +194,7 @@ function occMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMe
     duration:     f.duration || undefined,
     priority:     f.priority ?? undefined,
     done:         f.tracked ? f.done : undefined,
+    extra:        withoutKeys(base.extra, ['participants', 'duration', 'priority', 'done']),
   }
 }
 
@@ -176,14 +218,20 @@ function seriesMeta(base: Partial<OccurrenceMetadata>, f: EditFields): Occurrenc
  * Update (or create) the per-file entry in the roots map with the file-level
  * fields from `fields`. The roots map is the single source of truth for a file's
  * title/tags/items/body, so every edit scope routes file-level changes here.
+ *
+ * Carries the previous entry's `extra` forward — without this, every save
+ * through every scope would silently wipe unknown frontmatter keys at the file
+ * root, since this function otherwise rebuilds FileMetadata from scratch.
  */
 function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots {
   const next = new Map(roots)
+  const prevExtra = roots.get(fileSlug)?.extra
   next.set(fileSlug, {
     title: f.title,
     tags:  f.tags,
     items: f.items ?? [],
     body:  f.body || undefined,
+    extra: withoutKeys(prevExtra, ['title', 'tags', 'items']),
   })
   return next
 }
