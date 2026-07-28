@@ -34,25 +34,32 @@ export default function UndatedListView({ kind, Icon, emptyTitle, emptyHint, onO
   const handleToggleDone  = (occ: Occurrence) => toggleOccDone(occ)
   const handleSwipeDelete = (occ: Occurrence) => beginSwipeDelete(occ)
 
-  return (
-    <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]">
-      <div className="pb-24 lg:max-w-3xl lg:mx-auto">
-        {occs.length === 0 ? (
+  // OccurrenceList brings its own scroll container — its virtualizer has to
+  // read that element from a ref of its own, and a ref owned by this component
+  // would still be null when the virtualizer's layout effect runs on first
+  // mount (React attaches a host element's ref after its descendants' layout
+  // effects). So only the empty state is wrapped here.
+  if (occs.length === 0) {
+    return (
+      <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]">
+        <div className="pb-24 lg:max-w-3xl lg:mx-auto">
           <ListEmptyState
             Icon={Icon}
             title={emptyTitle}
             hint={emptyHint}
             filtered={all.length > 0}
           />
-        ) : (
-          <OccurrenceList
-            occs={occs}
-            onOpen={onOpen}
-            onToggleDone={handleToggleDone}
-            onSwipeDelete={handleSwipeDelete}
-          />
-        )}
+        </div>
       </div>
-    </div>
+    )
+  }
+
+  return (
+    <OccurrenceList
+      occs={occs}
+      onOpen={onOpen}
+      onToggleDone={handleToggleDone}
+      onSwipeDelete={handleSwipeDelete}
+    />
   )
 }
