@@ -93,18 +93,19 @@ function ParticipantAvatars({ participants }: { participants: string[] }) {
 }
 
 
-export default function OccurrenceCard({
-  occ,
-  now,
-  onOpen,
-  onToggleDone,
-  leadingIcon,
-  showTime = 'inline',
-  showDate = false,
-  showTagsParticipants = true,
-  listedOn = EMPTY_LISTED_ON,
-  animate = true,
-}: OccurrenceCardProps) {
+export default function OccurrenceCard(props: OccurrenceCardProps) {
+  const {
+    occ,
+    now,
+    onOpen,
+    onToggleDone,
+    leadingIcon,
+  } = props
+  const showTime = props.showTime ?? 'inline'
+  const showDate = props.showDate ?? false
+  const showTagsParticipants = props.showTagsParticipants ?? true
+  const listedOn = props.listedOn ?? EMPTY_LISTED_ON
+  const animate = props.animate ?? true
   const hour12   = useStore(s => s.localePrefs.hour12)
   const barClass = occState(occ, now)
   const isPast   = barClass === 'event-past'
