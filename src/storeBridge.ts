@@ -10,6 +10,8 @@ export const setData          = (d: { items: StoreItem[]; roots: Roots }) => use
 export const getSnapshot      = (): { items: StoreItem[]; roots: Roots } => ({ items: getItems(), roots: getRoots() })
 export const getVaults        = (): VaultRef[]     => useStore.getState().vaults
 export const getSyncError     = (): string | null  => useStore.getState().syncError
+export const getUnreadableFiles = (): Map<string, { path: string; message: string }> => useStore.getState().unreadableFiles
+export const setUnreadableFiles = (files: Map<string, { path: string; message: string }>) => useStore.getState().setUnreadableFiles(files)
 
 // ── STORE WRITERS (storage layer uses these instead of useStore directly) ──
 export const setVaultLoading     = (loading: boolean)  => useStore.setState({ vaultLoading: loading })

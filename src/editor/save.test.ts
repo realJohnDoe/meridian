@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { applyScope, entryFromOccurrence } from './save'
-import { makeOcc, makeSeries } from '@/test-utils'
+import { applyScope, entryFromOccurrence, saveNode } from './save'
+import { makeOcc, makeSeries, setupStore, installFakePersistence } from '@/test-utils'
+import { useStore } from '@/store'
+import { setUnreadableFiles } from '@/storeBridge'
+import { ENTRY_DEFAULT } from './state'
 
 describe('entryFromOccurrence', () => {
   it('derives a note when the item is untracked and unscheduled', () => {
@@ -73,5 +76,44 @@ describe('applyScope', () => {
     const { scheduled, repeat } = applyScope(occ, 'all', [occ])
     expect(scheduled).toEqual({ date: '2026-06-15', time: '09:00' })
     expect(repeat).toBeNull()
+  })
+})
+
+describe('saveNode — reserved (unreadable) slugs', () => {
+  setupStore()
+  const persistence = installFakePersistence()
+
+  it('places a new entry on a free slug instead of overwriting a file that failed to parse', () => {
+    setUnreadableFiles(new Map([
+      ['buy-groceries', { path: 'buy-groceries.md', message: 'bad indentation, line 3' }],
+    ]))
+
+    const result = saveNode(null, 'all', {
+      ...ENTRY_DEFAULT,
+      title: 'Buy groceries',
+      body: 'totally different note',
+    })
+
+    // Never adopts the reserved slug — the unreadable file's path stays untouched.
+    expect(result).toBe('buy-groceries-2')
+    expect(useStore.getState().roots.has('buy-groceries')).toBe(false)
+    expect(useStore.getState().roots.get('buy-groceries-2')?.body).toContain('totally different note')
+    expect(persistence.writes).toEqual(['buy-groceries-2'])
+  })
+
+  it('still lands a new entry on its natural slug when that slug is not reserved', () => {
+    setUnreadableFiles(new Map([
+      ['some-other-file', { path: 'some-other-file.md', message: 'bad indentation' }],
+    ]))
+
+    const result = saveNode(null, 'all', {
+      ...ENTRY_DEFAULT,
+      title: 'Buy groceries',
+      body: 'note',
+    })
+
+    expect(result).toBe('buy-groceries')
+    expect(useStore.getState().roots.get('buy-groceries')?.title).toBe('Buy groceries')
+    expect(persistence.writes).toEqual(['buy-groceries'])
   })
 })

@@ -269,6 +269,14 @@ it("a count-bounded series yields the same occurrences regardless of the query w
 
 ### #7 — One YAML syntax error removes a file from the vault with no user-visible signal
 
+**Status: fixed.** `parseFiles` now collects a `{path, slug, message}` failure per
+unparseable file instead of only `console.warn`-ing; `reportParseFailures` toasts them
+and the sync popover lists them persistently. Every failure's slug is also recorded in a
+new `unreadableFiles` store field, kept out of `roots` so it can't masquerade as a real
+entry — and `newEntrySlug`'s `slugTaken` check (see #2) now consults it too, so a new
+entry whose title slugifies onto an unreadable file's slug is placed on a free one
+instead of silently overwriting it on next save.
+
 - **Invariant violated:** 7 (recoverability), plus the validation category. Any
   hand-edited file with a YAML syntax error — and hand editing is a headline feature.
 - **Category:** `validation` `recoverability`

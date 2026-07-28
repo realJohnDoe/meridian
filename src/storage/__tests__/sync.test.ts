@@ -25,6 +25,7 @@ const { cacheStore, storeState, notifyFns } = vi.hoisted(() => ({
   storeState: {
     items: [] as unknown[],
     roots: new Map<string, unknown>(),
+    unreadableFiles: new Map<string, { path: string; message: string }>(),
     syncDirtyCount: 0,
     syncError: null as string | null,
     syncOffline: false,
@@ -114,6 +115,8 @@ vi.mock('@/storeBridge', () => ({
     storeState.items = d.items
     storeState.roots = d.roots
   }),
+  getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
+  setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
   setSyncDirtyCount: vi.fn((n: number) => { storeState.syncDirtyCount = n }),
   setSyncError: vi.fn((e: string | null) => { storeState.syncError = e }),
   getSyncError: vi.fn(() => storeState.syncError),
@@ -126,7 +129,7 @@ vi.mock('@/storage/notifications', () => notifyFns)
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend } from '@/storage/sync'
+import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend, parseFiles, reportParseFailures } from '@/storage/sync'
 import { setActiveBackend } from '@/storage/activeBackend'
 import { recordLocalEdit, recordLocalDelete } from '@/storage/cache'
 
@@ -275,6 +278,7 @@ beforeEach(() => {
   cacheStore.clear()
   storeState.items = []
   storeState.roots = new Map()
+  storeState.unreadableFiles = new Map()
   storeState.syncDirtyCount = 0
   storeState.syncError = null
   storeState.syncOffline = false
@@ -1012,5 +1016,51 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     await syncToBackend()
 
     expect(cacheStore.has(vp('fake-vault', 'note.md'))).toBe(false)
+  })
+})
+
+// ── parseFiles / reportParseFailures ────────────────────────────────────
+
+describe('parseFiles', () => {
+  it('loads every well-formed file and collects a named failure per malformed one, without blocking the rest', () => {
+    const files = [
+      { path: 'good.md', content: '---\ntitle: Good\ndate: "2026-04-08"\n---\n\nfine' },
+      { path: 'bad.md', content: '---\ntitle: Bad: with a colon\ndate: "2026-04-08"\n---\n\noops' },
+      { path: 'tabs.md', content: '---\ntitle: Tabs\ndefaults:\n\tdone: false\n---' },
+      { path: 'dup.md', content: '---\ntitle: A\ntitle: B\n---' },
+      { path: 'also-good.md', content: '---\ntitle: Also good\n---' },
+    ]
+
+    const { roots, failures } = parseFiles(files)
+
+    expect([...roots.keys()].sort()).toEqual(['also-good', 'good'])
+    expect(failures.map(f => f.slug).sort()).toEqual(['bad', 'dup', 'tabs'])
+    // Every failure carries enough to act on, and to reserve its slug.
+    for (const f of failures) {
+      expect(f.path).toMatch(/\.md$/)
+      expect(f.message.length).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('reportParseFailures', () => {
+  it('warns with the message for a single failure', () => {
+    reportParseFailures([{ path: 'bad.md', slug: 'bad', message: 'bad indentation' }])
+    expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('bad.md'))
+    expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('bad indentation'))
+  })
+
+  it('lists every path when several files fail', () => {
+    reportParseFailures([
+      { path: 'bad.md', slug: 'bad', message: 'x' },
+      { path: 'tabs.md', slug: 'tabs', message: 'y' },
+    ])
+    expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('bad.md'))
+    expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('tabs.md'))
+  })
+
+  it('stays silent when there is nothing to report', () => {
+    reportParseFailures([])
+    expect(notifyFns.warn).not.toHaveBeenCalled()
   })
 })

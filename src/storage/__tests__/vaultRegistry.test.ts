@@ -54,6 +54,7 @@ const {
     storeState: {
       items: [] as unknown[],
       roots: new Map<string, unknown>(),
+      unreadableFiles: new Map<string, { path: string; message: string }>(),
       vaults: [] as VaultRef[],
       activeVaultId: null as string | null,
       pendingDirReconnect: null as string | null,
@@ -71,7 +72,9 @@ const {
       parseFiles: vi.fn((files: Array<{ path: string; content: string }>) => ({
         items: files.map(f => ({ fileSlug: f.path })),
         roots: new Map(files.map(f => [f.path, { body: f.content }])),
+        failures: [] as Array<{ path: string; slug: string; message: string }>,
       })),
+      reportParseFailures: vi.fn(),
       updateSyncUI: vi.fn(),
     },
   }
@@ -171,6 +174,8 @@ vi.mock('@/storeBridge', () => ({
     storeState.items = d.items
     storeState.roots = d.roots
   }),
+  getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
+  setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
   getVaults: vi.fn(() => storeState.vaults),
   setVaultList: vi.fn((refs: VaultRef[]) => { storeState.vaults = refs }),
   setActiveVaultId: vi.fn((id: string | null) => { storeState.activeVaultId = id }),
@@ -197,6 +202,7 @@ beforeEach(() => {
   metaStore.clear()
   storeState.items = []
   storeState.roots = new Map()
+  storeState.unreadableFiles = new Map()
   storeState.vaults = []
   storeState.activeVaultId = null
   storeState.pendingDirReconnect = null
@@ -210,6 +216,7 @@ beforeEach(() => {
   notifyFns.warn.mockClear()
   syncFns.syncOnActivate.mockClear()
   syncFns.parseFiles.mockClear()
+  syncFns.reportParseFailures.mockClear()
   syncFns.updateSyncUI.mockClear()
   backendConfig.localPermission = 'granted'
   backendConfig.githubPermission = 'granted'

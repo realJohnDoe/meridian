@@ -2,7 +2,7 @@ import { startOfToday } from 'date-fns'
 import { fmtISO, applyEdit, newEntrySlug, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing, fileSlugItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
-import { getSnapshot, getItems, getRoots, getBacklinks } from '@/storeBridge'
+import { getSnapshot, getItems, getRoots, getBacklinks, getUnreadableFiles } from '@/storeBridge'
 import { commitNext, commitDelete } from '@/storeCommit'
 import type { EntryState, ItemType } from './state'
 
@@ -108,13 +108,18 @@ export type SaveResult = string | null
  *
  * Returns the slug actually written rather than letting callers recompute
  * `titleToSlug(title)`: a new entry whose title slugifies onto a slug some other
- * file already owns is placed on a free one, so the two no longer agree.
+ * file already owns — or one that belongs to a file that failed to parse and so
+ * has no root of its own — is placed on a free one, so the two no longer agree.
  */
 export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields, draftId?: string): SaveResult {
   const { title } = fields
   if (!title) return null
 
-  const snapshot = getSnapshot()
+  // unreadableSlugs makes newEntrySlug/applyNew treat a file that failed to
+  // parse as occupied even though it has no root: without this, a new entry
+  // whose title slugifies onto that slug would look free and silently
+  // overwrite the file on write — see reportParseFailures in storage/sync.ts.
+  const snapshot = { ...getSnapshot(), unreadableSlugs: new Set(getUnreadableFiles().keys()) }
   const nextData = applyEdit(snapshot, item, editScope, {
     title,
     tags:         fields.tags         ?? [],
