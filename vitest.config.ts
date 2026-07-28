@@ -23,14 +23,20 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         ...coverageConfigDefaults.exclude,
-        // shadcn registry components and route registration are boilerplate,
-        // not application logic worth a coverage floor. components/ui/ is kept
-        // as a faithful mirror of the shadcn registry precisely so this
-        // exclusion stays true — our own shared primitives live in
-        // components/primitives/ (and feature-owned ones in their feature dir),
-        // where they ARE counted. Don't hand-write first-party files in here.
+        // shadcn registry components are boilerplate, not application logic
+        // worth a coverage floor. components/ui/ is kept as a faithful mirror
+        // of the shadcn registry precisely so this exclusion stays true — our
+        // own shared primitives live in components/primitives/ (and
+        // feature-owned ones in their feature dir), where they ARE counted.
+        // Don't hand-write first-party files in here.
         'src/components/ui/**',
-        'src/routes/**',
+        // Route registration: the `_app*` files wire a component to a path and
+        // little else. Deliberately NOT all of src/routes/ — `-` prefixed
+        // files aren't routes at all (TanStack ignores them; see
+        // routeFileIgnorePrefix), they're ordinary modules that live here
+        // because their callers do, and __root.tsx / auth.callback.tsx carry
+        // real logic. All of those are counted and tested.
+        'src/routes/_app*.tsx',
         'src/routeTree.gen.ts',
         'src/main.tsx',
       ],
@@ -43,10 +49,10 @@ export default defineConfig({
         // entirely. This catches that: adding a sizeable unexercised module
         // drags the project total below the floor and fails CI. Kept a few
         // points under the measured total so ordinary UI work doesn't trip it.
-        statements: 55,
-        branches: 52,
-        functions: 46,
-        lines: 57,
+        statements: 57,
+        branches: 54,
+        functions: 48,
+        lines: 59,
         'src/model/collapse.ts': { statements: 90, branches: 80, functions: 95, lines: 90 },
         'src/editor/cm/taskLines.ts': { statements: 90, branches: 80, functions: 95, lines: 95 },
         'src/editor/cm/markdownFormatting.ts': { statements: 88, branches: 78, functions: 70, lines: 87 },
@@ -65,6 +71,15 @@ export default defineConfig({
         'src/editor/dialogs/TimeWheels.tsx': { statements: 88, branches: 78, functions: 95, lines: 95 },
         'src/editor/FloatingComboboxList.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
         'src/calendar/ContinuationChevron.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        // src/routes/ files that are not route registration. auth.callback.tsx
+        // is the OAuth phase machine — a regression there is a broken sign-in
+        // with no other way in — so it gets the tightest floor here.
+        'src/routes/auth.callback.tsx': { statements: 92, branches: 88, functions: 95, lines: 95 },
+        'src/routes/__root.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        'src/routes/-entryRoute.ts': { statements: 92, branches: 85, functions: 95, lines: 95 },
+        'src/routes/-entryTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        'src/routes/-pagedTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        'src/routes/-topbarEdgePadding.ts': { statements: 92, branches: 90, functions: 95, lines: 92 },
       },
     },
   },
