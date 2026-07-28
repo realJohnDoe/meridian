@@ -190,6 +190,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                   beginExit(row)
                   onToggleDone?.(occ)
                 }}
+                animate={false}
               />
             ) : (
               <TagChip label={entry.ref} isTopic className="opacity-50 line-through" />
