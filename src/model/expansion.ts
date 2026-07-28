@@ -200,6 +200,31 @@ function generateScheduledDates(
     return n
   }
 
+  // Number of `nextBase` steps from `anchor` to the period boundary at or
+  // immediately before `target`, computed analytically so a query window far
+  // from the anchor doesn't require iterating every intermediate period.
+  function periodsBetween(target: Date): number {
+    if (interval <= 0) return 0
+    if (freq === 'daily')   return Math.floor(differenceInCalendarDays(target, anchor) / interval)
+    if (freq === 'weekly')  return Math.floor(differenceInCalendarDays(target, anchor) / (7 * interval))
+    if (freq === 'monthly') {
+      const months = (target.getFullYear() - anchor.getFullYear()) * 12 + (target.getMonth() - anchor.getMonth())
+      return Math.floor(months / interval)
+    }
+    if (freq === 'yearly')   return Math.floor((target.getFullYear() - anchor.getFullYear()) / interval)
+    return 0
+  }
+
+  // Applying `nextBase` `steps` times in one shot — same arithmetic, no loop.
+  function advanceCursor(d: Date, steps: number): Date {
+    const n = new Date(d)
+    if (freq === 'daily')        n.setDate(n.getDate() + interval * steps)
+    else if (freq === 'weekly')  n.setDate(n.getDate() + 7 * interval * steps)
+    else if (freq === 'monthly') { n.setDate(1); n.setMonth(n.getMonth() + interval * steps) }
+    else if (freq === 'yearly')  { n.setDate(1); n.setFullYear(n.getFullYear() + interval * steps) }
+    return n
+  }
+
   function matchesInPeriod(periodStart: Date): Date[] {
     const dates: Date[] = []
     if (freq === 'daily') {
@@ -258,6 +283,14 @@ function generateScheduledDates(
   }
 
   let cursor = new Date(anchor)
+  // `end: { type: 'count' }` must keep enumerating from the anchor so the
+  // occurrence count stays independent of the query window — only skip
+  // ahead for open-ended/until-bounded series, where every period from the
+  // anchor to `from` is equivalent to "not a match" and can be bypassed.
+  if (maxCount === Infinity && from > cursor) {
+    const steps = periodsBetween(from)
+    if (steps > 0) cursor = advanceCursor(cursor, steps)
+  }
   const LIMIT = 500; let iter = 0
   while (cursor <= maxDate && count < maxCount && iter++ < LIMIT) {
     const dates = matchesInPeriod(cursor).filter(d => d > anchor && d >= from && d <= maxDate && d <= to)

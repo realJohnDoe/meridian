@@ -269,6 +269,15 @@ it("a count-bounded series yields the same occurrences regardless of the query w
 
 ### #8 — The 500-iteration cap hides daily series past roughly 16 months from their anchor
 
+**Status: fixed.** `generateScheduledDates` now computes how many `nextBase` periods lie
+between the anchor and `from` analytically (`periodsBetween`) and jumps the cursor there
+in one step (`advanceCursor`) before the bounded loop starts, instead of walking every
+intermediate period. `LIMIT` still guards the loop itself, so a malformed `interval: 0`
+can't spin forever. The skip only applies when `end` is open-ended or `until`-bounded
+(`maxCount === Infinity`) — an `end: { type: 'count' }` series still enumerates from the
+anchor untouched, since its count must stay independent of the query window (#5) and this
+fix doesn't change that (still-open) behavior.
+
 - **Invariant violated:** 8 (temporal correctness). Any high-frequency series (daily, or
   short-interval) once the queried window is more than `LIMIT` periods from the anchor.
 - **Category:** `temporal`
