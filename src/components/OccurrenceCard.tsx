@@ -93,18 +93,27 @@ function ParticipantAvatars({ participants }: { participants: string[] }) {
 }
 
 
-export default function OccurrenceCard({
-  occ,
-  now,
-  onOpen,
-  onToggleDone,
-  leadingIcon,
-  showTime = 'inline',
-  showDate = false,
-  showTagsParticipants = true,
-  listedOn = EMPTY_LISTED_ON,
-  animate = true,
-}: OccurrenceCardProps) {
+export default function OccurrenceCard(props: OccurrenceCardProps) {
+  // Defaults are pulled out into `??` assignments below rather than written
+  // as `showTime = 'inline'` etc. in the destructured params: that shape
+  // (an AssignmentPattern inside a destructured parameter) makes
+  // babel-plugin-react-compiler bail out of optimizing this whole component,
+  // silently — no build or lint error, just no memoization. Verified against
+  // the real vite pipeline and the `pnpm run build` bundle; don't undo this
+  // without re-checking dist/assets/*.js for a `_c(N)` cache-init call at
+  // this function's head. See memory: react-compiler-audit-method.
+  const {
+    occ,
+    now,
+    onOpen,
+    onToggleDone,
+    leadingIcon,
+  } = props
+  const showTime = props.showTime ?? 'inline'
+  const showDate = props.showDate ?? false
+  const showTagsParticipants = props.showTagsParticipants ?? true
+  const listedOn = props.listedOn ?? EMPTY_LISTED_ON
+  const animate = props.animate ?? true
   const hour12   = useStore(s => s.localePrefs.hour12)
   const barClass = occState(occ, now)
   const isPast   = barClass === 'event-past'
