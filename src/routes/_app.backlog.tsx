@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useOpenEntry } from '@/hooks'
-import { PageSkeleton } from '@/components/ui/page-skeleton'
+import { PageSkeleton } from '@/components/primitives/page-skeleton'
 
 const BacklogView = lazy(() => import('@/calendar').then(m => ({ default: m.BacklogView })))
 

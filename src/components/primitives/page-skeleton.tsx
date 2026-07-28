@@ -1,4 +1,4 @@
-import { Skeleton } from './skeleton'
+import { Skeleton } from '../ui/skeleton'
 
 /** Generic loading placeholder for lazy-loaded list/calendar routes (day, month, backlog, notes). */
 export function PageSkeleton() {

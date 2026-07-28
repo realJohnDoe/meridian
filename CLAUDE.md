@@ -74,7 +74,7 @@ CI does exactly this before linting (`.github/workflows/build.yml`), which is wh
 | `storage/` | Backend abstraction (local FS, GitHub, example), IndexedDB cache, sync, vault registry, toast notifications. |
 | `editor/` | CodeMirror editor, entry UI, dialogs, save logic. |
 | `calendar/` | Day/month/agenda views and occurrence rendering. |
-| `components/` | Shared React components and shadcn/ui primitives (`components/ui/`). |
+| `components/` | Shared React components. Two primitive layers below it: `components/ui/` is a faithful mirror of the **shadcn registry** — only files the shadcn CLI wrote go there, never hand-written ones — and `components/primitives/` holds **our own** shared primitives (`IconButton`, `ResponsiveModal`, `SurfaceButton`, …). This split is load-bearing: `vitest.config.ts` excludes `components/ui/**` from coverage as boilerplate, and `shadcn diff` compares that directory against upstream. A first-party primitive used by only one feature dir belongs in that feature dir, not here — see the placement rule above. |
 | `hooks/` | Shared React hooks. |
 | `routes/` | TanStack Router route definitions. |
 
@@ -97,7 +97,7 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 
 1. **`model/` is the domain core — no outward dependencies.** It imports only from `types.ts`, `fileIO.ts`, and `wikilinks.ts` (all cross-cutting root residents). It must never import from `store`, `storage`, `editor`, `calendar`, or any other feature.
 
-2. **Cross-feature imports go through the barrel.** Code in feature dir A that imports from feature dir B must use `@/B` (the `index.ts` barrel), never `@/B/internal-file`. Two permanent exceptions (always allowed as deep imports): `@/components/ui/**` (shadcn primitives) and `@/lib/**` (utility leaf with no barrel).
+2. **Cross-feature imports go through the barrel.** Code in feature dir A that imports from feature dir B must use `@/B` (the `index.ts` barrel), never `@/B/internal-file`. Three permanent exceptions (always allowed as deep imports): `@/components/ui/**` (shadcn registry), `@/components/primitives/**` (our own shared primitives) and `@/lib/**` (utility leaf with no barrel).
 
 3. **Core persistence goes through the port.** `storeCommit.ts` and `occurrenceActions.ts` call the `persistencePort` abstraction rather than `@/storage` functions directly. The storage adapter registers the implementation at startup.
 

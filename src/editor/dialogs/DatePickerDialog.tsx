@@ -8,7 +8,7 @@ import {
   ResponsiveModalContent,
   ResponsiveModalTitle,
   ResponsiveModalActions,
-} from '@/components/ui/responsive-modal'
+} from '@/components/primitives/responsive-modal'
 import { Calendar } from '@/components/ui/calendar'
 import { Button } from '@/components/ui/button'
 

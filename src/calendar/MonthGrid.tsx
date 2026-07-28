@@ -14,9 +14,9 @@ const EMPTY: Occurrence[] = []
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday } from '@/hooks'
 import { useCalendarFilter } from './useCalendarFilter'
-import { SurfaceButton } from '@/components/ui/surface-button'
+import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
-import { dvBlockVariants, occPillRounded } from '@/components/ui/occurrence-variants'
+import { dvBlockVariants, occPillRounded } from '@/components/primitives/occurrence-variants'
 import { ContinuationChevron, CONTINUES_PADDING } from './ContinuationChevron'
 
 // Cell-chrome class strings, shared between CalCell and the invisible chrome

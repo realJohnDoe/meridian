@@ -11,9 +11,9 @@ import { occState } from '@/occView'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
 import { DimmableCard } from './DimmableCard'
-import { SurfaceButton } from './ui/surface-button'
+import { SurfaceButton } from './primitives/surface-button'
 import { cn } from '@/lib/cn'
-import { occBarVariants } from './ui/occurrence-variants'
+import { occBarVariants } from './primitives/occurrence-variants'
 import TagChip from './TagChip'
 
 const EMPTY_LISTED_ON: string[] = []

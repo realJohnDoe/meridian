@@ -1,7 +1,7 @@
 import { CircleFadingArrowUp } from 'lucide-react'
 import { Checkbox } from './ui/checkbox'
 import { DimmableCard } from './DimmableCard'
-import { IconButton } from './ui/icon-button'
+import { IconButton } from './primitives/icon-button'
 import { Input } from './ui/input'
 import { cn } from '@/lib/cn'
 

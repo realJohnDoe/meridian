@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO, fmtMonth, parseMonth } from '@/model'
-import { PageSkeleton } from '@/components/ui/page-skeleton'
+import { PageSkeleton } from '@/components/primitives/page-skeleton'
 
 const MonthView = lazy(() => import('@/calendar').then(m => ({ default: m.MonthView })))
 

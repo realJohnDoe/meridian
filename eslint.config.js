@@ -158,14 +158,16 @@ export default [
       //    the target lists every OTHER feature dir as the restriction source.
       //
       // Global exceptions (always allowed as deep imports):
-      //   @/components/ui/**              — shadcn primitives, always consumed as deep paths.
+      //   @/components/ui/**              — shadcn registry components, always consumed as deep paths.
+      //   @/components/primitives/**      — our own shared primitives (same deep-path ergonomics;
+      //     kept out of ui/ so that directory stays a faithful mirror of the shadcn registry).
       //   @/lib/**                        — utility leaf, no barrel (lib/ has no index.ts).
       //   react-dom/client                — node_modules deep import needed at the entry point.
       //   @testing-library/jest-dom/vitest — node_modules deep import; the subpath is how
       //     jest-dom registers its matchers on vitest's `expect` (see test-utils/setup.ts).
       'import-x/no-internal-modules': [
         'error',
-        { allow: ['@/components/ui/**', '@/lib/**', 'react-dom/client', '@testing-library/jest-dom/vitest'] },
+        { allow: ['@/components/ui/**', '@/components/primitives/**', '@/lib/**', 'react-dom/client', '@testing-library/jest-dom/vitest'] },
       ],
 
       // For each barrel module, forbid deep imports into it from any OTHER
@@ -177,9 +179,10 @@ export default [
             ...BARREL_DIRS.map(protected_ => ({
               target: BARREL_DIRS.filter(d => d !== protected_).map(d => `./src/${d}`),
               from: `./src/${protected_}`,
-              // components/ui/ is the shadcn primitive layer — always allowed as deep imports.
+              // components/ui/ (shadcn registry) and components/primitives/ (ours) are both
+              // primitive layers — always allowed as deep imports.
               except: protected_ === 'components'
-                ? ['./index.ts', './index.tsx', './ui']
+                ? ['./index.ts', './index.tsx', './ui', './primitives']
                 : ['./index.ts', './index.tsx'],
               message: `Import from @/${protected_} barrel (index.ts), not from its internals.`,
             })),

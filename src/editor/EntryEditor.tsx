@@ -5,7 +5,7 @@ import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileTe
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import { isSeries } from '@/types'
 import { badgeVariants } from '@/components/ui/badge'
-import { PRIORITY_CLASS } from '@/components/ui/occurrence-variants'
+import { PRIORITY_CLASS } from '@/components/primitives/occurrence-variants'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { segmentedGroupVariants, segmentedItemVariants } from './segmentedGroup'

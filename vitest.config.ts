@@ -23,8 +23,12 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         ...coverageConfigDefaults.exclude,
-        // shadcn primitives and route registration are boilerplate, not
-        // application logic worth a coverage floor.
+        // shadcn registry components and route registration are boilerplate,
+        // not application logic worth a coverage floor. components/ui/ is kept
+        // as a faithful mirror of the shadcn registry precisely so this
+        // exclusion stays true — our own shared primitives live in
+        // components/primitives/ (and feature-owned ones in their feature dir),
+        // where they ARE counted. Don't hand-write first-party files in here.
         'src/components/ui/**',
         'src/routes/**',
         'src/routeTree.gen.ts',
