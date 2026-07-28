@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate } from '@tanstack/react-router'
 import type { EditorView } from '@codemirror/view'
 import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
-import { isSeries } from '@/types'
+import type { SeriesContext } from '@/model'
 import { badgeVariants } from '@/components/ui/badge'
 import { PRIORITY_CLASS } from '@/components/primitives/occurrence-variants'
 import { Button } from '@/components/ui/button'
@@ -19,7 +18,6 @@ import EntryBody from './EntryBody'
 import { cn } from '@/lib/cn'
 import type { EntryState, ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
-import { saveNode } from './save'
 import { formatDurationChip, fmtDuration, fmtShort } from '@/format'
 import { fmtT, parseDateString } from '@/model'
 import { useStore } from '@/store'
@@ -53,6 +51,8 @@ const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
 
 interface Props {
   entry: EntryState
+  /** How this occurrence sits in its series — derived in model/, see seriesContext. */
+  series: SeriesContext
   onChange: (updater: (prev: EntryState) => EntryState) => void
   onSave: (body: string) => void
   onAutoSave?: (body: string) => void
@@ -63,6 +63,7 @@ interface Props {
   onScopeChange?: (scope: EditScope) => void
   onTypeChange?: (t: ItemType) => void
   onDoneToggle?: () => void
+  onPromoteTask: (title: string, done: boolean) => string | null
   items: StoreItem[]
   roots: Roots
   onOpenWikilink?: (ref: string) => void
@@ -76,10 +77,8 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = el.scrollHeight + 'px'
 }
 
-export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMetaSave, pendingLinks, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, items, roots, onOpenWikilink, onToggleDoneBacklink, titleError, focusTitleTick }: Props) {
-  const navigate           = useNavigate()
+export default function EntryEditor({ entry, series, onChange, onSave, onAutoSave, onMetaSave, pendingLinks, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, onPromoteTask, items, roots, onOpenWikilink, onToggleDoneBacklink, titleError, focusTitleTick }: Props) {
   const hour12             = useStore(s => s.localePrefs.hour12)
-  const defaultParticipants = useStore(s => s.defaultParticipants)
   const backlinks          = useStore(s => s.backlinks)
   const titleRef  = useRef<HTMLTextAreaElement>(null)
   const viewRef   = useRef<EditorView | null>(null)
@@ -91,22 +90,6 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   useEffect(() => {
     if (focusTitleTick) titleRef.current?.focus()
   }, [focusTitleTick])
-
-  function handlePromoteTask(title: string, done: boolean): string | null {
-    // No draft id: each promotion is a genuinely new entry, so a title that
-    // slugifies onto an existing file's slug gets its own free slug rather than
-    // overwriting that file. saveNode reports which slug that was — the checklist
-    // line is rewritten to a wikilink pointing at it, so it must be the real one.
-    const slug = saveNode(null, 'all', {
-      item: null, title, tracked: true, itemType: 'task', done,
-      body: '', tags: [], items: [], participants: [...defaultParticipants],
-      priority: null, scheduled: null, duration: '', repeat: null,
-      editScope: 'all',
-    })
-    if (slug === null) return null
-    void navigate({ to: '/entry/$slug', params: { slug } })
-    return slug
-  }
 
   function handleScopeChange(scope: EditScope) {
     onChange(prev => ({ ...prev, editScope: scope }))
@@ -121,12 +104,8 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
 
   const linkedSlugs = [...(backlinks.get(effectiveSlug ?? '') ?? []), ...pendingSlugs]
 
-  const parentSeries = item?.ownerId ? items.find(i => isSeries(i) && i.id === item.ownerId) : null
-  const isRecur = !!(item && item.ownerId)
-  const seriesRepeat = (parentSeries && isSeries(parentSeries)) ? parentSeries.repeat : null
-  const isScheduled = !!(item && seriesRepeat?.type === 'schedule')
-  const isAfterCompletion = !!(item && seriesRepeat?.type === 'after_completion')
-  const hasSched = !!(item && item.date)
+  const { isRecurring, isScheduled, isAfterCompletion } = series
+  const hasSched = !!item?.date
 
   const hasDate = !!scheduled
   const hasTime = !!(scheduled?.time)
@@ -134,10 +113,10 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   const isNote = itemType === 'note'
 
   const showDateChip = !isNote
-  const showRepeat = !isNote && (hasDate || tracked) && (!isSingleScope || !isRecur)
+  const showRepeat = !isNote && (hasDate || tracked) && (!isSingleScope || !isRecurring)
   const bodyKey = item ? `${item.fileSlug || 'item'}-${item.date || ''}-${editScope}` : 'new'
 
-  const showScopeRow = isRecur || hasSched
+  const showScopeRow = isRecurring || hasSched
 
   return (
     <>
@@ -281,7 +260,7 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
           }}
           roots={roots}
           currentSlug={effectiveSlug ?? null}
-          onPromote={handlePromoteTask}
+          onPromote={onPromoteTask}
           onOpenWikilink={onOpenWikilink}
           onToggleDone={onToggleDoneBacklink}
         />

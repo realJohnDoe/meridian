@@ -8,7 +8,7 @@ import {
   expandRange, treeHasOccurrences,
   collapseToYaml,
   parseToStoreItems,
-  applyEdit, excludeOccurrence, deleteFollowing, findSeries, upsertOverride, type EditFields,
+  applyEdit, excludeOccurrence, deleteFollowing, findSeries, seriesContext, upsertOverride, type EditFields,
   dayBefore,
   saveFile,
 } from '@/model'
@@ -729,11 +729,15 @@ export default function NodeInheritanceDebugger() {
             <>
               <EntryEditor
                 entry={debugEntry}
+                series={seriesContext(items, debugEntry.item)}
                 onChange={(updater) => setDebugEntry(prev => prev ? updater(prev) : prev)}
                 onSave={handleDebugSave}
                 onOpenDlg={openDialog}
                 onOpenRepeatDlg={openRepeatDialog}
                 onScopeChange={handleDebugScopeChange}
+                // Promoting a checklist line creates a real vault file and navigates to
+                // it — out of scope for the debugger, which edits a scratch snapshot.
+                onPromoteTask={() => null}
                 pendingLinks={debugPendingLinks}
                 items={items}
                 roots={debugRoots}

@@ -1,7 +1,8 @@
 import { useReducer, useState } from 'react'
 import { Info } from 'lucide-react'
-import type { Repeat, Scheduled, Weekday } from '@/types'
-import { parseDateString, weekStartsOn, parseInterval, serialiseInterval, monthlyWeekdaySpec } from '@/model'
+import type { Repeat, Scheduled } from '@/types'
+import type { RepeatForm, RepeatFormContext, RepeatFormFreq, ScheduleFreq, MonthlyMode, RepeatEndType } from '@/model'
+import { parseDateString, weekStartsOn, monthlyWeekdaySpec, repeatToForm, formToRepeat } from '@/model'
 import { useStore } from '@/store'
 import { useResetOnChange } from '@/hooks'
 import {
@@ -21,27 +22,15 @@ import DatePickerDialog from './DatePickerDialog'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Freq = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'after_completion'
-type ScheduleFreq = Exclude<Freq, 'after_completion'>
-type EndType = 'never' | 'until' | 'count'
-type MonthlyMode = 'same-day' | 'weekday-pattern'
-
-interface DialogState {
-  freq: Freq
-  wdays: boolean[]         // Mon–Sun, index 0–6
-  monthly: MonthlyMode
-  endType: EndType
-  endVal: string
-  intervalNum: number
-  completionNum: number
-  completionUnit: string
-}
+// The editable shape and its Repeat ⇄ form conversions live in `model/repeat.ts`
+// — this dialog only renders them. Note the conversions are deliberately lossy;
+// the contract comment there spells out which values don't survive a round trip.
 
 type DialogAction =
-  | { type: 'reset'; state: DialogState }
-  | { type: 'set'; patch: Partial<DialogState> }
+  | { type: 'reset'; state: RepeatForm }
+  | { type: 'set'; patch: Partial<RepeatForm> }
 
-function dialogReducer(state: DialogState, action: DialogAction): DialogState {
+function dialogReducer(state: RepeatForm, action: DialogAction): RepeatForm {
   switch (action.type) {
     case 'reset': return action.state
     case 'set': return { ...state, ...action.patch }
@@ -61,8 +50,8 @@ interface Props {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+// Display labels for `RepeatForm.wdays` — same Monday-first index order.
 const WDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
-const WDAY_CODES: Weekday[] = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su']
 
 const FREQ_UNITS: readonly ScheduleFreq[] = ['daily', 'weekly', 'monthly', 'yearly']
 const FREQ_UNIT_LABELS: Record<ScheduleFreq, string> = {
@@ -80,135 +69,6 @@ function getOrdinalSuffix(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]!);
-}
-
-// ── State helpers ─────────────────────────────────────────────────────────────
-
-/** Default weekday selection: the day matching `scheduledDate`, or Monday. */
-function defaultWdays(scheduledDate?: string | null): boolean[] {
-  const wdays = [false, false, false, false, false, false, false]
-  const jsDay = parseDateString(scheduledDate ?? '') ?.getDay() ?? 1
-  const monFirst = (jsDay + 6) % 7
-  wdays[monFirst] = true
-  return wdays
-}
-
-/** Derive initial dialog state from an existing Repeat value (or sensible defaults). */
-function initState(
-  repeat: Repeat | null,
-  scheduled: Scheduled | null,
-  hasSched: boolean,
-  hasTrk: boolean,
-): DialogState {
-  const defaultFreq: Freq = hasTrk && !hasSched ? 'after_completion' : 'weekly'
-
-  if (!repeat) {
-    const { n: completionNum, unit: completionUnit } = parseInterval('1 day')
-    return {
-      freq: defaultFreq,
-      wdays: defaultWdays(scheduled?.date),
-      monthly: 'same-day',
-      endType: 'never',
-      endVal: '',
-      intervalNum: 1,
-      completionNum,
-      completionUnit,
-    }
-  }
-
-  if (repeat.type === 'after_completion') {
-    const { n: completionNum, unit: completionUnit } = parseInterval(repeat.interval ?? '1 day')
-    return {
-      freq: 'after_completion',
-      wdays: defaultWdays(scheduled?.date),
-      monthly: 'same-day',
-      endType: 'never',
-      endVal: '',
-      intervalNum: 1,
-      completionNum,
-      completionUnit,
-    }
-  }
-
-  // Scheduled repeat: reverse-engineer state from the flat spec
-  const s = repeat
-
-  // Determine monthly mode
-  let monthly: MonthlyMode = 'same-day'
-  if (s.byweekday && s.bysetpos !== undefined) monthly = 'weekday-pattern'
-
-  // Determine weekday booleans
-  const wdays = [false, false, false, false, false, false, false]
-  if (s.freq === 'weekly' && s.byweekday) {
-    WDAY_CODES.forEach((code, i) => { wdays[i] = (s.byweekday ?? []).includes(code) })
-  }
-
-  // Determine end condition
-  let endType: EndType = 'never'
-  let endVal = ''
-  if (s.end?.type === 'until') {
-    endType = 'until'
-    endVal = s.end.date ?? s.end.time ?? ''
-  } else if (s.end?.type === 'count') {
-    endType = 'count'
-    endVal = String(s.end.occurrences)
-  }
-
-  const { n: completionNum, unit: completionUnit } = parseInterval('1 day')
-  return {
-    freq: s.freq,
-    wdays,
-    monthly,
-    endType,
-    endVal,
-    intervalNum: s.interval ?? 1,
-    completionNum,
-    completionUnit,
-  }
-}
-
-/** Build a Repeat value from the current dialog state. */
-function buildRepeat(
-  freq: Freq,
-  wdays: boolean[],
-  monthly: MonthlyMode,
-  endType: EndType,
-  endVal: string,
-  interval: string,
-  intervalNum: number,
-  scheduledDate?: string | null,
-): Repeat {
-  if (freq === 'after_completion') {
-    return { type: 'after_completion', interval }
-  }
-
-  const r: Repeat = { 
-    type: 'schedule', 
-    freq: freq,
-    interval: intervalNum,
-  }
-
-  if (freq === 'weekly') {
-    r.byweekday = WDAY_CODES.filter((_, i) => wdays[i])
-  }
-
-  if (freq === 'monthly') {
-    const d = parseDateString(scheduledDate ?? '')
-    if (d) {
-      if (monthly === 'same-day') {
-        r.bymonthday = [d.getDate()]
-      } else {
-        const spec = monthlyWeekdaySpec(d)
-        r.byweekday = spec.byweekday
-        r.bysetpos = spec.bysetpos
-      }
-    }
-  }
-
-  if (endType === 'until' && endVal)  r.end = { type: 'until', date: endVal }
-  if (endType === 'count' && endVal)  r.end = { type: 'count', occurrences: parseInt(endVal, 10) }
-
-  return r
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -234,17 +94,18 @@ export default function RepeatDialog({
 
   const hasSched = !!scheduled
   const hasTrk   = tracked && itemType !== 'event'
+  const formCtx: RepeatFormContext = { scheduledDate: scheduled?.date, hasSchedule: hasSched, hasTracking: hasTrk }
 
   const [state, dispatch] = useReducer(
     dialogReducer,
-    { repeat, scheduled, hasSched, hasTrk },
-    ({ repeat, scheduled, hasSched, hasTrk }) => initState(repeat, scheduled, hasSched, hasTrk),
+    { repeat, formCtx },
+    ({ repeat, formCtx }) => repeatToForm(repeat, formCtx),
   )
   const { freq, wdays, monthly, endType, endVal, intervalNum, completionNum, completionUnit } = state
-  const setFreq           = (freq: Freq)          => dispatch({ type: 'set', patch: { freq } })
+  const setFreq           = (freq: RepeatFormFreq) => dispatch({ type: 'set', patch: { freq } })
   const setWdays          = (wdays: boolean[])    => dispatch({ type: 'set', patch: { wdays } })
   const setMonthly        = (monthly: MonthlyMode)=> dispatch({ type: 'set', patch: { monthly } })
-  const setEndType        = (endType: EndType)    => dispatch({ type: 'set', patch: { endType } })
+  const setEndType        = (endType: RepeatEndType) => dispatch({ type: 'set', patch: { endType } })
   const setEndVal         = (endVal: string)      => dispatch({ type: 'set', patch: { endVal } })
   const setIntervalNum    = (intervalNum: number) => dispatch({ type: 'set', patch: { intervalNum } })
   const setCompletionNum  = (completionNum: number) => dispatch({ type: 'set', patch: { completionNum } })
@@ -255,7 +116,7 @@ export default function RepeatDialog({
   // Re-initialise whenever the dialog opens (so stale state never leaks between opens)
   useResetOnChange([open], () => {
     if (!open) return
-    dispatch({ type: 'reset', state: initState(repeat, scheduled, hasSched, hasTrk) })
+    dispatch({ type: 'reset', state: repeatToForm(repeat, formCtx) })
   })
 
   const hintText =
@@ -266,9 +127,7 @@ export default function RepeatDialog({
       : 'Choose how often this scheduled item repeats.'
 
   function handleSet() {
-    const finalIntervalNum = Math.max(1, intervalNum)
-    const finalCompletionNum = Math.max(1, completionNum)
-    onConfirm(buildRepeat(freq, wdays, monthly, endType, endVal, serialiseInterval(finalCompletionNum, completionUnit), finalIntervalNum, scheduled?.date))
+    onConfirm(formToRepeat(state, scheduled?.date))
     onClose()
   }
 
@@ -298,8 +157,8 @@ export default function RepeatDialog({
                   setFreq('after_completion')
                 } else {
                   // Switch to schedule, defaulting to computed frequency or weekly
-                  const s = initState(repeat, scheduled, hasSched, hasTrk)
-                  setFreq(s.freq === 'after_completion' ? 'weekly' : s.freq)
+                  const { freq } = repeatToForm(repeat, formCtx)
+                  setFreq(freq === 'after_completion' ? 'weekly' : freq)
                 }
               }}
             >
@@ -395,10 +254,10 @@ export default function RepeatDialog({
                 <ToggleGroup
                   type="single"
                   value={endType}
-                  onValueChange={(v) => { if (v) setEndType(v as EndType) }}
+                  onValueChange={(v) => { if (v) setEndType(v as RepeatEndType) }}
                   className="justify-start gap-2 mb-2.5"
                 >
-                  {(['never', 'until', 'count'] as EndType[]).map(t => (
+                  {(['never', 'until', 'count'] as RepeatEndType[]).map(t => (
                     <ToggleGroupItem
                       key={t}
                       value={t}
