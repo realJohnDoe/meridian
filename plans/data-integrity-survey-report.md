@@ -151,6 +151,17 @@ independent of everything else.
 
 ### #2 — Creating an entry whose title slugifies onto an existing file overwrites that file
 
+**Status: fixed.** `applyNew` no longer branches on `roots.has(fileSlug)`. The editor
+session mints a `draftId` (`useEntryEditor`) that is threaded through `saveNode` into
+`applyEdit` and stamped on the item `applyNew` creates, so a repeat create-scoped commit
+for the same draft is recognised by id and upserts — the re-entrancy the old guard
+existed for. Anything else landing on a taken slug now gets a free one from
+`newEntrySlug` (`buy-groceries-2`, `-3`, …), which checks `items` as well as `roots` so
+an entry whose file failed to parse still holds its slug. `saveNode` returns the slug it
+actually wrote; callers use that instead of recomputing `titleToSlug(title)`, which no
+longer agrees with it on the collision path (promote-to-task's wikilink, the new-entry
+route's favourite target, pending "listed on" links).
+
 - **Invariant violated:** 2 (edit locality) and 7 (recoverability). Only when creating a
   **new** entry (renaming an existing one is safe — `saveNode` keeps `item.fileSlug`).
 - **Category:** `edit-locality` `recoverability` `validation`

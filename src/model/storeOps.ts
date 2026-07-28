@@ -258,27 +258,76 @@ function applyFieldsToItem(item: StoreItem, fields: EditFields): StoreItem {
     date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
 }
 
+// ── New-entry slug allocation ─────────────────────────────────────────────────
+
+/** True when some file already occupies `fileSlug` in this snapshot. */
+function slugTaken({ items, roots }: StoreData, fileSlug: string): boolean {
+  return roots.has(fileSlug) || items.some(i => i.fileSlug === fileSlug)
+}
+
+/**
+ * The item a still-unadopted draft already created, if its first save has run.
+ *
+ * `draftId` is the id `applyNew` stamps on the item it creates, so this is the
+ * one identity that distinguishes "this draft saving again" (upsert) from "a
+ * different entry whose title happens to slugify onto a taken slug" (allocate a
+ * free slug). Restricted to series/standalone roots — a draft is never an
+ * override child.
+ */
+function findDraft(items: StoreItem[], draftId: string | undefined): StoreItem | undefined {
+  if (!draftId) return undefined
+  return items.find(i => i.id === draftId && (isSeries(i) || isStandaloneOcc(i)))
+}
+
+/**
+ * The file slug a brand-new entry will occupy.
+ *
+ * A draft that already created its file keeps that file, whatever its title has
+ * since become — the rename happens inside the file, not by moving it.
+ *
+ * Otherwise the title's slug is used, unless another entry already owns it, in
+ * which case a `-2`, `-3`, … suffix is appended until a free one is found.
+ * `titleToSlug` collides freely ("Buy groceries" / "Buy groceries!" / any two
+ * titles agreeing in their first 60 slug characters all map to `buy-groceries`)
+ * and a file write is a whole-file replace, so without this a new entry would
+ * silently destroy the unrelated entry sitting on its slug.
+ *
+ * Exported because callers need the resulting slug to know which file to
+ * persist — see `saveNode`.
+ */
+export function newEntrySlug(data: StoreData, title: string, draftId?: string): string {
+  const draft = findDraft(data.items, draftId)
+  if (draft) return draft.fileSlug
+
+  const base = titleToSlug(title) || crypto.randomUUID()
+  if (!slugTaken(data, base)) return base
+  let n = 2
+  while (slugTaken(data, `${base}-${n}`)) n++
+  return `${base}-${n}`
+}
+
 /**
  * Create a brand-new item (series or standalone).
  *
- * Guarded against re-creating over an existing file: a "new entry" commit can
- * run more than once for the same not-yet-adopted item (e.g. a debounced
- * autosave firing after an in-dialog save already created the file). If a root
- * already exists for the title's fileSlug, this upserts onto its existing
- * series/standalone item instead of appending a sibling — otherwise two items
- * would end up sharing one fileSlug, which collapses into a duplicate
- * `instances[]` entry on write.
+ * A "new entry" commit can run more than once for the same not-yet-adopted item
+ * (e.g. a debounced autosave firing after an in-dialog save already created the
+ * file), so the later runs must upsert onto what the first created rather than
+ * append a sibling — two items sharing one fileSlug collapse into a duplicate
+ * `instances[]` entry on write. `draftId` is what makes those runs recognisable:
+ * it is stamped on the item created here, so a re-run finds it by id. Callers
+ * that create genuinely one-shot entries (e.g. promoting a checklist line) can
+ * omit it; they then always get a free slug.
  */
-function applyNew({ items, roots }: StoreData, fields: EditFields): StoreData {
-  const { title, scheduled, repeat } = fields
-  const fileSlug = titleToSlug(title) || crypto.randomUUID()
+function applyNew(data: StoreData, fields: EditFields, draftId?: string): StoreData {
+  const { items, roots } = data
+  const { scheduled, repeat } = fields
+  const fileSlug = newEntrySlug(data, fields.title, draftId)
 
-  if (roots.has(fileSlug)) {
-    const existing = items.find(i => i.fileSlug === fileSlug && (isSeries(i) || isStandaloneOcc(i)))
-    if (existing) {
-      const newRoots = updateRoot(roots, fileSlug, fields)
-      const newItems = items.map(i => i.id === existing.id ? applyFieldsToItem(i, fields) : i)
-      return { items: newItems, roots: newRoots }
+  const draft = findDraft(items, draftId)
+  if (draft) {
+    return {
+      items: items.map(i => i.id === draft.id ? applyFieldsToItem(i, fields) : i),
+      roots: updateRoot(roots, fileSlug, fields),
     }
   }
 
@@ -292,7 +341,7 @@ function applyNew({ items, roots }: StoreData, fields: EditFields): StoreData {
       time:     scheduled?.time || null,
       repeat,
       fileSlug,
-      id:       crypto.randomUUID(),
+      id:       draftId ?? crypto.randomUUID(),
       metadata: seriesMeta({}, fields),
     }
     return { items: [...items, newSeries], roots: newRoots }
@@ -302,7 +351,7 @@ function applyNew({ items, roots }: StoreData, fields: EditFields): StoreData {
     time:    scheduled?.time || null,
     source:  'explicit',
     fileSlug,
-    id:      crypto.randomUUID(),
+    id:      draftId ?? crypto.randomUUID(),
     metadata: occMeta({}, fields),
   }
   return { items: [...items, newOcc], roots: newRoots }
@@ -475,15 +524,19 @@ function applyAdd({ items, roots }: StoreData, occ: Occurrence, fields: EditFiel
  * scope 'single' — upsert an explicit override for this occurrence's date.
  * scope 'future' — cap the existing series; create a new sibling series from occDate.
  * scope 'add'    — append a new explicit occurrence.
- * occ == null    — create a brand-new item (series or standalone).
+ * occ == null    — create a brand-new item (series or standalone). `draftId`
+ *                  identifies the editor draft doing the creating, so a repeat
+ *                  commit for the same draft upserts instead of creating a
+ *                  second file — see `applyNew`.
  */
 export function applyEdit(
   data: StoreData,
   occ: Occurrence | null,
   scope: EditScope,
   fields: EditFields,
+  draftId?: string,
 ): StoreData {
-  if (!occ) return applyNew(data, fields)
+  if (!occ) return applyNew(data, fields, draftId)
   switch (scope) {
     case 'all':    return applyAll(data, occ, fields)
     case 'single': return applySingle(data, occ, fields)

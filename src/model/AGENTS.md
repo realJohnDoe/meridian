@@ -229,9 +229,17 @@ point on Meridian's *own* output, and the loss happens on the first pass.
 
 No store, React, or file I/O dependencies.
 
-- `applyEdit(data, occ, scope, fields): StoreData` — apply an editor save across
-  four scopes: `'all'`, `'single'`, `'future'` (series split), `'add'`. Updates
+- `applyEdit(data, occ, scope, fields, draftId?): StoreData` — apply an editor save
+  across four scopes: `'all'`, `'single'`, `'future'` (series split), `'add'`. Updates
   both items (occurrence-level changes) and roots (file-level title/tags/items).
+  With `occ == null` it creates a brand-new entry; `draftId` is the editor draft's
+  identity, stamped on the created item so a repeat commit for the same draft
+  upserts instead of creating a second file.
+- `newEntrySlug(data, title, draftId?): string` — the slug a new entry will occupy.
+  Never returns a slug another file already owns: colliding titles (`titleToSlug`
+  collapses punctuation, accents, and everything past 60 chars) get a `-2`, `-3`, …
+  suffix rather than overwriting the file already there. Callers persist the slug
+  this returns, not `titleToSlug(title)`.
 - `updateRoot(roots, fileSlug, fields): Roots` — update file-level metadata for
   one slug and return a new roots map.
 - `toggleDone`, `excludeOccurrence`, `deleteByFileSlug`, `deleteFollowing`

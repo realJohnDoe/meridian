@@ -145,6 +145,56 @@ describe('useEntryEditor', () => {
     expect(navigateMock).not.toHaveBeenCalled()
   })
 
+  it('a new entry whose title slugifies onto an existing file leaves that file alone', () => {
+    // Reproduces the reported bug: "Buy groceries!" slugifies to `buy-groceries`,
+    // the slug an unrelated entry already owns. A write is a whole-file replace,
+    // so creating the new entry there destroyed the existing one outright — no
+    // error, no artifact, and every wikilink to it silently re-pointed.
+    const occ = makeOcc({ id: 'occ-1', fileSlug: 'buy-groceries', date: '2026-04-08', metadata: { participants: [], title: 'Buy groceries', tags: ['errands'], items: [] } })
+    seedStore([occ], makeRoots('buy-groceries', { title: 'Buy groceries', tags: ['errands'], body: 'Remember the bags.' }))
+
+    renderHook(() => useEntryEditor(null, 'all', 'Buy groceries!'))
+
+    const roots = useStore.getState().roots
+    expect(roots.get('buy-groceries')?.title).toBe('Buy groceries')
+    expect(roots.get('buy-groceries')?.body).toBe('Remember the bags.')
+    expect(roots.get('buy-groceries-2')?.title).toBe('Buy groceries!')
+    expect(persistence.writes).toEqual(['buy-groceries-2'])
+  })
+
+  it('later saves of a slug-collided new entry keep hitting its own file', () => {
+    // The re-entrancy the applyNew guard exists for, on the collision path: the
+    // creating save lands on `buy-groceries-2`, and the autosave that follows must
+    // upsert onto it rather than allocate `buy-groceries-3` (or fall back onto the
+    // unrelated `buy-groceries`).
+    const occ = makeOcc({ id: 'occ-1', fileSlug: 'buy-groceries', date: '2026-04-08', metadata: { participants: [], title: 'Buy groceries', tags: [], items: [] } })
+    seedStore([occ], makeRoots('buy-groceries', { title: 'Buy groceries', body: 'Remember the bags.' }))
+
+    const { result } = renderHook(() => useEntryEditor(null, 'all', 'Buy groceries!'))
+    act(() => { result.current.scheduleAutoSave('totally different note') })
+    act(() => { vi.advanceTimersByTime(1500) })
+
+    const roots = useStore.getState().roots
+    expect([...roots.keys()].sort()).toEqual(['buy-groceries', 'buy-groceries-2'])
+    expect(roots.get('buy-groceries')?.body).toBe('Remember the bags.')
+    expect(roots.get('buy-groceries-2')?.body).toBe('totally different note')
+    expect(useStore.getState().items.filter(i => i.fileSlug === 'buy-groceries-2')).toHaveLength(1)
+  })
+
+  it('handleSave on a not-yet-adopted new entry upserts instead of creating a second file', () => {
+    // handleSave passes entry.item, which stays null for a brand-new entry even
+    // after autosave created the file — so without the draft identity it asks for
+    // another new entry and lands on a `-2` sibling of the file it just made.
+    const { result } = renderHook(() => useEntryEditor(null, 'all', 'Board game night'))
+    expect(persistence.writes).toEqual(['board-game-night'])
+
+    act(() => { result.current.handleSave('body text') })
+
+    expect([...useStore.getState().roots.keys()]).toEqual(['board-game-night'])
+    expect(useStore.getState().roots.get('board-game-night')?.body).toBe('body text')
+    expect(useStore.getState().items).toHaveLength(1)
+  })
+
   it('editScope "add" suppresses both the meta save and the autosave', () => {
     const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))

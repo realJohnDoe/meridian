@@ -38,9 +38,11 @@ function NewEntryReady({ title, date, time, duration, itemType }: NewEntrySearch
   const hooks = useEntryEditor(null, 'all', title, { date, time, duration, itemType })
 
   // A brand-new item has no file yet, but once it has a title its eventual fileSlug is
-  // already determined (see save.ts's `fileSlug = item?.fileSlug ?? titleToSlug(title)`),
-  // so favoriting can target that slug immediately rather than waiting for autosave.
-  const effectiveSlug = hooks.entry.item?.fileSlug ?? (hooks.entry.title ? titleToSlug(hooks.entry.title) : null)
+  // predictable, so favoriting can target that slug immediately rather than waiting for
+  // autosave. `titleToSlug` is only the estimate — once the first save has landed,
+  // `createdSlug` is the slug the file actually got (they differ when the title
+  // slugifies onto one another file already owns).
+  const effectiveSlug = hooks.entry.item?.fileSlug ?? hooks.createdSlug ?? (hooks.entry.title ? titleToSlug(hooks.entry.title) : null)
   const isFavorited = !!effectiveSlug && favorites.includes(effectiveSlug)
 
   return (

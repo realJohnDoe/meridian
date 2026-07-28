@@ -8,7 +8,6 @@ import { fmtISO } from '@/model'
 import { useToday } from '@/hooks'
 import { newEntryRoute } from '@/routes'
 import { resolveWikilink } from '@/wikilinks'
-import { titleToSlug } from '@/fileIO'
 import { getFom } from '@/storeBridge'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
@@ -60,7 +59,13 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // meta-only save can capture the current body without reaching into CodeMirror.
   const bodyRef = useRef(entry.body)
 
-  const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(entry.item, entry.title)
+  // The slug a brand-new entry actually landed on, once its first save created the
+  // file. Not necessarily `titleToSlug(entry.title)`: a title that slugifies onto a
+  // slug another file already owns gets placed on a free one instead. Kept in state
+  // (not a ref) because it feeds the favourite button and the "listed on" target.
+  const [createdSlug, setCreatedSlug] = useState<string | null>(null)
+
+  const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(entry.item, entry.title, createdSlug)
   // Mirrors the latest flushOnSave (its closure changes every render as pendingSlugs/item
   // change) so timer/dialog-driven commits — which may fire after several re-renders —
   // flush against the current pending links instead of a stale render's closure.
@@ -76,6 +81,12 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // EntryEditor derives `bodyKey`/scope-row visibility/etc. from that field, and
   // flipping it mid-session would remount the CodeMirror body editor under the user.
   const createdItemRef = useRef<Occurrence | null>(null)
+  // Identity of this editor session's draft, stamped on the item its first save
+  // creates. It's what lets applyNew tell a repeat commit for *this* draft (upsert)
+  // from a different entry landing on a taken slug (allocate a free slug) — the
+  // createdItemRef adoption below covers the same ground, but only once the fom
+  // lookup has succeeded, and handleSave/dialog paths can commit before then.
+  const [draftId] = useState(() => crypto.randomUUID())
 
   const storeRoots = useStore(s => s.roots)
   const navigate = useNavigate()
@@ -90,21 +101,22 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const commitEntry = (next: EntryState) => {
     const item = next.item ?? createdItemRef.current
     if (item) {
-      const result = saveNode(item, next.editScope, next)
-      setTitleMissing(result === 'missing-title')
+      const slug = saveNode(item, next.editScope, next)
+      setTitleMissing(slug === null)
       // No-op once `next.item` itself is set (usePendingLinks already flushes
       // immediately in that case) — but while item only lives in
       // createdItemRef, entry.item is still null, so pending "listed on" links
       // added after creation would otherwise never get flushed again.
-      flushLinksRef.current(titleToSlug(next.title))
+      if (slug) flushLinksRef.current(slug)
       return
     }
     if (!next.title) return
-    const result = saveNode(null, next.editScope, next)
-    if (result !== 'saved') { setTitleMissing(true); return }
+    const slug = saveNode(null, next.editScope, next, draftId)
+    if (slug === null) { setTitleMissing(true); return }
     setTitleMissing(false)
-    flushLinksRef.current(titleToSlug(next.title))
-    createdItemRef.current = getFom().get(titleToSlug(next.title)) ?? null
+    flushLinksRef.current(slug)
+    setCreatedSlug(slug)
+    createdItemRef.current = getFom().get(slug) ?? null
   }
 
   const saveMeta = (next: EntryState) => {
@@ -173,8 +185,12 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   }
 
   const handleSave = (body: string) => {
-    const result = saveNode(entry.item, entry.editScope, { ...entry, body })
-    if (result === 'saved') { setTitleMissing(false); goBack(); return }
+    // Same fallback as commitEntry: once autosave has created the file, entry.item is
+    // still deliberately null, so saving must target the adopted item rather than ask
+    // for another new entry. draftIdRef covers the window before that adoption lands.
+    const item = entry.item ?? createdItemRef.current
+    const slug = saveNode(item, entry.editScope, { ...entry, body }, draftId)
+    if (slug !== null) { setTitleMissing(false); goBack(); return }
     setTitleMissing(true)
     setFocusTitleTick(t => t + 1)
   }
@@ -226,6 +242,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   return {
     entry, setEntry,
+    createdSlug,
     pendingLinks: { effectiveSlug, pendingSlugs, handleAdd, handleRemove },
     saveMeta,
     handleOpenWikilink,
