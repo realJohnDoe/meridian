@@ -195,8 +195,8 @@ function generateScheduledDates(
     const n = new Date(d)
     if (freq === 'daily')        n.setDate(n.getDate() + interval)
     else if (freq === 'weekly')  n.setDate(n.getDate() + 7 * interval)
-    else if (freq === 'monthly') n.setMonth(n.getMonth() + interval)
-    else if (freq === 'yearly')  n.setFullYear(n.getFullYear() + interval)
+    else if (freq === 'monthly') { n.setDate(1); n.setMonth(n.getMonth() + interval) }
+    else if (freq === 'yearly')  { n.setDate(1); n.setFullYear(n.getFullYear() + interval) }
     return n
   }
 
@@ -220,14 +220,17 @@ function generateScheduledDates(
         }
       }
     } else if (freq === 'monthly') {
+      const year = periodStart.getFullYear(), month = periodStart.getMonth()
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
       if (bymonthday && bymonthday.length) {
         for (const mday of bymonthday) {
-          dates.push(withTime(new Date(periodStart.getFullYear(), periodStart.getMonth(), mday)))
+          // A day-of-month that doesn't exist in this month (e.g. 31 in April) is
+          // skipped rather than overflowing into the next month's 1st.
+          if (mday > daysInMonth) continue
+          dates.push(withTime(new Date(year, month, mday)))
         }
       } else if (byweekday && byweekday.length && bysetpos !== undefined) {
-        const month = periodStart.getMonth(), year = periodStart.getFullYear()
         const candidates: Date[] = []
-        const daysInMonth = new Date(year, month + 1, 0).getDate()
         const targetDays = byweekday.map(d => WDAYS_MAP[d.toLowerCase()] ?? 0)
         for (let day = 1; day <= daysInMonth; day++) {
           const d2 = new Date(year, month, day)
@@ -236,10 +239,20 @@ function generateScheduledDates(
         const pos = bysetpos < 0 ? candidates.length + bysetpos : bysetpos - 1
         if (candidates[pos]) dates.push(withTime(candidates[pos]))
       } else {
-        dates.push(withTime(new Date(periodStart.getFullYear(), periodStart.getMonth(), anchor.getDate())))
+        // Same day-of-month as the anchor every month; skip months too short to
+        // have that day instead of overflowing into the next month's 1st.
+        if (anchor.getDate() <= daysInMonth) {
+          dates.push(withTime(new Date(year, month, anchor.getDate())))
+        }
       }
     } else if (freq === 'yearly') {
-      dates.push(withTime(new Date(periodStart.getFullYear(), anchor.getMonth(), anchor.getDate())))
+      const year = periodStart.getFullYear()
+      const daysInTargetMonth = new Date(year, anchor.getMonth() + 1, 0).getDate()
+      // Feb 29 anchors are skipped in non-leap years instead of overflowing into
+      // March 1st.
+      if (anchor.getDate() <= daysInTargetMonth) {
+        dates.push(withTime(new Date(year, anchor.getMonth(), anchor.getDate())))
+      }
     }
     return dates
   }
