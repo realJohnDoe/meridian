@@ -1,8 +1,7 @@
 import { startOfToday } from 'date-fns'
-import { fmtISO, applyEdit, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing, fileSlugItems, findSeries } from '@/model'
+import { fmtISO, applyEdit, newEntrySlug, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing, fileSlugItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
-import { titleToSlug } from '@/fileIO'
 import { getSnapshot, getItems, getRoots, getBacklinks } from '@/storeBridge'
 import { commitNext, commitDelete } from '@/storeCommit'
 import type { EntryState, ItemType } from './state'
@@ -97,13 +96,26 @@ export function entryFromOccurrence(
 
 type SaveFields = EntryState & { body: string }
 
-export type SaveResult = 'saved' | 'missing-title'
+/** The slug of the file that was written, or null when nothing was (empty title). */
+export type SaveResult = string | null
 
-export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields): SaveResult {
+/**
+ * Persist an editor save.
+ *
+ * `draftId` identifies the draft when `item` is null (a brand-new entry), so a
+ * second create-scoped save for the same draft upserts onto the file the first
+ * one made instead of creating another — see `applyNew`.
+ *
+ * Returns the slug actually written rather than letting callers recompute
+ * `titleToSlug(title)`: a new entry whose title slugifies onto a slug some other
+ * file already owns is placed on a free one, so the two no longer agree.
+ */
+export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields, draftId?: string): SaveResult {
   const { title } = fields
-  if (!title) return 'missing-title'
+  if (!title) return null
 
-  const nextData = applyEdit(getSnapshot(), item, editScope, {
+  const snapshot = getSnapshot()
+  const nextData = applyEdit(snapshot, item, editScope, {
     title,
     tags:         fields.tags         ?? [],
     items:        fields.items        ?? [],
@@ -115,10 +127,13 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
     scheduled:    fields.scheduled    ?? null,
     duration:     fields.duration     ?? '',
     repeat:       fields.repeat       ?? null,
-  })
-  const fileSlug = item?.fileSlug ?? titleToSlug(title)
-  if (fileSlug) commitNext(nextData, [fileSlug])
-  return 'saved'
+  }, draftId)
+  // Same snapshot and same draftId as the applyEdit above, so this is exactly
+  // the slug applyNew allocated for it.
+  const fileSlug = item?.fileSlug ?? newEntrySlug(snapshot, title, draftId)
+  if (!fileSlug) return null   // nothing to write to; newEntrySlug never yields this
+  commitNext(nextData, [fileSlug])
+  return fileSlug
 }
 
 export function deleteNode(

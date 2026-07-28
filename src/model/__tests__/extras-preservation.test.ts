@@ -123,6 +123,7 @@ const EXEMPT: Record<string, string> = {
   findSeries: 'pure lookup — returns an existing object untouched',
   deletionEndsAfterCompletionSeries: 'predicate — returns a boolean',
   occFromAppMeta: 'metadata constructor, covered by its own test below',
+  newEntrySlug: 'pure slug allocation — returns a string, never touches metadata',
 }
 
 describe('unknown keys survive every store operation', () => {

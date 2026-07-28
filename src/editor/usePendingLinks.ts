@@ -3,10 +3,15 @@ import type { Occurrence } from '../types'
 import { titleToSlug } from '../fileIO'
 import { addItemLink, removeItemLink } from './save'
 
-export function usePendingLinks(item: Occurrence | null, title: string) {
+/**
+ * `createdSlug` is the slug a brand-new entry's first save actually landed on —
+ * prefer it over `titleToSlug(title)`, which is only an estimate: a title that
+ * slugifies onto a slug another file already owns gets placed on a free one.
+ */
+export function usePendingLinks(item: Occurrence | null, title: string, createdSlug?: string | null) {
   const [pendingSlugs, setPendingSlugs] = useState<string[]>([])
 
-  const effectiveSlug = item?.fileSlug ?? (title.trim() ? titleToSlug(title) : undefined)
+  const effectiveSlug = item?.fileSlug ?? createdSlug ?? (title.trim() ? titleToSlug(title) : undefined)
 
   const handleAdd = (targetSlug: string) => {
     if (item) {

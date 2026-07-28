@@ -296,13 +296,13 @@ repeat:
     expect(serializeData(next)).toMatchSnapshot()
   })
 
-  it('committing a "new entry" create twice for the same title upserts instead of duplicating', () => {
+  it('committing a "new entry" create twice for the same draft upserts instead of duplicating', () => {
     // Regression test: a brand-new item's first save can be followed by a second
     // create-scoped commit before the caller has adopted the item it just
     // created (e.g. a debounced body autosave firing right after an in-dialog
-    // metadata save already created the file). Without a guard, applyNew would
-    // append a second item sharing the same fileSlug, producing a silent
-    // duplicate `instances[]` entry on write.
+    // metadata save already created the file). Without the draft id to recognise
+    // the re-run by, applyNew would append a second item, producing either a
+    // silent duplicate `instances[]` entry or a stray second file.
     const emptyData: StoreData = { items: [], roots: new Map() }
     const fields: EditFields = {
       title: 'Board game night',
@@ -311,12 +311,97 @@ repeat:
       scheduled: { date: '2026-06-05', time: '19:00' },
       duration: '', repeat: null,
     }
-    const afterFirst = applyEdit(emptyData, null, 'all', fields)
+    const draftId = 'draft-1'
+    const afterFirst = applyEdit(emptyData, null, 'all', fields, draftId)
     expect(afterFirst.items).toHaveLength(1)
+    expect(afterFirst.items[0]!.id).toBe(draftId)
 
-    const afterSecond = applyEdit(afterFirst, null, 'all', { ...fields, duration: '1 hour' })
+    const afterSecond = applyEdit(afterFirst, null, 'all', { ...fields, duration: '1 hour' }, draftId)
     expect(afterSecond.items).toHaveLength(1)
     expect(afterSecond.items[0]!.metadata.duration).toBe('1 hour')
+    expect([...afterSecond.roots.keys()]).toEqual(['board-game-night'])
+  })
+
+  it('a draft that has already created its file keeps it when the title is retyped', () => {
+    // The editor saves as the user types, so the file is created from a partial
+    // title. Renaming happens inside that file — the draft must not go allocate a
+    // second one once the title grows.
+    const emptyData: StoreData = { items: [], roots: new Map() }
+    const fields: EditFields = {
+      title: 'Board', tags: [], items: [], participants: [],
+      body: '', tracked: false, done: false, priority: null,
+      scheduled: null, duration: '', repeat: null,
+    }
+    const draftId = 'draft-1'
+    const afterFirst = applyEdit(emptyData, null, 'all', fields, draftId)
+    const afterRename = applyEdit(afterFirst, null, 'all', { ...fields, title: 'Board game night' }, draftId)
+
+    expect([...afterRename.roots.keys()]).toEqual(['board'])
+    expect(afterRename.roots.get('board')!.title).toBe('Board game night')
+    expect(afterRename.items).toHaveLength(1)
+  })
+
+  it('creating an entry on a taken slug does not overwrite the existing file', () => {
+    // `titleToSlug` collides freely — "Buy groceries" and "Buy groceries!" both
+    // map to `buy-groceries`, as does any pair of titles agreeing in their first
+    // 60 slug characters. A file write is a whole-file replace, so adopting the
+    // colliding slug would silently destroy an unrelated entry.
+    const existing = parseToStoreItems(
+      'buy-groceries.md',
+      '---\ntitle: Buy groceries\ntags: [errands]\ndone: false\ndate: "2026-04-08"\n---\n\nRemember the bags.',
+    )
+    const data: StoreData = { items: existing.items, roots: new Map([['buy-groceries', existing.root]]) }
+
+    const next = applyEdit(data, null, 'all', {
+      title: 'Buy groceries!',
+      tags: [], items: [], participants: [],
+      body: 'totally different note',
+      tracked: false, done: false, priority: null,
+      scheduled: null, duration: '', repeat: null,
+    }, 'draft-1')
+
+    const untouched = next.roots.get('buy-groceries')!
+    expect(untouched.title).toBe('Buy groceries')
+    expect(untouched.tags).toEqual(['errands'])
+    expect(untouched.body).toContain('Remember the bags')
+
+    const created = next.roots.get('buy-groceries-2')!
+    expect(created.title).toBe('Buy groceries!')
+    expect(created.body).toBe('totally different note')
+    expect(next.items.filter(i => i.fileSlug === 'buy-groceries-2')).toHaveLength(1)
+  })
+
+  it('a third colliding title keeps counting up rather than landing on a taken slug', () => {
+    const fields = (title: string): EditFields => ({
+      title, tags: [], items: [], participants: [], body: '',
+      tracked: false, done: false, priority: null,
+      scheduled: null, duration: '', repeat: null,
+    })
+    let data: StoreData = { items: [], roots: new Map() }
+    data = applyEdit(data, null, 'all', fields('Q3 review'), 'draft-1')
+    data = applyEdit(data, null, 'all', fields('Q3-review'), 'draft-2')
+    data = applyEdit(data, null, 'all', fields('Q3 Review!'), 'draft-3')
+
+    expect([...data.roots.keys()]).toEqual(['q3-review', 'q3-review-2', 'q3-review-3'])
+    expect(data.items.map(i => i.fileSlug).sort()).toEqual(['q3-review', 'q3-review-2', 'q3-review-3'])
+  })
+
+  it('a new entry avoids a slug held by items whose file failed to reach roots', () => {
+    // roots and items can disagree — a file that fails to parse leaves no root
+    // entry. Keying the collision check off roots alone would let a new entry
+    // adopt a slug that items still point at.
+    const orphan: StoreData = {
+      items: [{ date: '2026-04-08', time: null, source: 'explicit', fileSlug: 'cafe', id: 'orphan-1', metadata: { participants: [] } }],
+      roots: new Map(),
+    }
+    const next = applyEdit(orphan, null, 'all', {
+      title: 'Café', tags: [], items: [], participants: [], body: '',
+      tracked: false, done: false, priority: null,
+      scheduled: null, duration: '', repeat: null,
+    }, 'draft-1')
+
+    expect([...next.roots.keys()]).toEqual(['cafe-2'])
+    expect(next.items.find(i => i.id === 'orphan-1')!.fileSlug).toBe('cafe')
   })
 
   it('creating an undated task persists and stays searchable but off the calendar', () => {

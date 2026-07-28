@@ -23,7 +23,6 @@ import { saveNode } from './save'
 import { formatDurationChip, fmtDuration, fmtShort } from '@/format'
 import { fmtT, parseDateString } from '@/model'
 import { useStore } from '@/store'
-import { titleToSlug } from '@/fileIO'
 import type { PendingLinks } from './usePendingLinks'
 import { useAllParticipants } from '@/hooks'
 
@@ -94,14 +93,17 @@ export default function EntryEditor({ entry, onChange, onSave, onAutoSave, onMet
   }, [focusTitleTick])
 
   function handlePromoteTask(title: string, done: boolean): string | null {
-    const result = saveNode(null, 'all', {
+    // No draft id: each promotion is a genuinely new entry, so a title that
+    // slugifies onto an existing file's slug gets its own free slug rather than
+    // overwriting that file. saveNode reports which slug that was — the checklist
+    // line is rewritten to a wikilink pointing at it, so it must be the real one.
+    const slug = saveNode(null, 'all', {
       item: null, title, tracked: true, itemType: 'task', done,
       body: '', tags: [], items: [], participants: [...defaultParticipants],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
     })
-    if (result !== 'saved') return null
-    const slug = titleToSlug(title)
+    if (slug === null) return null
     void navigate({ to: '/entry/$slug', params: { slug } })
     return slug
   }
