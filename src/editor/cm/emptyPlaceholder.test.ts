@@ -39,4 +39,13 @@ describe('emptyPlaceholder build()', () => {
 
     expect(decos.size).toBe(0)
   })
+
+  it('hides the placeholder as soon as the empty editor is focused', () => {
+    const view = mkView('')
+    expect(build(view).size).toBeGreaterThan(0)
+
+    view.focus()
+
+    expect(build(view).size).toBe(0)
+  })
 })
