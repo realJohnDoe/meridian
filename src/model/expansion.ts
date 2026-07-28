@@ -178,8 +178,13 @@ function generateScheduledDates(
   const untilDate = end?.type === 'until' ? toDate(end.date || end.time) : null
   // `end.date` is a date-only value (no time-of-day); treat it as inclusive of
   // the entire day so occurrences scheduled later that day are still included.
-  const maxDate = untilDate ? endOfDay(untilDate) : to
-  const maxCount = end?.type === 'count' ? end.occurrences : Infinity
+  // A `count` end must enumerate from the anchor regardless of the query
+  // window — bounding by `to` here would make the same series yield different
+  // occurrences depending on which page the caller happens to view.
+  const dateBound = untilDate ? endOfDay(untilDate) : (end?.type === 'count' ? null : to)
+  // The anchor itself is occurrence #1 (emitted separately by expandNode), so
+  // only `occurrences - 1` further dates are generated here.
+  const maxCount = end?.type === 'count' ? Math.max(0, end.occurrences - 1) : Infinity
   let count = 0
 
   function withTime(d: Date): Date {
@@ -259,15 +264,17 @@ function generateScheduledDates(
 
   let cursor = new Date(anchor)
   const LIMIT = 500; let iter = 0
-  while (cursor <= maxDate && count < maxCount && iter++ < LIMIT) {
-    const dates = matchesInPeriod(cursor).filter(d => d > anchor && d >= from && d <= maxDate && d <= to)
+  while ((dateBound === null || cursor <= dateBound) && count < maxCount && iter++ < LIMIT) {
+    const dates = matchesInPeriod(cursor).filter(d => d > anchor && (dateBound === null || d <= dateBound))
     for (const d of dates.sort((a, b) => a.getTime() - b.getTime())) {
       if (d > anchor && count < maxCount) { results.push(d); count++ }
     }
     cursor = nextBase(cursor)
-    if (cursor > maxDate || cursor > to) break
+    if (dateBound !== null && cursor > dateBound) break
   }
-  return results
+  // Enumeration above is independent of the query window for count-bounded
+  // series (see dateBound); clip to the window only now, at the very end.
+  return results.filter(d => d >= from && d <= to)
 }
 
 function expandNode<M>(
