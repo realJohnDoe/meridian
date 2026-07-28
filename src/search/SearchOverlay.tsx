@@ -39,11 +39,34 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
     if (open && isMobile) inputRef.current?.focus()
   }, [open, isMobile])
 
+  // Desktop renders nothing until there's a query (see the early return below),
+  // so the overlay is only actually on screen in these two cases.
+  const showing = isMobile ? open : open && !!query
+
+  // Escape closes the overlay. This is a document-level listener mounted only
+  // while the overlay is showing — not a handler on the layer itself — because
+  // focus can sit outside this component's tree: on desktop the search input
+  // lives in components/SearchBar.tsx, above the overlay. Same shape as the
+  // dismissal effect in hooks/use-floating-combobox.ts.
+  useEffect(() => {
+    if (!showing) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose() }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [showing, onClose])
+
   if (isMobile) {
     if (!open) return null
 
     return (
-      <div className="mobile-search-overlay fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search"
+        className="mobile-search-overlay fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto"
+      >
         {/* Top input row — pinned, always visible */}
         <div className="shrink-0 flex items-center gap-2 px-3.5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 border-b border-border">
           <IconButton
@@ -87,8 +110,13 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
 
   return (
     <>
-      {/* Backdrop: covers the content area behind the popover, not the sidebar */}
-      <div
+      {/* Backdrop: covers the content area behind the popover, not the sidebar.
+          A <button> rather than a <div> so click-to-dismiss is reachable by
+          keyboard and screen readers instead of being a dead click target. */}
+      <button
+        type="button"
+        aria-label="Close search"
+        onClick={onClose}
         className={cn('fixed inset-y-0 right-0 z-search-backdrop bg-background/80 backdrop-blur-sm pointer-events-auto transition-[left] duration-200 ease-linear', sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0')}
       />
       <div id="filterOverlay" className="absolute bottom-full left-0 right-0 z-search-panel pointer-events-auto">
