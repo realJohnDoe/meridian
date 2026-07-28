@@ -56,7 +56,7 @@ describe('beginSwipeDelete', () => {
     expect(persistence.deletes).toEqual(['note.md'])
   })
 
-  it('Undo restores the snapshot and the deferred commit never persists', () => {
+  it('Undo restores the snapshot, persists the restore, and the deferred commit never persists', () => {
     const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md' })
     seedStore([occ], makeRoots('note.md'))
     render(<Toaster />)
@@ -71,7 +71,7 @@ describe('beginSwipeDelete', () => {
     act(() => { vi.advanceTimersByTime(5000) })
 
     expect(persistence.deletes).toEqual([])
-    expect(persistence.writes).toEqual([])
+    expect(persistence.writes).toEqual(['note.md'])
   })
 
   it('excludes (not deletes) a recurring occurrence and writes the file on auto-close', () => {
@@ -93,7 +93,7 @@ describe('beginSwipeDelete', () => {
     expect(persistence.deletes).toEqual([])
   })
 
-  it('Undo on a recurring occurrence restores the un-excluded snapshot', () => {
+  it('Undo on a recurring occurrence restores the un-excluded snapshot and persists it', () => {
     const series = makeSeries({ id: 'series-1', fileSlug: 'note.md', repeat: { type: 'schedule', freq: 'daily' } })
     const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', ownerId: 'series-1' })
     seedStore([series], makeRoots('note.md'))
@@ -108,8 +108,32 @@ describe('beginSwipeDelete', () => {
 
     act(() => { vi.advanceTimersByTime(5000) })
 
-    expect(persistence.writes).toEqual([])
+    expect(persistence.writes).toEqual(['note.md'])
     expect(persistence.deletes).toEqual([])
+  })
+
+  it('undoing a delete does not revert an unrelated edit made during the toast window', () => {
+    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', date: '2026-06-15', time: null, metadata: { participants: [], title: 'A', tags: [], items: [] } })
+    const b = makeOcc({
+      id: 'occ-b', fileSlug: 'b.md', date: '2026-06-16', time: null,
+      metadata: { participants: [], title: 'B', tags: [], items: [], done: false },
+    })
+    const roots: Roots = makeRoots('a.md', { title: 'A' })
+    roots.set('b.md', { title: 'B', tags: [], items: [] })
+    seedStore([a, b], roots)
+    render(<Toaster />)
+
+    const apply = beginSwipeDelete(a)
+    act(() => apply())
+    flushToastMount()
+
+    act(() => { toggleOccDone(b) })
+    expect(persistence.writes).toEqual(['b.md'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(items().map(i => i.fileSlug).sort()).toEqual(['a.md', 'b.md'])
+    expect((items().find(i => i.id === 'occ-b') as StoreOcc).metadata.done).toBe(true)
   })
 
   it('a second delete fires the first pending commit immediately, before any timer advances', () => {

@@ -2,7 +2,7 @@ import { toast } from 'sonner'
 import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, occFromAppMeta } from '@/model'
 import { occIsRecur } from './occView'
 import { isStandaloneOcc } from './types'
-import type { Occurrence, OccurrenceEntry, OccurrenceMetadata } from './types'
+import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots, StoreItem } from './types'
 import { getSnapshot, getItems, getRoots, setData } from './storeBridge'
 import { writeEntity, deleteEntity } from './persistencePort'
 import { commitNext } from './storeCommit'
@@ -10,6 +10,24 @@ import { commitNext } from './storeCommit'
 let _toastId:       string | number | null = null
 let _pendingCommit: (() => void) | null    = null
 const TOAST_MS = 4000
+
+// Restores only `fileSlug`'s items/root from `snapshot` into the *current*
+// store, rather than reverting the whole store — an edit made to another
+// file while the undo toast was up must survive. The restored slug is then
+// re-persisted so the cache/backend agree with the reverted store.
+function restoreFileSlug(snapshot: { items: StoreItem[]; roots: Roots }, fileSlug: string): void {
+  const current = getSnapshot()
+  const items = [
+    ...current.items.filter(i => i.fileSlug !== fileSlug),
+    ...snapshot.items.filter(i => i.fileSlug === fileSlug),
+  ]
+  const roots = new Map(current.roots)
+  const snapshotRoot = snapshot.roots.get(fileSlug)
+  if (snapshotRoot) roots.set(fileSlug, snapshotRoot)
+  else roots.delete(fileSlug)
+  setData({ items, roots })
+  writeEntity(fileSlug)
+}
 
 function showDeleteToast(
   title: string,
@@ -91,7 +109,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
     const endsSeries = deletionEndsAfterCompletionSeries(snapshot.items, o)
     showDeleteToast(title,
       () => { writeEntity(o.fileSlug) },
-      () => { cancelled = true; setData(snapshot) },
+      () => { cancelled = true; restoreFileSlug(snapshot, o.fileSlug) },
       { endsSeries },
     )
     return () => { if (!cancelled) setData(next) }
@@ -100,7 +118,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
       () => { deleteEntity(o.fileSlug) },
       () => {
         cancelled = true
-        if (!getItems().find(i => i.id === o.id)) setData(snapshot)
+        if (!getItems().find(i => i.id === o.id)) restoreFileSlug(snapshot, o.fileSlug)
       },
     )
     return () => {
