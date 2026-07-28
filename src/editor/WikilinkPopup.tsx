@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { EditorView } from '@codemirror/view'
 import type { Roots } from '@/types'
@@ -48,6 +48,15 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
     onClose()
   }
 
+  // Latest-ref for the two callbacks the capture-phase listener invokes.
+  // insertWikilink is rebuilt every render (it closes over view/popup.from/
+  // onClose), so listing it in the dep array below would resubscribe on every
+  // render; naming it in a suppression instead is what previously opted this
+  // component out of React Compiler optimization altogether. The ref keeps
+  // both current without either cost.
+  const actionsRef = useRef({ insertWikilink, onClose })
+  useEffect(() => { actionsRef.current = { insertWikilink, onClose } })
+
   // Intercept arrow/enter/escape in capture phase so CM6 doesn't consume them
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -59,15 +68,14 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
         setFocusIdx(i => Math.max(i - 1, 0))
       } else if (e.key === 'Enter') {
         const m = matches[focusIdx]
-        if (m) { e.preventDefault(); e.stopPropagation(); insertWikilink(m.title) }
+        if (m) { e.preventDefault(); e.stopPropagation(); actionsRef.current.insertWikilink(m.title) }
       } else if (e.key === 'Escape') {
-        e.preventDefault(); e.stopPropagation(); onClose()
+        e.preventDefault(); e.stopPropagation(); actionsRef.current.onClose()
       }
     }
     view.contentDOM.addEventListener('keydown', handler, true)
     return () => view.contentDOM.removeEventListener('keydown', handler, true)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matches, focusIdx, view, popup.from])
+  }, [matches, focusIdx, view])
 
   // Close on click outside the popup
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { StoreItem, Roots, Occurrence } from '@/types'
 import { computeExpansionCache, weekStartsOn, type ExpansionCache } from '@/model'
 import { useStore } from '@/store'
@@ -51,15 +52,37 @@ export function useExpandWithMultiday(
   const prev = cacheByWindow.get(key) ?? null
   const next = computeExpansionCache(prev, items, roots, from, to, weekStart)
 
-  // Re-set on every call (not just when the result changed) so the map's
-  // insertion order tracks recency of use, keeping the LRU eviction below
-  // targeted at windows that are actually stale rather than merely unchanged.
-  cacheByWindow.delete(key)
+  // Value write, render phase. Safe here because it's idempotent:
+  // computeExpansionCache returns `prev` by reference when nothing changed, so
+  // repeating this write (StrictMode double-render) or skipping it (React
+  // Compiler memoizing this block on items/roots/from/to/weekStart) can't
+  // produce a wrong value. `set` on an existing key also leaves the map's
+  // insertion order alone, so this deliberately does NOT touch recency.
   cacheByWindow.set(key, next)
-  if (cacheByWindow.size > MAX_CACHED_WINDOWS) {
-    const oldestKey = cacheByWindow.keys().next().value
-    if (oldestKey !== undefined) cacheByWindow.delete(oldestKey)
-  }
+
+  // Recency write, commit phase. This one is order-dependent, so it can't live
+  // in render: the compiler memoizes the block above, and callers whose window
+  // is reference-stable across renders (useAgendaSections memoizes from/to on
+  // `today`) would then skip the touch entirely on unrelated re-renders — the
+  // agenda's minute tick, a filter change — and the LRU would start evicting
+  // windows that are in active use rather than ones that are actually stale.
+  // Intentionally no dep array: "recency of use" means every commit that used
+  // this window, which is the closest honest equivalent of the old
+  // every-render touch now that "every render" is not something a compiled
+  // component can promise. Both operations are O(1).
+  useEffect(() => {
+    // delete+set rather than set alone: `set` on an existing key keeps its
+    // original position, and moving `key` to the end is the whole point. Also
+    // re-inserts the entry if another window's eviction dropped it meanwhile.
+    cacheByWindow.delete(key)
+    cacheByWindow.set(key, next)
+    if (cacheByWindow.size > MAX_CACHED_WINDOWS) {
+      // Can't hit the entry just re-inserted above — it's now the newest, and
+      // the map only overflows at sizes well above one.
+      const oldestKey = cacheByWindow.keys().next().value
+      if (oldestKey !== undefined) cacheByWindow.delete(oldestKey)
+    }
+  })
 
   return next.allOccs
 }
