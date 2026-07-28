@@ -17,6 +17,13 @@ import { resolveWikilink, unwrapRef } from '../wikilinks'
 export interface StoreData {
   items: StoreItem[]
   roots: Roots
+  /**
+   * Slugs occupied by a file that exists on disk but failed to parse, so it
+   * has neither a root nor an item of its own — see `slugTaken`/`newEntrySlug`.
+   * Optional: most StoreData snapshots (any edit to an existing item) have no
+   * use for it and omit it.
+   */
+  unreadableSlugs?: ReadonlySet<string>
 }
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
@@ -261,8 +268,8 @@ function applyFieldsToItem(item: StoreItem, fields: EditFields): StoreItem {
 // ── New-entry slug allocation ─────────────────────────────────────────────────
 
 /** True when some file already occupies `fileSlug` in this snapshot. */
-function slugTaken({ items, roots }: StoreData, fileSlug: string): boolean {
-  return roots.has(fileSlug) || items.some(i => i.fileSlug === fileSlug)
+function slugTaken({ items, roots, unreadableSlugs }: StoreData, fileSlug: string): boolean {
+  return roots.has(fileSlug) || items.some(i => i.fileSlug === fileSlug) || (unreadableSlugs?.has(fileSlug) ?? false)
 }
 
 /**
@@ -290,7 +297,9 @@ function findDraft(items: StoreItem[], draftId: string | undefined): StoreItem |
  * `titleToSlug` collides freely ("Buy groceries" / "Buy groceries!" / any two
  * titles agreeing in their first 60 slug characters all map to `buy-groceries`)
  * and a file write is a whole-file replace, so without this a new entry would
- * silently destroy the unrelated entry sitting on its slug.
+ * silently destroy the unrelated entry sitting on its slug. `slugTaken` also
+ * consults `data.unreadableSlugs`, so a file that failed to parse (and so has
+ * neither a root nor an item) still holds its slug instead of looking free.
  *
  * Exported because callers need the resulting slug to know which file to
  * persist — see `saveNode`.

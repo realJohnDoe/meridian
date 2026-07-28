@@ -11,10 +11,11 @@ export default function SyncButton() {
   const syncOffline    = useStore(s => s.syncOffline)
   const syncInProgress = useStore(s => s.syncInProgress)
   const lastSyncedAt   = useStore(s => s.lastSyncedAt)
+  const unreadableFiles = useStore(s => s.unreadableFiles)
 
   const isPending = syncOffline || syncDirtyCount > 0
 
-  const color = syncError !== null
+  const color = syncError !== null || unreadableFiles.size > 0
     ? 'var(--destructive)'
     : isPending ? 'var(--warning)'
     : 'var(--dim)'
@@ -59,6 +60,19 @@ export default function SyncButton() {
           <p className="text-xs text-destructive">
             {syncError}
           </p>
+        )}
+
+        {unreadableFiles.size > 0 && (
+          <div className="text-xs text-destructive space-y-1">
+            <p>
+              {unreadableFiles.size} file{unreadableFiles.size > 1 ? 's' : ''} couldn't be read:
+            </p>
+            <ul className="list-disc list-inside">
+              {[...unreadableFiles.values()].map(f => (
+                <li key={f.path} title={f.message}>{f.path}</li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <Button

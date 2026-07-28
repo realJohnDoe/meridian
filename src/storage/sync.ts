@@ -14,7 +14,7 @@ import type { StoreItem, Roots } from '@/types'
 import {
   getItems, getRoots, setData,
   setSyncDirtyCount, setSyncError, setSyncOffline, setLastSyncedAt, getSyncError,
-  setSyncInProgress,
+  setSyncInProgress, getUnreadableFiles, setUnreadableFiles,
 } from '@/storeBridge'
 import { notify, warn, notifyError } from './notifications'
 import { getActiveBackend } from './activeBackend'
@@ -35,19 +35,48 @@ export function updateSyncUI(): void {
   cacheDirtyCount(backend.id).then(n => setSyncDirtyCount(n)).catch(() => {})
 }
 
+/** A file that failed to parse, keyed by its path (see `ParseFailure.slug` for the store key). */
+export interface ParseFailure {
+  path:    string
+  slug:    string
+  message: string
+}
+
 export function parseFiles(
   files: Array<{ path: string; content: string }>,
-): { items: StoreItem[]; roots: Roots } {
+): { items: StoreItem[]; roots: Roots; failures: ParseFailure[] } {
   const loaded: StoreItem[] = []
   const roots: Roots = new Map()
+  const failures: ParseFailure[] = []
   for (const { path, content } of files) {
     try {
       const parsed = parseToStoreItems(path, content)
       loaded.push(...parsed.items)
       roots.set(pathToSlug(path), parsed.root)
-    } catch (e) { console.warn('[vault] parse failed for', path, e) }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      failures.push({ path, slug: pathToSlug(path), message })
+      console.warn('[vault] parse failed for', path, e)
+    }
   }
-  return { items: loaded, roots }
+  return { items: loaded, roots, failures }
+}
+
+/**
+ * Surface parse failures to the user. A `console.warn` alone (the old
+ * behaviour) is invisible in a PWA with no open devtools — this is the one
+ * user-visible signal that a hand-edited file silently dropped out of the
+ * vault. Called after every full load and every reconcile merge that touches
+ * a file which fails to parse.
+ */
+export function reportParseFailures(failures: ParseFailure[]): void {
+  if (failures.length === 0) return
+  const [first] = failures
+  if (first && failures.length === 1) {
+    warn(`Couldn't read ${first.path} — ${first.message}`)
+    return
+  }
+  warn(`Couldn't read ${failures.length} files: ${failures.map(f => f.path).join(', ')}`)
 }
 
 // ── COLLISION RESOLUTION ───────────────────────────────────────────
@@ -198,9 +227,15 @@ function mergeChangedIntoStore(
   const keptRoots: Roots = new Map(
     [...getRoots()].filter(([slug]) => !affectedSlugs.has(slug)),
   )
+  const keptUnreadable = new Map(
+    [...getUnreadableFiles()].filter(([slug]) => !affectedSlugs.has(slug)),
+  )
 
-  const { items: newItems, roots: newRoots } = parseFiles(records)
+  const { items: newItems, roots: newRoots, failures } = parseFiles(records)
   setData({ items: [...keptItems, ...newItems], roots: new Map([...keptRoots, ...newRoots]) })
+  for (const f of failures) keptUnreadable.set(f.slug, { path: f.path, message: f.message })
+  setUnreadableFiles(keptUnreadable)
+  reportParseFailures(failures)
 }
 
 // Above this many changed paths, a per-file readFiles() fan-out risks the same

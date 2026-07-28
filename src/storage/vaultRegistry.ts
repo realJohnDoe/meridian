@@ -13,10 +13,10 @@ import { ExampleBackend } from './exampleBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import type { VaultRef, GitHubVaultRef } from '@/types'
-import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress } from '@/storeBridge'
+import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress, setUnreadableFiles } from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
-import { syncOnActivate, parseFiles, updateSyncUI } from './sync'
+import { syncOnActivate, parseFiles, reportParseFailures, updateSyncUI } from './sync'
 // ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
 
 const _vaultChangedListeners = new Set<() => void>()
@@ -58,10 +58,13 @@ async function hydrateFromCache(vaultId: string): Promise<boolean> {
     // entries, and the reconcile that follows won't evict them
     // (mergeChangedIntoStore preserves unaffected slugs).
     setData({ items: [], roots: new Map() })
+    setUnreadableFiles(new Map())
     return false
   }
-  const { items, roots } = parseFiles(cached)
+  const { items, roots, failures } = parseFiles(cached)
   setData({ items, roots })
+  setUnreadableFiles(new Map(failures.map(f => [f.slug, { path: f.path, message: f.message }])))
+  reportParseFailures(failures)
   return true
 }
 
@@ -97,7 +100,10 @@ async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<v
   const backend = new ExampleBackend()
   await setActiveVaultIdentity(backend, { persist: opts.persist ?? true })
   const files = await backend.readAll()
-  setData(parseFiles(files))
+  const { items, roots, failures } = parseFiles(files)
+  setData({ items, roots })
+  setUnreadableFiles(new Map(failures.map(f => [f.slug, { path: f.path, message: f.message }])))
+  reportParseFailures(failures)
   updateSyncUI()
   emitVaultChanged()
 }

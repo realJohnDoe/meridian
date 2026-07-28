@@ -39,6 +39,16 @@ interface MeridianStore {
   backlinks: Map<string, string[]>
   /** Set items and roots together atomically. */
   setData: (data: { items: StoreItem[]; roots: Roots }) => void
+  /**
+   * Files that failed to parse on the last load or reconcile, keyed by
+   * fileSlug. Deliberately kept out of `roots` — an unparseable file has no
+   * FileMetadata to offer, and giving it a placeholder root would make it
+   * look like a normal (if empty) entry to wikilink resolution, search, and
+   * `applyNew`'s collision check. Consulted by `saveNode` (src/editor/save.ts)
+   * so a new entry can never silently overwrite a file that couldn't be read.
+   */
+  unreadableFiles: Map<string, { path: string; message: string }>
+  setUnreadableFiles: (files: Map<string, { path: string; message: string }>) => void
 
   // ── Vaults ──────────────────────────────────────────────────────
   vaults:        VaultRef[]
@@ -153,6 +163,9 @@ export const useStore = create<MeridianStore>((set, get) => {
       const backlinks = roots === prevRoots ? prevBacklinks : buildBacklinkIndex(roots)
       set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots, weekStart), backlinks })
     },
+
+    unreadableFiles: new Map(),
+    setUnreadableFiles: (files) => set({ unreadableFiles: files }),
 
     vaults:              [],
     activeVaultId:       null,
