@@ -141,17 +141,24 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     if (autosaveTimerRef.current) { clearTimeout(autosaveTimerRef.current); autosaveTimerRef.current = null }
   }
 
-  useEffect(() => () => {
-    flushAutoSave()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // The unmount flush must run the *latest* flushAutoSave, not the one from
+  // mount — it commits whatever edit is pending at teardown. Standard
+  // latest-ref: a depless effect refreshes it after every commit, and the
+  // cleanup below reads it. Replaces an exhaustive-deps suppression, which
+  // would have opted this hook out of React Compiler optimization entirely.
+  const flushAutoSaveRef = useRef(flushAutoSave)
+  useEffect(() => { flushAutoSaveRef.current = flushAutoSave })
+  useEffect(() => () => { flushAutoSaveRef.current() }, [])
 
   // A new item opened with an initial title (e.g. "Add <query>" from search, or a
   // wikilink to a not-yet-existing note) already has everything needed to create the
   // file — don't wait for the user to make an edit that would trigger autosave.
+  // Mount-time values by construction: this fires once, before any edit could
+  // have changed initialOcc or rebuilt commitEntry.
+  const initialCommitRef = useRef({ initialOcc, commitEntry })
   useEffect(() => {
-    if (!initialOcc && entryRef.current.title) commitEntry(entryRef.current)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const { initialOcc: occAtMount, commitEntry: commitAtMount } = initialCommitRef.current
+    if (!occAtMount && entryRef.current.title) commitAtMount(entryRef.current)
   }, [])
 
   const updateEntry = (next: EntryState) => {

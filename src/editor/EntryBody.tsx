@@ -86,12 +86,24 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
   useEffect(() => { onOpenRef.current   = onOpenWikilink ?? (() => {}) }, [onOpenWikilink])
   useEffect(() => { onChangeRef.current = onChange ?? (() => {}) }, [onChange])
 
+  // Seed values for the CM6 mount effect below. These are only ever read to
+  // build the initial EditorState, so capturing them at mount is the intended
+  // semantics — useRef ignores its argument after the first render, which
+  // states that in code instead of via an exhaustive-deps suppression. The
+  // distinction matters beyond style: any react-hooks suppression inside a
+  // component makes the React Compiler skip optimizing the whole component
+  // ("skipped optimizing this component because one or more React ESLint rules
+  // were disabled"), so a one-line suppression silently cost this entire file
+  // its memoization.
+  const seedRef = useRef({ body, roots, items })
+
   // Mount CM6 EditorView once per component lifetime (key= on parent handles remounts)
   useEffect(() => {
     if (!containerRef.current) return
+    const { body: seedBody, roots: seedRoots, items: seedItems } = seedRef.current
 
     const state = EditorState.create({
-      doc: body,
+      doc: seedBody,
       extensions: [
         markdownLanguage,
         markdownHighlight,
@@ -99,8 +111,8 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
         markdownListDecos,
         markdownLivePreview,
         // Wikilink state fields (must be registered before the decoration plugin)
-        rootsField.init(() => roots),
-        itemsField.init(() => items),
+        rootsField.init(() => seedRoots),
+        itemsField.init(() => seedItems),
         createWikilinkExtension(onOpenRef),
         wikilinkTheme,
         createTaskExtension(),
@@ -138,8 +150,11 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
       viewRef.current = null
       setView(null)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    // viewRef is listed rather than seeded above because the effect writes
+    // through it (including in cleanup) — same convention as the setRoots/
+    // setItems effects below. It's a ref object from the parent, so it's
+    // stable and this stays mount-only in practice.
+  }, [viewRef])
 
   // Keep roots in sync without remounting
   useEffect(() => {

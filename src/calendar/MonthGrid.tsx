@@ -12,6 +12,7 @@ import { maxVisibleFor, ROW_GAP } from './snapCarousel'
 
 const EMPTY: Occurrence[] = []
 import { useExpandWithMultiday } from './useExpandWithMultiday'
+import { useNow } from './useNow'
 import { useToday } from '@/hooks'
 import { useCalendarFilter } from './useCalendarFilter'
 import { SurfaceButton } from '@/components/primitives/surface-button'
@@ -120,6 +121,13 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
   const m = month.getMonth()
   const y = month.getFullYear()
 
+  // Sort clock for occsByDay below. Only this pane can have an occurrence cross
+  // the now-boundary: in a past month everything is already past, in a future
+  // month everything is still future, so the other two carousel panes freeze at
+  // whatever they mounted with (same `enabled` trick as DayPane).
+  const showsToday = today.getFullYear() === y && today.getMonth() === m
+  const now = useNow(60_000, showsToday)
+
   // useExpandWithMultiday caches by (fromMs, toMs, items structure, roots) so
   // non-structural edits (done-toggle, priority change) skip re-expansion here
   // just as they do in Agenda and Day views. Multiday events emit both a root
@@ -166,11 +174,17 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
         rootsById.set(o.id, o)
       }
     }
-    // Unlike AgendaView/DayPane, this partition isn't inside a useMemo — it
-    // reruns on every render — so calling the wall clock directly here is
-    // exactly as fresh as occState(o)'s own default below, with no memo
-    // dependency to keep honest and no need for a ticking clock.
-    const now = new Date()
+    // `now` is the ticking value from useNow above, not a `new Date()` read
+    // here. Reading the clock inline used to look safe — this partition isn't
+    // in a useMemo, and the React Compiler does not in fact memoize it (it
+    // gives MonthGrid only a 4-slot cache, for parseMonth(monthKey) and the
+    // returned JSX; verify with `grep -c memo_cache_sentinel` over this
+    // component's range in dist/assets/calendar-*.js). But "recomputed on
+    // every render" is not the same as "current": nothing schedules a render
+    // when the clock crosses an occurrence boundary, so a pane sitting idle at
+    // 13:59 kept sorting a 14:00 event as active long past 14:00. sortOccs
+    // needs sub-day precision — occState compares jsTime and jsTime+duration
+    // against `now`, not just startOfDay(now) — so `today` alone won't do.
     for (const [k, arr] of dayMap) dayMap.set(k, sortOccs(arr, now))
     return { occsByDay: dayMap, multidayLanes: computeMultidayLanes([...rootsById.values()]) }
   })()

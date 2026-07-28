@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   completeGitHubSignIn, fetchInstalledRepos, addGitHubVaultOAuth,
@@ -44,11 +44,19 @@ function AuthCallbackPage() {
   const [phase, setPhase] = useState<Phase>({ kind: 'exchanging' })
   const loadProgress = useStore(s => s.vaultLoadProgress)
 
+  // The OAuth exchange runs exactly once against the params this page was
+  // loaded with; `connect` is a hoisted declaration, so capturing it here picks
+  // up the same closure the effect would have seen anyway. Written as a mount
+  // ref rather than an exhaustive-deps suppression because such a suppression
+  // makes the React Compiler skip optimizing the whole component.
+  const startRef = useRef({ search, connect })
+
   useEffect(() => {
+    const { search: mountSearch, connect: mountConnect } = startRef.current
     const params = new URLSearchParams()
-    if (search.code) params.set('code', search.code)
-    if (search.state) params.set('state', search.state)
-    if (search.error) params.set('error', search.error)
+    if (mountSearch.code) params.set('code', mountSearch.code)
+    if (mountSearch.state) params.set('state', mountSearch.state)
+    if (mountSearch.error) params.set('error', mountSearch.error)
 
     let cancelled = false
     completeGitHubSignIn(params)
@@ -56,7 +64,7 @@ function AuthCallbackPage() {
         const repos = await fetchInstalledRepos(tokens.accessToken)
         if (cancelled) return
         if (repos.length === 0) setPhase({ kind: 'no-installations' })
-        else if (repos.length === 1) await connect(tokens, repos[0]!)
+        else if (repos.length === 1) await mountConnect(tokens, repos[0]!)
         else setPhase({ kind: 'picking', tokens, repos })
       })
       .catch(e => {
@@ -65,7 +73,6 @@ function AuthCallbackPage() {
         setPhase({ kind: 'error', message })
       })
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function connect(tokens: OAuthTokens, repo: InstalledRepo) {

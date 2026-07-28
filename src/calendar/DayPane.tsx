@@ -247,13 +247,18 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
   // 50ms-then-scrollTo timer (which only ever ran once per date, always
   // resetting to 7am — the deliberate behaviour change here is that scroll
   // position now persists across day navigation instead).
+  // Mount-only: this pane's scroll position is then owned by the user/the
+  // cross-pane mirror in DayView, not by getInitialScrollTop changing later.
+  // Held in a ref rather than declared via an exhaustive-deps suppression —
+  // useRef keeps the mount-time value and nothing else, which is the same
+  // semantics, and it keeps DayPane eligible for the React Compiler (a single
+  // react-hooks suppression anywhere in a component opts the whole component
+  // out of compilation).
+  const getInitialScrollTopRef = useRef(getInitialScrollTop)
   useLayoutEffect(() => {
     const el = scRef.current
     if (!el) return
-    el.scrollTop = getInitialScrollTop()
-    // Mount-only: this pane's scroll position is then owned by the user/the
-    // cross-pane mirror in DayView, not by getInitialScrollTop changing later.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    el.scrollTop = getInitialScrollTopRef.current()
   }, [])
 
   const totalCols = Math.max(cols.length, 1)
