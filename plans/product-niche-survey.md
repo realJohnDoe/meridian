@@ -13,6 +13,20 @@ Code quality, UI implementation, speed, and data safety belong to the other surv
 
 **Visual design is in scope here, but from the opposite side of the UI survey.** That survey reads the same files — theme tokens, Tailwind usage, `components/ui/` — and asks whether the styling system is *internally consistent*. This survey asks whether the styling system says the *right thing about who this product is for*. A palette can be perfectly consistent and still address the wrong audience; a layout can be flawlessly systematic and still look like a different category of product. Same files, different question — when a finding is about consistency, hand it to the UI survey and say so.
 
+## Product/market fit — what this survey can and cannot say
+
+**It cannot assess product/market fit, and it must not pretend to.** PMF is a demand-side claim — do real people adopt this, keep using it, and choose it over what they use today? That is answered with evidence from outside the repository: retention, repeat use, unprompted feedback, people switching. This project currently has none of it. There is no analytics, telemetry, or feedback path in the app, `.github/` holds only workflows, and the first line of `plans/next-steps.md` is `Post about Meridian in Obsidian forums` — market contact hasn't happened yet. There is no PMF signal here to read.
+
+What this survey covers is the **precondition side**: niche coherence, recognisability, and adoption gates. Those can show you would **fail** PMF for a knowable reason — the right person can't tell it's for them, or can't get in the door. They can never show that you would pass.
+
+**The hard rule that follows:** do not infer demand from the product. No claims about what users want, how big the audience is, what people would pay, or how a segment would react, unless you are quoting an actual artifact. This is the one place in the survey where confident invention is easy and worthless. When you catch yourself reaching for such a claim, stop and log it as a bet below — that is the useful form of the same thought.
+
+Three things are legitimately available, and the report must deliver them:
+
+- **The bet list.** State the product's core falsifiable bets — the things that must be true about real people for this to work — and for each, name the evidence that would confirm it and the evidence that would kill it. Derive them from what the product actually commits to (one timeline for tasks, events and notes; plain files being worth their setup cost; mobile experience as the wedge against the Obsidian + TaskNotes combination; recurrence depth mattering to real schedules), not from a template. Each bet should be phrased so that a forum thread, a first ten users, or a week of a stranger's use could refute it.
+- **Dogfooding as the one real usage signal.** The author is the product's primary user, and PMF-of-one is legitimate early evidence. Read the repository for it: what the roadmap prioritises and why, what the example vault and fixtures reveal about actual use, where the code carries workarounds for the author's own friction. Report what daily use appears to confirm — and be equally interested in what it can't tell you, since a product shaped around one user's habits is the classic way a niche stays a niche of one.
+- **Feedback-channel readiness.** Say what would have to exist for the first launch to teach anything at all, and note the genuine tension: a no-server, privacy-respecting, local-first product has principled reasons *not* to add telemetry. Present the options that fit those values — an in-app feedback link, a discussions space, watching the forum thread — and route the choice to the decisions section. Do not recommend analytics by default.
+
 ## Phase 0 — establish the three niches (do this first, state it explicitly)
 
 Everything else in this survey is a gap between these three. Write each as one or two sentences naming a **person**, the **job** they're hiring the product for, and the **alternative** they'd otherwise use.
@@ -103,9 +117,15 @@ Rank by `(impact × breadth) ÷ effort`, where `effort` is the tier as an ordina
 
 Where findings touch the same surface, add a one-line **sequencing note**: positioning decisions must land before the copy edits that express them, or the edits get redone.
 
-### 5. The decisions only you can make
+### 5. PMF bets and what would test them
 
-Close with a short, explicit list of the **strategy questions this survey surfaces but must not answer** — what the niche is, who the beachhead user is, which differentiator leads, whether the notes category stays in the headline, whether the LLM-friendly audience is worth targeting. State the options and the consequence of each, then stop. Everything outside this list should be actionable without further input.
+Deliver the three items from the product/market-fit section above: the bet list (each with its confirming and killing evidence), the dogfooding read, and the feedback-channel options. Keep it to a page. State plainly at the top that this is not a PMF assessment and cannot be one — it is the list of things the first real contact with the market would settle, written so that contact can actually settle them.
+
+Findings do **not** live here: nothing in this section is ranked, scored, or given a model tier. It is a set of open questions, and its value is that it stays open.
+
+### 6. The decisions only you can make
+
+Close with a short, explicit list of the **strategy questions this survey surfaces but must not answer** — what the niche is, who the beachhead user is, which differentiator leads, whether the notes category stays in the headline, whether the LLM-friendly audience is worth targeting, and which feedback channel (if any) fits a product built on not running a server. State the options and the consequence of each, then stop. Everything outside this list should be actionable without further input.
 
 Do not pad to 8 — a short report grounded in real quotes beats a long one built on speculation.
 
