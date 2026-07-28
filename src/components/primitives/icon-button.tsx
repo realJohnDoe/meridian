@@ -24,7 +24,7 @@
 import * as React from 'react'
 import { cn } from '@/lib/cn'
 
-export interface IconButtonProps extends React.ComponentProps<'button'> {
+interface IconButtonProps extends React.ComponentProps<'button'> {
   /** Accessible name, rendered as `aria-label`. */
   label: string
   hit?: 'expand' | 'pad'
