@@ -11,7 +11,8 @@ const { navigateMock, completeGitHubSignIn, fetchInstalledRepos, addGitHubVaultO
     completeGitHubSignIn: vi.fn(),
     fetchInstalledRepos: vi.fn(),
     addGitHubVaultOAuth: vi.fn(),
-    searchMock: vi.fn(),
+    // Typed so the createFileRoute mock's useSearch does not return `any`.
+    searchMock: vi.fn<() => { code?: string; state?: string; error?: string }>(),
     // Must be the same class the component checks with `instanceof`, so it is
     // defined here and re-exported by the mock rather than imported.
     OAuthCallbackError: class OAuthCallbackError extends Error {},
@@ -37,8 +38,15 @@ vi.mock('@/vaultActions', () => ({
   GITHUB_APP_INSTALL_URL: 'https://github.com/apps/test-app/installations/new',
 }))
 
+// The createFileRoute mock hands back the plain options object at runtime, but
+// the static type still describes the real Route, which exposes neither
+// `component` nor `validateSearch`. Re-describe it for the type checker.
 const { Route } = await import('./auth.callback')
-const AuthCallbackPage = Route.component as () => React.ReactElement
+const routeOptions = Route as unknown as {
+  component: () => React.ReactElement
+  validateSearch: (s: Record<string, unknown>) => { code?: string; state?: string; error?: string }
+}
+const AuthCallbackPage = routeOptions.component
 
 const TOKENS = { accessToken: 'at', refreshToken: 'rt', expiresAt: 1_800_000 }
 const repo = (name: string) => ({ owner: 'acme', repo: name, branch: 'main' })
@@ -55,7 +63,7 @@ beforeEach(() => {
 })
 
 describe('auth.callback — validateSearch', () => {
-  const validate = Route.validateSearch as (s: Record<string, unknown>) => Record<string, unknown>
+  const validate = routeOptions.validateSearch
 
   it('passes through string code, state and error', () => {
     expect(validate({ code: 'c', state: 's', error: 'e' })).toEqual({ code: 'c', state: 's', error: 'e' })
