@@ -138,6 +138,7 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
               showTagsParticipants={false}
               onOpen={() => insertWikilink(e.title)}
               onToggleDone={() => {}}
+              animate={false}
             />
           </div>
         ) : (
