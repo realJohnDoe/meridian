@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { EditorState } from '@codemirror/state'
-import { EditorView, keymap, placeholder, drawSelection } from '@codemirror/view'
+import { EditorView, keymap, drawSelection } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import type { Roots, StoreItem } from '@/types'
 import {
@@ -10,6 +10,7 @@ import {
 } from './cm/wikilinkDecorations'
 import { createTaskExtension, taskTheme } from './cm/taskDecorations'
 import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme } from './cm/markdownFormatting'
+import { emptyPlaceholder, emptyPlaceholderTheme } from './cm/emptyPlaceholder'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
 
 interface Props {
@@ -49,9 +50,6 @@ const editorTheme = EditorView.theme({
   },
   '.cm-selectionBackground, ::selection': {
     background: 'color-mix(in oklab, var(--primary), transparent 75%) !important',
-  },
-  '.cm-placeholder': {
-    color: 'var(--muted-foreground)',
   },
   // Rendered markdown link on non-cursor lines
   '.cm-md-link': {
@@ -109,7 +107,8 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
         taskTheme,
         editorTheme,
         drawSelection(),
-        placeholder('Add a description…'),
+        emptyPlaceholder,
+        emptyPlaceholderTheme('Add a description…'),
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ spellcheck: 'false' }),
         history(),
