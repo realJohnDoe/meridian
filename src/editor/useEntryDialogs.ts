@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { SeriesSheetConfig } from './save'
 import type { Priority } from '@/types'
 import type { EntryState } from './state'
@@ -26,11 +26,12 @@ export function useEntryDialogs(entry: EntryState, updateEntry: (next: EntryStat
   const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void } | null>(null)
   const [seriesSheetConfig, setSeriesSheetConfig] = useState<SeriesSheetConfig | null>(null)
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setActiveDialog(null) }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [])
+  // No document-level Escape listener here on purpose. Every dialog in
+  // DialogStack is a Radix Dialog/AlertDialog or a vaul Drawer, each of which
+  // already dismisses itself on Escape and reports it through onOpenChange.
+  // A global listener additionally fired for *nested* layers (RepeatDialog's
+  // end-date picker, or any Select inside a dialog), tearing down the whole
+  // stack when Escape should only have closed the topmost one.
 
   const handleOpenDlg = (id: string) => setActiveDialog(id)
   const handleOpenRepeatDlg = (_itemType?: string) => setActiveDialog('dlgRepeat')

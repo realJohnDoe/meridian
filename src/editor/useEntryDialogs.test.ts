@@ -27,20 +27,15 @@ describe('useEntryDialogs', () => {
     expect(result.current.dialogHandlers.activeDialog).toBe('dlgRepeat')
   })
 
-  it('closes the active dialog on Escape', () => {
+  // The hook deliberately installs no document-level Escape listener: each
+  // dialog is a Radix/vaul layer that dismisses itself and reports it through
+  // onOpenChange. A global listener also fired for nested layers, closing the
+  // whole stack at once — see the nesting test in DialogStack.test.tsx.
+  it('does not close the active dialog on a bare document Escape', () => {
     const { result } = setup()
     act(() => result.current.handleOpenDlg('dlgDate'))
-    expect(result.current.dialogHandlers.activeDialog).toBe('dlgDate')
 
     act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
-    expect(result.current.dialogHandlers.activeDialog).toBeNull()
-  })
-
-  it('ignores non-Escape keys', () => {
-    const { result } = setup()
-    act(() => result.current.handleOpenDlg('dlgDate'))
-
-    act(() => { fireEvent.keyDown(document, { key: 'Enter' }) })
     expect(result.current.dialogHandlers.activeDialog).toBe('dlgDate')
   })
 
