@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn'
 import { addLocalVault, addGitHubVault, startGitHubSignIn } from '@/vaultActions'
 import {
   ResponsiveModalTitle,
-} from '@/components/ui/responsive-modal'
+} from '@/components/primitives/responsive-modal'
 import { useStore } from '@/store'
 
 type WizardStep = 'source' | 'github'

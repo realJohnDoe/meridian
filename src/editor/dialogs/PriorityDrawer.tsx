@@ -5,9 +5,9 @@ import {
   ResponsiveModalContent,
   ResponsiveModalTitle,
   ResponsiveModalActions,
-} from '@/components/ui/responsive-modal'
+} from '@/components/primitives/responsive-modal'
 import { badgeVariants } from '@/components/ui/badge'
-import { PRIORITY_CLASS } from '@/components/ui/occurrence-variants'
+import { PRIORITY_CLASS } from '@/components/primitives/occurrence-variants'
 import { cn } from '@/lib/cn'
 import { useResetOnChange } from '@/hooks'
 import type { Priority } from '@/types'

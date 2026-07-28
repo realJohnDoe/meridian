@@ -1,4 +1,4 @@
-import { cva, type VariantProps } from 'class-variance-authority'
+import { cva } from 'class-variance-authority'
 import type { OccState, Priority } from '@/types'
 
 /**
@@ -42,8 +42,6 @@ export const occBarVariants = cva(
   },
 )
 
-export type OccBarVariants = VariantProps<typeof occBarVariants>
-
 /**
  * Shared small corner radius for occurrence "pill" elements — month-view day
  * cell chips/bars and day-view all-day items. Kept in one place so the two
@@ -52,27 +50,6 @@ export type OccBarVariants = VariantProps<typeof occBarVariants>
  * MonthGrid.tsx) — they ended up more rounded than their day-view counterpart.
  */
 export const occPillRounded = 'rounded-xs sm:rounded-sm'
-
-/**
- * Mini colour-coded label bars in MonthView calendar cells.
- * Past events and done tasks show struck through.
- */
-export const ccBarVariants = cva(
-  'rounded-sm py-px px-1 text-3xs font-medium truncate leading-snug shrink-0',
-  {
-    variants: {
-      state: {
-        ...TINT_CLASSES,
-        'event-future': 'bg-event/18 text-event',
-        'event-past':   'bg-muted text-muted-foreground line-through',
-        done:           'bg-muted text-muted-foreground line-through',
-      } satisfies Record<OccState, string>,
-    },
-    defaultVariants: { state: 'done' },
-  },
-)
-
-export type CcBarVariants = VariantProps<typeof ccBarVariants>
 
 /**
  * DayView item colouring — all-day pills (bordered=false) and timed event
@@ -105,8 +82,6 @@ export const dvBlockVariants = cva('', {
   ],
   defaultVariants: { state: 'done', bordered: false },
 })
-
-export type DvBlockVariants = VariantProps<typeof dvBlockVariants>
 
 /**
  * Priority chip active-state colouring — shared between the entry editor's

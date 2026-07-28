@@ -1,5 +1,5 @@
 import { Menu, ChevronLeft, ChevronRight } from 'lucide-react'
-import { IconButton } from '@/components/ui/icon-button'
+import { IconButton } from '@/components/primitives/icon-button'
 
 // Shared by the day and month topbar variants — both are a mobile menu
 // button, an ellipsized label, and prev/next chevrons, differing only in

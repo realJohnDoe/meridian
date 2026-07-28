@@ -2,7 +2,7 @@ import { lazy, Suspense, useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor'
-import { EntrySkeleton } from '@/components/ui/entry-skeleton'
+import { EntrySkeleton } from '@/components/primitives/entry-skeleton'
 import { titleToSlug } from '@/fileIO'
 import { EntryTopbar } from './-entryTopbar'
 

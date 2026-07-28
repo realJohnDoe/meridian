@@ -3,7 +3,7 @@ import { Plus, Users } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { TagChip } from '@/components'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
-import { FloatingComboboxList } from '@/components/ui/floating-combobox-list'
+import { FloatingComboboxList } from './FloatingComboboxList'
 import { useFloatingCombobox } from '@/hooks'
 
 const EMPTY_PARTICIPANTS: string[] = []

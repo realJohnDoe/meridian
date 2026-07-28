@@ -12,7 +12,7 @@ import {
   ResponsiveModalContent,
   ResponsiveModalTitle,
   ResponsiveModalDescription,
-} from '@/components/ui/responsive-modal'
+} from '@/components/primitives/responsive-modal'
 import { AddVaultWizard } from '@/components/AddVaultWizard'
 import { VaultSettings } from '@/components/VaultSettings'
 

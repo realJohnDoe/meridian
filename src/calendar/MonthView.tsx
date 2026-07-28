@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '@/store'
 import { fmtMonth, parseMonth, weekStartsOn } from '@/model'
 import MonthGrid, { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS } from './MonthGrid'
-import { SurfaceButton } from '@/components/ui/surface-button'
+import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import { useCarousel } from './useCarousel'
 import { PANE_COUNT } from './snapCarousel'
-import { occPillRounded } from '@/components/ui/occurrence-variants'
+import { occPillRounded } from '@/components/primitives/occurrence-variants'
 import { calendarView, setMonthPreview } from './viewState'
 
 // Fallback for the occurrence-list start offset until it's measured (cell top padding

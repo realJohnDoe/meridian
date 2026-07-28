@@ -23,8 +23,12 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
         ...coverageConfigDefaults.exclude,
-        // shadcn primitives and route registration are boilerplate, not
-        // application logic worth a coverage floor.
+        // shadcn registry components and route registration are boilerplate,
+        // not application logic worth a coverage floor. components/ui/ is kept
+        // as a faithful mirror of the shadcn registry precisely so this
+        // exclusion stays true — our own shared primitives live in
+        // components/primitives/ (and feature-owned ones in their feature dir),
+        // where they ARE counted. Don't hand-write first-party files in here.
         'src/components/ui/**',
         'src/routes/**',
         'src/routeTree.gen.ts',
@@ -39,10 +43,10 @@ export default defineConfig({
         // entirely. This catches that: adding a sizeable unexercised module
         // drags the project total below the floor and fails CI. Kept a few
         // points under the measured total so ordinary UI work doesn't trip it.
-        statements: 50,
-        branches: 47,
-        functions: 42,
-        lines: 52,
+        statements: 55,
+        branches: 52,
+        functions: 46,
+        lines: 57,
         'src/model/collapse.ts': { statements: 90, branches: 80, functions: 95, lines: 90 },
         'src/editor/cm/taskLines.ts': { statements: 90, branches: 80, functions: 95, lines: 95 },
         'src/editor/cm/markdownFormatting.ts': { statements: 88, branches: 78, functions: 70, lines: 87 },
@@ -54,6 +58,13 @@ export default defineConfig({
         'src/editor/useEntryEditor.ts': { statements: 68, branches: 55, functions: 55, lines: 70 },
         'src/storeCommit.ts': { statements: 30, branches: 95, functions: 45, lines: 35 },
         'src/storage/sync.ts': { statements: 68, branches: 55, functions: 55, lines: 72 },
+        // First-party primitives lifted out of components/ui/, where the
+        // coverage exclusion had kept them invisible.
+        'src/components/primitives/responsive-modal.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        'src/components/primitives/icon-button.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        'src/editor/dialogs/TimeWheels.tsx': { statements: 88, branches: 78, functions: 95, lines: 95 },
+        'src/editor/FloatingComboboxList.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        'src/calendar/ContinuationChevron.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
       },
     },
   },

@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import { ArrowLeft, Heart, Trash2 } from 'lucide-react'
 import { SyncButton } from '@/components'
-import { IconButton } from '@/components/ui/icon-button'
+import { IconButton } from '@/components/primitives/icon-button'
 import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { useTopbarSlot } from './-topbarSlot'

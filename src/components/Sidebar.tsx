@@ -8,7 +8,7 @@ import { useToday, useResetOnChange } from '@/hooks'
 import { FlipList } from './FlipList'
 import { vaultIcon } from './vaultIcon'
 import { Checkbox } from './ui/checkbox'
-import { IconButton } from './ui/icon-button'
+import { IconButton } from './primitives/icon-button'
 import {
   Sidebar,
   SidebarContent,

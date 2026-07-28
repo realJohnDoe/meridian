@@ -10,10 +10,10 @@
  * - Inherits shadcn's focus-visible ring and disabled states
  */
 import * as React from 'react'
-import { Button } from './button'
+import { Button } from '../ui/button'
 import { cn } from '@/lib/cn'
 
-export type SurfaceButtonProps = React.ComponentProps<typeof Button>
+type SurfaceButtonProps = React.ComponentProps<typeof Button>
 
 function SurfaceButton({ className, ...props }: SurfaceButtonProps) {
   return (
