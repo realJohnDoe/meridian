@@ -42,6 +42,36 @@ export function findSeries(
   return items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined
 }
 
+/**
+ * How an occurrence sits inside a recurring series — the facts that decide which
+ * edit scopes it offers and whether a repeat pattern can be attached at all.
+ *
+ * `isScheduled` and `isAfterCompletion` describe the PARENT SERIES' repeat, not
+ * the occurrence's own: an override child carries no `repeat` of its own, so the
+ * distinction only exists one level up. Both are false for a standalone.
+ */
+export interface SeriesContext {
+  /** The occurrence belongs to a repeating series (it is an override child). */
+  isRecurring: boolean
+  /** Its series repeats on a calendar schedule — "this and following" is meaningful. */
+  isScheduled: boolean
+  /** Its series repeats a fixed interval after each completion. */
+  isAfterCompletion: boolean
+  /** The parent series' repeat spec, or null for a standalone. */
+  seriesRepeat: Repeat | null
+}
+
+export function seriesContext(items: StoreItem[], occ: Occurrence | null): SeriesContext {
+  const series = occ ? findSeries(items, occ) : undefined
+  const seriesRepeat = series?.repeat ?? null
+  return {
+    isRecurring: !!occ?.ownerId,
+    isScheduled: seriesRepeat?.type === 'schedule',
+    isAfterCompletion: seriesRepeat?.type === 'after_completion',
+    seriesRepeat,
+  }
+}
+
 // ── Upsert helper ─────────────────────────────────────────────────────────────
 
 /**

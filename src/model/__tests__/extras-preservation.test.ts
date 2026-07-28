@@ -121,6 +121,7 @@ const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
 const EXEMPT: Record<string, string> = {
   fileSlugItems: 'pure filter over items — returns existing objects untouched',
   findSeries: 'pure lookup — returns an existing object untouched',
+  seriesContext: 'read-only derivation — returns booleans plus an existing repeat spec',
   deletionEndsAfterCompletionSeries: 'predicate — returns a boolean',
   occFromAppMeta: 'metadata constructor, covered by its own test below',
   newEntrySlug: 'pure slug allocation — returns a string, never touches metadata',

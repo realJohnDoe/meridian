@@ -17,11 +17,13 @@ interface Props {
 export default function EditorShell({ entry, hooks, items, roots }: Props) {
   const {
     setEntry,
+    series,
     pendingLinks,
     saveMeta,
     handleOpenWikilink,
     handleSave, handleScopeChange,
     handleTypeChange, handleDoneToggle,
+    handlePromoteTask,
     handleOpenDlg, handleOpenRepeatDlg,
     dialogHandlers,
     scheduleAutoSave,
@@ -33,6 +35,7 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
     <section className="view active flex-1 min-h-0 flex flex-col">
       <EntryEditor
         entry={entry}
+        series={series}
         onChange={setEntry}
         onSave={handleSave}
         onAutoSave={scheduleAutoSave}
@@ -43,6 +46,7 @@ export default function EditorShell({ entry, hooks, items, roots }: Props) {
         onScopeChange={handleScopeChange}
         onTypeChange={handleTypeChange}
         onDoneToggle={handleDoneToggle}
+        onPromoteTask={handlePromoteTask}
         items={items}
         roots={roots}
         onOpenWikilink={handleOpenWikilink}

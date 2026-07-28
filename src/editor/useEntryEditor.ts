@@ -4,7 +4,7 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './save'
 import type { Occurrence, EditScope } from '@/types'
-import { fmtISO } from '@/model'
+import { fmtISO, seriesContext } from '@/model'
 import { useToday } from '@/hooks'
 import { newEntryRoute } from '@/routes'
 import { resolveWikilink } from '@/wikilinks'
@@ -89,6 +89,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const [draftId] = useState(() => crypto.randomUUID())
 
   const storeRoots = useStore(s => s.roots)
+  const storeItems = useStore(s => s.items)
   const navigate = useNavigate()
   const router = useRouter()
 
@@ -247,9 +248,32 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     updateEntry({ ...entry, done: !entry.done })
   }
 
+  // Promotes a checklist line into an entry of its own. No draft id: each
+  // promotion is a genuinely new entry, so a title that slugifies onto an
+  // existing file's slug gets its own free slug rather than overwriting that
+  // file. saveNode reports which slug that was — the checklist line is rewritten
+  // to a wikilink pointing at it, so it must be the real one, not
+  // titleToSlug(title).
+  const handlePromoteTask = (title: string, done: boolean): string | null => {
+    const slug = saveNode(null, 'all', {
+      item: null, title, tracked: true, itemType: 'task', done,
+      body: '', tags: [], items: [], participants: [...useStore.getState().defaultParticipants],
+      priority: null, scheduled: null, duration: '', repeat: null,
+      editScope: 'all',
+    })
+    if (slug === null) return null
+    void navigate({ to: '/entry/$slug', params: { slug } })
+    return slug
+  }
+
+  // Which repeat/scope controls the editor offers is a property of the series
+  // this occurrence hangs off — derived in model/, not in the render body.
+  const series = seriesContext(storeItems, entry.item)
+
   return {
     entry, setEntry,
     createdSlug,
+    series,
     pendingLinks: { effectiveSlug, pendingSlugs, handleAdd, handleRemove },
     saveMeta,
     handleOpenWikilink,
@@ -259,6 +283,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     handleScopeChange,
     handleTypeChange,
     handleDoneToggle,
+    handlePromoteTask,
     handleOpenDlg: dialogs.handleOpenDlg,
     handleOpenRepeatDlg: dialogs.handleOpenRepeatDlg,
     dialogHandlers: dialogs.dialogHandlers,
