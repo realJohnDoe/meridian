@@ -23,6 +23,55 @@ export function setupStore(): void {
   })
 }
 
+/**
+ * Installs a controllable `window.matchMedia` around each test in the calling
+ * describe block, and returns a setter that flips the answer and notifies
+ * subscribers.
+ *
+ * The global stub in `setup.ts` answers every `min-width` query with
+ * `matches: true` and registers no listeners. That leaves two things
+ * untestable: the mobile branch of anything built on `useMediaQuery` (e.g.
+ * ResponsiveModal's Drawer, which no existing test has ever rendered), and
+ * breakpoint *changes* — `useMediaQuery` subscribes via `useSyncExternalStore`
+ * (src/hooks/use-media-query.ts), and a no-op `addEventListener` means that
+ * subscription can never fire.
+ *
+ * Call at describe scope, like {@link setupStore}. Wrap the returned setter in
+ * `act()` — it notifies React synchronously.
+ */
+export function setMediaQuery(initialMatches: boolean): (next: boolean) => void {
+  const listeners = new Set<(e: MediaQueryListEvent) => void>()
+  let matches = initialMatches
+  // eslint-disable-next-line @typescript-eslint/unbound-method -- stashed for restore, never called unbound
+  const original = window.matchMedia
+
+  beforeEach(() => {
+    matches = initialMatches
+    listeners.clear()
+    window.matchMedia = ((query: string) => ({
+      // getter, not a snapshot: useSyncExternalStore re-reads this on every
+      // notify, so a plain `matches: matches` would freeze at the initial value.
+      get matches() { return matches },
+      media: query,
+      onchange: null,
+      addEventListener: (_: string, cb: (e: MediaQueryListEvent) => void) => { listeners.add(cb) },
+      removeEventListener: (_: string, cb: (e: MediaQueryListEvent) => void) => { listeners.delete(cb) },
+      addListener: (cb: (e: MediaQueryListEvent) => void) => { listeners.add(cb) },
+      removeListener: (cb: (e: MediaQueryListEvent) => void) => { listeners.delete(cb) },
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+  })
+
+  afterEach(() => {
+    window.matchMedia = original
+  })
+
+  return (next: boolean) => {
+    matches = next
+    for (const cb of listeners) cb({ matches: next } as MediaQueryListEvent)
+  }
+}
+
 export function seedStore(items: StoreItem[], roots: Roots): void {
   useStore.getState().setData({ items, roots })
 }
