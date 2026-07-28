@@ -5,7 +5,7 @@ import { fileEntries } from '@/fileOccurrence'
 import { TagChip } from '@/components'
 import { Badge } from '@/components/ui/badge'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
-import { FloatingComboboxList } from '@/components/ui/floating-combobox-list'
+import { FloatingComboboxList } from './FloatingComboboxList'
 import { rankByQuery } from '@/lib/matching'
 import { useFloatingCombobox } from '@/hooks'
 

@@ -17,7 +17,7 @@ import { useCalendarFilter } from './useCalendarFilter'
 import { SurfaceButton } from '@/components/ui/surface-button'
 import { cn } from '@/lib/cn'
 import { dvBlockVariants, occPillRounded } from '@/components/ui/occurrence-variants'
-import { ContinuationChevron, CONTINUES_PADDING } from '@/components/ui/continuation-chevron'
+import { ContinuationChevron, CONTINUES_PADDING } from './ContinuationChevron'
 
 // Cell-chrome class strings, shared between CalCell and the invisible chrome
 // sentinel so the bar overlay's top offset can be MEASURED from a real replica

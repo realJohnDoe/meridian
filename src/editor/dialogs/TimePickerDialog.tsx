@@ -8,7 +8,7 @@ import {
   ResponsiveModalDescription,
   ResponsiveModalActions,
 } from '@/components/ui/responsive-modal'
-import TimeWheels from '@/components/ui/TimeWheels'
+import TimeWheels from './TimeWheels'
 import { Input } from '@/components/ui/input'
 
 function normaliseTime(hhmm: string): string {

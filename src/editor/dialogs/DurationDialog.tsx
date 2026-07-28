@@ -13,7 +13,7 @@ import {
   ResponsiveModalActions,
 } from '@/components/ui/responsive-modal'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { segmentedGroupVariants, segmentedItemVariants } from '@/components/ui/segmented-group'
+import { segmentedGroupVariants, segmentedItemVariants } from '../segmentedGroup'
 import { badgeVariants } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'

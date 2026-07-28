@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { cn } from '@/lib/cn'
-import { Card } from './card'
+import { Card } from './ui/card'
 
 interface DimmableCardProps extends React.ComponentProps<typeof Card> {
   /** Applies the done/past dim treatment: overflow clip + `--done-overlay` scrim. */
