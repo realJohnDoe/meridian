@@ -100,20 +100,44 @@ describe('TimeWheels — selection', () => {
     expect(onChange).toHaveBeenCalledWith('09:25')
   })
 
-  it('clamps at the first row instead of wrapping', () => {
+  it('wraps from the first hour to the last with ArrowUp', () => {
     const { onChange, hour } = renderWheels('00:30')
 
     fireEvent.keyDown(hour, { key: 'ArrowUp' })
 
-    expect(onChange).toHaveBeenCalledWith('00:30')
+    expect(onChange).toHaveBeenCalledWith('23:30')
   })
 
-  it('clamps at the last row instead of wrapping', () => {
+  it('wraps from the last hour to the first with ArrowDown', () => {
     const { onChange, hour } = renderWheels('23:30')
 
     fireEvent.keyDown(hour, { key: 'ArrowDown' })
 
-    expect(onChange).toHaveBeenCalledWith('23:30')
+    expect(onChange).toHaveBeenCalledWith('00:30')
+  })
+
+  it('carries the hour forward when the minute wraps past 55', () => {
+    const { onChange, minute } = renderWheels('09:55')
+
+    fireEvent.keyDown(minute, { key: 'ArrowDown' })
+
+    expect(onChange).toHaveBeenCalledWith('10:00')
+  })
+
+  it('carries the hour backward when the minute wraps past 00', () => {
+    const { onChange, minute } = renderWheels('09:00')
+
+    fireEvent.keyDown(minute, { key: 'ArrowUp' })
+
+    expect(onChange).toHaveBeenCalledWith('08:55')
+  })
+
+  it('wraps the hour along with the minute at the day boundary', () => {
+    const { onChange, minute } = renderWheels('23:55')
+
+    fireEvent.keyDown(minute, { key: 'ArrowDown' })
+
+    expect(onChange).toHaveBeenCalledWith('00:00')
   })
 
   it('ignores keys other than the arrows', () => {
@@ -126,10 +150,14 @@ describe('TimeWheels — selection', () => {
 })
 
 describe('TimeWheels — scrolling', () => {
+  // A ghost row previewing the opposite end of the list sits before the real
+  // items (so the wheel has something to scroll onto when wrapping), which
+  // shifts every real row's scroll offset up by one ITEM_H versus its plain
+  // index in `items`.
   it('translates scroll offset into the row at that index', () => {
     const { onChange, hour } = renderWheels('09:30')
 
-    setScrollTop(hour, 5 * ITEM_H)
+    setScrollTop(hour, 6 * ITEM_H)
     fireEvent.scroll(hour)
 
     expect(onChange).toHaveBeenCalledWith('05:30')
@@ -138,25 +166,44 @@ describe('TimeWheels — scrolling', () => {
   it('rounds a scroll offset that lands between rows to the nearer one', () => {
     const { onChange, hour } = renderWheels('09:30')
 
-    setScrollTop(hour, 5 * ITEM_H + 0.6 * ITEM_H)
+    setScrollTop(hour, 6 * ITEM_H + 0.6 * ITEM_H)
     fireEvent.scroll(hour)
 
     expect(onChange).toHaveBeenCalledWith('06:30')
   })
 
-  it('clamps a scroll past the end to the last row', () => {
+  it('wraps a scroll past the end back to the first row', () => {
     const { onChange, hour } = renderWheels('09:30')
 
     setScrollTop(hour, 99 * ITEM_H)
     fireEvent.scroll(hour)
 
+    expect(onChange).toHaveBeenCalledWith('00:30')
+  })
+
+  it('wraps a scroll before the start back to the last row', () => {
+    const { onChange, hour } = renderWheels('09:30')
+
+    setScrollTop(hour, -50 * ITEM_H)
+    fireEvent.scroll(hour)
+
     expect(onChange).toHaveBeenCalledWith('23:30')
+  })
+
+  it('re-centers onto the real row after wrapping, so scroll position stays valid', () => {
+    const { hour } = renderWheels('09:30')
+
+    setScrollTop(hour, 99 * ITEM_H)
+    fireEvent.scroll(hour)
+
+    // Wrapped to hour 0 (ext index 1): real items start at ext index 1.
+    expect(hour.scrollTop).toBe(1 * ITEM_H)
   })
 
   it('does not re-emit when the scroll lands on the row already selected', () => {
     const { onChange, hour } = renderWheels('09:30')
 
-    setScrollTop(hour, 9 * ITEM_H)
+    setScrollTop(hour, 10 * ITEM_H)
     fireEvent.scroll(hour)
 
     expect(onChange).not.toHaveBeenCalled()
@@ -170,13 +217,13 @@ describe('TimeWheels — scrolling', () => {
     const scrollTo = vi.fn()
     hour.scrollTo = scrollTo
 
-    setScrollTop(hour, 5 * ITEM_H + 10)
+    setScrollTop(hour, 6 * ITEM_H + 10)
     fireEvent.scroll(hour)
     expect(scrollTo).not.toHaveBeenCalled()
 
     vi.advanceTimersByTime(SETTLE_MS)
 
-    expect(scrollTo).toHaveBeenCalledWith({ top: 5 * ITEM_H, behavior: 'smooth' })
+    expect(scrollTo).toHaveBeenCalledWith({ top: 6 * ITEM_H, behavior: 'smooth' })
   })
 
   it('leaves a column already resting on a row alone', () => {
@@ -185,7 +232,7 @@ describe('TimeWheels — scrolling', () => {
     const scrollTo = vi.fn()
     hour.scrollTo = scrollTo
 
-    setScrollTop(hour, 5 * ITEM_H)
+    setScrollTop(hour, 6 * ITEM_H)
     fireEvent.scroll(hour)
     vi.advanceTimersByTime(SETTLE_MS)
 
@@ -198,15 +245,15 @@ describe('TimeWheels — scrolling', () => {
     const scrollTo = vi.fn()
     hour.scrollTo = scrollTo
 
-    setScrollTop(hour, 3 * ITEM_H + 10)
+    setScrollTop(hour, 4 * ITEM_H + 10)
     fireEvent.scroll(hour)
     vi.advanceTimersByTime(SETTLE_MS - 20)
 
-    setScrollTop(hour, 7 * ITEM_H + 10)
+    setScrollTop(hour, 8 * ITEM_H + 10)
     fireEvent.scroll(hour)
     vi.advanceTimersByTime(SETTLE_MS)
 
     expect(scrollTo).toHaveBeenCalledTimes(1)
-    expect(scrollTo).toHaveBeenCalledWith({ top: 7 * ITEM_H, behavior: 'smooth' })
+    expect(scrollTo).toHaveBeenCalledWith({ top: 8 * ITEM_H, behavior: 'smooth' })
   })
 })
