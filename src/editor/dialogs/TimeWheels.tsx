@@ -30,14 +30,16 @@ interface ScrollColumnProps {
 
 function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps) {
   const ref = useRef<HTMLDivElement>(null)
-  // The old spacer rows above/below the real items are replaced by a single
-  // "ghost" row on each side previewing the opposite end of the list (23
-  // above 00, 00 below 23, ...). Scrolling onto a ghost is what makes the
-  // wheel feel periodic: handleScroll detects it and instantly re-centers the
-  // scroll position on the real row at the far end, so there's always a fresh
-  // ghost to scroll onto if the gesture continues in the same direction.
-  // Row indices below are in this extended (ghost + items + ghost) space;
-  // extIdx = realIdx + 1.
+  // Each side gets a "ghost" row previewing the opposite end of the list (23
+  // above 00, 00 below 23, ...) PLUS the original blank spacer row beyond it.
+  // The ghost alone isn't enough: without the spacer behind it there's no
+  // scroll room left for the ghost to ever reach the centered/highlighted
+  // row, so it could only ever be glimpsed fading in at the very edge, never
+  // actually selected — and the boundary-crossing scroll event that triggers
+  // a wrap could never fire. The spacer supplies that missing room.
+  // Content layout: [spacer, ghost(last), items..., ghost(first), spacer].
+  // scrollTop = extIdx * ITEM_H where extIdx = realIdx + 1 (0 = ghost-last
+  // centered, N+1 = ghost-first centered).
   const extLen = items.length + 2
 
   // ext index this column last reported upward (including recenters after a
@@ -127,6 +129,7 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
         }}
         style={{ scrollbarWidth: 'none' }}
       >
+        <div className="h-10 shrink-0" /> {/* top spacer — gives the top ghost room to reach center */}
         <div
           aria-hidden="true"
           className="h-10 shrink-0 flex items-center justify-center snap-center font-mono text-sm text-muted-foreground/40 select-none"
@@ -155,6 +158,7 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
         >
           {fmt(items[0]!)}
         </div>
+        <div className="h-10 shrink-0" /> {/* bottom spacer — gives the bottom ghost room to reach center */}
       </div>
     </div>
   )
