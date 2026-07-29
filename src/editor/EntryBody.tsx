@@ -11,6 +11,7 @@ import {
 import { createTaskExtension, taskTheme } from './cm/taskDecorations'
 import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme } from './cm/markdownFormatting'
 import { emptyPlaceholder, emptyPlaceholderTheme } from './cm/emptyPlaceholder'
+import { emptyLineCursorFix } from './cm/emptyLineCursorFix'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
 
 interface Props {
@@ -119,6 +120,12 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
         taskTheme,
         editorTheme,
         drawSelection(),
+        // Registered after drawSelection() so its update() (and thus its
+        // requestMeasure() call) is scheduled after the cursor layer's —
+        // CM6 batches same-frame requestMeasure calls in registration
+        // order, so this reliably runs its correction after the cursor
+        // has (possibly wrongly) been (re)drawn for that frame.
+        emptyLineCursorFix,
         emptyPlaceholder,
         emptyPlaceholderTheme('Add a description…'),
         EditorView.lineWrapping,
@@ -145,20 +152,7 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
     viewRef.current = view
     setView(view)
 
-    // DM Sans/DM Mono load via a `display=swap` <link>, so the very first
-    // layout can happen against a fallback font. CM6 caches line-height
-    // metrics from whatever's rendered at that point (see measureTextSize())
-    // and only re-measures on its own once real content changes — which is
-    // why the cursor visibly resizes on the first keystroke otherwise.
-    // Forcing a remeasure once the real fonts are in makes it correct from
-    // the start, without waiting on the user to type.
-    let destroyed = false
-    void document.fonts.ready.then(() => {
-      if (!destroyed) view.requestMeasure()
-    })
-
     return () => {
-      destroyed = true
       view.destroy()
       viewRef.current = null
       setView(null)
