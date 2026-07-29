@@ -145,20 +145,7 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
     viewRef.current = view
     setView(view)
 
-    // DM Sans/DM Mono load via a `display=swap` <link>, so the very first
-    // layout can happen against a fallback font. CM6 caches line-height
-    // metrics from whatever's rendered at that point (see measureTextSize())
-    // and only re-measures on its own once real content changes — which is
-    // why the cursor visibly resizes on the first keystroke otherwise.
-    // Forcing a remeasure once the real fonts are in makes it correct from
-    // the start, without waiting on the user to type.
-    let destroyed = false
-    void document.fonts.ready.then(() => {
-      if (!destroyed) view.requestMeasure()
-    })
-
     return () => {
-      destroyed = true
       view.destroy()
       viewRef.current = null
       setView(null)
