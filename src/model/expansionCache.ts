@@ -1,4 +1,4 @@
-import type { StoreItem, StoreOcc, Roots, Occurrence, FileMetadata } from '@/types'
+import type { StoreItem, StoreOcc, StoreSeries, Roots, Occurrence, FileMetadata } from '@/types'
 import { isSeries } from '@/types'
 import { expandWithMultiday } from './expansion'
 
@@ -89,9 +89,18 @@ export function computeExpansionCache(
     // storeOps.ts's updateRoot), but that alone is never structural, so it must
     // not force a full re-expansion of every other file's occurrences too.
     const changedById = new Map<string, StoreOcc>()
+    // Series (repeat pattern) items whose own metadata changed. Tracked
+    // separately from changedById because a series never appears as `occ.id`
+    // itself — expandRange synthesizes a distinct id per generated occurrence
+    // (see stableOccId in expansion.ts) — so matching has to go through
+    // `ownerId` below instead of a direct id lookup.
+    const changedSeriesById = new Map<string, StoreSeries>()
     for (let i = 0; i < items.length; i++) {
       const item = items[i]!  // i < items.length
-      if (item !== prev.items[i] && !isSeries(item)) {
+      if (item === prev.items[i]) continue
+      if (isSeries(item)) {
+        changedSeriesById.set(item.id, item)
+      } else {
         changedById.set(item.id, item)
       }
     }
@@ -103,19 +112,43 @@ export function computeExpansionCache(
       }
     }
 
-    if (changedById.size === 0 && changedFileMeta.size === 0) {
+    if (changedById.size === 0 && changedFileMeta.size === 0 && changedSeriesById.size === 0) {
       return { ...prev, items, roots }
+    }
+
+    // Overrides of a changed series, keyed by their own id (which is what
+    // occurrences generated from an override carry as `occ.id` — see
+    // expandRange). occFromAppMeta/occMeta (storeOps.ts) always set
+    // done/priority/participants explicitly on an override, even to
+    // `undefined`, so an override's metadata fully replaces the series'
+    // rather than falling back to it field-by-field — same as the
+    // `{ ...series.metadata, ...override.metadata }` merge expandRange
+    // itself performs.
+    const overrideById = new Map<string, StoreOcc>()
+    if (changedSeriesById.size > 0) {
+      for (const item of items) {
+        if (!isSeries(item) && item.ownerId && changedSeriesById.has(item.ownerId)) {
+          overrideById.set(item.id, item)
+        }
+      }
     }
 
     const allOccs = prev.allOccs.map(occ => {
       const changedItem = changedById.get(occ.id)
       const changedFile = changedFileMeta.get(occ.fileSlug)
-      if (!changedItem && !changedFile) return occ
+      const changedSeries = occ.ownerId ? changedSeriesById.get(occ.ownerId) : undefined
+      if (!changedItem && !changedFile && !changedSeries) return occ
+      const override = changedSeries ? overrideById.get(occ.id) : undefined
       return {
         ...occ,
         metadata: {
           ...occ.metadata,
           ...(changedFile ? { title: changedFile.title, tags: changedFile.tags, items: changedFile.items, body: changedFile.body } : null),
+          ...(changedSeries ? {
+            done:         override ? override.metadata.done : changedSeries.metadata.done,
+            priority:     override ? override.metadata.priority : changedSeries.metadata.priority,
+            participants: override ? override.metadata.participants : changedSeries.metadata.participants,
+          } : null),
           ...(changedItem ? {
             done:         changedItem.metadata.done,
             priority:     changedItem.metadata.priority,
