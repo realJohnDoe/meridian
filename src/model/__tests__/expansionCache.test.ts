@@ -168,4 +168,46 @@ describe('computeExpansionCache', () => {
 
     expect(second.allOccs).toBe(first.allOccs)
   })
+
+  it('overlays a changed series participants onto its generated occurrences without re-expanding', () => {
+    // Regression test: editing a repeat pattern's participants used to leave
+    // the agenda showing stale participants until a full page reload, because
+    // the overlay's changed-item scan explicitly skipped series items.
+    const s1 = series({ id: 'series-1', metadata: { participants: ['alice'] } })
+    const items1 = [s1]
+    const roots = rootsOf([['note.md', { title: 'Note', tags: [], items: [] }]])
+
+    const first = computeExpansionCache(null, items1, roots, from, to)
+    expect(first.allOccs.map(o => o.date)).toEqual(['2026-06-01', '2026-06-08'])
+    expect(first.allOccs.every(o => o.metadata.participants?.join() === 'alice')).toBe(true)
+
+    const s2 = series({ id: 'series-1', metadata: { participants: ['alice', 'bob'] } })
+    const items2 = [s2]
+    const second = computeExpansionCache(first, items2, roots, from, to)
+
+    // Fast path taken (overlay, not full re-expansion): allOccs is a new array,
+    // but the update still must be reflected in every generated occurrence.
+    expect(second.allOccs).not.toBe(first.allOccs)
+    expect(second.allOccs.every(o => o.metadata.participants?.join() === 'alice,bob')).toBe(true)
+  })
+
+  it("does not let a series-level participants overlay clobber an override's own participants", () => {
+    const s1 = series({ id: 'series-1', metadata: { participants: ['alice'] } })
+    const override = occ({ id: 'override-1', ownerId: 'series-1', date: '2026-06-01', metadata: { participants: ['carol'] } })
+    const items1 = [s1, override]
+    const roots = rootsOf([['note.md', { title: 'Note', tags: [], items: [] }]])
+
+    const first = computeExpansionCache(null, items1, roots, from, to)
+
+    const s2 = series({ id: 'series-1', metadata: { participants: ['alice', 'bob'] } })
+    const items2 = [s2, override]
+    const second = computeExpansionCache(first, items2, roots, from, to)
+
+    // The overlay result must match a from-scratch expansion of the same inputs.
+    const fresh = computeExpansionCache(null, items2, roots, from, to)
+    expect(second.allOccs).toEqual(fresh.allOccs)
+
+    expect(second.allOccs.find(o => o.id === 'override-1')?.metadata.participants).toEqual(['carol'])
+    expect(second.allOccs.find(o => o.date === '2026-06-08')?.metadata.participants).toEqual(['alice', 'bob'])
+  })
 })
