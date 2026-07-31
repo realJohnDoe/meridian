@@ -22,12 +22,12 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 | Root | Property | Findings | Root fix | Tier |
 |---|---|---|---|---|
 | **A** | The file is a projection of the store, and nothing requires the projection to be **total** | #2, #3, #5, #8 | Define and enforce totality; close the four leaks | Opus 5, plan mode / multi-PR |
-| **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Dev-mode read-back assertion in the save path | Sonnet 5 |
+| **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks: collapse totality at save, source fidelity at load. Prod-enabled, ~162 ms/300 files | Sonnet 5 |
 | **C** | The one cache transition allowed to destroy local content has an unenforced precondition | #1, #4 | Make the destructive transition unrepresentable without a confirmed copy | Sonnet 5 → Opus 5 |
 | **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
 | **E** | Store transitions don't report which files they touched | #7 | Return the affected slug set from the transition | Haiku 4.5 |
 
-**Do B first.** It is the cheapest item here and the only one that pays off before it is finished: it converts the entire A class — including leaks not yet found — from silent to loud, in dev, at the moment of loss. Everything else is easier to verify once B exists.
+**Do B first.** It is the cheapest item here and the only one that pays off before it is finished: it converts the entire A class — including leaks not yet found — from silent to loud at the moment of loss. Run it in **production**, not just dev — see Root B for the measured cost, the two-checks-at-two-times split, and why the load-time check must not run on the save path.
 
 ---
 
@@ -71,9 +71,34 @@ Fire-and-forget, returning `void`. The store is updated synchronously and uncond
 
 This is why every Root-A leak — and #7 — is *silent rather than loud*. In each case the store holds the correct value and the file holds a lossy one, and there is no mechanism anywhere that would notice: reconcile skips dirty records, so the next sync doesn't catch it either. The divergence materialises only on reload, when `hydrateFromCache` re-parses the file and the store finally learns what was actually written — hours or weeks after the edit, with no connection to the action that caused it.
 
-This is the **highest-leverage item in the survey and the cheapest**. `writeEntityToCache` already holds `content`; re-parsing it and diffing against `fileSlugItems(getItems(), fileSlug)` + the root is pure, needs no I/O, and is fast (309 model tests execute in 2.34s total). Behind `import.meta.env.DEV` it costs production nothing and would have caught #2, #3, #5 and #8 the first time each fired.
+This is the **highest-leverage item in the survey and the cheapest**. But it is **two checks at two different times**, not one — measured against the four A-class repros and all 18 fixtures:
+
+| | **Check 1 — collapse totality** | **Check 2 — source fidelity** |
+|---|---|---|
+| Question | does the store survive its own serialization? | did the file lose anything the source had? |
+| Compare | `normalizeIds(store)` vs `normalizeIds(parse(serialize(store)))` | `collectKeyValues` of source vs of saved, set containment |
+| Runs at | **save** (`writeEntityToCache`, after `saveFile`) | **load** — on `serialize(parse(content))`, before any edit |
+| Catches #2 | ✅ fires | ❌ clean (the loss is relative to the *edit*, not the source) |
+| Catches #3 | ✅ fires | ✅ fires |
+| Catches #5 | ❌ clean (the store never held the keys) | ✅ fires |
+| Catches #8 | ❌ clean | ❌ clean — needs a **byte** compare, not a semantic one |
+| 18 fixtures, unedited | clean | clean |
+| Ordinary edit (`done: false` → `true`) | clean | 🔴 **false-positives** — reports `done=false` as lost |
+
+Two consequences that decide the design:
+
+- **Check 2 must never run on the save path.** Any intentional change looks like a loss to it — the control edit above fires on a plain checkbox toggle. It is only sound where no edit sits between the two sides, i.e. **at load**. That is the better place anyway: it fires while the original file is still intact on disk, *before* Meridian has written anything.
+- **The parse-side leaks (#5, #8) are invisible to a save-time check**, because for those the store is already missing the data by the time you compare. This is why the split matters — one check does not cover Root A.
+
+Cost, measured over a 300-file corpus built from the fixtures: parse alone **131.5 ms**, parse + serialize + re-parse **293.2 ms** — an added **~162 ms** for the whole vault, i.e. ~0.5 ms per file. Cheap enough to run in production (see the `notify()` note below); if a cold-start budget is tight, run check 2 lazily on first write attempt per slug and cache the verdict, which keeps the "before the damage" property at zero startup cost.
 
 Note what this does **not** do: it does not fix a single finding. It is a detector, not a repair — which is exactly why it belongs first. It makes the A class visible while you work through it, and catches the fifth leak nobody has found yet.
+
+**Run it in production, not just `import.meta.env.DEV`.** The codebase already made this call for the same class of problem — `reportParseFailures` toasts in prod, with the rationale spelled out in its doc comment: *"A `console.warn` alone is invisible in a PWA with no open devtools — this is the one user-visible signal that a hand-edited file silently dropped out of the vault."* A file Meridian would rewrite lossily is the same category of event. Three constraints on doing it well:
+
+1. **Enable after closing the leaks, or it is a permanent alarm.** Today check 1 fires on every exclude (#3) and every cleared inherited field (#2), and check 2 fires on any file with a nested `title:` (#5). Ship the checks with the fixes, or land them logging-only first and flip to `warn()` per leak as each closes.
+2. **Make the message actionable, and dedupe it.** Both checks already compute *what* was lost, so say so — "`trip.md` has frontmatter Meridian can't preserve: `title` on 2 instances. Editing it here will drop those keys." Dedupe per slug per session, the way `sync.ts` dedupes actionable errors with `_lastErrorSig`.
+3. **Prefer refusing to write over warning about a write.** The strongest use of check 2 is not a toast at all: a file that fails it is one Meridian *cannot round-trip*, which is a weaker form of the condition `unreadableSlugs` already models. Marking it read-only (or gating the first edit behind a confirmation) turns the detector into recoverability — the loss never happens rather than being reported after the fact.
 
 **The test suite has the same blind spot, from the same cause.** `yaml-roundtrip.test.ts` asserts `serialize(parse(serialize(f))) === serialize(f)` — a fixed point on Meridian's *own* output — so the loss on the first pass is invisible to it by construction. `unknown-keys.test.ts` exists because someone spotted this and asserts against the source instead, but only for the `extra`-bag class. Separately, `src/storage/cache.ts` sits at 3.73% statements because `sync.test.ts` mocks it with a hand-written **re-implementation**: the tests verify `sync.ts` against a second copy of the cache's logic rather than against the cache. Both are the same architectural habit — treating the store as authoritative and the file as derived — reproduced in the tests.
 
@@ -227,7 +252,7 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 
 **Root-first (recommended).** This order never patches the same file twice and keeps the suite green at every step:
 
-1. **Root B** — dev-mode read-back in `writeEntityToCache`. Fixes nothing, makes the whole A class loud while you work through it. Land the #8 CRLF fixture with it, since read-back is what proves the fixture round-trips.
+1. **Root B** — both read-back checks (collapse totality at save, source fidelity at load), logging-only at first. Fixes nothing, makes the whole A class loud while you work through it. Flip each to `warn()` as the corresponding leak closes, so it is never a permanent alarm. Land the #8 CRLF fixture with it — and note #8 needs a **byte** compare, which neither semantic check catches.
 2. **Root C** — `resolveCollision`'s decision table + the cache-API precondition. Closes **#1 and #4 together**; doing #1 alone leaves #4's "remote is gone" branch unsafe.
 3. **Root A**, in the order the leaks stack in `src/model/collapse.ts` + `src/types.ts`: **#3 → #5 → #8 → #2a**, then **#2b** as its own PR once you've decided provenance vs. edit semantics. #3 is self-contained in `serializeChildren`; #5 changes where the parse side routes reserved keys; #2 changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and will conflict with both if taken first.
 4. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half. Doing E after B is deliberate: it makes B's read-back check verify exactly the slugs a transition claims to have written.
