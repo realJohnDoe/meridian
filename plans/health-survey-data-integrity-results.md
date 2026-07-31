@@ -22,7 +22,7 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 | Root | Property | Findings | Root fix | Tier |
 |---|---|---|---|---|
 | **A** | The file is a projection of the store, and nothing requires the projection to be **total** | #2, #3, #5, #8 | Define and enforce totality; close the four leaks | Opus 5, plan mode / multi-PR |
-| **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** first and **B-runtime** last — see below. ~162 ms/300 files | Sonnet 5 |
+| **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** (done — `round-trip-totality.test.ts`) and **B-runtime** (still open) — see below. ~162 ms/300 files | Sonnet 5 |
 | **C** | The one cache transition allowed to destroy local content has an unenforced precondition | #1, #4 | Make the destructive transition unrepresentable without a confirmed copy | Sonnet 5 → Opus 5 |
 | **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
 | **E** | Store transitions don't report which files they touched | #7 | Return the affected slug set from the transition | Haiku 4.5 |
@@ -96,8 +96,12 @@ Cost, measured over a 300-file corpus built from the fixtures: parse alone **131
 
 Note what this does **not** do: it does not fix a single finding. It is a **ratchet, not a diagnostic** — and that decides when each half lands:
 
-- **B-test — first.** The two checks as helpers over the fixture corpus. Zero false positives today (18/18 fixtures clean on both), no production surface, ~an hour. This is Root A step 1: the totality invariant written down as an assertion, and the net every subsequent fix is verified against. It also needs two fixtures the corpus lacks — an excluded instance carrying metadata, and a CRLF file.
-- **B-runtime — last.** Wiring the checks into `writeEntityToCache` and the load path. It **cannot be switched on until the leaks close** (constraint 1 below), and for the four leaks already found it is redundant — each arrives with its own regression test. Its value is the *fifth* leak and regression prevention afterwards, which is precisely the value a ratchet has once the thing it protects is already correct.
+- **B-test — DONE.** `src/model/__tests__/round-trip-totality.test.ts` implements both checks as reusable functions (`assertCollapseTotality`, `assertSourceFidelity`) and pins the two open leaks the fixture corpus didn't cover — an excluded instance carrying metadata (#3) and a title on a non-root node (#5) — plus a narrower, non-normalisation-conflicting slice of #8 (a save must never mix `
+
+` and bare `
+` in one file). Each is `it.fails`, so the suite is green (76 files, 926 passed + 3 expected-fail) while the invariant is documented. **Verified the ratchet actually ratchets**, not just documents: patching `serializeChildren` to emit the excluded child's diffed metadata flips the #3 case from expected-fail to `Error: Expect test to fail` — i.e. a real fix is required to turn it green, not just a passing assertion waiting to be noticed. That patch was reverted; #3 is still open. The two blanket corpus suites (`yaml-roundtrip.test.ts`'s "preserves store structure", `unknown-keys.test.ts`'s "no key loss") were deliberately left untouched rather than folding the new fixtures into `fixtures/` — adding a known-failing case to an `it.each` sweep with no all-fixtures-pass guarantee would have gone red immediately; keeping the two classes separate is what lets this be a ratchet instead of a broken build.
+- **Not built:** #2 has no fixture-corpus form — it only exists relative to an `applyEdit` call, which is out of scope for an *unedited* round-trip check. Its own repro (finding #2) is the thing that pins it.
+- **B-runtime — still to do.** Wiring the checks into `writeEntityToCache` and the load path. It **cannot be switched on until the leaks close** (constraint 1 below), and for the four leaks already found it is redundant — each arrives with its own regression test. Its value is the *fifth* leak and regression prevention afterwards, which is precisely the value a ratchet has once the thing it protects is already correct.
 
 An earlier draft of this report recommended doing B wholesale first. Measuring it showed that to be wrong: the runtime half would have spent the whole project muted.
 
@@ -194,7 +198,7 @@ Vaults used: the 16-file shipped Tutorial vault (`exampleBackend.ts`), the 18 `s
 |---|---|
 | `pnpm run build` | **PASS** (exit 0) |
 | `pnpm run lint` | **PASS** — 0 errors, 14 pre-existing warnings (all `react-hooks/incompatible-library` on TanStack Virtual/Router) |
-| `pnpm test` | **PASS** — 75 files, 926 tests |
+| `pnpm test` | **PASS** — 75 files, 926 tests (survey run, before B-test landed; 76 files / 926 passed + 3 expected-fail afterward — see §2 Root B) |
 | `pnpm run test:coverage` | **PASS** — all thresholds met. Totals 61.69% stmts / 58.19% branch / 64.02% lines |
 
 Coverage pointers worth acting on (pointers, not findings):
@@ -259,8 +263,8 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 
 **Root-first (recommended).** This order never patches the same file twice and keeps the suite green at every step:
 
-1. **B-test** — check 1 and check 2 as helpers over the fixture corpus (see Root B for both definitions). ~an hour, zero false positives today, no production surface. This is Root A step 1 — the totality invariant written down as an assertion — and it is the safety net every step below runs against.
-2. **#3** — one line in `serializeChildren` plus its regression test. Cheap, and it is the leak that makes B-test's corpus meaningful (the fixtures currently contain no excluded instance carrying metadata).
+1. **B-test — done.** `src/model/__tests__/round-trip-totality.test.ts`. See Root B for what it covers, what it deliberately doesn't (#2), and the verification that the ratchet actually flips.
+2. **#3** — one line in `serializeChildren` plus its regression test. Cheap. Its PR should also flip B-test's `excluding a recurring occurrence keeps the metadata it carried` case from `it.fails` to `it` — that flip is verification, not extra work, and confirmed to require the real fix (a stub patch alone does not turn it green).
 3. **Root C — #1 and #4 together.** `resolveCollision`'s decision table + the cache-API precondition. Doing #1 alone leaves #4's "remote is gone" branch unsafe.
 4. **#5**, then **#8**, the remaining mechanical A leaks in `src/model/collapse.ts` + `src/types.ts`. #5 changes where the parse side routes reserved keys; #8 needs a **byte** compare and a CRLF fixture, which neither semantic check catches.
 5. **#2a** (make "cleared" expressible), then **#2b** as its own PR once provenance vs. edit semantics is decided. #2 changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and will conflict with #3 and #5 if taken before them.
@@ -677,7 +681,7 @@ const RESERVED_KEYS: ReadonlySet<string> = new Set([
     }
 ```
 - **Problem:** a hand-authored file that puts a title (or any key) on a nested node loses those bytes the first time Meridian saves it, despite the README promising hand-created files are picked up.
-- **Fix:** route reserved keys with no home at the current level into that node's `extra` bag, and give container nodes a remainder home; afterwards both repros round-trip their keys and the "emits `date` exactly once" test still passes. **Root fix:** giving the *tree* a remainder home (rather than adding a second allow-list) is what stops leak number five; see §2 Root A.
+- **Fix:** route reserved keys with no home at the current level into that node's `extra` bag, and give container nodes a remainder home; afterwards both repros round-trip their keys and the "emits `date` exactly once" test still passes. **Root fix:** giving the *tree* a remainder home (rather than adding a second allow-list) is what stops leak number five; see §2 Root A. Flip B-test's `a title written on a child instance survives the save` case from `it.fails` to `it` as part of this PR — that is the fix's acceptance check.
 
 ---
 
@@ -856,7 +860,7 @@ export function wrapFrontmatter(yamlFields: string, body: string): string {
 }
 ```
 - **Problem:** every save rewrites bytes the user did not change — indentation on the first body line, the trailing newline, and every `\r` in the frontmatter — turning a one-field edit into a whole-file diff on Windows-authored vaults.
-- **Fix:** carry the source line ending and trailing-newline convention through `loadFile` → `FileMetadata` → `wrapFrontmatter`, and trim only the blank lines around the frontmatter fence rather than the whole body; afterwards all three repro inputs round-trip byte-identically when nothing changed. **Root fix:** add a byte-level arm to Root B's load-time check and a CRLF fixture, so this cannot regress — the two semantic checks will not catch it.
+- **Fix:** carry the source line ending and trailing-newline convention through `loadFile` → `FileMetadata` → `wrapFrontmatter`, and trim only the blank lines around the frontmatter fence rather than the whole body; afterwards all three repro inputs round-trip byte-identically when nothing changed. **Root fix:** add a byte-level arm to Root B's load-time check and a CRLF fixture, so this cannot regress — the two semantic checks will not catch it. B-test already pins the narrowest slice of this (no mixed line endings within one file, `round-trip-totality.test.ts`); flip that case as part of this PR, and extend it once the fuller line-ending/trailing-newline fix is decided.
 
 ---
 
