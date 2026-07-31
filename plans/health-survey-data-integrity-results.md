@@ -7,11 +7,119 @@ Brief: [health-survey-data-integrity.md](health-survey-data-integrity.md).
 
 ## 1. Integrity verdict
 
-Yes — this app can lose the user's writing, and the two worst cases are both silent. The headline is **`resolveCollision` in `src/storage/sync.ts`: it overwrites the dirty cache record with the freshly-pulled remote content *before* it writes the user's version to a conflict copy**, so if that copy write fails (offline mid-sync, a rate-limited 403, an expired token) the local edit exists nowhere — not on the backend, not in IndexedDB — while the UI says "You're offline — changes are saved locally and will sync when you reconnect." The second-worst is structural rather than a slip: **inheritance is flattened at parse time and re-derived on collapse, and "cleared" is not representable in that round-trip** — emptying an occurrence's `participants`, or untracking one occurrence of a series, writes a file that re-inherits the old value from `defaults:` on the next load, so the change survives in the store until reload and then quietly reverts. The single biggest structural theme is that **`collapse.ts` is a lossy projection that only the store's in-memory shape can see through**: anything the store cannot represent (a cleared inherited field, metadata on an excluded instance, a key on a node with no `StoreItem` home) is dropped at serialization time, and because the store keeps holding the correct value until the next reload, *no user-visible symptom ever coincides with the moment of loss*. The sync layer is otherwise in genuinely good shape — CAS is enforced by both writable backends, `planReconcile`'s decision table is fully enumerated by tests, and the in-flight/`markPushed`/`applyRemoteBatch` guards against mid-flight edits all hold up under direct probing. The damage is concentrated in the two error paths sync tests never enter, and in the model layer's collapse projection.
+Yes — this app can lose the user's writing, and the two worst cases are both silent. The headline is **`resolveCollision` in `src/storage/sync.ts`: it overwrites the dirty cache record with the freshly-pulled remote content *before* it writes the user's version to a conflict copy**, so if that copy write fails (offline mid-sync, a rate-limited 403, an expired token) the local edit exists nowhere — not on the backend, not in IndexedDB — while the UI says "You're offline — changes are saved locally and will sync when you reconnect." The second-worst is structural rather than a slip: **inheritance is flattened at parse time and re-derived on collapse, and "cleared" is not representable in that round-trip** — emptying an occurrence's `participants`, or untracking one occurrence of a series, writes a file that re-inherits the old value from `defaults:` on the next load, so the change survives in the store until reload and then quietly reverts.
+
+**These eight findings are not eight problems.** They are five architectural roots, set out in §2: the file is a *projection* of the store that nothing requires to be **total** (four separate leaks, findings #2/#3/#5/#8); **nothing ever reads back what it wrote**, which is why every one of those leaks is silent rather than loud; the one cache function permitted to destroy local content without a precondition is the one handling the hardest case (#1, #4); a **viewer preference is an input to a domain computation**, so the same file means different things on two devices (#6); and **store transitions don't report which files they touched**, so half the delete path forgets to persist them (#7). Fixing the eight one at a time would leave all five roots in place and the next leak just as invisible — §2 states the root fix for each, and every finding below carries a **Root** field saying which of them subsumes it.
+
+The sync layer is otherwise in genuinely good shape — CAS is enforced by both writable backends, `planReconcile`'s decision table is fully enumerated by tests, and the in-flight/`markPushed`/`applyRemoteBatch` guards against mid-flight edits all hold up under direct probing. The damage is concentrated in the two error paths sync tests never enter, and in the model layer's collapse projection.
 
 ---
 
-## 2. Coverage statement
+## 2. Architectural roots
+
+Every finding below is a symptom. This section is the diagnosis: five structural properties of the design, what each one costs, and what the *root* fix is as distinct from the point fix. The per-finding **Fix** lines in §6 are deliberately scoped to one call site each — they are what you'd do if you were patching. If you'd rather fix the architecture, work this section instead and the findings fall out as consequences.
+
+| Root | Property | Findings | Root fix | Tier |
+|---|---|---|---|---|
+| **A** | The file is a projection of the store, and nothing requires the projection to be **total** | #2, #3, #5, #8 | Define and enforce totality; close the four leaks | Opus 5, plan mode / multi-PR |
+| **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Dev-mode read-back assertion in the save path | Sonnet 5 |
+| **C** | The one cache transition allowed to destroy local content has an unenforced precondition | #1, #4 | Make the destructive transition unrepresentable without a confirmed copy | Sonnet 5 → Opus 5 |
+| **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
+| **E** | Store transitions don't report which files they touched | #7 | Return the affected slug set from the transition | Haiku 4.5 |
+
+**Do B first.** It is the cheapest item here and the only one that pays off before it is finished: it converts the entire A class — including leaks not yet found — from silent to loud, in dev, at the moment of loss. Everything else is easier to verify once B exists.
+
+---
+
+### Root A — the projection isn't required to be total
+
+The pipeline is `file → RawNode → EffectiveNode → StoreItem[] + FileMetadata → collapse → file`. After load, **the file is no longer the source of truth; the store is**, and every save regenerates the whole file from it. That is a legitimate design — but it makes one invariant load-bearing, and that invariant is written down nowhere:
+
+> everything the file said must survive into the store, and everything the store holds must come back out.
+
+Nothing owns it, no single function is responsible for it, and no test asserts it (see the round-trip note under Root B). So it leaks in four independent places, each a different *kind* of hole:
+
+| Finding | Where it leaks | Kind |
+|---|---|---|
+| #5 | parse — `RESERVED_KEYS` filters a key out at a node with no `StoreItem` home | the store **cannot hold** it |
+| #8 | parse — `loadFile` trims the body, `wrapFrontmatter` hardcodes `\n` | the store **never held** it |
+| #2 | collapse — `inlineFieldEmpty` can't distinguish "cleared" from "never set" | the store holds it, the projection **can't express** it |
+| #3 | collapse — `serializeChildren` has `c.metadata` in hand and emits `date`/`time`/`excluded` only | the store holds it, the projection **just doesn't emit** it |
+
+Four leaks, one missing invariant. The `extra` bag is the project's own patch for this class, and its shape shows where the model stops: it hangs off `StoreItem`s and `FileMetadata`, not off *nodes of the YAML tree* — which is exactly why #5 exists, since a container node and a `title:` on a child are both tree positions with no `StoreItem` to attach to. `src/model/AGENTS.md` already lists #3, #5 and #8 among its "still-open losses," so the design knows the bag doesn't cover the tree; what it doesn't have is anything that would stop leak number five appearing.
+
+**One genuinely hard sub-case.** #2 has two halves and they need different answers:
+
+- **#2a (clear one occurrence)** is an *expressibility* problem. Making "cleared" emittable — an explicit `participants: []` / `done: null` on the diverging instance, read back as cleared by `parseInlineField` — fixes it without touching the parse pipeline.
+- **#2b (clear the whole series, one override keeps the old value)** is a *provenance* problem. `buildEffectiveTree` merges `defaults:` into children and, per `EffectiveNode`'s own doc, `Fields carry plain values — no origin tracking.` So an override that merely *inherited* `participants: [alice, bob]` is indistinguishable from one that stated it, and collapse's diff correctly reports a divergence that the user never authored. Expressibility does not fix this. It needs either per-field provenance (explicit vs inherited) carried through the store, or a product decision that scope `all` rewrites overrides' inherited fields.
+
+**Root fix, in order:** (1) write the totality invariant down, in `AGENTS.md` and as a test that asserts source→saved containment for a fixture set that includes CRLF, container nodes, and excluded instances with metadata; (2) close #3 and #5 (both mechanical once the invariant is stated); (3) make "cleared" expressible, fixing #2a; (4) decide #2b — provenance or edit semantics — as its own PR. **Resist starting at (4).** Retaining provenance means changing what `EffectiveNode` is, and that is the layer `AGENTS.md` correctly insists stays field-agnostic; steps 1–3 recover most of the loss without going there.
+
+**What a bandage looks like here:** special-casing `excluded` in `serializeChildren`, or adding `title` to a second allow-list. Both close one leak and leave the invariant unowned.
+
+---
+
+### Root B — nothing reads back what it wrote
+
+`commitNext` is `setData(next); slugs.forEach(writeEntity)`, and the registered implementation (`src/storage/index.ts:5`) is:
+
+```ts
+  writeEntity: slug => { void writeEntityToCache(slug) },
+```
+
+Fire-and-forget, returning `void`. The store is updated synchronously and unconditionally; the file is written asynchronously and **never verified against the store it came from**. `writeEntityToCache` collapses, serializes, hands the string to `recordLocalEdit`, and stops.
+
+This is why every Root-A leak — and #7 — is *silent rather than loud*. In each case the store holds the correct value and the file holds a lossy one, and there is no mechanism anywhere that would notice: reconcile skips dirty records, so the next sync doesn't catch it either. The divergence materialises only on reload, when `hydrateFromCache` re-parses the file and the store finally learns what was actually written — hours or weeks after the edit, with no connection to the action that caused it.
+
+This is the **highest-leverage item in the survey and the cheapest**. `writeEntityToCache` already holds `content`; re-parsing it and diffing against `fileSlugItems(getItems(), fileSlug)` + the root is pure, needs no I/O, and is fast (309 model tests execute in 2.34s total). Behind `import.meta.env.DEV` it costs production nothing and would have caught #2, #3, #5 and #8 the first time each fired.
+
+Note what this does **not** do: it does not fix a single finding. It is a detector, not a repair — which is exactly why it belongs first. It makes the A class visible while you work through it, and catches the fifth leak nobody has found yet.
+
+**The test suite has the same blind spot, from the same cause.** `yaml-roundtrip.test.ts` asserts `serialize(parse(serialize(f))) === serialize(f)` — a fixed point on Meridian's *own* output — so the loss on the first pass is invisible to it by construction. `unknown-keys.test.ts` exists because someone spotted this and asserts against the source instead, but only for the `extra`-bag class. Separately, `src/storage/cache.ts` sits at 3.73% statements because `sync.test.ts` mocks it with a hand-written **re-implementation**: the tests verify `sync.ts` against a second copy of the cache's logic rather than against the cache. Both are the same architectural habit — treating the store as authoritative and the file as derived — reproduced in the tests.
+
+---
+
+### Root C — the escape hatch was carved for the highest-risk path
+
+`src/storage/cache.ts`'s header describes discipline that is genuinely good:
+
+> Six transitions cover every way a record's status can legitimately change. Each is a single transaction with its precondition built in, so "don't clobber a locally-modified record" is not a rule call sites must remember — there is no function that does an unconditional clean write except `setResolvedClean`, which exists solely for `resolveCollision`'s two intentional overwrites (the local content has already been copied out by the time it's called).
+
+The parenthetical is finding #1 in full. The invariant is stated, the single exemption is named, and **the exemption's stated precondition is false in program order** — `setResolvedClean` runs *before* the copy write, not after. The one function permitted to destroy local content without a precondition is the one handling the case where local content is most at risk, and the comment asserting otherwise is what stopped anyone re-checking.
+
+The missing structural piece: there is nowhere to express *"the user's content must exist in at least one durable place at every instant."* If the transition API had no way to say "discard local content" without evidence of a copy — e.g. `setResolvedClean(vaultId, path, remote, { copiedTo })` requiring a confirmed path — #1 would be **unrepresentable** rather than merely untested. #4 is the same function's other missing branch (`if (fresh)` silently no-ops when the remote file is gone, leaving the record dirty forever), which is why the two must be fixed together rather than in sequence.
+
+A second-order instance of the same confusion: `isTransientSyncError` classifies by **transport**, and the UI then asserts a fact about **storage** — *"changes are saved locally and will sync when you reconnect."* In #1 the transport classification is correct and the sentence is a lie, because whether changes are saved locally is a property of the cache that nothing consults before saying so. Any fix should derive that message from the cache's actual state.
+
+**Root fix:** give `resolveCollision` a total decision table over {remote present, remote gone} × {copy written, copy failed}, and encode the "content must survive somewhere" precondition in the cache API's type rather than in a comment. **Tier: Sonnet 5** if the task states the ordering constraint and the API change explicitly; **Opus 5** otherwise — the naive reorder creates the mirror bug (an orphan copy with no cache record when the *re-read* fails), and both `pushed` (feeding `planReconcile`'s `skipPaths`) and `collisionMerges` (feeding `mergeChangedIntoStore`) must stay consistent with whichever half completed.
+
+**What a bandage looks like here:** swapping the two statements in `resolveCollision`. That fixes #1's repro and leaves the next caller of `setResolvedClean` free to do the same thing again.
+
+---
+
+### Root D — a viewer preference is an input to a domain computation
+
+`expandRange(items, roots, from, to, weekStart)` makes the occurrence set a function of *(file, viewer)*. Everything downstream — including the edit path, which writes overrides keyed by expanded dates — treats it as a function of *(file)*. That mismatch is #6, and it is why the damage escapes into the file instead of staying on screen: an override written on a Monday-first device lands on a date that a Sunday-first device's schedule does not contain, and surfaces there as a phantom `source: 'explicit'` occurrence.
+
+The tell is that `weekStartsOn(localePrefs)` has two legitimate roles that were never separated: **view layout** (`MonthView.tsx:34`, `DatePickerDialog.tsx:78` — correctly locale-dependent) and **recurrence semantics** (`expansion.ts`'s weekly branch — must not be). One value, two meanings, no boundary.
+
+The general rule the codebase is missing: **anything that reaches `expandNode` must come from the file, or cross-device agreement breaks.** Today only `weekStart` violates it; nothing prevents the next parameter. That rule belongs in `src/model/AGENTS.md` next to the existing layering rules, and it is enforceable — `expandNode`'s inputs are a short list.
+
+**Root fix:** ground the `byweekday` week on the series anchor, or persist a `wkst` in the repeat block (RFC 5545's answer), and keep `localePrefs` for layout only. **Tier: Opus 5** — any change here re-dates every existing biweekly series in every vault, so it needs a migration decision; and `src/model/__tests__/weekStart.test.ts` currently pins *both* behaviours as correct, so the fix has to argue with an existing test rather than just make it pass. The trap: "just hardcode Monday" is correct in the author's locale and silently wrong in the US.
+
+---
+
+### Root E — store transitions don't report their blast radius
+
+`deleteByFileSlug` strips backlinks from *other* files' roots, but the set of files it touched is not in its return value — it returns only the new `StoreData`. So `commitDelete(next, slug, backlinkSlugs)` requires the caller to independently re-derive that set via `getBacklinks()`. The editor's delete path does (`src/editor/save.ts:171-173`, `:185-187`); the swipe path doesn't (`src/occurrenceActions.ts:124-126`). That is #7 — an API where the correct call is harder than the incorrect one.
+
+The general shape: `writeEntity(slug)` takes a slug, so every `commitNext(next, [slug])` site must independently know which slugs the transition dirtied. Nothing derives it from the transition. Search: `grep -rn "commitNext(\|commitDelete(" src --include=*.ts --include=*.tsx | grep -v __tests__` → **15 call sites**, each a place to forget one.
+
+**Root fix:** have store transitions return `{ data, affectedSlugs }` and have `commitNext`/`commitDelete` persist exactly that set. This closes the class rather than #7, and it makes Root B's read-back check trivially correct — it would then verify precisely the slugs the transition claims to have written. **Tier: Haiku 4.5** for the mechanical propagation once the signature change is decided; the undo half of #7 stays Sonnet 5 (see the finding).
+
+---
+
+## 3. Coverage statement
 
 ### Probed with real reproductions
 
@@ -59,7 +167,7 @@ Vaults used: the 16-file shipped Tutorial vault (`exampleBackend.ts`), the 18 `s
 
 Coverage pointers worth acting on (pointers, not findings):
 
-- **`src/storage/cache.ts`: 3.73% statements, 0% branches.** Every real Dexie transaction — `recordLocalEdit`, `markPushed`, `applyRemoteBatch`, `recordLocalDelete`, `confirmDeleted` — is exercised only through **hand-written re-implementations** in `sync.test.ts`'s `vi.mock('@/storage/cache')`. The mock and the real code agree today because someone kept them in sync by hand; nothing enforces it. This is the least-defended integrity-critical file in the repo.
+- **`src/storage/cache.ts`: 3.73% statements, 0% branches.** Every real Dexie transaction — `recordLocalEdit`, `markPushed`, `applyRemoteBatch`, `recordLocalDelete`, `confirmDeleted` — is exercised only through **hand-written re-implementations** in `sync.test.ts`'s `vi.mock('@/storage/cache')`. The mock and the real code agree today because someone kept them in sync by hand; nothing enforces it. This is the least-defended integrity-critical file in the repo — and, per §2 Root B, it is the same blind spot as the production code: the tests verify `sync.ts` against a second copy of the cache's logic rather than against the cache.
 - `src/storage/localBackend.ts`: 0%. `src/model/inheritance.ts`: 67% (the `mergeValue` sum-type / product-dict branches at lines 70 and 75 are never taken).
 
 ### Fraction of the integrity-critical surface
@@ -68,21 +176,23 @@ Roughly **75–80%**. The parse/serialize pipeline, all four `applyEdit` scopes,
 
 ---
 
-## 3. Category verdicts
+## 4. Category verdicts
 
-| # | Category | Verdict |
-|---|---|---|
-| 1 | Round-trip fidelity & edit locality | **findings: #2, #3, #5, #8** |
-| 2 | Lost updates & conflict handling | **findings: #1, #4** |
-| 3 | Cache coherence & durability | **partially assessed** — `planReconcile`, `markPushed`, `applyRemoteBatch` and the in-flight registry were probed and are clean; multi-tab and IndexedDB quota were reasoned about only (see coverage statement) |
-| 4 | Atomicity & partial failure | **findings: #1, #4** — `markInFlight`/`clearInFlight` pairing was checked at every call site and is `finally`-guarded; `applyRemoteBatch` is a single Dexie transaction |
-| 5 | Destruction & recoverability | **findings: #3, #7** |
-| 6 | Temporal correctness | **findings: #6** — DST, month-end overflow, leap-day and count-vs-window independence were all probed and are correct |
-| 7 | Input validation & untrusted files | **clean** — a malformed file fails per-file with a user-visible toast (`reportParseFailures`), its slug is reserved via `unreadableSlugs` so a new entry cannot overwrite it, and `titleToSlug` collisions are resolved with a `-2`/`-3` suffix. This is genuinely well built. (The nested-node key drop is filed under round-trip as #5.) |
+Categories are the brief's taxonomy; the **Root** column maps them onto §2's, which is the axis to fix along.
+
+| # | Category | Verdict | Root |
+|---|---|---|---|
+| 1 | Round-trip fidelity & edit locality | **findings: #2, #3, #5, #8** | all four are Root **A**, silent because of **B** |
+| 2 | Lost updates & conflict handling | **findings: #1, #4** | both Root **C** |
+| 3 | Cache coherence & durability | **partially assessed** — `planReconcile`, `markPushed`, `applyRemoteBatch` and the in-flight registry were probed and are clean; multi-tab and IndexedDB quota were reasoned about only (see coverage statement) | — |
+| 4 | Atomicity & partial failure | **findings: #1, #4** — `markInFlight`/`clearInFlight` pairing was checked at every call site and is `finally`-guarded; `applyRemoteBatch` is a single Dexie transaction | **C** |
+| 5 | Destruction & recoverability | **findings: #3, #7** | **A** + **E** |
+| 6 | Temporal correctness | **findings: #6** — DST, month-end overflow, leap-day and count-vs-window independence were all probed and are correct | **D** |
+| 7 | Input validation & untrusted files | **clean** — a malformed file fails per-file with a user-visible toast (`reportParseFailures`), its slug is reserved via `unreadableSlugs` so a new entry cannot overwrite it, and `titleToSlug` collisions are resolved with a `-2`/`-3` suffix. This is genuinely well built. (The nested-node key drop is filed under round-trip as #5.) | — |
 
 ---
 
-## 4. Verdicts on the brief's "known suspects"
+## 5. Verdicts on the brief's "known suspects"
 
 | Suspect | Verdict |
 |---|---|
@@ -94,24 +204,36 @@ Roughly **75–80%**. The parse/serialize pipeline, all four `applyEdit` scopes,
 
 ---
 
-## 5. Findings
+## 6. Findings
 
 ### Summary table
 
-| # | Finding | Invariant | Failure | Impact | Breadth | Model |
-|---|---|---|---|---|---|---|
-| 1 | `resolveCollision` reverts the cache before the copy is safe | 4, 6, 7 | **silent** | 9 | 1 fn, all backends, every conflicting write | Sonnet 5 (with the ordering constraint stated) |
-| 2 | Clearing an inherited field silently reverts on reload | 1, 2, 3 | **silent** | 7 | every file with a `defaults:` block | Opus 5, plan mode / multi-PR |
-| 3 | Excluding an occurrence discards everything on it | 1, 2, 7 | **silent** | 7 | 1 line, 3 prod callers, every recurring entry | Sonnet 5 |
-| 4 | Remote-deleted + local edit ⇒ one conflict copy per sync tick, forever | 4, 5 | **loud, unbounded** | 6 | 1 fn, all backends | Sonnet 5 |
-| 5 | Frontmatter on a node with no `StoreItem` home is deleted | 1 | **silent** | 6 | hand-authored multi-event files | Sonnet 5 (with the ownership rule stated) |
-| 6 | Biweekly `byweekday` series expand differently per device locale | 8, 2 | **silent** | 6 | `freq: weekly` + `interval ≥ 2` + `byweekday` | Opus 5 |
-| 7 | Swipe-delete Undo doesn't restore the wikilinks it removed | 7, 2 | **silent** | 5 | 1 of 2 delete paths | Sonnet 5 |
-| 8 | Body whitespace and CRLF rewritten on every save | 1 | **silent** | 3 | **every file, every save** | Haiku 4.5 |
+| # | Finding | Root | Invariant | Failure | Impact | Breadth | Model (point fix) |
+|---|---|---|---|---|---|---|---|
+| 1 | `resolveCollision` reverts the cache before the copy is safe | **C** | 4, 6, 7 | **silent** | 9 | 1 fn, all backends, every conflicting write | Sonnet 5 (with the ordering constraint stated) |
+| 2 | Clearing an inherited field silently reverts on reload | **A** | 1, 2, 3 | **silent** | 7 | every file with a `defaults:` block | Opus 5, plan mode / multi-PR |
+| 3 | Excluding an occurrence discards everything on it | **A** | 1, 2, 7 | **silent** | 7 | 1 line, 3 prod callers, every recurring entry | Sonnet 5 |
+| 4 | Remote-deleted + local edit ⇒ one conflict copy per sync tick, forever | **C** | 4, 5 | **loud, unbounded** | 6 | 1 fn, all backends | Sonnet 5 |
+| 5 | Frontmatter on a node with no `StoreItem` home is deleted | **A** | 1 | **silent** | 6 | hand-authored multi-event files | Sonnet 5 (with the ownership rule stated) |
+| 6 | Biweekly `byweekday` series expand differently per device locale | **D** | 8, 2 | **silent** | 6 | `freq: weekly` + `interval ≥ 2` + `byweekday` | Opus 5 |
+| 7 | Swipe-delete Undo doesn't restore the wikilinks it removed | **E** | 7, 2 | **silent** | 5 | 1 of 2 delete paths | Sonnet 5 |
+| 8 | Body whitespace and CRLF rewritten on every save | **A** | 1 | **silent** | 3 | **every file, every save** | Haiku 4.5 |
 
 Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreakers (silent > loud, unrecoverable > recoverable) applied. #1 leads on unrecoverability; #8 ranks high on the raw formula (breadth = all files, effort = 1) and is listed last only because its impact is genuinely small — re-sort freely.
 
-**Sequencing note.** #2, #3 and #5 all land in `src/model/collapse.ts` + `src/types.ts`; do them in the order **#3 → #5 → #2**. #3 is a self-contained change to `serializeChildren`; #5 changes where the parse side routes reserved keys; #2 changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and will conflict with both if done first. #1 and #4 both rewrite `resolveCollision` — **do #1 first**, since its reordering is the precondition for #4's "the remote file is gone" branch to be safe.
+**The "Model (point fix)" column costs the patch, not the cure.** Each entry is the tier for the one-call-site change described in that finding's **Fix** line. If you are working §2 instead, use the tiers in the roots table there — they are different, and mostly higher, because a root fix is load-bearing judgement where a point fix is mostly mechanical.
+
+### Sequencing
+
+**Root-first (recommended).** This order never patches the same file twice and keeps the suite green at every step:
+
+1. **Root B** — dev-mode read-back in `writeEntityToCache`. Fixes nothing, makes the whole A class loud while you work through it. Land the #8 CRLF fixture with it, since read-back is what proves the fixture round-trips.
+2. **Root C** — `resolveCollision`'s decision table + the cache-API precondition. Closes **#1 and #4 together**; doing #1 alone leaves #4's "remote is gone" branch unsafe.
+3. **Root A**, in the order the leaks stack in `src/model/collapse.ts` + `src/types.ts`: **#3 → #5 → #8 → #2a**, then **#2b** as its own PR once you've decided provenance vs. edit semantics. #3 is self-contained in `serializeChildren`; #5 changes where the parse side routes reserved keys; #2 changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and will conflict with both if taken first.
+4. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half. Doing E after B is deliberate: it makes B's read-back check verify exactly the slugs a transition claims to have written.
+5. **Root D** — #6, gated on the migration decision and on rewriting `weekStart.test.ts`.
+
+**Patch-first**, if you want the bleeding stopped before any restructuring: **#1 → #3 → #5 → #7**, which is the same file ordering with the roots left in place. Note that #2 has no safe point fix — every version of it is a change to the emit predicates, which is why it carries a plan-mode tier in the table above.
 
 ---
 
@@ -119,6 +241,7 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 
 - **Invariant violated:** 4 (no lost update), 6 (durability of accepted writes), 7 (recoverability). Fires whenever a CAS write conflicts *and* the follow-up conflict-copy write fails — i.e. a network drop, a GitHub rate limit, or an expired token landing in the ~1-second window between the two calls. Both writable backends, any file.
 - **Category:** `lost-update` `durability` `atomicity` `recoverability`
+- **Root:** **C** — the destructive cache transition's precondition lives in a comment, not in the API. The root fix makes this state unreachable rather than merely untested; see §2 Root C.
 - **Failure mode:** **Silent.** `TransientSyncError` is classified as offline, so `runSync` reports `setSyncOffline(true)` and — on a manual sync — toasts *"You're offline — changes are saved locally and will sync when you reconnect."* That sentence is false for this file. A user would notice only by reopening the entry after a reload and finding the other device's version. If the failure is a 401 instead, the toast says "Sync failed" — equally uninformative about the destroyed edit.
 - **Impact:** **9**
 
@@ -184,7 +307,7 @@ describe('pushDirty — a conflict-copy write that fails must not destroy the lo
 
   `setResolvedClean` is documented in `src/storage/cache.ts:127` as safe precisely because *"the local content has already been copied out to a conflict-copy path first"* — which, in program order, it has not been.
 - **Problem:** a conflict resolution that fails halfway leaves the user's unpushed edit in neither the cache nor the backend, while the UI claims it is saved locally.
-- **Fix:** write (and confirm) the conflict copy first, then `setResolvedClean` the original; on any error from the copy write, leave the original record `dirty` and rethrow. After the fix the repro's assertion passes via the `dirty` branch on the first cycle and via the copy on the next.
+- **Fix:** write (and confirm) the conflict copy first, then `setResolvedClean` the original; on any error from the copy write, leave the original record `dirty` and rethrow. After the fix the repro's assertion passes via the `dirty` branch on the first cycle and via the copy on the next. **Root fix (preferred):** do this as part of Root C's decision table + cache-API precondition, so the next caller cannot repeat it.
 
 ---
 
@@ -192,6 +315,7 @@ describe('pushDirty — a conflict-copy write that fails must not destroy the lo
 
 - **Invariant violated:** 1 (round-trip fidelity), 2 (edit locality), 3 (expansion ↔ collapse agreement). Every save, on any file whose collapse shape produces a `defaults:` block — which is *every* series with instances, i.e. the shape Meridian itself writes.
 - **Category:** `round-trip` `edit-locality`
+- **Root:** **A** — the projection can't *express* "cleared". #2a (one occurrence) is fixed by expressibility; **#2b (whole series) is the one genuinely hard sub-case in the survey** and needs provenance or an edit-semantics decision — see §2 Root A.
 - **Failure mode:** **Silent, and actively misleading.** The store keeps the cleared value, so the UI shows the change as applied and the sync indicator goes green. The value reappears on the next reload, on another device immediately, and there is no error anywhere. A user would notice as "the app keeps re-adding Bob to my Tuesday standup."
 - **Impact:** **7**
 
@@ -294,7 +418,7 @@ export function inlineFieldEmpty(kind: InlineFieldKind, v: unknown): boolean {
 
   `src/model/AGENTS.md` already lists *"absent-vs-empty for required arrays"* among its still-open losses — this finding is what that sentence costs in practice.
 - **Problem:** an occurrence-level field the user cleared is written as an absent key, so `defaults:` inheritance restores the old value on the next load and the edit is undone without a trace.
-- **Fix:** make "cleared" representable — emit an explicit empty/null marker for a field that diverges from its inherited default, and teach `parseInlineField` to read it back as cleared; afterwards the test above passes and the "All events" repro leaves no stale `participants:` on the 2026-04-13 instance.
+- **Fix:** make "cleared" representable — emit an explicit empty/null marker for a field that diverges from its inherited default, and teach `parseInlineField` to read it back as cleared; afterwards the #2a test above passes. **There is no point fix for #2b** — the stale `participants:` on the 2026-04-13 instance needs the provenance-or-semantics decision in §2 Root A, and should be a separate PR.
 
 ---
 
@@ -302,6 +426,7 @@ export function inlineFieldEmpty(kind: InlineFieldKind, v: unknown): boolean {
 
 - **Invariant violated:** 1 (round-trip), 2 (edit locality), 7 (recoverability). Fires on every swipe-delete or "This occurrence" delete of a recurring occurrence that carries per-occurrence data, and on every override at or after the cut when "This and following" is used.
 - **Category:** `round-trip` `recoverability` `edit-locality`
+- **Root:** **A** — the projection *has* the data and simply doesn't emit it. The cheapest of the four A leaks to close, and the natural place to start Root A.
 - **Failure mode:** **Silent.** The store keeps the full metadata after the exclude, so nothing looks wrong; the loss materialises only on the next reload or on the other device. The swipe-delete undo toast lasts 4 seconds and restores from an in-memory snapshot — after that there is no artifact anywhere. The editor's "This and following" path (`deleteFuture`) has no undo toast at all.
 - **Impact:** **7**
 
@@ -374,7 +499,7 @@ it('excluding an occurrence keeps the unknown keys it carried', () => {
 
   Note `src/model/__tests__/__snapshots__/edits.test.ts.snap` bakes this shape in at four places (e.g. `- date: 2026-04-20 / time: 09:00 / excluded: true`) — but every fixture there excludes a *generated* occurrence with nothing to lose, so the snapshot is defending a case that has never carried data. That is exactly the "snapshot asserts stability, not correctness" trap the brief flagged.
 - **Problem:** deleting one occurrence of a series erases the notes, links and overrides the user attached to that occurrence, with a 4-second undo window and no recoverable artifact after it.
-- **Fix:** emit the excluded child's diffed metadata alongside `excluded: true` in `serializeChildren`; afterwards the test above passes and the hand-authored `cancelReason`/`owner` case round-trips.
+- **Fix:** emit the excluded child's diffed metadata alongside `excluded: true` in `serializeChildren`; afterwards the test above passes and the hand-authored `cancelReason`/`owner` case round-trips. **Root fix:** land it under Root A step 2, with the totality assertion in place, so the fix is verified against the invariant rather than against one repro.
 
 ---
 
@@ -382,6 +507,7 @@ it('excluding an occurrence keeps the unknown keys it carried', () => {
 
 - **Invariant violated:** 4 (no lost update), 5 (cache coherence). Fires when a file is deleted or renamed on the other device — or by hand, or by `git rm` in a GitHub vault — while the local cache still holds an unpushed edit for it.
 - **Category:** `lost-update` `cache-coherence` `atomicity`
+- **Root:** **C** — the same function's other missing branch. Fix with #1, not after it: #1's reordering is what makes this branch's "re-push as a create" safe.
 - **Failure mode:** **Loud, but unbounded and non-converging.** Each cycle raises one `warn` toast ("Conflict on task.md — your version saved as …") and creates one new file; the dirty badge never clears because `task.md` stays `dirty` forever. The user's content is never lost, but the vault fills with duplicates at one per `autoSyncTick` (60 s ⇒ ~1440 files/day), each of which is itself a `.md` vault entry that gets parsed into the store and pushed to the backend.
 - **Impact:** **6**
 
@@ -424,7 +550,7 @@ Two conflicts on the *same* path inside one second is a related second-order bug
   await backend.write(copy, localContent)
 ```
 - **Problem:** a file deleted on one device while edited on another wedges sync permanently and litters the vault with one duplicate entry per minute.
-- **Fix:** handle the "remote is gone" case explicitly — clear the record's base `version` and re-push it as a create (or tombstone it, with a toast saying which) — and make the copy write collision-tolerant by bumping the timestamp/suffix on `ConflictError`; afterwards the four-cycle repro produces at most one extra file and ends with no dirty records.
+- **Fix:** handle the "remote is gone" case explicitly — clear the record's base `version` and re-push it as a create (or tombstone it, with a toast saying which) — and make the copy write collision-tolerant by bumping the timestamp/suffix on `ConflictError`; afterwards the four-cycle repro produces at most one extra file and ends with no dirty records. **Root fix:** this is one cell of Root C's decision table — write the table, don't add a branch.
 
 ---
 
@@ -432,6 +558,7 @@ Two conflicts on the *same* path inside one second is a related second-order bug
 
 - **Invariant violated:** 1 (round-trip fidelity). Hand-authored files only, on the first save after the file is edited through the app.
 - **Category:** `round-trip` `validation`
+- **Root:** **A** — the *store* has no home for the data, so the leak is on the parse side. This is the leak that shows the `extra` bag hangs off `StoreItem`s rather than off tree nodes; see §2 Root A.
 - **Failure mode:** **Silent.** No parse error, no toast; the file loads, the keys are simply absent from the store and therefore from the next write. A user would notice as "Meridian ate my per-event titles" in a `git diff`, possibly weeks later.
 - **Impact:** **6**
 
@@ -513,7 +640,7 @@ const RESERVED_KEYS: ReadonlySet<string> = new Set([
     }
 ```
 - **Problem:** a hand-authored file that puts a title (or any key) on a nested node loses those bytes the first time Meridian saves it, despite the README promising hand-created files are picked up.
-- **Fix:** route reserved keys with no home at the current level into that node's `extra` bag, and give container nodes a remainder home; afterwards both repros round-trip their keys and the "emits `date` exactly once" test still passes.
+- **Fix:** route reserved keys with no home at the current level into that node's `extra` bag, and give container nodes a remainder home; afterwards both repros round-trip their keys and the "emits `date` exactly once" test still passes. **Root fix:** giving the *tree* a remainder home (rather than adding a second allow-list) is what stops leak number five; see §2 Root A.
 
 ---
 
@@ -521,6 +648,7 @@ const RESERVED_KEYS: ReadonlySet<string> = new Set([
 
 - **Invariant violated:** 8 (temporal correctness) always; 2 (edit locality) as soon as one device writes an override. Two devices with different `Intl` locales, or one device whose locale changes.
 - **Category:** `temporal` `edit-locality`
+- **Root:** **D** — the only place a viewer preference reaches a domain computation. The root fix is the boundary rule (nothing reaches `expandNode` that isn't in the file), not just this call site.
 - **Failure mode:** **Silent.** Both devices render a perfectly plausible schedule; they just disagree about which days it falls on. A user would notice as "my sprint review shows on the 19th on my laptop and the 12th on my phone."
 - **Impact:** **6**
 
@@ -590,7 +718,7 @@ it('a biweekly byweekday series yields the same dates regardless of locale week 
 
   With `interval ≥ 2` the period cursor advances 14 days, so which fortnight a `byweekday` day falls into depends entirely on where the reader's week boundary sits.
 - **Problem:** the same vault file describes two different schedules on two devices, and an override written on one appears as a phantom extra occurrence on the other.
-- **Fix:** ground the `byweekday` week on the series anchor (or a persisted `wkst`) instead of the viewer's `localePrefs`, with a migration note; afterwards the test above passes and the cross-device override lands on a real generated slot on both devices.
+- **Fix:** ground the `byweekday` week on the series anchor (or a persisted `wkst`) instead of the viewer's `localePrefs`, with a migration note; afterwards the test above passes and the cross-device override lands on a real generated slot on both devices. **Root fix:** add the boundary rule to `src/model/AGENTS.md` in the same PR — `expandNode`'s inputs are a short list, so it is enforceable by review.
 
 ---
 
@@ -598,6 +726,7 @@ it('a biweekly byweekday series yields the same dates regardless of locale week 
 
 - **Invariant violated:** 7 (recoverability), 2 (edit locality). Swipe-deleting a standalone entry that other notes link to.
 - **Category:** `recoverability` `edit-locality` `cache-coherence`
+- **Root:** **E** for the missed persistence (the transition doesn't report what it touched); the *undo* half is its own bug and survives the Root E fix — see the Fix line.
 - **Failure mode:** **Silent.** After Undo the entry is back and looks intact; the linking note's `items` list is empty in the store while the file on disk still has the link. Nothing warns. The user notices when the linking note's Items section is short a row — or never, until they edit that note and the link is written out of the file for real.
 - **Impact:** **5**
 
@@ -652,7 +781,7 @@ it('Undo restores the wikilink the delete removed from another file', () => {
   if (snapshotRoot) roots.set(fileSlug, snapshotRoot)
 ```
 - **Problem:** undoing a swipe-delete leaves other notes missing the wikilink they carried to the restored entry, and the next edit to those notes writes that loss to disk.
-- **Fix:** have `beginSwipeDelete` pass the backlink slugs through `commitDelete`, and have the undo path restore and re-persist those same slugs; afterwards the test above passes and `writes` contains `note-b` on both the delete and the undo.
+- **Fix:** have `beginSwipeDelete` pass the backlink slugs through `commitDelete`, and have the undo path restore and re-persist those same slugs; afterwards the test above passes and `writes` contains `note-b` on both the delete and the undo. **Root fix:** Root E's `{ data, affectedSlugs }` return removes the *class* (15 call sites can no longer forget a slug), but the undo half still needs fixing by hand — restoring the backlink slugs without clobbering unrelated edits made during the toast window.
 
 ---
 
@@ -660,6 +789,7 @@ it('Undo restores the wikilink the delete removed from another file', () => {
 
 - **Invariant violated:** 1 (round-trip fidelity). Every save of every file; the CRLF half hits every vault authored on Windows or synced through a tool that normalises to CRLF.
 - **Category:** `round-trip`
+- **Root:** **A** — the store *never held* the bytes; `loadFile` trims them at parse. Bundle with Root B: read-back is what proves a CRLF fixture round-trips.
 - **Failure mode:** **Silent.** No error; the content is semantically identical. The user notices as a whole-file `git diff` on a one-character edit, or as lost indentation on a body that started with an indented code block.
 - **Impact:** **3**
 
@@ -689,11 +819,11 @@ export function wrapFrontmatter(yamlFields: string, body: string): string {
 }
 ```
 - **Problem:** every save rewrites bytes the user did not change — indentation on the first body line, the trailing newline, and every `\r` in the frontmatter — turning a one-field edit into a whole-file diff on Windows-authored vaults.
-- **Fix:** carry the source line ending and trailing-newline convention through `loadFile` → `FileMetadata` → `wrapFrontmatter`, and trim only the blank lines around the frontmatter fence rather than the whole body; afterwards all three repro inputs round-trip byte-identically when nothing changed.
+- **Fix:** carry the source line ending and trailing-newline convention through `loadFile` → `FileMetadata` → `wrapFrontmatter`, and trim only the blank lines around the frontmatter fence rather than the whole body; afterwards all three repro inputs round-trip byte-identically when nothing changed. **Root fix:** land with Root B, whose read-back assertion is exactly the check that keeps this from regressing.
 
 ---
 
-## 6. Things checked and found sound
+## 7. Things checked and found sound
 
 Worth recording so the next pass doesn't re-derive them:
 
@@ -705,7 +835,7 @@ Worth recording so the next pass doesn't re-derive them:
 - **`stableOccId` and duplicate dates.** Two instances on the same date get distinct `#2` suffixes at parse time (`storeItems.ts`'s `usedKeys` counter) and each keeps its own metadata through the round-trip; `expandNode`'s `findOverrides` returns every match rather than the first.
 - **Malformed input.** A file with bad YAML fails individually, raises a `warn` toast, and reserves its slug via `unreadableSlugs` so a new entry cannot be written over it. Verified with duplicate keys, tab indentation, and unquoted colons.
 
-## 7. Smaller observations (not findings — no byte lost)
+## 8. Smaller observations (not findings — no byte lost)
 
 - **`applyFuture` on a count-bounded series silently changes the total.** Splitting a 10-occurrence series at its third occurrence caps the first at `until: 2026-04-19` but copies `end: { type: count, occurrences: 10 }` verbatim onto the new one — total goes 10 → 12 (verified). Not a byte lost, but "this and following" changes the schedule's meaning.
 - **"Remove repeat" does nothing to an existing series.** `useEntryDialogs.ts:74` sets `repeat: null`, but `applyFieldsToItem` does `repeat: repeat ?? item.repeat` (`storeOps.ts:291`), so a scope-`all` save keeps the old rule. Verified: the file is unchanged.
