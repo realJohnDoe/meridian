@@ -11,7 +11,7 @@ import {
 import { createTaskExtension, taskTheme } from './cm/taskDecorations'
 import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme } from './cm/markdownFormatting'
 import { emptyPlaceholder, emptyPlaceholderTheme } from './cm/emptyPlaceholder'
-import { emptyLineCursorFix } from './cm/emptyLineCursorFix'
+import { emptyLineCaret, emptyLineCaretTheme } from './cm/emptyLineCaret'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
 
 interface Props {
@@ -120,12 +120,8 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
         taskTheme,
         editorTheme,
         drawSelection(),
-        // Registered after drawSelection() so its update() (and thus its
-        // requestMeasure() call) is scheduled after the cursor layer's —
-        // CM6 batches same-frame requestMeasure calls in registration
-        // order, so this reliably runs its correction after the cursor
-        // has (possibly wrongly) been (re)drawn for that frame.
-        emptyLineCursorFix,
+        emptyLineCaret,
+        emptyLineCaretTheme,
         emptyPlaceholder,
         emptyPlaceholderTheme('Add a description…'),
         EditorView.lineWrapping,
