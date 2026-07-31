@@ -190,14 +190,55 @@ describe('TimeWheels — scrolling', () => {
     expect(onChange).toHaveBeenCalledWith('23:30')
   })
 
-  it('re-centers onto the real row after wrapping, so scroll position stays valid', () => {
+  // The hop off the ghost waits for the fling to be over. Doing it the moment
+  // the boundary is touched would give the momentum animation fresh runway to
+  // hit the boundary again — one flick, many carries.
+  it('re-centers onto the real row once scrolling goes quiet, not immediately', () => {
+    vi.useFakeTimers()
     const { hour } = renderWheels('09:30')
 
     setScrollTop(hour, 99 * ITEM_H)
     fireEvent.scroll(hour)
+    expect(hour.scrollTop).toBe(99 * ITEM_H)  // still parked on the ghost
+
+    vi.advanceTimersByTime(SETTLE_MS)
 
     // Wrapped to hour 0 (ext index 1): real items start at ext index 1.
     expect(hour.scrollTop).toBe(1 * ITEM_H)
+  })
+
+  // Regression: a fling fires many scroll events while it sits on the ghost.
+  // Each used to be taken as a fresh boundary crossing, so a single flick
+  // could carry the hour through a whole run of values at once.
+  it('emits one carry per boundary crossing, however many scroll events fire there', () => {
+    const { onChange, minute } = renderWheels('09:55')
+
+    setScrollTop(minute, 13 * ITEM_H)     // ext N+1 — the wrap ghost
+    fireEvent.scroll(minute)
+    fireEvent.scroll(minute)
+    fireEvent.scroll(minute)
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith('10:00')
+  })
+
+  // Regression: writing scrollTop provokes another scroll event, which used to
+  // run before React re-rendered and so still saw the pre-carry hour. It
+  // re-emitted with carry 0 and overwrote 10:00 back to 09:00 — the carry
+  // looked like it never happened.
+  it('does not undo the carry when the re-centering scroll echoes back', () => {
+    vi.useFakeTimers()
+    const { onChange, minute } = renderWheels('09:55')
+
+    setScrollTop(minute, 13 * ITEM_H)
+    fireEvent.scroll(minute)
+    expect(onChange).toHaveBeenLastCalledWith('10:00')
+
+    vi.advanceTimersByTime(SETTLE_MS)     // hop to the real row…
+    fireEvent.scroll(minute)              // …and the echo that write provokes
+
+    expect(onChange).toHaveBeenLastCalledWith('10:00')
+    expect(onChange).toHaveBeenCalledTimes(1)
   })
 
   it('does not re-emit when the scroll lands on the row already selected', () => {
