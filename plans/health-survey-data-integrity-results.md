@@ -22,12 +22,14 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 | Root | Property | Findings | Root fix | Tier |
 |---|---|---|---|---|
 | **A** | The file is a projection of the store, and nothing requires the projection to be **total** | #2, #3, #5, #8 | Define and enforce totality; close the four leaks | Opus 5, plan mode / multi-PR |
-| **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks: collapse totality at save, source fidelity at load. Prod-enabled, ~162 ms/300 files | Sonnet 5 |
+| **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** first and **B-runtime** last — see below. ~162 ms/300 files | Sonnet 5 |
 | **C** | The one cache transition allowed to destroy local content has an unenforced precondition | #1, #4 | Make the destructive transition unrepresentable without a confirmed copy | Sonnet 5 → Opus 5 |
 | **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
 | **E** | Store transitions don't report which files they touched | #7 | Return the affected slug set from the transition | Haiku 4.5 |
 
-**Do B first.** It is the cheapest item here and the only one that pays off before it is finished: it converts the entire A class — including leaks not yet found — from silent to loud at the moment of loss. Run it in **production**, not just dev — see Root B for the measured cost, the two-checks-at-two-times split, and why the load-time check must not run on the save path.
+**B is a ratchet, not a diagnostic — split it and put the halves at opposite ends.** An earlier draft of this report said "do B first" wholesale; measuring it showed that to be wrong. The runtime half **cannot be switched on today**: check 1 fires on every exclude (#3) and every cleared inherited field (#2), and check 2 on any file with a nested `title:` (#5), so shipping it early buys a detector you must leave muted until the leaks close. And for the leaks already found it is redundant — all four arrive with their own regression tests, which is the verification mechanism. Its real value is the *fifth* leak and regression prevention afterwards, and ratchets belong after the thing they protect is correct.
+
+So: **B-test first** (the two checks as fixture-corpus assertions — zero false positives today, 18/18 fixtures clean, and it *is* Root A step 1), and **B-runtime last** (the prod `notify()`/refuse-to-write path, once turning it on is not an alarm). See §6 Sequencing for the full order and Root B below for the measured behaviour of each check.
 
 ---
 
@@ -92,9 +94,14 @@ Two consequences that decide the design:
 
 Cost, measured over a 300-file corpus built from the fixtures: parse alone **131.5 ms**, parse + serialize + re-parse **293.2 ms** — an added **~162 ms** for the whole vault, i.e. ~0.5 ms per file. Cheap enough to run in production (see the `notify()` note below); if a cold-start budget is tight, run check 2 lazily on first write attempt per slug and cache the verdict, which keeps the "before the damage" property at zero startup cost.
 
-Note what this does **not** do: it does not fix a single finding. It is a detector, not a repair — which is exactly why it belongs first. It makes the A class visible while you work through it, and catches the fifth leak nobody has found yet.
+Note what this does **not** do: it does not fix a single finding. It is a **ratchet, not a diagnostic** — and that decides when each half lands:
 
-**Run it in production, not just `import.meta.env.DEV`.** The codebase already made this call for the same class of problem — `reportParseFailures` toasts in prod, with the rationale spelled out in its doc comment: *"A `console.warn` alone is invisible in a PWA with no open devtools — this is the one user-visible signal that a hand-edited file silently dropped out of the vault."* A file Meridian would rewrite lossily is the same category of event. Three constraints on doing it well:
+- **B-test — first.** The two checks as helpers over the fixture corpus. Zero false positives today (18/18 fixtures clean on both), no production surface, ~an hour. This is Root A step 1: the totality invariant written down as an assertion, and the net every subsequent fix is verified against. It also needs two fixtures the corpus lacks — an excluded instance carrying metadata, and a CRLF file.
+- **B-runtime — last.** Wiring the checks into `writeEntityToCache` and the load path. It **cannot be switched on until the leaks close** (constraint 1 below), and for the four leaks already found it is redundant — each arrives with its own regression test. Its value is the *fifth* leak and regression prevention afterwards, which is precisely the value a ratchet has once the thing it protects is already correct.
+
+An earlier draft of this report recommended doing B wholesale first. Measuring it showed that to be wrong: the runtime half would have spent the whole project muted.
+
+**When B-runtime does land, run it in production, not just `import.meta.env.DEV`.** The codebase already made this call for the same class of problem — `reportParseFailures` toasts in prod, with the rationale spelled out in its doc comment: *"A `console.warn` alone is invisible in a PWA with no open devtools — this is the one user-visible signal that a hand-edited file silently dropped out of the vault."* A file Meridian would rewrite lossily is the same category of event. Three constraints on doing it well:
 
 1. **Enable after closing the leaks, or it is a permanent alarm.** Today check 1 fires on every exclude (#3) and every cleared inherited field (#2), and check 2 fires on any file with a nested `title:` (#5). Ship the checks with the fixes, or land them logging-only first and flip to `warn()` per leak as each closes.
 2. **Make the message actionable, and dedupe it.** Both checks already compute *what* was lost, so say so — "`trip.md` has frontmatter Meridian can't preserve: `title` on 2 instances. Editing it here will drop those keys." Dedupe per slug per session, the way `sync.ts` dedupes actionable errors with `_lastErrorSig`.
@@ -252,11 +259,16 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 
 **Root-first (recommended).** This order never patches the same file twice and keeps the suite green at every step:
 
-1. **Root B** — both read-back checks (collapse totality at save, source fidelity at load), logging-only at first. Fixes nothing, makes the whole A class loud while you work through it. Flip each to `warn()` as the corresponding leak closes, so it is never a permanent alarm. Land the #8 CRLF fixture with it — and note #8 needs a **byte** compare, which neither semantic check catches.
-2. **Root C** — `resolveCollision`'s decision table + the cache-API precondition. Closes **#1 and #4 together**; doing #1 alone leaves #4's "remote is gone" branch unsafe.
-3. **Root A**, in the order the leaks stack in `src/model/collapse.ts` + `src/types.ts`: **#3 → #5 → #8 → #2a**, then **#2b** as its own PR once you've decided provenance vs. edit semantics. #3 is self-contained in `serializeChildren`; #5 changes where the parse side routes reserved keys; #2 changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and will conflict with both if taken first.
-4. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half. Doing E after B is deliberate: it makes B's read-back check verify exactly the slugs a transition claims to have written.
-5. **Root D** — #6, gated on the migration decision and on rewriting `weekStart.test.ts`.
+1. **B-test** — check 1 and check 2 as helpers over the fixture corpus (see Root B for both definitions). ~an hour, zero false positives today, no production surface. This is Root A step 1 — the totality invariant written down as an assertion — and it is the safety net every step below runs against.
+2. **#3** — one line in `serializeChildren` plus its regression test. Cheap, and it is the leak that makes B-test's corpus meaningful (the fixtures currently contain no excluded instance carrying metadata).
+3. **Root C — #1 and #4 together.** `resolveCollision`'s decision table + the cache-API precondition. Doing #1 alone leaves #4's "remote is gone" branch unsafe.
+4. **#5**, then **#8**, the remaining mechanical A leaks in `src/model/collapse.ts` + `src/types.ts`. #5 changes where the parse side routes reserved keys; #8 needs a **byte** compare and a CRLF fixture, which neither semantic check catches.
+5. **#2a** (make "cleared" expressible), then **#2b** as its own PR once provenance vs. edit semantics is decided. #2 changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and will conflict with #3 and #5 if taken before them.
+6. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half by hand.
+7. **Root D** — #6, gated on the migration decision and on rewriting `weekStart.test.ts`.
+8. **B-runtime** — wire the two checks into `writeEntityToCache` and the load path, and flip them from logging-only to `warn()` (or to refusing the write, per Root B's third constraint). By this point they are quiet on a correct vault, so enabling them is a ratchet rather than an alarm.
+
+**Steps 2 and 3 are genuinely arguable — pick by how the vault is used.** Severity-first says C before #3: #1 is total, silent, unrecoverable loss of an edit (impact 9). Frequency-first says the reverse: #1 needs a conflict *and* a network failure inside a ~1-second window, so it is rare-but-catastrophic, while #3 fires every time anyone deletes a recurring occurrence carrying data — single device, no conflict required. The order above assumes multi-device GitHub sync is in real use, which makes conflicts unexceptional; for a predominantly single-device vault, swap them. #3 is cheap enough that it barely delays C either way.
 
 **Patch-first**, if you want the bleeding stopped before any restructuring: **#1 → #3 → #5 → #7**, which is the same file ordering with the roots left in place. Note that #2 has no safe point fix — every version of it is a change to the emit predicates, which is why it carries a plan-mode tier in the table above.
 
@@ -814,7 +826,7 @@ it('Undo restores the wikilink the delete removed from another file', () => {
 
 - **Invariant violated:** 1 (round-trip fidelity). Every save of every file; the CRLF half hits every vault authored on Windows or synced through a tool that normalises to CRLF.
 - **Category:** `round-trip`
-- **Root:** **A** — the store *never held* the bytes; `loadFile` trims them at parse. Bundle with Root B: read-back is what proves a CRLF fixture round-trips.
+- **Root:** **A** — the store *never held* the bytes; `loadFile` trims them at parse. Note that **neither** of Root B's semantic checks catches this one (measured: both clean on a CRLF file) — it needs a **byte** compare at load, plus a CRLF fixture, which the corpus currently lacks.
 - **Failure mode:** **Silent.** No error; the content is semantically identical. The user notices as a whole-file `git diff` on a one-character edit, or as lost indentation on a body that started with an indented code block.
 - **Impact:** **3**
 
@@ -844,7 +856,7 @@ export function wrapFrontmatter(yamlFields: string, body: string): string {
 }
 ```
 - **Problem:** every save rewrites bytes the user did not change — indentation on the first body line, the trailing newline, and every `\r` in the frontmatter — turning a one-field edit into a whole-file diff on Windows-authored vaults.
-- **Fix:** carry the source line ending and trailing-newline convention through `loadFile` → `FileMetadata` → `wrapFrontmatter`, and trim only the blank lines around the frontmatter fence rather than the whole body; afterwards all three repro inputs round-trip byte-identically when nothing changed. **Root fix:** land with Root B, whose read-back assertion is exactly the check that keeps this from regressing.
+- **Fix:** carry the source line ending and trailing-newline convention through `loadFile` → `FileMetadata` → `wrapFrontmatter`, and trim only the blank lines around the frontmatter fence rather than the whole body; afterwards all three repro inputs round-trip byte-identically when nothing changed. **Root fix:** add a byte-level arm to Root B's load-time check and a CRLF fixture, so this cannot regress — the two semantic checks will not catch it.
 
 ---
 
