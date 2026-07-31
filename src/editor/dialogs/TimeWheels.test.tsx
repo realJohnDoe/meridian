@@ -1,16 +1,46 @@
 // @vitest-environment jsdom
+import { useState } from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import TimeWheels from './TimeWheels'
 
-const ITEM_H = 40    // must match TimeWheels' own constant
+// These must match TimeWheels' own constants.
+const ITEM_H = 40
 const SETTLE_MS = 120
+const RUNWAY_PX = 2000
+
+// The list is repeated enough times to give a fling RUNWAY_PX of travel in
+// both directions, so a row's scroll offset is its index within that strip,
+// not within `items`. `home` is the start of the middle copy, where a column
+// sits at rest.
+function geometry(len: number) {
+  const periods = Math.ceil(RUNWAY_PX / (len * ITEM_H)) * 2 + 1
+  return { total: periods * len, home: Math.floor(periods / 2) * len }
+}
+const H = geometry(24)   // hours:   home 72
+const M = geometry(12)   // minutes: home 60
 
 function renderWheels(value: string) {
   const onChange = vi.fn()
   render(<TimeWheels value={value} onChange={onChange} />)
   return {
     onChange,
+    hour:   screen.getByRole('listbox', { name: 'Hour' }),
+    minute: screen.getByRole('listbox', { name: 'Minute' }),
+  }
+}
+
+// A controlled host, for the cases where the emitted value has to feed back in
+// — a carry only moves the hour column because the new value returns as a prop.
+function renderLive(initial: string) {
+  const emitted = vi.fn()
+  function Host() {
+    const [v, setV] = useState(initial)
+    return <TimeWheels value={v} onChange={next => { emitted(next); setV(next) }} />
+  }
+  render(<Host />)
+  return {
+    emitted,
     hour:   screen.getByRole('listbox', { name: 'Hour' }),
     minute: screen.getByRole('listbox', { name: 'Minute' }),
   }
@@ -150,14 +180,13 @@ describe('TimeWheels — selection', () => {
 })
 
 describe('TimeWheels — scrolling', () => {
-  // A ghost row previewing the opposite end of the list sits before the real
-  // items (so the wheel has something to scroll onto when wrapping), which
-  // shifts every real row's scroll offset up by one ITEM_H versus its plain
-  // index in `items`.
+  // Offsets are strip rows, so a column at rest on hour 9 sits at H.home + 9,
+  // not at 9. One pad row above the strip is what makes row k centre at
+  // exactly k * ITEM_H.
   it('translates scroll offset into the row at that index', () => {
     const { onChange, hour } = renderWheels('09:30')
 
-    setScrollTop(hour, 6 * ITEM_H)
+    setScrollTop(hour, (H.home + 5) * ITEM_H)
     fireEvent.scroll(hour)
 
     expect(onChange).toHaveBeenCalledWith('05:30')
@@ -166,54 +195,77 @@ describe('TimeWheels — scrolling', () => {
   it('rounds a scroll offset that lands between rows to the nearer one', () => {
     const { onChange, hour } = renderWheels('09:30')
 
-    setScrollTop(hour, 6 * ITEM_H + 0.6 * ITEM_H)
+    setScrollTop(hour, (H.home + 5) * ITEM_H + 0.6 * ITEM_H)
     fireEvent.scroll(hour)
 
     expect(onChange).toHaveBeenCalledWith('06:30')
   })
 
-  it('wraps a scroll past the end back to the first row', () => {
+  it('rolls past the end of the list onto the first row', () => {
     const { onChange, hour } = renderWheels('09:30')
 
-    setScrollTop(hour, 99 * ITEM_H)
+    setScrollTop(hour, (H.home + 24) * ITEM_H)   // one whole period on
     fireEvent.scroll(hour)
 
     expect(onChange).toHaveBeenCalledWith('00:30')
   })
 
-  it('wraps a scroll before the start back to the last row', () => {
+  it('rolls before the start of the list onto the last row', () => {
     const { onChange, hour } = renderWheels('09:30')
 
-    setScrollTop(hour, -50 * ITEM_H)
+    setScrollTop(hour, (H.home - 1) * ITEM_H)
     fireEvent.scroll(hour)
 
     expect(onChange).toHaveBeenCalledWith('23:30')
   })
 
-  // The hop off the ghost waits for the fling to be over. Doing it the moment
-  // the boundary is touched would give the momentum animation fresh runway to
-  // hit the boundary again — one flick, many carries.
-  it('re-centers onto the real row once scrolling goes quiet, not immediately', () => {
-    vi.useFakeTimers()
-    const { hour } = renderWheels('09:30')
+  it('does not re-emit when the scroll lands on the row already selected', () => {
+    const { onChange, hour } = renderWheels('09:30')
 
-    setScrollTop(hour, 99 * ITEM_H)
+    setScrollTop(hour, (H.home + 9) * ITEM_H)
     fireEvent.scroll(hour)
-    expect(hour.scrollTop).toBe(99 * ITEM_H)  // still parked on the ghost
 
-    vi.advanceTimersByTime(SETTLE_MS)
-
-    // Wrapped to hour 0 (ext index 1): real items start at ext index 1.
-    expect(hour.scrollTop).toBe(1 * ITEM_H)
+    expect(onChange).not.toHaveBeenCalled()
   })
+})
 
-  // Regression: a fling fires many scroll events while it sits on the ghost.
-  // Each used to be taken as a fresh boundary crossing, so a single flick
-  // could carry the hour through a whole run of values at once.
-  it('emits one carry per boundary crossing, however many scroll events fire there', () => {
+describe('TimeWheels — carrying the hour', () => {
+  it('carries the hour forward when the minutes roll past the end', () => {
     const { onChange, minute } = renderWheels('09:55')
 
-    setScrollTop(minute, 13 * ITEM_H)     // ext N+1 — the wrap ghost
+    setScrollTop(minute, (M.home + 12) * ITEM_H)
+    fireEvent.scroll(minute)
+
+    expect(onChange).toHaveBeenCalledWith('10:00')
+  })
+
+  it('carries the hour backward when the minutes roll before the start', () => {
+    const { onChange, minute } = renderWheels('09:00')
+
+    setScrollTop(minute, (M.home - 1) * ITEM_H)
+    fireEvent.scroll(minute)
+
+    expect(onChange).toHaveBeenCalledWith('08:55')
+  })
+
+  // The strip is long enough that momentum keeps running through the wrap
+  // instead of dead-ending on it, so a hard fling can cover several laps —
+  // and each lap is a real hour, exactly as on a geared wheel.
+  it('carries one hour per lap when a fling spins through several', () => {
+    const { onChange, minute } = renderWheels('09:55')
+
+    setScrollTop(minute, (M.home + 24) * ITEM_H)   // two whole periods on
+    fireEvent.scroll(minute)
+
+    expect(onChange).toHaveBeenCalledWith('11:00')
+  })
+
+  // Regression: a fling fires many scroll events, and each used to be taken
+  // as a fresh boundary crossing — one flick, a whole run of hours.
+  it('emits once while the position is unchanged, however many events fire', () => {
+    const { onChange, minute } = renderWheels('09:55')
+
+    setScrollTop(minute, (M.home + 12) * ITEM_H)
     fireEvent.scroll(minute)
     fireEvent.scroll(minute)
     fireEvent.scroll(minute)
@@ -222,79 +274,106 @@ describe('TimeWheels — scrolling', () => {
     expect(onChange).toHaveBeenCalledWith('10:00')
   })
 
-  // Regression: writing scrollTop provokes another scroll event, which used to
-  // run before React re-rendered and so still saw the pre-carry hour. It
-  // re-emitted with carry 0 and overwrote 10:00 back to 09:00 — the carry
-  // looked like it never happened.
+  // Regression: the re-centering write provokes another scroll event, which
+  // used to run before React re-rendered, still see the pre-carry hour, and
+  // overwrite 10:00 back to 09:00 — the carry looked like it never happened.
   it('does not undo the carry when the re-centering scroll echoes back', () => {
     vi.useFakeTimers()
     const { onChange, minute } = renderWheels('09:55')
 
-    setScrollTop(minute, 13 * ITEM_H)
+    setScrollTop(minute, (M.home + 12) * ITEM_H)
     fireEvent.scroll(minute)
     expect(onChange).toHaveBeenLastCalledWith('10:00')
 
-    vi.advanceTimersByTime(SETTLE_MS)     // hop to the real row…
-    fireEvent.scroll(minute)              // …and the echo that write provokes
+    vi.advanceTimersByTime(SETTLE_MS)   // hop back to the middle period…
+    fireEvent.scroll(minute)            // …and the echo that write provokes
 
     expect(onChange).toHaveBeenLastCalledWith('10:00')
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it('does not re-emit when the scroll lands on the row already selected', () => {
-    const { onChange, hour } = renderWheels('09:30')
+  it('rolls the hour column over with the minutes, one row, animated', () => {
+    const { emitted, hour, minute } = renderLive('09:55')
+    const scrollTo = vi.fn()
+    hour.scrollTo = scrollTo
+    setScrollTop(hour, (H.home + 9) * ITEM_H)
 
-    setScrollTop(hour, 10 * ITEM_H)
+    setScrollTop(minute, (M.home + 12) * ITEM_H)
+    fireEvent.scroll(minute)
+
+    expect(emitted).toHaveBeenCalledWith('10:00')
+    expect(selected(hour)).toBe('10')
+    // One row on from where it stood, eased rather than jumped.
+    expect(scrollTo).toHaveBeenCalledWith({ top: (H.home + 10) * ITEM_H, behavior: 'smooth' })
+  })
+
+  it('takes the short way round when the hour wraps across midnight', () => {
+    const { emitted, hour, minute } = renderLive('23:55')
+    const scrollTo = vi.fn()
+    hour.scrollTo = scrollTo
+    setScrollTop(hour, (H.home + 23) * ITEM_H)
+
+    setScrollTop(minute, (M.home + 12) * ITEM_H)
+    fireEvent.scroll(minute)
+
+    expect(emitted).toHaveBeenCalledWith('00:00')
+    // Forward one row onto the next copy of 00 — not back 23 rows to this
+    // period's own 00, which would visibly unwind the whole wheel.
+    expect(scrollTo).toHaveBeenCalledWith({ top: (H.home + 24) * ITEM_H, behavior: 'smooth' })
+  })
+})
+
+describe('TimeWheels — settling', () => {
+  it('returns to the middle period once scrolling goes quiet', () => {
+    vi.useFakeTimers()
+    const { hour } = renderWheels('09:30')
+
+    setScrollTop(hour, (H.home + 24 + 5) * ITEM_H)   // a period out from home
     fireEvent.scroll(hour)
+    expect(hour.scrollTop).toBe((H.home + 24 + 5) * ITEM_H)   // left alone mid-fling
 
-    expect(onChange).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(SETTLE_MS)
+
+    // Same row to look at, but with a full runway again in both directions.
+    expect(hour.scrollTop).toBe((H.home + 5) * ITEM_H)
   })
 
   // The safety net for a snap interrupted mid-fling: after SETTLE_MS of quiet,
-  // a column resting between rows is nudged onto the nearest one.
-  it('re-snaps a column left between rows once scrolling goes quiet', () => {
+  // a column resting between rows is squared up onto the nearest one.
+  it('squares up a column left between rows', () => {
     vi.useFakeTimers()
     const { hour } = renderWheels('09:30')
-    const scrollTo = vi.fn()
-    hour.scrollTo = scrollTo
 
-    setScrollTop(hour, 6 * ITEM_H + 10)
-    fireEvent.scroll(hour)
-    expect(scrollTo).not.toHaveBeenCalled()
-
-    vi.advanceTimersByTime(SETTLE_MS)
-
-    expect(scrollTo).toHaveBeenCalledWith({ top: 6 * ITEM_H, behavior: 'smooth' })
-  })
-
-  it('leaves a column already resting on a row alone', () => {
-    vi.useFakeTimers()
-    const { hour } = renderWheels('09:30')
-    const scrollTo = vi.fn()
-    hour.scrollTo = scrollTo
-
-    setScrollTop(hour, 6 * ITEM_H)
+    setScrollTop(hour, (H.home + 6) * ITEM_H + 10)
     fireEvent.scroll(hour)
     vi.advanceTimersByTime(SETTLE_MS)
 
-    expect(scrollTo).not.toHaveBeenCalled()
+    expect(hour.scrollTop).toBe((H.home + 6) * ITEM_H)
   })
 
-  it('debounces the settle timer, so only the final resting place is snapped to', () => {
+  it('leaves a column already resting on its home row alone', () => {
     vi.useFakeTimers()
     const { hour } = renderWheels('09:30')
-    const scrollTo = vi.fn()
-    hour.scrollTo = scrollTo
 
-    setScrollTop(hour, 4 * ITEM_H + 10)
+    setScrollTop(hour, (H.home + 6) * ITEM_H)
+    fireEvent.scroll(hour)
+    vi.advanceTimersByTime(SETTLE_MS)
+
+    expect(hour.scrollTop).toBe((H.home + 6) * ITEM_H)
+  })
+
+  it('debounces the settle timer, so only the final resting place is kept', () => {
+    vi.useFakeTimers()
+    const { hour } = renderWheels('09:30')
+
+    setScrollTop(hour, (H.home + 4) * ITEM_H + 10)
     fireEvent.scroll(hour)
     vi.advanceTimersByTime(SETTLE_MS - 20)
 
-    setScrollTop(hour, 8 * ITEM_H + 10)
+    setScrollTop(hour, (H.home + 8) * ITEM_H + 10)
     fireEvent.scroll(hour)
     vi.advanceTimersByTime(SETTLE_MS)
 
-    expect(scrollTo).toHaveBeenCalledTimes(1)
-    expect(scrollTo).toHaveBeenCalledWith({ top: 8 * ITEM_H, behavior: 'smooth' })
+    expect(hour.scrollTop).toBe((H.home + 8) * ITEM_H)
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useCallback, memo } from 'react'
 import { cn } from '@/lib/cn'
 
 // The column geometry is load-bearing and must stay consistent: the viewport is
@@ -11,19 +11,56 @@ import { cn } from '@/lib/cn'
 // its highlight.
 const ITEM_H = 40 // px per visible row
 
-// How long the scroller has to be quiet before we consider it settled. Snap
-// normally lands it on a row by itself; this is the safety net for a snap that
-// got interrupted (a tap landing mid-fling on iOS) and left it between rows,
-// and it's when a column parked on a wrap ghost hops to the real row.
+// How long the scroller has to be quiet before we consider it settled.
 const SETTLE_MS = 120
+
+// How far a single fling may travel before it runs out of strip. The list is
+// repeated enough times to cover this in both directions from the middle, so
+// momentum rolls through the wrap boundary without ever meeting a scroll
+// limit. A strip only as long as the list itself dead-ends one row past the
+// end — which is what used to stop a flick dead the moment the hour rolled.
+const RUNWAY_PX = 2000
+
+// Fallback for a smooth scroll that never lands exactly on its target.
+const ANIM_MS = 500
+
+const mod = (n: number, m: number) => ((n % m) + m) % m
+
+// Enough whole repeats on each side of the middle to cover the runway, plus
+// the middle itself — always an odd count, so `home` is genuinely centred.
+function geometry(len: number) {
+  const periods = Math.ceil(RUNWAY_PX / (len * ITEM_H)) * 2 + 1
+  return { total: periods * len, home: Math.floor(periods / 2) * len }
+}
+
+const rowClass =
+  'w-full h-10 flex items-center justify-center snap-center font-mono text-sm select-none cursor-pointer shrink-0'
+
+// Rows are memoised and clicks are delegated to the scroller, so a value
+// change re-renders only the few rows whose selected state actually flipped
+// rather than all ~300 in the strip.
+const Row = memo(function Row(
+  { n, text, selected, canonical }: { n: number; text: string; selected: boolean; canonical: boolean },
+) {
+  const className = cn(rowClass, selected ? 'text-foreground font-semibold' : 'text-muted-foreground')
+  // Only the middle period is exposed to assistive tech, so the listbox reads
+  // as one clean set of options rather than the strip's many copies.
+  return canonical ? (
+    <button type="button" role="option" aria-selected={selected} data-n={n} tabIndex={-1} className={className}>
+      {text}
+    </button>
+  ) : (
+    <div aria-hidden="true" data-n={n} className={className}>{text}</div>
+  )
+})
 
 interface ScrollColumnProps {
   items: number[]
   value: number
   fmt: (n: number) => string
-  // `carry` is nonzero when the change crossed the wrap boundary: +1 rolled
-  // forward past the last row onto the first, -1 rolled backward past the
-  // first row onto the last. Callers that chain columns (minutes carrying
+  // `carry` is how many times the column rolled past the end of the list to
+  // get here: +1 forward, -1 backward, and more when one fling genuinely
+  // spins through several laps. Callers that chain columns (minutes carrying
   // into hours) use it; a column with nothing above it just ignores it.
   onChange: (v: number, carry: number) => void
   label: string
@@ -31,105 +68,104 @@ interface ScrollColumnProps {
 
 function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps) {
   const ref = useRef<HTMLDivElement>(null)
-
-  // Content layout, top to bottom:
-  //   [pad(-2), ghost(-1), items[0..N-1], ghost(0), pad(1)]
-  // The two ghosts preview the opposite end of the list so the wheel can be
-  // scrolled one row past either end instead of dead-ending — that overshoot
-  // is what a wrap is. The pads beyond them supply the scroll room a ghost
-  // needs to reach the centered/highlighted row at all, and they show the
-  // *next* value round so the settle-time hop from ghost to real row is
-  // pixel-identical rather than a visible flicker.
-  //
-  // Positions below are "ext" indices: scrollTop = extIdx * ITEM_H, where
-  // extIdx = realIdx + 1. So ext 0 centers ghost(-1), ext 1..N center the
-  // real rows, and ext N+1 centers ghost(0).
-  const extLen = items.length + 2
   const len = items.length
-  const at = (i: number) => items[((i % len) + len) % len]!
+  const { total, home } = useMemo(() => geometry(len), [len])
 
-  // The ext index this column currently represents. Every programmatic
-  // scrollTop write sets this first, so the scroll event that write provokes
-  // sees `raw === emittedRef.current` and returns instead of re-emitting.
-  // Deduping against this ref rather than against `value` is deliberate:
-  // `value` is a render-time snapshot, and scroll events routinely fire
-  // several times before React commits the next render, so a stale `value`
-  // would let our own echo through — which is exactly how a carry used to be
-  // overwritten a millisecond after it landed.
-  const emittedRef = useRef<number | null>(null)
-
-  // Latched while parked on a ghost row, so one boundary crossing emits one
-  // carry no matter how many scroll events the fling fires there.
-  const onGhostRef = useRef(false)
+  // Which row of the strip we are on. Carries come from how many period
+  // boundaries the position crosses between events, so genuine laps count
+  // while our own programmatic writes — which claim this ref before touching
+  // scrollTop — cross none and stay silent.
+  const posRef = useRef<number | null>(null)
+  const animRef = useRef<number | null>(null)   // target of an in-flight smooth scroll
+  const animTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const settleRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  const settle = useCallback(() => {
+    const node = ref.current
+    if (!node) return
+    const k = Math.max(0, Math.min(Math.round(node.scrollTop / ITEM_H), total - 1))
+    // Back to the middle period, so the next fling gets a full runway again.
+    // A whole-period hop lands on an identical row, so it is invisible; the
+    // same write squares up a column left resting between rows.
+    const target = home + mod(k, len)
+    posRef.current = target
+    if (Math.abs(node.scrollTop - target * ITEM_H) > 0.5) node.scrollTop = target * ITEM_H
+  }, [total, home, len])
+
+  useEffect(() => () => {
+    clearTimeout(settleRef.current)
+    clearTimeout(animTimerRef.current)
+  }, [])
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const idx = items.indexOf(value)
     if (idx < 0) return
-    const extIdx = idx + 1
-    // Already where this value belongs — either our own scroll coming home,
-    // or a column parked on the ghost that renders this same value. Writing
-    // scrollTop here would fight the in-flight momentum/snap animation.
-    if (extIdx === emittedRef.current) return
-    emittedRef.current = extIdx
-    el.scrollTop = extIdx * ITEM_H
-  }, [value, items])
+    const pos = posRef.current
 
-  useEffect(() => () => clearTimeout(settleRef.current), [])
+    if (pos === null) {
+      // First paint: land on the middle period, no animation.
+      posRef.current = home + idx
+      el.scrollTop = (home + idx) * ITEM_H
+      return
+    }
+    // Already showing this value — our own scroll coming home. Writing
+    // scrollTop here would fight the in-flight momentum.
+    if (mod(pos, len) === idx) return
+
+    // Someone else moved us: the minute wheel carrying the hour, an arrow
+    // key, a tap on a row. Roll to the *nearest* row holding the new value —
+    // for a carry that is exactly one row away — and animate it, so the hour
+    // turns over in step with the minute wheel the way a geared watch does.
+    const step = mod(idx - mod(pos, len) + len / 2, len) - len / 2
+    const target = Math.max(0, Math.min(pos + step, total - 1))
+    posRef.current = target
+    animRef.current = target * ITEM_H
+    clearTimeout(animTimerRef.current)
+    animTimerRef.current = setTimeout(() => { animRef.current = null }, ANIM_MS)
+    if (typeof el.scrollTo === 'function') el.scrollTo({ top: target * ITEM_H, behavior: 'smooth' })
+    else el.scrollTop = target * ITEM_H
+  }, [value, items, len, home, total])
 
   const handleScroll = useCallback(() => {
     const el = ref.current
     if (!el) return
-    const raw = Math.max(0, Math.min(Math.round(el.scrollTop / ITEM_H), extLen - 1))
+    const k = Math.max(0, Math.min(Math.round(el.scrollTop / ITEM_H), total - 1))
 
-    clearTimeout(settleRef.current)
-    settleRef.current = setTimeout(() => {
-      const node = ref.current
-      if (!node) return
-      const idx = Math.max(0, Math.min(Math.round(node.scrollTop / ITEM_H), extLen - 1))
-
-      if (idx === 0 || idx === extLen - 1) {
-        // Parked on a ghost with the fling over: hop to the real row showing
-        // the same number. Deferring this to settle rather than doing it the
-        // instant the boundary is touched is what keeps one gesture to one
-        // carry — recentring mid-fling hands the momentum animation fresh
-        // runway to hit the boundary again, and it would carry once per lap.
-        // An instant write, not `smooth`: the glyphs are identical, so the
-        // jump is invisible, whereas a smooth scroll visibly slides the list.
-        const real = idx === 0 ? items.length : 1
-        emittedRef.current = real
-        onGhostRef.current = false
-        node.scrollTop = real * ITEM_H
-        return
+    // Our own animation is running: track where it has got to, never emit.
+    if (animRef.current !== null) {
+      posRef.current = k
+      if (Math.abs(el.scrollTop - animRef.current) < 0.5) {
+        animRef.current = null
+        clearTimeout(animTimerRef.current)
+        clearTimeout(settleRef.current)
+        settleRef.current = setTimeout(settle, SETTLE_MS)
       }
-
-      const target = idx * ITEM_H
-      if (Math.abs(node.scrollTop - target) > 0.5) node.scrollTo({ top: target, behavior: 'smooth' })
-    }, SETTLE_MS)
-
-    if (raw === 0 || raw === extLen - 1) {
-      if (onGhostRef.current) return
-      onGhostRef.current = true
-      const carry = raw === 0 ? -1 : 1
-      // The real row this ghost stands in for; claiming it now keeps the
-      // layout effect from yanking the wheel off the ghost mid-fling when
-      // the carried value arrives back as a prop.
-      const real = raw === 0 ? items.length : 1
-      emittedRef.current = real
-      onChange(items[real - 1]!, carry)
       return
     }
 
-    onGhostRef.current = false
-    if (raw === emittedRef.current) return
-    emittedRef.current = raw
-    onChange(items[raw - 1]!, 0)
-  }, [items, onChange, extLen])
+    clearTimeout(settleRef.current)
+    settleRef.current = setTimeout(settle, SETTLE_MS)
 
-  const ghostClass =
-    'h-10 shrink-0 flex items-center justify-center font-mono text-sm text-muted-foreground/40 select-none'
+    const prev = posRef.current
+    if (prev === null || k === prev) return
+    posRef.current = k
+    // Every period boundary between the two positions is one roll past the
+    // end of the list. No boundary row to land on and no latch to arm, so
+    // momentum is never interrupted — and a fling that really does spin
+    // several laps carries several hours.
+    onChange(items[mod(k, len)]!, Math.floor(k / len) - Math.floor(prev / len))
+  }, [items, onChange, total, len, settle])
+
+  const rows = useMemo(
+    () => Array.from({ length: total }, (_, k) => ({
+      k,
+      n: items[mod(k, len)]!,
+      canonical: k >= home && k < home + len,
+    })),
+    [total, items, len, home],
+  )
 
   return (
     <div className="relative w-12 h-30">
@@ -145,39 +181,27 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
         tabIndex={0}
         className="h-full overflow-y-scroll snap-y snap-mandatory [&::-webkit-scrollbar]:hidden focus-visible:outline-none"
         onScroll={handleScroll}
+        // Let the user grab the wheel back out of an in-flight animation.
+        onPointerDown={() => { animRef.current = null }}
+        onClick={e => {
+          const hit = (e.target as HTMLElement).closest<HTMLElement>('[data-n]')
+          if (hit) onChange(Number(hit.dataset.n), 0)
+        }}
         onKeyDown={e => {
           const idx = items.indexOf(value)
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault()
-            const delta = e.key === 'ArrowDown' ? 1 : -1
-            const next = idx + delta
-            const carry = next >= items.length ? 1 : next < 0 ? -1 : 0
-            onChange(at(next), carry)
+            const next = idx + (e.key === 'ArrowDown' ? 1 : -1)
+            onChange(items[mod(next, len)]!, next >= len ? 1 : next < 0 ? -1 : 0)
           }
         }}
         style={{ scrollbarWidth: 'none' }}
       >
-        {/* pad — never centered, only ever seen as the row beyond a ghost */}
-        <div aria-hidden="true" className={ghostClass}>{fmt(at(-2))}</div>
-        <div aria-hidden="true" className={cn(ghostClass, 'snap-center')}>{fmt(at(-1))}</div>
-        {items.map(n => (
-          <button
-            key={n}
-            type="button"
-            role="option"
-            aria-selected={n === value}
-            tabIndex={-1}
-            className={cn(
-              'w-full h-10 flex items-center justify-center snap-center font-mono text-sm select-none cursor-pointer shrink-0',
-              n === value ? 'text-foreground font-semibold' : 'text-muted-foreground',
-            )}
-            onClick={() => onChange(n, 0)}
-          >
-            {fmt(n)}
-          </button>
+        <div className="h-10 shrink-0" /> {/* pad, so the first row can reach the centre */}
+        {rows.map(r => (
+          <Row key={r.k} n={r.n} text={fmt(r.n)} selected={r.n === value} canonical={r.canonical} />
         ))}
-        <div aria-hidden="true" className={cn(ghostClass, 'snap-center')}>{fmt(at(0))}</div>
-        <div aria-hidden="true" className={ghostClass}>{fmt(at(1))}</div>
+        <div className="h-10 shrink-0" /> {/* pad, so the last row can reach the centre */}
       </div>
     </div>
   )
@@ -215,7 +239,7 @@ export default function TimeWheels({ value, onChange }: Props) {
 
   const onHour = useCallback((nh: number) => emit(nh, latestRef.current.m), [emit])
   const onMinute = useCallback(
-    (nm: number, carry: number) => emit((latestRef.current.h + carry + 24) % 24, nm),
+    (nm: number, carry: number) => emit(mod(latestRef.current.h + carry, 24), nm),
     [emit],
   )
 
