@@ -23,6 +23,16 @@ import type { RawNode } from './nodeSchema'
  * The expansion engine uses this to seed generated occurrences, which are
  * semantically equivalent to virtual children with only a date override.
  *
+ * `ownFields` holds this node's own explicit properties (everything except
+ * `defaults`/`instances`), *before* `parentDefaults` merging — i.e. exactly
+ * what distinguishes this node from a copy that inherited everything. A
+ * container node (no `date`, no `repeat`) never becomes a `StoreItem` of its
+ * own, so `fields` (which already has `parentDefaults` folded in) has no home
+ * to reach at collapse time; `storeItems.ts` uses `ownFields` to recover a
+ * container's own remainder and carry it down to its descendant items instead
+ * of silently discarding it — still field-agnostic here, since this is purely
+ * "own vs. inherited" bookkeeping, not a name any domain field would use.
+ *
  * **Intended scope:** this type is an implementation detail of the parse
  * pipeline (`storeItems.ts`). It is exported only so that
  * `NodeInheritanceDebugger` can visualise the inheritance tree. Production
@@ -32,6 +42,7 @@ export interface EffectiveNode {
   fields:        Record<string, unknown>
   childDefaults: Record<string, unknown>
   instances:     EffectiveNode[]
+  ownFields:     Record<string, unknown>
 }
 
 // ── Spec helpers ──────────────────────────────────────────────────────────────
@@ -115,10 +126,13 @@ export function buildEffectiveTree(
     if (!NON_INHERITABLE.has(key)) fields[key] = value
   }
 
-  // 2. Apply this node's own fields on top (spec merge rules)
+  // 2. Apply this node's own fields on top (spec merge rules), tracking which
+  // keys were this node's own (see `EffectiveNode.ownFields`).
+  const ownFields: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(node)) {
     if (key === 'defaults' || key === 'instances') continue
     fields[key] = mergeValue(fields[key], value)
+    ownFields[key] = value
   }
 
   // 3. Recurse into instances, passing down the effective defaults
@@ -126,7 +140,7 @@ export function buildEffectiveTree(
   const rawInstances = Array.isArray(node.instances) ? node.instances : []
   const instances    = rawInstances.map(child => buildEffectiveTree(child, accumulated))
 
-  return { fields, childDefaults: accumulated, instances }
+  return { fields, childDefaults: accumulated, instances, ownFields }
 }
 
 // ── Value display ─────────────────────────────────────────────────────────────

@@ -618,8 +618,19 @@ repeat:
     }
   })
 
-  it('load normalizes a legacy override that diverged title — root wins', () => {
-    // Simulate a file where an override instance had a different title (legacy data).
+  it('load keeps root as the canonical display title, and the override its own diverged title', () => {
+    // A file where an override instance had a different title (legacy data).
+    //
+    // Before finding #5a was fixed, this test asserted the opposite of its own
+    // last line below — that the override's own `title:` gets silently dropped
+    // on save ("root wins" by way of deletion). It did not; `title` is a
+    // `RESERVED_KEYS` member at BOTH levels, so any non-root node writing it
+    // had it filtered out with no bag to land in. Root's title is still the
+    // one Meridian treats as canonical for display (`FileMetadata.title` /
+    // `AppMetadata.title` via `joinFileMeta` — untouched by this fix, since
+    // `OccurrenceMetadata` has no typed `title` field for the override's value
+    // to compete with). But the override's own bytes are no longer destroyed:
+    // they round-trip as inert extra, exactly like any other unknown key.
     const legacy = `---
 defaults:
   title: Original Title
@@ -641,14 +652,19 @@ instances:
     const loaded = parseToStoreItems('legacy.md', legacy)
     // The file-level root holds the canonical title.
     expect(rootMeta(loaded).title).toBe('Original Title')
-    // Raw store items carry only occurrence metadata — no title field.
+    // No typed occurrence field competes with it — OccurrenceMetadata has none.
     for (const i of loaded.items) {
       expect((i.metadata as unknown as Record<string, unknown>).title).toBeUndefined()
     }
-    // In YAML, title must not appear inside an instance.
+    // The override's own title is preserved as inert extra — never a typed
+    // field, never rendered as a display title anywhere — but no longer bytes
+    // the user loses on the first save.
+    const override = loaded.items.find(i => !isSeries(i) && i.date === '2026-04-13')!
+    expect(override.metadata.extra?.title).toBe('Override Title')
+
     const yaml = serialize(loaded.items, loaded.root)
     const instancesSection = yaml.slice(yaml.indexOf('instances:'))
-    expect(instancesSection).not.toMatch(/title:/)
+    expect(instancesSection).toMatch(/title: Override Title/)
   })
 })
 
