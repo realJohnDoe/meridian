@@ -295,6 +295,38 @@ function applyFieldsToItem(item: StoreItem, fields: EditFields): StoreItem {
     date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
 }
 
+/**
+ * Push the editor's metadata onto a series' override children — "all events"
+ * means all events, including occurrences the user has already overridden.
+ *
+ * Without this the override silently keeps the old value. Its stored metadata
+ * was materialised from the series at parse time (see `effectiveNodeToStoreItems`,
+ * which merges the node's inherited fields into every child), so once the series
+ * moves on, collapse re-reads that inherited copy as a genuine divergence and
+ * emits the stale value back onto the instance — leaving one occurrence behind
+ * on a change the user asked to apply everywhere. Matches how calendar apps
+ * treat the same choice.
+ *
+ * Deliberately narrower than `applyFieldsToItem`. A child keeps:
+ *  - `date`/`time` — the whole reason the override exists is to sit elsewhere;
+ *  - `done` — an "all events" metadata change must not un-complete finished
+ *    occurrences (and `seriesMeta` forces `done` to the series default, which
+ *    would do exactly that);
+ *  - `excluded` — a deleted occurrence stays deleted;
+ *  - its unknown-key bag — an edit never mints unknown keys (see the invariant
+ *    above `mergeOccMeta`), so there is nothing to propagate, and a child's own
+ *    `owner: bob` must survive an edit that never mentioned `owner`.
+ *
+ * Spreading `occMeta`'s result rather than assembling a literal is the
+ * sanctioned form — see the "Metadata constructors" note above.
+ */
+function applyFieldsToChildren(items: StoreItem[], seriesId: string, fields: EditFields): StoreItem[] {
+  return items.map(i => {
+    if (isSeries(i) || i.ownerId !== seriesId) return i
+    return { ...i, metadata: { ...occMeta(i.metadata, fields), done: i.metadata.done } }
+  })
+}
+
 // ── New-entry slug allocation ─────────────────────────────────────────────────
 
 /** True when some file already occupies `fileSlug` in this snapshot. */
@@ -403,6 +435,9 @@ function applyAll({ items, roots }: StoreData, occ: Occurrence, fields: EditFiel
     ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
     : (i: StoreItem) => isStandaloneOcc(i) && i.id === occ.id
   items = items.map(i => matchItem(i) ? applyFieldsToItem(i, fields) : i)
+  // …and onto the series' override children, so "all events" reaches the
+  // occurrences the user already overrode — see `applyFieldsToChildren`.
+  if (occ.ownerId) items = applyFieldsToChildren(items, occ.ownerId, fields)
   return { items, roots }
 }
 
@@ -509,9 +544,14 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
       }
       return [capped, newSeries]
     }
-    // Re-point overrides at/after occDate to the new series.
+    // Re-point overrides at/after occDate to the new series, applying the same
+    // metadata the new series root got. Without this they keep the value they
+    // inherited from the OLD series and collapse re-emits it as a divergence —
+    // the same defect `applyFieldsToChildren` fixes for scope 'all', and the
+    // same reasoning: "this and following" covers the overridden occurrences in
+    // that range too. `done`/`excluded`/date/time stay the child's own.
     if (!isSeries(i) && i.ownerId === series.id && i.date >= occDate) {
-      return [{ ...i, ownerId: newSeriesId }]
+      return [{ ...i, ownerId: newSeriesId, metadata: { ...occMeta(i.metadata, fields), done: i.metadata.done } }]
     }
     return [i]
   })

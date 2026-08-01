@@ -62,6 +62,11 @@ describe('edit operations → serialized YAML', () => {
   })
 
   it('all-scope edit updates the whole series', () => {
+    // The two overridden instances must NOT carry `duration: 30m` here. Until
+    // finding #2b was fixed this snapshot recorded exactly that — the old value
+    // re-materialised onto every override — which is what "all events" failing
+    // to reach an overridden occurrence looks like on disk. They keep only their
+    // genuine divergence (`done: true`).
     const data = fixtureData('weekly-series')
     const occ = occOn(data.items, data.roots, '2026-04-20')
     const next = applyEdit(data, occ, 'all', editFields(occ, {
@@ -70,6 +75,62 @@ describe('edit operations → serialized YAML', () => {
       scheduled: { date: '2026-04-06', time: '09:00' },
     }))
     expect(serializeData(next)).toMatchSnapshot()
+  })
+
+  // ── finding #2b: "all events" must reach overridden occurrences ────────────
+
+  it('all-scope reaches an occurrence the user had already overridden', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const next = applyEdit(data, occ, 'all', editFields(occ, {
+      duration: '45m',
+      scheduled: { date: '2026-04-06', time: '09:00' },
+    }))
+    // Survives a save + reload, which is where the old behaviour showed up.
+    const reparsed = parseToStoreItems('weekly-series.md', serializeData(next))
+    const roots = new Map([['weekly-series', reparsed.root]])
+    const durations = expandRange(reparsed.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))
+      .map(o => o.metadata.duration)
+    expect(new Set(durations)).toEqual(new Set(['45m']))
+  })
+
+  it('all-scope does not un-complete an occurrence it reaches', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const next = applyEdit(data, occ, 'all', editFields(occ, {
+      duration: '45m',
+      scheduled: { date: '2026-04-06', time: '09:00' },
+    }))
+    const reparsed = parseToStoreItems('weekly-series.md', serializeData(next))
+    const roots = new Map([['weekly-series', reparsed.root]])
+    const done = expandRange(reparsed.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))
+      .filter(o => o.metadata.done)
+      .map(o => o.date)
+    expect(done).toEqual(['2026-04-13', '2026-04-14'])
+  })
+
+  it('all-scope leaves an override\'s own unknown key alone', () => {
+    // `owner: bob` diverges from the series' `owner: alice`; an edit that never
+    // mentioned `owner` must not flatten it (an edit never mints unknown keys).
+    const data = fixtureData('unknown-keys-series')
+    const occ = occOn(data.items, data.roots, '2026-04-13')
+    const next = applyEdit(data, occ, 'all', editFields(occ, { duration: '45m' }))
+    const override = next.items.find(i => !isSeries(i) && i.date === '2026-04-20')!
+    expect(override.metadata.extra?.owner).toBe('bob')
+  })
+
+  it('future-scope reaches overridden occurrences in the range it splits off', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(data.items, data.roots, '2026-04-13')
+    const next = applyEdit(data, occ, 'future', editFields(occ, {
+      duration: '45m',
+      scheduled: { date: '2026-04-13', time: '09:00' },
+    }))
+    // 04-13 and 04-14 are overrides at/after the cut — they move to the new
+    // series and must take its metadata, not the old series' 30m.
+    const moved = next.items.filter(i => !isSeries(i) && i.date >= '2026-04-13')
+    expect(moved.map(i => i.metadata.duration)).toEqual(['45m', '45m'])
+    expect(moved.map(i => i.metadata.done)).toEqual([true, true])
   })
 
   it('future-scope edit splits the series at the occurrence date', () => {
