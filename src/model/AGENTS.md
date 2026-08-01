@@ -190,16 +190,38 @@ must be stripped from existing `extra` bags on load, or a stale raw value shadow
 the new typed field forever.
 
 **Deliberate non-goals.** These are normalised away and are *not* bugs: comments,
-key order, quoting style, blank lines, CRLF; a key's position when collapse
-relocates it between the root and `defaults:`. Still-open losses, out of scope
-here: fields on nested container nodes (no `StoreItem` to hang a remainder on),
-markdown-body leading/trailing whitespace (`fileIO.ts` trims), and
-absent-vs-empty for required arrays. (Metadata on an excluded instance used to
-be in this list — `serializeChildren` now diffs an excluded child against the
-series metadata like any other override, so exclusion only suppresses the
-occurrence, it no longer erases what was written on it. See
-`__tests__/round-trip-totality.test.ts` and `__tests__/edits.test.ts`'s
-`excludeOccurrence` cases.)
+key order, quoting style, multiple consecutive blank lines (collapsed to the
+single one `wrapFrontmatter`'s own separator inserts); a key's position when
+collapse relocates it between the root and `defaults:`. Still-open loss, out
+of scope here: absent-vs-empty for required arrays.
+
+(Three items used to be in this list and no longer are:
+- **Metadata on an excluded instance** — `serializeChildren` now diffs an
+  excluded child against the series metadata like any other override, so
+  exclusion only suppresses the occurrence, it no longer erases what was
+  written on it.
+- **Fields on nested container nodes** — a container's own remainder (no
+  `StoreItem` of its own to hang it on) is now carried down to its descendant
+  items instead of discarded; `hoistSharedMetadata` collapses it back to a
+  shared `defaults:` block when every descendant agrees. See `storeItems.ts`'s
+  `containerOwnRemainder`.
+- **Markdown-body leading/trailing whitespace, and the file's line-ending
+  convention** — `fileIO.ts` used to `.trim()` the whole body (stripping
+  meaningful indentation on its first line along with the incidental blank
+  line Meridian's own separator inserts) and hardcode LF regardless of the
+  source, guaranteeing mixed `\r\n`/`\n` output for any CRLF-authored file.
+  `loadFile` now strips only the incidental leading blank line and the file's
+  own trailing newline, tracks the source's line-ending/trailing-newline
+  convention as `FileMetadata.fileConvention`, and `wrapFrontmatter` re-applies
+  it to the structural glue it generates — never to the body's own bytes,
+  which were never touched to begin with. `fileConvention` is carried forward
+  across edits by `updateRoot` in `storeOps.ts`, the same way `extra` is;
+  omitting that carry-forward is the trap that would silently revert a file to
+  LF on its next edit.
+
+See `__tests__/round-trip-totality.test.ts` and `__tests__/edits.test.ts`'s
+`excludeOccurrence` cases for the first; the same file's container-remainder
+and line-ending cases for the other two.)
 
 **On the edit side, an edit never mints unknown keys** — they originate only at
 parse time and flow through. Every bag reaching `storeOps.ts` is therefore

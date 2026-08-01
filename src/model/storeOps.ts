@@ -270,16 +270,23 @@ function seriesMeta(base: Partial<OccurrenceMetadata>, f: EditFields): Occurrenc
  * Carries the previous entry's `extra` forward — without this, every save
  * through every scope would silently wipe unknown frontmatter keys at the file
  * root, since this function otherwise rebuilds FileMetadata from scratch.
+ *
+ * Carries `fileConvention` forward too, for the same reason: it is never part
+ * of `EditFields` (the user cannot edit it), so a rebuild that omitted it would
+ * silently revert the file to Meridian's LF default the moment it's next
+ * saved — the exact class of loss finding #8 was about, reintroduced one
+ * layer up if this line is ever dropped.
  */
 function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots {
   const next = new Map(roots)
-  const prevExtra = roots.get(fileSlug)?.extra
+  const prev = roots.get(fileSlug)
   next.set(fileSlug, {
     title: f.title,
     tags:  f.tags,
     items: f.items ?? [],
     body:  f.body || undefined,
-    extra: withoutKeys(prevExtra, ['title', 'tags', 'items']),
+    extra: withoutKeys(prev?.extra, ['title', 'tags', 'items']),
+    fileConvention: prev?.fileConvention,
   })
   return next
 }

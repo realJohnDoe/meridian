@@ -88,7 +88,8 @@ instances:
 Quick sync. Agenda:
 - [[project-alpha]] status
 - Blockers
-- [[weekly-log]] updates"
+- [[weekly-log]] updates
+"
 `;
 
 exports[`edit operations → serialized YAML > creating a new standalone task serializes to a single file 1`] = `
@@ -101,7 +102,8 @@ priority: medium
 date: 2026-06-05
 ---
 
-Milk, eggs, bread"
+Milk, eggs, bread
+"
 `;
 
 exports[`edit operations → serialized YAML > deleteFollowing caps the series end before the occurrence 1`] = `
@@ -132,7 +134,8 @@ instances:
 Quick sync. Agenda:
 - [[project-alpha]] status
 - Blockers
-- [[weekly-log]] updates"
+- [[weekly-log]] updates
+"
 `;
 
 exports[`edit operations → serialized YAML > excludeOccurrence drops a single generated occurrence 1`] = `
@@ -163,7 +166,8 @@ instances:
 Quick sync. Agenda:
 - [[project-alpha]] status
 - Blockers
-- [[weekly-log]] updates"
+- [[weekly-log]] updates
+"
 `;
 
 exports[`edit operations → serialized YAML > excludeOccurrence on a series in a mixed file leaves other series and standalone intact 1`] = `
@@ -249,7 +253,8 @@ instances:
 Quick sync. Agenda:
 - [[project-alpha]] status
 - Blockers
-- [[weekly-log]] updates"
+- [[weekly-log]] updates
+"
 `;
 
 exports[`edit operations → serialized YAML > moving an occurrence back to its original date un-hides it 1`] = `
@@ -279,7 +284,8 @@ instances:
 Quick sync. Agenda:
 - [[project-alpha]] status
 - Blockers
-- [[weekly-log]] updates"
+- [[weekly-log]] updates
+"
 `;
 
 exports[`edit operations → serialized YAML > moving an occurrence onto a date excluded for an unrelated reason un-hides that date 1`] = `
@@ -312,7 +318,8 @@ instances:
 Quick sync. Agenda:
 - [[project-alpha]] status
 - Blockers
-- [[weekly-log]] updates"
+- [[weekly-log]] updates
+"
 `;
 
 exports[`edit operations → serialized YAML > single-scope edit overrides one occurrence (priority) without touching the series 1`] = `
@@ -343,7 +350,8 @@ instances:
 Quick sync. Agenda:
 - [[project-alpha]] status
 - Blockers
-- [[weekly-log]] updates"
+- [[weekly-log]] updates
+"
 `;
 
 exports[`edit operations → serialized YAML > single-scope move excludes the original slot and re-adds at the new date 1`] = `
@@ -376,7 +384,8 @@ instances:
 Quick sync. Agenda:
 - [[project-alpha]] status
 - Blockers
-- [[weekly-log]] updates"
+- [[weekly-log]] updates
+"
 `;
 
 exports[`edit operations → serialized YAML > toggleDone on a generated occurrence adds a done override 1`] = `
@@ -407,7 +416,8 @@ instances:
 Quick sync. Agenda:
 - [[project-alpha]] status
 - Blockers
-- [[weekly-log]] updates"
+- [[weekly-log]] updates
+"
 `;
 
 exports[`edit operations → serialized YAML > toggleDone on generated occurrence from the after_completion series targets series2 1`] = `

@@ -18,22 +18,20 @@
  * `unknown-keys.test.ts` ("no key loss") respectively. This file does not repeat
  * that sweep. It exists to pin the cases the corpus doesn't cover yet — an
  * excluded instance carrying metadata (#3, fixed), a file-level key on a
- * non-root node and a container's own remainder (#5a/#5b, fixed), a save never
- * mixing line endings (#8, open) — as inline regressions, using `it.fails` for
- * the ones still open so CI stays green while the bug exists. THE POINT OF
- * `it.fails`: the moment the corresponding fix lands, this file goes red on its
- * own — flip that one case to `it` (removing `.fails`) as part of the fix's PR,
- * moving it from "known-open leaks" to "closed leaks" below. That flip is the
- * ratchet; #3's and #5's flips are what confirmed it actually ratchets (see
- * each finding's repro history) rather than just documenting a bug forever.
+ * non-root node and a container's own remainder (#5a/#5b, fixed), a file's
+ * line-ending/whitespace convention (#8, fixed) — as inline regressions, using
+ * `it.fails` for any still open so CI stays green while the bug exists. THE
+ * POINT OF `it.fails`: the moment the corresponding fix lands, this file goes
+ * red on its own — flip that case to `it` (removing `.fails`) as part of the
+ * fix's PR, moving it from "known-open leaks" to "closed leaks" below. That
+ * flip is the ratchet; #3's, #5's and #8's flips are what confirmed it
+ * actually ratchets (see each finding's repro history) rather than just
+ * documenting a bug forever.
  *
  * Deliberately NOT here: #2 (clearing a field inherited from `defaults:`) is not
  * a load→save case — it only exists relative to an `applyEdit` call — so it falls
  * outside what an unedited-round-trip check can express. #2's own regression test
  * (health-survey-data-integrity-results.md finding #2) is what pins it instead.
- * #8 (CRLF) is pinned below by a narrower invariant than either check above — see
- * "mixed line endings", which does not conflict with AGENTS.md's declared
- * non-goal of normalising CRLF/blank-lines/quoting away.
  */
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
@@ -165,20 +163,44 @@ describe('Root A totality — closed leaks (regression guards)', () => {
     const saved = serialize(parsed.items, parsed.root)
     expect(frontmatterOf(saved).defaults).toEqual({ project: 'apollo', reviewer: 'alice' })
   })
-})
 
-describe('Root A totality — known-open leaks (documented, not yet fixed)', () => {
-  // Finding #8 (narrow slice): AGENTS.md declares CRLF/blank-line normalisation a
-  // deliberate non-goal, so this does NOT assert byte-identity. It asserts the one
-  // part of #8 that isn't a normalisation choice: the output must not mix line
-  // endings within one file (today the frontmatter is rewritten to LF while the
-  // body's CRLF passes through untouched).
-  it.fails('a save never mixes CRLF and bare LF in one file', () => {
+  // Finding #8, fixed. `loadFile` used to `.trim()` the whole body (stripping
+  // meaningful leading indentation along with the incidental blank line
+  // Meridian's own separator inserts) and `wrapFrontmatter` hardcoded LF
+  // regardless of source, guaranteeing mixed `\r\n`/`\n` output for any
+  // CRLF-authored file. The fix turned out to do better than the narrow
+  // "don't mix line endings" the report scoped it to — an unedited round trip
+  // is now BYTE-IDENTICAL, not merely internally consistent, because the
+  // body's own bytes were never the problem (they always passed through
+  // untouched) and the structural glue now matches them instead of
+  // overriding them.
+  it('an unedited round trip is byte-identical: CRLF source', () => {
     const source = '---\r\ntitle: A\r\ndate: 2026-01-01\r\n---\r\n\r\nline1\r\nline2\r\n'
     const original = parseToStoreItems('crlf.md', source)
     const saved = serialize(original.items, original.root)
-    const hasCRLF = saved.includes('\r\n')
-    const hasBareLF = /(?<!\r)\n/.test(saved)
-    expect(hasCRLF && hasBareLF).toBe(false)
+    expect(saved).toBe(source)
+    // The narrower invariant the report originally scoped this to, kept as an
+    // explicit assertion in its own right: whatever else changes, a save must
+    // never mix `\r\n` and bare `\n` in one file.
+    expect(saved.includes('\r\n') && /(?<!\r)\n/.test(saved)).toBe(false)
+  })
+
+  // The report's other repro: leading indentation on the body's first line,
+  // and a trailing blank line, both surviving a save that changed nothing.
+  it('an unedited round trip is byte-identical: indented body, trailing blank line', () => {
+    const source = '---\ntitle: A\n---\n\n  indented start\n\ncode:\n\n```\n  x = 1\n```\n\n\n'
+    const original = parseToStoreItems('indented.md', source)
+    const saved = serialize(original.items, original.root)
+    expect(saved).toBe(source)
+  })
+
+  // A brand-new entry has no source file to preserve a convention from — falls
+  // back to Meridian's own default (LF, trailing newline) rather than throwing
+  // or producing `undefined` anywhere in the output.
+  it('a freshly-created entry with no fileConvention falls back to LF + trailing newline', () => {
+    const created = parseToStoreItems('new.md', '---\ntitle: Fresh\ndate: 2026-01-01\n---\n')
+    const savedWithoutConvention = serialize(created.items, { ...created.root, fileConvention: undefined })
+    expect(savedWithoutConvention.includes('\r')).toBe(false)
+    expect(savedWithoutConvention.endsWith('\n')).toBe(true)
   })
 })
