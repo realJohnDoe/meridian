@@ -82,67 +82,127 @@ export function reportParseFailures(failures: ParseFailure[]): void {
 // ── COLLISION RESOLUTION ───────────────────────────────────────────
 
 /**
- * Handle a write collision: backend version of `path` has drifted while the
- * cache also has unsaved local edits.
+ * What a failed CAS write resolved to. `recreated` carries no `merges`: the
+ * store already holds that content (it is where the dirty record came from),
+ * so there is nothing to merge back into it.
+ */
+type CollisionOutcome =
+  | { kind: 'copied'; copy: string; merges: Array<{ path: string; content: string }> }
+  | { kind: 'recreated' }
+
+/**
+ * The version token to record for a path we just wrote.
  *
- * Resolution:
- *  1. Re-pull the backend's copy → overwrite the original path in cache (clean).
- *  2. Write the local content to a timestamped copy on the backend immediately.
- *  3. Cache the copy (clean) and notify the user.
+ * `StorageBackend.write` returns the new token only "if the backend can
+ * determine it", so a bare `undefined` from it is not authoritative — and
+ * recording `undefined` is actively harmful: the next edit to that file would
+ * CAS with no precondition, which every backend reads as "must be absent", and
+ * a file that plainly exists would conflict for no reason. Fall back to a read.
+ */
+async function versionAfterWrite(
+  backend: StorageBackend,
+  path: string,
+  fromWrite: string | undefined,
+): Promise<string | undefined> {
+  if (fromWrite !== undefined) return fromWrite
+  const [fresh] = await backend.readFiles([path])
+  return fresh?.version
+}
+
+/**
+ * Write `content` to a fresh conflict-copy path and return the path used.
  *
- * Returns the copy's path plus a `merges` list of the path+content pairs this
- * resolved (the re-pulled original, the new copy, or both) — the caller merges
- * these into the store immediately (see mergeChangedIntoStore) rather than
- * leaving them to a same-cycle reconcile, which deliberately skips paths this
- * cycle already resolved (see planReconcile's skipPaths).
+ * The write carries no `expectedVersion`, which every backend reads as
+ * "create — the path must be absent". Two collisions on the same file inside
+ * one second would otherwise generate the same name twice and the second write
+ * would fail: `conflictPath` is second-granular, so the retry walks the
+ * timestamp forward rather than appending a counter (a counter suffix would be
+ * eaten by `conflictPath`'s own SUFFIX_RE the next time the copy conflicts).
+ */
+async function writeConflictCopy(
+  backend: StorageBackend,
+  path: string,
+  content: string,
+): Promise<{ copy: string; version?: string }> {
+  let when = new Date()
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const copy = conflictPath(path, when)
+    try {
+      const written = await backend.write(copy, content)
+      return { copy, version: await versionAfterWrite(backend, copy, written) }
+    } catch (e) {
+      if (!(e instanceof ConflictError)) throw e
+      when = new Date(when.getTime() + 1000)
+    }
+  }
+  throw new Error(`Could not find a free conflict-copy path for ${path}`)
+}
+
+/**
+ * Handle a failed CAS write. Two outcomes, chosen by what the backend actually
+ * holds now — which is why this re-reads rather than trusting the listing:
+ *
+ *  - **The remote diverged.** Someone else's content sits at `path`. Both sides
+ *    are kept: the remote wins the path, the local content lands in a
+ *    timestamped conflict copy.
+ *  - **The remote is gone.** The file was deleted (or renamed) on another device
+ *    while we held an unpushed edit. There is nothing to preserve from the other
+ *    side, so the local content is re-created at its original path. Keeping the
+ *    path is the point: a conflict copy would orphan every `[[wikilink]]`
+ *    pointing at this slug, and re-deleting is one gesture where hunting down a
+ *    stray copy and renaming it back is several.
+ *
+ * Both directions follow one rule — **an edit beats a delete** — which is the
+ * same rule `pushDirty`'s tombstone branch already applies from the other side
+ * (a remote edit landing after a local delete keeps the remote version). The
+ * user is told either way, so a delete they meant can just be repeated.
+ *
+ * **Ordering is load-bearing.** The local content must be durable *somewhere*
+ * before the dirty record holding it is cleared. The previous version reverted
+ * the cache record to the remote copy first and wrote the conflict copy second,
+ * so any failure in between — an offline blip, a rate-limited 403, an expired
+ * token — destroyed the only copy of the edit while the UI reported "changes are
+ * saved locally". See the data-integrity survey, finding #1.
  */
 async function resolveCollision(
   backend: StorageBackend,
   vaultId: string,
   path: string,
   localContent: string,
-  cacheMap?: Map<string, CacheRecord>,
-): Promise<{ copy: string; merges: Array<{ path: string; content: string }> }> {
-  const merges: Array<{ path: string; content: string }> = []
+): Promise<CollisionOutcome> {
+  let [remote] = await backend.readFiles([path])
 
-  const [fresh] = await backend.readFiles([path])
-  if (fresh) {
-    await setResolvedClean(vaultId, path, fresh.content, fresh.version)
-    merges.push({ path, content: fresh.content })
-    if (cacheMap) {
-      cacheMap.set(path, {
-        vaultPath: `${vaultId}::${path}`,
-        vaultId, path,
-        content: fresh.content,
-        status: 'clean',
-        updatedAt: Date.now(),
-        version: fresh.version,
-      })
+  if (!remote) {
+    try {
+      // No `expectedVersion`: the record's base version points at the blob that
+      // was deleted, so this has to go out as a create, not a compare-and-swap.
+      const written = await backend.write(path, localContent, undefined)
+      // markPushed, not setResolvedClean: another edit may have landed during
+      // the round trip above, and it must stay dirty rather than be stamped
+      // clean under content it no longer holds.
+      await markPushed(vaultId, path, localContent, await versionAfterWrite(backend, path, written))
+      warn(`${path} was deleted on another device — your unsaved changes were restored. Delete it again if that was intended.`)
+      return { kind: 'recreated' }
+    } catch (e) {
+      if (!(e instanceof ConflictError)) throw e
+      // Lost a race: the path was re-created between our two writes. Re-read and
+      // fall through — there is remote content to preserve after all.
+      ;[remote] = await backend.readFiles([path])
     }
   }
 
-  const copy = conflictPath(path, new Date())
-  await backend.write(copy, localContent)
-
-  let copyVersion: string | undefined
-  const [copyFresh] = await backend.readFiles([copy])
-  if (copyFresh) copyVersion = copyFresh.version
-
+  // ── Diverged: copy out first, revert the original second ──────────────────
+  const { copy, version: copyVersion } = await writeConflictCopy(backend, path, localContent)
   await setResolvedClean(vaultId, copy, localContent, copyVersion)
-  merges.push({ path: copy, content: localContent })
-  if (cacheMap && copyVersion !== undefined) {
-    cacheMap.set(copy, {
-      vaultPath: `${vaultId}::${copy}`,
-      vaultId, path: copy,
-      content: localContent,
-      status: 'clean',
-      updatedAt: Date.now(),
-      version: copyVersion,
-    })
+  const merges: Array<{ path: string; content: string }> = [{ path: copy, content: localContent }]
+
+  if (remote) {
+    await setResolvedClean(vaultId, path, remote.content, remote.version)
+    merges.unshift({ path, content: remote.content })
   }
 
   warn(`Conflict on ${path} — your version saved as ${copy}.`)
-  return { copy, merges }
+  return { kind: 'copied', copy, merges }
 }
 
 // ── RECONCILE ─────────────────────────────────────────────────
@@ -380,11 +440,15 @@ async function pushDirty(
       pushed.add(f.path)
     } catch (e) {
       if (e instanceof ConflictError) {
-        const { copy, merges } = await resolveCollision(backend, vaultId, f.path, f.content)
+        const outcome = await resolveCollision(backend, vaultId, f.path, f.content)
         hadCollision = true
         pushed.add(f.path)
-        pushed.add(copy)
-        collisionMerges.push(...merges)
+        if (outcome.kind === 'copied') {
+          pushed.add(outcome.copy)
+          collisionMerges.push(...outcome.merges)
+        }
+        // 'recreated' contributes no merges: the store is already the source of
+        // this content, so there is nothing to merge back into it.
       } else {
         throw e
       }
