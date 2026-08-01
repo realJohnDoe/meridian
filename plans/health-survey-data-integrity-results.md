@@ -21,7 +21,7 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 
 | Root | Property | Findings | Root fix | Tier |
 |---|---|---|---|---|
-| **A** | The file is a projection of the store, and nothing requires the projection to be **total** | #2a, ~~#2b~~, ~~#3~~ (fixed), #5, #8 | Define and enforce totality; close the remaining three leaks (#2a, #5, #8) | Opus 5, plan mode / multi-PR |
+| **A** | The file is a projection of the store, and nothing requires the projection to be **total** | #2a, ~~#2b~~, ~~#3~~, ~~#5~~ (fixed), #8 | Define and enforce totality; close the remaining two leaks (#2a, #8) | Opus 5, plan mode / multi-PR |
 | **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** (done — `round-trip-totality.test.ts`) and **B-runtime** (still open) — see below. ~162 ms/300 files | Sonnet 5 |
 | **C** | The one cache transition allowed to destroy local content has an unenforced precondition | ~~#1, #4~~ (**fixed**) | Decision table landed; the cache-API type change is still open — see Root C | Sonnet 5 → Opus 5 |
 | **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
@@ -55,7 +55,7 @@ Four leaks, one missing invariant. The `extra` bag is the project's own patch fo
 - **#2a (clear one occurrence)** is an *expressibility* problem. Making "cleared" emittable — an explicit `participants: []` / `done: null` on the diverging instance, read back as cleared by `parseInlineField` — fixes it without touching the parse pipeline.
 - **#2b (clear the whole series, one override keeps the old value)** is a *provenance* problem. `buildEffectiveTree` merges `defaults:` into children and, per `EffectiveNode`'s own doc, `Fields carry plain values — no origin tracking.` So an override that merely *inherited* `participants: [alice, bob]` is indistinguishable from one that stated it, and collapse's diff correctly reports a divergence that the user never authored. Expressibility does not fix this. It needs either per-field provenance (explicit vs inherited) carried through the store, or a product decision that scope `all` rewrites overrides' inherited fields. **Resolved by the latter — see #2b's verification block: scope `all` (and `future`) now push the editor's metadata onto override children, matching how calendar apps treat the same choice. No provenance needed, so `EffectiveNode` stays field-agnostic.**
 
-**Root fix, in order:** (1) write the totality invariant down, in `AGENTS.md` and as a test that asserts source→saved containment for a fixture set that includes CRLF, container nodes, and excluded instances with metadata — **done**, `round-trip-totality.test.ts`; (2) close #3 (**done**) and #5 (both mechanical once the invariant is stated); (3) make "cleared" expressible, fixing #2a — still open; (4) decide #2b — **done**, resolved as edit semantics rather than provenance. **Resist starting at (4)** was the original advice — in the event (4) turned out to be the cheaper half, because the edit-semantics answer avoids the restructure entirely. Retaining provenance means changing what `EffectiveNode` is, and that is the layer `AGENTS.md` correctly insists stays field-agnostic; steps 1–3 recover most of the loss without going there.
+**Root fix, in order:** (1) write the totality invariant down, in `AGENTS.md` and as a test that asserts source→saved containment for a fixture set that includes CRLF, container nodes, and excluded instances with metadata — **done**, `round-trip-totality.test.ts`; (2) close #3 (**done**) and #5 (**done** — both were mechanical once the invariant was stated, exactly as predicted); (3) make "cleared" expressible, fixing #2a — still open; (4) decide #2b — **done**, resolved as edit semantics rather than provenance. **Resist starting at (4)** was the original advice — in the event (4) turned out to be the cheaper half, because the edit-semantics answer avoids the restructure entirely. Retaining provenance means changing what `EffectiveNode` is, and that is the layer `AGENTS.md` correctly insists stays field-agnostic; steps 1–3 recover most of the loss without going there.
 
 **What a bandage looks like here:** special-casing `excluded` in `serializeChildren`, or adding `title` to a second allow-list. Both close one leak and leave the invariant unowned.
 
@@ -214,7 +214,7 @@ Vaults used: the 16-file shipped Tutorial vault (`exampleBackend.ts`), the 18 `s
 |---|---|
 | `pnpm run build` | **PASS** (exit 0) |
 | `pnpm run lint` | **PASS** — 0 errors, 14 pre-existing warnings (all `react-hooks/incompatible-library` on TanStack Virtual/Router) |
-| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); **937 passed + 2 expected-fail after #2b** — see §2 and findings #1, #2, #3, #4 |
+| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; **940 passed + 1 expected-fail after #5** — see §2 and findings #1–#5 |
 | `pnpm run test:coverage` | **PASS** — all thresholds met. Totals 61.69% stmts / 58.19% branch / 64.02% lines |
 
 Coverage pointers worth acting on (pointers, not findings):
@@ -266,7 +266,7 @@ Categories are the brief's taxonomy; the **Root** column maps them onto §2's, w
 | 2 | Clearing an inherited field silently reverts on reload — **#2b fixed, #2a open** | **A** | 1, 2, 3 | **silent** | 7 | every file with a `defaults:` block | Opus 5, plan mode / multi-PR |
 | 3 | ~~Excluding an occurrence discards everything on it~~ — **FIXED** | **A** | 1, 2, 7 | **silent** | 7 | 1 line, 3 prod callers, every recurring entry | Sonnet 5 |
 | 4 | ~~Remote-deleted + local edit ⇒ one conflict copy per sync tick, forever~~ — **FIXED** | **C** | 4, 5 | **loud, unbounded** | 6 | 1 fn, all backends | Sonnet 5 |
-| 5 | Frontmatter on a node with no `StoreItem` home is deleted | **A** | 1 | **silent** | 6 | hand-authored multi-event files | Sonnet 5 (with the ownership rule stated) |
+| 5 | ~~Frontmatter on a node with no `StoreItem` home is deleted~~ — **FIXED** | **A** | 1 | **silent** | 6 | hand-authored multi-event files | Sonnet 5 (with the ownership rule stated) |
 | 6 | Biweekly `byweekday` series expand differently per device locale | **D** | 8, 2 | **silent** | 6 | `freq: weekly` + `interval ≥ 2` + `byweekday` | Opus 5 |
 | 7 | Swipe-delete Undo doesn't restore the wikilinks it removed | **E** | 7, 2 | **silent** | 5 | 1 of 2 delete paths | Sonnet 5 |
 | 8 | Body whitespace and CRLF rewritten on every save | **A** | 1 | **silent** | 3 | **every file, every save** | Haiku 4.5 |
@@ -282,7 +282,7 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 1. **B-test — done.** `src/model/__tests__/round-trip-totality.test.ts`. See Root B for what it covers, what it deliberately doesn't (#2), and the verification that the ratchet actually flips.
 2. **#3 — done.** One line in `serializeChildren` plus two regression tests (`edits.test.ts`) and the B-test ratchet flip (`round-trip-totality.test.ts`). See finding #3's verification note for what was checked before landing it: every pre-existing exclude test traced by hand and confirmed not to regress, and the ratchet confirmed to require the real fix rather than any change.
 3. **Root C — done (#1 and #4 together).** `resolveCollision` is now a decision table. Landed as one PR because the two are independent defects in the same 48-line function — neither fix implies the other, but the end state is one structure and the intermediate state is incoherent. The cache-API precondition (making #1 unrepresentable rather than merely fixed) is still open; see Root C's verification block.
-4. **#5**, then **#8**, the remaining mechanical A leaks in `src/model/collapse.ts` + `src/types.ts`. #5 changes where the parse side routes reserved keys; #8 needs a **byte** compare and a CRLF fixture, which neither semantic check catches.
+4. **#5 — done.** Both sub-cases (file-level key on a non-root node; container's own remainder) fixed together in `inheritance.ts` + `storeItems.ts` — the parse side, not `collapse.ts`/`types.ts` as originally guessed; collapse needed no changes at all, since `emitExtra`/`hoistSharedMetadata` were already generic enough. **#8 still open** — needs a **byte** compare and a CRLF fixture, which neither semantic check catches.
 5. **#2b — done** (edit semantics: scope `all`/`future` reach override children; `storeOps.ts`, independent of the emit predicates so it did not need to wait for #5). **#2a still open** — it changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and should follow #5 to avoid conflicting with it.
 6. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half by hand.
 7. **Root D** — #6, gated on the migration decision and on rewriting `weekStart.test.ts`.
@@ -290,7 +290,7 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 
 **Steps 2 and 3's severity-vs-frequency tradeoff is now moot — #3 landed first regardless, and it was cheap enough (one line, two tests) that it barely delayed Root C either way.** For the record, the reasoning that would have applied to a costlier #3: severity-first says C before #3, since #1 is total, silent, unrecoverable loss of an edit (impact 9); frequency-first says the reverse, since #1 needs a conflict *and* a network failure inside a ~1-second window (rare-but-catastrophic) while #3 fired on every delete of a recurring occurrence carrying data (single device, no conflict required). Keep that framework for any future case where step ordering is genuinely expensive to get wrong.
 
-**Patch-first**, if you want the bleeding stopped before any restructuring: **#1 → ~~#3~~ (done) → #5 → #7**, which is the same file ordering with the roots left in place. Note that #2 has no safe point fix — every version of it is a change to the emit predicates, which is why it carries a plan-mode tier in the table above.
+**Patch-first**, if you want the bleeding stopped before any restructuring: **#1 → ~~#3~~ (done) → ~~#5~~ (done) → #7**, which is the same file ordering with the roots left in place. Note that #2 has no safe point fix — every version of it is a change to the emit predicates, which is why it carries a plan-mode tier in the table above.
 
 ---
 
@@ -637,7 +637,7 @@ Two conflicts on the *same* path inside one second is a related second-order bug
 
 ---
 
-### #5 — Frontmatter on a node the parser gives no `StoreItem` home is silently deleted
+### #5 — Frontmatter on a node the parser gives no `StoreItem` home is silently deleted — **FIXED**
 
 - **Invariant violated:** 1 (round-trip fidelity). Hand-authored files only, on the first save after the file is edited through the app.
 - **Category:** `round-trip` `validation`
@@ -724,6 +724,25 @@ const RESERVED_KEYS: ReadonlySet<string> = new Set([
 ```
 - **Problem:** a hand-authored file that puts a title (or any key) on a nested node loses those bytes the first time Meridian saves it, despite the README promising hand-created files are picked up.
 - **Fix:** route reserved keys with no home at the current level into that node's `extra` bag, and give container nodes a remainder home; afterwards both repros round-trip their keys and the "emits `date` exactly once" test still passes. **Root fix:** giving the *tree* a remainder home (rather than adding a second allow-list) is what stops leak number five; see §2 Root A. Flip B-test's `a title written on a child instance survives the save` case from `it.fails` to `it` as part of this PR — that is the fix's acceptance check.
+
+**Verification — both (a) and (b) FIXED, and the fix caught its own first draft over-reaching.**
+
+Both repros are the same underlying gap — a node whose own keys have nowhere to land — closed the same way: `EffectiveNode` gained `ownFields` (this node's own explicit properties, *before* `parentDefaults` merging — `inheritance.ts`, additive, still field-agnostic per its own design constraint), and `storeItems.ts`'s walk now uses it in two places:
+
+- **(a)** `extractItemMetadata` rescues a non-root node's own file-level keys (title/tags/items) into its `extra` bag — the ownership-rule guard the report's hazard note called for (`isRoot` short-circuits before any rescue, so the root item never double-carries what `buildRoot` already owns).
+- **(b)** `containerOwnRemainder` gives a container node the "tree remainder home" the root fix asked for: its own keys (minus `STRUCTURAL_KEYS`) are threaded down through the recursion as `ancestorRemainder` and merged onto every descendant item's `extra`. Since identical descendants carry the identical value, `hoistSharedMetadata` — unmodified — collapses it back to a single shared `defaults:` block on save. No new hoisting logic was written; this reuses the mechanism #3's fix already leaned on.
+
+**The first draft was wrong, and the existing test suite caught it before any manual review would have had to.** It read the file-level-key rescue for (a) off the node's *merged* `fields` (parent-inherited + own), not off `ownFields`. That double-counts: a title inherited from the file root's own `defaults:` block is a *different*, already-working mechanism (`buildRoot`'s legacy-nesting fallback reads `rawNode.defaults` directly), and stuffing that same inherited value into every override's own `extra` too made `title` reappear on override children that had never written one — a new bug, not a fix. Two independent existing tests failed and pinpointed it precisely: `unknown-keys.test.ts`'s hoisting test (an override that only agrees with its series suddenly carried a stray `title`) and `edits.test.ts`'s `load normalizes a legacy override that diverged title — root wins` (whose own name records that this exact "root vs. override" scenario had a test already — see below). Corrected to check `ownFields` specifically — the node's own explicit properties, not what it inherited — and both failures resolved as a side effect, no special-casing added.
+
+**A stale test was found and corrected, not just newly written.** `edits.test.ts`'s `load normalizes a legacy override that diverged title — root wins` asserted `title:` must not appear inside `instances:` at all — i.e. it locked in finding #5a's exact byte-loss as intended behaviour, under a name that reads as a deliberate conflict-resolution policy. Renamed to `load keeps root as the canonical display title, and the override its own diverged title`, with a comment explaining the correction: root's title is still canonical for display (`FileMetadata.title`, untouched — `OccurrenceMetadata` has no typed `title` field to compete with it), but the override's own bytes are no longer destroyed to make that true.
+
+**Two new regression tests in `round-trip-totality.test.ts`, beyond the one flipped ratchet case.** `an override that merely inherits the series title carries no title of its own; one that diverges does` pins the (a)-vs-inherited distinction directly — the exact bug the first draft introduced — asserting an inheriting override's `extra.title` is `undefined` while a diverging one's is not. `a container node's own keys survive, carried down to its descendant items` pins (b) end to end, including the collapsed shape: `frontmatterOf(saved).defaults` equals `{ project: 'apollo', reviewer: 'alice' }` — confirming the hoisting reuse actually produces the clean, minimal output the model is meant to produce, not just "the bytes exist somewhere."
+
+**Red-then-green confirmed for all four,** not assumed: reverting `inheritance.ts` + `storeItems.ts` to pre-fix state (`git stash`, tests kept) fails exactly the ratchet case, both new tests, and the corrected legacy-override test — nothing else. Restored and re-verified.
+
+**Scope note, stated rather than silently assumed:** the fix guarantees *byte* preservation, not preservation of the *original grouping structure* for containers nested more than one level deep. `collapseToYaml` has no representation for arbitrary N-level container nesting — that structural flattening was already happening before this fix (verified separately: a container-inside-a-container both correctly *and incorrectly* flattens its two levels down to one flat `instances:` list even for plain dated children with no ownFields involved at all) and is out of scope here, same as the other structural normalisations `AGENTS.md`'s "Deliberate non-goals" list already accepts. What changes is that the *keys* on every level of that nesting now survive somewhere, carried down to the nearest node that still gets a `StoreItem`.
+
+Full suite **76 files / 940 passed + 1 expected-fail** (down from 2 — only #8's mixed-line-ending slice remains open), lint 0 errors, build exit 0.
 
 ---
 

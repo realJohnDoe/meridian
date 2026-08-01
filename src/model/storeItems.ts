@@ -17,8 +17,8 @@ import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '@/types'
-import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, unknownKeys } from '@/types'
-import type { StoreItem, FileMetadata } from '@/types'
+import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, unknownKeys, FILE_LEVEL_SPECS, STRUCTURAL_KEYS } from '@/types'
+import type { StoreItem, FileMetadata, OccurrenceMetadata } from '@/types'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +36,83 @@ function nodeIsItem(n: EffectiveNode): boolean {
 }
 
 /**
+ * Occurrence metadata for a node that is not the file root.
+ *
+ * `mergedFields` (parent-inherited + this node's own, typically `base` or
+ * `{...base, ...child.fields}`) drives the normal typed-field extraction, same
+ * as always. `ownFields` — this node's own explicit properties only, *not*
+ * merged with anything inherited — drives a second, narrower check: does this
+ * node itself explicitly write a file-level key (title/tags/items)?
+ *
+ * That second check has to read `ownFields`, not `mergedFields`. A node whose
+ * `title` came from an inherited `defaults:` block (`mergedFields.title` set,
+ * `ownFields.title` absent) is not this bug — the file root's own `defaults:`
+ * block is already read directly by `buildRoot`'s legacy-nesting fallback, so
+ * rescuing that same inherited value here a second time, onto every override
+ * that merely inherited it, would emit `title:` on each one for no reason.
+ * Only a node's own DIVERGENT title — one it wrote itself, not one it
+ * inherited — has nowhere else to go and needs rescuing (data-integrity
+ * survey, finding #5a).
+ */
+function extractItemMetadata(
+  mergedFields: Record<string, unknown>,
+  ownFields: Record<string, unknown>,
+  isRoot: boolean,
+): OccurrenceMetadata {
+  const meta = extractOccurrenceMetadata(mergedFields)
+  if (isRoot) return meta
+  const fileLevelRemainder: Record<string, unknown> = {}
+  for (const spec of FILE_LEVEL_SPECS) {
+    if (spec.key in ownFields) fileLevelRemainder[spec.key as string] = ownFields[spec.key as string]
+  }
+  if (Object.keys(fileLevelRemainder).length === 0) return meta
+  // fileLevelRemainder keys are, by construction, never already in meta.extra
+  // (RESERVED_KEYS filtered them out of it) — spread order only matters for
+  // documenting the same "more specific wins" convention `withAncestorRemainder`
+  // relies on below.
+  return { ...meta, extra: { ...fileLevelRemainder, ...meta.extra } }
+}
+
+/**
+ * A container node's own remainder — everything on it besides structural keys.
+ *
+ * A container (no `date`, no `repeat`) never becomes a `StoreItem` of its own,
+ * so unlike a series or standalone it has no `extra` bag to carry its own keys
+ * in. Without this, any key written directly on a container — `project: apollo`
+ * on a nested grouping entry, say — is silently deleted on the first save (data-
+ * integrity survey, finding #5b), same failure as #5a but for a node that can
+ * never be rescued by `extractItemMetadata` because it never reaches it.
+ *
+ * Deliberately untyped: unlike `extractItemMetadata`, this never routes a key
+ * through `parseInlineField`/`OCCURRENCE_FIELDS` even if it happens to share a
+ * name with a registry field (e.g. a bare `done: false` written directly on a
+ * container). Only `defaults:` is specified to propagate as a typed value
+ * (spec §2); a container's own bare fields are outside that spec entirely, so
+ * treating one as a typed default would invent behaviour nothing asked for.
+ * This carries the bytes, nothing more — same restraint as the excluded-child
+ * fix (`serializeChildren`) and the malformed-known-field fallback.
+ */
+function containerOwnRemainder(ownFields: Record<string, unknown>): Record<string, unknown> | undefined {
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(ownFields)) {
+    if (!STRUCTURAL_KEYS.has(k)) out[k] = v
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
+/**
+ * Merge remainder carried down from an enclosing container (see
+ * `containerOwnRemainder`) onto an item's own metadata. `meta.extra` spread
+ * last so the item's own value for a key always wins over an ancestor's —
+ * same child-overrides-parent precedence `defaults:` inheritance already uses
+ * everywhere else.
+ */
+function withAncestorRemainder(meta: OccurrenceMetadata, ancestorRemainder: Record<string, unknown>): OccurrenceMetadata {
+  if (Object.keys(ancestorRemainder).length === 0) return meta
+  return { ...meta, extra: { ...ancestorRemainder, ...meta.extra } }
+}
+
+/**
  * Walk an inheritance-resolved EffectiveNode tree and emit StoreItems.
  *
  *  - Series node (has `repeat`) → RepeatPattern. Its metadata merges the node's
@@ -46,7 +123,10 @@ function nodeIsItem(n: EffectiveNode): boolean {
  *  - Nested series child → walked as its own flat sibling series.
  *  - Node with a `date` but no `repeat` → standalone OccurrenceEntry; its
  *    explicit instances become additional standalones.
- *  - Container node (no repeat, no date) → recurse into instances.
+ *  - Container node (no repeat, no date) → recurse into instances, carrying its
+ *    own remainder down (`containerOwnRemainder`) — except at the root, whose
+ *    own remainder is already `FileMetadata.extra`'s job (`buildRoot`); carrying
+ *    it here too would emit it twice.
  */
 function effectiveNodeToStoreItems(
   tree: EffectiveNode,
@@ -63,7 +143,7 @@ function effectiveNodeToStoreItems(
     return n === 1 ? key : `${key}#${n}`
   }
 
-  function walk(n: EffectiveNode) {
+  function walk(n: EffectiveNode, isRoot: boolean, ancestorRemainder: Record<string, unknown>) {
     // Merge childDefaults under fields so task defaults (done/priority) that live
     // in a `defaults:` block survive — mirrors `toExpandable` in expansion.ts.
     const base = { ...n.childDefaults, ...n.fields }
@@ -78,10 +158,10 @@ function effectiveNodeToStoreItems(
         repeat: n.fields.repeat as Repeat,
         fileSlug,
         id:     seriesId,
-        metadata: extractOccurrenceMetadata(base),
+        metadata: withAncestorRemainder(extractItemMetadata(base, n.ownFields, isRoot), ancestorRemainder),
       })
       for (const child of n.instances) {
-        if (hasRepeat(child)) { walk(child); continue }  // nested series → flat sibling
+        if (hasRepeat(child)) { walk(child, false, ancestorRemainder); continue }  // nested series → flat sibling
         const childDate = scalarToString(child.fields.date) ?? ''
         const childTime = scalarToString(child.fields.time) ?? ''
         result.push({
@@ -92,7 +172,7 @@ function effectiveNodeToStoreItems(
           id:      stableId(`${seriesId}|inst|${childDate}|${childTime}`),
           ownerId: seriesId,
           ...(child.fields.excluded === true ? { excluded: true as const } : {}),
-          metadata: extractOccurrenceMetadata({ ...base, ...child.fields }),
+          metadata: withAncestorRemainder(extractItemMetadata({ ...base, ...child.fields }, child.ownFields, false), ancestorRemainder),
         })
       }
     } else if (nodeIsItem(n)) {
@@ -107,7 +187,7 @@ function effectiveNodeToStoreItems(
         source: 'explicit',
         fileSlug,
         id:     stableId(`${fileSlug}|occ|${occDate}|${occTime}`),
-        metadata: extractOccurrenceMetadata(base),
+        metadata: withAncestorRemainder(extractItemMetadata(base, n.ownFields, isRoot), ancestorRemainder),
       })
       for (const child of n.instances) {
         if (child.fields.excluded === true) continue
@@ -119,15 +199,19 @@ function effectiveNodeToStoreItems(
           source: 'explicit',
           fileSlug,
           id:     stableId(`${fileSlug}|occ|${childDate}|${childTime}`),
-          metadata: extractOccurrenceMetadata({ ...base, ...child.fields }),
+          metadata: withAncestorRemainder(extractItemMetadata({ ...base, ...child.fields }, child.ownFields, false), ancestorRemainder),
         })
       }
     } else {
-      n.instances.forEach(walk)  // container node
+      // Container node. Root's own remainder is buildRoot's job (FileMetadata.extra) —
+      // carrying it here too would emit it a second time on every descendant item.
+      const ownRemainder = isRoot ? undefined : containerOwnRemainder(n.ownFields)
+      const nextAncestorRemainder = ownRemainder ? { ...ancestorRemainder, ...ownRemainder } : ancestorRemainder
+      n.instances.forEach(child => walk(child, false, nextAncestorRemainder))
     }
   }
 
-  walk(tree)
+  walk(tree, true, {})
   return result
 }
 
