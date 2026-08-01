@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import TimeWheels from './TimeWheels'
 
 // These must match TimeWheels' own constants.
@@ -277,19 +277,22 @@ describe('TimeWheels — carrying the hour', () => {
   // Regression: the re-centering write provokes another scroll event, which
   // used to run before React re-rendered, still see the pre-carry hour, and
   // overwrite 10:00 back to 09:00 — the carry looked like it never happened.
+  // Controlled, because the settling pass now checks the row it rests on
+  // against the value it was given back — with a host that drops the value
+  // it would rightly re-emit, and the echo would be lost in the noise.
   it('does not undo the carry when the re-centering scroll echoes back', () => {
     vi.useFakeTimers()
-    const { onChange, minute } = renderWheels('09:55')
+    const { emitted, minute } = renderLive('09:55')
 
     setScrollTop(minute, (M.home + 12) * ITEM_H)
     fireEvent.scroll(minute)
-    expect(onChange).toHaveBeenLastCalledWith('10:00')
+    expect(emitted).toHaveBeenLastCalledWith('10:00')
 
-    vi.advanceTimersByTime(SETTLE_MS)   // hop back to the middle period…
-    fireEvent.scroll(minute)            // …and the echo that write provokes
+    act(() => { vi.advanceTimersByTime(SETTLE_MS) })   // hop to the middle period…
+    fireEvent.scroll(minute)                           // …and the echo it provokes
 
-    expect(onChange).toHaveBeenLastCalledWith('10:00')
-    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(emitted).toHaveBeenLastCalledWith('10:00')
+    expect(emitted).toHaveBeenCalledTimes(1)
   })
 
   it('rolls the hour column over with the minutes, one row, animated', () => {
@@ -375,5 +378,63 @@ describe('TimeWheels — settling', () => {
     vi.advanceTimersByTime(SETTLE_MS)
 
     expect(hour.scrollTop).toBe((H.home + 8) * ITEM_H)
+  })
+})
+
+describe('TimeWheels — recovering from an interrupted animation', () => {
+  // The bug this guards: while a roll was in flight every scroll event was
+  // swallowed, and the settle pass was scheduled only if the animation landed
+  // exactly on target. An animation cut short therefore left the column
+  // resting between rows, still bolding the value it had set out for, with
+  // nothing pending to reconcile the two.
+  const ANIM_MS = 500
+
+  it('squares up and adopts the row it rests on when a roll never lands', () => {
+    vi.useFakeTimers()
+    const { emitted, hour } = renderLive('09:30')
+    setScrollTop(hour, (H.home + 9) * ITEM_H)
+    hour.scrollTo = vi.fn()   // an animation that is never carried out
+
+    // Send it rolling to 14, then drag elsewhere while that roll is pending.
+    fireEvent.click(within(hour).getByRole('option', { name: '14' }))
+    setScrollTop(hour, (H.home + 6) * ITEM_H)
+    fireEvent.scroll(hour)
+
+    act(() => { vi.advanceTimersByTime(ANIM_MS + SETTLE_MS) })
+
+    expect(hour.scrollTop).toBe((H.home + 6) * ITEM_H)
+    expect(emitted).toHaveBeenLastCalledWith('06:30')
+    expect(selected(hour)).toBe('06')
+  })
+
+  it('leaves a column resting off-grid squared up on a row', () => {
+    vi.useFakeTimers()
+    const { hour } = renderLive('09:30')
+    setScrollTop(hour, (H.home + 9) * ITEM_H)
+    hour.scrollTo = vi.fn()
+
+    fireEvent.click(within(hour).getByRole('option', { name: '14' }))
+    setScrollTop(hour, (H.home + 6) * ITEM_H + 17)   // stranded between rows
+    fireEvent.scroll(hour)
+
+    act(() => { vi.advanceTimersByTime(ANIM_MS + SETTLE_MS) })
+
+    expect(hour.scrollTop % ITEM_H).toBe(0)
+  })
+
+  it('keeps the value and the resting row in step after a settle', () => {
+    vi.useFakeTimers()
+    const { hour } = renderLive('09:30')
+    setScrollTop(hour, (H.home + 9) * ITEM_H)
+    hour.scrollTo = vi.fn()
+
+    fireEvent.click(within(hour).getByRole('option', { name: '14' }))
+    setScrollTop(hour, (H.home + 2) * ITEM_H)
+    fireEvent.scroll(hour)
+    act(() => { vi.advanceTimersByTime(ANIM_MS + SETTLE_MS) })
+
+    // The row under the highlight and the bolded value are the same row.
+    const restingRow = hour.scrollTop / ITEM_H
+    expect(selected(hour)).toBe(String((restingRow - H.home) % 24).padStart(2, '0'))
   })
 })

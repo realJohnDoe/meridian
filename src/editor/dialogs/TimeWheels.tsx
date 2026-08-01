@@ -80,9 +80,24 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
   const animTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const settleRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
+  // Kept current so `settle` can stay stable while still seeing the latest
+  // props when it finally fires from a timer.
+  const valueRef = useRef(value)
+  const onChangeRef = useRef(onChange)
+  // Lets `settle` re-arm itself without naming itself before it exists.
+  const settleFnRef = useRef<() => void>(() => {})
+  useLayoutEffect(() => { valueRef.current = value; onChangeRef.current = onChange })
+
   const settle = useCallback(() => {
     const node = ref.current
     if (!node) return
+    if (animRef.current !== null) {
+      // Our own animation is still in flight; look again once it is done.
+      // Re-arming rather than returning matters: this is the only thing left
+      // running, so dropping it here would leave the wheel wherever it lies.
+      settleRef.current = setTimeout(() => settleFnRef.current(), SETTLE_MS)
+      return
+    }
     const k = Math.max(0, Math.min(Math.round(node.scrollTop / ITEM_H), total - 1))
     // Back to the middle period, so the next fling gets a full runway again.
     // A whole-period hop lands on an identical row, so it is invisible; the
@@ -90,7 +105,16 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
     const target = home + mod(k, len)
     posRef.current = target
     if (Math.abs(node.scrollTop - target * ITEM_H) > 0.5) node.scrollTop = target * ITEM_H
-  }, [total, home, len])
+
+    // Whatever happened on the way here — an animation cut short, a drag
+    // whose events were swallowed while one was running — the row now under
+    // the highlight is the truth. Without this the two can disagree forever,
+    // which is what left a column resting off its own bolded value.
+    const landed = items[mod(k, len)]!
+    if (landed !== valueRef.current) onChangeRef.current(landed, 0)
+  }, [total, home, len, items])
+
+  useLayoutEffect(() => { settleFnRef.current = settle }, [settle])
 
   useEffect(() => () => {
     clearTimeout(settleRef.current)
@@ -123,15 +147,29 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
     posRef.current = target
     animRef.current = target * ITEM_H
     clearTimeout(animTimerRef.current)
-    animTimerRef.current = setTimeout(() => { animRef.current = null }, ANIM_MS)
+    animTimerRef.current = setTimeout(() => {
+      // The scroll never landed on its target — interrupted, or a browser
+      // that quietly declined to animate. Hand back to the settle pass so
+      // the wheel is squared up and reconciled rather than left adrift.
+      animRef.current = null
+      clearTimeout(settleRef.current)
+      settleRef.current = setTimeout(settle, SETTLE_MS)
+    }, ANIM_MS)
     if (typeof el.scrollTo === 'function') el.scrollTo({ top: target * ITEM_H, behavior: 'smooth' })
     else el.scrollTop = target * ITEM_H
-  }, [value, items, len, home, total])
+  }, [value, items, len, home, total, settle])
 
   const handleScroll = useCallback(() => {
     const el = ref.current
     if (!el) return
     const k = Math.max(0, Math.min(Math.round(el.scrollTop / ITEM_H), total - 1))
+
+    // Unconditionally, so that however this scroll ends — landed, swallowed,
+    // interrupted — a pass is always pending to square the wheel up. Leaving
+    // it out of the animation branch below is what stranded a column between
+    // rows with nothing left running to fix it.
+    clearTimeout(settleRef.current)
+    settleRef.current = setTimeout(settle, SETTLE_MS)
 
     // Our own animation is running: track where it has got to, never emit.
     if (animRef.current !== null) {
@@ -139,14 +177,9 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
       if (Math.abs(el.scrollTop - animRef.current) < 0.5) {
         animRef.current = null
         clearTimeout(animTimerRef.current)
-        clearTimeout(settleRef.current)
-        settleRef.current = setTimeout(settle, SETTLE_MS)
       }
       return
     }
-
-    clearTimeout(settleRef.current)
-    settleRef.current = setTimeout(settle, SETTLE_MS)
 
     const prev = posRef.current
     if (prev === null || k === prev) return
@@ -182,7 +215,12 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
         className="h-full overflow-y-scroll snap-y snap-mandatory [&::-webkit-scrollbar]:hidden focus-visible:outline-none"
         onScroll={handleScroll}
         // Let the user grab the wheel back out of an in-flight animation.
+        // Wheel and touch both count: a trackpad scroll fires no pointerdown,
+        // so without `onWheel` those scrolls were swallowed by the guard and
+        // the column drifted away from the value it was showing.
         onPointerDown={() => { animRef.current = null }}
+        onTouchStart={() => { animRef.current = null }}
+        onWheel={() => { animRef.current = null }}
         onClick={e => {
           const hit = (e.target as HTMLElement).closest<HTMLElement>('[data-n]')
           if (hit) onChange(Number(hit.dataset.n), 0)
