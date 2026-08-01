@@ -23,7 +23,7 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 |---|---|---|---|---|
 | **A** | The file is a projection of the store, and nothing requires the projection to be **total** | #2, ~~#3~~ (fixed), #5, #8 | Define and enforce totality; close the remaining three leaks | Opus 5, plan mode / multi-PR |
 | **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** (done — `round-trip-totality.test.ts`) and **B-runtime** (still open) — see below. ~162 ms/300 files | Sonnet 5 |
-| **C** | The one cache transition allowed to destroy local content has an unenforced precondition | #1, #4 | Make the destructive transition unrepresentable without a confirmed copy | Sonnet 5 → Opus 5 |
+| **C** | The one cache transition allowed to destroy local content has an unenforced precondition | ~~#1, #4~~ (**fixed**) | Decision table landed; the cache-API type change is still open — see Root C | Sonnet 5 → Opus 5 |
 | **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
 | **E** | Store transitions don't report which files they touched | #7 | Return the affected slug set from the transition | Haiku 4.5 |
 
@@ -128,6 +128,25 @@ A second-order instance of the same confusion: `isTransientSyncError` classifies
 
 **What a bandage looks like here:** swapping the two statements in `resolveCollision`. That fixes #1's repro and leaves the next caller of `setResolvedClean` free to do the same thing again.
 
+**Verification — landed (#1 + #4 in one PR, three commits).**
+
+`resolveCollision` is now a decision table rather than a linear path with an `if (fresh)` bolted on:
+
+| case | behaviour |
+|---|---|
+| remote diverged | copy the local content out **first**, then revert the original to remote |
+| remote gone | re-create the local content **at its original path**, warn, done — no copy |
+| copy write fails | record stays `dirty`, error rethrown; the edit is never in neither place |
+| copy path already taken (same second) | walk the timestamp forward until a free name is found |
+| path re-created mid-resolution | fall back to the diverged case — there is remote content to preserve after all |
+
+- **Policy resolved, and it made the codebase more consistent, not less.** The remote-gone case restores at the original path (see #4's verification for why). That is the same rule `pushDirty`'s tombstone branch already applied from the other side — **an edit beats a delete** — which was previously two unrelated-looking behaviours and is now one stated rule.
+- **Red-then-green confirmed, not assumed.** With `sync.ts` stashed back to its pre-fix state and the new tests kept, **4 of the 5 new tests fail**; all pass after. The fifth (`falls back to a conflict copy if the path is re-created mid-resolution`) passes against both — under the old code trivially, because `!fresh` fell straight through to the copy path — so it pins the new fallback branch rather than proving a fix, and is labelled as such here rather than counted as a regression test.
+- **Two extra defects fixed in the same rewrite, named rather than smuggled.** (a) The same-second copy collision found during the survey: `conflictPath` is second-granular, so two conflicts on one path produced the same name and the second write's `ConflictError` escaped `resolveCollision` to be reclassified as an actionable sync failure. `writeConflictCopy` now retries with the timestamp walked forward — a counter suffix would be eaten by `conflictPath`'s own `SUFFIX_RE` the next time that copy conflicted. (b) `backend.write` returns a version token only *"if the backend can determine it"*; recording a bare `undefined` would make the next edit to that file CAS with no precondition — which every backend reads as *"must be absent"* — so a file that plainly exists would conflict for no reason. `versionAfterWrite` falls back to a read. The original code did this defensively for the copy path only; it now applies to the re-create path too.
+- **~15 lines of dead code removed.** `resolveCollision`'s `cacheMap` parameter and both `if (cacheMap)` blocks were never reachable — the sole caller passes four arguments. Carrying them through the rewrite would have preserved dead branches in the one function being made legible. (`CacheRecord` stays imported; `planReconcile` still uses it.)
+- **Not done: the cache-API type change.** The root fix above also calls for encoding "content must survive somewhere" in `setResolvedClean`'s signature so the next caller cannot repeat #1. That is still a comment, not a type. The decision table makes the current caller correct; it does not make the mistake unrepresentable. Worth doing when a second caller ever appears.
+- Full suite **76 files / 933 passed + 2 expected-fail**, `pnpm run lint` 0 errors, `pnpm run build` exit 0.
+
 ---
 
 ### Root D — a viewer preference is an input to a domain computation
@@ -195,7 +214,7 @@ Vaults used: the 16-file shipped Tutorial vault (`exampleBackend.ts`), the 18 `s
 |---|---|
 | `pnpm run build` | **PASS** (exit 0) |
 | `pnpm run lint` | **PASS** — 0 errors, 14 pre-existing warnings (all `react-hooks/incompatible-library` on TanStack Virtual/Router) |
-| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). 76 files / 926 passed + 3 expected-fail after B-test landed; **76 files / 928 passed + 2 expected-fail after #3's fix landed** (2 new regression tests, 1 ratchet case closed) — see §2 Root B and finding #3 |
+| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; **933 passed + 2 expected-fail after Root C (#1+#4)** — see §2 Root B/Root C and findings #1, #3, #4 |
 | `pnpm run test:coverage` | **PASS** — all thresholds met. Totals 61.69% stmts / 58.19% branch / 64.02% lines |
 
 Coverage pointers worth acting on (pointers, not findings):
@@ -243,10 +262,10 @@ Categories are the brief's taxonomy; the **Root** column maps them onto §2's, w
 
 | # | Finding | Root | Invariant | Failure | Impact | Breadth | Model (point fix) |
 |---|---|---|---|---|---|---|---|
-| 1 | `resolveCollision` reverts the cache before the copy is safe | **C** | 4, 6, 7 | **silent** | 9 | 1 fn, all backends, every conflicting write | Sonnet 5 (with the ordering constraint stated) |
+| 1 | ~~`resolveCollision` reverts the cache before the copy is safe~~ — **FIXED** | **C** | 4, 6, 7 | **silent** | 9 | 1 fn, all backends, every conflicting write | Sonnet 5 (with the ordering constraint stated) |
 | 2 | Clearing an inherited field silently reverts on reload | **A** | 1, 2, 3 | **silent** | 7 | every file with a `defaults:` block | Opus 5, plan mode / multi-PR |
 | 3 | ~~Excluding an occurrence discards everything on it~~ — **FIXED** | **A** | 1, 2, 7 | **silent** | 7 | 1 line, 3 prod callers, every recurring entry | Sonnet 5 |
-| 4 | Remote-deleted + local edit ⇒ one conflict copy per sync tick, forever | **C** | 4, 5 | **loud, unbounded** | 6 | 1 fn, all backends | Sonnet 5 |
+| 4 | ~~Remote-deleted + local edit ⇒ one conflict copy per sync tick, forever~~ — **FIXED** | **C** | 4, 5 | **loud, unbounded** | 6 | 1 fn, all backends | Sonnet 5 |
 | 5 | Frontmatter on a node with no `StoreItem` home is deleted | **A** | 1 | **silent** | 6 | hand-authored multi-event files | Sonnet 5 (with the ownership rule stated) |
 | 6 | Biweekly `byweekday` series expand differently per device locale | **D** | 8, 2 | **silent** | 6 | `freq: weekly` + `interval ≥ 2` + `byweekday` | Opus 5 |
 | 7 | Swipe-delete Undo doesn't restore the wikilinks it removed | **E** | 7, 2 | **silent** | 5 | 1 of 2 delete paths | Sonnet 5 |
@@ -262,7 +281,7 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 
 1. **B-test — done.** `src/model/__tests__/round-trip-totality.test.ts`. See Root B for what it covers, what it deliberately doesn't (#2), and the verification that the ratchet actually flips.
 2. **#3 — done.** One line in `serializeChildren` plus two regression tests (`edits.test.ts`) and the B-test ratchet flip (`round-trip-totality.test.ts`). See finding #3's verification note for what was checked before landing it: every pre-existing exclude test traced by hand and confirmed not to regress, and the ratchet confirmed to require the real fix rather than any change.
-3. **Root C — #1 and #4 together.** `resolveCollision`'s decision table + the cache-API precondition. Doing #1 alone leaves #4's "remote is gone" branch unsafe.
+3. **Root C — done (#1 and #4 together).** `resolveCollision` is now a decision table. Landed as one PR because the two are independent defects in the same 48-line function — neither fix implies the other, but the end state is one structure and the intermediate state is incoherent. The cache-API precondition (making #1 unrepresentable rather than merely fixed) is still open; see Root C's verification block.
 4. **#5**, then **#8**, the remaining mechanical A leaks in `src/model/collapse.ts` + `src/types.ts`. #5 changes where the parse side routes reserved keys; #8 needs a **byte** compare and a CRLF fixture, which neither semantic check catches.
 5. **#2a** (make "cleared" expressible), then **#2b** as its own PR once provenance vs. edit semantics is decided. #2 changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and will conflict with #5 if taken before it — #3 is already landed, so that conflict no longer applies.
 6. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half by hand.
@@ -275,7 +294,7 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 
 ---
 
-### #1 — `resolveCollision` reverts the local edit before the conflict copy is durable
+### #1 — `resolveCollision` reverts the local edit before the conflict copy is durable — **FIXED**
 
 - **Invariant violated:** 4 (no lost update), 6 (durability of accepted writes), 7 (recoverability). Fires whenever a CAS write conflicts *and* the follow-up conflict-copy write fails — i.e. a network drop, a GitHub rate limit, or an expired token landing in the ~1-second window between the two calls. Both writable backends, any file.
 - **Category:** `lost-update` `durability` `atomicity` `recoverability`
@@ -346,6 +365,8 @@ describe('pushDirty — a conflict-copy write that fails must not destroy the lo
   `setResolvedClean` is documented in `src/storage/cache.ts:127` as safe precisely because *"the local content has already been copied out to a conflict-copy path first"* — which, in program order, it has not been.
 - **Problem:** a conflict resolution that fails halfway leaves the user's unpushed edit in neither the cache nor the backend, while the UI claims it is saved locally.
 - **Fix:** write (and confirm) the conflict copy first, then `setResolvedClean` the original; on any error from the copy write, leave the original record `dirty` and rethrow. After the fix the repro's assertion passes via the `dirty` branch on the first cycle and via the copy on the next. **Root fix (preferred):** do this as part of Root C's decision table + cache-API precondition, so the next caller cannot repeat it.
+
+**Verification — fixed as part of Root C.** `resolveCollision` now writes the conflict copy first and only then reverts the original's cache record; any failure in between leaves the record `dirty` and rethrows, so the edit is retried next cycle. Confirmed red-then-green: with `sync.ts` reverted to its pre-fix state the new test `keeps the local edit recoverable when the conflict-copy write fails mid-resolution` fails, and passes after. See Root C's verification block.
 
 ---
 
@@ -551,7 +572,7 @@ it('excluding an occurrence keeps the unknown keys it carried', () => {
 
 ---
 
-### #4 — A remotely-deleted file with a pending local edit spawns a new conflict copy every sync tick, forever
+### #4 — A remotely-deleted file with a pending local edit spawns a new conflict copy every sync tick, forever — **FIXED**
 
 - **Invariant violated:** 4 (no lost update), 5 (cache coherence). Fires when a file is deleted or renamed on the other device — or by hand, or by `git rm` in a GitHub vault — while the local cache still holds an unpushed edit for it.
 - **Category:** `lost-update` `cache-coherence` `atomicity`
@@ -599,6 +620,8 @@ Two conflicts on the *same* path inside one second is a related second-order bug
 ```
 - **Problem:** a file deleted on one device while edited on another wedges sync permanently and litters the vault with one duplicate entry per minute.
 - **Fix:** handle the "remote is gone" case explicitly — clear the record's base `version` and re-push it as a create (or tombstone it, with a toast saying which) — and make the copy write collision-tolerant by bumping the timestamp/suffix on `ConflictError`; afterwards the four-cycle repro produces at most one extra file and ends with no dirty records. **Root fix:** this is one cell of Root C's decision table — write the table, don't add a branch.
+
+**Verification — fixed as part of Root C, with the policy resolved.** The open question in the Fix line above ("re-push as a create, *or* tombstone") was settled deliberately: **the local content is restored at its original path**, not written to a conflict copy. A copy would orphan every `[[wikilink]]` pointing at that slug, and re-deleting is one gesture where finding a stray copy and renaming it back is several. The user is warned so a delete they meant can simply be repeated. This also makes the policy symmetric with the tombstone branch, which already keeps a remote edit that lands after a local delete — one rule, stated in the code: **an edit beats a delete.** The four-cycle repro now ends with exactly `['task.md']` on the backend, a clean cache record, and one warning. See Root C's verification block.
 
 ---
 

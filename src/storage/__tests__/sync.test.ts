@@ -153,6 +153,8 @@ class FakeBackend implements StorageBackend {
   private _files = new Map<string, FakeFile>()
   private _versionCounter = 0
   private _writeErrorQueue:   Error[] = []
+  private _writeFailPattern:  { pattern: RegExp; error: () => Error } | null = null
+  private _afterNextReadFiles: (() => void) | null = null
   private _deleteErrorQueue:  Error[] = []
   private _statAllErrorQueue: Error[] = []
   private _hidden = new Set<string>()
@@ -167,6 +169,16 @@ class FakeBackend implements StorageBackend {
   listPaths(): string[] { return Array.from(this._files.keys()) }
 
   queueWriteError(e: Error): void { this._writeErrorQueue.push(e) }
+
+  /** Fail every write whose path matches — used to simulate a network drop that
+   *  lands specifically on the conflict-copy write, mid-resolution. */
+  failWritesTo(pattern: RegExp, error: () => Error): void {
+    this._writeFailPattern = { pattern, error }
+  }
+
+  /** Run `fn` once, immediately after the next readFiles() resolves — lets a
+   *  test land a concurrent remote change inside a resolution's own window. */
+  onNextReadFiles(fn: () => void): void { this._afterNextReadFiles = fn }
   queueDeleteError(e: Error): void { this._deleteErrorQueue.push(e) }
   queueStatAllError(e: Error): void { this._statAllErrorQueue.push(e) }
 
@@ -213,10 +225,16 @@ class FakeBackend implements StorageBackend {
       this._pendingReadFilesGate = null
       await gate
     }
-    return paths.flatMap(p => {
+    const result = paths.flatMap(p => {
       const f = this._files.get(p)
       return f ? [{ path: p, content: f.content, version: f.version }] : []
     })
+    if (this._afterNextReadFiles) {
+      const fn = this._afterNextReadFiles
+      this._afterNextReadFiles = null
+      fn()
+    }
+    return result
   }
 
   async readAll(): Promise<RawFile[]> {
@@ -227,6 +245,7 @@ class FakeBackend implements StorageBackend {
   async write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> {
     this.writeCallCount++
     if (this._writeErrorQueue.length) throw this._writeErrorQueue.shift()!
+    if (this._writeFailPattern?.pattern.test(path)) throw this._writeFailPattern.error()
     if (this._pendingWriteGate) {
       const gate = this._pendingWriteGate
       this._pendingWriteGate = null
@@ -335,6 +354,128 @@ describe('pushDirty — write-conflict collision', () => {
 
     // The collision doesn't surface as a sync failure — it's a handled outcome.
     expect(storeState.syncError).toBeNull()
+  })
+
+  // Data-integrity survey, finding #1. resolveCollision used to revert the dirty
+  // cache record to the remote copy BEFORE writing the local content anywhere,
+  // so a failure in between left the edit in neither place — while the UI
+  // reported "changes are saved locally and will sync when you reconnect".
+  it('keeps the local edit recoverable when the conflict-copy write fails mid-resolution', async () => {
+    const backend = new FakeBackend()
+    backend.seed('task.md', 'remote v1', 'sha1')
+    setActiveBackend(backend)
+    await backend.write('task.md', 'REMOTE v2', 'sha1')          // another device pushed first
+    seedDirty('fake-vault', 'task.md', 'MY LOCAL EDIT', 'sha1')
+    // The network drops precisely on the conflict-copy write.
+    backend.failWritesTo(/^task_\d/, () => new TransientSyncError('Failed to fetch'))
+
+    await syncToBackend()
+
+    // The edit must survive somewhere: either copied out, or still dirty for
+    // the next cycle. What must never happen is neither.
+    const copy = backend.listPaths().find(p => p !== 'task.md')
+    const cached = cacheStore.get(vp('fake-vault', 'task.md'))
+    const survived = copy ? backend.get(copy)!.content : cached?.content
+    expect(survived).toBe('MY LOCAL EDIT')
+    // Specifically: the record stays dirty, so the next sync retries it.
+    expect(cached?.status).toBe('dirty')
+  })
+
+  // Two collisions on one path inside the same second used to generate the same
+  // conflict-copy name twice; the second write hit an existing file and the
+  // ConflictError escaped resolveCollision, surfacing as an actionable sync
+  // failure rather than being handled.
+  it('finds a free name when two conflicts on one path land in the same second', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 6, 31, 8, 0, 0).getTime())
+    try {
+      backend.seed('a.md', 'r1', 'sha1')
+      await backend.write('a.md', 'R2', 'sha1')
+      seedDirty('fake-vault', 'a.md', 'local one', 'sha1')
+      await syncToBackend()
+
+      // Second conflict on the same path, same wall-clock second.
+      await backend.write('a.md', 'R3', backend.get('a.md')!.version)
+      seedDirty('fake-vault', 'a.md', 'local two', 'stale')
+      await syncToBackend()
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const copies = backend.listPaths().filter(p => p !== 'a.md')
+    expect(copies).toHaveLength(2)
+    expect(copies.map(p => backend.get(p)!.content).sort()).toEqual(['local one', 'local two'])
+    expect(storeState.syncError).toBeNull()
+  })
+})
+
+// ── Remote-deleted file with a pending local edit ────────────────────────
+//
+// An edit beats a delete — the same rule the tombstone branch below applies
+// from the other side. The local content is restored at its ORIGINAL path
+// rather than landing in a conflict copy: a copy would orphan every wikilink
+// pointing at this slug, and re-deleting is one gesture where finding a stray
+// copy and renaming it back is several.
+
+describe('pushDirty — the file was deleted remotely while a local edit was pending', () => {
+  it('restores the local content at its original path and tells the user', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    // The file existed (base version sha1) but another device deleted it.
+    seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
+
+    await syncToBackend()
+
+    expect(backend.get('task.md')?.content).toBe('local edit')
+    // No conflict copy — the path itself is kept.
+    expect(backend.listPaths()).toEqual(['task.md'])
+    const cached = cacheStore.get(vp('fake-vault', 'task.md'))
+    expect(cached?.status).toBe('clean')
+    expect(cached?.version).toBeDefined()   // a real token, so the next edit CASes correctly
+    expect(notifyFns.warn).toHaveBeenCalledTimes(1)
+    expect(notifyFns.warn.mock.calls[0]![0]).toContain('deleted on another device')
+    expect(storeState.syncError).toBeNull()
+  })
+
+  it('converges — repeated syncs do not pile up conflict copies', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
+
+    vi.useFakeTimers({ toFake: ['Date'] })
+    let now = new Date(2026, 6, 31, 8, 0, 0).getTime()
+    try {
+      for (let i = 0; i < 4; i++) {
+        vi.setSystemTime(now)
+        await syncToBackend()
+        now += 61_000   // one autoSyncTick apart
+      }
+    } finally {
+      vi.useRealTimers()
+    }
+
+    // Previously: one new conflict copy per tick, forever, with task.md stuck dirty.
+    expect(backend.listPaths()).toEqual(['task.md'])
+    expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('clean')
+    expect(notifyFns.warn).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to a conflict copy if the path is re-created mid-resolution', async () => {
+    const backend = new FakeBackend()
+    setActiveBackend(backend)
+    seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
+    // readFiles reports the path as gone, but a create lands before ours does —
+    // the recreate must not clobber it.
+    backend.onNextReadFiles(() => { backend.seed('task.md', 'RECREATED REMOTELY', 'sha9') })
+
+    await syncToBackend()
+
+    expect(backend.get('task.md')?.content).toBe('RECREATED REMOTELY')
+    const copy = backend.listPaths().find(p => p !== 'task.md')
+    expect(copy).toBeDefined()
+    expect(backend.get(copy!)?.content).toBe('local edit')
   })
 })
 
