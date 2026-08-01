@@ -438,3 +438,61 @@ describe('TimeWheels — recovering from an interrupted animation', () => {
     expect(selected(hour)).toBe(String((restingRow - H.home) % 24).padStart(2, '0'))
   })
 })
+
+describe('TimeWheels — handing the wheel back to the user mid-roll', () => {
+  // A roll swallows scroll events so its own animation is not mistaken for
+  // the user turning the wheel. Any sign of a real hand on it has to lift
+  // that guard at once, or the column keeps moving under a user who has
+  // already grabbed it and drifts away from the value it shows. A trackpad
+  // fires only `wheel`, which is how this last slipped through.
+  const grabs = [
+    ['a wheel notch',  (el: HTMLElement) => fireEvent.wheel(el)],
+    ['a finger down',  (el: HTMLElement) => fireEvent.touchStart(el)],
+    ['a pointer down', (el: HTMLElement) => fireEvent.pointerDown(el)],
+  ] as const
+
+  it.each(grabs)('lets %s take over from a roll in flight', (_label, grab) => {
+    const { emitted, hour } = renderLive('09:30')
+    setScrollTop(hour, (H.home + 9) * ITEM_H)
+    hour.scrollTo = vi.fn()          // a roll that is still on its way
+
+    fireEvent.click(within(hour).getByRole('option', { name: '14' }))
+    emitted.mockClear()
+
+    grab(hour)
+    setScrollTop(hour, (H.home + 6) * ITEM_H)
+    fireEvent.scroll(hour)
+
+    // Acted on straight away rather than swallowed as part of the roll.
+    expect(emitted).toHaveBeenCalledWith('06:30')
+  })
+
+  it('swallows the roll’s own scrolls while no one has grabbed it', () => {
+    const { emitted, hour } = renderLive('09:30')
+    setScrollTop(hour, (H.home + 9) * ITEM_H)
+    hour.scrollTo = vi.fn()
+
+    fireEvent.click(within(hour).getByRole('option', { name: '14' }))
+    emitted.mockClear()
+
+    setScrollTop(hour, (H.home + 11) * ITEM_H)   // the roll passing through
+    fireEvent.scroll(hour)
+
+    expect(emitted).not.toHaveBeenCalled()
+  })
+
+  it('takes the wheel back once the roll lands on its row', () => {
+    const { emitted, hour } = renderLive('09:30')
+    setScrollTop(hour, (H.home + 9) * ITEM_H)
+    hour.scrollTo = o => { hour.scrollTop = o!.top as number }   // a roll that lands
+
+    fireEvent.click(within(hour).getByRole('option', { name: '14' }))
+    fireEvent.scroll(hour)                        // arrives on target, guard lifts
+    emitted.mockClear()
+
+    setScrollTop(hour, (H.home + 3) * ITEM_H)
+    fireEvent.scroll(hour)
+
+    expect(emitted).toHaveBeenCalledWith('03:30')
+  })
+})
