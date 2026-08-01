@@ -645,15 +645,48 @@ describe('unknown keys survive every edit scope', () => {
     expect(override.metadata.extra?.owner).toBe('bob')
   })
 
-  it('excludeOccurrence does not touch a preserved override\'s unknown key on the store item', () => {
-    // The store item still carries the key; collapse deliberately does not emit
-    // metadata on excluded instances (documented non-goal), so this only guards
-    // that excludeOccurrence itself isn't an additional loss site.
+  it('excludeOccurrence preserves an override\'s unknown key on the store item, AND on save', () => {
     const data = fixtureData('unknown-keys-series')
     const occ = occOn(data.items, data.roots, '2026-04-20')
     const next = excludeOccurrence(data, occ)
     const override = next.items.find(i => !isSeries(i) && i.date === '2026-04-20')!
     expect(override.metadata.extra?.owner).toBe('bob')
+    // Regression guard for finding #3 (data-integrity survey): serializeChildren
+    // used to emit only date/time/excluded for an excluded child, silently
+    // dropping whatever metadata it carried — un-excluding it would have come
+    // back blank. It now diffs the excluded child against the series metadata
+    // like any other override.
+    expect(serializeData(next)).toContain('owner: bob')
+  })
+
+  it('excludeOccurrence keeps an unknown key the occurrence carried, on a fresh exclusion stub', () => {
+    // The report's original repro: unlike the case above (an existing override
+    // being excluded), this occurrence has no prior override — excludeOccurrence
+    // creates the exclusion stub for the first time from a generated slot's
+    // inherited metadata plus its own explicit fields.
+    const src = [
+      '---',
+      'title: Standup',
+      'date: 2026-04-06',
+      'repeat:',
+      '  type: schedule',
+      '  freq: weekly',
+      '  byweekday: [mo]',
+      'instances:',
+      '  - date: 2026-04-13',
+      '    done: true',
+      '    minutesUrl: https://example.com/notes/13',
+      '---',
+    ].join('\n')
+    const p = parseToStoreItems('s2.md', src)
+    const roots = new Map([['s2', p.root]])
+    const occ = occOn(p.items, roots, '2026-04-13')
+
+    const next = excludeOccurrence({ items: p.items, roots }, occ)
+    const out = serialize(next.items, next.roots.get('s2'))
+
+    expect(out).toContain('minutesUrl: https://example.com/notes/13')
+    expect(out).toContain('done: true')
   })
 })
 

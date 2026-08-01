@@ -141,15 +141,21 @@ function hoistSharedMetadata(metas: Partial<OccurrenceMetadata>[]): {
 /**
  * Serialize the override children of a series into a YAML instances array.
  * Each child stores only the fields that differ from the series metadata.
+ *
+ * An excluded child is still diffed against `seriesMeta` like any other override
+ * — exclusion only suppresses the occurrence from expansion (see `makeOcc` in
+ * expansion.ts), it does not erase whatever the user had already written on that
+ * instance (a note, a link, a completed `done`). Un-excluding it must bring that
+ * back, not resurface a blank slot.
  */
 function serializeChildren(
   children: AnyOcc[],
   seriesMeta: Partial<OccurrenceMetadata>,
 ): Record<string, unknown>[] {
   return children.map(c => {
-    if (c.excluded) return { date: c.date, ...(c.time ? { time: c.time } : {}), excluded: true }
     const child: Record<string, unknown> = { date: c.date }
     if (c.time) child.time = c.time
+    if (c.excluded) child.excluded = true
     const diff = diffMetadata(c.metadata, seriesMeta)
     Object.assign(child, occMetaToYaml(diff))
     return child

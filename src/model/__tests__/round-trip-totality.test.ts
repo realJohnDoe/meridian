@@ -16,12 +16,15 @@
  * These are the exact assertions already generalised over the fixture corpus in
  * `yaml-roundtrip.test.ts` ("preserves store structure across a round-trip") and
  * `unknown-keys.test.ts` ("no key loss") respectively. This file does not repeat
- * that sweep. It exists to pin the two cases the corpus doesn't cover yet — an
- * excluded instance carrying metadata (#3) and a file-level key on a non-root
- * node (#5) — as inline regressions, using `it.fails` so CI stays green while
- * the bug is open. THE POINT OF `it.fails`: the moment the corresponding fix
- * lands, this file goes red on its own — flip that one case to `it` (removing
- * `.fails`) as part of the fix's PR. That flip is the ratchet.
+ * that sweep. It exists to pin the cases the corpus doesn't cover yet — an
+ * excluded instance carrying metadata (#3, fixed), a file-level key on a
+ * non-root node (#5, open) — as inline regressions, using `it.fails` for the
+ * ones still open so CI stays green while the bug exists. THE POINT OF
+ * `it.fails`: the moment the corresponding fix lands, this file goes red on its
+ * own — flip that one case to `it` (removing `.fails`) as part of the fix's PR,
+ * moving it from "known-open leaks" to "closed leaks" below. That flip is the
+ * ratchet; #3's flip is what confirmed it actually ratchets (see the finding's
+ * repro history) rather than just documenting a bug forever.
  *
  * Deliberately NOT here: #2 (clearing a field inherited from `defaults:`) is not
  * a load→save case — it only exists relative to an `applyEdit` call — so it falls
@@ -56,10 +59,13 @@ function assertSourceFidelity(slug: string, source: string): void {
   expect(lost).toEqual([])
 }
 
-describe('Root A totality — known-open leaks (documented, not yet fixed)', () => {
-  // Finding #3: excluding an occurrence discards every field it carried, not just
-  // its visibility. serializeChildren emits only `date`/`time`/`excluded`.
-  it.fails('excluding a recurring occurrence keeps the metadata it carried', () => {
+describe('Root A totality — closed leaks (regression guards)', () => {
+  // Finding #3, fixed: excluding an occurrence used to discard every field it
+  // carried, not just its visibility — serializeChildren emitted only
+  // `date`/`time`/`excluded`. It now diffs the excluded child against the
+  // series metadata like any other override, so un-excluding it restores what
+  // was there rather than surfacing a blank slot.
+  it('excluding a recurring occurrence keeps the metadata it carried', () => {
     const source = [
       '---',
       'title: Standup',
@@ -77,7 +83,9 @@ describe('Root A totality — known-open leaks (documented, not yet fixed)', () 
     assertCollapseTotality('excluded-metadata', source)
     assertSourceFidelity('excluded-metadata', source)
   })
+})
 
+describe('Root A totality — known-open leaks (documented, not yet fixed)', () => {
   // Finding #5: a file-level key (title/tags/items) written on a non-root node has
   // nowhere to live — RESERVED_KEYS filters it out and it lands in neither the
   // occurrence's `extra` bag nor the file root's.
