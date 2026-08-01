@@ -36,7 +36,7 @@ export interface FileConvention {
 }
 
 /** Meridian's own default for a freshly-created entry with no source file yet. */
-export const DEFAULT_FILE_CONVENTION: FileConvention = { crlf: false, trailingNewline: true }
+const DEFAULT_FILE_CONVENTION: FileConvention = { crlf: false, trailingNewline: true }
 
 // ── Frontmatter split / merge ─────────────────────────────────
 
