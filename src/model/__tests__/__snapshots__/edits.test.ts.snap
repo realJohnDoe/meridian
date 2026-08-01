@@ -81,10 +81,8 @@ repeat:
 instances:
   - date: 2026-04-13
     done: true
-    duration: 30m
   - date: 2026-04-14
     done: true
-    duration: 30m
 ---
 
 Quick sync. Agenda:
