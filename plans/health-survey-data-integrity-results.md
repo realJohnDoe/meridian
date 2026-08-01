@@ -21,7 +21,7 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 
 | Root | Property | Findings | Root fix | Tier |
 |---|---|---|---|---|
-| **A** | The file is a projection of the store, and nothing requires the projection to be **total** | #2, #3, #5, #8 | Define and enforce totality; close the four leaks | Opus 5, plan mode / multi-PR |
+| **A** | The file is a projection of the store, and nothing requires the projection to be **total** | #2, ~~#3~~ (fixed), #5, #8 | Define and enforce totality; close the remaining three leaks | Opus 5, plan mode / multi-PR |
 | **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** (done — `round-trip-totality.test.ts`) and **B-runtime** (still open) — see below. ~162 ms/300 files | Sonnet 5 |
 | **C** | The one cache transition allowed to destroy local content has an unenforced precondition | #1, #4 | Make the destructive transition unrepresentable without a confirmed copy | Sonnet 5 → Opus 5 |
 | **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
@@ -55,7 +55,7 @@ Four leaks, one missing invariant. The `extra` bag is the project's own patch fo
 - **#2a (clear one occurrence)** is an *expressibility* problem. Making "cleared" emittable — an explicit `participants: []` / `done: null` on the diverging instance, read back as cleared by `parseInlineField` — fixes it without touching the parse pipeline.
 - **#2b (clear the whole series, one override keeps the old value)** is a *provenance* problem. `buildEffectiveTree` merges `defaults:` into children and, per `EffectiveNode`'s own doc, `Fields carry plain values — no origin tracking.` So an override that merely *inherited* `participants: [alice, bob]` is indistinguishable from one that stated it, and collapse's diff correctly reports a divergence that the user never authored. Expressibility does not fix this. It needs either per-field provenance (explicit vs inherited) carried through the store, or a product decision that scope `all` rewrites overrides' inherited fields.
 
-**Root fix, in order:** (1) write the totality invariant down, in `AGENTS.md` and as a test that asserts source→saved containment for a fixture set that includes CRLF, container nodes, and excluded instances with metadata; (2) close #3 and #5 (both mechanical once the invariant is stated); (3) make "cleared" expressible, fixing #2a; (4) decide #2b — provenance or edit semantics — as its own PR. **Resist starting at (4).** Retaining provenance means changing what `EffectiveNode` is, and that is the layer `AGENTS.md` correctly insists stays field-agnostic; steps 1–3 recover most of the loss without going there.
+**Root fix, in order:** (1) write the totality invariant down, in `AGENTS.md` and as a test that asserts source→saved containment for a fixture set that includes CRLF, container nodes, and excluded instances with metadata — **done**, `round-trip-totality.test.ts`; (2) close #3 (**done**) and #5 (both mechanical once the invariant is stated); (3) make "cleared" expressible, fixing #2a; (4) decide #2b — provenance or edit semantics — as its own PR. **Resist starting at (4).** Retaining provenance means changing what `EffectiveNode` is, and that is the layer `AGENTS.md` correctly insists stays field-agnostic; steps 1–3 recover most of the loss without going there.
 
 **What a bandage looks like here:** special-casing `excluded` in `serializeChildren`, or adding `title` to a second allow-list. Both close one leak and leave the invariant unowned.
 
@@ -96,10 +96,7 @@ Cost, measured over a 300-file corpus built from the fixtures: parse alone **131
 
 Note what this does **not** do: it does not fix a single finding. It is a **ratchet, not a diagnostic** — and that decides when each half lands:
 
-- **B-test — DONE.** `src/model/__tests__/round-trip-totality.test.ts` implements both checks as reusable functions (`assertCollapseTotality`, `assertSourceFidelity`) and pins the two open leaks the fixture corpus didn't cover — an excluded instance carrying metadata (#3) and a title on a non-root node (#5) — plus a narrower, non-normalisation-conflicting slice of #8 (a save must never mix `
-
-` and bare `
-` in one file). Each is `it.fails`, so the suite is green (76 files, 926 passed + 3 expected-fail) while the invariant is documented. **Verified the ratchet actually ratchets**, not just documents: patching `serializeChildren` to emit the excluded child's diffed metadata flips the #3 case from expected-fail to `Error: Expect test to fail` — i.e. a real fix is required to turn it green, not just a passing assertion waiting to be noticed. That patch was reverted; #3 is still open. The two blanket corpus suites (`yaml-roundtrip.test.ts`'s "preserves store structure", `unknown-keys.test.ts`'s "no key loss") were deliberately left untouched rather than folding the new fixtures into `fixtures/` — adding a known-failing case to an `it.each` sweep with no all-fixtures-pass guarantee would have gone red immediately; keeping the two classes separate is what lets this be a ratchet instead of a broken build.
+- **B-test — DONE.** `src/model/__tests__/round-trip-totality.test.ts` implements both checks as reusable functions (`assertCollapseTotality`, `assertSourceFidelity`) and pins the leaks the fixture corpus didn't cover — an excluded instance carrying metadata (#3), a title on a non-root node (#5), and a narrower, non-normalisation-conflicting slice of #8 (a save must never mix CRLF and bare LF in one file) — as `it.fails` cases, so the suite stayed green while each was open. **Verified the ratchet actually ratchets**, not just documents: before landing #3's real fix, patching `serializeChildren` to emit the excluded child's diffed metadata was tried, and it flipped the case from expected-fail to `Error: Expect test to fail` — proof a real fix is required to close it, not just any change. #3's case has since been flipped to a normal `it` and moved into a "closed leaks" describe block — see finding #3's verification note. #5 and #8's narrow slice remain `it.fails`. The two blanket corpus suites (`yaml-roundtrip.test.ts`'s "preserves store structure", `unknown-keys.test.ts`'s "no key loss") were deliberately left untouched rather than folding the new fixtures into `fixtures/` — adding a known-failing case to an `it.each` sweep with no all-fixtures-pass guarantee would have gone red immediately; keeping the two classes separate is what lets this be a ratchet instead of a broken build.
 - **Not built:** #2 has no fixture-corpus form — it only exists relative to an `applyEdit` call, which is out of scope for an *unedited* round-trip check. Its own repro (finding #2) is the thing that pins it.
 - **B-runtime — still to do.** Wiring the checks into `writeEntityToCache` and the load path. It **cannot be switched on until the leaks close** (constraint 1 below), and for the four leaks already found it is redundant — each arrives with its own regression test. Its value is the *fifth* leak and regression prevention afterwards, which is precisely the value a ratchet has once the thing it protects is already correct.
 
@@ -198,7 +195,7 @@ Vaults used: the 16-file shipped Tutorial vault (`exampleBackend.ts`), the 18 `s
 |---|---|
 | `pnpm run build` | **PASS** (exit 0) |
 | `pnpm run lint` | **PASS** — 0 errors, 14 pre-existing warnings (all `react-hooks/incompatible-library` on TanStack Virtual/Router) |
-| `pnpm test` | **PASS** — 75 files, 926 tests (survey run, before B-test landed; 76 files / 926 passed + 3 expected-fail afterward — see §2 Root B) |
+| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). 76 files / 926 passed + 3 expected-fail after B-test landed; **76 files / 928 passed + 2 expected-fail after #3's fix landed** (2 new regression tests, 1 ratchet case closed) — see §2 Root B and finding #3 |
 | `pnpm run test:coverage` | **PASS** — all thresholds met. Totals 61.69% stmts / 58.19% branch / 64.02% lines |
 
 Coverage pointers worth acting on (pointers, not findings):
@@ -248,7 +245,7 @@ Categories are the brief's taxonomy; the **Root** column maps them onto §2's, w
 |---|---|---|---|---|---|---|---|
 | 1 | `resolveCollision` reverts the cache before the copy is safe | **C** | 4, 6, 7 | **silent** | 9 | 1 fn, all backends, every conflicting write | Sonnet 5 (with the ordering constraint stated) |
 | 2 | Clearing an inherited field silently reverts on reload | **A** | 1, 2, 3 | **silent** | 7 | every file with a `defaults:` block | Opus 5, plan mode / multi-PR |
-| 3 | Excluding an occurrence discards everything on it | **A** | 1, 2, 7 | **silent** | 7 | 1 line, 3 prod callers, every recurring entry | Sonnet 5 |
+| 3 | ~~Excluding an occurrence discards everything on it~~ — **FIXED** | **A** | 1, 2, 7 | **silent** | 7 | 1 line, 3 prod callers, every recurring entry | Sonnet 5 |
 | 4 | Remote-deleted + local edit ⇒ one conflict copy per sync tick, forever | **C** | 4, 5 | **loud, unbounded** | 6 | 1 fn, all backends | Sonnet 5 |
 | 5 | Frontmatter on a node with no `StoreItem` home is deleted | **A** | 1 | **silent** | 6 | hand-authored multi-event files | Sonnet 5 (with the ownership rule stated) |
 | 6 | Biweekly `byweekday` series expand differently per device locale | **D** | 8, 2 | **silent** | 6 | `freq: weekly` + `interval ≥ 2` + `byweekday` | Opus 5 |
@@ -264,17 +261,17 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 **Root-first (recommended).** This order never patches the same file twice and keeps the suite green at every step:
 
 1. **B-test — done.** `src/model/__tests__/round-trip-totality.test.ts`. See Root B for what it covers, what it deliberately doesn't (#2), and the verification that the ratchet actually flips.
-2. **#3** — one line in `serializeChildren` plus its regression test. Cheap. Its PR should also flip B-test's `excluding a recurring occurrence keeps the metadata it carried` case from `it.fails` to `it` — that flip is verification, not extra work, and confirmed to require the real fix (a stub patch alone does not turn it green).
+2. **#3 — done.** One line in `serializeChildren` plus two regression tests (`edits.test.ts`) and the B-test ratchet flip (`round-trip-totality.test.ts`). See finding #3's verification note for what was checked before landing it: every pre-existing exclude test traced by hand and confirmed not to regress, and the ratchet confirmed to require the real fix rather than any change.
 3. **Root C — #1 and #4 together.** `resolveCollision`'s decision table + the cache-API precondition. Doing #1 alone leaves #4's "remote is gone" branch unsafe.
 4. **#5**, then **#8**, the remaining mechanical A leaks in `src/model/collapse.ts` + `src/types.ts`. #5 changes where the parse side routes reserved keys; #8 needs a **byte** compare and a CRLF fixture, which neither semantic check catches.
-5. **#2a** (make "cleared" expressible), then **#2b** as its own PR once provenance vs. edit semantics is decided. #2 changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and will conflict with #3 and #5 if taken before them.
+5. **#2a** (make "cleared" expressible), then **#2b** as its own PR once provenance vs. edit semantics is decided. #2 changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and will conflict with #5 if taken before it — #3 is already landed, so that conflict no longer applies.
 6. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half by hand.
 7. **Root D** — #6, gated on the migration decision and on rewriting `weekStart.test.ts`.
 8. **B-runtime** — wire the two checks into `writeEntityToCache` and the load path, and flip them from logging-only to `warn()` (or to refusing the write, per Root B's third constraint). By this point they are quiet on a correct vault, so enabling them is a ratchet rather than an alarm.
 
-**Steps 2 and 3 are genuinely arguable — pick by how the vault is used.** Severity-first says C before #3: #1 is total, silent, unrecoverable loss of an edit (impact 9). Frequency-first says the reverse: #1 needs a conflict *and* a network failure inside a ~1-second window, so it is rare-but-catastrophic, while #3 fires every time anyone deletes a recurring occurrence carrying data — single device, no conflict required. The order above assumes multi-device GitHub sync is in real use, which makes conflicts unexceptional; for a predominantly single-device vault, swap them. #3 is cheap enough that it barely delays C either way.
+**Steps 2 and 3's severity-vs-frequency tradeoff is now moot — #3 landed first regardless, and it was cheap enough (one line, two tests) that it barely delayed Root C either way.** For the record, the reasoning that would have applied to a costlier #3: severity-first says C before #3, since #1 is total, silent, unrecoverable loss of an edit (impact 9); frequency-first says the reverse, since #1 needs a conflict *and* a network failure inside a ~1-second window (rare-but-catastrophic) while #3 fired on every delete of a recurring occurrence carrying data (single device, no conflict required). Keep that framework for any future case where step ordering is genuinely expensive to get wrong.
 
-**Patch-first**, if you want the bleeding stopped before any restructuring: **#1 → #3 → #5 → #7**, which is the same file ordering with the roots left in place. Note that #2 has no safe point fix — every version of it is a change to the emit predicates, which is why it carries a plan-mode tier in the table above.
+**Patch-first**, if you want the bleeding stopped before any restructuring: **#1 → ~~#3~~ (done) → #5 → #7**, which is the same file ordering with the roots left in place. Note that #2 has no safe point fix — every version of it is a change to the emit predicates, which is why it carries a plan-mode tier in the table above.
 
 ---
 
@@ -463,7 +460,9 @@ export function inlineFieldEmpty(kind: InlineFieldKind, v: unknown): boolean {
 
 ---
 
-### #3 — Excluding an occurrence discards every field on it
+### #3 — Excluding an occurrence discards every field on it — **FIXED**
+
+> Fixed in `src/model/collapse.ts`'s `serializeChildren` (commit "Land finding #3"). The repro, expected/observed, and original point-fix guidance below are kept verbatim as the historical record; see the verification block at the end for what actually landed.
 
 - **Invariant violated:** 1 (round-trip), 2 (edit locality), 7 (recoverability). Fires on every swipe-delete or "This occurrence" delete of a recurring occurrence that carries per-occurrence data, and on every override at or after the cut when "This and following" is used.
 - **Category:** `round-trip` `recoverability` `edit-locality`
@@ -541,6 +540,14 @@ it('excluding an occurrence keeps the unknown keys it carried', () => {
   Note `src/model/__tests__/__snapshots__/edits.test.ts.snap` bakes this shape in at four places (e.g. `- date: 2026-04-20 / time: 09:00 / excluded: true`) — but every fixture there excludes a *generated* occurrence with nothing to lose, so the snapshot is defending a case that has never carried data. That is exactly the "snapshot asserts stability, not correctness" trap the brief flagged.
 - **Problem:** deleting one occurrence of a series erases the notes, links and overrides the user attached to that occurrence, with a 4-second undo window and no recoverable artifact after it.
 - **Fix:** emit the excluded child's diffed metadata alongside `excluded: true` in `serializeChildren`; afterwards the test above passes and the hand-authored `cancelReason`/`owner` case round-trips. **Root fix:** land it under Root A step 2, with the totality assertion in place, so the fix is verified against the invariant rather than against one repro.
+
+**Verification — landed as described, no surprises.**
+
+- `serializeChildren` now builds `{ date, time?, excluded?, ...diffedMetadata }` unconditionally instead of early-returning `{ date, time?, excluded: true }` for an excluded child — the exact change the point-fix predicted, including the diffed-against-series-metadata caveat (no wholesale dump).
+- **The ratchet caught the fix, as designed.** `round-trip-totality.test.ts`'s `excluding a recurring occurrence keeps the metadata it carried` moved from `it.fails` to `it` and now passes; before landing the real change, patching the stub *without* diffing (returning the raw metadata unconditionally) was tried first and correctly flipped the ratchet to `Error: Expect test to fail` rather than green — confirming the assertion pins the specific behaviour, not just "some change happened."
+- **Two regression tests added, not one.** The report's repro above now lives in `src/model/__tests__/edits.test.ts` as `excludeOccurrence keeps an unknown key the occurrence carried, on a fresh exclusion stub` (verbatim: creates the exclusion stub from a generated slot, asserts `minutesUrl` and `done: true` both survive). A second case, `excludeOccurrence preserves an override's unknown key on the store item, AND on save`, extends a pre-existing test (`unknown-keys-series` fixture) that had only checked the *store item* kept its unknown key — not that a save actually emitted it. That test's own comment used to say collapse "deliberately does not emit metadata on excluded instances (documented non-goal)" — which was simply wrong; `AGENTS.md`'s own "Deliberate non-goals" list correctly filed it as a **still-open loss**, not a non-goal, and has been corrected to say it's closed.
+- **Every pre-existing exclude test was traced by hand before the fix landed**, to confirm none would regress: all target occurrences with metadata identical to their series (a freshly-excluded generated slot, or an override created with no divergent fields), so `diffMetadata` against the series always produces `{}` for them and their snapshots are byte-for-byte unchanged. Confirmed by running the suite: **76 files, 928 passed + 2 expected-fail** (down from 3 — #3's case closed; #5 and #8's narrow slice remain open), zero snapshot diffs. `pnpm run build` and `pnpm run lint` both pass with no new errors or warnings.
+- **What #3 does *not* fix:** an excluded child's metadata was already correct on the *store item* before this change (`upsertOverride` never touched it) — the bug was purely in what `serializeChildren` chose to emit. So this closes the round-trip leak without touching `expandNode`'s exclusion logic (`eff.excluded` still suppresses the occurrence before its metadata is ever read) or any other Root-A leak. #2, #5 and #8 are unaffected and remain open, tracked by the two remaining `it.fails` cases in `round-trip-totality.test.ts`.
 
 ---
 

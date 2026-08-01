@@ -192,10 +192,14 @@ the new typed field forever.
 **Deliberate non-goals.** These are normalised away and are *not* bugs: comments,
 key order, quoting style, blank lines, CRLF; a key's position when collapse
 relocates it between the root and `defaults:`. Still-open losses, out of scope
-here: metadata on excluded instances (`serializeChildren` emits only
-`date`/`time`/`excluded`), fields on nested container nodes (no `StoreItem` to
-hang a remainder on), markdown-body leading/trailing whitespace (`fileIO.ts`
-trims), and absent-vs-empty for required arrays.
+here: fields on nested container nodes (no `StoreItem` to hang a remainder on),
+markdown-body leading/trailing whitespace (`fileIO.ts` trims), and
+absent-vs-empty for required arrays. (Metadata on an excluded instance used to
+be in this list — `serializeChildren` now diffs an excluded child against the
+series metadata like any other override, so exclusion only suppresses the
+occurrence, it no longer erases what was written on it. See
+`__tests__/round-trip-totality.test.ts` and `__tests__/edits.test.ts`'s
+`excludeOccurrence` cases.)
 
 **On the edit side, an edit never mints unknown keys** — they originate only at
 parse time and flow through. Every bag reaching `storeOps.ts` is therefore
