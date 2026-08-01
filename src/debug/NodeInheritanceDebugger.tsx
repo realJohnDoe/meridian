@@ -34,7 +34,7 @@ const DEBUG_FILE_SLUG = 'debug-node'
 function itemsToYaml(items: StoreItem[], root: FileMetadata | undefined, body: string): string {
   if (items.length === 0) return ''
   const frontmatter = collapseToYaml(items, root)
-  return saveFile(frontmatter, body)
+  return saveFile(frontmatter, body, root?.fileConvention)
 }
 
 // ── Tree display helpers ──────────────────────────────────────────────────────

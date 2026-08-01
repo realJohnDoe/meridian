@@ -1,5 +1,7 @@
 // ── MERIDIAN DOMAIN TYPES ────────────────────────────────────────────────────
 
+import type { FileConvention } from '@/fileIO'
+
 export type Priority = 'high' | 'medium' | 'low'
 
 export type Weekday = 'mo' | 'tu' | 'we' | 'th' | 'fr' | 'sa' | 'su'
@@ -32,6 +34,17 @@ export interface FileMetadata {
    * is not itself an item — see `nodeIsItem` in model/storeItems.ts.
    */
   extra?: Record<string, unknown>
+  /**
+   * The source file's line-ending / trailing-newline convention, captured at
+   * parse time so a save doesn't rewrite every `\r` just because one field
+   * changed (data-integrity survey, finding #8). `undefined` for a
+   * freshly-created entry with no source file yet — `saveFile` then falls
+   * back to `DEFAULT_FILE_CONVENTION`. Never user-editable, so it is carried
+   * forward across edits the same way `extra` is — see `updateRoot` in
+   * `storeOps.ts`; forgetting to would silently revert the file to LF the
+   * moment the user makes their first edit through the app.
+   */
+  fileConvention?: FileConvention
 }
 
 /**

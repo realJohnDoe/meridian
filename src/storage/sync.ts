@@ -649,7 +649,7 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     }
     const frontmatter = collapseToYaml(slugItems, root)
     const body        = root?.body ?? ''
-    const content     = saveFile(frontmatter, body)
+    const content     = saveFile(frontmatter, body, root?.fileConvention)
     await recordLocalEdit(backend.id, path, content)
     updateSyncUI()
     scheduleAutoPush()

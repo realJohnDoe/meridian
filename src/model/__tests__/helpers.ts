@@ -39,7 +39,7 @@ export function parseFixture(name: string): ParseResult {
 export function serialize(items: StoreItem[], root?: FileMetadata): string {
   const frontmatter = collapseToYaml(items, root)
   const body = root?.body ?? ''
-  return saveFile(frontmatter, body)
+  return saveFile(frontmatter, body, root?.fileConvention)
 }
 
 /**

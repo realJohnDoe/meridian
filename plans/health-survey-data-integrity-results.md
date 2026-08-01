@@ -3,6 +3,17 @@
 Survey run: 2026-07-31, branch `claude/data-integrity-durability-survey-57d9f7`, worktree `octokit-lazy-bundle-9ac43c`.
 Brief: [health-survey-data-integrity.md](health-survey-data-integrity.md).
 
+> **Status update, same session:** 7 of the 8 findings below are now fixed —
+> #1, #2b, #3, #4, #5 (both sub-cases), #8, and Root C in full. Only **#2a**
+> (clearing a field on a single occurrence, still silently reverting on
+> reload) remains open. §1's verdict below and each finding's own body are
+> kept as the **original, unedited assessment** — the historical record of
+> what the audit found — with a **Verification** block appended to each fixed
+> finding recording what actually landed, what was checked before landing it,
+> and any place the original Fix/Root guidance turned out to be wrong. Look
+> for **FIXED** / ~~strikethrough~~ markers in §2's roots table and §4's
+> summary table for the current state at a glance.
+
 ---
 
 ## 1. Integrity verdict
@@ -21,7 +32,7 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 
 | Root | Property | Findings | Root fix | Tier |
 |---|---|---|---|---|
-| **A** | The file is a projection of the store, and nothing requires the projection to be **total** | #2a, ~~#2b~~, ~~#3~~, ~~#5~~ (fixed), #8 | Define and enforce totality; close the remaining two leaks (#2a, #8) | Opus 5, plan mode / multi-PR |
+| **A** | The file is a projection of the store, and nothing requires the projection to be **total** | ~~#2b~~, ~~#3~~, ~~#5~~, ~~#8~~ (fixed), #2a (open) | Define and enforce totality; close the one remaining leak (#2a) | Opus 5, plan mode / multi-PR |
 | **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** (done — `round-trip-totality.test.ts`) and **B-runtime** (still open) — see below. ~162 ms/300 files | Sonnet 5 |
 | **C** | The one cache transition allowed to destroy local content has an unenforced precondition | ~~#1, #4~~ (**fixed**) | Decision table landed; the cache-API type change is still open — see Root C | Sonnet 5 → Opus 5 |
 | **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
@@ -214,7 +225,7 @@ Vaults used: the 16-file shipped Tutorial vault (`exampleBackend.ts`), the 18 `s
 |---|---|
 | `pnpm run build` | **PASS** (exit 0) |
 | `pnpm run lint` | **PASS** — 0 errors, 14 pre-existing warnings (all `react-hooks/incompatible-library` on TanStack Virtual/Router) |
-| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; **940 passed + 1 expected-fail after #5** — see §2 and findings #1–#5 |
+| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; 940+1 after #5; **943 passed, 0 expected-fail after #8** — every ratchet case this survey opened is now closed except #2a. See §2 and findings #1–#5, #8 |
 | `pnpm run test:coverage` | **PASS** — all thresholds met. Totals 61.69% stmts / 58.19% branch / 64.02% lines |
 
 Coverage pointers worth acting on (pointers, not findings):
@@ -269,7 +280,7 @@ Categories are the brief's taxonomy; the **Root** column maps them onto §2's, w
 | 5 | ~~Frontmatter on a node with no `StoreItem` home is deleted~~ — **FIXED** | **A** | 1 | **silent** | 6 | hand-authored multi-event files | Sonnet 5 (with the ownership rule stated) |
 | 6 | Biweekly `byweekday` series expand differently per device locale | **D** | 8, 2 | **silent** | 6 | `freq: weekly` + `interval ≥ 2` + `byweekday` | Opus 5 |
 | 7 | Swipe-delete Undo doesn't restore the wikilinks it removed | **E** | 7, 2 | **silent** | 5 | 1 of 2 delete paths | Sonnet 5 |
-| 8 | Body whitespace and CRLF rewritten on every save | **A** | 1 | **silent** | 3 | **every file, every save** | Haiku 4.5 |
+| 8 | ~~Body whitespace and CRLF rewritten on every save~~ — **FIXED** | **A** | 1 | **silent** | 3 | **every file, every save** | Haiku 4.5 |
 
 Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreakers (silent > loud, unrecoverable > recoverable) applied. #1 leads on unrecoverability; #8 ranks high on the raw formula (breadth = all files, effort = 1) and is listed last only because its impact is genuinely small — re-sort freely.
 
@@ -282,15 +293,17 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 1. **B-test — done.** `src/model/__tests__/round-trip-totality.test.ts`. See Root B for what it covers, what it deliberately doesn't (#2), and the verification that the ratchet actually flips.
 2. **#3 — done.** One line in `serializeChildren` plus two regression tests (`edits.test.ts`) and the B-test ratchet flip (`round-trip-totality.test.ts`). See finding #3's verification note for what was checked before landing it: every pre-existing exclude test traced by hand and confirmed not to regress, and the ratchet confirmed to require the real fix rather than any change.
 3. **Root C — done (#1 and #4 together).** `resolveCollision` is now a decision table. Landed as one PR because the two are independent defects in the same 48-line function — neither fix implies the other, but the end state is one structure and the intermediate state is incoherent. The cache-API precondition (making #1 unrepresentable rather than merely fixed) is still open; see Root C's verification block.
-4. **#5 — done.** Both sub-cases (file-level key on a non-root node; container's own remainder) fixed together in `inheritance.ts` + `storeItems.ts` — the parse side, not `collapse.ts`/`types.ts` as originally guessed; collapse needed no changes at all, since `emitExtra`/`hoistSharedMetadata` were already generic enough. **#8 still open** — needs a **byte** compare and a CRLF fixture, which neither semantic check catches.
-5. **#2b — done** (edit semantics: scope `all`/`future` reach override children; `storeOps.ts`, independent of the emit predicates so it did not need to wait for #5). **#2a still open** — it changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and should follow #5 to avoid conflicting with it.
-6. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half by hand.
-7. **Root D** — #6, gated on the migration decision and on rewriting `weekStart.test.ts`.
-8. **B-runtime** — wire the two checks into `writeEntityToCache` and the load path, and flip them from logging-only to `warn()` (or to refusing the write, per Root B's third constraint). By this point they are quiet on a correct vault, so enabling them is a ratchet rather than an alarm.
+4. **#2b — done** (edit semantics: scope `all`/`future` reach override children; `storeOps.ts`, independent of the emit predicates so it did not need to wait for #5).
+5. **#5 — done.** Both sub-cases (file-level key on a non-root node; container's own remainder) fixed together in `inheritance.ts` + `storeItems.ts` — the parse side, not `collapse.ts`/`types.ts` as originally guessed; collapse needed no changes at all, since `emitExtra`/`hoistSharedMetadata` were already generic enough.
+6. **#8 — done.** `fileIO.ts` (detection + reassembly) + a carry-forward line in `storeOps.ts`'s `updateRoot` (the trap: `FileConvention` is never user-editable, so an edit that forgets to carry it forward silently reverts the file to LF on its first save through the app). Turned out to guarantee full byte-identity, not just "no mixed line endings" as originally scoped.
+7. **#2a still open** — the last leak in Root A. It changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and needed #5 landed first to avoid conflicting with it — that precondition is now satisfied.
+8. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half by hand.
+9. **Root D** — #6, gated on the migration decision and on rewriting `weekStart.test.ts`.
+10. **B-runtime** — wire the two checks into `writeEntityToCache` and the load path, and flip them from logging-only to `warn()` (or to refusing the write, per Root B's third constraint). By this point they are quiet on a correct vault, so enabling them is a ratchet rather than an alarm.
 
 **Steps 2 and 3's severity-vs-frequency tradeoff is now moot — #3 landed first regardless, and it was cheap enough (one line, two tests) that it barely delayed Root C either way.** For the record, the reasoning that would have applied to a costlier #3: severity-first says C before #3, since #1 is total, silent, unrecoverable loss of an edit (impact 9); frequency-first says the reverse, since #1 needs a conflict *and* a network failure inside a ~1-second window (rare-but-catastrophic) while #3 fired on every delete of a recurring occurrence carrying data (single device, no conflict required). Keep that framework for any future case where step ordering is genuinely expensive to get wrong.
 
-**Patch-first**, if you want the bleeding stopped before any restructuring: **#1 → ~~#3~~ (done) → ~~#5~~ (done) → #7**, which is the same file ordering with the roots left in place. Note that #2 has no safe point fix — every version of it is a change to the emit predicates, which is why it carries a plan-mode tier in the table above.
+**Patch-first**, if you want the bleeding stopped before any restructuring: **#1 → ~~#3~~ (done) → ~~#5~~ (done) → ~~#8~~ (done) → #7**, which is the same file ordering with the roots left in place. Note that #2a has no safe point fix — every version of it is a change to the emit predicates, which is why it carries a plan-mode tier in the table above.
 
 ---
 
@@ -887,7 +900,7 @@ it('Undo restores the wikilink the delete removed from another file', () => {
 
 ---
 
-### #8 — Body whitespace and CRLF rewritten on every save
+### #8 — Body whitespace and CRLF rewritten on every save — **FIXED**
 
 - **Invariant violated:** 1 (round-trip fidelity). Every save of every file; the CRLF half hits every vault authored on Windows or synced through a tool that normalises to CRLF.
 - **Category:** `round-trip`
@@ -922,6 +935,18 @@ export function wrapFrontmatter(yamlFields: string, body: string): string {
 ```
 - **Problem:** every save rewrites bytes the user did not change — indentation on the first body line, the trailing newline, and every `\r` in the frontmatter — turning a one-field edit into a whole-file diff on Windows-authored vaults.
 - **Fix:** carry the source line ending and trailing-newline convention through `loadFile` → `FileMetadata` → `wrapFrontmatter`, and trim only the blank lines around the frontmatter fence rather than the whole body; afterwards all three repro inputs round-trip byte-identically when nothing changed. **Root fix:** add a byte-level arm to Root B's load-time check and a CRLF fixture, so this cannot regress — the two semantic checks will not catch it. B-test already pins the narrowest slice of this (no mixed line endings within one file, `round-trip-totality.test.ts`); flip that case as part of this PR, and extend it once the fuller line-ending/trailing-newline fix is decided.
+
+**Verification — repros (a) and (b) FIXED, exceeding the original acceptance bar; repro (c) explicitly left as-is.**
+
+- **The fix outperformed its own spec.** The point fix asked for "round-trip byte-identically when nothing changed"; the ratchet test now asserts exactly that (`expect(saved).toBe(source)`, not a semantic comparison) for both the CRLF repro and the indented-body repro, and both pass. `wrapFrontmatter` never touches the body's own bytes — the body was never actually the problem, only the STRUCTURAL glue (frontmatter fence, the blank-line separator, the trailing newline) that Meridian itself generates and used to hardcode LF for regardless of source. That structural glue now carries a detected `FileConvention` (`{ crlf, trailingNewline }`), captured once at parse (`loadFile`) and threaded through `saveFile`/`wrapFrontmatter`.
+- **The load-bearing trap the report warned about (an "interacting call site that's easy to miss") was real and specifically about persistence, not detection.** `FileConvention` is never user-editable, so it cannot flow through `EditFields` the way `title`/`tags` do — it has to be carried forward from the previous `FileMetadata` on every edit, the same way `extra` already is. `storeOps.ts`'s `updateRoot` rebuilds `FileMetadata` from scratch on every scope; missing this one line would have silently reverted every file to LF the moment a user made their first edit through the app, passing every test that only exercises an *unedited* round trip (which is most of the existing suite) while failing on the one workflow that actually matters. Added `prev?.fileConvention` alongside the existing `prevExtra` carry-forward, with a comment naming the trap explicitly.
+- **Root fix done differently than scoped, and it turned out cheaper.** The plan called for "a byte-level arm to Root B's load-time check." In practice the *existing* ratchet infrastructure already had everywhere it needed — `assertCollapseTotality`/`assertSourceFidelity` didn't need a third check; the byte-identity assertion is `expect(saved).toBe(source)`, no new machinery. The narrower "never mix line endings" invariant B-test originally pinned is kept as a second assertion in the same test, now for documentation rather than necessity — the byte-identity check already implies it.
+- **Breadth exceeded what the three report repros implied.** Spot-checking mid-implementation: `weekly-series.md`, a real fixture used across ~10 existing `edits.test.ts` snapshots, ends in a trailing newline on disk (confirmed via `xxd`) — the *old* code was silently dropping that real newline on every single serialize of every fixture in the suite, not just on the report's three constructed repros. Those 10 pre-existing snapshots had baked in "no trailing newline" as correct output for over a year of the file's life; none of them are CRLF or indentation edge cases, they're everyday recurring-series edits. Updated via `-u` after confirming each diff was exactly "gains one trailing `\n`, nothing else changed" (`git diff` reviewed in full, not spot-checked).
+- **Repro (c) (a plain `.md` gaining a synthetic `title: ""` frontmatter block) is deliberately untouched**, consistent with how the report itself scoped the Fix and Expected lines — neither mentions suppressing the frontmatter block, only the line-ending/whitespace mechanics. Meridian still adds frontmatter to a bare markdown file the first time it's parsed into a `StoreItem` (a leaf item always gets a `FileMetadata` with a required, always-emitted `title`); that is a distinct, larger product question ("should Meridian ever touch a plain note it didn't create if no Meridian field is set on it?") outside a mechanical whitespace fix. What *does* survive now, even for this case: the body's own bytes round-trip exactly, and the trailing-newline convention is respected — the file just also gains a frontmatter block, as before.
+- **`AGENTS.md` corrected in the same pass**, not left stale: its "Deliberate non-goals" list had CRLF filed as "normalised away, not a bug," and separately listed "fields on nested container nodes" and "markdown-body leading/trailing whitespace" as still-open losses — both fixed in this session (#5b and #8 respectively). All three moved to a "no longer in this list" note with the mechanism that closed each, so the doc doesn't silently re-become the thing the survey flagged it for.
+- **Red-then-green confirmed**, not assumed: reverting `fileIO.ts`, `types.ts`, `storeItems.ts`, `inheritance.ts`, `storeOps.ts`, `storage/sync.ts`, and `debug/NodeInheritanceDebugger.tsx` to pre-fix state (tests, snapshot, and the test-helper's convention-threading kept) fails exactly 13 tests — the 10 fixture snapshots reverting to their old missing-trailing-newline shape, plus all 3 new byte-identity/fallback tests. Nothing else moves. Restored and re-verified.
+
+Full suite **76 files / 943 passed, 0 expected-fail** — every `it.fails` case opened by this survey is now closed except #2a — lint 0 errors, build exit 0.
 
 ---
 

@@ -227,11 +227,11 @@ export interface ParseResult {
  * Replaces `rawToNode` + `nodesToStoreItems`.
  */
 export function parseToStoreItems(path: string, content: string): ParseResult {
-  const { rawNode, body } = loadFile(path, content)
+  const { rawNode, body, convention } = loadFile(path, content)
   const fileSlug = pathToSlug(path)
   const tree = buildEffectiveTree(rawNode)
   const items = effectiveNodeToStoreItems(tree, fileSlug)
-  return { items, root: buildRoot(rawNode, body, nodeIsItem(tree)) }
+  return { items, root: { ...buildRoot(rawNode, body, nodeIsItem(tree)), fileConvention: convention } }
 }
 
 /**

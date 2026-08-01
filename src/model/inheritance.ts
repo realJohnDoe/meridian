@@ -9,6 +9,7 @@
 
 import { stringify } from 'yaml'
 import { wrapFrontmatter } from '@/fileIO'
+import type { FileConvention } from '@/fileIO'
 import type { RawNode } from './nodeSchema'
 
 // ── Output type ───────────────────────────────────────────────────────────────
@@ -221,6 +222,6 @@ function serializeRawNode(node: RawNode): string {
 }
 
 /** Serialise a raw node + body into a full file string (frontmatter + body). */
-export function saveFile(rawNode: Record<string, unknown>, body: string): string {
-  return wrapFrontmatter(serializeRawNode(rawNode), body)
+export function saveFile(rawNode: Record<string, unknown>, body: string, convention?: FileConvention): string {
+  return wrapFrontmatter(serializeRawNode(rawNode), body, convention)
 }
