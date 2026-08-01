@@ -484,7 +484,11 @@ describe('TimeWheels — handing the wheel back to the user mid-roll', () => {
   it('takes the wheel back once the roll lands on its row', () => {
     const { emitted, hour } = renderLive('09:30')
     setScrollTop(hour, (H.home + 9) * ITEM_H)
-    hour.scrollTo = o => { hour.scrollTop = o!.top as number }   // a roll that lands
+    // A roll that lands: jsdom runs no scroll animation, so apply it at once.
+    // `scrollTo` is overloaded (options, or x and y), hence the union.
+    hour.scrollTo = (o?: number | ScrollToOptions) => {
+      hour.scrollTop = typeof o === 'object' ? o.top ?? 0 : 0
+    }
 
     fireEvent.click(within(hour).getByRole('option', { name: '14' }))
     fireEvent.scroll(hour)                        // arrives on target, guard lifts
