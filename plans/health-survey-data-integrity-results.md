@@ -3,10 +3,18 @@
 Survey run: 2026-07-31, branch `claude/data-integrity-durability-survey-57d9f7`, worktree `octokit-lazy-bundle-9ac43c`.
 Brief: [health-survey-data-integrity.md](health-survey-data-integrity.md).
 
-> **Status update, same session:** 7 of the 8 findings below are now fixed —
-> #1, #2b, #3, #4, #5 (both sub-cases), #8, and Root C in full. Only **#2a**
-> (clearing a field on a single occurrence, still silently reverting on
-> reload) remains open. §1's verdict below and each finding's own body are
+> **Status update, same session: 6 of the 8 findings are fixed** — #1, #2
+> (both sub-cases), #3, #4, #5 (both sub-cases) and #8. That closes **Root A**
+> and **Root C** entirely, and every `it.fails` ratchet this survey opened.
+>
+> **Still open:** **#6** (locale-dependent biweekly expansion, Root D) —
+> gated on a migration decision, since any fix re-dates every existing
+> biweekly series in every vault, and on rewriting `weekStart.test.ts`, which
+> currently pins both behaviours as correct. **#7** (swipe-delete undo not
+> restoring backlinks, Root E) — unstarted. **B-runtime** (wiring the
+> read-back checks into production) — sequenced last by design, and now
+> unblocked, since the leaks that would have made it a permanent alarm are
+> closed. §1's verdict below and each finding's own body are
 > kept as the **original, unedited assessment** — the historical record of
 > what the audit found — with a **Verification** block appended to each fixed
 > finding recording what actually landed, what was checked before landing it,
@@ -32,7 +40,7 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 
 | Root | Property | Findings | Root fix | Tier |
 |---|---|---|---|---|
-| **A** | The file is a projection of the store, and nothing requires the projection to be **total** | ~~#2b~~, ~~#3~~, ~~#5~~, ~~#8~~ (fixed), #2a (open) | Define and enforce totality; close the one remaining leak (#2a) | Opus 5, plan mode / multi-PR |
+| **A** | The file is a projection of the store, and nothing requires the projection to be **total** | ~~#2a~~, ~~#2b~~, ~~#3~~, ~~#5~~, ~~#8~~ — **all fixed** | Totality enforced by one relational emit rule in `collapse.ts` + the parse-side remainder homes; no provenance restructure needed | Opus 5, plan mode / multi-PR |
 | **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** (done — `round-trip-totality.test.ts`) and **B-runtime** (still open) — see below. ~162 ms/300 files | Sonnet 5 |
 | **C** | The one cache transition allowed to destroy local content has an unenforced precondition | ~~#1, #4~~ (**fixed**) | Decision table landed; the cache-API type change is still open — see Root C | Sonnet 5 → Opus 5 |
 | **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
@@ -66,7 +74,7 @@ Four leaks, one missing invariant. The `extra` bag is the project's own patch fo
 - **#2a (clear one occurrence)** is an *expressibility* problem. Making "cleared" emittable — an explicit `participants: []` / `done: null` on the diverging instance, read back as cleared by `parseInlineField` — fixes it without touching the parse pipeline.
 - **#2b (clear the whole series, one override keeps the old value)** is a *provenance* problem. `buildEffectiveTree` merges `defaults:` into children and, per `EffectiveNode`'s own doc, `Fields carry plain values — no origin tracking.` So an override that merely *inherited* `participants: [alice, bob]` is indistinguishable from one that stated it, and collapse's diff correctly reports a divergence that the user never authored. Expressibility does not fix this. It needs either per-field provenance (explicit vs inherited) carried through the store, or a product decision that scope `all` rewrites overrides' inherited fields. **Resolved by the latter — see #2b's verification block: scope `all` (and `future`) now push the editor's metadata onto override children, matching how calendar apps treat the same choice. No provenance needed, so `EffectiveNode` stays field-agnostic.**
 
-**Root fix, in order:** (1) write the totality invariant down, in `AGENTS.md` and as a test that asserts source→saved containment for a fixture set that includes CRLF, container nodes, and excluded instances with metadata — **done**, `round-trip-totality.test.ts`; (2) close #3 (**done**) and #5 (**done** — both were mechanical once the invariant was stated, exactly as predicted); (3) make "cleared" expressible, fixing #2a — still open; (4) decide #2b — **done**, resolved as edit semantics rather than provenance. **Resist starting at (4)** was the original advice — in the event (4) turned out to be the cheaper half, because the edit-semantics answer avoids the restructure entirely. Retaining provenance means changing what `EffectiveNode` is, and that is the layer `AGENTS.md` correctly insists stays field-agnostic; steps 1–3 recover most of the loss without going there.
+**Root fix, in order:** (1) write the totality invariant down, in `AGENTS.md` and as a test that asserts source→saved containment for a fixture set that includes CRLF, container nodes, and excluded instances with metadata — **done**, `round-trip-totality.test.ts`; (2) close #3 (**done**) and #5 (**done** — both were mechanical once the invariant was stated, exactly as predicted); (3) make "cleared" expressible, fixing #2a — **done**, and it turned out to be a refactor that removed two helpers rather than an added special case; (4) decide #2b — **done**, resolved as edit semantics rather than provenance. **Resist starting at (4)** was the original advice — in the event (4) turned out to be the cheaper half, because the edit-semantics answer avoids the restructure entirely. Retaining provenance means changing what `EffectiveNode` is, and that is the layer `AGENTS.md` correctly insists stays field-agnostic; steps 1–3 recover most of the loss without going there.
 
 **What a bandage looks like here:** special-casing `excluded` in `serializeChildren`, or adding `title` to a second allow-list. Both close one leak and leave the invariant unowned.
 
@@ -225,7 +233,7 @@ Vaults used: the 16-file shipped Tutorial vault (`exampleBackend.ts`), the 18 `s
 |---|---|
 | `pnpm run build` | **PASS** (exit 0) |
 | `pnpm run lint` | **PASS** — 0 errors, 14 pre-existing warnings (all `react-hooks/incompatible-library` on TanStack Virtual/Router) |
-| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; 940+1 after #5; **943 passed, 0 expected-fail after #8** — every ratchet case this survey opened is now closed except #2a. See §2 and findings #1–#5, #8 |
+| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; 940+1 after #5; 943+0 after #8; **947 passed, 0 expected-fail after #2a**. Every ratchet case this survey opened is now closed. See §2 and findings #1–#5, #8 |
 | `pnpm run test:coverage` | **PASS** — all thresholds met. Totals 61.69% stmts / 58.19% branch / 64.02% lines |
 
 Coverage pointers worth acting on (pointers, not findings):
@@ -274,7 +282,7 @@ Categories are the brief's taxonomy; the **Root** column maps them onto §2's, w
 | # | Finding | Root | Invariant | Failure | Impact | Breadth | Model (point fix) |
 |---|---|---|---|---|---|---|---|
 | 1 | ~~`resolveCollision` reverts the cache before the copy is safe~~ — **FIXED** | **C** | 4, 6, 7 | **silent** | 9 | 1 fn, all backends, every conflicting write | Sonnet 5 (with the ordering constraint stated) |
-| 2 | Clearing an inherited field silently reverts on reload — **#2b fixed, #2a open** | **A** | 1, 2, 3 | **silent** | 7 | every file with a `defaults:` block | Opus 5, plan mode / multi-PR |
+| 2 | ~~Clearing an inherited field silently reverts on reload~~ — **FIXED** (#2a + #2b) | **A** | 1, 2, 3 | **silent** | 7 | every file with a `defaults:` block | Opus 5, plan mode / multi-PR |
 | 3 | ~~Excluding an occurrence discards everything on it~~ — **FIXED** | **A** | 1, 2, 7 | **silent** | 7 | 1 line, 3 prod callers, every recurring entry | Sonnet 5 |
 | 4 | ~~Remote-deleted + local edit ⇒ one conflict copy per sync tick, forever~~ — **FIXED** | **C** | 4, 5 | **loud, unbounded** | 6 | 1 fn, all backends | Sonnet 5 |
 | 5 | ~~Frontmatter on a node with no `StoreItem` home is deleted~~ — **FIXED** | **A** | 1 | **silent** | 6 | hand-authored multi-event files | Sonnet 5 (with the ownership rule stated) |
@@ -294,16 +302,16 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 2. **#3 — done.** One line in `serializeChildren` plus two regression tests (`edits.test.ts`) and the B-test ratchet flip (`round-trip-totality.test.ts`). See finding #3's verification note for what was checked before landing it: every pre-existing exclude test traced by hand and confirmed not to regress, and the ratchet confirmed to require the real fix rather than any change.
 3. **Root C — done (#1 and #4 together).** `resolveCollision` is now a decision table. Landed as one PR because the two are independent defects in the same 48-line function — neither fix implies the other, but the end state is one structure and the intermediate state is incoherent. The cache-API precondition (making #1 unrepresentable rather than merely fixed) is still open; see Root C's verification block.
 4. **#2b — done** (edit semantics: scope `all`/`future` reach override children; `storeOps.ts`, independent of the emit predicates so it did not need to wait for #5).
-5. **#5 — done.** Both sub-cases (file-level key on a non-root node; container's own remainder) fixed together in `inheritance.ts` + `storeItems.ts` — the parse side, not `collapse.ts`/`types.ts` as originally guessed; collapse needed no changes at all, since `emitExtra`/`hoistSharedMetadata` were already generic enough.
+5. **#5 — done.** Both sub-cases (file-level key on a non-root node; container's own remainder) fixed together in `inheritance.ts` + `storeItems.ts` — the parse side, not `collapse.ts`/`types.ts` as originally guessed; collapse needed no changes at all, since its unknown-key hoisting was already generic enough. (`hoistSharedMetadata` has since been deleted by #2a's refactor — the hoisting itself survives as `computeSharedFields`.)
 6. **#8 — done.** `fileIO.ts` (detection + reassembly) + a carry-forward line in `storeOps.ts`'s `updateRoot` (the trap: `FileConvention` is never user-editable, so an edit that forgets to carry it forward silently reverts the file to LF on its first save through the app). Turned out to guarantee full byte-identity, not just "no mixed line endings" as originally scoped.
-7. **#2a still open** — the last leak in Root A. It changes the emit predicates (`inlineFieldEmpty`, `diffMetadata`) and needed #5 landed first to avoid conflicting with it — that precondition is now satisfied.
+7. **#2a — done.** The last leak in Root A. Replaced the unary emit predicate with one relational rule ("omit only when omitting round-trips"), which deleted `diffMetadata` and `hoistSharedMetadata`'s diff half rather than adding a mode flag. Also required a parse-side rule for `done: null` (finding #2a-ii, decided as Option A) which closed a latent third-state bug on the way.
 8. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half by hand.
 9. **Root D** — #6, gated on the migration decision and on rewriting `weekStart.test.ts`.
 10. **B-runtime** — wire the two checks into `writeEntityToCache` and the load path, and flip them from logging-only to `warn()` (or to refusing the write, per Root B's third constraint). By this point they are quiet on a correct vault, so enabling them is a ratchet rather than an alarm.
 
 **Steps 2 and 3's severity-vs-frequency tradeoff is now moot — #3 landed first regardless, and it was cheap enough (one line, two tests) that it barely delayed Root C either way.** For the record, the reasoning that would have applied to a costlier #3: severity-first says C before #3, since #1 is total, silent, unrecoverable loss of an edit (impact 9); frequency-first says the reverse, since #1 needs a conflict *and* a network failure inside a ~1-second window (rare-but-catastrophic) while #3 fired on every delete of a recurring occurrence carrying data (single device, no conflict required). Keep that framework for any future case where step ordering is genuinely expensive to get wrong.
 
-**Patch-first**, if you want the bleeding stopped before any restructuring: **#1 → ~~#3~~ (done) → ~~#5~~ (done) → ~~#8~~ (done) → #7**, which is the same file ordering with the roots left in place. Note that #2a has no safe point fix — every version of it is a change to the emit predicates, which is why it carries a plan-mode tier in the table above.
+**Patch-first** is now moot for everything except **#7** — the roots it would have deferred (A and C) are both closed. Recorded for the shape of the argument: it would have been **#1 → #3 → #5 → #8 → #7**, the same file ordering with the roots left in place. The note that "#2a has no safe point fix" proved right in a way that argued *for* the root fix rather than against it: every point-fix version was a change to the emit predicates, and the one that worked was the one that replaced them outright.
 
 ---
 
@@ -503,6 +511,26 @@ The claim above that #2b has "no point fix" was wrong, and worth recording as a 
 - **Red-then-green, and separately, guard tests.** With `storeOps.ts` reverted, **3 of the 5 new tests fail** (the snapshot, `all-scope reaches an occurrence the user had already overridden`, `future-scope reaches overridden occurrences in the range it splits off`). The other two — `does not un-complete an occurrence it reaches` and `leaves an override's own unknown key alone` — pass both before and after, because the old code never touched children at all. They are not regression tests; they guard against this fix **over-reaching**, which is its plausible failure mode.
 - **#2a is untouched and still open.** Clearing a field on a *single* occurrence still silently reverts. Worth noting for scoping: `participants: []` on an instance already parses correctly as a clear and overrides the inherited value (verified), so #2a is a collapse-emission fix only — the parse side needs no work.
 - Full suite **76 files / 937 passed + 2 expected-fail**, lint 0 errors, build exit 0.
+
+**Verification — #2a FIXED, as a refactor rather than a special case.**
+
+The scoping note above was half right and half wrong, and the correction is the interesting part. `participants` is indeed collapse-only. But **`done` is not**, and the two need different work:
+
+| | store representation of "cleared" | what was needed |
+|---|---|---|
+| `participants` (required array) | `[]`, genuinely distinct from `undefined` = not-set | collapse-emission only |
+| `done` (optional scalar) | `undefined` — **identical to not-set** | a YAML representation (`done: null`) *and* a parse rule |
+
+- **The first-draft fix was rejected as hacky, correctly.** The obvious patch — give `occMetaToYaml` an optional baseline and use it at 3 of its 7 call sites — leaves the unary predicate in place, bolts context onto it, and makes every future caller remember which of two modes it is in. That is the "second allow-list" smell, and it would have re-created the `RESERVED_KEYS` problem from #5 in a new place.
+- **The clean version came from noticing all seven sites are the same operation.** `occMetaToYaml(rootDefaults)` and `occMetaToYaml(s.metadata)` at a flat root aren't "absolute" emissions — they are relative emissions against an *empty* baseline, because a `defaults:` block and a flat single item both inherit from nothing. So there is one rule, not two modes: **omit a key only when omitting it would round-trip.** `absentFieldValue(spec)` supplies "what an absent key reads back as" ( `[]`/`''` for required, `undefined` otherwise), which is what makes an empty baseline behave correctly without a flag — `participants: []` at a root compares equal to omitting it and stays clean, while the same value on an override with a non-empty baseline is emitted.
+- **The refactor removed code rather than adding a parameter.** `diffMetadata` is gone (its job *was* the emit decision, done half-way and then re-filtered by `inlineFieldEmpty`, which is what dropped the cleared value); `hoistSharedMetadata` is gone (its `localDefaults` half was an index-parallel intermediate that now falls out of the rule); `emitExtra` absorbed the unknown-key half of the same diff. Net −1 concept, and the old `if (v === undefined) continue` in `diffMetadata` — the other half of the bug, which silently discarded an untracked override before it could be emitted — disappeared with it.
+- **`done: null` was a deliberate product call** (the alternative was declaring "untrack one occurrence of a task series" unsupported). It is not a new convention: this format already treats `null` as "explicitly nothing" for unknown keys — `unknown-keys.test.ts` has kept an explicit `reviewer: null` round-tripping since long before this survey. And given generated occurrences inherit from `defaults:` and have no YAML entry of their own, an exception *must* be written explicitly; there is no shape in which it can be expressed by omission.
+- **It also closed a latent bug nobody had reported.** `parseInlineField` returned `raw` verbatim for `boolean`/`priority`, so a hand-authored `done: null` survived as literal `null`, and `isTracked`'s `done !== undefined` then reported it as a **task** — a third state, neither done nor not-done, reachable by hand-editing today and entirely independent of the edit path. Now mapped to `undefined` at parse.
+- **Red-then-green, with one test corrected after it failed to fail.** Of four new tests, the first pass showed only two failing against pre-fix code. `single-scope clearing participants survives a save + reload` was **vacuous**: it used the `weekly-series` fixture, which has no `participants` field at all, so every occurrence already held the `[]` default and "clearing" it was a no-op that passed either way. Rebuilt inline with a genuinely inherited `participants: [alice, bob]`; it then failed correctly. The fourth (`a node that inherits nothing still omits an empty field`) passes both before and after by design — it guards against the fix **over-reaching** into vault-wide `participants: []` noise, and is labelled as a guard, not counted as a regression test.
+- **Zero snapshot changes across all 19 model test files** — the strongest available evidence the refactor is behaviour-preserving everywhere except the bug.
+- **Deliberately not touched:** `fileMetaToYaml` still uses `inlineFieldEmpty`. File-level fields have no inheritance chain (one root per file), so the relational rule would be equivalent — except for one case: it would stop emitting `title: ""` for a frontmatter-less note, which is finding #8's repro (c) and a separate product question about whether Meridian should write to such files at all. Left as-is with a comment saying so.
+
+Full suite **76 files / 947 passed, 0 expected-fail**, lint 0 errors, knip clean, build exit 0.
 
 ---
 

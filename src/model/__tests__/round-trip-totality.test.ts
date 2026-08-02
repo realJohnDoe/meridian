@@ -35,7 +35,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
-import { isSeries } from '@/types'
+import { isSeries, isTracked } from '@/types'
 import { collectKeyValues, frontmatterOf, normalizeIds, serialize } from './helpers'
 
 /** Check 1 — collapse totality. Store must survive its own serialization. */
@@ -192,6 +192,37 @@ describe('Root A totality — closed leaks (regression guards)', () => {
     const original = parseToStoreItems('indented.md', source)
     const saved = serialize(original.items, original.root)
     expect(saved).toBe(source)
+  })
+
+  // Finding #2a-ii, fixed — the parse half. `done: null` is how an occurrence
+  // says "I am not a task" against a series whose `defaults:` makes every
+  // occurrence one; an absent key would inherit `false` instead. It used to
+  // survive as literal `null`, and `isTracked`'s `done !== undefined` then
+  // reported it as a task — a third state that is neither done nor not-done,
+  // reachable by hand-authoring long before the edit path could emit it.
+  it('an explicit `done: null` reads back as untracked, not as a third state', () => {
+    const source = [
+      '---',
+      'title: Standup',
+      'date: 2026-04-06',
+      'repeat:',
+      '  type: schedule',
+      '  freq: weekly',
+      '  byweekday: [mo]',
+      'defaults:',
+      '  done: false',
+      'instances:',
+      '  - date: 2026-04-13',
+      '    done: null',
+      '---',
+    ].join('\n')
+    assertCollapseTotality('done-null', source)
+    assertSourceFidelity('done-null', source)
+
+    const { items } = parseToStoreItems('done-null.md', source)
+    const override = items.find(i => !isSeries(i) && i.date === '2026-04-13')!
+    expect(override.metadata.done).toBeUndefined()
+    expect(isTracked(override)).toBe(false)
   })
 
   // A brand-new entry has no source file to preserve a convention from — falls
