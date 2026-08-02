@@ -111,7 +111,7 @@ const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
   deleteFollowing: d => storeOps.deleteFollowing(d, occOn(d.items, d.roots, GENERATED)),
   // Removes its target file by design; the property still holds for every file
   // it does not touch, which is what this case pins down.
-  deleteByFileSlug: d => storeOps.deleteByFileSlug(d, 'some-other-file'),
+  deleteByFileSlug: d => storeOps.deleteByFileSlug(d, 'some-other-file').data,
 }
 
 /**

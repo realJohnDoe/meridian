@@ -665,19 +665,45 @@ export function excludeOccurrence({ items, roots }: StoreData, occ: Occurrence):
   return { items: items.filter(i => i.id !== occ.id), roots }
 }
 
-/** Remove all items and the root entry for a fileSlug, cleaning up backlinks from other files. */
-export function deleteByFileSlug({ items, roots }: StoreData, fileSlug: string): StoreData {
+/**
+ * Remove all items and the root entry for a fileSlug, cleaning up backlinks
+ * from other files.
+ *
+ * Returns `affectedSlugs` — the OTHER files whose `items:` list this edited —
+ * alongside `data`, rather than making every caller separately consult the
+ * store's backlink index to find the same set. Before this, two callers
+ * (`editor/save.ts`) did that lookup by hand and one (the swipe-delete path in
+ * `occurrenceActions.ts`) did not — which is finding #7: a swipe-deleted
+ * entry's backlink cleanup was applied to the in-memory store but never
+ * persisted, and Undo never restored it. Reporting the set here — computed
+ * from the exact same filter that performs the edit, not a second index that
+ * could in principle disagree — makes the correct call the only one available
+ * rather than the one every caller has to remember to make. (The now-unused
+ * imperative accessor for that index, `getBacklinks()`, has been removed from
+ * `storeBridge.ts`; the reactive `useStore(s => s.backlinks)` the UI panels
+ * use is untouched.)
+ */
+export function deleteByFileSlug(
+  { items, roots }: StoreData,
+  fileSlug: string,
+): { data: StoreData; affectedSlugs: string[] } {
   const nextRoots = new Map(roots)
+  const affectedSlugs: string[] = []
   for (const [slug, meta] of nextRoots) {
     if (slug === fileSlug) continue
     const filtered = (meta.items ?? []).filter(
       raw => resolveWikilink(unwrapRef(raw), roots) !== fileSlug,
     )
-    if (filtered.length !== (meta.items ?? []).length)
+    if (filtered.length !== (meta.items ?? []).length) {
       nextRoots.set(slug, { ...meta, items: filtered })
+      affectedSlugs.push(slug)
+    }
   }
   nextRoots.delete(fileSlug)
-  return { items: items.filter(i => i.fileSlug !== fileSlug), roots: nextRoots }
+  return {
+    data: { items: items.filter(i => i.fileSlug !== fileSlug), roots: nextRoots },
+    affectedSlugs,
+  }
 }
 
 /**
