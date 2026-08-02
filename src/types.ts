@@ -258,13 +258,42 @@ export function scalarToString(v: unknown): string | undefined {
 }
 
 /** Coerce a raw YAML value to the typed value for `spec`. */
-function parseInlineField(spec: InlineFieldSpec, raw: unknown): unknown {
+/**
+ * Only `kind` and `required` decide how a raw value is coerced, so this takes
+ * the two fields structurally rather than the whole spec — which lets
+ * `absentFieldValue` below be exported without exporting `InlineFieldSpec`.
+ */
+type FieldShape = { kind: InlineFieldKind; required?: boolean }
+
+function parseInlineField(spec: FieldShape, raw: unknown): unknown {
   switch (spec.kind) {
-    case 'boolean':     return raw
-    case 'priority':    return raw
+    // An explicit YAML `null` means "this node has no value here" — which is
+    // NOT the same as the key being absent, since an absent key inherits from
+    // `defaults:` while `null` deliberately overrides it with nothing. Mapping
+    // it to `undefined` is what makes an occurrence that stopped being a task
+    // read back as untracked rather than as a third, meaningless state
+    // (`done: null` used to survive as literal null, and `isTracked`'s
+    // `!== undefined` then called it a task). See the data-integrity survey,
+    // finding #2a-ii.
+    case 'boolean':     return raw === null ? undefined : raw
+    case 'priority':    return raw === null ? undefined : raw
+    // The two below already collapse null to the absent value: `Array.isArray`
+    // and `scalarToString` both reject it, so they need no null branch.
     case 'stringArray': return Array.isArray(raw) ? (raw as string[]) : (spec.required ? [] : undefined)
     case 'string':      return scalarToString(raw) ?? (spec.required ? '' : undefined)
   }
+}
+
+/**
+ * The value a field reads back as when its key is absent from the YAML —
+ * `[]`/`''` for a required field, `undefined` otherwise.
+ *
+ * This is half of the emit decision in `collapse.ts`: a key is only safe to
+ * omit when omitting it round-trips to the value the node actually holds, and
+ * for a node that inherits nothing, "what omitting gives you" is exactly this.
+ */
+export function absentFieldValue(spec: FieldShape): unknown {
+  return parseInlineField(spec, undefined)
 }
 
 /**

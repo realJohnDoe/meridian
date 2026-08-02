@@ -77,6 +77,81 @@ describe('edit operations → serialized YAML', () => {
     expect(serializeData(next)).toMatchSnapshot()
   })
 
+  // ── finding #2a: clearing an inherited field must survive a reload ─────────
+  //
+  // The store distinguishes "cleared" from "not set" for both fields below
+  // (`[]` vs `undefined`; `undefined` vs the inherited `false`). Collapse used
+  // to flatten that distinction on the way out — `inlineFieldEmpty` asked "is
+  // this empty?" when the question is "would omitting it lose information?" —
+  // so the instance emitted nothing and the next parse re-inherited the old
+  // value. Both assert through a full save + reparse, since the store looked
+  // correct the whole time and only a reload exposed the loss.
+
+  it('single-scope clearing participants survives a save + reload', () => {
+    // Built inline rather than from `weekly-series`: that fixture has no
+    // `participants` at all, so every occurrence already holds the `[]` default
+    // and "clearing" it is a no-op that passes with or without the fix. The
+    // bug only exists where there is a non-empty inherited value to diverge from.
+    const src = [
+      '---',
+      'title: Team Standup',
+      'date: 2026-04-06',
+      'time: "09:00"',
+      'participants: [alice, bob]',
+      'repeat:', '  type: schedule', '  freq: weekly', '  byweekday: [mo]',
+      'defaults:', '  done: false',
+      'instances:', '  - date: 2026-04-13', '    done: true',
+      '---',
+    ].join('\n')
+    const p = parseToStoreItems('ts.md', src)
+    const roots = new Map([['ts', p.root]])
+    const occ = occOn(p.items, roots, '2026-04-20')
+    expect(occ.metadata.participants).toEqual(['alice', 'bob'])   // inherited, not its own
+
+    const next = applyEdit({ items: p.items, roots }, occ, 'single', editFields(occ, {
+      participants: [],
+      scheduled: { date: '2026-04-20', time: '09:00' },
+    }))
+
+    const reparsed = parseToStoreItems('ts.md', serialize(next.items, next.roots.get('ts')))
+    const after = expandRange(reparsed.items, new Map([['ts', reparsed.root]]),
+      new Date('2026-01-01'), new Date('2026-12-31'))
+    expect(after.find(o => o.date === '2026-04-20')!.metadata.participants).toEqual([])
+    // …and only that occurrence: every sibling keeps the inherited list.
+    expect(after.find(o => o.date === '2026-04-27')!.metadata.participants).toEqual(['alice', 'bob'])
+  })
+
+  it('single-scope untracking one occurrence survives a save + reload', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(data.items, data.roots, '2026-04-20')
+    expect(occ.metadata.done).toBe(false)   // the series makes every occurrence a task
+
+    const next = applyEdit(data, occ, 'single', editFields(occ, {
+      tracked: false,
+      scheduled: { date: '2026-04-20', time: '09:00' },
+    }))
+
+    const reparsed = parseToStoreItems('weekly-series.md', serializeData(next))
+    const roots = new Map([['weekly-series', reparsed.root]])
+    const after = expandRange(reparsed.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))
+    // Untracked: not a task at all, rather than a task that is merely not done.
+    expect(after.find(o => o.date === '2026-04-20')!.metadata.done).toBeUndefined()
+    expect(after.find(o => o.date === '2026-04-27')!.metadata.done).toBe(false)
+  })
+
+  it('a node that inherits nothing still omits an empty field rather than writing it', () => {
+    // Passes before AND after the fix — not a regression test, a guard against
+    // it OVER-reaching, which is its plausible failure mode. Emitting a cleared
+    // value is only correct where the node HAS a baseline to diverge from;
+    // loosening the rule everywhere would sprout `participants: []` on every
+    // file in every vault. A flat standalone inherits nothing, so an empty list
+    // there is still just absent.
+    const data = fixtureData('standalone-task')
+    const occ = occOn(data.items, data.roots, '2026-04-09')
+    const next = applyEdit(data, occ, 'all', editFields(occ, { participants: [] }))
+    expect(serializeData(next)).not.toMatch(/participants:/)
+  })
+
   // ── finding #2b: "all events" must reach overridden occurrences ────────────
 
   it('all-scope reaches an occurrence the user had already overridden', () => {

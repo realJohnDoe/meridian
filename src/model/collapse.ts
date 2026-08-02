@@ -1,5 +1,5 @@
 import type { StoreItem, OccurrenceMetadata, FileMetadata, OccurrenceEntry } from '@/types'
-import { isSeries, isStandaloneOcc, OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, STRUCTURAL_KEYS, inlineFieldEqual, inlineFieldEmpty, deepEqual } from '@/types'
+import { isSeries, isStandaloneOcc, OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, STRUCTURAL_KEYS, inlineFieldEqual, inlineFieldEmpty, absentFieldValue, deepEqual } from '@/types'
 
 type AnyOcc = OccurrenceEntry<OccurrenceMetadata>
 
@@ -53,9 +53,10 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
 
   // ── Container cases — inheritance hierarchy applies ───────────────────────
   //
-  // hoistSharedMetadata() is the single place that decides what is shared
-  // (→ root defaults) vs what is unique to each item (→ local defaults).
-  // It is domain-agnostic: it knows nothing about dates, repeats, or YAML.
+  // computeSharedFields() decides what is shared (→ root defaults); each item
+  // is then emitted relative to that baseline, so what is unique to it falls
+  // out of the emit rule rather than being computed separately. Both are
+  // domain-agnostic: they know nothing about dates, repeats, or YAML.
   //
   // Structural fields (date, time, repeat) are handled separately below:
   //   • Single series with instances → structural fields at the file root.
@@ -65,7 +66,7 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
     ...seriesBlocks.map(b => b.series.metadata),
     ...standalones.map(s => s.metadata),
   ]
-  const { rootDefaults, localDefaults } = hoistSharedMetadata(allMetas)
+  const rootDefaults = computeSharedFields(allMetas)
 
   // ── Single series with instances (flat root, no outer instances wrapper) ──
   if (series.length === 1 && standalones.length === 0) {
@@ -85,9 +86,8 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
   // ── Multiple series / standalones (container: root defaults + instances[]) ─
   const allInstances: Record<string, unknown>[] = []
 
-  seriesBlocks.forEach(({ series: s, children }, i) => {
-    // localDefaults is 1:1 with allMetas = [...seriesBlocks, ...standalones].
-    const ld = occMetaToYaml(localDefaults[i]!)
+  seriesBlocks.forEach(({ series: s, children }) => {
+    const ld = occMetaToYaml(s.metadata, rootDefaults)
     const inst: Record<string, unknown> = {
       date:   s.date,
       ...(s.time ? { time: s.time } : {}),
@@ -99,9 +99,8 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
     allInstances.push(inst)
   })
 
-  standalones.forEach((s, i) => {
-    const offset = seriesBlocks.length
-    const ld = occMetaToYaml(localDefaults[offset + i]!)
+  standalones.forEach(s => {
+    const ld = occMetaToYaml(s.metadata, rootDefaults)
     allInstances.push({
       ...(s.date ? { date: s.date } : {}),
       ...(s.time ? { time: s.time } : {}),
@@ -119,24 +118,12 @@ export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Domain-agnostic inheritance helper.
- *
- * Given N metadata objects, partition them into:
- *   - `rootDefaults` — fields shared by every item (→ file-level defaults: block)
- *   - `localDefaults` — per-item fields that diverge from the shared set
- *                       (→ per-series local defaults: block)
- */
-function hoistSharedMetadata(metas: Partial<OccurrenceMetadata>[]): {
-  rootDefaults: Partial<OccurrenceMetadata>
-  localDefaults: Partial<OccurrenceMetadata>[]
-} {
-  const rootDefaults = computeSharedFields(metas)
-  return {
-    rootDefaults,
-    localDefaults: metas.map(m => diffMetadata(m, rootDefaults)),
-  }
-}
+// `hoistSharedMetadata` used to live here, returning `rootDefaults` plus a
+// parallel `localDefaults` array of per-item diffs. The diff half is gone:
+// each item is now emitted with `occMetaToYaml(item.metadata, rootDefaults)`,
+// which makes the same decision without materialising an intermediate object
+// that had to be kept 1:1 with `allMetas` by index. What's left is
+// `computeSharedFields` on its own, called directly.
 
 /**
  * Serialize the override children of a series into a YAML instances array.
@@ -156,23 +143,34 @@ function serializeChildren(
     const child: Record<string, unknown> = { date: c.date }
     if (c.time) child.time = c.time
     if (c.excluded) child.excluded = true
-    const diff = diffMetadata(c.metadata, seriesMeta)
-    Object.assign(child, occMetaToYaml(diff))
+    Object.assign(child, occMetaToYaml(c.metadata, seriesMeta))
     return child
   })
 }
 
 /**
- * Copy a metadata bag's unknown keys onto the emitted node.
+ * Copy a metadata bag's unknown keys onto the emitted node, skipping any the
+ * baseline already supplies with an equal value (`deepEqual`, since an unknown
+ * key can hold a nested mapping or sequence that `===` cannot compare).
  *
  * Structural keys are skipped defensively — the parse side can never put one in
  * the bag, but a hand-built StoreItem (tests, the debug view) could, and letting
  * one through would overwrite the schedule this node is emitting.
+ *
+ * `baselineExtra` is `undefined` for a node that inherits nothing, which makes
+ * every key differ and so emits the whole bag — the behaviour every caller had
+ * before this took a baseline at all.
  */
-function emitExtra(extra: Record<string, unknown> | undefined, out: Record<string, unknown>): void {
+function emitExtra(
+  extra: Record<string, unknown> | undefined,
+  baselineExtra: Record<string, unknown> | undefined,
+  out: Record<string, unknown>,
+): void {
   if (!extra) return
   for (const [k, v] of Object.entries(extra)) {
-    if (!STRUCTURAL_KEYS.has(k)) out[k] = v
+    if (STRUCTURAL_KEYS.has(k)) continue
+    if (baselineExtra && deepEqual(v, baselineExtra[k])) continue
+    out[k] = v
   }
 }
 
@@ -187,19 +185,63 @@ function fileMetaToYaml(root: FileMetadata): Record<string, unknown> {
     const v = (root as unknown as Record<string, unknown>)[spec.key as string]
     if (!inlineFieldEmpty(spec.kind, v)) out[spec.key] = v
   }
-  emitExtra(root.extra, out)
+  // No baseline: a file has exactly one root, so file-level fields inherit from
+  // nothing and every unknown key on it is emitted. Deliberately still using
+  // `inlineFieldEmpty` above rather than the relational rule occurrence fields
+  // now use — switching it would also stop emitting `title: ""` for a
+  // frontmatter-less note, which is finding #8's repro (c) and a separate
+  // product question about whether Meridian should touch such files at all.
+  emitExtra(root.extra, undefined, out)
   return out
 }
 
-/** Convert OccurrenceMetadata fields to a plain YAML-serializable object. */
-function occMetaToYaml(m: Partial<OccurrenceMetadata>): Record<string, unknown> {
+/**
+ * Emit a node's occurrence metadata as YAML, relative to what it inherits.
+ *
+ * **One rule, at every emit site: a key is omitted only when omitting it would
+ * round-trip.** If leaving `duration` out means the next parse reads back the
+ * same value this node holds — because the baseline supplies it, or because
+ * the field's absent-value default already matches — the key is noise and is
+ * dropped. Otherwise it is written, *including when the value is "nothing"*:
+ * an occurrence that cleared a `participants:` list its series still carries
+ * must say `participants: []`, and one that stopped being a task must say
+ * `done: null`, or the next parse silently re-inherits the old value
+ * (data-integrity survey, finding #2a).
+ *
+ * `baseline` is whatever this node inherits: the series metadata for an
+ * override child, the root `defaults:` block for a series inside a container,
+ * and `{}` for a node at the top of its own chain — a flat single item, or a
+ * `defaults:` block itself, which inherits from nothing.
+ *
+ * That last case is why an empty baseline is deliberately **not** a separate
+ * mode. `absentFieldValue` makes `participants: []` at a root compare equal to
+ * omitting it, so roots stay clean on the same rule that makes an override
+ * emit the very same value. The predicate this replaced (`inlineFieldEmpty`,
+ * a function of the value alone) could not tell those two apart, which is
+ * exactly why a cleared field vanished: it asked "is this empty?" when the
+ * question is "would omitting this lose information?".
+ */
+function occMetaToYaml(
+  m: Partial<OccurrenceMetadata>,
+  baseline: Partial<OccurrenceMetadata> = {},
+): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const spec of OCCURRENCE_FIELDS) {
+    // A registry key parked in `extra` was written in a shape the model can't
+    // represent; the raw value wins on emission, so skip the typed field here
+    // and let emitExtra below write the original.
     if (m.extra && spec.key in m.extra) continue
     const v = (m as Record<string, unknown>)[spec.key as string]
-    if (!inlineFieldEmpty(spec.kind, v)) result[spec.key] = v
+    const inherited = (baseline as Record<string, unknown>)[spec.key as string]
+    const ifOmitted = inherited !== undefined ? inherited : absentFieldValue(spec)
+    if (inlineFieldEqual(spec.kind, v, ifOmitted)) continue
+    // `undefined` reaching here means the node holds nothing where the baseline
+    // holds something — an override that untracked itself. YAML's word for that
+    // is `null`, which this format already uses the same way for unknown keys
+    // (see unknown-keys.test.ts's "keeps an explicit null and an empty list").
+    result[spec.key] = v === undefined ? null : v
   }
-  emitExtra(m.extra, result)
+  emitExtra(m.extra, baseline.extra, result)
   return result
 }
 
@@ -225,19 +267,12 @@ function computeSharedFields(metas: Partial<OccurrenceMetadata>[]): Partial<Occu
   return shared
 }
 
-/** Return fields from `meta` that differ from (or are absent from) `defaults`. */
-function diffMetadata(meta: Partial<OccurrenceMetadata>, defaults: Partial<OccurrenceMetadata>): Partial<OccurrenceMetadata> {
-  const diff: Partial<OccurrenceMetadata> = {}
-  for (const spec of OCCURRENCE_FIELDS) {
-    const v = (meta as Record<string, unknown>)[spec.key as string]
-    if (v === undefined) continue
-    if (!inlineFieldEqual(spec.kind, v, (defaults as Record<string, unknown>)[spec.key as string]))
-      (diff as Record<string, unknown>)[spec.key] = v
-  }
-  const diffExtra: Record<string, unknown> = {}
-  for (const [key, v] of Object.entries(meta.extra ?? {})) {
-    if (!deepEqual(v, defaults.extra?.[key])) diffExtra[key] = v
-  }
-  if (Object.keys(diffExtra).length > 0) diff.extra = diffExtra
-  return diff
-}
+// `diffMetadata` used to live here: it computed "fields that differ from the
+// baseline" as an intermediate object, which `occMetaToYaml` then re-filtered
+// through `inlineFieldEmpty` — and that second filter is what dropped a
+// deliberately-cleared field, since by then `[]` was indistinguishable from
+// "never set". Both steps are now one relational decision inside
+// `occMetaToYaml`, which takes the baseline directly. Its `undefined` skip
+// (`if (v === undefined) continue`) is likewise gone: that was the other half
+// of the same bug, silently discarding an untracked override before it could
+// be emitted as `done: null`.
