@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import type { StoreItem, Roots, Occurrence } from '@/types'
-import { computeExpansionCache, weekStartsOn, type ExpansionCache } from '@/model'
-import { useStore } from '@/store'
+import { computeExpansionCache, type ExpansionCache } from '@/model'
 
 // MonthGrid keeps three panes (prev/current/next month) alive at once, and
 // DayPane's carousel does the same for days, so several distinct (from, to)
@@ -13,8 +12,8 @@ const MAX_CACHED_WINDOWS = 12
 
 const cacheByWindow = new Map<string, ExpansionCache>()
 
-function windowKey(fromMs: number, toMs: number, weekStart: 0 | 1 | 6): string {
-  return `${fromMs}:${toMs}:${weekStart}`
+function windowKey(fromMs: number, toMs: number): string {
+  return `${fromMs}:${toMs}`
 }
 
 /**
@@ -30,7 +29,7 @@ export function resetExpansionCache(): void {
 
 /**
  * Cached expansion hook. Calls expandWithMultiday once per structural change
- * per (from, to, weekStart) window, and overlays non-structural metadata
+ * per (from, to) window, and overlays non-structural metadata
  * (done, priority, participants) onto the cached result when only those
  * fields change — avoiding a full re-expansion on every done-toggle or
  * priority edit.
@@ -46,16 +45,15 @@ export function useExpandWithMultiday(
   from: Date,
   to: Date,
 ): Occurrence[] {
-  const weekStart = useStore(s => weekStartsOn(s.localePrefs))
-  const key = windowKey(from.getTime(), to.getTime(), weekStart)
+  const key = windowKey(from.getTime(), to.getTime())
 
   const prev = cacheByWindow.get(key) ?? null
-  const next = computeExpansionCache(prev, items, roots, from, to, weekStart)
+  const next = computeExpansionCache(prev, items, roots, from, to)
 
   // Value write, render phase. Safe here because it's idempotent:
   // computeExpansionCache returns `prev` by reference when nothing changed, so
   // repeating this write (StrictMode double-render) or skipping it (React
-  // Compiler memoizing this block on items/roots/from/to/weekStart) can't
+  // Compiler memoizing this block on items/roots/from/to) can't
   // produce a wrong value. `set` on an existing key also leaves the map's
   // insertion order alone, so this deliberately does NOT touch recency.
   cacheByWindow.set(key, next)

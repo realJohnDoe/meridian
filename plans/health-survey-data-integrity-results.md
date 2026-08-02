@@ -3,18 +3,16 @@
 Survey run: 2026-07-31, branch `claude/data-integrity-durability-survey-57d9f7`, worktree `octokit-lazy-bundle-9ac43c`.
 Brief: [health-survey-data-integrity.md](health-survey-data-integrity.md).
 
-> **Status update, same session: 7 of the 8 findings are fixed** — #1, #2
-> (both sub-cases), #3, #4, #5 (both sub-cases), #7, and #8. That closes
-> **Roots A, C and E** entirely, and every `it.fails` ratchet this survey
+> **Status update, same session: all 8 findings are fixed** — #1, #2 (both
+> sub-cases), #3, #4, #5 (both sub-cases), #6, #7 and #8. That closes **every
+> architectural root** (A, C, D, E) and every `it.fails` ratchet this survey
 > opened.
 >
-> **Still open:** **#6** (locale-dependent biweekly expansion, Root D) —
-> gated on a migration decision, since any fix re-dates every existing
-> biweekly series in every vault, and on rewriting `weekStart.test.ts`, which
-> currently pins both behaviours as correct. **B-runtime** (wiring the
-> read-back checks into production) — sequenced last by design, and now
-> unblocked, since the leaks that would have made it a permanent alarm are
-> closed. §1's verdict below and each finding's own body are
+> **Still open:** **B-runtime** — wiring the two read-back checks into the
+> production save/load path. Sequenced last by design and now fully unblocked:
+> every leak that would have made it a permanent alarm is closed. It also
+> carries two open product questions (warn vs. refuse-to-write, and the
+> message wording) — see §2 Root B. §1's verdict below and each finding's own body are
 > kept as the **original, unedited assessment** — the historical record of
 > what the audit found — with a **Verification** block appended to each fixed
 > finding recording what actually landed, what was checked before landing it,
@@ -43,7 +41,7 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 | **A** | The file is a projection of the store, and nothing requires the projection to be **total** | ~~#2a~~, ~~#2b~~, ~~#3~~, ~~#5~~, ~~#8~~ — **all fixed** | Totality enforced by one relational emit rule in `collapse.ts` + the parse-side remainder homes; no provenance restructure needed | Opus 5, plan mode / multi-PR |
 | **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** (done — `round-trip-totality.test.ts`) and **B-runtime** (still open) — see below. ~162 ms/300 files | Sonnet 5 |
 | **C** | The one cache transition allowed to destroy local content has an unenforced precondition | ~~#1, #4~~ (**fixed**) | Decision table landed; the cache-API type change is still open — see Root C | Sonnet 5 → Opus 5 |
-| **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
+| **D** | ~~A viewer preference is an input to a domain computation~~ — **FIXED** | #6 | `weekStart` removed from the expansion API; the week is grounded on the series anchor | Opus 5 |
 | **E** | ~~Store transitions don't report which files they touched~~ — **FIXED** | #7 | Scoped to the one transition with a hidden blast radius (`deleteByFileSlug`), not all seven | Haiku 4.5 |
 
 **B is a ratchet, not a diagnostic — split it and put the halves at opposite ends.** An earlier draft of this report said "do B first" wholesale; measuring it showed that to be wrong. The runtime half **cannot be switched on today**: check 1 fires on every exclude (#3) and every cleared inherited field (#2), and check 2 on any file with a nested `title:` (#5), so shipping it early buys a detector you must leave muted until the leaks close. And for the leaks already found it is redundant — all four arrive with their own regression tests, which is the verification mechanism. Its real value is the *fifth* leak and regression prevention afterwards, and ratchets belong after the thing they protect is correct.
@@ -168,7 +166,7 @@ A second-order instance of the same confusion: `isTransientSyncError` classifies
 
 ---
 
-### Root D — a viewer preference is an input to a domain computation
+### Root D — a viewer preference is an input to a domain computation — **FIXED**
 
 `expandRange(items, roots, from, to, weekStart)` makes the occurrence set a function of *(file, viewer)*. Everything downstream — including the edit path, which writes overrides keyed by expanded dates — treats it as a function of *(file)*. That mismatch is #6, and it is why the damage escapes into the file instead of staying on screen: an override written on a Monday-first device lands on a date that a Sunday-first device's schedule does not contain, and surfaces there as a phantom `source: 'explicit'` occurrence.
 
@@ -177,6 +175,8 @@ The tell is that `weekStartsOn(localePrefs)` has two legitimate roles that were 
 The general rule the codebase is missing: **anything that reaches `expandNode` must come from the file, or cross-device agreement breaks.** Today only `weekStart` violates it; nothing prevents the next parameter. That rule belongs in `src/model/AGENTS.md` next to the existing layering rules, and it is enforceable — `expandNode`'s inputs are a short list.
 
 **Root fix:** ground the `byweekday` week on the series anchor, or persist a `wkst` in the repeat block (RFC 5545's answer), and keep `localePrefs` for layout only. **Tier: Opus 5** — any change here re-dates every existing biweekly series in every vault, so it needs a migration decision; and `src/model/__tests__/weekStart.test.ts` currently pins *both* behaviours as correct, so the fix has to argue with an existing test rather than just make it pass. The trap: "just hardcode Monday" is correct in the author's locale and silently wrong in the US.
+
+**Verification — FIXED.** Grounded on the series anchor (not a new `wkst` field), and `weekStart` was **removed from the expansion API entirely** rather than given a fixed value — so the rule this section asks for (*"anything reaching `expandNode` must come from the file"*) is now enforced by the signature instead of by review. `weekStartsOn` keeps its three view roles, which is the separation this section said was missing. The "re-dates every existing biweekly series" migration worry was overstated — `interval: 1` is provably unaffected and the affected shape appears zero times in the fixtures and shipped vault. Details, including the rejected words-vs-numbers hypothesis, in finding #6's verification block.
 
 ---
 
@@ -241,7 +241,7 @@ Vaults used: the 16-file shipped Tutorial vault (`exampleBackend.ts`), the 18 `s
 |---|---|
 | `pnpm run build` | **PASS** (exit 0) |
 | `pnpm run lint` | **PASS** — 0 errors, 14 pre-existing warnings (all `react-hooks/incompatible-library` on TanStack Virtual/Router) |
-| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; 940+1 after #5; 943+0 after #8; 947+0 after #2a; **949 passed, 0 expected-fail after Root E (#7)**. Every ratchet case this survey opened is now closed. See §2 and findings #1–#5, #7, #8 |
+| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; 940+1 after #5; 943+0 after #8; 947+0 after #2a; 949+0 after Root E (#7); **951 passed, 0 expected-fail after Root D (#6)**. Every ratchet case this survey opened is now closed. See §2 and every finding's verification block |
 | `pnpm run test:coverage` | **PASS** — all thresholds met. Totals 61.69% stmts / 58.19% branch / 64.02% lines |
 
 Coverage pointers worth acting on (pointers, not findings):
@@ -294,7 +294,7 @@ Categories are the brief's taxonomy; the **Root** column maps them onto §2's, w
 | 3 | ~~Excluding an occurrence discards everything on it~~ — **FIXED** | **A** | 1, 2, 7 | **silent** | 7 | 1 line, 3 prod callers, every recurring entry | Sonnet 5 |
 | 4 | ~~Remote-deleted + local edit ⇒ one conflict copy per sync tick, forever~~ — **FIXED** | **C** | 4, 5 | **loud, unbounded** | 6 | 1 fn, all backends | Sonnet 5 |
 | 5 | ~~Frontmatter on a node with no `StoreItem` home is deleted~~ — **FIXED** | **A** | 1 | **silent** | 6 | hand-authored multi-event files | Sonnet 5 (with the ownership rule stated) |
-| 6 | Biweekly `byweekday` series expand differently per device locale | **D** | 8, 2 | **silent** | 6 | `freq: weekly` + `interval ≥ 2` + `byweekday` | Opus 5 |
+| 6 | ~~Biweekly `byweekday` series expand differently per device locale~~ — **FIXED** | **D** | 8, 2 | **silent** | 6 | `freq: weekly` + `interval ≥ 2` + `byweekday` | Opus 5 |
 | 7 | ~~Swipe-delete Undo doesn't restore the wikilinks it removed~~ — **FIXED** | **E** | 7, 2 | **silent** | 5 | 1 of 2 delete paths | Sonnet 5 |
 | 8 | ~~Body whitespace and CRLF rewritten on every save~~ — **FIXED** | **A** | 1 | **silent** | 3 | **every file, every save** | Haiku 4.5 |
 
@@ -314,7 +314,7 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 6. **#8 — done.** `fileIO.ts` (detection + reassembly) + a carry-forward line in `storeOps.ts`'s `updateRoot` (the trap: `FileConvention` is never user-editable, so an edit that forgets to carry it forward silently reverts the file to LF on its first save through the app). Turned out to guarantee full byte-identity, not just "no mixed line endings" as originally scoped.
 7. **#2a — done.** The last leak in Root A. Replaced the unary emit predicate with one relational rule ("omit only when omitting round-trips"), which deleted `diffMetadata` and `hoistSharedMetadata`'s diff half rather than adding a mode flag. Also required a parse-side rule for `done: null` (finding #2a-ii, decided as Option A) which closed a latent third-state bug on the way.
 8. **Root E — done.** Scoped to the one transition with a hidden blast radius (`deleteByFileSlug`), not all seven exported transitions — the root-fix line's "every transition" framing was wider than the actual defect. #7's two halves (missed persistence, undo restoration) turned out to share one fix rather than needing the undo half done separately "by hand" as originally guessed; the real complication was a timing race (a swipe's deferred commit can fire before its own `apply()` has run), not a missing mechanism.
-9. **Root D** — #6, gated on the migration decision and on rewriting `weekStart.test.ts`.
+9. **Root D — done.** #6. Grounded the `byweekday` week on the series anchor and **removed `weekStart` from the expansion API entirely**, so a viewer preference can no longer reach `expandNode` at all. The migration worry that gated this proved overstated: `interval: 1` is provably unaffected and the affected shape (`weekly` + `interval ≥ 2` + `byweekday`) appears zero times in the fixtures or shipped vault. The words-vs-numbers hypothesis for the root cause was checked and rejected — `byweekday` was always words; the ambiguity was bucketing, not naming.
 10. **B-runtime** — wire the two checks into `writeEntityToCache` and the load path, and flip them from logging-only to `warn()` (or to refusing the write, per Root B's third constraint). By this point they are quiet on a correct vault, so enabling them is a ratchet rather than an alarm.
 
 **Steps 2 and 3's severity-vs-frequency tradeoff is now moot — #3 landed first regardless, and it was cheap enough (one line, two tests) that it barely delayed Root C either way.** For the record, the reasoning that would have applied to a costlier #3: severity-first says C before #3, since #1 is total, silent, unrecoverable loss of an edit (impact 9); frequency-first says the reverse, since #1 needs a conflict *and* a network failure inside a ~1-second window (rare-but-catastrophic) while #3 fired on every delete of a recurring occurrence carrying data (single device, no conflict required). Keep that framework for any future case where step ordering is genuinely expensive to get wrong.
@@ -795,7 +795,7 @@ Full suite **76 files / 940 passed + 1 expected-fail** (down from 2 — only #8'
 
 ---
 
-### #6 — A biweekly `byweekday` series expands to different dates depending on the reader's locale
+### #6 — A biweekly `byweekday` series expands to different dates depending on the reader's locale — **FIXED**
 
 - **Invariant violated:** 8 (temporal correctness) always; 2 (edit locality) as soon as one device writes an override. Two devices with different `Intl` locales, or one device whose locale changes.
 - **Category:** `temporal` `edit-locality`
@@ -870,6 +870,18 @@ it('a biweekly byweekday series yields the same dates regardless of locale week 
   With `interval ≥ 2` the period cursor advances 14 days, so which fortnight a `byweekday` day falls into depends entirely on where the reader's week boundary sits.
 - **Problem:** the same vault file describes two different schedules on two devices, and an override written on one appears as a phantom extra occurrence on the other.
 - **Fix:** ground the `byweekday` week on the series anchor (or a persisted `wkst`) instead of the viewer's `localePrefs`, with a migration note; afterwards the test above passes and the cross-device override lands on a real generated slot on both devices. **Root fix:** add the boundary rule to `src/model/AGENTS.md` in the same PR — `expandNode`'s inputs are a short list, so it is enforceable by review.
+
+**Verification — FIXED, by removing the parameter rather than choosing a value for it.**
+
+- **A rejected hypothesis worth recording, because it was the obvious one.** The first instinct was that the ambiguity lived in the *encoding* — that weekdays were stored as numbers and a number needs a week-start to be read as a day. Checked: `byweekday` is **already words** (`Weekday = 'mo' | 'tu' | …`, written `byweekday: [mo, we, fr]`), and `WDAYS_MAP` reads them unambiguously. Switching to words would have been work that fixed nothing. The ambiguity was never *naming* a weekday; it was **bucketing** — which 7-day window a date belongs to — which is why both uses of `weekStart` were in the period arithmetic, never in the lookup.
+- **Resolved as anchor-relative bucketing.** The period is the 7 days starting at `periodStart`, which always falls on the anchor's weekday (the cursor only moves in whole weeks), so each named day is 0–6 days forward from it. No new schema field, no locale, fully determined by the `date:` already in the file. Equivalent to RFC 5545 with `WKST` pinned to the anchor's weekday — so this does **not** burn an ICS-export bridge, which was the main argument against diverging from the spec.
+- **`weekStart` is gone from the expansion API entirely, not merely given a fixed value.** After the bucketing change it was a pure pass-through — threaded through `generateScheduledDates` → `expandNode` → `expandRange` → `expandWithMultiday` and read by nothing. Removing the parameter is what makes Root D's rule (*"anything reaching `expandNode` must come from the file"*) enforced by the type system rather than by review: the divergence is now **unrepresentable**, not just absent. Propagated out of `expansionCache.ts` (including the cache key, which no longer needs a week-start dimension), `useExpandWithMultiday.ts`, `fileOccurrence.ts`, `_app.entry.$slug.tsx`, and `store.ts`.
+- **`weekStartsOn` survives untouched for its three legitimate uses** — the month grid (`MonthView.tsx`), the date picker (`DatePickerDialog.tsx`), and the weekday-checkbox order in `RepeatDialog.tsx`. Those *should* follow the viewer's locale. Root D's actual complaint was one value serving two meanings with no boundary; the boundary now exists.
+- **The migration framing in the tier note above was overstated, and I want that on the record.** "Re-dates every existing biweekly series in every vault" assumes a stable status quo worth preserving. There wasn't one — those series already expanded differently per device, which *is* the bug. The change doesn't break something consistent; it makes something inconsistent consistent. Concretely: `interval: 1` is provably unaffected (with a 7-day step every window holds each weekday exactly once wherever the boundary sits, so windows tile identically), which is the overwhelming majority of weekly series; the blast radius is exactly `weekly` + `interval ≥ 2` + non-empty `byweekday`, of which there are **zero** in the fixtures and the shipped tutorial vault (`grep` for `interval: [2-9]` returns only `after_completion` intervals, a different field).
+- **Only one of the four rewritten tests is red-then-green, and the test file says so.** The canonical repro's Thursday anchor happens to bucket identically under Monday-started weeks, so that assertion passes against the old code too — it pins the repro, it doesn't discriminate. The discriminating case is a Saturday named against a Sunday anchor: old code gave `2026-04-18` (13 days out, because `04-04` preceded the anchor and was filtered, pushing it to the next fortnight), new code gives `2026-04-11`. Verified by reverting `expansion.ts` with the tests kept. The primary symptom — same file, two devices, two calendars — is no longer expressible as a test *because the knob is gone*, which is a stronger guarantee than an assertion; the file documents that explicitly rather than implying four regression tests.
+- `weekStart.test.ts` no longer pins both behaviours as correct. It now asserts locale-independence, plus the `interval: 1` and multi-weekday cases that must stay byte-identical.
+
+Full suite **76 files / 951 passed, 0 expected-fail**, zero snapshot changes (confirming `interval: 1` really is untouched), lint 0 errors, knip clean, build exit 0.
 
 ---
 

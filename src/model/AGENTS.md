@@ -96,6 +96,31 @@ live in `expansion.ts` and are only used there.
   take the child's value when present; `metadata` is shallow-merged.
 - `expandNode<M>(node, from, to)` — core recurrence engine; returns `ExpandedOcc<M>[]`.
 
+**Boundary rule — everything reaching `expandNode` must come from the file.**
+A recurrence rule has to mean the same thing on every device, so the engine's
+inputs are the node, the query window, and nothing else. No locale, no user
+preference, no ambient setting — those make the occurrence set a function of
+*(file, viewer)* while every consumer downstream (notably the edit path, which
+writes overrides keyed by expanded dates) treats it as a function of *(file)*.
+An override written under one viewer's reading then lands on a date another
+viewer's schedule never generates.
+
+This was violated exactly once, by a `weekStart` parameter threaded from
+`weekStartsOn(localePrefs)`, and it is worth knowing what it cost: a
+`freq: weekly` + `interval >= 2` + `byweekday` rule expanded to **disjoint**
+date sets for a Monday-first and a Sunday-first reader (data-integrity survey,
+finding #6). The fix grounds the week on the series' own anchor date and
+deletes the parameter, so the rule is now enforced by the signature rather than
+by review. `weekStartsOn` still exists and is still locale-driven — it belongs
+to *view layout* (month grid, date picker, weekday-checkbox order), which is a
+different concern that happens to share a helper.
+
+Note the ambiguity was never in *naming* a weekday: `byweekday` is stored as
+words (`[mo, we, fr]`) and always was. It was in **bucketing** — which 7-day
+window a date belongs to — which only becomes observable once `interval >= 2`
+stops the windows tiling. Any future parameter should be checked against that
+distinction before assuming an encoding change would help.
+
 *Main-app entry point* (domain-aware):
 - `expandRange(items, roots, from, to)` — takes a `StoreItem[]` and a `Roots`
   map and expands all series and standalones within the date window, returning
