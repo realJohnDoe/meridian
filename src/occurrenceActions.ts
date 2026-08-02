@@ -11,22 +11,32 @@ let _toastId:       string | number | null = null
 let _pendingCommit: (() => void) | null    = null
 const TOAST_MS = 4000
 
-// Restores only `fileSlug`'s items/root from `snapshot` into the *current*
+// Restores each of `fileSlugs`' items/root from `snapshot` into the *current*
 // store, rather than reverting the whole store — an edit made to another
-// file while the undo toast was up must survive. The restored slug is then
+// file while the undo toast was up must survive. The restored slugs are then
 // re-persisted so the cache/backend agree with the reverted store.
-function restoreFileSlug(snapshot: { items: StoreItem[]; roots: Roots }, fileSlug: string): void {
+//
+// Takes a list rather than one slug so a delete's backlink cleanup (see
+// `deleteByFileSlug`'s `affectedSlugs`) can be undone in the same call as the
+// primary file — restoring only the primary slug would put the deleted entry
+// back while leaving every other file's wikilink to it stripped, which is the
+// half of finding #7 that was specific to Undo (the missing persistence was
+// the other half, fixed at the two `beginSwipeDelete` call sites below).
+function restoreFileSlugs(snapshot: { items: StoreItem[]; roots: Roots }, fileSlugs: readonly string[]): void {
+  const slugs = new Set(fileSlugs)
   const current = getSnapshot()
   const items = [
-    ...current.items.filter(i => i.fileSlug !== fileSlug),
-    ...snapshot.items.filter(i => i.fileSlug === fileSlug),
+    ...current.items.filter(i => !slugs.has(i.fileSlug)),
+    ...snapshot.items.filter(i => slugs.has(i.fileSlug)),
   ]
   const roots = new Map(current.roots)
-  const snapshotRoot = snapshot.roots.get(fileSlug)
-  if (snapshotRoot) roots.set(fileSlug, snapshotRoot)
-  else roots.delete(fileSlug)
+  for (const fileSlug of slugs) {
+    const snapshotRoot = snapshot.roots.get(fileSlug)
+    if (snapshotRoot) roots.set(fileSlug, snapshotRoot)
+    else roots.delete(fileSlug)
+  }
   setData({ items, roots })
-  writeEntity(fileSlug)
+  for (const fileSlug of slugs) writeEntity(fileSlug)
 }
 
 function showDeleteToast(
@@ -109,20 +119,34 @@ export function beginSwipeDelete(o: Occurrence): () => void {
     const endsSeries = deletionEndsAfterCompletionSeries(snapshot.items, o)
     showDeleteToast(title,
       () => { writeEntity(o.fileSlug) },
-      () => { cancelled = true; restoreFileSlug(snapshot, o.fileSlug) },
+      () => { cancelled = true; restoreFileSlugs(snapshot, [o.fileSlug]) },
       { endsSeries },
     )
     return () => { if (!cancelled) setData(next) }
   } else {
+    // deleteByFileSlug's backlink cleanup — the OTHER files whose `items:`
+    // list pointed at this one — is captured here so the deferred commit and
+    // Undo (defined below, but not run until later: on toast auto-close, a
+    // forced early commit from a second swipe-delete, or an Undo click) can
+    // reach it without recomputing it from whatever the store happens to look
+    // like when they fire. Genuinely unknown until apply() actually runs
+    // (below): it recomputes from a FRESH snapshot, deliberately, so a
+    // concurrent edit to some other file during the exit animation is not
+    // silently reverted by writing back a stale one — see the identical
+    // reasoning already governing `next` here for the recurring branch above.
+    let affectedSlugs: string[] = []
     showDeleteToast(title,
-      () => { deleteEntity(o.fileSlug) },
+      () => { for (const slug of affectedSlugs) writeEntity(slug); deleteEntity(o.fileSlug) },
       () => {
         cancelled = true
-        if (!getItems().find(i => i.id === o.id)) restoreFileSlug(snapshot, o.fileSlug)
+        if (!getItems().find(i => i.id === o.id)) restoreFileSlugs(snapshot, [o.fileSlug, ...affectedSlugs])
       },
     )
     return () => {
-      if (!cancelled) setData(deleteByFileSlug(getSnapshot(), o.fileSlug))
+      if (cancelled) return
+      const { data, affectedSlugs: computed } = deleteByFileSlug(getSnapshot(), o.fileSlug)
+      affectedSlugs = computed
+      setData(data)
     }
   }
 }

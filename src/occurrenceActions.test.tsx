@@ -136,6 +136,60 @@ describe('beginSwipeDelete', () => {
     expect((items().find(i => i.id === 'occ-b') as StoreOcc).metadata.done).toBe(true)
   })
 
+  // ── finding #7: swipe-deleting an entry other files link to ────────────────
+  //
+  // deleteByFileSlug strips the deleted slug out of every other file's items:
+  // list in the STORE, but that cleanup used to never reach the backend (this
+  // path never wrote the affected file) and Undo never reversed it (restored
+  // only the deleted file's own slug). Both halves are pinned here.
+
+  it('persists the backlink cleanup on commit, not just in the in-memory store', () => {
+    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
+    const b = makeOcc({ id: 'occ-b', fileSlug: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
+    const roots: Roots = makeRoots('a.md', { title: 'A' })
+    roots.set('b.md', { title: 'B', tags: [], items: ['[[a.md]]'] })
+    seedStore([a, b], roots)
+    render(<Toaster />)
+
+    const apply = beginSwipeDelete(a)
+    act(() => apply())
+    flushToastMount()
+
+    // Optimistic: the store already reflects the cleanup before the toast settles.
+    expect(useStore.getState().roots.get('b.md')?.items).toEqual([])
+    expect(persistence.writes).toEqual([])
+
+    act(() => { vi.advanceTimersByTime(4100) })
+
+    expect(persistence.deletes).toEqual(['a.md'])
+    expect(persistence.writes).toEqual(['b.md'])
+  })
+
+  it('Undo restores both the deleted entry and the wikilink other files carried to it', () => {
+    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
+    const b = makeOcc({ id: 'occ-b', fileSlug: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
+    const roots: Roots = makeRoots('a.md', { title: 'A' })
+    roots.set('b.md', { title: 'B', tags: [], items: ['[[a.md]]'] })
+    seedStore([a, b], roots)
+    render(<Toaster />)
+
+    const apply = beginSwipeDelete(a)
+    act(() => apply())
+    flushToastMount()
+    expect(useStore.getState().roots.get('b.md')?.items).toEqual([])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(items().find(i => i.id === 'occ-a')).toBeDefined()
+    expect(useStore.getState().roots.get('b.md')?.items).toEqual(['[[a.md]]'])
+
+    act(() => { vi.advanceTimersByTime(5000) })
+
+    // The restore is persisted too — both slugs, since both were reverted.
+    expect(persistence.writes.sort()).toEqual(['a.md', 'b.md'])
+    expect(persistence.deletes).toEqual([])
+  })
+
   it('a second delete fires the first pending commit immediately, before any timer advances', () => {
     const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
     const b = makeOcc({ id: 'occ-b', fileSlug: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })

@@ -5,7 +5,6 @@ import { useStore } from './store'
 export const getItems         = (): StoreItem[]    => useStore.getState().items
 export const getRoots         = (): Roots          => useStore.getState().roots
 export const getFom           = (): Map<string, Occurrence> => useStore.getState().fom
-export const getBacklinks     = (): Map<string, string[]> => useStore.getState().backlinks
 export const setData          = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
 export const getSnapshot      = (): { items: StoreItem[]; roots: Roots } => ({ items: getItems(), roots: getRoots() })
 export const getVaults        = (): VaultRef[]     => useStore.getState().vaults

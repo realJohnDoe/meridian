@@ -2,7 +2,7 @@ import { startOfToday } from 'date-fns'
 import { fmtISO, applyEdit, newEntrySlug, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing, fileSlugItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
-import { getSnapshot, getItems, getRoots, getBacklinks, getUnreadableFiles } from '@/storeBridge'
+import { getSnapshot, getItems, getRoots, getUnreadableFiles } from '@/storeBridge'
 import { commitNext, commitDelete } from '@/storeCommit'
 import type { EntryState, ItemType } from './state'
 
@@ -168,9 +168,8 @@ export function deleteNode(
   }
   function deleteAll() {
     if (!item) return
-    const affected = getBacklinks().get(item.fileSlug) ?? []
-    const next = deleteByFileSlug(getSnapshot(), item.fileSlug)
-    commitDelete(next, item.fileSlug, affected)
+    const { data: next, affectedSlugs } = deleteByFileSlug(getSnapshot(), item.fileSlug)
+    commitDelete(next, item.fileSlug, affectedSlugs)
     hideSheet(); navigateBack()
   }
   function deleteFuture() {
@@ -182,9 +181,8 @@ export function deleteNode(
 
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
-      const affected = getBacklinks().get(item.fileSlug) ?? []
-      const next = deleteByFileSlug(getSnapshot(), item.fileSlug)
-      commitDelete(next, item.fileSlug, affected)
+      const { data: next, affectedSlugs } = deleteByFileSlug(getSnapshot(), item.fileSlug)
+      commitDelete(next, item.fileSlug, affectedSlugs)
       navigateBack()
     }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }

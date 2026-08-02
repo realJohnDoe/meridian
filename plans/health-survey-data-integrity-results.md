@@ -3,15 +3,15 @@
 Survey run: 2026-07-31, branch `claude/data-integrity-durability-survey-57d9f7`, worktree `octokit-lazy-bundle-9ac43c`.
 Brief: [health-survey-data-integrity.md](health-survey-data-integrity.md).
 
-> **Status update, same session: 6 of the 8 findings are fixed** — #1, #2
-> (both sub-cases), #3, #4, #5 (both sub-cases) and #8. That closes **Root A**
-> and **Root C** entirely, and every `it.fails` ratchet this survey opened.
+> **Status update, same session: 7 of the 8 findings are fixed** — #1, #2
+> (both sub-cases), #3, #4, #5 (both sub-cases), #7, and #8. That closes
+> **Roots A, C and E** entirely, and every `it.fails` ratchet this survey
+> opened.
 >
 > **Still open:** **#6** (locale-dependent biweekly expansion, Root D) —
 > gated on a migration decision, since any fix re-dates every existing
 > biweekly series in every vault, and on rewriting `weekStart.test.ts`, which
-> currently pins both behaviours as correct. **#7** (swipe-delete undo not
-> restoring backlinks, Root E) — unstarted. **B-runtime** (wiring the
+> currently pins both behaviours as correct. **B-runtime** (wiring the
 > read-back checks into production) — sequenced last by design, and now
 > unblocked, since the leaks that would have made it a permanent alarm are
 > closed. §1's verdict below and each finding's own body are
@@ -44,7 +44,7 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 | **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** (done — `round-trip-totality.test.ts`) and **B-runtime** (still open) — see below. ~162 ms/300 files | Sonnet 5 |
 | **C** | The one cache transition allowed to destroy local content has an unenforced precondition | ~~#1, #4~~ (**fixed**) | Decision table landed; the cache-API type change is still open — see Root C | Sonnet 5 → Opus 5 |
 | **D** | A viewer preference is an input to a domain computation | #6 | Take `weekStart` out of expansion; source recurrence semantics from the file | Opus 5 |
-| **E** | Store transitions don't report which files they touched | #7 | Return the affected slug set from the transition | Haiku 4.5 |
+| **E** | ~~Store transitions don't report which files they touched~~ — **FIXED** | #7 | Scoped to the one transition with a hidden blast radius (`deleteByFileSlug`), not all seven | Haiku 4.5 |
 
 **B is a ratchet, not a diagnostic — split it and put the halves at opposite ends.** An earlier draft of this report said "do B first" wholesale; measuring it showed that to be wrong. The runtime half **cannot be switched on today**: check 1 fires on every exclude (#3) and every cleared inherited field (#2), and check 2 on any file with a nested `title:` (#5), so shipping it early buys a detector you must leave muted until the leaks close. And for the leaks already found it is redundant — all four arrive with their own regression tests, which is the verification mechanism. Its real value is the *fifth* leak and regression prevention afterwards, and ratchets belong after the thing they protect is correct.
 
@@ -188,6 +188,14 @@ The general shape: `writeEntity(slug)` takes a slug, so every `commitNext(next, 
 
 **Root fix:** have store transitions return `{ data, affectedSlugs }` and have `commitNext`/`commitDelete` persist exactly that set. This closes the class rather than #7, and it makes Root B's read-back check trivially correct — it would then verify precisely the slugs the transition claims to have written. **Tier: Haiku 4.5** for the mechanical propagation once the signature change is decided; the undo half of #7 stays Sonnet 5 (see the finding).
 
+**Verification — FIXED, narrower than "every transition" and better for it.**
+
+The 15-call-site count above was real, but it counts *callers* of `commitNext`/`commitDelete`, not transitions with a hidden blast radius — those are different sets. Checked before writing any code: `applyEdit`'s four scopes, `toggleDone`, `excludeOccurrence`, and `deleteFollowing` all write to exactly one slug the caller already has (`occ.fileSlug`) — there is nothing hidden to report. `deleteByFileSlug` is the *only* transition that mutates files the caller never named, because it is the only one that walks every other root looking for a wikilink to strip. Widening `{ data, affectedSlugs }` to all seven exported transitions, as the root-fix line above proposed, would have changed ~15 call sites for a return value twelve of them would have thrown away unused. Scoped to the one function that actually needed it, the change touched five.
+
+`deleteByFileSlug`'s new signature and both real bugs at #7 (missed persistence, and the "still needs fixing by hand" undo half — which turned out not to) are recorded together in finding #7's own verification block above, including the timing-race design problem that made this harder than a signature change (a swipe's deferred commit can fire before its own `apply()` has run).
+
+Full suite **76 files / 949 passed, 0 expected-fail**, lint 0 errors, knip clean, build exit 0.
+
 ---
 
 ## 3. Coverage statement
@@ -233,7 +241,7 @@ Vaults used: the 16-file shipped Tutorial vault (`exampleBackend.ts`), the 18 `s
 |---|---|
 | `pnpm run build` | **PASS** (exit 0) |
 | `pnpm run lint` | **PASS** — 0 errors, 14 pre-existing warnings (all `react-hooks/incompatible-library` on TanStack Virtual/Router) |
-| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; 940+1 after #5; 943+0 after #8; **947 passed, 0 expected-fail after #2a**. Every ratchet case this survey opened is now closed. See §2 and findings #1–#5, #8 |
+| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; 940+1 after #5; 943+0 after #8; 947+0 after #2a; **949 passed, 0 expected-fail after Root E (#7)**. Every ratchet case this survey opened is now closed. See §2 and findings #1–#5, #7, #8 |
 | `pnpm run test:coverage` | **PASS** — all thresholds met. Totals 61.69% stmts / 58.19% branch / 64.02% lines |
 
 Coverage pointers worth acting on (pointers, not findings):
@@ -287,7 +295,7 @@ Categories are the brief's taxonomy; the **Root** column maps them onto §2's, w
 | 4 | ~~Remote-deleted + local edit ⇒ one conflict copy per sync tick, forever~~ — **FIXED** | **C** | 4, 5 | **loud, unbounded** | 6 | 1 fn, all backends | Sonnet 5 |
 | 5 | ~~Frontmatter on a node with no `StoreItem` home is deleted~~ — **FIXED** | **A** | 1 | **silent** | 6 | hand-authored multi-event files | Sonnet 5 (with the ownership rule stated) |
 | 6 | Biweekly `byweekday` series expand differently per device locale | **D** | 8, 2 | **silent** | 6 | `freq: weekly` + `interval ≥ 2` + `byweekday` | Opus 5 |
-| 7 | Swipe-delete Undo doesn't restore the wikilinks it removed | **E** | 7, 2 | **silent** | 5 | 1 of 2 delete paths | Sonnet 5 |
+| 7 | ~~Swipe-delete Undo doesn't restore the wikilinks it removed~~ — **FIXED** | **E** | 7, 2 | **silent** | 5 | 1 of 2 delete paths | Sonnet 5 |
 | 8 | ~~Body whitespace and CRLF rewritten on every save~~ — **FIXED** | **A** | 1 | **silent** | 3 | **every file, every save** | Haiku 4.5 |
 
 Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreakers (silent > loud, unrecoverable > recoverable) applied. #1 leads on unrecoverability; #8 ranks high on the raw formula (breadth = all files, effort = 1) and is listed last only because its impact is genuinely small — re-sort freely.
@@ -305,13 +313,13 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 5. **#5 — done.** Both sub-cases (file-level key on a non-root node; container's own remainder) fixed together in `inheritance.ts` + `storeItems.ts` — the parse side, not `collapse.ts`/`types.ts` as originally guessed; collapse needed no changes at all, since its unknown-key hoisting was already generic enough. (`hoistSharedMetadata` has since been deleted by #2a's refactor — the hoisting itself survives as `computeSharedFields`.)
 6. **#8 — done.** `fileIO.ts` (detection + reassembly) + a carry-forward line in `storeOps.ts`'s `updateRoot` (the trap: `FileConvention` is never user-editable, so an edit that forgets to carry it forward silently reverts the file to LF on its first save through the app). Turned out to guarantee full byte-identity, not just "no mixed line endings" as originally scoped.
 7. **#2a — done.** The last leak in Root A. Replaced the unary emit predicate with one relational rule ("omit only when omitting round-trips"), which deleted `diffMetadata` and `hoistSharedMetadata`'s diff half rather than adding a mode flag. Also required a parse-side rule for `done: null` (finding #2a-ii, decided as Option A) which closed a latent third-state bug on the way.
-8. **Root E** — the `{ data, affectedSlugs }` signature change, then #7's undo half by hand.
+8. **Root E — done.** Scoped to the one transition with a hidden blast radius (`deleteByFileSlug`), not all seven exported transitions — the root-fix line's "every transition" framing was wider than the actual defect. #7's two halves (missed persistence, undo restoration) turned out to share one fix rather than needing the undo half done separately "by hand" as originally guessed; the real complication was a timing race (a swipe's deferred commit can fire before its own `apply()` has run), not a missing mechanism.
 9. **Root D** — #6, gated on the migration decision and on rewriting `weekStart.test.ts`.
 10. **B-runtime** — wire the two checks into `writeEntityToCache` and the load path, and flip them from logging-only to `warn()` (or to refusing the write, per Root B's third constraint). By this point they are quiet on a correct vault, so enabling them is a ratchet rather than an alarm.
 
 **Steps 2 and 3's severity-vs-frequency tradeoff is now moot — #3 landed first regardless, and it was cheap enough (one line, two tests) that it barely delayed Root C either way.** For the record, the reasoning that would have applied to a costlier #3: severity-first says C before #3, since #1 is total, silent, unrecoverable loss of an edit (impact 9); frequency-first says the reverse, since #1 needs a conflict *and* a network failure inside a ~1-second window (rare-but-catastrophic) while #3 fired on every delete of a recurring occurrence carrying data (single device, no conflict required). Keep that framework for any future case where step ordering is genuinely expensive to get wrong.
 
-**Patch-first** is now moot for everything except **#7** — the roots it would have deferred (A and C) are both closed. Recorded for the shape of the argument: it would have been **#1 → #3 → #5 → #8 → #7**, the same file ordering with the roots left in place. The note that "#2a has no safe point fix" proved right in a way that argued *for* the root fix rather than against it: every point-fix version was a change to the emit predicates, and the one that worked was the one that replaced them outright.
+**Patch-first** is now entirely moot — every root it would have deferred (A, C, E) is closed, and #7 landed as part of Root E rather than needing a separate patch-first path. Recorded for the shape of the argument: it would have been **#1 → #3 → #5 → #8 → #7**, the same file ordering with the roots left in place. The note that "#2a has no safe point fix" proved right in a way that argued *for* the root fix rather than against it: every point-fix version was a change to the emit predicates, and the one that worked was the one that replaced them outright.
 
 ---
 
@@ -925,6 +933,18 @@ it('Undo restores the wikilink the delete removed from another file', () => {
 ```
 - **Problem:** undoing a swipe-delete leaves other notes missing the wikilink they carried to the restored entry, and the next edit to those notes writes that loss to disk.
 - **Fix:** have `beginSwipeDelete` pass the backlink slugs through `commitDelete`, and have the undo path restore and re-persist those same slugs; afterwards the test above passes and `writes` contains `note-b` on both the delete and the undo. **Root fix:** Root E's `{ data, affectedSlugs }` return removes the *class* (15 call sites can no longer forget a slug), but the undo half still needs fixing by hand — restoring the backlink slugs without clobbering unrelated edits made during the toast window.
+
+**Verification — FIXED, both halves in one change; the "still needs fixing by hand" claim above was wrong.**
+
+- **`deleteByFileSlug` is the only function Root E actually needed to touch.** Before implementing, I checked whether the fix should be the full `{ data, affectedSlugs }` convention on every `StoreData`-returning function, as the original phrasing implied. It shouldn't: every other transition (`applyEdit`'s four scopes, `toggleDone`, `excludeOccurrence`, `deleteFollowing`) only ever writes to `occ.fileSlug`, a slug the caller already has in hand — `deleteByFileSlug` is the one function with a *hidden* blast radius, because it's the only one that mutates *other* files' roots as a side effect. Widening the convention everywhere would have touched ~15 call sites for no functional gain; narrowing it to the one function that actually hides information closed the finding with a smaller, more precise diff.
+- **Verified the new `affectedSlugs` is not a second, possibly-divergent index**, before wiring it up: `deleteByFileSlug`'s existing filter and the store's `buildBacklinkIndex` (`fileOccurrence.ts`) both resolve wikilinks through the same `fileSlug`-then-title order (the latter's own comment says so — `"matching resolveWikilink's fileSlug-before-title order"`), so `deleteByFileSlug` reporting its own computed set is not a narrower or different answer than the `getBacklinks()` lookup it replaces, just the same answer computed once instead of twice.
+- **The report's claim that the undo half "still needs fixing by hand" as separate work was wrong, the same way #2b's "no point fix" claim was wrong** — both assumed the harder-looking half needed its own mechanism. Once `deleteByFileSlug` reports `affectedSlugs`, the undo path just needs a plural `restoreFileSlugs(snapshot, [primary, ...affected])` instead of the existing single-slug `restoreFileSlug` — persistence and undo restoration both consume the exact same array, from the exact same call.
+- **The real design problem was a timing race, not a missing mechanism.** `beginSwipeDelete`'s deferred commit/undo closures are defined synchronously, but `apply()` — which actually calls `deleteByFileSlug` — runs up to 230ms later (the swipe's exit animation, confirmed by reading `OccurrenceRow.tsx`'s `setTimeout(() => applyDelete(), 230)`), and a rapid second swipe can force the first item's deferred commit to fire even earlier via `_pendingCommit`. So `affectedSlugs` cannot be computed once at the top of `beginSwipeDelete` — it has to be captured into an outer-scope variable *inside* `apply()`, populated whenever `apply()` actually runs, and read by whichever of commit/undo fires later. `apply()` itself still recomputes from a fresh `getSnapshot()` at that point, preserving the existing (and already load-bearing, per the "does not revert an unrelated edit made during the toast window" test) property that a concurrent edit to some other file during the animation isn't silently reverted.
+- **Two regression tests, not one**, since persistence and undo restoration are independently reachable bugs even though they share a fix: `persists the backlink cleanup on commit, not just in the in-memory store` and `Undo restores both the deleted entry and the wikilink other files carried to it`.
+- **`editor/save.ts`'s two existing call sites were simplified as a consequence, not touched defensively.** They previously called `getBacklinks().get(item.fileSlug) ?? []` as a separate step before `deleteByFileSlug`; now they destructure `{ data, affectedSlugs }` from the one call and the separate lookup is gone. This left `getBacklinks()` (the imperative accessor in `storeBridge.ts`) with no remaining callers — removed, since `knip` correctly flagged it as dead. The *reactive* `useStore(s => s.backlinks)` the Backlinks UI panels use is a different code path and is untouched.
+- **Red-then-green confirmed**, not assumed: reverting `storeOps.ts`, `occurrenceActions.ts`, and `editor/save.ts` to pre-fix state (tests kept) fails exactly the two new tests; all 12 pre-existing tests in the same file still pass, including the "unrelated edit during the toast window" test the fix was warned not to break.
+
+This closes **Root E**. Full suite **76 files / 949 passed, 0 expected-fail**, lint 0 errors, knip clean, build exit 0.
 
 ---
 
