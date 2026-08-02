@@ -54,10 +54,9 @@ function resolveOneSlug(
   now: Date,
   AHEAD: Date,
   BACK: Date,
-  weekStart: 0 | 1 | 6,
 ): Occurrence | null {
   const nowMs    = now.getTime()
-  const inWindow = expandRange(slugItems, roots, BACK, AHEAD, weekStart) // ascending by time
+  const inWindow = expandRange(slugItems, roots, BACK, AHEAD) // ascending by time
 
   // 1. Nearest upcoming event.
   const futureEvent = inWindow.find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs)
@@ -120,7 +119,6 @@ export function updateFileOccurrenceMap(
   prevRoots: Roots,
   items:     StoreItem[],
   roots:     Roots,
-  weekStart: 0 | 1 | 6 = 1,
 ): Map<string, Occurrence> {
   const now   = startOfToday()
   const AHEAD = new Date(now.getTime() + _3YR_MS)
@@ -155,7 +153,7 @@ export function updateFileOccurrenceMap(
       if (cached !== undefined) { map.set(slug, cached); continue }
     }
 
-    const occ = resolveOneSlug(slug, slugItems, roots, now, AHEAD, BACK, weekStart)
+    const occ = resolveOneSlug(slug, slugItems, roots, now, AHEAD, BACK)
     if (occ) map.set(slug, occ)
   }
 

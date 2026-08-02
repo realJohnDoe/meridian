@@ -171,7 +171,6 @@ function generateScheduledDates(
   sched: Extract<Repeat, { type: 'schedule' }>,
   from: Date,
   to: Date,
-  weekStart: 0 | 1 | 6 = 1,
 ): Date[] {
   const { freq, byweekday, bymonthday, bysetpos, interval = 1, end } = sched
   const results: Date[] = []
@@ -238,14 +237,31 @@ function generateScheduledDates(
       if (!byweekday || !byweekday.length) {
         dates.push(withTime(periodStart))
       } else {
-        const wd = periodStart.getDay()
-        const weekStartOff = -((wd - weekStart + 7) % 7)
-        const periodWeekStart = new Date(periodStart)
-        periodWeekStart.setDate(periodStart.getDate() + weekStartOff)
+        // The period is the 7 days starting at `periodStart`, which always
+        // falls on the ANCHOR's weekday (the cursor only ever moves in whole
+        // weeks). So each named weekday is 0–6 days forward from there.
+        //
+        // Anchoring the week here — rather than on the viewer's locale — is
+        // what makes a `weekly` + `interval >= 2` + `byweekday` rule mean the
+        // same thing on every device. `byweekday` was never the ambiguous
+        // part: it is already stored as words (`[mo, we, fr]`) and WDAYS_MAP
+        // reads them unambiguously. The ambiguity was which 7-day window a
+        // date belongs to, and with `interval >= 2` the windows no longer
+        // tile, so a Monday-first and a Sunday-first reader bucketed the same
+        // file into different fortnights and got disjoint date sets. See the
+        // data-integrity survey, finding #6.
+        //
+        // `interval: 1` is unaffected by construction: with a 7-day step every
+        // window contains each weekday exactly once wherever the boundary
+        // sits, so the windows tile identically however you draw them.
+        //
+        // Equivalent to RFC 5545 with `WKST` pinned to the anchor's weekday,
+        // so an ICS export could reproduce this exactly by emitting that.
+        const anchorDow = anchor.getDay()
         for (const dStr of byweekday) {
           const target = WDAYS_MAP[dStr.toLowerCase()] ?? 0
-          const dayCandidate = new Date(periodWeekStart)
-          dayCandidate.setDate(periodWeekStart.getDate() + (target - weekStart + 7) % 7)
+          const dayCandidate = new Date(periodStart)
+          dayCandidate.setDate(periodStart.getDate() + (target - anchorDow + 7) % 7)
           dates.push(withTime(dayCandidate))
         }
       }
@@ -314,7 +330,6 @@ function expandNode<M>(
   node: ExpandNode<M>,
   from: Date,
   to: Date,
-  weekStart: 0 | 1 | 6 = 1,
 ): ExpandedOcc<M>[] {
   const occurrences: ExpandedOcc<M>[] = []
   const anchor = nodeDateTime(node)
@@ -382,7 +397,7 @@ function expandNode<M>(
   const repeat = node.repeat
 
   if (repeat.type === 'schedule') {
-    const generated = generateScheduledDates(anchor, node.time, repeat, from, to, weekStart)
+    const generated = generateScheduledDates(anchor, node.time, repeat, from, to)
     const generatedMs = new Set(generated.map(d => d.getTime()))
     generatedMs.add(anchor.getTime())
 
@@ -492,7 +507,7 @@ function expandNode<M>(
   for (const child of node.instances ?? []) {
     if (child.repeat) {
       const effChild = mergeNode(node, child)
-      occurrences.push(...expandNode({ ...effChild, instances: [] }, from, to, weekStart))
+      occurrences.push(...expandNode({ ...effChild, instances: [] }, from, to))
     }
   }
 
@@ -574,7 +589,6 @@ export function expandRange(
   roots: Roots,
   from: Date,
   to: Date,
-  weekStart: 0 | 1 | 6 = 1,
 ): OccurrenceEntry<AppMetadata>[] {
   const result: OccurrenceEntry<AppMetadata>[] = []
 
@@ -604,7 +618,7 @@ export function expandRange(
       })),
     }
 
-    const raw = expandNode(expandable, from, to, weekStart)
+    const raw = expandNode(expandable, from, to)
 
     // Map each emitted occurrence back to the exact override child it came from
     // via `overrideId`. Keying by child id (not by minute) is what lets two
@@ -667,9 +681,8 @@ export function expandWithMultiday(
   roots: Roots,
   from: Date,
   to: Date,
-  weekStart: 0 | 1 | 6 = 1,
 ): OccurrenceEntry<AppMetadata>[] {
-  const occs = expandRange(items, roots, from, to, weekStart)
+  const occs = expandRange(items, roots, from, to)
 
   const extraMultiday = items
     .filter(isStandaloneOcc)

@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import type { StoreItem, Roots, Occurrence, LocalePrefs, VaultRef } from './types'
-import { weekStartsOn } from '@/model'
 import { updateFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
 import { readVaultStringArray, writeVaultJSON, readVaultJSON } from '@/lib/vaultStorage'
 
@@ -157,11 +156,10 @@ export const useStore = create<MeridianStore>((set, get) => {
     fom: new Map(),
     backlinks: new Map(),
     setData: ({ items, roots }) => {
-      const { items: prevItems, roots: prevRoots, fom: prevFom, backlinks: prevBacklinks, localePrefs } = get()
-      const weekStart = weekStartsOn(localePrefs)
+      const { items: prevItems, roots: prevRoots, fom: prevFom, backlinks: prevBacklinks } = get()
       // backlinks depend only on roots; reuse the prior index when roots is reference-stable.
       const backlinks = roots === prevRoots ? prevBacklinks : buildBacklinkIndex(roots)
-      set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots, weekStart), backlinks })
+      set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots), backlinks })
     },
 
     unreadableFiles: new Map(),

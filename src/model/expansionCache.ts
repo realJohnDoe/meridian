@@ -7,7 +7,6 @@ export interface ExpansionCache {
   roots: Roots
   fromMs: number
   toMs: number
-  weekStart: 0 | 1 | 6
   allOccs: Occurrence[]
 }
 
@@ -77,12 +76,11 @@ export function computeExpansionCache(
   roots: Roots,
   from: Date,
   to: Date,
-  weekStart: 0 | 1 | 6 = 1,
 ): ExpansionCache {
   const fromMs = from.getTime()
   const toMs = to.getTime()
 
-  if (prev && prev.fromMs === fromMs && prev.toMs === toMs && prev.weekStart === weekStart && hasSameStructure(prev.items, items)) {
+  if (prev && prev.fromMs === fromMs && prev.toMs === toMs && hasSameStructure(prev.items, items)) {
     // Only non-structural metadata changed — find altered items/files and overlay.
     // `roots` identity is deliberately NOT part of the fast-path gate above: a
     // title/tags/body edit on one file allocates a brand-new `roots` map (see
@@ -124,9 +122,9 @@ export function computeExpansionCache(
         },
       }
     })
-    return { items, roots, fromMs, toMs, weekStart, allOccs }
+    return { items, roots, fromMs, toMs, allOccs }
   }
 
-  const allOccs = expandWithMultiday(items, roots, from, to, weekStart)
-  return { items, roots, fromMs, toMs, weekStart, allOccs }
+  const allOccs = expandWithMultiday(items, roots, from, to)
+  return { items, roots, fromMs, toMs, allOccs }
 }
