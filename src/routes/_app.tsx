@@ -109,7 +109,7 @@ function AppMain() {
         <header
           id="mainTop"
           className={cn(
-            'h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10',
+            'h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10 shadow-md',
             isEntryView
               ? 'overflow-hidden'
               // Right edge always leads with an icon button; left edge only does on mobile

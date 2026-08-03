@@ -68,7 +68,7 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
         className="mobile-search-overlay fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto"
       >
         {/* Top input row — pinned, always visible */}
-        <div className="shrink-0 flex items-center gap-2 px-3.5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 border-b border-border">
+        <div className="relative z-10 shrink-0 flex items-center gap-2 px-3.5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 border-b border-border shadow-md">
           <IconButton
             variant="ghost"
             className="w-9 h-9 text-muted-foreground"

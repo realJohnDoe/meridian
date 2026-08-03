@@ -143,37 +143,43 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
   }, []) // listeners are stable; callback accessed via ref
 
   return (
-    <div
-      className="relative overflow-hidden rounded-lg mx-3.5 mb-1.5"
-      ref={wrapRef}
-      data-occ-key={occ.id}
-    >
-      {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
+    // Two nested boxes: the swipe reveal needs overflow-hidden (clips the
+    // delete panel to the row's rounded corners and the horizontal slide),
+    // but that same overflow-hidden clips any box-shadow on the card inside
+    // it since the card fills this box exactly. So the shadow lives on this
+    // outer, unclipped box instead, wrapping the actual clip boundary.
+    <div className="relative rounded-lg mx-3.5 mb-1.5 shadow-sm" data-occ-key={occ.id}>
       <div
-        ref={hintRef}
-        className="swipe-hint absolute inset-0 items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive"
+        className="relative overflow-hidden rounded-lg"
+        ref={wrapRef}
       >
-        <Trash2
-          ref={iconRef}
-          size={18}
-          strokeWidth={2.5}
-          className="shrink-0 stroke-primary-foreground fill-none [transform:scale(var(--icon-scale,1))] transition-transform duration-150"
-        />
-        <span className="text-xs font-bold text-primary-foreground whitespace-nowrap">Delete</span>
-      </div>
+        {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
+        <div
+          ref={hintRef}
+          className="swipe-hint absolute inset-0 items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive"
+        >
+          <Trash2
+            ref={iconRef}
+            size={18}
+            strokeWidth={2.5}
+            className="shrink-0 stroke-primary-foreground fill-none [transform:scale(var(--icon-scale,1))] transition-transform duration-150"
+          />
+          <span className="text-xs font-bold text-primary-foreground whitespace-nowrap">Delete</span>
+        </div>
 
-      {/* Main row — transform driven by CSS (.swipe-row) */}
-      <div ref={rowRef} className="swipe-row relative z-10 bg-background touch-pan-y select-none">
-        <OccurrenceCard
-          occ={occ}
-          now={now}
-          leadingIcon="checkbox"
-          onOpen={() => onOpen(occ)}
-          onToggleDone={() => onToggleDone(occ)}
-          showDate={showDate}
-          listedOn={listedOn}
-          animate={false}
-        />
+        {/* Main row — transform driven by CSS (.swipe-row) */}
+        <div ref={rowRef} className="swipe-row relative z-10 bg-background touch-pan-y select-none">
+          <OccurrenceCard
+            occ={occ}
+            now={now}
+            leadingIcon="checkbox"
+            onOpen={() => onOpen(occ)}
+            onToggleDone={() => onToggleDone(occ)}
+            showDate={showDate}
+            listedOn={listedOn}
+            animate={false}
+          />
+        </div>
       </div>
     </div>
   )
