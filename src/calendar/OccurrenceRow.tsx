@@ -2,6 +2,8 @@ import { memo, useRef, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import { OccurrenceCard } from '@/components'
+import { occState } from '@/occView'
+import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
 
 interface Props {
@@ -30,6 +32,15 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
   const roots     = useStore(s => s.roots)
   const backlinks = useStore(s => s.backlinks)
   const listedOn  = (backlinks.get(occ.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug)
+
+  // Mirrors OccurrenceCard's own `dimmed` (isDone || isPast) so this row's
+  // outer wrapper — which hosts the elevation shadow OccurrenceCard's own
+  // shadow can't show here (see the overflow-hidden comment below) — drops
+  // it for done/past items too. Deliberately doesn't chase OccurrenceCard's
+  // brief post-click optimistic-done state: the store commit that follows a
+  // toggle click lands within the same tick, so the two are indistinguishable
+  // in practice.
+  const dimmed = !!occ.metadata.done || occState(occ, now) === 'event-past'
 
   const wrapRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
@@ -148,7 +159,7 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
     // but that same overflow-hidden clips any box-shadow on the card inside
     // it since the card fills this box exactly. So the shadow lives on this
     // outer, unclipped box instead, wrapping the actual clip boundary.
-    <div className="relative rounded-lg mx-3.5 mb-1.5 shadow-sm" data-occ-key={occ.id}>
+    <div className={cn('relative rounded-lg mx-3.5 mb-1.5', !dimmed && 'shadow-sm')} data-occ-key={occ.id}>
       <div
         className="relative overflow-hidden rounded-lg"
         ref={wrapRef}

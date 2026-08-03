@@ -11,8 +11,12 @@ function DimmableCard({ dimmed, className, children, ...props }: DimmableCardPro
   return (
     <Card
       className={cn(
-        'relative shadow-sm bg-card border border-input rounded-lg transition-colors hover:bg-accent',
-        dimmed && 'overflow-hidden',
+        'relative bg-card border border-input rounded-lg transition-colors hover:bg-accent',
+        // Card's own base className always sets shadow-sm (see ui/card.tsx),
+        // so removing the shadow when dimmed needs an explicit shadow-none —
+        // tailwind-merge only overrides a utility that's actually present in
+        // the merged class list, omitting shadow-sm here wouldn't cancel it.
+        dimmed ? 'overflow-hidden shadow-none' : 'shadow-sm',
         className,
       )}
       {...props}
