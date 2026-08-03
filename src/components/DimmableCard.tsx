@@ -18,8 +18,12 @@ function DimmableCard({ dimmed, className, children, ...props }: DimmableCardPro
         // the merged class list, omitting shadow-sm here wouldn't cancel it.
         // --shadow-card (not shadow-sm) because Tailwind's default shadow-sm
         // (black at .1 opacity) is nearly invisible against these dark
-        // surfaces — see the token's definition in index.css.
-        dimmed ? 'overflow-hidden shadow-none' : 'shadow-[var(--shadow-card)]',
+        // surfaces — see the token's definition in index.css. Must use the
+        // shadow-(--foo) custom-property shorthand, not shadow-[var(--foo)]:
+        // tailwind-merge doesn't classify the bracket form as a shadow value,
+        // so it wouldn't drop Card's own shadow-sm and both would ship,
+        // leaving shadow-sm to win in the generated CSS.
+        dimmed ? 'overflow-hidden shadow-none' : 'shadow-(--shadow-card)',
         className,
       )}
       {...props}
