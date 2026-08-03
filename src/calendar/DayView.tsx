@@ -5,7 +5,7 @@ import { addDays } from '@/format'
 import DayPane, { HP, TOP_PAD, DEFAULT_SCROLL_HOUR } from './DayPane'
 import { useCarousel } from './useCarousel'
 import { PANE_COUNT } from './snapCarousel'
-import { calendarView, setDayPreview, setTopbarShadow } from './viewState'
+import { calendarView, setDayPreview } from './viewState'
 
 const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 
@@ -65,23 +65,12 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
   const handleVerticalScroll = useCallback((key: string, scrollTop: number) => {
     if (vSyncingRef.current) return
     sharedTopRef.current = scrollTop
-    // Only the center pane is interactive (siblings are inert), so its scroll
-    // is the one that should drive the shared #mainTop header's shadow.
-    if (key === paneKeys[CENTER_PANE]) setTopbarShadow(scrollTop > 0)
     vSyncingRef.current = true
     mirrorScrollTop(scrollersRef.current, key, scrollTop)
     requestAnimationFrame(() => { vSyncingRef.current = false })
-  }, [paneKeys])
+  }, [])
 
   const getInitialScrollTop = useCallback(() => sharedTopRef.current, [])
-
-  // Timelines default to a 7am scroll offset (see DEFAULT_SCROLL_HOUR), so the
-  // shadow should already show on mount rather than waiting for a user scroll.
-  // Cleared on unmount so it doesn't linger into a view that doesn't set it.
-  useEffect(() => {
-    setTopbarShadow(sharedTopRef.current > 0)
-    return () => setTopbarShadow(false)
-  }, [])
 
   return (
     // Embla viewport → container → panes. touch-pan-y hands vertical drags to

@@ -261,12 +261,6 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
     el.scrollTop = getInitialScrollTopRef.current()
   }, [])
 
-  // Drives the All-day strip's scroll shadow. Seeded from the initial scroll
-  // offset (7am by default — see getInitialScrollTopRef above) rather than
-  // false, so the shadow is already correct on first paint instead of waiting
-  // for a scroll event.
-  const [timelineScrolled, setTimelineScrolled] = useState(() => getInitialScrollTop() > 0)
-
   const totalCols = Math.max(cols.length, 1)
   const isToday   = sameDay(dvDate, today)
 
@@ -300,7 +294,7 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
       {/* All-day / multiday strip. px-2 = RIGHT_PAD, so the all-day items
           share a right edge with the timeline's event blocks beneath them. */}
       {allDay.length > 0 && (
-        <div className={cn('px-2 py-1.5 border-b border-input bg-card shrink-0 transition-shadow', timelineScrolled && 'shadow-md')}>
+        <div className="px-2 py-1.5 border-b border-input bg-card shrink-0 shadow-md relative z-10">
           <div className="text-2xs font-semibold tracking-[.07em] uppercase text-muted-foreground mb-1">All day</div>
 
           {/* Always-visible first N items */}
@@ -338,11 +332,7 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
       <div
         className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch] relative pb-5"
         ref={setScrollerRef}
-        onScroll={e => {
-          const top = e.currentTarget.scrollTop
-          setTimelineScrolled(top > 0)
-          onVerticalScroll(dateKey, top)
-        }}
+        onScroll={e => onVerticalScroll(dateKey, e.currentTarget.scrollTop)}
       >
         <div className="relative" style={{ height: HOURS * HP + TOP_PAD + BOTTOM_PAD }}>
 

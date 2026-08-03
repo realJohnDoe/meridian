@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { ArrowLeft, Search, X } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import SearchResults from './SearchResults'
@@ -33,18 +33,6 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
   const inputRef = useRef<HTMLInputElement>(null)
   const mobileScrollRef = useRef<HTMLDivElement>(null)
   const desktopScrollRef = useRef<HTMLDivElement>(null)
-  // Drives the pinned top row's scroll shadow once results scroll beneath it.
-  // Reset whenever the overlay reopens (the dialog's DOM — and its scrollTop —
-  // was torn down while closed, so a stale `true` from the prior session would
-  // otherwise show a shadow before the first scroll event corrects it).
-  // Adjusting state during render, not in an effect, per React's "resetting
-  // state when a prop changes" pattern — avoids an extra render pass.
-  const [resultsScrolled, setResultsScrolled] = useState(false)
-  const [prevOpen, setPrevOpen] = useState(open)
-  if (open !== prevOpen) {
-    setPrevOpen(open)
-    if (open) setResultsScrolled(false)
-  }
 
   // Focus the input whenever the mobile layer opens so the keyboard comes up immediately.
   useEffect(() => {
@@ -80,7 +68,7 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
         className="mobile-search-overlay fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto"
       >
         {/* Top input row — pinned, always visible */}
-        <div className={cn('shrink-0 flex items-center gap-2 px-3.5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 border-b border-border transition-shadow', resultsScrolled && 'shadow-md')}>
+        <div className="relative z-10 shrink-0 flex items-center gap-2 px-3.5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 border-b border-border shadow-md">
           <IconButton
             variant="ghost"
             className="w-9 h-9 text-muted-foreground"
@@ -111,11 +99,7 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
         </div>
 
         {/* Results — scroll region; keyboard sits below this */}
-        <div
-          ref={mobileScrollRef}
-          className="flex-1 min-h-0 overflow-y-auto [-webkit-overflow-scrolling:touch]"
-          onScroll={e => setResultsScrolled(e.currentTarget.scrollTop > 0)}
-        >
+        <div ref={mobileScrollRef} className="flex-1 min-h-0 overflow-y-auto [-webkit-overflow-scrolling:touch]">
           <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} scrollRef={mobileScrollRef} />
         </div>
       </div>

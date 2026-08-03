@@ -11,7 +11,7 @@ import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useToday } from '@/hooks'
 import { useNow } from './useNow'
-import { useScrollToTodayOnce, setAgendaTopDate, markScrolledToToday, setTopbarShadow } from './viewState'
+import { useScrollToTodayOnce, setAgendaTopDate, markScrolledToToday } from './viewState'
 
 interface Props {
   onOpen: (occ: Occurrence, scope?: EditScope) => void
@@ -105,7 +105,6 @@ export default function AgendaView({ onOpen }: Props) {
     const items = virtualizer.getVirtualItems()
     if (!items.length) return
     const offset = virtualizer.scrollOffset ?? 0
-    setTopbarShadow(offset > 0)
     const top = items.find(vi => vi.end > offset + 12) ?? items[0]!  // items.length checked above
     // `?? fmtISO(today)` guards a stale `rows` capture: this listener closes
     // over the render's rows while the virtualizer's items may be newer.
@@ -123,10 +122,6 @@ export default function AgendaView({ onOpen }: Props) {
     el.addEventListener('scroll', updateTopDate, { passive: true })
     return () => el.removeEventListener('scroll', updateTopDate)
   }, [updateTopDate])
-
-  // Clear the shared topbar shadow flag on unmount so a lingering "scrolled"
-  // value from this view doesn't flash on the next view sharing #mainTop.
-  useEffect(() => () => setTopbarShadow(false), [])
 
   // Covers what the scroll listener can't: the initial label on mount, and
   // keeping it correct if `today` flips at midnight (a PWA left open
