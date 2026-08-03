@@ -16,7 +16,7 @@ import type { VaultRef, GitHubVaultRef } from '@/types'
 import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress, setUnreadableFiles } from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
-import { syncOnActivate, parseFiles, reportParseFailures, updateSyncUI } from './sync'
+import { syncOnActivate, parseFiles, reportParseFailures, reportRoundTripLosses, updateSyncUI } from './sync'
 // ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
 
 const _vaultChangedListeners = new Set<() => void>()
@@ -61,10 +61,11 @@ async function hydrateFromCache(vaultId: string): Promise<boolean> {
     setUnreadableFiles(new Map())
     return false
   }
-  const { items, roots, failures } = parseFiles(cached)
+  const { items, roots, failures, lossy } = parseFiles(cached)
   setData({ items, roots })
   setUnreadableFiles(new Map(failures.map(f => [f.slug, { path: f.path, message: f.message }])))
   reportParseFailures(failures)
+  reportRoundTripLosses(lossy)
   return true
 }
 
@@ -100,10 +101,11 @@ async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<v
   const backend = new ExampleBackend()
   await setActiveVaultIdentity(backend, { persist: opts.persist ?? true })
   const files = await backend.readAll()
-  const { items, roots, failures } = parseFiles(files)
+  const { items, roots, failures, lossy } = parseFiles(files)
   setData({ items, roots })
   setUnreadableFiles(new Map(failures.map(f => [f.slug, { path: f.path, message: f.message }])))
   reportParseFailures(failures)
+  reportRoundTripLosses(lossy)
   updateSyncUI()
   emitVaultChanged()
 }

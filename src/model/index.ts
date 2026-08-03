@@ -4,6 +4,7 @@ export type { StoreData, EditorFields, EditFields, SeriesContext } from './store
 export { fileSlugItems, findSeries, seriesContext, upsertOverride, applyEdit, newEntrySlug, toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing, occFromAppMeta } from './storeOps'
 export { parseToStoreItems } from './storeItems'
 export { collapseToYaml } from './collapse'
+export { roundTripLoss } from './roundTripCheck'
 export { parseDuration, parseDurationDays, parseDurationHours } from './duration'
 export { serialiseInterval, monthlyWeekdaySpec, repeatToForm, formToRepeat } from './repeat'
 export type { RepeatForm, RepeatFormContext, RepeatFormFreq, ScheduleFreq, MonthlyMode, RepeatEndType } from './repeat'

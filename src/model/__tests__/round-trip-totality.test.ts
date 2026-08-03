@@ -35,8 +35,9 @@
  */
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
+import { roundTripLoss } from '@/model/roundTripCheck'
 import { isSeries, isTracked } from '@/types'
-import { collectKeyValues, frontmatterOf, normalizeIds, serialize } from './helpers'
+import { fixtureNames, loadFixture, frontmatterOf, normalizeIds, serialize } from './helpers'
 
 /** Check 1 — collapse totality. Store must survive its own serialization. */
 function assertCollapseTotality(slug: string, source: string): void {
@@ -49,15 +50,52 @@ function assertCollapseTotality(slug: string, source: string): void {
  * Check 2 — source fidelity. Every key/value pair the source had must survive an
  * UNEDITED save. Do not call this after an `applyEdit` — an intentional change
  * (e.g. `done: false` → `true`) reads as a "lost" pair and false-positives.
+ *
+ * Delegates to the *production* guard (`roundTripLoss`, wired into `parseFiles`)
+ * rather than reimplementing the comparison, so every case below doubles as a
+ * test of the thing that actually runs on a user's vault.
  */
 function assertSourceFidelity(slug: string, source: string): void {
-  const original = parseToStoreItems(`${slug}.md`, source)
-  const saved = serialize(original.items, original.root)
-  const before = new Set(collectKeyValues(frontmatterOf(source)))
-  const after = new Set(collectKeyValues(frontmatterOf(saved)))
-  const lost = [...before].filter(pair => !after.has(pair))
-  expect(lost).toEqual([])
+  const parsed = parseToStoreItems(`${slug}.md`, source)
+  expect(roundTripLoss(`${slug}.md`, source, parsed)).toEqual([])
 }
+
+// ── The runtime guard itself ────────────────────────────────────────────────
+//
+// `roundTripLoss` is wired into `parseFiles`, so it runs over every file on
+// every vault load and warns the user if a save would drop frontmatter. It is
+// expected to never fire. That makes it exactly the kind of code that can rot
+// into a no-op unnoticed, so these pin both directions: silent on every real
+// file, and genuinely capable of detecting a loss.
+
+describe('roundTripLoss — the runtime guard', () => {
+  it.each(fixtureNames())('reports no loss for %s', (name) => {
+    const source = loadFixture(name)
+    const parsed = parseToStoreItems(`${name}.md`, source)
+    expect(roundTripLoss(`${name}.md`, source, parsed)).toEqual([])
+  })
+
+  // Non-vacuousness. Everything the survey found is fixed, so no real file
+  // trips this any more — which means "it returns []" proves nothing on its
+  // own. Feeding it a deliberately-lobotomised parse (the unknown-key bag
+  // emptied, simulating a future collapse regression that stops emitting it)
+  // proves the detector still detects.
+  it('reports the missing keys when a save would genuinely drop them', () => {
+    const source = [
+      '---',
+      'title: Quarterly review',
+      'project: apollo',
+      'date: 2026-04-08',
+      '---',
+    ].join('\n')
+    const parsed = parseToStoreItems('qr.md', source)
+    const lobotomised = {
+      ...parsed,
+      items: parsed.items.map(i => ({ ...i, metadata: { ...i.metadata, extra: undefined } })),
+    }
+    expect(roundTripLoss('qr.md', source, lobotomised)).toEqual(['project="apollo"'])
+  })
+})
 
 describe('Root A totality — closed leaks (regression guards)', () => {
   // Finding #3, fixed: excluding an occurrence used to discard every field it

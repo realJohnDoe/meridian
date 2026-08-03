@@ -8,7 +8,7 @@ import type { CacheRecord } from '@/storage/cache'
 import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
-import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile } from '@/model'
+import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile, roundTripLoss } from '@/model'
 import { pathToSlug, slugToPath } from '@/fileIO'
 import type { StoreItem, Roots } from '@/types'
 import {
@@ -42,24 +42,41 @@ export interface ParseFailure {
   message: string
 }
 
+/** A file that loads fine but would lose frontmatter on save — see `roundTripLoss`. */
+export interface RoundTripLoss {
+  path: string
+  /** The `key=value` pairs a save would drop. Never empty. */
+  lost: string[]
+}
+
 export function parseFiles(
   files: Array<{ path: string; content: string }>,
-): { items: StoreItem[]; roots: Roots; failures: ParseFailure[] } {
+): { items: StoreItem[]; roots: Roots; failures: ParseFailure[]; lossy: RoundTripLoss[] } {
   const loaded: StoreItem[] = []
   const roots: Roots = new Map()
   const failures: ParseFailure[] = []
+  const lossy: RoundTripLoss[] = []
   for (const { path, content } of files) {
     try {
       const parsed = parseToStoreItems(path, content)
       loaded.push(...parsed.items)
       roots.set(pathToSlug(path), parsed.root)
+      // Expected to be empty for every file — see roundTripCheck.ts. Runs here
+      // rather than at save because it is only sound on an UNEDITED round trip
+      // (after an edit, an intentional change reads as a "loss"), and because
+      // here it fires while the file on disk is still untouched.
+      const lost = roundTripLoss(path, content, parsed)
+      if (lost.length > 0) {
+        lossy.push({ path, lost })
+        console.warn('[vault] save would drop frontmatter from', path, lost)
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       failures.push({ path, slug: pathToSlug(path), message })
       console.warn('[vault] parse failed for', path, e)
     }
   }
-  return { items: loaded, roots, failures }
+  return { items: loaded, roots, failures, lossy }
 }
 
 /**
@@ -77,6 +94,37 @@ export function reportParseFailures(failures: ParseFailure[]): void {
     return
   }
   warn(`Couldn't read ${failures.length} files: ${failures.map(f => f.path).join(', ')}`)
+}
+
+/** Keys already reported this session, so a re-load or a reconcile touching the
+ *  same file doesn't re-toast. Session-scoped by design: a reload is a fresh
+ *  chance to notice, and this never grows beyond the number of affected files
+ *  (expected: zero). */
+const _reportedLossy = new Set<string>()
+
+/**
+ * Surface a file that loads fine but would lose frontmatter on save.
+ *
+ * This is a Meridian bug, not something the user did wrong — every known cause
+ * is fixed and test-pinned — so the message says so and asks for a report
+ * rather than offering a fix. Deliberately just a warning: it does not block
+ * the write or quarantine the file. If this ever actually fires, that is the
+ * point to decide whether it should. See `roundTripCheck.ts`.
+ */
+export function reportRoundTripLosses(lossy: RoundTripLoss[]): void {
+  const fresh = lossy.filter(l => !_reportedLossy.has(l.path))
+  if (fresh.length === 0) return
+  for (const l of fresh) _reportedLossy.add(l.path)
+
+  const [first] = fresh
+  if (first && fresh.length === 1) {
+    // Cap the key list: a pathological file shouldn't produce a wall of text.
+    const keys = first.lost.slice(0, 3).join(', ')
+    const more = first.lost.length > 3 ? `, +${first.lost.length - 3} more` : ''
+    warn(`Editing ${first.path} in Meridian would drop frontmatter (${keys}${more}). This is a bug — please report it.`)
+    return
+  }
+  warn(`Editing these ${fresh.length} files in Meridian would drop frontmatter: ${fresh.map(f => f.path).join(', ')}. This is a bug — please report it.`)
 }
 
 // ── COLLISION RESOLUTION ───────────────────────────────────────────
@@ -291,11 +339,12 @@ function mergeChangedIntoStore(
     [...getUnreadableFiles()].filter(([slug]) => !affectedSlugs.has(slug)),
   )
 
-  const { items: newItems, roots: newRoots, failures } = parseFiles(records)
+  const { items: newItems, roots: newRoots, failures, lossy } = parseFiles(records)
   setData({ items: [...keptItems, ...newItems], roots: new Map([...keptRoots, ...newRoots]) })
   for (const f of failures) keptUnreadable.set(f.slug, { path: f.path, message: f.message })
   setUnreadableFiles(keptUnreadable)
   reportParseFailures(failures)
+  reportRoundTripLosses(lossy)
 }
 
 // Above this many changed paths, a per-file readFiles() fan-out risks the same
