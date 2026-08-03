@@ -73,8 +73,10 @@ const {
         items: files.map(f => ({ fileSlug: f.path })),
         roots: new Map(files.map(f => [f.path, { body: f.content }])),
         failures: [] as Array<{ path: string; slug: string; message: string }>,
+        lossy: [] as Array<{ path: string; lost: string[] }>,
       })),
       reportParseFailures: vi.fn(),
+      reportRoundTripLosses: vi.fn(),
       updateSyncUI: vi.fn(),
     },
   }
@@ -217,6 +219,7 @@ beforeEach(() => {
   syncFns.syncOnActivate.mockClear()
   syncFns.parseFiles.mockClear()
   syncFns.reportParseFailures.mockClear()
+  syncFns.reportRoundTripLosses.mockClear()
   syncFns.updateSyncUI.mockClear()
   backendConfig.localPermission = 'granted'
   backendConfig.githubPermission = 'granted'

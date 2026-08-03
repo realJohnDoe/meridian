@@ -69,7 +69,7 @@ export default function SearchBar() {
 
       <div className={cn('relative z-search-bar px-3.5 pt-3.5 pb-[max(14px,env(safe-area-inset-bottom))] flex flex-col gap-2', searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm')}>
         <div className="search-bar-wrap w-full max-w-xl mx-auto">
-          <Search size={15} className="shrink-0 stroke-muted-foreground fill-none" />
+          <Search size={15} className="shrink-0 stroke-card-foreground fill-none" />
           {/*
            * Mobile: onClick opens the full-screen overlay (router push).
            * Desktop: typing directly updates sq via onChange (router replace).
@@ -77,7 +77,7 @@ export default function SearchBar() {
           <Input
             id="filterInput"
             variant="ghost"
-            className="flex-1 min-w-0"
+            className="flex-1 min-w-0 placeholder:text-card-foreground"
             placeholder="Search or create…"
             value={filterQuery}
             onClick={openSearch}
