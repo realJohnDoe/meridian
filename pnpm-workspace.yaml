@@ -18,10 +18,12 @@ minimumReleaseAge: 1440
 # module, RCE via NPM_CONFIG_REGISTRY). All paths run through vite.
 # brace-expansion has GHSA-3jxr-9vmj-r5cp (DoS via exponential-time expansion
 # of consecutive non-expanding {} groups) and GHSA-mh99-v99m-4gvg (DoS via
-# unbounded expansion length, <=5.0.7, patched >=5.0.8). Pulled in
-# transitively (dev-only, via vite-plugin-pwa and the eslint toolchain) at
-# three vulnerable major lines (1.x, 2.x, 5.x) — only the 5.x line ever got
-# a patch, so every consumer is forced onto it regardless of the major it
+# unbounded expansion length, <=5.0.7, patched >=5.0.8). GHSA-rgw5-rvv9-x895
+# (DoS via unbounded intermediate arrays, bypassing the GHSA-mh99 mitigation,
+# <5.0.9, patched >=5.0.9) supersedes that floor. Pulled in transitively
+# (dev-only, via vite-plugin-pwa and the eslint toolchain) at three
+# vulnerable major lines (1.x, 2.x, 5.x) — only the 5.x line ever got a
+# patch, so every consumer is forced onto it regardless of the major it
 # originally requested. brace-expansion's CJS/ESM API has stayed stable
 # across majors, so this is safe for these dev-only consumers.
 # fast-uri <3.1.4 has GHSA-v2hh-gcrm-f6hx (host confusion via literal backslash
@@ -32,7 +34,7 @@ minimumReleaseAge: 1440
 # Also pulled in transitively (dev-only) via wrangler's miniflare dependency.
 overrides:
   esbuild: ">=0.28.1"
-  brace-expansion: ">=5.0.8"
+  brace-expansion: ">=5.0.9"
   fast-uri: ">=3.1.4"
   sharp: ">=0.35.0"
 
