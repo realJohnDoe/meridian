@@ -121,6 +121,15 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
 
   useLayoutEffect(() => { settleFnRef.current = settle }, [settle])
 
+  // Fires on every way a hold can end (mouse up, touch end, touch/pointer
+  // cancel). Kicks a settle pass off right away rather than waiting out
+  // whatever quiet-scroll timer was last queued.
+  const release = useCallback(() => {
+    pointerDownRef.current = false
+    clearTimeout(settleRef.current)
+    settleRef.current = setTimeout(settle, SETTLE_MS)
+  }, [settle])
+
   useEffect(() => () => {
     clearTimeout(settleRef.current)
     clearTimeout(animTimerRef.current)
@@ -226,13 +235,10 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
         onPointerDown={() => { animRef.current = null; pointerDownRef.current = true }}
         onTouchStart={() => { animRef.current = null; pointerDownRef.current = true }}
         onWheel={() => { animRef.current = null }}
-        // Release the hold once the finger/mouse actually lifts, so a still
-        // touch no longer blocks settle indefinitely — and kick a settle pass
-        // off right away instead of waiting out whatever was last queued.
-        onPointerUp={() => { pointerDownRef.current = false; clearTimeout(settleRef.current); settleRef.current = setTimeout(settle, SETTLE_MS) }}
-        onPointerCancel={() => { pointerDownRef.current = false; clearTimeout(settleRef.current); settleRef.current = setTimeout(settle, SETTLE_MS) }}
-        onTouchEnd={() => { pointerDownRef.current = false; clearTimeout(settleRef.current); settleRef.current = setTimeout(settle, SETTLE_MS) }}
-        onTouchCancel={() => { pointerDownRef.current = false; clearTimeout(settleRef.current); settleRef.current = setTimeout(settle, SETTLE_MS) }}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onTouchEnd={release}
+        onTouchCancel={release}
         onClick={e => {
           const hit = (e.target as HTMLElement).closest<HTMLElement>('[data-n]')
           if (hit) onChange(Number(hit.dataset.n), 0)
