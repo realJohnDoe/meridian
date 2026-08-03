@@ -23,7 +23,7 @@ export default function SearchResults({ query, onOpen, onCreate, scrollRef }: Pr
         <div className="px-3.5 pt-2">
           <button
             type="button"
-            className="flex w-full items-center gap-2 pl-2 pr-2.5 py-2 rounded-lg border border-dashed border-border/60 bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
+            className="flex w-full items-center gap-2 pl-2 pr-2.5 py-2 rounded-lg border border-dashed border-input bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
             onClick={() => onCreate(query)}
             aria-label={`Create "${query}"`}
           >

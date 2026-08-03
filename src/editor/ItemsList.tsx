@@ -297,7 +297,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                 </div>
               ) : (
                 <Card
-                  className="flex items-center gap-2 pl-2 pr-2.5 py-2 border-dashed bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
+                  className="flex items-center gap-2 pl-2 pr-2.5 py-2 border-dashed border-input bg-transparent shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
                   onClick={() => setPickerOpen(true)}
                 >
                   <Plus size={13} className="shrink-0" />
