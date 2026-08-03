@@ -8,11 +8,10 @@ Brief: [health-survey-data-integrity.md](health-survey-data-integrity.md).
 > architectural root** (A, C, D, E) and every `it.fails` ratchet this survey
 > opened.
 >
-> **Still open:** **B-runtime** — wiring the two read-back checks into the
-> production save/load path. Sequenced last by design and now fully unblocked:
-> every leak that would have made it a permanent alarm is closed. It also
-> carries two open product questions (warn vs. refuse-to-write, and the
-> message wording) — see §2 Root B. §1's verdict below and each finding's own body are
+> **Nothing from the survey is open.** All 8 findings and all 5 roots are
+> closed, plus B-runtime as a minimal runtime guard (warning-only, source-
+> fidelity half — see Root B for what was deliberately scoped out and why).
+> §1's verdict below and each finding's own body are
 > kept as the **original, unedited assessment** — the historical record of
 > what the audit found — with a **Verification** block appended to each fixed
 > finding recording what actually landed, what was checked before landing it,
@@ -39,7 +38,7 @@ Every finding below is a symptom. This section is the diagnosis: five structural
 | Root | Property | Findings | Root fix | Tier |
 |---|---|---|---|---|
 | **A** | The file is a projection of the store, and nothing requires the projection to be **total** | ~~#2a~~, ~~#2b~~, ~~#3~~, ~~#5~~, ~~#8~~ — **all fixed** | Totality enforced by one relational emit rule in `collapse.ts` + the parse-side remainder homes; no provenance restructure needed | Opus 5, plan mode / multi-PR |
-| **B** | **Nothing reads back what it wrote** — the store is never compared against what actually landed | *why* A's leaks, and #7, are all silent | Two read-back checks (collapse totality at save, source fidelity at load), split into **B-test** (done — `round-trip-totality.test.ts`) and **B-runtime** (still open) — see below. ~162 ms/300 files | Sonnet 5 |
+| **B** | ~~**Nothing reads back what it wrote**~~ — **CLOSED** | *why* A's leaks, and #7, are all silent | **B-test** (`round-trip-totality.test.ts`) + **B-runtime** (`roundTripLoss` in `parseFiles`, warning-only, source-fidelity half). ~162 ms/300 files | Sonnet 5 |
 | **C** | The one cache transition allowed to destroy local content has an unenforced precondition | ~~#1, #4~~ (**fixed**) | Decision table landed; the cache-API type change is still open — see Root C | Sonnet 5 → Opus 5 |
 | **D** | ~~A viewer preference is an input to a domain computation~~ — **FIXED** | #6 | `weekStart` removed from the expansion API; the week is grounded on the series anchor | Opus 5 |
 | **E** | ~~Store transitions don't report which files they touched~~ — **FIXED** | #7 | Scoped to the one transition with a hidden blast radius (`deleteByFileSlug`), not all seven | Haiku 4.5 |
@@ -115,7 +114,11 @@ Note what this does **not** do: it does not fix a single finding. It is a **ratc
 
 - **B-test — DONE.** `src/model/__tests__/round-trip-totality.test.ts` implements both checks as reusable functions (`assertCollapseTotality`, `assertSourceFidelity`) and pins the leaks the fixture corpus didn't cover — an excluded instance carrying metadata (#3), a title on a non-root node (#5), and a narrower, non-normalisation-conflicting slice of #8 (a save must never mix CRLF and bare LF in one file) — as `it.fails` cases, so the suite stayed green while each was open. **Verified the ratchet actually ratchets**, not just documents: before landing #3's real fix, patching `serializeChildren` to emit the excluded child's diffed metadata was tried, and it flipped the case from expected-fail to `Error: Expect test to fail` — proof a real fix is required to close it, not just any change. #3's case has since been flipped to a normal `it` and moved into a "closed leaks" describe block — see finding #3's verification note. #5 and #8's narrow slice remain `it.fails`. The two blanket corpus suites (`yaml-roundtrip.test.ts`'s "preserves store structure", `unknown-keys.test.ts`'s "no key loss") were deliberately left untouched rather than folding the new fixtures into `fixtures/` — adding a known-failing case to an `it.each` sweep with no all-fixtures-pass guarantee would have gone red immediately; keeping the two classes separate is what lets this be a ratchet instead of a broken build.
 - **Not built:** #2 has no fixture-corpus form — it only exists relative to an `applyEdit` call, which is out of scope for an *unedited* round-trip check. Its own repro (finding #2) is the thing that pins it.
-- **B-runtime — still to do.** Wiring the checks into `writeEntityToCache` and the load path. It **cannot be switched on until the leaks close** (constraint 1 below), and for the four leaks already found it is redundant — each arrives with its own regression test. Its value is the *fifth* leak and regression prevention afterwards, which is precisely the value a ratchet has once the thing it protects is already correct.
+- **B-runtime — DONE, deliberately as the minimum viable version.** `src/model/roundTripCheck.ts` exports `roundTripLoss(path, content, parsed)`, wired into `parseFiles` so it runs over every file on every vault load and every reconcile merge; `reportRoundTripLosses` warns the user, deduped per path per session, reusing the `reportParseFailures` channel that already sits beside it.
+
+  **Only the source-fidelity half was wired up**, and the scope decision is worth recording. Collapse-totality would need id-normalised `StoreItem` comparison in production, could only report *"something changed"* rather than naming a key, and its one uniquely-covered class (#2 — an edit's intent not surviving) exists only relative to an `applyEdit` call, so a load-time check cannot observe it at all. Source-fidelity, by contrast, names the exact `key=value` pairs at risk and — per the measurement table above — catches #3 and #5's classes anyway. Both halves stay covered by tests. Given the guard is expected to never fire, the second half was deferred until there is an actual case in hand rather than a hypothetical.
+
+  **It warns; it does not refuse the write or quarantine the file.** The refuse-vs-warn question from the constraints below is deliberately left open: deciding it now would mean designing a lockout UX for an event that should never happen. If it ever fires, that is the moment to decide, with a real file to look at.
 
 An earlier draft of this report recommended doing B wholesale first. Measuring it showed that to be wrong: the runtime half would have spent the whole project muted.
 
@@ -241,7 +244,7 @@ Vaults used: the 16-file shipped Tutorial vault (`exampleBackend.ts`), the 18 `s
 |---|---|
 | `pnpm run build` | **PASS** (exit 0) |
 | `pnpm run lint` | **PASS** — 0 errors, 14 pre-existing warnings (all `react-hooks/incompatible-library` on TanStack Virtual/Router) |
-| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; 940+1 after #5; 943+0 after #8; 947+0 after #2a; 949+0 after Root E (#7); **951 passed, 0 expected-fail after Root D (#6)**. Every ratchet case this survey opened is now closed. See §2 and every finding's verification block |
+| `pnpm test` | **PASS** — 75 files, 926 tests (survey run). Since: 926+3 expected-fail after B-test; 928+2 after #3; 933+2 after Root C (#1+#4); 937+2 after #2b; 940+1 after #5; 943+0 after #8; 947+0 after #2a; 949+0 after Root E (#7); 951+0 after Root D (#6); **970 passed, 0 expected-fail after B-runtime** (+19: the guard's own 18-fixture sweep and its non-vacuousness test). Every ratchet case this survey opened is now closed. See §2 and every finding's verification block |
 | `pnpm run test:coverage` | **PASS** — all thresholds met. Totals 61.69% stmts / 58.19% branch / 64.02% lines |
 
 Coverage pointers worth acting on (pointers, not findings):
@@ -315,7 +318,7 @@ Ranked by `(impact × breadth) ÷ effort` with the scoring guidance's tiebreaker
 7. **#2a — done.** The last leak in Root A. Replaced the unary emit predicate with one relational rule ("omit only when omitting round-trips"), which deleted `diffMetadata` and `hoistSharedMetadata`'s diff half rather than adding a mode flag. Also required a parse-side rule for `done: null` (finding #2a-ii, decided as Option A) which closed a latent third-state bug on the way.
 8. **Root E — done.** Scoped to the one transition with a hidden blast radius (`deleteByFileSlug`), not all seven exported transitions — the root-fix line's "every transition" framing was wider than the actual defect. #7's two halves (missed persistence, undo restoration) turned out to share one fix rather than needing the undo half done separately "by hand" as originally guessed; the real complication was a timing race (a swipe's deferred commit can fire before its own `apply()` has run), not a missing mechanism.
 9. **Root D — done.** #6. Grounded the `byweekday` week on the series anchor and **removed `weekStart` from the expansion API entirely**, so a viewer preference can no longer reach `expandNode` at all. The migration worry that gated this proved overstated: `interval: 1` is provably unaffected and the affected shape (`weekly` + `interval ≥ 2` + `byweekday`) appears zero times in the fixtures or shipped vault. The words-vs-numbers hypothesis for the root cause was checked and rejected — `byweekday` was always words; the ambiguity was bucketing, not naming.
-10. **B-runtime** — wire the two checks into `writeEntityToCache` and the load path, and flip them from logging-only to `warn()` (or to refusing the write, per Root B's third constraint). By this point they are quiet on a correct vault, so enabling them is a ratchet rather than an alarm.
+10. **B-runtime — done (minimum viable).** `roundTripLoss` in `parseFiles` + a deduped `warn()`. Source-fidelity half only, warning-only; see Root B for why each half of that was scoped down and what is deliberately still open.
 
 **Steps 2 and 3's severity-vs-frequency tradeoff is now moot — #3 landed first regardless, and it was cheap enough (one line, two tests) that it barely delayed Root C either way.** For the record, the reasoning that would have applied to a costlier #3: severity-first says C before #3, since #1 is total, silent, unrecoverable loss of an edit (impact 9); frequency-first says the reverse, since #1 needs a conflict *and* a network failure inside a ~1-second window (rare-but-catastrophic) while #3 fired on every delete of a recurring occurrence carrying data (single device, no conflict required). Keep that framework for any future case where step ordering is genuinely expensive to get wrong.
 
