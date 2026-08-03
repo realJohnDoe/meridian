@@ -500,3 +500,43 @@ describe('TimeWheels — handing the wheel back to the user mid-roll', () => {
     expect(emitted).toHaveBeenCalledWith('03:30')
   })
 })
+
+describe('TimeWheels — holding through settle', () => {
+  // Regression: a touch held still (no movement, so no further scroll events)
+  // used to get snapped out from under the finger the moment the quiet-scroll
+  // timer fired, because settle had no way to know the hold hadn't ended.
+  it('does not snap while a touch is still down, even once the settle timer would fire', () => {
+    vi.useFakeTimers()
+    const { hour } = renderWheels('09:30')
+
+    fireEvent.touchStart(hour)
+    setScrollTop(hour, (H.home + 6) * ITEM_H + 10)
+    fireEvent.scroll(hour)
+    vi.advanceTimersByTime(SETTLE_MS * 2)
+
+    expect(hour.scrollTop).toBe((H.home + 6) * ITEM_H + 10)   // left alone mid-hold
+  })
+
+  const releases = [
+    ['touchend',      (el: HTMLElement) => fireEvent.touchEnd(el)],
+    ['touchcancel',   (el: HTMLElement) => fireEvent.touchCancel(el)],
+    ['pointerup',     (el: HTMLElement) => fireEvent.pointerUp(el)],
+    ['pointercancel', (el: HTMLElement) => fireEvent.pointerCancel(el)],
+  ] as const
+
+  it.each(releases)('snaps once the hold ends via %s', (_label, release) => {
+    vi.useFakeTimers()
+    const { hour } = renderWheels('09:30')
+
+    fireEvent.touchStart(hour)
+    setScrollTop(hour, (H.home + 6) * ITEM_H + 10)
+    fireEvent.scroll(hour)
+    vi.advanceTimersByTime(SETTLE_MS)
+    expect(hour.scrollTop).toBe((H.home + 6) * ITEM_H + 10)   // still held, still off-grid
+
+    release(hour)
+    vi.advanceTimersByTime(SETTLE_MS)
+
+    expect(hour.scrollTop).toBe((H.home + 6) * ITEM_H)   // squared up now that it's released
+  })
+})
