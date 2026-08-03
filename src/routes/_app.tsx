@@ -5,7 +5,7 @@ import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
 import { onVaultChanged } from '@/storage'
-import { resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useAgendaTopDate, requestScrollToToday } from '@/calendar'
+import { resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useAgendaTopDate, requestScrollToToday, useTopbarShadow } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ParticipantFilterButton } from '@/components'
 import { IconButton } from '@/components/primitives/icon-button'
@@ -67,11 +67,16 @@ function AppMain() {
   const agendaTopDate = useAgendaTopDate()
   const monthPreview  = useMonthPreview()
   const dayPreview    = useDayPreview()
+  const topbarShadow  = useTopbarShadow()
 
   const isEntryView  = !!entrySlugMatch || !!entryNewMatch
   const isDayView    = !!dayMatch
   const isMonthView  = !!monthMatch
   const isListView   = !!backlogMatch || !!notesMatch
+  // Month/list/entry routes share #mainTop but don't write topbarShadow (only
+  // agenda and day view do — see viewState.ts), so gate on the route too
+  // rather than trusting a value those routes never clear.
+  const showTopbarShadow = topbarShadow && !isMonthView && !isListView && !isEntryView
   const dvDate       = dayMatch ? new Date(dayMatch.params.date + 'T00:00:00') : null
   const monthViewDate = monthMatch ? parseMonth(monthMatch.params.month) : null
 
@@ -109,7 +114,8 @@ function AppMain() {
         <header
           id="mainTop"
           className={cn(
-            'h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10',
+            'h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10 transition-shadow',
+            showTopbarShadow && 'shadow-md',
             isEntryView
               ? 'overflow-hidden'
               // Right edge always leads with an icon button; left edge only does on mobile

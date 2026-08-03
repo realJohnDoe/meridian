@@ -28,6 +28,14 @@ interface CalendarViewState {
   scrollToTodayOnce: boolean
   /** ISO date string of the topmost visible day in the agenda view. */
   agendaTopDate: string | null
+  /**
+   * True once the active view's scroll container has moved off its top edge —
+   * drives the shared `#mainTop` header's scroll shadow (see _app.tsx). Set by
+   * AgendaView and DayView's own scroll handling; other routes sharing the
+   * header (month, list, entry) don't write it, so _app.tsx also gates display
+   * on the current route rather than trusting this flag alone.
+   */
+  topbarShadow: boolean
 }
 
 /** Calendar-view-local ephemeral state — scroll position, carousel previews.
@@ -40,6 +48,7 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   dayPreview: null,
   scrollToTodayOnce: false,
   agendaTopDate: null,
+  topbarShadow: false,
 }))
 
 export function resetCalendarViewState(): void {
@@ -87,6 +96,17 @@ export function useScrollToTodayOnce(): boolean {
 
 export function useAgendaTopDate(): string | null {
   return useZustandStore(calendarView, s => s.agendaTopDate)
+}
+
+export function useTopbarShadow(): boolean {
+  return useZustandStore(calendarView, s => s.topbarShadow)
+}
+
+/** No-op if unchanged, so scroll handlers can call this on every scroll event
+ * without forcing a re-render of every #mainTop subscriber each tick. */
+export function setTopbarShadow(shadow: boolean): void {
+  if (calendarView.getState().topbarShadow === shadow) return
+  calendarView.setState({ topbarShadow: shadow })
 }
 
 /** Flags AgendaView to scroll to today on its next render. */
