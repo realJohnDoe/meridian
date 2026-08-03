@@ -11,8 +11,8 @@ function DimmableCard({ dimmed, className, children, ...props }: DimmableCardPro
   return (
     <Card
       className={cn(
-        'relative shadow-sm bg-card border border-input rounded-lg transition-colors hover:bg-accent',
-        dimmed && 'overflow-hidden',
+        'relative bg-card border border-input rounded-lg transition-colors hover:bg-accent',
+        dimmed ? 'overflow-hidden' : 'shadow-sm',
         className,
       )}
       {...props}
