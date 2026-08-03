@@ -478,18 +478,17 @@
   --priority-2:   #cb4b16;   /* orange */
   --priority-3:   #b58900;   /* yellow */
 
-  /* On-accent text — light ink on every swatch except priority-3 (yellow),
-     per design call: pure black ink (see above) technically wins every
-     swatch by WCAG's luminance-only math, but light ink reads better in
-     practice here (this theme sits chips on a light row background,
-     which the metric doesn't model). priority-3 keeps dark ink — it's
-     the one swatch where dark is a decisive, not marginal, win. */
+  /* On-accent text — light ink on every swatch, including priority-3
+     (yellow): pure black ink (see above) technically wins every swatch by
+     WCAG's luminance-only math, but light ink reads better in practice
+     here (this theme sits chips on a light row background, which the
+     metric doesn't model). */
   --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
   --priority-2-foreground: var(--ink-light);
-  --priority-3-foreground: var(--ink-dark);
+  --priority-3-foreground: var(--ink-light);
 
   /* Sidebar */
   --sidebar:                    #fdf6e3;
@@ -564,14 +563,13 @@
   --priority-3:   #b58900;   /* yellow */
 
   /* On-accent text — mirrors .solarized-light's design call: light ink on
-     every swatch except priority-3 (yellow), the one swatch where dark
-     ink wins decisively rather than marginally. */
+     every swatch, including priority-3 (yellow). */
   --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
   --priority-2-foreground: var(--ink-light);
-  --priority-3-foreground: var(--ink-dark);
+  --priority-3-foreground: var(--ink-light);
 
   /* Sidebar */
   --sidebar:                    #073642;
