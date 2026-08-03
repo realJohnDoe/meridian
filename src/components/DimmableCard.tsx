@@ -16,7 +16,10 @@ function DimmableCard({ dimmed, className, children, ...props }: DimmableCardPro
         // so removing the shadow when dimmed needs an explicit shadow-none —
         // tailwind-merge only overrides a utility that's actually present in
         // the merged class list, omitting shadow-sm here wouldn't cancel it.
-        dimmed ? 'overflow-hidden shadow-none' : 'shadow-sm',
+        // --shadow-card (not shadow-sm) because Tailwind's default shadow-sm
+        // (black at .1 opacity) is nearly invisible against these dark
+        // surfaces — see the token's definition in index.css.
+        dimmed ? 'overflow-hidden shadow-none' : 'shadow-[var(--shadow-card)]',
         className,
       )}
       {...props}

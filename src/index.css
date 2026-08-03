@@ -196,6 +196,13 @@
   --shadow-float:       0 2px 16px rgba(0,0,0,.55), 0 12px 48px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 90%);
   --shadow-float-focus: 0 2px 16px rgba(0,0,0,.55), 0 14px 52px color-mix(in oklab,var(--primary-dark),transparent 58%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 75%);
 
+  /* Resting card elevation (occurrence/markdown cards). Plain Tailwind
+     shadow-sm (black at .1 opacity) reads fine on light surfaces but is
+     nearly invisible against these dark, already-low-contrast surfaces —
+     needs real opacity/blur to actually show, same reasoning as --shadow-float
+     above just toned down for a resting (non-floating) element. */
+  --shadow-card: 0 1px 3px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35);
+
   /* event-border used in EntryBody wikilink underline */
   --event-border: color-mix(in oklab, var(--event), transparent 68%);
 
@@ -427,6 +434,7 @@
   --chip-border: color-mix(in oklab, #9893a5, transparent 68%);
   --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
   --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+  --shadow-card:        0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
 }
 
 /* ── SOLARIZED LIGHT THEME ──────────────────────────────────────── */
@@ -508,6 +516,7 @@
   --chip-border: color-mix(in oklab, #839496, transparent 68%);
   --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
   --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+  --shadow-card:        0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
 }
 
 /* ── SOLARIZED DARK THEME ───────────────────────────────────────── */
@@ -749,6 +758,7 @@
   /* Float shadow — lighter for a light theme */
   --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
   --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+  --shadow-card:        0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
 }
 
 /* ── CATPPUCCIN MOCHA THEME ─────────────────────────────────────── */
