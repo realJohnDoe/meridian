@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Occurrence, Priority } from '@/types'
-import { computeAgendaSections, type Section, type FilterOccs } from './agendaSections'
+import { computeAgendaSections, estimateRow, type Section, type FilterOccs, type AgendaRow } from './agendaSections'
 
 const TODAY = new Date(2026, 5, 15)
 const NOW = new Date(2026, 5, 15, 9, 0)
@@ -291,5 +291,46 @@ describe('computeAgendaSections — flat rows (F1)', () => {
     const todayTarget = noOverdue.rows[noOverdue.goToRowIndex]
     expect(todayTarget?.kind).toBe('header')
     expect(todayTarget?.kind === 'header' && todayTarget.tone).toBe('today')
+  })
+})
+
+describe('estimateRow', () => {
+  const rowFor = (rows: AgendaRow[], id: string) =>
+    rows.find(r => r.kind === 'occ' && r.occ.id === id)!
+
+  it('estimates a plain day row shorter than one carrying a meta row', () => {
+    const { rows } = computeAgendaSections(
+      null,
+      [
+        occ('untimed', '2026-06-16'),
+        occ('timed', '2026-06-16', { time: '11:00' }),
+        occ('with-duration', '2026-06-16', { duration: '30m' }),
+      ],
+      TODAY, NOW, noFilter,
+    )
+
+    // No badge at all — the card sits on its min-h-11 floor.
+    expect(estimateRow(rowFor(rows, 'untimed'))).toBe(50)
+    // A time badge or a duration chip each force the meta row.
+    expect(estimateRow(rowFor(rows, 'timed'))).toBe(68)
+    expect(estimateRow(rowFor(rows, 'with-duration'))).toBe(68)
+  })
+
+  it('estimates overdue rows at the meta height — they always show a date badge', () => {
+    const { rows } = computeAgendaSections(
+      null,
+      [occ('overdue-untimed', '2026-06-10', { done: false })],
+      TODAY, NOW, noFilter,
+    )
+
+    const row = rowFor(rows, 'overdue-untimed')
+    expect(row.kind === 'occ' && row.showDate).toBe(true)
+    expect(estimateRow(row)).toBe(68)
+  })
+
+  it('estimates headers at their own height', () => {
+    const { rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
+
+    expect(estimateRow(rows.find(r => r.kind === 'header')!)).toBe(40)
   })
 })
