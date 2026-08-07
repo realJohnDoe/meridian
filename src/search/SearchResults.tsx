@@ -2,7 +2,6 @@ import type { RefObject } from 'react'
 import { Plus } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import FileResultsList from './FileResultsList'
-import { Button } from '@/components/ui/button'
 
 interface Props {
   query: string
@@ -21,15 +20,17 @@ export default function SearchResults({ query, onOpen, onCreate, scrollRef }: Pr
   return (
     <div className="lg:max-w-3xl lg:mx-auto">
       {query && (
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-2.5 px-3.5 py-3 h-auto rounded-none border-b border-border text-primary hover:bg-card hover:text-primary"
-          onClick={() => onCreate(query)}
-          aria-label={`Create "${query}"`}
-        >
-          <Plus size={14} className="shrink-0" />
-          <span>Create "<strong>{query}</strong>"</span>
-        </Button>
+        <div className="px-3.5 pt-2">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 pl-2 pr-2.5 py-2 rounded-lg border border-dashed border-input bg-card/50 shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
+            onClick={() => onCreate(query)}
+            aria-label={`Create "${query}"`}
+          >
+            <Plus size={13} className="shrink-0" />
+            <span className="text-sm">Create "<strong>{query}</strong>"</span>
+          </button>
+        </div>
       )}
 
       <FileResultsList query={query} onOpen={onOpen} scrollRef={scrollRef} />

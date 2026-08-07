@@ -196,6 +196,13 @@
   --shadow-float:       0 2px 16px rgba(0,0,0,.55), 0 12px 48px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 90%);
   --shadow-float-focus: 0 2px 16px rgba(0,0,0,.55), 0 14px 52px color-mix(in oklab,var(--primary-dark),transparent 58%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 75%);
 
+  /* Resting card elevation (occurrence/markdown cards). Plain Tailwind
+     shadow-sm (black at .1 opacity) reads fine on light surfaces but is
+     nearly invisible against these dark, already-low-contrast surfaces —
+     needs real opacity/blur to actually show, same reasoning as --shadow-float
+     above just toned down for a resting (non-floating) element. */
+  --shadow-card: 0 1px 3px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35);
+
   /* event-border used in EntryBody wikilink underline */
   --event-border: color-mix(in oklab, var(--event), transparent 68%);
 
@@ -427,6 +434,7 @@
   --chip-border: color-mix(in oklab, #9893a5, transparent 68%);
   --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
   --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+  --shadow-card:        0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
 }
 
 /* ── SOLARIZED LIGHT THEME ──────────────────────────────────────── */
@@ -478,18 +486,17 @@
   --priority-2:   #cb4b16;   /* orange */
   --priority-3:   #b58900;   /* yellow */
 
-  /* On-accent text — light ink on every swatch except priority-3 (yellow),
-     per design call: pure black ink (see above) technically wins every
-     swatch by WCAG's luminance-only math, but light ink reads better in
-     practice here (this theme sits chips on a light row background,
-     which the metric doesn't model). priority-3 keeps dark ink — it's
-     the one swatch where dark is a decisive, not marginal, win. */
+  /* On-accent text — light ink on every swatch, including priority-3
+     (yellow): pure black ink (see above) technically wins every swatch by
+     WCAG's luminance-only math, but light ink reads better in practice
+     here (this theme sits chips on a light row background, which the
+     metric doesn't model). */
   --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
   --priority-2-foreground: var(--ink-light);
-  --priority-3-foreground: var(--ink-dark);
+  --priority-3-foreground: var(--ink-light);
 
   /* Sidebar */
   --sidebar:                    #fdf6e3;
@@ -509,6 +516,7 @@
   --chip-border: color-mix(in oklab, #839496, transparent 68%);
   --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
   --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+  --shadow-card:        0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
 }
 
 /* ── SOLARIZED DARK THEME ───────────────────────────────────────── */
@@ -564,14 +572,13 @@
   --priority-3:   #b58900;   /* yellow */
 
   /* On-accent text — mirrors .solarized-light's design call: light ink on
-     every swatch except priority-3 (yellow), the one swatch where dark
-     ink wins decisively rather than marginally. */
+     every swatch, including priority-3 (yellow). */
   --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
   --priority-2-foreground: var(--ink-light);
-  --priority-3-foreground: var(--ink-dark);
+  --priority-3-foreground: var(--ink-light);
 
   /* Sidebar */
   --sidebar:                    #073642;
@@ -751,6 +758,7 @@
   /* Float shadow — lighter for a light theme */
   --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
   --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+  --shadow-card:        0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
 }
 
 /* ── CATPPUCCIN MOCHA THEME ─────────────────────────────────────── */
