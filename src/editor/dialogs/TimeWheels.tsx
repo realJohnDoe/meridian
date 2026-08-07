@@ -79,10 +79,16 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
   const animRef = useRef<number | null>(null)   // target of an in-flight smooth scroll
   const animTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const settleRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  // True while a finger/mouse is still down on the wheel. A touch held still
-  // produces no scroll events, so without this the quiet-scroll timer alone
-  // would snap the wheel out from under a finger that hasn't lifted yet.
-  const pointerDownRef = useRef(false)
+  // True while a finger is still on the wheel. A touch held still produces no
+  // scroll events, so without this the quiet-scroll timer alone would snap the
+  // wheel out from under a finger that hasn't lifted yet.
+  //
+  // Tracked with *touch* events, never pointer events: the spec has the browser
+  // fire `pointercancel` as soon as a pointer starts panning the page, so a
+  // drag that scrolls this column abandons its pointer stream mid-gesture and
+  // never sends `pointerup` at all. Touch events keep firing through the scroll
+  // and always deliver `touchend` to the element the gesture started on.
+  const touchHoldRef = useRef(false)
 
   // Kept current so `settle` can stay stable while still seeing the latest
   // props when it finally fires from a timer.
@@ -95,7 +101,7 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
   const settle = useCallback(() => {
     const node = ref.current
     if (!node) return
-    if (animRef.current !== null || pointerDownRef.current) {
+    if (animRef.current !== null || touchHoldRef.current) {
       // Our own animation is still in flight, or a finger is still holding
       // the wheel; look again once it is done. Re-arming rather than
       // returning matters: this is the only thing left running, so dropping
@@ -121,11 +127,11 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
 
   useLayoutEffect(() => { settleFnRef.current = settle }, [settle])
 
-  // Fires on every way a hold can end (mouse up, touch end, touch/pointer
-  // cancel). Kicks a settle pass off right away rather than waiting out
+  // Both ways a finger can leave the wheel: lifted, or the gesture taken over
+  // by the system. Kicks a settle pass off right away rather than waiting out
   // whatever quiet-scroll timer was last queued.
   const release = useCallback(() => {
-    pointerDownRef.current = false
+    touchHoldRef.current = false
     clearTimeout(settleRef.current)
     settleRef.current = setTimeout(settle, SETTLE_MS)
   }, [settle])
@@ -232,11 +238,11 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
         // Wheel and touch both count: a trackpad scroll fires no pointerdown,
         // so without `onWheel` those scrolls were swallowed by the guard and
         // the column drifted away from the value it was showing.
-        onPointerDown={() => { animRef.current = null; pointerDownRef.current = true }}
-        onTouchStart={() => { animRef.current = null; pointerDownRef.current = true }}
+        onPointerDown={() => { animRef.current = null }}
         onWheel={() => { animRef.current = null }}
-        onPointerUp={release}
-        onPointerCancel={release}
+        // A finger additionally holds off the settle pass until it lifts —
+        // see `touchHoldRef` for why this can't ride on the pointer events.
+        onTouchStart={() => { animRef.current = null; touchHoldRef.current = true }}
         onTouchEnd={release}
         onTouchCancel={release}
         onClick={e => {
