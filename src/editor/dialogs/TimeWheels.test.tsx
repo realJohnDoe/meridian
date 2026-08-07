@@ -518,10 +518,8 @@ describe('TimeWheels — holding through settle', () => {
   })
 
   const releases = [
-    ['touchend',      (el: HTMLElement) => fireEvent.touchEnd(el)],
-    ['touchcancel',   (el: HTMLElement) => fireEvent.touchCancel(el)],
-    ['pointerup',     (el: HTMLElement) => fireEvent.pointerUp(el)],
-    ['pointercancel', (el: HTMLElement) => fireEvent.pointerCancel(el)],
+    ['touchend',    (el: HTMLElement) => fireEvent.touchEnd(el)],
+    ['touchcancel', (el: HTMLElement) => fireEvent.touchCancel(el)],
   ] as const
 
   it.each(releases)('snaps once the hold ends via %s', (_label, release) => {
@@ -538,5 +536,26 @@ describe('TimeWheels — holding through settle', () => {
     vi.advanceTimersByTime(SETTLE_MS)
 
     expect(hour.scrollTop).toBe((H.home + 6) * ITEM_H)   // squared up now that it's released
+  })
+
+  // The regression that made the first attempt at this fix inert on a real
+  // phone. A touch-drag that scrolls the column counts as panning the
+  // viewport, so the browser abandons the pointer stream mid-gesture:
+  // pointerdown, then pointercancel while the finger is still very much down,
+  // and no pointerup ever. Hanging the release on those events therefore
+  // cleared the hold in the middle of the drag and snapped exactly as before.
+  it('keeps holding through the pointercancel a scrolling drag provokes', () => {
+    vi.useFakeTimers()
+    const { hour } = renderWheels('09:30')
+
+    fireEvent.pointerDown(hour)
+    fireEvent.touchStart(hour)
+    setScrollTop(hour, (H.home + 6) * ITEM_H + 10)
+    fireEvent.scroll(hour)
+    fireEvent.pointerCancel(hour)   // browser hands the gesture to the scroller
+
+    vi.advanceTimersByTime(SETTLE_MS * 2)
+
+    expect(hour.scrollTop).toBe((H.home + 6) * ITEM_H + 10)   // finger still down
   })
 })
