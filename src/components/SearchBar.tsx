@@ -6,6 +6,7 @@ import { IconButton } from './primitives/icon-button'
 import { Input } from './ui/input'
 import { newEntryRoute } from '@/routes'
 import { useOpenEntry } from '@/hooks'
+import { useCurrentDate } from '@/calendar'
 import { cn } from '@/lib/cn'
 
 // Lazy: SearchResults/FileResultsList pull in enough weight that they
@@ -18,6 +19,7 @@ export default function SearchBar() {
   const { sq } = useSearch({ from: '/_app' })
   const navigate = useNavigate()
   const openEntry = useOpenEntry()
+  const currentDate = useCurrentDate()
 
   const searchOpen = sq !== undefined
   const filterQuery = sq ?? ''
@@ -43,7 +45,7 @@ export default function SearchBar() {
   }
 
   function handleCreate(title: string) {
-    void navigate({ ...newEntryRoute(title), replace: true })
+    void navigate({ ...newEntryRoute(title, { date: currentDate }), replace: true })
   }
 
   return (
@@ -96,7 +98,7 @@ export default function SearchBar() {
             size="icon"
             className="w-9 h-9 rounded-full shrink-0 hover:scale-[1.08] active:scale-[.93] [&_svg]:size-4"
             aria-label="New entry"
-            onClick={() => navigate({ ...newEntryRoute(filterQuery || undefined), replace: searchOpen })}
+            onClick={() => navigate({ ...newEntryRoute(filterQuery || undefined, { date: currentDate }), replace: searchOpen })}
           ><Plus size={16} /></Button>
         </div>
       </div>
