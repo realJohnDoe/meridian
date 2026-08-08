@@ -5,4 +5,7 @@ export { default as BacklogView } from './BacklogView'
 export { default as NotesView } from './NotesView'
 export { sortOccs, isDimmed, priorityRank, doneKindOrder } from './occSort'
 export { NO_PARTICIPANT, filterByParticipants } from './useCalendarFilter'
-export { resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useAgendaTopDate, requestScrollToToday } from './viewState'
+export {
+  resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useAgendaTopDate, requestScrollToToday,
+  useCurrentDate, setCurrentDate, setCurrentMonthKeepingDay,
+} from './viewState'

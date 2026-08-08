@@ -2,8 +2,9 @@ import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { ThemeProvider, useTheme } from 'next-themes'
+import { fmtISO } from '@/model'
 import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush } from '@/storage'
-import { requestScrollToToday } from '@/calendar'
+import { requestScrollToToday, setCurrentDate } from '@/calendar'
 import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createRootRoute({
@@ -56,6 +57,11 @@ function Root() {
       if (day !== lastActiveDayRef.current) {
         lastActiveDayRef.current = day
         requestScrollToToday()
+        // Also resets the cross-view "current date" (calendar/viewState.ts),
+        // not just Agenda's own scroll target — otherwise resuming on Month
+        // or Day after a multi-day suspend would leave the sidebar carrying
+        // over whatever stale day was in view when the app was backgrounded.
+        setCurrentDate(fmtISO(new Date(day)))
       }
     }
     window.addEventListener('online', onOnline)

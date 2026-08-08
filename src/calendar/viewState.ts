@@ -1,6 +1,8 @@
 import { createStore } from 'zustand/vanilla'
 import { useStore as useZustandStore } from 'zustand/react'
+import { startOfToday } from 'date-fns'
 import type { VirtualItem } from '@tanstack/react-virtual'
+import { fmtISO } from '@/model'
 import { resetExpansionCache } from './useExpandWithMultiday'
 import { resetAgendaSectionsCache } from './useAgendaSections'
 
@@ -28,6 +30,14 @@ interface CalendarViewState {
   scrollToTodayOnce: boolean
   /** ISO date string of the topmost visible day in the agenda view. */
   agendaTopDate: string | null
+  /**
+   * ISO date (`YYYY-MM-DD`) of the day last focused across the calendar
+   * views — kept in sync with agenda's scroll position, the day carousel's
+   * route param, and month's day-of-month (see setCurrentMonthKeepingDay).
+   * Read by the sidebar so switching between Agenda/Month/Day lands on this
+   * day instead of resetting to today.
+   */
+  currentDate: string
 }
 
 /** Calendar-view-local ephemeral state — scroll position, carousel previews.
@@ -40,10 +50,14 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   dayPreview: null,
   scrollToTodayOnce: false,
   agendaTopDate: null,
+  currentDate: fmtISO(startOfToday()),
 }))
 
 export function resetCalendarViewState(): void {
-  calendarView.setState(calendarView.getInitialState(), true)
+  // currentDate is recomputed rather than taken from the frozen initial
+  // snapshot — getInitialState() captured "today" at module load, which can
+  // be stale by the time a long-lived tab switches vaults.
+  calendarView.setState({ ...calendarView.getInitialState(), currentDate: fmtISO(startOfToday()) }, true)
 }
 
 /**
@@ -89,18 +103,42 @@ export function useAgendaTopDate(): string | null {
   return useZustandStore(calendarView, s => s.agendaTopDate)
 }
 
+export function useCurrentDate(): string {
+  return useZustandStore(calendarView, s => s.currentDate)
+}
+
 /** Flags AgendaView to scroll to today on its next render. */
 export function requestScrollToToday(): void {
   calendarView.setState({ scrollToTodayOnce: true })
 }
 
 export function setAgendaTopDate(key: string): void {
-  calendarView.setState({ agendaTopDate: key })
+  calendarView.setState({ agendaTopDate: key, currentDate: key })
+}
+
+/** Records the day currently focused — e.g. the day view's route param on
+ * mount/swipe, or month's day-of-month via setCurrentMonthKeepingDay. */
+export function setCurrentDate(dateKey: string): void {
+  calendarView.setState({ currentDate: dateKey })
+}
+
+/**
+ * Updates currentDate when the month carousel pages to a new month, keeping
+ * the same day-of-month (clamped to the target month's last day) instead of
+ * jumping to the 1st — e.g. paging from Sep 8 to October lands on Oct 8; Jan
+ * 31 to February lands on Feb 28.
+ */
+export function setCurrentMonthKeepingDay(monthKey: string): void {
+  const day = Number(calendarView.getState().currentDate.slice(8, 10))
+  const [y = NaN, m = NaN] = monthKey.split('-').map(Number)
+  const daysInMonth = new Date(y, m, 0).getDate()
+  const clampedDay = Math.min(day, daysInMonth)
+  calendarView.setState({ currentDate: `${monthKey}-${String(clampedDay).padStart(2, '0')}` })
 }
 
 /** Clears the scroll-to-today flag and records the date scrolled to, in one
  * write — splitting this into two setState calls would notify subscribers
  * twice, flashing the stale top date before it settles. */
 export function markScrolledToToday(topDate: string): void {
-  calendarView.setState({ scrollToTodayOnce: false, agendaTopDate: topDate })
+  calendarView.setState({ scrollToTodayOnce: false, agendaTopDate: topDate, currentDate: topDate })
 }

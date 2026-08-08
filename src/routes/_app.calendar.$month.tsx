@@ -1,6 +1,7 @@
-import { lazy, Suspense, useCallback, useMemo } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO, fmtMonth, parseMonth } from '@/model'
+import { setCurrentMonthKeepingDay } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
 
 const MonthView = lazy(() => import('@/calendar').then(m => ({ default: m.MonthView })))
@@ -14,6 +15,12 @@ function CalendarPage() {
   const navigate = useNavigate()
 
   const month = useMemo(() => parseMonth(monthStr), [monthStr])
+
+  // Keeps the cross-view "current date" in sync with whichever month this
+  // route is showing — mount, chevron nav, and carousel swipe-commit all go
+  // through this param — so the sidebar's Day switch lands on the same
+  // day-of-month rather than resetting to today.
+  useEffect(() => setCurrentMonthKeepingDay(monthStr), [monthStr])
 
   // replace: true — paging to a neighbouring month is view state, not a
   // navigation event; mobile calendar conventions (Apple/Google/Outlook/

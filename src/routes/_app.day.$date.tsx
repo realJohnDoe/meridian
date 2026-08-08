@@ -1,7 +1,8 @@
-import { lazy, Suspense, useCallback, useMemo } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO } from '@/model'
 import { useOpenEntry } from '@/hooks'
+import { setCurrentDate } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
 import { newEntryRoute } from './-entryRoute'
 
@@ -16,6 +17,11 @@ function DayPage() {
   const { date } = Route.useParams()
 
   const dvDate = useMemo(() => new Date(date + 'T00:00:00'), [date])
+
+  // Keeps the cross-view "current date" in sync with whichever day this route
+  // is showing — mount, chevron nav, and carousel swipe-commit all go through
+  // this param — so the sidebar lands here again after a detour elsewhere.
+  useEffect(() => setCurrentDate(date), [date])
 
   const onOpen = useOpenEntry()
   // replace: true — paging to a neighbouring day is view state, not a
