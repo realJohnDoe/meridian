@@ -19,7 +19,7 @@ If prior work on this repo has raised specific suspicions, list them here as **h
 - Skim the full directory tree (listings + file names) so nothing is invisible to you.
 - Read closely: the entry points, the most-imported modules (measure this — don't guess), the 15 largest source files, and at least 2–3 representative files from every feature directory.
 - **Read the toolchain, not just the source:** `package.json` (scripts _and_ the full dependency list), lint/formatter configs, CI workflows, test config, and any `.npmrc`/tsconfig strictness settings. For each dependency, know roughly what it's for and where it's used — this feeds the Library Fit category.
-- **Measure dependency currency against the registry, not memory:** run the package manager's outdated report (`pnpm outdated` / `npm outdated` / `cargo outdated` / …) in **every workspace**, including sub-workspaces like workers or serverless functions. Your knowledge of "the latest version" is stale by definition; only the registry answer counts. This is the evidence base for the version-currency bullets in category 7.
+- **Measure dependency currency against the registry, not memory:** run the package manager's outdated report (`pnpm outdated` / `npm outdated` / `cargo outdated` / …) in **every workspace**, including sub-workspaces like workers or serverless functions. Your knowledge of "the latest version" is stale by definition; only the registry answer counts. This is the evidence base for the version-currency bullets in category 8.
 - **Run the existing quality gates once** — build, lint, and test (plus coverage, if the project has it configured) — and report each gate's pass/fail status in the coverage statement. A failing gate is itself a finding (usually a high-impact one), and the dry-run comparisons above need this green baseline to diff against.
 - **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
 - Sample the rest. Do not skip a directory entirely without recording it in the coverage statement.
@@ -28,7 +28,7 @@ If prior work on this repo has raised specific suspicions, list them here as **h
 
 ### 1. Health verdict (~5 sentences)
 
-A plain-language summary of the repo's overall health. Name the **worst one or two areas** (by directory or subsystem, e.g. "the `auth/` layer" — not individual findings) and the **single biggest structural theme** running through the findings. This is the headline answer; the list below is the supporting evidence.
+A plain-language summary of the repo's overall health. Name the **worst one or two areas** (by directory or subsystem, e.g. "the `auth/` layer" — not individual findings) and the **single biggest structural theme** running through the findings — explicitly consider whether that theme is **overengineering** (abstraction, configuration, or indirection outpacing the problem's actual complexity) as often as you'd consider underengineering (leakage, duplication, missing boundaries). Complexity added without a present need is exactly as much a health problem as complexity avoided where it was needed — weigh both with the same seriousness. This is the headline answer; the list below is the supporting evidence.
 
 ### 2. Coverage statement
 
@@ -39,7 +39,7 @@ A plain-language summary of the repo's overall health. Name the **worst one or t
 
 ### 3. Category verdicts
 
-One line per category (1–9), with one of three verdicts:
+One line per category (1–10), with one of three verdicts:
 
 - **clean** — the scan plan for this category was fully executed and nothing worth reporting turned up
 - **findings: #N, #M** — pointing at the numbered findings below
@@ -52,7 +52,7 @@ This makes the absence of findings distinguishable from the absence of scanning.
 For each finding, output:
 
 - **Title** — short label
-- **Category** — one or more tags from: `architecture` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`
+- **Category** — one or more tags from: `architecture` `overengineering` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`
 - **Impact** — 1–10 (10 = catastrophic/systemic; 5 = e.g. a DRY violation duplicated across ~4 files, or a missing error state on a primary user flow; 1 = trivial/cosmetic)
 - **Breadth** — number of **files** affected. Counts must come from an actual search (grep/glob), and you should be able to name the search you ran; if you estimated instead, write "est." next to the number.
 - **Recommended model** — which model tier is capable enough to do this fix well: **Haiku 4.5** / **Sonnet 5** / **Opus 5** / **Opus 5 in plan mode, for a plan spanning multiple PRs** (or the current equivalent tier, if these names have moved on). Judge by how much of the fix is load-bearing judgment versus mechanical edit, and by **how the fix fails**: a wrong-but-plausible change that breaks the build, a type-check, or a test is far safer to hand down-tier than one that fails silently (a re-hidden bug class, a lint rule that passes but no longer catches what it should, a "dead" export that's actually reached dynamically, a boundary that still resolves but now leaks). Reserve plan mode + multi-PR for findings that need an architecture change **or** a product decision the user should make (e.g. "narrow the type" vs "restructure the module boundary"). **State the specific hazard that sets the tier** — the trap that would void the fix, the invariant that fails quietly, the interacting call site that's easy to miss. A tier without a named hazard is not useful. If naming that hazard makes a lower tier sufficient, say so explicitly (e.g. "Sonnet 5 if the import boundary to preserve is specified in the task; else Opus 5") — that turns the field into a prompt-writing hint, not just a rating.
@@ -80,7 +80,7 @@ The category ranking is a tiebreaker, not a filter. A serious finding in any cat
 
 ### 1. Architecture & Domain Separation _(highest weight — prefer findings here)_
 
-**Scope:** whether responsibilities live in the right modules and the dependency structure between them is sound. This category owns **module-level** concern sprawl; function/component-level SRP belongs in category 5.
+**Scope:** whether responsibilities live in the right modules and the dependency structure between them is sound. This category owns **module-level** concern sprawl; function/component-level SRP belongs in category 6.
 
 Examples (not exhaustive):
 
@@ -95,7 +95,24 @@ Examples (not exhaustive):
   implementation-specific concern (auth, retries, caching) handled outside the
   interface instead of behind it
 
-### 2. Directory & File Layout _(high weight)_
+### 2. Simplicity & Overengineering _(highest weight — prefer findings here)_
+
+**Scope:** whether the code's complexity is proportional to the problem it actually solves right now — unnecessary abstraction, premature generalization, and configuration or indirection that outpaces the real variance in use. This category owns **structural and speculative** over-engineering; function-level clarity and duplication (the opposite failure mode — too little abstraction) belongs in category 6 (Code Health & DRY). The same code can be over- and under-engineered in different spots; report both where you find them, and don't let a strong finding in one category talk you out of looking for the other.
+
+Hold every abstraction to a "does a second real caller exist today?" test, not "might this be useful later?" — per the Process section, treat any comment or doc claiming a pattern is "for future extensibility" or "in case we need X" as a hypothesis to verify against actual call sites, not a settled justification. An interface, config knob, or generic parameter with no second consumer is a finding, not a design choice, until proven otherwise by a real second use.
+
+Examples (not exhaustive):
+
+- Unnecessary abstraction layers — an interface, factory, plugin/strategy system, or dependency-injection seam with exactly one real implementation and no second implementation on the horizon
+- Speculative generality — config flags, extension points, options objects, or generic type parameters built for an imagined future need, where a grep for consumers shows zero call sites exercising the variance
+- Indirection that doesn't earn its keep — a wrapper/service/manager/hook that only forwards to another call with no added behavior, validation, or error handling of its own (verify by reading the function body, not the name)
+- Configuration surface disproportionate to actual variance — an options object, env var set, or settings panel with far more knobs than the codebase (or its users) ever set away from the default; count how many of the options are ever passed a non-default value
+- Premature abstraction — logic extracted into a shared utility/hook/base class after only one real use case exists, where inlined duplicate code would have been clearer and cheaper to change independently (this directly violates the "three similar lines is better than a premature abstraction" principle most codebases and CLAUDE.md-style guides already state — check whether the codebase is actually holding itself to it)
+- Framework or pattern misuse for a scale the project doesn't have — e.g. a state-machine library, event bus, or generic rules engine solving a problem a handful of `if` statements would solve just as clearly
+- Defensive code for scenarios that cannot occur — validation, fallbacks, null-checks, or try/catch for inputs or states the type system, call graph, or upstream validation already rules out
+- Layered configurability — a setting that is itself configurable, or an abstraction with its own plugin system, where the underlying thing being configured has one or two real variants in practice
+
+### 3. Directory & File Layout _(high weight)_
 
 **Scope:** whether the directory tree's shape matches how the code is actually used, changed, and depended upon.
 
@@ -107,7 +124,7 @@ Examples (not exhaustive):
 - Layout that fights the framework — e.g., route files that aren't co-located with their route, server-only code inside `components/`, shared utilities scattered across feature folders
 - Flat directories that should be split, or deeply nested directories that should be flattened
 
-### 3. Security
+### 4. Security
 
 **Scope:** any way an attacker or malicious input could compromise the app, its data, or its users — evaluated against this app's actual threat model (state what that model is: what's client-side, what's persisted where, what external input is parsed).
 
@@ -119,7 +136,7 @@ Examples (not exhaustive):
 - Untrusted-input parsing without sanitization (markdown/HTML rendering, file names, path traversal in user-supplied paths)
 - Anything else in scope — injection, missing origin checks on `postMessage`, known-vulnerable dependency versions, etc.
 
-### 4. Testing & Error Handling
+### 5. Testing & Error Handling
 
 **Scope:** whether failures — in code or in tests — are detected, surfaced, and recoverable.
 
@@ -130,20 +147,20 @@ Examples (not exhaustive):
 - Swallowed errors — empty or log-only `catch` blocks, unhandled promise rejections, errors caught without surfacing to the user or a recovery path
 - No consistent error strategy — each layer inventing its own mix of throw / return-null / silent-default
 
-### 5. Code Health & DRY
+### 6. Code Health & DRY
 
-**Scope:** the local quality of the code — duplication, clarity, cohesion, and type discipline at the function and file level.
+**Scope:** the local quality of the code — duplication, clarity, cohesion, and type discipline at the function and file level. This category owns duplication (too little sharing); structural over-abstraction (too much sharing, too soon) belongs in category 2.
 
 Examples (not exhaustive):
 
-- DRY violations — duplicated logic that should be a shared utility or hook, especially across feature boundaries
+- DRY violations — duplicated logic that should be a shared utility or hook, especially across feature boundaries (only past the point where a second real use case exists — see category 2 on premature extraction)
 - SRP violations at the function/component level — one function or component doing several unrelated jobs (module-level sprawl belongs in category 1)
 - Redundant layered guards — the **same check on the same value** repeated at both the call site and inside the callee (or across 3+ layers of one call path) with no documented ownership of the invariant
 - Naming — misleading, ambiguous, or inconsistent names across a module boundary (e.g. the same concept called different things in different layers, or a name that no longer reflects what the code does)
 - Dead code — unreachable paths, unused exports, or unused imports at module boundaries (not just individual variables)
 - Type safety — pervasive use of `any`, missing return types on public API surfaces, unsafe casts
 
-### 6. Toolchain & Developer Feedback Loops
+### 7. Toolchain & Developer Feedback Loops
 
 **Scope:** whether the project's tooling catches the mistakes this codebase actually makes — and catches them as early and cheaply as possible.
 
@@ -157,7 +174,7 @@ Examples (not exhaustive):
 - Formatter: note presence/absence and whether adopting one actually fits this project. Consider the authorship model (a single-author or agent-written codebase with consistent deliberate style may be right to skip one) and the migration cost — evaluate the trade-off, don't reflexively recommend adding it
 - Recommend against tools too: fast lint/format replacements that can't replicate existing custom rules, or pre-commit hooks that duplicate CI, are anti-recommendations worth stating
 
-### 7. Dependencies & Library Fit
+### 8. Dependencies & Library Fit
 
 **Scope:** whether each dependency earns its place, whether custom code should be a dependency — in both directions — and whether the installed versions are current and fully exploited.
 
@@ -173,7 +190,7 @@ Evaluate in **both directions**, and say explicitly when the status quo is corre
 - **Runtime alignment over recency** — version choices that should track a deployed runtime rather than "latest" (e.g. `@types/node` vs the Node version CI and production actually run); flag both drift _and_ chasing latest past the runtime
 - Significantly outdated or abandoned dependencies; functionality duplicated across two libraries; heavyweight dependencies used for a small fraction of their surface (flag as "watch", not necessarily "replace")
 
-### 8. Styling & UX
+### 9. Styling & UX
 
 **Scope:** consistency of the styling approach with the project's chosen system, and whether the UI communicates state and is usable by everyone.
 
@@ -183,7 +200,7 @@ Examples (not exhaustive):
 - Raw CSS / inline styles where the project's styling system (e.g. Tailwind) would suffice, or utility classes used where plain CSS is clearly better
 - UX anti-patterns: missing loading/error states, non-accessible interactive elements (no keyboard nav, missing ARIA)
 
-### 9. Performance
+### 10. Performance
 
 **Scope:** work done unnecessarily, too often, or at the wrong time — at any layer: render, data, or bundle.
 
@@ -195,4 +212,4 @@ Examples (not exhaustive):
 
 ---
 
-**Scoring guidance:** A finding that reveals a structural pattern affecting the whole codebase (e.g., "every feature imports from `lib/` internals instead of going through a public API") scores higher than a finding about a single misused hook. A toolchain finding that would _mechanically catch an entire class of issues_ (e.g. enabling an installed lint preset that flags 30 real problems, or a lint zone that enforces a documented architecture invariant) scores like the class it catches, not like a config tweak. Skip findings that are purely stylistic or affect a single isolated callsite — they belong in a lint rule, not a health report.
+**Scoring guidance:** A finding that reveals a structural pattern affecting the whole codebase (e.g., "every feature imports from `lib/` internals instead of going through a public API") scores higher than a finding about a single misused hook. Score overengineering findings by the same standard: an unnecessary abstraction repeated as the codebase's default pattern (e.g. every data-fetching hook wrapped in an unused strategy interface) is a systemic finding, not a nitpick — don't undercount it just because the fix is a deletion rather than an addition. A toolchain finding that would _mechanically catch an entire class of issues_ (e.g. enabling an installed lint preset that flags 30 real problems, or a lint zone that enforces a documented architecture invariant) scores like the class it catches, not like a config tweak. Skip findings that are purely stylistic or affect a single isolated callsite — they belong in a lint rule, not a health report. A fix that only deletes code (removing an unused abstraction, a dead config knob, an unreachable branch) is not automatically low-effort to rate at the cheapest tier — rate it by the judgment needed to confirm nothing else depends on what's being deleted, per the Recommended model guidance above.
