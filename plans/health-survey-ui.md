@@ -16,12 +16,6 @@ Start by identifying which directories constitute the UI layer and state that li
 - Evaluate the code on its merits. Treat claims in CLAUDE.md, READMEs, or architecture docs (e.g. "this exception is deliberate") as hypotheses to verify against the code, not as settled exceptions — if a documented rationale no longer holds, that is a finding.
 - **Verify capability claims by inspection, not memory.** For toolchain findings, check the _installed_ version of a plugin/library (its actual rule set, exports, or API) against what the config enables — do not assume from the version number. Where cheap, verify by dry-run: e.g. run the linter with a candidate preset via a temporary config and report the real finding count and distribution (clean up temp files afterwards). The same applies to component libraries: check what the installed shadcn/radix components actually ship before claiming a custom implementation duplicates one.
 
-## Known suspects (optional)
-
-If prior work on this repo has raised specific suspicions about the UI, list them here as **hypotheses to verify or refute**. The report must state a verdict on each (confirmed / refuted / couldn't verify); a refutation is as valid an outcome as a confirmation.
-
-- _(none listed)_
-
 ## Budget
 
 - Skim the full directory tree once so nothing is invisible, then confine close reading to the UI layer.

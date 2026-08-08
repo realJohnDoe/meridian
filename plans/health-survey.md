@@ -8,12 +8,6 @@ Survey this codebase for code health issues across the categories below.
 - Evaluate the code on its merits. Treat claims in CLAUDE.md, READMEs, or architecture docs (e.g. "this exception is deliberate", "a refactor is planned") as hypotheses to verify against the code, not as settled exceptions — if a documented rationale no longer holds, that is a finding.
 - **Verify capability claims by inspection, not memory.** For toolchain findings, check the _installed_ version of a plugin/library (its actual rule set, exports, or API) against what the config enables — do not assume from the version number. The same applies to version currency: what "latest" means comes from the registry query in the Budget section, never from your training data. Where cheap, verify by dry-run: e.g. run the linter with a candidate preset via a temporary config and report the real finding count and distribution (clean up temp files afterwards).
 
-## Known suspects (optional)
-
-If prior work on this repo has raised specific suspicions, list them here as **hypotheses to verify or refute** — do not fold them into the category examples below. The report must state a verdict on each (confirmed / refuted / couldn't verify), and a refutation is as valid an outcome as a confirmation.
-
-- _(none listed)_
-
 ## Budget
 
 - Skim the full directory tree (listings + file names) so nothing is invisible to you.
