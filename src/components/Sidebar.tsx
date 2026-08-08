@@ -3,8 +3,8 @@ import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil,
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { setActiveVault } from '@/vaultActions'
-import { fmtISO, fmtMonth } from '@/model'
-import { useToday, useResetOnChange } from '@/hooks'
+import { useResetOnChange } from '@/hooks'
+import { useCurrentDate } from '@/calendar'
 import { FlipList } from './FlipList'
 import { vaultIcon } from './vaultIcon'
 import { Checkbox } from './ui/checkbox'
@@ -33,9 +33,9 @@ export default function AppSidebar() {
   const [hasOpenedSettings, setHasOpenedSettings] = useState(false)
   const [editingFavorites, setEditingFavorites] = useState(false)
 
-  const navigate  = useNavigate()
-  const pathname  = useRouterState({ select: s => s.location.pathname })
-  const today     = useToday()
+  const navigate    = useNavigate()
+  const pathname    = useRouterState({ select: s => s.location.pathname })
+  const currentDate = useCurrentDate()
   const { isMobile, setOpenMobile } = useSidebar()
 
   const vaults                  = useStore(s => s.vaults)
@@ -54,11 +54,14 @@ export default function AppSidebar() {
 
   const close = () => { if (isMobile) setOpenMobile(false) }
 
-  // Calendar views — the three time-based views the tasks toggle below scopes to.
+  // Calendar views — the three time-based views the tasks toggle below scopes
+  // to. Month/Day nav targets carry over `currentDate` (the day last focused
+  // in any calendar view — see calendar/viewState.ts) instead of always
+  // resetting to today, so switching views lands where you were looking.
   const navItems = [
     { Icon: AlignLeft,     label: 'Agenda', active: pathname === '/',                 onClick: () => { close(); void navigate({ to: '/' }) } },
-    { Icon: CalendarDays,  label: 'Month',  active: pathname.startsWith('/calendar'), onClick: () => { close(); void navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } }) } },
-    { Icon: CalendarClock, label: 'Day',    active: isDayView,                        onClick: () => { close(); void navigate({ to: '/day/$date', params: { date: fmtISO(today) } }) } },
+    { Icon: CalendarDays,  label: 'Month',  active: pathname.startsWith('/calendar'), onClick: () => { close(); void navigate({ to: '/calendar/$month', params: { month: currentDate.slice(0, 7) } }) } },
+    { Icon: CalendarClock, label: 'Day',    active: isDayView,                        onClick: () => { close(); void navigate({ to: '/day/$date', params: { date: currentDate } }) } },
   ]
 
   // Content destinations — homes for entries that live outside the calendar.

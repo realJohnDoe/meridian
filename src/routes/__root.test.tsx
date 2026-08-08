@@ -4,13 +4,14 @@ import type * as ReactRouter from '@tanstack/react-router'
 import { render, act } from '@testing-library/react'
 
 const {
-  restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, requestScrollToToday,
+  restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, requestScrollToToday, setCurrentDate,
 } = vi.hoisted(() => ({
   restoreVaults: vi.fn(),
   autoSyncTick: vi.fn(),
   resetSyncBackoff: vi.fn(),
   flushPendingPush: vi.fn(),
   requestScrollToToday: vi.fn(),
+  setCurrentDate: vi.fn(),
 }))
 
 // createFileRoute is mocked to hand back the component directly — the real
@@ -26,7 +27,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 })
 
 vi.mock('@/storage', () => ({ restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush }))
-vi.mock('@/calendar', () => ({ requestScrollToToday }))
+vi.mock('@/calendar', () => ({ requestScrollToToday, setCurrentDate }))
 vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }))
 
 // The createRootRoute mock hands back the plain options object at runtime; the
@@ -211,6 +212,7 @@ describe('__root — resuming', () => {
     setVisibility('visible')
 
     expect(requestScrollToToday).not.toHaveBeenCalled()
+    expect(setCurrentDate).not.toHaveBeenCalled()
   })
 
   // Mobile PWAs freeze timers rather than reload, so a resume days later would
@@ -224,6 +226,9 @@ describe('__root — resuming', () => {
     setVisibility('visible')
 
     expect(requestScrollToToday).toHaveBeenCalledTimes(1)
+    // Resets the cross-view "current date" too, not just Agenda's own scroll
+    // target — otherwise resuming on Month/Day would carry over a stale day.
+    expect(setCurrentDate).toHaveBeenCalledWith('2026-06-18')
   })
 
   it('re-scrolls only once per day change, not on every subsequent resume', () => {
@@ -235,6 +240,7 @@ describe('__root — resuming', () => {
     setVisibility('visible')
 
     expect(requestScrollToToday).toHaveBeenCalledTimes(1)
+    expect(setCurrentDate).toHaveBeenCalledTimes(1)
   })
 
   // Crossing midnight while merely backgrounded for a few minutes is still a
@@ -247,6 +253,7 @@ describe('__root — resuming', () => {
     setVisibility('visible')
 
     expect(requestScrollToToday).toHaveBeenCalledTimes(1)
+    expect(setCurrentDate).toHaveBeenCalledWith('2026-06-16')
   })
 
   it('ignores a time change that stays inside the same day', () => {
@@ -257,5 +264,6 @@ describe('__root — resuming', () => {
     setVisibility('visible')
 
     expect(requestScrollToToday).not.toHaveBeenCalled()
+    expect(setCurrentDate).not.toHaveBeenCalled()
   })
 })
