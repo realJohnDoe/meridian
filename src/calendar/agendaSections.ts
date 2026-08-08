@@ -11,18 +11,24 @@ const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 // stable before a row has been measured. initialMeasurementsCache means
 // returning users always get real sizes — estimates only matter on first visit.
 //
-// HEADER_H: AgendaHeaderRow div — pt-3.5 (14) + pb-1.5 (6) + text-xs line (~20) ≈ 40px
-// ROW_H:    OccurrenceCard min-h-11 + py-2 padding + OccurrenceRow mb-1.5 (6) ≈ 68px
+// HEADER_H:     AgendaHeaderRow div — pt-3.5 (14) + pb-1.5 (6) + text-xs line (~20) ≈ 40px
+// ROW_H_META:   OccurrenceCard min-h-11 + py-2 padding + a meta row + OccurrenceRow mb-1.5 (6) ≈ 68px
+// ROW_H_PLAIN:  the same card with no meta row, so it sits on its min-h-11 (44)
+//               floor + mb-1.5 (6) = 50px — the figure OccurrenceList.ts already
+//               uses for exactly this shape.
 // Update these if the header/card padding changes in AgendaHeaderRow.tsx /
 // OccurrenceCard.tsx.
 //
-// One ROW_H for every occurrence row, not two: it already assumes a meta row
-// is present, which is exactly right for overdue rows (they all pass
-// showDate, so OccurrenceCard's showMeta is always true). Day rows without a
-// time, duration or backlink are ~50px, but they come in small groups, so the
-// drift stays bounded — don't split this speculatively.
+// Split into two, where this used to be one ROW_H of 68: a single estimate
+// assuming a meta row is right for overdue rows (they all pass showDate, so
+// showMeta is always true) but over-states plain day rows — which have no
+// badge at all — by ~36%. That was harmless while it only affected the
+// scrollbar, but useAgendaScrollRestore now sums these to seed the
+// virtualizer's initial offset at today, and the error compounds over a
+// year's worth of past rows.
 const HEADER_H = 40
-const ROW_H = 68
+const ROW_H_META = 68
+const ROW_H_PLAIN = 50
 
 /**
  * One virtualizable row of the agenda's flat row list — either a section
@@ -39,8 +45,25 @@ export type Section =
   | { kind: 'day'; key: string; dateKey: string; date: Date; isToday: boolean; isTomorrow: boolean; items: Occurrence[]; rows: AgendaRow[] }
   | { kind: 'overdue'; key: string; items: Occurrence[]; rows: AgendaRow[] }
 
+/**
+ * Whether this row's card will render its meta row, mirroring OccurrenceCard's
+ * own `showMeta`. AgendaView passes neither `showTime` nor
+ * `showTagsParticipants`, so only three of the inputs vary here: the date badge
+ * (overdue rows, which pass showDate), the time badge, and the duration chip.
+ *
+ * The one input this can't see is `listedOn` — backlinks, which live in the
+ * store and never reach agendaSections. A plain row on a backlinked file
+ * therefore estimates 50 and measures 68. That's the same direction and
+ * magnitude of error the old single ROW_H had, but on far fewer rows, and
+ * measureElement corrects it as soon as the row is on screen.
+ */
+function hasMetaRow(r: Extract<AgendaRow, { kind: 'occ' }>): boolean {
+  return r.showDate || !!r.occ.time || !!r.occ.metadata.duration
+}
+
 export function estimateRow(r: AgendaRow): number {
-  return r.kind === 'header' ? HEADER_H : ROW_H
+  if (r.kind === 'header') return HEADER_H
+  return hasMetaRow(r) ? ROW_H_META : ROW_H_PLAIN
 }
 
 function headerRow(key: string, dateKey: string, label: string, tone: 'default' | 'today' | 'overdue'): AgendaRow {

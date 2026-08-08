@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Occurrence, EditScope } from '@/types'
 
@@ -56,10 +56,12 @@ export default function AgendaView({ onOpen }: Props) {
   // AgendaView owns its scroll container (scRef below), so the virtualizer reads
   // its own ref. The ref attaches during the layout phase before the
   // virtualizer's internal layout effect runs, so it connects synchronously on
-  // first mount. Restore the prior scroll position (offset + measured sizes)
-  // unless we're about to scroll to today.
+  // first mount. Seed it with the prior scroll position (offset + measured
+  // sizes), or with today's own offset when a scroll-to-today is pending — so
+  // the first painted frame is already in the right place rather than at the
+  // top of the list.
   const scRef = useRef<HTMLDivElement>(null)
-  const { initialOffset, initialMeasurementsCache } = useAgendaScrollRestore(scrollToTodayOnce)
+  const { initialOffset, initialMeasurementsCache } = useAgendaScrollRestore(scrollToTodayOnce, rows, goToRowIndex)
 
   // Counts *rows*, not sections. Section-granular virtualization mounted every
   // row a section owned the moment it entered the viewport, and the overdue
@@ -130,7 +132,18 @@ export default function AgendaView({ onOpen }: Props) {
     updateTopDate()
   }, [updateTopDate])
 
-  useEffect(() => {
+  // Layout, not passive: a passive effect runs *after* the browser has painted
+  // the committed frame, so the scroll was a visible correction — the agenda
+  // showed wherever the list happened to start, then jumped. Running it in the
+  // layout phase keeps it in the same frame as the commit.
+  //
+  // On mount this is now only a correction: useAgendaScrollRestore already
+  // seeded the virtualizer at today, and this fixes up the residual error
+  // between the estimated row sizes it summed and the real measured ones. The
+  // case it still carries on its own is the Today button pressed while the
+  // agenda is already mounted (see AppMain's handleToday), where there is no
+  // new mount and therefore no initialOffset to seed.
+  useLayoutEffect(() => {
     if (!scrollToTodayOnce || goToRowIndex < 0 || !scRef.current) return
     virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })
     lastTopRef.current = fmtISO(today)
