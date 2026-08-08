@@ -32,12 +32,6 @@ Findings must be anchored to one or more of these flows — an issue that no com
 - **Perceived performance counts as performance.** A toggle that persists in 300 ms but paints the checkmark optimistically in 16 ms is _fast_; one that paints after persistence is _slow_ even if total work is identical. Measure when pixels change (mark in the handler, measure in a `requestAnimationFrame`-after-commit or paint-adjacent callback), not just how much work runs.
 - Evaluate the code on its merits. Treat claims in CLAUDE.md or comments (e.g. "this is debounced", "this is cached") as hypotheses to verify against the code and the measurements, not settled facts.
 
-## Known suspects (optional)
-
-If prior work has raised specific suspicions, list them as **hypotheses to verify or refute** — the report must state a verdict on each (confirmed / refuted / couldn't verify), backed by a measurement where possible.
-
-- _(none listed)_
-
 ## Budget
 
 - **Use the existing big-vault generator — do not write a new one.** The example vault is too small to expose scaling problems. A deterministic large-vault generator already exists at `src/storage/devFixtures/testVaultGen.ts`, wired into the example backend: run `localStorage.setItem('meridian_bigvault', '300')` in the browser console, then (re)load the Tutorial vault. Run all measurements against this vault and note its size (the number you passed) in the coverage statement. It is dev-only (`import.meta.env.DEV`) and dead-code-eliminated from production builds, so it cannot be used against a prod build.
