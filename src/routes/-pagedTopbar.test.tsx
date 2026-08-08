@@ -12,6 +12,7 @@ function renderTopbar(isMobile = false) {
       isMobile={isMobile}
       openSidebar={openSidebar}
       label="June 2026"
+      shortLabel="Jun 2026"
       prevLabel="Previous month"
       nextLabel="Next month"
       onPrev={onPrev}

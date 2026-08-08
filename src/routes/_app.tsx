@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import { Menu, CalendarCheck2 } from 'lucide-react'
-import { addDays, fmtTopBarDay, fmtTopBarMonth } from '@/format'
+import { addDays, fmtTopBarDay, fmtTopBarDayShort, fmtTopBarMonth, fmtTopBarMonthShort } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
 import { onVaultChanged } from '@/storage'
@@ -14,6 +14,7 @@ import { cn } from '@/lib/cn'
 import { TopbarSlotContext } from './-topbarSlot'
 import { topbarEdgePadding } from './-topbarEdgePadding'
 import { PagedTopbar } from './-pagedTopbar'
+import { TopbarLabel } from './-topbarLabel'
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
@@ -75,15 +76,19 @@ function AppMain() {
   const dvDate       = dayMatch ? new Date(dayMatch.params.date + 'T00:00:00') : null
   const monthViewDate = monthMatch ? parseMonth(monthMatch.params.month) : null
 
-  const topBarLabel = (() => {
-    if (backlogMatch) return 'Backlog'
-    if (notesMatch)   return 'Notes'
-    // monthPreview (set by the swipe carousel on touchend) shows the label the
-    // gesture is heading toward immediately, ahead of the route committing —
-    // chevron navigation and Today still key off the route's own monthViewDate.
-    if (monthViewDate) return fmtTopBarMonth(monthPreview ? parseMonth(monthPreview) : monthViewDate, today)
+  // monthPreview/dayPreview (set by the swipe carousel on touchend / crossing the
+  // halfway point) show the label the gesture is heading toward immediately,
+  // ahead of the route committing — chevron navigation and Today still key off
+  // the route's own monthViewDate/dvDate.
+  const monthDisplayDate = monthViewDate && (monthPreview ? parseMonth(monthPreview) : monthViewDate)
+  const dvDisplayDate    = dvDate && (dayPreview ? (parseDateString(dayPreview) ?? dvDate) : dvDate)
+
+  const [topBarLabel, topBarLabelShort] = (() => {
+    if (backlogMatch) return ['Backlog', 'Backlog']
+    if (notesMatch)   return ['Notes', 'Notes']
+    if (monthDisplayDate) return [fmtTopBarMonth(monthDisplayDate, today), fmtTopBarMonthShort(monthDisplayDate, today)]
     const d = agendaTopDate ? new Date(agendaTopDate + 'T00:00:00') : today
-    return fmtTopBarDay(d, today)
+    return [fmtTopBarDay(d, today), fmtTopBarDayShort(d, today)]
   })()
 
   const handleToday = () => {
@@ -113,17 +118,17 @@ function AppMain() {
             isEntryView
               ? 'overflow-hidden'
               // Right edge always leads with an icon button; left edge only does on mobile
-              // (hamburger) — desktop's left edge is a plain text label.
-              : cn('justify-between', topbarEdgePadding(isMobile, true)),
+              // (hamburger) — desktop's left edge is a plain text label. gap-2 is a floor,
+              // not the usual spacing: justify-between alone only inserts space when the
+              // label has room to spare, so a wide participant-filter pill (active filter)
+              // can otherwise squeeze all the way up against the truncated label.
+              : cn('justify-between gap-2', topbarEdgePadding(isMobile, true)),
           )}
         >
           {isEntryView ? (
             // Portal target — entry route injects topbar controls here via createPortal
             <div ref={setSlotEl} className="flex flex-1 items-center h-full overflow-hidden" />
-          ) : isDayView && dvDate ? (
-            // dayPreview (set by the swipe carousel as a swipe crosses the
-            // halfway point) shows the label the gesture is heading toward
-            // immediately, ahead of the route committing — mirrors monthPreview.
+          ) : isDayView && dvDate && dvDisplayDate ? (
             // replace: true on nav — mirrors the day carousel's swipe-to-page
             // semantics (see DayView) so chevron taps and swipes leave the
             // same, single history entry per visit instead of chevron taps
@@ -131,13 +136,14 @@ function AppMain() {
             <PagedTopbar
               isMobile={isMobile}
               openSidebar={openSidebar}
-              label={fmtTopBarDay(dayPreview ? (parseDateString(dayPreview) ?? dvDate) : dvDate, today)}
+              label={fmtTopBarDay(dvDisplayDate, today)}
+              shortLabel={fmtTopBarDayShort(dvDisplayDate, today)}
               prevLabel="Previous day"
               nextLabel="Next day"
               onPrev={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}
               onNext={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}
             />
-          ) : isMonthView && monthViewDate ? (
+          ) : isMonthView && monthViewDate && monthDisplayDate ? (
             // replace: true on nav — mirrors the month carousel's swipe-to-page
             // semantics (see MonthView) so chevron taps and swipes leave
             // the same, single history entry per visit instead of chevron
@@ -146,6 +152,7 @@ function AppMain() {
               isMobile={isMobile}
               openSidebar={openSidebar}
               label={topBarLabel}
+              shortLabel={topBarLabelShort}
               prevLabel="Previous month"
               nextLabel="Next month"
               onPrev={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}
@@ -154,7 +161,7 @@ function AppMain() {
           ) : (
             <div className="flex items-center gap-2 min-w-0" id="tbDefault">
               {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
-              <span className="text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{topBarLabel}</span>
+              <TopbarLabel long={topBarLabel} short={topBarLabelShort} className="text-base text-foreground" />
             </div>
           )}
           {!isEntryView && (
