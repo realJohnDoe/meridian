@@ -30,13 +30,6 @@ export function fmtTopBarMonth(d: Date, today: Date): string {
   return d.toLocaleDateString(undefined, opts)
 }
 
-// See fmtTopBarDayShort.
-export function fmtTopBarMonthShort(d: Date, today: Date): string {
-  const opts: Intl.DateTimeFormatOptions = { month: 'short' }
-  if (d.getFullYear() !== today.getFullYear()) opts.year = 'numeric'
-  return d.toLocaleDateString(undefined, opts)
-}
-
 // ── Duration formatting ───────────────────────────────────────────────────────
 
 function pluralize(n: number, unit: string): string {
