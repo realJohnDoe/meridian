@@ -1,10 +1,68 @@
 # Meridian
 
-**A calm calendar, task manager, and notes app built on plain Markdown files.**
+**Tasks and a calendar that are actually good on your phone — stored as plain Markdown files you own.**
 
-Meridian blends task management, event scheduling, and note-taking into a single timeline — and stores everything as plain Markdown files you can read, edit, and back up anywhere. It's a free, open-source PWA.
+**Who it's for:** you keep your life in Markdown — Obsidian, TaskNotes, or just a folder of `.md` files — and you're tired of tasks and dates being something a plugin bolts onto a desktop-first app. In Meridian they're first-class, and they're fast on a phone.
 
-**[Open the app →](https://realjohndoe.github.io/meridian/)**
+**And whoever you share with doesn't have to be you.** Point Meridian at a repo and the people you share it with just open a web app — no vault to configure, no plugins, no accounts to create. Tag people on entries, filter the calendar down to one person.
+
+**[Open the app →](https://realjohndoe.github.io/meridian/)** — try the example vault first, nothing to sign up for.
+
+*Meridian does tasks and calendar. It doesn't try to out-note Obsidian, and doesn't want to.*
+
+---
+
+## Why not just Obsidian + TaskNotes?
+
+That's what I used, and TaskNotes is good. The limit isn't the plugin — it's that a plugin has to work through Obsidian's own interface, which was built for the desktop. Capturing something on a phone takes a couple of taps more than it would in Google Calendar or Todoist, and those taps add up.
+
+|  | Meridian | Obsidian + TaskNotes | Google Calendar / Todoist |
+|---|---|---|---|
+| Plain Markdown files you own | ✅ | ✅ | ❌ |
+| Tasks + calendar first-class, no plugin | ✅ | Plugin-mediated | ✅ |
+| Built phone-first | ✅ | Desktop-first | ✅ |
+| Usable by someone who won't configure a vault | ✅ | ❌ | ✅ |
+
+Only one column has all four.
+
+---
+
+## ✨ What it does
+
+- **Agenda, day, and month views** — see your tasks and events in whatever layout suits the moment.
+- **Tasks, events, and notes in one place** — all the same kind of thing, all on one timeline.
+- **Rich recurrence** — daily, weekly, monthly, yearly, custom intervals, weekday-specific patterns, and "repeat N days after completion" — without fiddling with a wizard.
+- **Wikilinks** — connect entries with `[[Note Title]]` links that render as inline chips with a preview popover.
+- **Participants** — tag people on entries and filter the whole calendar to show only their items.
+- **Priority and duration** — first-class metadata on every task or event.
+- **Search** — find any entry by title or content across your entire vault.
+- **Offline-first** — the app works without a network connection and syncs automatically when you're back online.
+- **Installable** — add Meridian to your home screen or desktop like any native app (it's a PWA).
+
+---
+
+## 🗄️ Your data, your way
+
+Meridian doesn't run a server that holds your notes. You choose where your files live:
+
+| Backend | How it works |
+|---|---|
+| **GitHub repository** ⭐ | Reads and writes directly to a repo of your choice via the GitHub API. Instant cloud sync, full git history, and works on any device including iOS. This is the recommended backend for most users. |
+| **Local folder** | Opens a folder on your computer via the browser's File System API. Files stay on your machine. Supported in Chrome and Edge only — not available on iOS or Firefox. |
+| **Example vault** | A built-in demo you can explore before connecting anything — no account needed. |
+
+Files are plain `.md` files. Open them in any text editor, check them into git, sync them with any tool you already use.
+
+---
+
+## 🚀 Getting started
+
+1. **Open the app** at [realjohndoe.github.io/meridian](https://realjohndoe.github.io/meridian/).
+2. Try the **Example vault** to get a feel for the interface — click through the onboarding tour.
+3. When you're ready, connect your own storage:
+   - **GitHub** (recommended) — click "Connect GitHub repo", **Sign in with GitHub**, and pick the repository to use — no token to create by hand. (You can also connect manually with a [fine-grained personal access token](https://github.com/settings/tokens?type=beta) scoped to that one repo with **Contents: Read and write**.) Meridian reads and writes files directly, so you can reach your vault from any device.
+   - **Local folder** — click "Connect local folder" and pick a directory. Chrome and Edge only; not supported on iOS or Firefox.
+4. Create your first entry with the **+** button and start building your calendar.
 
 ---
 
@@ -50,46 +108,8 @@ Real schedules aren't tidy, so Meridian's recurrence model goes well beyond "rep
 
 ---
 
-## ✨ What it does
-
-- **Agenda, day, and month views** — see your tasks and events in whatever layout suits the moment.
-- **Tasks, events, and notes in one place** — all the same kind of thing, all on one timeline.
-- **Rich recurrence** — daily, weekly, monthly, yearly, custom intervals, weekday-specific patterns, and "repeat N days after completion" — without fiddling with a wizard.
-- **Wikilinks** — connect entries with `[[Note Title]]` links that render as inline chips with a preview popover.
-- **Participants** — tag people on entries and filter the whole calendar to show only their items.
-- **Priority and duration** — first-class metadata on every task or event.
-- **Search** — find any entry by title or content across your entire vault.
-- **Offline-first** — the app works without a network connection and syncs automatically when you're back online.
-- **Installable** — add Meridian to your home screen or desktop like any native app (it's a PWA).
-
----
-
-## 🗄️ Your data, your way
-
-Meridian doesn't run a server that holds your notes. You choose where your files live:
-
-| Backend | How it works |
-|---|---|
-| **GitHub repository** ⭐ | Reads and writes directly to a repo of your choice via the GitHub API. Instant cloud sync, full git history, and works on any device including iOS. This is the recommended backend for most users. |
-| **Local folder** | Opens a folder on your computer via the browser's File System API. Files stay on your machine. Supported in Chrome and Edge only — not available on iOS or Firefox. |
-| **Example vault** | A built-in demo you can explore before connecting anything — no account needed. |
-
-Files are plain `.md` files. Open them in any text editor, check them into git, sync them with any tool you already use.
-
----
-
-## 🚀 Getting started
-
-1. **Open the app** at [realjohndoe.github.io/meridian](https://realjohndoe.github.io/meridian/).
-2. Try the **Example vault** to get a feel for the interface — click through the onboarding tour.
-3. When you're ready, connect your own storage:
-   - **GitHub** (recommended) — click "Connect GitHub repo", **Sign in with GitHub**, and pick the repository to use — no token to create by hand. (You can also connect manually with a [fine-grained personal access token](https://github.com/settings/tokens?type=beta) scoped to that one repo with **Contents: Read and write**.) Meridian reads and writes files directly, so you can reach your vault from any device.
-   - **Local folder** — click "Connect local folder" and pick a directory. Chrome and Edge only; not supported on iOS or Firefox.
-4. Create your first entry with the **+** button and start building your calendar.
-
----
-
-## 📄 Entry format
+<details>
+<summary><h2 style="display: inline">📄 Entry format</h2></summary>
 
 Every entry is a Markdown file. Here's a simple weekly task:
 
@@ -140,6 +160,8 @@ You can write and edit these files by hand if you prefer — Meridian will pick 
 
 Frontmatter keys Meridian doesn't use (`aliases`, `cssclasses`, or anything of your own) are kept as they are, so a file stays yours. Saving does rewrite the frontmatter into Meridian's canonical form: comments are dropped, and keys may be reordered, requoted, or moved between the root and a `defaults:` block. The markdown body below the frontmatter is kept as written, apart from trimming blank lines at either end.
 
+</details>
+
 ---
 
 ## 🙏 Inspiration and comparisons
@@ -148,7 +170,7 @@ Meridian was heavily inspired by tools we already loved, and tries to fill the g
 
 | Feature | Meridian | [Obsidian](https://obsidian.md) + [TaskNotes](https://tasknotes.dev/) | [Google Calendar](https://calendar.google.com) | [GitHub Issues / Projects](https://github.com/features/issues) | [Todoist](https://todoist.com) | [Google Keep](https://keep.google.com) |
 |---|---|---|---|---|---|---|
-| Great mobile UX | ✅ | Partial | ✅ | Partial | ✅ | ✅ |
+| Phone-first UI | ✅ | Desktop-first | ✅ | Partial | ✅ | ✅ |
 | Plain Markdown storage | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Calendar views (day / month) | ✅ | Plugin-dependent | ✅ | Partial | Partial | ❌ |
 | Task management | ✅ | ✅ (TaskNotes plugin) | Limited | ✅ | ✅ | Partial |
@@ -156,7 +178,7 @@ Meridian was heavily inspired by tools we already loved, and tries to fill the g
 | Advanced note-taking (plugin ecosystem, graph view, deep linking) | Partial | ✅ | ❌ | ❌ | ❌ | Partial |
 | Rich recurrence rules | ✅ | Limited | ✅ | ❌ | ✅ | ❌ |
 | Multiple participants / assignees | ✅ | Partial | ❌ | ✅ | ✅ (paid) | ❌ |
-| Free & open source | ✅ | Partially (core only) | ❌ | ❌ | ❌ | ❌ |
+| Free & open source | ✅ | Partially (plugin only) | ❌ | ❌ | ❌ | ❌ |
 | Works in the browser | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
 **[Obsidian](https://obsidian.md) and the [TaskNotes plugin](https://tasknotes.dev/)** inspired the wikilink system, the plain-Markdown-as-the-source-of-truth philosophy, and much of the editor UX. If you're already an Obsidian user, Meridian's vault format will feel immediately familiar.
