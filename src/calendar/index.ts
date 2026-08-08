@@ -7,5 +7,5 @@ export { sortOccs, isDimmed, priorityRank, doneKindOrder } from './occSort'
 export { NO_PARTICIPANT, filterByParticipants } from './useCalendarFilter'
 export {
   resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useAgendaTopDate, requestScrollToToday,
-  useCurrentDate, setCurrentDate, setCurrentMonthKeepingDay,
+  requestScrollToDate, useCurrentDate, setCurrentDate, setCurrentMonthKeepingDay,
 } from './viewState'

@@ -26,8 +26,23 @@ interface CalendarViewState {
   monthPreview: string | null
   /** `YYYY-MM-DD` of the date the day-view swipe carousel is settling toward — same shape as monthPreview. */
   dayPreview: string | null
-  /** When true, AgendaView will scroll to today once then clear this flag. */
-  scrollToTodayOnce: boolean
+  /**
+   * ISO date (`YYYY-MM-DD`) AgendaView's expansion window is centered on —
+   * `[agendaAnchor - 365d, agendaAnchor + 90d]`, see useAgendaSections.
+   * Defaults to today and only moves on an explicit jump (requestScrollToDate),
+   * so an ordinary scroll or remount never shifts it — the window has to stay
+   * stable while mounted, or rows would shuffle out from under the scroll
+   * position. Read by AgendaView on every render, unlike agendaScrollTarget
+   * below, which is consumed once.
+   */
+  agendaAnchor: string
+  /**
+   * ISO date (`YYYY-MM-DD`) AgendaView should scroll to on its next render,
+   * then clear back to null. Always set together with agendaAnchor (see
+   * requestScrollToDate) so the target's row exists in the freshly-centered
+   * window by the time the scroll fires.
+   */
+  agendaScrollTarget: string | null
   /** ISO date string of the topmost visible day in the agenda view. */
   agendaTopDate: string | null
   /**
@@ -48,16 +63,18 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   agendaScrollMeasurements: [],
   monthPreview: null,
   dayPreview: null,
-  scrollToTodayOnce: false,
+  agendaAnchor: fmtISO(startOfToday()),
+  agendaScrollTarget: null,
   agendaTopDate: null,
   currentDate: fmtISO(startOfToday()),
 }))
 
 export function resetCalendarViewState(): void {
-  // currentDate is recomputed rather than taken from the frozen initial
-  // snapshot — getInitialState() captured "today" at module load, which can
-  // be stale by the time a long-lived tab switches vaults.
-  calendarView.setState({ ...calendarView.getInitialState(), currentDate: fmtISO(startOfToday()) }, true)
+  // currentDate/agendaAnchor are recomputed rather than taken from the frozen
+  // initial snapshot — getInitialState() captured "today" at module load,
+  // which can be stale by the time a long-lived tab switches vaults.
+  const today = fmtISO(startOfToday())
+  calendarView.setState({ ...calendarView.getInitialState(), currentDate: today, agendaAnchor: today }, true)
 }
 
 /**
@@ -69,9 +86,9 @@ export function resetCalendarViewState(): void {
  * Deliberately does not also call requestScrollToToday() — the caller does
  * that itself, after this returns. Folding it in here would mean this reset
  * (a full-state replace, see resetCalendarViewState above) always stomps the
- * flag right back to false, and it would leave test cleanup (which wants a
- * clean *initial* state, not a pending scroll) with scrollToTodayOnce stuck
- * true for the next test.
+ * pending target right back to null, and it would leave test cleanup (which
+ * wants a clean *initial* state, not a pending scroll) with agendaScrollTarget
+ * stuck non-null for the next test.
  */
 export function resetCalendarOnVaultChange(): void {
   resetExpansionCache()
@@ -95,8 +112,12 @@ export function setDayPreview(key: string | null): void {
   calendarView.setState({ dayPreview: key })
 }
 
-export function useScrollToTodayOnce(): boolean {
-  return useZustandStore(calendarView, s => s.scrollToTodayOnce)
+export function useAgendaAnchor(): string {
+  return useZustandStore(calendarView, s => s.agendaAnchor)
+}
+
+export function useAgendaScrollTarget(): string | null {
+  return useZustandStore(calendarView, s => s.agendaScrollTarget)
 }
 
 export function useAgendaTopDate(): string | null {
@@ -107,9 +128,19 @@ export function useCurrentDate(): string {
   return useZustandStore(calendarView, s => s.currentDate)
 }
 
+/**
+ * Flags AgendaView to re-center its window on `dateKey` and scroll there on
+ * its next render, then clear the pending target — used for jumps to a day
+ * that may fall outside the default window (e.g. arriving from a Month/Day
+ * view that had paged far from today; see Sidebar's Agenda nav item).
+ */
+export function requestScrollToDate(dateKey: string): void {
+  calendarView.setState({ agendaAnchor: dateKey, agendaScrollTarget: dateKey })
+}
+
 /** Flags AgendaView to scroll to today on its next render. */
 export function requestScrollToToday(): void {
-  calendarView.setState({ scrollToTodayOnce: true })
+  requestScrollToDate(fmtISO(startOfToday()))
 }
 
 export function setAgendaTopDate(key: string): void {
@@ -136,9 +167,11 @@ export function setCurrentMonthKeepingDay(monthKey: string): void {
   calendarView.setState({ currentDate: `${monthKey}-${String(clampedDay).padStart(2, '0')}` })
 }
 
-/** Clears the scroll-to-today flag and records the date scrolled to, in one
+/** Clears the pending scroll target and records the date scrolled to, in one
  * write — splitting this into two setState calls would notify subscribers
- * twice, flashing the stale top date before it settles. */
-export function markScrolledToToday(topDate: string): void {
-  calendarView.setState({ scrollToTodayOnce: false, agendaTopDate: topDate, currentDate: topDate })
+ * twice, flashing the stale top date before it settles. Does not touch
+ * agendaAnchor: it was already set to this date by whatever requested the
+ * scroll (requestScrollToDate/requestScrollToToday). */
+export function markAgendaScrolled(topDate: string): void {
+  calendarView.setState({ agendaScrollTarget: null, agendaTopDate: topDate, currentDate: topDate })
 }

@@ -5,7 +5,8 @@ import { setupStore } from '@/test-utils'
 import {
   calendarView, resetCalendarViewState,
   useMonthPreview, useDayPreview, setMonthPreview, setDayPreview,
-  useScrollToTodayOnce, useAgendaTopDate, requestScrollToToday, setAgendaTopDate, markScrolledToToday,
+  useAgendaAnchor, useAgendaScrollTarget, useAgendaTopDate,
+  requestScrollToToday, requestScrollToDate, setAgendaTopDate, markAgendaScrolled,
 } from './viewState'
 
 setupStore()
@@ -24,7 +25,8 @@ describe('calendarView', () => {
       agendaScrollMeasurements: [{ index: 0, start: 0, end: 10, size: 10, key: 'a', lane: 0 }],
       monthPreview: '2026-07',
       dayPreview: '2026-07-26',
-      scrollToTodayOnce: true,
+      agendaAnchor: '2026-07-26',
+      agendaScrollTarget: '2026-07-26',
       agendaTopDate: '2026-07-26',
     })
 
@@ -35,7 +37,7 @@ describe('calendarView', () => {
     expect(calendarView.getState().agendaScrollMeasurements).toEqual([])
     expect(calendarView.getState().monthPreview).toBeNull()
     expect(calendarView.getState().dayPreview).toBeNull()
-    expect(calendarView.getState().scrollToTodayOnce).toBe(false)
+    expect(calendarView.getState().agendaScrollTarget).toBeNull()
     expect(calendarView.getState().agendaTopDate).toBeNull()
   })
 })
@@ -74,13 +76,26 @@ describe('useMonthPreview / useDayPreview', () => {
   })
 })
 
-describe('useScrollToTodayOnce / useAgendaTopDate', () => {
-  it('requestScrollToToday flips the flag reactively', () => {
-    const { result } = renderHook(() => useScrollToTodayOnce())
-    expect(result.current).toBe(false)
+describe('useAgendaAnchor / useAgendaScrollTarget / useAgendaTopDate', () => {
+  it('requestScrollToToday sets both the anchor and the pending target to today', () => {
+    const { result: anchorResult } = renderHook(() => useAgendaAnchor())
+    const { result: targetResult } = renderHook(() => useAgendaScrollTarget())
+    const today = anchorResult.current // whatever "today" resolved to at init
 
     act(() => requestScrollToToday())
-    expect(result.current).toBe(true)
+
+    expect(anchorResult.current).toBe(today)
+    expect(targetResult.current).toBe(today)
+  })
+
+  it('requestScrollToDate re-centers the anchor on an arbitrary day', () => {
+    const { result: anchorResult } = renderHook(() => useAgendaAnchor())
+    const { result: targetResult } = renderHook(() => useAgendaScrollTarget())
+
+    act(() => requestScrollToDate('2026-12-25'))
+
+    expect(anchorResult.current).toBe('2026-12-25')
+    expect(targetResult.current).toBe('2026-12-25')
   })
 
   it('setAgendaTopDate updates reactively', () => {
@@ -91,15 +106,17 @@ describe('useScrollToTodayOnce / useAgendaTopDate', () => {
     expect(result.current).toBe('2026-07-26')
   })
 
-  it('markScrolledToToday clears the flag and sets the date in one write', () => {
-    act(() => requestScrollToToday())
+  it('markAgendaScrolled clears the pending target and sets the date in one write, leaving the anchor alone', () => {
+    act(() => requestScrollToDate('2026-07-26'))
 
-    const { result: flagResult } = renderHook(() => useScrollToTodayOnce())
+    const { result: targetResult } = renderHook(() => useAgendaScrollTarget())
+    const { result: anchorResult } = renderHook(() => useAgendaAnchor())
     const { result: dateResult } = renderHook(() => useAgendaTopDate())
 
-    act(() => markScrolledToToday('2026-07-26'))
+    act(() => markAgendaScrolled('2026-07-26'))
 
-    expect(flagResult.current).toBe(false)
+    expect(targetResult.current).toBeNull()
+    expect(anchorResult.current).toBe('2026-07-26')
     expect(dateResult.current).toBe('2026-07-26')
   })
 })

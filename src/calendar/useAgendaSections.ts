@@ -62,16 +62,22 @@ export function resetAgendaSectionsCache(): void {
  * `today` and `now` are passed in rather than read here via useToday/useNow,
  * since AgendaView needs both for its own scroll-to-today and per-row
  * live-repaint logic too — one ticking source shared by both, not two.
+ *
+ * `anchor` defaults to `today` and centers the expansion window
+ * (`[anchor - PAST_WINDOW_DAYS, anchor + FUTURE_WINDOW_DAYS]`) — see
+ * calendar/viewState.ts's agendaAnchor for why AgendaView passes something
+ * else after a jump from Month/Day.
  */
 export function useAgendaSections(
   today: Date,
   now: Date,
+  anchor: Date = today,
 ): { rows: AgendaRow[]; goToRowIndex: number } {
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
 
-  const from = addDays(today, -PAST_WINDOW_DAYS)
-  const to = addDays(today, FUTURE_WINDOW_DAYS)
+  const from = addDays(anchor, -PAST_WINDOW_DAYS)
+  const to = addDays(anchor, FUTURE_WINDOW_DAYS)
   const allOccs = useExpandWithMultiday(items, roots, from, to)
   const { filterOccs } = useCalendarFilter()
 
@@ -83,7 +89,7 @@ export function useAgendaSections(
   const nowBucket = new Date(Math.floor(now.getTime() / 60_000) * 60_000)
 
   const cached = sectionsCacheSlot.get(SECTIONS_CACHE_KEY) ?? null
-  const next = computeAgendaSections(cached, allOccs, today, nowBucket, filterOccs)
+  const next = computeAgendaSections(cached, allOccs, today, nowBucket, filterOccs, anchor)
   if (next !== cached) {
     sectionsCacheSlot.set(SECTIONS_CACHE_KEY, next)
   }

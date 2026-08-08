@@ -294,6 +294,55 @@ describe('computeAgendaSections — flat rows (F1)', () => {
   })
 })
 
+describe('computeAgendaSections — anchor', () => {
+  it('defaults to today, preserving the overdue-preferring scroll target', () => {
+    const { goToRowIndex, rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
+    const target = rows[goToRowIndex]
+    expect(target?.kind === 'header' && target.tone).toBe('overdue')
+  })
+
+  it('targets a day with content directly when anchored there, ignoring overdue', () => {
+    const anchor = new Date(2026, 5, 20) // future-event's own day
+    const { sections, rows, goToRowIndex } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter, anchor)
+
+    expect(dayKeys(sections)).toEqual(['2026-06-10', '__overdue__', '2026-06-15', '2026-06-20'])
+    const target = rows[goToRowIndex]
+    expect(target?.kind === 'header').toBe(true)
+    expect(target?.dateKey).toBe('2026-06-20')
+  })
+
+  it('force-renders an empty section at the anchor — future or past — purely as a scroll target', () => {
+    const futureAnchor = new Date(2026, 5, 25) // no occurrences on this day
+    const future = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter, futureAnchor)
+    expect(dayKeys(future.sections)).toContain('2026-06-25')
+    const futureTarget = future.sections[future.goToIndex]
+    expect(futureTarget?.kind === 'day' && futureTarget.items).toEqual([])
+
+    const pastAnchor = new Date(2026, 5, 5) // before any occurrence, and before today
+    const past = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter, pastAnchor)
+    expect(dayKeys(past.sections)).toContain('2026-06-05')
+    const pastTarget = past.sections[past.goToIndex]
+    expect(pastTarget?.kind === 'day' && pastTarget.items).toEqual([])
+  })
+
+  it('does not force-render an empty today section when anchored elsewhere', () => {
+    const anchor = new Date(2026, 5, 20)
+    const onlyFuture = [occ('future-event', '2026-06-20', { time: '09:00' })]
+    const { sections } = computeAgendaSections(null, onlyFuture, TODAY, NOW, noFilter, anchor)
+
+    expect(dayKeys(sections)).toEqual(['2026-06-20'])
+  })
+
+  it('re-groups from scratch when only the anchor changes', () => {
+    const all = baseOccs()
+    const first = computeAgendaSections(null, all, TODAY, NOW, noFilter)
+    const second = computeAgendaSections(first, all, TODAY, NOW, noFilter, new Date(2026, 5, 20))
+
+    expect(second).not.toBe(first)
+    expect(second.rows[second.goToRowIndex]?.dateKey).toBe('2026-06-20')
+  })
+})
+
 describe('estimateRow', () => {
   const rowFor = (rows: AgendaRow[], id: string) =>
     rows.find(r => r.kind === 'occ' && r.occ.id === id)!

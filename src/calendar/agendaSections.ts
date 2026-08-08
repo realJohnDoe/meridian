@@ -109,6 +109,7 @@ interface DayBucket {
 export interface AgendaSectionCache {
   allOccs: Occurrence[]
   todayMs: number
+  anchorMs: number
   nowMs: number
   filterOccs: FilterOccs
   buckets: Map<string, DayBucket>
@@ -157,6 +158,8 @@ interface BuildCtx {
   tomorrow: Date
   now: Date
   todayKey: string
+  /** See computeAgendaSections' `anchor` param. */
+  anchorKey: string
   filterOccs: FilterOccs
 }
 
@@ -175,7 +178,10 @@ function buildBucket(b: DayBucket, ctx: BuildCtx): DayBucket {
     return {
       ...b,
       overdue,
-      section: items.length
+      // `|| b.key === ctx.anchorKey` forces a render even when empty — the
+      // anchor always needs a section to scroll to, mirroring the today
+      // special-case below (identical when anchor is today, the default).
+      section: items.length || b.key === ctx.anchorKey
         ? {
             kind: 'day', key: b.key, dateKey: b.key, date: b.date, isToday: false, isTomorrow: false, items,
             rows: [headerRow(b.key, b.key, fmtLong(b.date), 'default'), ...occRows(items, b.key, false, false)],
@@ -191,7 +197,7 @@ function buildBucket(b: DayBucket, ctx: BuildCtx): DayBucket {
   return {
     ...b,
     overdue: EMPTY_OCCS,
-    section: items.length || b.key === ctx.todayKey
+    section: items.length || b.key === ctx.anchorKey
       ? {
           kind: 'day', key: b.key, dateKey: b.key, date: b.date, isToday, isTomorrow, items,
           rows: [headerRow(b.key, b.key, label, isToday ? 'today' : 'default'), ...occRows(items, b.key, false, isToday)],
@@ -200,15 +206,15 @@ function buildBucket(b: DayBucket, ctx: BuildCtx): DayBucket {
   }
 }
 
-/** Bucket every occurrence by its calendar day, seeding today so it always exists. */
-function groupByDay(allOccs: Occurrence[], today: Date, todayKey: string) {
+/** Bucket every occurrence by its calendar day, seeding the anchor so it always exists. */
+function groupByDay(allOccs: Occurrence[], todayKey: string, anchor: Date, anchorKey: string) {
   const buckets = new Map<string, DayBucket>()
   const keyByIndex = new Array<string | undefined>(allOccs.length)
 
-  buckets.set(todayKey, {
-    key: todayKey,
-    date: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-    isPast: false,
+  buckets.set(anchorKey, {
+    key: anchorKey,
+    date: new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate()),
+    isPast: anchorKey < todayKey,
     indices: [], occs: [], overdue: EMPTY_OCCS, section: null,
   })
 
@@ -253,6 +259,12 @@ function groupByDay(allOccs: Occurrence[], today: Date, todayKey: string) {
  *
  * Unchanged `Section` objects are returned by reference, which is what keeps
  * DaySection's memo from re-rendering days the toggle didn't touch.
+ *
+ * `anchor` defaults to `today` — the ordinary case, where the seeded/scroll
+ * target bucket is today's own and goToIndex prefers the overdue section over
+ * it exactly as before. Passing a different anchor (Agenda re-centered on a
+ * day reached via Month/Day) instead seeds that day's bucket and targets it
+ * directly, skipping the overdue preference — see the goToIndex comment below.
  */
 export function computeAgendaSections(
   prev: AgendaSectionCache | null,
@@ -260,20 +272,23 @@ export function computeAgendaSections(
   today: Date,
   now: Date,
   filterOccs: FilterOccs,
+  anchor: Date = today,
 ): AgendaSectionCache {
   const todayMs = today.getTime()
+  const anchorMs = anchor.getTime()
   const nowMs = now.getTime()
 
-  if (prev && prev.allOccs === allOccs && prev.todayMs === todayMs && prev.nowMs === nowMs && prev.filterOccs === filterOccs) {
+  if (prev && prev.allOccs === allOccs && prev.todayMs === todayMs && prev.anchorMs === anchorMs && prev.nowMs === nowMs && prev.filterOccs === filterOccs) {
     return prev
   }
 
   const todayKey = fmtISO(today)
-  const ctx: BuildCtx = { today, tomorrow: addDays(today, 1), now, todayKey, filterOccs }
+  const anchorKey = fmtISO(anchor)
+  const ctx: BuildCtx = { today, tomorrow: addDays(today, 1), now, todayKey, anchorKey, filterOccs }
 
-  // `today` gates grouping reuse because it decides both the seeded bucket and
-  // each bucket's isPast flag.
-  const changed = prev && prev.todayMs === todayMs ? changedIndices(prev.allOccs, allOccs) : null
+  // `today`/`anchor` gate grouping reuse because they decide the seeded
+  // bucket and (for today) each bucket's isPast flag.
+  const changed = prev && prev.todayMs === todayMs && prev.anchorMs === anchorMs ? changedIndices(prev.allOccs, allOccs) : null
   const sectionsReusable = changed !== null && prev !== null && prev.nowMs === nowMs && prev.filterOccs === filterOccs
 
   let buckets: Map<string, DayBucket>
@@ -306,7 +321,7 @@ export function computeAgendaSections(
     }
     dirty = sectionsReusable ? touched : null
   } else {
-    ({ buckets, keyByIndex, sortedKeys } = groupByDay(allOccs, today, todayKey))
+    ({ buckets, keyByIndex, sortedKeys } = groupByDay(allOccs, todayKey, anchor, anchorKey))
     dirty = null
   }
 
@@ -344,31 +359,44 @@ export function computeAgendaSections(
     }
   }
 
+  // anchorKey === todayKey (the default, anchor omitted) is the ordinary
+  // "scroll to today" case: prefer the overdue section when there is one,
+  // else today's own section — exactly the pre-anchor behavior. A different
+  // anchor means an explicit jump to that specific day instead, so it always
+  // wins regardless of overdue — surfacing unrelated overdue work isn't what
+  // "take me to this day" asked for.
+  const preferOverdue = anchorKey === todayKey
+
   // Flatten: past day-sections (ascending) → overdue → current/future days.
   const sections: Section[] = []
+  let goToIndex = -1
   for (const k of sortedKeys) {
     if (k >= todayKey) break
     const s = buckets.get(k)?.section
-    if (s) sections.push(s)
+    if (!s) continue
+    if (!preferOverdue && k === anchorKey) goToIndex = sections.length
+    sections.push(s)
   }
-  // goToday scrolls to the overdue section when there is one, else to today.
-  let goToIndex = -1
   if (overdueSection) {
-    goToIndex = sections.length
+    if (preferOverdue) goToIndex = sections.length
     sections.push(overdueSection)
   }
   for (const k of sortedKeys) {
     if (k < todayKey) continue
     const s = buckets.get(k)?.section
     if (!s) continue
-    if (goToIndex < 0 && s.kind === 'day' && s.isToday) goToIndex = sections.length
+    if (preferOverdue) {
+      if (goToIndex < 0 && s.kind === 'day' && s.isToday) goToIndex = sections.length
+    } else if (k === anchorKey) {
+      goToIndex = sections.length
+    }
     sections.push(s)
   }
 
   // Flatten sections into one virtualizable row list. `goToIndex` (a section
-  // index) already identifies the scroll-to-today target, so reuse it here
-  // rather than re-deriving which section is "the target" a second time —
-  // goToRowIndex is the position of that section's header row.
+  // index) already identifies the scroll target, so reuse it here rather than
+  // re-deriving which section is "the target" a second time — goToRowIndex is
+  // the position of that section's header row.
   const rows: AgendaRow[] = []
   let goToRowIndex = -1
   for (let i = 0; i < sections.length; i++) {
@@ -377,7 +405,7 @@ export function computeAgendaSections(
   }
 
   return {
-    allOccs, todayMs, nowMs, filterOccs, buckets, sortedKeys, keyByIndex,
+    allOccs, todayMs, anchorMs, nowMs, filterOccs, buckets, sortedKeys, keyByIndex,
     overdueSection, sections, goToIndex, rows, goToRowIndex,
   }
 }

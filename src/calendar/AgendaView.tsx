@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Occurrence, EditScope } from '@/types'
 
-import { fmtISO } from '@/model'
+import { parseDateString } from '@/model'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import AgendaHeaderRow from './AgendaHeaderRow'
 import OccurrenceRow from './OccurrenceRow'
@@ -11,7 +11,7 @@ import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useToday } from '@/hooks'
 import { useNow } from './useNow'
-import { useScrollToTodayOnce, setAgendaTopDate, markScrolledToToday } from './viewState'
+import { useAgendaAnchor, useAgendaScrollTarget, setAgendaTopDate, markAgendaScrolled } from './viewState'
 
 interface Props {
   onOpen: (occ: Occurrence, scope?: EditScope) => void
@@ -32,7 +32,12 @@ export default function AgendaView({ onOpen }: Props) {
   // explicit and future-proofs against that auto-detection changing. The
   // eslint warning here is expected and permanent; see eslint.config.js.
   const today = useToday()
-  const scrollToTodayOnce = useScrollToTodayOnce()
+  // agendaAnchor centers the expansion window (see viewState.ts) — normally
+  // today, but re-centered by a jump from Month/Day via the sidebar (a day
+  // outside the default ±window otherwise wouldn't have a row at all).
+  const anchorKey = useAgendaAnchor()
+  const anchor = useMemo(() => parseDateString(anchorKey) ?? today, [anchorKey, today])
+  const scrollTarget = useAgendaScrollTarget()
 
   // Today's occurrences (and any occurrence whose event-past/event-future
   // state is instant-sensitive, e.g. a cross-midnight timed duration) can
@@ -42,7 +47,7 @@ export default function AgendaView({ onOpen }: Props) {
   // negligible even at ~455 sections; see occSort's decorate-sort-undecorate).
   const now = useNow(60_000)
 
-  const { rows, goToRowIndex } = useAgendaSections(today, now)
+  const { rows, goToRowIndex } = useAgendaSections(today, now, anchor)
 
   // OccurrenceRow is memoized with React's default shallow compare, so these
   // handlers are genuinely part of its props comparison: an unstable reference
@@ -57,11 +62,11 @@ export default function AgendaView({ onOpen }: Props) {
   // its own ref. The ref attaches during the layout phase before the
   // virtualizer's internal layout effect runs, so it connects synchronously on
   // first mount. Seed it with the prior scroll position (offset + measured
-  // sizes), or with today's own offset when a scroll-to-today is pending — so
+  // sizes), or with the target row's own offset when a scroll is pending — so
   // the first painted frame is already in the right place rather than at the
   // top of the list.
   const scRef = useRef<HTMLDivElement>(null)
-  const { initialOffset, initialMeasurementsCache } = useAgendaScrollRestore(scrollToTodayOnce, rows, goToRowIndex)
+  const { initialOffset, initialMeasurementsCache } = useAgendaScrollRestore(scrollTarget !== null, rows, goToRowIndex)
 
   // Counts *rows*, not sections. Section-granular virtualization mounted every
   // row a section owned the moment it entered the viewport, and the overdue
@@ -108,15 +113,15 @@ export default function AgendaView({ onOpen }: Props) {
     if (!items.length) return
     const offset = virtualizer.scrollOffset ?? 0
     const top = items.find(vi => vi.end > offset + 12) ?? items[0]!  // items.length checked above
-    // `?? fmtISO(today)` guards a stale `rows` capture: this listener closes
-    // over the render's rows while the virtualizer's items may be newer.
-    // Overdue rows carry todayKey (see agendaSections.ts), so the label reads
-    // "Today" over that block without a special case here.
-    const key = rows[top.index]?.dateKey ?? fmtISO(today)
+    // `?? anchorKey` guards a stale `rows` capture: this listener closes over
+    // the render's rows while the virtualizer's items may be newer. Overdue
+    // rows carry todayKey (see agendaSections.ts), so the label reads "Today"
+    // over that block without a special case here.
+    const key = rows[top.index]?.dateKey ?? anchorKey
     if (key === lastTopRef.current) return
     lastTopRef.current = key
     setAgendaTopDate(key)
-  }, [rows, today, virtualizer])
+  }, [rows, anchorKey, virtualizer])
 
   useEffect(() => {
     const el = scRef.current
@@ -138,17 +143,17 @@ export default function AgendaView({ onOpen }: Props) {
   // layout phase keeps it in the same frame as the commit.
   //
   // On mount this is now only a correction: useAgendaScrollRestore already
-  // seeded the virtualizer at today, and this fixes up the residual error
-  // between the estimated row sizes it summed and the real measured ones. The
-  // case it still carries on its own is the Today button pressed while the
-  // agenda is already mounted (see AppMain's handleToday), where there is no
-  // new mount and therefore no initialOffset to seed.
+  // seeded the virtualizer at the target row, and this fixes up the residual
+  // error between the estimated row sizes it summed and the real measured
+  // ones. The case it still carries on its own is the Today button (or a
+  // sidebar jump) pressed while the agenda is already mounted, where there is
+  // no new mount and therefore no initialOffset to seed.
   useLayoutEffect(() => {
-    if (!scrollToTodayOnce || goToRowIndex < 0 || !scRef.current) return
+    if (!scrollTarget || goToRowIndex < 0 || !scRef.current) return
     virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })
-    lastTopRef.current = fmtISO(today)
-    markScrolledToToday(fmtISO(today))
-  }, [scrollToTodayOnce, goToRowIndex, today, virtualizer])
+    lastTopRef.current = scrollTarget
+    markAgendaScrolled(scrollTarget)
+  }, [scrollTarget, goToRowIndex, virtualizer])
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" ref={scRef}>
