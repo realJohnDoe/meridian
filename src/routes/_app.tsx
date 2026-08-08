@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import { Menu, CalendarCheck2 } from 'lucide-react'
-import { addDays, fmtTopBarDay, fmtTopBarDayShort, fmtTopBarMonth, fmtTopBarMonthShort } from '@/format'
+import { addDays, fmtTopBarDay, fmtTopBarDayShort, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
 import { onVaultChanged } from '@/storage'
@@ -83,10 +83,12 @@ function AppMain() {
   const monthDisplayDate = monthViewDate && (monthPreview ? parseMonth(monthPreview) : monthViewDate)
   const dvDisplayDate    = dvDate && (dayPreview ? (parseDateString(dayPreview) ?? dvDate) : dvDate)
 
+  // Backlog/Notes are fixed strings; the agenda default view is date-based
+  // like day mode. Month mode (below) computes its own label directly — it
+  // never abbreviates, so it doesn't need a long/short pair.
   const [topBarLabel, topBarLabelShort] = (() => {
     if (backlogMatch) return ['Backlog', 'Backlog']
     if (notesMatch)   return ['Notes', 'Notes']
-    if (monthDisplayDate) return [fmtTopBarMonth(monthDisplayDate, today), fmtTopBarMonthShort(monthDisplayDate, today)]
     const d = agendaTopDate ? new Date(agendaTopDate + 'T00:00:00') : today
     return [fmtTopBarDay(d, today), fmtTopBarDayShort(d, today)]
   })()
@@ -151,17 +153,21 @@ function AppMain() {
             <PagedTopbar
               isMobile={isMobile}
               openSidebar={openSidebar}
-              label={topBarLabel}
-              shortLabel={topBarLabelShort}
+              label={fmtTopBarMonth(monthDisplayDate, today)}
               prevLabel="Previous month"
               nextLabel="Next month"
               onPrev={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}
               onNext={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}
             />
           ) : (
-            <div className="flex items-center gap-2 min-w-0" id="tbDefault">
+            <div className="flex flex-1 items-center gap-2 min-w-0" id="tbDefault">
               {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
-              <TopbarLabel long={topBarLabel} short={topBarLabelShort} className="text-base text-foreground" />
+              {/* flex-1 here (and on the row above) is load-bearing, not cosmetic: TopbarLabel's
+                  @container needs a size that comes from the flex algorithm's available-space
+                  distribution. A shrink-to-fit width (flex-basis: auto, sized from content) would
+                  collapse to 0 instead, because container-type: inline-size makes the browser
+                  disregard the label's own content when computing that shrink-to-fit size. */}
+              <TopbarLabel long={topBarLabel} short={topBarLabelShort} className="flex-1 text-base text-foreground" />
             </div>
           )}
           {!isEntryView && (

@@ -63,4 +63,29 @@ describe('PagedTopbar', () => {
     renderTopbar(false)
     expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument()
   })
+
+  // On narrow screens the chevrons would crowd the label for little benefit
+  // over the swipe-to-page carousel the day/month views already have.
+  it('hides the chevrons on mobile', () => {
+    renderTopbar(true)
+    expect(screen.queryByRole('button', { name: 'Previous month' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next month' })).not.toBeInTheDocument()
+  })
+
+  // Month view passes no shortLabel because it never wants to abbreviate —
+  // it should fall back to a plain label, not render a short-text node too.
+  it('renders only the label when shortLabel is omitted', () => {
+    render(
+      <PagedTopbar
+        isMobile={false}
+        openSidebar={vi.fn()}
+        label="August"
+        prevLabel="Previous month"
+        nextLabel="Next month"
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('August')).toBeInTheDocument()
+  })
 })
