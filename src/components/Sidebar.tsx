@@ -4,7 +4,7 @@ import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { setActiveVault } from '@/vaultActions'
 import { useResetOnChange } from '@/hooks'
-import { useCurrentDate } from '@/calendar'
+import { useCurrentDate, requestScrollToDate } from '@/calendar'
 import { FlipList } from './FlipList'
 import { vaultIcon } from './vaultIcon'
 import { Checkbox } from './ui/checkbox'
@@ -58,8 +58,15 @@ export default function AppSidebar() {
   // to. Month/Day nav targets carry over `currentDate` (the day last focused
   // in any calendar view — see calendar/viewState.ts) instead of always
   // resetting to today, so switching views lands where you were looking.
+  // Agenda's jump is gated on actually switching in (pathname !== '/'):
+  // re-clicking Agenda while already there would otherwise re-center its
+  // window on wherever it's already scrolled to — a no-op that still forces
+  // a full section rebuild and a jarring re-scroll.
   const navItems = [
-    { Icon: AlignLeft,     label: 'Agenda', active: pathname === '/',                 onClick: () => { close(); void navigate({ to: '/' }) } },
+    {
+      Icon: AlignLeft, label: 'Agenda', active: pathname === '/',
+      onClick: () => { close(); if (pathname !== '/') requestScrollToDate(currentDate); void navigate({ to: '/' }) },
+    },
     { Icon: CalendarDays,  label: 'Month',  active: pathname.startsWith('/calendar'), onClick: () => { close(); void navigate({ to: '/calendar/$month', params: { month: currentDate.slice(0, 7) } }) } },
     { Icon: CalendarClock, label: 'Day',    active: isDayView,                        onClick: () => { close(); void navigate({ to: '/day/$date', params: { date: currentDate } }) } },
   ]

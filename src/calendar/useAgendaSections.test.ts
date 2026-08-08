@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { setupStore, seedStore, makeOcc, makeRoots } from '@/test-utils'
+import { fmtISO } from '@/model'
 import { useAgendaSections } from './useAgendaSections'
 import type { AgendaRow } from './useAgendaSections'
 
@@ -101,5 +102,30 @@ describe('useAgendaSections', () => {
     // …while every untouched row is the very same object, so OccurrenceRow's
     // memo skips it instead of re-rendering the rest of the vault.
     expect(result.current.rows.find(r => r.kind === 'occ' && r.occ.id === 'future-1')).toBe(futureRowBefore)
+  })
+
+  describe('anchor', () => {
+    // Well beyond today's own ±90-day future window, so it only shows up once
+    // the window itself re-centers on an anchor near it.
+    const farFuture = new Date(2026, 5, 15 + 120)
+
+    it('excludes a day outside the default window when anchor stays at today', () => {
+      seedStore([makeOcc({ id: 'far-future', date: fmtISO(farFuture), time: '09:00' })], makeRoots('note.md'))
+
+      const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
+
+      expect(occIdsFor(result.current.rows, fmtISO(farFuture))).toEqual([])
+    })
+
+    it('re-centers the expansion window when a different anchor is passed', () => {
+      seedStore([makeOcc({ id: 'far-future', date: fmtISO(farFuture), time: '09:00' })], makeRoots('note.md'))
+
+      const { result } = renderHook(() => useAgendaSections(TODAY, NOW, farFuture))
+
+      expect(occIdsFor(result.current.rows, fmtISO(farFuture))).toEqual(['far-future'])
+      // The anchor day itself is the scroll target, not today's (now out-of-window) section.
+      const target = result.current.rows[result.current.goToRowIndex]
+      expect(target?.dateKey).toBe(fmtISO(farFuture))
+    })
   })
 })
