@@ -165,7 +165,7 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
         />
 
         {/* ── OCCURRENCE-LEVEL: scope caption → type → metadata → participants ── */}
-        <Card className="mt-3 mb-4 overflow-hidden bg-card">
+        <Card className="mt-3 mb-4 overflow-hidden bg-card shadow-(--shadow-card)">
           <CardContent className="px-3 pt-3 pb-3 bg-card">
             {showScopeRow && (
               <Select value={editScope} onValueChange={v => handleScopeChange(v as EditScope)}>
