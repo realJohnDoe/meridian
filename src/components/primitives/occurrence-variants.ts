@@ -49,7 +49,7 @@ export const occBarVariants = cva(
  * bumped to rounded-sm/md without updating this radius (see git history on
  * MonthGrid.tsx) — they ended up more rounded than their day-view counterpart.
  */
-export const occPillRounded = 'rounded-xs sm:rounded-sm'
+export const occPillRounded = 'rounded-xs sm:rounded'
 
 /**
  * DayView item colouring — all-day pills (bordered=false) and timed event
