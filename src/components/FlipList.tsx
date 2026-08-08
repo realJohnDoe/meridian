@@ -63,34 +63,29 @@ function useFlipTransition(
   const prevHeight = useRef<number | null>(null)
   const rowAnims   = useRef<Animation[]>([])
   const heightAnim = useRef<Animation | null>(null)
-  const scroller   = useRef<HTMLElement | null>(null)
-  const pinnedToBottom = useRef(false)
-
-  // Tracks the nearest scrollable ancestor's "pinned to bottom" state off of
-  // its own scroll events — independent of this list's render cycle — so we
-  // know what it was *before* a row leaves. By the time our own layout effect
-  // below runs, the row is already gone from the DOM: any geometry read at
-  // that point forces a reflow that bakes in the ancestor's shrunken
-  // scrollHeight, and a scroller sitting at max scroll gets clamped down
-  // right there, before the fold below ever gets to animate anything.
-  useLayoutEffect(() => {
-    if (!animateHeight) return
-    const container = containerRef.current
-    if (!container) return
-    const found = findScrollParent(container)
-    scroller.current = found
-    if (!found) return
-    const update = () => {
-      pinnedToBottom.current = found.scrollHeight - found.scrollTop - found.clientHeight <= 1
-    }
-    update()
-    found.addEventListener('scroll', update, { passive: true })
-    return () => found.removeEventListener('scroll', update)
-  }, [containerRef, animateHeight])
 
   useLayoutEffect(() => {
     const container = containerRef.current
     if (!container) return
+
+    // WRITE BEFORE READ, deliberately — this one has to come before the
+    // measuring pass below. React has already pulled the leaving row out of
+    // the DOM, so the very first geometry read forces a layout in which the
+    // scroll container is shorter; one sitting at its bottom edge has its
+    // scrollTop clamped down right there, a whole frame before the fold gets
+    // to animate anything. Re-pinning after the fact can't help — the jump is
+    // already in the committed layout. Holding the box at the height it had
+    // last commit means that layout never shrinks in the first place, so the
+    // clamp never fires and the fold below owns the shrink from start to end.
+    // (A fold already in flight holds the box open by itself; see the inline
+    // height it parks there.)
+    const heldForRead = animateHeight && !heightAnim.current && prevHeight.current !== null
+    if (heldForRead) container.style.height = `${prevHeight.current}px`
+
+    // Read while the box is still held open, so this is the offset from before
+    // the row left rather than a clamped one.
+    const scroller       = animateHeight ? findScrollParent(container) : null
+    const savedScrollTop = scroller ? scroller.scrollTop : 0
 
     const rows  = [...container.querySelectorAll<HTMLElement>(`[${attr}]`)]
     const cRect = container.getBoundingClientRect()
@@ -123,7 +118,10 @@ function useFlipTransition(
     // An unrelated re-render (a keystroke in a row, a store tick) commits the
     // same layout. Leave any in-flight animation alone rather than restarting
     // it from scratch, which would stretch a 350ms fold out indefinitely.
-    if (!keysChanged && !anyMoved) return
+    if (!keysChanged && !anyMoved) {
+      if (heldForRead) container.style.height = ''
+      return
+    }
 
     for (const a of rowAnims.current) a.cancel()
     rowAnims.current = []
@@ -144,33 +142,40 @@ function useFlipTransition(
       const from    = running ? cRect.height : prevHeight.current
       running?.cancel()
       heightAnim.current = null
-      const target = running ? container.getBoundingClientRect().height : cRect.height
+      // Drop every hold — this run's pre-read one and any a previous fold
+      // parked — so what we measure is the natural height, not one of ours.
+      container.style.height = ''
+      const target = container.getBoundingClientRect().height
 
       if ((keysChanged || running) && from !== null && Math.abs(from - target) > 1) {
         // Rows glide on the same duration and easing, so the bottom-most one
         // tracks the closing edge exactly and never gets cut off; clipping is
         // what turns a leaving row's fade into a fold.
         container.style.overflow = 'hidden'
+        // Re-hold at `from` in the author origin as well. The fold's own first
+        // frame does this from the animation origin (which outranks inline
+        // style, so it still drives the visual), but only once styles are
+        // recalculated — and the scroll restore below needs a layout that
+        // already has the old height, this same tick.
+        container.style.height = `${from}px`
         const anim = container.animate(
           [{ height: `${from}px` }, { height: `${target}px` }],
           { duration: DURATION, easing: EASING },
         )
         heightAnim.current = anim
 
-        // The fold's first frame just reopened the box to `from`, which
-        // undoes the ancestor's premature clamp (below) for anyone reading
-        // its scrollHeight now — but scrollTop itself doesn't bounce back up
-        // on its own. Re-pin it while that room is back, so the browser's own
-        // per-frame clamping tracks the fold smoothly from here instead of
-        // having already snapped straight to the end.
-        const sc = scroller.current
-        if (sc && pinnedToBottom.current) sc.scrollTop = sc.scrollHeight - sc.clientHeight
+        // Reading `target` above unheld the box for one layout, which is
+        // enough for a bottom-pinned scroller to clamp. Put the offset back
+        // now that the box is held open again; from here the browser's own
+        // per-frame clamping walks it down in step with the fold.
+        if (scroller) scroller.scrollTop = savedScrollTop
 
         void anim.finished.then(
           () => {
             if (heightAnim.current !== anim) return
             heightAnim.current = null
             container.style.overflow = ''
+            container.style.height = ''
           },
           () => {/* cancelled — whichever run cancelled it owns the cleanup */},
         )
@@ -178,17 +183,26 @@ function useFlipTransition(
         container.style.overflow = ''
       }
       prevHeight.current = target
+    } else if (heldForRead) {
+      container.style.height = ''
     }
 
     prevTops.current = tops
   }, [items, containerRef, attr, animateHeight])
 }
 
+/**
+ * Nearest ancestor that scrolls vertically. Resolved per commit rather than
+ * cached on mount: a list that doesn't overflow its pane yet still grows into
+ * one later, and a scroller cached as null then would stay null for good.
+ * Deliberately doesn't require the pane to *currently* overflow, for the same
+ * reason — whether it does is a property of this commit, not of the element.
+ */
 function findScrollParent(el: HTMLElement): HTMLElement | null {
   let node = el.parentElement
   while (node) {
     const overflowY = getComputedStyle(node).overflowY
-    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) return node
+    if (overflowY === 'auto' || overflowY === 'scroll') return node
     node = node.parentElement
   }
   return null
