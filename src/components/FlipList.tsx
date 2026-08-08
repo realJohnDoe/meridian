@@ -63,6 +63,30 @@ function useFlipTransition(
   const prevHeight = useRef<number | null>(null)
   const rowAnims   = useRef<Animation[]>([])
   const heightAnim = useRef<Animation | null>(null)
+  const scroller   = useRef<HTMLElement | null>(null)
+  const pinnedToBottom = useRef(false)
+
+  // Tracks the nearest scrollable ancestor's "pinned to bottom" state off of
+  // its own scroll events — independent of this list's render cycle — so we
+  // know what it was *before* a row leaves. By the time our own layout effect
+  // below runs, the row is already gone from the DOM: any geometry read at
+  // that point forces a reflow that bakes in the ancestor's shrunken
+  // scrollHeight, and a scroller sitting at max scroll gets clamped down
+  // right there, before the fold below ever gets to animate anything.
+  useLayoutEffect(() => {
+    if (!animateHeight) return
+    const container = containerRef.current
+    if (!container) return
+    const found = findScrollParent(container)
+    scroller.current = found
+    if (!found) return
+    const update = () => {
+      pinnedToBottom.current = found.scrollHeight - found.scrollTop - found.clientHeight <= 1
+    }
+    update()
+    found.addEventListener('scroll', update, { passive: true })
+    return () => found.removeEventListener('scroll', update)
+  }, [containerRef, animateHeight])
 
   useLayoutEffect(() => {
     const container = containerRef.current
@@ -132,6 +156,16 @@ function useFlipTransition(
           { duration: DURATION, easing: EASING },
         )
         heightAnim.current = anim
+
+        // The fold's first frame just reopened the box to `from`, which
+        // undoes the ancestor's premature clamp (below) for anyone reading
+        // its scrollHeight now — but scrollTop itself doesn't bounce back up
+        // on its own. Re-pin it while that room is back, so the browser's own
+        // per-frame clamping tracks the fold smoothly from here instead of
+        // having already snapped straight to the end.
+        const sc = scroller.current
+        if (sc && pinnedToBottom.current) sc.scrollTop = sc.scrollHeight - sc.clientHeight
+
         void anim.finished.then(
           () => {
             if (heightAnim.current !== anim) return
@@ -148,6 +182,16 @@ function useFlipTransition(
 
     prevTops.current = tops
   }, [items, containerRef, attr, animateHeight])
+}
+
+function findScrollParent(el: HTMLElement): HTMLElement | null {
+  let node = el.parentElement
+  while (node) {
+    const overflowY = getComputedStyle(node).overflowY
+    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) return node
+    node = node.parentElement
+  }
+  return null
 }
 
 function translateY(el: HTMLElement): number {
