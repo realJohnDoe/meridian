@@ -60,16 +60,22 @@ describe('FlipList animateHeight scroll preservation', () => {
     delete (Element.prototype as Partial<Element>).animate
   })
 
-  /** Stands in for the absent jsdom `Element.animate`. */
+  /**
+   * Stands in for the absent jsdom `Element.animate`, collecting the keyframes
+   * it was handed so a caller can assert on what the fold asked for.
+   */
   function stubAnimate(onAnimate?: () => void) {
-    const animate = vi.fn(() => {
-      onAnimate?.()
-      return { finished: new Promise(() => {/* never settles */}), cancel: vi.fn() } as unknown as Animation
-    })
+    const keyframeCalls: Keyframe[][] = []
     Object.defineProperty(Element.prototype, 'animate', {
-      value: animate, configurable: true, writable: true,
+      value: (keyframes: Keyframe[]) => {
+        keyframeCalls.push(keyframes)
+        onAnimate?.()
+        return { finished: new Promise(() => {/* never settles */}), cancel: vi.fn() } as unknown as Animation
+      },
+      configurable: true,
+      writable: true,
     })
-    return animate
+    return keyframeCalls
   }
 
   function Harness({ keys, scrollerRef, containerRef }: {
@@ -117,7 +123,7 @@ describe('FlipList animateHeight scroll preservation', () => {
     // stand in for that at the point the fold starts, to prove the restore
     // lands after it rather than before.
     scroller.scrollTop = 164
-    const animate = stubAnimate(() => { scroller.scrollTop = 124 })
+    const keyframeCalls = stubAnimate(() => { scroller.scrollTop = 124 })
 
     height = 60
     rerender(<Harness keys={['a']} scrollerRef={scrollerRef} containerRef={containerRef} />)
@@ -127,7 +133,8 @@ describe('FlipList animateHeight scroll preservation', () => {
     // Released only to read the natural target, then re-held for the fold.
     expect(heldDuringMeasure.at(-1)).toBe('')
     // Folds from the height it was holding down to the natural new one.
-    expect(animate.mock.calls[0]?.[0]).toEqual([{ height: '100px' }, { height: '60px' }])
+    const fold = keyframeCalls.find(frames => frames[0] && 'height' in frames[0])
+    expect(fold).toEqual([{ height: '100px' }, { height: '60px' }])
     expect(container.style.height).toBe('100px')
     expect(scroller.scrollTop).toBe(164)
   })
