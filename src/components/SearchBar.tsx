@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
 import { Button } from './ui/button'
@@ -22,13 +22,33 @@ export default function SearchBar() {
   const currentDate = useCurrentDate()
 
   const searchOpen = sq !== undefined
-  const filterQuery = sq ?? ''
+  const urlQuery = sq ?? ''
+
+  // The input's displayed value is buffered in local state rather than read
+  // straight from `sq`, because router search-param updates land through an
+  // async transition. Deriving the controlled value from `sq` directly means
+  // a keystroke's onChange fires, then — a tick later — the transition
+  // commits and re-renders with a value that (briefly, mid-flight) doesn't
+  // match what's already in the DOM, forcing a real value write that resets
+  // the cursor to the end. Local state updates synchronously with the
+  // keystroke, so the DOM value and cursor never get second-guessed.
+  // `syncedUrlQuery` records which `sq` the local buffer was last derived
+  // from, so a genuinely external change (opening, closing, browser
+  // back/forward) is still picked up — this is React's "adjust state during
+  // render" pattern, not an effect, so there's no extra tick where the two
+  // could disagree.
+  const [filterState, setFilterState] = useState(() => ({ query: urlQuery, syncedUrlQuery: urlQuery }))
+  if (urlQuery !== filterState.syncedUrlQuery) {
+    setFilterState({ query: urlQuery, syncedUrlQuery: urlQuery })
+  }
+  const filterQuery = filterState.query
 
   function openSearch() {
     void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: '' }) })
   }
 
   function setQuery(value: string) {
+    setFilterState(prev => ({ query: value, syncedUrlQuery: prev.syncedUrlQuery }))
     // replace: true so typing doesn't spam the history stack
     void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: value }), replace: true })
   }
