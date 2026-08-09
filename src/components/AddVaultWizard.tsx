@@ -14,16 +14,16 @@ type Source = 'local' | 'github'
 
 const SOURCE_CARDS: { id: Source; Icon: typeof HardDrive; title: string; desc: string }[] = [
   {
-    id:    'local',
-    Icon:  HardDrive,
-    title: 'Local folder',
-    desc:  'Use a folder on this device. Works in Chrome and Edge, desktop or Android; not supported on iOS or Safari.',
-  },
-  {
     id:    'github',
     Icon:  GitBranch,
     title: 'GitHub repository',
     desc:  'Sign in with GitHub, or connect manually with an access token. Works on any device and browser.',
+  },
+  {
+    id:    'local',
+    Icon:  HardDrive,
+    title: 'Local folder',
+    desc:  'Use a folder on this device. Works in Chrome and Edge, desktop or Android; not supported on iOS or Safari.',
   },
 ]
 
@@ -39,7 +39,7 @@ const availableSourceCards = localFolderSupported
 
 export function AddVaultWizard({ onClose, onBack }: Props) {
   const [step,        setStep]        = useState<WizardStep>('source')
-  const [source,      setSource]      = useState<Source>(localFolderSupported ? 'local' : 'github')
+  const [source,      setSource]      = useState<Source>('github')
   const [showManual,  setShowManual]  = useState(false)
   const [repoStr,     setRepoStr]     = useState('')
   const [branch,      setBranch]      = useState('main')
