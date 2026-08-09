@@ -207,6 +207,21 @@ describe('buildBacklinkIndex', () => {
   it('returns an empty map for empty roots', () => {
     expect(buildBacklinkIndex(new Map()).size).toBe(0)
   })
+
+  // Health survey finding #1: a hand-edited `items:` list containing a
+  // non-string element (a bare number, plausible fat-finger for a wikilink)
+  // used to reach this point untouched — extractFileMetadata only checked
+  // Array.isArray(fields.items), never each element's type — and crashed
+  // here with "stored.match is not a function" inside unwrapRef, taking the
+  // whole vault load down instead of degrading just this one file.
+  it('does not crash on a root whose items list holds a malformed element', () => {
+    const { roots } = makeStore([
+      { slug: 'note', yaml: '---\ntitle: Note\ntags: []\nitems: [42, "[[real-note]]"]\n---\n' },
+      { slug: 'real-note', yaml: '---\ntitle: Real Note\ntags: []\nitems: []\n---\n' },
+    ])
+    expect(() => buildBacklinkIndex(roots)).not.toThrow()
+    expect(buildBacklinkIndex(roots).get('real-note')).toEqual(['note'])
+  })
 })
 
 // ── representative occurrence resolution ─────────────────────────────────────

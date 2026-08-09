@@ -3,6 +3,7 @@
 import type { FileConvention } from '@/fileIO'
 
 export type Priority = 'high' | 'medium' | 'low'
+const PRIORITIES: readonly Priority[] = ['high', 'medium', 'low']
 
 export type Weekday = 'mo' | 'tu' | 'we' | 'th' | 'fr' | 'sa' | 'su'
 
@@ -274,12 +275,21 @@ function parseInlineField(spec: FieldShape, raw: unknown): unknown {
     // read back as untracked rather than as a third, meaningless state
     // (`done: null` used to survive as literal null, and `isTracked`'s
     // `!== undefined` then called it a task). See the data-integrity survey,
-    // finding #2a-ii.
-    case 'boolean':     return raw === null ? undefined : raw
-    case 'priority':    return raw === null ? undefined : raw
-    // The two below already collapse null to the absent value: `Array.isArray`
-    // and `scalarToString` both reject it, so they need no null branch.
-    case 'stringArray': return Array.isArray(raw) ? (raw as string[]) : (spec.required ? [] : undefined)
+    // finding #2a-ii. A value of the wrong shape (a string, a number, an
+    // unrecognised priority word) collapses the same way `null` does — the
+    // typed field stays honest, and `malformedKnownFields` below routes the
+    // original value into `extra` so it still round-trips (health survey
+    // finding #1).
+    case 'boolean':     return typeof raw === 'boolean' ? raw : undefined
+    case 'priority':    return typeof raw === 'string' && (PRIORITIES as readonly string[]).includes(raw) ? raw : undefined
+    // Each element is coerced independently, same rule as the `string` kind
+    // below: a bare number/boolean is text that happens to look like one and
+    // is kept, a nested mapping/sequence can't be represented as a string and
+    // is dropped from the typed array (the untouched raw array still
+    // round-trips via `extra` — see `malformedKnownFields`).
+    case 'stringArray': return Array.isArray(raw)
+      ? raw.map(scalarToString).filter((s): s is string => s !== undefined)
+      : (spec.required ? [] : undefined)
     case 'string':      return scalarToString(raw) ?? (spec.required ? '' : undefined)
   }
 }
@@ -298,15 +308,16 @@ export function absentFieldValue(spec: FieldShape): unknown {
 
 /**
  * Route a known field's raw value into `extra` when its shape didn't match the
- * registry's expected kind (e.g. `duration: [1, 2]`, `tags: "not-a-list"`),
- * instead of silently discarding it. The typed field still falls back to its
- * usual `undefined`/`''`/`[]` — domain types stay honest — but the raw value
- * survives a save under its own key, and `fileMetaToYaml`/`occMetaToYaml`
- * prefer it over the typed fallback on emission.
+ * registry's expected kind (e.g. `duration: [1, 2]`, `tags: "not-a-list"`,
+ * `done: "yes-please"`, `priority: 7`, an `items` array holding a nested
+ * mapping), instead of silently discarding it. The typed field still falls
+ * back to its usual `undefined`/`''`/`[]`/filtered-array — domain types stay
+ * honest — but the raw value survives a save under its own key, and
+ * `fileMetaToYaml`/`occMetaToYaml` prefer it over the typed fallback on
+ * emission.
  *
- * `boolean` and `priority` are excluded: `parseInlineField` returns them
- * verbatim regardless of shape, so they already round-trip via the typed
- * field and rerouting would double-handle the same value.
+ * An explicit YAML `null` is never malformed for any kind — see the
+ * null-handling note on `parseInlineField` — so every branch below excludes it.
  */
 function malformedKnownFields(
   fields: Record<string, unknown>,
@@ -315,9 +326,11 @@ function malformedKnownFields(
   const out: Record<string, unknown> = {}
   for (const spec of specs) {
     const raw = fields[spec.key]
-    if (raw === undefined) continue
-    const malformed = spec.kind === 'string' ? scalarToString(raw) === undefined
-      : spec.kind === 'stringArray' ? !Array.isArray(raw)
+    if (raw === undefined || raw === null) continue
+    const malformed = spec.kind === 'string'      ? scalarToString(raw) === undefined
+      : spec.kind === 'stringArray' ? !Array.isArray(raw) || raw.some(el => scalarToString(el) === undefined)
+      : spec.kind === 'boolean'     ? typeof raw !== 'boolean'
+      : spec.kind === 'priority'    ? !(PRIORITIES as readonly unknown[]).includes(raw)
       : false
     if (malformed) out[spec.key] = raw
   }
@@ -343,14 +356,20 @@ export function extractFileMetadata(
   fields: Record<string, unknown>,
   remainder?: Record<string, unknown>,
 ): FileMetadata {
-  const extra = mergeBags(remainder, malformedKnownFields(fields, FILE_LEVEL_SPECS))
-  return {
-    title: scalarToString(fields.title) ?? '',
-    tags:  Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
-    items: Array.isArray(fields.items) ? (fields.items as string[]) : [],
-    body:  scalarToString(fields.body),
-    ...(extra ? { extra } : {}),
+  // title/tags/items go through the same per-field/per-element coercion as
+  // extractOccurrenceMetadata below — this used to hand-roll its own
+  // Array.isArray(...) ? raw : [] check, which (unlike parseInlineField)
+  // never validated array ELEMENTS, so a malformed `items:` list reached
+  // `root.items` — the exact map wikilinks.ts/fileOccurrence.ts iterate —
+  // untouched (health survey finding #1).
+  const meta = { body: scalarToString(fields.body) } as unknown as FileMetadata
+  const sink = meta as unknown as Record<string, unknown>
+  for (const spec of FILE_LEVEL_SPECS) {
+    sink[spec.key as string] = parseInlineField(spec, fields[spec.key])
   }
+  const extra = mergeBags(remainder, malformedKnownFields(fields, FILE_LEVEL_SPECS))
+  if (extra) meta.extra = extra
+  return meta
 }
 
 /** Extract occurrence-level metadata from the raw fields of a node or occurrence. */
