@@ -17,8 +17,8 @@ import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '@/types'
-import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, unknownKeys, FILE_LEVEL_SPECS, STRUCTURAL_KEYS } from '@/types'
 import type { StoreItem, FileMetadata, OccurrenceMetadata } from '@/types'
+import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, unknownKeys, FILE_LEVEL_SPECS, STRUCTURAL_KEYS } from './fieldRegistry'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
 

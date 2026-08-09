@@ -80,14 +80,15 @@ CI does exactly this before linting (`.github/workflows/build.yml`), which is wh
 
 **Root-level files are intentionally cross-cutting** — they are imported by three or more unrelated layers and have no single owning directory. The deliberate root residents are:
 
-- `types.ts` — domain types used by every layer
+- `types.ts` — pure domain type declarations, plus the four `isX` discriminated-union guards that belong beside their unions (`isSeries`, `isStandaloneOcc`, `isTracked`, `isEditScope`). No runtime registries or logic — the YAML field-parse registry that used to live here is `model/fieldRegistry.ts`, private to `model/` since every consumer lives there.
+- `vaultRef.ts` — the `VaultRef`/`VaultKind`/`GitHubVaultRef` family; a root leaf (not `storage/`) because `components/` is barred from importing `@/storage` at all (invariant 2), and `@/vaultActions` re-exports `VaultRef` for it.
 - `store.ts` + `storeBridge.ts` — Zustand store for durable, cross-cutting state (vault data, sync status, favorites, prefs); `storeBridge` is imported by `storage/`, `editor/`, and `occurrenceActions.ts`/`storeCommit.ts`. View-local ephemeral state does not belong here — see invariant 5 below.
 - `fileIO.ts` — YAML/frontmatter parse+serialize; used by `debug/`, `editor/`, `model/`, `storage/`
 - `wikilinks.ts` — wikilink parse+resolve; used by `editor/`, `model/`, and root
 - `occurrenceActions.ts` — user-action orchestration, including its delete-undo toast; used by `editor/` and `calendar/`
 - `storeCommit.ts` + `persistencePort.ts` — persistence-port abstraction (see invariant 3 below); used by `editor/`, `storage/`, and `occurrenceActions.ts`
 - `vaultActions.ts` — used by `components/` and `routes/`
-- `format.ts`, `fileOccurrence.ts`, `occView.ts` — view-model helpers; each used by three or more feature dirs (`calendar/`, `components/`, `editor/`, `hooks/`, `routes/`, `storage/`, `search/`)
+- `format.ts`, `fileOccurrence.ts`, `occView.ts` — view-model helpers; each used by three or more feature dirs (`calendar/`, `components/`, `editor/`, `hooks/`, `routes/`, `storage/`, `search/`). `occView.ts` also owns `OccState`, the display-styling vocabulary its own `occState()` derives.
 
 All feature directories already have `index.ts` barrels enforced by the import-boundary lint rules — do not propose adding them.
 
@@ -97,7 +98,7 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 
 1. **`model/` is the domain core — no outward dependencies.** It imports only from `types.ts`, `fileIO.ts`, and `wikilinks.ts` (all cross-cutting root residents). It must never import from `store`, `storage`, `editor`, `calendar`, or any other feature.
 
-2. **Cross-feature imports go through the barrel.** Code in feature dir A that imports from feature dir B must use `@/B` (the `index.ts` barrel), never `@/B/internal-file`. Three permanent exceptions (always allowed as deep imports): `@/components/ui/**` (shadcn registry), `@/components/primitives/**` (our own shared primitives) and `@/lib/**` (utility leaf with no barrel).
+2. **A module's internals are private to its own subtree; the barrel is its only public surface.** A module is any `src/` directory with its own `index.ts` — `eslint.config.js` derives the list from the filesystem (`findModules`), so a directory becomes a protected module the moment it grows a barrel, with no config edit. Code outside a module — a sibling module, *or* a root-level file — must import it via `@/module` (the barrel), never `@/module/internal-file`; a single `no-restricted-paths` zone per module enforces both directions the same way (root files aren't a privileged exception — "root resident" means cross-cutting, not exempt from the boundary). Widening a module's reach costs an explicit barrel export or a move up the tree, never a deep import. Two permanent exceptions (always allowed as deep imports): `@/components/ui/**` (shadcn registry) and `@/components/primitives/**` (our own shared primitives) — both primitive layers one level inside `components/`. `@/lib/**` is exempt for a different reason: it has no `index.ts`, so it isn't a module at all.
 
 3. **Core persistence goes through the port.** `storeCommit.ts` and `occurrenceActions.ts` call the `persistencePort` abstraction rather than `@/storage` functions directly. The storage adapter registers the implementation at startup.
 

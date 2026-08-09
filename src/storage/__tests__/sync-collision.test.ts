@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { StorageBackend, RawFile } from '@/storage/backend'
-import type { VaultKind } from '@/types'
+import type { VaultKind } from '@/vaultRef'
 import { ConflictError } from '@/storage/conflictError'
 
 // ── FakeBackend ────────────────────────────────────────────────

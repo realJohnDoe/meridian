@@ -1,5 +1,7 @@
 import { create } from 'zustand'
-import type { StoreItem, Roots, Occurrence, LocalePrefs, VaultRef } from './types'
+import type { StoreItem, Roots, Occurrence } from './types'
+import type { LocalePrefs } from '@/model'
+import type { VaultRef } from './vaultRef'
 import { updateFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
 import { readVaultStringArray, writeVaultJSON, readVaultJSON } from '@/lib/vaultStorage'
 

@@ -57,7 +57,7 @@ export default defineConfig({
         'src/editor/cm/taskLines.ts': { statements: 90, branches: 80, functions: 95, lines: 95 },
         'src/editor/cm/markdownFormatting.ts': { statements: 88, branches: 78, functions: 70, lines: 87 },
         'src/editor/cm/ReactWidget.ts': { statements: 78, branches: 90, functions: 50, lines: 77 },
-        'src/types.ts': { statements: 90, branches: 80, functions: 85, lines: 90 },
+        'src/model/fieldRegistry.ts': { statements: 90, branches: 80, functions: 85, lines: 90 },
         'src/storage/conflictError.ts': { statements: 90, branches: 85, functions: 95, lines: 95 },
         'src/editor/dialogs/RepeatDialog.tsx': { statements: 75, branches: 60, functions: 65, lines: 75 },
         'src/occurrenceActions.ts': { statements: 85, branches: 75, functions: 80, lines: 88 },

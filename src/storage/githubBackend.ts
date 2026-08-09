@@ -1,6 +1,6 @@
 import type { StorageBackend, RawFile, PermissionOutcome } from './backend'
 import { isVaultFile } from './backend'
-import type { VaultKind } from '@/types'
+import type { VaultKind } from '@/vaultRef'
 import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError } from './githubApi'
 import { ensureFreshAccessToken } from './githubOAuth'
 import { isTransientSyncError } from './conflictError'

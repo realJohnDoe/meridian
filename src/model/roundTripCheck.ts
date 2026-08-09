@@ -22,7 +22,7 @@
  */
 
 import { loadFile } from '@/fileIO'
-import { STRUCTURAL_KEYS } from '@/types'
+import { STRUCTURAL_KEYS } from './fieldRegistry'
 import { collapseToYaml } from './collapse'
 import { saveFile } from './inheritance'
 import type { ParseResult } from './storeItems'

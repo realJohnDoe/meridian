@@ -1,5 +1,6 @@
 import { cva } from 'class-variance-authority'
-import type { OccState, Priority } from '@/types'
+import type { Priority } from '@/types'
+import type { OccState } from '@/occView'
 
 /**
  * Shared pattern for active tasks and notes: solid bg-{color} + text-{color}-foreground.

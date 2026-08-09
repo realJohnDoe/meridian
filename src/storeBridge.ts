@@ -1,4 +1,5 @@
-import type { StoreItem, Roots, VaultRef, Occurrence } from './types'
+import type { StoreItem, Roots, Occurrence } from './types'
+import type { VaultRef } from './vaultRef'
 import { useStore } from './store'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────

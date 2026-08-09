@@ -12,7 +12,7 @@
  * always writes single-unit full-word strings via serialise()).
  */
 
-import { scalarToString } from '@/types'
+import { scalarToString } from './fieldRegistry'
 
 export type DurationUnit = 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'
 
