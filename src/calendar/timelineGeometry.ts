@@ -9,11 +9,11 @@ export const HOURS = 24               // hours shown on the timeline
 export const HP = 56                  // px per hour (timeline scale, not a spacing gap)
 export const GUTTER = 64              // px reserved for the left hour-label column — Tailwind `16` step
 export const RIGHT_PAD = 8            // px breathing room to the right edge of the screen — `2` step
-export const COL_GAP = 6              // px gap between simultaneous (colliding) event columns — `1.5` step
+const COL_GAP = 6                     // px gap between simultaneous (colliding) event columns — `1.5` step
 export const TOP_PAD = 8              // px headroom above 0:00 so its label isn't clipped — `2` step
 export const BOTTOM_PAD = 8           // px breathing room below 24:00 — `2` step
 export const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
-export const CREATE_SNAP_MIN = 15     // minutes new events snap to when created via click
+const CREATE_SNAP_MIN = 15            // minutes new events snap to when created via click
 export const DEFAULT_CREATE_DURATION = '1h'
 
 /** Localized hour-boundary label (0:00…24:00), matching the Intl formatting fmtT uses for event times. */
