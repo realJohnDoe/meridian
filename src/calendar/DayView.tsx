@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import type { Occurrence, EditScope } from '@/types'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
-import DayPane, { HP, TOP_PAD, DEFAULT_SCROLL_HOUR } from './DayPane'
+import DayPane from './DayPane'
 import { useCarousel } from './useCarousel'
 import { PANE_COUNT } from './snapCarousel'
 import { calendarView, setDayPreview } from './viewState'
+import { useTimelineScrollSync } from './useTimelineScrollSync'
 
 const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 
@@ -47,30 +48,8 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
   useEffect(() => () => setDayPreview(null), [])
 
   // Vertical scroll position syncs across days (scroll to 6pm, swipe, still
-  // at 6pm): panes register their scroller here, and any pane's scroll
-  // mirrors to its siblings, guarded against feedback the same way TimeWheels
-  // guards its own scrollTop write. A pane preserved across a swipe (keyed
-  // reconciliation — see useCarousel) simply keeps its own scrollTop
-  // untouched; a freshly-mounted pane seeds from sharedTopRef (see DayPane's
-  // mount effect), so there's nothing to correct on commit either way.
-  const scrollersRef = useRef(new Map<string, HTMLDivElement>())
-  const sharedTopRef = useRef(DEFAULT_SCROLL_HOUR * HP + TOP_PAD)
-  const vSyncingRef = useRef(false)
-
-  const registerScroller = useCallback((key: string, el: HTMLDivElement | null) => {
-    if (el) scrollersRef.current.set(key, el)
-    else scrollersRef.current.delete(key)
-  }, [])
-
-  const handleVerticalScroll = useCallback((key: string, scrollTop: number) => {
-    if (vSyncingRef.current) return
-    sharedTopRef.current = scrollTop
-    vSyncingRef.current = true
-    mirrorScrollTop(scrollersRef.current, key, scrollTop)
-    requestAnimationFrame(() => { vSyncingRef.current = false })
-  }, [])
-
-  const getInitialScrollTop = useCallback(() => sharedTopRef.current, [])
+  // at 6pm) — see useTimelineScrollSync.
+  const { registerScroller, handleVerticalScroll, getInitialScrollTop } = useTimelineScrollSync()
 
   return (
     // Embla viewport → container → panes. touch-pan-y hands vertical drags to
@@ -102,15 +81,4 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
 function parseDateKey(key: string): Date {
   const [y = NaN, m = NaN, d = NaN] = key.split('-').map(Number)
   return new Date(y, m - 1, d)
-}
-
-// Plain helper, deliberately outside the component: writing to a DOM element
-// pulled out of a ref-held Map inside a useCallback trips the React
-// Compiler's immutability analysis (it treats the element as a frozen "hook
-// argument" once it's flowed through registerScroller's callback param) —
-// moving the actual mutation into an ordinary function sidesteps that.
-function mirrorScrollTop(scrollers: Map<string, HTMLDivElement>, exceptKey: string, scrollTop: number) {
-  for (const [k, el] of scrollers) {
-    if (k !== exceptKey) el.scrollTop = scrollTop
-  }
 }
