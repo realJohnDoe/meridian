@@ -2,11 +2,13 @@
 
 Run: 2026-08-08 · commit `b7fdc5b` · branch `claude/codebase-health-survey-ldpr9j`
 
+> **Update:** the original finding #1 (malformed YAML array/boolean/priority values escaping the parse quarantine and crashing the whole vault load) was fixed in commit `aaea5af` on `claude/fix-yaml-array-element-coercion`, and has been removed from this report. The remaining findings are renumbered #1–#8 below.
+
 ## 1. Health verdict
 
-Meridian is a healthy, unusually well-tended codebase: every quality gate passes (build, lint, 79 test files, coverage 62.5% against a 57% floor, knip, `pnpm audit --audit-level=high`), the documented architecture invariants are genuinely machine-enforced by custom `import-x` zones rather than just asserted, dependencies are current in both workspaces with zero unaddressed major gaps, and the security posture (PKCE + `state`, worker holding the client secret, no `innerHTML` anywhere, scheme-guarded link widget) is correct. The two weakest areas are **the YAML parse boundary** — `types.ts` plus the coercion path it owns, where the domain types promise more than the parser delivers — and **`storage/cache.ts`**, the durability-and-credentials layer, which is simultaneously the repo's most concern-crowded module (32 exports over five unrelated jobs) and its least-covered one (3.7% statements, `vi.mock`'d away in every test that touches it).
+Meridian is a healthy, unusually well-tended codebase: every quality gate passes (build, lint, 79 test files, coverage 62.5% against a 57% floor, knip, `pnpm audit --audit-level=high`), the documented architecture invariants are genuinely machine-enforced by custom `import-x` zones rather than just asserted, dependencies are current in both workspaces with zero unaddressed major gaps, and the security posture (PKCE + `state`, worker holding the client secret, no `innerHTML` anywhere, scheme-guarded link widget) is correct. The weakest remaining area is **`storage/cache.ts`**, the durability-and-credentials layer, which is simultaneously the repo's most concern-crowded module (32 exports over five unrelated jobs) and its least-covered one (3.7% statements, `vi.mock`'d away in every test that touches it). (The YAML parse boundary in `types.ts` — the other weak area this survey originally found — has since been fixed; see the update note above.)
 
-The single biggest structural theme is **underengineering at exactly one seam — the boundary between untrusted file bytes and typed domain data** — while the rest of the codebase is, if anything, slightly over-abstracted. `parseToStoreItems` is wrapped in a careful per-file quarantine that reports failures to the user, but the coercion it feeds emits `string[]` types holding numbers and `boolean` types holding strings; one hand-authored `items: [42]` in any vault file therefore escapes the quarantine and throws in `buildBacklinkIndex`, taking the whole vault load down. Against that, the overengineering pressure is real but mild and localised: an `EditorShell` that forwards fifteen fields and adds a `<section>`, thirteen single-caller one-line forwarders in `storeBridge.ts`, and an entry-editing concern that costs eight files to follow end to end. Neither theme is systemic enough to call the codebase unhealthy — this is a "fix the parse boundary, then thin two seams" report, not a restructuring one.
+The single biggest structural theme this survey found was **underengineering at exactly one seam — the boundary between untrusted file bytes and typed domain data**: `parseToStoreItems` was wrapped in a careful per-file quarantine that reported failures to the user, but the coercion it fed emitted `string[]` types holding numbers and `boolean` types holding strings, so one hand-authored `items: [42]` in any vault file escaped the quarantine and threw in `buildBacklinkIndex`, taking the whole vault load down. That gap is now closed. With it fixed, the codebase's remaining underengineering is smaller and more contained — `storage/cache.ts`'s five unrelated concerns crowded into one file, paired with its near-zero test coverage — set against a mild, localised overengineering pressure elsewhere: an `EditorShell` that forwards fifteen fields and adds a `<section>`, thirteen single-caller one-line forwarders in `storeBridge.ts`, and an entry-editing concern that costs eight files to follow end to end. Neither theme is systemic enough to call the codebase unhealthy.
 
 ## 2. Coverage statement
 
@@ -21,7 +23,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 | Gate | Command | Result |
 |---|---|---|
 | Build | `pnpm run build` | ✅ pass (exit 0) |
-| Lint | `pnpm run lint` | ✅ pass (exit 0) — **0 errors, 12 warnings** (see finding #7) |
+| Lint | `pnpm run lint` | ✅ pass (exit 0) — **0 errors, 12 warnings** (see finding #6) |
 | Tests | `pnpm run test:coverage` | ✅ pass — statements 62.46%, branches 59.25%, functions 53.22%, lines 64.67%; all per-file and global thresholds met |
 | Dead code | `pnpm run knip` | ✅ pass, zero issues |
 | Audit | `pnpm audit --audit-level=high` | ✅ pass (1 moderate, below threshold) |
@@ -41,20 +43,20 @@ The single biggest structural theme is **underengineering at exactly one seam �
 
 | # | Category | Verdict |
 |---|---|---|
-| 1 | Architecture & Domain Separation | findings: **#2, #4, #6** — barrel invariants, `model/` purity and port usage all verified clean by grep; the two god modules are the real issue |
-| 2 | Simplicity & Overengineering | findings: **#5, #6, #9** |
+| 1 | Architecture & Domain Separation | findings: **#1, #3, #5** — barrel invariants, `model/` purity and port usage all verified clean by grep; the two god modules are the real issue |
+| 2 | Simplicity & Overengineering | findings: **#4, #5, #8** |
 | 3 | Directory & File Layout | **clean** — co-change analysis over 120 days produced no cross-directory pair above 3 co-occurrences; the root-resident list in CLAUDE.md matches the actual import graph (spot-checked all 12); `-`-prefixed non-route files in `routes/` are correctly placed beside their only consumers |
 | 4 | Security | **clean** — threat model and evidence below the table |
-| 5 | Testing & Error Handling | findings: **#1, #3** — error *strategy* is otherwise consistent and good (see note below) |
-| 6 | Code Health & DRY | findings: **#1, #8** |
-| 7 | Toolchain & Developer Feedback Loops | findings: **#5, #7** |
+| 5 | Testing & Error Handling | findings: **#2** — error *strategy* is otherwise consistent and good (see note below) |
+| 6 | Code Health & DRY | findings: **#7** |
+| 7 | Toolchain & Developer Feedback Loops | findings: **#4, #6** |
 | 8 | Dependencies & Library Fit | **clean** — measured verdicts below the table |
 | 9 | Styling & UX | **clean** — 33 inline `style={{}}` uses, all dynamic values Tailwind can't express (measured positions, CSS custom properties, virtualizer transforms); no custom re-implementation of an installed shadcn component; `jsx-a11y/recommended` is enabled and passing with one justified `no-autofocus` disable |
 | 10 | Performance | **clean** — React Compiler enabled at target 19, three virtualized lists, route-level `lazy()` on every heavy view, an LRU expansion cache with correct vault-change reset wiring (verified `resetCalendarOnVaultChange` → `resetExpansionCache` is called from `routes/_app.tsx:56`) |
 
 **Category 4 — threat model and why it is clean.** Everything but the OAuth token exchange is client-side: vault bytes live in the browser's IndexedDB (Dexie) and on the user's disk or GitHub repo; the only server is a Cloudflare Worker holding `GITHUB_CLIENT_SECRET`. Untrusted input is (a) vault markdown/YAML, possibly authored by someone else in a shared repo, and (b) the OAuth redirect's query string. Checks run: zero occurrences of `dangerouslySetInnerHTML`, `innerHTML`, `eval`, or `new Function` across `src/`; the one variable `href` is a module constant (`GITHUB_APP_INSTALL_URL`); `LinkWidget.toDOM` uses `textContent` and gates navigation on `/^(https?|mailto):/i.test(this.url)`, so `[x](javascript:…)` in a note body renders inert; `completeGitHubSignIn` validates `state !== storedState` and uses S256 PKCE; the worker never echoes the client secret and gates CORS response-reading on a single origin, with a correct written rationale for why executing the exchange from any origin is safe under PKCE; tokens sit in IndexedDB (appropriate for an offline-first PWA — `sessionStorage` holds only the short-lived verifier). `pnpm audit --audit-level=high` is clean and `pnpm-workspace.yaml` carries documented, CVE-cited overrides plus `minimumReleaseAge: 1440`.
 
-**Category 5 — the error *strategy* is a keep.** `storage/githubBackend.ts` routes every failure through one `mapGitHubError` classifier; `sync.ts` quarantines per-file parse failures and surfaces them via `reportParseFailures` toasts rather than `console.warn` alone. Only three empty `catch` blocks exist repo-wide (`src/store.ts:27`, `src/storage/exampleBackend.ts:446`, `src/onboarding/tourState.ts:8`) and all three wrap `localStorage` access, where swallowing is correct. Findings #1 and #3 are about a gap the strategy doesn't reach, not about the strategy.
+**Category 5 — the error *strategy* is a keep.** `storage/githubBackend.ts` routes every failure through one `mapGitHubError` classifier; `sync.ts` quarantines per-file parse failures and surfaces them via `reportParseFailures` toasts rather than `console.warn` alone. Only three empty `catch` blocks exist repo-wide (`src/store.ts:27`, `src/storage/exampleBackend.ts:446`, `src/onboarding/tourState.ts:8`) and all three wrap `localStorage` access, where swallowing is correct. Finding #2 is about a gap the strategy doesn't reach, not about the strategy.
 
 **Category 8 — measured verdicts** (`pnpm outdated` in both workspaces, run this session):
 - **Root workspace: no unaddressed major gaps.** 28 packages drift by patch/minor only (Radix `1.1.20 → 1.1.23`, `@tanstack/react-router 1.170.18 → 1.170.23`, `lucide-react 1.25.0 → 1.30.0`, `vite 8.1.5 → 8.2.1`, `eslint 10.7.0 → 10.8.0`, `knip 6.29.0 → 6.32.0`, …). Note `resolution-mode=lowest-direct` in `.npmrc` means "Current" is the floor of each caret range, not a stale lock — the drift is a deliberate standing policy, not neglect. **Verdict: batch all of these into one sweep PR; `pnpm run build && pnpm run lint && pnpm run test:coverage && pnpm run knip` green is the verdict.**
@@ -72,61 +74,20 @@ The single biggest structural theme is **underengineering at exactly one seam �
 
 | # | Finding | Recommended model |
 |---|---|---|
-| 1 | Malformed YAML array elements escape the parse quarantine and crash the whole vault load | **Opus 5** (Sonnet 5 if the round-trip constraint is named in the task) |
-| 2 | `types.ts` is a god module: domain types + YAML parse runtime + storage + UI vocabulary, imported by 105 files | **Opus 5 in plan mode, multi-PR** |
-| 3 | The durability + credentials layer is mocked out of every test it appears in (3.7% coverage) | **Opus 5** |
-| 4 | `storage/cache.ts` holds five unrelated concerns because one lint rule forces them together | **Opus 5** |
-| 5 | `strict-type-checked` ships in the installed plugin but isn't enabled; `no-unnecessary-condition` alone flags 81 checks the types already rule out | **Sonnet 5** |
-| 6 | Entry editing costs eight files to follow, with `EditorShell` forwarding fifteen fields and adding nothing | **Opus 5** |
-| 7 | CI accepts lint warnings silently, and unused-disable reporting is switched off in both blocks | **Haiku 4.5** |
-| 8 | `NewEntrySeed` is defined twice, in `routes/` and `editor/`, with divergent types | **Haiku 4.5** |
-| 9 | 13 of 19 `storeBridge` exports are single-caller one-line forwarders | **Sonnet 5** |
+| 1 | `types.ts` is a god module: domain types + YAML parse runtime + storage + UI vocabulary, imported by 105 files | **Opus 5 in plan mode, multi-PR** |
+| 2 | The durability + credentials layer is mocked out of every test it appears in (3.7% coverage) | **Opus 5** |
+| 3 | `storage/cache.ts` holds five unrelated concerns because one lint rule forces them together | **Opus 5** |
+| 4 | `strict-type-checked` ships in the installed plugin but isn't enabled; `no-unnecessary-condition` alone flags 81 checks the types already rule out | **Sonnet 5** |
+| 5 | Entry editing costs eight files to follow, with `EditorShell` forwarding fifteen fields and adding nothing | **Opus 5** |
+| 6 | CI accepts lint warnings silently, and unused-disable reporting is switched off in both blocks | **Haiku 4.5** |
+| 7 | `NewEntrySeed` is defined twice, in `routes/` and `editor/`, with divergent types | **Haiku 4.5** |
+| 8 | 13 of 19 `storeBridge` exports are single-caller one-line forwarders | **Sonnet 5** |
 
-**Sequencing note.** #1 and #2 both edit `src/types.ts` — land **#1 first** (a surgical change to `parseInlineField` / `extractFileMetadata`), then #2 moves the finished coercion code into `model/` wholesale. #3 and #4 both target `src/storage/cache.ts`: land **#4 first** (splitting the module gives #3 a smaller, mockable-in-isolation surface to write real tests against), otherwise the new tests get rewritten when the split lands. #5 and #1 overlap in `src/types.ts` and `src/editor/save.ts` — run #5 *after* #1, since fixing the coercion changes which conditions the rule considers unnecessary. Everything else is independent.
-
----
-
-### 1. Malformed YAML array elements escape the parse quarantine and crash the whole vault load
-
-- **Category** `error-handling` `types` `architecture`
-- **Impact** 8
-- **Breadth** 4 files (`src/types.ts`, `src/fileOccurrence.ts`, `src/wikilinks.ts`, `src/storage/sync.ts`) — search: `grep -rn "Array.isArray(fields" src/types.ts` plus `grep -rl "meta\.items\|metadata\.items\|meta\.tags" src --include=*.ts --include=*.tsx | grep -v test`
-- **Recommended model** **Opus 5.** The hazard is that the obvious fix — filter non-string elements out during coercion — silently deletes user data on the next save, which is precisely the bug class the data-integrity survey already fixed with the `extra` bag and `malformedKnownFields`. Any fix must route rejected elements into `extra` so `roundTripLoss` stays silent, and must not perturb `absentFieldValue`, which `collapse.ts` uses to decide whether a key is safe to omit. *If the task explicitly states "coerce per element, and route rejected elements into the `extra` bag so the round-trip stays lossless", **Sonnet 5** is sufficient* — that names the invariant that otherwise fails quietly.
-- **Evidence**
-
-  `src/types.ts:349` — the array coercion checks the container, never the elements:
-  ```
-      tags:  Array.isArray(fields.tags) ? (fields.tags as string[]) : [],
-  ```
-  `src/types.ts:278` — `boolean` and `priority` are returned verbatim, whatever shape they arrived in:
-  ```
-      case 'boolean':     return raw === null ? undefined : raw
-  ```
-  `src/wikilinks.ts:89` — the consumer assumes the type is honest:
-  ```
-    const m = stored.match(/^\[\[(.+)\]\]$/)
-  ```
-  `src/storage/sync.ts:75` — the quarantine that is supposed to contain this only wraps `parseToStoreItems`, which succeeds here:
-  ```
-        failures.push({ path, slug: pathToSlug(path), message })
-  ```
-  `src/store.ts:161` — the crash site sits outside every `try`:
-  ```
-        const backlinks = roots === prevRoots ? prevBacklinks : buildBacklinkIndex(roots)
-  ```
-
-  **Reproduced this session** with a temporary vitest probe (since deleted). A file containing `items:` / `  - 42` / `  - [[real]]` parses cleanly, then:
-  ```
-  PARSED root.items = [42,[["real"]]] typeof[0]= number
-  buildBacklinkIndex threw: stored.match is not a function
-  ```
-  A second probe with `tags: [7]`, `done: yes-please`, `priority: urgent` yielded `root.tags = [7]` and `{"done":"yes-please","participants":[],"priority":"urgent"}` — a `string[]` holding a number, a `boolean` holding a string, and a `Priority` union holding a value outside it.
-- **Problem** One hand-authored vault file whose `items:` or `tags:` list contains a non-string takes down the entire vault load, bypassing the per-file quarantine that exists specifically to isolate bad files — and the same gap lets `done`/`priority` carry values their declared types forbid, so every downstream `if (priority === 'high')` silently mis-branches instead of failing loudly.
-- **Fix** Coerce array elements (`scalarToString` per item) and validate `boolean`/`priority` against their unions inside `parseInlineField`, routing every rejected raw value into the `extra` bag through `malformedKnownFields` so the file still round-trips byte-for-byte on save.
+**Sequencing note.** #2 and #3 both target `src/storage/cache.ts`: land **#3 first** (splitting the module gives #2 a smaller, mockable-in-isolation surface to write real tests against), otherwise the new tests get rewritten when the split lands. Everything else is independent.
 
 ---
 
-### 2. `types.ts` is a god module: domain types, YAML parse runtime, storage refs and UI vocabulary in one 425-line file
+### 1. `types.ts` is a god module: domain types, YAML parse runtime, storage refs and UI vocabulary in one 425-line file
 
 - **Category** `architecture` `layout`
 - **Impact** 7
@@ -143,7 +104,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 
 ---
 
-### 3. The durability and credentials layer is `vi.mock`'d out of every test that touches it
+### 2. The durability and credentials layer is `vi.mock`'d out of every test that touches it
 
 - **Category** `testing`
 - **Impact** 7
@@ -163,7 +124,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 
 ---
 
-### 4. `storage/cache.ts` holds five unrelated concerns because one lint rule forces them together
+### 3. `storage/cache.ts` holds five unrelated concerns because one lint rule forces them together
 
 - **Category** `architecture` `srp`
 - **Impact** 6
@@ -179,17 +140,17 @@ The single biggest structural theme is **underengineering at exactly one seam �
     _inFlightPaths.set(path, (_inFlightPaths.get(path) ?? 0) + 1)
   }
   ```
-- **Problem** A well-intentioned "exactly one file may import dexie" rule has quietly become a "everything persistence-adjacent lives in one 396-line file" rule, so the token store, the FS-handle store, the vault registry and a pure in-memory refcount all share a module — and, per finding #3, share its 3.7% coverage.
+- **Problem** A well-intentioned "exactly one file may import dexie" rule has quietly become a "everything persistence-adjacent lives in one 396-line file" rule, so the token store, the FS-handle store, the vault registry and a pure in-memory refcount all share a module — and, per finding #2, share its 3.7% coverage.
 - **Fix** Move `markInFlight`/`clearInFlight`/`getInFlightPaths` to their own `storage/inFlight.ts` immediately (no Dexie involved, no lint change needed), then split the Dexie surface into `cache/files.ts`, `cache/credentials.ts` and `cache/registry.ts` behind a shared `cache/db.ts`, and narrow the eslint `ignores` entry to that single `db.ts`.
 
 ---
 
-### 5. `strict-type-checked` ships in the installed plugin but isn't enabled — `no-unnecessary-condition` alone flags 81 checks the types already rule out
+### 4. `strict-type-checked` ships in the installed plugin but isn't enabled — `no-unnecessary-condition` alone flags 81 checks the types already rule out
 
 - **Category** `toolchain` `overengineering`
 - **Impact** 6
 - **Breadth** 22 non-test files (29 including tests) for the `no-unnecessary-condition` subset — from the dry run below
-- **Recommended model** **Sonnet 5.** The hazard is that `no-unnecessary-condition` reports "always truthy" *because the type lies*, not because the check is dead — finding #1 is the proof. Deleting a guard the type wrongly says is redundant re-hides a real bug class, and nothing breaks at build time. Sonnet 5 is sufficient **because the ordering constraint is nameable**: land #1 first, then enable only the three rules named below, and audit each `??`/`||` site against the *runtime* source of the value before deleting it. Enabling the whole preset blind would be an Opus-tier judgment call, which is exactly why the recommendation is a subset.
+- **Recommended model** **Sonnet 5.** The hazard is that `no-unnecessary-condition` reports "always truthy" *because the type lies*, not because the check is dead — the malformed-YAML parse-boundary bug this survey originally found (and which has since been fixed) is the proof: a type that claimed more honesty than the parser delivered made a real bug class look like a redundant guard. Deleting a guard the type wrongly says is redundant re-hides that class. Sonnet 5 is sufficient because the fix is bounded to a named subset of rules: enable only the three named below, and audit each `??`/`||` site against the *runtime* source of the value before deleting it. Enabling the whole preset blind would be an Opus-tier judgment call, which is exactly why the recommendation is a subset.
 - **Evidence** `eslint.config.js:27` enables only the recommended tier:
   ```
     ...tsPlugin.configs['flat/recommended-type-checked'][1].rules,
@@ -206,12 +167,12 @@ The single biggest structural theme is **underengineering at exactly one seam �
     1  @typescript-eslint/no-unnecessary-boolean-literal-compare
   ```
   The two large counts are noise for this codebase's idioms (`m[1]!` after a regex match; `onClick={() => setX()}`). The valuable signal is concentrated: `src/editor/save.ts` (14), `src/debug/NodeInheritanceDebugger.tsx` (10), `src/editor/ItemsList.tsx` (7), `src/model/expansion.ts` (7), `src/model/storeOps.ts` (5) — plus `src/calendar/agendaSections.ts:339` flagged as *"the types have no overlap"* (a condition that can never be true) and `src/editor/EntryBody.tsx:21` on `MutableRefObject is deprecated. Use RefObject instead`.
-- **Problem** An installed, already-paid-for lint tier that would mechanically catch a whole class of defensive-code-for-impossible-states — and one genuinely unreachable condition — is switched off, while the same codebase writes `m.title || ''` against a field typed `string` in dozens of places because the author (correctly, per finding #1) doesn't trust the type.
-- **Fix** After landing #1, enable exactly `no-unnecessary-condition`, `no-deprecated` and `use-unknown-in-catch-callback-variable` (leaving `no-non-null-assertion` and `no-confusing-void-expression` off, with a comment saying why), and fix the ~20 files they flag.
+- **Problem** An installed, already-paid-for lint tier that would mechanically catch a whole class of defensive-code-for-impossible-states — and one genuinely unreachable condition — is switched off, while the same codebase writes `m.title || ''` against a field typed `string` in dozens of places because the author, correctly, doesn't trust the type.
+- **Fix** Enable exactly `no-unnecessary-condition`, `no-deprecated` and `use-unknown-in-catch-callback-variable` (leaving `no-non-null-assertion` and `no-confusing-void-expression` off, with a comment saying why), and fix the ~20 files they flag.
 
 ---
 
-### 6. Entry editing costs eight files to follow, with `EditorShell` forwarding fifteen fields and adding nothing
+### 5. Entry editing costs eight files to follow, with `EditorShell` forwarding fifteen fields and adding nothing
 
 - **Category** `architecture` `overengineering` `srp`
 - **Impact** 5
@@ -227,7 +188,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 
 ---
 
-### 7. CI accepts lint warnings silently, and unused-disable reporting is switched off in both config blocks
+### 6. CI accepts lint warnings silently, and unused-disable reporting is switched off in both config blocks
 
 - **Category** `toolchain`
 - **Impact** 4
@@ -247,7 +208,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 
 ---
 
-### 8. `NewEntrySeed` is defined twice, in `routes/` and `editor/`, with divergent types
+### 7. `NewEntrySeed` is defined twice, in `routes/` and `editor/`, with divergent types
 
 - **Category** `dry` `types` `naming`
 - **Impact** 3
@@ -263,7 +224,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 
 ---
 
-### 9. 13 of 19 `storeBridge` exports are single-caller one-line forwarders
+### 8. 13 of 19 `storeBridge` exports are single-caller one-line forwarders
 
 - **Category** `overengineering`
 - **Impact** 3
