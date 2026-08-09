@@ -3,7 +3,7 @@ import { HardDrive, GitBranch } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
-import { addLocalVault, addGitHubVault, startGitHubSignIn } from '@/vaultActions'
+import { addLocalVault, addGitHubVault, startGitHubSignIn, isFolderPickerSupported } from '@/vaultActions'
 import {
   ResponsiveModalTitle,
 } from '@/components/primitives/responsive-modal'
@@ -14,16 +14,16 @@ type Source = 'local' | 'github'
 
 const SOURCE_CARDS: { id: Source; Icon: typeof HardDrive; title: string; desc: string }[] = [
   {
-    id:    'local',
-    Icon:  HardDrive,
-    title: 'Local folder',
-    desc:  'Use a folder on this device. Works in Chrome and on Android; not supported on iOS or Safari.',
-  },
-  {
     id:    'github',
     Icon:  GitBranch,
     title: 'GitHub repository',
     desc:  'Sign in with GitHub, or connect manually with an access token. Works on any device and browser.',
+  },
+  {
+    id:    'local',
+    Icon:  HardDrive,
+    title: 'Local folder',
+    desc:  'Use a folder on this device. Works in Chrome and Edge, desktop or Android; not supported on iOS or Safari.',
   },
 ]
 
@@ -32,9 +32,14 @@ interface Props {
   onBack:  () => void
 }
 
+const localFolderSupported = isFolderPickerSupported()
+const availableSourceCards = localFolderSupported
+  ? SOURCE_CARDS
+  : SOURCE_CARDS.filter(c => c.id !== 'local')
+
 export function AddVaultWizard({ onClose, onBack }: Props) {
   const [step,        setStep]        = useState<WizardStep>('source')
-  const [source,      setSource]      = useState<Source>('local')
+  const [source,      setSource]      = useState<Source>('github')
   const [showManual,  setShowManual]  = useState(false)
   const [repoStr,     setRepoStr]     = useState('')
   const [branch,      setBranch]      = useState('main')
@@ -90,7 +95,7 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
         <ResponsiveModalTitle>Add vault</ResponsiveModalTitle>
 
         <div className="flex flex-col gap-3 p-4">
-          {SOURCE_CARDS.map(({ id, Icon, title, desc }) => (
+          {availableSourceCards.map(({ id, Icon, title, desc }) => (
             <button
               key={id}
               onClick={() => setSource(id)}

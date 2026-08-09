@@ -1,4 +1,4 @@
-export { addLocalVault, addGitHubVault, addGitHubVaultOAuth, removeVault, setActiveVault } from '@/storage'
+export { addLocalVault, addGitHubVault, addGitHubVaultOAuth, removeVault, setActiveVault, isFolderPickerSupported } from '@/storage'
 export type { VaultRef } from '@/storage'
 export { syncToBackend, tokenSave, cacheDirtyCount } from '@/storage'
 
