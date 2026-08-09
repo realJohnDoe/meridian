@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import tsParser from '@typescript-eslint/parser'
 import tsPlugin from '@typescript-eslint/eslint-plugin'
 import importXPlugin from 'eslint-plugin-import-x'
@@ -6,7 +8,37 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks'
 import reactPlugin from '@eslint-react/eslint-plugin'
 import jsxA11yPlugin from 'eslint-plugin-jsx-a11y'
 
-const BARREL_DIRS = ['calendar', 'components', 'editor', 'hooks', 'model', 'onboarding', 'routes', 'search', 'storage']
+// A module is any src/ directory with its own index.ts(x) — its internals
+// are private to its own subtree, reachable from outside only through that
+// barrel. Derived from the filesystem (not hand-maintained) so the boundary
+// rule below can never drift from the actual tree: a directory becomes a
+// protected module the moment it grows a barrel, with no config edit.
+function findModules(dir, base = '') {
+  const modules = []
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name.startsWith('__')) continue
+    const rel = base ? `${base}/${entry.name}` : entry.name
+    const full = path.join(dir, entry.name)
+    if (fs.existsSync(path.join(full, 'index.ts')) || fs.existsSync(path.join(full, 'index.tsx'))) {
+      modules.push(rel)
+    }
+    modules.push(...findModules(full, rel))
+  }
+  return modules
+}
+
+const MODULES = findModules(path.resolve(import.meta.dirname, 'src')).sort()
+
+// True when `a` is nested inside `b`'s own directory tree (or vice versa).
+// Used to keep a nested module (e.g. a hypothetical editor/cm) out of its own
+// ancestor's zone target: files physically inside a module's tree are that
+// module's own implementation, not an outside consumer, so they may still
+// reach the ancestor's local siblings directly. The ancestor itself stays in
+// the nested module's target list, so reaching the nested module's internals
+// from anywhere else — including from its own ancestor — still requires that
+// nested module's barrel. No directory today has this shape; this only
+// matters the day one does.
+const nested = (a, b) => a.startsWith(`${b}/`) || b.startsWith(`${a}/`)
 
 // react-hooks 'recommended-latest' includes the React Compiler's diagnostics
 // (refs, set-state-in-effect, purity, immutability, …) alongside the two
@@ -146,38 +178,32 @@ export default [
       ],
 
       // ── Import boundaries (barrel enforcement) ───────────────────────────────
-      // Each directory with an index.ts is a feature module. Code outside that
-      // directory must import via the barrel, not from internal files.
+      // Every module (a src/ directory with its own index.ts — see MODULES
+      // above) is private to its own subtree; the only way in from outside is
+      // its barrel. no-restricted-paths is the single expression of that
+      // invariant: one zone per module, and each zone's target list is BOTH
+      // every other module AND root-level src/*.{ts,tsx} files, so a root file
+      // reaching into a module's internals is caught the same way a sibling
+      // module reaching in is. (Root files still need module barrels too —
+      // "root resident" per CLAUDE.md means cross-cutting, not privileged.)
       //
-      // Two-rule strategy:
-      // 1. no-internal-modules  — catches violations from root-level src/ files.
-      //    Feature dirs turn this off below (so their own relative subdirectory
-      //    imports don't fire as false positives), but the rule stays on globally.
-      // 2. no-restricted-paths  — catches violations FROM within feature dirs
-      //    (which have no-internal-modules off). One zone per protected module;
-      //    the target lists every OTHER feature dir as the restriction source.
-      //
-      // Global exceptions (always allowed as deep imports):
-      //   @/components/ui/**              — shadcn registry components, always consumed as deep paths.
-      //   @/components/primitives/**      — our own shared primitives (same deep-path ergonomics;
-      //     kept out of ui/ so that directory stays a faithful mirror of the shadcn registry).
-      //   @/lib/**                        — utility leaf, no barrel (lib/ has no index.ts).
-      //   react-dom/client                — node_modules deep import needed at the entry point.
-      //   @testing-library/jest-dom/vitest — node_modules deep import; the subpath is how
-      //     jest-dom registers its matchers on vitest's `expect` (see test-utils/setup.ts).
+      // no-internal-modules is narrowed to what no-restricted-paths can't
+      // express: deep imports into node_modules packages. All first-party
+      // '@/**' imports are exempted here since the zones below now own that.
       'import-x/no-internal-modules': [
         'error',
-        { allow: ['@/components/ui/**', '@/components/primitives/**', '@/lib/**', 'react-dom/client', '@testing-library/jest-dom/vitest'] },
+        { allow: ['@/**', 'react-dom/client', '@testing-library/jest-dom/vitest'] },
       ],
 
-      // For each barrel module, forbid deep imports into it from any OTHER
-      // feature dir. One zone per protected module.
       'import-x/no-restricted-paths': [
         'error',
         {
           zones: [
-            ...BARREL_DIRS.map(protected_ => ({
-              target: BARREL_DIRS.filter(d => d !== protected_).map(d => `./src/${d}`),
+            ...MODULES.map(protected_ => ({
+              target: [
+                './src/*.{ts,tsx}',
+                ...MODULES.filter(m => m !== protected_ && !nested(m, protected_)).map(m => `./src/${m}`),
+              ],
               from: `./src/${protected_}`,
               // components/ui/ (shadcn registry) and components/primitives/ (ours) are both
               // primitive layers — always allowed as deep imports.
@@ -242,11 +268,13 @@ export default [
     ),
   },
 
-  // Within-feature files may use relative imports into their own subdirectories.
-  // The no-restricted-paths rule above still enforces cross-feature boundaries
-  // (it is a separate rule and is not suppressed by this override).
+  // Within a module, relative imports into its own subdirectories (e.g.
+  // editor/ importing './dialogs/RepeatDialog') are ordinary internal
+  // structure, not a boundary violation — the no-restricted-paths zones above
+  // are what enforce the actual module boundary, and are not suppressed by
+  // this override.
   {
-    files: BARREL_DIRS.flatMap(dir => [`src/${dir}/**/*.{ts,tsx}`]),
+    files: MODULES.flatMap(dir => [`src/${dir}/**/*.{ts,tsx}`]),
     rules: { 'import-x/no-internal-modules': 'off' },
   },
 

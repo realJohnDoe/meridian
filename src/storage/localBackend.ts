@@ -1,5 +1,5 @@
 import type { StorageBackend, RawFile } from './backend'
-import type { VaultKind } from '@/types'
+import type { VaultKind } from '@/vaultRef'
 import { diskStatAll, diskReadFiles, diskReadAll, diskWrite, diskDelete } from './fs'
 
 export class LocalBackend implements StorageBackend {

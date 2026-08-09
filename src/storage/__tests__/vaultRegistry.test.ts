@@ -14,7 +14,7 @@
  * directly controllable per test.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { VaultRef } from '@/types'
+import type { VaultRef } from '@/vaultRef'
 import type { PermissionOutcome } from '@/storage/backend'
 
 /** A promise plus its resolver, for tests that need to hold an await open. */

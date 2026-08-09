@@ -1,6 +1,17 @@
 import { startOfDay } from 'date-fns'
 import { parseDurationDays, parseDurationHours } from '@/model'
-import { isTracked, type Occurrence, type OccState } from './types'
+import { isTracked, type Occurrence } from './types'
+
+/** Canonical occurrence state — single domain vocabulary for all styling variants. */
+export type OccState =
+  | 'event-future'
+  | 'event-past'
+  | 'task-open'
+  | 'task-p1'
+  | 'task-p2'
+  | 'task-p3'
+  | 'note'
+  | 'done'
 
 /** Derive the display kind from occurrence data. */
 export function occKind(occ: Occurrence): 'event' | 'task' | 'note' {

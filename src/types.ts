@@ -128,19 +128,6 @@ export function isSeries(item: StoreItem): item is StoreSeries {
   return 'repeat' in item && item.repeat !== undefined
 }
 
-// ── Occurrence display state ──────────────────────────────────────────────────
-
-/** Canonical occurrence state — single domain vocabulary for all styling variants. */
-export type OccState =
-  | 'event-future'
-  | 'event-past'
-  | 'task-open'
-  | 'task-p1'
-  | 'task-p2'
-  | 'task-p3'
-  | 'note'
-  | 'done'
-
 // ── Occurrence ───────────────────────────────────────────────────────────────
 
 /**
@@ -180,35 +167,3 @@ export interface Scheduled {
   date: string
   time: string
 }
-
-// ── Locale preferences ─────────────────────────────────────────────────────────
-
-/** firstDayOfWeek uses Intl getWeekInfo values: 1=Mon, 6=Sat, 7=Sun. */
-export type LocalePrefs = {
-  hour12: boolean
-  firstDayOfWeek: 1 | 6 | 7
-}
-
-// ── Vault references ─────────────────────────────────────────────────────────
-
-export type VaultKind = 'local' | 'example' | 'github'
-
-interface VaultRefBase {
-  id:   string
-  name: string
-}
-
-interface LocalVaultRef extends VaultRefBase {
-  kind: 'local'
-}
-
-interface ExampleVaultRef extends VaultRefBase {
-  kind: 'example'
-}
-
-export interface GitHubVaultRef extends VaultRefBase {
-  kind:   'github'
-  github: { owner: string; repo: string; branch: string }
-}
-
-export type VaultRef = LocalVaultRef | ExampleVaultRef | GitHubVaultRef

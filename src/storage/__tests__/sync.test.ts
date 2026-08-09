@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { StorageBackend, RawFile } from '@/storage/backend'
-import type { VaultKind } from '@/types'
+import type { VaultKind } from '@/vaultRef'
 import { ConflictError, AuthSyncError, TransientSyncError } from '@/storage/conflictError'
 
 // ── Hoisted shared fakes (referenced by the vi.mock factories below, which

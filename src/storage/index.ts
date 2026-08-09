@@ -20,4 +20,4 @@ export {
 } from './githubOAuth'
 export type { OAuthTokens, InstalledRepo } from './githubOAuth'
 
-export type { VaultRef } from '@/types'
+export type { VaultRef } from '@/vaultRef'

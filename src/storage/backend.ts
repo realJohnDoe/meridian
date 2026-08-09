@@ -1,4 +1,4 @@
-import type { VaultKind } from '@/types'
+import type { VaultKind } from '@/vaultRef'
 
 /** Whether `name` is a vault entry file (markdown with YAML frontmatter). */
 export function isVaultFile(name: string): boolean {
