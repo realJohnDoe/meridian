@@ -79,15 +79,19 @@ async function resolveParentDir(
 
 // ── Public API ─────────────────────────────────────────────────
 
+export function isFolderPickerSupported(): boolean {
+  return typeof window.showDirectoryPicker === 'function'
+}
+
 export async function diskPickDirectory(): Promise<FileSystemDirectoryHandle> {
-  if (!window.showDirectoryPicker) {
-    throw new Error('Your browser does not support folder access. Use Chrome or Edge, and open this file directly (not in a preview).')
+  if (!isFolderPickerSupported()) {
+    throw new Error('Your browser does not support folder access. Use Chrome or Edge (desktop or Android), or connect a GitHub repo instead.')
   }
   try {
     return await window.showDirectoryPicker({ mode: 'readwrite' })
   } catch (e) {
     if ((e as Error).name === 'SecurityError') {
-      throw new Error('Folder access is blocked here. This happens inside embedded previews. Save this HTML file and open it directly in Chrome or Edge.')
+      throw new Error('Folder access is blocked here. This can happen inside an embedded preview or iframe — open Meridian directly, or connect a GitHub repo instead.')
     }
     throw e
   }

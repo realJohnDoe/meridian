@@ -4,7 +4,7 @@ Findings from a survey run against [product-niche-survey.md](product-niche-surve
 
 ## 1. Niche verdict
 
-**Declared niche** — someone with scattered productivity apps who wants a calm, all-in-one calendar/tasks/notes app on plain Markdown, instead of Google Calendar + Todoist + Keep. **Revealed niche** — an Obsidian user who lives on their phone, already has a GitHub account, and wants tasks and calendar to be first-class rather than plugin-mediated; instead of Obsidian + TaskNotes. **Served niche** — that same person, *provided* they use GitHub (the local-folder path is desktop-Chromium-only and mis-advertised), and are willing to retype their existing calendar because there's no iCal import.
+**Declared niche** — someone with scattered productivity apps who wants a calm, all-in-one calendar/tasks/notes app on plain Markdown, instead of Google Calendar + Todoist + Keep. **Revealed niche** — an Obsidian user who lives on their phone, already has a GitHub account, and wants tasks and calendar to be first-class rather than plugin-mediated; instead of Obsidian + TaskNotes. **Served niche** — that same person, *provided* they're on Chromium (desktop or Android) if they want the local-folder path, or GitHub otherwise (the four support-matrix claims were inconsistent and one was stale — corrected in finding #1), and are willing to retype their existing calendar because there's no iCal import.
 
 The **fit is genuinely good** — the product invests exactly where the revealed niche needs it (`model/` 6,534 lines of recurrence depth, `editor/` 6,981, 16 files carrying swipe handling, `vaul` drawers, a 768px single column that never pretends to be a desktop app) and it honours its stated non-goal of out-noting Obsidian. **The communication is where it comes apart.** The widest gap is **declared vs. revealed**: every surface that a visitor reads first describes a general-audience app, while every surface built from the product's own effort — the palette, the eight-theme picker, the setup path, the founder's own blog — describes an Obsidian-adjacent power user. The word `mobile` appears **once** in the entire README, in a table cell 83% of the way down, despite the author writing `Mobile is where this is decided.` and calling it `the biggest single reason I eventually built something of my own`.
 
@@ -43,48 +43,45 @@ The **fit is genuinely good** — the product invests exactly where the revealed
 | 3 | Visual identity & aesthetic fit | character-vs-promise assessed and largely **confirmed as working** (formerly evidenced by #2 — implemented, PR #658) |
 | 4 | Differentiation & alternatives | **findings: #5** (formerly also #4 — implemented, PR #658) |
 | 5 | Audience selection | formerly #2 — implemented, PR #658 |
-| 6 | Adoption gates | **findings: #1, #3** |
-| 7 | Niche drift & emerging signals | **findings: #1** (prototype-era error copy); LLM angle assessed — see decisions |
+| 6 | Adoption gates | **findings: #3** (formerly also #1 — implemented, corrected and fixed) |
+| 7 | Niche drift & emerging signals | formerly #1 (prototype-era error copy — implemented, corrected and fixed); LLM angle assessed — see decisions |
 
 ## 4. Findings — top 5
 
 | # | Finding | Gap | Question | Model |
 |---|---|---|---|---|
-| 1 | Local-folder support is claimed four different ways and dead-ends on Android | declared-vs-served | both | Sonnet 5 |
 | 3 | The app deliberately opens on your overdue backlog | declared-vs-revealed | both | Opus 5 |
 | 5 | The comparison table's open-source row is backwards | declared-vs-served | communication | Haiku 4.5 |
 
-**Implemented and removed from this record:** #2 (the real beachhead was visible in every pixel and named in no copy) and #4 ("Great mobile UX" was the lead differentiator and appeared once) — these were the same decision seen twice, both rewriting the README's opening, and were implemented together in [PR #658](https://github.com/realJohnDoe/meridian/pull/658).
+**Implemented and removed from this record:** #2 (the real beachhead was visible in every pixel and named in no copy) and #4 ("Great mobile UX" was the lead differentiator and appeared once) — these were the same decision seen twice, both rewriting the README's opening, and were implemented together in [PR #658](https://github.com/realJohnDoe/meridian/pull/658). #1 (local-folder support claims) — the survey's premise that Chrome for Android lacks `showDirectoryPicker` was stale (it shipped in Chrome 132–134, Q1 2025); corrected and fixed by unifying all four surfaces on the real matrix (desktop or Android Chromium; not iOS/Firefox) and replacing `fs.ts`'s prototype-era error copy.
 
-**Sequencing note.** #5 edits one table cell and is safe to do immediately. #1 and #3 touch code and fixtures, independent of the positioning decisions, and remain open.
+**Sequencing note.** #5 edits one table cell and is safe to do immediately. #3 touches code and fixtures, independent of the positioning decisions, and remains open.
 
 ---
 
-### #1 — Local-folder support is claimed four different ways, and dead-ends on Android
+### #1 — Local-folder support was claimed four different ways — **fixed**
 
 - **Gap** declared-vs-served · **Question** fit + communication · **Category** `adoption-gate` `proof` `identity`
-- **Who it costs us** Anyone who picks "Local folder" on a phone — and it is preselected by default (`useState<Source>('local')`). Every mobile arrival who prefers not to use GitHub hits this, which on a mobile-first product is a large share.
-- **Impact** 7 · **Breadth** 4 surfaces, 8 sites (searched: `README.md`, `AddVaultWizard.tsx`, `exampleBackend.ts`, `fs.ts`)
+- **Status** **Implemented.** The survey's own verdict was wrong on the pivotal fact and has been corrected below before being acted on.
 
-**Evidence — four mutually inconsistent claims:**
+**Original evidence — four mutually inconsistent claims:**
 
-> `Supported in Chrome and Edge only — not available on iOS or Firefox.` — [README.md:74](README.md:74)
+> `Supported in Chrome and Edge only — not available on iOS or Firefox.` — README.md
 
-> `local folder access requires a Chromium-based browser` — [README.md:174](README.md:174)
+> `local folder access requires a Chromium-based browser` — README.md
 
-> `'Use a folder on this device. Works in Chrome and on Android; not supported on iOS or Safari.',` — [src/components/AddVaultWizard.tsx:20](../src/components/AddVaultWizard.tsx:20)
+> `'Use a folder on this device. Works in Chrome and on Android; not supported on iOS or Safari.',` — `src/components/AddVaultWizard.tsx`
 
-> `**Heads-up on storage:** the **local folder** backend works only in Chromium browsers` / `(Chrome, Edge) on desktop.` — [src/storage/exampleBackend.ts:386](../src/storage/exampleBackend.ts:386)
+> `**Heads-up on storage:** the **local folder** backend works only in Chromium browsers` / `(Chrome, Edge) on desktop.` — `src/storage/exampleBackend.ts`
 
-The wizard says Android works; the example vault says desktop only. **The wizard is wrong** — Chrome for Android does not expose `showDirectoryPicker`. And the failure message is prototype-era copy that survived the rewrite from the single-HTML-file phone prototype into a React PWA served from GitHub Pages:
+The survey concluded **"the wizard is wrong"**, on the premise that Chrome for Android does not expose `showDirectoryPicker`. **That premise was stale.** Chrome shipped File System Access (including `showDirectoryPicker`) on Android in Chrome 132–134 (Q1 2025) — over a year before this finding was recorded. The user tested Local folder on Android/Chrome directly and confirmed it works, which is what prompted the recheck. **The wizard string had it right all along**; `exampleBackend.ts` and the general "desktop Chromium" framing were the stale ones.
 
-> `throw new Error('Your browser does not support folder access. Use Chrome or Edge, and open this file directly (not in a preview).')` — [src/storage/fs.ts:84](../src/storage/fs.ts:84)
+The one part of the original finding that held up regardless of the Android verdict: `fs.ts`'s error strings were prototype-era copy left over from the single-HTML-file phone prototype, nonsensical in the current React PWA:
 
-An Android Chrome user is told the option works, taps it, and is told to use Chrome (they are) and to "open this file directly" (there is no file). That is a dead end at the exact moment of adoption.
+> `throw new Error('Your browser does not support folder access. Use Chrome or Edge, and open this file directly (not in a preview).')` — `src/storage/fs.ts`
 
-- **Recommended model** **Sonnet 5.** Mechanical once the truth is established, but the hazard is a confident rewrite that unifies the four claims on the *wrong* one — the in-app string is the most prominent and the most incorrect. The fix must also decide whether to preselect GitHub (which the README already stars as recommended) and must rewrite `fs.ts`'s two prototype-era errors. Haiku 4.5 would suffice if the task specifies the correct support matrix and the preselection decision.
-- **Problem** A mobile user is invited into a storage path their browser cannot run, then given impossible advice.
-- **Fix** Establish one support statement (desktop Chromium only), propagate it to all four surfaces, feature-detect `showDirectoryPicker` to disable or hide the local option when unsupported, preselect GitHub, and replace both `fs.ts` error strings with PWA-appropriate text.
+- **Problem** Four surfaces disagreed on the local-folder support matrix, and one surface's error copy referenced a UI (a standalone HTML file) the product no longer has.
+- **Fix applied** Unified all four surfaces on the correct matrix — **Chrome/Edge, desktop or Android; not iOS or Firefox** — in `README.md` (two spots) and `src/storage/exampleBackend.ts`; the in-app wizard string was already correct. Added `isFolderPickerSupported()` in `src/storage/fs.ts` (exported through the `storage`/`vaultActions` barrels) and used it in `AddVaultWizard.tsx` to hide the Local-folder card and default to GitHub on browsers that genuinely lack `showDirectoryPicker` (iOS Safari, Firefox), rather than on Android. Replaced both `fs.ts` error strings with PWA-appropriate text that points to GitHub as a fallback instead of the dead "open this file directly" advice.
 
 ---
 
