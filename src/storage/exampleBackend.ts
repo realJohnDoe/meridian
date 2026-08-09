@@ -121,7 +121,7 @@ items:
 Meridian has no "type" field. What an entry *is* comes from which fields it carries:
 
 - **Note** — no \`date\`, no \`done\`; just freeform writing (like this one).
-- **Event** — has a \`date\` (plus optional \`time\`, \`duration\`, \`participants\`). Shows up in the Agenda, Month, and Day views. Example: [[plan-the-week]].
+- **Event** — has a \`date\` (plus optional \`time\`, \`duration\`, \`participants\`). Shows up in the Agenda, Month, Week, and Day views. Example: [[plan-the-week]].
 - **Task** — has a \`done\` checkbox (plus optional \`priority\` and \`date\`). Tick it and Meridian writes \`done: true\` back to the file. Example: [[buy-groceries]].
 
 A task doesn't need a date — leave it off and it waits in your backlog, like
