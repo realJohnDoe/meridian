@@ -42,7 +42,7 @@ export default [
       },
     },
     linterOptions: {
-      reportUnusedDisableDirectives: false,
+      reportUnusedDisableDirectives: 'error',
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
@@ -215,7 +215,7 @@ export default [
       },
     },
     linterOptions: {
-      reportUnusedDisableDirectives: false,
+      reportUnusedDisableDirectives: 'error',
     },
     plugins: {
       '@typescript-eslint': tsPlugin,

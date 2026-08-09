@@ -47,7 +47,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 | 4 | Security | **clean** — threat model and evidence below the table |
 | 5 | Testing & Error Handling | findings: **#1, #3** — error *strategy* is otherwise consistent and good (see note below) |
 | 6 | Code Health & DRY | findings: **#1, #8** |
-| 7 | Toolchain & Developer Feedback Loops | findings: **#5, #7** |
+| 7 | Toolchain & Developer Feedback Loops | findings: **#5** (~~#7~~ — **FIXED**) |
 | 8 | Dependencies & Library Fit | **clean** — measured verdicts below the table |
 | 9 | Styling & UX | **clean** — 33 inline `style={{}}` uses, all dynamic values Tailwind can't express (measured positions, CSS custom properties, virtualizer transforms); no custom re-implementation of an installed shadcn component; `jsx-a11y/recommended` is enabled and passing with one justified `no-autofocus` disable |
 | 10 | Performance | **clean** — React Compiler enabled at target 19, three virtualized lists, route-level `lazy()` on every heavy view, an LRU expansion cache with correct vault-change reset wiring (verified `resetCalendarOnVaultChange` → `resetExpansionCache` is called from `routes/_app.tsx:56`) |
@@ -78,7 +78,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 | 4 | `storage/cache.ts` holds five unrelated concerns because one lint rule forces them together | **Opus 5** |
 | 5 | `strict-type-checked` ships in the installed plugin but isn't enabled; `no-unnecessary-condition` alone flags 81 checks the types already rule out | **Sonnet 5** |
 | 6 | Entry editing costs eight files to follow, with `EditorShell` forwarding fifteen fields and adding nothing | **Opus 5** |
-| 7 | CI accepts lint warnings silently, and unused-disable reporting is switched off in both blocks | **Haiku 4.5** |
+| 7 | ~~CI accepts lint warnings silently, and unused-disable reporting is switched off in both blocks~~ — **FIXED** | **Haiku 4.5** |
 | 8 | `NewEntrySeed` is defined twice, in `routes/` and `editor/`, with divergent types | **Haiku 4.5** |
 | 9 | 13 of 19 `storeBridge` exports are single-caller one-line forwarders | **Sonnet 5** |
 
@@ -227,7 +227,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 
 ---
 
-### 7. CI accepts lint warnings silently, and unused-disable reporting is switched off in both config blocks
+### 7. ~~CI accepts lint warnings silently, and unused-disable reporting is switched off in both config blocks~~ — FIXED
 
 - **Category** `toolchain`
 - **Impact** 4
@@ -244,6 +244,8 @@ The single biggest structural theme is **underengineering at exactly one seam �
   A dry run with `--report-unused-disable-directives` found none today across the 7 files carrying disables — so this is a rot-prevention gap, not existing rot.
 - **Problem** Warnings are invisible to CI, so a new one lands with a green check and joins the existing 12 in the noise floor; and `eslint-disable` comments can go stale indefinitely without anything noticing.
 - **Fix** Add `--max-warnings=12` to the lint script as a ratchet (lowering it as warnings are resolved) and flip `reportUnusedDisableDirectives` to `'error'` in both blocks.
+
+**Verification — FIXED.** `package.json`'s `lint` script is now `eslint src worker/src --max-warnings=12`, and `reportUnusedDisableDirectives` is `'error'` in both `eslint.config.js` `linterOptions` blocks (`src` and `worker/src`). `pnpm run lint` still exits 0 at exactly 12 warnings (no unused-disable directives flagged), so the ratchet is exact — a 13th warning now fails the build, matching the finding's own scoping note that `--max-warnings=0` outright would have turned today's 12 into an immediate red build. `pnpm run build` remains green.
 
 ---
 
