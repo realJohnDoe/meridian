@@ -16,7 +16,7 @@ const occIdsFor = (rows: AgendaRow[], dateKey: string) =>
   rows.filter(r => r.kind === 'occ' && r.dateKey === dateKey).map(r => r.kind === 'occ' && r.occ.id)
 
 const headerTones = (rows: AgendaRow[]) =>
-  rows.filter(r => r.kind === 'header').map(r => r.kind === 'header' && r.tone)
+  rows.filter(r => r.kind === 'header').map(r => r.tone)
 
 describe('useAgendaSections', () => {
   it('always seeds a today header, even with no occurrences', () => {

@@ -1,10 +1,11 @@
 import { createStore } from 'zustand/vanilla'
 import { useStore as useZustandStore } from 'zustand/react'
-import { startOfToday } from 'date-fns'
+import { startOfToday, addDays, differenceInCalendarDays } from 'date-fns'
 import type { VirtualItem } from '@tanstack/react-virtual'
 import { fmtISO } from '@/model'
 import { resetExpansionCache } from './useExpandWithMultiday'
 import { resetAgendaSectionsCache } from './useAgendaSections'
+import { weekStartFor } from './weekRange'
 
 interface CalendarViewState {
   /**
@@ -26,6 +27,8 @@ interface CalendarViewState {
   monthPreview: string | null
   /** `YYYY-MM-DD` of the date the day-view swipe carousel is settling toward — same shape as monthPreview. */
   dayPreview: string | null
+  /** `YYYY-MM-DD` of the week-start the week-view swipe carousel is settling toward — same shape as monthPreview/dayPreview. */
+  weekPreview: string | null
   /**
    * ISO date (`YYYY-MM-DD`) AgendaView's expansion window is centered on —
    * `[agendaAnchor - 365d, agendaAnchor + 90d]`, see useAgendaSections.
@@ -49,8 +52,8 @@ interface CalendarViewState {
    * ISO date (`YYYY-MM-DD`) of the day last focused across the calendar
    * views — kept in sync with agenda's scroll position, the day carousel's
    * route param, and month's day-of-month (see setCurrentMonthKeepingDay).
-   * Read by the sidebar so switching between Agenda/Month/Day lands on this
-   * day instead of resetting to today.
+   * Read by the sidebar so switching between Agenda/Month/Week/Day lands on
+   * this day instead of resetting to today.
    */
   currentDate: string
 }
@@ -63,6 +66,7 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   agendaScrollMeasurements: [],
   monthPreview: null,
   dayPreview: null,
+  weekPreview: null,
   agendaAnchor: fmtISO(startOfToday()),
   agendaScrollTarget: null,
   agendaTopDate: null,
@@ -104,12 +108,20 @@ export function useDayPreview(): string | null {
   return useZustandStore(calendarView, s => s.dayPreview)
 }
 
+export function useWeekPreview(): string | null {
+  return useZustandStore(calendarView, s => s.weekPreview)
+}
+
 export function setMonthPreview(key: string | null): void {
   calendarView.setState({ monthPreview: key })
 }
 
 export function setDayPreview(key: string | null): void {
   calendarView.setState({ dayPreview: key })
+}
+
+export function setWeekPreview(key: string | null): void {
+  calendarView.setState({ weekPreview: key })
 }
 
 export function useAgendaAnchor(): string {
@@ -165,6 +177,29 @@ export function setCurrentMonthKeepingDay(monthKey: string): void {
   const daysInMonth = new Date(y, m, 0).getDate()
   const clampedDay = Math.min(day, daysInMonth)
   calendarView.setState({ currentDate: `${monthKey}-${String(clampedDay).padStart(2, '0')}` })
+}
+
+/**
+ * Updates currentDate when the week carousel pages to a new week, keeping
+ * the same weekday instead of jumping to the week's first day — e.g. paging
+ * from Wed Aug 12 to the next week lands on Wed Aug 19. Mirrors
+ * setCurrentMonthKeepingDay's day-of-month preservation.
+ *
+ * `dateKey` is any date within the target week, not necessarily its start —
+ * the route param itself isn't guaranteed to be week-start-normalized on
+ * first mount (see WeekView), so normalization happens here via `ws` rather
+ * than being required of the caller.
+ */
+export function setCurrentWeekKeepingWeekday(dateKey: string, ws: 0 | 1 | 6): void {
+  const [ny = NaN, nm = NaN, nd = NaN] = dateKey.split('-').map(Number)
+  const newWeekStart = weekStartFor(new Date(ny, nm - 1, nd), ws)
+
+  const current = calendarView.getState().currentDate
+  const [cy = NaN, cm = NaN, cd = NaN] = current.split('-').map(Number)
+  const currentDateObj = new Date(cy, cm - 1, cd)
+  const offsetDays = differenceInCalendarDays(currentDateObj, weekStartFor(currentDateObj, ws))
+
+  calendarView.setState({ currentDate: fmtISO(addDays(newWeekStart, offsetDays)) })
 }
 
 /** Clears the pending scroll target and records the date scrolled to, in one

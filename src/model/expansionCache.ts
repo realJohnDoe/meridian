@@ -31,7 +31,7 @@ export function hasSameStructure(a: StoreItem[], b: StoreItem[]): boolean {
   // Pre-collect repeat types so we can check after_completion overrides below.
   const seriesTypeById = new Map<string, string | undefined>()
   for (const item of b) {
-    if (isSeries(item)) seriesTypeById.set(item.id, item.repeat?.type)
+    if (isSeries(item)) seriesTypeById.set(item.id, item.repeat.type)
   }
 
   for (let i = 0; i < a.length; i++) {
@@ -46,7 +46,7 @@ export function hasSameStructure(a: StoreItem[], b: StoreItem[]): boolean {
     if (isSeries(ai) && isSeries(bi)) {
       if (JSON.stringify(ai.repeat) !== JSON.stringify(bi.repeat)) return false
       // For after_completion series, done determines when the next occurrence is.
-      if (ai.repeat?.type === 'after_completion' && ai.metadata.done !== bi.metadata.done) return false
+      if (ai.repeat.type === 'after_completion' && ai.metadata.done !== bi.metadata.done) return false
       if ((ai.metadata.duration ?? '') !== (bi.metadata.duration ?? '')) return false
     } else if (!isSeries(ai) && !isSeries(bi)) {
       const oa = ai, ob = bi

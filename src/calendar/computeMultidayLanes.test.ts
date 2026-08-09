@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeMultidayLanes } from './computeMultidayLanes'
+import { computeMultidayLanes, compactRowLanes, visibleLaneCount } from './computeMultidayLanes'
 import type { Occurrence } from '@/types'
 
 function makeOcc(overrides: Partial<Occurrence> & { date: string; duration: string }): Occurrence {
@@ -60,5 +60,49 @@ describe('computeMultidayLanes', () => {
 
   it('returns an empty array for no events', () => {
     expect(computeMultidayLanes([])).toEqual([])
+  })
+})
+
+describe('compactRowLanes', () => {
+  it('is a no-op for an already-dense range', () => {
+    const map = compactRowLanes([0, 1, 2])
+    expect([...map.entries()]).toEqual([[0, 0], [1, 1], [2, 2]])
+  })
+
+  it('collapses a sparse set of lanes to a dense range, preserving order', () => {
+    // e.g. lane 5 survives alone in a row after lanes 0-4 have all ended.
+    const map = compactRowLanes([5])
+    expect([...map.entries()]).toEqual([[5, 0]])
+  })
+
+  it('preserves relative order across a mixed sparse set', () => {
+    const map = compactRowLanes([1, 4, 7])
+    expect([...map.entries()]).toEqual([[1, 0], [4, 1], [7, 2]])
+  })
+
+  it('de-duplicates repeated lanes (multiple bars sharing a lane in the row)', () => {
+    const map = compactRowLanes([3, 3, 0, 3])
+    expect([...map.entries()]).toEqual([[0, 0], [3, 1]])
+  })
+
+  it('is a no-op for an empty row', () => {
+    expect(compactRowLanes([]).size).toBe(0)
+  })
+})
+
+describe('visibleLaneCount', () => {
+  it('shows every lane when they fit within maxVisible', () => {
+    expect(visibleLaneCount(3, 4)).toBe(3)
+    expect(visibleLaneCount(4, 4)).toBe(4)
+  })
+
+  it('reserves one slot for the overflow marker when lanes exceed maxVisible', () => {
+    expect(visibleLaneCount(6, 4)).toBe(3)
+    expect(visibleLaneCount(5, 4)).toBe(3)
+  })
+
+  it('never goes negative when maxVisible is smaller than the reservation', () => {
+    expect(visibleLaneCount(3, 1)).toBe(0)
+    expect(visibleLaneCount(3, 0)).toBe(0)
   })
 })

@@ -554,7 +554,7 @@ describe('GitHubBackend', () => {
         if (typeof url !== 'string' || !url.includes('/graphql')) {
           return Promise.reject(new Error(`unexpected fetch in this test: ${String(url)}`))
         }
-        const body = JSON.parse((init?.body as string) ?? '{}') as { query: string }
+        const body = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as { query: string }
         const repository: Record<string, { text: string }> = {}
         const aliasRe = /f(\d+): object\(expression: "[^:"\\]*:((?:[^"\\]|\\.)*)"\)/g
         let m: RegExpExecArray | null

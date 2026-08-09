@@ -115,7 +115,7 @@ export const emptyLineCaret = ViewPlugin.fromClass(
         write: (metrics, view) => {
           const apply = !!metrics?.quirk && caretOnEmptyLine(view.state)
           view.dom.classList.toggle(CARET_CLASS, apply)
-          if (apply && metrics) {
+          if (apply) {
             view.dom.style.setProperty(HEIGHT_VAR, `${metrics.textHeight}px`)
             view.dom.style.setProperty(OFFSET_VAR, `${caretOffset(metrics)}px`)
           }

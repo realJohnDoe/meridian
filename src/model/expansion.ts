@@ -49,7 +49,7 @@ function nodeDateTime(node: { date: string; time: string | null }): Date | null 
 }
 
 function jsDateToSpec(jsDate: Date): { date: string | null; time: string | null } {
-  if (!jsDate || !isValid(jsDate)) return { date: null, time: null }
+  if (!isValid(jsDate)) return { date: null, time: null }
   return { date: fmtISO(jsDate), time: fmtT(jsDate) }
 }
 
@@ -201,7 +201,7 @@ function generateScheduledDates(
     if (freq === 'daily')        n.setDate(n.getDate() + interval)
     else if (freq === 'weekly')  n.setDate(n.getDate() + 7 * interval)
     else if (freq === 'monthly') { n.setDate(1); n.setMonth(n.getMonth() + interval) }
-    else if (freq === 'yearly')  { n.setDate(1); n.setFullYear(n.getFullYear() + interval) }
+    else                         { n.setDate(1); n.setFullYear(n.getFullYear() + interval) }
     return n
   }
 
@@ -216,8 +216,7 @@ function generateScheduledDates(
       const months = (target.getFullYear() - anchor.getFullYear()) * 12 + (target.getMonth() - anchor.getMonth())
       return Math.floor(months / interval)
     }
-    if (freq === 'yearly')   return Math.floor((target.getFullYear() - anchor.getFullYear()) / interval)
-    return 0
+    return Math.floor((target.getFullYear() - anchor.getFullYear()) / interval)
   }
 
   // Applying `nextBase` `steps` times in one shot — same arithmetic, no loop.
@@ -226,7 +225,7 @@ function generateScheduledDates(
     if (freq === 'daily')        n.setDate(n.getDate() + interval * steps)
     else if (freq === 'weekly')  n.setDate(n.getDate() + 7 * interval * steps)
     else if (freq === 'monthly') { n.setDate(1); n.setMonth(n.getMonth() + interval * steps) }
-    else if (freq === 'yearly')  { n.setDate(1); n.setFullYear(n.getFullYear() + interval * steps) }
+    else                         { n.setDate(1); n.setFullYear(n.getFullYear() + interval * steps) }
     return n
   }
 
@@ -292,7 +291,7 @@ function generateScheduledDates(
           dates.push(withTime(new Date(year, month, anchor.getDate())))
         }
       }
-    } else if (freq === 'yearly') {
+    } else {
       const year = periodStart.getFullYear()
       const daysInTargetMonth = new Date(year, anchor.getMonth() + 1, 0).getDate()
       // Feb 29 anchors are skipped in non-leap years instead of overflowing into
@@ -430,7 +429,7 @@ function expandNode<M>(
         }
       }
     }
-  } else if (repeat.type === 'after_completion') {
+  } else {
     const allTimes: Array<{ jsTime: Date; timed: boolean; done?: boolean; overrideId?: string; metadata: M }> = []
     const anchorInst = (node.instances ?? []).find(i => {
       const t = nodeDateTime(i) || parseDateString(i.date)

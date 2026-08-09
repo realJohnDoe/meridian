@@ -1,11 +1,15 @@
 import { useState, useCallback, useEffect } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import { Menu, CalendarCheck2 } from 'lucide-react'
-import { addDays, fmtTopBarDay, fmtTopBarDayShort, fmtTopBarMonth } from '@/format'
-import { fmtISO, fmtMonth, parseDateString, parseMonth } from '@/model'
+import { addDays, fmtTopBarDay, fmtTopBarDayShort, fmtTopBarMonth, fmtTopBarWeek } from '@/format'
+import { fmtISO, fmtMonth, parseDateString, parseMonth, weekStartsOn } from '@/model'
 import { useToday } from '@/hooks'
+import { useStore } from '@/store'
 import { onVaultChanged } from '@/storage'
-import { resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useAgendaTopDate, requestScrollToToday } from '@/calendar'
+import {
+  resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useWeekPreview,
+  useAgendaTopDate, requestScrollToToday, weekStartFor,
+} from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ParticipantFilterButton } from '@/components'
 import { IconButton } from '@/components/primitives/icon-button'
@@ -60,6 +64,7 @@ function AppMain() {
   const entrySlugMatch = useMatch({ from: '/_app/entry/$slug', shouldThrow: false })
   const entryNewMatch  = useMatch({ from: '/_app/entry/new', shouldThrow: false })
   const dayMatch       = useMatch({ from: '/_app/day/$date', shouldThrow: false })
+  const weekMatch      = useMatch({ from: '/_app/week/$date', shouldThrow: false })
   const monthMatch     = useMatch({ from: '/_app/calendar/$month', shouldThrow: false })
   const backlogMatch   = useMatch({ from: '/_app/backlog', shouldThrow: false })
   const notesMatch     = useMatch({ from: '/_app/notes', shouldThrow: false })
@@ -68,20 +73,28 @@ function AppMain() {
   const agendaTopDate = useAgendaTopDate()
   const monthPreview  = useMonthPreview()
   const dayPreview    = useDayPreview()
+  const weekPreview   = useWeekPreview()
+  const ws            = weekStartsOn(useStore(s => s.localePrefs))
 
   const isEntryView  = !!entrySlugMatch || !!entryNewMatch
   const isDayView    = !!dayMatch
+  const isWeekView   = !!weekMatch
   const isMonthView  = !!monthMatch
   const isListView   = !!backlogMatch || !!notesMatch
   const dvDate       = dayMatch ? new Date(dayMatch.params.date + 'T00:00:00') : null
   const monthViewDate = monthMatch ? parseMonth(monthMatch.params.month) : null
+  // The route param need not already be week-start-normalized (see WeekView),
+  // so it's normalized here before anything reads it.
+  const weekStartDate = weekMatch ? weekStartFor(new Date(weekMatch.params.date + 'T00:00:00'), ws) : null
 
-  // monthPreview/dayPreview (set by the swipe carousel on touchend / crossing the
-  // halfway point) show the label the gesture is heading toward immediately,
-  // ahead of the route committing — chevron navigation and Today still key off
-  // the route's own monthViewDate/dvDate.
+  // monthPreview/dayPreview/weekPreview (set by the swipe carousel on touchend
+  // / crossing the halfway point) show the label the gesture is heading
+  // toward immediately, ahead of the route committing — chevron navigation
+  // and Today still key off the route's own monthViewDate/dvDate/weekStartDate.
   const monthDisplayDate = monthViewDate && (monthPreview ? parseMonth(monthPreview) : monthViewDate)
   const dvDisplayDate    = dvDate && (dayPreview ? (parseDateString(dayPreview) ?? dvDate) : dvDate)
+  const weekDisplayStart = weekStartDate && (weekPreview ? (parseDateString(weekPreview) ?? weekStartDate) : weekStartDate)
+  const weekDisplayEnd   = weekDisplayStart && addDays(weekDisplayStart, 6)
 
   // Backlog/Notes are fixed strings; the agenda default view is date-based
   // like day mode. Month mode (below) computes its own label directly — it
@@ -96,6 +109,8 @@ function AppMain() {
   const handleToday = () => {
     if (isDayView) {
       void navigate({ to: '/day/$date', params: { date: fmtISO(today) } })
+    } else if (isWeekView) {
+      void navigate({ to: '/week/$date', params: { date: fmtISO(today) } })
     } else if (isMonthView) {
       void navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } })
     } else {
@@ -144,6 +159,20 @@ function AppMain() {
               nextLabel="Next day"
               onPrev={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}
               onNext={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}
+            />
+          ) : isWeekView && weekStartDate && weekDisplayStart && weekDisplayEnd ? (
+            // replace: true on nav — mirrors the day/month carousels' swipe-to-page
+            // semantics (see WeekView) so chevron taps and swipes leave the
+            // same, single history entry per visit instead of chevron taps
+            // alone stacking up a back-press-per-week trail.
+            <PagedTopbar
+              isMobile={isMobile}
+              openSidebar={openSidebar}
+              label={fmtTopBarWeek(weekDisplayStart, weekDisplayEnd, today)}
+              prevLabel="Previous week"
+              nextLabel="Next week"
+              onPrev={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true })}
+              onNext={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true })}
             />
           ) : isMonthView && monthViewDate && monthDisplayDate ? (
             // replace: true on nav — mirrors the month carousel's swipe-to-page

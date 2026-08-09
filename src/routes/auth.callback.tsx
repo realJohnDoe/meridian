@@ -67,7 +67,7 @@ function AuthCallbackPage() {
         else if (repos.length === 1) await mountConnect(tokens, repos[0]!)
         else setPhase({ kind: 'picking', tokens, repos })
       })
-      .catch(e => {
+      .catch((e: unknown) => {
         if (cancelled) return
         const message = e instanceof OAuthCallbackError ? e.message : 'Something went wrong finishing sign-in.'
         setPhase({ kind: 'error', message })

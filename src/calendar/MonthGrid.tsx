@@ -7,7 +7,7 @@ import { parseDurationDays, parseMonth } from '@/model'
 import { sameDay } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
-import { computeMultidayLanes } from './computeMultidayLanes'
+import { computeMultidayLanes, compactRowLanes, visibleLaneCount } from './computeMultidayLanes'
 import { maxVisibleFor, ROW_GAP } from './snapCarousel'
 
 const EMPTY: Occurrence[] = []
@@ -28,8 +28,6 @@ import { ContinuationChevron, CONTINUES_PADDING } from './ContinuationChevron'
 export const CELL_CLASS = 'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] bg-muted/40 transition-colors overflow-hidden min-h-0 w-full'
 export const BADGE_CLASS = 'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
 export const OCC_LIST_CLASS = 'flex flex-col gap-0.5 flex-1 overflow-hidden'
-
-const MAX_BAR_LANES = 2 // stacked multiday bars per week row before overflow
 
 // ── CalCell ───────────────────────────────────────────────────
 interface CalCellProps {
@@ -200,16 +198,22 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
         const rowStart = row[0]!.date
         const rowEnd = row[6]!.date
         const rowKey = `${rowStart.getFullYear()}-${rowStart.getMonth()}-${rowStart.getDate()}`
-        const rowBars = multidayLanes
-          .filter(l => l.startD <= rowEnd && l.endD >= rowStart)
-          .map(l => ({
-            ...l,
-            startCol: Math.max(0, differenceInCalendarDays(l.startD, rowStart)),
-            endCol: Math.min(6, differenceInCalendarDays(l.endD, rowStart)),
-            continuesLeft: l.startD < rowStart,
-            continuesRight: l.endD > rowEnd,
-          }))
-        const shownBars = rowBars.filter(b => b.lane < MAX_BAR_LANES)
+        const rowLanesRaw = multidayLanes.filter(l => l.startD <= rowEnd && l.endD >= rowStart)
+        // Compact this row's (possibly sparse) global lanes to a dense range
+        // before laying out — see compactRowLanes. Every downstream use of
+        // `.lane` below (reservedLanes, hiddenBarCount, shownBars, gridRow)
+        // reads the compacted value.
+        const laneMap = compactRowLanes(rowLanesRaw.map(l => l.lane))
+        const rowBars = rowLanesRaw.map(l => ({
+          ...l,
+          lane: laneMap.get(l.lane)!,
+          startCol: Math.max(0, differenceInCalendarDays(l.startD, rowStart)),
+          endCol: Math.min(6, differenceInCalendarDays(l.endD, rowStart)),
+          continuesLeft: l.startD < rowStart,
+          continuesRight: l.endD > rowEnd,
+        }))
+        const shownLanes = visibleLaneCount(laneMap.size, maxVisible)
+        const shownBars = rowBars.filter(b => b.lane < shownLanes)
 
         return (
           <div key={rowKey} className="relative flex-1">
@@ -222,7 +226,7 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
                 // THIS day, so a day past the end of a multiday bar reclaims that
                 // lane for its own single-day occurrence rows instead of leaving it blank.
                 const dayLaneCount = dayBars.reduce((max, b) => Math.max(max, b.lane + 1), 0)
-                const reservedLanes = Math.min(MAX_BAR_LANES, dayLaneCount)
+                const reservedLanes = Math.min(shownLanes, dayLaneCount)
                 const hiddenBarCount = dayBars.filter(b => b.lane >= reservedLanes).length
                 return (
                   <CalCell

@@ -52,7 +52,7 @@ import { ConflictError, AuthSyncError, TransientSyncError, isTransientSyncError 
  * of just waiting out the rate limit.
  */
 function isRateLimitError(e: unknown): boolean {
-  const headers = (e as { response?: { headers?: Record<string, string> } })?.response?.headers
+  const headers = (e as { response?: { headers?: Record<string, string> } }).response?.headers
   if (!headers) return false
   return headers['x-ratelimit-remaining'] === '0' || headers['retry-after'] !== undefined
 }
@@ -71,6 +71,6 @@ export function mapGitHubError(e: unknown, path?: string): Error {
     if (status === 404) return new AuthSyncError('Repository not found or token lacks access.')
     if (status === 409 || status === 422) return new ConflictError(path ?? 'unknown')
   }
-  if (isTransientSyncError(e)) return new TransientSyncError((e as Error)?.message)
+  if (isTransientSyncError(e)) return new TransientSyncError((e as Error).message)
   return e instanceof Error ? e : new Error(String(e))
 }

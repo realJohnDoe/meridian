@@ -139,7 +139,7 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
 
   const t            = fmtT(occ.time, hour12)
   const hasTrack     = isTracked(occ)
-  const participants = occ.metadata.participants || []
+  const participants = occ.metadata.participants
   const rawDuration  = occ.metadata.duration
   const durationLabel = rawDuration
     ? (occ.time

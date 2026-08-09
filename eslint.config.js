@@ -157,6 +157,20 @@ export default [
       // non-default options.
       ...tsRecommendedTypeCheckedRules,
 
+      // strict-type-checked adds 27 rules beyond recommended-type-checked; a
+      // dry run of the full tier found two (no-non-null-assertion,
+      // no-confusing-void-expression) that are noise for this codebase's
+      // idioms, so only these three are enabled individually rather than
+      // pulling in the whole preset.
+      '@typescript-eslint/no-unnecessary-condition': [
+        'error',
+        // `while (true) { ... break ... }` is a deliberate idiom (storage/sync.ts's
+        // retry-after-refresh loop) — not a redundant check to fix.
+        { allowConstantLoopConditions: true },
+      ],
+      '@typescript-eslint/no-deprecated': 'error',
+      '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
+
       // Enforce `import type` for type-only imports (auto-fixable)
       '@typescript-eslint/consistent-type-imports': [
         'error',
@@ -248,6 +262,14 @@ export default [
     },
     rules: {
       ...tsRecommendedTypeCheckedRules,
+      // See the matching src/ block above for why only these three
+      // strict-type-checked rules are enabled rather than the whole preset.
+      '@typescript-eslint/no-unnecessary-condition': [
+        'error',
+        { allowConstantLoopConditions: true },
+      ],
+      '@typescript-eslint/no-deprecated': 'error',
+      '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
       '@typescript-eslint/consistent-type-imports': [
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },

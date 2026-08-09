@@ -14,9 +14,9 @@ export function addItemLink(targetSlug: string, sourceSlug: string): void {
   const file = roots.get(targetSlug)
   if (!file) return
   const stored = `[[${sourceSlug}]]`
-  if ((file.items ?? []).includes(stored)) return
+  if (file.items.includes(stored)) return
   const newRoots = new Map(roots)
-  newRoots.set(targetSlug, { ...file, items: [...(file.items ?? []), stored] })
+  newRoots.set(targetSlug, { ...file, items: [...file.items, stored] })
   commitNext({ items: getItems(), roots: newRoots }, [targetSlug])
 }
 
@@ -27,7 +27,7 @@ export function removeItemLink(targetSlug: string, sourceSlug: string): void {
   if (!file) return
   const stored = `[[${sourceSlug}]]`
   const newRoots = new Map(roots)
-  newRoots.set(targetSlug, { ...file, items: (file.items ?? []).filter(i => i !== stored) })
+  newRoots.set(targetSlug, { ...file, items: file.items.filter(i => i !== stored) })
   commitNext({ items: getItems(), roots: newRoots }, [targetSlug])
 }
 
@@ -84,9 +84,9 @@ export function entryFromOccurrence(
     tracked,
     itemType,
     done:         m.done     ?? false,
-    tags:         [...(m.tags         || [])],
-    items:        [...(m.items        || [])],
-    participants: [...(m.participants || [])],
+    tags:         [...m.tags],
+    items:        [...m.items],
+    participants: [...m.participants],
     priority:     (m.priority || null),
     editScope,
   }
@@ -122,15 +122,15 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   const snapshot = { ...getSnapshot(), unreadableSlugs: new Set(getUnreadableFiles().keys()) }
   const nextData = applyEdit(snapshot, item, editScope, {
     title,
-    tags:         fields.tags         ?? [],
-    items:        fields.items        ?? [],
-    participants: fields.participants  ?? [],
-    body:         fields.body         ?? '',
-    tracked:      fields.tracked      ?? false,
-    done:         fields.done         ?? false,
+    tags:         fields.tags,
+    items:        fields.items,
+    participants: fields.participants,
+    body:         fields.body,
+    tracked:      fields.tracked,
+    done:         fields.done,
     priority:     fields.priority     ?? null,
     scheduled:    fields.scheduled    ?? null,
-    duration:     fields.duration     ?? '',
+    duration:     fields.duration,
     repeat:       fields.repeat       ?? null,
   }, draftId)
   // Same snapshot and same draftId as the applyEdit above, so this is exactly
@@ -155,7 +155,7 @@ export function deleteNode(
   const isSelf      = (i: StoreItem) => i.id === item.id
   const hasSiblings = slugItems.some(i => !isSeries(i) && !isSelf(i) && !i.excluded)
   const isRecurring = !!item.ownerId
-  const isScheduled = series?.repeat?.type === 'schedule'
+  const isScheduled = series?.repeat.type === 'schedule'
   const title       = item.metadata.title
 
   function hideSheet() { onHideSeries?.() }

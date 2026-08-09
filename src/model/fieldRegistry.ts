@@ -183,8 +183,7 @@ function malformedKnownFields(
     const malformed = spec.kind === 'string'      ? scalarToString(raw) === undefined
       : spec.kind === 'stringArray' ? !Array.isArray(raw) || raw.some(el => scalarToString(el) === undefined)
       : spec.kind === 'boolean'     ? typeof raw !== 'boolean'
-      : spec.kind === 'priority'    ? !(PRIORITIES as readonly unknown[]).includes(raw)
-      : false
+      : !(PRIORITIES as readonly unknown[]).includes(raw)
     if (malformed) out[spec.key] = raw
   }
   return Object.keys(out).length > 0 ? out : undefined

@@ -36,13 +36,13 @@ export function rowSortKey({ entry, occ }: Row): [number, number, string] {
   if (entry.kind === 'link') {
     if (!occ) return [5, entry.idx, '']
     if (isDimmed(occ)) {
-      return [4, doneKindOrder(occKind(occ)), occ.metadata.title?.toLowerCase() ?? '']
+      return [4, doneKindOrder(occKind(occ)), occ.metadata.title.toLowerCase()]
     }
     const k = occKind(occ)
-    if (k === 'note')  return [0, 0, occ.metadata.title?.toLowerCase() ?? '']
+    if (k === 'note')  return [0, 0, occ.metadata.title.toLowerCase()]
     if (k === 'event') return [1, occ.metadata.jsTime?.getTime() ?? 0, '']
     // task: sort by priority
-    return [2, priorityRank(occ.metadata.priority), occ.metadata.title?.toLowerCase() ?? '']
+    return [2, priorityRank(occ.metadata.priority), occ.metadata.title.toLowerCase()]
   }
   // string task (always kind 'task')
   if (entry.done) return [4, doneKindOrder('task'), entry.text.toLowerCase()]
@@ -149,7 +149,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     return doneRows.filter(({ entry, occ }) => {
       if (!q) return true
       if (entry.kind === 'task') return entry.text.toLowerCase().includes(q)
-      return occ ? (occ.metadata.title ?? '').toLowerCase().includes(q) : entry.ref.toLowerCase().includes(q)
+      return occ ? occ.metadata.title.toLowerCase().includes(q) : entry.ref.toLowerCase().includes(q)
     })
   })()
 

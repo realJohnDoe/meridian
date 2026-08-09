@@ -30,6 +30,28 @@ export function fmtTopBarMonth(d: Date, today: Date): string {
   return d.toLocaleDateString(undefined, opts)
 }
 
+/** `start`/`end` are the week's first and last day (inclusive). Never abbreviates further — like fmtTopBarMonth, this is already short enough that PagedTopbar doesn't need a shortLabel fallback. */
+export function fmtTopBarWeek(start: Date, end: Date, today: Date): string {
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
+  const monthStr = start.toLocaleDateString(undefined, { month: 'short' })
+
+  if (sameMonth) {
+    if (start.getFullYear() === today.getFullYear()) return `${monthStr} ${start.getDate()} – ${end.getDate()}`
+    // Rare: the week is in a different year than today but stays within one
+    // month — show the year once, on the end, in its usual position rather
+    // than formatting a bare day+year (Intl renders that combination oddly).
+    const endStr = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    return `${monthStr} ${start.getDate()} – ${endStr}`
+  }
+
+  const crossesYear = start.getFullYear() !== end.getFullYear()
+  const startOpts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  if (crossesYear || start.getFullYear() !== today.getFullYear()) startOpts.year = 'numeric'
+  const endOpts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  if (crossesYear || end.getFullYear() !== today.getFullYear()) endOpts.year = 'numeric'
+  return `${start.toLocaleDateString(undefined, startOpts)} – ${end.toLocaleDateString(undefined, endOpts)}`
+}
+
 // ── Duration formatting ───────────────────────────────────────────────────────
 
 function pluralize(n: number, unit: string): string {
@@ -63,8 +85,7 @@ export function durationToEndDate(startStr: string, duration: string): string {
   if (p.unit === 'days')    return fmtISO(addDays(start, p.n - 1))
   if (p.unit === 'weeks')   return fmtISO(addDays(addWeeks(start, p.n), -1))
   if (p.unit === 'months')  return fmtISO(inclusiveCalendarEnd(start, addMonths(start, p.n)))
-  if (p.unit === 'years')   return fmtISO(inclusiveCalendarEnd(start, addYears(start, p.n)))
-  return fmtISO(addDays(start, 1))
+  return fmtISO(inclusiveCalendarEnd(start, addYears(start, p.n)))
 }
 
 export function durationToEndDateTime(startDateStr: string, startTimeStr: string, duration: string): { date: string; time: string } {
@@ -140,8 +161,7 @@ export function fmtDurationCompact(duration: string): string {
   if (unit === 'days')    return `${n}d`
   if (unit === 'weeks')   return `${n}w`
   if (unit === 'months')  return `${n}mo`
-  if (unit === 'years')   return `${n}y`
-  return duration
+  return `${n}y`
 }
 
 export function formatDurationChip(duration: string, scheduled: Scheduled, hour12 = false): string {

@@ -57,7 +57,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
     },
     {
       title: 'The menu',
-      body: 'Open the menu (☰) to switch between Agenda, Month, and Day, reach your favorites, and manage vaults in Settings. That\'s it — explore freely.',
+      body: 'Open the menu (☰) to switch between Agenda, Month, Week, and Day, reach your favorites, and manage vaults in Settings. That\'s it — explore freely.',
       before: async () => {
         navigateHome()
         setSidebarOpen(true)

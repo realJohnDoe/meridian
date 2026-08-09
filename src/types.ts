@@ -125,7 +125,7 @@ export type StoreItem   = StoreSeries | StoreOcc
 export type Roots = Map<string, FileMetadata>
 
 export function isSeries(item: StoreItem): item is StoreSeries {
-  return 'repeat' in item && item.repeat !== undefined
+  return 'repeat' in item
 }
 
 // ── Occurrence ───────────────────────────────────────────────────────────────
