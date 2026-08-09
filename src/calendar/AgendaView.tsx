@@ -11,7 +11,7 @@ import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useToday } from '@/hooks'
 import { useNow } from './useNow'
-import { useAgendaAnchor, useAgendaScrollTarget, setAgendaTopDate, markAgendaScrolled } from './viewState'
+import { useAgendaAnchor, useAgendaScrollTarget, setAgendaTopDate, markAgendaScrolled, toggleOverdueCollapsed } from './viewState'
 
 interface Props {
   onOpen: (occ: Occurrence, scope?: EditScope) => void
@@ -178,7 +178,14 @@ export default function AgendaView({ onOpen }: Props) {
                     top of the list. */}
                 <div {...{ [FLIP_KEY_ATTR]: vi.key }}>
                   {row.kind === 'header' ? (
-                    <AgendaHeaderRow label={row.label} tone={row.tone} />
+                    <AgendaHeaderRow
+                      label={row.label}
+                      tone={row.tone}
+                      collapsible={row.collapsible}
+                      collapsed={row.collapsed}
+                      count={row.count}
+                      onToggle={toggleOverdueCollapsed}
+                    />
                   ) : (
                     <OccurrenceRow
                       occ={row.occ}
