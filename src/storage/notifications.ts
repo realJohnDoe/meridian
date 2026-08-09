@@ -9,7 +9,6 @@ export function warn(msg: string): void {
 }
 
 export function notifyError(prefix: string, e: unknown): void {
-  const err = e as Error
-  const detail = err?.message || err?.name
+  const detail = e instanceof Error ? e.message || e.name : undefined
   notify(detail ? `${prefix}: ${detail}` : prefix)
 }

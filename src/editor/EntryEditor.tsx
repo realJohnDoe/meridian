@@ -228,7 +228,7 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
                 )}
                 {showRepeat && (
                   <PropChip icon={Repeat} label="Repeat" pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}
-                    value={repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type || '') : undefined} />
+                    value={repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type) : undefined} />
                 )}
               </div>
             )}

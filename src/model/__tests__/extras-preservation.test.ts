@@ -30,8 +30,8 @@ function occOn(items: StoreItem[], roots: Roots, dateISO: string): Occurrence {
 function editFields(occ: Occurrence, over: Partial<EditFields> = {}): EditFields {
   const m = occ.metadata
   return {
-    title: m.title, tags: m.tags ?? [], items: m.items ?? [],
-    participants: m.participants ?? [], body: m.body ?? '',
+    title: m.title, tags: m.tags, items: m.items,
+    participants: m.participants, body: m.body ?? '',
     tracked: m.done !== undefined, done: m.done ?? false,
     priority: m.priority ?? null,
     scheduled: occ.date ? { date: occ.date, time: occ.time ?? '' } : null,

@@ -40,7 +40,7 @@ function openRepeatDialog() {
 function openNestedDatePicker() {
   act(() => { fireEvent.click(screen.getAllByText('On date')[0]!) })
   const trigger = Array.from(document.querySelectorAll('button'))
-    .find(b => b.textContent?.includes('Select date'))
+    .find(b => b.textContent.includes('Select date'))
   expect(trigger).toBeTruthy()
   act(() => { fireEvent.click(trigger!) })
   expect(isOpen('Date')).toBe(true)

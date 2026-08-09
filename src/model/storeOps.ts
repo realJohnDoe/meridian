@@ -238,7 +238,7 @@ export function occFromAppMeta(m: { done?: boolean; participants?: string[]; pri
 function occMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMetadata {
   return {
     ...(base as OccurrenceMetadata),
-    participants: f.participants ?? [],
+    participants: f.participants,
     duration:     f.duration || undefined,
     priority:     f.priority ?? undefined,
     done:         f.tracked ? f.done : undefined,
@@ -283,7 +283,7 @@ function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots {
   next.set(fileSlug, {
     title: f.title,
     tags:  f.tags,
-    items: f.items ?? [],
+    items: f.items,
     body:  f.body || undefined,
     extra: withoutKeys(prev?.extra, ['title', 'tags', 'items']),
     fileConvention: prev?.fileConvention,
@@ -648,7 +648,7 @@ export function toggleDone({ items, roots }: StoreData, occ: Occurrence): StoreD
  */
 export function deletionEndsAfterCompletionSeries(items: StoreItem[], occ: Occurrence): boolean {
   const series = findSeries(items, occ)
-  if (!series || series.repeat?.type !== 'after_completion') return false
+  if (!series || series.repeat.type !== 'after_completion') return false
   if (occ.metadata.done) return false
   return !items.some(i => {
     if (isSeries(i)) return false
@@ -691,10 +691,10 @@ export function deleteByFileSlug(
   const affectedSlugs: string[] = []
   for (const [slug, meta] of nextRoots) {
     if (slug === fileSlug) continue
-    const filtered = (meta.items ?? []).filter(
+    const filtered = meta.items.filter(
       raw => resolveWikilink(unwrapRef(raw), roots) !== fileSlug,
     )
-    if (filtered.length !== (meta.items ?? []).length) {
+    if (filtered.length !== meta.items.length) {
       nextRoots.set(slug, { ...meta, items: filtered })
       affectedSlugs.push(slug)
     }

@@ -99,7 +99,7 @@ function childDefaults(
   parentDefaults: Record<string, unknown>,
   node: RawNode,
 ): Record<string, unknown> {
-  const own = (node.defaults as Record<string, unknown>) ?? {}
+  const own = node.defaults ?? {}
   const filtered = Object.fromEntries(
     Object.entries(own).filter(([k]) => !NON_INHERITABLE.has(k)),
   )

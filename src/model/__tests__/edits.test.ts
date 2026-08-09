@@ -32,9 +32,9 @@ function editFields(occ: Occurrence, over: Partial<EditFields> = {}): EditFields
   const m = occ.metadata
   return {
     title:        m.title,
-    tags:         m.tags ?? [],
-    items:        m.items ?? [],
-    participants: m.participants ?? [],
+    tags:         m.tags,
+    items:        m.items,
+    participants: m.participants,
     body:         m.body ?? '',
     tracked:      m.done !== undefined,
     done:         m.done ?? false,

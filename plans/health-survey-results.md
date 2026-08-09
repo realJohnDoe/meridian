@@ -2,7 +2,7 @@
 
 Run: 2026-08-08 · commit `b7fdc5b` · branch `claude/codebase-health-survey-ldpr9j`
 
-> **Update:** findings #1 (malformed YAML array/boolean/priority values escaping the parse quarantine and crashing the whole vault load), #7 (CI accepting lint warnings silently), and #8 (`NewEntrySeed` defined twice) have been fixed and their write-ups removed below — see the "Fixed and removed from this record" note under the findings summary table for what changed and how each was verified. The remaining findings keep their original numbers (#2–#6, #9) rather than being renumbered, so references from parallel sessions still resolve.
+> **Update:** findings #1 (malformed YAML array/boolean/priority values escaping the parse quarantine and crashing the whole vault load), #5 (`strict-type-checked` subset unenabled), #7 (CI accepting lint warnings silently), and #8 (`NewEntrySeed` defined twice) have been fixed and their write-ups removed below — see the "Fixed and removed from this record" note under the findings summary table for what changed and how each was verified. The remaining findings keep their original numbers (#2, #3, #4, #6, #9) rather than being renumbered, so references from parallel sessions still resolve.
 
 ## 1. Health verdict
 
@@ -44,12 +44,12 @@ The single biggest structural theme this survey found was **underengineering at 
 | # | Category | Verdict |
 |---|---|---|
 | 1 | Architecture & Domain Separation | findings: **#2, #4, #6** — barrel invariants, `model/` purity and port usage all verified clean by grep; the two god modules are the real issue |
-| 2 | Simplicity & Overengineering | findings: **#5, #6, #9** |
+| 2 | Simplicity & Overengineering | findings: **#6, #9** — its other finding (#5, `strict-type-checked` subset unenabled) was fixed and removed from this record |
 | 3 | Directory & File Layout | **clean** — co-change analysis over 120 days produced no cross-directory pair above 3 co-occurrences; the root-resident list in CLAUDE.md matches the actual import graph (spot-checked all 12); `-`-prefixed non-route files in `routes/` are correctly placed beside their only consumers |
 | 4 | Security | **clean** — threat model and evidence below the table |
 | 5 | Testing & Error Handling | findings: **#3** — error *strategy* is otherwise consistent and good (see note below) |
 | 6 | Code Health & DRY | **clean** — both its findings (#1, malformed YAML coercion; #8, `NewEntrySeed` defined twice) were fixed and removed from this record |
-| 7 | Toolchain & Developer Feedback Loops | findings: **#5** — its other finding (#7, CI silently accepting lint warnings) was fixed and removed from this record |
+| 7 | Toolchain & Developer Feedback Loops | **clean** — both its findings (#5, `strict-type-checked` subset unenabled; #7, CI silently accepting lint warnings) were fixed and removed from this record |
 | 8 | Dependencies & Library Fit | **clean** — measured verdicts below the table |
 | 9 | Styling & UX | **clean** — 33 inline `style={{}}` uses, all dynamic values Tailwind can't express (measured positions, CSS custom properties, virtualizer transforms); no custom re-implementation of an installed shadcn component; `jsx-a11y/recommended` is enabled and passing with one justified `no-autofocus` disable |
 | 10 | Performance | **clean** — React Compiler enabled at target 19, three virtualized lists, route-level `lazy()` on every heavy view, an LRU expansion cache with correct vault-change reset wiring (verified `resetCalendarOnVaultChange` → `resetExpansionCache` is called from `routes/_app.tsx:56`) |
@@ -77,11 +77,10 @@ The single biggest structural theme this survey found was **underengineering at 
 | 2 | `types.ts` is a god module: domain types + YAML parse runtime + storage + UI vocabulary, imported by 105 files | **Opus 5 in plan mode, multi-PR** |
 | 3 | The durability + credentials layer is mocked out of every test it appears in (3.7% coverage) | **Opus 5** |
 | 4 | `storage/cache.ts` holds five unrelated concerns because one lint rule forces them together | **Opus 5** |
-| 5 | `strict-type-checked` ships in the installed plugin but isn't enabled; `no-unnecessary-condition` alone flags 81 checks the types already rule out | **Sonnet 5** |
 | 6 | Entry editing costs eight files to follow, with `EditorShell` forwarding fifteen fields and adding nothing | **Opus 5** |
 | 9 | 13 of 19 `storeBridge` exports are single-caller one-line forwarders | **Sonnet 5** |
 
-**Fixed and removed from this record:** #1 (malformed YAML array/boolean/priority values escaped the parse quarantine and crashed the whole vault load) — `parseInlineField`/`extractFileMetadata` in `src/types.ts` now validate array elements and boolean/priority shape, routing anything that fails validation into the `extra` bag so a save still round-trips byte-for-byte. Verified: `pnpm run build`/`lint`/`test:coverage` stay green, and a regression test in `linking.test.ts` reproduces the original `buildBacklinkIndex` crash and confirms it no longer throws. #7 (CI accepted lint warnings silently, and unused-disable reporting was switched off in both `eslint.config.js` blocks) — `package.json`'s `lint` script now runs with `--max-warnings=12` as a ratchet, and `reportUnusedDisableDirectives` is `'error'` in both blocks. Verified: `pnpm run lint` still exits 0 at exactly 12 warnings with zero unused-disable errors, and `pnpm run build` stays green. #8 (`NewEntrySeed` was defined twice, in `routes/` and `editor/`, with divergent types) — the `routes/` copy was deleted and it now imports the type from `@/editor`. Verified: `pnpm run build` stays green with no import-cycle error, and both files' tests still pass.
+**Fixed and removed from this record:** #1 (malformed YAML array/boolean/priority values escaped the parse quarantine and crashed the whole vault load) — `parseInlineField`/`extractFileMetadata` in `src/types.ts` now validate array elements and boolean/priority shape, routing anything that fails validation into the `extra` bag so a save still round-trips byte-for-byte. Verified: `pnpm run build`/`lint`/`test:coverage` stay green, and a regression test in `linking.test.ts` reproduces the original `buildBacklinkIndex` crash and confirms it no longer throws. #5 (`strict-type-checked` shipped in the installed plugin but wasn't enabled) — `eslint.config.js` now enables `no-unnecessary-condition` (with `allowConstantLoopConditions: true` for the deliberate `while (true)` retry loop in `storage/sync.ts`), `no-deprecated`, and `use-unknown-in-catch-callback-variable` in both the `src/` and `worker/src/` rule blocks. Each of the 84 flagged sites across 29 files was audited individually against the runtime source of the value rather than mechanically deleted: most were genuinely-redundant `?? []`/`|| []` fallbacks on fields the type registry already guarantees non-null (e.g. `tags`, `items`, `participants`) or exhaustive `if`/`else if` chains over a closed union where the last branch was always true; three sites in `test-utils/setup.ts` were kept with a targeted `eslint-disable` because the DOM lib types claim `matchMedia`/`ResizeObserver`/`scrollIntoView` are always defined while jsdom 29 doesn't implement them, so the guards are load-bearing polyfills, not redundant checks. Verified: `pnpm run build`/`lint`/`test:coverage` (1028 tests) and the worker's `typecheck`/`test`/`knip` all stay green. #7 (CI accepted lint warnings silently, and unused-disable reporting was switched off in both `eslint.config.js` blocks) — `package.json`'s `lint` script now runs with `--max-warnings=12` as a ratchet, and `reportUnusedDisableDirectives` is `'error'` in both blocks. Verified: `pnpm run lint` still exits 0 at exactly 12 warnings with zero unused-disable errors, and `pnpm run build` stays green. #8 (`NewEntrySeed` was defined twice, in `routes/` and `editor/`, with divergent types) — the `routes/` copy was deleted and it now imports the type from `@/editor`. Verified: `pnpm run build` stays green with no import-cycle error, and both files' tests still pass.
 
 **Sequencing note.** #3 and #4 both target `src/storage/cache.ts`: land **#4 first** (splitting the module gives #3 a smaller, mockable-in-isolation surface to write real tests against), otherwise the new tests get rewritten when the split lands. Everything else is independent.
 
@@ -142,33 +141,6 @@ The single biggest structural theme this survey found was **underengineering at 
   ```
 - **Problem** A well-intentioned "exactly one file may import dexie" rule has quietly become a "everything persistence-adjacent lives in one 396-line file" rule, so the token store, the FS-handle store, the vault registry and a pure in-memory refcount all share a module — and, per finding #3, share its 3.7% coverage.
 - **Fix** Move `markInFlight`/`clearInFlight`/`getInFlightPaths` to their own `storage/inFlight.ts` immediately (no Dexie involved, no lint change needed), then split the Dexie surface into `cache/files.ts`, `cache/credentials.ts` and `cache/registry.ts` behind a shared `cache/db.ts`, and narrow the eslint `ignores` entry to that single `db.ts`.
-
----
-
-### 5. `strict-type-checked` ships in the installed plugin but isn't enabled — `no-unnecessary-condition` alone flags 81 checks the types already rule out
-
-- **Category** `toolchain` `overengineering`
-- **Impact** 6
-- **Breadth** 22 non-test files (29 including tests) for the `no-unnecessary-condition` subset — from the dry run below
-- **Recommended model** **Sonnet 5.** The hazard is that `no-unnecessary-condition` reports "always truthy" *because the type lies*, not because the check is dead — the malformed-YAML parse-boundary bug this survey originally found (fixed in commit `aaea5af`) is the proof: a type that claimed more honesty than the parser delivered made a real bug class look like a redundant guard. Deleting a guard the type wrongly says is redundant re-hides that class. Sonnet 5 is sufficient because the fix is bounded to a named subset of rules: enable only the three named below, and audit each `??`/`||` site against the *runtime* source of the value before deleting it. Enabling the whole preset blind would be an Opus-tier judgment call, which is exactly why the recommendation is a subset.
-- **Evidence** `eslint.config.js:27` enables only the recommended tier:
-  ```
-    ...tsPlugin.configs['flat/recommended-type-checked'][1].rules,
-  ```
-  Inspection of the *installed* `@typescript-eslint/eslint-plugin@8.65.0` (not assumed from the version number) shows 134 rules available and 27 in `strict-type-checked` beyond `recommended-type-checked`. **Dry run** with a temporary config layering only those 27 rules over the existing config, across `src` + `worker/src` (temp config since deleted):
-  ```
-  TOTAL errors: 647 across 131 files
-  312  @typescript-eslint/no-non-null-assertion
-  249  @typescript-eslint/no-confusing-void-expression
-   81  @typescript-eslint/no-unnecessary-condition
-    2  @typescript-eslint/use-unknown-in-catch-callback-variable
-    1  @typescript-eslint/no-deprecated
-    1  @typescript-eslint/no-unnecessary-type-conversion
-    1  @typescript-eslint/no-unnecessary-boolean-literal-compare
-  ```
-  The two large counts are noise for this codebase's idioms (`m[1]!` after a regex match; `onClick={() => setX()}`). The valuable signal is concentrated: `src/editor/save.ts` (14), `src/debug/NodeInheritanceDebugger.tsx` (10), `src/editor/ItemsList.tsx` (7), `src/model/expansion.ts` (7), `src/model/storeOps.ts` (5) — plus `src/calendar/agendaSections.ts:339` flagged as *"the types have no overlap"* (a condition that can never be true) and `src/editor/EntryBody.tsx:21` on `MutableRefObject is deprecated. Use RefObject instead`.
-- **Problem** An installed, already-paid-for lint tier that would mechanically catch a whole class of defensive-code-for-impossible-states — and one genuinely unreachable condition — is switched off, while the same codebase writes `m.title || ''` against a field typed `string` in dozens of places because the author, correctly, doesn't trust the type.
-- **Fix** Enable exactly `no-unnecessary-condition`, `no-deprecated` and `use-unknown-in-catch-callback-variable` (leaving `no-non-null-assertion` and `no-confusing-void-expression` off, with a comment saying why), and fix the ~20 files they flag.
 
 ---
 
