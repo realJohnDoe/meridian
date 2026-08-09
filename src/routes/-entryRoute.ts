@@ -1,11 +1,5 @@
 import type { Occurrence, EditScope } from '@/types'
-
-export interface NewEntrySeed {
-  date?: string
-  time?: string
-  duration?: string
-  itemType?: 'task' | 'event' | 'note'
-}
+import type { NewEntrySeed } from '@/editor'
 
 export function newEntryRoute(title?: string, seed?: NewEntrySeed) {
   return {

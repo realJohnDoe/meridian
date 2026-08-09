@@ -78,10 +78,9 @@ The single biggest structural theme is **underengineering at exactly one seam �
 | 4 | `storage/cache.ts` holds five unrelated concerns because one lint rule forces them together | **Opus 5** |
 | 5 | `strict-type-checked` ships in the installed plugin but isn't enabled; `no-unnecessary-condition` alone flags 81 checks the types already rule out | **Sonnet 5** |
 | 6 | Entry editing costs eight files to follow, with `EditorShell` forwarding fifteen fields and adding nothing | **Opus 5** |
-| 8 | `NewEntrySeed` is defined twice, in `routes/` and `editor/`, with divergent types | **Haiku 4.5** |
 | 9 | 13 of 19 `storeBridge` exports are single-caller one-line forwarders | **Sonnet 5** |
 
-**Fixed and removed from this record:** #7 (CI accepted lint warnings silently, and unused-disable reporting was switched off in both `eslint.config.js` blocks) — `package.json`'s `lint` script now runs with `--max-warnings=12` as a ratchet, and `reportUnusedDisableDirectives` is `'error'` in both blocks. Verified: `pnpm run lint` still exits 0 at exactly 12 warnings with zero unused-disable errors, and `pnpm run build` stays green.
+**Fixed and removed from this record:** #7 (CI accepted lint warnings silently, and unused-disable reporting was switched off in both `eslint.config.js` blocks) — `package.json`'s `lint` script now runs with `--max-warnings=12` as a ratchet, and `reportUnusedDisableDirectives` is `'error'` in both blocks. Verified: `pnpm run lint` still exits 0 at exactly 12 warnings with zero unused-disable errors, and `pnpm run build` stays green. #8 (`NewEntrySeed` was defined twice, in `routes/` and `editor/`, with divergent types) — the `routes/` copy was deleted and it now imports the type from `@/editor`. Verified: `pnpm run build` stays green with no import-cycle error, and both files' tests still pass.
 
 **Sequencing note.** #1 and #2 both edit `src/types.ts` — land **#1 first** (a surgical change to `parseInlineField` / `extractFileMetadata`), then #2 moves the finished coercion code into `model/` wholesale. #3 and #4 both target `src/storage/cache.ts`: land **#4 first** (splitting the module gives #3 a smaller, mockable-in-isolation surface to write real tests against), otherwise the new tests get rewritten when the split lands. #5 and #1 overlap in `src/types.ts` and `src/editor/save.ts` — run #5 *after* #1, since fixing the coercion changes which conditions the rule considers unnecessary. Everything else is independent.
 
@@ -227,20 +226,6 @@ The single biggest structural theme is **underengineering at exactly one seam �
 - **Fix** Inline `EditorShell` into `_app.entry.$slug.tsx` (it is the only caller) and pass the `hooks` object through to `EntryEditor` as one prop rather than fifteen, keeping `useEntryEditor`'s ref identities exactly as they are.
 
 ---
-
-### 8. `NewEntrySeed` is defined twice, in `routes/` and `editor/`, with divergent types
-
-- **Category** `dry` `types` `naming`
-- **Impact** 3
-- **Breadth** 2 files — search: `grep -rn "NewEntrySeed" src --include=*.ts --include=*.tsx`
-- **Recommended model** **Haiku 4.5.** The one thing to get right is import direction: `editor/` may import `@/routes` (it already does, for `newEntryRoute`), but `routes/` importing `@/editor` would risk the cycle the `vite.config.ts` `CYCLIC_CROSS_CHUNK_REEXPORT` guard throws on. Name that direction in the task and the fix is mechanical, with a build failure as the safety net if it's wrong.
-- **Evidence** `src/routes/-entryRoute.ts:7`:
-  ```
-    itemType?: 'task' | 'event' | 'note'
-  ```
-  versus `src/editor/useEntryEditor.ts:22`, the same four fields with `itemType?: ItemType` — where `ItemType` is that identical literal union, declared a third time in `src/editor/state.ts:4`.
-- **Problem** One concept (the seed values for a brand-new entry) has two independent declarations across a module boundary, so adding a seed field silently only reaches half the call path and the literal union is spelled out twice instead of referencing `ItemType`.
-- **Fix** Delete the `routes/` copy, import `NewEntrySeed` from `@/editor`, and have `editor/useEntryEditor.ts` reference `ItemType` from `./state` rather than restating the union.
 
 ---
 
