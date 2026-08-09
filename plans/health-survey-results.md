@@ -21,7 +21,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 | Gate | Command | Result |
 |---|---|---|
 | Build | `pnpm run build` | ✅ pass (exit 0) |
-| Lint | `pnpm run lint` | ✅ pass (exit 0) — **0 errors, 12 warnings** (see finding #7) |
+| Lint | `pnpm run lint` | ✅ pass (exit 0) — **0 errors, 12 warnings**, ratcheted via `--max-warnings=12` (formerly finding #7, fixed and removed from this record) |
 | Tests | `pnpm run test:coverage` | ✅ pass — statements 62.46%, branches 59.25%, functions 53.22%, lines 64.67%; all per-file and global thresholds met |
 | Dead code | `pnpm run knip` | ✅ pass, zero issues |
 | Audit | `pnpm audit --audit-level=high` | ✅ pass (1 moderate, below threshold) |
@@ -47,7 +47,7 @@ The single biggest structural theme is **underengineering at exactly one seam �
 | 4 | Security | **clean** — threat model and evidence below the table |
 | 5 | Testing & Error Handling | findings: **#1, #3** — error *strategy* is otherwise consistent and good (see note below) |
 | 6 | Code Health & DRY | findings: **#1, #8** |
-| 7 | Toolchain & Developer Feedback Loops | findings: **#5, #7** |
+| 7 | Toolchain & Developer Feedback Loops | findings: **#5** (formerly also #7 — fixed, removed from this record) |
 | 8 | Dependencies & Library Fit | **clean** — measured verdicts below the table |
 | 9 | Styling & UX | **clean** — 33 inline `style={{}}` uses, all dynamic values Tailwind can't express (measured positions, CSS custom properties, virtualizer transforms); no custom re-implementation of an installed shadcn component; `jsx-a11y/recommended` is enabled and passing with one justified `no-autofocus` disable |
 | 10 | Performance | **clean** — React Compiler enabled at target 19, three virtualized lists, route-level `lazy()` on every heavy view, an LRU expansion cache with correct vault-change reset wiring (verified `resetCalendarOnVaultChange` → `resetExpansionCache` is called from `routes/_app.tsx:56`) |
@@ -78,9 +78,10 @@ The single biggest structural theme is **underengineering at exactly one seam �
 | 4 | `storage/cache.ts` holds five unrelated concerns because one lint rule forces them together | **Opus 5** |
 | 5 | `strict-type-checked` ships in the installed plugin but isn't enabled; `no-unnecessary-condition` alone flags 81 checks the types already rule out | **Sonnet 5** |
 | 6 | Entry editing costs eight files to follow, with `EditorShell` forwarding fifteen fields and adding nothing | **Opus 5** |
-| 7 | CI accepts lint warnings silently, and unused-disable reporting is switched off in both blocks | **Haiku 4.5** |
 | 8 | `NewEntrySeed` is defined twice, in `routes/` and `editor/`, with divergent types | **Haiku 4.5** |
 | 9 | 13 of 19 `storeBridge` exports are single-caller one-line forwarders | **Sonnet 5** |
+
+**Fixed and removed from this record:** #7 (CI accepted lint warnings silently, and unused-disable reporting was switched off in both `eslint.config.js` blocks) — `package.json`'s `lint` script now runs with `--max-warnings=12` as a ratchet, and `reportUnusedDisableDirectives` is `'error'` in both blocks. Verified: `pnpm run lint` still exits 0 at exactly 12 warnings with zero unused-disable errors, and `pnpm run build` stays green.
 
 **Sequencing note.** #1 and #2 both edit `src/types.ts` — land **#1 first** (a surgical change to `parseInlineField` / `extractFileMetadata`), then #2 moves the finished coercion code into `model/` wholesale. #3 and #4 both target `src/storage/cache.ts`: land **#4 first** (splitting the module gives #3 a smaller, mockable-in-isolation surface to write real tests against), otherwise the new tests get rewritten when the split lands. #5 and #1 overlap in `src/types.ts` and `src/editor/save.ts` — run #5 *after* #1, since fixing the coercion changes which conditions the rule considers unnecessary. Everything else is independent.
 
@@ -224,26 +225,6 @@ The single biggest structural theme is **underengineering at exactly one seam �
   …and `EntryEditor`'s own `Props` interface carries 21 members, ten of them optional callbacks. `editor/` is the #2 hottest directory in the repo (292 file-touches in 60 days), so each new editor feature pays this forwarding tax again.
 - **Problem** Following one behaviour end to end — "what happens when the user types in the title" — requires opening the route, the hook, the shell, the presentational component and `save.ts`, and the shell layer in the middle contributes no behaviour, validation or error handling of its own to justify the hop.
 - **Fix** Inline `EditorShell` into `_app.entry.$slug.tsx` (it is the only caller) and pass the `hooks` object through to `EntryEditor` as one prop rather than fifteen, keeping `useEntryEditor`'s ref identities exactly as they are.
-
----
-
-### 7. CI accepts lint warnings silently, and unused-disable reporting is switched off in both config blocks
-
-- **Category** `toolchain`
-- **Impact** 4
-- **Breadth** 3 files (`package.json`, `eslint.config.js`, `.github/workflows/build.yml`)
-- **Recommended model** **Haiku 4.5.** The only trap is that adding `--max-warnings=0` outright turns 12 currently-passing warnings into a red build, so the change must be `--max-warnings=12` (a ratchet) or the 12 must be resolved first — and either way the failure is loud and immediate at CI time, never silent. That makes it safe to hand down-tier.
-- **Evidence** `package.json:14`:
-  ```
-      "lint": "eslint src worker/src",
-  ```
-  No `--max-warnings`, and `.github/workflows/build.yml` runs it bare (`- run: pnpm run lint`), so this session's run exited 0 with `✖ 12 problems (0 errors, 12 warnings)`. Separately, `eslint.config.js` disables unused-directive reporting in *both* config blocks (lines 45 and 218):
-  ```
-        reportUnusedDisableDirectives: false,
-  ```
-  A dry run with `--report-unused-disable-directives` found none today across the 7 files carrying disables — so this is a rot-prevention gap, not existing rot.
-- **Problem** Warnings are invisible to CI, so a new one lands with a green check and joins the existing 12 in the noise floor; and `eslint-disable` comments can go stale indefinitely without anything noticing.
-- **Fix** Add `--max-warnings=12` to the lint script as a ratchet (lowering it as warnings are resolved) and flip `reportUnusedDisableDirectives` to `'error'` in both blocks.
 
 ---
 
