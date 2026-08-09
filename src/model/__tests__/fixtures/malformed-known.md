@@ -4,4 +4,6 @@ date: 2026-04-08
 duration: [1, 2]
 tags: not-a-list
 priority: 7
+done: yes
+items: [1, {nested: true}, "[[real-note]]"]
 ---

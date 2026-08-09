@@ -173,13 +173,23 @@ describe('values the serialiser used to prune', () => {
 describe('known fields carrying an unexpected type', () => {
   it('keeps the typed field honest while the raw value round-trips', () => {
     const p = parseFixture('malformed-known')
-    // The typed fields fall back to their usual absent/empty value...
+    // The typed fields fall back to their usual absent/empty/filtered value...
     expect(p.items[0]!.metadata.duration).toBeUndefined()
     expect(p.root.tags).toEqual([])
-    // ...priority is untouched: parseInlineField returns it verbatim regardless
-    // of shape, so it is NOT a malformed-value case and must not be rerouted.
-    expect(p.items[0]!.metadata.priority).toBe(7)
-    expect(p.items[0]!.metadata.extra?.priority).toBeUndefined()
+    // ...including priority and done: a value outside their declared union
+    // is exactly as malformed as a wrong container shape (health survey
+    // finding #1 — a `Priority` field silently holding `7`, or a `boolean`
+    // field holding an arbitrary string, made every downstream `===` check
+    // on them a silent no-op instead of a loud failure).
+    expect(p.items[0]!.metadata.priority).toBeUndefined()
+    expect(p.items[0]!.metadata.extra?.priority).toBe(7)
+    expect(p.items[0]!.metadata.done).toBeUndefined()
+    expect(p.items[0]!.metadata.extra?.done).toBe('yes')
+    // A stringArray with SOME unrepresentable elements (a nested mapping)
+    // keeps its representable elements typed — coerced, not dropped whole —
+    // while the untouched raw array survives in extra for the save.
+    expect(p.root.items).toEqual(['1', '[[real-note]]'])
+    expect(p.root.extra?.items).toEqual([1, { nested: true }, '[[real-note]]'])
     // ...but the raw values for duration/tags survive under their own key.
     expect(p.items[0]!.metadata.extra?.duration).toEqual([1, 2])
     expect(p.root.extra?.tags).toBe('not-a-list')
@@ -191,8 +201,11 @@ describe('known fields carrying an unexpected type', () => {
     expect(fm.duration).toEqual([1, 2])
     expect(fm.tags).toBe('not-a-list')
     expect(fm.priority).toBe(7)
+    expect(fm.done).toBe('yes')
+    expect(fm.items).toEqual([1, { nested: true }, '[[real-note]]'])
     expect(out.match(/^duration:/gm)).toHaveLength(1)
     expect(out.match(/^tags:/gm)).toHaveLength(1)
+    expect(out.match(/^items:/gm)).toHaveLength(1)
   })
 
   it('a retyped value from the editor is not shadowed by the stale raw one', () => {
