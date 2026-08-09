@@ -1,5 +1,6 @@
 import type { StoreItem, OccurrenceMetadata, FileMetadata, OccurrenceEntry } from '@/types'
-import { isSeries, isStandaloneOcc, OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, STRUCTURAL_KEYS, inlineFieldEqual, inlineFieldEmpty, absentFieldValue, deepEqual } from '@/types'
+import { isSeries, isStandaloneOcc } from '@/types'
+import { OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, STRUCTURAL_KEYS, inlineFieldEqual, inlineFieldEmpty, absentFieldValue, deepEqual } from './fieldRegistry'
 
 type AnyOcc = OccurrenceEntry<OccurrenceMetadata>
 

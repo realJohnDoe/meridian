@@ -15,7 +15,8 @@ import {
   differenceInCalendarDays,
 } from 'date-fns'
 import type { Repeat, StoreItem, StoreOcc, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
-import { isSeries, isStandaloneOcc, scalarToString } from '@/types'
+import { isSeries, isStandaloneOcc } from '@/types'
+import { scalarToString } from './fieldRegistry'
 import type { EffectiveNode } from './inheritance'
 import { fmtISO, fmtT, parseDateString, parseDateTime } from './dateUtils'
 import { parseDurationDays } from './duration'

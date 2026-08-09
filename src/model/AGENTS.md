@@ -168,7 +168,7 @@ name for would be deleted on the first edit. To prevent that, each node's
 **remainder** — its keys outside the reserved vocabulary — is carried verbatim in
 an `extra` bag on `OccurrenceMetadata` / `FileMetadata` and re-emitted on collapse.
 
-**Reserved vocabulary** (`src/types.ts`): `STRUCTURAL_KEYS` = `date`, `time`,
+**Reserved vocabulary** (`src/model/fieldRegistry.ts`): `STRUCTURAL_KEYS` = `date`, `time`,
 `repeat`, `excluded`, `instances`, `defaults` — plus every `INLINE_FIELDS` key at
 both levels. `unknownKeys(fields)` returns everything else, or `undefined` when
 there is nothing to carry (never `{}`, so files without unknown keys keep
