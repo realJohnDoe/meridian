@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react'
-import { AlignLeft, CalendarDays, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
+import { AlignLeft, CalendarDays, CalendarRange, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { setActiveVault } from '@/vaultActions'
@@ -54,20 +54,21 @@ export default function AppSidebar() {
 
   const close = () => { if (isMobile) setOpenMobile(false) }
 
-  // Calendar views — the three time-based views the tasks toggle below scopes
-  // to. Month/Day nav targets carry over `currentDate` (the day last focused
-  // in any calendar view — see calendar/viewState.ts) instead of always
-  // resetting to today, so switching views lands where you were looking.
-  // Agenda's jump is gated on actually switching in (pathname !== '/'):
-  // re-clicking Agenda while already there would otherwise re-center its
-  // window on wherever it's already scrolled to — a no-op that still forces
-  // a full section rebuild and a jarring re-scroll.
+  // Calendar views — the four time-based views the tasks toggle below scopes
+  // to. Month/Week/Day nav targets carry over `currentDate` (the day last
+  // focused in any calendar view — see calendar/viewState.ts) instead of
+  // always resetting to today, so switching views lands where you were
+  // looking. Agenda's jump is gated on actually switching in (pathname !==
+  // '/'): re-clicking Agenda while already there would otherwise re-center
+  // its window on wherever it's already scrolled to — a no-op that still
+  // forces a full section rebuild and a jarring re-scroll.
   const navItems = [
     {
       Icon: AlignLeft, label: 'Agenda', active: pathname === '/',
       onClick: () => { close(); if (pathname !== '/') requestScrollToDate(currentDate); void navigate({ to: '/' }) },
     },
     { Icon: CalendarDays,  label: 'Month',  active: pathname.startsWith('/calendar'), onClick: () => { close(); void navigate({ to: '/calendar/$month', params: { month: currentDate.slice(0, 7) } }) } },
+    { Icon: CalendarRange, label: 'Week',   active: pathname.startsWith('/week'),     onClick: () => { close(); void navigate({ to: '/week/$date', params: { date: currentDate } }) } },
     { Icon: CalendarClock, label: 'Day',    active: isDayView,                        onClick: () => { close(); void navigate({ to: '/day/$date', params: { date: currentDate } }) } },
   ]
 
@@ -95,7 +96,7 @@ export default function AppSidebar() {
 
         <SidebarContent className="pb-[max(calc(var(--spacing)*2),env(safe-area-inset-bottom))]">
           {/* Calendar — views and the tasks toggle bound as one region so the
-              toggle reads as scoped to all three views, not to the Day row it
+              toggle reads as scoped to all four views, not to the Day row it
               happens to sit beneath. */}
           <SidebarGroup className="p-0 pt-3">
             <div className="mx-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 overflow-hidden">

@@ -4,9 +4,10 @@ import { renderHook, act } from '@testing-library/react'
 import { setupStore } from '@/test-utils'
 import {
   calendarView, resetCalendarViewState,
-  useMonthPreview, useDayPreview, setMonthPreview, setDayPreview,
+  useMonthPreview, useDayPreview, useWeekPreview, setMonthPreview, setDayPreview, setWeekPreview,
   useAgendaAnchor, useAgendaScrollTarget, useAgendaTopDate,
   requestScrollToToday, requestScrollToDate, setAgendaTopDate, markAgendaScrolled,
+  setCurrentWeekKeepingWeekday,
 } from './viewState'
 
 setupStore()
@@ -25,6 +26,7 @@ describe('calendarView', () => {
       agendaScrollMeasurements: [{ index: 0, start: 0, end: 10, size: 10, key: 'a', lane: 0 }],
       monthPreview: '2026-07',
       dayPreview: '2026-07-26',
+      weekPreview: '2026-07-20',
       agendaAnchor: '2026-07-26',
       agendaScrollTarget: '2026-07-26',
       agendaTopDate: '2026-07-26',
@@ -37,6 +39,7 @@ describe('calendarView', () => {
     expect(calendarView.getState().agendaScrollMeasurements).toEqual([])
     expect(calendarView.getState().monthPreview).toBeNull()
     expect(calendarView.getState().dayPreview).toBeNull()
+    expect(calendarView.getState().weekPreview).toBeNull()
     expect(calendarView.getState().agendaScrollTarget).toBeNull()
     expect(calendarView.getState().agendaTopDate).toBeNull()
   })
@@ -65,14 +68,56 @@ describe('useMonthPreview / useDayPreview', () => {
     expect(result.current).toBeNull()
   })
 
-  it('setMonthPreview does not affect dayPreview and vice versa', () => {
+  it('starts null and reflects setWeekPreview writes reactively', () => {
+    const { result } = renderHook(() => useWeekPreview())
+    expect(result.current).toBeNull()
+
+    act(() => setWeekPreview('2026-08-10'))
+    expect(result.current).toBe('2026-08-10')
+
+    act(() => setWeekPreview(null))
+    expect(result.current).toBeNull()
+  })
+
+  it('setMonthPreview does not affect dayPreview/weekPreview and vice versa', () => {
     act(() => {
       setMonthPreview('2026-08')
       setDayPreview('2026-08-01')
+      setWeekPreview('2026-08-10')
     })
 
     expect(calendarView.getState().monthPreview).toBe('2026-08')
     expect(calendarView.getState().dayPreview).toBe('2026-08-01')
+    expect(calendarView.getState().weekPreview).toBe('2026-08-10')
+  })
+})
+
+describe('setCurrentWeekKeepingWeekday', () => {
+  it('preserves the weekday offset when paging to a later week', () => {
+    // 2026-08-12 is a Wednesday; Monday-start week runs Aug 10-16.
+    calendarView.setState({ currentDate: '2026-08-12' })
+    setCurrentWeekKeepingWeekday('2026-08-17', 1) // next week's Monday
+    expect(calendarView.getState().currentDate).toBe('2026-08-19') // next Wednesday
+  })
+
+  it('normalizes an arbitrary date within the target week to the same result as its week start', () => {
+    calendarView.setState({ currentDate: '2026-08-12' })
+    setCurrentWeekKeepingWeekday('2026-08-20', 1) // a Thursday within the same target week
+    expect(calendarView.getState().currentDate).toBe('2026-08-19')
+  })
+
+  it('respects a Sunday-start week convention', () => {
+    // Sunday-start week containing Aug 12 (Wed) runs Aug 9-15; offset is 3 days.
+    calendarView.setState({ currentDate: '2026-08-12' })
+    setCurrentWeekKeepingWeekday('2026-08-16', 0) // next week's Sunday
+    expect(calendarView.getState().currentDate).toBe('2026-08-19')
+  })
+
+  it('carries the offset correctly across a year boundary', () => {
+    // 2025-12-31 is a Wednesday; Monday-start week runs Dec 29 - Jan 4, offset 2 days.
+    calendarView.setState({ currentDate: '2025-12-31' })
+    setCurrentWeekKeepingWeekday('2026-01-05', 1) // next week's Monday
+    expect(calendarView.getState().currentDate).toBe('2026-01-07')
   })
 })
 

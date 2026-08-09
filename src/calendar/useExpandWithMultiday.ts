@@ -3,12 +3,13 @@ import type { StoreItem, Roots, Occurrence } from '@/types'
 import { computeExpansionCache, type ExpansionCache } from '@/model'
 
 // MonthGrid keeps three panes (prev/current/next month) alive at once, and
-// DayPane's carousel does the same for days, so several distinct (from, to)
-// windows are live simultaneously alongside the agenda's own window — a
-// single shared slot would thrash between them. Keying by window lets every
-// caller share one cache without evicting each other's entries every render.
-// Capped so months/days scrolled past and forgotten don't accumulate forever.
-const MAX_CACHED_WINDOWS = 12
+// DayPane/WeekPane's carousels do the same for days/weeks (5 panes each, see
+// PANE_COUNT), so several distinct (from, to) windows are live simultaneously
+// alongside the agenda's own window — a single shared slot would thrash
+// between them. Keying by window lets every caller share one cache without
+// evicting each other's entries every render. Capped so months/days/weeks
+// scrolled past and forgotten don't accumulate forever.
+const MAX_CACHED_WINDOWS = 16
 
 const cacheByWindow = new Map<string, ExpansionCache>()
 

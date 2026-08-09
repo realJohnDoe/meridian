@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { durationToEndDate, formatDurationChip, fmtDuration, fmtEndDate } from '@/format'
+import { durationToEndDate, formatDurationChip, fmtDuration, fmtEndDate, fmtTopBarWeek } from '@/format'
 import type { Scheduled } from '@/types'
 
 describe('durationToEndDate', () => {
@@ -79,5 +79,33 @@ describe('formatDurationChip', () => {
     const scheduled: Scheduled = { date: '2026-06-01', time: '' }
     const expectedEnd = fmtEndDate(durationToEndDate(scheduled.date, '3 days'))
     expect(formatDurationChip('3 days', scheduled)).toBe(`until ${expectedEnd} (3 days)`)
+  })
+})
+
+describe('fmtTopBarWeek', () => {
+  const today = new Date(2026, 7, 12) // within the same-month week below
+
+  it('shows the month once for a week within a single month', () => {
+    expect(fmtTopBarWeek(new Date(2026, 7, 10), new Date(2026, 7, 16), today)).toBe('Aug 10 – 16')
+  })
+
+  it('shows both months for a week spanning a month boundary', () => {
+    expect(fmtTopBarWeek(new Date(2026, 7, 31), new Date(2026, 8, 6), today)).toBe('Aug 31 – Sep 6')
+  })
+
+  it('shows both years for a week spanning a year boundary', () => {
+    expect(fmtTopBarWeek(new Date(2025, 11, 29), new Date(2026, 0, 4), today)).toBe('Dec 29, 2025 – Jan 4, 2026')
+  })
+
+  it('omits the year for a same-month week in the current year', () => {
+    expect(fmtTopBarWeek(new Date(2026, 7, 10), new Date(2026, 7, 16), today)).not.toMatch(/2026/)
+  })
+
+  it('shows the year once, on the end, for a same-month week in a different year than today', () => {
+    expect(fmtTopBarWeek(new Date(2025, 7, 10), new Date(2025, 7, 16), today)).toBe('Aug 10 – Aug 16, 2025')
+  })
+
+  it('adds the year to a cross-month week outside the current year, even without crossing years itself', () => {
+    expect(fmtTopBarWeek(new Date(2025, 7, 31), new Date(2025, 8, 6), today)).toBe('Aug 31, 2025 – Sep 6, 2025')
   })
 })
