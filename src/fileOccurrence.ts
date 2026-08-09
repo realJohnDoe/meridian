@@ -20,8 +20,8 @@ export function fileEntries(roots: Roots): FilePickerEntry[] {
     entries.push({
       fileSlug,
       title: meta.title || fileSlug,
-      tags:  meta.tags  || [],
-      items: meta.items || [],
+      tags:  meta.tags,
+      items: meta.items,
     })
   }
   return entries
@@ -173,7 +173,7 @@ export function buildBacklinkIndex(roots: Roots): Map<string, string[]> {
   const backlinks = new Map<string, string[]>()
   for (const [fileSlug, meta] of roots) {
     const seen = new Set<string>()
-    for (const raw of meta.items ?? []) {
+    for (const raw of meta.items) {
       const target = resolve.get(unwrapRef(raw).toLowerCase())
       if (!target || target === fileSlug || seen.has(target)) continue
       seen.add(target)

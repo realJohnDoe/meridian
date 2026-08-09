@@ -7,7 +7,7 @@ if (typeof window !== 'undefined') {
   // useMediaQuery) calls window.matchMedia directly, so any render throws
   // without a stub. Default to "matches" for min-width queries so
   // ResponsiveModal renders the Radix Dialog branch, not the Vaul drawer.
-  // eslint-disable-next-line @typescript-eslint/unbound-method -- polyfill assignment, never called unbound
+  // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-unnecessary-condition -- polyfill assignment; DOM lib types claim this is always defined, but jsdom 29 doesn't implement it, so the guard is load-bearing at runtime
   window.matchMedia ??= ((query: string) =>
     ({
       matches: query.includes('min-width'),
@@ -20,13 +20,14 @@ if (typeof window !== 'undefined') {
       dispatchEvent: () => false,
     }) as unknown as MediaQueryList) as typeof window.matchMedia
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- lib types claim this is always defined, but jsdom 29 doesn't implement it, so the guard is load-bearing at runtime
   globalThis.ResizeObserver ??= class {
     observe() {}
     unobserve() {}
     disconnect() {}
   }
 
-  // eslint-disable-next-line @typescript-eslint/unbound-method -- polyfill assignment, never called unbound
+  // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-unnecessary-condition -- polyfill assignment; DOM lib types claim this is always defined, but jsdom 29 doesn't implement it, so the guard is load-bearing at runtime
   Element.prototype.scrollIntoView ??= () => {}
 
   const { cleanup } = await import('@testing-library/react')

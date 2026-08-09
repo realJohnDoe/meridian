@@ -142,7 +142,7 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
 
   if (!repeat || repeat.type === 'after_completion') {
     const { n: completionNum, unit: completionUnit } = parseInterval(
-      repeat ? repeat.interval ?? '1 day' : '1 day',
+      repeat ? repeat.interval : '1 day',
     )
     return {
       freq: repeat ? 'after_completion' : defaultFreq,

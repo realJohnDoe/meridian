@@ -438,12 +438,12 @@ export default function NodeInheritanceDebugger() {
     const { title, tags, items: listItems, participants, tracked, done, priority, scheduled, duration, repeat, editScope } = debugEntry
     const fields: EditFields = {
       title:        title || '',
-      tags:         tags || [],
-      items:        listItems || [],
-      participants: participants || [],
+      tags:         tags,
+      items:        listItems,
+      participants: participants,
       body,
-      tracked:  tracked ?? false,
-      done:     done ?? false,
+      tracked:  tracked,
+      done:     done,
       priority: priority ?? null,
       scheduled: scheduled ?? null,
       duration: duration || '',
@@ -651,7 +651,7 @@ export default function NodeInheritanceDebugger() {
                     <ActionBtn label={deleteAllLabel}    icon={<Trash2 size={11} />} active={activeAction === 'delete-all'} onClick={() => toggleAction('delete-all')} />
                   </div>
 
-                  {activeAction === 'add' && selectedOcc && (
+                  {activeAction === 'add' && (
                     <AddOccurrenceForm
                       onApply={(date, time, done) => {
                         const series = findSeries(items, selectedOcc)
@@ -667,7 +667,7 @@ export default function NodeInheritanceDebugger() {
                       }}
                       onCancel={() => setActiveAction(null)} />
                   )}
-                  {activeAction === 'edit-occurrence' && selectedOcc && (
+                  {activeAction === 'edit-occurrence' && (
                     <EditOccurrenceForm occ={selectedOcc}
                       onApply={(date, time, done) => {
                         const next = upsertOverride(items, selectedOcc, {
@@ -679,7 +679,7 @@ export default function NodeInheritanceDebugger() {
                       }}
                       onCancel={() => setActiveAction(null)} />
                   )}
-                  {activeAction === 'edit-following' && selectedOcc && (
+                  {activeAction === 'edit-following' && (
                     <EditFollowingForm occ={selectedOcc}
                       onApply={() => {
                         const next = deleteFollowing({ items, roots: debugRoots }, selectedOcc)
@@ -688,7 +688,7 @@ export default function NodeInheritanceDebugger() {
                       }}
                       onCancel={() => setActiveAction(null)} />
                   )}
-                  {activeAction === 'delete-occurrence' && selectedOcc && (
+                  {activeAction === 'delete-occurrence' && (
                     <DeleteConfirmForm
                       message={selectedOcc.source === 'generated' ? `Mark ${selectedOcc.date} as excluded.` : `Remove explicit instance on ${selectedOcc.date}.`}
                       label="Delete occurrence"
@@ -699,7 +699,7 @@ export default function NodeInheritanceDebugger() {
                       }}
                       onCancel={() => setActiveAction(null)} />
                   )}
-                  {activeAction === 'delete-following' && selectedOcc && (
+                  {activeAction === 'delete-following' && (
                     <DeleteConfirmForm
                       message={`End the series on ${dayBefore(selectedOcc.date)}. Occurrences from ${selectedOcc.date} onwards will be removed.`}
                       label="Delete this & following"

@@ -138,7 +138,7 @@ async function activateWritableVault(backend: StorageBackend, prePainted = false
     setVaultLoading(false)
     // .catch is belt-and-braces: runSync swallows its own errors, so this can
     // only ever fire if that invariant is broken later.
-    void syncOnActivate().catch(e => console.warn('[vault] activation sync failed:', e))
+    void syncOnActivate().catch((e: unknown) => console.warn('[vault] activation sync failed:', e))
   } else {
     await syncOnActivate()
   }

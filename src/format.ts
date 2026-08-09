@@ -63,8 +63,7 @@ export function durationToEndDate(startStr: string, duration: string): string {
   if (p.unit === 'days')    return fmtISO(addDays(start, p.n - 1))
   if (p.unit === 'weeks')   return fmtISO(addDays(addWeeks(start, p.n), -1))
   if (p.unit === 'months')  return fmtISO(inclusiveCalendarEnd(start, addMonths(start, p.n)))
-  if (p.unit === 'years')   return fmtISO(inclusiveCalendarEnd(start, addYears(start, p.n)))
-  return fmtISO(addDays(start, 1))
+  return fmtISO(inclusiveCalendarEnd(start, addYears(start, p.n)))
 }
 
 export function durationToEndDateTime(startDateStr: string, startTimeStr: string, duration: string): { date: string; time: string } {
@@ -140,8 +139,7 @@ export function fmtDurationCompact(duration: string): string {
   if (unit === 'days')    return `${n}d`
   if (unit === 'weeks')   return `${n}w`
   if (unit === 'months')  return `${n}mo`
-  if (unit === 'years')   return `${n}y`
-  return duration
+  return `${n}y`
 }
 
 export function formatDurationChip(duration: string, scheduled: Scheduled, hour12 = false): string {

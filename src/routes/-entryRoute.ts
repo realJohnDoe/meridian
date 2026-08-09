@@ -18,7 +18,7 @@ export function entryRoute(occ: Occurrence, scope?: EditScope) {
   return {
     to: '/entry/$slug' as const,
     params: { slug: occ.fileSlug },
-    search: { date: occ.date ?? undefined, scope: scope ?? 'single' },
+    search: { date: occ.date, scope: scope ?? 'single' },
   }
 }
 

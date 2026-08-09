@@ -58,7 +58,7 @@ export function parseDurationHours(dur: unknown): number {
     if (p.unit === 'days')    return p.n * 24
     if (p.unit === 'weeks')   return p.n * 7 * 24
     if (p.unit === 'months')  return p.n * 30 * 24
-    if (p.unit === 'years')   return p.n * 365 * 24
+    return p.n * 365 * 24
   }
   // Compound forms: "1h 30m", "1 hour 30 minutes"
   const sl = s.toLowerCase()

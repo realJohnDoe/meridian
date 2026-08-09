@@ -18,7 +18,7 @@ interface Props {
   body:             string
   roots:            Roots
   items:            StoreItem[]
-  viewRef:          React.MutableRefObject<EditorView | null>
+  viewRef:          React.RefObject<EditorView | null>
   onOpenWikilink?:  (ref: string) => void
   onChange?:        (body: string) => void
 }

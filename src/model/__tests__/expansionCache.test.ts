@@ -179,7 +179,7 @@ describe('computeExpansionCache', () => {
 
     const first = computeExpansionCache(null, items1, roots, from, to)
     expect(first.allOccs.map(o => o.date)).toEqual(['2026-06-01', '2026-06-08'])
-    expect(first.allOccs.every(o => o.metadata.participants?.join() === 'alice')).toBe(true)
+    expect(first.allOccs.every(o => o.metadata.participants.join() === 'alice')).toBe(true)
 
     const s2 = series({ id: 'series-1', metadata: { participants: ['alice', 'bob'] } })
     const items2 = [s2]
@@ -188,7 +188,7 @@ describe('computeExpansionCache', () => {
     // Fast path taken (overlay, not full re-expansion): allOccs is a new array,
     // but the update still must be reflected in every generated occurrence.
     expect(second.allOccs).not.toBe(first.allOccs)
-    expect(second.allOccs.every(o => o.metadata.participants?.join() === 'alice,bob')).toBe(true)
+    expect(second.allOccs.every(o => o.metadata.participants.join() === 'alice,bob')).toBe(true)
   })
 
   it("does not let a series-level participants overlay clobber an override's own participants", () => {

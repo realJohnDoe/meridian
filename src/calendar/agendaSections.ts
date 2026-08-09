@@ -336,7 +336,7 @@ export function computeAgendaSections(
   // The overdue section pools every past day, so it only survives when no past
   // day was rebuilt.
   let overdueSection: Section | null
-  if (sectionsReusable && !pastDirty && prev !== null) {
+  if (sectionsReusable && !pastDirty) {
     overdueSection = prev.overdueSection
   } else {
     const pooled: Occurrence[] = []
