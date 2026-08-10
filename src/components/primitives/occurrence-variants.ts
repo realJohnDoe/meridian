@@ -50,7 +50,7 @@ export const occBarVariants = cva(
  * (DayPane/WeekPane hour cells, MonthGrid's CELL_CLASS). Small on phones so
  * these read tight in a narrow column, growing to match the agenda view's
  * OccurrenceCard radius (rounded-lg) once there's room at sm: and up. The
- * agenda view itself is deliberately excluded — OccurrenceCard/OccurrenceRow
+ * agenda view itself is deliberately excluded — OccurrenceCard/AgendaRow
  * is a separate, more widely-shared component (also used by search results
  * and the editor's items list) and keeps its own rounded-lg unconditionally.
  * Kept in one place so the grid views can't drift apart the way month view

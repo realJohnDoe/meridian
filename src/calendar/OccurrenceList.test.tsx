@@ -107,7 +107,7 @@ describe('OccurrenceList', () => {
 
     // The backlog holds all 500, but virtualization is row-granular: only the
     // 600px viewport plus overscan may mount. Unvirtualized, all 500 mounted
-    // in one synchronous commit — each OccurrenceRow carrying three raw touch
+    // in one synchronous commit — each AgendaRow carrying three raw touch
     // listeners, two store subscriptions and a backlink lookup.
     const mounted = renderedCards().length
     expect(mounted).toBeGreaterThan(0)

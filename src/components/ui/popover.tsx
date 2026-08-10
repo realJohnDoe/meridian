@@ -14,7 +14,7 @@ function PopoverContent({
   // Radix defaults this to 0, which lets a collision-shifted popover come to
   // rest exactly on the viewport edge — no breathing room at all on a phone,
   // where the trigger is usually near an edge to begin with. 14px matches the
-  // screen edge (OccurrenceRow's mx-3.5) the rest of the app sits on.
+  // screen edge (AgendaRow's mx-3.5) the rest of the app sits on.
   collisionPadding = 14,
   style,
   ...props

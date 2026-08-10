@@ -3,7 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronDown } from 'lucide-react'
 import type { Occurrence, EditScope } from '@/types'
 import { cn } from '@/lib/cn'
-import OccurrenceRow from './OccurrenceRow'
+import AgendaRow from './AgendaRow'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 
 /**
@@ -28,7 +28,7 @@ const DONE_HEADER_KEY = '__done__'
 // (measureElement); accurate estimates just keep the scrollbar stable before a
 // row has been measured. Update these if the card/divider padding changes.
 //
-// ROW_H:     OccurrenceCard min-h-11 (44) + OccurrenceRow mb-1.5 (6) = 50px.
+// ROW_H:     OccurrenceCard min-h-11 (44) + AgendaRow mb-1.5 (6) = 50px.
 //            Undated occurrences carry no time, duration or date badge, so the
 //            card's meta row only appears for an entry with backlinks (~68px).
 //            Those are the minority here, so estimate the bare row and let
@@ -52,7 +52,7 @@ interface Props {
  * Backlog is by definition where undated tasks pile up without a bound, so it
  * gets the same treatment AgendaView's overdue section got: `count` is the
  * flat row list, not a section count, and only the viewport plus overscan is
- * ever mounted. Each OccurrenceRow attaches three raw touch listeners and two
+ * ever mounted. Each AgendaRow attaches three raw touch listeners and two
  * store subscriptions, so mounting a whole vault's worth in one synchronous
  * commit is what froze the agenda before it was virtualized.
  *
@@ -142,7 +142,7 @@ export default function OccurrenceList({ occs, onOpen, onToggleDone, onSwipeDele
                       onToggle={() => setDoneOpen(o => !o)}
                     />
                   ) : (
-                    <OccurrenceRow
+                    <AgendaRow
                       occ={row.occ}
                       onOpen={onOpen}
                       onToggleDone={onToggleDone}

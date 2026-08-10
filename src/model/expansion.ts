@@ -536,7 +536,7 @@ export function treeHasOccurrences(node: EffectiveNode): boolean {
  * A pure function of its logical key (ownerId|date|time) rather than a
  * memoised random UUID: the same key always yields the same id, so occ.id
  * stays stable across re-expansions AND across store commits — required for
- * it to double as a React row key (OccurrenceRow) that survives a done-toggle
+ * it to double as a React row key (AgendaRow) that survives a done-toggle
  * without unmounting.
  */
 export function stableOccId(key: string): string {

@@ -10,7 +10,7 @@ export const Route = createFileRoute('/_app/')({
 
 function AgendaSkeleton() {
   return (
-    // px-3.5 matches both OccurrenceRow's mx-3.5 and AgendaHeaderRow's own
+    // px-3.5 matches both AgendaRow's mx-3.5 and AgendaHeaderRow's own
     // px-3.5, so the real agenda lands on the same edge the skeleton drew —
     // no sideways jump when it swaps in.
     <div className="flex flex-col gap-0 px-3.5 pt-3 pb-8 lg:max-w-3xl lg:mx-auto">

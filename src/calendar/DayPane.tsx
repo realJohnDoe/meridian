@@ -3,15 +3,14 @@ import { startOfDay } from 'date-fns'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
-import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
 import { multidayDisplayTitle, fmtT, parseDateString, parseDurationDays } from '@/model'
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
-import { dvBlockVariants, occRadius } from '@/components/primitives/occurrence-variants'
-import { ContinuationChevron, CONTINUES_PADDING_ALWAYS } from './ContinuationChevron'
+import { occRadius } from '@/components/primitives/occurrence-variants'
+import { OccurrencePill } from './OccurrencePill'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday } from '@/hooks'
 import { useFilteredOccs } from './useCalendarFilter'
@@ -25,40 +24,12 @@ import {
 
 // ── Sub-components ────────────────────────────────────────────
 
-interface AllDayItemProps {
-  o: Occurrence
-  onOpen: (o: Occurrence) => void
-  displayTitle?: string
-  continuesLeft?: boolean
-  continuesRight?: boolean
-}
 // occState(o) here intentionally keeps its default (true wall clock), not the
 // pane's clockValue — clockValue freezes at `today` midnight for non-today
 // panes (see clockValue's own comment below), which would misclassify a
 // cross-midnight timed duration in this pane's own day. sortOccs (below) has
 // no such fallback available since it runs inside a memo, so it accepts that
 // rare imprecision; painting doesn't need to.
-function AllDayItem({ o, onOpen, displayTitle, continuesLeft, continuesRight }: AllDayItemProps) {
-  const title = displayTitle ?? o.metadata.title
-  return (
-    <SurfaceButton
-      className={cn(
-        dvBlockVariants({ state: occState(o) }),
-        occRadius,
-        'relative w-full flex items-center px-2 py-0.5 text-xs font-medium truncate mb-0.5',
-        continuesLeft && CONTINUES_PADDING_ALWAYS.left,
-        continuesRight && CONTINUES_PADDING_ALWAYS.right,
-      )}
-      onClick={() => onOpen(o)}
-      aria-label={title}
-    >
-      {continuesLeft && <ContinuationChevron side="left" />}
-      <span>{title}</span>
-      {continuesRight && <ContinuationChevron side="right" />}
-    </SurfaceButton>
-  )
-}
-
 function renderAllDayItem(
   o: Occurrence,
   i: number,
@@ -69,13 +40,14 @@ function renderAllDayItem(
   const startD = parseDateString(o.date)
   const endD = startD && days > 1 ? addDays(startD, days - 1) : startD
   return (
-    <AllDayItem
+    <OccurrencePill
       key={`${o.fileSlug}-${o.date}-${i}`}
-      o={o}
-      onOpen={onOpen}
-      displayTitle={multidayDisplayTitle(o, dvMidnight)}
+      state={occState(o)}
+      title={multidayDisplayTitle(o, dvMidnight) ?? o.metadata.title}
+      onClick={() => onOpen(o)}
       continuesLeft={!!startD && startD < dvMidnight}
       continuesRight={!!endD && endD > dvMidnight}
+      className="w-full px-2 py-0.5 text-xs mb-0.5"
     />
   )
 }
@@ -119,7 +91,7 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
   // The value sortOccs (below) requires: the live tick for today's pane,
   // otherwise `today`. Safe for sortOccs's own day-granular grouping/ordering
   // in every case except a cross-midnight timed duration in this exact pane's
-  // day — see AllDayItem's comment for why painting doesn't inherit this
+  // day — see renderAllDayItem's comment for why painting doesn't inherit this
   // same imprecision (it keeps using the true wall clock instead).
   const clockValue = sameDay(dvDate, today) ? now : today
 

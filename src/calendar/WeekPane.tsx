@@ -1,15 +1,14 @@
 import { useMemo, useLayoutEffect, useRef, useCallback, type MouseEvent } from 'react'
 import { differenceInCalendarDays } from 'date-fns'
 import { useStore } from '@/store'
-import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
 import { fmtT, fmtISO, parseDurationDays } from '@/model'
 import { sameDay, fmtShort } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
-import { dvBlockVariants, occRadius } from '@/components/primitives/occurrence-variants'
-import { ContinuationChevron, CONTINUES_PADDING } from './ContinuationChevron'
+import { occRadius } from '@/components/primitives/occurrence-variants'
+import { OccurrencePill } from './OccurrencePill'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday } from '@/hooks'
 import { useFilteredOccs } from './useCalendarFilter'
@@ -206,39 +205,28 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
           <div className="flex-1 overflow-y-auto py-1" style={{ maxHeight: ALLDAY_MAX_H }}>
             <div className="grid grid-cols-7 gap-0.5" style={{ gridAutoRows: ALLDAY_ROW_H }}>
               {bars.map(b => (
-                <SurfaceButton
+                <OccurrencePill
                   key={b.occ.id}
                   style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.lane + 1 }}
-                  className={cn(
-                    dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
-                    occRadius,
-                    'relative flex items-center px-0.5 sm:px-1.5 text-3xs sm:text-xs font-medium overflow-hidden',
-                    b.continuesLeft && CONTINUES_PADDING.left,
-                    b.continuesRight && CONTINUES_PADDING.right,
-                  )}
+                  state={occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
+                  title={b.occ.metadata.title}
                   onClick={() => onOpen(b.occ)}
-                  aria-label={b.occ.metadata.title}
-                >
-                  {b.continuesLeft && <ContinuationChevron side="left" className="hidden sm:block" />}
-                  <span className="truncate min-w-0">{b.occ.metadata.title}</span>
-                  {b.continuesRight && <ContinuationChevron side="right" className="hidden sm:block" />}
-                </SurfaceButton>
+                  continuesLeft={b.continuesLeft}
+                  continuesRight={b.continuesRight}
+                  chevronHiddenOnMobile
+                  className="px-0.5 sm:px-1.5 text-3xs sm:text-xs"
+                />
               ))}
               {days.map((d, col) =>
                 (untimedByDay.get(fmtISO(d)) ?? []).map((o, i) => (
-                  <SurfaceButton
+                  <OccurrencePill
                     key={`${o.fileSlug}-${o.date}`}
                     style={{ gridColumn: col + 1, gridRow: laneCount + i + 1 }}
-                    className={cn(
-                      dvBlockVariants({ state: occState(o) }),
-                      occRadius,
-                      'flex items-center px-0.5 sm:px-1.5 text-3xs sm:text-xs font-medium w-full overflow-hidden',
-                    )}
+                    state={occState(o)}
+                    title={o.metadata.title}
                     onClick={() => onOpen(o)}
-                    aria-label={o.metadata.title}
-                  >
-                    <span className="truncate min-w-0">{o.metadata.title}</span>
-                  </SurfaceButton>
+                    className="px-0.5 sm:px-1.5 text-3xs sm:text-xs w-full"
+                  />
                 )),
               )}
             </div>
