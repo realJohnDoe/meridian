@@ -136,7 +136,13 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
   const dvMidnight = startOfDay(dvDate)
 
   const [allDayExpanded, setAllDayExpanded] = useState(false)
-  const hiddenCount = allDay.length - ALL_DAY_THRESHOLD
+  // Reserve the last visible slot for a "+N" label once there's overflow —
+  // mirrors CalCell in MonthGrid and WeekPane's own per-day version — so the
+  // always-visible portion never exceeds ALL_DAY_THRESHOLD lines even
+  // counting the label itself.
+  const allDayOverflowing = allDay.length > ALL_DAY_THRESHOLD
+  const shownAllDayCount = allDayOverflowing ? ALL_DAY_THRESHOLD - 1 : allDay.length
+  const hiddenCount = allDay.length - shownAllDayCount
 
   // minutesWithinHour is 0 for keyboard-triggered activation (Enter/Space on
   // the hour button), since there's no pointer position to derive it from —
@@ -156,31 +162,44 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
   return (
     <>
       {/* All-day / multiday strip. px-2 = RIGHT_PAD, so the all-day items
-          share a right edge with the timeline's event blocks beneath them. */}
+          share a right edge with the timeline's event blocks beneath them.
+          The expand/collapse chevron sits to the left of the list; a "+N"
+          label takes the last visible line instead of an item once there's
+          overflow (see shownAllDayCount above) — both expand the strip. */}
       {allDay.length > 0 && (
-        <div className="px-2 py-1.5 border-b border-input bg-card shrink-0 shadow-md relative z-10">
-          <div className="text-2xs font-semibold tracking-[.07em] uppercase text-muted-foreground mb-1">All day</div>
-
-          {/* Always-visible first N items */}
-          {allDay.slice(0, ALL_DAY_THRESHOLD).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
-
-          {/* Animated overflow */}
-          {hiddenCount > 0 && (
-            <div className={cn('dv-adoverflow', allDayExpanded && 'open')}>
-              <div>
-                {allDay.slice(ALL_DAY_THRESHOLD).map((o, i) =>
-                  renderAllDayItem(o, ALL_DAY_THRESHOLD + i, dvMidnight, onOpen)
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Expand / collapse toggle */}
+        <div className="flex items-start gap-1 px-2 py-1.5 border-b border-input bg-card shrink-0 shadow-md relative z-10">
           <AllDayOverflowToggle
             hiddenCount={hiddenCount}
             expanded={allDayExpanded}
             onToggle={() => setAllDayExpanded(v => !v)}
           />
+          <div className="flex-1 min-w-0">
+            <div className="text-2xs font-semibold tracking-[.07em] uppercase text-muted-foreground mb-1">All day</div>
+
+            {/* Always-visible first N items (N-1 once overflowing, to make room for the label below) */}
+            {allDay.slice(0, shownAllDayCount).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
+
+            {hiddenCount > 0 && !allDayExpanded && (
+              <button
+                type="button"
+                onClick={() => setAllDayExpanded(true)}
+                className="text-xs text-muted-foreground hover:text-secondary-foreground"
+              >
+                +{hiddenCount}
+              </button>
+            )}
+
+            {/* Animated overflow */}
+            {hiddenCount > 0 && (
+              <div className={cn('dv-adoverflow', allDayExpanded && 'open')}>
+                <div>
+                  {allDay.slice(shownAllDayCount).map((o, i) =>
+                    renderAllDayItem(o, shownAllDayCount + i, dvMidnight, onOpen)
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

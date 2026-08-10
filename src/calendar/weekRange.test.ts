@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { weekStartFor, weekDays, weekContains } from './weekRange'
+import { weekStartFor, weekDays, weekContains, weekNumberFor } from './weekRange'
 
 // 2026-08-12 is a Wednesday.
 const WED = new Date(2026, 7, 12)
@@ -52,6 +52,26 @@ describe('weekDays', () => {
     expect(days.map(d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)).toEqual([
       '2025-12-29', '2025-12-30', '2025-12-31', '2026-1-1', '2026-1-2', '2026-1-3', '2026-1-4',
     ])
+  })
+})
+
+describe('weekNumberFor', () => {
+  it('returns the ISO week number for a mid-year date', () => {
+    // 2026-08-10 is a Monday; ISO week 33 of 2026.
+    expect(weekNumberFor(new Date(2026, 7, 10))).toBe(33)
+  })
+
+  it('is stable across the days of the same ISO week', () => {
+    const weekStart = new Date(2026, 7, 10) // Monday
+    const days = weekDays(weekStart)
+    for (const d of days) expect(weekNumberFor(d)).toBe(weekNumberFor(weekStart))
+  })
+
+  it('rolls over at a year boundary per ISO 8601 (week 1 contains the first Thursday)', () => {
+    // 2025-12-29 (Mon) - 2026-01-04 (Sun) is ISO week 1 of 2026, since its
+    // Thursday (Jan 1) falls in 2026.
+    expect(weekNumberFor(new Date(2025, 11, 29))).toBe(1)
+    expect(weekNumberFor(new Date(2026, 0, 1))).toBe(1)
   })
 })
 
