@@ -90,12 +90,13 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Shared corner radius for calendar surfaces — occurrence cards
-     (OccurrenceRow), occurrence blocks (EventBlock), and the day/week/month
-     background rects (DayPane/WeekPane hour cells, MonthGrid's CELL_CLASS).
-     These used to split across --radius-lg (cards, rects) and --radius-md
-     (blocks); one shared step between the two keeps all three surfaces
-     visually consistent across day, week, and month views. */
+  /* Shared corner radius for the day/week/month grid views — timed
+     occurrence blocks (EventBlock) and the background rects behind them
+     (DayPane/WeekPane hour cells, MonthGrid's CELL_CLASS). These used to
+     split across --radius-lg (rects) and --radius-md (blocks); one shared
+     step between the two keeps both surfaces visually consistent. Deliberately
+     scoped to the grid views — the agenda view's OccurrenceCard/OccurrenceRow
+     is a separate, more widely-shared component and keeps its own --radius-lg. */
   --radius-calendar: calc(var(--radius) - 1px);
 
   /* Z-index layers.
