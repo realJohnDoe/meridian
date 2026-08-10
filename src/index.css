@@ -90,6 +90,14 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
+  /* Shared corner radius for calendar surfaces — occurrence cards
+     (OccurrenceRow), occurrence blocks (EventBlock), and the day/week/month
+     background rects (DayPane/WeekPane hour cells, MonthGrid's CELL_CLASS).
+     These used to split across --radius-lg (cards, rects) and --radius-md
+     (blocks); one shared step between the two keeps all three surfaces
+     visually consistent across day, week, and month views. */
+  --radius-calendar: calc(var(--radius) - 1px);
+
   /* Z-index layers.
      Component-local stacking (card overlays, sidebar rail, popovers, dialogs…)
      uses Tailwind's default z-0/10/20/30/50 scale directly — that's already a
@@ -216,7 +224,7 @@
   /* 54px content height + top safe-area inset, so anything sized off --th
      (main topbar, sidebar header, Sonner offset, search overlay max-height)
      grows to clear the notch/rounded corners together */
-  --th: calc(54px + env(safe-area-inset-top, 0px)); --r: var(--radius);
+  --th: calc(54px + env(safe-area-inset-top, 0px));
 }
 
 /* Class-scoped restatement of the Meridian tokens above, mirroring the other

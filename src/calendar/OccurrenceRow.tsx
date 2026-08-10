@@ -159,9 +159,9 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
     // but that same overflow-hidden clips any box-shadow on the card inside
     // it since the card fills this box exactly. So the shadow lives on this
     // outer, unclipped box instead, wrapping the actual clip boundary.
-    <div className={cn('relative rounded-lg mx-3.5 mb-1.5', !dimmed && 'shadow-(--shadow-card)')} data-occ-key={occ.id}>
+    <div className={cn('relative rounded-[var(--radius-calendar)] mx-3.5 mb-1.5', !dimmed && 'shadow-(--shadow-card)')} data-occ-key={occ.id}>
       <div
-        className="relative overflow-hidden rounded-lg"
+        className="relative overflow-hidden rounded-[var(--radius-calendar)]"
         ref={wrapRef}
       >
         {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
