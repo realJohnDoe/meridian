@@ -1,4 +1,4 @@
-import { tokenLoad, tokenSave, refreshTokenLoad, refreshTokenSave, tokenExpiryLoad, tokenExpirySave } from './cache'
+import { tokenLoad, tokenSave, refreshTokenLoad, refreshTokenSave, tokenExpiryLoad, tokenExpirySave } from './cache/credentials'
 
 const GITHUB_CLIENT_ID = 'Iv23liMpUq1CUQl4TcaT'
 export const GITHUB_APP_INSTALL_URL = 'https://github.com/apps/realjohndoe-meridian/installations/new'

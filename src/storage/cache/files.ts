@@ -1,5 +1,4 @@
-import Dexie from 'dexie'
-import type { VaultRef } from '@/vaultRef'
+import { cacheInit, openedDb, vp, type DexieFileRow } from './db'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -39,63 +38,11 @@ export interface CacheRecord {
   version?:  string
 }
 
-/** Row shape actually stored in Dexie — `dirty` stays a persisted number. */
-interface DexieFileRow {
-  vaultPath: string
-  vaultId:   string
-  path:      string
-  content:   string
-  dirty:     number
-  updatedAt: number
-  version?:  string
-}
-
 function toCacheRecord(r: DexieFileRow): CacheRecord {
   return {
     vaultPath: r.vaultPath, vaultId: r.vaultId, path: r.path, content: r.content,
     status: toStatus(r.dirty), updatedAt: r.updatedAt, version: r.version,
   }
-}
-
-interface MetaRecord {
-  key:   string
-  value: FileSystemDirectoryHandle | string | number | VaultRef[]
-}
-
-// ── Dexie DB ───────────────────────────────────────────────────
-
-class MeridianDB extends Dexie {
-  files!: Dexie.Table<DexieFileRow, string>
-  meta!:  Dexie.Table<MetaRecord,   string>
-  constructor() {
-    // New database name (meridian_v3) — avoids any upgrade conflicts with the
-    // old meridian_v2 schema. Users re-import their vault once.
-    super('meridian_v3')
-    this.version(1).stores({
-      files: 'vaultPath,dirty,updatedAt,vaultId',
-      meta:  'key',
-    })
-  }
-}
-
-let db: MeridianDB | null = null
-let _cacheInitPromise: Promise<MeridianDB> | null = null
-
-export async function cacheInit(): Promise<MeridianDB> {
-  if (db) return db
-  if (_cacheInitPromise) return _cacheInitPromise
-  _cacheInitPromise = (async () => {
-    db = new MeridianDB()
-    await db.open()
-    return db
-  })()
-  return _cacheInitPromise
-}
-
-// ── Key helpers ────────────────────────────────────────────────
-
-function vp(vaultId: string, path: string): string {
-  return `${vaultId}::${path}`
 }
 
 // ── Cache CRUD ─────────────────────────────────────────────────
@@ -232,165 +179,16 @@ export async function cacheGetTombstones(vaultId: string): Promise<CacheRecord[]
 }
 
 export async function cacheDirtyCount(vaultId: string): Promise<number> {
-  if (!db) return 0
+  const d = openedDb()
+  if (!d) return 0
   try {
-    return await db.files.where('vaultId').equals(vaultId)
+    return await d.files.where('vaultId').equals(vaultId)
       .filter(r => r.dirty === DIRTY_BY_STATUS.dirty || r.dirty === DIRTY_BY_STATUS.deleted).count()
   }
   catch { return 0 }
 }
 
-// ── In-flight write registry ──────────────────────────────────
-//
-// Paths with a cache write/delete in flight — marked synchronously, before
-// sync.ts's writeEntityToCache/deleteFromBackend reach their first await, so
-// the interval between `setData` updating the store and Dexie recording a
-// dirty/deleted status is never observable to a concurrent reconcile.
-// Without this, a reconcile landing in that interval sees a clean status and
-// can merge remote content over an edit still only in the store — or, worse,
-// resurrect a note whose delete is still in flight: mergeChangedIntoStore
-// would re-add it to the store and nothing would ever evict it again.
-//
-// Refcounted rather than a Set: two commits for the same slug can overlap
-// (e.g. rapid checkbox toggles), and writeEntityToCache's self-heal path
-// nests a deleteFromBackend call for the same path. In both cases a plain
-// Set's cleanup would clear the shared mark as soon as either call settles,
-// while the other is still outstanding — a structural gap even though
-// today's planReconcile happens to guard the same records another way once
-// one write has actually landed (see its own status!=='clean' checks). The
-// refcount removes the dependence on that coincidence.
-const _inFlightPaths = new Map<string, number>()
-
-export function markInFlight(path: string): void {
-  _inFlightPaths.set(path, (_inFlightPaths.get(path) ?? 0) + 1)
-}
-
-export function clearInFlight(path: string): void {
-  const n = (_inFlightPaths.get(path) ?? 0) - 1
-  if (n > 0) _inFlightPaths.set(path, n)
-  else _inFlightPaths.delete(path)
-}
-
-/** Snapshot of paths currently in flight — for a reconcile to union into its skipPaths. */
-export function getInFlightPaths(): ReadonlySet<string> {
-  return new Set(_inFlightPaths.keys())
-}
-
-// ── Per-vault handle persistence ──────────────────────────────
-
-export async function handleSave(vaultId: string, h: FileSystemDirectoryHandle): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.put({ key: `handle:${vaultId}`, value: h })
-}
-
-export async function handleLoad(vaultId: string): Promise<FileSystemDirectoryHandle | null> {
-  const d = await cacheInit()
-  const record = await d.meta.get(`handle:${vaultId}`)
-  const v = record?.value
-  return (v instanceof FileSystemDirectoryHandle) ? v : null
-}
-
-export async function handleClear(vaultId: string): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.delete(`handle:${vaultId}`)
-}
-
-// ── Per-vault token persistence ───────────────────────────────
-
-export async function tokenSave(vaultId: string, token: string): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.put({ key: `token:${vaultId}`, value: token })
-}
-
-export async function tokenLoad(vaultId: string): Promise<string | null> {
-  const d = await cacheInit()
-  const record = await d.meta.get(`token:${vaultId}`)
-  const v = record?.value
-  return typeof v === 'string' ? v : null
-}
-
-export async function tokenClear(vaultId: string): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.delete(`token:${vaultId}`)
-}
-
-// ── Per-vault OAuth refresh-token + expiry (OAuth-managed vaults only) ────
-// Presence of a refresh token is what marks a vault as OAuth-managed rather
-// than PAT-managed — PAT vaults never have one.
-
-export async function refreshTokenSave(vaultId: string, refreshToken: string): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.put({ key: `refreshToken:${vaultId}`, value: refreshToken })
-}
-
-export async function refreshTokenLoad(vaultId: string): Promise<string | null> {
-  const d = await cacheInit()
-  const record = await d.meta.get(`refreshToken:${vaultId}`)
-  const v = record?.value
-  return typeof v === 'string' ? v : null
-}
-
-export async function refreshTokenClear(vaultId: string): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.delete(`refreshToken:${vaultId}`)
-}
-
-export async function tokenExpirySave(vaultId: string, expiresAt: number): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.put({ key: `tokenExpiry:${vaultId}`, value: expiresAt })
-}
-
-export async function tokenExpiryLoad(vaultId: string): Promise<number | null> {
-  const d = await cacheInit()
-  const record = await d.meta.get(`tokenExpiry:${vaultId}`)
-  const v = record?.value
-  return typeof v === 'number' ? v : null
-}
-
-export async function tokenExpiryClear(vaultId: string): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.delete(`tokenExpiry:${vaultId}`)
-}
-
 export async function cacheDeleteAll(vaultId: string): Promise<void> {
   const d = await cacheInit()
   await d.files.where('vaultId').equals(vaultId).delete()
-}
-
-// ── Vault registry ─────────────────────────────────────────────
-
-export async function vaultRefsSave(refs: VaultRef[]): Promise<void> {
-  const d = await cacheInit()
-  await d.meta.put({ key: 'vaults', value: refs })
-}
-
-function isVaultRef(v: unknown): v is VaultRef {
-  if (!v || typeof v !== 'object') return false
-  const r = v as Record<string, unknown>
-  return typeof r['id'] === 'string'
-    && typeof r['name'] === 'string'
-    && (r['kind'] === 'local' || r['kind'] === 'example' || r['kind'] === 'github')
-}
-
-export async function vaultRefsLoad(): Promise<VaultRef[]> {
-  const d = await cacheInit()
-  const record = await d.meta.get('vaults')
-  const v = record?.value
-  return Array.isArray(v) ? v.filter(isVaultRef) : []
-}
-
-export async function activeVaultIdSave(id: string | null): Promise<void> {
-  const d = await cacheInit()
-  if (id === null) {
-    await d.meta.delete('activeVaultId')
-  } else {
-    await d.meta.put({ key: 'activeVaultId', value: id })
-  }
-}
-
-export async function activeVaultIdLoad(): Promise<string | null> {
-  const d = await cacheInit()
-  const record = await d.meta.get('activeVaultId')
-  const v = record?.value
-  return typeof v === 'string' ? v : null
 }

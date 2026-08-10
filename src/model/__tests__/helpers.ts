@@ -10,7 +10,7 @@ import { loadFile } from '@/fileIO'
 // Re-exported from production rather than duplicated: this is the exact
 // comparison the runtime round-trip guard uses, and two hand-synced copies of
 // it would be the same 'mock agrees with real code by convention' problem the
-// survey flagged in storage/cache.ts.
+// survey flagged in the storage cache's mocks.
 export { collectKeyValues } from '@/model/roundTripCheck'
 import { isSeries } from '@/types'
 import type { StoreItem, FileMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'

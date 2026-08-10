@@ -1,0 +1,82 @@
+import { cacheInit } from './db'
+
+// Per-vault secrets and OS handles, keyed in the `meta` table. Everything
+// here is credential-shaped: the FS directory handle that grants disk access,
+// the GitHub access token, and (OAuth-managed vaults only) the refresh token
+// and its expiry.
+
+// ── Per-vault handle persistence ──────────────────────────────
+
+export async function handleSave(vaultId: string, h: FileSystemDirectoryHandle): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.put({ key: `handle:${vaultId}`, value: h })
+}
+
+export async function handleLoad(vaultId: string): Promise<FileSystemDirectoryHandle | null> {
+  const d = await cacheInit()
+  const record = await d.meta.get(`handle:${vaultId}`)
+  const v = record?.value
+  return (v instanceof FileSystemDirectoryHandle) ? v : null
+}
+
+export async function handleClear(vaultId: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.delete(`handle:${vaultId}`)
+}
+
+// ── Per-vault token persistence ───────────────────────────────
+
+export async function tokenSave(vaultId: string, token: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.put({ key: `token:${vaultId}`, value: token })
+}
+
+export async function tokenLoad(vaultId: string): Promise<string | null> {
+  const d = await cacheInit()
+  const record = await d.meta.get(`token:${vaultId}`)
+  const v = record?.value
+  return typeof v === 'string' ? v : null
+}
+
+export async function tokenClear(vaultId: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.delete(`token:${vaultId}`)
+}
+
+// ── Per-vault OAuth refresh-token + expiry (OAuth-managed vaults only) ────
+// Presence of a refresh token is what marks a vault as OAuth-managed rather
+// than PAT-managed — PAT vaults never have one.
+
+export async function refreshTokenSave(vaultId: string, refreshToken: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.put({ key: `refreshToken:${vaultId}`, value: refreshToken })
+}
+
+export async function refreshTokenLoad(vaultId: string): Promise<string | null> {
+  const d = await cacheInit()
+  const record = await d.meta.get(`refreshToken:${vaultId}`)
+  const v = record?.value
+  return typeof v === 'string' ? v : null
+}
+
+export async function refreshTokenClear(vaultId: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.delete(`refreshToken:${vaultId}`)
+}
+
+export async function tokenExpirySave(vaultId: string, expiresAt: number): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.put({ key: `tokenExpiry:${vaultId}`, value: expiresAt })
+}
+
+export async function tokenExpiryLoad(vaultId: string): Promise<number | null> {
+  const d = await cacheInit()
+  const record = await d.meta.get(`tokenExpiry:${vaultId}`)
+  const v = record?.value
+  return typeof v === 'number' ? v : null
+}
+
+export async function tokenExpiryClear(vaultId: string): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.delete(`tokenExpiry:${vaultId}`)
+}

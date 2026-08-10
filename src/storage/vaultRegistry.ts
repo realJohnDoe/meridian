@@ -1,12 +1,12 @@
+import { cacheInit } from '@/storage/cache/db'
+import { cacheLoadAll, applyRemoteBatch, cacheDeleteAll } from '@/storage/cache/files'
 import {
-  cacheInit, cacheLoadAll, applyRemoteBatch, cacheDeleteAll,
   handleSave, handleLoad, handleClear,
   tokenSave, tokenClear,
   refreshTokenSave, refreshTokenClear,
   tokenExpirySave, tokenExpiryClear,
-  vaultRefsSave, vaultRefsLoad,
-  activeVaultIdSave, activeVaultIdLoad,
-} from '@/storage/cache'
+} from '@/storage/cache/credentials'
+import { vaultRefsSave, vaultRefsLoad, activeVaultIdSave, activeVaultIdLoad } from '@/storage/cache/registry'
 import { diskPickDirectory } from './fs'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
