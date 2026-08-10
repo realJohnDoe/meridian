@@ -2,6 +2,7 @@ import { useStore } from '@/store'
 import { addDays } from '@/format'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useCalendarFilter } from './useCalendarFilter'
+import { useOverdueCollapsed } from './viewState'
 import { computeAgendaSections, type AgendaSectionCache, type AgendaRow } from './agendaSections'
 
 export { estimateRow, type AgendaRow } from './agendaSections'
@@ -80,6 +81,7 @@ export function useAgendaSections(
   const to = addDays(anchor, FUTURE_WINDOW_DAYS)
   const allOccs = useExpandWithMultiday(items, roots, from, to)
   const { filterOccs } = useCalendarFilter()
+  const overdueCollapsed = useOverdueCollapsed()
 
   // now ticks once a minute (see useNow), but a remounted AgendaView
   // allocates a fresh Date even within the same tick — bucket to that same
@@ -89,7 +91,7 @@ export function useAgendaSections(
   const nowBucket = new Date(Math.floor(now.getTime() / 60_000) * 60_000)
 
   const cached = sectionsCacheSlot.get(SECTIONS_CACHE_KEY) ?? null
-  const next = computeAgendaSections(cached, allOccs, today, nowBucket, filterOccs, anchor)
+  const next = computeAgendaSections(cached, allOccs, today, nowBucket, filterOccs, anchor, overdueCollapsed)
   if (next !== cached) {
     sectionsCacheSlot.set(SECTIONS_CACHE_KEY, next)
   }

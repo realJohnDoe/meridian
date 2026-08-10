@@ -38,7 +38,16 @@ const ROW_H_PLAIN = 50
  * viewport + overscan in one commit. See useAgendaSections.ts's `rows`.
  */
 export type AgendaRow =
-  | { kind: 'header'; key: string; dateKey: string; label: string; tone: 'default' | 'today' | 'overdue' }
+  | {
+      kind: 'header'; key: string; dateKey: string; label: string; tone: 'default' | 'today' | 'overdue'
+      /**
+       * Set only on the overdue header, which is a toggle rather than a label.
+       * `count` is the number of items the section holds — carried separately
+       * from `label` (which stays exactly "Overdue") so the header can render
+       * the two independently.
+       */
+      collapsible?: true; collapsed?: boolean; count?: number
+    }
   | { kind: 'occ'; key: string; dateKey: string; occ: Occurrence; showDate: boolean; isToday: boolean }
 
 export type Section =
@@ -68,6 +77,11 @@ export function estimateRow(r: AgendaRow): number {
 
 function headerRow(key: string, dateKey: string, label: string, tone: 'default' | 'today' | 'overdue'): AgendaRow {
   return { kind: 'header', key: `h|${key}`, dateKey, label, tone }
+}
+
+/** The overdue section's header — a collapse toggle, not a plain label. */
+function overdueHeaderRow(dateKey: string, collapsed: boolean, count: number): AgendaRow {
+  return { kind: 'header', key: 'h|__overdue__', dateKey, label: 'Overdue', tone: 'overdue', collapsible: true, collapsed, count }
 }
 
 // Keyed by dateKey (the section's own day, or `todayKey` for overdue rows —
@@ -112,6 +126,8 @@ export interface AgendaSectionCache {
   anchorMs: number
   nowMs: number
   filterOccs: FilterOccs
+  /** Whether the overdue section was built collapsed — see calendar/viewState.ts. */
+  overdueCollapsed: boolean
   buckets: Map<string, DayBucket>
   /** All bucket keys, ascending — stable while the grouping is reused. */
   sortedKeys: string[]
@@ -273,12 +289,13 @@ export function computeAgendaSections(
   now: Date,
   filterOccs: FilterOccs,
   anchor: Date = today,
+  overdueCollapsed = false,
 ): AgendaSectionCache {
   const todayMs = today.getTime()
   const anchorMs = anchor.getTime()
   const nowMs = now.getTime()
 
-  if (prev && prev.allOccs === allOccs && prev.todayMs === todayMs && prev.anchorMs === anchorMs && prev.nowMs === nowMs && prev.filterOccs === filterOccs) {
+  if (prev && prev.allOccs === allOccs && prev.todayMs === todayMs && prev.anchorMs === anchorMs && prev.nowMs === nowMs && prev.filterOccs === filterOccs && prev.overdueCollapsed === overdueCollapsed) {
     return prev
   }
 
@@ -289,7 +306,11 @@ export function computeAgendaSections(
   // `today`/`anchor` gate grouping reuse because they decide the seeded
   // bucket and (for today) each bucket's isPast flag.
   const changed = prev && prev.todayMs === todayMs && prev.anchorMs === anchorMs ? changedIndices(prev.allOccs, allOccs) : null
-  const sectionsReusable = changed !== null && prev !== null && prev.nowMs === nowMs && prev.filterOccs === filterOccs
+  // overdueCollapsed only changes the overdue section's own rows, but it gates
+  // section reuse wholesale: the `sectionsReusable && !pastDirty` branch below
+  // hands back `prev.overdueSection` by reference, which would keep the stale
+  // expansion when the flag flips with no occurrence change to force a rebuild.
+  const sectionsReusable = changed !== null && prev !== null && prev.nowMs === nowMs && prev.filterOccs === filterOccs && prev.overdueCollapsed === overdueCollapsed
 
   let buckets: Map<string, DayBucket>
   let keyByIndex: (string | undefined)[]
@@ -352,7 +373,13 @@ export function computeAgendaSections(
         // Overdue rows carry todayKey (not each occurrence's own past day) so
         // the top-bar label falls back to "Today" over this block, matching
         // AgendaView's updateTopDate behavior before flattening.
-        rows: [headerRow('__overdue__', todayKey, 'Overdue', 'overdue'), ...occRows(items, todayKey, true, false)],
+        //
+        // Collapsed, the section is its header and nothing else — `items` still
+        // carries the full list, so only what's rendered changes. That's what
+        // keeps the overdue preference below from landing on an unbounded wall.
+        rows: overdueCollapsed
+          ? [overdueHeaderRow(todayKey, true, items.length)]
+          : [overdueHeaderRow(todayKey, false, items.length), ...occRows(items, todayKey, true, false)],
       }
     } else {
       overdueSection = null
@@ -405,7 +432,7 @@ export function computeAgendaSections(
   }
 
   return {
-    allOccs, todayMs, anchorMs, nowMs, filterOccs, buckets, sortedKeys, keyByIndex,
+    allOccs, todayMs, anchorMs, nowMs, filterOccs, overdueCollapsed, buckets, sortedKeys, keyByIndex,
     overdueSection, sections, goToIndex, rows, goToRowIndex,
   }
 }

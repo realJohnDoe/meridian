@@ -16,17 +16,36 @@ function d(offset: number): string {
 }
 
 /** Most-recent occurrence of a given weekday (0=Sun … 6=Sat) at or before today. */
-function lastWeekday(dow: number): string {
+function lastWeekdayDate(dow: number): Date {
   const t = startOfToday()
-  const diff = (t.getDay() - dow + 7) % 7
-  return fmtISO(addDays(t, -diff))
+  return addDays(t, -((t.getDay() - dow + 7) % 7))
 }
 
-/** N weeks before lastWeekday(dow). */
-function prevWeekday(dow: number, weeksBack: number): string {
-  const t = startOfToday()
-  const diff = (t.getDay() - dow + 7) % 7
-  return fmtISO(addDays(t, -(diff + 7 * weeksBack)))
+/** Every day from `from` up to — but not including — today that falls on one of `dows`, ascending. */
+function weekdaysBeforeToday(from: Date, dows: number[]): string[] {
+  const today = startOfToday()
+  const out: string[] = []
+  for (let day = from; day < today; day = addDays(day, 1)) {
+    if (dows.includes(day.getDay())) out.push(fmtISO(day))
+  }
+  return out
+}
+
+/**
+ * A YAML `instances:` block ticking each date done, or the empty string when
+ * there are none.
+ *
+ * Every past occurrence of the two demo series is marked done so the example
+ * vault has no overdue items at all: it's a read-only sandbox, so anything
+ * undone is something a first-time visitor can see but not clear, and the
+ * agenda's scroll-to-today lands on the overdue section when one exists. The
+ * empty case is real rather than defensive — the series anchor is the
+ * most-recent Monday, so on a Monday it *is* today and there are no past
+ * occurrences to tick. The key has to vanish then, not appear childless.
+ */
+function doneInstances(dates: string[]): string {
+  if (dates.length === 0) return ''
+  return `instances:\n${dates.map(date => `  - date: "${date}"\n    done: true`).join('\n')}\n`
 }
 
 // ── Seed content ───────────────────────────────────────────────
@@ -35,13 +54,14 @@ function prevWeekday(dow: number, weeksBack: number): string {
 // through the exact same parseToStoreItems path.
 
 // Weekday indices
-const MON = 1, WED = 3
+const MON = 1, WED = 3, FRI = 5
 
 function buildEntries(): Array<{ id: string; content: string }> {
   // Recurring series anchor: most-recent Monday
-  const recAnchor   = lastWeekday(MON)
-  const recPrev1Mon = prevWeekday(MON, 1)
-  const recPrev1Wed = prevWeekday(WED, 1)
+  const recAnchorDate = lastWeekdayDate(MON)
+  const recAnchor     = fmtISO(recAnchorDate)
+  // Every Mon/Wed/Fri occurrence the series has already had, ticked done.
+  const recDone       = doneInstances(weekdaysBeforeToday(recAnchorDate, [MON, WED, FRI]))
 
   return [
     // ── 01-start-here: landing pad — the home list, dated today so it tops the Agenda ──
@@ -212,7 +232,7 @@ items:
 Real schedules are messy, so Meridian's recurrence goes well past "repeats weekly."
 
 A \`repeat\` block defines the schedule; \`instances\` override individual occurrences.
-See [[team-standup]] — a Mon/Wed/Fri event where two past occurrences are ticked done
+See [[team-standup]] — a Mon/Wed/Fri event where the past occurrences are ticked done
 while future ones stay open. Tasks repeat the same way: [[morning-run]].
 
 **Editing one occurrence.** When you change a recurring item, Meridian asks how far the
@@ -241,17 +261,12 @@ repeat:
   byweekday: [mo, we, fr]
 defaults:
   done: false
-instances:
-  - date: "${recPrev1Mon}"
-    done: true
-  - date: "${recPrev1Wed}"
-    done: true
----
+${recDone}---
 
 A **recurring event** that repeats Mon/Wed/Fri.
 
 The \`repeat\` block defines the schedule. Each \`instances\` entry overrides one
-occurrence — here two past occurrences are marked done while future ones stay open.
+occurrence — here the past ones are marked done while future ones stay open.
 
 See [[recurring-events]] for the *This / This and future / All* edit choices.`,
     },
@@ -269,12 +284,7 @@ repeat:
 defaults:
   done: false
   priority: medium
-instances:
-  - date: "${recPrev1Mon}"
-    done: true
-  - date: "${recPrev1Wed}"
-    done: true
----
+${recDone}---
 
 A **recurring task** — same \`repeat\` mechanics as [[team-standup]], but with a \`done\`
 field instead of \`time\`. The \`defaults\` block sets the priority for every occurrence.`,

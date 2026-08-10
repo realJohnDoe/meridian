@@ -72,6 +72,28 @@ describe('computeAgendaSections', () => {
     expect(sections[goToIndex]).toBe(findOverdue(sections))
   })
 
+  it('collapses the overdue section to just its header row when overdueCollapsed is true', () => {
+    const { sections, goToIndex } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter, TODAY, true)
+
+    const overdue = findOverdue(sections)
+    // `items` still carries the full pool — only what's rendered shrinks.
+    expect(itemIds(overdue)).toEqual(['overdue-task'])
+    expect(overdue?.rows).toHaveLength(1)
+    expect(overdue?.rows[0]).toMatchObject({ kind: 'header', label: 'Overdue', collapsed: true, count: 1 })
+    // The scroll target is still the overdue section — collapsed, it's just one row.
+    expect(sections[goToIndex]).toBe(overdue)
+  })
+
+  it('rebuilds the overdue section when overdueCollapsed flips, even with no occurrence change', () => {
+    const all = baseOccs()
+    const collapsed = computeAgendaSections(null, all, TODAY, NOW, noFilter, TODAY, true)
+    const expanded = computeAgendaSections(collapsed, all, TODAY, NOW, noFilter, TODAY, false)
+
+    expect(expanded).not.toBe(collapsed)
+    expect(findOverdue(expanded.sections)?.rows).toHaveLength(2) // header + the one overdue task
+    expect(findOverdue(expanded.sections)?.rows[0]).toMatchObject({ collapsed: false, count: 1 })
+  })
+
   it('seeds an empty today section so goToIndex always resolves', () => {
     const { sections, goToIndex } = computeAgendaSections(null, [], TODAY, NOW, noFilter)
 

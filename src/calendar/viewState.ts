@@ -49,6 +49,17 @@ interface CalendarViewState {
   /** ISO date string of the topmost visible day in the agenda view. */
   agendaTopDate: string | null
   /**
+   * Whether the agenda's overdue section is collapsed to just its header row.
+   *
+   * Starts collapsed, which is what keeps scroll-to-today's overdue preference
+   * (see agendaSections.ts's `preferOverdue`) from landing the user on an
+   * unbounded wall of unfinished work: the target is still the overdue section,
+   * but collapsed it's a single bar sitting directly above Today. Expanding is
+   * a per-session act — this is view-ephemeral like the rest of this store, so
+   * a reload starts collapsed again.
+   */
+  overdueCollapsed: boolean
+  /**
    * ISO date (`YYYY-MM-DD`) of the day last focused across the calendar
    * views — kept in sync with agenda's scroll position, the day carousel's
    * route param, and month's day-of-month (see setCurrentMonthKeepingDay).
@@ -70,6 +81,7 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   agendaAnchor: fmtISO(startOfToday()),
   agendaScrollTarget: null,
   agendaTopDate: null,
+  overdueCollapsed: true,
   currentDate: fmtISO(startOfToday()),
 }))
 
@@ -138,6 +150,14 @@ export function useAgendaTopDate(): string | null {
 
 export function useCurrentDate(): string {
   return useZustandStore(calendarView, s => s.currentDate)
+}
+
+export function useOverdueCollapsed(): boolean {
+  return useZustandStore(calendarView, s => s.overdueCollapsed)
+}
+
+export function toggleOverdueCollapsed(): void {
+  calendarView.setState(s => ({ overdueCollapsed: !s.overdueCollapsed }))
 }
 
 /**
