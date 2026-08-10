@@ -171,25 +171,27 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
       {/* Day headers — gutter spacer + 7 day columns, aligned with the grid below. */}
       <div className="flex shrink-0 border-b border-input">
         <div style={{ width: GUTTER }} className="shrink-0" />
-        {days.map(d => {
-          const isToday = sameDay(d, today)
-          return (
-            <button
-              key={fmtISO(d)}
-              type="button"
-              onClick={() => onDayClick(d)}
-              className="flex-1 min-w-0 flex flex-col items-center gap-0.5 py-1.5 hover:bg-muted/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-              aria-label={fmtShort(d)}
-            >
-              <span className="text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground">
-                {d.toLocaleDateString(undefined, { weekday: 'short' })}
-              </span>
-              <span className={cn(BADGE_CLASS, isToday && 'bg-primary text-primary-foreground font-bold')}>
-                {d.getDate()}
-              </span>
-            </button>
-          )
-        })}
+        <div className="flex flex-1 gap-0.5">
+          {days.map(d => {
+            const isToday = sameDay(d, today)
+            return (
+              <button
+                key={fmtISO(d)}
+                type="button"
+                onClick={() => onDayClick(d)}
+                className="flex-1 min-w-0 flex flex-col items-center gap-0.5 py-1.5 hover:bg-muted/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                aria-label={fmtShort(d)}
+              >
+                <span className="text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground">
+                  {d.toLocaleDateString(undefined, { weekday: 'short' })}
+                </span>
+                <span className={cn(BADGE_CLASS, isToday && 'bg-primary text-primary-foreground font-bold')}>
+                  {d.getDate()}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* All-day / multiday strip — gutter spacer + a single grid-cols-7 grid
@@ -270,7 +272,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
               geometry needs no shared gutter-inset wrapper the way DayPane's
               does (there, "columns" are overlapping events within one day;
               here they're the days themselves). */}
-          <div className="absolute inset-y-0 flex divide-x divide-border/60" style={{ left: GUTTER, right: RIGHT_PAD }}>
+          <div className="absolute inset-y-0 flex gap-0.5 divide-x divide-border/60" style={{ left: GUTTER, right: RIGHT_PAD }}>
             {days.map(d => {
               const dKey = fmtISO(d)
               const isToday = sameDay(d, today)
