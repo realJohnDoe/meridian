@@ -1,8 +1,6 @@
 import { useMemo, useLayoutEffect, useRef, useState, useCallback, type MouseEvent } from 'react'
 import { startOfDay } from 'date-fns'
-import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useStore } from '@/store'
-import { Button } from '@/components/ui/button'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
@@ -12,6 +10,7 @@ import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { dvBlockVariants, occPillRounded } from '@/components/primitives/occurrence-variants'
 import { ContinuationChevron, CONTINUES_PADDING_ALWAYS } from './ContinuationChevron'
+import { AllDayOverflowToggle, ALL_DAY_THRESHOLD } from './AllDayOverflowToggle'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday } from '@/hooks'
 import { useFilteredOccs } from './useCalendarFilter'
@@ -164,7 +163,6 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
 
   const dvMidnight = startOfDay(dvDate)
 
-  const ALL_DAY_THRESHOLD = 3
   const [allDayExpanded, setAllDayExpanded] = useState(false)
   const hiddenCount = allDay.length - ALL_DAY_THRESHOLD
 
@@ -206,18 +204,11 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
           )}
 
           {/* Expand / collapse toggle */}
-          {hiddenCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 py-0 text-xs text-muted-foreground hover:text-secondary-foreground gap-1 self-start"
-              onClick={() => setAllDayExpanded(v => !v)}
-            >
-              {allDayExpanded
-                ? <><ChevronUp size={11} />Show less</>
-                : <><ChevronDown size={11} />{hiddenCount} more</>}
-            </Button>
-          )}
+          <AllDayOverflowToggle
+            hiddenCount={hiddenCount}
+            expanded={allDayExpanded}
+            onToggle={() => setAllDayExpanded(v => !v)}
+          />
         </div>
       )}
 
