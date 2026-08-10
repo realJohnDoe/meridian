@@ -157,12 +157,13 @@
   --priority-2:   oklch(0.76 0.17 48);    /* orange */
   --priority-3:   oklch(0.88 0.18 82);    /* yellow */
 
-  /* On-accent text — all domain colors here are light pastels, so dark ink wins */
-  --event-foreground:      var(--ink-dark);
+  /* On-accent text — task/note/priority-3 are light pastels where dark ink
+     wins; event (purple) and priority-1/2 (red/orange) use light ink instead. */
+  --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-dark);
   --note-foreground:       var(--ink-dark);
-  --priority-1-foreground: var(--ink-dark);
-  --priority-2-foreground: var(--ink-dark);
+  --priority-1-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
@@ -260,11 +261,11 @@
   --priority-2:   oklch(0.76 0.17 48);
   --priority-3:   oklch(0.88 0.18 82);
 
-  --event-foreground:      var(--ink-dark);
+  --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-dark);
   --note-foreground:       var(--ink-dark);
-  --priority-1-foreground: var(--ink-dark);
-  --priority-2-foreground: var(--ink-dark);
+  --priority-1-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-dark);
 
   --sidebar:                    oklch(0.24 0.05 252);
