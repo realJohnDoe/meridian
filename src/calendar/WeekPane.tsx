@@ -119,12 +119,12 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
   // All-day strip bar layout — one row spanning the whole week (unlike
   // MonthGrid, which repeats this per week-row of a month). No lane cap: see
   // the file header comment for why multiday events are never hidden here.
-  const { bars, laneCount } = useMemo(() => {
+  const bars = useMemo(() => {
     const rowStart = days[0]!
     const rowEnd = days[6]!
     const rawLanes = computeMultidayLanes(multidayRoots).filter(l => l.startD <= rowEnd && l.endD >= rowStart)
     const laneMap = compactRowLanes(rawLanes.map(l => l.lane))
-    const bars = rawLanes.map(l => ({
+    return rawLanes.map(l => ({
       ...l,
       lane: laneMap.get(l.lane)!,
       startCol: Math.max(0, differenceInCalendarDays(l.startD, rowStart)),
@@ -132,7 +132,6 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
       continuesLeft: l.startD < rowStart,
       continuesRight: l.endD > rowEnd,
     }))
-    return { bars, laneCount: laneMap.size }
   }, [multidayRoots, days])
 
   const hasAllDayContent = bars.length > 0 || untimedByDay.size > 0
@@ -158,11 +157,15 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
       else overflowBars.push({ ...b, row: b.lane - ALL_DAY_THRESHOLD })
     }
 
-    // A day's own pills start right after all bar lanes (laneCount), same as
-    // before — that's the capacity every day shares for its own items.
-    const pillCapacity = Math.max(0, ALL_DAY_THRESHOLD - laneCount)
-    const overflowLaneCount = Math.max(0, laneCount - ALL_DAY_THRESHOLD)
-
+    // Pills start right after the lanes THIS day's own bars actually occupy
+    // (mirrors MonthGrid's dayLaneCount), not the week's global lane count —
+    // a day with no bar over it (or a bar only in a lower lane) reclaims the
+    // blank rows above instead of leaving them empty while the pill is
+    // pushed below every lane used anywhere in the week. Once that leaves
+    // room for fewer than ALL_DAY_THRESHOLD items — or a bar overflows onto
+    // this day — the day's last visible slot is reserved for a "+N" label
+    // instead of an item (labelByDay), mirroring CalCell's reserved slot in
+    // MonthGrid.
     const visiblePillsByDay = new Map<string, { o: Occurrence; row: number }[]>()
     const overflowPillsByDay = new Map<string, { o: Occurrence; row: number }[]>()
     const labelByDay = new Map<string, { row: number; hidden: number }>()
@@ -171,26 +174,31 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
     days.forEach((d, col) => {
       const key = fmtISO(d)
       const dayPills = untimedByDay.get(key) ?? []
-      const barOverflowForDay = overflowBars.filter(b => b.startCol <= col && col <= b.endCol).length
+      const dayBars = bars.filter(b => b.startCol <= col && col <= b.endCol)
+      const visRowStart = dayBars.reduce((max, b) => b.lane < ALL_DAY_THRESHOLD ? Math.max(max, b.lane + 1) : max, 0)
+      const ovfRowStart = dayBars.reduce((max, b) => b.lane >= ALL_DAY_THRESHOLD ? Math.max(max, b.lane - ALL_DAY_THRESHOLD + 1) : max, 0)
+      const barOverflowForDay = dayBars.filter(b => b.lane >= ALL_DAY_THRESHOLD).length
+
+      const pillCapacity = Math.max(0, ALL_DAY_THRESHOLD - visRowStart)
       const overflowing = dayPills.length > pillCapacity || barOverflowForDay > 0
       const shown = overflowing ? Math.max(0, pillCapacity - 1) : dayPills.length
 
       if (shown > 0) {
-        visiblePillsByDay.set(key, dayPills.slice(0, shown).map((o, i) => ({ o, row: laneCount + i })))
+        visiblePillsByDay.set(key, dayPills.slice(0, shown).map((o, i) => ({ o, row: visRowStart + i })))
       }
       if (dayPills.length > shown) {
-        overflowPillsByDay.set(key, dayPills.slice(shown).map((o, i) => ({ o, row: overflowLaneCount + i })))
+        overflowPillsByDay.set(key, dayPills.slice(shown).map((o, i) => ({ o, row: ovfRowStart + i })))
         hiddenPillCount += dayPills.length - shown
       }
       const hiddenForDay = (dayPills.length - shown) + barOverflowForDay
-      if (hiddenForDay > 0) labelByDay.set(key, { row: laneCount + shown, hidden: hiddenForDay })
+      if (hiddenForDay > 0) labelByDay.set(key, { row: visRowStart + shown, hidden: hiddenForDay })
     })
 
     return {
       visibleBars, overflowBars, visiblePillsByDay, overflowPillsByDay, labelByDay,
       hiddenCount: overflowBars.length + hiddenPillCount,
     }
-  }, [bars, untimedByDay, days, laneCount])
+  }, [bars, untimedByDay, days])
 
   const [allDayExpanded, setAllDayExpanded] = useState(false)
 
@@ -279,9 +287,10 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
 
       {/* All-day / multiday strip — gutter (expand/collapse chevron) + a
           grid-cols-7 grid holding both the spanning bars and each day's own
-          untimed pills. Bars occupy rows [0, laneCount); a day's pills start
-          at row laneCount, so the two never share a cell regardless of
-          container overflow — no absolute-positioned overlay needed (unlike
+          untimed pills. A day's pills start right after the lanes its own
+          bars occupy (see the visiblePillsByDay/overflowPillsByDay memo
+          above), so the two never share a cell regardless of container
+          overflow — no absolute-positioned overlay needed (unlike
           MonthGrid, whose bars overlay a separately-measured cell grid).
           Rows at/beyond ALL_DAY_THRESHOLD are split into a second grid and
           folded behind the chevron in the gutter — see AllDayOverflowToggle.
