@@ -1,4 +1,4 @@
-import { useMemo, useLayoutEffect, useRef, useCallback, type MouseEvent } from 'react'
+import { useMemo, useLayoutEffect, useRef, useState, useCallback, type MouseEvent } from 'react'
 import { differenceInCalendarDays } from 'date-fns'
 import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
@@ -9,13 +9,13 @@ import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { occRadius } from '@/components/primitives/occurrence-variants'
 import { OccurrencePill } from './OccurrencePill'
+import { AllDayOverflowToggle, ALL_DAY_THRESHOLD } from './AllDayOverflowToggle'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday } from '@/hooks'
 import { useFilteredOccs } from './useCalendarFilter'
 import { useNow } from './useNow'
 import { computeColumns } from './computeColumns'
 import { computeMultidayLanes, compactRowLanes } from './computeMultidayLanes'
-import { ROW_GAP } from './snapCarousel'
 import { EventBlock } from './EventBlock'
 import { BADGE_CLASS } from './MonthGrid'
 import { weekDays, weekContains } from './weekRange'
@@ -30,7 +30,6 @@ import {
 // page, so a literal pixel height keeps the marginTop reservation below
 // trivially correct with no measurement machinery.
 const ALLDAY_ROW_H = 20 // matches BADGE_CLASS's h-5
-const ALLDAY_MAX_H = 4.5 * (ALLDAY_ROW_H + ROW_GAP) + 8 // ~4-5 lanes before the strip scrolls internally
 
 // ── WeekPane ──────────────────────────────────────────────────
 // One pane of the week carousel — self-contained so React can key panes by
@@ -137,6 +136,49 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
 
   const hasAllDayContent = bars.length > 0 || untimedByDay.size > 0
 
+  // Splits the strip's bars/pills into an always-visible portion (the first
+  // ALL_DAY_THRESHOLD rows) and an overflow portion folded behind the same
+  // expand/collapse toggle DayPane uses for its all-day list — see
+  // AllDayOverflowToggle. Rows, not occurrence count, are the visible unit
+  // here (a row can hold up to 7 items, one per day column), but hiddenCount
+  // itself is still an occurrence count so the toggle's "N more" reads the
+  // same way it does in DayPane.
+  const {
+    visibleBars, overflowBars,
+    visiblePillsByDay, overflowPillsByDay,
+    hiddenCount,
+  } = useMemo(() => {
+    const visibleBars: ((typeof bars)[number] & { row: number })[] = []
+    const overflowBars: ((typeof bars)[number] & { row: number })[] = []
+    for (const b of bars) {
+      if (b.lane < ALL_DAY_THRESHOLD) visibleBars.push({ ...b, row: b.lane })
+      else overflowBars.push({ ...b, row: b.lane - ALL_DAY_THRESHOLD })
+    }
+
+    const visiblePillsByDay = new Map<string, { o: Occurrence; row: number }[]>()
+    const overflowPillsByDay = new Map<string, { o: Occurrence; row: number }[]>()
+    let overflowPillCount = 0
+    for (const d of days) {
+      const key = fmtISO(d)
+      const vis: { o: Occurrence; row: number }[] = []
+      const ovf: { o: Occurrence; row: number }[] = []
+      ;(untimedByDay.get(key) ?? []).forEach((o, i) => {
+        const absRow = laneCount + i
+        if (absRow < ALL_DAY_THRESHOLD) vis.push({ o, row: absRow })
+        else { ovf.push({ o, row: absRow - ALL_DAY_THRESHOLD }); overflowPillCount++ }
+      })
+      if (vis.length) visiblePillsByDay.set(key, vis)
+      if (ovf.length) overflowPillsByDay.set(key, ovf)
+    }
+
+    return {
+      visibleBars, overflowBars, visiblePillsByDay, overflowPillsByDay,
+      hiddenCount: overflowBars.length + overflowPillCount,
+    }
+  }, [bars, untimedByDay, days, laneCount])
+
+  const [allDayExpanded, setAllDayExpanded] = useState(false)
+
   const scRef = useRef<HTMLDivElement | null>(null)
   const setScrollerRef = useCallback((el: HTMLDivElement | null) => {
     scRef.current = el
@@ -164,6 +206,31 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
     const rect = e.currentTarget.getBoundingClientRect()
     createAt(day, h, ((e.clientY - rect.top) / HP) * 60)
   }
+
+  const renderBar = (b: (typeof bars)[number] & { row: number }) => (
+    <OccurrencePill
+      key={b.occ.id}
+      style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.row + 1 }}
+      state={occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
+      title={b.occ.metadata.title}
+      onClick={() => onOpen(b.occ)}
+      continuesLeft={b.continuesLeft}
+      continuesRight={b.continuesRight}
+      chevronHiddenOnMobile
+      className="px-0.5 sm:px-1.5 text-3xs sm:text-xs"
+    />
+  )
+
+  const renderPill = (o: Occurrence, col: number, row: number) => (
+    <OccurrencePill
+      key={`${o.fileSlug}-${o.date}`}
+      style={{ gridColumn: col + 1, gridRow: row + 1 }}
+      state={occState(o)}
+      title={o.metadata.title}
+      onClick={() => onOpen(o)}
+      className="px-0.5 sm:px-1.5 text-3xs sm:text-xs w-full"
+    />
+  )
 
   return (
     <>
@@ -193,43 +260,42 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
         </div>
       </div>
 
-      {/* All-day / multiday strip — gutter spacer + a single grid-cols-7 grid
+      {/* All-day / multiday strip — gutter spacer + a grid-cols-7 grid
           holding both the spanning bars and each day's own untimed pills.
           Bars occupy rows [0, laneCount); a day's pills start at row
           laneCount, so the two never share a cell regardless of container
           overflow — no absolute-positioned overlay needed (unlike
-          MonthGrid, whose bars overlay a separately-measured cell grid). */}
+          MonthGrid, whose bars overlay a separately-measured cell grid).
+          Rows at/beyond ALL_DAY_THRESHOLD are split into a second grid and
+          folded behind the same expand/collapse toggle DayPane uses for its
+          all-day list — see AllDayOverflowToggle. */}
       {hasAllDayContent && (
         <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
           <div style={{ width: GUTTER }} className="shrink-0" />
-          <div className="flex-1 overflow-y-auto py-1" style={{ maxHeight: ALLDAY_MAX_H }}>
+          <div className="flex-1 py-1 min-w-0">
             <div className="grid grid-cols-7 gap-0.5" style={{ gridAutoRows: ALLDAY_ROW_H }}>
-              {bars.map(b => (
-                <OccurrencePill
-                  key={b.occ.id}
-                  style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.lane + 1 }}
-                  state={occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
-                  title={b.occ.metadata.title}
-                  onClick={() => onOpen(b.occ)}
-                  continuesLeft={b.continuesLeft}
-                  continuesRight={b.continuesRight}
-                  chevronHiddenOnMobile
-                  className="px-0.5 sm:px-1.5 text-3xs sm:text-xs"
-                />
-              ))}
+              {visibleBars.map(renderBar)}
               {days.map((d, col) =>
-                (untimedByDay.get(fmtISO(d)) ?? []).map((o, i) => (
-                  <OccurrencePill
-                    key={`${o.fileSlug}-${o.date}`}
-                    style={{ gridColumn: col + 1, gridRow: laneCount + i + 1 }}
-                    state={occState(o)}
-                    title={o.metadata.title}
-                    onClick={() => onOpen(o)}
-                    className="px-0.5 sm:px-1.5 text-3xs sm:text-xs w-full"
-                  />
-                )),
+                (visiblePillsByDay.get(fmtISO(d)) ?? []).map(p => renderPill(p.o, col, p.row)),
               )}
             </div>
+
+            {hiddenCount > 0 && (
+              <div className={cn('dv-adoverflow', allDayExpanded && 'open')}>
+                <div className="grid grid-cols-7 gap-0.5 mt-0.5" style={{ gridAutoRows: ALLDAY_ROW_H }}>
+                  {overflowBars.map(renderBar)}
+                  {days.map((d, col) =>
+                    (overflowPillsByDay.get(fmtISO(d)) ?? []).map(p => renderPill(p.o, col, p.row)),
+                  )}
+                </div>
+              </div>
+            )}
+
+            <AllDayOverflowToggle
+              hiddenCount={hiddenCount}
+              expanded={allDayExpanded}
+              onToggle={() => setAllDayExpanded(v => !v)}
+            />
           </div>
         </div>
       )}
