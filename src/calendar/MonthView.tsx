@@ -6,7 +6,7 @@ import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import { useCarousel } from './useCarousel'
 import { PANE_COUNT } from './snapCarousel'
-import { occPillRounded } from '@/components/primitives/occurrence-variants'
+import { occRadius } from '@/components/primitives/occurrence-variants'
 import { calendarView, setMonthPreview } from './viewState'
 
 // Fallback for the occurrence-list start offset until it's measured (cell top padding
@@ -117,7 +117,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       <div
         ref={rowSentinelRef}
         aria-hidden
-        className={cn('invisible absolute pointer-events-none flex items-center px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium', occPillRounded)}
+        className={cn('invisible absolute pointer-events-none flex items-center px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium', occRadius)}
       >
         &nbsp;
       </div>

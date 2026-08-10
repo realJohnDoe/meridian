@@ -8,7 +8,7 @@ import { fmtT, fmtISO, parseDurationDays } from '@/model'
 import { sameDay, fmtShort } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
-import { dvBlockVariants, occPillRounded } from '@/components/primitives/occurrence-variants'
+import { dvBlockVariants, occRadius } from '@/components/primitives/occurrence-variants'
 import { ContinuationChevron, CONTINUES_PADDING } from './ContinuationChevron'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday } from '@/hooks'
@@ -211,7 +211,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
                   style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.lane + 1 }}
                   className={cn(
                     dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
-                    occPillRounded,
+                    occRadius,
                     'relative flex items-center px-0.5 sm:px-1.5 text-3xs sm:text-xs font-medium overflow-hidden',
                     b.continuesLeft && CONTINUES_PADDING.left,
                     b.continuesRight && CONTINUES_PADDING.right,
@@ -231,7 +231,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
                     style={{ gridColumn: col + 1, gridRow: laneCount + i + 1 }}
                     className={cn(
                       dvBlockVariants({ state: occState(o) }),
-                      occPillRounded,
+                      occRadius,
                       'flex items-center px-0.5 sm:px-1.5 text-3xs sm:text-xs font-medium w-full overflow-hidden',
                     )}
                     onClick={() => onOpen(o)}

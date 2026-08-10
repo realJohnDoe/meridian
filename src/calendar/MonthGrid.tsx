@@ -17,7 +17,7 @@ import { useToday } from '@/hooks'
 import { useCalendarFilter } from './useCalendarFilter'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
-import { dvBlockVariants, occPillRounded } from '@/components/primitives/occurrence-variants'
+import { dvBlockVariants, occRadius } from '@/components/primitives/occurrence-variants'
 import { ContinuationChevron, CONTINUES_PADDING } from './ContinuationChevron'
 
 // Cell-chrome class strings, shared between CalCell and the invisible chrome
@@ -81,7 +81,7 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
         style={reservedLanes ? { marginTop: reservedLanes * (rowH + ROW_GAP) } : undefined}
       >
         {dayOccs.slice(0, shown).map(o => (
-          <div key={`${o.fileSlug}-${o.date}`} className={cn(dvBlockVariants({ state: occState(o) }), occPillRounded, 'flex items-center px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
+          <div key={`${o.fileSlug}-${o.date}`} className={cn(dvBlockVariants({ state: occState(o) }), occRadius, 'flex items-center px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
             <span className="truncate min-w-0">{o.metadata.title}</span>
           </div>
         ))}
@@ -256,7 +256,7 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
                     style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.lane + 1 }}
                     className={cn(
                       dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
-                      occPillRounded,
+                      occRadius,
                       // mx-0.5 mirrors the day cell's 2px horizontal padding so a
                       // single-column bar aligns exactly with a single-day occurrence row.
                       'relative flex items-center mx-0.5 px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
