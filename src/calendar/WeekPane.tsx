@@ -285,7 +285,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
                     <button
                       key={h}
                       type="button"
-                      className="absolute inset-x-0 rounded-[var(--radius-calendar)] bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className={cn(occRadius, 'absolute inset-x-0 bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}
                       style={{ top: h * HP + TOP_PAD + 1, height: HP - 2 }}
                       onClick={handleHourClick(d, h)}
                       aria-label={`Create event on ${fmtShort(d)} at ${formatHourBoundary(h, hour12)}`}

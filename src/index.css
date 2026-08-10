@@ -90,14 +90,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Corner radius for the neutral (non-colored) background rects behind the
-     day/week/month grids — DayPane/WeekPane hour cells and MonthGrid's
-     CELL_CLASS. These are plain bg-muted surfaces, not occurrence displays,
-     so they don't follow occRadius's responsive/colored-surface treatment
-     (see occurrence-variants.ts) — just a flat step between --radius-md and
-     --radius-lg at every viewport width. */
-  --radius-calendar: calc(var(--radius) - 1px);
-
   /* Z-index layers.
      Component-local stacking (card overlays, sidebar rail, popovers, dialogs…)
      uses Tailwind's default z-0/10/20/30/50 scale directly — that's already a
