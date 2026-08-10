@@ -5,9 +5,11 @@
  *
  * sync.ts is exercised only through its public surface (syncToBackend,
  * autoSyncTick, resetSyncBackoff) — pushDirty/resolveCollision/runSync are
- * module-private. `@/storage/cache`, `@/storeBridge`, and
+ * module-private. `@/storage/cache/files`, `@/storeBridge`, and
  * `@/storage/notifications` are replaced with in-memory fakes so the test
  * doesn't need Dexie/IndexedDB or a DOM-backed zustand store/sonner toast.
+ * `@/storage/inFlight` is deliberately NOT mocked — it holds no Dexie state,
+ * so the real refcounted registry is what these tests exercise.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { StorageBackend, RawFile } from '@/storage/backend'
@@ -39,12 +41,7 @@ function vp(vaultId: string, path: string): string {
   return `${vaultId}::${path}`
 }
 
-// The mock's own in-flight registry mirrors cache.ts's real one — declared
-// inside the factory body (rather than the object-literal shorthand used
-// before PR 6) so it can hold this closed-over Map.
-vi.mock('@/storage/cache', () => {
-  const _inFlightPaths = new Map<string, number>()
-
+vi.mock('@/storage/cache/files', () => {
   return {
     recordLocalEdit: vi.fn(async (vaultId: string, path: string, content: string) => {
       const key = vp(vaultId, path)
@@ -96,15 +93,6 @@ vi.mock('@/storage/cache', () => {
     cacheDirtyCount: vi.fn(async (vaultId: string) => {
       return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId && (r.status === 'dirty' || r.status === 'deleted')).length
     }),
-    markInFlight: vi.fn((path: string) => {
-      _inFlightPaths.set(path, (_inFlightPaths.get(path) ?? 0) + 1)
-    }),
-    clearInFlight: vi.fn((path: string) => {
-      const n = (_inFlightPaths.get(path) ?? 0) - 1
-      if (n > 0) _inFlightPaths.set(path, n)
-      else _inFlightPaths.delete(path)
-    }),
-    getInFlightPaths: vi.fn(() => new Set(_inFlightPaths.keys())),
   }
 })
 
@@ -131,7 +119,7 @@ vi.mock('@/storage/notifications', () => notifyFns)
 // come after the vi.mock calls above.
 import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend, parseFiles, reportParseFailures } from '@/storage/sync'
 import { setActiveBackend } from '@/storage/activeBackend'
-import { recordLocalEdit, recordLocalDelete } from '@/storage/cache'
+import { recordLocalEdit, recordLocalDelete } from '@/storage/cache/files'
 
 // ── FakeBackend ──────────────────────────────────────────────────────────
 
@@ -528,7 +516,7 @@ describe('pushDirty — delete-conflict tombstone handling', () => {
 // — a real network round trip. If another edit to that same path lands
 // during the wait, the post-push write must not silently discard it (or
 // resurrect it as clean) just because the push that started earlier
-// finishes later. See markPushed's doc comment in cache.ts.
+// finishes later. See markPushed's doc comment in cache/files.ts.
 
 describe('pushDirty — post-push write does not clobber a concurrent edit', () => {
   it('keeps an edit that lands while the push is still in flight', async () => {

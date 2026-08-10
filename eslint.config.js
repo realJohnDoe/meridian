@@ -300,10 +300,16 @@ export default [
     rules: { 'import-x/no-internal-modules': 'off' },
   },
 
-  // The global app store (src/store.ts) and the Dexie cache (src/storage/cache.ts)
-  // are each singletons: exactly one file may import their underlying library.
-  // Everything else goes through @/storeBridge and @/storage/cache's exported
-  // functions. src/calendar/viewState.ts is a second, deliberately separate
+  // The global app store (src/store.ts) and the Dexie database
+  // (src/storage/cache/db.ts) are each singletons: exactly one file may import
+  // their underlying library. Everything else goes through @/storeBridge and
+  // the functions exported by src/storage/cache/{files,credentials,registry}.ts,
+  // which reach IndexedDB only through db.ts's cacheInit(). Scoping this to
+  // db.ts rather than the whole cache/ directory is deliberate: it keeps the
+  // singleton guarantee while letting the persistence concerns live in
+  // separate files. Do NOT widen it to src/storage/cache/** — that dissolves
+  // the guarantee with lint still green.
+  // src/calendar/viewState.ts is a second, deliberately separate
   // Zustand store scoped to calendar-view-local ephemeral state (scroll
   // position, carousel previews) — not the global store, so it's exempted
   // here too, but it must still be reached through the @/calendar barrel like
@@ -317,18 +323,18 @@ export default [
   // repeats `zustand` and `dexie` itself.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/store.ts', 'src/storage/cache.ts', 'src/calendar/viewState.ts'],
+    ignores: ['src/store.ts', 'src/storage/cache/db.ts', 'src/calendar/viewState.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
         {
           paths: [
             { name: 'zustand', message: 'Only src/store.ts may import zustand. Use @/store or @/storeBridge.' },
-            { name: 'dexie',   message: 'Only src/storage/cache.ts may import dexie. Use the cache* functions from @/storage/cache.' },
+            { name: 'dexie',   message: 'Only src/storage/cache/db.ts may import dexie. Use the functions exported by @/storage/cache/{files,credentials,registry}.' },
           ],
           patterns: [
             { group: ['zustand/*'], message: 'Only src/store.ts may import zustand. Use @/store or @/storeBridge.' },
-            { group: ['dexie/*'],   message: 'Only src/storage/cache.ts may import dexie. Use the cache* functions from @/storage/cache.' },
+            { group: ['dexie/*'],   message: 'Only src/storage/cache/db.ts may import dexie. Use the functions exported by @/storage/cache/{files,credentials,registry}.' },
           ],
         },
       ],

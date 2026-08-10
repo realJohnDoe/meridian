@@ -82,8 +82,11 @@ const {
   }
 })
 
-vi.mock('@/storage/cache', () => ({
+vi.mock('@/storage/cache/db', () => ({
   cacheInit: vi.fn(async () => {}),
+}))
+
+vi.mock('@/storage/cache/files', () => ({
   cacheLoadAll: vi.fn(async (vaultId: string) => {
     callOrder.push('cacheLoadAll')
     return cacheConfig.rows.get(vaultId) ?? []
@@ -92,6 +95,9 @@ vi.mock('@/storage/cache', () => ({
   cacheDeleteAll: vi.fn(async (vaultId: string) => {
     for (const k of Array.from(metaStore.keys())) if (k.startsWith(`files:${vaultId}:`)) metaStore.delete(k)
   }),
+}))
+
+vi.mock('@/storage/cache/credentials', () => ({
   handleSave: vi.fn(async (id: string, h: unknown) => { metaStore.set(`handle:${id}`, h) }),
   handleLoad: vi.fn(async (id: string) => metaStore.get(`handle:${id}`) ?? null),
   handleClear: vi.fn(async (id: string) => { metaStore.delete(`handle:${id}`) }),
@@ -101,6 +107,9 @@ vi.mock('@/storage/cache', () => ({
   refreshTokenClear: vi.fn(async (id: string) => { metaStore.delete(`refreshToken:${id}`) }),
   tokenExpirySave: vi.fn(async (id: string, e: number) => { metaStore.set(`tokenExpiry:${id}`, e) }),
   tokenExpiryClear: vi.fn(async (id: string) => { metaStore.delete(`tokenExpiry:${id}`) }),
+}))
+
+vi.mock('@/storage/cache/registry', () => ({
   vaultRefsSave: vi.fn(async (refs: VaultRef[]) => { metaStore.set('vaults', refs) }),
   vaultRefsLoad: vi.fn(async () => (metaStore.get('vaults') as VaultRef[] | undefined) ?? []),
   activeVaultIdSave: vi.fn(async (id: string | null) => {

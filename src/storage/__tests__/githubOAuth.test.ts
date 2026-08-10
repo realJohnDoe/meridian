@@ -3,8 +3,8 @@
  * PAT- vs OAuth-managed vaults, the expiry-margin check, the `force` override,
  * and how refresh success/failure feed back into the caller.
  *
- * `@/storage/cache` is replaced with an in-memory fake so the test doesn't
- * need Dexie/IndexedDB. `fetch` is stubbed directly since exchangeForTokens
+ * `@/storage/cache/credentials` is replaced with an in-memory fake so the test
+ * doesn't need Dexie/IndexedDB. `fetch` is stubbed directly since exchangeForTokens
  * talks to the OAuth worker over HTTP.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -13,7 +13,7 @@ const { tokenStore } = vi.hoisted(() => ({
   tokenStore: new Map<string, string | number>(),
 }))
 
-vi.mock('@/storage/cache', () => ({
+vi.mock('@/storage/cache/credentials', () => ({
   tokenLoad: vi.fn(async (vaultId: string) => {
     const v = tokenStore.get(`token:${vaultId}`)
     return typeof v === 'string' ? v : null

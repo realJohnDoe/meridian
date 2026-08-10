@@ -12,7 +12,8 @@ export { isFolderPickerSupported } from './fs'
 
 export { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush } from './sync'
 
-export { tokenSave, cacheDirtyCount } from './cache'
+export { tokenSave } from './cache/credentials'
+export { cacheDirtyCount } from './cache/files'
 
 export {
   startGitHubSignIn, completeGitHubSignIn, fetchInstalledRepos,

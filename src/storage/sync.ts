@@ -2,9 +2,9 @@ import {
   recordLocalEdit, applyRemoteBatch, confirmDeleted, cacheGetDirty,
   setResolvedClean, markPushed, cacheDirtyCount, cacheLoadAll,
   recordLocalDelete, cacheGetTombstones,
-  markInFlight, clearInFlight, getInFlightPaths,
-} from '@/storage/cache'
-import type { CacheRecord } from '@/storage/cache'
+} from '@/storage/cache/files'
+import type { CacheRecord } from '@/storage/cache/files'
+import { markInFlight, clearInFlight, getInFlightPaths } from '@/storage/inFlight'
 import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
@@ -370,7 +370,7 @@ export async function reconcileWithBackend(
   const cacheMap   = new Map(cached.map(r => [r.path, r]))
 
   // Union in any path with a write/delete currently in flight (see
-  // markInFlight/getInFlightPaths in cache.ts) — snapshotted here, immediately
+  // markInFlight/getInFlightPaths in inFlight.ts) — snapshotted here, immediately
   // before planning, so it reflects everything in flight at the moment this
   // cycle decides.
   const inFlight = getInFlightPaths()
@@ -484,7 +484,7 @@ async function pushDirty(
       // markPushed (not setResolvedClean): f.content was captured before
       // this network round trip, and another edit to this same path may have
       // landed in the meantime. An unconditional clean write would silently
-      // discard that edit — see its doc comment in cache.ts.
+      // discard that edit — see its doc comment in cache/files.ts.
       await markPushed(vaultId, f.path, f.content, newVersion)
       pushed.add(f.path)
     } catch (e) {
@@ -672,8 +672,8 @@ export async function syncToBackend(): Promise<void> {
 // ── CACHE WRITE / DELETE ──────────────────────────────────────
 //
 // The in-flight write registry (markInFlight/clearInFlight/getInFlightPaths)
-// lives in cache.ts now, alongside the persisted status it overlays — see its
-// doc comment there for why marking is refcounted.
+// lives in inFlight.ts — pure in-memory bookkeeping overlaying the persisted
+// status; see its doc comment there for why marking is refcounted.
 
 export async function writeEntityToCache(fileSlug: string): Promise<void> {
   const path = slugToPath(fileSlug)
