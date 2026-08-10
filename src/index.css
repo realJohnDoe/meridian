@@ -216,7 +216,7 @@
   /* 54px content height + top safe-area inset, so anything sized off --th
      (main topbar, sidebar header, Sonner offset, search overlay max-height)
      grows to clear the notch/rounded corners together */
-  --th: calc(54px + env(safe-area-inset-top, 0px)); --r: var(--radius);
+  --th: calc(54px + env(safe-area-inset-top, 0px));
 }
 
 /* Class-scoped restatement of the Meridian tokens above, mirroring the other

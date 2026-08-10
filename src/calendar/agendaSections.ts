@@ -12,7 +12,7 @@ const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
 // returning users always get real sizes — estimates only matter on first visit.
 //
 // HEADER_H:     AgendaHeaderRow div — pt-3.5 (14) + pb-1.5 (6) + text-xs line (~20) ≈ 40px
-// ROW_H_META:   OccurrenceCard min-h-11 + py-2 padding + a meta row + OccurrenceRow mb-1.5 (6) ≈ 68px
+// ROW_H_META:   OccurrenceCard min-h-11 + py-2 padding + a meta row + AgendaRow mb-1.5 (6) ≈ 68px
 // ROW_H_PLAIN:  the same card with no meta row, so it sits on its min-h-11 (44)
 //               floor + mb-1.5 (6) = 50px — the figure OccurrenceList.ts already
 //               uses for exactly this shape.

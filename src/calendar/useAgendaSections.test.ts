@@ -126,7 +126,7 @@ describe('useAgendaSections', () => {
     // The toggled row carries the new value…
     const toggled = result.current.rows.find(r => r.kind === 'occ' && r.occ.id === 'today-task')
     expect(toggled?.kind === 'occ' && toggled.occ.metadata.done).toBe(true)
-    // …while every untouched row is the very same object, so OccurrenceRow's
+    // …while every untouched row is the very same object, so AgendaRow's
     // memo skips it instead of re-rendering the rest of the vault.
     expect(result.current.rows.find(r => r.kind === 'occ' && r.occ.id === 'future-1')).toBe(futureRowBefore)
   })

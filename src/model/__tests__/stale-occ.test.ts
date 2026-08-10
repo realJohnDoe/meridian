@@ -4,7 +4,7 @@
  * The original bug (documented in PR 1):
  *   After a reconcile, parseToStoreItems assigned new UUIDs to every item.
  *   DaySection's memo comparator did not check id/ownerId, so it skipped
- *   re-renders and left OccurrenceRow children with stale occurrences whose
+ *   re-renders and left AgendaRow children with stale occurrences whose
  *   ownerId no longer matched any series in the store. Toggling such a stale
  *   occurrence was a no-op in the model, yet cacheWrite (now recordLocalEdit)
  *   still marked the file dirty, producing a phantom commit.
@@ -12,7 +12,7 @@
  * Fix A (DaySection propsAreEqual) adds id/ownerId to the memo comparator so
  * any identity change forces a re-render and children always close over live
  * occurrences. (DaySection and its comparator are gone since the agenda moved
- * to row-level virtualization: OccurrenceRow now compares the `occ` object
+ * to row-level virtualization: AgendaRow now compares the `occ` object
  * itself, so any identity change reaches it directly. Fix C is what makes
  * that safe — see below.)
  * Fix B (cacheWrite, now recordLocalEdit) short-circuits when content is unchanged, eliminating

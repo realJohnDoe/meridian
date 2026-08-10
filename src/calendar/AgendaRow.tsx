@@ -28,7 +28,7 @@ interface Props {
 // when this row's rendered output could differ. Unrelated sibling changes in
 // the same day leave `occ` reference-stable (see expansionCache.ts's overlay
 // logic), so this row correctly skips re-rendering for those.
-function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
+function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
   const roots     = useStore(s => s.roots)
   const backlinks = useStore(s => s.backlinks)
   const listedOn  = (backlinks.get(occ.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug)
@@ -196,4 +196,4 @@ function OccurrenceRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate
   )
 }
 
-export default memo(OccurrenceRow)
+export default memo(AgendaRow)

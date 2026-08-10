@@ -44,13 +44,20 @@ export const occBarVariants = cva(
 )
 
 /**
- * Shared small corner radius for occurrence "pill" elements — month-view day
- * cell chips/bars and day-view all-day items. Kept in one place so the two
- * views can't drift apart the way they did when month view's chips were
- * bumped to rounded-sm/md without updating this radius (see git history on
- * MonthGrid.tsx) — they ended up more rounded than their day-view counterpart.
+ * Shared corner radius for every surface in the day/week/month grid views —
+ * month-view day-cell chips/bars, day/week all-day pills, day/week timed
+ * EventBlocks, and the neutral bg-muted background rects behind them
+ * (DayPane/WeekPane hour cells, MonthGrid's CELL_CLASS). Small on phones so
+ * these read tight in a narrow column, growing to match the agenda view's
+ * OccurrenceCard radius (rounded-lg) once there's room at sm: and up. The
+ * agenda view itself is deliberately excluded — OccurrenceCard/AgendaRow
+ * is a separate, more widely-shared component (also used by search results
+ * and the editor's items list) and keeps its own rounded-lg unconditionally.
+ * Kept in one place so the grid views can't drift apart the way month view
+ * once did (see git history on MonthGrid.tsx, when its chips were bumped to
+ * rounded-sm/md without updating this radius).
  */
-export const occPillRounded = 'rounded-xs sm:rounded'
+export const occRadius = 'rounded-[4px] sm:rounded-lg'
 
 /**
  * DayView item colouring — all-day pills (bordered=false) and timed event

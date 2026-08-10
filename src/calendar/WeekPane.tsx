@@ -1,15 +1,14 @@
 import { useMemo, useLayoutEffect, useRef, useState, useCallback, type MouseEvent } from 'react'
 import { differenceInCalendarDays } from 'date-fns'
 import { useStore } from '@/store'
-import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
 import { fmtT, fmtISO, parseDurationDays } from '@/model'
 import { sameDay, fmtShort } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
-import { dvBlockVariants, occPillRounded } from '@/components/primitives/occurrence-variants'
-import { ContinuationChevron, CONTINUES_PADDING } from './ContinuationChevron'
+import { occRadius } from '@/components/primitives/occurrence-variants'
+import { OccurrencePill } from './OccurrencePill'
 import { AllDayOverflowToggle, ALL_DAY_THRESHOLD } from './AllDayOverflowToggle'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday } from '@/hooks'
@@ -209,39 +208,28 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
   }
 
   const renderBar = (b: (typeof bars)[number] & { row: number }) => (
-    <SurfaceButton
+    <OccurrencePill
       key={b.occ.id}
       style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.row + 1 }}
-      className={cn(
-        dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
-        occPillRounded,
-        'relative flex items-center px-0.5 sm:px-1.5 text-3xs sm:text-xs font-medium overflow-hidden',
-        b.continuesLeft && CONTINUES_PADDING.left,
-        b.continuesRight && CONTINUES_PADDING.right,
-      )}
+      state={occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
+      title={b.occ.metadata.title}
       onClick={() => onOpen(b.occ)}
-      aria-label={b.occ.metadata.title}
-    >
-      {b.continuesLeft && <ContinuationChevron side="left" className="hidden sm:block" />}
-      <span className="truncate min-w-0">{b.occ.metadata.title}</span>
-      {b.continuesRight && <ContinuationChevron side="right" className="hidden sm:block" />}
-    </SurfaceButton>
+      continuesLeft={b.continuesLeft}
+      continuesRight={b.continuesRight}
+      chevronHiddenOnMobile
+      className="px-0.5 sm:px-1.5 text-3xs sm:text-xs"
+    />
   )
 
   const renderPill = (o: Occurrence, col: number, row: number) => (
-    <SurfaceButton
+    <OccurrencePill
       key={`${o.fileSlug}-${o.date}`}
       style={{ gridColumn: col + 1, gridRow: row + 1 }}
-      className={cn(
-        dvBlockVariants({ state: occState(o) }),
-        occPillRounded,
-        'flex items-center px-0.5 sm:px-1.5 text-3xs sm:text-xs font-medium w-full overflow-hidden',
-      )}
+      state={occState(o)}
+      title={o.metadata.title}
       onClick={() => onOpen(o)}
-      aria-label={o.metadata.title}
-    >
-      <span className="truncate min-w-0">{o.metadata.title}</span>
-    </SurfaceButton>
+      className="px-0.5 sm:px-1.5 text-3xs sm:text-xs w-full"
+    />
   )
 
   return (
@@ -351,7 +339,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
                     <button
                       key={h}
                       type="button"
-                      className="absolute inset-x-0 rounded-lg bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className={cn(occRadius, 'absolute inset-x-0 bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}
                       style={{ top: h * HP + TOP_PAD + 1, height: HP - 2 }}
                       onClick={handleHourClick(d, h)}
                       aria-label={`Create event on ${fmtShort(d)} at ${formatHourBoundary(h, hour12)}`}

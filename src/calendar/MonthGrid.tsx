@@ -17,15 +17,15 @@ import { useToday } from '@/hooks'
 import { useCalendarFilter } from './useCalendarFilter'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
-import { dvBlockVariants, occPillRounded } from '@/components/primitives/occurrence-variants'
-import { ContinuationChevron, CONTINUES_PADDING } from './ContinuationChevron'
+import { occRadius } from '@/components/primitives/occurrence-variants'
+import { OccurrencePill } from './OccurrencePill'
 
 // Cell-chrome class strings, shared between CalCell and the invisible chrome
 // sentinel so the bar overlay's top offset can be MEASURED from a real replica
 // rather than hand-computed — the day-number badge, cell padding, or the flex
 // gap can change without silently breaking bar↔row alignment (see `barTop`,
 // hoisted and measured once in MonthView since it's month-independent).
-export const CELL_CLASS = 'flex-col items-stretch p-[3px_2px_2px] rounded-[var(--r)] bg-muted/40 transition-colors overflow-hidden min-h-0 w-full'
+export const CELL_CLASS = `flex-col items-stretch p-[3px_2px_2px] ${occRadius} bg-muted/40 transition-colors overflow-hidden min-h-0 w-full`
 export const BADGE_CLASS = 'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
 export const OCC_LIST_CLASS = 'flex flex-col gap-0.5 flex-1 overflow-hidden'
 
@@ -44,7 +44,7 @@ interface CalCellProps {
 }
 
 // No memo() here — all props are read directly in the body (no unused
-// "force refresh" prop like OccurrenceRow's `tick`), and `dayOccs`/`today`
+// "force refresh" prop like AgendaRow's `tick`), and `dayOccs`/`today`
 // stay reference-stable across unrelated MonthGrid renders (the compiler
 // auto-caches occsByDay, and useToday only updates at midnight), so the
 // React Compiler's own per-prop memoization already skips this render when
@@ -81,9 +81,12 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
         style={reservedLanes ? { marginTop: reservedLanes * (rowH + ROW_GAP) } : undefined}
       >
         {dayOccs.slice(0, shown).map(o => (
-          <div key={`${o.fileSlug}-${o.date}`} className={cn(dvBlockVariants({ state: occState(o) }), occPillRounded, 'flex items-center px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium w-full overflow-hidden')}>
-            <span className="truncate min-w-0">{o.metadata.title}</span>
-          </div>
+          <OccurrencePill
+            key={`${o.fileSlug}-${o.date}`}
+            state={occState(o)}
+            title={o.metadata.title}
+            className="px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs w-full"
+          />
         ))}
         {overflowing && (
           <div className="text-3xs sm:text-2xs text-foreground px-0.5 sm:px-1">+{hiddenCount}</div>
@@ -251,23 +254,18 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
                 style={{ top: barTop, gridAutoRows: rowH || undefined }}
               >
                 {shownBars.map(b => (
-                  <div
+                  <OccurrencePill
                     key={b.occ.id}
                     style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.lane + 1 }}
-                    className={cn(
-                      dvBlockVariants({ state: occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }) }),
-                      occPillRounded,
-                      // mx-0.5 mirrors the day cell's 2px horizontal padding so a
-                      // single-column bar aligns exactly with a single-day occurrence row.
-                      'relative flex items-center mx-0.5 px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs font-medium overflow-hidden',
-                      b.continuesLeft && CONTINUES_PADDING.left,
-                      b.continuesRight && CONTINUES_PADDING.right,
-                    )}
-                  >
-                    {b.continuesLeft && <ContinuationChevron side="left" className="hidden sm:block" />}
-                    <span className="truncate min-w-0">{b.occ.metadata.title}</span>
-                    {b.continuesRight && <ContinuationChevron side="right" className="hidden sm:block" />}
-                  </div>
+                    state={occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
+                    title={b.occ.metadata.title}
+                    continuesLeft={b.continuesLeft}
+                    continuesRight={b.continuesRight}
+                    chevronHiddenOnMobile
+                    // mx-0.5 mirrors the day cell's 2px horizontal padding so a
+                    // single-column bar aligns exactly with a single-day occurrence row.
+                    className="mx-0.5 px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs"
+                  />
                 ))}
               </div>
             )}

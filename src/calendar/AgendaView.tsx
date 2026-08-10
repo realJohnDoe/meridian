@@ -5,7 +5,7 @@ import type { Occurrence, EditScope } from '@/types'
 import { parseDateString } from '@/model'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import AgendaHeaderRow from './AgendaHeaderRow'
-import OccurrenceRow from './OccurrenceRow'
+import AgendaRow from './AgendaRow'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
 import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
@@ -23,7 +23,7 @@ export default function AgendaView({ onOpen }: Props) {
   // than props/state the compiler can track — react-hooks/incompatible-library.
   // This component also drives a raw scroll listener off virtualizer.scrollOffset
   // directly (see updateTopDate below), which is exactly the pattern the rule
-  // warns about. Opting out here only affects this function — OccurrenceRow,
+  // warns about. Opting out here only affects this function — AgendaRow,
   // useAgendaSections, and everything else still gets compiled/memoized normally.
   //
   // Note: the compiler already auto-skips memoizing this function because it
@@ -49,7 +49,7 @@ export default function AgendaView({ onOpen }: Props) {
 
   const { rows, goToRowIndex } = useAgendaSections(today, now, anchor)
 
-  // OccurrenceRow is memoized with React's default shallow compare, so these
+  // AgendaRow is memoized with React's default shallow compare, so these
   // handlers are genuinely part of its props comparison: an unstable reference
   // here would re-render every mounted row on every AgendaView render.
   // (Before row virtualization, DaySection's custom comparator ignored them
@@ -71,7 +71,7 @@ export default function AgendaView({ onOpen }: Props) {
   // Counts *rows*, not sections. Section-granular virtualization mounted every
   // row a section owned the moment it entered the viewport, and the overdue
   // section pools every undone past task with no cap — on a large vault that
-  // was thousands of OccurrenceRows (each with three touch listeners, two
+  // was thousands of AgendaRows (each with three touch listeners, two
   // store subscriptions and a backlink lookup) in one synchronous commit.
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -187,7 +187,7 @@ export default function AgendaView({ onOpen }: Props) {
                       onToggle={toggleOverdueCollapsed}
                     />
                   ) : (
-                    <OccurrenceRow
+                    <AgendaRow
                       occ={row.occ}
                       // Only today's rows track the clock; every other row's
                       // event-past/event-future state can't change from the
