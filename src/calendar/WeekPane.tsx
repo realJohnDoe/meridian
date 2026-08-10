@@ -207,6 +207,10 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
     createAt(day, h, ((e.clientY - rect.top) / HP) * 60)
   }
 
+  // Unlike MonthGrid's bars (always narrow — a fixed 1/7-width cell no matter
+  // the span), a week bar's rendered width scales with how many day columns
+  // it covers, so only a single-day-wide bar is as cramped on mobile as a
+  // month cell; anything wider has room for the chevron at any viewport size.
   const renderBar = (b: (typeof bars)[number] & { row: number }) => (
     <OccurrencePill
       key={b.occ.id}
@@ -216,7 +220,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
       onClick={() => onOpen(b.occ)}
       continuesLeft={b.continuesLeft}
       continuesRight={b.continuesRight}
-      chevronHiddenOnMobile
+      chevronHiddenOnMobile={b.startCol === b.endCol}
       className="px-0.5 sm:px-1.5 text-3xs sm:text-xs"
     />
   )
