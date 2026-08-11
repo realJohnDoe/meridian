@@ -13,7 +13,7 @@ import { ExampleBackend } from './exampleBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import type { VaultRef, GitHubVaultRef } from '@/vaultRef'
-import { setData, getVaults, setActiveVaultId, setStoreState, setUnreadableFiles } from '@/storeBridge'
+import { setData, getVaults, setActiveVaultId, setStoreState, setUnreadableFiles, loadVaultPrefs } from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
 import { syncOnActivate, parseFiles, reportParseFailures, updateSyncUI } from './sync'
@@ -70,6 +70,14 @@ async function updateVaultRefs(mutate: (current: VaultRef[]) => VaultRef[]): Pro
  * down now or must stay up until the first sync fills the store.
  */
 async function hydrateFromCache(vaultId: string): Promise<boolean> {
+  // Before anything paints. The participant filter and the tasks toggle decide
+  // which occurrences the agenda builds sections from, and they are a plain
+  // localStorage read — but setActiveVaultId, which normally loads them, only
+  // runs after the token refresh and the permission probe. Painting first meant
+  // the first frame used the *default* filters, and the agenda then dropped
+  // every filtered-out row — including the whole overdue section — from above
+  // its own scroll position once the real values arrived. See loadVaultPrefs.
+  loadVaultPrefs(vaultId)
   const cached = await cacheLoadAll(vaultId)
   if (cached.length === 0) {
     // Clear rather than return early: leaving the previous vault's items in

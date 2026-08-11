@@ -17,13 +17,34 @@ export const setUnreadableFiles = (files: Map<string, { path: string; message: s
 // ── STORE WRITERS (storage layer uses these instead of useStore directly) ──
 /** Single-field-set forwarder for callers that don't need `setActiveVaultId`'s fan-out. */
 export const setStoreState = useStore.setState
+/**
+ * Load the per-vault preferences out of localStorage.
+ *
+ * Two of these — `participantFilter` and `showTasks` — decide what the calendar
+ * renders (they feed `useCalendarFilter`), so they are not merely cosmetic:
+ * whatever is on screen before they land is filtered by the *defaults*.
+ *
+ * Split out of `setActiveVaultId` so the cache-first paint can call it before
+ * it paints. These are a synchronous localStorage read — no credential, no
+ * network — but `setActiveVaultId` only runs after the OAuth token refresh and
+ * the permission probe. Painting first and re-filtering afterwards silently
+ * removed rows from *above* the agenda's scroll position, sliding it forward by
+ * however tall the (now-empty) overdue section had been. See
+ * plans/time-to-today.md.
+ *
+ * Idempotent: calling it again for the same vault is a re-read, not a change.
+ */
+export const loadVaultPrefs      = (id: string): void => {
+  const store = useStore.getState()
+  store.loadFavorites(id)
+  store.loadDefaultParticipants(id)
+  store.loadParticipantFilter(id)
+  store.loadShowTasks(id)
+}
 export const setActiveVaultId    = (id: string | null) => {
   useStore.setState({ activeVaultId: id })
   if (id) {
-    useStore.getState().loadFavorites(id)
-    useStore.getState().loadDefaultParticipants(id)
-    useStore.getState().loadParticipantFilter(id)
-    useStore.getState().loadShowTasks(id)
+    loadVaultPrefs(id)
   } else {
     useStore.setState({ favorites: [], defaultParticipants: [], participantFilter: [], showTasks: true })
   }
