@@ -157,12 +157,13 @@ function AppMain() {
             // replace: true on nav — mirrors the day carousel's swipe-to-page
             // semantics (see DayView) so chevron taps and swipes leave the
             // same, single history entry per visit instead of chevron taps
-            // alone stacking up a back-press-per-day trail.
+            // alone stacking up a back-press-per-day trail. Label is just the
+            // month (like month view's own PagedTopbar below) — the weekday
+            // and day-of-month already show in DayPane's own corner badge.
             <PagedTopbar
               isMobile={isMobile}
               openSidebar={openSidebar}
-              label={fmtTopBarDay(dvDisplayDate, today)}
-              shortLabel={fmtTopBarDayShort(dvDisplayDate, today)}
+              label={fmtTopBarMonth(dvDisplayDate, today)}
               prevLabel="Previous day"
               nextLabel="Next day"
               onPrev={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}
