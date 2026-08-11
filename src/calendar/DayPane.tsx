@@ -188,7 +188,7 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
             <span className="text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground">
               {dvDate.toLocaleDateString(undefined, { weekday: 'short' })}
             </span>
-            <span className={cn(BADGE_CLASS, isToday && 'bg-primary text-primary-foreground font-bold')}>
+            <span className={cn(BADGE_CLASS, 'text-base w-7 h-7', isToday && 'bg-primary text-primary-foreground font-bold')}>
               {dvDate.getDate()}
             </span>
           </div>
@@ -200,8 +200,6 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
           />
         </div>
         <div className="flex-1 min-w-0 pr-2 py-1.5">
-          <div className="text-2xs font-semibold tracking-[.07em] uppercase text-muted-foreground mb-1">All day</div>
-
           {/* Always-visible first N items (capped at ALL_DAY_VISIBLE_ROWS once overflowing, to make room for the label below) */}
           {allDay.slice(0, shownAllDayCount).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
 
