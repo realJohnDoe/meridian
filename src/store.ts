@@ -1,8 +1,8 @@
 import { create } from 'zustand'
-import type { StoreItem, Roots, Occurrence } from './types'
+import type { StoreItem, Roots } from './types'
 import type { LocalePrefs } from '@/model'
 import type { VaultRef } from './vaultRef'
-import { updateFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
+import { warmFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
 import { readVaultStringArray, writeVaultJSON, readVaultJSON } from '@/lib/vaultStorage'
 
 function detectLocalePrefs(): LocalePrefs {
@@ -34,9 +34,16 @@ interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
   items: StoreItem[]
   roots: Roots
-  /** Derived: one representative Occurrence per file slug. Recomputed on every setData. */
-  fom: Map<string, Occurrence>
-  /** Derived: targetSlug → sourceSlugs that link to it. Recomputed on every setData. */
+  /**
+   * Derived: targetSlug → sourceSlugs that link to it. Recomputed on every
+   * setData, which is affordable (~1 ms on a 300-file vault) and necessary —
+   * AgendaRow reads it, so it is on the first-paint path.
+   *
+   * Its sibling index, the fileSlug → representative Occurrence map, is
+   * deliberately *not* a store field: it costs ~240 ms to build and no
+   * cold-start view reads it. See `fileOccurrenceMap` in fileOccurrence.ts and
+   * the `useFileOccurrenceMap` hook.
+   */
   backlinks: Map<string, string[]>
   /** Set items and roots together atomically. */
   setData: (data: { items: StoreItem[]; roots: Roots }) => void
@@ -155,13 +162,16 @@ export const useStore = create<MeridianStore>((set, get) => {
   return {
     items: [],
     roots: new Map(),
-    fom: new Map(),
     backlinks: new Map(),
     setData: ({ items, roots }) => {
-      const { items: prevItems, roots: prevRoots, fom: prevFom, backlinks: prevBacklinks } = get()
+      const { roots: prevRoots, backlinks: prevBacklinks } = get()
       // backlinks depend only on roots; reuse the prior index when roots is reference-stable.
       const backlinks = roots === prevRoots ? prevBacklinks : buildBacklinkIndex(roots)
-      set({ items, roots, fom: updateFileOccurrenceMap(prevFom, prevItems, prevRoots, items, roots), backlinks })
+      set({ items, roots, backlinks })
+      // Off the critical path on purpose — this is the expensive derived index,
+      // and nothing painted at cold start reads it. Warming it during idle keeps
+      // the editor/search consumers from paying for it on open either.
+      warmFileOccurrenceMap(items, roots)
     },
 
     unreadableFiles: new Map(),

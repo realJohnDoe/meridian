@@ -4,6 +4,7 @@ export { multidayDisplayTitle, treeHasOccurrences, stableOccId, expandRange, joi
 export type { StoreData, EditorFields, EditFields, SeriesContext } from './storeOps'
 export { fileSlugItems, findSeries, seriesContext, upsertOverride, applyEdit, newEntrySlug, toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing, occFromAppMeta } from './storeOps'
 export { parseToStoreItems } from './storeItems'
+export type { ParseResult } from './storeItems'
 export { collapseToYaml } from './collapse'
 export { roundTripLoss } from './roundTripCheck'
 export { parseDuration, parseDurationDays, parseDurationHours } from './duration'

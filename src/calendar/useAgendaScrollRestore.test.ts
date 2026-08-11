@@ -88,6 +88,22 @@ describe('useAgendaScrollRestore', () => {
     expect(result.current.initialOffset).toBe(30 + 68)
   })
 
+  // The cold-start regression this whole seeding mechanism exists for: on a
+  // fresh load nothing has requested a scroll, and `agendaScrollOffset` is 0 —
+  // the top of the ~455-day window, ten screens above today. viewState's
+  // agendaScrollTarget therefore defaults to today rather than null, so the
+  // very first mount takes the seeded branch with no signal from anywhere.
+  it('has a scroll-to-today pending by default, so a cold start seeds at today', () => {
+    const { rows, goToRowIndex } = agenda()
+    const pending = calendarView.getState().agendaScrollTarget !== null
+
+    expect(pending).toBe(true)
+
+    const { result } = renderHook(() => useAgendaScrollRestore(pending, rows, goToRowIndex))
+    expect(result.current.initialOffset).toBe(108)
+    expect(result.current.initialOffset).not.toBe(calendarView.getState().agendaScrollOffset)
+  })
+
   it('restores the saved scroll offset when no scroll-to-today is pending', () => {
     const { rows, goToRowIndex } = agenda()
     calendarView.setState({ agendaScrollOffset: 1234 })

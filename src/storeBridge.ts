@@ -1,11 +1,12 @@
 import type { StoreItem, Roots, Occurrence } from './types'
 import type { VaultRef } from './vaultRef'
 import { useStore } from './store'
+import { fileOccurrenceMap } from './fileOccurrence'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
 export const getItems         = (): StoreItem[]    => useStore.getState().items
 export const getRoots         = (): Roots          => useStore.getState().roots
-export const getFom           = (): Map<string, Occurrence> => useStore.getState().fom
+export const getFom           = (): Map<string, Occurrence> => fileOccurrenceMap(getItems(), getRoots())
 export const setData          = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
 export const getSnapshot      = (): { items: StoreItem[]; roots: Roots } => ({ items: getItems(), roots: getRoots() })
 export const getVaults        = (): VaultRef[]     => useStore.getState().vaults

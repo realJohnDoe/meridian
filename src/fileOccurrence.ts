@@ -3,6 +3,7 @@ import { expandRange, joinFileMeta, stableOccId } from '@/model'
 import { buildResolveIndex, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc } from './types'
 import { occKind } from './occView'
+import { onIdle } from '@/lib/idle'
 import type { Occurrence, StoreItem, Roots } from './types'
 
 /** A flat, file-granular entry for the item picker and search overlay. */
@@ -158,6 +159,72 @@ export function updateFileOccurrenceMap(
   }
 
   return map
+}
+
+// ── the memo, and why this is no longer part of setData ────────────────────
+//
+// `updateFileOccurrenceMap` used to run synchronously inside `setData`, which
+// put it between the Dexie read and the agenda's first paint. On a 300-file
+// vault that measured ~240 ms — larger than the YAML parse and the agenda's
+// whole expansion+grouping stage — because `resolveOneSlug` expands every slug
+// over the ±3-year window above, generating ~28.5k occurrences to pick 300
+// representatives. See plans/time-to-today.md.
+//
+// Nothing rendered at cold start reads it. Its consumers are the editor
+// (ItemsList, WikilinkPopup, useEntryEditor), the search overlay
+// (FileResultsList) and the entry route — all of which mount well after the
+// agenda. So the map is derived on demand instead, and merely *warmed* during
+// idle time so those consumers almost never pay for it either.
+
+interface FomMemo { items: StoreItem[]; roots: Roots; map: Map<string, Occurrence> }
+
+// A one-entry Map rather than a `let` or a mutable object field, because
+// `fileOccurrenceMap` is called during render (via useFileOccurrenceMap): the
+// React Compiler's purity check flags both reassigning a module binding and
+// writing a property on one, but a `Map.set()` on a const-bound object is the
+// pattern useAgendaSections' sectionsCacheSlot already uses and passes.
+const FOM_KEY = 'fom'
+const fomMemo = new Map<typeof FOM_KEY, FomMemo>()
+
+// Typed empties for the cold-start call below; a bare `new Map()` there infers
+// Map<any, any> and trips the no-unsafe-argument rule.
+const NO_ITEMS: StoreItem[] = []
+const NO_ROOTS: Roots = new Map()
+const NO_FOM: Map<string, Occurrence> = new Map()
+
+/**
+ * The fileSlug → representative Occurrence map for `items`/`roots`, memoized on
+ * their identity. Safe to call during render: repeating the call with the same
+ * inputs returns the same Map by reference, so it behaves as a pure derivation.
+ *
+ * A miss still goes through `updateFileOccurrenceMap`, so it re-resolves only
+ * the slugs that actually changed since the last call — the incremental path is
+ * unchanged, it just runs on read rather than on write.
+ */
+export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string, Occurrence> {
+  const prev = fomMemo.get(FOM_KEY)
+  if (prev && prev.items === items && prev.roots === roots) return prev.map
+
+  const map = updateFileOccurrenceMap(
+    prev?.map ?? NO_FOM, prev?.items ?? NO_ITEMS, prev?.roots ?? NO_ROOTS, items, roots,
+  )
+  fomMemo.set(FOM_KEY, { items, roots, map })
+  return map
+}
+
+let cancelWarm = (): void => {}
+
+/**
+ * Pre-build the map for `items`/`roots` during idle time, so the first
+ * consumer to mount gets a memo hit instead of paying the full resolve inline.
+ *
+ * Called from `setData`. Re-entrant: a newer store write cancels the pending
+ * warm-up rather than queueing a second one, so a burst of sync merges does the
+ * work once, for the final state.
+ */
+export function warmFileOccurrenceMap(items: StoreItem[], roots: Roots): void {
+  cancelWarm()
+  cancelWarm = onIdle(() => { fileOccurrenceMap(items, roots) })
 }
 
 /**

@@ -11,12 +11,10 @@ import type { Occurrence } from '@/types'
 setupStore()
 
 /**
- * The overdue section ships collapsed (viewState.ts), so its occurrence rows
- * don't render until it's expanded. Tests below that are *about* those rows —
- * virtualization, titles, click-through — expand it first; the collapsed
- * default gets its own test.
+ * The overdue section ships expanded (viewState.ts), so its occurrence rows
+ * render by default. Only the test about collapsing needs this.
  */
-const expandOverdue = () => { calendarView.setState({ overdueCollapsed: false }) }
+const collapseOverdue = () => { calendarView.setState({ overdueCollapsed: true }) }
 
 // @tanstack/react-virtual measures the scroll element once via offsetWidth/
 // offsetHeight (see virtual-core's `getRect`), which jsdom leaves at 0 — with
@@ -73,7 +71,6 @@ describe('AgendaView', () => {
   it('mounts only a viewport-sized window of rows, not the whole overdue section', () => {
     const occs = Array.from({ length: 500 }, (_, i) => overdueTask(i))
     seedStore(occs, makeRoots('note.md'))
-    expandOverdue()
 
     render(<AgendaView onOpen={vi.fn()} />)
 
@@ -96,7 +93,6 @@ describe('AgendaView', () => {
       metadata: { participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
     })
     seedStore([task], makeRoots('note.md'))
-    expandOverdue()
 
     render(<AgendaView onOpen={vi.fn()} />)
 
@@ -104,7 +100,7 @@ describe('AgendaView', () => {
     expect(screen.getByText('Pay the invoice')).toBeInTheDocument()
   })
 
-  it('collapses the overdue section by default, mounting its header but none of its rows', () => {
+  it('expands the overdue section by default, mounting its rows', () => {
     const occs = Array.from({ length: 20 }, (_, i) => overdueTask(i))
     seedStore(occs, makeRoots('note.md'))
 
@@ -114,12 +110,24 @@ describe('AgendaView', () => {
     // still reads exactly "Overdue".
     expect(screen.getByText('Overdue')).toBeInTheDocument()
     expect(screen.getByText('20')).toBeInTheDocument()
-    expect(renderedCards()).toHaveLength(0)
-
-    // …and one tap brings the backlog back.
-    fireEvent.click(screen.getByRole('button', { expanded: false }))
-
     expect(renderedCards().length).toBeGreaterThan(0)
+
+    // …and one tap folds it away to just the bar.
+    fireEvent.click(screen.getByRole('button', { expanded: true }))
+
+    expect(renderedCards()).toHaveLength(0)
+  })
+
+  it('renders only the header once the user collapses the overdue section', () => {
+    const occs = Array.from({ length: 20 }, (_, i) => overdueTask(i))
+    seedStore(occs, makeRoots('note.md'))
+    collapseOverdue()
+
+    render(<AgendaView onOpen={vi.fn()} />)
+
+    expect(screen.getByText('Overdue')).toBeInTheDocument()
+    expect(screen.getByText('20')).toBeInTheDocument()
+    expect(renderedCards()).toHaveLength(0)
   })
 
   it('calls onOpen with the occurrence when a row is clicked', () => {
@@ -130,7 +138,6 @@ describe('AgendaView', () => {
       metadata: { participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
     })
     seedStore([task], makeRoots('note.md'))
-    expandOverdue()
 
     const onOpen = vi.fn()
     render(<AgendaView onOpen={onOpen} />)

@@ -15,7 +15,7 @@ import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandE
 import { FloatingComboboxList } from './FloatingComboboxList'
 import { reopenOcc } from '@/occurrenceActions'
 import { rankByQuery } from '@/lib/matching'
-import { useFloatingCombobox } from '@/hooks'
+import { useFloatingCombobox, useFileOccurrenceMap } from '@/hooks'
 
 interface Props {
   items:           string[]
@@ -58,7 +58,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const activeRef = useRef<HTMLDivElement>(null)
   const { anchorRef, listRef, placement } = useFloatingCombobox(pickerOpen, setPickerOpen)
 
-  const occBySlug = useStore(s => s.fom)
+  const occBySlug = useFileOccurrenceMap()
   const backlinks = useStore(s => s.backlinks)
   const allFiles  = fileEntries(roots)
   const filtered  = pickerQuery ? rankByQuery(pickerQuery, allFiles, e => e.title) : allFiles

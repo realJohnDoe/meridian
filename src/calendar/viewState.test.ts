@@ -2,6 +2,8 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { setupStore } from '@/test-utils'
+import { startOfToday } from 'date-fns'
+import { fmtISO } from '@/model'
 import {
   calendarView, resetCalendarViewState,
   useMonthPreview, useDayPreview, useWeekPreview, setMonthPreview, setDayPreview, setWeekPreview,
@@ -40,7 +42,9 @@ describe('calendarView', () => {
     expect(calendarView.getState().monthPreview).toBeNull()
     expect(calendarView.getState().dayPreview).toBeNull()
     expect(calendarView.getState().weekPreview).toBeNull()
-    expect(calendarView.getState().agendaScrollTarget).toBeNull()
+    // Not null: the agenda's resting default is "scroll to today" — see the
+    // agendaScrollTarget doc in viewState.ts.
+    expect(calendarView.getState().agendaScrollTarget).toBe(fmtISO(startOfToday()))
     expect(calendarView.getState().agendaTopDate).toBeNull()
   })
 })

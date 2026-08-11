@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
 import { resolveWikilink, buildResolveIndex, unwrapRef } from '@/wikilinks'
-import { fileEntries, buildBacklinkIndex, updateFileOccurrenceMap } from '@/fileOccurrence'
+import { fileEntries, buildBacklinkIndex, updateFileOccurrenceMap, fileOccurrenceMap } from '@/fileOccurrence'
 import { toggleDone } from '@/model/storeOps'
 import type { StoreItem, Roots, Occurrence } from '@/types'
 
@@ -508,5 +508,68 @@ describe('updateFileOccurrenceMap', () => {
     assertMapsEquivalent(incremental, full)
     // Unrelated slug reuses cached reference.
     expect(incremental.get('my-task')).toBe(prevFom.get('my-task'))
+  })
+})
+
+// ── fileOccurrenceMap ────────────────────────────────────────────────────────
+//
+// The memoized read-side wrapper. This map is no longer built inside setData:
+// on a 300-file vault it measured ~240 ms of blocking work before the agenda's
+// first paint, for an index no cold-start view reads (its consumers are the
+// editor, the search overlay, and the entry route). It is derived on demand and
+// warmed during idle instead — see fileOccurrence.ts and plans/time-to-today.md.
+//
+// Being called during render, the memo has to behave as a pure derivation:
+// same inputs must give back the very same Map, not an equal copy.
+
+describe('fileOccurrenceMap', () => {
+  it('returns the same Map by reference for the same items/roots', () => {
+    const { items, roots } = makeStore([
+      { slug: 'project-alpha',  yaml: ALPHA_YAML },
+      { slug: 'weekly-standup', yaml: RECUR_YAML },
+    ])
+
+    const first  = fileOccurrenceMap(items, roots)
+    const second = fileOccurrenceMap(items, roots)
+
+    expect(second).toBe(first)
+  })
+
+  it('re-derives when items change, matching a full rebuild', () => {
+    const base = makeStore([
+      { slug: 'weekly-standup', yaml: RECUR_YAML },
+      { slug: 'my-task',        yaml: TASK_YAML  },
+    ])
+    const before = fileOccurrenceMap(base.items, base.roots)
+
+    const next = toggleDone(base, before.get('weekly-standup')!)
+    const after = fileOccurrenceMap(next.items, next.roots)
+
+    expect(after).not.toBe(before)
+    assertMapsEquivalent(after, buildFom(next.items, next.roots))
+  })
+
+  it('is correct even when several store writes are skipped between reads', () => {
+    // Nothing forces a read per write any more, so the memo can be several
+    // generations behind when a consumer finally mounts. updateFileOccurrenceMap
+    // compares item groups by reference, so that stays correct — just less
+    // incremental.
+    const base = makeStore([
+      { slug: 'weekly-standup', yaml: RECUR_YAML },
+      { slug: 'my-task',        yaml: TASK_YAML  },
+    ])
+    const seed = fileOccurrenceMap(base.items, base.roots)
+
+    const once  = toggleDone(base, seed.get('weekly-standup')!)
+    const twice = toggleDone(once, fileOccurrenceMap(once.items, once.roots).get('my-task')!)
+
+    // Jump straight from `base` to `twice` without reading the state between.
+    const skipped = makeStore([
+      { slug: 'weekly-standup', yaml: RECUR_YAML },
+      { slug: 'my-task',        yaml: TASK_YAML  },
+    ])
+    fileOccurrenceMap(skipped.items, skipped.roots)
+
+    assertMapsEquivalent(fileOccurrenceMap(twice.items, twice.roots), buildFom(twice.items, twice.roots))
   })
 })
