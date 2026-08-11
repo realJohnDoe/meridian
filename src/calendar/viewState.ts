@@ -44,6 +44,21 @@ interface CalendarViewState {
    * then clear back to null. Always set together with agendaAnchor (see
    * requestScrollToDate) so the target's row exists in the freshly-centered
    * window by the time the scroll fires.
+   *
+   * **Starts at today, not null.** Landing on today is what the agenda should
+   * do the first time it mounts in a session; null meant "no target", which
+   * sent useAgendaScrollRestore down its `agendaScrollOffset` branch — and that
+   * is 0 on a cold start, i.e. the top of the ~455-day window, about ten
+   * screens above today. The correct target used to arrive only when
+   * `onVaultChanged` fired, which on a GitHub vault is behind an OAuth token
+   * refresh and two API round trips: the reported "up to a second before it
+   * scrolls to today". Defaulting it here makes the first painted frame right
+   * without waiting to be told. See plans/time-to-today.md.
+   *
+   * Offset 0 is not a restored scroll position, it is the *absence* of one —
+   * nothing is lost by preferring today for that case. Within a session
+   * `markAgendaScrolled` clears this back to null on the first scroll, so
+   * ordinary remounts still restore the saved offset exactly as before.
    */
   agendaScrollTarget: string | null
   /** ISO date string of the topmost visible day in the agenda view. */
@@ -51,12 +66,18 @@ interface CalendarViewState {
   /**
    * Whether the agenda's overdue section is collapsed to just its header row.
    *
-   * Starts collapsed, which is what keeps scroll-to-today's overdue preference
-   * (see agendaSections.ts's `preferOverdue`) from landing the user on an
-   * unbounded wall of unfinished work: the target is still the overdue section,
-   * but collapsed it's a single bar sitting directly above Today. Expanding is
-   * a per-session act — this is view-ephemeral like the rest of this store, so
-   * a reload starts collapsed again.
+   * **Starts expanded.** Scroll-to-today already targets the overdue section
+   * when there is one (see agendaSections.ts's `preferOverdue`), so "scroll to
+   * today" means "scroll to overdue, with Today directly below it" — and
+   * showing that work is the point of opening the app. This previously started
+   * collapsed to keep the landing spot from being an unbounded wall of
+   * unfinished tasks; row-level virtualization makes that cheap now (AgendaView
+   * counts rows, not sections, so an oversized overdue section never mounts
+   * more than the viewport), and the header still carries a count and a toggle
+   * for anyone who wants it out of the way.
+   *
+   * Collapsing is a per-session act — this is view-ephemeral like the rest of
+   * this store, so a reload starts expanded again.
    */
   overdueCollapsed: boolean
   /**
@@ -79,18 +100,22 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   dayPreview: null,
   weekPreview: null,
   agendaAnchor: fmtISO(startOfToday()),
-  agendaScrollTarget: null,
+  agendaScrollTarget: fmtISO(startOfToday()),
   agendaTopDate: null,
-  overdueCollapsed: true,
+  overdueCollapsed: false,
   currentDate: fmtISO(startOfToday()),
 }))
 
 export function resetCalendarViewState(): void {
-  // currentDate/agendaAnchor are recomputed rather than taken from the frozen
-  // initial snapshot — getInitialState() captured "today" at module load,
-  // which can be stale by the time a long-lived tab switches vaults.
+  // currentDate/agendaAnchor/agendaScrollTarget are recomputed rather than
+  // taken from the frozen initial snapshot — getInitialState() captured "today"
+  // at module load, which can be stale by the time a long-lived tab switches
+  // vaults.
   const today = fmtISO(startOfToday())
-  calendarView.setState({ ...calendarView.getInitialState(), currentDate: today, agendaAnchor: today }, true)
+  calendarView.setState(
+    { ...calendarView.getInitialState(), currentDate: today, agendaAnchor: today, agendaScrollTarget: today },
+    true,
+  )
 }
 
 /**
@@ -99,12 +124,15 @@ export function resetCalendarViewState(): void {
  * and the view-local scroll/preview state. Call once on vault change; nothing
  * else needs to hand-enumerate these.
  *
- * Deliberately does not also call requestScrollToToday() — the caller does
- * that itself, after this returns. Folding it in here would mean this reset
- * (a full-state replace, see resetCalendarViewState above) always stomps the
- * pending target right back to null, and it would leave test cleanup (which
- * wants a clean *initial* state, not a pending scroll) with agendaScrollTarget
- * stuck non-null for the next test.
+ * Call this only when the vault's *content* was actually replaced — see
+ * `VaultChange.contentReplaced` in storage/vaultRegistry.ts. The cache-first
+ * restore path re-activates the vault already on screen, where these caches are
+ * still valid and rebuilding them costs a full re-expansion on the critical
+ * path to the agenda's first frame.
+ *
+ * No separate requestScrollToToday() call is needed after this: agendaScrollTarget
+ * resets to today along with everything else (see resetCalendarViewState), which
+ * is exactly what a vault change wants.
  */
 export function resetCalendarOnVaultChange(): void {
   resetExpansionCache()

@@ -4,6 +4,7 @@ import type { Occurrence } from '@/types'
 import { fileEntries } from '@/fileOccurrence'
 import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
+import { useFileOccurrenceMap } from '@/hooks'
 import { rankByQuery } from '@/lib/matching'
 
 interface Props {
@@ -44,7 +45,7 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
   // is explicit documentation rather than a functional change; the eslint
   // warning here is expected and permanent, see eslint.config.js.
   const roots     = useStore(s => s.roots)
-  const occBySlug = useStore(s => s.fom)
+  const occBySlug = useFileOccurrenceMap()
   const backlinks = useStore(s => s.backlinks)
 
   const debouncedQuery = useDebouncedValue(query, 150)

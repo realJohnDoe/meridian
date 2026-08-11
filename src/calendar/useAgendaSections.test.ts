@@ -7,8 +7,8 @@ import { useAgendaSections } from './useAgendaSections'
 import type { AgendaRow } from './useAgendaSections'
 import { calendarView } from './viewState'
 
-/** The overdue section starts collapsed (viewState.ts); expand it for tests about its contents. */
-const expandOverdue = () => { calendarView.setState({ overdueCollapsed: false }) }
+/** The overdue section starts expanded (viewState.ts); collapse it for the test about that. */
+const collapseOverdue = () => { calendarView.setState({ overdueCollapsed: true }) }
 
 setupStore()
 
@@ -53,7 +53,6 @@ describe('useAgendaSections', () => {
       fileSlug: 'other.md',
     })
     seedStore([overdueTask, pastEvent], new Map([...makeRoots('note.md'), ...makeRoots('other.md')]))
-    expandOverdue()
 
     const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
     const { rows, goToRowIndex } = result.current
@@ -69,7 +68,10 @@ describe('useAgendaSections', () => {
     expect(target?.kind === 'header' && target.tone).toBe('overdue')
   })
 
-  it('collapses the overdue section by default, keeping its header as the scroll target', () => {
+  // Scroll-to-today targets the overdue header when there is one, so this is
+  // what the agenda actually opens on: the overdue work itself, with Today
+  // directly below it.
+  it('expands the overdue section by default, keeping its header as the scroll target', () => {
     const overdueTask = makeOcc({
       id: 'overdue-1',
       date: '2026-06-10',
@@ -81,9 +83,29 @@ describe('useAgendaSections', () => {
     const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
     const { rows, goToRowIndex } = result.current
 
-    // The divider is still there — and still where scroll-to-today lands — but
-    // it's the whole section now, so the agenda opens on a one-line bar above
-    // Today instead of the backlog itself.
+    expect(headerTones(rows)).toEqual(['overdue', 'today'])
+    // Overdue rows carry todayKey, not their own past day — see agendaSections.
+    expect(occIdsFor(rows, '2026-06-15')).toEqual(['overdue-1'])
+    const target = rows[goToRowIndex]
+    expect(target?.kind === 'header' && target.tone).toBe('overdue')
+    expect(target?.kind === 'header' && target.count).toBe(1)
+  })
+
+  it('collapses the overdue section to just its header when the user collapses it', () => {
+    const overdueTask = makeOcc({
+      id: 'overdue-1',
+      date: '2026-06-10',
+      time: null,
+      metadata: { participants: [], title: 'Old task', tags: [], items: [], done: false },
+    })
+    seedStore([overdueTask], makeRoots('note.md'))
+    collapseOverdue()
+
+    const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
+    const { rows, goToRowIndex } = result.current
+
+    // The divider stays — and stays where scroll-to-today lands — but it is the
+    // whole section now, so the agenda shows a one-line bar above Today.
     expect(headerTones(rows)).toEqual(['overdue', 'today'])
     expect(occIdsFor(rows, '2026-06-15')).toEqual([])
     const target = rows[goToRowIndex]

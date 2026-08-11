@@ -8,8 +8,9 @@ import { markInFlight, clearInFlight, getInFlightPaths } from '@/storage/inFligh
 import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
-import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile, roundTripLoss } from '@/model'
+import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile, roundTripLoss, type ParseResult } from '@/model'
 import { pathToSlug, slugToPath } from '@/fileIO'
+import { runInIdleBatches } from '@/lib/idle'
 import type { StoreItem, Roots } from '@/types'
 import {
   getItems, getRoots, setData,
@@ -43,40 +44,67 @@ export interface ParseFailure {
 }
 
 /** A file that loads fine but would lose frontmatter on save — see `roundTripLoss`. */
-export interface RoundTripLoss {
+interface RoundTripLoss {
   path: string
   /** The `key=value` pairs a save would drop. Never empty. */
   lost: string[]
 }
 
-export function parseFiles(
-  files: Array<{ path: string; content: string }>,
-): { items: StoreItem[]; roots: Roots; failures: ParseFailure[]; lossy: RoundTripLoss[] } {
-  const loaded: StoreItem[] = []
-  const roots: Roots = new Map()
-  const failures: ParseFailure[] = []
+/**
+ * Run the round-trip guard over every successfully-parsed file, spread across
+ * idle periods, and report anything it finds.
+ *
+ * Split out of the `parseFiles` loop because it dominated it: on a 300-file
+ * vault the guard measured 75% of the total parse cost (and 70 of its 92 ms was
+ * the two extra `loadFile` calls it makes internally), all of it blocking the
+ * agenda's first paint. Coverage is unchanged — every file is still checked,
+ * and `reportRoundTripLosses` still toasts — only the timing moved. See
+ * plans/time-to-today.md.
+ *
+ * Deliberately not cancellable from the outside: a sweep that started for a
+ * vault which has since been switched away still reports a genuine defect in a
+ * real file, and the check is a pure function of the (path, content, parsed)
+ * triple it captured, so a later vault change cannot make its verdict wrong.
+ */
+function auditRoundTrip(parsed: Array<{ path: string; content: string; result: ParseResult }>): void {
   const lossy: RoundTripLoss[] = []
-  for (const { path, content } of files) {
-    try {
-      const parsed = parseToStoreItems(path, content)
-      loaded.push(...parsed.items)
-      roots.set(pathToSlug(path), parsed.root)
-      // Expected to be empty for every file — see roundTripCheck.ts. Runs here
-      // rather than at save because it is only sound on an UNEDITED round trip
-      // (after an edit, an intentional change reads as a "loss"), and because
-      // here it fires while the file on disk is still untouched.
-      const lost = roundTripLoss(path, content, parsed)
+  runInIdleBatches(
+    parsed,
+    ({ path, content, result }) => {
+      const lost = roundTripLoss(path, content, result)
       if (lost.length > 0) {
         lossy.push({ path, lost })
         console.warn('[vault] save would drop frontmatter from', path, lost)
       }
+    },
+    () => { reportRoundTripLosses(lossy) },
+  )
+}
+
+export function parseFiles(
+  files: Array<{ path: string; content: string }>,
+): { items: StoreItem[]; roots: Roots; failures: ParseFailure[]; auditRoundTrip: () => void } {
+  const loaded: StoreItem[] = []
+  const roots: Roots = new Map()
+  const failures: ParseFailure[] = []
+  const parsed: Array<{ path: string; content: string; result: ParseResult }> = []
+  for (const { path, content } of files) {
+    try {
+      const result = parseToStoreItems(path, content)
+      loaded.push(...result.items)
+      roots.set(pathToSlug(path), result.root)
+      // The round-trip guard is deferred (see auditRoundTrip above), but the
+      // parse it needs is kept here rather than redone: it is only sound on an
+      // UNEDITED round trip — after an edit, an intentional change reads as a
+      // "loss" — so it must see the file exactly as it was loaded.
+      parsed.push({ path, content, result })
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       failures.push({ path, slug: pathToSlug(path), message })
       console.warn('[vault] parse failed for', path, e)
     }
   }
-  return { items: loaded, roots, failures, lossy }
+  return { items: loaded, roots, failures, auditRoundTrip: () => { auditRoundTrip(parsed) } }
 }
 
 /**
@@ -103,7 +131,9 @@ export function reportParseFailures(failures: ParseFailure[]): void {
 const _reportedLossy = new Set<string>()
 
 /**
- * Surface a file that loads fine but would lose frontmatter on save.
+ * Surface a file that loads fine but would lose frontmatter on save. Called
+ * only by `auditRoundTrip` above, once its idle sweep finishes — the parse path
+ * no longer reports losses inline, so this is module-private.
  *
  * This is a Meridian bug, not something the user did wrong — every known cause
  * is fixed and test-pinned — so the message says so and asks for a report
@@ -111,7 +141,7 @@ const _reportedLossy = new Set<string>()
  * the write or quarantine the file. If this ever actually fires, that is the
  * point to decide whether it should. See `roundTripCheck.ts`.
  */
-export function reportRoundTripLosses(lossy: RoundTripLoss[]): void {
+function reportRoundTripLosses(lossy: RoundTripLoss[]): void {
   const fresh = lossy.filter(l => !_reportedLossy.has(l.path))
   if (fresh.length === 0) return
   for (const l of fresh) _reportedLossy.add(l.path)
@@ -339,12 +369,12 @@ function mergeChangedIntoStore(
     [...getUnreadableFiles()].filter(([slug]) => !affectedSlugs.has(slug)),
   )
 
-  const { items: newItems, roots: newRoots, failures, lossy } = parseFiles(records)
+  const { items: newItems, roots: newRoots, failures, auditRoundTrip } = parseFiles(records)
   setData({ items: [...keptItems, ...newItems], roots: new Map([...keptRoots, ...newRoots]) })
   for (const f of failures) keptUnreadable.set(f.slug, { path: f.path, message: f.message })
   setUnreadableFiles(keptUnreadable)
   reportParseFailures(failures)
-  reportRoundTripLosses(lossy)
+  auditRoundTrip()
 }
 
 // Above this many changed paths, a per-file readFiles() fan-out risks the same

@@ -16,18 +16,37 @@ import type { VaultRef, GitHubVaultRef } from '@/vaultRef'
 import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress, setUnreadableFiles } from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
-import { syncOnActivate, parseFiles, reportParseFailures, reportRoundTripLosses, updateSyncUI } from './sync'
+import { syncOnActivate, parseFiles, reportParseFailures, updateSyncUI } from './sync'
 // ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
 
-const _vaultChangedListeners = new Set<() => void>()
+export interface VaultChange {
+  /**
+   * Whether this activation replaced the store's items/roots with a *different*
+   * vault's content.
+   *
+   * False on the cache-first restore path, where `hydrateFromCache` painted
+   * this same vault before activation even started — so everything derived from
+   * that content (cached expansions, agenda sections, scroll position) is still
+   * valid and must not be thrown away. Discarding it there cost a full
+   * re-expansion and re-grouping of the vault on the critical path to the
+   * agenda's first correct frame, for a vault that had not changed.
+   *
+   * True for a user-initiated switch, for a restore whose cache was empty, and
+   * for every fallback to the example vault — all of which do replace the
+   * content under whatever the calendar had cached.
+   */
+  contentReplaced: boolean
+}
 
-export function onVaultChanged(fn: () => void): () => void {
+const _vaultChangedListeners = new Set<(change: VaultChange) => void>()
+
+export function onVaultChanged(fn: (change: VaultChange) => void): () => void {
   _vaultChangedListeners.add(fn)
   return () => _vaultChangedListeners.delete(fn)
 }
 
-function emitVaultChanged(): void {
-  _vaultChangedListeners.forEach(fn => fn())
+function emitVaultChanged(change: VaultChange): void {
+  _vaultChangedListeners.forEach(fn => fn(change))
 }
 
 // ── CONSTANTS ─────────────────────────────────────────────────
@@ -61,11 +80,11 @@ async function hydrateFromCache(vaultId: string): Promise<boolean> {
     setUnreadableFiles(new Map())
     return false
   }
-  const { items, roots, failures, lossy } = parseFiles(cached)
+  const { items, roots, failures, auditRoundTrip } = parseFiles(cached)
   setData({ items, roots })
   setUnreadableFiles(new Map(failures.map(f => [f.slug, { path: f.path, message: f.message }])))
   reportParseFailures(failures)
-  reportRoundTripLosses(lossy)
+  auditRoundTrip()
   return true
 }
 
@@ -101,13 +120,16 @@ async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<v
   const backend = new ExampleBackend()
   await setActiveVaultIdentity(backend, { persist: opts.persist ?? true })
   const files = await backend.readAll()
-  const { items, roots, failures, lossy } = parseFiles(files)
+  const { items, roots, failures, auditRoundTrip } = parseFiles(files)
   setData({ items, roots })
   setUnreadableFiles(new Map(failures.map(f => [f.slug, { path: f.path, message: f.message }])))
   reportParseFailures(failures)
-  reportRoundTripLosses(lossy)
+  auditRoundTrip()
   updateSyncUI()
-  emitVaultChanged()
+  // Always a replacement: the example vault's content is never what was
+  // already painted, even on the fallback paths that reach here after a real
+  // vault was pre-painted from cache.
+  emitVaultChanged({ contentReplaced: true })
 }
 
 /**
@@ -132,7 +154,9 @@ async function activateWritableVault(backend: StorageBackend, prePainted = false
   await setActiveVaultIdentity(backend)
   const painted = prePainted || await hydrateFromCache(backend.id)
   updateSyncUI()
-  emitVaultChanged()
+  // `prePainted` is exactly the "cache-first restore of the vault already on
+  // screen" case — see VaultChange.contentReplaced.
+  emitVaultChanged({ contentReplaced: !prePainted })
 
   if (painted) {
     setVaultLoading(false)

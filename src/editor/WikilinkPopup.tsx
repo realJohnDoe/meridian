@@ -4,8 +4,7 @@ import type { EditorView } from '@codemirror/view'
 import type { Roots } from '@/types'
 import { OccurrenceCard } from '@/components'
 import { fileEntries } from '@/fileOccurrence'
-import { useStore } from '@/store'
-import { useResetOnChange, useVisualViewportHeight, useVisualViewportOffsetTop } from '@/hooks'
+import { useResetOnChange, useVisualViewportHeight, useVisualViewportOffsetTop, useFileOccurrenceMap } from '@/hooks'
 import { computeFloatingPlacement } from '@/lib/floatingPlacement'
 import { cn } from '@/lib/cn'
 
@@ -25,7 +24,7 @@ interface Props {
 export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
   const [focusIdx, setFocusIdx] = useState(0)
 
-  const occBySlug = useStore(s => s.fom)
+  const occBySlug = useFileOccurrenceMap()
 
   const q = popup.query.toLowerCase()
   // Memoized so the array reference is stable across renders when roots/query

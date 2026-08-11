@@ -1,120 +1,62 @@
-# Cold start: the vault parse and the agenda's 455-day window
+# Cold start: what is left of the blocking parse and the agenda's 455-day window
 
-> **Re-scoped by [time-to-today.md](./time-to-today.md) (2026-08-11).** The
-> "up to a second before it scrolls to today" symptom turned out not to be
-> CPU-bound: the scroll-to-today signal is emitted only after an OAuth token
-> refresh and two GitHub permission round trips, so D and E cannot fix it. D
-> and E remain real *first-paint* work and the plan below still stands, with
-> two corrections: **D1 is now measured** (`roundTripLoss` is 75% of
-> `parseFiles`, and 70 of its 92 ms is two redundant `loadFile` calls), and the
-> **baseline table below mis-attributes its largest row** — much of the 314 ms
-> "model chunk (YAML)" is `updateFileOccurrenceMap`'s per-slug ±3-year
-> `expandRange`, not YAML parsing. That call alone measures 240 ms and blocks
-> first paint for a map nothing on the agenda reads. See the new document
-> before starting on D.
+What remains of the 2026-08-08 scroll-to-today investigation after two rounds
+of work. Read [time-to-today.md](./time-to-today.md) first — it holds the
+measurements, the boot-ordering root cause, and the record of what shipped.
 
-Implementation plan for the two remaining items from the scroll-to-today
-investigation (2026-08-08). Options A/B/C from that investigation shipped in
-PR #645 (`1eda75b`); this covers **D** (the blocking vault parse) and **E**
-(the agenda's past/future window). Unlike the other files in `plans/`, this is
-an implementation plan rather than a survey prompt.
+Closed since the original plan, and deliberately not repeated here:
 
-## Measured baseline
+- **A/B/C** — virtualizer seeding and the scroll re-render. Shipped in PR #645
+  (`1eda75b`).
+- **D1** — "measure the `roundTripLoss` split before acting on it". Measured:
+  the guard is **75 % of `parseFiles`**, and 70 of its 92 ms is the two extra
+  `loadFile` calls it makes internally. It was the dominant parse cost, not a
+  footnote.
+- **D2** — the guard is off the load path. `parseFiles` now returns an
+  `auditRoundTrip` thunk that sweeps every file in `requestIdleCallback`
+  batches after first paint; coverage and the toast are unchanged. All three
+  `parseFiles` callers, including the per-sync `mergeChangedIntoStore`
+  reconcile, got it together.
+- **The old "measured baseline" table** — withdrawn. Its largest row (314 ms
+  attributed to "`model` chunk (YAML)") folded in `updateFileOccurrenceMap`'s
+  per-slug ±3-year `expandRange`, which lives in the same chunk but is not YAML
+  parsing at all. That work is now off the critical path entirely; see
+  time-to-today.md for the replacement figures.
 
-From a production cold-start trace on `realjohndoe.github.io/meridian` (a real
-GitHub-backed vault, desktop Chrome, hot Dexie cache). Times are sample-time
-attribution — actual `timeDeltas` summed per category, not sample counts —
-over the 671 ms between the start of the vault-parse task and the first
-correct paint:
+What is left is **D3/D4** (the ~40 ms of genuine parse that remains) and **E**
+(the agenda window). Both are first-paint work. Neither affects time-to-today,
+which is now settled.
 
-| Category | Time | What it is |
-|---|---|---|
-| `model` chunk (YAML) | **314 ms** | `parseFiles` → `parseToStoreItems` + `roundTripLoss` |
-| `calendar` chunk | **173 ms** | expansion, grouping, agenda render — *includes the 66 ms scroll re-render that A removed* |
-| browser internals / `(program)` | 134 ms | |
-| React (`main` chunk only) | 32 ms | |
-| GC | 22 ms | |
+Current blocking cost before the first correct frame, 300-file generated vault,
+Node with the dev transform — treat the shares as real and the absolutes as
+inflated:
 
-Structure of the cold start, for reference:
+| Stage | Time |
+|---|---:|
+| `parseToStoreItems` | 39 ms |
+| `setData` → `buildBacklinkIndex` | 1 ms |
+| `expandWithMultiday` −365/+90 | 70 ms |
+| `computeAgendaSections` | 57 ms |
+| **total** | **167 ms** (was ~530 ms) |
 
-- `12250` navigation → `12716` FCP (shell + agenda skeleton)
-- `12729–13178` **one 449 ms blocking task**: `hydrateFromCache` →
-  `cacheLoadAll` (Dexie) → `parseFiles` → `setData`. Within it, ~260 ms is
-  inside the YAML parser and ~47 ms is `setData` rebuilding the derived `fom`
-  and `backlinks` indexes.
-- `13233` first paint of real rows
-- `13392` correct content
-
-So after A/B/C, **D is the single largest remaining item** and E is a distant
-second. Everything below assumes that ordering.
+So the agenda's own pipeline (**E**, 127 ms) is now the larger half and the
+parse (**D**, 39 ms) the smaller — the reverse of the original plan's ordering.
+Re-measure against a production trace before starting either.
 
 ---
 
-## D — the blocking vault parse
+## D — the remaining parse
 
-`hydrateFromCache` ([storage/vaultRegistry.ts:53](../src/storage/vaultRegistry.ts))
+`hydrateFromCache` ([storage/vaultRegistry.ts](../src/storage/vaultRegistry.ts))
 reads every cached file out of Dexie and hands it to `parseFiles`
-([storage/sync.ts:52](../src/storage/sync.ts)), which is a single synchronous
-`for` loop over the whole vault. Nothing paints until it returns.
+([storage/sync.ts](../src/storage/sync.ts)), still a single synchronous `for`
+loop. Nothing paints until it returns.
 
-### D1 — Measure the `roundTripLoss` split first (blocking; do not skip)
+At 39 ms on this vault it is no longer the headline, but it scales with vault
+size and is materially worse on mobile. D3 and D4 are **alternatives, not a
+sequence**; D4 subsumes D3 if it lands.
 
-`parseFiles` calls `roundTripLoss(path, content, parsed)` for **every file on
-every load**. That function
-([model/roundTripCheck.ts:61](../src/model/roundTripCheck.ts)) does one
-`collapseToYaml` + `saveFile` serialize and **two** further `loadFile` calls —
-so a load performs *three* YAML frontmatter parses per file where one would
-do. Its own doc comment budgets this at ~0.5 ms/file over a 300-file corpus.
-
-The trace **cannot confirm the split**: V8 inlined the frames between the
-`parseFiles` loop and the shared YAML entry point, so all three parses
-collapse onto one stack. Structurally it should be ~2/3 of the parse time, but
-that is an inference, not a measurement. Measure it before acting on it.
-
-**Recipe.** Patch `performance.mark`/`measure` pairs around the
-`parseToStoreItems` call and the `roundTripLoss` call inside the `parseFiles`
-loop; load the Tutorial vault with `localStorage.setItem('meridian_bigvault',
-'300')` (the generator at `src/storage/devFixtures/testVaultGen.ts`); read the
-totals back with `performance.getEntriesByType('measure')`. Measure against
-the **production build** (`pnpm run build` + `vite preview`) — dev-mode React
-does not affect this loop much, but the YAML path is hot enough that
-minification matters. Revert the instrumentation afterwards.
-
-This number decides whether D2 is the whole fix or a footnote.
-
-### D2 — Stop paying the round-trip guard on the load path
-
-The guard is a runtime canary for the Root-A totality invariant. Its own
-header says every known leak is fixed and pinned by
-`__tests__/round-trip-totality.test.ts`, and that it is *expected never to
-fire*. Paying a 3× parse amplification on every cold start for that is the
-wrong trade. Options, cheapest first:
-
-1. **Sample it.** Run it on a bounded random subset per load (say 20 files, or
-   5%). A systematic parser regression shows up on the first load either way;
-   only a single-file oddity could hide, and it will surface on a later load.
-2. **Defer it.** Run the full sweep in `requestIdleCallback` batches *after*
-   first paint, off the critical path entirely. Keeps 100% coverage, costs
-   nothing user-visible. Preferred if D1 says the guard is the dominant cost.
-3. **Dev-only.** Gate on `import.meta.env.DEV`. Cheapest, but throws away the
-   whole point — the guard exists to catch the next leak on a *real* vault,
-   which is exactly the case a dev build never sees. Only take this if 1 and 2
-   both prove awkward.
-
-Recommendation: **(2), falling back to (1)** if the idle-batch bookkeeping
-turns out to be more machinery than it is worth. Either way, keep
-`reportRoundTripLosses` and its toast — only the *timing* changes.
-
-Note the other two `parseFiles` callers — `activateExampleVault`
-([vaultRegistry.ts:104](../src/storage/vaultRegistry.ts)) and
-`mergeChangedIntoStore` ([sync.ts:342](../src/storage/sync.ts)) — get the same
-change for free. The reconcile path in particular re-parses every changed file
-on every sync, so this is not only a cold-start win.
-
-### D3 — Take the remaining parse off the main thread
-
-Whatever D2 leaves (structurally ~100 ms of genuine parse on this vault, more
-on bigger ones and on mobile) is still a synchronous block before first paint.
+### D3 — Take the parse off the main thread
 
 `parseFiles` is a **pure function of `files`** — no DOM, no store, no
 `activeBackend`. That makes it directly worker-eligible, which is the main
@@ -125,18 +67,20 @@ reason to prefer this over restructuring the call site.
   structured-cloneable, so no manual serialization is needed.
 - **The risk is the clone, not the parse.** A vault's worth of strings in and
   a large object graph out could plausibly cost 30–80 ms of clone on each
-  side, eating much of the win. **Measure the clone cost with a stub worker
-  that echoes the input back before writing any real parsing logic.** If the
-  round-trip clone is more than ~30% of the parse it replaces, stop and take
-  D4 instead.
+  side, which at 39 ms of parse would now be a straight loss. **Measure the
+  clone cost with a stub worker that echoes the input back before writing any
+  real parsing logic.** If the round-trip clone is more than ~30 % of the parse
+  it replaces, stop and take D4 instead.
 - Console warnings inside the loop (`[vault] parse failed…`) need to become
   part of the returned payload rather than direct `console.warn` calls.
+- The deferred round-trip audit would have to move too, or keep its own copy of
+  the file contents — it needs the `(path, content, parsed)` triple.
 
 **Explicitly rejected: chunking the parse across frames.** It would keep the
 main thread responsive but would *not* make first-correct-paint sooner, and a
 partially-parsed vault yields a wrong overdue list and a wrong today section —
-so the agenda cannot paint progressively anyway. It trades a visible 450 ms
-block for the same 450 ms of jank with no benefit.
+so the agenda cannot paint progressively anyway. It trades a visible block for
+the same duration of jank with no benefit.
 
 ### D4 — Cache the derived items, not just the raw markdown
 
@@ -144,9 +88,10 @@ The structural fix, and the one that makes cold start not parse *at all*. Also
 the fallback if D3's clone cost sinks the worker.
 
 Today the Dexie `files` table stores raw `content`
-([storage/cache.ts:43](../src/storage/cache.ts)), and it is simultaneously the
-sync source of truth (dirty flags, base versions, tombstones) — so it **cannot
-be replaced** with parsed output. Add a *second*, derived table instead:
+([storage/cache/files.ts](../src/storage/cache/files.ts)), and it is
+simultaneously the sync source of truth (dirty flags, base versions,
+tombstones) — so it **cannot be replaced** with parsed output. Add a *second*,
+derived table instead:
 
 ```
 derived: 'vaultId'   // { vaultId, parserVersion, contentStamp, items, roots }
@@ -162,47 +107,45 @@ derived: 'vaultId'   // { vaultId, parserVersion, contentStamp, items, roots }
   hashing content.
 - Write it after every `setData` that came from a full parse; drop it on any
   write to `files` for that vault.
+- The round-trip audit must still run on a derived-cache hit — it is the guard
+  against a parser regression, and a cache hit is exactly the case that never
+  re-parses. Either persist the audit's verdict alongside the derivation
+  (keyed by the same `parserVersion`), or re-parse for the audit alone in idle.
 
 Cold start then becomes one Dexie read plus a structured clone, with the
 existing parse path as the fallback whenever the stamp or parser version
-misses. `setData`'s ~47 ms of `fom`/`backlinks` rebuilding stays — deriving
-*those* into the cache too is possible but should be a separate step, only if
-measurement says they still matter.
-
-**Sequencing:** D1 → D2 → measure again. Only then decide between D3 and D4;
-they are alternatives, not a sequence, and D4 subsumes D3 if it lands.
+misses.
 
 ---
 
 ## E — the agenda's 455-day window
 
-`useAgendaSections` ([calendar/useAgendaSections.ts:14](../src/calendar/useAgendaSections.ts))
+`useAgendaSections` ([calendar/useAgendaSections.ts](../src/calendar/useAgendaSections.ts))
 expands, groups and sorts `PAST_WINDOW_DAYS = 365` + `FUTURE_WINDOW_DAYS = 90`
-days on every cold start.
+days on every cold start: 70 ms of expansion plus 57 ms of grouping, cached
+thereafter by `sectionsCacheSlot` and `cacheByWindow`.
 
-### E has shrunk — re-scope it before building anything
+Two things have changed since this was written:
 
-The original argument for E was "put today near offset 0 so `scrollToIndex`
-has nothing to correct". **A delivered that**: the virtualizer is now seeded at
-today's offset directly and never scrolls on mount. The 66 ms synchronous
-re-render inside the scroll event is gone, which is most of what made the
-window size hurt.
-
-What is left is ~107 ms of expansion + grouping + agenda render (173 ms
-measured, minus the 66 ms that A removed) on cold start only — cached
-thereafter by `sectionsCacheSlot` and `cacheByWindow`. That is worth having
-but it is **an order of magnitude less than D**, and it competes with the
-best-tested logic in the calendar layer. Do D first and re-measure; if the
-agenda's share has not moved, E may not be worth its risk at all.
+- **It is now the larger half of what is left**, not "a distant second". The
+  original ordering assumed a 314 ms parse that turned out to be mostly
+  something else.
+- **The duplicate build is gone.** `resetCalendarOnVaultChange` used to fire on
+  the initial activation too, discarding this work right after the first paint
+  and rebuilding it. It now runs only when the vault's content was actually
+  replaced (see `VaultChange.contentReplaced`).
 
 ### The constraint that makes the obvious version wrong
 
 "Only build rows from today forward, prepend past days on scroll-up" **does
 not work as stated**. The overdue section pools every undone task from every
 past day — that is why `PAST_WINDOW_DAYS` was widened from 7 to 365 in the
-first place (see the comment at the top of `useAgendaSections.ts`). Skipping
-past days means an incomplete overdue list, which is a correctness regression,
-not a perf trade.
+first place. Skipping past days means an incomplete overdue list, which is a
+correctness regression, not a perf trade.
+
+It is now also a *visible* one: overdue ships expanded and scroll-to-today
+targets its header, so a truncated overdue pool is the first thing the user
+sees, not a collapsed bar.
 
 The two halves must be separated:
 
@@ -224,6 +167,11 @@ So the shape of E, if it is taken:
    estimated height, which `buildBucket` can produce without building the
    rows.
 
+This is also the right primitive for infinite scroll: one lazily-materialized
+region with a stable estimated size works in both directions, where a
+three-step window widening does not (each widening shifts today's row under a
+scroll position that was already committed).
+
 Note that `offsetOfRow` in `useAgendaScrollRestore` sums every row above the
 target on mount; step 2 makes that loop trivially short, which is a small
 bonus rather than the point.
@@ -231,27 +179,30 @@ bonus rather than the point.
 ### Cheaper alternatives to consider first
 
 - **Shrink `FUTURE_WINDOW_DAYS`.** 90 days of future rows are materialized on
-  every cold start and are almost never scrolled to. Cutting it to ~30 is a
-  one-line change with no correctness implications and should be measured
-  before any of the above is attempted.
+  every cold start and are almost never scrolled to, and — unlike the past
+  direction — nothing pools forward, so there is no correctness coupling at
+  all. Cutting it to ~30 is a one-line change and should be measured before any
+  of the above is attempted.
 - **Split expansion from grouping across a paint.** Expand + pool overdue and
   today eagerly; do the rest of the grouping in an idle callback. Smaller
-  change than lazy rows, most of the benefit.
+  change than lazy rows, most of the benefit — and the idle infrastructure
+  (`lib/idle.ts`) already exists.
 
 ---
 
 ## Acceptance
 
-Re-run the same cold-start trace (production build, hot Dexie cache, the
-300-file generated vault) and compare against the baseline table above:
+Re-run a cold-start trace (production build, hot Dexie cache, the 300-file
+generated vault) and compare against the 167 ms table above:
 
-- **D2 alone:** the 449 ms task shrinks by the share D1 measured for
-  `roundTripLoss`.
 - **D3 or D4:** no single main-thread task over ~100 ms between navigation and
   first correct paint.
 - **E:** `calendar`-chunk attribution over the load window drops below ~60 ms.
 
-Correctness gates that must not regress: `round-trip-totality.test.ts` still
-passes and `reportRoundTripLosses` still surfaces a real loss (D2); a parser
-change invalidates every derived cache entry (D4); the overdue section
-contains exactly the same occurrences before and after (E).
+Correctness gates that must not regress:
+
+- a parser change invalidates every derived cache entry (D4);
+- the round-trip audit still visits every file that parsed, and still surfaces
+  a real loss, on the derived-cache-hit path as well (D3/D4);
+- the overdue section contains exactly the same occurrences before and after
+  (E).

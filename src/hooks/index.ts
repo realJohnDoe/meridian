@@ -5,3 +5,4 @@ export { useVisualViewportHeight, useVisualViewportOffsetTop } from './use-visua
 export { useResetOnChange } from './useResetOnChange'
 export { useFloatingCombobox, type FloatingComboboxPlacement } from './use-floating-combobox'
 export { useAllParticipants } from './useAllParticipants'
+export { useFileOccurrenceMap } from './useFileOccurrenceMap'

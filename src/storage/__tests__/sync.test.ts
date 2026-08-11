@@ -15,11 +15,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { StorageBackend, RawFile } from '@/storage/backend'
 import type { VaultKind } from '@/vaultRef'
 import { ConflictError, AuthSyncError, TransientSyncError } from '@/storage/conflictError'
+import type * as MeridianModel from '@/model'
 
 // ── Hoisted shared fakes (referenced by the vi.mock factories below, which
 // run before the rest of this file's top-level code) ──────────────────────
 
-const { cacheStore, storeState, notifyFns } = vi.hoisted(() => ({
+const { cacheStore, storeState, notifyFns, roundTripLossMock } = vi.hoisted(() => ({
   cacheStore: new Map<string, {
     vaultPath: string; vaultId: string; path: string; content: string
     status: 'clean' | 'dirty' | 'deleted'; updatedAt: number; version?: string
@@ -35,6 +36,11 @@ const { cacheStore, storeState, notifyFns } = vi.hoisted(() => ({
     lastSyncedAt: null as number | null,
   },
   notifyFns: { notify: vi.fn(), warn: vi.fn(), notifyError: vi.fn() },
+  // The round-trip guard is the only part of @/model stubbed here: it is
+  // expected never to fire on a real file (see roundTripCheck.ts), so the tests
+  // for its *scheduling* need to drive its verdict directly. Everything else in
+  // @/model stays real — reconcile leans on the genuine parse/collapse.
+  roundTripLossMock: vi.fn<(path: string, content: string, parsed: unknown) => string[]>(() => []),
 }))
 
 function vp(vaultId: string, path: string): string {
@@ -114,6 +120,11 @@ vi.mock('@/storeBridge', () => ({
 }))
 
 vi.mock('@/storage/notifications', () => notifyFns)
+
+vi.mock('@/model', async (importActual) => ({
+  ...await importActual<typeof MeridianModel>(),
+  roundTripLoss: roundTripLossMock,
+}))
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
@@ -294,6 +305,8 @@ beforeEach(() => {
   notifyFns.notify.mockClear()
   notifyFns.warn.mockClear()
   notifyFns.notifyError.mockClear()
+  roundTripLossMock.mockClear()
+  roundTripLossMock.mockReturnValue([])
   setActiveBackend(null)
   resetSyncBackoff()
 })
@@ -1169,6 +1182,53 @@ describe('parseFiles', () => {
       expect(f.path).toMatch(/\.md$/)
       expect(f.message.length).toBeGreaterThan(0)
     }
+  })
+})
+
+// ── the deferred round-trip guard ───────────────────────────────────────
+//
+// The guard used to run inside the parseFiles loop, where it measured 75% of
+// the total parse cost on a 300-file vault — all of it between the Dexie read
+// and the agenda's first paint. It now runs in idle batches afterwards. What
+// must not change is its coverage: every file that parsed still gets checked,
+// and a real loss still reaches the user. See plans/time-to-today.md.
+
+describe('parseFiles — round-trip guard scheduling', () => {
+  const files = [
+    { path: 'good.md', content: '---\ntitle: Good\n---' },
+    { path: 'also-good.md', content: '---\ntitle: Also good\n---' },
+    { path: 'broken.md', content: '---\ntitle: Bad: with a colon\n---' },
+  ]
+
+  it('does not run the guard during the parse itself', () => {
+    const { items } = parseFiles(files)
+
+    expect(items).toBeDefined()
+    expect(roundTripLossMock).not.toHaveBeenCalled()
+  })
+
+  it('checks every file that parsed — and only those — once the audit runs', async () => {
+    const { auditRoundTrip } = parseFiles(files)
+    auditRoundTrip()
+
+    await vi.waitFor(() => { expect(roundTripLossMock).toHaveBeenCalledTimes(2) })
+    // broken.md never parsed, so there is nothing to round-trip it against.
+    expect(roundTripLossMock.mock.calls.map(c => c[0])).toEqual(['good.md', 'also-good.md'])
+  })
+
+  it('still surfaces a genuine loss to the user, just later', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    roundTripLossMock.mockReturnValue(['project="apollo"'])
+
+    const { auditRoundTrip } = parseFiles([{ path: 'deferred-loss.md', content: '---\ntitle: X\n---' }])
+    expect(notifyFns.warn).not.toHaveBeenCalled()
+    auditRoundTrip()
+
+    await vi.waitFor(() => {
+      expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('deferred-loss.md'))
+    })
+    expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('project="apollo"'))
+    warnSpy.mockRestore()
   })
 })
 

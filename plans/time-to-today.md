@@ -3,44 +3,48 @@
 Investigation of "opening the app sometimes takes up to a second before it
 scrolls to today, even though the agenda is already visible" (2026-08-11).
 
+**Status: fixed.** The diagnosis and the measurements are below, then
+[What shipped](#what-shipped). Sections up to that point describe the code as
+it was; everything they diagnose has since been changed.
+
 Supersedes the framing in
 [cold-start-parse-and-agenda-window.md](./cold-start-parse-and-agenda-window.md).
 That plan assumed time-to-today was CPU-bound and set out to attack the vault
-parse (D) and the agenda window (E). **The reported symptom is not CPU-bound at
-all** — it is a boot-ordering problem, and it is gated on the network. D and E
-are still real, but they are first-paint work, not time-to-today work. The
-plan's baseline table also mis-attributes its single largest row; see
+parse (D) and the agenda window (E). **The reported symptom was not CPU-bound
+at all** — it was a boot-ordering problem, gated on the network. What remains of
+D and E is real, but it is first-paint work, not time-to-today work. That plan's
+baseline table also mis-attributed its single largest row; see
 [Correcting the old baseline](#correcting-the-old-baseline).
 
 ---
 
 ## The headline
 
-On a GitHub-backed vault with a warm Dexie cache, the agenda paints real rows
-from cache **immediately**, and then sits on a day roughly a year in the past
-until an OAuth token refresh and two GitHub API round trips have completed.
-Only then does anything tell it to scroll to today.
+On a GitHub-backed vault with a warm Dexie cache, the agenda painted real rows
+from cache **immediately**, and then sat on a day roughly a year in the past
+until an OAuth token refresh and two GitHub API round trips had completed.
+Only then did anything tell it to scroll to today.
 
 Measured on the 300-file generated vault (`generateBigVault(300)`), today's
 header row sits **8,078 px — about ten screens — below the top of the row
 list**. The virtualizer is seeded at offset 0, so that is exactly where the
 first painted frame lands.
 
-That is the second. It is network latency, and no amount of parse or expansion
+That was the second. It is network latency, and no amount of parse or expansion
 optimisation touches it.
 
 ---
 
-## Root cause 1 — the scroll-to-today signal is behind the network
+## Root cause 1 — the scroll-to-today signal was behind the network
 
 `AgendaView` seeds its virtualizer from `useAgendaScrollRestore`
 ([calendar/useAgendaScrollRestore.ts:58](../src/calendar/useAgendaScrollRestore.ts)),
 which only seeds at today's row when `calendarView.agendaScrollTarget` is
-non-null. That field **starts as `null`**
-([calendar/viewState.ts:82](../src/calendar/viewState.ts)), so on a cold start
-the first mount falls through to `agendaScrollOffset`, which is `0`.
+non-null. That field **started as `null`**
+([calendar/viewState.ts](../src/calendar/viewState.ts)), so on a cold start
+the first mount fell through to `agendaScrollOffset`, which is `0`.
 
-The only thing that ever sets the target on startup is `AppMain`'s
+The only thing that ever set the target on startup was `AppMain`'s
 `onVaultChanged` subscription
 ([routes/\_app.tsx:59](../src/routes/_app.tsx)), and that fires from
 `emitVaultChanged()` inside `activateWritableVault`
@@ -94,9 +98,9 @@ how this slipped through.
 Only the GitHub path has a network gate here, which is why this reproduces on
 `realjohndoe.github.io/meridian` and not in dev.
 
-## Root cause 2 — the first paint's work is thrown away and redone
+## Root cause 2 — the first paint's work was thrown away and redone
 
-When `emitVaultChanged()` finally fires, `AppMain` calls
+When `emitVaultChanged()` finally fired, `AppMain` called
 `resetCalendarOnVaultChange()` **before** `requestScrollToToday()`. That clears
 both `resetExpansionCache()` and `resetAgendaSectionsCache()` — the caches the
 agenda populated for the first paint seconds earlier. The vault has not
@@ -130,16 +134,16 @@ rows are the point, not the milliseconds.**
 
 ### The surprise: `fom` costs more than the parse
 
-`updateFileOccurrenceMap` ([fileOccurrence.ts:116](../src/fileOccurrence.ts))
-runs synchronously inside `setData`, so it blocks first paint. For every slug
+`updateFileOccurrenceMap` ([fileOccurrence.ts](../src/fileOccurrence.ts))
+ran synchronously inside `setData`, so it blocked first paint. For every slug
 it calls `resolveOneSlug`, which does `expandRange(slugItems, roots, BACK,
 AHEAD)` over a **±3-year** window
-([fileOccurrence.ts:33](../src/fileOccurrence.ts)) purely to pick one
+([fileOccurrence.ts](../src/fileOccurrence.ts)) purely to pick one
 representative occurrence:
 
 | `fom` window | time | occurrences generated |
 |---|---:|---:|
-| **±3 yr (shipped)** | **283 ms** | **28,528** |
+| **±3 yr (the shipped window)** | **283 ms** | **28,528** |
 | ±1 yr | 135 ms | 14,130 |
 | ±90 d | 36 ms | 3,667 |
 
@@ -176,71 +180,74 @@ A ±7-day first pass is **26× cheaper** than the shipped window.
 
 ---
 
-## Top 3 ways to improve time-to-today
+## What shipped
 
-Ranked by effect on the reported symptom, cheapest first within a rank.
+All three landed, plus the overdue-by-default change. Ranked by effect on the
+reported symptom.
 
 ### 1. Seed the agenda at today unconditionally — don't wait to be told
 
-**Effect: removes the network gate entirely. Time-to-today becomes the first
+**Effect: removes the network gate entirely. Time-to-today is now the first
 painted frame.** This is the fix for the actual complaint.
 
 The agenda already knows how to land on today on its first painted frame — PR
 #645's `initialOffset` seeding does exactly that. It just never gets the
 signal in time. Two parts:
 
-**(a) Make today the default, not a request.** Initialise
-`calendarView.agendaScrollTarget` to `fmtISO(startOfToday())` instead of `null`
-([viewState.ts:82](../src/calendar/viewState.ts)). The first mount then seeds
-at today with no signal from anywhere, and `markAgendaScrolled` clears it
-exactly as today, so in-session remounts still restore the saved offset.
+**(a) Today is the default, not a request.** `calendarView.agendaScrollTarget`
+now initialises to `fmtISO(startOfToday())` instead of `null`
+([viewState.ts](../src/calendar/viewState.ts)). The first mount seeds at today
+with no signal from anywhere, and `markAgendaScrolled` clears it exactly as
+before, so in-session remounts still restore the saved offset.
 `agendaScrollOffset` is `0` on a cold start anyway, so nothing is lost —
-offset 0 is not a restored position, it is the absence of one, and today is the
-better default for that case. Note `resetCalendarViewState`'s existing
-`getInitialState()` staleness workaround needs extending to this field (same
-treatment `currentDate`/`agendaAnchor` already get).
+offset 0 is not a restored position, it is the absence of one.
+`resetCalendarViewState`'s `getInitialState()` staleness workaround was
+extended to this field (the same treatment `currentDate`/`agendaAnchor` get).
 
-This is roughly a one-line change and it makes time-to-today independent of
+A one-line change that makes time-to-today independent of
 `ensureFreshAccessToken`, `ensurePermission`, and the vault backend entirely.
 
-**(b) Don't reset the calendar caches for the vault that was just
-pre-painted.** `onVaultChanged` fires on the *initial* activation too, where
-`resetCalendarOnVaultChange()` discards 151 ms of freshly-built expansion and
-grouping for no reason. Gate the reset on the vault id actually having changed
-from the previously-active one (or split the "pre-painted this vault" signal
-out from "switched to a different vault"). Keeps the genuine vault-switch
-behaviour intact.
+**(b) The calendar caches survive the pre-painted vault's own activation.**
+`onVaultChanged` now carries `VaultChange.contentReplaced`
+([vaultRegistry.ts](../src/storage/vaultRegistry.ts)), which is `!prePainted` —
+false exactly on the cache-first restore, where the vault being activated is
+the one already on screen. `AppMain` skips `resetCalendarOnVaultChange()` on
+that path instead of discarding 151 ms of freshly-built expansion and grouping.
+Genuine switches, empty-cache restores and every example-vault fallback still
+report `true` and reset as before.
 
-Pin it with a test: extend the existing `vaultRegistry.test.ts` cache-first
-suite so the scroll-to-today signal is asserted to arrive before
-`ensurePermission` resolves, not after. That is the assertion whose absence let
-this ship.
+Pinned by two tests in `vaultRegistry.test.ts`'s cache-first suite (the
+`contentReplaced` value on each path) and one in
+`useAgendaScrollRestore.test.ts` (a cold start with no request still seeds at
+today rather than at `agendaScrollOffset`). The absence of an assertion on the
+scroll signal — as opposed to the content — is what let this ship.
 
 ### 2. Take `fom` off the first-paint path
 
 **Effect: −240 ms of blocking work on a 300-file vault; the largest single
 item.**
 
-Nothing rendered at cold start reads `fom`. `setData` should not build it
-synchronously. Cheapest first:
+`fom` is no longer a store field. `fileOccurrenceMap(items, roots)`
+([fileOccurrence.ts](../src/fileOccurrence.ts)) derives it on demand, memoized
+on input identity so it behaves as a pure derivation when called during render;
+the four reactive consumers go through the new `useFileOccurrenceMap` hook and
+`storeBridge.getFom()` routes through the same memo. `setData` calls
+`warmFileOccurrenceMap`, which builds it in an idle callback — so the editor
+and search overlay get a memo hit rather than paying the resolve on open, and a
+burst of sync merges warms once for the final state rather than queueing.
 
-1. **Defer it.** Build `fom` in a `requestIdleCallback` (or a post-paint
-   microtask) after `setData` commits, and have the store expose it as it does
-   now. Its consumers — editor, search overlay, entry route — all mount well
-   after first paint, and each already handles a missing entry (`fom.get(slug)
-   ?? null`). Cheapest and lowest-risk.
-2. **Make it lazy.** Compute on first read and memoise on `(items, roots)`
-   identity. Slightly more machinery, but nothing pays for it unless something
-   asks.
-3. **Shrink the window.** ±3 yr → ±1 yr is 283 → 135 ms; ±90 d is 36 ms. This
-   changes which occurrence gets picked as a file's representative, so it is a
-   behaviour change, not a pure optimisation. Only worth it on top of 1 or 2 if
-   measurement says the deferred build still hurts.
+Both halves are load-bearing: lazy alone would just move the 240 ms to the
+first editor open; warming alone would still need somewhere correct to read
+from before idle ran.
 
-Recommendation: **(1)**. The 28,528-occurrences-for-300-representatives ratio
-also suggests `resolveOneSlug` could answer most slugs without a full
-expansion (a cheap "next/previous instant" query rather than materialising
-every occurrence in six years), but that is a follow-up, not a prerequisite.
+Deliberately *not* done: shrinking the ±3-year window (±1 yr is 135 ms, ±90 d
+is 36 ms). That changes which occurrence a file resolves to, so it is a
+behaviour change rather than an optimisation, and it is unnecessary now the
+build is off the critical path. The
+28,528-occurrences-for-300-representatives ratio does suggest `resolveOneSlug`
+could answer most slugs without a full expansion — a cheap "next/previous
+instant" query rather than materialising every occurrence in six years — but
+that is a follow-up, not a prerequisite.
 
 ### 3. Get `roundTripLoss` off the load path
 
@@ -254,28 +261,66 @@ re-parse frontmatter the loader already parsed. So even keeping the guard on
 the load path, restructuring it to reuse the parse it was handed would recover
 most of the cost.
 
-Take the old plan's recommendation — **defer the full sweep to
+Took the old plan's recommendation — **the full sweep is deferred to
 `requestIdleCallback` batches after first paint**, keeping 100 % coverage and
-`reportRoundTripLosses` unchanged. `mergeChangedIntoStore` gets the same win on
-every sync for free.
+the toast unchanged. `parseFiles` now returns an `auditRoundTrip` thunk instead
+of a `lossy` array; it captures the `(path, content, parsed)` triples so the
+audit does not re-parse, and it only ever sees files exactly as they were
+loaded (the check is unsound on an edited round trip). All three callers,
+including `mergeChangedIntoStore`, get it — so this is a win on every sync, not
+just cold start.
+
+Not done, and worth keeping in mind: even inline, restructuring the guard to
+reuse the parse it was handed would recover 70 of its 92 ms. If it ever needs
+to move back onto a hot path, that is the lever.
+
+### 4. Overdue expanded by default
+
+Requested alongside the three above, and a natural fit: scroll-to-today already
+targets the overdue section's header when there is one
+([agendaSections.ts](../src/calendar/agendaSections.ts)'s `preferOverdue`), so
+"scroll to today" now genuinely means "scroll to overdue, with Today directly
+below it" rather than to a one-line collapsed bar.
+
+`overdueCollapsed` starts `false`. What made this safe is already in place:
+`AgendaView` virtualizes *rows*, not sections, so an unbounded overdue section
+never mounts more than the viewport plus overscan — the reason it originally
+shipped collapsed no longer holds. The header keeps its count and its toggle,
+and collapsing stays per-session view state.
+
+One consequence worth knowing: the seeded scroll offset is unaffected (the
+overdue header sits *above* its own rows, so `offsetOfRow` never sums them),
+but Today is now below the full overdue list rather than one row down. On the
+300-file generated vault that is 8,835 rows against 2,033 — and costs 8 ms more
+grouping, which is why the totals below are quoted with overdue expanded.
 
 ### Combined
 
-Blocking work before the first *correct* frame drops from ≈530 ms (plus the
-network gate, plus 151 ms of duplicated work) to ≈195 ms (parse 43 + expand 85
-+ sections 66), with the network gate gone entirely. Time-to-today goes from
-"up to a second" to "the first frame the agenda paints".
+| | before | after |
+|---|---:|---:|
+| `parseFiles` | 135 ms | 39 ms |
+| `setData` derived indexes | 241 ms | 1 ms |
+| agenda expansion | 85 ms | 70 ms |
+| agenda grouping | 66 ms | 57 ms |
+| duplicated on the reset | +151 ms | — |
+| **blocking before the first correct frame** | **≈530 ms** | **167 ms** |
+| **gated on the network?** | **yes, up to ~1 s** | **no** |
+
+Time-to-today goes from "up to a second" to "the first frame the agenda
+paints".
 
 ---
 
 ## On the progressive window (±1 week → ±1 month → ±1 quarter)
 
 The instinct is right about the mechanism and the numbers back it — ±7 d is
-5.8 ms against 151 ms — but **it does not attack the reported symptom.** Once
-#1 lands, the agenda is already on today in its first painted frame; the 151 ms
-delays *that frame*, it does not delay the scroll. So this is a first-paint
-optimisation, ranked 4th, and worth doing for its own sake and for the infinite
-scroll synergy.
+5.8 ms against 151 ms — but **it does not attack the reported symptom.** Now
+that #1 has landed the agenda is already on today in its first painted frame;
+the remaining 127 ms of expansion + grouping delays *that frame*, it does not
+delay the scroll. So this is a first-paint optimisation, worth doing for its own
+sake and for the infinite-scroll synergy — see the re-scoped **E** in
+[cold-start-parse-and-agenda-window.md](./cold-start-parse-and-agenda-window.md),
+which now carries the design.
 
 Two things to carry into that design:
 
@@ -284,10 +329,12 @@ section pools every undone task from every past day — that is why
 `PAST_WINDOW_DAYS` went from 7 to 365 in the first place. A ±7-day first pass
 shows a *wrong* overdue count, and since `goToIndex` prefers the overdue
 section when it exists
-([agendaSections.ts:395](../src/calendar/agendaSections.ts)), a wrong overdue
+([agendaSections.ts](../src/calendar/agendaSections.ts)), a wrong overdue
 section means a wrong scroll target — the one thing this whole investigation is
 about. Widening the window afterwards would then shift today's row underneath a
-scroll position that was already committed.
+scroll position that was already committed. Now that overdue also ships
+*expanded*, a truncated pool is directly visible on the landing screen rather
+than hidden behind a collapsed bar.
 
 So the split the old plan identified still holds, and is the right shape here
 too: **scanning** the past is required for overdue and stays whole-window;
@@ -306,7 +353,9 @@ the lazy-materialisation machinery is built.
 
 ## Reproducing the measurements
 
-Both probes were temporary and have been removed. To rebuild them:
+Both probes were temporary and have been removed — the behaviour they proved is
+pinned by real tests now (see [What shipped](#what-shipped)). To rebuild the
+*measurement* harnesses:
 
 - **CPU costs:** a `src/*.test.ts` file that calls `generateBigVault(300)`,
   maps to `{path: `${id}.md`, content}`, then times `parseToStoreItems` /

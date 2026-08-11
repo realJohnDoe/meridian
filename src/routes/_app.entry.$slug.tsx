@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
+import { useFileOccurrenceMap } from '@/hooks'
 import { useEntryEditor } from '@/editor'
 import { expandRange } from '@/model'
 import { isEditScope } from '@/types'
@@ -51,7 +52,7 @@ function EntrySlugPage() {
 
   const items        = useStore(s => s.items)
   const roots        = useStore(s => s.roots)
-  const fom          = useStore(s => s.fom)
+  const fom          = useFileOccurrenceMap()
   const vaultLoading = useStore(s => s.vaultLoading)
 
   const occ = useMemo((): Occurrence | null => {

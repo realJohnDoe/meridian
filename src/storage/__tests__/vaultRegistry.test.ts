@@ -73,10 +73,12 @@ const {
         items: files.map(f => ({ fileSlug: f.path })),
         roots: new Map(files.map(f => [f.path, { body: f.content }])),
         failures: [] as Array<{ path: string; slug: string; message: string }>,
-        lossy: [] as Array<{ path: string; lost: string[] }>,
+        // The round-trip guard is deferred out of parseFiles now (see
+        // auditRoundTrip in sync.ts); callers invoke this thunk instead of
+        // reporting a `lossy` array inline.
+        auditRoundTrip: () => {},
       })),
       reportParseFailures: vi.fn(),
-      reportRoundTripLosses: vi.fn(),
       updateSyncUI: vi.fn(),
     },
   }
@@ -202,7 +204,7 @@ vi.mock('@/storage/sync', () => syncFns)
 
 // Imports of the module under test (and its non-mocked collaborators — the
 // trivial in-memory activeBackend singleton) must come after the vi.mock calls.
-import { restoreVaults, setActiveVault, removeVault, addGitHubVault } from '@/storage/vaultRegistry'
+import { restoreVaults, setActiveVault, removeVault, addGitHubVault, onVaultChanged } from '@/storage/vaultRegistry'
 import { getActiveBackend, setActiveBackend } from '@/storage/activeBackend'
 import { ensureFreshAccessToken } from '@/storage/githubOAuth'
 
@@ -228,7 +230,6 @@ beforeEach(() => {
   syncFns.syncOnActivate.mockClear()
   syncFns.parseFiles.mockClear()
   syncFns.reportParseFailures.mockClear()
-  syncFns.reportRoundTripLosses.mockClear()
   syncFns.updateSyncUI.mockClear()
   backendConfig.localPermission = 'granted'
   backendConfig.githubPermission = 'granted'
@@ -422,6 +423,33 @@ describe('restoreVaults — cache-first paint', () => {
     gate.release()
     await restoring
     expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
+  })
+
+  // The reported "up to a second before it scrolls to today": the calendar
+  // listens on this signal, and it only arrives after the OAuth refresh and the
+  // two ensurePermission round trips. It must not carry `contentReplaced` on
+  // this path, or the listener throws away the expansion and grouping the first
+  // paint just built — and re-does them, visibly, that far into the load.
+  it('reports contentReplaced: false when the cache pre-painted this same vault', async () => {
+    cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
+    const changes: boolean[] = []
+    const off = onVaultChanged(({ contentReplaced }) => changes.push(contentReplaced))
+
+    await restoreVaults()
+    off()
+
+    expect(changes).toEqual([false])
+  })
+
+  it('reports contentReplaced: true when the cache was empty, so nothing was pre-painted', async () => {
+    // No cached rows — activation itself paints, over whatever was there.
+    const changes: boolean[] = []
+    const off = onVaultChanged(({ contentReplaced }) => changes.push(contentReplaced))
+
+    await restoreVaults()
+    off()
+
+    expect(changes).toEqual([true])
   })
 
   it('reads the cache before probing permission, and only once', async () => {
