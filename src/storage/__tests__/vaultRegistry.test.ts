@@ -61,6 +61,8 @@ const {
       vaultLoading: false,
       vaultLoadProgress: null as { loaded: number; total: number } | null,
       syncOffline: false,
+      /** Vault id whose localStorage prefs were last loaded — see loadVaultPrefs. */
+      prefsLoadedFor: null as string | null,
     },
     notifyFns: { notify: vi.fn(), notifyError: vi.fn(), warn: vi.fn() },
     syncFns: {
@@ -192,6 +194,7 @@ vi.mock('@/storeBridge', () => ({
   getVaults: vi.fn(() => storeState.vaults),
   setVaultList: vi.fn((refs: VaultRef[]) => { storeState.vaults = refs }),
   setActiveVaultId: vi.fn((id: string | null) => { storeState.activeVaultId = id }),
+  loadVaultPrefs: vi.fn((id: string) => { callOrder.push('loadVaultPrefs'); storeState.prefsLoadedFor = id }),
   setPendingReconnect: vi.fn((name: string | null) => { storeState.pendingDirReconnect = name }),
   setVaultLoading: vi.fn((loading: boolean) => { storeState.vaultLoading = loading }),
   setVaultLoadProgress: vi.fn((p: { loaded: number; total: number } | null) => { storeState.vaultLoadProgress = p }),
@@ -222,6 +225,7 @@ beforeEach(() => {
   storeState.vaultLoading = false
   storeState.vaultLoadProgress = null
   storeState.syncOffline = false
+  storeState.prefsLoadedFor = null
   cacheConfig.rows.clear()
   callOrder.length = 0
   notifyFns.notify.mockClear()
@@ -450,6 +454,32 @@ describe('restoreVaults — cache-first paint', () => {
     off()
 
     expect(changes).toEqual([true])
+  })
+
+  // The agenda's first frame is built through useCalendarFilter, which reads
+  // participantFilter/showTasks. Those are a localStorage read, but they used to
+  // arrive with setActiveVaultId — behind the token refresh and the permission
+  // probe. The cache then painted unfiltered, and when the real prefs landed the
+  // filtered-out rows (the whole overdue section, with tasks hidden) vanished
+  // from *above* the scroll position and slid the agenda days forward.
+  it('loads the vault preferences before painting, not after the permission probe', async () => {
+    cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
+    const gate = makeGate()
+    backendConfig.permissionGate = gate
+
+    const restoring = restoreVaults()
+
+    // Painted content and the filters that shape it must land together, while
+    // the network is still blocked.
+    await vi.waitFor(() => { expect(storeState.items).toHaveLength(1) })
+    expect(storeState.prefsLoadedFor).toBe(GITHUB_REF.id)
+
+    gate.release()
+    await restoring
+
+    // Ordering, not just presence — the whole point is that it precedes both.
+    expect(callOrder.indexOf('loadVaultPrefs')).toBeLessThan(callOrder.indexOf('cacheLoadAll'))
+    expect(callOrder.indexOf('loadVaultPrefs')).toBeLessThan(callOrder.indexOf('ensurePermission'))
   })
 
   it('reads the cache before probing permission, and only once', async () => {
