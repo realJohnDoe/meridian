@@ -304,7 +304,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
           column (labelByDay), which also expands the strip. */}
       {hasAllDayContent && (
         <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
-          <div style={{ width: GUTTER }} className="shrink-0 flex flex-col justify-end">
+          <div style={{ width: GUTTER }} className="shrink-0 flex flex-col justify-end pb-1">
             <AllDayOverflowToggle
               hiddenCount={hiddenCount}
               expanded={allDayExpanded}
