@@ -1,57 +1,73 @@
 import type { Occurrence } from '@/types'
 import { occKind } from '@/occView'
 import { fmtISO } from '@/model'
-import { sameDay, addDays, fmtLong } from '@/format'
+import { sameDay, addDays, fmtTopBarMonth, fmtTopBarWeek } from '@/format'
+import { weekStartFor, weekNumberFor } from './weekRange'
 import { sortOccs } from './occSort'
 
 const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
+
+// Asymmetric on purpose: overdue tasks can be arbitrarily old (see the fix
+// that expanded this from 7 to 365 days so old tasks would still surface in
+// the overdue section), but the agenda itself is a near-term view — planning
+// further ahead than a season ahead belongs in month view, not an infinitely
+// scrolling list. Also doubles as the span the day-by-day walk below covers,
+// so exported for useAgendaSections' useExpandWithMultiday call.
+export const PAST_WINDOW_DAYS = 365
+export const FUTURE_WINDOW_DAYS = 90
 
 // Size estimates for the virtualizer. Real sizes are measured after render
 // (measureElement); accurate estimates just keep the scrollbar/scrollToIndex
 // stable before a row has been measured. initialMeasurementsCache means
 // returning users always get real sizes — estimates only matter on first visit.
 //
-// HEADER_H:     AgendaHeaderRow div — pt-3.5 (14) + pb-1.5 (6) + text-xs line (~20) ≈ 40px
-// ROW_H_META:   OccurrenceCard min-h-11 + py-2 padding + a meta row + AgendaRow mb-1.5 (6) ≈ 68px
-// ROW_H_PLAIN:  the same card with no meta row, so it sits on its min-h-11 (44)
-//               floor + mb-1.5 (6) = 50px — the figure OccurrenceList.ts already
-//               uses for exactly this shape.
-// Update these if the header/card padding changes in AgendaHeaderRow.tsx /
-// OccurrenceCard.tsx.
-//
-// Split into two, where this used to be one ROW_H of 68: a single estimate
-// assuming a meta row is right for overdue rows (they all pass showDate, so
-// showMeta is always true) but over-states plain day rows — which have no
-// badge at all — by ~36%. That was harmless while it only affected the
-// scrollbar, but useAgendaScrollRestore now sums these to seed the
-// virtualizer's initial offset at today, and the error compounds over a
-// year's worth of past rows.
+// HEADER_H:    the overdue toggle row.
+// MONTH_H:     the big per-month divider ("August 2026").
+// WEEK_H:      the smaller per-week divider ("Week 32, Aug 3 – 9").
+// ROW_H_META:  OccurrenceCard min-h-11 + py-2 padding + a meta row + AgendaRow mb-1.5 (6) ≈ 68px
+// ROW_H_PLAIN: the same card with no meta row, so it sits on its min-h-11 (44)
+//              floor + mb-1.5 (6) = 50px — the figure OccurrenceList.ts already
+//              uses for exactly this shape.
+// EMPTY_H:     a day-empty row (badge + "No events" text), no card at all.
+// Update these if the corresponding row component's padding changes.
 const HEADER_H = 40
+const MONTH_H = 56
+const WEEK_H = 32
 const ROW_H_META = 68
 const ROW_H_PLAIN = 50
+const EMPTY_H = 44
 
 /**
- * One virtualizable row of the agenda's flat row list — either a section
- * header or a single occurrence. AgendaView virtualizes this list directly
- * (not `Section[]`), so an oversized section (notably `__overdue__`, which
- * pools every undone past task with no cap) never mounts more than the
- * viewport + overscan in one commit. See useAgendaSections.ts's `rows`.
+ * One virtualizable row of the agenda's flat row list. AgendaView virtualizes
+ * this list directly (not `Section[]`), so an oversized section (notably
+ * `__overdue__`, which pools every undone past task with no cap) never mounts
+ * more than the viewport + overscan in one commit. See useAgendaSections.ts's
+ * `rows`.
  */
 export type AgendaRow =
   | {
-      kind: 'header'; key: string; dateKey: string; label: string; tone: 'default' | 'today' | 'overdue'
-      /**
-       * Set only on the overdue header, which is a toggle rather than a label.
-       * `count` is the number of items the section holds — carried separately
-       * from `label` (which stays exactly "Overdue") so the header can render
-       * the two independently.
-       */
-      collapsible?: true; collapsed?: boolean; count?: number
+      // The overdue toggle — the only 'header' row left once per-day headers
+      // were replaced by inline badges (see 'occ'/'day-empty' below).
+      kind: 'header'; key: string; dateKey: string; label: string
+      collapsible: true; collapsed: boolean; count: number
     }
-  | { kind: 'occ'; key: string; dateKey: string; occ: Occurrence; showDate: boolean; isToday: boolean }
+  // Always-rendered dividers for every month/week the agenda's window spans
+  // (see the day-by-day walk in computeAgendaSections), independent of
+  // whether that month/week has any content — a continuous ruler rather than
+  // a label that only shows up where there's something to label.
+  | { kind: 'month'; key: string; dateKey: string; label: string }
+  | { kind: 'week'; key: string; dateKey: string; label: string }
+  | {
+      kind: 'occ'; key: string; dateKey: string; occ: Occurrence; showDate: boolean; isToday: boolean
+      /** Set only on a day's first occurrence row — the weekday/day-number badge that replaces the old per-day text header. Later rows on the same day reserve the same gutter width but render no badge, so entries visually nest under it. */
+      badge: { date: Date; isToday: boolean } | null
+    }
+  // A day forced into existence purely as a scroll target (the anchor day,
+  // or today under the default anchor) with nothing scheduled on it.
+  | { kind: 'day-empty'; key: string; dateKey: string; date: Date; isToday: boolean }
 
 export type Section =
-  | { kind: 'day'; key: string; dateKey: string; date: Date; isToday: boolean; isTomorrow: boolean; items: Occurrence[]; rows: AgendaRow[] }
+  | { kind: 'day'; key: string; dateKey: string; date: Date; isToday: boolean; items: Occurrence[]; rows: AgendaRow[] }
   | { kind: 'overdue'; key: string; items: Occurrence[]; rows: AgendaRow[] }
 
 /**
@@ -72,30 +88,44 @@ function hasMetaRow(r: Extract<AgendaRow, { kind: 'occ' }>): boolean {
 
 export function estimateRow(r: AgendaRow): number {
   if (r.kind === 'header') return HEADER_H
+  if (r.kind === 'month') return MONTH_H
+  if (r.kind === 'week') return WEEK_H
+  if (r.kind === 'day-empty') return EMPTY_H
   return hasMetaRow(r) ? ROW_H_META : ROW_H_PLAIN
-}
-
-function headerRow(key: string, dateKey: string, label: string, tone: 'default' | 'today' | 'overdue'): AgendaRow {
-  return { kind: 'header', key: `h|${key}`, dateKey, label, tone }
 }
 
 /** The overdue section's header — a collapse toggle, not a plain label. */
 function overdueHeaderRow(dateKey: string, collapsed: boolean, count: number): AgendaRow {
-  return { kind: 'header', key: 'h|__overdue__', dateKey, label: 'Overdue', tone: 'overdue', collapsible: true, collapsed, count }
+  return { kind: 'header', key: 'h|__overdue__', dateKey, label: 'Overdue', collapsible: true, collapsed, count }
 }
 
 // Keyed by dateKey (the section's own day, or `todayKey` for overdue rows —
 // see the AgendaRow doc comment above) + occ id + instant, not just occ id:
 // a multiday task pooled into overdue from several past days shares one id
 // across those days, and a bare-id key would collide across the flat list.
-function occRows(items: Occurrence[], dateKey: string, showDate: boolean, isToday: boolean): AgendaRow[] {
+function occRowKey(dateKey: string, o: Occurrence): string {
+  return `${dateKey}|${o.id}|${o.metadata.jsTime?.getTime() ?? ''}`
+}
+
+/** Overdue's pooled rows — always carry a date badge on the card itself (`showDate`), never the gutter badge (they span many different days). */
+function overdueRows(items: Occurrence[], dateKey: string): AgendaRow[] {
   return items.map(o => ({
-    kind: 'occ',
-    key: `${dateKey}|${o.id}|${o.metadata.jsTime?.getTime() ?? ''}`,
-    dateKey,
-    occ: o,
-    showDate,
-    isToday,
+    kind: 'occ', key: occRowKey(dateKey, o), dateKey, occ: o, showDate: true, isToday: false, badge: null,
+  }))
+}
+
+/**
+ * A single day's rendered rows: its occurrences with a gutter badge on the
+ * first one, or — when the day was forced into existence with nothing
+ * scheduled (see buildBucket) — one 'day-empty' row carrying the badge alone.
+ */
+function dayRows(items: Occurrence[], dateKey: string, date: Date, isToday: boolean): AgendaRow[] {
+  if (items.length === 0) {
+    return [{ kind: 'day-empty', key: `e|${dateKey}`, dateKey, date, isToday }]
+  }
+  return items.map((o, i) => ({
+    kind: 'occ', key: occRowKey(dateKey, o), dateKey, occ: o, showDate: false, isToday,
+    badge: i === 0 ? { date, isToday } : null,
   }))
 }
 
@@ -128,6 +158,8 @@ export interface AgendaSectionCache {
   filterOccs: FilterOccs
   /** Whether the overdue section was built collapsed — see calendar/viewState.ts. */
   overdueCollapsed: boolean
+  /** Locale week-start (0=Sun, 1=Mon, 6=Sat) — gates week-divider boundaries. */
+  ws: 0 | 1 | 6
   buckets: Map<string, DayBucket>
   /** All bucket keys, ascending — stable while the grouping is reused. */
   sortedKeys: string[]
@@ -136,9 +168,9 @@ export interface AgendaSectionCache {
   overdueSection: Section | null
   sections: Section[]
   goToIndex: number
-  /** Flattened `sections[*].rows`, in order — what AgendaView actually virtualizes. */
+  /** Flattened, week/month-divider-interspersed row list — what AgendaView actually virtualizes. */
   rows: AgendaRow[]
-  /** Index into `rows` of the scroll-to-today target's header row (see `goToIndex`). */
+  /** Index into `rows` of the scroll-to-today target's own first row (see `goToIndex`). */
   goToRowIndex: number
 }
 
@@ -171,7 +203,6 @@ function changedIndices(prev: Occurrence[], next: Occurrence[]): number[] | null
 
 interface BuildCtx {
   today: Date
-  tomorrow: Date
   now: Date
   todayKey: string
   /** See computeAgendaSections' `anchor` param. */
@@ -198,26 +229,18 @@ function buildBucket(b: DayBucket, ctx: BuildCtx): DayBucket {
       // anchor always needs a section to scroll to, mirroring the today
       // special-case below (identical when anchor is today, the default).
       section: items.length || b.key === ctx.anchorKey
-        ? {
-            kind: 'day', key: b.key, dateKey: b.key, date: b.date, isToday: false, isTomorrow: false, items,
-            rows: [headerRow(b.key, b.key, fmtLong(b.date), 'default'), ...occRows(items, b.key, false, false)],
-          }
+        ? { kind: 'day', key: b.key, dateKey: b.key, date: b.date, isToday: false, items, rows: dayRows(items, b.key, b.date, false) }
         : null,
     }
   }
 
   const items = sortOccs(filtered, ctx.now)
   const isToday = sameDay(b.date, ctx.today)
-  const isTomorrow = sameDay(b.date, ctx.tomorrow)
-  const label = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : fmtLong(b.date)
   return {
     ...b,
     overdue: EMPTY_OCCS,
     section: items.length || b.key === ctx.anchorKey
-      ? {
-          kind: 'day', key: b.key, dateKey: b.key, date: b.date, isToday, isTomorrow, items,
-          rows: [headerRow(b.key, b.key, label, isToday ? 'today' : 'default'), ...occRows(items, b.key, false, isToday)],
-        }
+      ? { kind: 'day', key: b.key, dateKey: b.key, date: b.date, isToday, items, rows: dayRows(items, b.key, b.date, isToday) }
       : null,
   }
 }
@@ -257,6 +280,11 @@ function groupByDay(allOccs: Occurrence[], todayKey: string, anchor: Date, ancho
   return { buckets, keyByIndex, sortedKeys: [...buckets.keys()].sort() }
 }
 
+/** "Week N, <range>" — reuses the topbar's own range formatter so the two stay in sync. */
+function weekLabel(weekStart: Date, today: Date): string {
+  return `Week ${weekNumberFor(weekStart)}, ${fmtTopBarWeek(weekStart, addDays(weekStart, 6), today)}`
+}
+
 /**
  * The agenda's grouping + sorting stage, as an explicit cache rather than a
  * chain of useMemos.
@@ -273,8 +301,12 @@ function groupByDay(allOccs: Occurrence[], todayKey: string, anchor: Date, ancho
  *     is re-run wholesale when `now` ticks, `today` rolls over, or the calendar
  *     filter changes (all of which every section's contents depend on).
  *
- * Unchanged `Section` objects are returned by reference, which is what keeps
- * DaySection's memo from re-rendering days the toggle didn't touch.
+ * Unchanged `Section` objects (and their `rows`) are returned by reference,
+ * which is what keeps AgendaRow's memo from re-rendering days the toggle
+ * didn't touch — the day-by-day flatten pass below always re-runs in full
+ * (it's cheap, ~455 iterations of array pushes), but it only ever *reads*
+ * `buckets`, so an untouched day still contributes the same `rows` array by
+ * reference.
  *
  * `anchor` defaults to `today` — the ordinary case, where the seeded/scroll
  * target bucket is today's own and goToIndex prefers the overdue section over
@@ -290,18 +322,19 @@ export function computeAgendaSections(
   filterOccs: FilterOccs,
   anchor: Date = today,
   overdueCollapsed = false,
+  ws: 0 | 1 | 6 = 1,
 ): AgendaSectionCache {
   const todayMs = today.getTime()
   const anchorMs = anchor.getTime()
   const nowMs = now.getTime()
 
-  if (prev && prev.allOccs === allOccs && prev.todayMs === todayMs && prev.anchorMs === anchorMs && prev.nowMs === nowMs && prev.filterOccs === filterOccs && prev.overdueCollapsed === overdueCollapsed) {
+  if (prev && prev.allOccs === allOccs && prev.todayMs === todayMs && prev.anchorMs === anchorMs && prev.nowMs === nowMs && prev.filterOccs === filterOccs && prev.overdueCollapsed === overdueCollapsed && prev.ws === ws) {
     return prev
   }
 
   const todayKey = fmtISO(today)
   const anchorKey = fmtISO(anchor)
-  const ctx: BuildCtx = { today, tomorrow: addDays(today, 1), now, todayKey, anchorKey, filterOccs }
+  const ctx: BuildCtx = { today, now, todayKey, anchorKey, filterOccs }
 
   // `today`/`anchor` gate grouping reuse because they decide the seeded
   // bucket and (for today) each bucket's isPast flag.
@@ -325,9 +358,13 @@ export function computeAgendaSections(
       if (k !== undefined) touched.add(k)
     }
 
-    // Nothing moved and nothing else changed — hand back the same sections array
-    // so AgendaView's virtualizer and scroll listener don't see a new identity.
-    if (sectionsReusable && touched.size === 0) {
+    // Nothing moved and nothing else changed — hand back the same cache so
+    // AgendaView's virtualizer and scroll listener don't see a new identity.
+    // `ws` doesn't gate bucket reuse (sectionsReusable, below) since it never
+    // affects bucket-building — only the flatten stage's week dividers read
+    // it — but it must still gate *this* shortcut, or a week-start-only
+    // change would hand back the old row list without ever re-walking it.
+    if (sectionsReusable && prev.ws === ws && touched.size === 0) {
       return prev.allOccs === allOccs ? prev : { ...prev, allOccs }
     }
 
@@ -371,15 +408,15 @@ export function computeAgendaSections(
       overdueSection = {
         kind: 'overdue', key: '__overdue__', items,
         // Overdue rows carry todayKey (not each occurrence's own past day) so
-        // the top-bar label falls back to "Today" over this block, matching
-        // AgendaView's updateTopDate behavior before flattening.
+        // the top-bar label falls back to today's month over this block,
+        // matching AgendaView's updateTopDate behavior before flattening.
         //
         // Collapsed, the section is its header and nothing else — `items` still
         // carries the full list, so only what's rendered changes. That's what
         // keeps the overdue preference below from landing on an unbounded wall.
         rows: overdueCollapsed
           ? [overdueHeaderRow(todayKey, true, items.length)]
-          : [overdueHeaderRow(todayKey, false, items.length), ...occRows(items, todayKey, true, false)],
+          : [overdueHeaderRow(todayKey, false, items.length), ...overdueRows(items, todayKey)],
       }
     } else {
       overdueSection = null
@@ -394,45 +431,84 @@ export function computeAgendaSections(
   // "take me to this day" asked for.
   const preferOverdue = anchorKey === todayKey
 
-  // Flatten: past day-sections (ascending) → overdue → current/future days.
+  // Flatten: a day-by-day walk over the whole [anchor-365, anchor+90] window
+  // (not just occurrence-bearing days), inserting a month/week divider row
+  // the first time each is entered — every week gets a row even when it has
+  // nothing scheduled, so the agenda reads as a continuous ruler rather than
+  // a list with unexplained gaps. Overdue is spliced in at the today/future
+  // boundary: normally that lands mid-walk (today's own divider rows go out
+  // first, then Overdue, then today's own content), but if `anchor` is far
+  // enough from today that the whole window is on one side of it, clamping
+  // into [from, to] below still resolves it to one end of the window rather
+  // than dropping it.
+  // Mirrors the row walk's own placement below: past days ascending, then
+  // overdue, then current/future days ascending — kept in this order (rather
+  // than pushing overdue last) so `sections`/`goToIndex` stay meaningful for
+  // callers reasoning about chronology independent of the divider rows.
   const sections: Section[] = []
-  let goToIndex = -1
   for (const k of sortedKeys) {
     if (k >= todayKey) break
     const s = buckets.get(k)?.section
-    if (!s) continue
-    if (!preferOverdue && k === anchorKey) goToIndex = sections.length
-    sections.push(s)
+    if (s) sections.push(s)
   }
-  if (overdueSection) {
-    if (preferOverdue) goToIndex = sections.length
-    sections.push(overdueSection)
-  }
+  if (overdueSection) sections.push(overdueSection)
   for (const k of sortedKeys) {
     if (k < todayKey) continue
     const s = buckets.get(k)?.section
-    if (!s) continue
-    if (preferOverdue) {
-      if (goToIndex < 0 && s.kind === 'day' && s.isToday) goToIndex = sections.length
-    } else if (k === anchorKey) {
-      goToIndex = sections.length
-    }
-    sections.push(s)
+    if (s) sections.push(s)
   }
 
-  // Flatten sections into one virtualizable row list. `goToIndex` (a section
-  // index) already identifies the scroll target, so reuse it here rather than
-  // re-deriving which section is "the target" a second time — goToRowIndex is
-  // the position of that section's header row.
   const rows: AgendaRow[] = []
   let goToRowIndex = -1
-  for (let i = 0; i < sections.length; i++) {
-    if (i === goToIndex) goToRowIndex = rows.length
-    for (const r of sections[i]!.rows) rows.push(r)
+
+  const from = addDays(anchor, -PAST_WINDOW_DAYS)
+  const to = addDays(anchor, FUTURE_WINDOW_DAYS)
+  // The single point in the walk where Overdue splices in: today, clamped
+  // into [from, to] so it still resolves to one end of the window (rather
+  // than never matching any `day` in the loop below) when `anchor` is far
+  // enough from today that the whole window lands on one side of it.
+  const overdueAtMs = Math.max(from.getTime(), Math.min(todayMs, to.getTime()))
+
+  let lastMonthKey = ''
+  let lastWeekKey = ''
+  for (let day = from; day.getTime() <= to.getTime(); day = addDays(day, 1)) {
+    const dateKey = fmtISO(day)
+
+    const monthKey = `${day.getFullYear()}-${day.getMonth()}`
+    if (monthKey !== lastMonthKey) {
+      lastMonthKey = monthKey
+      rows.push({ kind: 'month', key: `m|${monthKey}`, dateKey, label: fmtTopBarMonth(day, today) })
+    }
+    const weekStart = weekStartFor(day, ws)
+    const weekKey = fmtISO(weekStart)
+    if (weekKey !== lastWeekKey) {
+      lastWeekKey = weekKey
+      rows.push({ kind: 'week', key: `w|${weekKey}`, dateKey, label: weekLabel(weekStart, today) })
+    }
+
+    if (day.getTime() === overdueAtMs && overdueSection) {
+      if (preferOverdue) goToRowIndex = rows.length
+      for (const r of overdueSection.rows) rows.push(r)
+    }
+
+    const section = buckets.get(dateKey)?.section
+    if (section) {
+      if (dateKey === anchorKey) {
+        if (preferOverdue) { if (goToRowIndex < 0) goToRowIndex = rows.length }
+        else goToRowIndex = rows.length
+      }
+      for (const r of section.rows) rows.push(r)
+    }
   }
 
+  // goToIndex (section-granular) is kept only for tests/consumers that still
+  // reason in terms of sections; goToRowIndex above is what AgendaView uses.
+  const goToIndex = overdueSection && preferOverdue
+    ? sections.indexOf(overdueSection)
+    : sections.findIndex(s => (s.kind === 'day' && s.dateKey === anchorKey))
+
   return {
-    allOccs, todayMs, anchorMs, nowMs, filterOccs, overdueCollapsed, buckets, sortedKeys, keyByIndex,
+    allOccs, todayMs, anchorMs, nowMs, filterOccs, overdueCollapsed, ws, buckets, sortedKeys, keyByIndex,
     overdueSection, sections, goToIndex, rows, goToRowIndex,
   }
 }

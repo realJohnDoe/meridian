@@ -5,6 +5,7 @@ import { OccurrenceCard } from '@/components'
 import { occState } from '@/occView'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
+import { DayBadge } from './DayBadge'
 
 interface Props {
   occ: Occurrence
@@ -20,6 +21,14 @@ interface Props {
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
   showDate?: boolean
+  /**
+   * Set on a day's first occurrence row only (see agendaSections.ts's
+   * dayRows) — the weekday/day-number badge that stands in for the old
+   * per-day text header. Later rows on the same day pass null but still
+   * reserve the gutter width, so their cards nest under the badge instead of
+   * flush against the edge.
+   */
+  badge?: { date: Date; isToday: boolean } | null
 }
 
 // Memoized on purpose: now that `now` is an explicit, compared prop rather
@@ -28,7 +37,7 @@ interface Props {
 // when this row's rendered output could differ. Unrelated sibling changes in
 // the same day leave `occ` reference-stable (see expansionCache.ts's overlay
 // logic), so this row correctly skips re-rendering for those.
-function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
+function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, badge }: Props) {
   const roots     = useStore(s => s.roots)
   const backlinks = useStore(s => s.backlinks)
   const listedOn  = (backlinks.get(occ.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug)
@@ -154,42 +163,50 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate }: 
   }, []) // listeners are stable; callback accessed via ref
 
   return (
-    // Two nested boxes: the swipe reveal needs overflow-hidden (clips the
-    // delete panel to the row's rounded corners and the horizontal slide),
-    // but that same overflow-hidden clips any box-shadow on the card inside
-    // it since the card fills this box exactly. So the shadow lives on this
-    // outer, unclipped box instead, wrapping the actual clip boundary.
-    <div className={cn('relative rounded-lg mx-3.5 mb-1.5', !dimmed && 'shadow-(--shadow-card)')} data-occ-key={occ.id}>
-      <div
-        className="relative overflow-hidden rounded-lg"
-        ref={wrapRef}
-      >
-        {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
+    <div className="flex gap-2 px-3.5 mb-1.5">
+      {/* Gutter — the day's badge on its first row, an equal-width empty
+          spacer on the rest, so every card in a multi-item day still lines
+          up under the badge instead of flush against the edge. */}
+      <div className="w-9 shrink-0 flex justify-center pt-1.5">
+        {badge && <DayBadge date={badge.date} isToday={badge.isToday} />}
+      </div>
+      {/* Two nested boxes: the swipe reveal needs overflow-hidden (clips the
+          delete panel to the row's rounded corners and the horizontal slide),
+          but that same overflow-hidden clips any box-shadow on the card inside
+          it since the card fills this box exactly. So the shadow lives on this
+          outer, unclipped box instead, wrapping the actual clip boundary. */}
+      <div className={cn('relative rounded-lg flex-1 min-w-0', !dimmed && 'shadow-(--shadow-card)')} data-occ-key={occ.id}>
         <div
-          ref={hintRef}
-          className="swipe-hint absolute inset-0 items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive"
+          className="relative overflow-hidden rounded-lg"
+          ref={wrapRef}
         >
-          <Trash2
-            ref={iconRef}
-            size={18}
-            strokeWidth={2.5}
-            className="shrink-0 stroke-primary-foreground fill-none [transform:scale(var(--icon-scale,1))] transition-transform duration-150"
-          />
-          <span className="text-xs font-bold text-primary-foreground whitespace-nowrap">Delete</span>
-        </div>
+          {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
+          <div
+            ref={hintRef}
+            className="swipe-hint absolute inset-0 items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive"
+          >
+            <Trash2
+              ref={iconRef}
+              size={18}
+              strokeWidth={2.5}
+              className="shrink-0 stroke-primary-foreground fill-none [transform:scale(var(--icon-scale,1))] transition-transform duration-150"
+            />
+            <span className="text-xs font-bold text-primary-foreground whitespace-nowrap">Delete</span>
+          </div>
 
-        {/* Main row — transform driven by CSS (.swipe-row) */}
-        <div ref={rowRef} className="swipe-row relative z-10 bg-background touch-pan-y select-none">
-          <OccurrenceCard
-            occ={occ}
-            now={now}
-            leadingIcon="checkbox"
-            onOpen={() => onOpen(occ)}
-            onToggleDone={() => onToggleDone(occ)}
-            showDate={showDate}
-            listedOn={listedOn}
-            animate={false}
-          />
+          {/* Main row — transform driven by CSS (.swipe-row) */}
+          <div ref={rowRef} className="swipe-row relative z-10 bg-background touch-pan-y select-none">
+            <OccurrenceCard
+              occ={occ}
+              now={now}
+              leadingIcon="checkbox"
+              onOpen={() => onOpen(occ)}
+              onToggleDone={() => onToggleDone(occ)}
+              showDate={showDate}
+              listedOn={listedOn}
+              animate={false}
+            />
+          </div>
         </div>
       </div>
     </div>
