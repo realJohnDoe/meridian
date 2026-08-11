@@ -9,17 +9,23 @@ import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { occRadius } from '@/components/primitives/occurrence-variants'
 import { OccurrencePill } from './OccurrencePill'
-import { AllDayOverflowToggle, ALL_DAY_THRESHOLD } from './AllDayOverflowToggle'
+import { AllDayOverflowToggle } from './AllDayOverflowToggle'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useToday } from '@/hooks'
 import { useFilteredOccs } from './useCalendarFilter'
 import { useNow } from './useNow'
 import { computeColumns } from './computeColumns'
 import { EventBlock } from './EventBlock'
+import { BADGE_CLASS } from './MonthGrid'
 import {
   HOURS, HP, GUTTER, RIGHT_PAD, TOP_PAD, BOTTOM_PAD, DEFAULT_CREATE_DURATION,
   formatHourBoundary, snapCreateTime,
 } from './timelineGeometry'
+
+// Google Calendar's day view always keeps 2 all-day rows visible (even when
+// empty) and only switches to a "+N" label once a 3rd item shows up — a
+// lower, DayPane-only threshold than WeekPane's shared ALL_DAY_THRESHOLD.
+const ALL_DAY_VISIBLE_ROWS = 2
 
 // ── Sub-components ────────────────────────────────────────────
 
@@ -136,12 +142,12 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
   const dvMidnight = startOfDay(dvDate)
 
   const [allDayExpanded, setAllDayExpanded] = useState(false)
-  // Reserve the last visible slot for a "+N" label once there's overflow —
-  // mirrors CalCell in MonthGrid and WeekPane's own per-day version — so the
-  // always-visible portion never exceeds ALL_DAY_THRESHOLD lines even
-  // counting the label itself.
-  const allDayOverflowing = allDay.length > ALL_DAY_THRESHOLD
-  const shownAllDayCount = allDayOverflowing ? ALL_DAY_THRESHOLD - 1 : allDay.length
+  // Unlike WeekPane's shared ALL_DAY_THRESHOLD, the day view always reserves
+  // exactly ALL_DAY_VISIBLE_ROWS of height for all-day content (matching
+  // Google Calendar's fixed two-row day-view strip) and folds the 3rd+ item
+  // straight behind a "+N" label rather than ever showing a bare 3rd item.
+  const allDayOverflowing = allDay.length > ALL_DAY_VISIBLE_ROWS
+  const shownAllDayCount = allDayOverflowing ? ALL_DAY_VISIBLE_ROWS : allDay.length
   const hiddenCount = allDay.length - shownAllDayCount
 
   // minutesWithinHour is 0 for keyboard-triggered activation (Enter/Space on
@@ -163,54 +169,69 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
     <>
       {/* All-day / multiday strip — a fixed-width GUTTER column (matching the
           timeline gutter below) plus a content column, mirroring WeekPane's
-          layout. The gutter column is unconditionally rendered at GUTTER
-          width — even when AllDayOverflowToggle renders nothing (no
-          overflow) — so the item pills' left edge never bleeds into the
-          hour-label gutter beneath them. The chevron is bottom-aligned within
-          it, right above the border separating this strip from the hourly
-          grid. pr-2 = RIGHT_PAD, so the all-day items share a right edge with
-          the timeline's event blocks beneath them. A "+N" label takes the
-          last visible line instead of an item once there's overflow (see
-          shownAllDayCount above) — both expand the strip. */}
-      {allDay.length > 0 && (
-        <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
-          <div style={{ width: GUTTER }} className="shrink-0 flex flex-col justify-end pb-1.5">
-            <AllDayOverflowToggle
-              hiddenCount={hiddenCount}
-              expanded={allDayExpanded}
-              onToggle={() => setAllDayExpanded(v => !v)}
-              className="h-5 w-full p-0"
-            />
+          layout. Unlike WeekPane, this strip is unconditionally rendered
+          (not just when allDay.length > 0): it doubles as the day view's
+          header, carrying the weekday + day-of-month badge in its gutter —
+          mirroring the week-number badge in WeekPane's own header row — so
+          there's always a "which day is this" indicator even with no
+          all-day content. The badge sits above the expand/collapse chevron,
+          which stays bottom-aligned right above the border into the hourly
+          grid. pr-2 = RIGHT_PAD, so the all-day items share a right edge
+          with the timeline's event blocks beneath them. A "+N" label takes
+          the last visible line instead of an item once there's overflow
+          (see shownAllDayCount above); empty placeholder rows fill out to
+          ALL_DAY_VISIBLE_ROWS otherwise, so the strip's height never
+          depends on how many all-day items exist. */}
+      <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
+        <div style={{ width: GUTTER }} className="shrink-0 flex flex-col items-center justify-between pb-1.5">
+          <div className="flex flex-col items-center gap-0.5 pt-1">
+            <span className="text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground">
+              {dvDate.toLocaleDateString(undefined, { weekday: 'short' })}
+            </span>
+            <span className={cn(BADGE_CLASS, isToday && 'bg-primary text-primary-foreground font-bold')}>
+              {dvDate.getDate()}
+            </span>
           </div>
-          <div className="flex-1 min-w-0 pr-2 py-1.5">
-            <div className="text-2xs font-semibold tracking-[.07em] uppercase text-muted-foreground mb-1">All day</div>
-
-            {/* Always-visible first N items (N-1 once overflowing, to make room for the label below) */}
-            {allDay.slice(0, shownAllDayCount).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
-
-            {hiddenCount > 0 && !allDayExpanded && (
-              <button
-                type="button"
-                onClick={() => setAllDayExpanded(true)}
-                className="h-5 flex items-center text-xs text-muted-foreground hover:text-secondary-foreground"
-              >
-                +{hiddenCount}
-              </button>
-            )}
-
-            {/* Animated overflow */}
-            {hiddenCount > 0 && (
-              <div className={cn('dv-adoverflow', allDayExpanded && 'open')}>
-                <div>
-                  {allDay.slice(shownAllDayCount).map((o, i) =>
-                    renderAllDayItem(o, shownAllDayCount + i, dvMidnight, onOpen)
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <AllDayOverflowToggle
+            hiddenCount={hiddenCount}
+            expanded={allDayExpanded}
+            onToggle={() => setAllDayExpanded(v => !v)}
+            className="h-5 w-full p-0"
+          />
         </div>
-      )}
+        <div className="flex-1 min-w-0 pr-2 py-1.5">
+          <div className="text-2xs font-semibold tracking-[.07em] uppercase text-muted-foreground mb-1">All day</div>
+
+          {/* Always-visible first N items (capped at ALL_DAY_VISIBLE_ROWS once overflowing, to make room for the label below) */}
+          {allDay.slice(0, shownAllDayCount).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
+
+          {/* Empty rows so the strip always reserves ALL_DAY_VISIBLE_ROWS of height, even with fewer (or zero) items */}
+          {Array.from({ length: ALL_DAY_VISIBLE_ROWS - shownAllDayCount }, (_, i) => (
+            <div key={`ad-placeholder-${i}`} className="h-5 mb-0.5" aria-hidden />
+          ))}
+
+          {hiddenCount > 0 && !allDayExpanded && (
+            <button
+              type="button"
+              onClick={() => setAllDayExpanded(true)}
+              className="h-5 flex items-center text-xs text-muted-foreground hover:text-secondary-foreground"
+            >
+              +{hiddenCount}
+            </button>
+          )}
+
+          {/* Animated overflow */}
+          {hiddenCount > 0 && (
+            <div className={cn('dv-adoverflow', allDayExpanded && 'open')}>
+              <div>
+                {allDay.slice(shownAllDayCount).map((o, i) =>
+                  renderAllDayItem(o, shownAllDayCount + i, dvMidnight, onOpen)
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Scrollable timeline. pb-5 (20px) matches the search-bar gradient
           height so the 24:00 boundary can scroll clear of the overlaid fade. */}

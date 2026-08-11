@@ -2,13 +2,16 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { IconButton } from '@/components/primitives/icon-button'
 import { cn } from '@/lib/cn'
 
-// Shared between DayPane and WeekPane's all-day strips: both cap the
-// always-visible portion at this many rows/items per day and fold the rest
-// behind this same expand/collapse toggle (paired with the `.dv-adoverflow`
-// CSS animation class in index.css). When a day has more than this many
-// items, its last visible slot is given over to a "+N" label instead (see
-// each pane's own overflow layout) rather than an item — one more reason,
-// besides ALL_DAY_THRESHOLD itself, that the two panes stay in lockstep.
+// WeekPane's cap on the always-visible portion of its per-day-column
+// all-day strip (rows/items per day) before folding the rest behind this
+// same expand/collapse toggle (paired with the `.dv-adoverflow` CSS
+// animation class in index.css) — a "+N" label takes the last visible slot
+// once a day has more than this many items (see WeekPane's own overflow
+// layout). DayPane uses its own lower, unshared threshold
+// (ALL_DAY_VISIBLE_ROWS in DayPane.tsx) to keep a fixed two-row strip
+// matching Google Calendar's day view, so the two panes are intentionally
+// no longer in lockstep on this number — only this toggle component itself
+// is shared between them.
 export const ALL_DAY_THRESHOLD = 3
 
 interface Props {
