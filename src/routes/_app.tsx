@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import { Menu, CalendarCheck2 } from 'lucide-react'
-import { addDays, fmtTopBarDay, fmtTopBarDayShort, fmtTopBarMonth, fmtTopBarWeek } from '@/format'
+import { addDays, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth, weekStartsOn } from '@/model'
 import { useToday } from '@/hooks'
 import { useStore } from '@/store'
@@ -104,14 +104,15 @@ function AppMain() {
   const weekDisplayStart = weekStartDate && (weekPreview ? (parseDateString(weekPreview) ?? weekStartDate) : weekStartDate)
   const weekDisplayEnd   = weekDisplayStart && addDays(weekDisplayStart, 6)
 
-  // Backlog/Notes are fixed strings; the agenda default view is date-based
-  // like day mode. Month mode (below) computes its own label directly — it
-  // never abbreviates, so it doesn't need a long/short pair.
+  // Backlog/Notes are fixed strings; the agenda default view shows just the
+  // month of its topmost visible row, matching Day/Month/Week's own topbar —
+  // it never abbreviates, so long and short are the same string.
   const [topBarLabel, topBarLabelShort] = (() => {
     if (backlogMatch) return ['Backlog', 'Backlog']
     if (notesMatch)   return ['Notes', 'Notes']
     const d = agendaTopDate ? new Date(agendaTopDate + 'T00:00:00') : today
-    return [fmtTopBarDay(d, today), fmtTopBarDayShort(d, today)]
+    const label = fmtTopBarMonth(d, today)
+    return [label, label]
   })()
 
   const handleToday = () => {
@@ -173,11 +174,13 @@ function AppMain() {
             // replace: true on nav — mirrors the day/month carousels' swipe-to-page
             // semantics (see WeekView) so chevron taps and swipes leave the
             // same, single history entry per visit instead of chevron taps
-            // alone stacking up a back-press-per-week trail.
+            // alone stacking up a back-press-per-week trail. Label is just the
+            // month of the week's first day, like Day/Month's own topbar —
+            // the day-of-month range shows in WeekPane's own column badges.
             <PagedTopbar
               isMobile={isMobile}
               openSidebar={openSidebar}
-              label={fmtTopBarWeek(weekDisplayStart, weekDisplayEnd, today)}
+              label={fmtTopBarMonth(weekDisplayStart, today)}
               prevLabel="Previous week"
               nextLabel="Next week"
               onPrev={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true })}
