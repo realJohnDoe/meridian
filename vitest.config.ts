@@ -59,6 +59,20 @@ export default defineConfig({
         'src/editor/cm/ReactWidget.ts': { statements: 78, branches: 90, functions: 50, lines: 77 },
         'src/model/fieldRegistry.ts': { statements: 90, branches: 80, functions: 85, lines: 90 },
         'src/storage/conflictError.ts': { statements: 90, branches: 85, functions: 95, lines: 95 },
+        // The durability + credentials layer: unsynced edits, tombstones and
+        // GitHub tokens. Every other suite that touches it swaps in an
+        // in-memory fake, so without these floors it can drift back to being
+        // covered only by its own doubles. cache.test.ts runs the real Dexie
+        // code against fake-indexeddb; keep it that way.
+        'src/storage/cache/files.ts': { statements: 95, branches: 92, functions: 95, lines: 95 },
+        'src/storage/cache/credentials.ts': { statements: 95, branches: 92, functions: 95, lines: 95 },
+        'src/storage/cache/registry.ts': { statements: 95, branches: 92, functions: 95, lines: 95 },
+        // db.ts sits lower on branches by design: cacheInit's
+        // `_cacheInitPromise` re-entry guard is unreachable in practice (the
+        // IIFE assigns `db` before its first await, so a concurrent caller
+        // always returns on the `if (db)` line above it) and isn't worth
+        // contorting a test to reach.
+        'src/storage/cache/db.ts': { statements: 88, branches: 70, functions: 95, lines: 95 },
         'src/editor/dialogs/RepeatDialog.tsx': { statements: 75, branches: 60, functions: 65, lines: 75 },
         'src/occurrenceActions.ts': { statements: 85, branches: 75, functions: 80, lines: 88 },
         'src/editor/useEntryEditor.ts': { statements: 68, branches: 55, functions: 55, lines: 70 },
