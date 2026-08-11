@@ -15,8 +15,8 @@ import {
 import { loadFile } from '@/fileIO'
 import { cn } from '@/lib/cn'
 import type { Occurrence, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern, OccurrenceMetadata } from '@/types'
-import { EntryEditor, DialogStack, RepeatDialog, applyScope, entryFromOccurrence, usePendingLinks } from '@/editor'
-import type { EntryState, DialogHandlers } from '@/editor'
+import { EntryEditor, RepeatDialog, applyScope, entryFromOccurrence, usePendingLinks } from '@/editor'
+import type { EntryState, DialogHandlers, EntryEditorHooks } from '@/editor'
 
 // ── Misc helpers ──────────────────────────────────────────────────────────────
 
@@ -273,7 +273,8 @@ function DeleteConfirmForm({ message, label, onApply, onCancel }: {
 // ── Dialog state hook ─────────────────────────────────────────────────────────
 //
 // Manages the activeDialog open/close state and assembles the DialogHandlers
-// object that DialogStack expects, keeping this glue out of the main component.
+// object EntryEditor's dialog stack expects, keeping this glue out of the main
+// component.
 
 function useDebugDialogHandlers(
   setEntry: React.Dispatch<React.SetStateAction<EntryState | null>>,
@@ -726,24 +727,24 @@ export default function NodeInheritanceDebugger() {
         {/* 4TH COLUMN: EntryEditor */}
         <div className="flex-1 flex flex-col min-h-0 bg-[#0f1318]">
           {debugEntry ? (
-            <>
-              <EntryEditor
-                entry={debugEntry}
-                series={seriesContext(items, debugEntry.item)}
-                onChange={(updater) => setDebugEntry(prev => prev ? updater(prev) : prev)}
-                onSave={handleDebugSave}
-                onOpenDlg={openDialog}
-                onOpenRepeatDlg={openRepeatDialog}
-                onScopeChange={handleDebugScopeChange}
+            <EntryEditor
+              hooks={{
+                entry: debugEntry,
+                series: seriesContext(items, debugEntry.item),
+                pendingLinks: debugPendingLinks,
+                dialogHandlers,
+                setEntry: (updater) => setDebugEntry(prev => prev ? updater(prev) : prev),
+                handleSave: handleDebugSave,
+                handleOpenDlg: openDialog,
+                handleOpenRepeatDlg: openRepeatDialog,
+                handleScopeChange: handleDebugScopeChange,
                 // Promoting a checklist line creates a real vault file and navigates to
                 // it — out of scope for the debugger, which edits a scratch snapshot.
-                onPromoteTask={() => null}
-                pendingLinks={debugPendingLinks}
-                items={items}
-                roots={debugRoots}
-              />
-              <DialogStack entry={debugEntry} handlers={dialogHandlers} />
-            </>
+                handlePromoteTask: () => null,
+              } satisfies EntryEditorHooks}
+              items={items}
+              roots={debugRoots}
+            />
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-white/20 select-none">
               <CalendarDays size={32} strokeWidth={1.2} />

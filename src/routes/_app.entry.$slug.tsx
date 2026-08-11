@@ -11,7 +11,7 @@ import { EntrySkeleton } from '@/components/primitives/entry-skeleton'
 import { EntryTopbar } from './-entryTopbar'
 import type { Occurrence, EditScope } from '@/types'
 
-const EditorShell = lazy(() => import('@/editor').then(m => ({ default: m.EditorShell })))
+const EntryEditor = lazy(() => import('@/editor').then(m => ({ default: m.EntryEditor })))
 
 export const Route = createFileRoute('/_app/entry/$slug')({
   component: EntrySlugPage,
@@ -39,7 +39,7 @@ function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
         onBack={hooks.handleClose}
       />
       <Suspense fallback={<EntrySkeleton />}>
-        <EditorShell entry={hooks.entry} hooks={hooks} items={items} roots={roots} />
+        <EntryEditor hooks={hooks} items={items} roots={roots} />
       </Suspense>
     </>
   )

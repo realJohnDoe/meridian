@@ -6,7 +6,7 @@ import { EntrySkeleton } from '@/components/primitives/entry-skeleton'
 import { titleToSlug } from '@/fileIO'
 import { EntryTopbar } from './-entryTopbar'
 
-const EditorShell = lazy(() => import('@/editor').then(m => ({ default: m.EditorShell })))
+const EntryEditor = lazy(() => import('@/editor').then(m => ({ default: m.EntryEditor })))
 
 type ItemTypeSearch = 'task' | 'event' | 'note'
 const ITEM_TYPES: ItemTypeSearch[] = ['task', 'event', 'note']
@@ -54,7 +54,7 @@ function NewEntryReady({ title, date, time, duration, itemType }: NewEntrySearch
         onBack={hooks.handleClose}
       />
       <Suspense fallback={<EntrySkeleton />}>
-        <EditorShell entry={hooks.entry} hooks={hooks} items={items} roots={roots} />
+        <EntryEditor hooks={hooks} items={items} roots={roots} />
       </Suspense>
     </>
   )

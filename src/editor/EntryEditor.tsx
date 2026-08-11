@@ -3,6 +3,8 @@ import type { EditorView } from '@codemirror/view'
 import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import type { SeriesContext } from '@/model'
+import DialogStack from './DialogStack'
+import type { DialogHandlers } from './useEntryDialogs'
 import { badgeVariants } from '@/components/ui/badge'
 import { PRIORITY_CLASS } from '@/components/primitives/occurrence-variants'
 import { Button } from '@/components/ui/button'
@@ -49,27 +51,43 @@ const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
 }
 
 
-interface Props {
+/**
+ * What the editor needs from its controller. `useEntryEditor`'s return value
+ * satisfies this structurally, so a route hands its `hooks` straight through as
+ * one prop — no per-field forwarding layer in between.
+ *
+ * Declared as its own interface rather than `ReturnType<typeof useEntryEditor>`
+ * so `debug/NodeInheritanceDebugger` can drive the same component from a
+ * hand-built object: it edits a scratch snapshot, never the vault, so it has no
+ * autosave, no wikilink navigation and no backlink toggling. Everything optional
+ * here is a capability that caller legitimately doesn't have.
+ */
+export interface EntryEditorHooks {
   entry: EntryState
   /** How this occurrence sits in its series — derived in model/, see seriesContext. */
   series: SeriesContext
-  onChange: (updater: (prev: EntryState) => EntryState) => void
-  onSave: (body: string) => void
-  onAutoSave?: (body: string) => void
-  onMetaSave?: (next: EntryState) => void
   pendingLinks: PendingLinks
-  onOpenDlg: (id: string) => void
-  onOpenRepeatDlg: (itemType: ItemType) => void
-  onScopeChange?: (scope: EditScope) => void
-  onTypeChange?: (t: ItemType) => void
-  onDoneToggle?: () => void
-  onPromoteTask: (title: string, done: boolean) => string | null
+  dialogHandlers: DialogHandlers
+  setEntry: (updater: (prev: EntryState) => EntryState) => void
+  handleSave: (body: string) => void
+  handleOpenDlg: (id: string) => void
+  handleOpenRepeatDlg: (itemType: ItemType) => void
+  handlePromoteTask: (title: string, done: boolean) => string | null
+  scheduleAutoSave?: (body: string) => void
+  saveMeta?: (next: EntryState) => void
+  handleScopeChange?: (scope: EditScope) => void
+  handleTypeChange?: (t: ItemType) => void
+  handleDoneToggle?: () => void
+  handleOpenWikilink?: (ref: string) => void
+  handleToggleDoneBacklink?: (occ: Occurrence) => void
+  titleMissing?: boolean
+  focusTitleTick?: number
+}
+
+interface Props {
+  hooks: EntryEditorHooks
   items: StoreItem[]
   roots: Roots
-  onOpenWikilink?: (ref: string) => void
-  onToggleDoneBacklink?: (occ: Occurrence) => void
-  titleError?: boolean
-  focusTitleTick?: number
 }
 
 function autoResize(el: HTMLTextAreaElement) {
@@ -77,7 +95,13 @@ function autoResize(el: HTMLTextAreaElement) {
   el.style.height = el.scrollHeight + 'px'
 }
 
-export default function EntryEditor({ entry, series, onChange, onSave, onAutoSave, onMetaSave, pendingLinks, onOpenDlg, onOpenRepeatDlg, onScopeChange, onTypeChange, onDoneToggle, onPromoteTask, items, roots, onOpenWikilink, onToggleDoneBacklink, titleError, focusTitleTick }: Props) {
+export default function EntryEditor({ hooks, items, roots }: Props) {
+  const {
+    entry, series, pendingLinks, dialogHandlers,
+    setEntry, handleSave, handleOpenDlg, handleOpenRepeatDlg, handlePromoteTask,
+    scheduleAutoSave, saveMeta, handleScopeChange, handleTypeChange, handleDoneToggle,
+    handleOpenWikilink, handleToggleDoneBacklink, titleMissing, focusTitleTick,
+  } = hooks
   const hour12             = useStore(s => s.localePrefs.hour12)
   const backlinks          = useStore(s => s.backlinks)
   const titleRef  = useRef<HTMLTextAreaElement>(null)
@@ -91,9 +115,9 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
     if (focusTitleTick) titleRef.current?.focus()
   }, [focusTitleTick])
 
-  function handleScopeChange(scope: EditScope) {
-    onChange(prev => ({ ...prev, editScope: scope }))
-    onScopeChange?.(scope)
+  function changeScope(scope: EditScope) {
+    setEntry(prev => ({ ...prev, editScope: scope }))
+    handleScopeChange?.(scope)
   }
 
   const allParticipants = useAllParticipants(items)
@@ -119,7 +143,7 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
   const showScopeRow = isRecurring || hasSched
 
   return (
-    <>
+    <section className="flex-1 min-h-0 flex flex-col">
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-3xl lg:mx-auto">
 
         {/* ── FILE-LEVEL: title + slug ── */}
@@ -127,7 +151,7 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
           {tracked && (
             <Checkbox
               checked={done}
-              onCheckedChange={() => onDoneToggle?.()}
+              onCheckedChange={() => handleDoneToggle?.()}
               className="mt-1"
               visualClassName="size-6"
             />
@@ -137,15 +161,15 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
               ref={titleRef}
               className={cn(
                 'w-full text-2xl font-light text-foreground bg-transparent border-none outline-none leading-snug resize-none',
-                titleError ? 'placeholder:text-destructive' : 'placeholder:text-muted-foreground',
+                titleMissing ? 'placeholder:text-destructive' : 'placeholder:text-muted-foreground',
               )}
               placeholder="Title"
               rows={1}
               value={title}
               onChange={e => {
-                onChange(prev => ({ ...prev, title: e.target.value }))
+                setEntry(prev => ({ ...prev, title: e.target.value }))
                 autoResize(e.target)
-                if (editScope !== 'add') onAutoSave?.(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+                if (editScope !== 'add') scheduleAutoSave?.(viewRef.current?.state.doc.toString().trimEnd() ?? '')
               }}
             />
             {item && (
@@ -159,7 +183,7 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
           slugs={linkedSlugs}
           fileSlug={effectiveSlug}
           roots={roots}
-          onOpenWikilink={onOpenWikilink}
+          onOpenWikilink={handleOpenWikilink}
           onAdd={handleAdd}
           onRemove={handleRemove}
         />
@@ -168,7 +192,7 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
         <Card className="mt-3 mb-4 overflow-hidden bg-card shadow-(--shadow-card)">
           <CardContent className="px-3 pt-3 pb-3 bg-card">
             {showScopeRow && (
-              <Select value={editScope} onValueChange={v => handleScopeChange(v as EditScope)}>
+              <Select value={editScope} onValueChange={v => changeScope(v as EditScope)}>
                 <SelectTrigger
                   className={cn(
                     'w-fit gap-1 !h-11 -mt-3.5 -mb-0.5 px-0 text-xs font-medium text-muted-foreground',
@@ -190,7 +214,7 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
             <ToggleGroup
               type="single"
               value={itemType}
-              onValueChange={(v) => { if (v) onTypeChange?.(v as ItemType) }}
+              onValueChange={(v) => { if (v) handleTypeChange?.(v as ItemType) }}
               className={cn(segmentedGroupVariants(), 'mb-4')}
             >
               {(['task', 'event', 'note'] as ItemType[]).map(t => (
@@ -210,24 +234,24 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
             {(showDateChip || tracked || showRepeat) && (
               <div className="flex gap-1.5 flex-wrap mb-4">
                 {showDateChip && (
-                  <PropChip icon={Calendar} label="Date" pressed={!!scheduled} onClick={() => onOpenDlg('dlgSched')}
+                  <PropChip icon={Calendar} label="Date" pressed={!!scheduled} onClick={() => handleOpenDlg('dlgSched')}
                     value={scheduled ? (fmtShort(parseDateString(scheduled.date) ?? new Date(scheduled.date))) : undefined} />
                 )}
                 {showDateChip && hasDate && (
-                  <PropChip icon={Clock} label="Time" pressed={hasTime} onClick={() => onOpenDlg('dlgTime')}
+                  <PropChip icon={Clock} label="Time" pressed={hasTime} onClick={() => handleOpenDlg('dlgTime')}
                     value={hasTime ? (fmtT(scheduled.time, hour12) ?? undefined) : undefined} />
                 )}
                 {showDateChip && (
-                  <PropChip icon={Timer} label="Duration" pressed={!!duration} onClick={() => onOpenDlg('dlgDur')}
+                  <PropChip icon={Timer} label="Duration" pressed={!!duration} onClick={() => handleOpenDlg('dlgDur')}
                     value={duration ? (scheduled ? formatDurationChip(duration, scheduled, hour12) : fmtDuration(duration)) : undefined} />
                 )}
                 {tracked && (
-                  <PropChip icon={Flag} label="Priority" pressed={!!priority} onClick={() => onOpenDlg('dlgPriority')}
+                  <PropChip icon={Flag} label="Priority" pressed={!!priority} onClick={() => handleOpenDlg('dlgPriority')}
                     value={priority ? PRIORITY_LABELS[priority] : undefined}
                     className={priority ? PRIORITY_CLASS[priority] : undefined} />
                 )}
                 {showRepeat && (
-                  <PropChip icon={Repeat} label="Repeat" pressed={!!repeat} onClick={() => onOpenRepeatDlg(itemType)}
+                  <PropChip icon={Repeat} label="Repeat" pressed={!!repeat} onClick={() => handleOpenRepeatDlg(itemType)}
                     value={repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type) : undefined} />
                 )}
               </div>
@@ -235,13 +259,13 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
 
             <ParticipantsRow participants={participants} onChange={ps => {
               const next = { ...entry, participants: ps }
-              onChange(() => next)
-              onMetaSave?.(next)
+              setEntry(() => next)
+              saveMeta?.(next)
             }} allParticipants={allParticipants} />
 
             {editScope === 'add' && (
               <div className="mt-3 flex justify-end">
-                <Button variant="default" size="sm" onClick={() => onSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')}>
+                <Button variant="default" size="sm" onClick={() => handleSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')}>
                   Save occurrence
                 </Button>
               </div>
@@ -249,23 +273,27 @@ export default function EntryEditor({ entry, series, onChange, onSave, onAutoSav
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={onOpenWikilink} onChange={editScope !== 'add' ? onAutoSave : undefined} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={handleOpenWikilink} onChange={editScope !== 'add' ? scheduleAutoSave : undefined} />
 
         <ItemsList
           items={listItems}
           onChange={its => {
             const next = { ...entry, items: its }
-            onChange(() => next)
-            onMetaSave?.(next)
+            setEntry(() => next)
+            saveMeta?.(next)
           }}
           roots={roots}
           currentSlug={effectiveSlug ?? null}
-          onPromote={onPromoteTask}
-          onOpenWikilink={onOpenWikilink}
-          onToggleDone={onToggleDoneBacklink}
+          onPromote={handlePromoteTask}
+          onOpenWikilink={handleOpenWikilink}
+          onToggleDone={handleToggleDoneBacklink}
         />
 
       </div></div>
-    </>
+
+      {/* The dialogs the property chips above open — same controller, so they
+          live with the chips rather than behind another wrapper component. */}
+      <DialogStack entry={entry} handlers={dialogHandlers} />
+    </section>
   )
 }

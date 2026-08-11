@@ -8,6 +8,7 @@ import { fmtISO, seriesContext } from '@/model'
 import { useToday } from '@/hooks'
 import { newEntryRoute } from '@/routes'
 import { resolveWikilink } from '@/wikilinks'
+import { toggleOccDone } from '@/occurrenceActions'
 import { getFom } from '@/storeBridge'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
@@ -284,6 +285,10 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     handleTypeChange,
     handleDoneToggle,
     handlePromoteTask,
+    // Ticking a checklist line that points at another entry commits to *that*
+    // file, not this one — it goes straight through the shared occurrence
+    // action rather than this editor's save path.
+    handleToggleDoneBacklink: toggleOccDone,
     handleOpenDlg: dialogs.handleOpenDlg,
     handleOpenRepeatDlg: dialogs.handleOpenRepeatDlg,
     dialogHandlers: dialogs.dialogHandlers,
