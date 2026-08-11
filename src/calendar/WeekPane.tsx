@@ -230,10 +230,17 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
     createAt(day, h, ((e.clientY - rect.top) / HP) * 60)
   }
 
-  // Unlike MonthGrid's bars (always narrow — a fixed 1/7-width cell no matter
-  // the span), a week bar's rendered width scales with how many day columns
-  // it covers, so only a single-day-wide bar is as cramped on mobile as a
-  // month cell; anything wider has room for the chevron at any viewport size.
+  // Chevrons show at every viewport width here, unlike MonthGrid's bars
+  // (which hide them below `sm:`). A month cell is a fixed 1/7 width no
+  // matter the span, and its bar competes with the day's own chips for a few
+  // lines of text; a week bar is the only thing in its lane and usually
+  // spans several columns. Even the narrowest case — a bar clipped to a
+  // single column, e.g. a Sun→Fri event seen from the week it starts in —
+  // carries at most one chevron (a bar continuing past *both* edges by
+  // definition covers all 7 columns), so the reserve costs 16px on one side
+  // of that column. That title truncates at this width regardless, and
+  // dropping the cue was the whole complaint: the same event shows its
+  // chevron in the day view, so a week bar going bare looked like a bug.
   const renderBar = (b: (typeof bars)[number] & { row: number }) => (
     <OccurrencePill
       key={b.occ.id}
@@ -243,7 +250,6 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
       onClick={() => onOpen(b.occ)}
       continuesLeft={b.continuesLeft}
       continuesRight={b.continuesRight}
-      chevronHiddenOnMobile={b.startCol === b.endCol}
       className="px-0.5 sm:px-1.5 text-3xs sm:text-xs"
     />
   )
