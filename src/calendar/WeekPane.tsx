@@ -295,24 +295,27 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
         </div>
       </div>
 
-      {/* All-day / multiday strip — gutter (expand/collapse chevron) + a
-          grid-cols-7 grid holding both the spanning bars and each day's own
-          untimed pills. A day's pills start right after the lanes its own
-          bars occupy (see the visiblePillsByDay/overflowPillsByDay memo
-          above), so the two never share a cell regardless of container
-          overflow — no absolute-positioned overlay needed (unlike
-          MonthGrid, whose bars overlay a separately-measured cell grid).
-          Rows at/beyond ALL_DAY_THRESHOLD are split into a second grid and
-          folded behind the chevron in the gutter — see AllDayOverflowToggle.
-          Each day with its own hidden items additionally gets a "+N" label
-          in its own column (labelByDay), which also expands the strip. */}
+      {/* All-day / multiday strip — gutter (expand/collapse chevron,
+          bottom-aligned so it sits right above the border into the hourly
+          grid, matching the hour-label gutter's width) + a grid-cols-7 grid
+          holding both the spanning bars and each day's own untimed pills. A
+          day's pills start right after the lanes its own bars occupy (see
+          the visiblePillsByDay/overflowPillsByDay memo above), so the two
+          never share a cell regardless of container overflow — no
+          absolute-positioned overlay needed (unlike MonthGrid, whose bars
+          overlay a separately-measured cell grid). Rows at/beyond
+          ALL_DAY_THRESHOLD are split into a second grid and folded behind
+          the chevron in the gutter — see AllDayOverflowToggle. Each day with
+          its own hidden items additionally gets a "+N" label in its own
+          column (labelByDay), which also expands the strip. */}
       {hasAllDayContent && (
         <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
-          <div style={{ width: GUTTER }} className="shrink-0 flex items-start justify-center pt-1">
+          <div style={{ width: GUTTER }} className="shrink-0 flex flex-col justify-end">
             <AllDayOverflowToggle
               hiddenCount={hiddenCount}
               expanded={allDayExpanded}
               onToggle={() => setAllDayExpanded(v => !v)}
+              className="h-5 w-full p-0"
             />
           </div>
           <div className="flex-1 py-1 min-w-0">
