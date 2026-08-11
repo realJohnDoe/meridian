@@ -324,12 +324,24 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
               {days.map((d, col) =>
                 (visiblePillsByDay.get(fmtISO(d)) ?? []).map(p => renderPill(p.o, col, p.row)),
               )}
-              {!allDayExpanded && days.map((d, col) => {
-                const label = labelByDay.get(fmtISO(d))
+              {days.map((d, col) => {
+                const key = fmtISO(d)
+                const label = labelByDay.get(key)
                 if (!label) return null
+                if (allDayExpanded) {
+                  // Backfill the label's own cell with the first hidden pill
+                  // instead of leaving it blank once the "+N" button
+                  // disappears — keeps the day's stack contiguous instead of
+                  // opening a gap where the label used to sit. A day whose
+                  // overflow is bar-only (no hidden pill to promote — a
+                  // spanning bar can't be squeezed into one day's column)
+                  // just leaves the cell empty, same as before.
+                  const first = overflowPillsByDay.get(key)?.[0]
+                  return first ? renderPill(first.o, col, label.row) : null
+                }
                 return (
                   <button
-                    key={`ovf-${fmtISO(d)}`}
+                    key={`ovf-${key}`}
                     type="button"
                     onClick={() => setAllDayExpanded(true)}
                     style={{ gridColumn: col + 1, gridRow: label.row + 1 }}
@@ -345,9 +357,18 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
               <div className={cn('dv-adoverflow', allDayExpanded && 'open')}>
                 <div className="grid grid-cols-7 gap-0.5 mt-0.5" style={{ gridAutoRows: ALLDAY_ROW_H }}>
                   {overflowBars.map(renderBar)}
-                  {days.map((d, col) =>
-                    (overflowPillsByDay.get(fmtISO(d)) ?? []).map(p => renderPill(p.o, col, p.row)),
-                  )}
+                  {days.map((d, col) => {
+                    const key = fmtISO(d)
+                    const list = overflowPillsByDay.get(key) ?? []
+                    // The label's cell above already took the first item
+                    // once expanded (see the backfill above) — drop it here
+                    // too and shift the rest up a row so this grid starts
+                    // flush instead of repeating a leading blank row.
+                    const rest = allDayExpanded && labelByDay.has(key)
+                      ? list.slice(1).map(p => ({ ...p, row: p.row - 1 }))
+                      : list
+                    return rest.map(p => renderPill(p.o, col, p.row))
+                  })}
                 </div>
               </div>
             )}
