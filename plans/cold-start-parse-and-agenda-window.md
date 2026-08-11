@@ -1,5 +1,18 @@
 # Cold start: the vault parse and the agenda's 455-day window
 
+> **Re-scoped by [time-to-today.md](./time-to-today.md) (2026-08-11).** The
+> "up to a second before it scrolls to today" symptom turned out not to be
+> CPU-bound: the scroll-to-today signal is emitted only after an OAuth token
+> refresh and two GitHub permission round trips, so D and E cannot fix it. D
+> and E remain real *first-paint* work and the plan below still stands, with
+> two corrections: **D1 is now measured** (`roundTripLoss` is 75% of
+> `parseFiles`, and 70 of its 92 ms is two redundant `loadFile` calls), and the
+> **baseline table below mis-attributes its largest row** — much of the 314 ms
+> "model chunk (YAML)" is `updateFileOccurrenceMap`'s per-slug ±3-year
+> `expandRange`, not YAML parsing. That call alone measures 240 ms and blocks
+> first paint for a map nothing on the agenda reads. See the new document
+> before starting on D.
+
 Implementation plan for the two remaining items from the scroll-to-today
 investigation (2026-08-08). Options A/B/C from that investigation shipped in
 PR #645 (`1eda75b`); this covers **D** (the blocking vault parse) and **E**
