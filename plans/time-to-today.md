@@ -274,6 +274,54 @@ Not done, and worth keeping in mind: even inline, restructuring the guard to
 reuse the parse it was handed would recover 70 of its 92 ms. If it ever needs
 to move back onto a hot path, that is the lever.
 
+### 3b. Load the per-vault preferences before the cache-first paint
+
+**Found after the above shipped**, from the report "the scroll is fast but ends
+up a few days in the future" alongside "an overdue section flashes up, then
+corrects to empty". Same root-cause class as #1 — state that lands after the
+first paint — and #1 is what exposed it, by moving the scroll early enough to be
+overtaken.
+
+`participantFilter` and `showTasks` feed `useCalendarFilter`, which decides
+which occurrences `computeAgendaSections` builds sections from. They live in
+localStorage, but they were loaded by `setActiveVaultId`
+([storeBridge.ts](../src/storeBridge.ts)) — called from `setActiveVaultIdentity`
+at the top of `activateWritableVault`, i.e. **behind the same OAuth refresh and
+permission probe as everything else in root cause 1**.
+
+So with tasks hidden on the calendar, the sequence was:
+
+1. Cache paints with the *default* filters — tasks shown, overdue full.
+2. Scroll-to-today lands on the overdue header. Correct, for what is on screen.
+3. The network settles, the real prefs load, every task disappears — including
+   the entire overdue section, which sat *above* the scroll position.
+4. The virtualizer holds its pixel offset, so the viewport slides forward by
+   however tall that section was.
+
+Reproduced in Chromium against a seeded Dexie cache with a stubbed 1 s GitHub
+gate — the overdue flash and the forward slide, exactly as reported:
+
+```
+first frame:  scrollTop=8298  top="Overdue 6802"     <- correct
+t+1.1s:       scrollTop=6765  top="…September 17…"   <- overdue gone, slid forward
+```
+
+`loadVaultPrefs` is now split out of `setActiveVaultId` and called at the top of
+`hydrateFromCache`, before it reads Dexie. It is a synchronous localStorage read
+with no credential and no network, so there was never a reason for it to sit
+behind the probe. Same probe after the fix: lands on the right row on the first
+frame and does not move.
+
+Pinned by `vaultRegistry.test.ts` ("loads the vault preferences before painting,
+not after the permission probe"), which asserts the ordering against both
+`cacheLoadAll` and `ensurePermission`.
+
+**The general lesson, for the next one:** anything the first paint is derived
+from has to be loaded before the first paint. The scroll position is only as
+correct as the row list under it, and a row list built from defaults is a row
+list that will move. `localePrefs` (week start) is the remaining input of this
+shape; it loads at store creation, so it is already fine.
+
 ### 4. Overdue expanded by default
 
 Requested alongside the three above, and a natural fit: scroll-to-today already
@@ -305,6 +353,7 @@ grouping, which is why the totals below are quoted with overdue expanded.
 | duplicated on the reset | +151 ms | — |
 | **blocking before the first correct frame** | **≈530 ms** | **167 ms** |
 | **gated on the network?** | **yes, up to ~1 s** | **no** |
+| **row list settled at first paint?** | n/a (scroll came later) | **yes** (see 3b) |
 
 Time-to-today goes from "up to a second" to "the first frame the agenda
 paints".
