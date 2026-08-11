@@ -1,29 +1,37 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
-import { ContinuationChevron, CONTINUES_PADDING, CONTINUES_PADDING_ALWAYS } from './ContinuationChevron'
+import { ContinuationChevron } from './ContinuationChevron'
 
 const svgOf = (container: HTMLElement) => container.querySelector('svg')!
 
 describe('ContinuationChevron', () => {
-  it('points right and sits at the right edge for side="right"', () => {
-    const { container } = render(<ContinuationChevron side="right" />)
-    const svg = svgOf(container)
+  it('points right for side="right"', () => {
+    const svg = svgOf(render(<ContinuationChevron side="right" />).container)
     expect(svg.getAttribute('class')).toContain('chevron-right')
-    expect(svg.getAttribute('class')).toContain('right-0.5')
-    expect(svg.getAttribute('class')).not.toContain('left-0.5')
+    expect(svg.getAttribute('class')).not.toContain('chevron-left')
   })
 
-  it('points left and sits at the left edge for side="left"', () => {
-    const { container } = render(<ContinuationChevron side="left" />)
-    const svg = svgOf(container)
+  it('points left for side="left"', () => {
+    const svg = svgOf(render(<ContinuationChevron side="left" />).container)
     expect(svg.getAttribute('class')).toContain('chevron-left')
-    expect(svg.getAttribute('class')).toContain('left-0.5')
-    expect(svg.getAttribute('class')).not.toContain('right-0.5')
+    expect(svg.getAttribute('class')).not.toContain('chevron-right')
   })
 
   it('is decorative — hidden from assistive tech', () => {
     expect(svgOf(render(<ContinuationChevron side="right" />).container)).toHaveAttribute('aria-hidden')
+  })
+
+  // The chevron shares a flex row with the title (see OccurrencePill) rather
+  // than floating over it on an absolute inset, which is what keeps the two
+  // from overlapping. Both halves matter: no positioning of its own, and
+  // shrink-0 so a long title can't squeeze it away — the pill's
+  // non-interactive form is a plain div, with none of shadcn Button's
+  // `[&_svg]:shrink-0` to fall back on.
+  it('lays out in flow, at a size a long title cannot squeeze', () => {
+    const svg = svgOf(render(<ContinuationChevron side="right" />).container)
+    expect(svg.getAttribute('class')).toContain('shrink-0')
+    expect(svg.getAttribute('class')).not.toContain('absolute')
   })
 
   // The size comes from an inline style, not the `size` prop, specifically so
@@ -40,20 +48,6 @@ describe('ContinuationChevron', () => {
     const svg = svgOf(render(<ContinuationChevron side="right" className="hidden sm:block" />).container)
     expect(svg.getAttribute('class')).toContain('hidden')
     expect(svg.getAttribute('class')).toContain('sm:block')
-    expect(svg.getAttribute('class')).toContain('right-0.5')
-  })
-
-  // These constants exist so MonthView bars and DayView's all-day pill reserve
-  // the same room for the chevron. A side must reserve padding on its own side.
-  it('reserves padding on the matching side', () => {
-    expect(CONTINUES_PADDING.left).toContain('pl-')
-    expect(CONTINUES_PADDING.right).toContain('pr-')
-    expect(CONTINUES_PADDING_ALWAYS.left).toContain('pl-')
-    expect(CONTINUES_PADDING_ALWAYS.right).toContain('pr-')
-  })
-
-  it('differs from the responsive variant only by the sm: breakpoint prefix', () => {
-    expect(CONTINUES_PADDING.left).toBe(`sm:${CONTINUES_PADDING_ALWAYS.left}`)
-    expect(CONTINUES_PADDING.right).toBe(`sm:${CONTINUES_PADDING_ALWAYS.right}`)
+    expect(svg.getAttribute('class')).toContain('shrink-0')
   })
 })
