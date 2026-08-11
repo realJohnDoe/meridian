@@ -6,7 +6,7 @@ import { useStore } from '@/store'
 import { setupStore, seedStore, installFakePersistence, makeOcc, makeRoots } from '@/test-utils'
 import type { Occurrence } from '@/types'
 import { useEntryEditor } from './useEntryEditor'
-import EditorShell from './EditorShell'
+import EntryEditor from './EntryEditor'
 
 const { navigateMock, backMock } = vi.hoisted(() => ({ navigateMock: vi.fn(), backMock: vi.fn() }))
 
@@ -40,10 +40,10 @@ afterEach(() => {
 
 function Harness({ occ }: { occ: Occurrence }) {
   const hooks = useEntryEditor(occ)
-  return <EditorShell entry={hooks.entry} hooks={hooks} items={[occ]} roots={makeRoots(occ.fileSlug)} />
+  return <EntryEditor hooks={hooks} items={[occ]} roots={makeRoots(occ.fileSlug)} />
 }
 
-describe('EditorShell', () => {
+describe('EntryEditor', () => {
   it('autosaves a body edit after the debounce and persists a checkbox toggle immediately', () => {
     const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))
