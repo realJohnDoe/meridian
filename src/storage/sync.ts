@@ -14,8 +14,8 @@ import { runInIdleBatches } from '@/lib/idle'
 import type { StoreItem, Roots } from '@/types'
 import {
   getItems, getRoots, setData,
-  setSyncDirtyCount, setSyncError, setSyncOffline, setLastSyncedAt, getSyncError,
-  setSyncInProgress, getUnreadableFiles, setUnreadableFiles,
+  setStoreState, getSyncError,
+  getUnreadableFiles, setUnreadableFiles,
 } from '@/storeBridge'
 import { notify, warn, notifyError } from './notifications'
 import { getActiveBackend } from './activeBackend'
@@ -25,15 +25,14 @@ import { getActiveBackend } from './activeBackend'
 export function updateSyncUI(): void {
   const backend = getActiveBackend()
   if (!backend?.id || backend.readOnly) {
-    setSyncDirtyCount(0)
-    setSyncError('Read-only vault')
+    setStoreState({ syncDirtyCount: 0, syncError: 'Read-only vault' })
     return
   }
   // Clear the read-only sentinel left over from a previous (read-only)
   // vault — but leave a real sync error (auth failure, etc.) in place so
   // it isn't wiped by an unrelated local edit.
-  if (getSyncError() === 'Read-only vault') setSyncError(null)
-  cacheDirtyCount(backend.id).then(n => setSyncDirtyCount(n)).catch(() => {})
+  if (getSyncError() === 'Read-only vault') setStoreState({ syncError: null })
+  cacheDirtyCount(backend.id).then(n => setStoreState({ syncDirtyCount: n })).catch(() => {})
 }
 
 /** A file that failed to parse, keyed by its path (see `ParseFailure.slug` for the store key). */
@@ -571,7 +570,7 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
   }
   if (_syncing) return
   _syncing = true
-  setSyncInProgress(true)
+  setStoreState({ syncInProgress: true })
 
   const vaultId = backend.id
   let attemptedRefresh = false
@@ -598,9 +597,7 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
       }
     }
     // ── SUCCESS ──────────────────────────────────────────────────
-    setSyncError(null)
-    setSyncOffline(false)
-    setLastSyncedAt(Date.now())
+    setStoreState({ syncError: null, syncOffline: false, lastSyncedAt: Date.now() })
     _consecutiveFailures = 0
     _nextRetryAt         = 0
     _lastErrorSig        = null
@@ -610,7 +607,7 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
 
     if (isTransientSyncError(e)) {
       // ── TRANSIENT (offline / network drop) ───────────────────
-      setSyncOffline(true)
+      setStoreState({ syncOffline: true })
       _consecutiveFailures++
       _nextRetryAt = Date.now() + Math.min(
         BACKOFF_BASE_MS * Math.pow(2, _consecutiveFailures - 1),
@@ -622,7 +619,7 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
     } else {
       // ── ACTIONABLE (auth, repo missing, etc.) ────────────────
       const msg = (e as Error).message || (e as Error).name || 'Unknown error'
-      setSyncError(msg)
+      setStoreState({ syncError: msg })
       if (!opts.silent || _lastErrorSig !== msg) {
         notifyError('Sync failed', e)
         _lastErrorSig = msg
@@ -630,7 +627,7 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
     }
   } finally {
     _syncing = false
-    setSyncInProgress(false)
+    setStoreState({ syncInProgress: false })
     // A push that arrived mid-sync was queued (see attemptPush) instead of
     // dropped — re-arm the debounced push now that this sync has settled.
     if (_pushQueued) { _pushQueued = false; scheduleAutoPush() }

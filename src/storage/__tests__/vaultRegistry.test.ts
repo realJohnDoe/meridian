@@ -192,13 +192,9 @@ vi.mock('@/storeBridge', () => ({
   getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
   setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
   getVaults: vi.fn(() => storeState.vaults),
-  setVaultList: vi.fn((refs: VaultRef[]) => { storeState.vaults = refs }),
   setActiveVaultId: vi.fn((id: string | null) => { storeState.activeVaultId = id }),
+  setStoreState: vi.fn((partial: Partial<typeof storeState>) => { Object.assign(storeState, partial) }),
   loadVaultPrefs: vi.fn((id: string) => { callOrder.push('loadVaultPrefs'); storeState.prefsLoadedFor = id }),
-  setPendingReconnect: vi.fn((name: string | null) => { storeState.pendingDirReconnect = name }),
-  setVaultLoading: vi.fn((loading: boolean) => { storeState.vaultLoading = loading }),
-  setVaultLoadProgress: vi.fn((p: { loaded: number; total: number } | null) => { storeState.vaultLoadProgress = p }),
-  setSyncOffline: vi.fn((offline: boolean) => { storeState.syncOffline = offline }),
 }))
 
 vi.mock('@/storage/notifications', () => notifyFns)

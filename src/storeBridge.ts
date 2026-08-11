@@ -15,15 +15,8 @@ export const getUnreadableFiles = (): Map<string, { path: string; message: strin
 export const setUnreadableFiles = (files: Map<string, { path: string; message: string }>) => useStore.getState().setUnreadableFiles(files)
 
 // ── STORE WRITERS (storage layer uses these instead of useStore directly) ──
-export const setVaultLoading     = (loading: boolean)  => useStore.setState({ vaultLoading: loading })
-export const setVaultLoadProgress = (progress: { loaded: number; total: number } | null) =>
-  useStore.setState({ vaultLoadProgress: progress })
-export const setSyncDirtyCount   = (n: number)         => useStore.setState({ syncDirtyCount: n })
-export const setSyncError        = (error: string | null) => useStore.setState({ syncError: error })
-export const setSyncOffline      = (offline: boolean)      => useStore.setState({ syncOffline: offline })
-export const setSyncInProgress   = (running: boolean)      => useStore.setState({ syncInProgress: running })
-export const setLastSyncedAt     = (ts: number | null)     => useStore.setState({ lastSyncedAt: ts })
-export const setVaultList        = (refs: VaultRef[])  => useStore.setState({ vaults: refs })
+/** Single-field-set forwarder for callers that don't need `setActiveVaultId`'s fan-out. */
+export const setStoreState = useStore.setState
 /**
  * Load the per-vault preferences out of localStorage.
  *
@@ -56,4 +49,3 @@ export const setActiveVaultId    = (id: string | null) => {
     useStore.setState({ favorites: [], defaultParticipants: [], participantFilter: [], showTasks: true })
   }
 }
-export const setPendingReconnect = (name: string | null) => useStore.setState({ pendingDirReconnect: name })

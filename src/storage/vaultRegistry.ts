@@ -13,7 +13,7 @@ import { ExampleBackend } from './exampleBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import type { VaultRef, GitHubVaultRef } from '@/vaultRef'
-import { setData, getVaults, setVaultList, setActiveVaultId, setPendingReconnect, setVaultLoading, setVaultLoadProgress, setUnreadableFiles, loadVaultPrefs } from '@/storeBridge'
+import { setData, getVaults, setActiveVaultId, setStoreState, setUnreadableFiles, loadVaultPrefs } from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
 import { getActiveBackend, setActiveBackend } from './activeBackend'
 import { syncOnActivate, parseFiles, reportParseFailures, updateSyncUI } from './sync'
@@ -59,7 +59,7 @@ async function updateVaultRefs(mutate: (current: VaultRef[]) => VaultRef[]): Pro
   const current = await vaultRefsLoad()
   const updated = mutate(current)
   await vaultRefsSave(updated)
-  setVaultList([EXAMPLE_REF, ...updated])
+  setStoreState({ vaults: [EXAMPLE_REF, ...updated] })
 }
 
 // ── ACTIVATION HELPERS ─────────────────────────────────────────
@@ -113,7 +113,7 @@ async function setActiveVaultIdentity(
   const { pendingReconnect = null, persist = true } = opts
   setActiveBackend(backend)
   setActiveVaultId(backend.id)
-  setPendingReconnect(pendingReconnect)
+  setStoreState({ pendingDirReconnect: pendingReconnect })
   if (persist) await activeVaultIdSave(backend.id)
 }
 
@@ -167,7 +167,7 @@ async function activateWritableVault(backend: StorageBackend, prePainted = false
   emitVaultChanged({ contentReplaced: !prePainted })
 
   if (painted) {
-    setVaultLoading(false)
+    setStoreState({ vaultLoading: false })
     // .catch is belt-and-braces: runSync swallows its own errors, so this can
     // only ever fire if that invariant is broken later.
     void syncOnActivate().catch((e: unknown) => console.warn('[vault] activation sync failed:', e))
@@ -238,13 +238,13 @@ async function activateVaultRef(
 async function registerAndActivate(ref: VaultRef, backend: StorageBackend): Promise<void> {
   await updateVaultRefs(existing => [...existing, ref])
   try {
-    const files = await backend.readAll((loaded, total) => setVaultLoadProgress({ loaded, total }))
+    const files = await backend.readAll((loaded, total) => setStoreState({ vaultLoadProgress: { loaded, total } }))
     await applyRemoteBatch(backend.id, files)
     await activateWritableVault(backend)
   } finally {
     // Reset even on a thrown/failed load, so a retry (or the next vault) never
     // inherits a stale "N of M" from an aborted first connect.
-    setVaultLoadProgress(null)
+    setStoreState({ vaultLoadProgress: null })
   }
 }
 
@@ -254,13 +254,13 @@ export async function restoreVaults(): Promise<void> {
   try {
     await restoreVaultsInner()
   } finally {
-    setVaultLoading(false)
+    setStoreState({ vaultLoading: false })
   }
 }
 
 async function restoreVaultsInner(): Promise<void> {
   async function fallbackToExample() {
-    setVaultList([EXAMPLE_REF])
+    setStoreState({ vaults: [EXAMPLE_REF] })
     await activateExampleVault({ persist: false })
   }
 
@@ -269,7 +269,7 @@ async function restoreVaultsInner(): Promise<void> {
 
     const savedRefs = await vaultRefsLoad()
     const allRefs: VaultRef[] = [EXAMPLE_REF, ...savedRefs]
-    setVaultList(allRefs)
+    setStoreState({ vaults: allRefs })
 
     const savedActiveId = await activeVaultIdLoad()
     const targetRef     = allRefs.find(r => r.id === savedActiveId) ?? EXAMPLE_REF
@@ -287,7 +287,7 @@ async function restoreVaultsInner(): Promise<void> {
       // identity is still claimed by activateVaultRef after the permission
       // check, so nothing observes a half-activated vault.
       const prePainted = await hydrateFromCache(targetRef.id)
-      if (prePainted) setVaultLoading(false)
+      if (prePainted) setStoreState({ vaultLoading: false })
 
       const outcome = await activateVaultRef(targetRef, false, prePainted)
       // persist: false on both fallback branches below — a bad token or
