@@ -143,10 +143,11 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
 
   const [allDayExpanded, setAllDayExpanded] = useState(false)
   // Unlike WeekPane's shared ALL_DAY_THRESHOLD, the day view always reserves
-  // exactly ALL_DAY_VISIBLE_ROWS of height for all-day content (matching
-  // Google Calendar's fixed two-row day-view strip) and folds the 3rd+ item
-  // straight behind a "+N" label rather than ever showing a bare 3rd item.
-  const allDayOverflowing = allDay.length > ALL_DAY_VISIBLE_ROWS
+  // at least ALL_DAY_VISIBLE_ROWS of height for all-day content (matching
+  // Google Calendar's fixed two-row day-view strip), but a bare 3rd item
+  // still gets its own row rather than folding behind "+N" — only the 4th+
+  // item does, leaving room for the label on that row instead.
+  const allDayOverflowing = allDay.length > ALL_DAY_VISIBLE_ROWS + 1
   const shownAllDayCount = allDayOverflowing ? ALL_DAY_VISIBLE_ROWS : allDay.length
   const hiddenCount = allDay.length - shownAllDayCount
 
@@ -179,9 +180,10 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
           grid. pr-2 = RIGHT_PAD, so the all-day items share a right edge
           with the timeline's event blocks beneath them. A "+N" label takes
           the last visible line instead of an item once there's overflow
-          (see shownAllDayCount above); empty placeholder rows fill out to
-          ALL_DAY_VISIBLE_ROWS otherwise, so the strip's height never
-          depends on how many all-day items exist. */}
+          (see shownAllDayCount above) — a bare 3rd item still gets its own
+          row rather than folding, so only 4+ items trigger that; empty
+          placeholder rows fill out to ALL_DAY_VISIBLE_ROWS below that, so
+          the strip's height never drops under a fixed two-row minimum. */}
       <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
         <div style={{ width: GUTTER }} className="shrink-0 flex flex-col items-center justify-between pb-1.5">
           <div className="flex flex-col items-center gap-0.5 pt-1">
@@ -203,8 +205,10 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
           {/* Always-visible first N items (capped at ALL_DAY_VISIBLE_ROWS once overflowing, to make room for the label below) */}
           {allDay.slice(0, shownAllDayCount).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
 
-          {/* Empty rows so the strip always reserves ALL_DAY_VISIBLE_ROWS of height, even with fewer (or zero) items */}
-          {Array.from({ length: ALL_DAY_VISIBLE_ROWS - shownAllDayCount }, (_, i) => (
+          {/* Empty rows so the strip always reserves at least ALL_DAY_VISIBLE_ROWS of
+              height, even with fewer (or zero) items — a bare 3rd item (not overflowing)
+              already exceeds that minimum, hence the floor at 0. */}
+          {Array.from({ length: Math.max(0, ALL_DAY_VISIBLE_ROWS - shownAllDayCount) }, (_, i) => (
             <div key={`ad-placeholder-${i}`} className="h-5 mb-0.5" aria-hidden />
           ))}
 
