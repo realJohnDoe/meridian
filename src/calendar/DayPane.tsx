@@ -188,7 +188,7 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
             <span className="text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground">
               {dvDate.toLocaleDateString(undefined, { weekday: 'short' })}
             </span>
-            <span className={cn(BADGE_CLASS, isToday && 'bg-primary text-primary-foreground font-bold')}>
+            <span className={cn(BADGE_CLASS, 'text-base w-7 h-7', isToday && 'bg-primary text-primary-foreground font-bold')}>
               {dvDate.getDate()}
             </span>
           </div>
