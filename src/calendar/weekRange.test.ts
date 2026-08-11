@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { weekStartFor, weekDays, weekContains } from './weekRange'
+import { weekStartFor, weekDays, weekContains, weekNumberFor } from './weekRange'
 
 // 2026-08-12 is a Wednesday.
 const WED = new Date(2026, 7, 12)
@@ -52,6 +52,34 @@ describe('weekDays', () => {
     expect(days.map(d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`)).toEqual([
       '2025-12-29', '2025-12-30', '2025-12-31', '2026-1-1', '2026-1-2', '2026-1-3', '2026-1-4',
     ])
+  })
+})
+
+describe('weekNumberFor', () => {
+  it('returns the ISO week number for a Monday-start row', () => {
+    // 2026-08-10 is a Monday; ISO week 33 of 2026.
+    expect(weekNumberFor(new Date(2026, 7, 10))).toBe(33)
+  })
+
+  it('returns the same number regardless of the locale start-of-week — pinned to the row\'s Monday, not its own first day', () => {
+    // Three ways the app can slice "the row containing Monday Aug 10 2026"
+    // (ISO week 33), one per weekStartFor `ws` convention: Monday-start
+    // starts on the Monday itself; Sunday-start starts the day before;
+    // Saturday-start starts two days before. All three should agree,
+    // mirroring Google Calendar's own week-number behavior — see
+    // weekNumberFor's own comment for why the naive "ISO-week of weekStart
+    // itself" answer would be wrong for the Sunday/Saturday cases.
+    expect(weekNumberFor(weekStartFor(new Date(2026, 7, 10), 1))).toBe(33)
+    expect(weekNumberFor(weekStartFor(new Date(2026, 7, 10), 0))).toBe(33)
+    expect(weekNumberFor(weekStartFor(new Date(2026, 7, 10), 6))).toBe(33)
+  })
+
+  it('rolls over at a year boundary per ISO 8601 (week 1 contains the first Thursday), for every start-of-week convention', () => {
+    // 2025-12-29 (Mon) - 2026-01-04 (Sun) is ISO week 1 of 2026, since its
+    // Thursday (Jan 1) falls in 2026.
+    expect(weekNumberFor(weekStartFor(new Date(2025, 11, 29), 1))).toBe(1)
+    expect(weekNumberFor(weekStartFor(new Date(2025, 11, 29), 0))).toBe(1)
+    expect(weekNumberFor(weekStartFor(new Date(2025, 11, 29), 6))).toBe(1)
   })
 })
 

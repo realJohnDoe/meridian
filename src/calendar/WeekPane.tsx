@@ -18,7 +18,7 @@ import { computeColumns } from './computeColumns'
 import { computeMultidayLanes, compactRowLanes } from './computeMultidayLanes'
 import { EventBlock } from './EventBlock'
 import { BADGE_CLASS } from './MonthGrid'
-import { weekDays, weekContains } from './weekRange'
+import { weekDays, weekContains, weekNumberFor } from './weekRange'
 import {
   HOURS, HP, GUTTER, RIGHT_PAD, TOP_PAD, BOTTOM_PAD, DEFAULT_CREATE_DURATION,
   formatHourBoundary, snapCreateTime,
@@ -63,6 +63,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
     return new Date(y, m - 1, d)
   }, [weekStartKey])
   const days = useMemo(() => weekDays(weekStart), [weekStart])
+  const weekNum = weekNumberFor(weekStart)
 
   const today  = useToday()
   const items  = useStore(s => s.items)
@@ -138,13 +139,15 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
   // Splits the strip's bars/pills into an always-visible portion (the first
   // ALL_DAY_THRESHOLD rows) and an overflow portion folded behind the same
   // expand/collapse toggle DayPane uses for its all-day list — see
-  // AllDayOverflowToggle. Rows, not occurrence count, are the visible unit
-  // here (a row can hold up to 7 items, one per day column), but hiddenCount
-  // itself is still an occurrence count so the toggle's "N more" reads the
-  // same way it does in DayPane.
+  // AllDayOverflowToggle. Bars are never capped per-day (a spanning bar's
+  // lane is shared by every day it covers), but once a day's own pills would
+  // push it past ALL_DAY_THRESHOLD rows — or a bar overflows onto it — its
+  // last visible slot is reserved for a "+N" label instead of an item
+  // (labelByDay), mirroring CalCell's reserved slot in MonthGrid.
   const {
     visibleBars, overflowBars,
     visiblePillsByDay, overflowPillsByDay,
+    labelByDay,
     hiddenCount,
   } = useMemo(() => {
     const visibleBars: ((typeof bars)[number] & { row: number })[] = []
@@ -158,28 +161,42 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
     // (mirrors MonthGrid's dayLaneCount), not the week's global lane count —
     // a day with no bar over it (or a bar only in a lower lane) reclaims the
     // blank rows above instead of leaving them empty while the pill is
-    // pushed below every lane used anywhere in the week.
+    // pushed below every lane used anywhere in the week. Once that leaves
+    // room for fewer than ALL_DAY_THRESHOLD items — or a bar overflows onto
+    // this day — the day's last visible slot is reserved for a "+N" label
+    // instead of an item (labelByDay), mirroring CalCell's reserved slot in
+    // MonthGrid.
     const visiblePillsByDay = new Map<string, { o: Occurrence; row: number }[]>()
     const overflowPillsByDay = new Map<string, { o: Occurrence; row: number }[]>()
-    let overflowPillCount = 0
+    const labelByDay = new Map<string, { row: number; hidden: number }>()
+    let hiddenPillCount = 0
+
     days.forEach((d, col) => {
       const key = fmtISO(d)
+      const dayPills = untimedByDay.get(key) ?? []
       const dayBars = bars.filter(b => b.startCol <= col && col <= b.endCol)
-      let visRow = dayBars.reduce((max, b) => b.lane < ALL_DAY_THRESHOLD ? Math.max(max, b.lane + 1) : max, 0)
-      let ovfRow = dayBars.reduce((max, b) => b.lane >= ALL_DAY_THRESHOLD ? Math.max(max, b.lane - ALL_DAY_THRESHOLD + 1) : max, 0)
-      const vis: { o: Occurrence; row: number }[] = []
-      const ovf: { o: Occurrence; row: number }[] = []
-      for (const o of untimedByDay.get(key) ?? []) {
-        if (visRow < ALL_DAY_THRESHOLD) vis.push({ o, row: visRow++ })
-        else { ovf.push({ o, row: ovfRow++ }); overflowPillCount++ }
+      const visRowStart = dayBars.reduce((max, b) => b.lane < ALL_DAY_THRESHOLD ? Math.max(max, b.lane + 1) : max, 0)
+      const ovfRowStart = dayBars.reduce((max, b) => b.lane >= ALL_DAY_THRESHOLD ? Math.max(max, b.lane - ALL_DAY_THRESHOLD + 1) : max, 0)
+      const barOverflowForDay = dayBars.filter(b => b.lane >= ALL_DAY_THRESHOLD).length
+
+      const pillCapacity = Math.max(0, ALL_DAY_THRESHOLD - visRowStart)
+      const overflowing = dayPills.length > pillCapacity || barOverflowForDay > 0
+      const shown = overflowing ? Math.max(0, pillCapacity - 1) : dayPills.length
+
+      if (shown > 0) {
+        visiblePillsByDay.set(key, dayPills.slice(0, shown).map((o, i) => ({ o, row: visRowStart + i })))
       }
-      if (vis.length) visiblePillsByDay.set(key, vis)
-      if (ovf.length) overflowPillsByDay.set(key, ovf)
+      if (dayPills.length > shown) {
+        overflowPillsByDay.set(key, dayPills.slice(shown).map((o, i) => ({ o, row: ovfRowStart + i })))
+        hiddenPillCount += dayPills.length - shown
+      }
+      const hiddenForDay = (dayPills.length - shown) + barOverflowForDay
+      if (hiddenForDay > 0) labelByDay.set(key, { row: visRowStart + shown, hidden: hiddenForDay })
     })
 
     return {
-      visibleBars, overflowBars, visiblePillsByDay, overflowPillsByDay,
-      hiddenCount: overflowBars.length + overflowPillCount,
+      visibleBars, overflowBars, visiblePillsByDay, overflowPillsByDay, labelByDay,
+      hiddenCount: overflowBars.length + hiddenPillCount,
     }
   }, [bars, untimedByDay, days])
 
@@ -244,9 +261,11 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
 
   return (
     <>
-      {/* Day headers — gutter spacer + 7 day columns, aligned with the grid below. */}
+      {/* Day headers — gutter (week-number badge) + 7 day columns, aligned with the grid below. */}
       <div className="flex shrink-0 border-b border-input">
-        <div style={{ width: GUTTER }} className="shrink-0" />
+        <div style={{ width: GUTTER }} className="shrink-0 flex items-center justify-center">
+          <span className={BADGE_CLASS} aria-label={`Week ${weekNum}`}>{weekNum}</span>
+        </div>
         <div className="flex flex-1 gap-0.5">
           {days.map(d => {
             const isToday = sameDay(d, today)
@@ -270,25 +289,47 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
         </div>
       </div>
 
-      {/* All-day / multiday strip — gutter spacer + a grid-cols-7 grid
-          holding both the spanning bars and each day's own untimed pills.
-          A day's pills start right after the lanes its own bars occupy (see
-          the visiblePillsByDay/overflowPillsByDay memo above), so the two
-          never share a cell regardless of container overflow — no
-          absolute-positioned overlay needed (unlike MonthGrid, whose bars
-          overlay a separately-measured cell grid). Rows at/beyond
-          ALL_DAY_THRESHOLD are split into a second grid and folded behind
-          the same expand/collapse toggle DayPane uses for its all-day list
-          — see AllDayOverflowToggle. */}
+      {/* All-day / multiday strip — gutter (expand/collapse chevron) + a
+          grid-cols-7 grid holding both the spanning bars and each day's own
+          untimed pills. A day's pills start right after the lanes its own
+          bars occupy (see the visiblePillsByDay/overflowPillsByDay memo
+          above), so the two never share a cell regardless of container
+          overflow — no absolute-positioned overlay needed (unlike
+          MonthGrid, whose bars overlay a separately-measured cell grid).
+          Rows at/beyond ALL_DAY_THRESHOLD are split into a second grid and
+          folded behind the chevron in the gutter — see AllDayOverflowToggle.
+          Each day with its own hidden items additionally gets a "+N" label
+          in its own column (labelByDay), which also expands the strip. */}
       {hasAllDayContent && (
         <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
-          <div style={{ width: GUTTER }} className="shrink-0" />
+          <div style={{ width: GUTTER }} className="shrink-0 flex items-start justify-center pt-1">
+            <AllDayOverflowToggle
+              hiddenCount={hiddenCount}
+              expanded={allDayExpanded}
+              onToggle={() => setAllDayExpanded(v => !v)}
+            />
+          </div>
           <div className="flex-1 py-1 min-w-0">
             <div className="grid grid-cols-7 gap-0.5" style={{ gridAutoRows: ALLDAY_ROW_H }}>
               {visibleBars.map(renderBar)}
               {days.map((d, col) =>
                 (visiblePillsByDay.get(fmtISO(d)) ?? []).map(p => renderPill(p.o, col, p.row)),
               )}
+              {!allDayExpanded && days.map((d, col) => {
+                const label = labelByDay.get(fmtISO(d))
+                if (!label) return null
+                return (
+                  <button
+                    key={`ovf-${fmtISO(d)}`}
+                    type="button"
+                    onClick={() => setAllDayExpanded(true)}
+                    style={{ gridColumn: col + 1, gridRow: label.row + 1 }}
+                    className="text-3xs sm:text-2xs text-muted-foreground hover:text-secondary-foreground text-left px-0.5 sm:px-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                  >
+                    +{label.hidden}
+                  </button>
+                )
+              })}
             </div>
 
             {hiddenCount > 0 && (
@@ -301,12 +342,6 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
                 </div>
               </div>
             )}
-
-            <AllDayOverflowToggle
-              hiddenCount={hiddenCount}
-              expanded={allDayExpanded}
-              onToggle={() => setAllDayExpanded(v => !v)}
-            />
           </div>
         </div>
       )}
