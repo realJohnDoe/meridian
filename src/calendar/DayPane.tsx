@@ -161,19 +161,28 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
 
   return (
     <>
-      {/* All-day / multiday strip. px-2 = RIGHT_PAD, so the all-day items
-          share a right edge with the timeline's event blocks beneath them.
-          The expand/collapse chevron sits to the left of the list; a "+N"
-          label takes the last visible line instead of an item once there's
-          overflow (see shownAllDayCount above) — both expand the strip. */}
+      {/* All-day / multiday strip — a fixed-width GUTTER column (matching the
+          timeline gutter below) plus a content column, mirroring WeekPane's
+          layout. The gutter column is unconditionally rendered at GUTTER
+          width — even when AllDayOverflowToggle renders nothing (no
+          overflow) — so the item pills' left edge never bleeds into the
+          hour-label gutter beneath them. The chevron is bottom-aligned within
+          it, right above the border separating this strip from the hourly
+          grid. pr-2 = RIGHT_PAD, so the all-day items share a right edge with
+          the timeline's event blocks beneath them. A "+N" label takes the
+          last visible line instead of an item once there's overflow (see
+          shownAllDayCount above) — both expand the strip. */}
       {allDay.length > 0 && (
-        <div className="flex items-start gap-1 px-2 py-1.5 border-b border-input bg-card shrink-0 shadow-md relative z-10">
-          <AllDayOverflowToggle
-            hiddenCount={hiddenCount}
-            expanded={allDayExpanded}
-            onToggle={() => setAllDayExpanded(v => !v)}
-          />
-          <div className="flex-1 min-w-0">
+        <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
+          <div style={{ width: GUTTER }} className="shrink-0 flex flex-col justify-end">
+            <AllDayOverflowToggle
+              hiddenCount={hiddenCount}
+              expanded={allDayExpanded}
+              onToggle={() => setAllDayExpanded(v => !v)}
+              className="h-5 w-full p-0"
+            />
+          </div>
+          <div className="flex-1 min-w-0 pr-2 py-1.5">
             <div className="text-2xs font-semibold tracking-[.07em] uppercase text-muted-foreground mb-1">All day</div>
 
             {/* Always-visible first N items (N-1 once overflowing, to make room for the label below) */}
@@ -183,7 +192,7 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
               <button
                 type="button"
                 onClick={() => setAllDayExpanded(true)}
-                className="text-xs text-muted-foreground hover:text-secondary-foreground"
+                className="h-5 flex items-center text-xs text-muted-foreground hover:text-secondary-foreground"
               >
                 +{hiddenCount}
               </button>
