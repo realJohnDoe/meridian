@@ -174,7 +174,7 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
           shownAllDayCount above) — both expand the strip. */}
       {allDay.length > 0 && (
         <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
-          <div style={{ width: GUTTER }} className="shrink-0 flex flex-col justify-end">
+          <div style={{ width: GUTTER }} className="shrink-0 flex flex-col justify-end pb-1.5">
             <AllDayOverflowToggle
               hiddenCount={hiddenCount}
               expanded={allDayExpanded}
