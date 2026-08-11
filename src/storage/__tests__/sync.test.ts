@@ -111,12 +111,8 @@ vi.mock('@/storeBridge', () => ({
   }),
   getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
   setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
-  setSyncDirtyCount: vi.fn((n: number) => { storeState.syncDirtyCount = n }),
-  setSyncError: vi.fn((e: string | null) => { storeState.syncError = e }),
   getSyncError: vi.fn(() => storeState.syncError),
-  setSyncOffline: vi.fn((o: boolean) => { storeState.syncOffline = o }),
-  setSyncInProgress: vi.fn((r: boolean) => { storeState.syncInProgress = r }),
-  setLastSyncedAt: vi.fn((ts: number | null) => { storeState.lastSyncedAt = ts }),
+  setStoreState: vi.fn((partial: Partial<typeof storeState>) => { Object.assign(storeState, partial) }),
 }))
 
 vi.mock('@/storage/notifications', () => notifyFns)
