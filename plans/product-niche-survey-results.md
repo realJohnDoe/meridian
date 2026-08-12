@@ -53,7 +53,7 @@ Plan: [product-niche-survey.md](product-niche-survey.md).
 
 ### Suspected but unverified
 
-- **Creating an entry in the tutorial vault silently discards it.** `ExampleBackend.write()` is a no-op, `sync.ts` returns early on `readOnly`, and the `+` button is not gated — but I could not run the app to confirm the entry appears and then vanishes rather than erroring. **Unverified**; a single manual click of `+` in the example vault settles it. Finding #2 is written to hold either way, since the *disclosure* gap is confirmed by code regardless.
+- **Creating an entry in the tutorial vault silently discards it.** `ExampleBackend.write()` is a no-op, `sync.ts` returns early on `readOnly`, and the `+` button is not gated — but I could not run the app to confirm the entry appears and then vanishes rather than erroring. **Unverified**; a single manual click of `+` in the example vault settles it.
 - **Whether the 8 themes read as "developer tool" to a non-developer.** That is a claim about perception I cannot make from tokens alone, and the plan forbids inventing audience reactions. Flagged inside finding #4 as the bet it is.
 
 ### Plan drift noted
@@ -71,7 +71,7 @@ Two premises in the survey plan are now stale, which is itself evidence the posi
 | 3 | Visual identity & aesthetic fit | **partially assessed** — no preview tooling in this session, so the blind visual read and all screenshots were skipped. Assessed from tokens/deps only; **finding: #4**. |
 | 4 | Differentiation & alternatives | **findings: #5** |
 | 5 | Audience selection | **findings: #3, #4** |
-| 6 | Adoption gates | **findings: #2, #3** |
+| 6 | Adoption gates | **findings: #3** |
 | 7 | Niche drift & emerging signals | **findings: #3**, plus one below-the-cut item (tags, see the note after the findings). |
 
 **Working as intended — confirmed as strategy, not flagged as findings:**
@@ -89,36 +89,11 @@ Ranked by `(impact × breadth) ÷ effort`. Fields are reported separately so you
 
 | # | Finding | Gap | Question | Recommended model |
 |---|---|---|---|---|
-| 2 | The trial can't demonstrate the thing being sold | revealed-vs-served | fit + communication | **Sonnet 5** |
 | 3 | "No accounts to create" is false for the person you share with | declared-vs-served | fit + communication | **Opus 5 in plan mode, multi-PR** |
 | 4 | Forced dark default recruits against the line-7 persona | declared-vs-revealed | communication | **Opus 5** |
 | 5 | Todoist row gives away a real differentiator and invents a paywall | declared-vs-revealed | communication | **Sonnet 5** |
 
-**Sequencing note.** #3 is a positioning decision and #2 and #5 are copy/behaviour edits. #3 must land first *only where it overlaps* — the sharing sentence at README:7. #2 and #5 touch disjoint surfaces (the tutorial, the comparison table) and can proceed immediately without waiting on it. #4's copy half also waits on #3, since who the visual identity should address depends on whether the line-7 persona survives.
-
----
-
-### Finding #2 — The trial can't demonstrate the thing being sold
-
-- **Gap:** `revealed-vs-served`
-- **Question:** fit + communication
-- **Category:** `adoption-gate` `proof` `feature-fit`
-- **Who it costs us:** the evaluating visitor who took the "try it" invitation — i.e. **most arrivals**, since it is the primary call to action at README line 9 and the app's default vault. They come to test one claim (phone capture is fast) and that is the single claim the sandbox cannot answer.
-- **Impact:** 8
-- **Breadth:** 3 surfaces carry the invitation (`README.md:9`, the blog's closing paragraph, the app's default-vault behaviour in `vaultRegistry.ts`); **0 surfaces in the app's own chrome disclose the restriction** before a visitor hits it.
-- **Evidence — the promise:**
-  - `README.md:9` — `**[Open the app →](https://realjohndoe.github.io/meridian/)** — try the example vault first, nothing to sign up for.`
-  - `README.md:3` — `**Tasks and a calendar that are actually good on your phone — stored as plain Markdown files you own.**`
-- **Evidence — the product:** `src/storage/exampleBackend.ts:469` sets `readonly readOnly = true`, and `write()`/`delete()` are no-ops. The `+` button in `SearchBar.tsx:122` is **not gated on `readOnly`** — nor is the editor. The only in-app signal is in `src/storage/sync.ts:28`:
-
-  ```ts
-  setStoreState({ syncDirtyCount: 0, syncError: 'Read-only vault' })
-  ```
-
-  which `SyncButton.tsx` renders as `text-destructive` **inside a popover the visitor must open**, behind an icon tinted `var(--destructive)`. So the first screen of the demo shows a red fault indicator, and the explanation for it is one tap away. Everything else that discloses read-only status lives in the *body text of the tutorial notes themselves* — `This is a read-only sandbox — poke around freely.` (`exampleBackend.ts:99`) — i.e. only a visitor who reads the notes learns it.
-- **Recommended model:** **Sonnet 5**, for the disclosure fix (a non-destructive read-only affordance on the create/save path, and demoting `'Read-only vault'` from an error to an informational state so the demo doesn't open on a red icon). **Opus 5 if the chosen fix is a writable scratch sandbox** backed by IndexedDB, because that touches the persistence port and the vault-registry lifecycle. The hazard that sets the tier: a naive fix simply disables the `+` button, which removes the friction *and* the demonstration — the visitor then cannot see capture at all, which is strictly worse for positioning than losing an entry.
-- **Problem:** a visitor evaluating "is capture actually fast on my phone" cannot perform capture in the trial, and isn't told why until they open a red error popover.
-- **Fix:** make the sandbox writable to local device storage (preferred — it demonstrates the lead differentiator), or at minimum surface a calm, non-destructive "tutorial vault — changes aren't saved" affordance on the create/save path and stop styling the state as an error.
+**Sequencing note.** #3 is a positioning decision and #5 is a copy/behaviour edit. #3 must land first *only where it overlaps* — the sharing sentence at README:7. #5 touches a disjoint surface (the comparison table) and can proceed immediately without waiting on it. #4's copy half also waits on #3, since who the visual identity should address depends on whether the line-7 persona survives.
 
 ---
 

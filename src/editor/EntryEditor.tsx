@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { EditorView } from '@codemirror/view'
-import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText } from 'lucide-react'
+import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Info } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import type { SeriesContext } from '@/model'
 import DialogStack from './DialogStack'
@@ -104,6 +104,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
   } = hooks
   const hour12             = useStore(s => s.localePrefs.hour12)
   const backlinks          = useStore(s => s.backlinks)
+  const syncReadOnly       = useStore(s => s.syncReadOnly)
   const titleRef  = useRef<HTMLTextAreaElement>(null)
   const viewRef   = useRef<EditorView | null>(null)
 
@@ -145,6 +146,13 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
   return (
     <section className="flex-1 min-h-0 flex flex-col">
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-3xl lg:mx-auto">
+
+        {syncReadOnly && (
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 mb-3 text-xs text-muted-foreground">
+            <Info size={14} className="shrink-0" />
+            Tutorial vault — changes aren't saved.
+          </div>
+        )}
 
         {/* ── FILE-LEVEL: title + slug ── */}
         <div className="flex items-start gap-2.5 mb-3">
