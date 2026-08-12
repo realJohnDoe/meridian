@@ -282,6 +282,103 @@
   --surface-raised:  oklch(0.33 0.05 252);
 }
 
+/* ── MERIDIAN LIGHT THEME ───────────────────────────────────────── */
+/* The light half of the brand pair — same indigo identity as .meridian
+   (surfaces on hue 252, primary/event on 278), inverted onto a cool paper
+   ramp. This is the only light theme that is ours rather than a borrowed
+   editor palette, so it — not Rosé Pine Dawn or Catppuccin Latte — is what
+   `prefers-color-scheme: light` resolves to (see THEME_CLASS in routes/__root.tsx).
+
+   Domain hues are darkened from .meridian's pastels: those are tuned to sit
+   on a 0.18-lightness surface, and carrying them over unchanged would leave
+   every chip failing contrast against a 0.945 one. Every pairing below was
+   checked against WCAG AA (4.5:1 for text, 3:1 for icon/UI tiers); the
+   tightest are muted-foreground on --background at 4.58:1 and ink-light on
+   --note at 4.66:1, so treat those two as the floor when retuning. */
+.meridian-light {
+  /* Surfaces — 4-step ramp, darkest at the backdrop so it recedes */
+  --backdrop:   oklch(0.90  0.015 252);
+  --background: oklch(0.945 0.010 252);
+  --card:       oklch(0.98  0.006 252);
+  --popover:    oklch(0.98  0.006 252);
+  --secondary:  oklch(0.995 0.003 252);
+  --muted:      oklch(0.995 0.003 252);
+  --accent:     oklch(0.995 0.003 252);
+
+  /* Text — 3-tier emphasis, dark ink. Ordering by lightness is the inverse
+     of .meridian's: here the *lightest* tier is the least emphatic. */
+  --foreground:           oklch(0.36  0.045 270);
+  --card-foreground:      oklch(0.36  0.045 270);
+  --popover-foreground:   oklch(0.36  0.045 270);
+  --accent-foreground:    oklch(0.36  0.045 270);
+  --secondary-foreground: oklch(0.46  0.055 272);   /* indigo-tinted — wikilinks, time, entry body */
+  --muted-foreground:     oklch(0.525 0.038 250);   /* dim labels, placeholders, weekdays */
+  --dim:                  oklch(0.60  0.032 250);   /* icons, unselected nav */
+
+  /* Brand — same 278 indigo, darkened to carry light ink as a filled button */
+  --primary:            oklch(0.52 0.20 278);
+  --primary-foreground: var(--ink-light);
+  --ring:               oklch(0.52 0.20 278);
+
+  /* On-accent ink pair. ink-dark is a deep indigo-black rather than this
+     theme's --foreground: --foreground clears only ~3.2:1 on priority-3
+     yellow, under AA, while this clears ~10:1 — the same substitution
+     .rose-pine-dawn and .catppuccin-latte make for the same reason. */
+  --ink-light: oklch(0.99 0.004 252);
+  --ink-dark:  oklch(0.17 0.030 270);
+
+  /* Destructive / warning — darkened to read on light surfaces */
+  --destructive: oklch(0.55 0.20 15);
+  --warning:     oklch(0.62 0.14 74);
+
+  /* Borders */
+  --border: color-mix(in oklab, oklch(0.525 0.038 250), transparent 78%);
+  --input:  color-mix(in oklab, oklch(0.525 0.038 250), transparent 68%);
+
+  /* Domain colors — .meridian's hues, darkened for a light ground */
+  --event:        oklch(0.52 0.20 278);   /* indigo — alias of primary */
+  --task:         oklch(0.53 0.15 145);   /* green */
+  --note:         oklch(0.53 0.13 215);   /* sky blue */
+  --brand-cyan:   oklch(0.53 0.12 208);   /* sky blue — gradient accent */
+  --priority-1:   oklch(0.53 0.20 22);    /* red */
+  --priority-2:   oklch(0.55 0.16 48);    /* orange */
+  --priority-3:   oklch(0.80 0.16 82);    /* yellow */
+
+  /* On-accent text — light ink on every swatch except priority-3, which is
+     kept light enough to stay legible as a yellow and so takes dark ink.
+     Unlike the borrowed light themes, this is not a judgment call against
+     the metric: light ink wins on merit for all six here. */
+  --event-foreground:      var(--ink-light);
+  --task-foreground:       var(--ink-light);
+  --note-foreground:       var(--ink-light);
+  --priority-1-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-light);
+  --priority-3-foreground: var(--ink-dark);
+
+  /* Sidebar */
+  --sidebar:                    oklch(0.98  0.006 252);
+  --sidebar-foreground:         oklch(0.46  0.055 272);
+  --sidebar-primary:            oklch(0.52  0.20  278);
+  --sidebar-primary-foreground: oklch(0.99  0.004 252);
+  --sidebar-accent:             oklch(0.995 0.003 252);
+  --sidebar-accent-foreground:  oklch(0.36  0.045 270);
+  --sidebar-border: color-mix(in oklab, oklch(0.525 0.038 250), transparent 75%);
+  --sidebar-ring:               oklch(0.52 0.20 278);
+
+  /* Chip border — visible on light surfaces */
+  --chip-border: color-mix(in oklab, oklch(0.525 0.038 250), transparent 68%);
+
+  /* Absolute derived tokens */
+  --primary-dark:    oklch(0.45 0.19 278);
+  --brand-cyan-dark: oklch(0.46 0.11 208);
+  --surface-raised:  oklch(0.995 0.003 252);
+
+  /* Shadows — lighter, matching the other light themes */
+  --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
+  --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
+  --shadow-card:        0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+}
+
 /* ── TOKYO NIGHT THEME ──────────────────────────────────────────── */
 /* Class-scoped override (set by next-themes). Only the authored per-theme
    tokens are restated; the color-mix derived tokens above re-derive from these.

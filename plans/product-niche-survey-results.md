@@ -39,14 +39,14 @@ Plan: [product-niche-survey.md](product-niche-survey.md).
 ### Assessed from code and copy only
 
 - **The real setup path** — GitHub OAuth and File System Access permission grants cannot be driven by an automated browser, as the plan anticipated. Assessed from `AddVaultWizard.tsx`, `githubOAuth`, and `fs.ts` instead.
-- **The entire visual walk.** **No `preview_*` tools are available in this session** — `ToolSearch` returns only `WebFetch` and `DesignSync`. So the **blind visual read and the screenshot set (mobile/desktop × 8 themes) were not performed**, and neither was the first-run walk on the example vault. Everything in category 3 below is inferred from `src/index.css` tokens, the dependency set, and layout source. This is the largest hole in the survey; the finding it most affects is #5, which should be re-checked against real screenshots before acting on it.
+- **The entire visual walk.** **No `preview_*` tools are available in this session** — `ToolSearch` returns only `WebFetch` and `DesignSync`. So the **blind visual read and the screenshot set (mobile/desktop × 8 themes) were not performed**, and neither was the first-run walk on the example vault. Everything in category 3 below is inferred from `src/index.css` tokens, the dependency set, and layout source. This is the largest hole in the survey. No surviving finding rests on it — the one that did has since been fixed — but the category-3 walk should be redone properly in a session that has the tooling.
 
 ### Comparison-table claims verified
 
 | Claim | Verdict |
 |---|---|
 | Obsidian — "Works in the browser ❌" | **Confirmed.** No official browser version exists; only third-party Docker/Electron-in-browser projects. |
-| Todoist — "Multiple participants / assignees ✅ (paid)" | **Wrong on both halves.** Todoist supports exactly one assignee per task by design, and assignment works on the free plan (5 collaborators per project). See finding #5. |
+| Todoist — "Multiple participants / assignees ✅ (paid)" | **Wrong on both halves.** Todoist supports exactly one assignee per task by design, and assignment works on the free plan (5 collaborators per project). See finding #4. |
 | Obsidian — "Free & open source: Partially (plugin only)" | **Confirmed** as fair: Obsidian is free for personal use but proprietary; TaskNotes is open source. |
 | Obsidian/GCal/Todoist — "Multiple series + one-off overrides in one entry ❌ (single rule per …)" | **Not re-verified** — already corrected in `cb2549f`. Note the row's parentheticals are the accurate part; the bare ❌ may read as "cannot move one occurrence," which Google Calendar can do. Low priority. |
 | Google Keep, GitHub Issues rows | **Not verified.** Out of the time box. |
@@ -54,7 +54,7 @@ Plan: [product-niche-survey.md](product-niche-survey.md).
 ### Suspected but unverified
 
 - **Creating an entry in the tutorial vault silently discards it.** `ExampleBackend.write()` is a no-op, `sync.ts` returns early on `readOnly`, and the `+` button is not gated — but I could not run the app to confirm the entry appears and then vanishes rather than erroring. **Unverified**; a single manual click of `+` in the example vault settles it. Finding #2 is written to hold either way, since the *disclosure* gap is confirmed by code regardless.
-- **Whether the 8 themes read as "developer tool" to a non-developer.** That is a claim about perception I cannot make from tokens alone, and the plan forbids inventing audience reactions. Flagged inside finding #4 as the bet it is.
+- **Whether the theme set reads as "developer tool" to a non-developer.** That is a claim about perception I cannot make from tokens alone, and the plan forbids inventing audience reactions. It stays open, and belongs with the bets in section 5 rather than in the findings.
 
 ### Plan drift noted
 
@@ -68,9 +68,9 @@ Two premises in the survey plan are now stale, which is itself evidence the posi
 |---|---|---|
 | 1 | Niche fit | **findings: #3** — and largely healthy otherwise; see the "working as intended" note below. |
 | 2 | Niche recognition | **clean.** The niche is unambiguous by README line 5 and the app link is at line 9, before any philosophy. This is the strongest surface in the repository. |
-| 3 | Visual identity & aesthetic fit | **partially assessed** — no preview tooling in this session, so the blind visual read and all screenshots were skipped. Assessed from tokens/deps only; **finding: #4**. |
-| 4 | Differentiation & alternatives | **findings: #5** |
-| 5 | Audience selection | **findings: #3, #4** |
+| 3 | Visual identity & aesthetic fit | **partially assessed** — no preview tooling in this session, so the blind visual read and all screenshots were skipped; assessed from tokens/deps only. The one finding it produced has been fixed and removed. |
+| 4 | Differentiation & alternatives | **findings: #4** |
+| 5 | Audience selection | **findings: #3** |
 | 6 | Adoption gates | **findings: #1, #2, #3** |
 | 7 | Niche drift & emerging signals | **findings: #3**, plus one below-the-cut item (tags, see the note after the findings). |
 
@@ -78,24 +78,25 @@ Two premises in the survey plan are now stale, which is itself evidence the posi
 
 - `Meridian supports notes, but it doesn't try to be a better note-taking app than Obsidian` (README:186) is honoured in the code. There is no graph view, no plugin API, no backlink-graph investment; the notes surface is deliberately thin and the comparison table concedes `Advanced note-taking … | Partial` rather than claiming parity. The non-goal is real.
 - **The mobile-first claim is backed by real investment**, not just asserted: `vaul` for drawers, `embla-carousel-react` for swipe navigation, a 52px `.search-bar-wrap` with `--shadow-float` pinned in thumb reach, `env(safe-area-inset-*)` threaded through `--th`, and `apple-mobile-web-app-capable` in `index.html`. This is the lead differentiator and the product actually spent on it.
-- **The seven code-editor themes are well-matched to the *primary* declared niche.** Tokyo Night, Dracula, Solarized, Catppuccin and Rosé Pine are exactly the palettes an Obsidian user recognises. The narrow problem is the default and the second persona — see #4 — not the theme set, which should not be broadened.
+- **The seven code-editor themes are well-matched to the *primary* declared niche.** Tokyo Night, Dracula, Solarized, Catppuccin and Rosé Pine are exactly the palettes an Obsidian user recognises, and the set should not be broadened toward a neutral consumer theme. The narrow problem was never the set but the *default*: system preference was ignored, and the only routes to a light UI were other projects' brands. Both are now addressed by `.meridian-light` plus `enableSystem`, with the borrowed palettes left exactly as they were.
 - **Honest limitations earn credibility where they appear.** README:161's frontmatter caveat ("comments are dropped, and keys may be reordered, requoted…") and README:186's Obsidian concession are both the kind of conceding that buys trust. Keep them.
 
 ---
 
-## 4. Findings — top 5
+## 4. Findings — top 4
 
 Ranked by `(impact × breadth) ÷ effort`. **Note the ranking inverts the impact ordering**: the highest-impact finding (#3, impact 9) ranks third because its fix is a strategy decision, while the lowest-impact one (#1, impact 5) ranks first because its fix is mechanical and touches five surfaces. Fields are reported separately so you can re-sort.
+
+A fifth finding — the forced dark default, which left a light-mode visitor no way to see Meridian's own identity — has been **fixed and removed**: `enableSystem` now respects `prefers-color-scheme`, and it resolves to a new first-party `.meridian-light` rather than to a borrowed editor palette. The theme set itself was deliberately left intact.
 
 | # | Finding | Gap | Question | Recommended model |
 |---|---|---|---|---|
 | 1 | Local-folder support stated five ways, two of them wrong | declared-vs-served | communication | **Haiku 4.5** |
 | 2 | The trial can't demonstrate the thing being sold | revealed-vs-served | fit + communication | **Sonnet 5** |
 | 3 | "No accounts to create" is false for the person you share with | declared-vs-served | fit + communication | **Opus 5 in plan mode, multi-PR** |
-| 4 | Forced dark default recruits against the line-7 persona | declared-vs-revealed | communication | **Opus 5** |
-| 5 | Todoist row gives away a real differentiator and invents a paywall | declared-vs-revealed | communication | **Sonnet 5** |
+| 4 | Todoist row gives away a real differentiator and invents a paywall | declared-vs-revealed | communication | **Sonnet 5** |
 
-**Sequencing note.** #3 is a positioning decision and #1, #2 and #5 are copy/behaviour edits. #3 must land first *only where it overlaps* — the sharing sentence at README:7. #1, #2 and #5 touch disjoint surfaces (the storage table, the tutorial, the comparison table) and can proceed immediately without waiting on it. #4's copy half also waits on #3, since who the visual identity should address depends on whether the line-7 persona survives.
+**Sequencing note.** #3 is a positioning decision; #1, #2 and #4 are copy/behaviour edits. #3 must land first *only where it overlaps* — the sharing sentence at README:7. #1, #2 and #4 touch disjoint surfaces (the storage table, the tutorial, the comparison table) and can proceed immediately without waiting on it.
 
 ---
 
@@ -174,30 +175,7 @@ Ranked by `(impact × breadth) ÷ effort`. **Note the ranking inverts the impact
 
 ---
 
-### Finding #4 — The forced dark default recruits against the line-7 persona
-
-- **Gap:** `declared-vs-revealed`
-- **Question:** communication
-- **Category:** `visual-language` `aesthetic-fit` `audience-selection` `identity`
-- **Who it costs us:** the non-developer sharee from README:7, and any visitor arriving from a light-mode phone. They meet a saturated indigo dark IDE palette before reading a word. Share of arrivals is unknown — that is precisely the bet.
-- **Impact:** 5
-- **Breadth:** 2 surfaces (`src/routes/__root.tsx`; the theme block of `src/index.css`), but both are unconditional — every visitor meets them.
-- **Evidence:** `src/routes/__root.tsx:85-86`
-
-  ```tsx
-  defaultTheme="meridian"
-  enableSystem={false}
-  ```
-
-  `enableSystem={false}` means a visitor whose OS is set to light **still lands in dark**; the product declines to read the one preference signal it is handed for free. And the eight themes in `src/index.css` are: `.meridian` (`--background: oklch(0.18 0.05 252)`), `.tokyo-night`, `.rose-pine-dawn`, `.solarized-light`, `.solarized-dark`, `.dracula`, `.catppuccin-latte`, `.catppuccin-mocha` — **seven of eight are code-editor palettes**, and there is no neutral or consumer-calendar option. The default's own comment reads `--primary: oklch(0.68 0.22 278);   /* indigo — balanced for text on dark surfaces and filled button bg */`.
-- **Adjacency read:** placed beside the alternatives the README names, this reads as belonging firmly to the **Obsidian / local-first tools-for-thought** set, and emphatically *not* to the Google Calendar / Keep consumer set. For the primary declared niche that is correct and should not change. It is a deliberate outlier only with respect to the *second* declared persona.
-- **Recommended model:** **Opus 5.** The mechanical half (`enableSystem` → `true`, with `.catppuccin-latte` or `.rose-pine-dawn` as the light pair) is trivial, but the judgment half is not: the hazard is an agent "broadening the appeal" by adding a neutral consumer theme or desaturating the default, which would dissolve the strongest identity signal the product has in exchange for an audience it may not want. The correct output is usually **the small fix plus an explicit recommendation to keep the theme set exactly as it is**. Drops to **Haiku 4.5 if the decision is given as "respect system preference, pair dark Meridian with Catppuccin Latte, change nothing else."**
-- **Problem:** a light-mode, non-developer visitor is shown a code-editor palette they didn't ask for and can't tell the product is meant to include them.
-- **Fix:** set `enableSystem` and designate an existing light theme as the light-mode pair — **without** adding a neutral theme or softening the default; the code-editor identity is an asset for the primary niche and should be defended.
-
----
-
-### Finding #5 — The Todoist row gives away a real differentiator and invents a paywall
+### Finding #4 — The Todoist row gives away a real differentiator and invents a paywall
 
 - **Gap:** `declared-vs-revealed`
 - **Question:** communication
@@ -218,7 +196,7 @@ Ranked by `(impact × breadth) ÷ effort`. **Note the ranking inverts the impact
 
 ---
 
-**Below the cut (verified, did not make the top 5).** The philosophy table at `README.md:86` lists `| **Tag** | — | everything tagged with it |` as one of five entry kinds, implying a tag is an openable list. In the code a tag is a plain label: `tags: string[]` (`src/types.ts:28`), rendered as a non-interactive chip, with no resolution to an entry — and the tutorial says so correctly at `exampleBackend.ts:368` (`` `tags` — free-text labels ``). The blog still narrates first-class tags as achieved — `I had tags implemented _as_ wikilinks, which is how I got my first-class` / `tags.` (`blog/1-…/meridian-why-i-built-a-markdown-first-calendar.md:155-156`, wrapped across the line break) — which the `topics` → `items` migration of 2026-06-20 superseded. Classic niche drift — three surfaces frozen at three different eras — but it sits deep in the README where few readers reach, so impact is ~4.
+**Below the cut (verified, did not make the cut).** The philosophy table at `README.md:86` lists `| **Tag** | — | everything tagged with it |` as one of five entry kinds, implying a tag is an openable list. In the code a tag is a plain label: `tags: string[]` (`src/types.ts:28`), rendered as a non-interactive chip, with no resolution to an entry — and the tutorial says so correctly at `exampleBackend.ts:368` (`` `tags` — free-text labels ``). The blog still narrates first-class tags as achieved — `I had tags implemented _as_ wikilinks, which is how I got my first-class` / `tags.` (`blog/1-…/meridian-why-i-built-a-markdown-first-calendar.md:155-156`, wrapped across the line break) — which the `topics` → `items` migration of 2026-06-20 superseded. Classic niche drift — three surfaces frozen at three different eras — but it sits deep in the README where few readers reach, so impact is ~4.
 
 ---
 
