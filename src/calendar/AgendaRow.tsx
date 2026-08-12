@@ -5,6 +5,7 @@ import { OccurrenceCard } from '@/components'
 import { occState } from '@/occView'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
+import { DayBadge } from './DayBadge'
 
 interface Props {
   occ: Occurrence
@@ -20,6 +21,14 @@ interface Props {
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
   showDate?: boolean
+  /**
+   * Set on a day's first occurrence row only (see agendaSections.ts's
+   * dayRows) — the weekday/day-number badge that stands in for the old
+   * per-day text header. Later rows on the same day pass null but still
+   * reserve the gutter width, so their cards nest under the badge instead of
+   * flush against the edge.
+   */
+  badge?: { date: Date; isToday: boolean } | null
 }
 
 // Memoized on purpose: now that `now` is an explicit, compared prop rather
@@ -28,7 +37,7 @@ interface Props {
 // when this row's rendered output could differ. Unrelated sibling changes in
 // the same day leave `occ` reference-stable (see expansionCache.ts's overlay
 // logic), so this row correctly skips re-rendering for those.
-function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
+function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, badge }: Props) {
   const roots     = useStore(s => s.roots)
   const backlinks = useStore(s => s.backlinks)
   const listedOn  = (backlinks.get(occ.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug)
@@ -154,13 +163,25 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate }: 
   }, []) // listeners are stable; callback accessed via ref
 
   return (
-    <div className="px-3.5 mb-1.5">
+    // items-start (not the flex default of stretch): the badge and the card
+    // box must size to their own content independently. Under stretch, the
+    // card's shadowed box was forced to match the badge column's height
+    // whenever the badge was taller than the card (a single small card with
+    // no meta row) — visible empty space in the card's back. items-start
+    // still top-aligns the badge with the card, just without the stretch.
+    <div className="flex items-start gap-2 px-3.5 mb-1.5">
+      {/* Gutter — the day's badge on its first row, an equal-width empty
+          spacer on the rest, so every card in a multi-item day still lines
+          up under the badge instead of flush against the edge. */}
+      <div className="w-9 shrink-0 flex justify-center pt-1.5">
+        {badge && <DayBadge date={badge.date} isToday={badge.isToday} />}
+      </div>
       {/* Two nested boxes: the swipe reveal needs overflow-hidden (clips the
           delete panel to the row's rounded corners and the horizontal slide),
           but that same overflow-hidden clips any box-shadow on the card inside
           it since the card fills this box exactly. So the shadow lives on this
           outer, unclipped box instead, wrapping the actual clip boundary. */}
-      <div className={cn('relative rounded-lg', !dimmed && 'shadow-(--shadow-card)')} data-occ-key={occ.id}>
+      <div className={cn('relative rounded-lg flex-1 min-w-0', !dimmed && 'shadow-(--shadow-card)')} data-occ-key={occ.id}>
         <div
           className="relative overflow-hidden rounded-lg"
           ref={wrapRef}

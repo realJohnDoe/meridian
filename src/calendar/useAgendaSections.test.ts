@@ -25,12 +25,11 @@ const occIdsFor = (rows: AgendaRow[], dateKey: string) =>
 const content = (rows: AgendaRow[]) => rows.filter(r => r.kind !== 'month' && r.kind !== 'week')
 
 describe('useAgendaSections', () => {
-  it('always seeds a headered, empty today row, even with no occurrences', () => {
+  it('always seeds a badged, empty today row, even with no occurrences', () => {
     const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
 
-    const emptyIndex = result.current.rows.findIndex(r => r.kind === 'day-empty')
-    const headerRow = result.current.rows[emptyIndex - 1]
-    expect(headerRow?.kind === 'day-header' && headerRow.isToday).toBe(true)
+    const todayRow = result.current.rows.find(r => r.kind === 'day-empty')
+    expect(todayRow?.kind === 'day-empty' && todayRow.isToday).toBe(true)
     expect(result.current.goToRowIndex).toBeGreaterThanOrEqual(0)
   })
 
@@ -65,8 +64,8 @@ describe('useAgendaSections', () => {
     // whose rows carry todayKey rather than their own past day.
     expect(occIdsFor(rows, '2026-06-10')).toEqual(['past-event-1'])
     expect(occIdsFor(rows, '2026-06-15')).toEqual(['overdue-1'])
-    // past-event-1's day header + row → overdue header → overdue-1 → today's header + forced-empty row.
-    expect(content(rows).map(r => r.kind)).toEqual(['day-header', 'occ', 'header', 'occ', 'day-header', 'day-empty'])
+    // past-event-1 (badged) → overdue header → overdue-1 → today's forced-empty row.
+    expect(content(rows).map(r => r.kind)).toEqual(['occ', 'header', 'occ', 'day-empty'])
 
     // goToRowIndex prefers the overdue header over today's when both exist.
     expect(rows[goToRowIndex]?.kind).toBe('header')
@@ -87,7 +86,7 @@ describe('useAgendaSections', () => {
     const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
     const { rows, goToRowIndex } = result.current
 
-    expect(content(rows).map(r => r.kind)).toEqual(['header', 'occ', 'day-header', 'day-empty'])
+    expect(content(rows).map(r => r.kind)).toEqual(['header', 'occ', 'day-empty'])
     // Overdue rows carry todayKey, not their own past day — see agendaSections.
     expect(occIdsFor(rows, '2026-06-15')).toEqual(['overdue-1'])
     const target = rows[goToRowIndex]
@@ -110,14 +109,14 @@ describe('useAgendaSections', () => {
 
     // The divider stays — and stays where scroll-to-today lands — but it is the
     // whole section now, so the agenda shows a one-line bar above today.
-    expect(content(rows).map(r => r.kind)).toEqual(['header', 'day-header', 'day-empty'])
+    expect(content(rows).map(r => r.kind)).toEqual(['header', 'day-empty'])
     expect(occIdsFor(rows, '2026-06-15')).toEqual([])
     const target = rows[goToRowIndex]
     expect(target?.kind).toBe('header')
     expect(target?.kind === 'header' && target.count).toBe(1)
   })
 
-  it("points goToRowIndex at today's own row when there is no overdue section", () => {
+  it('points goToRowIndex at today\'s own badged row when there is no overdue section', () => {
     const occ = makeOcc({ id: 'today-1', date: '2026-06-15', time: '09:00' })
     seedStore([occ], makeRoots('note.md'))
 
@@ -126,8 +125,8 @@ describe('useAgendaSections', () => {
 
     expect(rows.some(r => r.kind === 'header')).toBe(false)
     const target = rows[goToRowIndex]
-    expect(target?.kind).toBe('day-header')
-    expect(target?.dateKey).toBe('2026-06-15')
+    expect(target?.kind).toBe('occ')
+    expect(target?.kind === 'occ' && target.badge?.isToday).toBe(true)
   })
 
   it('hands back untouched rows by reference when a task is toggled done', () => {

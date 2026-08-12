@@ -32,8 +32,8 @@ export function resetAgendaSectionsCache(): void {
  * The agenda's data pipeline: expand occurrences over the agenda window, then
  * group by day, filter, sort, and flatten into one ordered list of
  * virtualizable rows — a continuous day-by-day walk of the window carrying
- * month/week divider rows, each day's own header row plus its occurrence
- * rows, and the overdue toggle spliced in at the today/future boundary.
+ * month/week divider rows, each day's own occurrence rows (badged on the
+ * first), and the overdue toggle spliced in at the today/future boundary.
  *
  * Sections remain the *cache* unit inside computeAgendaSections — that's what
  * makes a single toggle rebuild one day instead of the whole vault — but they

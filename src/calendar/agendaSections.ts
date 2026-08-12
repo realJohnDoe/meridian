@@ -21,26 +21,21 @@ export const FUTURE_WINDOW_DAYS = 90
 // stable before a row has been measured. initialMeasurementsCache means
 // returning users always get real sizes — estimates only matter on first visit.
 //
-// HEADER_H:     the overdue toggle row.
-// MONTH_H:      the big per-month divider ("August 2026").
-// WEEK_H:       the smaller per-week divider ("Week 32, Aug 3 – 9").
-// DAY_HEADER_H: a day's own weekday/day-number badge row, now a standalone
-//               row at the top of the day's section (see dayRows) instead of
-//               sharing a flex row with the first occurrence card.
-// ROW_H_META:   OccurrenceCard min-h-11 + py-2 padding + a meta row + AgendaRow mb-1.5 (6) ≈ 68px
-// ROW_H_PLAIN:  the same card with no meta row, so it sits on its min-h-11 (44)
-//               floor + mb-1.5 (6) = 50px — the figure OccurrenceList.ts already
-//               uses for exactly this shape.
-// EMPTY_H:      a day-empty row ("No events" text alone; the badge lives in
-//               the day-header row that precedes it).
+// HEADER_H:    the overdue toggle row.
+// MONTH_H:     the big per-month divider ("August 2026").
+// WEEK_H:      the smaller per-week divider ("Week 32, Aug 3 – 9").
+// ROW_H_META:  OccurrenceCard min-h-11 + py-2 padding + a meta row + AgendaRow mb-1.5 (6) ≈ 68px
+// ROW_H_PLAIN: the same card with no meta row, so it sits on its min-h-11 (44)
+//              floor + mb-1.5 (6) = 50px — the figure OccurrenceList.ts already
+//              uses for exactly this shape.
+// EMPTY_H:     a day-empty row (badge + "No events" text), no card at all.
 // Update these if the corresponding row component's padding changes.
 const HEADER_H = 40
 const MONTH_H = 56
 const WEEK_H = 32
-const DAY_HEADER_H = 44
 const ROW_H_META = 68
 const ROW_H_PLAIN = 50
-const EMPTY_H = 28
+const EMPTY_H = 44
 
 /**
  * One virtualizable row of the agenda's flat row list. AgendaView virtualizes
@@ -51,8 +46,8 @@ const EMPTY_H = 28
  */
 export type AgendaRow =
   | {
-      // The overdue toggle — a collapsible header, unlike the always-expanded
-      // 'day-header' row every ordinary day gets (see below).
+      // The overdue toggle — the only 'header' row left once per-day headers
+      // were replaced by inline badges (see 'occ'/'day-empty' below).
       kind: 'header'; key: string; dateKey: string; label: string
       collapsible: true; collapsed: boolean; count: number
     }
@@ -62,16 +57,14 @@ export type AgendaRow =
   // a label that only shows up where there's something to label.
   | { kind: 'month'; key: string; dateKey: string; label: string }
   | { kind: 'week'; key: string; dateKey: string; label: string }
-  // A day section's own weekday/day-number badge, always the first row of
-  // that section (see dayRows) — a standalone row rather than something
-  // embedded in the first occurrence row, so a short card's row height is
-  // never stretched to fit the badge (see AgendaRow, pre-fix).
-  | { kind: 'day-header'; key: string; dateKey: string; date: Date; isToday: boolean }
-  | { kind: 'occ'; key: string; dateKey: string; occ: Occurrence; showDate: boolean; isToday: boolean }
+  | {
+      kind: 'occ'; key: string; dateKey: string; occ: Occurrence; showDate: boolean; isToday: boolean
+      /** Set only on a day's first occurrence row — the weekday/day-number badge that replaces the old per-day text header. Later rows on the same day reserve the same gutter width but render no badge, so entries visually nest under it. */
+      badge: { date: Date; isToday: boolean } | null
+    }
   // A day forced into existence purely as a scroll target (the anchor day,
-  // or today under the default anchor) with nothing scheduled on it. Follows
-  // that day's own 'day-header' row (see dayRows).
-  | { kind: 'day-empty'; key: string; dateKey: string }
+  // or today under the default anchor) with nothing scheduled on it.
+  | { kind: 'day-empty'; key: string; dateKey: string; date: Date; isToday: boolean }
 
 export type Section =
   | { kind: 'day'; key: string; dateKey: string; date: Date; isToday: boolean; items: Occurrence[]; rows: AgendaRow[] }
@@ -97,7 +90,6 @@ export function estimateRow(r: AgendaRow): number {
   if (r.kind === 'header') return HEADER_H
   if (r.kind === 'month') return MONTH_H
   if (r.kind === 'week') return WEEK_H
-  if (r.kind === 'day-header') return DAY_HEADER_H
   if (r.kind === 'day-empty') return EMPTY_H
   return hasMetaRow(r) ? ROW_H_META : ROW_H_PLAIN
 }
@@ -115,27 +107,26 @@ function occRowKey(dateKey: string, o: Occurrence): string {
   return `${dateKey}|${o.id}|${o.metadata.jsTime?.getTime() ?? ''}`
 }
 
-/** Overdue's pooled rows — always carry a date badge on the card itself (`showDate`); overdue has no single day to header. */
+/** Overdue's pooled rows — always carry a date badge on the card itself (`showDate`), never the gutter badge (they span many different days). */
 function overdueRows(items: Occurrence[], dateKey: string): AgendaRow[] {
   return items.map(o => ({
-    kind: 'occ', key: occRowKey(dateKey, o), dateKey, occ: o, showDate: true, isToday: false,
+    kind: 'occ', key: occRowKey(dateKey, o), dateKey, occ: o, showDate: true, isToday: false, badge: null,
   }))
 }
 
 /**
- * A single day's rendered rows: its own day-header row (weekday/day-number
- * badge), followed by its occurrences, or — when the day was forced into
- * existence with nothing scheduled (see buildBucket) — a single 'day-empty'
- * row.
+ * A single day's rendered rows: its occurrences with a gutter badge on the
+ * first one, or — when the day was forced into existence with nothing
+ * scheduled (see buildBucket) — one 'day-empty' row carrying the badge alone.
  */
 function dayRows(items: Occurrence[], dateKey: string, date: Date, isToday: boolean): AgendaRow[] {
-  const header: AgendaRow = { kind: 'day-header', key: `h|${dateKey}`, dateKey, date, isToday }
   if (items.length === 0) {
-    return [header, { kind: 'day-empty', key: `e|${dateKey}`, dateKey }]
+    return [{ kind: 'day-empty', key: `e|${dateKey}`, dateKey, date, isToday }]
   }
-  return [header, ...items.map(o => ({
-    kind: 'occ' as const, key: occRowKey(dateKey, o), dateKey, occ: o, showDate: false, isToday,
-  }))]
+  return items.map((o, i) => ({
+    kind: 'occ', key: occRowKey(dateKey, o), dateKey, occ: o, showDate: false, isToday,
+    badge: i === 0 ? { date, isToday } : null,
+  }))
 }
 
 export type FilterOccs = (occs: Occurrence[]) => Occurrence[]
