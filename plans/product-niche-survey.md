@@ -120,7 +120,7 @@ Findings do **not** live here: nothing in this section is ranked, scored, or giv
 
 ### 6. The decisions only you can make
 
-Close with a short, explicit list of the **strategy questions this survey surfaces but must not answer** — what the niche is, who the beachhead user is, which differentiator leads, whether the notes category stays in the pitch (it has already left the README headline but survives in the `index.html` meta description and the blog's self-description, so check where it currently lives before framing the question), whether the LLM-friendly audience is worth targeting, and which feedback channel (if any) fits a product built on not running a server. State the options and the consequence of each, then stop. Everything outside this list should be actionable without further input.
+Close with a short, explicit list of the **strategy questions this survey surfaces but must not answer** — what the niche is, who the beachhead user is, which differentiator leads, whether the notes category stays in the pitch (it has already left the three shortest surfaces — the README headline, the `index.html` meta description, and the PWA manifest — but survives in the README feature list and philosophy, the blog's self-description, and the coach tour's opening sentence; check where it currently lives before framing the question), whether the LLM-friendly audience is worth targeting, and which feedback channel (if any) fits a product built on not running a server. State the options and the consequence of each, then stop. Everything outside this list should be actionable without further input.
 
 Do not pad to 8 — a short report grounded in real quotes beats a long one built on speculation.
 
