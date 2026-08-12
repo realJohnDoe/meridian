@@ -31,8 +31,8 @@ export const FUTURE_WINDOW_DAYS = 90
 // EMPTY_H:     a day-empty row (badge + "No events" text), no card at all.
 // Update these if the corresponding row component's padding changes.
 const HEADER_H = 40
-const MONTH_H = 56
-const WEEK_H = 32
+const MONTH_H = 60
+const WEEK_H = 36
 const ROW_H_META = 68
 const ROW_H_PLAIN = 50
 const EMPTY_H = 44
