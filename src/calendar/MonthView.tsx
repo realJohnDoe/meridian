@@ -110,7 +110,10 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
 
   return (
     <div className="relative flex-1 flex flex-col overflow-hidden pb-5">
-      <div className="grid grid-cols-7 px-1 shrink-0 pt-2">
+      {/* px-0.5 matches MonthGrid's own gap-0.5 between day cells, so the
+          grid's outer columns sit the same distance from the pane edge as
+          they do from each other. */}
+      <div className="grid grid-cols-7 px-0.5 shrink-0 pt-2">
         {weekdayLabels.map(d => <div key={d} className="text-center text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground py-0.75">{d}</div>)}
       </div>
 
@@ -138,7 +141,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
             {paneKeys.map((key, i) => (
               <div
                 key={key}
-                className="flex-[0_0_100%] min-w-0 overflow-hidden px-1 flex flex-col"
+                className="flex-[0_0_100%] min-w-0 overflow-hidden px-0.5 flex flex-col"
                 inert={i === CENTER_PANE ? undefined : true}
               >
                 <MonthGrid

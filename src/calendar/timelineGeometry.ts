@@ -9,6 +9,13 @@ export const HOURS = 24               // hours shown on the timeline
 export const HP = 56                  // px per hour (timeline scale, not a spacing gap)
 export const GUTTER = 64              // px reserved for the left hour-label column — Tailwind `16` step
 export const RIGHT_PAD = 8            // px breathing room to the right edge of the screen — `2` step
+// px right padding for the week view's day-column rows (header, all-day
+// strip, hourly grid) — equals their own `gap-0.5` inter-column gap, so the
+// last day column sits the same distance from the pane edge as it does from
+// its neighbor, keeping all three rows' column edges aligned. Distinct from
+// RIGHT_PAD above: DayPane's all-day strip has no per-day columns to line
+// up, so it keeps using that arbitrary breathing-room value instead.
+export const COL_RIGHT_PAD = 2
 const COL_GAP = 6                     // px gap between simultaneous (colliding) event columns — `1.5` step
 export const TOP_PAD = 8              // px headroom above 0:00 so its label isn't clipped — `2` step
 export const BOTTOM_PAD = 8           // px breathing room below 24:00 — `2` step

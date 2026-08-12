@@ -20,7 +20,7 @@ import { EventBlock } from './EventBlock'
 import { BADGE_CLASS } from './MonthGrid'
 import { weekDays, weekContains, weekNumberFor } from './weekRange'
 import {
-  HOURS, HP, GUTTER, RIGHT_PAD, TOP_PAD, BOTTOM_PAD, DEFAULT_CREATE_DURATION,
+  HOURS, HP, GUTTER, COL_RIGHT_PAD, TOP_PAD, BOTTOM_PAD, DEFAULT_CREATE_DURATION,
   formatHourBoundary, snapCreateTime,
 } from './timelineGeometry'
 
@@ -272,7 +272,10 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
         <div style={{ width: GUTTER }} className="shrink-0 flex items-center justify-center">
           <span className={BADGE_CLASS} aria-label={`Week ${weekNum}`}>{weekNum}</span>
         </div>
-        <div className="flex flex-1 gap-0.5">
+        {/* pr-0.5 = COL_RIGHT_PAD, matching the gap-0.5 gap between day
+            buttons, so this row's columns line up with the all-day strip and
+            hourly grid below (see COL_RIGHT_PAD). */}
+        <div className="flex flex-1 gap-0.5 pr-0.5">
           {days.map(d => {
             const isToday = sameDay(d, today)
             return (
@@ -318,7 +321,10 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
               className="h-5 w-full p-0"
             />
           </div>
-          <div className="flex-1 py-1 min-w-0">
+          {/* pr-0.5 = COL_RIGHT_PAD, matching the gap-0.5 gap between the
+              grid's own columns, so its day columns share a right edge with
+              the header above and the hourly grid below. */}
+          <div className="flex-1 py-1 min-w-0 pr-0.5">
             <div className="grid grid-cols-7 gap-0.5" style={{ gridAutoRows: ALLDAY_ROW_H }}>
               {visibleBars.map(renderBar)}
               {days.map((d, col) =>
@@ -402,7 +408,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
               geometry needs no shared gutter-inset wrapper the way DayPane's
               does (there, "columns" are overlapping events within one day;
               here they're the days themselves). */}
-          <div className="absolute inset-y-0 flex gap-0.5 divide-x divide-border/60" style={{ left: GUTTER, right: RIGHT_PAD }}>
+          <div className="absolute inset-y-0 flex gap-0.5 divide-x divide-border/60" style={{ left: GUTTER, right: COL_RIGHT_PAD }}>
             {days.map(d => {
               const dKey = fmtISO(d)
               const isToday = sameDay(d, today)
