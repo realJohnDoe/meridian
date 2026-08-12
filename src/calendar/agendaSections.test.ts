@@ -484,6 +484,6 @@ describe('estimateRow', () => {
 
     expect(estimateRow(rows.find(r => r.kind === 'month')!)).toBe(60)
     expect(estimateRow(rows.find(r => r.kind === 'week')!)).toBe(36)
-    expect(estimateRow(rows.find(r => r.kind === 'day-empty')!)).toBe(44)
+    expect(estimateRow(rows.find(r => r.kind === 'day-empty')!)).toBe(56)
   })
 })

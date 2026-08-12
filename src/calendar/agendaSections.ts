@@ -28,14 +28,15 @@ export const FUTURE_WINDOW_DAYS = 90
 // ROW_H_PLAIN: the same card with no meta row, so it sits on its min-h-11 (44)
 //              floor + mb-1.5 (6) = 50px — the figure OccurrenceList.ts already
 //              uses for exactly this shape.
-// EMPTY_H:     a day-empty row (badge + "No events" text), no card at all.
+// EMPTY_H:     a day-empty row (badge + "No events" text), no card at all —
+//              min-h-11 (44) + its own mt-3 (12), always a fresh day.
 // Update these if the corresponding row component's padding changes.
 const HEADER_H = 40
 const MONTH_H = 60
 const WEEK_H = 36
 const ROW_H_META = 68
 const ROW_H_PLAIN = 50
-const EMPTY_H = 44
+const EMPTY_H = 56
 
 /**
  * One virtualizable row of the agenda's flat row list. AgendaView virtualizes

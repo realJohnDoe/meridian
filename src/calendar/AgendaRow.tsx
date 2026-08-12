@@ -169,7 +169,12 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
     // immediately visible, since the card's box carries the elevation shadow
     // and would paint that extra height as empty shadowed space below the
     // card. The badge is kept out of it entirely (see the gutter below).
-    <div className="flex items-start gap-2 px-3.5 mb-1.5">
+    //
+    // mt-3 on a badged row only: the extra breathing room between one day's
+    // last card and the next day's badge that separates day groups the way
+    // Google Calendar's agenda does. Rows within the same day (no badge)
+    // keep the plain mb-1.5 card-to-card rhythm.
+    <div className={cn('flex items-start gap-2 px-3.5 mb-1.5', badge && 'mt-3')}>
       {/* Gutter — an equal-width spacer on every row so cards line up in a
           column instead of flush against the edge. The badge (a day's first
           row only) is absolutely positioned inside it, top-0 so its own top
