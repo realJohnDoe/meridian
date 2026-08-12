@@ -67,7 +67,9 @@ interface MeridianStore {
   // ── Sync status ─────────────────────────────────────────────────
   /** Number of dirty (unsynced) files in the IndexedDB cache. */
   syncDirtyCount: number
-  /** Non-null when the vault is read-only or a sync attempt failed with an actionable error. */
+  /** True when the active vault is read-only (e.g. the tutorial vault) — informational, not an error. */
+  syncReadOnly: boolean
+  /** Non-null when a sync attempt failed with an actionable error. */
   syncError: string | null
   /** True when the last sync attempt failed due to a transient network/offline error. */
   syncOffline: boolean
@@ -182,6 +184,7 @@ export const useStore = create<MeridianStore>((set, get) => {
     pendingDirReconnect: null,
 
     syncDirtyCount: 0,
+    syncReadOnly:   false,
     syncError:      null,
     syncOffline:    false,
     syncInProgress: false,
