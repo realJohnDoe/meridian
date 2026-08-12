@@ -22,11 +22,16 @@ type Step = 'vault' | 'adding'
 // utilities resolve to that theme's actual tokens — no color values duplicated here.
 // Meridian also needs its own class (not just relying on :root) because :root
 // alone gets overridden globally whenever another theme is active on <html>.
+// `System` leads, then our own pair, then the borrowed editor palettes
+// alphabetically — so the two themes that are actually Meridian's are not
+// buried mid-list between Dracula and Rosé Pine.
 const THEMES: { id: string; label: string; className?: string }[] = [
+  { id: 'system', label: 'System' },
+  { id: 'meridian', label: 'Meridian Dark', className: 'meridian' },
+  { id: 'meridian-light', label: 'Meridian Light', className: 'meridian-light' },
   { id: 'catppuccin-latte', label: 'Catppuccin Latte', className: 'catppuccin-latte' },
   { id: 'catppuccin-mocha', label: 'Catppuccin Mocha', className: 'catppuccin-mocha' },
   { id: 'dracula', label: 'Dracula', className: 'dracula' },
-  { id: 'meridian', label: 'Meridian', className: 'meridian' },
   { id: 'rose-pine-dawn', label: 'Rosé Pine Dawn', className: 'rose-pine-dawn' },
   { id: 'solarized-dark', label: 'Solarized Dark', className: 'solarized-dark' },
   { id: 'solarized-light', label: 'Solarized Light', className: 'solarized-light' },
@@ -42,8 +47,13 @@ interface Props {
 }
 
 export default function SettingsDialog({ open, onOpenChange }: Props) {
-  const { theme, setTheme } = useTheme()
-  const activeTheme         = theme ?? 'meridian'
+  const { theme, setTheme, systemTheme } = useTheme()
+  const activeTheme         = theme ?? 'system'
+  // The System card has no class of its own, so it previews whichever of the
+  // branded pair the OS currently resolves to — the swatches below render
+  // from the card's own theme class, so without this it would inherit the
+  // active theme's colors and misrepresent what picking it would do.
+  const systemClass         = systemTheme === 'light' ? 'meridian-light' : 'meridian'
 
   const vaults        = useStore(s => s.vaults)
   const activeVaultId = useStore(s => s.activeVaultId)
@@ -107,7 +117,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                       onClick={() => setTheme(id)}
                       className={cn(
                         'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-left transition-colors bg-background text-foreground',
-                        className,
+                        className ?? systemClass,
                         activeTheme === id ? 'border-primary' : 'border-border hover:border-muted-foreground',
                       )}
                     >

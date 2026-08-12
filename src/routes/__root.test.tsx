@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type * as ReactRouter from '@tanstack/react-router'
 import { render, act } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const {
   restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, requestScrollToToday, setCurrentDate,
@@ -32,7 +34,7 @@ vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }))
 
 // The createRootRoute mock hands back the plain options object at runtime; the
 // static type still describes the real RootRoute, which has no `component`.
-const { Route } = await import('./__root')
+const { Route, THEME_CLASS, THEME_IDS } = await import('./__root')
 const Root = (Route as unknown as { component: () => React.ReactElement }).component
 
 /** Drives document.visibilityState, which is a read-only getter in jsdom. */
@@ -265,5 +267,33 @@ describe('__root — resuming', () => {
 
     expect(requestScrollToToday).not.toHaveBeenCalled()
     expect(setCurrentDate).not.toHaveBeenCalled()
+  })
+})
+
+describe('THEME_CLASS', () => {
+  // Read the stylesheet as text: jsdom does not evaluate @import or resolve
+  // Tailwind, so asserting on computed styles here would prove nothing. The
+  // failure this guards is a theme id whose class was never authored (or was
+  // renamed in index.css alone) — which shows up as a theme that silently
+  // falls back to :root instead of throwing.
+  // Resolved from the project root (vitest's cwd) rather than import.meta.url,
+  // which is an http: URL under the jsdom environment.
+  const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
+
+  it.each(Object.entries(THEME_CLASS))('%s maps to a class defined in index.css', (_id, cls) => {
+    expect(css).toContain(`.${cls} {`)
+  })
+
+  it('resolves prefers-color-scheme to the branded pair, not a borrowed palette', () => {
+    expect(THEME_CLASS.light).toBe('meridian-light')
+    expect(THEME_CLASS.dark).toBe('meridian')
+  })
+
+  it('exposes every theme except the two color-scheme aliases as selectable', () => {
+    expect(THEME_IDS).not.toContain('light')
+    expect(THEME_IDS).not.toContain('dark')
+    expect(THEME_IDS).toContain('meridian')
+    expect(THEME_IDS).toContain('meridian-light')
+    expect(THEME_IDS).toHaveLength(Object.keys(THEME_CLASS).length - 2)
   })
 })
