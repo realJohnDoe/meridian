@@ -6,23 +6,7 @@ export { addDays, isSameDay as sameDay }
 
 const thisYear = () => new Date().getFullYear()
 
-export const fmtLong  = (d: Date): string => d.toLocaleDateString(undefined, { weekday: 'long', month: 'long',  day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) })
-export const fmtShort = (d: Date): string => d.toLocaleDateString(undefined, {                  month: 'short', day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) })
-
-export function fmtTopBarDay(d: Date, today: Date): string {
-  const opts: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' }
-  if (d.getFullYear() !== today.getFullYear()) opts.year = 'numeric'
-  return d.toLocaleDateString(undefined, opts)
-}
-
-// Abbreviated fallback for when the topbar is too narrow to fit fmtTopBarDay's
-// spelled-out form — see TopbarLabel, which picks between the two by measured
-// width rather than truncating the long one into e.g. "Wednesda…".
-export function fmtTopBarDayShort(d: Date, today: Date): string {
-  const opts: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' }
-  if (d.getFullYear() !== today.getFullYear()) opts.year = 'numeric'
-  return d.toLocaleDateString(undefined, opts)
-}
+export const fmtShort = (d: Date): string => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) })
 
 export function fmtTopBarMonth(d: Date, today: Date): string {
   const opts: Intl.DateTimeFormatOptions = { month: 'long' }
