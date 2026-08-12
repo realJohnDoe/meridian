@@ -111,7 +111,6 @@ vi.mock('@/storeBridge', () => ({
   }),
   getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
   setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
-  getSyncError: vi.fn(() => storeState.syncError),
   setStoreState: vi.fn((partial: Partial<typeof storeState>) => { Object.assign(storeState, partial) }),
 }))
 
