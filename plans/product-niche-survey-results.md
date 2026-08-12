@@ -39,14 +39,14 @@ Plan: [product-niche-survey.md](product-niche-survey.md).
 ### Assessed from code and copy only
 
 - **The real setup path** — GitHub OAuth and File System Access permission grants cannot be driven by an automated browser, as the plan anticipated. Assessed from `AddVaultWizard.tsx`, `githubOAuth`, and `fs.ts` instead.
-- **The entire visual walk.** **No `preview_*` tools are available in this session** — `ToolSearch` returns only `WebFetch` and `DesignSync`. So the **blind visual read and the screenshot set (mobile/desktop × 8 themes) were not performed**, and neither was the first-run walk on the example vault. Everything in category 3 below is inferred from `src/index.css` tokens, the dependency set, and layout source. This is the largest hole in the survey; the finding it most affects is #5, which should be re-checked against real screenshots before acting on it.
+- **The entire visual walk.** **No `preview_*` tools are available in this session** — `ToolSearch` returns only `WebFetch` and `DesignSync`. So the **blind visual read and the screenshot set (mobile/desktop × 8 themes) were not performed**, and neither was the first-run walk on the example vault. Everything in category 3 below is inferred from `src/index.css` tokens, the dependency set, and layout source. This is the largest hole in the survey; the finding it most affects is #4, which should be re-checked against real screenshots before acting on it.
 
 ### Comparison-table claims verified
 
 | Claim | Verdict |
 |---|---|
 | Obsidian — "Works in the browser ❌" | **Confirmed.** No official browser version exists; only third-party Docker/Electron-in-browser projects. |
-| Todoist — "Multiple participants / assignees ✅ (paid)" | **Wrong on both halves.** Todoist supports exactly one assignee per task by design, and assignment works on the free plan (5 collaborators per project). See finding #5. |
+| Todoist — "Multiple participants / assignees ✅ (paid)" | **Wrong on both halves; fixed.** Todoist supports exactly one assignee per task by design, and assignment works on the free plan (5 collaborators per project). README:180 now reads `Partial (one assignee per task)`; GitHub Issues (up to 10 assignees) and Google Keep (collaboration only, no assignee concept) were re-verified and left unchanged. |
 | Obsidian — "Free & open source: Partially (plugin only)" | **Confirmed** as fair: Obsidian is free for personal use but proprietary; TaskNotes is open source. |
 | Obsidian/GCal/Todoist — "Multiple series + one-off overrides in one entry ❌ (single rule per …)" | **Not re-verified** — already corrected in `cb2549f`. Note the row's parentheticals are the accurate part; the bare ❌ may read as "cannot move one occurrence," which Google Calendar can do. Low priority. |
 | Google Keep, GitHub Issues rows | **Not verified.** Out of the time box. |
@@ -69,7 +69,7 @@ Two premises in the survey plan are now stale, which is itself evidence the posi
 | 1 | Niche fit | **findings: #3** — and largely healthy otherwise; see the "working as intended" note below. |
 | 2 | Niche recognition | **clean.** The niche is unambiguous by README line 5 and the app link is at line 9, before any philosophy. This is the strongest surface in the repository. |
 | 3 | Visual identity & aesthetic fit | **partially assessed** — no preview tooling in this session, so the blind visual read and all screenshots were skipped. Assessed from tokens/deps only; **finding: #4**. |
-| 4 | Differentiation & alternatives | **findings: #5** |
+| 4 | Differentiation & alternatives | **fixed** — see the comparison-table verification note above. |
 | 5 | Audience selection | **findings: #3, #4** |
 | 6 | Adoption gates | **findings: #3** |
 | 7 | Niche drift & emerging signals | **findings: #3**, plus one below-the-cut item (tags, see the note after the findings). |
@@ -90,9 +90,8 @@ Ranked by `(impact × breadth) ÷ effort`. Fields are reported separately so you
 | # | Finding | Gap | Question | Recommended model |
 |---|---|---|---|---|
 | 4 | Forced dark default recruits against the line-7 persona | declared-vs-revealed | communication | **Opus 5** |
-| 5 | Todoist row gives away a real differentiator and invents a paywall | declared-vs-revealed | communication | **Sonnet 5** |
 
-**Sequencing note.** #5 touches a disjoint surface (the comparison table) and can proceed immediately.
+**Sequencing note.** #3 and #5 are resolved (see the category-verdicts table above and the comparison-table note). #4 no longer waits on #3 — the line-7 persona survives under the option-(b) rewrite, so #4's copy half can proceed against it.
 
 ---
 
@@ -116,27 +115,6 @@ Ranked by `(impact × breadth) ÷ effort`. Fields are reported separately so you
 - **Recommended model:** **Opus 5.** The mechanical half (`enableSystem` → `true`, with `.catppuccin-latte` or `.rose-pine-dawn` as the light pair) is trivial, but the judgment half is not: the hazard is an agent "broadening the appeal" by adding a neutral consumer theme or desaturating the default, which would dissolve the strongest identity signal the product has in exchange for an audience it may not want. The correct output is usually **the small fix plus an explicit recommendation to keep the theme set exactly as it is**. Drops to **Haiku 4.5 if the decision is given as "respect system preference, pair dark Meridian with Catppuccin Latte, change nothing else."**
 - **Problem:** a light-mode, non-developer visitor is shown a code-editor palette they didn't ask for and can't tell the product is meant to include them.
 - **Fix:** set `enableSystem` and designate an existing light theme as the light-mode pair — **without** adding a neutral theme or softening the default; the code-editor identity is an asset for the primary niche and should be defended.
-
----
-
-### Finding #5 — The Todoist row gives away a real differentiator and invents a paywall
-
-- **Gap:** `declared-vs-revealed`
-- **Question:** communication
-- **Category:** `differentiation` `proof`
-- **Who it costs us:** the comparison-shopping reader who knows Todoist. They see Meridian concede parity on a feature Meridian actually wins, and they see a paywall claim they know to be false — which discounts every other row in the table. Small share of arrivals, high trust cost per reader.
-- **Impact:** 6
-- **Breadth:** 1 surface (`README.md:180`).
-- **Evidence:** `README.md:180`
-
-  ```
-  | Multiple participants / assignees | ✅ | Partial | ❌ | ✅ | ✅ (paid) | ❌ |
-  ```
-
-  Both halves of the Todoist cell are wrong. Todoist supports **exactly one assignee per task** as an explicit product decision (the "Direct Responsible Individual" model) — so a ✅ on a row titled *Multiple* participants is not a small imprecision, it is the wrong answer. And assignment is available on the **free** plan (5 collaborators per project), so `(paid)` is false. Meanwhile Meridian's own `participants: string[]` (`src/types.ts:56`) is a genuine list, with calendar-wide filtering — one of the few rows where Meridian beats every named alternative outright, and the table hands it away.
-- **Recommended model:** **Sonnet 5.** The correction itself is small, but the hazard is the one the plan names directly — a row "corrected" without checking the competitor. The task must require per-claim verification against vendor documentation, and should extend to the two rows this survey did not check (Google Keep, GitHub Issues). Not Haiku, because the failure mode is confident invention about products the model isn't re-reading.
-- **Problem:** a reader who knows Todoist sees Meridian concede a feature it actually wins and assert a paywall that doesn't exist, and discounts the whole table.
-- **Fix:** change the Todoist cell to `Partial (one assignee per task)`, drop `(paid)`, and re-verify the Google Keep and GitHub Issues cells in the same pass.
 
 ---
 

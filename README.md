@@ -177,7 +177,7 @@ Meridian was heavily inspired by tools we already loved, and tries to fill the g
 | Wikilinks between entries | ✅ | ✅ | ❌ | ✅ (`#123` issue links) | ❌ | ❌ |
 | Advanced note-taking (plugin ecosystem, graph view, deep linking) | Partial | ✅ | ❌ | ❌ | ❌ | Partial |
 | Multiple series + one-off overrides in one entry | ✅ | ❌ (single rule per task) | ❌ (single rule per event) | ❌ | ❌ (single rule per task) | ❌ |
-| Multiple participants / assignees | ✅ | Partial | ❌ | ✅ | ✅ (paid) | ❌ |
+| Multiple participants / assignees | ✅ | Partial | ❌ | ✅ | Partial (one assignee per task) | ❌ |
 | Free & open source | ✅ | Partially (plugin only) | ❌ | ❌ | ❌ | ❌ |
 | Works in the browser | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
 
