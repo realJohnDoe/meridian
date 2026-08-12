@@ -163,7 +163,20 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
   }, []) // listeners are stable; callback accessed via ref
 
   return (
-    <div className="flex gap-2 px-3.5 mb-1.5">
+    <div className={cn(
+      'flex gap-2 px-3.5 mb-1.5',
+      // A badged row's own box must be at least as tall as the badge, or the
+      // badge — which no longer participates in flex sizing (see the gutter
+      // comment below) — visually spills past this row's bottom edge into
+      // whatever renders next (the day's second item, or the next day, if
+      // this was the day's only item). DayBadge is a weekday line (10px
+      // font * inherited line-height 1.5 ≈ 15px) + gap-0.5 (2px) + a w-7
+      // circle (28px) = 45px, plus this row's own top-1.5 badge offset
+      // (6px) = 51px — a hair over the shortest possible card row (min-h-11
+      // + mb-1.5 = 50px), so the plain, untimed, single-line case needs
+      // this floor too, not just cards with a meta row.
+      badge && 'min-h-[51px]',
+    )}>
       {/* Gutter — an equal-width spacer on every row so cards line up in a
           column instead of flush against the edge. The badge itself (first
           row of a day only) is absolutely positioned inside it rather than
