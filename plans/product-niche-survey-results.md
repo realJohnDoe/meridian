@@ -71,7 +71,7 @@ Two premises in the survey plan are now stale, which is itself evidence the posi
 | 3 | Visual identity & aesthetic fit | **partially assessed** — no preview tooling in this session, so the blind visual read and all screenshots were skipped. Assessed from tokens/deps only; **finding: #4**. |
 | 4 | Differentiation & alternatives | **findings: #5** |
 | 5 | Audience selection | **findings: #3, #4** |
-| 6 | Adoption gates | **findings: #1, #3** |
+| 6 | Adoption gates | **findings: #3** |
 | 7 | Niche drift & emerging signals | **findings: #3**, plus one below-the-cut item (tags, see the note after the findings). |
 
 **Working as intended — confirmed as strategy, not flagged as findings:**
@@ -85,44 +85,15 @@ Two premises in the survey plan are now stale, which is itself evidence the posi
 
 ## 4. Findings — top 5
 
-Ranked by `(impact × breadth) ÷ effort`. **Note the ranking inverts the impact ordering**: the highest-impact finding (#3, impact 9) ranks third because its fix is a strategy decision, while the lowest-impact one (#1, impact 5) ranks first because its fix is mechanical and touches five surfaces. Fields are reported separately so you can re-sort.
+Ranked by `(impact × breadth) ÷ effort`. Fields are reported separately so you can re-sort.
 
 | # | Finding | Gap | Question | Recommended model |
 |---|---|---|---|---|
-| 1 | Local-folder support stated five ways, two of them wrong | declared-vs-served | communication | **Haiku 4.5** |
 | 3 | "No accounts to create" is false for the person you share with | declared-vs-served | fit + communication | **Opus 5 in plan mode, multi-PR** |
 | 4 | Forced dark default recruits against the line-7 persona | declared-vs-revealed | communication | **Opus 5** |
 | 5 | Todoist row gives away a real differentiator and invents a paywall | declared-vs-revealed | communication | **Sonnet 5** |
 
-**Sequencing note.** #3 is a positioning decision and #1 and #5 are copy/behaviour edits. #3 must land first *only where it overlaps* — the sharing sentence at README:7. #1 and #5 touch disjoint surfaces (the storage table, the comparison table) and can proceed immediately without waiting on it. #4's copy half also waits on #3, since who the visual identity should address depends on whether the line-7 persona survives.
-
----
-
-### Finding #1 — Local-folder support is stated five ways, two of them wrong
-
-- **Gap:** `declared-vs-served`
-- **Question:** communication
-- **Category:** `adoption-gate` `audience-selection` `recognition`
-- **Who it costs us:** a Safari-on-Mac user who reads the storage table, believes local folders will work, picks that path and hits a dead end — and a Firefox user who is told in the app that Firefox is fine when it isn't. Small share of arrivals, but they hit it at the exact moment they were converting.
-- **Impact:** 5
-- **Breadth:** **5 surfaces** (from `grep`), of which **2 are wrong**:
-  - `README.md:51` — `Supported in Chrome and Edge, desktop or Android — not available on iOS or Firefox.` ❌ omits Safari on macOS
-  - `src/components/AddVaultWizard.tsx:26` — `Works in Chrome and Edge, desktop or Android; not supported on iOS or Safari.` ❌ omits Firefox
-  - `src/storage/exampleBackend.ts:397` — `On iOS, Safari, and Firefox, use a **GitHub repo**` ✅
-  - `README.md:196` — `local folder access requires a Chromium-based browser` ✅
-  - `src/storage/fs.ts:88` — `Use Chrome or Edge (desktop or Android), or connect a GitHub repo instead.` ✅
-- **Evidence — the ground truth:** `src/storage/fs.ts:82-84`
-
-  ```ts
-  export function isFolderPickerSupported(): boolean {
-    return typeof window.showDirectoryPicker === 'function'
-  }
-  ```
-
-  `showDirectoryPicker` is Chromium-only, so the correct exclusion set is **Safari and Firefox on every platform** (which subsumes iOS, where all browsers are WebKit). The README and the wizard each drop a different half of that set — and the README contradicts *itself* between line 51 and line 196.
-- **Recommended model:** **Haiku 4.5.** The truth is already known and written correctly in three of the five places; this is a mechanical alignment onto the `fs.ts:88` phrasing. The hazard that would normally raise the tier — "corrected" into a new wrong claim — is neutralised because the predicate is one line of code. A previous pass (`6669602`, *"Fix finding #1: local-folder support matrix and stale error copy"*) already attempted this and left two surfaces wrong, so **the task must name all five locations explicitly** rather than saying "fix the support matrix."
-- **Problem:** a Safari or Firefox user is told local folders will work for them, picks that path, and finds it isn't offered.
-- **Fix:** restate all five surfaces as "Chrome or Edge (desktop or Android); not available in Safari or Firefox," and delete the platform-specific enumerations that keep drifting.
+**Sequencing note.** #3 is a positioning decision and #5 is a copy/behaviour edit. #3 must land first *only where it overlaps* — the sharing sentence at README:7. #5 touches a disjoint surface (the comparison table) and can proceed immediately without waiting on it. #4's copy half also waits on #3, since who the visual identity should address depends on whether the line-7 persona survives.
 
 ---
 
