@@ -178,7 +178,7 @@ describe('AgendaView', () => {
     expect(onOpen.mock.calls[0]![0]).toMatchObject({ id: 'overdue-1' })
   })
 
-  it("highlights today's own badge, replacing the old per-day text header", () => {
+  it("highlights today's own day-header badge", () => {
     seedStore([makeOcc({ id: 'today-1', date: fmtISO(today), time: '09:00' })], makeRoots('note.md'))
 
     render(<AgendaView onOpen={vi.fn()} />)

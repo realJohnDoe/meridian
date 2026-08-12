@@ -31,10 +31,10 @@ function occ(id: string, date: string, opts: { time?: string; done?: boolean } =
  * the real [today-365, today+90] window always carries dozens of week/month
  * divider rows before any actual content, which would make the offset math
  * below a function of exact calendar arithmetic instead of the row-summing
- * logic this hook actually owns. A week divider, a badged past-day
- * occurrence, then the overdue header (the scroll-to-today target) — so
- * there are exactly two rows above `goToRowIndex`, mirroring the shape a
- * real agenda produces just ahead of Overdue.
+ * logic this hook actually owns. A week divider, a past-day occurrence, then
+ * the overdue header (the scroll-to-today target) — so there are exactly two
+ * rows above `goToRowIndex`, mirroring the shape a real agenda produces just
+ * ahead of Overdue.
  */
 function agenda(): { rows: AgendaRow[]; goToRowIndex: number } {
   const rows: AgendaRow[] = [
@@ -42,13 +42,13 @@ function agenda(): { rows: AgendaRow[]; goToRowIndex: number } {
     {
       kind: 'occ', key: 'past-event|1', dateKey: '2026-06-10',
       occ: occ('past-event', '2026-06-10', { time: '10:00' }),
-      showDate: false, isToday: false, badge: { date: new Date(2026, 5, 10), isToday: false },
+      showDate: false, isToday: false,
     },
     { kind: 'header', key: 'h|__overdue__', dateKey: '2026-06-15', label: 'Overdue', collapsible: true, collapsed: false, count: 1 },
     {
       kind: 'occ', key: 'overdue-task|1', dateKey: '2026-06-15',
       occ: occ('overdue-task', '2026-06-10', { done: false }),
-      showDate: true, isToday: false, badge: null,
+      showDate: true, isToday: false,
     },
   ]
   return { rows, goToRowIndex: 2 }

@@ -18,11 +18,9 @@ const baseCls = cn(
 )
 
 /**
- * The agenda's one remaining full-width header row: the "Overdue" collapse
- * toggle. Per-day headers were replaced by inline gutter badges (see
- * DayBadge/AgendaRow's `badge` prop) — this is the sole survivor since
- * overdue pools many different days into one bucket that has no single day
- * badge to show.
+ * The "Overdue" collapse toggle — a full-width header row, like every other
+ * day's own AgendaDayHeaderRow, but this one's label is fixed since overdue
+ * pools many different days into one bucket that has no single day to badge.
  *
  * It starts collapsed (calendar/viewState.ts), which is what lets
  * scroll-to-today keep preferring the overdue section without landing the
