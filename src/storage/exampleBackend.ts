@@ -393,8 +393,8 @@ items:
 
 Meridian is a PWA — install it for a full-screen, app-like experience that works offline.
 
-**Heads-up on storage:** the **local folder** backend works only in Chromium browsers
-(Chrome, Edge) — desktop or Android. On iOS, Safari, and Firefox, use a **GitHub repo**
+**Heads-up on storage:** the **local folder** backend works only in Chrome or Edge,
+desktop or Android — not available in Safari or Firefox. Use a **GitHub repo**
 instead — see [[make-it-yours]].
 
 ### Chrome / Edge — Windows, Mac, Linux, Android
