@@ -172,23 +172,25 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
     <div className="flex items-start gap-2 px-3.5 mb-1.5">
       {/* Gutter — an equal-width spacer on every row so cards line up in a
           column instead of flush against the edge. The badge (a day's first
-          row only) is absolutely positioned inside it, so it contributes no
-          height here at all: it can neither stretch the card's shadowed box
-          nor grow the row that the virtualizer measures to place everything
+          row only) is absolutely positioned inside it, top-0 so its own top
+          edge lines up exactly with the card's (both are items-start flex
+          siblings starting at this row's own top). It contributes no height
+          here at all: it can neither stretch the card's shadowed box nor
+          grow the row that the virtualizer measures to place everything
           below it.
 
           It may therefore overflow this row's bottom edge, which is fine at
           every size the agenda actually renders. DayBadge is a weekday line
           (10px font * inherited line-height 1.5 = 15px) + gap-0.5 (2px) + a
-          w-7 circle (28px) = 45px, so with the top-1.5 offset below it sits
-          in y ∈ [6, 51]. The shortest possible row — a plain untimed card on
-          its min-h-11 (44) floor — advances the next row to y = 50 via
-          mb-1.5, and that next row is either a same-day sibling whose own
-          gutter is empty, or the next day's row whose badge starts at 56.
-          Either way there is nothing at y ∈ [50, 51] to collide with. */}
+          w-7 circle (28px) = 45px, so it sits in y ∈ [0, 45]. The shortest
+          possible row — a plain untimed card on its min-h-11 (44) floor —
+          advances the next row to y = 50 via mb-1.5, and that next row is
+          either a same-day sibling whose own gutter is empty, or the next
+          day's row whose badge starts at 50. Either way there is nothing at
+          y ∈ [45, 50] to collide with. */}
       <div className="w-9 shrink-0 relative">
         {badge && (
-          <div className="absolute inset-x-0 top-1.5 flex justify-center">
+          <div className="absolute inset-x-0 top-0 flex justify-center">
             <DayBadge date={badge.date} isToday={badge.isToday} />
           </div>
         )}
