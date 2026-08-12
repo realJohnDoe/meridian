@@ -5,7 +5,7 @@ import AgendaView from './AgendaView'
 import { setupStore, seedStore, makeOcc, makeRoots } from '@/test-utils'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
-import { calendarView } from './viewState'
+import { calendarView, resetCalendarOnVaultChange } from './viewState'
 import type { Occurrence } from '@/types'
 
 setupStore()
@@ -16,11 +16,35 @@ setupStore()
  */
 const collapseOverdue = () => { calendarView.setState({ overdueCollapsed: true }) }
 
+// The agenda's scroll offset/target and its cached row grouping are
+// module-level state (see viewState.ts, useAgendaSections.ts), not reset by
+// render() alone. Without clearing them, a later test can inherit an earlier
+// test's post-scroll agendaScrollOffset (scrollTarget cleared to null on the
+// first scroll) instead of getting its own fresh scroll-to-today — harmless
+// with the old, tiny per-test row lists, but the agenda's row list always
+// spans the full ~455-day window now, so landing on a carried-over offset
+// lands nowhere near the row this test actually seeded.
+beforeEach(() => {
+  resetCalendarOnVaultChange()
+})
+
 // @tanstack/react-virtual measures the scroll element once via offsetWidth/
 // offsetHeight (see virtual-core's `getRect`), which jsdom leaves at 0 — with
 // a zero-height viewport the virtualizer computes an empty visible range and
-// renders nothing, no matter how many rows exist. Give every element a real
-// viewport-sized box so the visible range actually covers the rows under test.
+// renders nothing, no matter how many rows exist. Give the scroll container a
+// real viewport-sized box so the visible range actually covers the rows under
+// test.
+//
+// Individual rows get a plausible non-zero size too (not the container's
+// 600), rather than jsdom's default 0: `measureElement` overwrites each row's
+// *estimated* size with whatever it measures once mounted, and since the
+// agenda's row list now always spans the full ~455-day window (dozens of
+// month/week dividers ahead of any actual content — see agendaSections.ts),
+// a mounted-but-measured-as-0 row makes the "fill the viewport" pass think it
+// still has 600px left to cover no matter how many rows it adds, sweeping
+// past the intended target all the way to the end of the list. A uniform,
+// roughly-realistic per-row size keeps that pass converging near the actual
+// scroll target instead.
 //
 // Unlike FileResultsList, AgendaView owns its own scroll container, so its ref
 // is attached before its own virtualizer's layout effect runs — no
@@ -29,11 +53,17 @@ let offsetHeightDescriptor: PropertyDescriptor | undefined
 let offsetWidthDescriptor: PropertyDescriptor | undefined
 let animateDescriptor: PropertyDescriptor | undefined
 
+const isScrollContainer = (el: HTMLElement) => el.classList.contains('overflow-y-auto')
+
 beforeEach(() => {
   offsetHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
   offsetWidthDescriptor  = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
-  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 600 })
-  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 600 })
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true, get(this: HTMLElement) { return isScrollContainer(this) ? 600 : 50 },
+  })
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true, get(this: HTMLElement) { return isScrollContainer(this) ? 600 : 320 },
+  })
   // jsdom has no Web Animations API. useVirtualFlip feature-detects and skips
   // without it, but stub it anyway so these tests exercise the real path
   // rather than passing only because the glide was skipped.
@@ -148,12 +178,15 @@ describe('AgendaView', () => {
     expect(onOpen.mock.calls[0]![0]).toMatchObject({ id: 'overdue-1' })
   })
 
-  it('labels today\'s header "Today"', () => {
+  it("highlights today's own badge, replacing the old per-day text header", () => {
     seedStore([makeOcc({ id: 'today-1', date: fmtISO(today), time: '09:00' })], makeRoots('note.md'))
 
     render(<AgendaView onOpen={vi.fn()} />)
 
-    expect(screen.getByText('Today')).toBeInTheDocument()
     expect(screen.getByText('Standup')).toBeInTheDocument()
+    // Several months' badges can share the same day-of-month number, so find
+    // the one carrying the "today" highlight rather than assuming uniqueness.
+    const dayNumbers = screen.getAllByText(String(today.getDate()))
+    expect(dayNumbers.some(el => el.className.includes('bg-primary'))).toBe(true)
   })
 })

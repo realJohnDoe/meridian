@@ -2,13 +2,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import type { Occurrence } from '@/types'
-import { computeAgendaSections, type FilterOccs, type AgendaRow } from './agendaSections'
+import type { AgendaRow } from './agendaSections'
 import { calendarView, resetCalendarViewState } from './viewState'
 import { useAgendaScrollRestore } from './useAgendaScrollRestore'
-
-const TODAY = new Date(2026, 5, 15)
-const NOW = new Date(2026, 5, 15, 9, 0)
-const noFilter: FilterOccs = occs => occs
 
 function occ(id: string, date: string, opts: { time?: string; done?: boolean } = {}): Occurrence {
   const [y = NaN, m = NaN, d = NaN] = date.split('-').map(Number)
@@ -31,17 +27,31 @@ function occ(id: string, date: string, opts: { time?: string; done?: boolean } =
 }
 
 /**
- * A past day-section (header + one timed event) followed by the overdue
- * section, whose header is the scroll-to-today target — so there are exactly
- * two rows above `goToRowIndex`.
+ * A hand-built row list rather than a real computeAgendaSections() result:
+ * the real [today-365, today+90] window always carries dozens of week/month
+ * divider rows before any actual content, which would make the offset math
+ * below a function of exact calendar arithmetic instead of the row-summing
+ * logic this hook actually owns. A week divider, a badged past-day
+ * occurrence, then the overdue header (the scroll-to-today target) — so
+ * there are exactly two rows above `goToRowIndex`, mirroring the shape a
+ * real agenda produces just ahead of Overdue.
  */
 function agenda(): { rows: AgendaRow[]; goToRowIndex: number } {
-  const { rows, goToRowIndex } = computeAgendaSections(
-    null,
-    [occ('past-event', '2026-06-10', { time: '10:00' }), occ('overdue-task', '2026-06-10', { done: false })],
-    TODAY, NOW, noFilter,
-  )
-  return { rows, goToRowIndex }
+  const rows: AgendaRow[] = [
+    { kind: 'week', key: 'w|2026-06-08', dateKey: '2026-06-10', label: 'Week 24, Jun 8 – 14' },
+    {
+      kind: 'occ', key: 'past-event|1', dateKey: '2026-06-10',
+      occ: occ('past-event', '2026-06-10', { time: '10:00' }),
+      showDate: false, isToday: false, badge: { date: new Date(2026, 5, 10), isToday: false },
+    },
+    { kind: 'header', key: 'h|__overdue__', dateKey: '2026-06-15', label: 'Overdue', collapsible: true, collapsed: false, count: 1 },
+    {
+      kind: 'occ', key: 'overdue-task|1', dateKey: '2026-06-15',
+      occ: occ('overdue-task', '2026-06-10', { done: false }),
+      showDate: true, isToday: false, badge: null,
+    },
+  ]
+  return { rows, goToRowIndex: 2 }
 }
 
 beforeEach(() => {
@@ -55,10 +65,10 @@ describe('useAgendaScrollRestore', () => {
 
     const { result } = renderHook(() => useAgendaScrollRestore(true, rows, goToRowIndex))
 
-    // The day header (40) plus one timed occurrence row (68) above the overdue
-    // header. Starting anywhere else means the first painted frame shows the
-    // wrong day and has to be corrected by a visible scroll.
-    expect(result.current.initialOffset).toBe(108)
+    // The week divider (36) plus one timed occurrence row (68) above the
+    // overdue header. Starting anywhere else means the first painted frame
+    // shows the wrong day and has to be corrected by a visible scroll.
+    expect(result.current.initialOffset).toBe(104)
   })
 
   it('prefers real measured sizes from the snapshot, matched by row key', () => {
@@ -100,7 +110,7 @@ describe('useAgendaScrollRestore', () => {
     expect(pending).toBe(true)
 
     const { result } = renderHook(() => useAgendaScrollRestore(pending, rows, goToRowIndex))
-    expect(result.current.initialOffset).toBe(108)
+    expect(result.current.initialOffset).toBe(104)
     expect(result.current.initialOffset).not.toBe(calendarView.getState().agendaScrollOffset)
   })
 

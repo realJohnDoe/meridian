@@ -7,6 +7,7 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
 
 export default function SyncButton() {
   const syncDirtyCount = useStore(s => s.syncDirtyCount)
+  const syncReadOnly   = useStore(s => s.syncReadOnly)
   const syncError      = useStore(s => s.syncError)
   const syncOffline    = useStore(s => s.syncOffline)
   const syncInProgress = useStore(s => s.syncInProgress)
@@ -15,6 +16,8 @@ export default function SyncButton() {
 
   const isPending = syncOffline || syncDirtyCount > 0
 
+  // Read-only is expected, calm state — not an error — so it never takes the
+  // destructive color, even though it also suppresses the dirty-count badge.
   const color = syncError !== null || unreadableFiles.size > 0
     ? 'var(--destructive)'
     : isPending ? 'var(--warning)'
@@ -50,6 +53,12 @@ export default function SyncButton() {
           </p>
         )}
 
+        {syncReadOnly && (
+          <p className="text-xs text-muted-foreground">
+            Tutorial vault — changes aren't saved.
+          </p>
+        )}
+
         {syncOffline && !syncError && (
           <p className="text-xs text-warning">
             Offline — changes are saved locally and will sync when you reconnect.
@@ -75,14 +84,16 @@ export default function SyncButton() {
           </div>
         )}
 
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full mt-1"
-          onClick={syncToBackend}
-        >
-          Sync now
-        </Button>
+        {!syncReadOnly && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full mt-1"
+            onClick={syncToBackend}
+          >
+            Sync now
+          </Button>
+        )}
       </PopoverContent>
     </Popover>
   )

@@ -39,21 +39,21 @@ Plan: [product-niche-survey.md](product-niche-survey.md).
 ### Assessed from code and copy only
 
 - **The real setup path** — GitHub OAuth and File System Access permission grants cannot be driven by an automated browser, as the plan anticipated. Assessed from `AddVaultWizard.tsx`, `githubOAuth`, and `fs.ts` instead.
-- **The entire visual walk.** **No `preview_*` tools are available in this session** — `ToolSearch` returns only `WebFetch` and `DesignSync`. So the **blind visual read and the screenshot set (mobile/desktop × 8 themes) were not performed**, and neither was the first-run walk on the example vault. Everything in category 3 below is inferred from `src/index.css` tokens, the dependency set, and layout source. This is the largest hole in the survey. No surviving finding rests on it — the one that did has since been fixed — but the category-3 walk should be redone properly in a session that has the tooling.
+- **The entire visual walk.** **No `preview_*` tools are available in this session** — `ToolSearch` returns only `WebFetch` and `DesignSync`. So the **blind visual read and the screenshot set (mobile/desktop × 8 themes) were not performed**, and neither was the first-run walk on the example vault. Everything in category 3 below is inferred from `src/index.css` tokens, the dependency set, and layout source. This is the largest hole in the survey. It affected finding #4 (the forced dark default), which has since been fixed — but the fix itself was applied without a visual check, since the same lack of tooling persisted; the branded light theme it shipped is worth a screenshot pass once tooling is available.
 
 ### Comparison-table claims verified
 
 | Claim | Verdict |
 |---|---|
 | Obsidian — "Works in the browser ❌" | **Confirmed.** No official browser version exists; only third-party Docker/Electron-in-browser projects. |
-| Todoist — "Multiple participants / assignees ✅ (paid)" | **Wrong on both halves.** Todoist supports exactly one assignee per task by design, and assignment works on the free plan (5 collaborators per project). See finding #5. |
+| Todoist — "Multiple participants / assignees ✅ (paid)" | **Wrong on both halves; fixed.** Todoist supports exactly one assignee per task by design, and assignment works on the free plan (5 collaborators per project). README:180 now reads `Partial (one assignee per task)`; GitHub Issues (up to 10 assignees) and Google Keep (collaboration only, no assignee concept) were re-verified and left unchanged. |
 | Obsidian — "Free & open source: Partially (plugin only)" | **Confirmed** as fair: Obsidian is free for personal use but proprietary; TaskNotes is open source. |
 | Obsidian/GCal/Todoist — "Multiple series + one-off overrides in one entry ❌ (single rule per …)" | **Not re-verified** — already corrected in `cb2549f`. Note the row's parentheticals are the accurate part; the bare ❌ may read as "cannot move one occurrence," which Google Calendar can do. Low priority. |
 | Google Keep, GitHub Issues rows | **Not verified.** Out of the time box. |
 
 ### Suspected but unverified
 
-- **Creating an entry in the tutorial vault silently discards it.** `ExampleBackend.write()` is a no-op, `sync.ts` returns early on `readOnly`, and the `+` button is not gated — but I could not run the app to confirm the entry appears and then vanishes rather than erroring. **Unverified**; a single manual click of `+` in the example vault settles it. Finding #2 is written to hold either way, since the *disclosure* gap is confirmed by code regardless.
+- **Creating an entry in the tutorial vault silently discards it.** `ExampleBackend.write()` is a no-op, `sync.ts` returns early on `readOnly`, and the `+` button is not gated — but I could not run the app to confirm the entry appears and then vanishes rather than erroring. **Unverified**; a single manual click of `+` in the example vault settles it.
 - **Whether the theme set reads as "developer tool" to a non-developer.** That is a claim about perception I cannot make from tokens alone, and the plan forbids inventing audience reactions. It stays open, and belongs with the bets in section 5 rather than in the findings.
 
 ### Plan drift noted
@@ -68,88 +68,32 @@ Two premises in the survey plan are now stale, which is itself evidence the posi
 |---|---|---|
 | 1 | Niche fit | **findings: #3** — and largely healthy otherwise; see the "working as intended" note below. |
 | 2 | Niche recognition | **clean.** The niche is unambiguous by README line 5 and the app link is at line 9, before any philosophy. This is the strongest surface in the repository. |
-| 3 | Visual identity & aesthetic fit | **partially assessed** — no preview tooling in this session, so the blind visual read and all screenshots were skipped; assessed from tokens/deps only. **findings: #4** (fixed, this PR — see gap row above) |
-| 4 | Differentiation & alternatives | **findings: #5** |
+| 3 | Visual identity & aesthetic fit | **partially assessed** — no preview tooling in this session, so the blind visual read and all screenshots were skipped. Assessed from tokens/deps only; the one finding it produced is **fixed** — see the comparison-table verification note's sibling below. |
+| 4 | Differentiation & alternatives | **fixed** — see the comparison-table verification note above. |
 | 5 | Audience selection | **findings: #3** |
-| 6 | Adoption gates | **findings: #1, #2, #3** |
+| 6 | Adoption gates | **findings: #3** |
 | 7 | Niche drift & emerging signals | **findings: #3**, plus one below-the-cut item (tags, see the note after the findings). |
 
 **Working as intended — confirmed as strategy, not flagged as findings:**
 
 - `Meridian supports notes, but it doesn't try to be a better note-taking app than Obsidian` (README:186) is honoured in the code. There is no graph view, no plugin API, no backlink-graph investment; the notes surface is deliberately thin and the comparison table concedes `Advanced note-taking … | Partial` rather than claiming parity. The non-goal is real.
 - **The mobile-first claim is backed by real investment**, not just asserted: `vaul` for drawers, `embla-carousel-react` for swipe navigation, a 52px `.search-bar-wrap` with `--shadow-float` pinned in thumb reach, `env(safe-area-inset-*)` threaded through `--th`, and `apple-mobile-web-app-capable` in `index.html`. This is the lead differentiator and the product actually spent on it.
-- **The seven code-editor themes are well-matched to the *primary* declared niche.** Tokyo Night, Dracula, Solarized, Catppuccin and Rosé Pine are exactly the palettes an Obsidian user recognises, and the set should not be broadened toward a neutral consumer theme. The narrow problem was never the set but the *default*: system preference was ignored, and the only routes to a light UI were other projects' brands. Both are now addressed by `.meridian-light` plus `enableSystem`, with the borrowed palettes left exactly as they were.
+- **The seven code-editor themes are well-matched to the *primary* declared niche.** Tokyo Night, Dracula, Solarized, Catppuccin and Rosé Pine are exactly the palettes an Obsidian user recognises, and the set should not be broadened toward a neutral consumer theme. The narrow problem was never the set but the *default*: system preference was ignored, and the only routes to a light UI were other projects' brands. Both are now addressed by a first-party `.meridian-light` plus `enableSystem`, with the borrowed palettes left exactly as they were.
 - **Honest limitations earn credibility where they appear.** README:161's frontmatter caveat ("comments are dropped, and keys may be reordered, requoted…") and README:186's Obsidian concession are both the kind of conceding that buys trust. Keep them.
 
 ---
 
 ## 4. Findings — top 5
 
-Ranked by `(impact × breadth) ÷ effort`. **Note the ranking inverts the impact ordering**: the highest-impact finding (#3, impact 9) ranks third because its fix is a strategy decision, while the lowest-impact one (#1, impact 5) ranks first because its fix is mechanical and touches five surfaces. Fields are reported separately so you can re-sort.
+Ranked by `(impact × breadth) ÷ effort`. Fields are reported separately so you can re-sort.
 
 | # | Finding | Gap | Question | Recommended model |
 |---|---|---|---|---|
-| 1 | Local-folder support stated five ways, two of them wrong | declared-vs-served | communication | **Haiku 4.5** |
-| 2 | The trial can't demonstrate the thing being sold | revealed-vs-served | fit + communication | **Sonnet 5** |
 | 3 | "No accounts to create" is false for the person you share with | declared-vs-served | fit + communication | **Opus 5 in plan mode, multi-PR** |
-| 4 | ~~Forced dark default recruits against the line-7 persona~~ — **fixed, this PR** | declared-vs-revealed | communication | — |
-| 5 | Todoist row gives away a real differentiator and invents a paywall | declared-vs-revealed | communication | **Sonnet 5** |
 
-**Fixed and removed from this record:** #4, the forced dark default that left a light-mode visitor no way to see Meridian's own identity — `enableSystem` now respects `prefers-color-scheme` and resolves to a new first-party `.meridian-light` rather than a borrowed editor palette. The theme set itself was deliberately left intact; see the "working as intended" note above.
+**Implemented and removed from this record:** #4, the forced dark default that left a light-mode visitor no way to see Meridian's own identity — `enableSystem` now respects `prefers-color-scheme` and resolves to a new first-party `.meridian-light` rather than a borrowed editor palette, implemented in [PR #709](https://github.com/realJohnDoe/meridian/pull/709). The theme set itself was deliberately left intact; see the "working as intended" note above.
 
-**Sequencing note.** #3 is a positioning decision; #1, #2 and #5 are copy/behaviour edits. #3 must land first *only where it overlaps* — the sharing sentence at README:7. #1, #2 and #5 touch disjoint surfaces (the storage table, the tutorial, the comparison table) and can proceed immediately without waiting on it.
-
----
-
-### Finding #1 — Local-folder support is stated five ways, two of them wrong
-
-- **Gap:** `declared-vs-served`
-- **Question:** communication
-- **Category:** `adoption-gate` `audience-selection` `recognition`
-- **Who it costs us:** a Safari-on-Mac user who reads the storage table, believes local folders will work, picks that path and hits a dead end — and a Firefox user who is told in the app that Firefox is fine when it isn't. Small share of arrivals, but they hit it at the exact moment they were converting.
-- **Impact:** 5
-- **Breadth:** **5 surfaces** (from `grep`), of which **2 are wrong**:
-  - `README.md:51` — `Supported in Chrome and Edge, desktop or Android — not available on iOS or Firefox.` ❌ omits Safari on macOS
-  - `src/components/AddVaultWizard.tsx:26` — `Works in Chrome and Edge, desktop or Android; not supported on iOS or Safari.` ❌ omits Firefox
-  - `src/storage/exampleBackend.ts:397` — `On iOS, Safari, and Firefox, use a **GitHub repo**` ✅
-  - `README.md:196` — `local folder access requires a Chromium-based browser` ✅
-  - `src/storage/fs.ts:88` — `Use Chrome or Edge (desktop or Android), or connect a GitHub repo instead.` ✅
-- **Evidence — the ground truth:** `src/storage/fs.ts:82-84`
-
-  ```ts
-  export function isFolderPickerSupported(): boolean {
-    return typeof window.showDirectoryPicker === 'function'
-  }
-  ```
-
-  `showDirectoryPicker` is Chromium-only, so the correct exclusion set is **Safari and Firefox on every platform** (which subsumes iOS, where all browsers are WebKit). The README and the wizard each drop a different half of that set — and the README contradicts *itself* between line 51 and line 196.
-- **Recommended model:** **Haiku 4.5.** The truth is already known and written correctly in three of the five places; this is a mechanical alignment onto the `fs.ts:88` phrasing. The hazard that would normally raise the tier — "corrected" into a new wrong claim — is neutralised because the predicate is one line of code. A previous pass (`6669602`, *"Fix finding #1: local-folder support matrix and stale error copy"*) already attempted this and left two surfaces wrong, so **the task must name all five locations explicitly** rather than saying "fix the support matrix."
-- **Problem:** a Safari or Firefox user is told local folders will work for them, picks that path, and finds it isn't offered.
-- **Fix:** restate all five surfaces as "Chrome or Edge (desktop or Android); not available in Safari or Firefox," and delete the platform-specific enumerations that keep drifting.
-
----
-
-### Finding #2 — The trial can't demonstrate the thing being sold
-
-- **Gap:** `revealed-vs-served`
-- **Question:** fit + communication
-- **Category:** `adoption-gate` `proof` `feature-fit`
-- **Who it costs us:** the evaluating visitor who took the "try it" invitation — i.e. **most arrivals**, since it is the primary call to action at README line 9 and the app's default vault. They come to test one claim (phone capture is fast) and that is the single claim the sandbox cannot answer.
-- **Impact:** 8
-- **Breadth:** 3 surfaces carry the invitation (`README.md:9`, the blog's closing paragraph, the app's default-vault behaviour in `vaultRegistry.ts`); **0 surfaces in the app's own chrome disclose the restriction** before a visitor hits it.
-- **Evidence — the promise:**
-  - `README.md:9` — `**[Open the app →](https://realjohndoe.github.io/meridian/)** — try the example vault first, nothing to sign up for.`
-  - `README.md:3` — `**Tasks and a calendar that are actually good on your phone — stored as plain Markdown files you own.**`
-- **Evidence — the product:** `src/storage/exampleBackend.ts:469` sets `readonly readOnly = true`, and `write()`/`delete()` are no-ops. The `+` button in `SearchBar.tsx:122` is **not gated on `readOnly`** — nor is the editor. The only in-app signal is in `src/storage/sync.ts:28`:
-
-  ```ts
-  setStoreState({ syncDirtyCount: 0, syncError: 'Read-only vault' })
-  ```
-
-  which `SyncButton.tsx` renders as `text-destructive` **inside a popover the visitor must open**, behind an icon tinted `var(--destructive)`. So the first screen of the demo shows a red fault indicator, and the explanation for it is one tap away. Everything else that discloses read-only status lives in the *body text of the tutorial notes themselves* — `This is a read-only sandbox — poke around freely.` (`exampleBackend.ts:99`) — i.e. only a visitor who reads the notes learns it.
-- **Recommended model:** **Sonnet 5**, for the disclosure fix (a non-destructive read-only affordance on the create/save path, and demoting `'Read-only vault'` from an error to an informational state so the demo doesn't open on a red icon). **Opus 5 if the chosen fix is a writable scratch sandbox** backed by IndexedDB, because that touches the persistence port and the vault-registry lifecycle. The hazard that sets the tier: a naive fix simply disables the `+` button, which removes the friction *and* the demonstration — the visitor then cannot see capture at all, which is strictly worse for positioning than losing an entry.
-- **Problem:** a visitor evaluating "is capture actually fast on my phone" cannot perform capture in the trial, and isn't told why until they open a red error popover.
-- **Fix:** make the sandbox writable to local device storage (preferred — it demonstrates the lead differentiator), or at minimum surface a calm, non-destructive "tutorial vault — changes aren't saved" affordance on the create/save path and stop styling the state as an error.
+**Sequencing note.** #3 is the only open finding in this record and is a positioning decision — nothing else here depends on it.
 
 ---
 
@@ -176,28 +120,7 @@ Ranked by `(impact × breadth) ÷ effort`. **Note the ranking inverts the impact
 
 ---
 
-### Finding #5 — The Todoist row gives away a real differentiator and invents a paywall
-
-- **Gap:** `declared-vs-revealed`
-- **Question:** communication
-- **Category:** `differentiation` `proof`
-- **Who it costs us:** the comparison-shopping reader who knows Todoist. They see Meridian concede parity on a feature Meridian actually wins, and they see a paywall claim they know to be false — which discounts every other row in the table. Small share of arrivals, high trust cost per reader.
-- **Impact:** 6
-- **Breadth:** 1 surface (`README.md:180`).
-- **Evidence:** `README.md:180`
-
-  ```
-  | Multiple participants / assignees | ✅ | Partial | ❌ | ✅ | ✅ (paid) | ❌ |
-  ```
-
-  Both halves of the Todoist cell are wrong. Todoist supports **exactly one assignee per task** as an explicit product decision (the "Direct Responsible Individual" model) — so a ✅ on a row titled *Multiple* participants is not a small imprecision, it is the wrong answer. And assignment is available on the **free** plan (5 collaborators per project), so `(paid)` is false. Meanwhile Meridian's own `participants: string[]` (`src/types.ts:56`) is a genuine list, with calendar-wide filtering — one of the few rows where Meridian beats every named alternative outright, and the table hands it away.
-- **Recommended model:** **Sonnet 5.** The correction itself is small, but the hazard is the one the plan names directly — a row "corrected" without checking the competitor. The task must require per-claim verification against vendor documentation, and should extend to the two rows this survey did not check (Google Keep, GitHub Issues). Not Haiku, because the failure mode is confident invention about products the model isn't re-reading.
-- **Problem:** a reader who knows Todoist sees Meridian concede a feature it actually wins and assert a paywall that doesn't exist, and discounts the whole table.
-- **Fix:** change the Todoist cell to `Partial (one assignee per task)`, drop `(paid)`, and re-verify the Google Keep and GitHub Issues cells in the same pass.
-
----
-
-**Below the cut (verified, did not make the cut).** The philosophy table at `README.md:86` lists `| **Tag** | — | everything tagged with it |` as one of five entry kinds, implying a tag is an openable list. In the code a tag is a plain label: `tags: string[]` (`src/types.ts:28`), rendered as a non-interactive chip, with no resolution to an entry — and the tutorial says so correctly at `exampleBackend.ts:368` (`` `tags` — free-text labels ``). The blog still narrates first-class tags as achieved — `I had tags implemented _as_ wikilinks, which is how I got my first-class` / `tags.` (`blog/1-…/meridian-why-i-built-a-markdown-first-calendar.md:155-156`, wrapped across the line break) — which the `topics` → `items` migration of 2026-06-20 superseded. Classic niche drift — three surfaces frozen at three different eras — but it sits deep in the README where few readers reach, so impact is ~4.
+**Below the cut (verified, did not make the top 5).** The philosophy table at `README.md:86` lists `| **Tag** | — | everything tagged with it |` as one of five entry kinds, implying a tag is an openable list. In the code a tag is a plain label: `tags: string[]` (`src/types.ts:28`), rendered as a non-interactive chip, with no resolution to an entry — and the tutorial says so correctly at `exampleBackend.ts:368` (`` `tags` — free-text labels ``). The blog still narrates first-class tags as achieved — `I had tags implemented _as_ wikilinks, which is how I got my first-class` / `tags.` (`blog/1-…/meridian-why-i-built-a-markdown-first-calendar.md:155-156`, wrapped across the line break) — which the `topics` → `items` migration of 2026-06-20 superseded. Classic niche drift — three surfaces frozen at three different eras — but it sits deep in the README where few readers reach, so impact is ~4.
 
 ---
 

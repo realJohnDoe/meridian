@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { Occurrence, Priority } from '@/types'
 import { computeAgendaSections, estimateRow, type Section, type FilterOccs, type AgendaRow } from './agendaSections'
 
-const TODAY = new Date(2026, 5, 15)
+const TODAY = new Date(2026, 5, 15) // a Monday
 const NOW = new Date(2026, 5, 15, 9, 0)
 
 const noFilter: FilterOccs = occs => occs
@@ -117,7 +117,7 @@ describe('computeAgendaSections', () => {
 
     expect(second).not.toBe(first)
     // Only today's section is rebuilt; the past day, the overdue pool and the
-    // future day are handed back by reference (this is what stops DaySection
+    // future day are handed back by reference (this is what stops AgendaRow
     // from re-rendering the rest of the vault).
     expect(findDay(second.sections, '2026-06-10')).toBe(findDay(first.sections, '2026-06-10'))
     expect(findDay(second.sections, '2026-06-20')).toBe(findDay(first.sections, '2026-06-20'))
@@ -255,32 +255,53 @@ describe('computeAgendaSections', () => {
     expect(itemIds(findOverdue(second.sections))).toEqual(['today-task-a', 'today-task-b', 'overdue-task'])
     expect(findDay(second.sections, '2026-06-16')?.items).toEqual([])
   })
+
+  it('rebuilds when the locale week-start changes, even with no occurrence change', () => {
+    const all = baseOccs()
+    const mondayStart = computeAgendaSections(null, all, TODAY, NOW, noFilter, TODAY, false, 1)
+    const sundayStart = computeAgendaSections(mondayStart, all, TODAY, NOW, noFilter, TODAY, false, 0)
+
+    expect(sundayStart).not.toBe(mondayStart)
+  })
 })
 
-describe('computeAgendaSections — flat rows (F1)', () => {
-  it('flattens every section into header-then-occ rows, in section order', () => {
-    const { sections, rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
+describe('computeAgendaSections — flat rows', () => {
+  it('badges only a day\'s first occurrence row; later rows on the same day carry no badge', () => {
+    const { rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
+    // isToday (not just dateKey) excludes the overdue-task row, which also
+    // carries dateKey '2026-06-15' (see the todayKey comment on overdueRows)
+    // but belongs to a different day's own content.
+    const todayRows = rows.filter((r): r is Extract<AgendaRow, { kind: 'occ' }> => r.kind === 'occ' && r.dateKey === '2026-06-15' && r.isToday)
 
-    // Row-for-row, the flat list is just every section's own `rows` concatenated.
-    expect(rows).toEqual(sections.flatMap(s => s.rows))
+    expect(todayRows).toHaveLength(3)
+    expect(todayRows.map(r => !!r.badge)).toEqual([true, false, false])
+    expect(todayRows[0]!.badge).toEqual({ date: new Date(2026, 5, 15), isToday: true })
+  })
 
-    expect(rows.map(r => r.kind)).toEqual([
-      'header', 'occ',               // 2026-06-10 (past-event)
-      'header', 'occ',               // __overdue__ (overdue-task)
-      'header', 'occ', 'occ', 'occ',  // 2026-06-15 (today-event, today-task-a, today-task-b)
-      'header', 'occ',               // 2026-06-20 (future-event)
+  it('never badges overdue rows — they carry a date chip on the card instead (showDate)', () => {
+    const { rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
+    const overdueRow = rows.find(r => r.kind === 'occ' && r.occ.id === 'overdue-task')
+
+    expect(overdueRow?.kind === 'occ' && overdueRow.badge).toBeNull()
+    expect(overdueRow?.kind === 'occ' && overdueRow.showDate).toBe(true)
+  })
+
+  it('preserves the past → overdue → current/future order of content rows around the week/month dividers', () => {
+    const { rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
+    const content = rows.filter(r => r.kind !== 'month' && r.kind !== 'week')
+
+    expect(content.map(r => r.kind)).toEqual([
+      'occ',                // 2026-06-10 (past-event) — badged, no header row anymore
+      'header', 'occ',       // __overdue__ (overdue-task)
+      'occ', 'occ', 'occ',   // 2026-06-15 (today-event, today-task-a, today-task-b)
+      'occ',                 // 2026-06-20 (future-event)
     ])
-    // Every section's own rows: header first, occurrences after.
-    for (const s of sections) {
-      expect(s.rows[0]!.kind).toBe('header')
-      expect(s.rows.slice(1).every(r => r.kind === 'occ')).toBe(true)
-    }
   })
 
   it("carries todayKey on overdue rows, not each occurrence's own past day", () => {
     const { rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
 
-    const overdueHeader = rows.find(r => r.kind === 'header' && r.tone === 'overdue')
+    const overdueHeader = rows.find(r => r.kind === 'header')
     const overdueOccRow = rows.find(r => r.kind === 'occ' && r.occ.id === 'overdue-task')
     expect(overdueHeader?.dateKey).toBe('2026-06-15')
     expect(overdueOccRow?.dateKey).toBe('2026-06-15')
@@ -302,17 +323,62 @@ describe('computeAgendaSections — flat rows (F1)', () => {
     expect(multidayRows[0]!.key).not.toBe(multidayRows[1]!.key)
   })
 
-  it('points goToRowIndex at the overdue header when present, else at today\'s header', () => {
+  it("points goToRowIndex at the overdue header when present, else at today's own badged row", () => {
     const withOverdue = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
     const overdueTarget = withOverdue.rows[withOverdue.goToRowIndex]
     expect(overdueTarget?.kind).toBe('header')
-    expect(overdueTarget?.kind === 'header' && overdueTarget.tone).toBe('overdue')
 
     const onlyToday = [occ('today-event', '2026-06-15', { time: '11:00' })]
     const noOverdue = computeAgendaSections(null, onlyToday, TODAY, NOW, noFilter)
     const todayTarget = noOverdue.rows[noOverdue.goToRowIndex]
-    expect(todayTarget?.kind).toBe('header')
-    expect(todayTarget?.kind === 'header' && todayTarget.tone).toBe('today')
+    expect(todayTarget?.kind).toBe('occ')
+    expect(todayTarget?.kind === 'occ' && todayTarget.badge?.isToday).toBe(true)
+  })
+
+  it('emits a badged day-empty row (not a header) for a forced, contentless anchor day', () => {
+    const { rows } = computeAgendaSections(null, [], TODAY, NOW, noFilter)
+    const todayRow = rows.find(r => r.kind === 'day-empty')
+
+    expect(todayRow?.kind === 'day-empty' && todayRow.isToday).toBe(true)
+    expect(todayRow?.kind === 'day-empty' && todayRow.date).toEqual(new Date(2026, 5, 15))
+  })
+})
+
+describe('computeAgendaSections — month/week dividers', () => {
+  it('gives every week in the window a divider row, even ones with nothing scheduled', () => {
+    const { rows } = computeAgendaSections(null, [], TODAY, NOW, noFilter)
+    // [anchor-365, anchor+90] spans a little over 65 weeks.
+    expect(rows.filter(r => r.kind === 'week').length).toBeGreaterThan(60)
+  })
+
+  it('gives every month in the window a divider row', () => {
+    const { rows } = computeAgendaSections(null, [], TODAY, NOW, noFilter)
+    // ~15-16 calendar months across a 455-day window.
+    expect(rows.filter(r => r.kind === 'month').length).toBeGreaterThan(13)
+  })
+
+  it('omits the year from a month divider in the current year, includes it for others', () => {
+    const { rows } = computeAgendaSections(null, [], TODAY, NOW, noFilter)
+    const monthRows = rows.filter((r): r is Extract<AgendaRow, { kind: 'month' }> => r.kind === 'month')
+
+    expect(monthRows.find(r => r.label === 'June')).toBeDefined()
+    expect(monthRows.find(r => r.label === 'December 2025')).toBeDefined()
+  })
+
+  it('labels a week with its ISO week number and date range', () => {
+    const { rows } = computeAgendaSections(null, [], TODAY, NOW, noFilter)
+    const weekRows = rows.filter((r): r is Extract<AgendaRow, { kind: 'week' }> => r.kind === 'week')
+
+    // TODAY (2026-06-15) is a Monday, so its own week starts on it.
+    const todaysWeek = weekRows.find(r => r.dateKey === '2026-06-15')
+    expect(todaysWeek?.label).toMatch(/^Week \d+, Jun 15 – 21$/)
+  })
+
+  it('places the month/week dividers before the day content that falls inside them', () => {
+    const { rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
+    const todayOccIndex = rows.findIndex(r => r.kind === 'occ' && r.dateKey === '2026-06-15')
+    const precedingWeek = [...rows.slice(0, todayOccIndex)].reverse().find(r => r.kind === 'week')
+    expect(precedingWeek?.dateKey).toBe('2026-06-15')
   })
 })
 
@@ -320,7 +386,7 @@ describe('computeAgendaSections — anchor', () => {
   it('defaults to today, preserving the overdue-preferring scroll target', () => {
     const { goToRowIndex, rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
     const target = rows[goToRowIndex]
-    expect(target?.kind === 'header' && target.tone).toBe('overdue')
+    expect(target?.kind).toBe('header')
   })
 
   it('targets a day with content directly when anchored there, ignoring overdue', () => {
@@ -329,7 +395,7 @@ describe('computeAgendaSections — anchor', () => {
 
     expect(dayKeys(sections)).toEqual(['2026-06-10', '__overdue__', '2026-06-15', '2026-06-20'])
     const target = rows[goToRowIndex]
-    expect(target?.kind === 'header').toBe(true)
+    expect(target?.kind).toBe('occ')
     expect(target?.dateKey).toBe('2026-06-20')
   })
 
@@ -362,6 +428,14 @@ describe('computeAgendaSections — anchor', () => {
 
     expect(second).not.toBe(first)
     expect(second.rows[second.goToRowIndex]?.dateKey).toBe('2026-06-20')
+  })
+
+  it('still splices in the overdue rows when the anchor is far enough away that today falls outside the window', () => {
+    const all = baseOccs()
+    const farAnchor = new Date(2027, 5, 15) // 365 days ahead of TODAY — well outside [anchor-365, anchor+90]
+    const { rows } = computeAgendaSections(null, all, TODAY, NOW, noFilter, farAnchor)
+
+    expect(rows.some(r => r.kind === 'header')).toBe(true)
   })
 })
 
@@ -399,9 +473,17 @@ describe('estimateRow', () => {
     expect(estimateRow(row)).toBe(68)
   })
 
-  it('estimates headers at their own height', () => {
+  it('estimates the overdue header at its own height', () => {
     const { rows } = computeAgendaSections(null, baseOccs(), TODAY, NOW, noFilter)
 
     expect(estimateRow(rows.find(r => r.kind === 'header')!)).toBe(40)
+  })
+
+  it('estimates month/week dividers and empty-day rows at their own heights', () => {
+    const { rows } = computeAgendaSections(null, [], TODAY, NOW, noFilter)
+
+    expect(estimateRow(rows.find(r => r.kind === 'month')!)).toBe(60)
+    expect(estimateRow(rows.find(r => r.kind === 'week')!)).toBe(36)
+    expect(estimateRow(rows.find(r => r.kind === 'day-empty')!)).toBe(56)
   })
 })

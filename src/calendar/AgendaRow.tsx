@@ -5,6 +5,7 @@ import { OccurrenceCard } from '@/components'
 import { occState } from '@/occView'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
+import { DayBadge } from './DayBadge'
 
 interface Props {
   occ: Occurrence
@@ -20,6 +21,14 @@ interface Props {
   onToggleDone: (occ: Occurrence) => void
   onSwipeDelete: (occ: Occurrence) => (() => void)
   showDate?: boolean
+  /**
+   * Set on a day's first occurrence row only (see agendaSections.ts's
+   * dayRows) — the weekday/day-number badge that stands in for the old
+   * per-day text header. Later rows on the same day pass null but still
+   * reserve the gutter width, so their cards nest under the badge instead of
+   * flush against the edge.
+   */
+  badge?: { date: Date; isToday: boolean } | null
 }
 
 // Memoized on purpose: now that `now` is an explicit, compared prop rather
@@ -28,7 +37,7 @@ interface Props {
 // when this row's rendered output could differ. Unrelated sibling changes in
 // the same day leave `occ` reference-stable (see expansionCache.ts's overlay
 // logic), so this row correctly skips re-rendering for those.
-function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate }: Props) {
+function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, badge }: Props) {
   const roots     = useStore(s => s.roots)
   const backlinks = useStore(s => s.backlinks)
   const listedOn  = (backlinks.get(occ.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug)
@@ -154,42 +163,80 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate }: 
   }, []) // listeners are stable; callback accessed via ref
 
   return (
-    // Two nested boxes: the swipe reveal needs overflow-hidden (clips the
-    // delete panel to the row's rounded corners and the horizontal slide),
-    // but that same overflow-hidden clips any box-shadow on the card inside
-    // it since the card fills this box exactly. So the shadow lives on this
-    // outer, unclipped box instead, wrapping the actual clip boundary.
-    <div className={cn('relative rounded-lg mx-3.5 mb-1.5', !dimmed && 'shadow-(--shadow-card)')} data-occ-key={occ.id}>
-      <div
-        className="relative overflow-hidden rounded-lg"
-        ref={wrapRef}
-      >
-        {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
-        <div
-          ref={hintRef}
-          className="swipe-hint absolute inset-0 items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive"
-        >
-          <Trash2
-            ref={iconRef}
-            size={18}
-            strokeWidth={2.5}
-            className="shrink-0 stroke-primary-foreground fill-none [transform:scale(var(--icon-scale,1))] transition-transform duration-150"
-          />
-          <span className="text-xs font-bold text-primary-foreground whitespace-nowrap">Delete</span>
-        </div>
+    // items-start, and no min-height: this row must size to the card alone.
+    // Anything that makes the row taller than the card — a min-height, or the
+    // flex default of stretch letting a tall gutter grow the line — is
+    // immediately visible, since the card's box carries the elevation shadow
+    // and would paint that extra height as empty shadowed space below the
+    // card. The badge is kept out of it entirely (see the gutter below).
+    //
+    // mt-3 on a badged row only: the extra breathing room between one day's
+    // last card and the next day's badge that separates day groups the way
+    // Google Calendar's agenda does. Rows within the same day (no badge)
+    // keep the plain mb-1.5 card-to-card rhythm.
+    <div className={cn('flex items-start gap-2 px-3.5 mb-1.5', badge && 'mt-3')}>
+      {/* Gutter — an equal-width spacer on every row so cards line up in a
+          column instead of flush against the edge. The badge (a day's first
+          row only) is absolutely positioned inside it, top-0 so its own top
+          edge lines up exactly with the card's (both are items-start flex
+          siblings starting at this row's own top). It contributes no height
+          here at all: it can neither stretch the card's shadowed box nor
+          grow the row that the virtualizer measures to place everything
+          below it.
 
-        {/* Main row — transform driven by CSS (.swipe-row) */}
-        <div ref={rowRef} className="swipe-row relative z-10 bg-background touch-pan-y select-none">
-          <OccurrenceCard
-            occ={occ}
-            now={now}
-            leadingIcon="checkbox"
-            onOpen={() => onOpen(occ)}
-            onToggleDone={() => onToggleDone(occ)}
-            showDate={showDate}
-            listedOn={listedOn}
-            animate={false}
-          />
+          It may therefore overflow this row's bottom edge, which is fine at
+          every size the agenda actually renders. DayBadge is a weekday line
+          (10px font * inherited line-height 1.5 = 15px) + gap-0.5 (2px) + a
+          w-7 circle (28px) = 45px, so it sits in y ∈ [0, 45]. The shortest
+          possible row — a plain untimed card on its min-h-11 (44) floor —
+          advances the next row to y = 50 via mb-1.5, and that next row is
+          either a same-day sibling whose own gutter is empty, or the next
+          day's row whose badge starts at 50. Either way there is nothing at
+          y ∈ [45, 50] to collide with. */}
+      <div className="w-9 shrink-0 relative">
+        {badge && (
+          <div className="absolute inset-x-0 top-0 flex justify-center">
+            <DayBadge date={badge.date} isToday={badge.isToday} />
+          </div>
+        )}
+      </div>
+      {/* Two nested boxes: the swipe reveal needs overflow-hidden (clips the
+          delete panel to the row's rounded corners and the horizontal slide),
+          but that same overflow-hidden clips any box-shadow on the card inside
+          it since the card fills this box exactly. So the shadow lives on this
+          outer, unclipped box instead, wrapping the actual clip boundary. */}
+      <div className={cn('relative rounded-lg flex-1 min-w-0', !dimmed && 'shadow-(--shadow-card)')} data-occ-key={occ.id}>
+        <div
+          className="relative overflow-hidden rounded-lg"
+          ref={wrapRef}
+        >
+          {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
+          <div
+            ref={hintRef}
+            className="swipe-hint absolute inset-0 items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive"
+          >
+            <Trash2
+              ref={iconRef}
+              size={18}
+              strokeWidth={2.5}
+              className="shrink-0 stroke-primary-foreground fill-none [transform:scale(var(--icon-scale,1))] transition-transform duration-150"
+            />
+            <span className="text-xs font-bold text-primary-foreground whitespace-nowrap">Delete</span>
+          </div>
+
+          {/* Main row — transform driven by CSS (.swipe-row) */}
+          <div ref={rowRef} className="swipe-row relative z-10 bg-background touch-pan-y select-none">
+            <OccurrenceCard
+              occ={occ}
+              now={now}
+              leadingIcon="checkbox"
+              onOpen={() => onOpen(occ)}
+              onToggleDone={() => onToggleDone(occ)}
+              showDate={showDate}
+              listedOn={listedOn}
+              animate={false}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -16,7 +16,7 @@ import { useFilteredOccs } from './useCalendarFilter'
 import { useNow } from './useNow'
 import { computeColumns } from './computeColumns'
 import { EventBlock } from './EventBlock'
-import { BADGE_CLASS } from './MonthGrid'
+import { DayBadge } from './DayBadge'
 import {
   HOURS, HP, GUTTER, RIGHT_PAD, TOP_PAD, BOTTOM_PAD, DEFAULT_CREATE_DURATION,
   formatHourBoundary, snapCreateTime,
@@ -186,14 +186,7 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
           the strip's height never drops under a fixed two-row minimum. */}
       <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
         <div style={{ width: GUTTER }} className="shrink-0 flex flex-col items-center justify-between pb-1.5">
-          <div className="flex flex-col items-center gap-0.5 pt-1">
-            <span className="text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground">
-              {dvDate.toLocaleDateString(undefined, { weekday: 'short' })}
-            </span>
-            <span className={cn(BADGE_CLASS, 'text-base w-7 h-7', isToday && 'bg-primary text-primary-foreground font-bold')}>
-              {dvDate.getDate()}
-            </span>
-          </div>
+          <DayBadge date={dvDate} isToday={isToday} className="pt-1" />
           <AllDayOverflowToggle
             hiddenCount={hiddenCount}
             expanded={allDayExpanded}

@@ -5,6 +5,8 @@ import type { Occurrence, EditScope } from '@/types'
 import { parseDateString } from '@/model'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import AgendaHeaderRow from './AgendaHeaderRow'
+import AgendaDividerRow from './AgendaDividerRow'
+import AgendaEmptyDayRow from './AgendaEmptyDayRow'
 import AgendaRow from './AgendaRow'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
 import { useAgendaSections, estimateRow } from './useAgendaSections'
@@ -180,12 +182,14 @@ export default function AgendaView({ onOpen }: Props) {
                   {row.kind === 'header' ? (
                     <AgendaHeaderRow
                       label={row.label}
-                      tone={row.tone}
-                      collapsible={row.collapsible}
                       collapsed={row.collapsed}
                       count={row.count}
                       onToggle={toggleOverdueCollapsed}
                     />
+                  ) : row.kind === 'month' || row.kind === 'week' ? (
+                    <AgendaDividerRow variant={row.kind} label={row.label} />
+                  ) : row.kind === 'day-empty' ? (
+                    <AgendaEmptyDayRow date={row.date} isToday={row.isToday} />
                   ) : (
                     <AgendaRow
                       occ={row.occ}
@@ -195,6 +199,7 @@ export default function AgendaView({ onOpen }: Props) {
                       // once a minute for nothing.
                       now={row.isToday ? now : undefined}
                       showDate={row.showDate}
+                      badge={row.badge}
                       onOpen={onOpen}
                       onToggleDone={handleToggleDone}
                       onSwipeDelete={handleSwipeDelete}

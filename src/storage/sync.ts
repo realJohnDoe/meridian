@@ -14,7 +14,7 @@ import { runInIdleBatches } from '@/lib/idle'
 import type { StoreItem, Roots } from '@/types'
 import {
   getItems, getRoots, setData,
-  setStoreState, getSyncError,
+  setStoreState,
   getUnreadableFiles, setUnreadableFiles,
 } from '@/storeBridge'
 import { notify, warn, notifyError } from './notifications'
@@ -25,13 +25,10 @@ import { getActiveBackend } from './activeBackend'
 export function updateSyncUI(): void {
   const backend = getActiveBackend()
   if (!backend?.id || backend.readOnly) {
-    setStoreState({ syncDirtyCount: 0, syncError: 'Read-only vault' })
+    setStoreState({ syncDirtyCount: 0, syncReadOnly: true })
     return
   }
-  // Clear the read-only sentinel left over from a previous (read-only)
-  // vault — but leave a real sync error (auth failure, etc.) in place so
-  // it isn't wiped by an unrelated local edit.
-  if (getSyncError() === 'Read-only vault') setStoreState({ syncError: null })
+  setStoreState({ syncReadOnly: false })
   cacheDirtyCount(backend.id).then(n => setStoreState({ syncDirtyCount: n })).catch(() => {})
 }
 
