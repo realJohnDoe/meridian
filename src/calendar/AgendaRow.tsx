@@ -163,7 +163,13 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
   }, []) // listeners are stable; callback accessed via ref
 
   return (
-    <div className="flex gap-2 px-3.5 mb-1.5">
+    // items-start (not the flex default of stretch): the badge and the card
+    // box must size to their own content independently. Under stretch, the
+    // card's shadowed box was forced to match the badge column's height
+    // whenever the badge was taller than the card (a single small card with
+    // no meta row) — visible empty space in the card's back. items-start
+    // still top-aligns the badge with the card, just without the stretch.
+    <div className="flex items-start gap-2 px-3.5 mb-1.5">
       {/* Gutter — the day's badge on its first row, an equal-width empty
           spacer on the rest, so every card in a multi-item day still lines
           up under the badge instead of flush against the edge. */}
