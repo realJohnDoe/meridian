@@ -4,7 +4,7 @@
 
 **Who it's for:** you keep your life in Markdown — Obsidian, TaskNotes, or just a folder of `.md` files — and you're tired of tasks and dates being something a plugin bolts onto a desktop-first app. In Meridian they're first-class, and they're fast on a phone.
 
-**And whoever you share with doesn't have to be you.** Point Meridian at a repo and the people you share it with just open a web app — no vault to configure, no plugins, no accounts to create. Tag people on entries, filter the calendar down to one person.
+**And whoever you share with doesn't have to be you.** Point Meridian at a repo and everyone you share it with reads and writes the same repo — no vault to configure, no plugins. Tag people on entries, filter the calendar down to one person.
 
 **[Open the app →](https://realjohndoe.github.io/meridian/)** — try the example vault first, nothing to sign up for.
 
