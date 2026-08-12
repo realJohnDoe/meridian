@@ -163,18 +163,36 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
   }, []) // listeners are stable; callback accessed via ref
 
   return (
-    // items-start (not the flex default of stretch): the badge and the card
-    // box must size to their own content independently. Under stretch, the
-    // card's shadowed box was forced to match the badge column's height
-    // whenever the badge was taller than the card (a single small card with
-    // no meta row) — visible empty space in the card's back. items-start
-    // still top-aligns the badge with the card, just without the stretch.
-    <div className="flex items-start gap-2 px-3.5 mb-1.5">
-      {/* Gutter — the day's badge on its first row, an equal-width empty
-          spacer on the rest, so every card in a multi-item day still lines
-          up under the badge instead of flush against the edge. */}
-      <div className="w-9 shrink-0 flex justify-center pt-1.5">
-        {badge && <DayBadge date={badge.date} isToday={badge.isToday} />}
+    <div className={cn(
+      'flex gap-2 px-3.5 mb-1.5',
+      // A badged row's own box must be at least as tall as the badge, or the
+      // badge — which no longer participates in flex sizing (see the gutter
+      // comment below) — visually spills past this row's bottom edge into
+      // whatever renders next (the day's second item, or the next day, if
+      // this was the day's only item). DayBadge is a weekday line (10px
+      // font * inherited line-height 1.5 ≈ 15px) + gap-0.5 (2px) + a w-7
+      // circle (28px) = 45px, plus this row's own top-1.5 badge offset
+      // (6px) = 51px — a hair over the shortest possible card row (min-h-11
+      // + mb-1.5 = 50px), so the plain, untimed, single-line case needs
+      // this floor too, not just cards with a meta row.
+      badge && 'min-h-[51px]',
+    )}>
+      {/* Gutter — an equal-width spacer on every row so cards line up in a
+          column instead of flush against the edge. The badge itself (first
+          row of a day only) is absolutely positioned inside it rather than
+          being flex-sized alongside the card: a badge taller than a small
+          card must not grow *this row's own box* to match, or the next
+          row gets pushed down by the difference — an empty gap below a
+          short card that's visually indistinguishable from the stretch bug
+          this replaced. Absolute positioning lets the badge overflow this
+          row's box freely (nothing here clips it) without the virtualizer's
+          measured height — and therefore every row below it — ever seeing it. */}
+      <div className="w-9 shrink-0 relative">
+        {badge && (
+          <div className="absolute inset-x-0 top-1.5 flex justify-center">
+            <DayBadge date={badge.date} isToday={badge.isToday} />
+          </div>
+        )}
       </div>
       {/* Two nested boxes: the swipe reveal needs overflow-hidden (clips the
           delete panel to the row's rounded corners and the horizontal slide),
