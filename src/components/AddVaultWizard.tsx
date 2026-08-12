@@ -23,7 +23,7 @@ const SOURCE_CARDS: { id: Source; Icon: typeof HardDrive; title: string; desc: s
     id:    'local',
     Icon:  HardDrive,
     title: 'Local folder',
-    desc:  'Use a folder on this device. Works in Chrome and Edge, desktop or Android; not supported on iOS or Safari.',
+    desc:  'Use a folder on this device. Works in Chrome or Edge, desktop or Android; not available in Safari or Firefox.',
   },
 ]
 

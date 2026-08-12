@@ -48,7 +48,7 @@ Meridian doesn't run a server that holds your notes. You choose where your files
 | Backend | How it works |
 |---|---|
 | **GitHub repository** ⭐ | Reads and writes directly to a repo of your choice via the GitHub API. Instant cloud sync, full git history, and works on any device including iOS. This is the recommended backend for most users. |
-| **Local folder** | Opens a folder on your device via the browser's File System API. Files stay on your device. Supported in Chrome and Edge, desktop or Android — not available on iOS or Firefox. |
+| **Local folder** | Opens a folder on your device via the browser's File System API. Files stay on your device. Supported in Chrome or Edge, desktop or Android — not available in Safari or Firefox. |
 | **Example vault** | A built-in demo you can explore before connecting anything — no account needed. |
 
 Files are plain `.md` files. Open them in any text editor, check them into git, sync them with any tool you already use.
@@ -61,7 +61,7 @@ Files are plain `.md` files. Open them in any text editor, check them into git, 
 2. Try the **Example vault** to get a feel for the interface — click through the onboarding tour.
 3. When you're ready, connect your own storage:
    - **GitHub** (recommended) — click "Connect GitHub repo", **Sign in with GitHub**, and pick the repository to use — no token to create by hand. (You can also connect manually with a [fine-grained personal access token](https://github.com/settings/tokens?type=beta) scoped to that one repo with **Contents: Read and write**.) Meridian reads and writes files directly, so you can reach your vault from any device.
-   - **Local folder** — click "Connect local folder" and pick a directory. Chrome and Edge, desktop or Android; not supported on iOS or Firefox.
+   - **Local folder** — click "Connect local folder" and pick a directory. Chrome or Edge, desktop or Android; not available in Safari or Firefox.
 4. Create your first entry with the **+** button and start building your calendar.
 
 ---
