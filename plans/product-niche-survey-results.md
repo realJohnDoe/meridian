@@ -46,7 +46,7 @@ Plan: [product-niche-survey.md](product-niche-survey.md).
 | Claim | Verdict |
 |---|---|
 | Obsidian — "Works in the browser ❌" | **Confirmed.** No official browser version exists; only third-party Docker/Electron-in-browser projects. |
-| Todoist — "Multiple participants / assignees ✅ (paid)" | **Wrong on both halves.** Todoist supports exactly one assignee per task by design, and assignment works on the free plan (5 collaborators per project). See finding #4. |
+| Todoist — "Multiple participants / assignees ✅ (paid)" | **Wrong on both halves.** Todoist supports exactly one assignee per task by design, and assignment works on the free plan (5 collaborators per project). See finding #5. |
 | Obsidian — "Free & open source: Partially (plugin only)" | **Confirmed** as fair: Obsidian is free for personal use but proprietary; TaskNotes is open source. |
 | Obsidian/GCal/Todoist — "Multiple series + one-off overrides in one entry ❌ (single rule per …)" | **Not re-verified** — already corrected in `cb2549f`. Note the row's parentheticals are the accurate part; the bare ❌ may read as "cannot move one occurrence," which Google Calendar can do. Low priority. |
 | Google Keep, GitHub Issues rows | **Not verified.** Out of the time box. |
@@ -68,8 +68,8 @@ Two premises in the survey plan are now stale, which is itself evidence the posi
 |---|---|---|
 | 1 | Niche fit | **findings: #3** — and largely healthy otherwise; see the "working as intended" note below. |
 | 2 | Niche recognition | **clean.** The niche is unambiguous by README line 5 and the app link is at line 9, before any philosophy. This is the strongest surface in the repository. |
-| 3 | Visual identity & aesthetic fit | **partially assessed** — no preview tooling in this session, so the blind visual read and all screenshots were skipped; assessed from tokens/deps only. The one finding it produced has been fixed and removed. |
-| 4 | Differentiation & alternatives | **findings: #4** |
+| 3 | Visual identity & aesthetic fit | **partially assessed** — no preview tooling in this session, so the blind visual read and all screenshots were skipped; assessed from tokens/deps only. **findings: #4** (fixed, this PR — see gap row above) |
+| 4 | Differentiation & alternatives | **findings: #5** |
 | 5 | Audience selection | **findings: #3** |
 | 6 | Adoption gates | **findings: #1, #2, #3** |
 | 7 | Niche drift & emerging signals | **findings: #3**, plus one below-the-cut item (tags, see the note after the findings). |
@@ -83,20 +83,21 @@ Two premises in the survey plan are now stale, which is itself evidence the posi
 
 ---
 
-## 4. Findings — top 4
+## 4. Findings — top 5
 
 Ranked by `(impact × breadth) ÷ effort`. **Note the ranking inverts the impact ordering**: the highest-impact finding (#3, impact 9) ranks third because its fix is a strategy decision, while the lowest-impact one (#1, impact 5) ranks first because its fix is mechanical and touches five surfaces. Fields are reported separately so you can re-sort.
-
-A fifth finding — the forced dark default, which left a light-mode visitor no way to see Meridian's own identity — has been **fixed and removed**: `enableSystem` now respects `prefers-color-scheme`, and it resolves to a new first-party `.meridian-light` rather than to a borrowed editor palette. The theme set itself was deliberately left intact.
 
 | # | Finding | Gap | Question | Recommended model |
 |---|---|---|---|---|
 | 1 | Local-folder support stated five ways, two of them wrong | declared-vs-served | communication | **Haiku 4.5** |
 | 2 | The trial can't demonstrate the thing being sold | revealed-vs-served | fit + communication | **Sonnet 5** |
 | 3 | "No accounts to create" is false for the person you share with | declared-vs-served | fit + communication | **Opus 5 in plan mode, multi-PR** |
-| 4 | Todoist row gives away a real differentiator and invents a paywall | declared-vs-revealed | communication | **Sonnet 5** |
+| 4 | ~~Forced dark default recruits against the line-7 persona~~ — **fixed, this PR** | declared-vs-revealed | communication | — |
+| 5 | Todoist row gives away a real differentiator and invents a paywall | declared-vs-revealed | communication | **Sonnet 5** |
 
-**Sequencing note.** #3 is a positioning decision; #1, #2 and #4 are copy/behaviour edits. #3 must land first *only where it overlaps* — the sharing sentence at README:7. #1, #2 and #4 touch disjoint surfaces (the storage table, the tutorial, the comparison table) and can proceed immediately without waiting on it.
+**Fixed and removed from this record:** #4, the forced dark default that left a light-mode visitor no way to see Meridian's own identity — `enableSystem` now respects `prefers-color-scheme` and resolves to a new first-party `.meridian-light` rather than a borrowed editor palette. The theme set itself was deliberately left intact; see the "working as intended" note above.
+
+**Sequencing note.** #3 is a positioning decision; #1, #2 and #5 are copy/behaviour edits. #3 must land first *only where it overlaps* — the sharing sentence at README:7. #1, #2 and #5 touch disjoint surfaces (the storage table, the tutorial, the comparison table) and can proceed immediately without waiting on it.
 
 ---
 
@@ -175,7 +176,7 @@ A fifth finding — the forced dark default, which left a light-mode visitor no 
 
 ---
 
-### Finding #4 — The Todoist row gives away a real differentiator and invents a paywall
+### Finding #5 — The Todoist row gives away a real differentiator and invents a paywall
 
 - **Gap:** `declared-vs-revealed`
 - **Question:** communication
