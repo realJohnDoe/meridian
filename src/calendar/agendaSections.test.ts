@@ -482,8 +482,8 @@ describe('estimateRow', () => {
   it('estimates month/week dividers and empty-day rows at their own heights', () => {
     const { rows } = computeAgendaSections(null, [], TODAY, NOW, noFilter)
 
-    expect(estimateRow(rows.find(r => r.kind === 'month')!)).toBe(56)
-    expect(estimateRow(rows.find(r => r.kind === 'week')!)).toBe(32)
+    expect(estimateRow(rows.find(r => r.kind === 'month')!)).toBe(60)
+    expect(estimateRow(rows.find(r => r.kind === 'week')!)).toBe(36)
     expect(estimateRow(rows.find(r => r.kind === 'day-empty')!)).toBe(44)
   })
 })

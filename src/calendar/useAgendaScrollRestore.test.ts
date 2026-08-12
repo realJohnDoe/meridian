@@ -65,10 +65,10 @@ describe('useAgendaScrollRestore', () => {
 
     const { result } = renderHook(() => useAgendaScrollRestore(true, rows, goToRowIndex))
 
-    // The week divider (32) plus one timed occurrence row (68) above the
+    // The week divider (36) plus one timed occurrence row (68) above the
     // overdue header. Starting anywhere else means the first painted frame
     // shows the wrong day and has to be corrected by a visible scroll.
-    expect(result.current.initialOffset).toBe(100)
+    expect(result.current.initialOffset).toBe(104)
   })
 
   it('prefers real measured sizes from the snapshot, matched by row key', () => {
@@ -110,7 +110,7 @@ describe('useAgendaScrollRestore', () => {
     expect(pending).toBe(true)
 
     const { result } = renderHook(() => useAgendaScrollRestore(pending, rows, goToRowIndex))
-    expect(result.current.initialOffset).toBe(100)
+    expect(result.current.initialOffset).toBe(104)
     expect(result.current.initialOffset).not.toBe(calendarView.getState().agendaScrollOffset)
   })
 
