@@ -89,34 +89,10 @@ Ranked by `(impact × breadth) ÷ effort`. Fields are reported separately so you
 
 | # | Finding | Gap | Question | Recommended model |
 |---|---|---|---|---|
-| 3 | "No accounts to create" is false for the person you share with | declared-vs-served | fit + communication | **Opus 5 in plan mode, multi-PR** |
 | 4 | Forced dark default recruits against the line-7 persona | declared-vs-revealed | communication | **Opus 5** |
 | 5 | Todoist row gives away a real differentiator and invents a paywall | declared-vs-revealed | communication | **Sonnet 5** |
 
-**Sequencing note.** #3 is a positioning decision and #5 is a copy/behaviour edit. #3 must land first *only where it overlaps* — the sharing sentence at README:7. #5 touches a disjoint surface (the comparison table) and can proceed immediately without waiting on it. #4's copy half also waits on #3, since who the visual identity should address depends on whether the line-7 persona survives.
-
----
-
-### Finding #3 — "No accounts to create" is false for the person you share with
-
-- **Gap:** `declared-vs-served`
-- **Question:** fit + communication
-- **Category:** `niche-definition` `audience-selection` `adoption-gate` `proof`
-- **Who it costs us:** the sharee — the partner, child, or colleague named in the founding story. They are not an arrival at all today; they are someone the *primary* user is promised they can bring along, and cannot. It costs the primary user their reason to switch, at the moment they try to onboard the second person.
-- **Impact:** 9
-- **Breadth:** 2 surfaces (`README.md:7`; the blog's founding narrative). Deliberately promoted — line 7 is above the fold, third paragraph.
-- **Evidence — the promise:** `README.md:7`
-
-  > `**And whoever you share with doesn't have to be you.** Point Meridian at a repo and the people you share it with just open a web app — no vault to configure, no plugins, no accounts to create. Tag people on entries, filter the calendar down to one person.`
-
-  and the founding motivation it descends from, `blog/1-…/meridian-why-i-built-a-markdown-first-calendar.md:19-24`:
-
-  > `The first: I want to keep track of our child's calendar, but she doesn't need a Proton account. Every system I tried wanted her to _be a user_ before she could _have a calendar_.`
-
-- **Evidence — the product:** there is no accountless path. `AddVaultWizard.tsx:20` offers exactly two routes — `'Sign in with GitHub, or connect manually with an access token. Works on any device and browser.'` — and `GitHubBackend`'s constructor unconditionally builds `makeOctokit(cfg.token)` from a `GitHubConfig` whose `token` is non-optional. A `grep` for `anonymous`, `public repo`, `unauthenticated`, `share link`, and `invite` across `src/` returns **nothing**. The sharee must therefore have a GitHub account, be added as a collaborator on a private repo, and complete OAuth or paste a fine-grained PAT. Meridian currently wants her to *be a user* before she can *have a calendar* — the exact condition the project was founded to escape.
-- **Recommended model:** **Opus 5 in plan mode, for a plan spanning multiple PRs.** This is not a copy fix; it is the question of whether the shared-calendar persona is a target at all, and the answer changes what the product is. The hazard that sets the tier is the confident rewrite: an agent told to "fix line 7" will most likely soften it into something that selects nobody ("easy sharing for your team"), which costs the differentiator without gaining accuracy — or will sharpen it into a claim about collaborator setup that reads as *more* developer-only than the current text. It cannot be lowered by naming the copy, because the copy depends on the build decision. **If you decide the direction first**, the resulting copy edit alone is Sonnet 5.
-- **Problem:** the primary user adopts Meridian for the shared-calendar promise, then discovers the person they wanted to share with must create a GitHub account and be added to a repository.
-- **Fix:** decide the sharing story, then state it. Options — (a) build an unauthenticated read path against a public repo, so a sharee genuinely just opens a link (delivers the promise; requires the vault be public); (b) keep the current model and rewrite line 7 to "everyone you share with reads and writes the same repo — no vault to configure, no plugins" (honest, weaker, free); (c) treat accountless sharing as a roadmap commitment and mark it as such on the surface rather than claiming it in the present tense.
+**Sequencing note.** #5 touches a disjoint surface (the comparison table) and can proceed immediately.
 
 ---
 
