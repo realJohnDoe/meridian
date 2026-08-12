@@ -163,30 +163,29 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
   }, []) // listeners are stable; callback accessed via ref
 
   return (
-    <div className={cn(
-      'flex gap-2 px-3.5 mb-1.5',
-      // A badged row's own box must be at least as tall as the badge, or the
-      // badge — which no longer participates in flex sizing (see the gutter
-      // comment below) — visually spills past this row's bottom edge into
-      // whatever renders next (the day's second item, or the next day, if
-      // this was the day's only item). DayBadge is a weekday line (10px
-      // font * inherited line-height 1.5 ≈ 15px) + gap-0.5 (2px) + a w-7
-      // circle (28px) = 45px, plus this row's own top-1.5 badge offset
-      // (6px) = 51px — a hair over the shortest possible card row (min-h-11
-      // + mb-1.5 = 50px), so the plain, untimed, single-line case needs
-      // this floor too, not just cards with a meta row.
-      badge && 'min-h-[51px]',
-    )}>
+    // items-start, and no min-height: this row must size to the card alone.
+    // Anything that makes the row taller than the card — a min-height, or the
+    // flex default of stretch letting a tall gutter grow the line — is
+    // immediately visible, since the card's box carries the elevation shadow
+    // and would paint that extra height as empty shadowed space below the
+    // card. The badge is kept out of it entirely (see the gutter below).
+    <div className="flex items-start gap-2 px-3.5 mb-1.5">
       {/* Gutter — an equal-width spacer on every row so cards line up in a
-          column instead of flush against the edge. The badge itself (first
-          row of a day only) is absolutely positioned inside it rather than
-          being flex-sized alongside the card: a badge taller than a small
-          card must not grow *this row's own box* to match, or the next
-          row gets pushed down by the difference — an empty gap below a
-          short card that's visually indistinguishable from the stretch bug
-          this replaced. Absolute positioning lets the badge overflow this
-          row's box freely (nothing here clips it) without the virtualizer's
-          measured height — and therefore every row below it — ever seeing it. */}
+          column instead of flush against the edge. The badge (a day's first
+          row only) is absolutely positioned inside it, so it contributes no
+          height here at all: it can neither stretch the card's shadowed box
+          nor grow the row that the virtualizer measures to place everything
+          below it.
+
+          It may therefore overflow this row's bottom edge, which is fine at
+          every size the agenda actually renders. DayBadge is a weekday line
+          (10px font * inherited line-height 1.5 = 15px) + gap-0.5 (2px) + a
+          w-7 circle (28px) = 45px, so with the top-1.5 offset below it sits
+          in y ∈ [6, 51]. The shortest possible row — a plain untimed card on
+          its min-h-11 (44) floor — advances the next row to y = 50 via
+          mb-1.5, and that next row is either a same-day sibling whose own
+          gutter is empty, or the next day's row whose badge starts at 56.
+          Either way there is nothing at y ∈ [50, 51] to collide with. */}
       <div className="w-9 shrink-0 relative">
         {badge && (
           <div className="absolute inset-x-0 top-1.5 flex justify-center">
