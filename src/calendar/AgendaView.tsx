@@ -199,7 +199,7 @@ export default function AgendaView({ onOpen }: Props) {
                       // once a minute for nothing.
                       now={row.isToday ? now : undefined}
                       showDate={row.showDate}
-                      badge={row.badge}
+                      badge={row.badge ? { kind: 'day', ...row.badge } : { kind: 'spacer' }}
                       onOpen={onOpen}
                       onToggleDone={handleToggleDone}
                       onSwipeDelete={handleSwipeDelete}

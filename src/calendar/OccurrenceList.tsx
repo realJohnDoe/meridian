@@ -144,6 +144,7 @@ export default function OccurrenceList({ occs, onOpen, onToggleDone, onSwipeDele
                   ) : (
                     <AgendaRow
                       occ={row.occ}
+                      badge={{ kind: 'none' }}
                       onOpen={onOpen}
                       onToggleDone={onToggleDone}
                       onSwipeDelete={onSwipeDelete}
