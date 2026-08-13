@@ -341,7 +341,7 @@
   --note:         oklch(0.53 0.13 215);   /* sky blue */
   --brand-cyan:   oklch(0.53 0.12 208);   /* sky blue — gradient accent */
   --priority-1:   oklch(0.53 0.20 22);    /* red */
-  --priority-2:   oklch(0.57 0.16 48);    /* orange */
+  --priority-2:   oklch(0.56 0.14 55);    /* orange */
   --priority-3:   oklch(0.80 0.16 82);    /* yellow */
 
   /* On-accent text — light ink on every swatch except priority-3, which is
