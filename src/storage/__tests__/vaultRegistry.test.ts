@@ -203,7 +203,7 @@ vi.mock('@/storage/sync', () => syncFns)
 
 // Imports of the module under test (and its non-mocked collaborators — the
 // trivial in-memory activeBackend singleton) must come after the vi.mock calls.
-import { restoreVaults, setActiveVault, removeVault, addGitHubVault, onVaultChanged } from '@/storage/vaultRegistry'
+import { restoreVaults, setActiveVault, removeVault, onVaultChanged } from '@/storage/vaultRegistry'
 import { getActiveBackend, setActiveBackend } from '@/storage/activeBackend'
 import { ensureFreshAccessToken } from '@/storage/githubOAuth'
 
@@ -685,22 +685,6 @@ describe('setActiveVault', () => {
     expect(notifyFns.notifyError.mock.calls[0]![0]).toBe('Could not switch vault')
     spy.mockRestore()
     permSpy.mockRestore()
-  })
-})
-
-// ── addGitHubVault ────────────────────────────────────────────────────────
-
-describe('addGitHubVault', () => {
-  it('reports offline rather than a bad token when the network is unreachable', async () => {
-    backendConfig.githubPermission = 'unreachable'
-
-    await addGitHubVault({ owner: 'me', repo: 'repo', branch: 'main', token: 'ghp_test' })
-
-    expect(notifyFns.notify).toHaveBeenCalledTimes(1)
-    const msg = notifyFns.notify.mock.calls[0]![0] as string
-    expect(msg).not.toMatch(/token/i)
-    expect(msg).toMatch(/offline/i)
-    expect(storeState.activeVaultId).toBeNull()
   })
 })
 

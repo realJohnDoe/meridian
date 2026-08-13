@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { HardDrive, GitBranch } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
-import { addLocalVault, addGitHubVault, startGitHubSignIn, isFolderPickerSupported } from '@/vaultActions'
+import { addLocalVault, startGitHubSignIn, isFolderPickerSupported } from '@/vaultActions'
 import {
   ResponsiveModalTitle,
 } from '@/components/primitives/responsive-modal'
-import { useStore } from '@/store'
 
 type WizardStep = 'source' | 'github'
 type Source = 'local' | 'github'
@@ -17,7 +15,7 @@ const SOURCE_CARDS: { id: Source; Icon: typeof HardDrive; title: string; desc: s
     id:    'github',
     Icon:  GitBranch,
     title: 'GitHub repository',
-    desc:  'Sign in with GitHub, or connect manually with an access token. Works on any device and browser.',
+    desc:  'Sign in with GitHub. Works on any device and browser.',
   },
   {
     id:    'local',
@@ -38,16 +36,9 @@ const availableSourceCards = localFolderSupported
   : SOURCE_CARDS.filter(c => c.id !== 'local')
 
 export function AddVaultWizard({ onClose, onBack }: Props) {
-  const [step,        setStep]        = useState<WizardStep>('source')
-  const [source,      setSource]      = useState<Source>('github')
-  const [showManual,  setShowManual]  = useState(false)
-  const [repoStr,     setRepoStr]     = useState('')
-  const [branch,      setBranch]      = useState('main')
-  const [token,       setToken]       = useState('')
-  const [busy,        setBusy]        = useState(false)
-  const [signingIn,   setSigningIn]   = useState(false)
-  const [error,       setError]       = useState<string | null>(null)
-  const loadProgress = useStore(s => s.vaultLoadProgress)
+  const [step,      setStep]      = useState<WizardStep>('source')
+  const [source,    setSource]    = useState<Source>('github')
+  const [signingIn, setSigningIn] = useState(false)
 
   async function handleSignIn() {
     setSigningIn(true)
@@ -60,32 +51,6 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
       await addLocalVault()
     } else {
       setStep('github')
-    }
-  }
-
-  async function handleConnect() {
-    setError(null)
-    const parts = repoStr.trim().split('/')
-    if (parts.length !== 2 || !parts[0] || !parts[1]) {
-      setError('Enter the repo as owner/repo (e.g. alice/notes).')
-      return
-    }
-    if (!token.trim()) {
-      setError('A GitHub token is required.')
-      return
-    }
-    setBusy(true)
-    try {
-      await addGitHubVault({
-        owner:  parts[0],
-        repo:   parts[1],
-        branch: branch.trim() || 'main',
-        token:  token.trim(),
-      })
-      onClose()
-    } catch (e) {
-      setError((e as Error).message || 'Could not connect.')
-      setBusy(false)
     }
   }
 
@@ -134,86 +99,12 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
           {signingIn ? 'Redirecting to GitHub…' : 'Sign in with GitHub'}
         </Button>
         <p className="text-xs text-muted-foreground">
-          Choose which repository to connect after signing in — no need to create a token by hand.
+          Choose which repository to connect after signing in.
         </p>
-
-        {!showManual && (
-          <button
-            onClick={() => setShowManual(true)}
-            className="self-start text-xs text-muted-foreground underline"
-          >
-            Or connect manually with a personal access token
-          </button>
-        )}
-
-        {showManual && (
-          <>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Create a{' '}
-              <a
-                href="https://github.com/settings/tokens?type=beta"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                fine-grained personal access token
-              </a>{' '}
-              on GitHub with these settings:
-            </p>
-            <ul className="ml-4 list-disc space-y-1 text-xs text-muted-foreground">
-              <li><strong>Repository access:</strong> Only select repositories — pick this vault&apos;s repo</li>
-              <li><strong>Permissions → Contents:</strong> Read and write</li>
-              <li>Leave all other permissions as <em>No access</em></li>
-            </ul>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium">Repository</span>
-              <Input
-                placeholder="owner/repo"
-                value={repoStr}
-                onChange={e => setRepoStr(e.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium">Branch</span>
-              <Input
-                placeholder="main"
-                value={branch}
-                onChange={e => setBranch(e.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium">Fine-grained access token</span>
-              <Input
-                type="password"
-                placeholder="github_pat_…"
-                value={token}
-                onChange={e => setToken(e.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </label>
-          </>
-        )}
-
-        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
 
       <div className="flex justify-between px-4 pb-4">
-        <Button variant="ghost" onClick={() => setStep('source')} disabled={busy || signingIn}>Back</Button>
-        {showManual && (
-          <Button onClick={handleConnect} disabled={busy}>
-            {busy
-              ? (loadProgress ? `Connecting… (${loadProgress.loaded}/${loadProgress.total})` : 'Connecting…')
-              : 'Connect'}
-          </Button>
-        )}
+        <Button variant="ghost" onClick={() => setStep('source')} disabled={signingIn}>Back</Button>
       </div>
     </>
   )

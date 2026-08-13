@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Trash2, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +14,7 @@ import {
 import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
-import { tokenSave, syncToBackend, removeVault, cacheDirtyCount } from '@/vaultActions'
+import { syncToBackend, removeVault, cacheDirtyCount } from '@/vaultActions'
 import { ParticipantsRow } from '@/editor'
 import type { VaultRef } from '@/vaultActions'
 
@@ -25,10 +24,7 @@ interface Props {
 }
 
 export function VaultSettings({ vault, isActive }: Props) {
-  const [token,    setToken]    = useState('')
-  const [busy,     setBusy]     = useState(false)
   const [syncing,  setSyncing]  = useState(false)
-  const [error,    setError]    = useState<string | null>(null)
   const [participants, setParticipants] = useState<string[]>(
     () => readVaultStringArray('meridian_default_participants', vault.id),
   )
@@ -61,23 +57,6 @@ export function VaultSettings({ vault, isActive }: Props) {
     setConfirmOpen(true)
   }
 
-  async function handleSaveToken() {
-    if (!token.trim()) return
-    setBusy(true)
-    setSyncing(true)
-    setError(null)
-    try {
-      await tokenSave(vault.id, token.trim())
-      setToken('')
-      await syncToBackend()
-    } catch (e) {
-      setError((e as Error).message || 'Could not save token.')
-    } finally {
-      setBusy(false)
-      setSyncing(false)
-    }
-  }
-
   return (
     <>
       {vault.kind === 'local' && (
@@ -95,37 +74,16 @@ export function VaultSettings({ vault, isActive }: Props) {
       )}
 
       {vault.kind === 'github' && (
-        <div className="flex flex-col gap-3 pt-2 border-t border-border">
-          <div className="flex flex-col gap-0.5">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+          <div className="flex flex-col gap-0.5 min-w-0">
             <span className="text-sm font-medium">Repository</span>
             <span className="text-xs text-muted-foreground font-mono truncate">
               {vault.github.owner}/{vault.github.repo} ({vault.github.branch})
             </span>
           </div>
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium">Update token</span>
-            <Input
-              type="password"
-              placeholder="github_pat_… (leave blank to keep current)"
-              value={token}
-              onChange={e => { setToken(e.target.value); setError(null) }}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </label>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={token.trim() ? handleSaveToken : handleSyncNow}
-              disabled={busy || syncing}
-            >
-              {(busy || syncing)
-                ? (token.trim() ? 'Saving…' : 'Syncing…')
-                : (token.trim() ? 'Save & sync' : 'Sync now')}
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
+            {syncing ? 'Syncing…' : 'Sync now'}
+          </Button>
         </div>
       )}
 

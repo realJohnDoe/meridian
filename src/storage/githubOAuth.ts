@@ -108,11 +108,12 @@ const REFRESH_MARGIN_MS = 5 * 60_000 // refresh if expiring within 5 minutes
 
 /**
  * Returns a usable access token for a GitHub vault, refreshing it first if
- * it's OAuth-managed (has a stored refresh token) and expired or expiring
- * soon (or unconditionally, if `force` is set — used when a live API call
- * came back 401 despite a fresh-looking local expiry).
+ * it has a stored refresh token and is expired or expiring soon (or
+ * unconditionally, if `force` is set — used when a live API call came back
+ * 401 despite a fresh-looking local expiry).
  *
- * PAT-managed vaults (no stored refresh token) pass through unchanged.
+ * A vault with no stored refresh token predates the app's "Sign in with
+ * GitHub" flow and can't be refreshed — its token passes through unchanged.
  * On a non-forced refresh failure, falls back to the existing (possibly
  * stale) token — the caller's own permission/API check will surface the
  * failure if it's truly invalid, same as before this existed. On a forced
@@ -125,9 +126,10 @@ export async function ensureFreshAccessToken(vaultId: string, opts?: { force?: b
 
   const refreshToken = await refreshTokenLoad(vaultId)
   if (!refreshToken) {
-    // PAT-managed — nothing to refresh. On a forced call (post-401 retry in
-    // sync.ts), signal "can't recover" rather than handing back the same
-    // token that just failed, so the caller doesn't retry pointlessly.
+    // No refresh token stored — nothing to refresh. On a forced call
+    // (post-401 retry in sync.ts), signal "can't recover" rather than handing
+    // back the same token that just failed, so the caller doesn't retry
+    // pointlessly.
     return opts?.force ? null : token
   }
 

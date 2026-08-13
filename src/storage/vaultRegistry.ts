@@ -346,13 +346,6 @@ export async function setActiveVault(id: string): Promise<void> {
   }
 }
 
-export interface GitHubVaultConfig {
-  owner:  string
-  repo:   string
-  branch: string
-  token:  string
-}
-
 export async function addLocalVault(): Promise<void> {
   try {
     await cacheInit()
@@ -368,38 +361,6 @@ export async function addLocalVault(): Promise<void> {
     if ((e as Error).name === 'AbortError') return
     console.error('[vault] addLocalVault failed:', e)
     notifyError('Could not connect vault', e)
-  }
-}
-
-export async function addGitHubVault(cfg: GitHubVaultConfig): Promise<void> {
-  try {
-    await cacheInit()
-    const id = crypto.randomUUID()
-
-    const { GitHubBackend } = await import('./githubBackend')
-    const backend = new GitHubBackend(id, `${cfg.owner}/${cfg.repo}`, cfg)
-    const perm    = await backend.ensurePermission(true)
-    if (perm === 'unreachable') {
-      notify("You're offline — connecting a GitHub vault needs a network connection.")
-      return
-    }
-    if (perm !== 'granted') {
-      notify('Could not connect to GitHub repository — check your token and repo name.')
-      return
-    }
-
-    await tokenSave(id, cfg.token)
-
-    const ref: GitHubVaultRef = {
-      id,
-      name:   `${cfg.owner}/${cfg.repo}`,
-      kind:   'github',
-      github: { owner: cfg.owner, repo: cfg.repo, branch: cfg.branch },
-    }
-    await registerAndActivate(ref, backend)
-  } catch (e) {
-    console.error('[vault] addGitHubVault failed:', e)
-    notifyError('Could not connect GitHub vault', e)
   }
 }
 
