@@ -28,7 +28,20 @@ interface Props {
    * reserve the gutter width, so their cards nest under the badge instead of
    * flush against the edge.
    */
-  badge?: { date: Date; isToday: boolean } | null
+  /**
+   * Whether this row reserves gutter space for a day badge, and if so
+   * whether it renders one. A required, explicit discriminant rather than an
+   * optional `{ date, isToday } | null | undefined` — every caller states
+   * its case by name instead of the component inferring "no gutter at all"
+   * from a prop being merely absent:
+   *   - 'day':    this row is a day's first occurrence — render the badge.
+   *   - 'spacer': a later row on the same day (or an overdue row) — no
+   *               badge, but still reserve the gutter so cards nest under
+   *               the badge above instead of sliding left to fill the gap.
+   *   - 'none':   this list has no day badges at all (backlog, notes) — no
+   *               gutter is reserved, so cards sit flush against the edge.
+   */
+  badge: { kind: 'day'; date: Date; isToday: boolean } | { kind: 'spacer' } | { kind: 'none' }
 }
 
 // Memoized on purpose: now that `now` is an explicit, compared prop rather
@@ -174,10 +187,12 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
     // last card and the next day's badge that separates day groups the way
     // Google Calendar's agenda does. Rows within the same day (no badge)
     // keep the plain mb-1.5 card-to-card rhythm.
-    <div className={cn('flex items-start gap-2 px-3.5 mb-1.5', badge && 'mt-3')}>
-      {/* Gutter — an equal-width spacer on every row so cards line up in a
-          column instead of flush against the edge. The badge (a day's first
-          row only) is absolutely positioned inside it, top-0 so its own top
+    <div className={cn('flex items-start gap-2 px-3.5 mb-1.5', badge.kind === 'day' && 'mt-3')}>
+      {/* Gutter — an equal-width spacer on every row of a badged list
+          (badge.kind !== 'none'; see the Props doc comment for the three
+          cases) so cards line up in a column instead of flush against the
+          edge. The badge (a day's first row only) is absolutely positioned
+          inside it, top-0 so its own top
           edge lines up exactly with the card's (both are items-start flex
           siblings starting at this row's own top). It contributes no height
           here at all: it can neither stretch the card's shadowed box nor
@@ -193,13 +208,15 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
           either a same-day sibling whose own gutter is empty, or the next
           day's row whose badge starts at 50. Either way there is nothing at
           y ∈ [45, 50] to collide with. */}
-      <div className="w-9 shrink-0 relative">
-        {badge && (
-          <div className="absolute inset-x-0 top-0 flex justify-center">
-            <DayBadge date={badge.date} isToday={badge.isToday} />
-          </div>
-        )}
-      </div>
+      {badge.kind !== 'none' && (
+        <div className="w-9 shrink-0 relative">
+          {badge.kind === 'day' && (
+            <div className="absolute inset-x-0 top-0 flex justify-center">
+              <DayBadge date={badge.date} isToday={badge.isToday} />
+            </div>
+          )}
+        </div>
+      )}
       {/* Two nested boxes: the swipe reveal needs overflow-hidden (clips the
           delete panel to the row's rounded corners and the horizontal slide),
           but that same overflow-hidden clips any box-shadow on the card inside
