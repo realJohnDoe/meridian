@@ -28,6 +28,9 @@ interface Props {
    * reserve the gutter width, so their cards nest under the badge instead of
    * flush against the edge.
    */
+  // Omitted entirely (undefined) by the undated lists (backlog, notes) —
+  // there's no weekday/day-of-month badge there, so no gutter is reserved
+  // for one either, and cards sit flush against the edge.
   badge?: { date: Date; isToday: boolean } | null
 }
 
@@ -175,9 +178,14 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
     // Google Calendar's agenda does. Rows within the same day (no badge)
     // keep the plain mb-1.5 card-to-card rhythm.
     <div className={cn('flex items-start gap-2 px-3.5 mb-1.5', badge && 'mt-3')}>
-      {/* Gutter — an equal-width spacer on every row so cards line up in a
-          column instead of flush against the edge. The badge (a day's first
-          row only) is absolutely positioned inside it, top-0 so its own top
+      {/* Gutter — an equal-width spacer on every row of a badged list (badge
+          undefined vs. null, not just falsy: the undated lists — backlog,
+          notes — never pass the prop at all, since there's no weekday/day
+          badge to reserve room for there, so their cards sit flush against
+          the edge instead of nesting under a gutter that would never hold
+          anything) so cards line up in a column instead of flush against the
+          edge. The badge (a day's first row only) is absolutely positioned
+          inside it, top-0 so its own top
           edge lines up exactly with the card's (both are items-start flex
           siblings starting at this row's own top). It contributes no height
           here at all: it can neither stretch the card's shadowed box nor
@@ -193,13 +201,15 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
           either a same-day sibling whose own gutter is empty, or the next
           day's row whose badge starts at 50. Either way there is nothing at
           y ∈ [45, 50] to collide with. */}
-      <div className="w-9 shrink-0 relative">
-        {badge && (
-          <div className="absolute inset-x-0 top-0 flex justify-center">
-            <DayBadge date={badge.date} isToday={badge.isToday} />
-          </div>
-        )}
-      </div>
+      {badge !== undefined && (
+        <div className="w-9 shrink-0 relative">
+          {badge && (
+            <div className="absolute inset-x-0 top-0 flex justify-center">
+              <DayBadge date={badge.date} isToday={badge.isToday} />
+            </div>
+          )}
+        </div>
+      )}
       {/* Two nested boxes: the swipe reveal needs overflow-hidden (clips the
           delete panel to the row's rounded corners and the horizontal slide),
           but that same overflow-hidden clips any box-shadow on the card inside
