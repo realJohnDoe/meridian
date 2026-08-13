@@ -1,7 +1,8 @@
 /**
  * Unit tests for ensureFreshAccessToken's decision matrix in githubOAuth.ts:
- * PAT- vs OAuth-managed vaults, the expiry-margin check, the `force` override,
- * and how refresh success/failure feed back into the caller.
+ * vaults with vs. without a stored refresh token, the expiry-margin check,
+ * the `force` override, and how refresh success/failure feed back into the
+ * caller.
  *
  * `@/storage/cache/credentials` is replaced with an in-memory fake so the test
  * doesn't need Dexie/IndexedDB. `fetch` is stubbed directly since exchangeForTokens
@@ -73,19 +74,19 @@ describe('ensureFreshAccessToken — no stored token', () => {
   })
 })
 
-describe('ensureFreshAccessToken — PAT-managed vault (no refresh token)', () => {
+describe('ensureFreshAccessToken — vault with no stored refresh token', () => {
   it('passes the token through unchanged on a non-forced call', async () => {
-    seed({ token: 'pat-token' })
+    seed({ token: 'legacy-token' })
     const fetchMock = mockFetchOnce({ body: {} })
 
     const result = await ensureFreshAccessToken(VAULT_ID)
 
-    expect(result).toBe('pat-token')
+    expect(result).toBe('legacy-token')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('returns null on a forced call instead of handing back the token that just failed', async () => {
-    seed({ token: 'pat-token' })
+    seed({ token: 'legacy-token' })
     const fetchMock = mockFetchOnce({ body: {} })
 
     const result = await ensureFreshAccessToken(VAULT_ID, { force: true })

@@ -6,13 +6,12 @@ setEntityPersistence({
   deleteEntity: slug => { void deleteFromBackend(slug) },
 })
 
-export { restoreVaults, setActiveVault, addLocalVault, addGitHubVault, addGitHubVaultOAuth, removeVault, onVaultChanged } from './vaultRegistry'
+export { restoreVaults, setActiveVault, addLocalVault, addGitHubVaultOAuth, removeVault, onVaultChanged } from './vaultRegistry'
 
 export { isFolderPickerSupported } from './fs'
 
 export { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush } from './sync'
 
-export { tokenSave } from './cache/credentials'
 export { cacheDirtyCount } from './cache/files'
 
 export {

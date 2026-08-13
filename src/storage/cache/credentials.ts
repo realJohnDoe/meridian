@@ -43,9 +43,9 @@ export async function tokenClear(vaultId: string): Promise<void> {
   await d.meta.delete(`token:${vaultId}`)
 }
 
-// ── Per-vault OAuth refresh-token + expiry (OAuth-managed vaults only) ────
-// Presence of a refresh token is what marks a vault as OAuth-managed rather
-// than PAT-managed — PAT vaults never have one.
+// ── Per-vault OAuth refresh-token + expiry ─────────────────────
+// Every GitHub vault created via the app's "Sign in with GitHub" flow has
+// one; its absence marks a token saved before that flow existed.
 
 export async function refreshTokenSave(vaultId: string, refreshToken: string): Promise<void> {
   const d = await cacheInit()
