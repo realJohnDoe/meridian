@@ -341,18 +341,19 @@
   --note:         oklch(0.53 0.13 215);   /* sky blue */
   --brand-cyan:   oklch(0.53 0.12 208);   /* sky blue — gradient accent */
   --priority-1:   oklch(0.53 0.20 22);    /* red */
-  --priority-2:   oklch(0.56 0.14 55);    /* orange */
+  --priority-2:   oklch(0.70 0.17 55);    /* orange */
   --priority-3:   oklch(0.80 0.16 82);    /* yellow */
 
-  /* On-accent text — light ink on every swatch except priority-3, which is
-     kept light enough to stay legible as a yellow and so takes dark ink.
-     Unlike the borrowed light themes, this is not a judgment call against
-     the metric: light ink wins on merit for all six here. */
+  /* On-accent text — light ink on every swatch except priority-2 and
+     priority-3, which are kept light enough to stay legible as
+     orange/yellow and so take dark ink instead. Unlike the borrowed light
+     themes, this is not a judgment call against the metric: each choice
+     wins on merit for its own swatch. */
   --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
-  --priority-2-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-dark);
   --priority-3-foreground: var(--ink-dark);
 
   /* Sidebar */
