@@ -69,7 +69,11 @@ function AppMain() {
     resetCalendarOnVaultChange()
   }), [])
 
-  const entrySlugMatch = useMatch({ from: '/_app/entry/$slug', shouldThrow: false })
+  const entryMatch     = useMatch({ from: '/_app/entry/$vault/$slug', shouldThrow: false })
+  // The pre-multi-vault `/entry/<slug>` URL, which redirects to the route above
+  // once the vault is restored. Counted as an entry view too, so the layout
+  // doesn't flash the agenda's topbar and search bar during that hop.
+  const entryLegacyMatch = useMatch({ from: '/_app/entry/$slug', shouldThrow: false })
   const entryNewMatch  = useMatch({ from: '/_app/entry/new', shouldThrow: false })
   const dayMatch       = useMatch({ from: '/_app/day/$date', shouldThrow: false })
   const weekMatch      = useMatch({ from: '/_app/week/$date', shouldThrow: false })
@@ -84,7 +88,7 @@ function AppMain() {
   const weekPreview   = useWeekPreview()
   const ws            = weekStartsOn(useStore(s => s.localePrefs))
 
-  const isEntryView  = !!entrySlugMatch || !!entryNewMatch
+  const isEntryView  = !!entryMatch || !!entryLegacyMatch || !!entryNewMatch
   const isDayView    = !!dayMatch
   const isWeekView   = !!weekMatch
   const isMonthView  = !!monthMatch
