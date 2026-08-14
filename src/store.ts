@@ -129,37 +129,41 @@ interface MeridianStore {
 }
 
 type Setter = (partial: Partial<MeridianStore>) => void
-type Getter = () => MeridianStore
 
-/** Persists a vault-scoped string-array field to localStorage on every write, keyed by the active vault. */
-function persistedArrayField(keyPrefix: string, field: keyof MeridianStore, set: Setter, get: Getter) {
+/**
+ * Persists a vault-scoped string-array field to localStorage on every write.
+ * Takes the vaultId to persist under as an explicit argument rather than
+ * reading `get().activeVaultId` itself, so a caller acting on a vault other
+ * than the active one (see `VaultSettings.handleParticipantsChange`'s
+ * precedent) — or, later, a store with no single "active" vault at all — can
+ * still use it correctly.
+ */
+function persistedArrayField(keyPrefix: string, field: keyof MeridianStore, set: Setter) {
   return {
     load: (vaultId: string) => set({ [field]: readVaultStringArray(keyPrefix, vaultId) }),
-    persist: (value: string[]) => {
-      const { activeVaultId } = get()
-      if (activeVaultId) writeVaultJSON(keyPrefix, activeVaultId, value)
+    persist: (vaultId: string | null, value: string[]) => {
+      if (vaultId) writeVaultJSON(keyPrefix, vaultId, value)
       set({ [field]: value })
     },
   }
 }
 
-/** Persists a vault-scoped boolean field to localStorage on every write, keyed by the active vault. */
-function persistedBoolField(keyPrefix: string, field: keyof MeridianStore, defaultValue: boolean, set: Setter, get: Getter) {
+/** Persists a vault-scoped boolean field to localStorage on every write. See `persistedArrayField` for why the vaultId is explicit. */
+function persistedBoolField(keyPrefix: string, field: keyof MeridianStore, defaultValue: boolean, set: Setter) {
   return {
     load: (vaultId: string) => set({ [field]: readVaultJSON(keyPrefix, vaultId, defaultValue) }),
-    persist: (value: boolean) => {
-      const { activeVaultId } = get()
-      if (activeVaultId) writeVaultJSON(keyPrefix, activeVaultId, value)
+    persist: (vaultId: string | null, value: boolean) => {
+      if (vaultId) writeVaultJSON(keyPrefix, vaultId, value)
       set({ [field]: value })
     },
   }
 }
 
 export const useStore = create<MeridianStore>((set, get) => {
-  const favoritesField = persistedArrayField('meridian_favorites', 'favorites', set, get)
-  const defaultParticipantsField = persistedArrayField('meridian_default_participants', 'defaultParticipants', set, get)
-  const participantFilterField = persistedArrayField('meridian_participant_filter', 'participantFilter', set, get)
-  const showTasksField = persistedBoolField('meridian_show_tasks', 'showTasks', true, set, get)
+  const favoritesField = persistedArrayField('meridian_favorites', 'favorites', set)
+  const defaultParticipantsField = persistedArrayField('meridian_default_participants', 'defaultParticipants', set)
+  const participantFilterField = persistedArrayField('meridian_participant_filter', 'participantFilter', set)
+  const showTasksField = persistedBoolField('meridian_show_tasks', 'showTasks', true, set)
 
   return {
     items: [],
@@ -196,14 +200,14 @@ export const useStore = create<MeridianStore>((set, get) => {
     favorites: [],
     loadFavorites: favoritesField.load,
     toggleFavorite: (fileSlug: string) => {
-      const { favorites } = get()
+      const { favorites, activeVaultId } = get()
       const next = favorites.includes(fileSlug)
         ? favorites.filter(s => s !== fileSlug)
         : [...favorites, fileSlug]
-      favoritesField.persist(next)
+      favoritesField.persist(activeVaultId, next)
     },
     reorderFavorites: (fromIdx: number, toIdx: number) => {
-      const { favorites } = get()
+      const { favorites, activeVaultId } = get()
       if (toIdx < 0 || toIdx >= favorites.length) return
       // fromIdx needs the same bounds check: an out-of-range splice() returns
       // [] and would otherwise insert `undefined` into the favorites list.
@@ -211,27 +215,27 @@ export const useStore = create<MeridianStore>((set, get) => {
       const next = [...favorites]
       const [item] = next.splice(fromIdx, 1)
       next.splice(toIdx, 0, item!)
-      favoritesField.persist(next)
+      favoritesField.persist(activeVaultId, next)
     },
 
     defaultParticipants: [],
     loadDefaultParticipants: defaultParticipantsField.load,
-    setDefaultParticipants: defaultParticipantsField.persist,
+    setDefaultParticipants: (participants: string[]) => defaultParticipantsField.persist(get().activeVaultId, participants),
 
     participantFilter: [],
     loadParticipantFilter: participantFilterField.load,
     toggleParticipantFilter: (name: string) => {
-      const { participantFilter } = get()
+      const { participantFilter, activeVaultId } = get()
       const next = participantFilter.includes(name)
         ? participantFilter.filter(s => s !== name)
         : [...participantFilter, name]
-      participantFilterField.persist(next)
+      participantFilterField.persist(activeVaultId, next)
     },
-    clearParticipantFilter: () => participantFilterField.persist([]),
+    clearParticipantFilter: () => participantFilterField.persist(get().activeVaultId, []),
 
     showTasks: true,
     loadShowTasks: showTasksField.load,
-    toggleShowTasks: () => showTasksField.persist(!get().showTasks),
+    toggleShowTasks: () => showTasksField.persist(get().activeVaultId, !get().showTasks),
 
     localePrefs: loadLocalePrefs(),
     setLocalePrefs: (prefs: Partial<LocalePrefs>) => {
