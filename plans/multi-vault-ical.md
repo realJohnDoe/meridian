@@ -42,7 +42,7 @@ kind that happens to be read-only" — no special case anywhere.
 | **Sync loop** | **Serial, oldest-synced first**, per-vault minimum intervals and per-vault backoff. |
 | **Fetching iCal** | **Proxy through the existing Cloudflare Worker** (`meridian-oauth`). |
 | **Naming** | **Any vault can be renamed** (except the synthesized Tutorial vault). |
-| **Non-writable entries** | **Two distinct modes**, not one: `sandbox` (Tutorial — full edit UI, "not saved" banner, unchanged) vs `read-only` (iCal — a genuinely plain, non-editable view). |
+| **Non-writable entries** | **Two distinct modes**, not one: `sandbox` (Tutorial — full edit UI, "not saved" banner, unchanged) vs `view-only` (iCal — a genuinely plain, non-editable view). |
 | **Delivery** | A behaviour-identical prep PR, then six feature PRs, each independently shippable. |
 
 ### On identifiers — no new UUIDs
@@ -417,31 +417,32 @@ into a compile error rather than a lurking bug.
 
 ### 11. Per-entry access, and the plain read view
 
-Two different vaults are read-only today, for two different reasons, and the UI should say so
-differently. The **Tutorial vault** is a sandbox — its whole pedagogical point is that you can
-poke at the type toggle, try a repeat rule, tick a checkbox, and see it work, with a banner
+Two different vaults are non-writable today, for two different reasons, and the UI should say
+so differently. The **Tutorial vault** is a sandbox — its whole pedagogical point is that you
+can poke at the type toggle, try a repeat rule, tick a checkbox, and see it work, with a banner
 explaining that none of it is saved. An **iCal feed** has no such use case: there is no source
 to write back to, so offering property chips and a save button would mislead rather than
-onboard. So this is not one "read-only" mode, it's two, and only one of them gets the new plain
-view:
+onboard. So this is not one mode, it's two, and only one of them gets the new plain view:
 
 ```ts
 // src/hooks/useEntryAccess.ts
 export type EntryAccess =
   | { mode: 'edit';      vault: VaultRef }
   | { mode: 'sandbox';   vault: VaultRef }   // Tutorial: full edit UI, writes silently discarded — unchanged from today
-  | { mode: 'read-only'; vault: VaultRef }   // subscription: no edit affordances — nothing to save back to
+  | { mode: 'view-only'; vault: VaultRef }   // subscription: no edit affordances — nothing to save back to
 
 /**
  * ⚠️ Keyed off `VaultKind`, NOT off `StorageBackend.readOnly` — and it must stay that way.
  * Both `example` and `ical` are `readOnly` to the sync layer (neither pushes writes), so
  * "simplifying" this to read that flag would hand the sandbox vault the no-affordances view
  * and destroy the tutorial's whole point. The two notions are genuinely independent: the
- * backend flag answers "do writes get pushed", this answers "what does the editor offer".
+ * backend flag answers "do writes get pushed", this answers "what does the editor offer" —
+ * and the name is deliberately `view-only`, not `read-only`, so it can never be confused with
+ * `StorageBackend.readOnly` in prose, a variable name, or a search.
  */
 function accessMode(kind: VaultKind): EntryAccess['mode'] {
   if (kind === 'example') return 'sandbox'
-  if (kind === 'ical')    return 'read-only'
+  if (kind === 'ical')    return 'view-only'
   return 'edit'
 }
 export function useEntryAccess(occ: Occurrence | null): EntryAccess
@@ -457,25 +458,26 @@ live (`components`/`hooks` may not import `@/storage` anyway).
 
 **`sandbox` gets no new work at all** — `EntryEditor` already renders it exactly as today
 (full affordances, the "changes aren't saved" banner from §4, generalized to the vault's own
-name). Only `read-only` routes to a new sibling component. `EntryEditor`'s always-required
+name). Only `view-only` routes to a new sibling component. `EntryEditor`'s always-required
 hook members (`setEntry`, `handleSave`, `handleOpenDlg`, `handleOpenRepeatDlg`,
-`handlePromoteTask`) are all mutators, so bending it into a read view for `read-only` would
+`handlePromoteTask`) are all mutators, so bending it into a read view for `view-only` would
 mean disabling a dozen affordances — a sibling presentational component is cleaner and is what
 "a different look, so as not to confuse users" actually asks for:
 
 ```
-editor/EntryReadonlyView.tsx
+editor/EntryViewOnly.tsx
 ```
 
 Title as static text, a source chip (vault icon + name, **not** a picker in this mode),
 date/time/duration/participants as `Badge variant="tag"` chips instead of pressable
 `PropChip`s, `LOCATION`/`URL`/organizer from `extra`, and the body through **`EntryBody` with a
-new `readOnly` prop** (`EditorState.readOnly.of(true)` + `EditorView.editable.of(false)`).
-Reusing `EntryBody` is deliberate: `markdownLivePreview` renders formatting on every line that
-has no cursor, so read-only mode renders the markdown *better* than editing mode does, and
-wikilink decorations keep working for free.
+new `readOnly` prop** (`EditorState.readOnly.of(true)` + `EditorView.editable.of(false)`) — that
+prop is CodeMirror's own vocabulary, unrelated to the `EntryAccess` mode name above, and is fine
+to keep as-is. Reusing `EntryBody` is deliberate: `markdownLivePreview` renders formatting on
+every line that has no cursor, so this read-only CodeMirror mode renders the markdown *better*
+than the editable configuration does, and wikilink decorations keep working for free.
 
-`routes/-entryTopbar.tsx` needs a prop to drop the delete button for `read-only` only — the
+`routes/-entryTopbar.tsx` needs a prop to drop the delete button for `view-only` only — the
 Tutorial vault's topbar is unchanged, whatever its current quirks (its delete button today is
 already a no-op past the storage layer; not this plan's concern to fix).
 
@@ -578,7 +580,7 @@ src/storage/icalBackend.ts              + __tests__/icalBackend.test.ts
 src/storage/moveEntry.ts                + __tests__/moveEntry.test.ts
 src/storage/workerOrigin.ts
 src/hooks/useEntryAccess.ts             + .test.ts
-src/editor/EntryReadonlyView.tsx        + .test.tsx
+src/editor/EntryViewOnly.tsx            + .test.tsx
 src/editor/VaultPicker.tsx              (the chip; new-entry + move)
 src/components/ViewFilterButton.tsx     (replaces ParticipantFilterButton.tsx)
 src/components/VaultChip.tsx
@@ -671,8 +673,8 @@ vault would share one agenda.
 wizard source card with a validate-and-preview URL step, registry wiring, settings detail row,
 `runSync` read-only pull path.
 
-**PR 4 — Plain read-only entry view.** `useEntryAccess`, `EntryReadonlyView`, `EntryBody`
-`readOnly` prop, route + topbar branching — scoped to `read-only` mode (iCal) only. The Tutorial
+**PR 4 — Plain view-only entry view.** `useEntryAccess`, `EntryViewOnly`, `EntryBody`
+`readOnly` prop, route + topbar branching — scoped to `view-only` mode (iCal) only. The Tutorial
 vault's existing `EntryEditor`-with-banner behavior is untouched, so this PR carries no
 regression risk for onboarding.
 
