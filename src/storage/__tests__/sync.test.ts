@@ -16,6 +16,8 @@ import type { StorageBackend, RawFile } from '@/storage/backend'
 import type { VaultKind } from '@/vaultRef'
 import { ConflictError, AuthSyncError, TransientSyncError } from '@/storage/conflictError'
 import type * as MeridianModel from '@/model'
+import { entryKey } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 
 // ── Hoisted shared fakes (referenced by the vi.mock factories below, which
 // run before the rest of this file's top-level code) ──────────────────────
@@ -42,6 +44,14 @@ const { cacheStore, storeState, notifyFns, roundTripLossMock } = vi.hoisted(() =
   // @/model stays real — reconcile leans on the genuine parse/collapse.
   roundTripLossMock: vi.fn<(path: string, content: string, parsed: unknown) => string[]>(() => []),
 }))
+
+/** The FakeBackend's vault id — the one every fixture below belongs to. */
+const VAULT = 'fake-vault'
+/** `entryKey(VAULT, slug)` — the identity the store is keyed by. */
+const K = (slug: string): EntryKey => entryKey(VAULT, slug)
+/** A complete root for `slug`, including the runtime provenance a parse supplies. */
+const rootFor = (slug: string, meta: { title: string; tags: string[]; items: string[] }) =>
+  ({ ...meta, vaultId: VAULT, fileSlug: slug })
 
 function vp(vaultId: string, path: string): string {
   return `${vaultId}::${path}`
@@ -339,10 +349,10 @@ describe('pushDirty — write-conflict collision', () => {
     // reconcile deliberately skips paths this cycle already resolved (see
     // planReconcile's skipPaths) and would otherwise leave them invisible
     // until a later reconcile or a full restart re-hydrate.
-    const taskRoot = storeState.roots.get('task') as { body?: string } | undefined
+    const taskRoot = storeState.roots.get(K('task')) as { body?: string } | undefined
     expect(taskRoot?.body).toBe('remote v2')
     const copySlug = copyPath!.replace(/\.md$/, '')
-    const copyRoot = storeState.roots.get(copySlug) as { body?: string } | undefined
+    const copyRoot = storeState.roots.get(K(copySlug)) as { body?: string } | undefined
     expect(copyRoot?.body).toBe('local edit')
 
     expect(notifyFns.warn).toHaveBeenCalledTimes(1)
@@ -730,14 +740,14 @@ describe('reconcileWithBackend — an eventually-consistent listing must not del
 
     try {
       seedClean('fake-vault', 'new.md', 'content', 'v1', now)
-      storeState.roots.set('new', { title: 'New', tags: [], items: [] })
+      storeState.roots.set(K('new'), rootFor('new', { title: 'New', tags: [], items: [] }))
       setActiveBackend(backend)
 
       now += 60_000 // one autoSyncTick interval later — well inside the 5-minute grace window
       await syncToBackend()
 
       expect(cacheStore.has(vp('fake-vault', 'new.md'))).toBe(true)
-      expect(storeState.roots.has('new')).toBe(true)
+      expect(storeState.roots.has(K('new'))).toBe(true)
     } finally {
       nowSpy.mockRestore()
     }
@@ -747,12 +757,12 @@ describe('reconcileWithBackend — an eventually-consistent listing must not del
     const backend = new FakeBackend()
     setActiveBackend(backend)
     seedClean('fake-vault', 'old.md', 'content', 'v1', 0) // written long ago, well outside the window
-    storeState.roots.set('old', { title: 'Old', tags: [], items: [] })
+    storeState.roots.set(K('old'), rootFor('old', { title: 'Old', tags: [], items: [] }))
 
     await syncToBackend()
 
     expect(cacheStore.has(vp('fake-vault', 'old.md'))).toBe(false)
-    expect(storeState.roots.has('old')).toBe(false)
+    expect(storeState.roots.has(K('old'))).toBe(false)
   })
 })
 
@@ -805,7 +815,7 @@ describe('reconcileWithBackend — a local edit landing mid-reconcile is not clo
     backend.seed('note.md', 'remote v2', 'v2')
     setActiveBackend(backend)
     seedClean('fake-vault', 'note.md', 'remote v1', 'v1', Date.now()) // clean, version drifted → planReconcile marks it "changed"
-    storeState.roots = new Map([['note', { title: 'Local Edit', tags: [], items: [] }]])
+    storeState.roots = new Map([[K('note'), rootFor('note', { title: 'Local Edit', tags: [], items: [] })]])
 
     const release = backend.blockNextReadFiles()
     const reconcilePromise = reconcileWithBackend(backend, 'fake-vault')
@@ -822,7 +832,7 @@ describe('reconcileWithBackend — a local edit landing mid-reconcile is not clo
     expect(cached?.content).toBe('local edit')
     // The store must still show the local edit — not overwritten by the
     // now-stale remote pull.
-    expect((storeState.roots.get('note') as { title?: string } | undefined)?.title).toBe('Local Edit')
+    expect((storeState.roots.get(K('note')) as { title?: string } | undefined)?.title).toBe('Local Edit')
   })
 
   it('still writes and merges other paths in the same batch that were not touched locally', async () => {
@@ -861,7 +871,7 @@ describe('reconcileWithBackend — the active vault changing mid-flight', () => 
     backend.seed('note.md', 'remote v2', 'v2')
     setActiveBackend(backend)
     seedClean('fake-vault', 'note.md', 'remote v1', 'v1', Date.now())
-    storeState.items = [{ entryKey: 'belongs-to-the-other-vault' }]
+    storeState.items = [{ entryKey: K('belongs-to-the-other-vault') }]
 
     const release = backend.blockNextReadFiles()
     const reconcilePromise = reconcileWithBackend(backend, 'fake-vault')
@@ -877,7 +887,7 @@ describe('reconcileWithBackend — the active vault changing mid-flight', () => 
     // Cache write completed — it is keyed by vaultId and stays correct.
     expect(cacheStore.get(vp('fake-vault', 'note.md'))?.content).toBe('remote v2')
     // ...but the store still belongs to whichever vault is active now.
-    expect(storeState.items).toEqual([{ entryKey: 'belongs-to-the-other-vault' }])
+    expect(storeState.items).toEqual([{ entryKey: K('belongs-to-the-other-vault') }])
   })
 })
 
@@ -1032,9 +1042,9 @@ describe('writeEntityToCache — self-heal delete guard', () => {
     const backend = new FakeBackend()
     setActiveBackend(backend)
     storeState.items = []
-    storeState.roots = new Map([['note', { title: 'Note', tags: [], items: [] }]])
+    storeState.roots = new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]])
 
-    await writeEntityToCache('note')
+    await writeEntityToCache(K('note'))
 
     expect(cacheStore.has(vp('fake-vault', 'note.md'))).toBe(false)
     expect(notifyFns.notifyError).not.toHaveBeenCalled()
@@ -1047,7 +1057,7 @@ describe('writeEntityToCache — self-heal delete guard', () => {
     storeState.items = []
     storeState.roots = new Map()
 
-    await writeEntityToCache('note')
+    await writeEntityToCache(K('note'))
 
     const cached = cacheStore.get(vp('fake-vault', 'note.md'))
     expect(cached?.status).toBe('deleted')
@@ -1067,14 +1077,14 @@ describe('writeEntityToCache — self-heal delete guard', () => {
 // write is outstanding.
 
 describe('in-flight write registry — protects against a concurrent reconcile', () => {
-  const oneItem = () => [{ date: '', time: null, source: 'explicit' as const, entryKey: 'note', id: 'i1', metadata: {} }]
+  const oneItem = () => [{ date: '', time: null, source: 'explicit' as const, entryKey: K('note'), id: 'i1', metadata: {} }]
 
   it('a reconcile landing mid-write does not pull remote content over the pending write', async () => {
     const backend = new FakeBackend()
     backend.seed('note.md', 'remote content', 'v2') // genuinely absent from (not yet reflected in) the cache
     setActiveBackend(backend)
     storeState.items = oneItem()
-    storeState.roots = new Map([['note', { title: 'Note', tags: [], items: [] }]])
+    storeState.roots = new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]])
 
     const originalRecordLocalEdit = vi.mocked(recordLocalEdit).getMockImplementation()!
     let releaseWrite!: () => void
@@ -1087,7 +1097,7 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     // markInFlight('note.md') fires synchronously inside writeEntityToCache,
     // before its first await — so it is already in effect the instant this
     // call returns control here, well before recordLocalEdit's gated write settles.
-    const writePromise = writeEntityToCache('note')
+    const writePromise = writeEntityToCache(K('note'))
 
     await reconcileWithBackend(backend, 'fake-vault')
     expect(backend.readFilesCallCount).toBe(0)
@@ -1113,7 +1123,7 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     backend.seed('note.md', 'remote content', 'v2')
     setActiveBackend(backend)
     storeState.items = oneItem()
-    storeState.roots = new Map([['note', { title: 'Note', tags: [], items: [] }]])
+    storeState.roots = new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]])
 
     const originalRecordLocalEdit = vi.mocked(recordLocalEdit).getMockImplementation()!
     let releaseA!: () => void
@@ -1124,8 +1134,8 @@ describe('in-flight write registry — protects against a concurrent reconcile',
       .mockImplementationOnce(async (...args: Parameters<typeof recordLocalEdit>) => { await gateA; return originalRecordLocalEdit(...args) })
       .mockImplementationOnce(async (...args: Parameters<typeof recordLocalEdit>) => { await gateB; return originalRecordLocalEdit(...args) })
 
-    const writeA = writeEntityToCache('note')
-    const writeB = writeEntityToCache('note')
+    const writeA = writeEntityToCache(K('note'))
+    const writeB = writeEntityToCache(K('note'))
 
     releaseA()
     await writeA // the first write settles; the second is still in flight
@@ -1143,9 +1153,9 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     const backend = new FakeBackend()
     setActiveBackend(backend)
     storeState.items = [] // no items yet
-    storeState.roots = new Map([['note', { title: 'Note', tags: [], items: [] }]]) // root already exists
+    storeState.roots = new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]) // root already exists
 
-    await writeEntityToCache('note') // takes the self-heal "skip" branch — warns and returns
+    await writeEntityToCache(K('note')) // takes the self-heal "skip" branch — warns and returns
 
     // A leaked mark here would keep 'note.md' in skipPaths forever, hiding a
     // genuine remote delete from ever being reconciled.
@@ -1168,10 +1178,10 @@ describe('parseFiles', () => {
       { path: 'also-good.md', content: '---\ntitle: Also good\n---' },
     ]
 
-    const { roots, failures } = parseFiles(files)
+    const { roots, failures } = parseFiles(files, VAULT)
 
-    expect([...roots.keys()].sort()).toEqual(['also-good', 'good'])
-    expect(failures.map(f => f.slug).sort()).toEqual(['bad', 'dup', 'tabs'])
+    expect([...roots.keys()].sort()).toEqual([K('also-good'), K('good')].sort())
+    expect(failures.map(f => f.key).sort()).toEqual([K('bad'), K('dup'), K('tabs')].sort())
     // Every failure carries enough to act on, and to reserve its slug.
     for (const f of failures) {
       expect(f.path).toMatch(/\.md$/)
@@ -1196,14 +1206,14 @@ describe('parseFiles — round-trip guard scheduling', () => {
   ]
 
   it('does not run the guard during the parse itself', () => {
-    const { items } = parseFiles(files)
+    const { items } = parseFiles(files, VAULT)
 
     expect(items).toBeDefined()
     expect(roundTripLossMock).not.toHaveBeenCalled()
   })
 
   it('checks every file that parsed — and only those — once the audit runs', async () => {
-    const { auditRoundTrip } = parseFiles(files)
+    const { auditRoundTrip } = parseFiles(files, VAULT)
     auditRoundTrip()
 
     await vi.waitFor(() => { expect(roundTripLossMock).toHaveBeenCalledTimes(2) })
@@ -1215,7 +1225,7 @@ describe('parseFiles — round-trip guard scheduling', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     roundTripLossMock.mockReturnValue(['project="apollo"'])
 
-    const { auditRoundTrip } = parseFiles([{ path: 'deferred-loss.md', content: '---\ntitle: X\n---' }])
+    const { auditRoundTrip } = parseFiles([{ path: 'deferred-loss.md', content: '---\ntitle: X\n---' }], VAULT)
     expect(notifyFns.warn).not.toHaveBeenCalled()
     auditRoundTrip()
 
@@ -1229,15 +1239,15 @@ describe('parseFiles — round-trip guard scheduling', () => {
 
 describe('reportParseFailures', () => {
   it('warns with the message for a single failure', () => {
-    reportParseFailures([{ path: 'bad.md', slug: 'bad', message: 'bad indentation' }])
+    reportParseFailures([{ path: 'bad.md', key: K('bad'), message: 'bad indentation' }])
     expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('bad.md'))
     expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('bad indentation'))
   })
 
   it('lists every path when several files fail', () => {
     reportParseFailures([
-      { path: 'bad.md', slug: 'bad', message: 'x' },
-      { path: 'tabs.md', slug: 'tabs', message: 'y' },
+      { path: 'bad.md', key: K('bad'), message: 'x' },
+      { path: 'tabs.md', key: K('tabs'), message: 'y' },
     ])
     expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('bad.md'))
     expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('tabs.md'))

@@ -24,7 +24,7 @@
  * These tests assert the correct post-Fix-C behaviour.
  */
 import { describe, it, expect } from 'vitest'
-import { loadFixture, parseFixture } from './helpers'
+import { loadFixture, parseFixture, TEST_VAULT, rootsOf } from './helpers'
 import { parseToStoreItems } from '@/model/storeItems'
 import { toggleDone } from '@/model/storeOps'
 import { expandRange } from '@/model/expansion'
@@ -35,8 +35,8 @@ import type { Roots } from '@/types'
 describe('stable IDs across re-parse (Fix C)', () => {
   it('parsing the same fixture twice produces identical series IDs', () => {
     const content = loadFixture('weekly-series')
-    const parse1 = parseToStoreItems('weekly-series.md', content)
-    const parse2 = parseToStoreItems('weekly-series.md', content)
+    const parse1 = parseToStoreItems('weekly-series.md', content, TEST_VAULT)
+    const parse2 = parseToStoreItems('weekly-series.md', content, TEST_VAULT)
 
     const ids1 = parse1.items.filter(isSeries).map(i => i.id)
     const ids2 = parse2.items.filter(isSeries).map(i => i.id)
@@ -48,8 +48,8 @@ describe('stable IDs across re-parse (Fix C)', () => {
 
   it('override children get identical ownerIds on each parse', () => {
     const content = loadFixture('weekly-series')
-    const parse1 = parseToStoreItems('weekly-series.md', content)
-    const parse2 = parseToStoreItems('weekly-series.md', content)
+    const parse1 = parseToStoreItems('weekly-series.md', content, TEST_VAULT)
+    const parse2 = parseToStoreItems('weekly-series.md', content, TEST_VAULT)
 
     const ownerIds1 = parse1.items.filter(i => !isSeries(i)).map(i => (i as { ownerId?: string }).ownerId).filter(Boolean)
     const ownerIds2 = parse2.items.filter(i => !isSeries(i)).map(i => (i as { ownerId?: string }).ownerId).filter(Boolean)
@@ -62,10 +62,10 @@ describe('stable IDs across re-parse (Fix C)', () => {
 describe('toggle works across a simulated reconcile (Fix A + Fix C)', () => {
   it('toggling an occurrence taken from parse1 against a store rebuilt from parse2 flips done', () => {
     const content = loadFixture('weekly-series')
-    const roots: Roots = new Map([['weekly-series', parseFixture('weekly-series').root]])
+    const roots: Roots = rootsOf(parseFixture('weekly-series').root)
 
     // parse1: expand to get occurrences (simulates pre-reconcile closure)
-    const parse1 = parseToStoreItems('weekly-series.md', content)
+    const parse1 = parseToStoreItems('weekly-series.md', content, TEST_VAULT)
     const occs1 = expandRange(parse1.items, roots, new Date('2026-01-01'), new Date('2026-12-31'))
     // Pick a generated (not explicitly overridden) occurrence — 2026-04-20 is a Monday
     const occ = occs1.find(o => o.date === '2026-04-20')!
@@ -73,7 +73,7 @@ describe('toggle works across a simulated reconcile (Fix A + Fix C)', () => {
     expect(occ.metadata.done).toBe(false)
 
     // parse2: reconcile rebuilds the store from the same content
-    const parse2 = parseToStoreItems('weekly-series.md', content)
+    const parse2 = parseToStoreItems('weekly-series.md', content, TEST_VAULT)
     const freshStore: StoreData = { items: parse2.items, roots }
 
     // With deterministic IDs, occ.ownerId matches the series in the fresh store

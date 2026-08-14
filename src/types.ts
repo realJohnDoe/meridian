@@ -1,6 +1,6 @@
 // ── MERIDIAN DOMAIN TYPES ────────────────────────────────────────────────────
 
-import type { FileConvention } from '@/fileIO'
+import type { FileConvention, EntryKey } from '@/fileIO'
 
 export type Priority = 'high' | 'medium' | 'low'
 
@@ -21,13 +21,31 @@ export type Repeat =
 /**
  * File-level fields — persisted at the frontmatter root; shared by all
  * occurrences in the file. `body` is markdown, not YAML frontmatter.
- * Stored in the roots map (Map<fileSlug, FileMetadata>), not on StoreItems.
+ * Stored in the roots map (Map<EntryKey, FileMetadata>), not on StoreItems.
  */
 export interface FileMetadata {
   title: string
   tags:  string[]
   items: string[]
   body?: string
+  /**
+   * Which vault this file came from. Runtime-only, never serialized — in the
+   * same family as `fileConvention` below, and likewise absent from
+   * `INLINE_FIELDS` (model/fieldRegistry.ts), so `collapseToYaml` never emits
+   * it. Present here rather than only inside the map key because
+   * `AppMetadata` spreads the root into every expanded occurrence
+   * (`joinFileMeta`), which is what gives every `Occurrence` its vault for
+   * free — no change to the expansion engine or to any view's data plumbing.
+   */
+  vaultId:  string
+  /**
+   * The bare, file-level slug — what `[[wikilinks]]` and the URL carry, and
+   * the other half of the map key. Kept beside `vaultId` for the same reason:
+   * every occurrence needs it for display and routing, and digging it back
+   * out of the key at each call site is how the two slug-shaped strings get
+   * confused again.
+   */
+  fileSlug: string
   /**
    * Frontmatter keys the model has no name for, kept verbatim so a save never
    * deletes hand-authored data. Owned by the file root ONLY when the root node
@@ -46,6 +64,15 @@ export interface FileMetadata {
    */
   fileConvention?: FileConvention
 }
+
+/**
+ * The half of `FileMetadata` a parse can derive from the file's own bytes.
+ * `vaultId`/`fileSlug`/`fileConvention` are provenance the *caller* supplies
+ * (it knows which vault and path it read from), so the parser returns this
+ * narrower type and `parseToStoreItems` completes it — making an omission a
+ * compile error rather than a silently vault-less root.
+ */
+export type FileFields = Omit<FileMetadata, 'vaultId' | 'fileSlug' | 'fileConvention'>
 
 /**
  * Occurrence-level fields — persisted per series or occurrence.
@@ -90,7 +117,7 @@ export interface OccurrenceEntry<T = Record<string, unknown>> {
   date:      string                    // YYYY-MM-DD
   time:      string | null             // HH:mm or null
   source:    'generated' | 'explicit'
-  entryKey:  string                    // identifies the source file within its vault
+  entryKey:  EntryKey                  // vault-qualified identity of the source file
   id:        string                    // stable UUID — carried from the store item or memoised by logical key
   ownerId?:  string                    // UUID of parent RepeatPattern (undefined for standalone)
   excluded?: boolean                   // exclusion override: suppresses a generated occurrence
@@ -105,7 +132,7 @@ export interface RepeatPattern<T = Record<string, unknown>> {
   date:      string
   time:      string | null
   repeat:    Repeat
-  entryKey:  string
+  entryKey:  EntryKey
   id:        string                    // own UUID
   // No ownerId — RepeatPatterns are flat siblings, never nested in the store
   metadata:  T
@@ -121,8 +148,8 @@ export type StoreSeries = RepeatPattern<OccurrenceMetadata>
 export type StoreOcc    = OccurrenceEntry<OccurrenceMetadata>
 export type StoreItem   = StoreSeries | StoreOcc
 
-/** keyed by fileSlug */
-export type Roots = Map<string, FileMetadata>
+/** keyed by EntryKey — the same slug in two vaults is two distinct entries */
+export type Roots = Map<EntryKey, FileMetadata>
 
 export function isSeries(item: StoreItem): item is StoreSeries {
   return 'repeat' in item

@@ -1,13 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { expandRange } from '@/model/expansion'
 import type { StoreSeries, Roots } from '@/types'
+import { keyOf } from './helpers'
 
 function series(overrides: Partial<StoreSeries> = {}): StoreSeries {
   return {
     date: '2026-01-31',
     time: null,
     repeat: { type: 'schedule', freq: 'monthly', bymonthday: [31] },
-    entryKey: 'note.md',
+    entryKey: keyOf('note.md'),
     id: 'series-1',
     metadata: { participants: [] },
     ...overrides,

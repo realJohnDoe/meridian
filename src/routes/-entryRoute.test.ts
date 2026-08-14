@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { makeOcc } from '@/test-utils'
-import { newEntryRoute, entryRoute, slugRoute } from './-entryRoute'
+import { makeOcc, testKey, TEST_VAULT } from '@/test-utils'
+import { entryKey } from '@/fileIO'
+import { newEntryRoute, entryRoute, keyRoute } from './-entryRoute'
 
 // These build the navigate() descriptors every caller of the entry routes
 // passes to TanStack Router. The `?? undefined` normalisation matters: a search
@@ -50,12 +51,21 @@ describe('newEntryRoute', () => {
 })
 
 describe('entryRoute', () => {
-  it('routes to the occurrence\'s file slug, defaulting to single-occurrence scope', () => {
-    expect(entryRoute(makeOcc({ entryKey: 'standup.md', date: '2026-06-15' }))).toEqual({
-      to: '/entry/$slug',
-      params: { slug: 'standup.md' },
+  // The URL carries the two halves of the EntryKey as separate path segments —
+  // `::` is not path-safe, and `/entry/<vault>/<slug>` reads as what it is.
+  it('routes to the occurrence\'s vault and file slug, defaulting to single-occurrence scope', () => {
+    expect(entryRoute(makeOcc({ entryKey: testKey('standup.md'), date: '2026-06-15' }))).toEqual({
+      to: '/entry/$vault/$slug',
+      params: { vault: TEST_VAULT, slug: 'standup.md' },
       search: { date: '2026-06-15', scope: 'single' },
     })
+  })
+
+  it('splits the same slug in two vaults into two different URLs', () => {
+    const work     = entryRoute(makeOcc({ entryKey: entryKey('work', 'notes') }))
+    const personal = entryRoute(makeOcc({ entryKey: entryKey('personal', 'notes') }))
+    expect(work.params).toEqual({ vault: 'work', slug: 'notes' })
+    expect(personal.params).toEqual({ vault: 'personal', slug: 'notes' })
   })
 
   it('honours an explicit scope', () => {
@@ -63,25 +73,25 @@ describe('entryRoute', () => {
   })
 
   // The date pins which occurrence of a series is being opened;
-  // _app.entry.$slug.tsx uses it to expandRange before falling back to the file.
+  // _app.entry.$vault.$slug.tsx uses it to expandRange before falling back to the file.
   it('passes the occurrence date so a series opens on the right instance', () => {
     expect(entryRoute(makeOcc({ date: '2026-07-01' })).search.date).toBe('2026-07-01')
   })
 })
 
-describe('slugRoute', () => {
-  it('routes to a file by slug with no search state', () => {
-    expect(slugRoute('weekly-review.md')).toEqual({
-      to: '/entry/$slug',
-      params: { slug: 'weekly-review.md' },
+describe('keyRoute', () => {
+  it('routes to an entry by key with no search state', () => {
+    expect(keyRoute(testKey('weekly-review.md'))).toEqual({
+      to: '/entry/$vault/$slug',
+      params: { vault: TEST_VAULT, slug: 'weekly-review.md' },
       search: {},
     })
   })
 
-  // The distinction from entryRoute: no date means _app.entry.$slug.tsx skips
-  // the expandRange lookup and resolves straight from the file-occurrence map.
+  // The distinction from entryRoute: no date means _app.entry.$vault.$slug.tsx
+  // skips the expandRange lookup and resolves straight from the file-occurrence map.
   it('omits date and scope entirely, unlike entryRoute', () => {
-    expect(slugRoute('weekly-review.md').search).not.toHaveProperty('date')
-    expect(slugRoute('weekly-review.md').search).not.toHaveProperty('scope')
+    expect(keyRoute(testKey('weekly-review.md')).search).not.toHaveProperty('date')
+    expect(keyRoute(testKey('weekly-review.md')).search).not.toHaveProperty('scope')
   })
 })

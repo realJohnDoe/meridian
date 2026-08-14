@@ -45,6 +45,20 @@ describe('entryKey', () => {
     expect(keyToPath(k)).toBe('meeting-notes.md')
   })
 
+  // Checked for real: `tsconfig.test.json` type-checks the test suite (see
+  // package.json's build script), so a `@ts-expect-error` here fails the build
+  // if the branding is ever weakened to a plain string alias.
+  it('rejects a bare string where an EntryKey is required', () => {
+    // @ts-expect-error a bare slug is not an EntryKey
+    keySlug('meeting-notes')
+    // @ts-expect-error nor is a vault id
+    keyVaultId('work')
+    // ...while a real key is accepted, and is still a plain string at runtime.
+    const k = entryKey('work', 'meeting-notes')
+    expect(typeof k).toBe('string')
+    expect(k.startsWith('work')).toBe(true)
+  })
+
   it('agrees with pathToSlug/slugToPath on the slug half', () => {
     const path = 'sub/dir/note.md'
     expect(keySlug(pathToKey('v', path))).toBe(pathToSlug(path))

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { applyScope, entryFromOccurrence, saveNode } from './save'
-import { makeOcc, makeSeries, setupStore, installFakePersistence } from '@/test-utils'
+import { makeOcc, makeSeries, setupStore, installFakePersistence, testKey, TEST_VAULT } from '@/test-utils'
 import { useStore } from '@/store'
 import { setUnreadableFiles } from '@/storeBridge'
 import { ENTRY_DEFAULT } from './state'
@@ -23,7 +23,7 @@ describe('entryFromOccurrence', () => {
   })
 
   it('derives a task when `done` is defined, regardless of scheduling', () => {
-    const occ = makeOcc({ metadata: { participants: [], title: 'Task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false } })
     const entry = entryFromOccurrence(occ, 'single')
     expect(entry.itemType).toBe('task')
     expect(entry.tracked).toBe(true)
@@ -32,7 +32,7 @@ describe('entryFromOccurrence', () => {
 
   it('copies array-valued metadata fields instead of aliasing them', () => {
     const tags = ['work']
-    const occ = makeOcc({ metadata: { participants: ['alice'], title: 'T', tags, items: [], done: true } })
+    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: ['alice'], title: 'T', tags, items: [], done: true } })
     const entry = entryFromOccurrence(occ, 'single')
     entry.tags.push('mutated')
     expect(tags).toEqual(['work'])
@@ -85,7 +85,7 @@ describe('saveNode — reserved (unreadable) slugs', () => {
 
   it('places a new entry on a free slug instead of overwriting a file that failed to parse', () => {
     setUnreadableFiles(new Map([
-      ['buy-groceries', { path: 'buy-groceries.md', message: 'bad indentation, line 3' }],
+      [testKey('buy-groceries'), { path: 'buy-groceries.md', message: 'bad indentation, line 3' }],
     ]))
 
     const result = saveNode(null, 'all', {
@@ -95,15 +95,15 @@ describe('saveNode — reserved (unreadable) slugs', () => {
     })
 
     // Never adopts the reserved slug — the unreadable file's path stays untouched.
-    expect(result).toBe('buy-groceries-2')
-    expect(useStore.getState().roots.has('buy-groceries')).toBe(false)
-    expect(useStore.getState().roots.get('buy-groceries-2')?.body).toContain('totally different note')
-    expect(persistence.writes).toEqual(['buy-groceries-2'])
+    expect(result).toBe(testKey('buy-groceries-2'))
+    expect(useStore.getState().roots.has(testKey('buy-groceries'))).toBe(false)
+    expect(useStore.getState().roots.get(testKey('buy-groceries-2'))?.body).toContain('totally different note')
+    expect(persistence.writes).toEqual([testKey('buy-groceries-2')])
   })
 
   it('still lands a new entry on its natural slug when that slug is not reserved', () => {
     setUnreadableFiles(new Map([
-      ['some-other-file', { path: 'some-other-file.md', message: 'bad indentation' }],
+      [testKey('some-other-file'), { path: 'some-other-file.md', message: 'bad indentation' }],
     ]))
 
     const result = saveNode(null, 'all', {
@@ -112,8 +112,8 @@ describe('saveNode — reserved (unreadable) slugs', () => {
       body: 'note',
     })
 
-    expect(result).toBe('buy-groceries')
-    expect(useStore.getState().roots.get('buy-groceries')?.title).toBe('Buy groceries')
-    expect(persistence.writes).toEqual(['buy-groceries'])
+    expect(result).toBe(testKey('buy-groceries'))
+    expect(useStore.getState().roots.get(testKey('buy-groceries'))?.title).toBe('Buy groceries')
+    expect(persistence.writes).toEqual([testKey('buy-groceries')])
   })
 })

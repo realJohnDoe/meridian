@@ -1,6 +1,8 @@
+import type { EntryKey } from './fileIO'
+
 export interface EntityPersistence {
-  writeEntity(slug: string): void
-  deleteEntity(slug: string): void
+  writeEntity(key: EntryKey): void
+  deleteEntity(key: EntryKey): void
 }
 
 let _impl: EntityPersistence | null = null
@@ -16,10 +18,10 @@ function requireImpl(): EntityPersistence {
   return _impl
 }
 
-export function writeEntity(slug: string): void {
-  requireImpl().writeEntity(slug)
+export function writeEntity(key: EntryKey): void {
+  requireImpl().writeEntity(key)
 }
 
-export function deleteEntity(slug: string): void {
-  requireImpl().deleteEntity(slug)
+export function deleteEntity(key: EntryKey): void {
+  requireImpl().deleteEntity(key)
 }

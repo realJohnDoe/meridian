@@ -5,6 +5,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import type { Roots, StoreItem } from '@/types'
 import {
   rootsField, setRootsEffect,
+  vaultIdField, setVaultIdEffect,
   itemsField, setItemsEffect,
   createWikilinkExtension, wikilinkTheme,
 } from './cm/wikilinkDecorations'
@@ -17,6 +18,8 @@ import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
 interface Props {
   body:             string
   roots:            Roots
+  /** The vault this entry lives in — wikilinks resolve only inside it. */
+  vaultId:          string | null
   items:            StoreItem[]
   viewRef:          React.RefObject<EditorView | null>
   onOpenWikilink?:  (ref: string) => void
@@ -72,7 +75,7 @@ const editorTheme = EditorView.theme({
   },
 })
 
-export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink, onChange }: Props) {
+export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpenWikilink, onChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [wlPopup, setWlPopup] = useState<WlPopupState | null>(null)
   const closePopup = () => setWlPopup(null)
@@ -96,12 +99,12 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
   // ("skipped optimizing this component because one or more React ESLint rules
   // were disabled"), so a one-line suppression silently cost this entire file
   // its memoization.
-  const seedRef = useRef({ body, roots, items })
+  const seedRef = useRef({ body, roots, vaultId, items })
 
   // Mount CM6 EditorView once per component lifetime (key= on parent handles remounts)
   useEffect(() => {
     if (!containerRef.current) return
-    const { body: seedBody, roots: seedRoots, items: seedItems } = seedRef.current
+    const { body: seedBody, roots: seedRoots, vaultId: seedVaultId, items: seedItems } = seedRef.current
 
     const state = EditorState.create({
       doc: seedBody,
@@ -113,6 +116,7 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
         markdownLivePreview,
         // Wikilink state fields (must be registered before the decoration plugin)
         rootsField.init(() => seedRoots),
+        vaultIdField.init(() => seedVaultId),
         itemsField.init(() => seedItems),
         createWikilinkExtension(onOpenRef),
         wikilinkTheme,
@@ -164,6 +168,11 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
     viewRef.current?.dispatch({ effects: setRootsEffect.of(roots) })
   }, [roots, viewRef])
 
+  // Keep the vault in sync without remounting
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: setVaultIdEffect.of(vaultId) })
+  }, [vaultId, viewRef])
+
   // Keep items in sync without remounting
   useEffect(() => {
     viewRef.current?.dispatch({ effects: setItemsEffect.of(items) })
@@ -180,6 +189,7 @@ export default function EntryBody({ body, roots, items, viewRef, onOpenWikilink,
         <WikilinkPopup
           popup={wlPopup}
           roots={roots}
+          vaultId={vaultId}
           view={view}
           onClose={closePopup}
         />

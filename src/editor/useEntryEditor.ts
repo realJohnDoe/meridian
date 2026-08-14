@@ -6,8 +6,10 @@ import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './save'
 import type { Occurrence, EditScope } from '@/types'
 import { fmtISO, seriesContext } from '@/model'
 import { useToday } from '@/hooks'
-import { newEntryRoute } from '@/routes'
+import { newEntryRoute, keyRoute } from '@/routes'
 import { resolveWikilink } from '@/wikilinks'
+import { keyVaultId, keySlug } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 import { toggleOccDone } from '@/occurrenceActions'
 import { getFom } from '@/storeBridge'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
@@ -60,13 +62,20 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // meta-only save can capture the current body without reaching into CodeMirror.
   const bodyRef = useRef(entry.body)
 
-  // The slug a brand-new entry actually landed on, once its first save created the
+  // The key a brand-new entry actually landed on, once its first save created the
   // file. Not necessarily `titleToSlug(entry.title)`: a title that slugifies onto a
   // slug another file already owns gets placed on a free one instead. Kept in state
   // (not a ref) because it feeds the favourite button and the "listed on" target.
-  const [createdSlug, setCreatedSlug] = useState<string | null>(null)
+  const [createdKey, setCreatedKey] = useState<EntryKey | null>(null)
 
-  const { effectiveSlug, pendingSlugs, handleAdd, handleRemove, flushOnSave } = usePendingLinks(entry.item, entry.title, createdSlug)
+  // An existing entry's vault is its own; a brand-new one lands in whichever
+  // vault is loaded. Both the link picker and wikilink resolution below are
+  // scoped to it — a `[[slug]]` only ever means a file in the same vault.
+  const activeVaultId = useStore(s => s.activeVaultId)
+  const vaultId = entry.item ? keyVaultId(entry.item.entryKey) : activeVaultId
+
+  const { effectiveKey, pendingKeys, handleAdd, handleRemove, flushOnSave } =
+    usePendingLinks(entry.item, entry.title, vaultId, createdKey)
   // Mirrors the latest flushOnSave (its closure changes every render as pendingSlugs/item
   // change) so timer/dialog-driven commits — which may fire after several re-renders —
   // flush against the current pending links instead of a stale render's closure.
@@ -103,22 +112,22 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const commitEntry = (next: EntryState) => {
     const item = next.item ?? createdItemRef.current
     if (item) {
-      const slug = saveNode(item, next.editScope, next)
-      setTitleMissing(slug === null)
+      const key = saveNode(item, next.editScope, next)
+      setTitleMissing(key === null)
       // No-op once `next.item` itself is set (usePendingLinks already flushes
       // immediately in that case) — but while item only lives in
       // createdItemRef, entry.item is still null, so pending "listed on" links
       // added after creation would otherwise never get flushed again.
-      if (slug) flushLinksRef.current(slug)
+      if (key) flushLinksRef.current(keySlug(key))
       return
     }
     if (!next.title) return
-    const slug = saveNode(null, next.editScope, next, draftId)
-    if (slug === null) { setTitleMissing(true); return }
+    const key = saveNode(null, next.editScope, next, draftId)
+    if (key === null) { setTitleMissing(true); return }
     setTitleMissing(false)
-    flushLinksRef.current(slug)
-    setCreatedSlug(slug)
-    createdItemRef.current = getFom().get(slug) ?? null
+    flushLinksRef.current(keySlug(key))
+    setCreatedKey(key)
+    createdItemRef.current = getFom().get(key) ?? null
   }
 
   const saveMeta = (next: EntryState) => {
@@ -179,12 +188,14 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   }
 
   const handleOpenWikilink = (ref: string) => {
-    const fileSlug = resolveWikilink(ref, storeRoots)
-    if (!fileSlug) {
+    // Resolved inside this entry's own vault: a bare `[[slug]]` in a file means
+    // that vault's slug, never another vault's file that happens to match.
+    const target = vaultId ? resolveWikilink(ref, storeRoots, vaultId) : undefined
+    if (!target) {
       void navigate(newEntryRoute(ref))
       return
     }
-    void navigate({ to: '/entry/$slug', params: { slug: fileSlug } })
+    void navigate(keyRoute(target))
   }
 
   const goBack = () => {
@@ -198,8 +209,8 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     // still deliberately null, so saving must target the adopted item rather than ask
     // for another new entry. draftIdRef covers the window before that adoption lands.
     const item = entry.item ?? createdItemRef.current
-    const slug = saveNode(item, entry.editScope, { ...entry, body }, draftId)
-    if (slug !== null) { setTitleMissing(false); goBack(); return }
+    const key = saveNode(item, entry.editScope, { ...entry, body }, draftId)
+    if (key !== null) { setTitleMissing(false); goBack(); return }
     setTitleMissing(true)
     setFocusTitleTick(t => t + 1)
   }
@@ -252,19 +263,19 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // Promotes a checklist line into an entry of its own. No draft id: each
   // promotion is a genuinely new entry, so a title that slugifies onto an
   // existing file's slug gets its own free slug rather than overwriting that
-  // file. saveNode reports which slug that was — the checklist line is rewritten
-  // to a wikilink pointing at it, so it must be the real one, not
-  // titleToSlug(title).
+  // file. saveNode reports which key that was — the checklist line is rewritten
+  // to a wikilink pointing at its BARE slug (that is what goes in a file), so it
+  // must be the real one, not titleToSlug(title).
   const handlePromoteTask = (title: string, done: boolean): string | null => {
-    const slug = saveNode(null, 'all', {
+    const key = saveNode(null, 'all', {
       item: null, title, tracked: true, itemType: 'task', done,
       body: '', tags: [], items: [], participants: [...useStore.getState().defaultParticipants],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
     })
-    if (slug === null) return null
-    void navigate({ to: '/entry/$slug', params: { slug } })
-    return slug
+    if (key === null) return null
+    void navigate(keyRoute(key))
+    return keySlug(key)
   }
 
   // Which repeat/scope controls the editor offers is a property of the series
@@ -273,9 +284,10 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   return {
     entry, setEntry,
-    createdSlug,
+    createdKey,
+    vaultId,
     series,
-    pendingLinks: { effectiveSlug, pendingSlugs, handleAdd, handleRemove },
+    pendingLinks: { effectiveKey, pendingKeys, handleAdd, handleRemove },
     saveMeta,
     handleOpenWikilink,
     handleSave,

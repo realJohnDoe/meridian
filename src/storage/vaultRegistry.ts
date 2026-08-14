@@ -88,9 +88,9 @@ async function hydrateFromCache(vaultId: string): Promise<boolean> {
     setUnreadableFiles(new Map())
     return false
   }
-  const { items, roots, failures, auditRoundTrip } = parseFiles(cached)
+  const { items, roots, failures, auditRoundTrip } = parseFiles(cached, vaultId)
   setData({ items, roots })
-  setUnreadableFiles(new Map(failures.map(f => [f.slug, { path: f.path, message: f.message }])))
+  setUnreadableFiles(new Map(failures.map(f => [f.key, { path: f.path, message: f.message }])))
   reportParseFailures(failures)
   auditRoundTrip()
   return true
@@ -128,9 +128,9 @@ async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<v
   const backend = new ExampleBackend()
   await setActiveVaultIdentity(backend, { persist: opts.persist ?? true })
   const files = await backend.readAll()
-  const { items, roots, failures, auditRoundTrip } = parseFiles(files)
+  const { items, roots, failures, auditRoundTrip } = parseFiles(files, backend.id)
   setData({ items, roots })
-  setUnreadableFiles(new Map(failures.map(f => [f.slug, { path: f.path, message: f.message }])))
+  setUnreadableFiles(new Map(failures.map(f => [f.key, { path: f.path, message: f.message }])))
   reportParseFailures(failures)
   auditRoundTrip()
   updateSyncUI(backend)

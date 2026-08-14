@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor'
 import { EntrySkeleton } from '@/components/primitives/entry-skeleton'
-import { titleToSlug } from '@/fileIO'
+import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
 import { EntryTopbar } from './-entryTopbar'
 
 const EntryEditor = lazy(() => import('@/editor').then(m => ({ default: m.EntryEditor })))
@@ -37,19 +37,22 @@ function NewEntryReady({ title, date, time, duration, itemType }: NewEntrySearch
   const toggleFavorite = useStore(s => s.toggleFavorite)
   const hooks = useEntryEditor(null, 'all', title, { date, time, duration, itemType })
 
-  // A brand-new item has no file yet, but once it has a title its eventual fileSlug is
-  // predictable, so favoriting can target that slug immediately rather than waiting for
+  // A brand-new item has no file yet, but once it has a title its eventual key is
+  // predictable, so favoriting can target it immediately rather than waiting for
   // autosave. `titleToSlug` is only the estimate — once the first save has landed,
-  // `createdSlug` is the slug the file actually got (they differ when the title
+  // `createdKey` is the key the file actually got (they differ when the title
   // slugifies onto one another file already owns).
-  const effectiveSlug = hooks.entry.item?.entryKey ?? hooks.createdSlug ?? (hooks.entry.title ? titleToSlug(hooks.entry.title) : null)
-  const isFavorited = !!effectiveSlug && favorites.includes(effectiveSlug)
+  const estimatedKey = hooks.vaultId && hooks.entry.title
+    ? makeEntryKey(hooks.vaultId, titleToSlug(hooks.entry.title))
+    : null
+  const effectiveKey = hooks.entry.item?.entryKey ?? hooks.createdKey ?? estimatedKey
+  const isFavorited = !!effectiveKey && favorites.includes(effectiveKey)
 
   return (
     <>
       <EntryTopbar
         isFavorited={isFavorited}
-        onToggleFavorite={effectiveSlug ? () => toggleFavorite(effectiveSlug) : null}
+        onToggleFavorite={effectiveKey ? () => toggleFavorite(effectiveKey) : null}
         onDelete={hooks.handleDelete}
         onBack={hooks.handleClose}
       />

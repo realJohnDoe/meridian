@@ -4,6 +4,9 @@ import { resolveWikilink, buildResolveIndex, unwrapRef } from '@/wikilinks'
 import { fileEntries, buildBacklinkIndex, updateFileOccurrenceMap, fileOccurrenceMap } from '@/fileOccurrence'
 import { toggleDone } from '@/model/storeOps'
 import type { StoreItem, Roots, Occurrence } from '@/types'
+import type { EntryKey } from '@/fileIO'
+import { entryKey } from '@/fileIO'
+import { TEST_VAULT, keyOf } from './helpers'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -13,9 +16,9 @@ function makeStore(yamls: Array<{ slug: string; yaml: string }>): StoreSnapshot 
   const items: StoreItem[] = []
   const roots: Roots = new Map()
   for (const { slug, yaml } of yamls) {
-    const result = parseToStoreItems(`${slug}.md`, yaml)
+    const result = parseToStoreItems(`${slug}.md`, yaml, TEST_VAULT)
     items.push(...result.items)
-    roots.set(slug, result.root)
+    roots.set(keyOf(slug), result.root)
   }
   return { items, roots }
 }
@@ -58,35 +61,109 @@ describe('resolveWikilink', () => {
   ])
 
   it('resolves by fileSlug (primary)', () => {
-    const fileSlug = resolveWikilink('project-alpha', roots)
-    expect(fileSlug).toBeDefined()
-    expect(fileSlug).toBe('project-alpha')
+    const target = resolveWikilink('project-alpha', roots, TEST_VAULT)
+    expect(target).toBeDefined()
+    expect(target).toBe(keyOf('project-alpha'))
   })
 
   it('resolves by fileSlug case-insensitively', () => {
-    const fileSlug = resolveWikilink('Project-Alpha', roots)
-    expect(fileSlug).toBe('project-alpha')
+    const target = resolveWikilink('Project-Alpha', roots, TEST_VAULT)
+    expect(target).toBe(keyOf('project-alpha'))
   })
 
   it('resolves by title alias (fallback)', () => {
-    const fileSlug = resolveWikilink('Project Alpha', roots)
-    expect(fileSlug).toBe('project-alpha')
+    const target = resolveWikilink('Project Alpha', roots, TEST_VAULT)
+    expect(target).toBe(keyOf('project-alpha'))
   })
 
   it('title alias is case-insensitive', () => {
-    const fileSlug = resolveWikilink('project alpha', roots)
-    expect(fileSlug).toBe('project-alpha')
+    const target = resolveWikilink('project alpha', roots, TEST_VAULT)
+    expect(target).toBe(keyOf('project-alpha'))
   })
 
   it('prefers fileSlug over title when both could match', () => {
     // "beta-notes" is both the fileSlug of beta-notes.md
     // and (hypothetically) could be a title — slug wins
-    const fileSlug = resolveWikilink('beta-notes', roots)
-    expect(fileSlug).toBe('beta-notes')
+    const target = resolveWikilink('beta-notes', roots, TEST_VAULT)
+    expect(target).toBe(keyOf('beta-notes'))
   })
 
   it('returns undefined for unknown refs', () => {
-    expect(resolveWikilink('does-not-exist', roots)).toBeUndefined()
+    expect(resolveWikilink('does-not-exist', roots, TEST_VAULT)).toBeUndefined()
+  })
+})
+
+// ── vault scoping ─────────────────────────────────────────────────────────────
+//
+// Files store a bare `[[slug]]`, so a link means "the entry with this slug in
+// the vault the linking file itself lives in". These pin that: two vaults may
+// hold the same slug, and neither resolution nor backlinks may cross between
+// them.
+
+describe('per-vault link resolution', () => {
+  const WORK = 'work'
+  const PERSONAL = 'personal'
+
+  /** The same slug parsed into two different vaults, each linking to it by slug. */
+  function twoVaults(): Roots {
+    const roots: Roots = new Map()
+    for (const vault of [WORK, PERSONAL]) {
+      const notes = parseToStoreItems('notes.md', `---\ntitle: ${vault} notes\ntags: []\n---\n`, vault)
+      const hub = parseToStoreItems(
+        'hub.md',
+        `---\ntitle: ${vault} hub\ntags: []\nitems: ["[[notes]]"]\n---\n`,
+        vault,
+      )
+      roots.set(entryKey(vault, 'notes'), notes.root)
+      roots.set(entryKey(vault, 'hub'), hub.root)
+    }
+    return roots
+  }
+
+  it('resolves the same bare slug to a different entry in each vault', () => {
+    const roots = twoVaults()
+    expect(resolveWikilink('notes', roots, WORK)).toBe(entryKey(WORK, 'notes'))
+    expect(resolveWikilink('notes', roots, PERSONAL)).toBe(entryKey(PERSONAL, 'notes'))
+  })
+
+  it('returns undefined for a slug that exists only in another vault', () => {
+    const roots: Roots = new Map()
+    const only = parseToStoreItems('secret.md', '---\ntitle: Secret\ntags: []\n---\n', WORK)
+    roots.set(entryKey(WORK, 'secret'), only.root)
+    expect(resolveWikilink('secret', roots, WORK)).toBe(entryKey(WORK, 'secret'))
+    expect(resolveWikilink('secret', roots, PERSONAL)).toBeUndefined()
+  })
+
+  it('does not match a title alias across a vault boundary', () => {
+    const roots = twoVaults()
+    // "work notes" is a title in WORK only.
+    expect(resolveWikilink('work notes', roots, WORK)).toBe(entryKey(WORK, 'notes'))
+    expect(resolveWikilink('work notes', roots, PERSONAL)).toBeUndefined()
+  })
+
+  it('partitions buildResolveIndex by vault, agreeing with resolveWikilink', () => {
+    const roots = twoVaults()
+    const index = buildResolveIndex(roots)
+    for (const vault of [WORK, PERSONAL]) {
+      for (const ref of ['notes', 'hub', 'work notes', 'personal notes', 'nope']) {
+        expect(index.get(vault)?.get(ref.toLowerCase())).toBe(resolveWikilink(ref, roots, vault))
+      }
+    }
+  })
+
+  it('keeps backlinks inside their own vault', () => {
+    const backlinks = buildBacklinkIndex(twoVaults())
+    // Each hub links `[[notes]]`; each notes must list only its own vault's hub.
+    expect(backlinks.get(entryKey(WORK, 'notes'))).toEqual([entryKey(WORK, 'hub')])
+    expect(backlinks.get(entryKey(PERSONAL, 'notes'))).toEqual([entryKey(PERSONAL, 'hub')])
+  })
+
+  it('offers file-picker entries from one vault only', () => {
+    const entries = fileEntries(twoVaults(), WORK)
+    expect(entries.map(e => e.entryKey).sort())
+      .toEqual([entryKey(WORK, 'hub'), entryKey(WORK, 'notes')].sort())
+    // The bare slug is what a picker writes into the file — never the key.
+    expect(entries.map(e => e.fileSlug).sort()).toEqual(['hub', 'notes'])
   })
 })
 
@@ -164,7 +241,7 @@ describe('buildResolveIndex', () => {
       'does-not-exist',  // unknown → undefined on both sides
     ]
     for (const ref of refs) {
-      expect(index.get(ref.toLowerCase())).toBe(resolveWikilink(ref, roots))
+      expect(index.get(TEST_VAULT)?.get(ref.toLowerCase())).toBe(resolveWikilink(ref, roots, TEST_VAULT))
     }
   })
 })
@@ -186,22 +263,22 @@ describe('buildBacklinkIndex', () => {
 
   it('collects sources that link by fileSlug and by title alias', () => {
     // beta (fileSlug), gamma (title alias), delta (both) — in roots iteration order.
-    expect(backlinks.get('project-alpha')).toEqual(['beta-notes', 'gamma-doc', 'delta-doc'])
+    expect(backlinks.get(keyOf('project-alpha'))).toEqual([keyOf('beta-notes'), keyOf('gamma-doc'), keyOf('delta-doc')])
   })
 
   it('excludes self-links', () => {
     // alpha links to itself but must not appear in its own sources.
-    expect(backlinks.get('project-alpha')).not.toContain('project-alpha')
+    expect(backlinks.get(keyOf('project-alpha'))).not.toContain(keyOf('project-alpha'))
   })
 
   it('lists a source once even when it links the same target twice', () => {
     // delta links to alpha via both fileSlug and title alias — counted once.
-    const alphaSources = backlinks.get('project-alpha') ?? []
-    expect(alphaSources.filter(s => s === 'delta-doc')).toHaveLength(1)
+    const alphaSources = backlinks.get(keyOf('project-alpha')) ?? []
+    expect(alphaSources.filter(s => s === keyOf('delta-doc'))).toHaveLength(1)
   })
 
   it('resolves an inbound link from alpha to beta', () => {
-    expect(backlinks.get('beta-notes')).toEqual(['project-alpha'])
+    expect(backlinks.get(keyOf('beta-notes'))).toEqual([keyOf('project-alpha')])
   })
 
   it('returns an empty map for empty roots', () => {
@@ -220,7 +297,7 @@ describe('buildBacklinkIndex', () => {
       { slug: 'real-note', yaml: '---\ntitle: Real Note\ntags: []\nitems: []\n---\n' },
     ])
     expect(() => buildBacklinkIndex(roots)).not.toThrow()
-    expect(buildBacklinkIndex(roots).get('real-note')).toEqual(['note'])
+    expect(buildBacklinkIndex(roots).get(keyOf('real-note'))).toEqual([keyOf('note')])
   })
 })
 
@@ -230,7 +307,7 @@ describe('buildBacklinkIndex', () => {
 // tests. It seeds updateFileOccurrenceMap with an empty previous state so every
 // slug is re-resolved from scratch — equivalent to what the deleted
 // fileOccurrenceMap export used to do, without shipping dead code in the bundle.
-function buildFom(items: StoreItem[], roots: Roots): Map<string, Occurrence> {
+function buildFom(items: StoreItem[], roots: Roots): Map<EntryKey, Occurrence> {
   return updateFileOccurrenceMap(new Map(), [], new Map(), items, roots)
 }
 
@@ -254,21 +331,21 @@ describe('representative occurrence resolution', () => {
   it('returns an occurrence for a file with a recurring series', () => {
     const { items, roots } = makeStore([{ slug: 'weekly-standup', yaml: RECUR_YAML }])
     const map = buildFom(items, roots)
-    expect(map.get('weekly-standup')).toBeDefined()
-    expect(map.get('weekly-standup')!.entryKey).toBe('weekly-standup')
+    expect(map.get(keyOf('weekly-standup'))).toBeDefined()
+    expect(map.get(keyOf('weekly-standup'))!.entryKey).toBe(keyOf('weekly-standup'))
   })
 
   it('returns an occurrence for a standalone past item', () => {
     const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const map = buildFom(items, roots)
-    expect(map.get('project-alpha')).toBeDefined()
-    expect(map.get('project-alpha')!.entryKey).toBe('project-alpha')
+    expect(map.get(keyOf('project-alpha'))).toBeDefined()
+    expect(map.get(keyOf('project-alpha'))!.entryKey).toBe(keyOf('project-alpha'))
   })
 
   it('returns undefined for an unknown fileSlug (slug not in roots)', () => {
     const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const map = buildFom(items, roots)
-    expect(map.get('no-such-file')).toBeUndefined()
+    expect(map.get(keyOf('no-such-file'))).toBeUndefined()
   })
 
   it('(original bug) dateless note resolves to its real store occurrence', () => {
@@ -277,9 +354,9 @@ describe('representative occurrence resolution', () => {
     // the total map covers undated notes so the click handler can open them.
     const { items, roots } = makeStore([{ slug: 'grocery-list', yaml: NOTE_YAML }])
     const map = buildFom(items, roots)
-    const occ = map.get('grocery-list')
+    const occ = map.get(keyOf('grocery-list'))
     expect(occ).toBeDefined()
-    expect(occ!.entryKey).toBe('grocery-list')
+    expect(occ!.entryKey).toBe(keyOf('grocery-list'))
     // Dateless note — date field is empty string
     expect(occ!.date).toBe('')
   })
@@ -289,9 +366,9 @@ describe('representative occurrence resolution', () => {
     // expandRange won't produce it; step 2 (isStandaloneOcc) must catch it.
     const { items, roots } = makeStore([{ slug: 'old-project', yaml: FAR_PAST_YAML }])
     const map = buildFom(items, roots)
-    const occ = map.get('old-project')
+    const occ = map.get(keyOf('old-project'))
     expect(occ).toBeDefined()
-    expect(occ!.entryKey).toBe('old-project')
+    expect(occ!.entryKey).toBe(keyOf('old-project'))
     expect(occ!.date).toBe('2020-01-01')
   })
 
@@ -325,7 +402,7 @@ instances:
 `
     const { items, roots } = makeStore([{ slug: 'bargeld', yaml: DONE_DATED_PLUS_UNDATED_OPEN }])
     const map = buildFom(items, roots)
-    const occ = map.get('bargeld')
+    const occ = map.get(keyOf('bargeld'))
     expect(occ).toBeDefined()
     expect(occ!.date).toBe('')
     expect(occ!.metadata.done).toBe(false)
@@ -346,7 +423,7 @@ instances:
 `
     const { items, roots } = makeStore([{ slug: 'sync-bug', yaml: DONE_TODAY_PLUS_UNDATED_OPEN }])
     const map = buildFom(items, roots)
-    const occ = map.get('sync-bug')
+    const occ = map.get(keyOf('sync-bug'))
     expect(occ).toBeDefined()
     expect(occ!.date).toBe('')
     expect(occ!.metadata.done).toBe(false)
@@ -381,7 +458,7 @@ function occKey(occ: Occurrence) {
   }
 }
 
-function assertMapsEquivalent(incremental: Map<string, Occurrence>, full: Map<string, Occurrence>) {
+function assertMapsEquivalent(incremental: Map<EntryKey, Occurrence>, full: Map<EntryKey, Occurrence>) {
   expect(incremental.size).toBe(full.size)
   for (const [slug, fullOcc] of full) {
     const incOcc = incremental.get(slug)
@@ -425,7 +502,7 @@ describe('updateFileOccurrenceMap', () => {
       { slug: 'future-event',   yaml: FUTURE_YAML },
     ])
     const prevFom = buildFom(base.items, base.roots)
-    const taskOcc = prevFom.get('my-task')!
+    const taskOcc = prevFom.get(keyOf('my-task'))!
 
     const next = toggleDone(base, taskOcc)
 
@@ -434,9 +511,9 @@ describe('updateFileOccurrenceMap', () => {
     assertMapsEquivalent(incremental, full)
 
     // Unchanged slug reuses the cached reference.
-    expect(incremental.get('future-event')).toBe(prevFom.get('future-event'))
+    expect(incremental.get(keyOf('future-event'))).toBe(prevFom.get(keyOf('future-event')))
     // Changed slug has updated done value.
-    expect(incremental.get('my-task')!.metadata.done).toBe(!taskOcc.metadata.done)
+    expect(incremental.get(keyOf('my-task'))!.metadata.done).toBe(!taskOcc.metadata.done)
   })
 
   it('adding a new file includes it in the incremental map', () => {
@@ -452,9 +529,9 @@ describe('updateFileOccurrenceMap', () => {
     const incremental = updateFileOccurrenceMap(prevFom, base.items, base.roots, nextItems, nextRoots)
     const full        = buildFom(nextItems, nextRoots)
     assertMapsEquivalent(incremental, full)
-    expect(incremental.get('my-task')).toBeDefined()
+    expect(incremental.get(keyOf('my-task'))).toBeDefined()
     // Unchanged slug reuses the cached reference (same item refs, same root ref).
-    expect(incremental.get('project-alpha')).toBe(prevFom.get('project-alpha'))
+    expect(incremental.get(keyOf('project-alpha'))).toBe(prevFom.get(keyOf('project-alpha')))
   })
 
   it('deleting a file removes it from the incremental map', () => {
@@ -470,7 +547,7 @@ describe('updateFileOccurrenceMap', () => {
     const incremental = updateFileOccurrenceMap(prevFom, baseItems, baseRoots, alpha.items, alpha.roots)
     const full        = buildFom(alpha.items, alpha.roots)
     assertMapsEquivalent(incremental, full)
-    expect(incremental.get('my-task')).toBeUndefined()
+    expect(incremental.get(keyOf('my-task'))).toBeUndefined()
   })
 
   it('root-only change (title rename) re-resolves affected slug', () => {
@@ -482,15 +559,15 @@ describe('updateFileOccurrenceMap', () => {
 
     // Rename project-alpha's title — new Map entry = new reference for that slug.
     const newRoots: Roots = new Map(base.roots)
-    newRoots.set('project-alpha', { ...base.roots.get('project-alpha')!, title: 'Project Alpha Renamed' })
+    newRoots.set(keyOf('project-alpha'), { ...base.roots.get(keyOf('project-alpha'))!, title: 'Project Alpha Renamed' })
     const next = { items: base.items, roots: newRoots }
 
     const incremental = updateFileOccurrenceMap(prevFom, base.items, base.roots, next.items, next.roots)
     const full        = buildFom(next.items, next.roots)
     assertMapsEquivalent(incremental, full)
-    expect(incremental.get('project-alpha')!.metadata.title).toBe('Project Alpha Renamed')
+    expect(incremental.get(keyOf('project-alpha'))!.metadata.title).toBe('Project Alpha Renamed')
     // Unaffected slug reuses cached reference.
-    expect(incremental.get('my-task')).toBe(prevFom.get('my-task'))
+    expect(incremental.get(keyOf('my-task'))).toBe(prevFom.get(keyOf('my-task')))
   })
 
   it('recurring series: toggle done on a generated occurrence matches full rebuild', () => {
@@ -499,7 +576,7 @@ describe('updateFileOccurrenceMap', () => {
       { slug: 'my-task',        yaml: TASK_YAML  },
     ])
     const prevFom = buildFom(base.items, base.roots)
-    const seriesOcc = prevFom.get('weekly-standup')!
+    const seriesOcc = prevFom.get(keyOf('weekly-standup'))!
 
     const next = toggleDone(base, seriesOcc)
 
@@ -507,7 +584,7 @@ describe('updateFileOccurrenceMap', () => {
     const full        = buildFom(next.items, next.roots)
     assertMapsEquivalent(incremental, full)
     // Unrelated slug reuses cached reference.
-    expect(incremental.get('my-task')).toBe(prevFom.get('my-task'))
+    expect(incremental.get(keyOf('my-task'))).toBe(prevFom.get(keyOf('my-task')))
   })
 })
 
@@ -542,7 +619,7 @@ describe('fileOccurrenceMap', () => {
     ])
     const before = fileOccurrenceMap(base.items, base.roots)
 
-    const next = toggleDone(base, before.get('weekly-standup')!)
+    const next = toggleDone(base, before.get(keyOf('weekly-standup'))!)
     const after = fileOccurrenceMap(next.items, next.roots)
 
     expect(after).not.toBe(before)
@@ -560,8 +637,8 @@ describe('fileOccurrenceMap', () => {
     ])
     const seed = fileOccurrenceMap(base.items, base.roots)
 
-    const once  = toggleDone(base, seed.get('weekly-standup')!)
-    const twice = toggleDone(once, fileOccurrenceMap(once.items, once.roots).get('my-task')!)
+    const once  = toggleDone(base, seed.get(keyOf('weekly-standup'))!)
+    const twice = toggleDone(once, fileOccurrenceMap(once.items, once.roots).get(keyOf('my-task'))!)
 
     // Jump straight from `base` to `twice` without reading the state between.
     const skipped = makeStore([

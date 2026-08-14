@@ -5,22 +5,40 @@ import { isSeries, isStandaloneOcc } from './types'
 import { occKind } from './occView'
 import { onIdle } from '@/lib/idle'
 import type { Occurrence, StoreItem, Roots } from './types'
+import type { EntryKey } from './fileIO'
 
-/** A flat, file-granular entry for the item picker and search overlay. */
+/**
+ * A flat, file-granular entry for the item picker and search overlay.
+ *
+ * Carries both halves of the identity on purpose: `entryKey` is what the store
+ * is looked up by, `fileSlug` is the bare slug that goes *into* the file when
+ * the picker writes a `[[wikilink]]`. Conflating the two is the whole bug class
+ * `EntryKey`'s branding exists to catch, so neither is derived at the call site.
+ */
 interface FilePickerEntry {
+  entryKey: EntryKey
   fileSlug: string
   title:    string
   tags:     string[]
   items:    string[]
 }
 
-/** One FilePickerEntry per file (deduped by fileSlug), sourced entirely from the roots map. */
-export function fileEntries(roots: Roots): FilePickerEntry[] {
+/**
+ * One FilePickerEntry per file, sourced entirely from the roots map.
+ *
+ * `vaultId` narrows the result to a single vault. Link pickers must pass it —
+ * a `[[wikilink]]` resolves only within its own vault (see `resolveWikilink`),
+ * so offering another vault's entries would write a link that renders broken.
+ * Search deliberately omits it and spans every registered vault.
+ */
+export function fileEntries(roots: Roots, vaultId?: string): FilePickerEntry[] {
   const entries: FilePickerEntry[] = []
-  for (const [fileSlug, meta] of roots) {
+  for (const [entryKey, meta] of roots) {
+    if (vaultId !== undefined && meta.vaultId !== vaultId) continue
     entries.push({
-      fileSlug,
-      title: meta.title || fileSlug,
+      entryKey,
+      fileSlug: meta.fileSlug,
+      title: meta.title || meta.fileSlug,
       tags:  meta.tags,
       items: meta.items,
     })
@@ -48,8 +66,8 @@ const _3YR_MS = 365 * 3 * 86_400_000
  *     occurrence built from the series' own anchor date (RepeatPattern isn't
  *     itself an Occurrence, so expandRange can't hand us one).
  */
-function resolveOneSlug(
-  fileSlug: string,
+function resolveOneKey(
+  entryKey: EntryKey,
   slugItems: StoreItem[],
   roots: Roots,
   now: Date,
@@ -66,7 +84,7 @@ function resolveOneSlug(
   // 2. Undated open standalone task.
   const undatedOpen = slugItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
   if (undatedOpen) {
-    return { ...undatedOpen, metadata: joinFileMeta(fileSlug, undatedOpen.metadata, roots) } as Occurrence
+    return { ...undatedOpen, metadata: joinFileMeta(entryKey, undatedOpen.metadata, roots) } as Occurrence
   }
 
   // 3. Earliest undone task.
@@ -84,7 +102,7 @@ function resolveOneSlug(
   // 6. Fallback: standalone as-is, or a synthesized anchor for an out-of-window series.
   for (const item of slugItems) {
     if (isStandaloneOcc(item)) {
-      return { ...item, metadata: joinFileMeta(fileSlug, item.metadata, roots) }
+      return { ...item, metadata: joinFileMeta(entryKey, item.metadata, roots) }
     }
     if (isSeries(item)) {
       return {
@@ -103,10 +121,10 @@ function resolveOneSlug(
 
 
 /**
- * Incremental update of the fileSlug → representative Occurrence map.
+ * Incremental update of the EntryKey → representative Occurrence map.
  *
- * Re-resolves only slugs whose items group or root entry actually changed.
- * A slug's entry is reusable when:
+ * Re-resolves only entries whose items group or root entry actually changed.
+ * An entry is reusable when:
  *   - its items group has the same length and the same element references, AND
  *   - prevRoots.get(slug) === roots.get(slug)  (reference equality)
  *
@@ -115,33 +133,33 @@ function resolveOneSlug(
  * what changed without deep comparison.
  */
 export function updateFileOccurrenceMap(
-  prevFom:   Map<string, Occurrence>,
+  prevFom:   Map<EntryKey, Occurrence>,
   prevItems: StoreItem[],
   prevRoots: Roots,
   items:     StoreItem[],
   roots:     Roots,
-): Map<string, Occurrence> {
+): Map<EntryKey, Occurrence> {
   const now   = startOfToday()
   const AHEAD = new Date(now.getTime() + _3YR_MS)
   const BACK  = new Date(now.getTime() - _3YR_MS)
 
-  // Group previous items by slug for reference comparison.
-  const prevBySlug = new Map<string, StoreItem[]>()
+  // Group previous items by key for reference comparison.
+  const prevBySlug = new Map<EntryKey, StoreItem[]>()
   for (const item of prevItems) {
     let group = prevBySlug.get(item.entryKey)
     if (!group) { group = []; prevBySlug.set(item.entryKey, group) }
     group.push(item)
   }
 
-  // Group new items by slug and build the updated map.
-  const newBySlug = new Map<string, StoreItem[]>()
+  // Group new items by key and build the updated map.
+  const newBySlug = new Map<EntryKey, StoreItem[]>()
   for (const item of items) {
     let group = newBySlug.get(item.entryKey)
     if (!group) { group = []; newBySlug.set(item.entryKey, group) }
     group.push(item)
   }
 
-  const map = new Map<string, Occurrence>()
+  const map = new Map<EntryKey, Occurrence>()
   for (const [slug, slugItems] of newBySlug) {
     const prevGroup    = prevBySlug.get(slug)
     const rootSame     = prevRoots.get(slug) === roots.get(slug)
@@ -154,7 +172,7 @@ export function updateFileOccurrenceMap(
       if (cached !== undefined) { map.set(slug, cached); continue }
     }
 
-    const occ = resolveOneSlug(slug, slugItems, roots, now, AHEAD, BACK)
+    const occ = resolveOneKey(slug, slugItems, roots, now, AHEAD, BACK)
     if (occ) map.set(slug, occ)
   }
 
@@ -176,7 +194,7 @@ export function updateFileOccurrenceMap(
 // agenda. So the map is derived on demand instead, and merely *warmed* during
 // idle time so those consumers almost never pay for it either.
 
-interface FomMemo { items: StoreItem[]; roots: Roots; map: Map<string, Occurrence> }
+interface FomMemo { items: StoreItem[]; roots: Roots; map: Map<EntryKey, Occurrence> }
 
 // A one-entry Map rather than a `let` or a mutable object field, because
 // `fileOccurrenceMap` is called during render (via useFileOccurrenceMap): the
@@ -190,10 +208,10 @@ const fomMemo = new Map<typeof FOM_KEY, FomMemo>()
 // Map<any, any> and trips the no-unsafe-argument rule.
 const NO_ITEMS: StoreItem[] = []
 const NO_ROOTS: Roots = new Map()
-const NO_FOM: Map<string, Occurrence> = new Map()
+const NO_FOM: Map<EntryKey, Occurrence> = new Map()
 
 /**
- * The fileSlug → representative Occurrence map for `items`/`roots`, memoized on
+ * The EntryKey → representative Occurrence map for `items`/`roots`, memoized on
  * their identity. Safe to call during render: repeating the call with the same
  * inputs returns the same Map by reference, so it behaves as a pure derivation.
  *
@@ -201,7 +219,7 @@ const NO_FOM: Map<string, Occurrence> = new Map()
  * the slugs that actually changed since the last call — the incremental path is
  * unchanged, it just runs on read rather than on write.
  */
-export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<string, Occurrence> {
+export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<EntryKey, Occurrence> {
   const prev = fomMemo.get(FOM_KEY)
   if (prev && prev.items === items && prev.roots === roots) return prev.map
 
@@ -228,25 +246,36 @@ export function warmFileOccurrenceMap(items: StoreItem[], roots: Roots): void {
 }
 
 /**
- * Build the whole-vault reverse-link index: targetSlug → fileSlugs that link to it.
- * Self-links are excluded and a source is listed at most once per target (matching the
- * old per-target `break`). Resolves each item once through a shared `buildResolveIndex`,
- * so the total build is O(roots · items) — replacing the old per-target `backlinksTo`
- * that was O(roots² · items) per call. Built once per `roots` change and stored on the
- * Zustand store; call sites do an O(1) `backlinks.get(slug)` lookup.
+ * Build the reverse-link index across every registered vault: target EntryKey →
+ * the EntryKeys that link to it.
+ *
+ * **Backlinks never cross a vault boundary.** Each root's items are resolved
+ * through that root's own vault partition of `buildResolveIndex`, so a
+ * `[[weekly-review]]` in the Work vault contributes a backlink to Work's
+ * weekly-review and nothing else — even when Personal has a file by the same
+ * slug. That falls out of the identity change rather than being a feature.
+ *
+ * Self-links are excluded and a source is listed at most once per target
+ * (matching the old per-target `break`). Resolves each item once through a
+ * shared `buildResolveIndex`, so the total build is O(roots · items) —
+ * replacing the old per-target `backlinksTo` that was O(roots² · items) per
+ * call. Built once per `roots` change and stored on the Zustand store; call
+ * sites do an O(1) `backlinks.get(key)` lookup.
  */
-export function buildBacklinkIndex(roots: Roots): Map<string, string[]> {
+export function buildBacklinkIndex(roots: Roots): Map<EntryKey, EntryKey[]> {
   const resolve = buildResolveIndex(roots)
-  const backlinks = new Map<string, string[]>()
-  for (const [fileSlug, meta] of roots) {
-    const seen = new Set<string>()
+  const backlinks = new Map<EntryKey, EntryKey[]>()
+  for (const [entryKey, meta] of roots) {
+    const inVault = resolve.get(meta.vaultId)
+    if (!inVault) continue
+    const seen = new Set<EntryKey>()
     for (const raw of meta.items) {
-      const target = resolve.get(unwrapRef(raw).toLowerCase())
-      if (!target || target === fileSlug || seen.has(target)) continue
+      const target = inVault.get(unwrapRef(raw).toLowerCase())
+      if (!target || target === entryKey || seen.has(target)) continue
       seen.add(target)
       const arr = backlinks.get(target)
-      if (arr) arr.push(fileSlug)
-      else backlinks.set(target, [fileSlug])
+      if (arr) arr.push(entryKey)
+      else backlinks.set(target, [entryKey])
     }
   }
   return backlinks

@@ -5,6 +5,7 @@ import type { Occurrence } from '@/types'
 import type { AgendaRow } from './agendaSections'
 import { calendarView, resetCalendarViewState } from './viewState'
 import { useAgendaScrollRestore } from './useAgendaScrollRestore'
+import { testKey, TEST_VAULT } from '@/test-utils'
 
 function occ(id: string, date: string, opts: { time?: string; done?: boolean } = {}): Occurrence {
   const [y = NaN, m = NaN, d = NaN] = date.split('-').map(Number)
@@ -13,9 +14,9 @@ function occ(id: string, date: string, opts: { time?: string; done?: boolean } =
     date,
     time: opts.time ?? null,
     source: 'explicit',
-    entryKey: 'note.md',
+    entryKey: testKey('note.md'),
     id,
-    metadata: {
+    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md',
       title: id,
       tags: [],
       items: [],

@@ -66,6 +66,8 @@ export interface EntryEditorHooks {
   entry: EntryState
   /** How this occurrence sits in its series — derived in model/, see seriesContext. */
   series: SeriesContext
+  /** The vault this entry lives in (or would, for a new one). Scopes links and the file picker. */
+  vaultId: string | null
   pendingLinks: PendingLinks
   dialogHandlers: DialogHandlers
   setEntry: (updater: (prev: EntryState) => EntryState) => void
@@ -97,7 +99,7 @@ function autoResize(el: HTMLTextAreaElement) {
 
 export default function EntryEditor({ hooks, items, roots }: Props) {
   const {
-    entry, series, pendingLinks, dialogHandlers,
+    entry, series, vaultId, pendingLinks, dialogHandlers,
     setEntry, handleSave, handleOpenDlg, handleOpenRepeatDlg, handlePromoteTask,
     scheduleAutoSave, saveMeta, handleScopeChange, handleTypeChange, handleDoneToggle,
     handleOpenWikilink, handleToggleDoneBacklink, titleMissing, focusTitleTick,
@@ -125,9 +127,9 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
 
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
-  const { effectiveSlug, pendingSlugs, handleAdd, handleRemove } = pendingLinks
+  const { effectiveKey, pendingKeys, handleAdd, handleRemove } = pendingLinks
 
-  const linkedSlugs = [...(backlinks.get(effectiveSlug ?? '') ?? []), ...pendingSlugs]
+  const linkedKeys = [...(effectiveKey ? backlinks.get(effectiveKey) ?? [] : []), ...pendingKeys]
 
   const { isRecurring, isScheduled, isAfterCompletion } = series
   const hasSched = !!item?.date
@@ -181,15 +183,16 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
               }}
             />
             {item && (
-              <p className="font-mono text-2xs text-muted-foreground mt-0.5">{item.entryKey}.md</p>
+              <p className="font-mono text-2xs text-muted-foreground mt-0.5">{item.metadata.fileSlug}.md</p>
             )}
           </div>
         </div>
 
         {/* ── FILE-LEVEL: listed-on reverse chips ── */}
         <ListedOnRow
-          slugs={linkedSlugs}
-          fileSlug={effectiveSlug}
+          linkedKeys={linkedKeys}
+          entryKey={effectiveKey}
+          vaultId={vaultId}
           roots={roots}
           onOpenWikilink={handleOpenWikilink}
           onAdd={handleAdd}
@@ -281,7 +284,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} items={items} onOpenWikilink={handleOpenWikilink} onChange={editScope !== 'add' ? scheduleAutoSave : undefined} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} vaultId={vaultId} items={items} onOpenWikilink={handleOpenWikilink} onChange={editScope !== 'add' ? scheduleAutoSave : undefined} />
 
         <ItemsList
           items={listItems}
@@ -291,7 +294,8 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
             saveMeta?.(next)
           }}
           roots={roots}
-          currentSlug={effectiveSlug ?? null}
+          currentKey={effectiveKey ?? null}
+          vaultId={vaultId}
           onPromote={handlePromoteTask}
           onOpenWikilink={handleOpenWikilink}
           onToggleDone={handleToggleDoneBacklink}

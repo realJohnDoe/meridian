@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { Occurrence, Priority } from '@/types'
 import { computeAgendaSections, estimateRow, type Section, type FilterOccs, type AgendaRow } from './agendaSections'
+import { testKey, TEST_VAULT } from '@/test-utils'
 
 const TODAY = new Date(2026, 5, 15) // a Monday
 const NOW = new Date(2026, 5, 15, 9, 0)
@@ -24,9 +25,9 @@ function occ(id: string, date: string, opts: OccOpts = {}): Occurrence {
     date,
     time: opts.time ?? null,
     source: 'explicit',
-    entryKey: 'note.md',
+    entryKey: testKey('note.md'),
     id,
-    metadata: {
+    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md',
       title: id,
       tags: [],
       items: [],

@@ -2,14 +2,30 @@ import { afterEach, beforeEach } from 'vitest'
 import { useStore } from '@/store'
 import { setEntityPersistence } from '@/persistencePort'
 import { resetCalendarOnVaultChange } from '@/calendar'
+import { entryKey as makeEntryKey } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 import type { Occurrence, StoreSeries, StoreItem, Roots, FileMetadata } from '@/types'
 
 const initialStoreState = useStore.getInitialState()
 
+/**
+ * The vault every test fixture belongs to. Entry identity is vault-qualified,
+ * so a fixture needs *a* vault — one shared constant keeps every helper's keys
+ * comparable without each test inventing its own id.
+ */
+export const TEST_VAULT = 'test-vault'
+
+/** `entryKey(TEST_VAULT, slug)` — the fixture form of an entry identity. */
+export function testKey(slug: string): EntryKey {
+  return makeEntryKey(TEST_VAULT, slug)
+}
+
 /** Resets the store (a module singleton) to a clean, deterministic state around each test. */
 export function setupStore(): void {
   beforeEach(() => {
-    useStore.setState({ localePrefs: { hour12: false, firstDayOfWeek: 1 } })
+    // activeVaultId is where a brand-new entry goes (see saveNode); without it
+    // creating an entry in a test would have no target vault at all.
+    useStore.setState({ localePrefs: { hour12: false, firstDayOfWeek: 1 }, activeVaultId: TEST_VAULT })
   })
   afterEach(() => {
     useStore.setState(initialStoreState, true)
@@ -73,6 +89,7 @@ export function setMediaQuery(initialMatches: boolean): (next: boolean) => void 
 }
 
 export function seedStore(items: StoreItem[], roots: Roots): void {
+  useStore.setState({ activeVaultId: TEST_VAULT })
   useStore.getState().setData({ items, roots })
 }
 
@@ -88,8 +105,8 @@ export function installFakePersistence(): FakePersistence {
     calls.writes = []
     calls.deletes = []
     setEntityPersistence({
-      writeEntity: (slug) => { calls.writes.push(slug) },
-      deleteEntity: (slug) => { calls.deletes.push(slug) },
+      writeEntity: (key) => { calls.writes.push(key) },
+      deleteEntity: (key) => { calls.deletes.push(key) },
     })
   })
   return calls
@@ -100,9 +117,9 @@ export function makeOcc(overrides: Partial<Occurrence> = {}): Occurrence {
     date: '2026-06-15',
     time: '09:00',
     source: 'explicit',
-    entryKey: 'note.md',
+    entryKey: testKey('note.md'),
     id: 'occ-1',
-    metadata: { participants: [], title: 'Standup', tags: [], items: [] },
+    metadata: { participants: [], title: 'Standup', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'note.md' },
     ...overrides,
   }
 }
@@ -111,7 +128,7 @@ export function makeSeries(overrides: Partial<StoreSeries> = {}): StoreSeries {
   return {
     date: '2026-06-01',
     time: '09:00',
-    entryKey: 'note.md',
+    entryKey: testKey('note.md'),
     id: 'series-1',
     repeat: { type: 'schedule', freq: 'daily' },
     metadata: { participants: [] },
@@ -119,6 +136,15 @@ export function makeSeries(overrides: Partial<StoreSeries> = {}): StoreSeries {
   }
 }
 
+/**
+ * A complete `FileMetadata` for `slug` in the test vault. `vaultId`/`fileSlug`
+ * are runtime provenance a parse always supplies, so a fixture has to as well —
+ * wikilink resolution and backlinks read them off the root, not off the key.
+ */
+export function makeRootMeta(fileSlug: string, meta: Partial<FileMetadata> = {}): FileMetadata {
+  return { title: 'Note', tags: [], items: [], vaultId: TEST_VAULT, fileSlug, ...meta }
+}
+
 export function makeRoots(slug: string, meta: Partial<FileMetadata> = {}): Roots {
-  return new Map([[slug, { title: 'Note', tags: [], items: [], ...meta }]])
+  return new Map([[testKey(slug), makeRootMeta(slug, meta)]])
 }

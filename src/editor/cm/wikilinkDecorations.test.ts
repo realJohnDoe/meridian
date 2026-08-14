@@ -2,9 +2,12 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { build, rootsField, itemsField } from './wikilinkDecorations'
+import { build, rootsField, vaultIdField, itemsField } from './wikilinkDecorations'
 import { visibleLineRanges } from './viewUtils'
 import type { FileMetadata, Roots } from '@/types'
+import { entryKey } from '@/fileIO'
+
+const VAULT = 'test-vault'
 
 const views: EditorView[] = []
 
@@ -13,14 +16,20 @@ afterEach(() => {
   views.length = 0
 })
 
-function mkFile(title: string): FileMetadata {
-  return { title, tags: [], items: [] }
+function mkFile(title: string, fileSlug: string): FileMetadata {
+  return { title, tags: [], items: [], vaultId: VAULT, fileSlug }
 }
 
 function mkView(doc: string, roots: Roots = new Map()): EditorView {
   const state = EditorState.create({
     doc,
-    extensions: [rootsField.init(() => roots), itemsField.init(() => [])],
+    extensions: [
+      rootsField.init(() => roots),
+      // A wikilink resolves only within its own vault, so the decorations need
+      // to know which one the document belongs to.
+      vaultIdField.init(() => VAULT),
+      itemsField.init(() => []),
+    ],
   })
   const view = new EditorView({ state })
   document.body.appendChild(view.dom)
@@ -36,7 +45,7 @@ function rangesOf(decos: ReturnType<typeof build>, docLength: number) {
 
 describe('wikilinkDecorations build()', () => {
   it('replaces a resolved wikilink with a chip covering exactly its [[...]] span', () => {
-    const roots: Roots = new Map([['some-note', mkFile('Some Note')]])
+    const roots: Roots = new Map([[entryKey(VAULT, 'some-note'), mkFile('Some Note', 'some-note')]])
     const view = mkView('before [[some-note]] after', roots)
 
     const decos = build(view, { current: () => {} })
@@ -48,7 +57,7 @@ describe('wikilinkDecorations build()', () => {
   })
 
   it('marks (does not replace) a wikilink on the focused cursor line', () => {
-    const roots: Roots = new Map([['some-note', mkFile('Some Note')]])
+    const roots: Roots = new Map([[entryKey(VAULT, 'some-note'), mkFile('Some Note', 'some-note')]])
     const view = mkView('[[some-note]]', roots)
     view.focus()
     view.dispatch({ selection: { anchor: 0 } })
@@ -65,7 +74,7 @@ describe('wikilinkDecorations build()', () => {
     const lineCount = 300
     const lines = Array.from({ length: lineCount }, (_, i) => `line ${i} [[note-${i}]] text`)
     const doc = lines.join('\n')
-    const roots: Roots = new Map(lines.map((_, i) => [`note-${i}`, mkFile(`Note ${i}`)]))
+    const roots: Roots = new Map(lines.map((_, i) => [entryKey(VAULT, `note-${i}`), mkFile(`Note ${i}`, `note-${i}`)]))
     const view = mkView(doc, roots)
 
     const visible = visibleLineRanges(view)

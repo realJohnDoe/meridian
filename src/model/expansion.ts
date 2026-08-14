@@ -21,6 +21,8 @@ import type { EffectiveNode } from './inheritance'
 import { fmtISO, fmtT, parseDateString, parseDateTime } from './dateUtils'
 import { parseDurationDays } from './duration'
 import { parseInterval } from './repeat'
+import { parseEntryKey } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL DATE HELPERS  (not exported — no consumers outside this file)
@@ -555,8 +557,13 @@ export function stableOccId(key: string): string {
  * would write them back as occurrence-level keys — emitting them twice.
  * AppMetadata.extra is always the occurrence bag (see the type's Omit).
  */
-export function joinFileMeta(fileSlug: string, meta: OccurrenceMetadata, roots: Roots): AppMetadata {
-  const { extra: _fileExtra, ...file } = roots.get(fileSlug) ?? { title: '', tags: [], items: [] }
+export function joinFileMeta(entryKey: EntryKey, meta: OccurrenceMetadata, roots: Roots): AppMetadata {
+  // The fallback derives `vaultId`/`fileSlug` from the key rather than leaving
+  // them blank: a root can legitimately be missing (an item whose file failed to
+  // parse, a debug-view synthetic), and an occurrence with no vault would route
+  // and resolve links against the wrong one instead of simply having no title.
+  const { extra: _fileExtra, ...file } =
+    roots.get(entryKey) ?? { title: '', tags: [], items: [], ...parseEntryKey(entryKey) }
   return { ...file, ...meta }
 }
 
@@ -674,7 +681,7 @@ export function expandRange(
  * subsequent day that a multi-day standalone event covers within [from, to].
  * The start-date occurrence is already produced by expandRange; this helper
  * adds days 2..N so callers don't need to scatter that logic across views.
- * Result is deduplicated by (fileSlug, jsTime) and sorted by jsTime.
+ * Result is deduplicated by (entryKey, jsTime) and sorted by jsTime.
  */
 export function expandWithMultiday(
   items: StoreItem[],

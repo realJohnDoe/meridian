@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeMultidayLanes, compactRowLanes, visibleLaneCount } from './computeMultidayLanes'
 import type { Occurrence } from '@/types'
+import { testKey, TEST_VAULT } from '@/test-utils'
 
 function makeOcc(overrides: Partial<Occurrence> & { date: string; duration: string }): Occurrence {
   const { date, duration, ...rest } = overrides
@@ -8,9 +9,9 @@ function makeOcc(overrides: Partial<Occurrence> & { date: string; duration: stri
     date,
     time: null,
     source: 'explicit',
-    entryKey: 'note.md',
+    entryKey: testKey('note.md'),
     id: 'occ-1',
-    metadata: { participants: [], title: '', tags: [], items: [], duration },
+    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: '', tags: [], items: [], duration },
     ...rest,
   }
 }

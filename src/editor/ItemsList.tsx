@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
 import type { Occurrence, Roots } from '@/types'
+import type { EntryKey } from '@/fileIO'
 import { occKind } from '@/occView'
 import { parseItemEntry, serializeTaskEntry } from './items'
 import { fileEntries } from '@/fileOccurrence'
@@ -21,7 +22,9 @@ interface Props {
   items:           string[]
   onChange:        (items: string[]) => void
   roots:           Roots
-  currentSlug:     string | null
+  currentKey:      EntryKey | null
+  /** Which vault this entry's links resolve in — never crosses a vault boundary. */
+  vaultId:         string | null
   onPromote:       (title: string, done: boolean) => string | null
   onOpenWikilink?: (ref: string) => void
   onToggleDone?:   (occ: Occurrence) => void
@@ -49,7 +52,7 @@ export function rowSortKey({ entry, occ }: Row): [number, number, string] {
   return [3, entry.idx, '']
 }
 
-export default function ItemsList({ items, onChange, roots, currentSlug, onPromote, onOpenWikilink, onToggleDone }: Props) {
+export default function ItemsList({ items, onChange, roots, currentKey, vaultId, onPromote, onOpenWikilink, onToggleDone }: Props) {
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const [editingIdx,  setEditingIdx]  = useState<number | null>(null)
@@ -60,7 +63,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
 
   const occBySlug = useFileOccurrenceMap()
   const backlinks = useStore(s => s.backlinks)
-  const allFiles  = fileEntries(roots)
+  const allFiles  = fileEntries(roots, vaultId ?? undefined)
   const filtered  = pickerQuery ? rankByQuery(pickerQuery, allFiles, e => e.title) : allFiles
 
   const entries: ParsedEntry[] = items.map((raw, idx) => ({ ...parseItemEntry(raw), idx }))
@@ -68,8 +71,8 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
   const sortedRows: Row[] = (() => {
     const rows: Row[] = entries.map(entry => {
       if (entry.kind !== 'link') return { entry, occ: undefined }
-      const slug = resolveWikilink(entry.ref, roots)
-      return { entry, occ: slug ? occBySlug.get(slug) : undefined }
+      const target = vaultId ? resolveWikilink(entry.ref, roots, vaultId) : undefined
+      return { entry, occ: target ? occBySlug.get(target) : undefined }
     })
     return [...rows].sort((a, b) => {
       const [ga, na, sa] = rowSortKey(a)
@@ -102,6 +105,8 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     setPickerOpen(false)
   }
 
+  // A file stores the BARE slug, never the key — the vault is implied by which
+  // file the link lives in.
   const addLink = (fileSlug: string) => {
     const stored = `[[${fileSlug}]]`
     if (!items.includes(stored)) onChange([...items, stored])
@@ -171,8 +176,8 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
     if (entry.kind === 'link') {
       const listedOn = occ
         ? (backlinks.get(occ.entryKey) ?? [])
-            .filter(slug => slug !== currentSlug)
-            .map(slug => roots.get(slug)?.title ?? slug)
+            .filter(key => key !== currentKey)
+            .map(key => roots.get(key)?.title ?? key)
         : []
       return (
         <>
@@ -185,7 +190,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                 showDate
                 showTagsParticipants
                 listedOn={listedOn}
-                onOpen={() => onOpenWikilink?.(occ.entryKey)}
+                onOpen={() => onOpenWikilink?.(occ.metadata.fileSlug)}
                 onToggleDone={() => {
                   beginExit(row)
                   onToggleDone?.(occ)

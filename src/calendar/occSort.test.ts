@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { sortOccs } from './occSort'
 import type { Occurrence } from '@/types'
+import { testKey, TEST_VAULT } from '@/test-utils'
 
 // Fixed clock well after every fixture's jsTime below, so `event-past`/
 // `event-future` classification is deterministic regardless of when the
@@ -14,9 +15,9 @@ function makeOcc(overrides: Partial<Occurrence> & { title?: string; done?: boole
     date: '2020-01-01',
     time: null,
     source: 'explicit',
-    entryKey: 'note.md',
+    entryKey: testKey('note.md'),
     id: title || 'occ',
-    metadata: { participants: [], title, tags: [], items: [], done, jsTime, duration },
+    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title, tags: [], items: [], done, jsTime, duration },
     ...rest,
   }
 }

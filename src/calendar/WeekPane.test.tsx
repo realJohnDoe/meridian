@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import WeekPane from './WeekPane'
-import { setupStore, seedStore, makeRoots } from '@/test-utils'
+import { setupStore, seedStore, makeRoots, testKey } from '@/test-utils'
 import type { StoreOcc } from '@/types'
 
 setupStore()
@@ -11,7 +11,7 @@ setupStore()
 const WEEK_START = '2026-06-08'
 
 function multiday(id: string, date: string, duration: string): StoreOcc {
-  return { id, date, time: null, source: 'explicit', entryKey: 'note.md', metadata: { participants: [], duration } }
+  return { id, date, time: null, source: 'explicit', entryKey: testKey('note.md'), metadata: { participants: [], duration } }
 }
 
 function renderWeek(items: StoreOcc[]) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fixtureNames, parseFixture, serialize, normalizeIds, rootMeta, occItems } from './helpers'
+import { fixtureNames, parseFixture, serialize, normalizeIds, rootMeta, occItems, TEST_VAULT, rootsOf } from './helpers'
 import { parseToStoreItems } from '@/model/storeItems'
 import { expandRange, expandWithMultiday, multidayCoversDate } from '@/model/expansion'
 import { fmtISO } from '@/model/dateUtils'
@@ -16,7 +16,7 @@ describe('YAML deserialize → serialize round-trip', () => {
     const parsed1 = parseFixture(name)
     const yaml1 = serialize(parsed1.items, parsed1.root)
 
-    const parsed2 = parseToStoreItems(`${name}.md`, yaml1)
+    const parsed2 = parseToStoreItems(`${name}.md`, yaml1, TEST_VAULT)
     const yaml2 = serialize(parsed2.items, parsed2.root)
 
     expect(yaml2).toBe(yaml1)
@@ -27,7 +27,7 @@ describe('YAML deserialize → serialize round-trip', () => {
   // fields in a way that survives the string comparison above.
   it.each(names)('%s preserves store structure across a round-trip', (name) => {
     const original = parseFixture(name)
-    const reparsed = parseToStoreItems(`${name}.md`, serialize(original.items, original.root))
+    const reparsed = parseToStoreItems(`${name}.md`, serialize(original.items, original.root), TEST_VAULT)
     expect(normalizeIds(reparsed.items)).toEqual(normalizeIds(original.items))
   })
 })
@@ -56,7 +56,7 @@ describe('structural expectations', () => {
 
   it('multiday emits a single occurrence; span is inferred via multidayCoversDate', () => {
     const parsed = parseFixture('multiday')
-    const roots = new Map([[`multiday`, parsed.root]])
+    const roots = rootsOf(parsed.root)
     expect(occItems(parsed)[0]!.metadata.duration).toBe('3d')
 
     // expandRange emits ONE occurrence on the start date — not one per day.
@@ -78,7 +78,7 @@ describe('structural expectations', () => {
   // the start-date occurrence's id.
   it('multiday: expandWithMultiday emits one occurrence per covered day across a range', () => {
     const parsed = parseFixture('multiday')
-    const roots = new Map([[`multiday`, parsed.root]])
+    const roots = rootsOf(parsed.root)
 
     const occs = expandWithMultiday(parsed.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))
     const dates = occs.map(o => o.metadata.jsTime && fmtISO(o.metadata.jsTime))
@@ -96,7 +96,7 @@ describe('structural expectations', () => {
       'date:',
       '  nested: yes',
       '---',
-    ].join('\n'))
+    ].join('\n'), TEST_VAULT)
 
     expect(parsed.root.title).not.toContain('[object Object]')
     expect(parsed.items[0]!.date).not.toContain('[object Object]')
@@ -144,7 +144,7 @@ describe('task-to-event', () => {
 
   it('generates future occurrences that are events (no done)', () => {
     const parsed = parseFixture('task-to-event')
-    const roots = new Map([[parsed.items[0]?.entryKey ?? 'task-to-event', parsed.root]])
+    const roots = rootsOf(parsed.root)
     const occs = expandRange(parsed.items, roots, new Date('2026-05-08'), new Date('2026-05-31'))
     // Generated occurrences inherit no `done` from the series
     for (const o of occs) expect(o.metadata.done).toBeUndefined()
@@ -213,8 +213,8 @@ describe('YAML scalar handling', () => {
   // strings, not timestamps. The app stores `date` as a string everywhere, so
   // this invariant must hold regardless of quoting in the source file.
   it('parses dates as strings, not Date objects', () => {
-    const quoted = parseToStoreItems('q.md', '---\ntitle: A\ndate: "2026-04-08"\n---\n')
-    const bare = parseToStoreItems('b.md', '---\ntitle: A\ndate: 2026-04-08\n---\n')
+    const quoted = parseToStoreItems('q.md', '---\ntitle: A\ndate: "2026-04-08"\n---\n', TEST_VAULT)
+    const bare = parseToStoreItems('b.md', '---\ntitle: A\ndate: 2026-04-08\n---\n', TEST_VAULT)
     expect(typeof quoted.items[0]!.date).toBe('string')
     expect(quoted.items[0]!.date).toBe('2026-04-08')
     expect(typeof bare.items[0]!.date).toBe('string')
@@ -223,9 +223,9 @@ describe('YAML scalar handling', () => {
 
   it('round-trips titles that need quoting', () => {
     const src = '---\ntitle: "1:1 with Alex"\ndate: "2026-05-13"\n---\n'
-    const parsed = parseToStoreItems('x.md', src)
+    const parsed = parseToStoreItems('x.md', src, TEST_VAULT)
     expect(rootMeta(parsed).title).toBe('1:1 with Alex')
-    const reparsed = parseToStoreItems('x.md', serialize(parsed.items, parsed.root))
+    const reparsed = parseToStoreItems('x.md', serialize(parsed.items, parsed.root), TEST_VAULT)
     expect(rootMeta(reparsed).title).toBe('1:1 with Alex')
   })
 })

@@ -8,9 +8,7 @@
  * SOURCE file instead.
  */
 import { describe, it, expect } from 'vitest'
-import {
-  fixtureNames, loadFixture, parseFixture, serialize, collectKeyValues, frontmatterOf,
-} from './helpers'
+import { fixtureNames, loadFixture, parseFixture, serialize, collectKeyValues, frontmatterOf, TEST_VAULT, rootsOf, NEW_TARGET, keyOf } from './helpers'
 import { parseToStoreItems } from '@/model/storeItems'
 import { collapseToYaml } from '@/model/collapse'
 import { saveFile } from '@/model/inheritance'
@@ -51,7 +49,7 @@ describe('unknown keys at the file root (flat file)', () => {
       '',
       'Body text here.',
     ].join('\n')
-    const p = parseToStoreItems('qr.md', src)
+    const p = parseToStoreItems('qr.md', src, TEST_VAULT)
     const out = saveFile(collapseToYaml(p.items, p.root), p.root.body ?? '')
     expect(out).toContain('project: apollo')
     expect(out).toContain('url: https://example.com/ticket/42')
@@ -152,7 +150,7 @@ describe('nested unknown values', () => {
       '      jira: XYZ-9',
       '---',
     ].join('\n')
-    const p = parseToStoreItems('dr.md', src)
+    const p = parseToStoreItems('dr.md', src, TEST_VAULT)
     const fm = frontmatterOf(saveFile(collapseToYaml(p.items, p.root), ''))
     expect(fm.defaults).toBeUndefined()
     expect((fm.instances as Record<string, unknown>[]).map(i => i.links))
@@ -163,7 +161,7 @@ describe('nested unknown values', () => {
 describe('values the serialiser used to prune', () => {
   it('keeps an explicit null and an empty list', () => {
     const src = '---\ntitle: A\ndate: 2026-04-08\nreviewer: null\naliases: []\n---\n'
-    const p = parseToStoreItems('n.md', src)
+    const p = parseToStoreItems('n.md', src, TEST_VAULT)
     const out = saveFile(collapseToYaml(p.items, p.root), '')
     expect(out).toContain('reviewer: null')
     expect(out).toContain('aliases: []')
@@ -213,15 +211,15 @@ describe('known fields carrying an unexpected type', () => {
     // malformed value is parked in extra, an edit that writes a well-shaped
     // value for the same field must not have the stale raw value re-win.
     const p = parseFixture('malformed-known')
-    const roots = new Map([['malformed-known', p.root]])
+    const roots = rootsOf(p.root)
     const occ = expandRange(p.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))[0]!
     const next = applyEdit({ items: p.items, roots }, occ, 'all', {
       title: 'Malformed fields', tags: ['work'], items: [], participants: [],
       tracked: false, done: false, priority: null,
       scheduled: { date: '2026-04-08', time: '' }, duration: '30m', repeat: null,
       body: '',
-    })
-    const yaml = serialize(next.items.filter(i => i.entryKey === 'malformed-known'), next.roots.get('malformed-known'))
+    }, NEW_TARGET)
+    const yaml = serialize(next.items.filter(i => i.entryKey === keyOf('malformed-known')), next.roots.get(keyOf('malformed-known')))
     const fm = frontmatterOf(yaml)
     expect(fm.duration).toBe('30m')
     expect(fm.tags).toEqual(['work'])
