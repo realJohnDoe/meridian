@@ -183,6 +183,13 @@ forever. Hide it as soon as the first real vault is registered.
 `onboarding/CoachTour.tsx:71` gates on `activeVaultId === 'example'` and must become "no
 writable vault registered yet".
 
+⚠️ **`activateExampleVault` must switch from `setData(...)` to `setVaultLayer('example', ...)`.**
+Today it calls `setData`, which replaces the whole store — harmless when it's the only vault, but
+under the layered model it would silently wipe out every other registered vault's content the
+moment the Tutorial vault (re-)activates. It stays on its own cache-free path (no Dexie, no
+`runSync`, per §4) — only the store write needs to become a normal layer write like every other
+backend's.
+
 ⚠️ `storage/sync.ts` reads `getItems()`/`getRoots()` in two places that must see **one layer,
 not the merge** — `mergeChangedIntoStore` (rebuilds the store by filtering out affected keys)
 and `writeEntityToCache` (collapses one file back to YAML). Add `getVaultLayer(vaultId)` to
@@ -316,12 +323,30 @@ the first save; that chip is the marker, so no separate sidebar indicator is nee
 
 ### 8. Preferences: per-vault vs global, settled
 
-| Pref | Scope after | Why |
-|---|---|---|
-| `favorites` | **per vault**, store holds the union | A favourite belongs with its vault; entries are `EntryKey`s, so writes route by `keyVaultId` and a move migrates cleanly. Old bare slugs migrate by prefixing with their vault id on load. |
-| `defaultParticipants` | **per vault** | Genuinely a property of that vault. |
-| `showTasks` | **global** | A view question, not a vault question. |
-| `hiddenVaultIds`, `hiddenParticipants`, `defaultVaultId` | **global** | Cross-vault by definition. |
+Everything participant-related is per-vault, full stop — two vaults can each have a "Bob" who is
+a different person, and nothing should conflate them. `hiddenParticipants` in §9 already models
+this correctly (`Record<vaultId, string[]>`, so hiding one vault's Bob leaves another's checked);
+an earlier draft of this table mislabeled it "global" alongside `hiddenVaultIds`/`defaultVaultId`,
+which really are cross-vault (a set of vault ids; a pointer to one vault) rather than per-vault
+values at all. Fixed here:
+
+| Pref | Scope | Loading | Why |
+|---|---|---|---|
+| `favorites` | per vault | **eager** — every registered vault at once | A favourite belongs with its vault; entries are `EntryKey`s, so writes route by `keyVaultId` and a move migrates cleanly. The sidebar's Favorites list spans every registered vault simultaneously, so this can't wait for a vault to "activate" the way `loadVaultPrefs` does today. |
+| `hiddenParticipants` | per vault | **eager** — every registered vault at once | Same reason as favourites: the filter popover (§9) shows every registered vault's people at once, so a "Bob" hidden in Work must have no effect on Personal's Bob, and both must be visible in the tree without switching vaults first. |
+| `defaultParticipants` | per vault | **lazy** — one vault at a time, on demand | Only ever consulted for *one* vault: the new entry's target, or whichever vault Settings currently has open. The existing per-vault-key, load-on-demand mechanism (`lib/vaultStorage.ts`) fits unchanged. |
+| `showTasks` | global | n/a | A view question, not a vault question. |
+| `hiddenVaultIds`, `defaultVaultId` | global | n/a | Genuinely cross-vault — a set of vault ids, and a pointer to one vault — never partitioned by vault at all. |
+
+**The eager ones are a real departure from today's loading pattern**, worth flagging for PR 2:
+`storeBridge.loadVaultPrefs(vaultId)` is called once, for whichever single vault just activated.
+With several vaults registered simultaneously, `favorites` and `hiddenParticipants` instead need
+to be loaded once at startup for *every* registered vault, and re-read when a vault is added or
+removed — `defaultParticipants` is the only field left that still fits the old one-vault-at-a-time
+call. Storage-wise this is simpler than it sounds: `favorites` needs no per-vault key at all
+(`EntryKey` already carries the vault id, so one flat `EntryKey[]` under a single localStorage key
+works), and `hiddenParticipants` persists as one key holding the whole `Record<vaultId, string[]>`
+blob rather than via `${prefix}_${vaultId}` per vault.
 
 ### 9. One nested filter: vaults, expanding to their people
 
