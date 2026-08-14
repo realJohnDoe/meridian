@@ -861,7 +861,7 @@ describe('reconcileWithBackend — the active vault changing mid-flight', () => 
     backend.seed('note.md', 'remote v2', 'v2')
     setActiveBackend(backend)
     seedClean('fake-vault', 'note.md', 'remote v1', 'v1', Date.now())
-    storeState.items = [{ fileSlug: 'belongs-to-the-other-vault' }]
+    storeState.items = [{ entryKey: 'belongs-to-the-other-vault' }]
 
     const release = backend.blockNextReadFiles()
     const reconcilePromise = reconcileWithBackend(backend, 'fake-vault')
@@ -877,7 +877,7 @@ describe('reconcileWithBackend — the active vault changing mid-flight', () => 
     // Cache write completed — it is keyed by vaultId and stays correct.
     expect(cacheStore.get(vp('fake-vault', 'note.md'))?.content).toBe('remote v2')
     // ...but the store still belongs to whichever vault is active now.
-    expect(storeState.items).toEqual([{ fileSlug: 'belongs-to-the-other-vault' }])
+    expect(storeState.items).toEqual([{ entryKey: 'belongs-to-the-other-vault' }])
   })
 })
 
@@ -1067,7 +1067,7 @@ describe('writeEntityToCache — self-heal delete guard', () => {
 // write is outstanding.
 
 describe('in-flight write registry — protects against a concurrent reconcile', () => {
-  const oneItem = () => [{ date: '', time: null, source: 'explicit' as const, fileSlug: 'note', id: 'i1', metadata: {} }]
+  const oneItem = () => [{ date: '', time: null, source: 'explicit' as const, entryKey: 'note', id: 'i1', metadata: {} }]
 
   it('a reconcile landing mid-write does not pull remote content over the pending write', async () => {
     const backend = new FakeBackend()

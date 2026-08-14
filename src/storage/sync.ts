@@ -356,7 +356,7 @@ function mergeChangedIntoStore(
   const affectedSlugs = new Set(alsoAffected)
   for (const r of records) affectedSlugs.add(pathToSlug(r.path))
 
-  const keptItems = getItems().filter(item => !affectedSlugs.has(item.fileSlug))
+  const keptItems = getItems().filter(item => !affectedSlugs.has(item.entryKey))
   const keptRoots: Roots = new Map(
     [...getRoots()].filter(([slug]) => !affectedSlugs.has(slug)),
   )

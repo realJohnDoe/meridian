@@ -139,7 +139,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
 
   const showDateChip = !isNote
   const showRepeat = !isNote && (hasDate || tracked) && (!isSingleScope || !isRecurring)
-  const bodyKey = item ? `${item.fileSlug || 'item'}-${item.date || ''}-${editScope}` : 'new'
+  const bodyKey = item ? `${item.entryKey || 'item'}-${item.date || ''}-${editScope}` : 'new'
 
   const showScopeRow = isRecurring || hasSched
 
@@ -181,7 +181,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
               }}
             />
             {item && (
-              <p className="font-mono text-2xs text-muted-foreground mt-0.5">{item.fileSlug}.md</p>
+              <p className="font-mono text-2xs text-muted-foreground mt-0.5">{item.entryKey}.md</p>
             )}
           </div>
         </div>

@@ -11,7 +11,7 @@
  *   - stableOccId's cache to grow unboundedly (new series.id → new cache entry
  *     each reconcile, old entries never evicted).
  *
- * Fix: IDs are now derived from intrinsic keys (fileSlug + anchor date/time),
+ * Fix: IDs are now derived from intrinsic keys (entryKey + anchor date/time),
  * so re-parsing identical content always yields identical IDs.
  */
 import { describe, it, expect } from 'vitest'
@@ -48,7 +48,7 @@ describe('deterministic IDs — re-parse of identical content', () => {
 })
 
 describe('deterministic ID format', () => {
-  it('series ID encodes fileSlug and anchor date/time', () => {
+  it('series ID encodes entryKey and anchor date/time', () => {
     const content = loadFixture('weekly-series')
     const { items } = parseToStoreItems('weekly-series.md', content)
     const series = items.find(isSeries)!
@@ -65,11 +65,11 @@ describe('deterministic ID format', () => {
     expect(overrides[1]!.id).toBe(`${seriesId}|inst|2026-04-14|`)
   })
 
-  it('standalone ID encodes fileSlug and date', () => {
+  it('standalone ID encodes entryKey and date', () => {
     const content = loadFixture('single-event')
     const { items } = parseToStoreItems('single-event.md', content)
     expect(items).toHaveLength(1)
-    // ID starts with the fileSlug|occ| prefix
+    // ID starts with the entryKey|occ| prefix
     expect(items[0]!.id).toMatch(/^single-event\|occ\|/)
   })
 

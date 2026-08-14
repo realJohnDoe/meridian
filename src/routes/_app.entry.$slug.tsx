@@ -27,14 +27,14 @@ function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
   const favorites      = useStore(s => s.favorites)
   const toggleFavorite = useStore(s => s.toggleFavorite)
 
-  const isFavorited = favorites.includes(occ.fileSlug)
+  const isFavorited = favorites.includes(occ.entryKey)
   const hooks = useEntryEditor(occ, scope ?? 'single')
 
   return (
     <>
       <EntryTopbar
         isFavorited={isFavorited}
-        onToggleFavorite={() => toggleFavorite(occ.fileSlug)}
+        onToggleFavorite={() => toggleFavorite(occ.entryKey)}
         onDelete={hooks.handleDelete}
         onBack={hooks.handleClose}
       />
@@ -59,7 +59,7 @@ function EntrySlugPage() {
     if (date) {
       const d = new Date(date + 'T00:00:00')
       const next = new Date(d); next.setDate(next.getDate() + 1)
-      const found = expandRange(items, roots, d, next).find(o => o.fileSlug === slug)
+      const found = expandRange(items, roots, d, next).find(o => o.entryKey === slug)
       if (found) return found
     }
     return fom.get(slug) ?? null

@@ -637,12 +637,12 @@ export function expandRange(
         date:    occ.date,
         time:    occ.time,
         source:  occ.source,
-        fileSlug: series.fileSlug,
+        entryKey: series.entryKey,
         id:      override
           ? override.id
           : stableOccId(`${series.id}|${occ.date}|${occ.time ?? ''}`),
         ownerId: series.id,
-        metadata: { ...joinFileMeta(series.fileSlug, occMeta, roots), jsTime },
+        metadata: { ...joinFileMeta(series.entryKey, occMeta, roots), jsTime },
       })
     }
   }
@@ -659,10 +659,10 @@ export function expandRange(
       date:    occ.date,
       time:    occ.time,
       source:  occ.source,
-      fileSlug: occ.fileSlug,
+      entryKey: occ.entryKey,
       id:      occ.id,
       excluded: occ.excluded,
-      metadata: { ...joinFileMeta(occ.fileSlug, occ.metadata, roots), jsTime },
+      metadata: { ...joinFileMeta(occ.entryKey, occ.metadata, roots), jsTime },
     })
   }
 
@@ -698,7 +698,7 @@ export function expandWithMultiday(
         extras.push({
           ...i,
           source: 'explicit' as const,
-          metadata: { ...joinFileMeta(i.fileSlug, i.metadata, roots), jsTime: coveredDate },
+          metadata: { ...joinFileMeta(i.entryKey, i.metadata, roots), jsTime: coveredDate },
         })
       }
       return extras

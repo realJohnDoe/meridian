@@ -170,7 +170,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
 
     if (entry.kind === 'link') {
       const listedOn = occ
-        ? (backlinks.get(occ.fileSlug) ?? [])
+        ? (backlinks.get(occ.entryKey) ?? [])
             .filter(slug => slug !== currentSlug)
             .map(slug => roots.get(slug)?.title ?? slug)
         : []
@@ -185,7 +185,7 @@ export default function ItemsList({ items, onChange, roots, currentSlug, onPromo
                 showDate
                 showTagsParticipants
                 listedOn={listedOn}
-                onOpen={() => onOpenWikilink?.(occ.fileSlug)}
+                onOpen={() => onOpenWikilink?.(occ.entryKey)}
                 onToggleDone={() => {
                   beginExit(row)
                   onToggleDone?.(occ)

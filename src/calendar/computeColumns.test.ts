@@ -8,7 +8,7 @@ function makeOcc(overrides: Partial<Occurrence> & { jsTime?: Date; duration?: st
     date: '2026-06-15',
     time: '09:00',
     source: 'explicit',
-    fileSlug: 'note.md',
+    entryKey: 'note.md',
     id: 'occ-1',
     metadata: { participants: [], title: '', tags: [], items: [], jsTime, duration },
     ...rest,

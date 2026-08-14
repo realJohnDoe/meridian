@@ -7,7 +7,7 @@ function series(overrides: Partial<StoreSeries> = {}): StoreSeries {
     date: '2026-01-01',
     time: '08:00',
     repeat: { type: 'schedule', freq: 'daily' },
-    fileSlug: 'meds.md',
+    entryKey: 'meds.md',
     id: 'series-1',
     metadata: { participants: [] },
     ...overrides,

@@ -82,7 +82,7 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
       >
         {dayOccs.slice(0, shown).map(o => (
           <OccurrencePill
-            key={`${o.fileSlug}-${o.date}`}
+            key={`${o.entryKey}-${o.date}`}
             state={occState(o)}
             title={o.metadata.title}
             className="px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs w-full"

@@ -13,7 +13,7 @@ function series(overrides: Partial<StoreSeries> = {}): StoreSeries {
       byweekday: ['tu'],
       end: { type: 'until', date: '2026-07-14' }, // also a Tuesday
     },
-    fileSlug: 'abc.md',
+    entryKey: 'abc.md',
     id: 'series-1',
     metadata: { participants: [] },
     ...overrides,

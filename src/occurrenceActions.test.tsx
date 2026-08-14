@@ -39,7 +39,7 @@ function flushToastMount() {
 
 describe('beginSwipeDelete', () => {
   it('optimistically removes a standalone occurrence and defers persistence to auto-close', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md' })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md' })
     seedStore([occ], makeRoots('note.md'))
     render(<Toaster />)
 
@@ -57,7 +57,7 @@ describe('beginSwipeDelete', () => {
   })
 
   it('Undo restores the snapshot, persists the restore, and the deferred commit never persists', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md' })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md' })
     seedStore([occ], makeRoots('note.md'))
     render(<Toaster />)
 
@@ -75,8 +75,8 @@ describe('beginSwipeDelete', () => {
   })
 
   it('excludes (not deletes) a recurring occurrence and writes the file on auto-close', () => {
-    const series = makeSeries({ id: 'series-1', fileSlug: 'note.md', repeat: { type: 'schedule', freq: 'daily' } })
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', ownerId: 'series-1' })
+    const series = makeSeries({ id: 'series-1', entryKey: 'note.md', repeat: { type: 'schedule', freq: 'daily' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md', ownerId: 'series-1' })
     seedStore([series], makeRoots('note.md'))
     render(<Toaster />)
 
@@ -94,8 +94,8 @@ describe('beginSwipeDelete', () => {
   })
 
   it('Undo on a recurring occurrence restores the un-excluded snapshot and persists it', () => {
-    const series = makeSeries({ id: 'series-1', fileSlug: 'note.md', repeat: { type: 'schedule', freq: 'daily' } })
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', ownerId: 'series-1' })
+    const series = makeSeries({ id: 'series-1', entryKey: 'note.md', repeat: { type: 'schedule', freq: 'daily' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md', ownerId: 'series-1' })
     seedStore([series], makeRoots('note.md'))
     render(<Toaster />)
 
@@ -113,9 +113,9 @@ describe('beginSwipeDelete', () => {
   })
 
   it('undoing a delete does not revert an unrelated edit made during the toast window', () => {
-    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', date: '2026-06-15', time: null, metadata: { participants: [], title: 'A', tags: [], items: [] } })
+    const a = makeOcc({ id: 'occ-a', entryKey: 'a.md', date: '2026-06-15', time: null, metadata: { participants: [], title: 'A', tags: [], items: [] } })
     const b = makeOcc({
-      id: 'occ-b', fileSlug: 'b.md', date: '2026-06-16', time: null,
+      id: 'occ-b', entryKey: 'b.md', date: '2026-06-16', time: null,
       metadata: { participants: [], title: 'B', tags: [], items: [], done: false },
     })
     const roots: Roots = makeRoots('a.md', { title: 'A' })
@@ -132,7 +132,7 @@ describe('beginSwipeDelete', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
 
-    expect(items().map(i => i.fileSlug).sort()).toEqual(['a.md', 'b.md'])
+    expect(items().map(i => i.entryKey).sort()).toEqual(['a.md', 'b.md'])
     expect((items().find(i => i.id === 'occ-b') as StoreOcc).metadata.done).toBe(true)
   })
 
@@ -144,8 +144,8 @@ describe('beginSwipeDelete', () => {
   // only the deleted file's own slug). Both halves are pinned here.
 
   it('persists the backlink cleanup on commit, not just in the in-memory store', () => {
-    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
-    const b = makeOcc({ id: 'occ-b', fileSlug: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
+    const a = makeOcc({ id: 'occ-a', entryKey: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
+    const b = makeOcc({ id: 'occ-b', entryKey: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
     const roots: Roots = makeRoots('a.md', { title: 'A' })
     roots.set('b.md', { title: 'B', tags: [], items: ['[[a.md]]'] })
     seedStore([a, b], roots)
@@ -166,8 +166,8 @@ describe('beginSwipeDelete', () => {
   })
 
   it('Undo restores both the deleted entry and the wikilink other files carried to it', () => {
-    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
-    const b = makeOcc({ id: 'occ-b', fileSlug: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
+    const a = makeOcc({ id: 'occ-a', entryKey: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
+    const b = makeOcc({ id: 'occ-b', entryKey: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
     const roots: Roots = makeRoots('a.md', { title: 'A' })
     roots.set('b.md', { title: 'B', tags: [], items: ['[[a.md]]'] })
     seedStore([a, b], roots)
@@ -191,8 +191,8 @@ describe('beginSwipeDelete', () => {
   })
 
   it('a second delete fires the first pending commit immediately, before any timer advances', () => {
-    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
-    const b = makeOcc({ id: 'occ-b', fileSlug: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
+    const a = makeOcc({ id: 'occ-a', entryKey: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
+    const b = makeOcc({ id: 'occ-b', entryKey: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
     const roots: Roots = makeRoots('a.md', { title: 'A' })
     roots.set('b.md', { title: 'B', tags: [], items: [] })
     seedStore([a, b], roots)
@@ -213,9 +213,9 @@ describe('beginSwipeDelete', () => {
   })
 
   it('deleting the last open occurrence of an after_completion series warns that it ends the series', () => {
-    const series = makeSeries({ id: 'series-1', fileSlug: 'note.md', repeat: { type: 'after_completion', interval: '1 day' } })
+    const series = makeSeries({ id: 'series-1', entryKey: 'note.md', repeat: { type: 'after_completion', interval: '1 day' } })
     const occ = makeOcc({
-      id: 'occ-1', fileSlug: 'note.md', ownerId: 'series-1',
+      id: 'occ-1', entryKey: 'note.md', ownerId: 'series-1',
       metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false },
     })
     seedStore([series], makeRoots('note.md'))
@@ -231,7 +231,7 @@ describe('beginSwipeDelete', () => {
 
 describe('toggleOccDone', () => {
   it('flips done to true and persists the file', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))
 
     toggleOccDone(occ)
@@ -241,7 +241,7 @@ describe('toggleOccDone', () => {
   })
 
   it('flips done back to false', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
     seedStore([occ], makeRoots('note.md'))
 
     toggleOccDone(occ)
@@ -252,8 +252,8 @@ describe('toggleOccDone', () => {
 
 describe('reopenOcc', () => {
   it('reuses an existing undated standalone entry for the same file', () => {
-    const dated = makeOcc({ id: 'occ-1', fileSlug: 'note.md', date: '2026-06-15', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
-    const undated = makeOcc({ id: 'occ-2', fileSlug: 'note.md', date: '', time: null, metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    const dated = makeOcc({ id: 'occ-1', entryKey: 'note.md', date: '2026-06-15', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    const undated = makeOcc({ id: 'occ-2', entryKey: 'note.md', date: '', time: null, metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
     seedStore([dated, undated], makeRoots('note.md'))
 
     reopenOcc(dated)
@@ -265,7 +265,7 @@ describe('reopenOcc', () => {
 
   it('creates a fresh undated entry when none exists for the file', () => {
     const occ = makeOcc({
-      id: 'occ-1', fileSlug: 'note.md', date: '2026-06-15',
+      id: 'occ-1', entryKey: 'note.md', date: '2026-06-15',
       metadata: { participants: ['alice'], title: 'Standup', tags: [], items: [], done: true, priority: 'high' },
     })
     seedStore([occ], makeRoots('note.md'))
@@ -282,8 +282,8 @@ describe('reopenOcc', () => {
   })
 
   it('does not reuse an undated entry belonging to a different file', () => {
-    const occA = makeOcc({ id: 'occ-1', fileSlug: 'a.md', date: '2026-06-15', metadata: { participants: [], title: 'A', tags: [], items: [], done: true } })
-    const undatedB = makeOcc({ id: 'occ-2', fileSlug: 'b.md', date: '', time: null, metadata: { participants: [], title: 'B', tags: [], items: [], done: true } })
+    const occA = makeOcc({ id: 'occ-1', entryKey: 'a.md', date: '2026-06-15', metadata: { participants: [], title: 'A', tags: [], items: [], done: true } })
+    const undatedB = makeOcc({ id: 'occ-2', entryKey: 'b.md', date: '', time: null, metadata: { participants: [], title: 'B', tags: [], items: [], done: true } })
     const roots: Roots = makeRoots('a.md', { title: 'A' })
     roots.set('b.md', { title: 'B', tags: [], items: [] })
     seedStore([occA, undatedB], roots)

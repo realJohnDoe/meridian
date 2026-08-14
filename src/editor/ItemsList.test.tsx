@@ -178,7 +178,7 @@ describe('ItemsList exit animation', () => {
 
 describe('ItemsList wikilink rows', () => {
   it('calls onToggleDone and begins an exit animation when a linked occurrence is checked off', () => {
-    const occ = makeOcc({ fileSlug: 'linked.md', metadata: { participants: [], title: 'Linked Task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ entryKey: 'linked.md', metadata: { participants: [], title: 'Linked Task', tags: [], items: [], done: false } })
     const onToggleDone = vi.fn()
     const roots = makeRoots('current.md')
     roots.set('linked.md', { title: 'Linked Task', tags: [], items: [] })
@@ -205,7 +205,7 @@ describe('ItemsList wikilink rows', () => {
     // The occurrence onToggleDone receives is the one resolved from the store's
     // `fom` map (joined + expanded), not the raw seeded object — it carries
     // extra computed fields (jsTime, excluded), so match on identity, not equality.
-    expect(onToggleDone).toHaveBeenCalledWith(expect.objectContaining({ fileSlug: 'linked.md' }))
+    expect(onToggleDone).toHaveBeenCalledWith(expect.objectContaining({ entryKey: 'linked.md' }))
     expect(document.querySelector('.flip-leave')).not.toBeNull()
   })
 })

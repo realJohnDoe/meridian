@@ -100,7 +100,7 @@ export function makeOcc(overrides: Partial<Occurrence> = {}): Occurrence {
     date: '2026-06-15',
     time: '09:00',
     source: 'explicit',
-    fileSlug: 'note.md',
+    entryKey: 'note.md',
     id: 'occ-1',
     metadata: { participants: [], title: 'Standup', tags: [], items: [] },
     ...overrides,
@@ -111,7 +111,7 @@ export function makeSeries(overrides: Partial<StoreSeries> = {}): StoreSeries {
   return {
     date: '2026-06-01',
     time: '09:00',
-    fileSlug: 'note.md',
+    entryKey: 'note.md',
     id: 'series-1',
     repeat: { type: 'schedule', freq: 'daily' },
     metadata: { participants: [] },

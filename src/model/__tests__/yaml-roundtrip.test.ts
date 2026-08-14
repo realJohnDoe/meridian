@@ -104,14 +104,14 @@ describe('structural expectations', () => {
 })
 
 describe('split series (repeat-type change)', () => {
-  it('parses into two separate RepeatPattern items with the same fileSlug', () => {
+  it('parses into two separate RepeatPattern items with the same entryKey', () => {
     const parsed = parseFixture('split-series')
     const series = parsed.items.filter(isSeries)
     expect(series).toHaveLength(2)
     expect(series[0]!.repeat).toMatchObject({ type: 'schedule', freq: 'daily' })
     expect(series[1]!.repeat).toMatchObject({ type: 'after_completion' })
     // Both series belong to the same file
-    expect(series[0]!.fileSlug).toBe(series[1]!.fileSlug)
+    expect(series[0]!.entryKey).toBe(series[1]!.entryKey)
   })
 
   it('file-level title/tags live on the root; series keep occurrence fields', () => {
@@ -144,7 +144,7 @@ describe('task-to-event', () => {
 
   it('generates future occurrences that are events (no done)', () => {
     const parsed = parseFixture('task-to-event')
-    const roots = new Map([[parsed.items[0]?.fileSlug ?? 'task-to-event', parsed.root]])
+    const roots = new Map([[parsed.items[0]?.entryKey ?? 'task-to-event', parsed.root]])
     const occs = expandRange(parsed.items, roots, new Date('2026-05-08'), new Date('2026-05-31'))
     // Generated occurrences inherit no `done` from the series
     for (const o of occs) expect(o.metadata.done).toBeUndefined()

@@ -14,7 +14,7 @@ function makeOcc(overrides: Partial<Occurrence> & { title?: string; done?: boole
     date: '2020-01-01',
     time: null,
     source: 'explicit',
-    fileSlug: 'note.md',
+    entryKey: 'note.md',
     id: title || 'occ',
     metadata: { participants: [], title, tags: [], items: [], done, jsTime, duration },
     ...rest,

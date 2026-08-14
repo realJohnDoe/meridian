@@ -53,7 +53,7 @@ interface Props {
 function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, badge }: Props) {
   const roots     = useStore(s => s.roots)
   const backlinks = useStore(s => s.backlinks)
-  const listedOn  = (backlinks.get(occ.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug)
+  const listedOn  = (backlinks.get(occ.entryKey) ?? []).map(slug => roots.get(slug)?.title ?? slug)
 
   // Mirrors OccurrenceCard's own `dimmed` (isDone || isPast) so this row's
   // outer wrapper — which hosts the elevation shadow OccurrenceCard's own

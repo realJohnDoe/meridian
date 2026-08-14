@@ -256,7 +256,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
 
   const renderPill = (o: Occurrence, col: number, row: number) => (
     <OccurrencePill
-      key={`${o.fileSlug}-${o.date}`}
+      key={`${o.entryKey}-${o.date}`}
       style={{ gridColumn: col + 1, gridRow: row + 1 }}
       state={occState(o)}
       title={o.metadata.title}

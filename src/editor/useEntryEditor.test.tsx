@@ -33,7 +33,7 @@ afterEach(() => {
 
 describe('useEntryEditor', () => {
   it('meta save (handleDoneToggle) writes synchronously', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -44,7 +44,7 @@ describe('useEntryEditor', () => {
   })
 
   it('autosave debounces body writes by 1500ms and commits the latest scheduled body', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md' })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md' })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -61,7 +61,7 @@ describe('useEntryEditor', () => {
   })
 
   it('a scheduled autosave commits against the latest entry state, not a stale snapshot', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -76,7 +76,7 @@ describe('useEntryEditor', () => {
   })
 
   it('goBack flushes a still-pending autosave immediately instead of dropping it', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md' })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md' })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -101,11 +101,11 @@ describe('useEntryEditor', () => {
     act(() => { result.current.handleClose() })
 
     expect(persistence.writes).toEqual([slug])
-    expect(useStore.getState().items.filter(i => i.fileSlug === slug)).toHaveLength(1)
+    expect(useStore.getState().items.filter(i => i.entryKey === slug)).toHaveLength(1)
   })
 
   it('flushes a still-pending autosave on unmount (e.g. navigating to a wikilink)', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md' })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md' })
     seedStore([occ], makeRoots('note.md'))
     const { result, unmount } = renderHook(() => useEntryEditor(occ))
 
@@ -137,11 +137,11 @@ describe('useEntryEditor', () => {
     const { result } = renderHook(() => useEntryEditor(null, 'all', 'Board game night'))
     const slug = titleToSlug('Board game night')
 
-    expect(useStore.getState().items.filter(i => i.fileSlug === slug)).toHaveLength(1)
+    expect(useStore.getState().items.filter(i => i.entryKey === slug)).toHaveLength(1)
 
     act(() => { result.current.handleDoneToggle() })
 
-    expect(useStore.getState().items.filter(i => i.fileSlug === slug)).toHaveLength(1)
+    expect(useStore.getState().items.filter(i => i.entryKey === slug)).toHaveLength(1)
     expect(navigateMock).not.toHaveBeenCalled()
   })
 
@@ -150,7 +150,7 @@ describe('useEntryEditor', () => {
     // the slug an unrelated entry already owns. A write is a whole-file replace,
     // so creating the new entry there destroyed the existing one outright — no
     // error, no artifact, and every wikilink to it silently re-pointed.
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'buy-groceries', date: '2026-04-08', metadata: { participants: [], title: 'Buy groceries', tags: ['errands'], items: [] } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'buy-groceries', date: '2026-04-08', metadata: { participants: [], title: 'Buy groceries', tags: ['errands'], items: [] } })
     seedStore([occ], makeRoots('buy-groceries', { title: 'Buy groceries', tags: ['errands'], body: 'Remember the bags.' }))
 
     renderHook(() => useEntryEditor(null, 'all', 'Buy groceries!'))
@@ -167,7 +167,7 @@ describe('useEntryEditor', () => {
     // creating save lands on `buy-groceries-2`, and the autosave that follows must
     // upsert onto it rather than allocate `buy-groceries-3` (or fall back onto the
     // unrelated `buy-groceries`).
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'buy-groceries', date: '2026-04-08', metadata: { participants: [], title: 'Buy groceries', tags: [], items: [] } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'buy-groceries', date: '2026-04-08', metadata: { participants: [], title: 'Buy groceries', tags: [], items: [] } })
     seedStore([occ], makeRoots('buy-groceries', { title: 'Buy groceries', body: 'Remember the bags.' }))
 
     const { result } = renderHook(() => useEntryEditor(null, 'all', 'Buy groceries!'))
@@ -178,7 +178,7 @@ describe('useEntryEditor', () => {
     expect([...roots.keys()].sort()).toEqual(['buy-groceries', 'buy-groceries-2'])
     expect(roots.get('buy-groceries')?.body).toBe('Remember the bags.')
     expect(roots.get('buy-groceries-2')?.body).toBe('totally different note')
-    expect(useStore.getState().items.filter(i => i.fileSlug === 'buy-groceries-2')).toHaveLength(1)
+    expect(useStore.getState().items.filter(i => i.entryKey === 'buy-groceries-2')).toHaveLength(1)
   })
 
   it('handleSave on a not-yet-adopted new entry upserts instead of creating a second file', () => {
@@ -196,7 +196,7 @@ describe('useEntryEditor', () => {
   })
 
   it('editScope "add" suppresses both the meta save and the autosave', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ, 'add'))
 
@@ -216,7 +216,7 @@ describe('useEntryEditor', () => {
   })
 
   it('handleSave with an empty title flags titleMissing and bumps focusTitleTick instead of navigating back', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 

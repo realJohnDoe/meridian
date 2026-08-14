@@ -17,7 +17,7 @@ export function newEntryRoute(title?: string, seed?: NewEntrySeed) {
 export function entryRoute(occ: Occurrence, scope?: EditScope) {
   return {
     to: '/entry/$slug' as const,
-    params: { slug: occ.fileSlug },
+    params: { slug: occ.entryKey },
     search: { date: occ.date, scope: scope ?? 'single' },
   }
 }

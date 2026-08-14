@@ -10,7 +10,7 @@ function makeOcc(overrides: Partial<Occurrence> = {}): Occurrence {
     date: '2026-06-15',
     time: null,
     source: 'explicit',
-    fileSlug: 'note.md',
+    entryKey: 'note.md',
     id: 'occ-1',
     metadata: { participants: [], title: '', tags: [], items: [] },
     ...overrides,

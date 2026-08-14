@@ -26,8 +26,8 @@ function restoreFileSlugs(snapshot: { items: StoreItem[]; roots: Roots }, fileSl
   const slugs = new Set(fileSlugs)
   const current = getSnapshot()
   const items = [
-    ...current.items.filter(i => !slugs.has(i.fileSlug)),
-    ...snapshot.items.filter(i => slugs.has(i.fileSlug)),
+    ...current.items.filter(i => !slugs.has(i.entryKey)),
+    ...snapshot.items.filter(i => slugs.has(i.entryKey)),
   ]
   const roots = new Map(current.roots)
   for (const fileSlug of slugs) {
@@ -77,7 +77,7 @@ function showDeleteToast(
 export function toggleOccDone(o: Occurrence): void {
   const snapshot = getSnapshot()
   const next = toggleDone(snapshot, o)
-  commitNext(next, [o.fileSlug])
+  commitNext(next, [o.entryKey])
 }
 
 // Re-opens a done, undated occurrence: reuses an existing undated entry for
@@ -85,7 +85,7 @@ export function toggleOccDone(o: Occurrence): void {
 export function reopenOcc(occ: Occurrence): void {
   const allItems = getItems()
   const existingUndated = allItems.find(
-    i => isStandaloneOcc(i) && i.fileSlug === occ.fileSlug && i.date === '',
+    i => isStandaloneOcc(i) && i.entryKey === occ.entryKey && i.date === '',
   ) as OccurrenceEntry<OccurrenceMetadata> | undefined
 
   if (existingUndated) {
@@ -95,17 +95,17 @@ export function reopenOcc(occ: Occurrence): void {
         : i,
       ),
       roots: getRoots(),
-    }, [occ.fileSlug])
+    }, [occ.entryKey])
   } else {
     const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
       date:     '',
       time:     null,
       source:   'explicit',
-      fileSlug: occ.fileSlug,
+      entryKey: occ.entryKey,
       id:       crypto.randomUUID(),
       metadata: { ...occFromAppMeta(occ.metadata), done: false },
     }
-    commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.fileSlug])
+    commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.entryKey])
   }
 }
 
@@ -118,8 +118,8 @@ export function beginSwipeDelete(o: Occurrence): () => void {
     const next = excludeOccurrence(snapshot, o)
     const endsSeries = deletionEndsAfterCompletionSeries(snapshot.items, o)
     showDeleteToast(title,
-      () => { writeEntity(o.fileSlug) },
-      () => { cancelled = true; restoreFileSlugs(snapshot, [o.fileSlug]) },
+      () => { writeEntity(o.entryKey) },
+      () => { cancelled = true; restoreFileSlugs(snapshot, [o.entryKey]) },
       { endsSeries },
     )
     return () => { if (!cancelled) setData(next) }
@@ -136,15 +136,15 @@ export function beginSwipeDelete(o: Occurrence): () => void {
     // reasoning already governing `next` here for the recurring branch above.
     let affectedSlugs: string[] = []
     showDeleteToast(title,
-      () => { for (const slug of affectedSlugs) writeEntity(slug); deleteEntity(o.fileSlug) },
+      () => { for (const slug of affectedSlugs) writeEntity(slug); deleteEntity(o.entryKey) },
       () => {
         cancelled = true
-        if (!getItems().find(i => i.id === o.id)) restoreFileSlugs(snapshot, [o.fileSlug, ...affectedSlugs])
+        if (!getItems().find(i => i.id === o.id)) restoreFileSlugs(snapshot, [o.entryKey, ...affectedSlugs])
       },
     )
     return () => {
       if (cancelled) return
-      const { data, affectedSlugs: computed } = deleteByFileSlug(getSnapshot(), o.fileSlug)
+      const { data, affectedSlugs: computed } = deleteByFileSlug(getSnapshot(), o.entryKey)
       affectedSlugs = computed
       setData(data)
     }

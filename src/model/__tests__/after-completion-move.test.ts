@@ -56,7 +56,7 @@ describe('after_completion: the projected next slot', () => {
       ...data,
       items: [...data.items, {
         date: '2026-07-23', time: null, source: 'explicit' as const, excluded: true,
-        fileSlug: 'after-completion-timed', id: 'stub',
+        entryKey: 'after-completion-timed', id: 'stub',
         ownerId: data.items.find(i => 'repeat' in i)!.id,
         metadata: { participants: [] },
       }],

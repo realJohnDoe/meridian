@@ -9,7 +9,7 @@ function series(overrides: Partial<StoreSeries> = {}): StoreSeries {
     date: '2026-06-01',
     time: null,
     repeat: { type: 'schedule', freq: 'weekly', byweekday: ['mo'] },
-    fileSlug: 'note.md',
+    entryKey: 'note.md',
     id: 'series-1',
     metadata: { participants: [] },
     ...overrides,
@@ -21,7 +21,7 @@ function occ(overrides: Partial<StoreOcc> = {}): StoreOcc {
     date: '2026-06-01',
     time: null,
     source: 'explicit',
-    fileSlug: 'note.md',
+    entryKey: 'note.md',
     id: 'occ-1',
     metadata: { participants: [] },
     ...overrides,
@@ -47,8 +47,8 @@ describe('hasSameStructure', () => {
     expect(hasSameStructure([occ({ id: 'a' })], [occ({ id: 'b' })])).toBe(false)
   })
 
-  it('detects fileSlug changes', () => {
-    expect(hasSameStructure([occ({ fileSlug: 'a.md' })], [occ({ fileSlug: 'b.md' })])).toBe(false)
+  it('detects entryKey changes', () => {
+    expect(hasSameStructure([occ({ entryKey: 'a.md' })], [occ({ entryKey: 'b.md' })])).toBe(false)
   })
 
   it('detects date changes', () => {
@@ -132,8 +132,8 @@ describe('computeExpansionCache', () => {
   }
 
   it('overlays a changed file title onto cached occurrences without re-expanding, leaving other files untouched', () => {
-    const a = occ({ id: 'a', fileSlug: 'note-a.md', date: '2026-06-01' })
-    const b = occ({ id: 'b', fileSlug: 'note-b.md', date: '2026-06-02' })
+    const a = occ({ id: 'a', entryKey: 'note-a.md', date: '2026-06-01' })
+    const b = occ({ id: 'b', entryKey: 'note-b.md', date: '2026-06-02' })
     const items = [a, b]
     const roots1 = rootsOf([
       ['note-a.md', { title: 'Old Title', tags: [], items: [] }],
@@ -157,7 +157,7 @@ describe('computeExpansionCache', () => {
   })
 
   it('returns the same allOccs reference when neither items nor roots entries changed', () => {
-    const a = occ({ id: 'a', fileSlug: 'note-a.md', date: '2026-06-01' })
+    const a = occ({ id: 'a', entryKey: 'note-a.md', date: '2026-06-01' })
     const items = [a]
     const roots1 = rootsOf([['note-a.md', { title: 'Title', tags: [], items: [] }]])
 

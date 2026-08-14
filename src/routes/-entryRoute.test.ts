@@ -51,7 +51,7 @@ describe('newEntryRoute', () => {
 
 describe('entryRoute', () => {
   it('routes to the occurrence\'s file slug, defaulting to single-occurrence scope', () => {
-    expect(entryRoute(makeOcc({ fileSlug: 'standup.md', date: '2026-06-15' }))).toEqual({
+    expect(entryRoute(makeOcc({ entryKey: 'standup.md', date: '2026-06-15' }))).toEqual({
       to: '/entry/$slug',
       params: { slug: 'standup.md' },
       search: { date: '2026-06-15', scope: 'single' },

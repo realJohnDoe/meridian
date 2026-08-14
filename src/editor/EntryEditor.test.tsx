@@ -40,12 +40,12 @@ afterEach(() => {
 
 function Harness({ occ }: { occ: Occurrence }) {
   const hooks = useEntryEditor(occ)
-  return <EntryEditor hooks={hooks} items={[occ]} roots={makeRoots(occ.fileSlug)} />
+  return <EntryEditor hooks={hooks} items={[occ]} roots={makeRoots(occ.entryKey)} />
 }
 
 describe('EntryEditor', () => {
   it('autosaves a body edit after the debounce and persists a checkbox toggle immediately', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))
     render(<Harness occ={occ} />)
 

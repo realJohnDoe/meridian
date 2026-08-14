@@ -72,7 +72,7 @@ export function collectUndated(items: StoreItem[], roots: Roots): OccurrenceEntr
   ) as OccurrenceEntry<AppMetadata>[]
   return undated.map(occ => ({
     ...occ,
-    metadata: joinFileMeta(occ.fileSlug, occ.metadata, roots),
+    metadata: joinFileMeta(occ.entryKey, occ.metadata, roots),
   }))
 }
 

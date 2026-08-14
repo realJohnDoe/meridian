@@ -135,7 +135,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   }, draftId)
   // Same snapshot and same draftId as the applyEdit above, so this is exactly
   // the slug applyNew allocated for it.
-  const fileSlug = item?.fileSlug ?? newEntrySlug(snapshot, title, draftId)
+  const fileSlug = item?.entryKey ?? newEntrySlug(snapshot, title, draftId)
   if (!fileSlug) return null   // nothing to write to; newEntrySlug never yields this
   commitNext(nextData, [fileSlug])
   return fileSlug
@@ -151,7 +151,7 @@ export function deleteNode(
   if (!item) return
   const items     = getItems()
   const series    = findSeries(items, item)
-  const slugItems = fileSlugItems(items, item.fileSlug)
+  const slugItems = fileSlugItems(items, item.entryKey)
   const isSelf      = (i: StoreItem) => i.id === item.id
   const hasSiblings = slugItems.some(i => !isSeries(i) && !isSelf(i) && !i.excluded)
   const isRecurring = !!item.ownerId
@@ -163,26 +163,26 @@ export function deleteNode(
   function excludeThis() {
     if (!item) return
     const next = excludeOccurrence(getSnapshot(), item)
-    commitNext(next, [item.fileSlug])
+    commitNext(next, [item.entryKey])
     hideSheet(); navigateBack()
   }
   function deleteAll() {
     if (!item) return
-    const { data: next, affectedSlugs } = deleteByFileSlug(getSnapshot(), item.fileSlug)
-    commitDelete(next, item.fileSlug, affectedSlugs)
+    const { data: next, affectedSlugs } = deleteByFileSlug(getSnapshot(), item.entryKey)
+    commitDelete(next, item.entryKey, affectedSlugs)
     hideSheet(); navigateBack()
   }
   function deleteFuture() {
     if (!item) return
     const next = deleteFollowing(getSnapshot(), item)
-    commitNext(next, [item.fileSlug])
+    commitNext(next, [item.entryKey])
     hideSheet(); navigateBack()
   }
 
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
-      const { data: next, affectedSlugs } = deleteByFileSlug(getSnapshot(), item.fileSlug)
-      commitDelete(next, item.fileSlug, affectedSlugs)
+      const { data: next, affectedSlugs } = deleteByFileSlug(getSnapshot(), item.entryKey)
+      commitDelete(next, item.entryKey, affectedSlugs)
       navigateBack()
     }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }

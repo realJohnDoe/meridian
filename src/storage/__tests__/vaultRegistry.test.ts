@@ -72,7 +72,7 @@ const {
       // Echo one item/root per file so "did the cache paint?" is observable
       // via storeState.items.length.
       parseFiles: vi.fn((files: Array<{ path: string; content: string }>) => ({
-        items: files.map(f => ({ fileSlug: f.path })),
+        items: files.map(f => ({ entryKey: f.path })),
         roots: new Map(files.map(f => [f.path, { body: f.content }])),
         failures: [] as Array<{ path: string; slug: string; message: string }>,
         // The round-trip guard is deferred out of parseFiles now (see
@@ -648,7 +648,7 @@ describe('setActiveVault', () => {
     // old vault's items in the store — and the reconcile that follows won't
     // evict them, since mergeChangedIntoStore preserves unaffected slugs.
     storeState.vaults = [LOCAL_REF, GITHUB_REF]
-    storeState.items = [{ fileSlug: 'stale-from-previous-vault.md' }]
+    storeState.items = [{ entryKey: 'stale-from-previous-vault.md' }]
     vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
     backendConfig.githubPermission = 'granted'
 

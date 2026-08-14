@@ -11,11 +11,11 @@ import { addItemLink, removeItemLink } from './save'
 export function usePendingLinks(item: Occurrence | null, title: string, createdSlug?: string | null) {
   const [pendingSlugs, setPendingSlugs] = useState<string[]>([])
 
-  const effectiveSlug = item?.fileSlug ?? createdSlug ?? (title.trim() ? titleToSlug(title) : undefined)
+  const effectiveSlug = item?.entryKey ?? createdSlug ?? (title.trim() ? titleToSlug(title) : undefined)
 
   const handleAdd = (targetSlug: string) => {
     if (item) {
-      addItemLink(targetSlug, item.fileSlug)
+      addItemLink(targetSlug, item.entryKey)
     } else {
       setPendingSlugs(prev => prev.includes(targetSlug) ? prev : [...prev, targetSlug])
     }
@@ -23,7 +23,7 @@ export function usePendingLinks(item: Occurrence | null, title: string, createdS
 
   const handleRemove = (targetSlug: string) => {
     if (item) {
-      removeItemLink(targetSlug, item.fileSlug)
+      removeItemLink(targetSlug, item.entryKey)
     } else {
       setPendingSlugs(prev => prev.filter(s => s !== targetSlug))
     }

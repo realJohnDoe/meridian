@@ -40,7 +40,7 @@ export function hasSameStructure(a: StoreItem[], b: StoreItem[]): boolean {
     if (ai === bi) continue  // same reference → nothing changed
 
     // Fields present on both RepeatPattern and OccurrenceEntry
-    if (ai.id !== bi.id || ai.fileSlug !== bi.fileSlug) return false
+    if (ai.id !== bi.id || ai.entryKey !== bi.entryKey) return false
     if (ai.date !== bi.date || (ai.time ?? null) !== (bi.time ?? null)) return false
 
     if (isSeries(ai) && isSeries(bi)) {
@@ -133,7 +133,7 @@ export function computeExpansionCache(
 
     const allOccs = prev.allOccs.map(occ => {
       const changedItem = changedById.get(occ.id)
-      const changedFile = changedFileMeta.get(occ.fileSlug)
+      const changedFile = changedFileMeta.get(occ.entryKey)
       const changedSeries = occ.ownerId ? changedSeriesById.get(occ.ownerId) : undefined
       if (!changedItem && !changedFile && !changedSeries) return occ
       const override = changedSeries ? overrideById.get(occ.id) : undefined

@@ -11,7 +11,7 @@ setupStore()
 const WEEK_START = '2026-06-08'
 
 function multiday(id: string, date: string, duration: string): StoreOcc {
-  return { id, date, time: null, source: 'explicit', fileSlug: 'note.md', metadata: { participants: [], duration } }
+  return { id, date, time: null, source: 'explicit', entryKey: 'note.md', metadata: { participants: [], duration } }
 }
 
 function renderWeek(items: StoreOcc[]) {

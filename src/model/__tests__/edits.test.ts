@@ -504,7 +504,7 @@ repeat:
     const created = next.roots.get('buy-groceries-2')!
     expect(created.title).toBe('Buy groceries!')
     expect(created.body).toBe('totally different note')
-    expect(next.items.filter(i => i.fileSlug === 'buy-groceries-2')).toHaveLength(1)
+    expect(next.items.filter(i => i.entryKey === 'buy-groceries-2')).toHaveLength(1)
   })
 
   it('a third colliding title keeps counting up rather than landing on a taken slug', () => {
@@ -519,7 +519,7 @@ repeat:
     data = applyEdit(data, null, 'all', fields('Q3 Review!'), 'draft-3')
 
     expect([...data.roots.keys()]).toEqual(['q3-review', 'q3-review-2', 'q3-review-3'])
-    expect(data.items.map(i => i.fileSlug).sort()).toEqual(['q3-review', 'q3-review-2', 'q3-review-3'])
+    expect(data.items.map(i => i.entryKey).sort()).toEqual(['q3-review', 'q3-review-2', 'q3-review-3'])
   })
 
   it('a new entry avoids a slug held by items whose file failed to reach roots', () => {
@@ -527,7 +527,7 @@ repeat:
     // entry. Keying the collision check off roots alone would let a new entry
     // adopt a slug that items still point at.
     const orphan: StoreData = {
-      items: [{ date: '2026-04-08', time: null, source: 'explicit', fileSlug: 'cafe', id: 'orphan-1', metadata: { participants: [] } }],
+      items: [{ date: '2026-04-08', time: null, source: 'explicit', entryKey: 'cafe', id: 'orphan-1', metadata: { participants: [] } }],
       roots: new Map(),
     }
     const next = applyEdit(orphan, null, 'all', {
@@ -537,7 +537,7 @@ repeat:
     }, 'draft-1')
 
     expect([...next.roots.keys()]).toEqual(['cafe-2'])
-    expect(next.items.find(i => i.id === 'orphan-1')!.fileSlug).toBe('cafe')
+    expect(next.items.find(i => i.id === 'orphan-1')!.entryKey).toBe('cafe')
   })
 
   it('creating an undated task persists and stays searchable but off the calendar', () => {
@@ -844,7 +844,7 @@ describe('unknown keys survive every edit scope', () => {
 
 describe('stable occurrence ids', () => {
   it('two standalones in the same file on the same date have distinct ids', () => {
-    // Two explicit instances on the same date — the old (fileSlug, date) matching
+    // Two explicit instances on the same date — the old (entryKey, date) matching
     // would have collapsed them; stable ids keep them distinct.
     // Root has no date so it acts as a container; only the two children are emitted.
     const yaml = `---

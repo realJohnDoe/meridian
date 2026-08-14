@@ -156,7 +156,7 @@ function effectiveNodeToStoreItems(
         date:   anchorDate,
         time:   scalarToString(n.fields.time) ?? null,
         repeat: n.fields.repeat as Repeat,
-        fileSlug,
+        entryKey: fileSlug,
         id:     seriesId,
         metadata: withAncestorRemainder(extractItemMetadata(base, n.ownFields, isRoot), ancestorRemainder),
       })
@@ -168,7 +168,7 @@ function effectiveNodeToStoreItems(
           date:    childDate,
           time:    scalarToString(child.fields.time) ?? null,
           source:  'explicit',
-          fileSlug,
+          entryKey: fileSlug,
           id:      stableId(`${seriesId}|inst|${childDate}|${childTime}`),
           ownerId: seriesId,
           ...(child.fields.excluded === true ? { excluded: true as const } : {}),
@@ -185,7 +185,7 @@ function effectiveNodeToStoreItems(
         date:   scalarToString(n.fields.date) ?? '',
         time:   scalarToString(n.fields.time) ?? null,
         source: 'explicit',
-        fileSlug,
+        entryKey: fileSlug,
         id:     stableId(`${fileSlug}|occ|${occDate}|${occTime}`),
         metadata: withAncestorRemainder(extractItemMetadata(base, n.ownFields, isRoot), ancestorRemainder),
       })
@@ -197,7 +197,7 @@ function effectiveNodeToStoreItems(
           date:   scalarToString(child.fields.date) ?? '',
           time:   scalarToString(child.fields.time) ?? null,
           source: 'explicit',
-          fileSlug,
+          entryKey: fileSlug,
           id:     stableId(`${fileSlug}|occ|${childDate}|${childTime}`),
           metadata: withAncestorRemainder(extractItemMetadata({ ...base, ...child.fields }, child.ownFields, false), ancestorRemainder),
         })

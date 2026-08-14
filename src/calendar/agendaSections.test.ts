@@ -24,7 +24,7 @@ function occ(id: string, date: string, opts: OccOpts = {}): Occurrence {
     date,
     time: opts.time ?? null,
     source: 'explicit',
-    fileSlug: 'note.md',
+    entryKey: 'note.md',
     id,
     metadata: {
       title: id,

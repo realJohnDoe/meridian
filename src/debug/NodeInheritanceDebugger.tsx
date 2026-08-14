@@ -362,7 +362,7 @@ export default function NodeInheritanceDebugger() {
     try {
       const parsed = parseToStoreItems(name || 'debug.md', content)
       // Assign a stable debug fileSlug so expandRange can match series↔overrides.
-      const withSlug = parsed.items.map(i => ({ ...i, fileSlug: i.fileSlug || DEBUG_FILE_SLUG }))
+      const withSlug = parsed.items.map(i => ({ ...i, fileSlug: i.entryKey || DEBUG_FILE_SLUG }))
       setItems(withSlug)
       setDebugRoot(parsed.root)
     } catch (e) {
@@ -619,7 +619,7 @@ export default function NodeInheritanceDebugger() {
               occurrences.length === 0
                 ? <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">No occurrences before {expandEndDate}</div>
                 : occurrences.map((occ, i) => (
-                    <OccurrenceRow key={`${occ.fileSlug}-${occ.date}`} occ={occ} isSelected={selectedIdx === i} onClick={() => handleSelectOccurrence(i)} />
+                    <OccurrenceRow key={`${occ.entryKey}-${occ.date}`} occ={occ} isSelected={selectedIdx === i} onClick={() => handleSelectOccurrence(i)} />
                   ))
             )}
           </div>
@@ -658,7 +658,7 @@ export default function NodeInheritanceDebugger() {
                         const series = findSeries(items, selectedOcc)
                         const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
                           date, time: time || null, source: 'explicit',
-                          fileSlug: selectedOcc.fileSlug, id: crypto.randomUUID(),
+                          entryKey: selectedOcc.entryKey, id: crypto.randomUUID(),
                           ownerId: selectedOcc.ownerId,
                           metadata: { ...(series?.metadata ?? {}), done, participants: [] },
                         }

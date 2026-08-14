@@ -25,7 +25,7 @@ function series(overrides: Partial<StoreSeries> = {}): StoreSeries {
     date: '2026-04-02', // Thursday
     time: null,
     repeat: { type: 'schedule', freq: 'weekly', interval: 2, byweekday: ['su'] },
-    fileSlug: 'note.md',
+    entryKey: 'note.md',
     id: 'series-1',
     metadata: { participants: [] },
     ...overrides,

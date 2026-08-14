@@ -53,7 +53,7 @@ describe('useAgendaSections', () => {
       id: 'past-event-1',
       date: '2026-06-10',
       time: '10:00',
-      fileSlug: 'other.md',
+      entryKey: 'other.md',
     })
     seedStore([overdueTask, pastEvent], new Map([...makeRoots('note.md'), ...makeRoots('other.md')]))
 

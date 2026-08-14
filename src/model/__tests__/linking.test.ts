@@ -255,14 +255,14 @@ describe('representative occurrence resolution', () => {
     const { items, roots } = makeStore([{ slug: 'weekly-standup', yaml: RECUR_YAML }])
     const map = buildFom(items, roots)
     expect(map.get('weekly-standup')).toBeDefined()
-    expect(map.get('weekly-standup')!.fileSlug).toBe('weekly-standup')
+    expect(map.get('weekly-standup')!.entryKey).toBe('weekly-standup')
   })
 
   it('returns an occurrence for a standalone past item', () => {
     const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const map = buildFom(items, roots)
     expect(map.get('project-alpha')).toBeDefined()
-    expect(map.get('project-alpha')!.fileSlug).toBe('project-alpha')
+    expect(map.get('project-alpha')!.entryKey).toBe('project-alpha')
   })
 
   it('returns undefined for an unknown fileSlug (slug not in roots)', () => {
@@ -279,7 +279,7 @@ describe('representative occurrence resolution', () => {
     const map = buildFom(items, roots)
     const occ = map.get('grocery-list')
     expect(occ).toBeDefined()
-    expect(occ!.fileSlug).toBe('grocery-list')
+    expect(occ!.entryKey).toBe('grocery-list')
     // Dateless note — date field is empty string
     expect(occ!.date).toBe('')
   })
@@ -291,7 +291,7 @@ describe('representative occurrence resolution', () => {
     const map = buildFom(items, roots)
     const occ = map.get('old-project')
     expect(occ).toBeDefined()
-    expect(occ!.fileSlug).toBe('old-project')
+    expect(occ!.entryKey).toBe('old-project')
     expect(occ!.date).toBe('2020-01-01')
   })
 
@@ -370,7 +370,7 @@ instances:
 
 function occKey(occ: Occurrence) {
   return {
-    fileSlug: occ.fileSlug,
+    entryKey: occ.entryKey,
     date:     occ.date,
     time:     occ.time,
     source:   occ.source,

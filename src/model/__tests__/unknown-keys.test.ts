@@ -221,7 +221,7 @@ describe('known fields carrying an unexpected type', () => {
       scheduled: { date: '2026-04-08', time: '' }, duration: '30m', repeat: null,
       body: '',
     })
-    const yaml = serialize(next.items.filter(i => i.fileSlug === 'malformed-known'), next.roots.get('malformed-known'))
+    const yaml = serialize(next.items.filter(i => i.entryKey === 'malformed-known'), next.roots.get('malformed-known'))
     const fm = frontmatterOf(yaml)
     expect(fm.duration).toBe('30m')
     expect(fm.tags).toEqual(['work'])

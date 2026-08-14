@@ -89,7 +89,7 @@ function overdueTask(i: number): Occurrence {
     id: `overdue-${i}`,
     date,
     time: null,
-    fileSlug: 'note.md',
+    entryKey: 'note.md',
     metadata: { participants: [], title: `Overdue task ${i}`, tags: [], items: [], done: false },
   })
 }

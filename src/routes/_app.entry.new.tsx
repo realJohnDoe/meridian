@@ -42,7 +42,7 @@ function NewEntryReady({ title, date, time, duration, itemType }: NewEntrySearch
   // autosave. `titleToSlug` is only the estimate — once the first save has landed,
   // `createdSlug` is the slug the file actually got (they differ when the title
   // slugifies onto one another file already owns).
-  const effectiveSlug = hooks.entry.item?.fileSlug ?? hooks.createdSlug ?? (hooks.entry.title ? titleToSlug(hooks.entry.title) : null)
+  const effectiveSlug = hooks.entry.item?.entryKey ?? hooks.createdSlug ?? (hooks.entry.title ? titleToSlug(hooks.entry.title) : null)
   const isFavorited = !!effectiveSlug && favorites.includes(effectiveSlug)
 
   return (

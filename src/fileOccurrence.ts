@@ -91,10 +91,10 @@ function resolveOneSlug(
         date:     item.date,
         time:     item.time,
         source:   'explicit' as const,
-        fileSlug: item.fileSlug,
-        id:       stableOccId(`${item.fileSlug}|${item.id}|anchor`),
+        entryKey: item.entryKey,
+        id:       stableOccId(`${item.entryKey}|${item.id}|anchor`),
         ownerId:  item.id,
-        metadata: joinFileMeta(item.fileSlug, item.metadata, roots),
+        metadata: joinFileMeta(item.entryKey, item.metadata, roots),
       }
     }
   }
@@ -128,16 +128,16 @@ export function updateFileOccurrenceMap(
   // Group previous items by slug for reference comparison.
   const prevBySlug = new Map<string, StoreItem[]>()
   for (const item of prevItems) {
-    let group = prevBySlug.get(item.fileSlug)
-    if (!group) { group = []; prevBySlug.set(item.fileSlug, group) }
+    let group = prevBySlug.get(item.entryKey)
+    if (!group) { group = []; prevBySlug.set(item.entryKey, group) }
     group.push(item)
   }
 
   // Group new items by slug and build the updated map.
   const newBySlug = new Map<string, StoreItem[]>()
   for (const item of items) {
-    let group = newBySlug.get(item.fileSlug)
-    if (!group) { group = []; newBySlug.set(item.fileSlug, group) }
+    let group = newBySlug.get(item.entryKey)
+    if (!group) { group = []; newBySlug.set(item.entryKey, group) }
     group.push(item)
   }
 

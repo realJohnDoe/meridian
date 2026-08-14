@@ -90,7 +90,7 @@ export interface OccurrenceEntry<T = Record<string, unknown>> {
   date:      string                    // YYYY-MM-DD
   time:      string | null             // HH:mm or null
   source:    'generated' | 'explicit'
-  fileSlug:  string                    // identifies source file (= node.id)
+  entryKey:  string                    // identifies the source file within its vault
   id:        string                    // stable UUID — carried from the store item or memoised by logical key
   ownerId?:  string                    // UUID of parent RepeatPattern (undefined for standalone)
   excluded?: boolean                   // exclusion override: suppresses a generated occurrence
@@ -105,7 +105,7 @@ export interface RepeatPattern<T = Record<string, unknown>> {
   date:      string
   time:      string | null
   repeat:    Repeat
-  fileSlug:  string
+  entryKey:  string
   id:        string                    // own UUID
   // No ownerId — RepeatPatterns are flat siblings, never nested in the store
   metadata:  T

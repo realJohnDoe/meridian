@@ -30,7 +30,7 @@ export interface StoreData {
 
 /** Items belonging to a specific file. */
 export function fileSlugItems(items: StoreItem[], fileSlug: string): StoreItem[] {
-  return items.filter(i => i.fileSlug === fileSlug)
+  return items.filter(i => i.entryKey === fileSlug)
 }
 
 /** Find the RepeatPattern that owns `occ`. Returns undefined for standalones. */
@@ -122,7 +122,7 @@ export function upsertOverride(
     date:    occ.date,
     time:    occ.time,
     source:  'explicit',
-    fileSlug: occ.fileSlug,
+    entryKey: occ.entryKey,
     id:      newId,
     ownerId: occ.ownerId,
     // The new override inherits the series' metadata as its base; collapse then
@@ -338,7 +338,7 @@ function applyFieldsToChildren(items: StoreItem[], seriesId: string, fields: Edi
 
 /** True when some file already occupies `fileSlug` in this snapshot. */
 function slugTaken({ items, roots, unreadableSlugs }: StoreData, fileSlug: string): boolean {
-  return roots.has(fileSlug) || items.some(i => i.fileSlug === fileSlug) || (unreadableSlugs?.has(fileSlug) ?? false)
+  return roots.has(fileSlug) || items.some(i => i.entryKey === fileSlug) || (unreadableSlugs?.has(fileSlug) ?? false)
 }
 
 /**
@@ -375,7 +375,7 @@ function findDraft(items: StoreItem[], draftId: string | undefined): StoreItem |
  */
 export function newEntrySlug(data: StoreData, title: string, draftId?: string): string {
   const draft = findDraft(data.items, draftId)
-  if (draft) return draft.fileSlug
+  if (draft) return draft.entryKey
 
   const base = titleToSlug(title) || crypto.randomUUID()
   if (!slugTaken(data, base)) return base
@@ -418,7 +418,7 @@ function applyNew(data: StoreData, fields: EditFields, draftId?: string): StoreD
       date:     scheduled?.date ?? '',
       time:     scheduled?.time || null,
       repeat,
-      fileSlug,
+      entryKey: fileSlug,
       id:       draftId ?? crypto.randomUUID(),
       metadata: seriesMeta({}, fields),
     }
@@ -428,7 +428,7 @@ function applyNew(data: StoreData, fields: EditFields, draftId?: string): StoreD
     date:    scheduled?.date ?? '',
     time:    scheduled?.time || null,
     source:  'explicit',
-    fileSlug,
+    entryKey: fileSlug,
     id:      draftId ?? crypto.randomUUID(),
     metadata: occMeta({}, fields),
   }
@@ -437,7 +437,7 @@ function applyNew(data: StoreData, fields: EditFields, draftId?: string): StoreD
 
 /** Update the series (or standalone) metadata across all occurrences. */
 function applyAll({ items, roots }: StoreData, occ: Occurrence, fields: EditFields): StoreData {
-  roots = updateRoot(roots, occ.fileSlug, fields)
+  roots = updateRoot(roots, occ.entryKey, fields)
   const matchItem = occ.ownerId
     ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
     : (i: StoreItem) => isStandaloneOcc(i) && i.id === occ.id
@@ -461,7 +461,7 @@ function applyAll({ items, roots }: StoreData, occ: Occurrence, fields: EditFiel
  */
 function applySingle({ items, roots }: StoreData, occ: Occurrence, fields: EditFields): StoreData {
   const { scheduled, repeat } = fields
-  roots = updateRoot(roots, occ.fileSlug, fields)
+  roots = updateRoot(roots, occ.entryKey, fields)
   const baseSeries = findSeries(items, occ)
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
   const newDate = scheduled?.date ?? ''
@@ -472,7 +472,7 @@ function applySingle({ items, roots }: StoreData, occ: Occurrence, fields: EditF
       date:     newDate,
       time:     newTime,
       repeat,
-      fileSlug: occ.fileSlug,
+      entryKey: occ.entryKey,
       id:       occ.id,
       metadata: seriesMeta(base, fields),
     }
@@ -493,7 +493,7 @@ function applySingle({ items, roots }: StoreData, occ: Occurrence, fields: EditF
       date:     newDate,
       time:     newTime,
       source:   'explicit',
-      fileSlug: occ.fileSlug,
+      entryKey: occ.entryKey,
       id:       movedId,
       ownerId:  occ.ownerId,
       metadata: occMeta(base, fields),
@@ -532,7 +532,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
   const newSeriesId = crypto.randomUUID()
   const newRepeat = repeat ?? series.repeat
   const newMeta = seriesMeta(series.metadata, fields)
-  roots = updateRoot(roots, occ.fileSlug, fields)
+  roots = updateRoot(roots, occ.entryKey, fields)
 
   items = items.flatMap(i => {
     if (i.id === series.id) {
@@ -545,7 +545,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
         date:     scheduled?.date ?? occDate,
         time:     scheduled?.time || null,
         repeat:   newRepeat,
-        fileSlug: series.fileSlug,
+        entryKey: series.entryKey,
         id:       newSeriesId,
         metadata: newMeta,
       }
@@ -579,13 +579,13 @@ function applyAdd({ items, roots }: StoreData, occ: Occurrence, fields: EditFiel
   const newDate = scheduled?.date ?? ''
   const baseSeries = findSeries(items, occ)
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
-  roots = updateRoot(roots, occ.fileSlug, fields)
+  roots = updateRoot(roots, occ.entryKey, fields)
   if (repeat) {
     const newSeries: RepeatPattern<OccurrenceMetadata> = {
       date:     newDate,
       time:     scheduled?.time || null,
       repeat,
-      fileSlug: occ.fileSlug,
+      entryKey: occ.entryKey,
       id:       crypto.randomUUID(),
       metadata: seriesMeta(base, fields),
     }
@@ -595,7 +595,7 @@ function applyAdd({ items, roots }: StoreData, occ: Occurrence, fields: EditFiel
     date:    newDate,
     time:    scheduled?.time || null,
     source:  'explicit',
-    fileSlug: occ.fileSlug,
+    entryKey: occ.entryKey,
     id:      crypto.randomUUID(),
     ownerId: occ.ownerId,
     metadata: { ...occMeta(base, fields), done: fields.tracked ? false : undefined },
@@ -701,7 +701,7 @@ export function deleteByFileSlug(
   }
   nextRoots.delete(fileSlug)
   return {
-    data: { items: items.filter(i => i.fileSlug !== fileSlug), roots: nextRoots },
+    data: { items: items.filter(i => i.entryKey !== fileSlug), roots: nextRoots },
     affectedSlugs,
   }
 }
