@@ -188,6 +188,17 @@ not the merge** — `mergeChangedIntoStore` (rebuilds the store by filtering out
 and `writeEntityToCache` (collapses one file back to YAML). Add `getVaultLayer(vaultId)` to
 `storeBridge.ts` and use it at both sites.
 
+**The sidebar's per-vault list goes away.** Once "registered", "visible" and "default" are three
+separate concepts (see the table above), a second list of vaults in the sidebar — alongside the
+filter's — is the same radio-vs-checkbox confusion this plan exists to remove, just relocated
+rather than solved. Each concept gets exactly one home instead: **Settings** owns registration
+(add/remove/rename) and the default-vault choice (§14); the **filter** owns visibility (§9); the
+**`SyncButton`** popover owns status, including the "needs reconnect" indicator that lives in the
+sidebar today (§4). The sidebar keeps its single "Settings" entry, unchanged, and drops the
+`SidebarGroupLabel className="…">Vaults</SidebarGroupLabel>` block and `vaultIcon` usage
+entirely — `Sidebar.tsx` still changes (favourites' `slugRoute` picks up the new URL shape), just
+not for a vault list.
+
 ### 4. Per-vault backends and a serial, per-vault sync loop
 
 `storage/activeBackend.ts` (a single module slot) becomes `storage/backends.ts`:
@@ -227,8 +238,13 @@ syncByVault: Map<string, {
 ```
 
 `SyncButton` aggregates for its icon (worst status wins) and lists per-vault rows in its
-popover. This also retires the two hardcoded "Tutorial vault — changes aren't saved." strings
-(`SyncButton.tsx:56`, `EntryEditor.tsx:150`) in favour of the vault's own name and kind.
+popover — now the **one** place per-vault status lives, since the sidebar's vault list is gone
+(§3). Each row absorbs what the sidebar used to show inline: dirty count, error/offline state,
+and the local vault's "needs reconnect" `AlertCircle` (today `pendingDirReconnect`, gated
+`vault.kind === 'local'`), with a click there triggering the same interactive permission
+re-request `setActiveVault` used to do on a sidebar click. This also retires the two hardcoded
+"Tutorial vault — changes aren't saved." strings (`SyncButton.tsx:56`, `EntryEditor.tsx:150`) in
+favour of the vault's own name and kind.
 
 **A read-only vault is no longer a dead end.** `runSync` currently bails entirely on
 `backend.readOnly`. Narrow that: skip `pushDirty` when read-only, but still reconcile when
@@ -291,10 +307,11 @@ Around that:
 
 ### 7. New entries
 
-`defaultVaultId` (settable in Settings, marked in the sidebar) is the target, **overridable per
-entry**: `newEntryRoute` gains an optional `vault`, and `_app.entry.new.tsx` renders the same
-vault chip — defaulting to `defaultVaultId`, listing registered writable vaults — changeable
-before the first save. `defaultParticipants` is read from the *target* vault at create time
+`defaultVaultId` (settable in Settings) is the target, **overridable per entry**:
+`newEntryRoute` gains an optional `vault`, and `_app.entry.new.tsx` renders the same vault
+chip — defaulting to `defaultVaultId`, listing registered writable vaults — changeable before
+the first save; that chip is the marker, so no separate sidebar indicator is needed.
+`defaultParticipants` is read from the *target* vault at create time
 (today it reads the active vault's), so the seed matches where the entry lands.
 
 ### 8. Preferences: per-vault vs global, settled
@@ -543,11 +560,14 @@ worker/src/icalFetch.ts                 + .test.ts
   `model/storeItems.ts`, `model/expansion.ts` (`joinFileMeta`), `test-utils/index.ts`
   (`makeRoots`), plus the mechanical `fileSlug`→`entryKey` rename across ~33 non-test files.
 - *Routing*: `routes/-entryRoute.ts`, `routes/-entryTopbar.tsx`, `editor/useEntryEditor.ts`
-  (two raw `to:` literals), `hooks/useOpenEntry.ts`, `components/Sidebar.tsx`,
-  `components/SearchBar.tsx`, `storage/vaultRegistry.ts` (`newVaultId`).
+  (two raw `to:` literals), `hooks/useOpenEntry.ts`, `components/Sidebar.tsx` (favourites'
+  `slugRoute` picks up the new URL shape), `components/SearchBar.tsx`,
+  `storage/vaultRegistry.ts` (`newVaultId`).
 - *Multi-vault*: `store.ts`, `storeBridge.ts`, `storage/vaultRegistry.ts`, `storage/sync.ts`,
   `storage/inFlight.ts`, `persistencePort.ts`, `storeCommit.ts`, `occurrenceActions.ts`,
-  `components/SyncButton.tsx`, `components/Sidebar.tsx`, `onboarding/CoachTour.tsx`.
+  `components/SyncButton.tsx` (per-vault rows, absorbing the sidebar's old "needs reconnect"
+  indicator), `components/Sidebar.tsx` (**remove** the per-vault list — see §3),
+  `onboarding/CoachTour.tsx`.
 - *New `VaultKind`* (TypeScript finds all of these): `vaultRef.ts`,
   `storage/cache/registry.ts`, `storage/vaultRegistry.ts`, `components/vaultIcon.ts`,
   `components/AddVaultWizard.tsx`, `components/VaultSettings.tsx`, `storage/index.ts` +
@@ -607,12 +627,12 @@ vault registered, so the only visible change is the URL shape.
 
 **PR 2 — Several vaults, registered and synced.** `storage/backends.ts` registry; per-vault
 sync state and the serial oldest-first scheduler; layered store + `getVaultLayer`;
-`defaultVaultId` replacing `activeVaultId`; the nested **Calendars & people** filter with
-hidden-semantics migration; sidebar showing all vaults with per-vault status and the default
-marker; per-vault `SyncButton` popover; new-entry vault chip; Tutorial auto-hidden and
-`CoachTour` re-gated; source chip on `OccurrenceCard`. **The big one** — the filter ships with
-it rather than after, because without it a real vault and the Tutorial vault would share one
-agenda.
+`defaultVaultId` replacing `activeVaultId`, shown via the new-entry vault chip; the nested
+**Calendars & people** filter with hidden-semantics migration; the sidebar's per-vault list
+**removed**, its status folded into a per-vault `SyncButton` popover; new-entry vault chip;
+Tutorial auto-hidden and `CoachTour` re-gated; source chip on `OccurrenceCard`. **The big one** —
+the filter ships with it rather than after, because without it a real vault and the Tutorial
+vault would share one agenda.
 
 **PR 3 — iCal vault kind.** ICS parser, RRULE mapping, synthesis, worker proxy, `IcalBackend`,
 wizard source card with a validate-and-preview URL step, registry wiring, settings detail row,
@@ -690,13 +710,14 @@ pnpm run lint && pnpm test
 **Manual** (per CLAUDE.md I won't start the dev server and drive it myself unless you ask):
 
 1. `pnpm dev`, open `http://localhost:5173/meridian/`.
-2. Settings → add a second vault. Both appear in the sidebar with their own sync status; both
-   sets of entries appear in the agenda, each with a source chip. Tutorial is hidden
-   automatically. The new vault's entry URLs read `/entry/<name>/<slug>`.
+2. Settings → add a second vault. Both appear in the vault picker with their own sync status
+   in `SyncButton`'s popover — the sidebar has no separate vault list. Both sets of entries
+   appear in the agenda, each with a source chip. Tutorial is hidden automatically. The new
+   vault's entry URLs read `/entry/<name>/<slug>`.
 3. Filter (topbar): vault rows expand to the people in that vault. Hide Alice under Work — her
    Personal entries stay. Hide a whole vault: it disappears from agenda, month, week, day,
-   Backlog and Notes, while its sync status keeps ticking in the sidebar, which is the
-   mount/view distinction made visible. Both survive a reload.
+   Backlog and Notes, while `SyncButton` keeps showing it syncing — the mount/view distinction
+   made visible. Both survive a reload.
 4. Create an entry: it lands in the default vault. Create another, switching the vault chip
    first: it lands in the other. Both save and sync independently.
 5. Open an entry, use the vault chip to move it. The dialog names how many links will break;
@@ -706,8 +727,8 @@ pnpm run lint && pnpm test
    The preview shows the calendar name and event count before you commit.
 7. Open a subscription event: plain view, no type toggle, no property chips, no delete, body
    rendered read-only. Open one of your own: fully editable, unchanged.
-8. Rename a vault: sidebar, filter and chips follow; an entry URL bookmarked before the rename
-   still opens (and still carries the original name — expected).
+8. Rename a vault: the filter, `SyncButton` popover and chips all follow; an entry URL
+   bookmarked before the rename still opens (and still carries the original name — expected).
 9. Go offline and reload: every registered vault still renders from the Dexie cache.
 10. Remove the subscription: its entries disappear and its cache rows are dropped
     (`cacheDeleteAll`).
