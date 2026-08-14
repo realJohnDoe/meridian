@@ -640,6 +640,23 @@ is stale — those params exist nowhere in `src/`. Fix it in PR 1, which touches
 
 ## PR sequence
 
+**Recommended model per PR.** The split follows one rubric: **Opus 5** for PRs with an
+invariant that's easy to get subtly, silently wrong and expensive to discover later (a
+dropped field, a mis-ordered write, a wrong RRULE edge case) — where the cost of a careful
+model paying off once vastly outweighs its cost on the PRs that don't need it. **Sonnet 5**
+for PRs that are mechanical, fully specified below, and backed by a sharp, cheap acceptance
+test (build/lint/test green, or an explicit "existing suite passes untouched").
+
+| PR | Model | Why |
+|---|---|---|
+| 0 — Prepare the storage layer | **Sonnet 5** | Mechanical parameter-threading and a data-shape merge, with the sharpest acceptance test in the whole plan: the existing suite must pass untouched. |
+| 1 — Vault-qualified entry identity | **Opus 5** | Foundational, and everything after it inherits its mistakes. `updateRoot` silently dropping `vaultId`/`fileSlug`, or wikilink resolution accidentally reaching across a vault boundary, are exactly the class of bug that ships clean and surfaces as data loss weeks later. |
+| 2 — Several vaults, registered and synced | **Opus 5** | The largest PR and the one that touches the durability layer (per-vault sync state, the scheduler, `mergeChangedIntoStore`) — see the Risk note below. Highest blast radius in the plan. |
+| 3 — iCal vault kind | **Opus 5** | Dense, edge-case-heavy domain logic (ICS parsing, RRULE→`Repeat` mapping, timezone conversion) plus security-sensitive worker code (SSRF-safe URL validation) — see §12–13. |
+| 4 — Plain view-only entry view | **Sonnet 5** | Fully specified in §11 down to which files change and why — assembling existing pieces (`EntryBody`, `Badge`) behind a well-defined branch, with zero effect on the Tutorial vault. |
+| 5 — Move entries between vaults | **Opus 5** | The write-before-delete durability ordering is, per §6, "the whole design" — getting the sequencing wrong risks losing an entry, and the link-breakage count needs careful reasoning about the backlink/wikilink structures. |
+| 6 — Vault names and settings scope restructure | **Sonnet 5** | Ordinary settings-UI work, no tricky invariants. |
+
 **PR 0 — Prepare the storage layer (behaviour-identical).** No user-visible change, existing
 tests unchanged; this is what keeps the risky PR 2 mechanical.
 
