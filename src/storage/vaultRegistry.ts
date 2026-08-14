@@ -133,7 +133,7 @@ async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<v
   setUnreadableFiles(new Map(failures.map(f => [f.slug, { path: f.path, message: f.message }])))
   reportParseFailures(failures)
   auditRoundTrip()
-  updateSyncUI()
+  updateSyncUI(backend)
   // Always a replacement: the example vault's content is never what was
   // already painted, even on the fallback paths that reach here after a real
   // vault was pre-painted from cache.
@@ -141,8 +141,11 @@ async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<v
 }
 
 /**
- * Activate a writable backend: claim the identity, paint whatever the cache
- * holds, then sync in the background.
+ * Load a vault's content into the store — paint whatever the cache holds,
+ * then sync in the background — without touching which vault is "active".
+ * Deliberately separate from claiming identity (see `activateWritableVault`
+ * below, which composes the two): a future multi-vault registry loads
+ * several vaults' content side by side, with at most one of them "active".
  *
  * `prePainted` means the caller already ran hydrateFromCache for this vault
  * id *before* the network work started (the whole point of the cache-first
@@ -158,10 +161,9 @@ async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<v
  * pushDirty leg rescues anything a previous session left dirty, in the same
  * cycle as the reconcile rather than as a second racing one.
  */
-async function activateWritableVault(backend: StorageBackend, prePainted = false): Promise<void> {
-  await setActiveVaultIdentity(backend)
+async function loadVaultContent(backend: StorageBackend, prePainted = false): Promise<void> {
   const painted = prePainted || await hydrateFromCache(backend.id)
-  updateSyncUI()
+  updateSyncUI(backend)
   // `prePainted` is exactly the "cache-first restore of the vault already on
   // screen" case — see VaultChange.contentReplaced.
   emitVaultChanged({ contentReplaced: !prePainted })
@@ -174,6 +176,12 @@ async function activateWritableVault(backend: StorageBackend, prePainted = false
   } else {
     await syncOnActivate()
   }
+}
+
+/** Activate a writable backend: claim the identity, then load its content. */
+async function activateWritableVault(backend: StorageBackend, prePainted = false): Promise<void> {
+  await setActiveVaultIdentity(backend)
+  await loadVaultContent(backend, prePainted)
 }
 
 /** Builds the backend for a local/github ref, fetching its stored credential
@@ -228,8 +236,10 @@ async function activateVaultRef(
   }
   if (perm === 'prompt' && !interactive) {
     await setActiveVaultIdentity(backend, { pendingReconnect: ref.name })
+    // No background sync here — permission isn't granted yet, so this loads
+    // only what the cache already holds rather than the full loadVaultContent.
     if (!prePainted) await hydrateFromCache(ref.id)
-    updateSyncUI()
+    updateSyncUI(backend)
     return 'prompt'
   }
   return 'denied'

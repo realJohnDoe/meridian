@@ -22,8 +22,7 @@ import { getActiveBackend } from './activeBackend'
 
 // ── HELPERS ────────────────────────────────────────────────────
 
-export function updateSyncUI(): void {
-  const backend = getActiveBackend()
+export function updateSyncUI(backend: StorageBackend | null): void {
   if (!backend?.id || backend.readOnly) {
     setStoreState({ syncDirtyCount: 0, syncReadOnly: true })
     return
@@ -438,7 +437,7 @@ export async function reconcileWithBackend(
   if (getActiveBackend()?.id !== vaultId) return
 
   const changedWritten = changed.filter(p => written.has(p))
-  if (changedWritten.length === 0 && deleted.length === 0) { updateSyncUI(); return }
+  if (changedWritten.length === 0 && deleted.length === 0) { updateSyncUI(backend); return }
 
   // Parse only the changed files; deleted paths have no replacement record and
   // are evicted via alsoAffected.
@@ -448,33 +447,52 @@ export async function reconcileWithBackend(
   const deletedSlugs = deleted.map(pathToSlug)
 
   mergeChangedIntoStore(changedRecords, deletedSlugs)
-  updateSyncUI()
+  updateSyncUI(backend)
 }
 
 // ── SYNC CORE ─────────────────────────────────────────────────────────
 
-let _syncing = false
-let _pushTimer: ReturnType<typeof setTimeout> | null = null
-// Set when a push was requested (scheduleAutoPush's timer firing, or an
-// explicit flushPendingPush()) while a sync was already in flight. runSync's
-// early `if (_syncing) return` would otherwise silently drop that request —
-// there's no rescheduling on that path today — stranding the write until the
-// next 60s autoSyncTick. Re-armed from runSync's `finally` once the in-flight
-// sync settles.
-let _pushQueued = false
+/**
+ * All of sync.ts's mutable per-vault state, collected into one record. Still
+ * a single module-level instance — one vault syncs at a time today — but
+ * shaped so a future multi-vault scheduler can key a `Map<vaultId,
+ * VaultSyncState>` off the same fields instead of threading six independent
+ * variables through every call site.
+ */
+interface VaultSyncState {
+  syncing: boolean
+  pushTimer: ReturnType<typeof setTimeout> | null
+  /**
+   * Set when a push was requested (scheduleAutoPush's timer firing, or an
+   * explicit flushPendingPush()) while a sync was already in flight. runSync's
+   * early `if (syncing) return` would otherwise silently drop that request —
+   * there's no rescheduling on that path today — stranding the write until the
+   * next 60s autoSyncTick. Re-armed from runSync's `finally` once the in-flight
+   * sync settles.
+   */
+  pushQueued: boolean
+  consecutiveFailures: number
+  nextRetryAt: number
+  /** Dedupe toasts for actionable (non-transient) errors across silent ticks. */
+  lastErrorSig: string | null
+}
+
+function createVaultSyncState(): VaultSyncState {
+  return {
+    syncing: false, pushTimer: null, pushQueued: false,
+    consecutiveFailures: 0, nextRetryAt: 0, lastErrorSig: null,
+  }
+}
+
+const syncState: VaultSyncState = createVaultSyncState()
 
 // ── BACKOFF STATE ─────────────────────────────────────────────────────
 const BACKOFF_BASE_MS  = 60_000
 const BACKOFF_MAX_MS   = 30 * 60_000
 
-let _consecutiveFailures = 0
-let _nextRetryAt         = 0
-// Dedupe toasts for actionable (non-transient) errors across silent ticks.
-let _lastErrorSig: string | null = null
-
 export function resetSyncBackoff(): void {
-  _consecutiveFailures = 0
-  _nextRetryAt         = 0
+  syncState.consecutiveFailures = 0
+  syncState.nextRetryAt         = 0
 }
 
 /**
@@ -559,14 +577,19 @@ async function pushDirty(
   return { hadCollision, pushed }
 }
 
-async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> {
-  const backend = getActiveBackend()
+/**
+ * `backend` is threaded in explicitly by every caller (each of which looks it
+ * up exactly once, at its own entry point) rather than looked up again here —
+ * so a backend captured at the start of a call can never silently diverge
+ * from what `getActiveBackend()` would return by the time this runs.
+ */
+async function runSync(backend: StorageBackend | null, opts: { silent: boolean; pull: boolean }): Promise<void> {
   if (!backend || backend.readOnly) {
     if (!opts.silent) notify('No writable vault connected. Add a local folder first.')
     return
   }
-  if (_syncing) return
-  _syncing = true
+  if (syncState.syncing) return
+  syncState.syncing = true
   setStoreState({ syncInProgress: true })
 
   const vaultId = backend.id
@@ -595,19 +618,19 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
     }
     // ── SUCCESS ──────────────────────────────────────────────────
     setStoreState({ syncError: null, syncOffline: false, lastSyncedAt: Date.now() })
-    _consecutiveFailures = 0
-    _nextRetryAt         = 0
-    _lastErrorSig        = null
-    updateSyncUI()
+    syncState.consecutiveFailures = 0
+    syncState.nextRetryAt         = 0
+    syncState.lastErrorSig        = null
+    updateSyncUI(backend)
   } catch (e) {
     console.error('[vault] sync failed:', e)
 
     if (isTransientSyncError(e)) {
       // ── TRANSIENT (offline / network drop) ───────────────────
       setStoreState({ syncOffline: true })
-      _consecutiveFailures++
-      _nextRetryAt = Date.now() + Math.min(
-        BACKOFF_BASE_MS * Math.pow(2, _consecutiveFailures - 1),
+      syncState.consecutiveFailures++
+      syncState.nextRetryAt = Date.now() + Math.min(
+        BACKOFF_BASE_MS * Math.pow(2, syncState.consecutiveFailures - 1),
         BACKOFF_MAX_MS,
       )
       if (!opts.silent) {
@@ -617,31 +640,30 @@ async function runSync(opts: { silent: boolean; pull: boolean }): Promise<void> 
       // ── ACTIONABLE (auth, repo missing, etc.) ────────────────
       const msg = (e as Error).message || (e as Error).name || 'Unknown error'
       setStoreState({ syncError: msg })
-      if (!opts.silent || _lastErrorSig !== msg) {
+      if (!opts.silent || syncState.lastErrorSig !== msg) {
         notifyError('Sync failed', e)
-        _lastErrorSig = msg
+        syncState.lastErrorSig = msg
       }
     }
   } finally {
-    _syncing = false
+    syncState.syncing = false
     setStoreState({ syncInProgress: false })
     // A push that arrived mid-sync was queued (see attemptPush) instead of
     // dropped — re-arm the debounced push now that this sync has settled.
-    if (_pushQueued) { _pushQueued = false; scheduleAutoPush() }
+    if (syncState.pushQueued) { syncState.pushQueued = false; scheduleAutoPush(backend) }
   }
 }
 
 /** Push pending local changes, or queue the request if a sync is already running. */
-function attemptPush(): void {
-  if (_syncing) { _pushQueued = true; return }
-  void runSync({ silent: true, pull: false })
+function attemptPush(backend: StorageBackend | null): void {
+  if (syncState.syncing) { syncState.pushQueued = true; return }
+  void runSync(backend, { silent: true, pull: false })
 }
 
-function scheduleAutoPush(): void {
-  const backend = getActiveBackend()
-  if (!backend || backend.readOnly) return
-  if (_pushTimer) clearTimeout(_pushTimer)
-  _pushTimer = setTimeout(() => { _pushTimer = null; attemptPush() }, 1000)
+function scheduleAutoPush(backend: StorageBackend): void {
+  if (backend.readOnly) return
+  if (syncState.pushTimer) clearTimeout(syncState.pushTimer)
+  syncState.pushTimer = setTimeout(() => { syncState.pushTimer = null; attemptPush(backend) }, 1000)
 }
 
 /**
@@ -652,7 +674,7 @@ function scheduleAutoPush(): void {
  * returns immediately if the cache has no dirty/tombstoned records.
  */
 export function flushPendingPush(): void {
-  attemptPush()
+  attemptPush(getActiveBackend())
 }
 
 /**
@@ -679,18 +701,18 @@ export function flushPendingPush(): void {
  */
 export async function syncOnActivate(): Promise<void> {
   resetSyncBackoff()
-  await runSync({ silent: true, pull: true })
+  await runSync(getActiveBackend(), { silent: true, pull: true })
 }
 
 export function autoSyncTick(): void {
-  if (Date.now() < _nextRetryAt) return
-  void runSync({ silent: true, pull: true })
+  if (Date.now() < syncState.nextRetryAt) return
+  void runSync(getActiveBackend(), { silent: true, pull: true })
 }
 
 export async function syncToBackend(): Promise<void> {
   // Manual sync always bypasses the backoff gate.
-  _nextRetryAt = 0
-  await runSync({ silent: false, pull: true })
+  syncState.nextRetryAt = 0
+  await runSync(getActiveBackend(), { silent: false, pull: true })
 }
 
 // ── CACHE WRITE / DELETE ──────────────────────────────────────
@@ -724,8 +746,8 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body, root?.fileConvention)
     await recordLocalEdit(backend.id, path, content)
-    updateSyncUI()
-    scheduleAutoPush()
+    updateSyncUI(backend)
+    scheduleAutoPush(backend)
   } catch (e) {
     console.error('[vault] writeEntityToCache failed:', e)
     notifyError('Save failed', e)
@@ -741,8 +763,8 @@ export async function deleteFromBackend(fileSlug: string): Promise<void> {
     const backend = getActiveBackend()
     if (!backend || backend.readOnly) return
     await recordLocalDelete(backend.id, path)
-    updateSyncUI()
-    scheduleAutoPush()
+    updateSyncUI(backend)
+    scheduleAutoPush(backend)
   } catch (e) {
     console.error('[vault] deleteFromBackend failed:', e)
     notifyError('Delete failed', e)
