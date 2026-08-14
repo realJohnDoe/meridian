@@ -7,6 +7,7 @@ import {
   tokenExpirySave, tokenExpiryClear,
 } from '@/storage/cache/credentials'
 import { vaultRefsSave, vaultRefsLoad, activeVaultIdSave, activeVaultIdLoad } from '@/storage/cache/registry'
+import { titleToSlug } from '@/fileIO'
 import { diskPickDirectory } from './fs'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
@@ -52,6 +53,45 @@ function emitVaultChanged(change: VaultChange): void {
 // ── CONSTANTS ─────────────────────────────────────────────────
 
 const EXAMPLE_REF: VaultRef = { id: 'example', name: 'Tutorial', kind: 'example' }
+
+// ── VAULT IDS ─────────────────────────────────────────────────
+
+/**
+ * A readable id for a brand-new vault, derived once at creation and then
+ * persisted — never regenerated.
+ *
+ * The id is the single identity: the Dexie partition key (`vp(vaultId, path)`),
+ * the credential key, the localStorage pref suffix, **and** the URL segment
+ * (`/entry/<vault>/<slug>`). That last use is why it stops being a UUID: a
+ * bookmark reading `/entry/realjohndoe-meridian/meeting-notes` is legible where
+ * one reading `/entry/3f2a5c9e-…/meeting-notes` is not.
+ *
+ * It cannot be *derived* from the vault's properties, which is why it is
+ * assigned rather than computed: `owner/repo@branch` is a genuine natural key
+ * but contains `/` and `@` (unusable as a path segment); a local folder's name
+ * is neither unique nor stable across re-picking; and an iCal URL is unique but
+ * is the user's secret address. So it is assigned once, from the name, and
+ * uniquified against the ids already taken — including `example`, which the
+ * synthesized Tutorial vault always holds.
+ *
+ * Vaults that already exist keep their UUIDs. There is no migration, and that
+ * is deliberate: moving an id would have to move Dexie rows, a GitHub token and
+ * an FS handle in lockstep, and a half-applied move orphans a credential. The
+ * trade is that their URLs stay ugly until they are re-added.
+ */
+export function newVaultId(name: string, taken: Set<string>): string {
+  const base = titleToSlug(name)
+  if (!taken.has(base)) return base
+  let n = 2
+  while (taken.has(`${base}-${n}`)) n++
+  return `${base}-${n}`
+}
+
+/** Ids already in use — the persisted vaults plus the synthesized Tutorial one. */
+async function takenVaultIds(): Promise<Set<string>> {
+  const existing = await vaultRefsLoad()
+  return new Set([EXAMPLE_REF.id, ...existing.map(r => r.id)])
+}
 
 // ── REGISTRY HELPER ───────────────────────────────────────────
 
@@ -360,7 +400,7 @@ export async function addLocalVault(): Promise<void> {
   try {
     await cacheInit()
     const handle = await diskPickDirectory()
-    const id     = crypto.randomUUID()
+    const id     = newVaultId(handle.name, await takenVaultIds())
 
     await handleSave(id, handle)
 
@@ -386,7 +426,7 @@ export interface GitHubOAuthVaultConfig {
 export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<void> {
   try {
     await cacheInit()
-    const id = crypto.randomUUID()
+    const id = newVaultId(`${cfg.owner}/${cfg.repo}`, await takenVaultIds())
 
     const { GitHubBackend } = await import('./githubBackend')
     const backend = new GitHubBackend(id, `${cfg.owner}/${cfg.repo}`, {

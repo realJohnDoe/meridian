@@ -203,7 +203,7 @@ vi.mock('@/storage/sync', () => syncFns)
 
 // Imports of the module under test (and its non-mocked collaborators — the
 // trivial in-memory activeBackend singleton) must come after the vi.mock calls.
-import { restoreVaults, setActiveVault, removeVault, onVaultChanged } from '@/storage/vaultRegistry'
+import { restoreVaults, setActiveVault, removeVault, onVaultChanged, newVaultId } from '@/storage/vaultRegistry'
 import { getActiveBackend, setActiveBackend } from '@/storage/activeBackend'
 import { ensureFreshAccessToken } from '@/storage/githubOAuth'
 
@@ -726,5 +726,44 @@ describe('removeVault', () => {
 
     expect((metaStore.get('vaults') as VaultRef[]).map(r => r.id)).toEqual([LOCAL_REF.id])
     expect(notifyFns.notifyError).not.toHaveBeenCalled()
+  })
+})
+
+// ── Readable vault ids ────────────────────────────────────────────────────
+//
+// The id is one identifier used four ways — Dexie partition key, credential
+// key, localStorage pref suffix, and URL segment. Only the last one cares that
+// it is readable, but it is the one the user sees.
+
+describe('newVaultId', () => {
+  it('derives a readable id from the vault name', () => {
+    expect(newVaultId('Notes', new Set())).toBe('notes')
+    expect(newVaultId('realjohndoe/meridian', new Set())).toBe('realjohndoe-meridian')
+  })
+
+  it('uniquifies against ids already taken', () => {
+    const taken = new Set(['notes'])
+    expect(newVaultId('Notes', taken)).toBe('notes-2')
+    expect(newVaultId('Notes', new Set([...taken, 'notes-2']))).toBe('notes-3')
+  })
+
+  it('never collides with the synthesized Tutorial vault', () => {
+    // `example` is always present in the taken set (see takenVaultIds), so a
+    // folder actually called "Example" cannot take the Tutorial vault's id and
+    // shadow it in the vault list.
+    expect(newVaultId('Example', new Set(['example']))).toBe('example-2')
+  })
+
+  it('produces a URL-safe segment for a name that is mostly punctuation', () => {
+    const id = newVaultId('~/Documents/My Vault!', new Set())
+    expect(id).toBe(encodeURIComponent(id))
+    expect(id).not.toContain('/')
+  })
+
+  it('falls back to a usable id when the name slugifies to nothing', () => {
+    // titleToSlug yields 'untitled' rather than '' — an empty id would break
+    // every path that composes it (`vp(vaultId, path)`, the URL segment).
+    expect(newVaultId('///', new Set())).toBe('untitled')
+    expect(newVaultId('///', new Set(['untitled']))).toBe('untitled-2')
   })
 })
