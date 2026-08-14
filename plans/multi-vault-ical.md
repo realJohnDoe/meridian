@@ -42,6 +42,7 @@ kind that happens to be read-only" — no special case anywhere.
 | **Sync loop** | **Serial, oldest-synced first**, per-vault minimum intervals and per-vault backoff. |
 | **Fetching iCal** | **Proxy through the existing Cloudflare Worker** (`meridian-oauth`). |
 | **Naming** | **Any vault can be renamed** (except the synthesized Tutorial vault). |
+| **Read-only entries** | **Two distinct modes**, not one: the Tutorial vault keeps its full edit UI with a "not saved" banner (unchanged); iCal entries get a genuinely plain, non-editable view. |
 | **Delivery** | A behaviour-identical prep PR, then six feature PRs, each independently shippable. |
 
 ### On identifiers — no new UUIDs
@@ -374,18 +375,42 @@ into a compile error rather than a lurking bug.
 
 ### 11. Per-entry access, and the plain read view
 
+Two different vaults are read-only today, for two different reasons, and the UI should say so
+differently. The **Tutorial vault** is a sandbox — its whole pedagogical point is that you can
+poke at the type toggle, try a repeat rule, tick a checkbox, and see it work, with a banner
+explaining that none of it is saved. An **iCal feed** has no such use case: there is no source
+to write back to, so offering property chips and a save button would mislead rather than
+onboard. So this is not one "read-only" mode, it's two, and only one of them gets the new plain
+view:
+
 ```ts
 // src/hooks/useEntryAccess.ts
 export type EntryAccess =
   | { mode: 'edit';         vault: VaultRef }
-  | { mode: 'read-discard'; vault: VaultRef }   // Tutorial: edits shown, never saved
-  | { mode: 'read-source';  vault: VaultRef }   // subscription: no edit affordances at all
+  | { mode: 'read-discard'; vault: VaultRef }   // Tutorial: full edit UI, writes silently discarded — unchanged from today
+  | { mode: 'read-source';  vault: VaultRef }   // subscription: no edit affordances — nothing to save back to
+
+function accessMode(kind: VaultKind): EntryAccess['mode'] {
+  if (kind === 'example') return 'read-discard'
+  if (kind === 'ical')    return 'read-source'
+  return 'edit'
+}
 export function useEntryAccess(occ: Occurrence | null): EntryAccess
 ```
 
-`EntryEditor`'s always-required hook members (`setEntry`, `handleSave`, `handleOpenDlg`,
-`handleOpenRepeatDlg`, `handlePromoteTask`) are all mutators, so bending it into a read view
-means disabling a dozen affordances. A sibling presentational component is cleaner and is what
+Deriving the mode from `VaultKind` alone — not from `StorageBackend.readOnly` — is deliberate
+and keeps this cheap: it needs no new field on `StorageBackend` or per-vault sync state, just a
+lookup already available where hooks live (`components`/`hooks` may not import `@/storage`
+anyway). The sync-layer `readOnly` boolean (whether writes get pushed) and this UI-mode question
+turn out to be independent: both `example` and `ical` are `readOnly` for sync purposes, but only
+`ical` should look different in the editor.
+
+**`read-discard` gets no new work at all** — `EntryEditor` already renders it exactly as today
+(full affordances, the "changes aren't saved" banner from §4, generalized to the vault's own
+name). Only `read-source` routes to a new sibling component. `EntryEditor`'s always-required
+hook members (`setEntry`, `handleSave`, `handleOpenDlg`, `handleOpenRepeatDlg`,
+`handlePromoteTask`) are all mutators, so bending it into a read view for `read-source` would
+mean disabling a dozen affordances — a sibling presentational component is cleaner and is what
 "a different look, so as not to confuse users" actually asks for:
 
 ```
@@ -400,7 +425,9 @@ Reusing `EntryBody` is deliberate: `markdownLivePreview` renders formatting on e
 has no cursor, so read-only mode renders the markdown *better* than editing mode does, and
 wikilink decorations keep working for free.
 
-`routes/-entryTopbar.tsx` needs a prop to drop the delete button for non-`edit` modes.
+`routes/-entryTopbar.tsx` needs a prop to drop the delete button for `read-source` only — the
+Tutorial vault's topbar is unchanged, whatever its current quirks (its delete button today is
+already a no-op past the storage layer; not this plan's concern to fix).
 
 ### 12. iCal vault kind
 
@@ -592,7 +619,9 @@ wizard source card with a validate-and-preview URL step, registry wiring, settin
 `runSync` read-only pull path.
 
 **PR 4 — Plain read-only entry view.** `useEntryAccess`, `EntryReadonlyView`, `EntryBody`
-`readOnly` prop, route + topbar branching. Covers subscriptions *and* the Tutorial vault.
+`readOnly` prop, route + topbar branching — scoped to `read-source` (iCal) only. The Tutorial
+vault's existing `EntryEditor`-with-banner behavior is untouched, so this PR carries no
+regression risk for onboarding.
 
 **PR 5 — Move entries between vaults.** `moveEntity` on the port, `storage/moveEntry.ts` with
 the write-before-delete ordering, slug-collision allocation, the link-breakage confirm dialog,
