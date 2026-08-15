@@ -1,1 +1,1 @@
-export { newEntryRoute, entryRoute, slugRoute } from './-entryRoute'
+export { newEntryRoute, entryRoute, keyRoute } from './-entryRoute'

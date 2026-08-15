@@ -6,7 +6,7 @@
 // duration and roundTripCheck. Deliberately NOT exported from model/index.ts:
 // this is the domain core's internals, not its public surface.
 
-import type { FileMetadata, OccurrenceMetadata, Priority } from '@/types'
+import type { FileMetadata, FileFields, OccurrenceMetadata, Priority } from '@/types'
 
 const PRIORITIES: readonly Priority[] = ['high', 'medium', 'low']
 
@@ -207,14 +207,14 @@ function mergeBags(
 export function extractFileMetadata(
   fields: Record<string, unknown>,
   remainder?: Record<string, unknown>,
-): FileMetadata {
+): FileFields {
   // title/tags/items go through the same per-field/per-element coercion as
   // extractOccurrenceMetadata below — this used to hand-roll its own
   // Array.isArray(...) ? raw : [] check, which (unlike parseInlineField)
   // never validated array ELEMENTS, so a malformed `items:` list reached
   // `root.items` — the exact map wikilinks.ts/fileOccurrence.ts iterate —
   // untouched (health survey finding #1).
-  const meta = { body: scalarToString(fields.body) } as unknown as FileMetadata
+  const meta = { body: scalarToString(fields.body) } as unknown as FileFields
   const sink = meta as unknown as Record<string, unknown>
   for (const spec of FILE_LEVEL_SPECS) {
     sink[spec.key as string] = parseInlineField(spec, fields[spec.key])

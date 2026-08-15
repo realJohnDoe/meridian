@@ -37,12 +37,12 @@ import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
 import { roundTripLoss } from '@/model/roundTripCheck'
 import { isSeries, isTracked } from '@/types'
-import { fixtureNames, loadFixture, frontmatterOf, normalizeIds, serialize } from './helpers'
+import { fixtureNames, loadFixture, frontmatterOf, normalizeIds, serialize, TEST_VAULT } from './helpers'
 
 /** Check 1 — collapse totality. Store must survive its own serialization. */
 function assertCollapseTotality(slug: string, source: string): void {
-  const original = parseToStoreItems(`${slug}.md`, source)
-  const reparsed = parseToStoreItems(`${slug}.md`, serialize(original.items, original.root))
+  const original = parseToStoreItems(`${slug}.md`, source, TEST_VAULT)
+  const reparsed = parseToStoreItems(`${slug}.md`, serialize(original.items, original.root), TEST_VAULT)
   expect(normalizeIds(reparsed.items)).toEqual(normalizeIds(original.items))
 }
 
@@ -56,7 +56,7 @@ function assertCollapseTotality(slug: string, source: string): void {
  * test of the thing that actually runs on a user's vault.
  */
 function assertSourceFidelity(slug: string, source: string): void {
-  const parsed = parseToStoreItems(`${slug}.md`, source)
+  const parsed = parseToStoreItems(`${slug}.md`, source, TEST_VAULT)
   expect(roundTripLoss(`${slug}.md`, source, parsed)).toEqual([])
 }
 
@@ -71,7 +71,7 @@ function assertSourceFidelity(slug: string, source: string): void {
 describe('roundTripLoss — the runtime guard', () => {
   it.each(fixtureNames())('reports no loss for %s', (name) => {
     const source = loadFixture(name)
-    const parsed = parseToStoreItems(`${name}.md`, source)
+    const parsed = parseToStoreItems(`${name}.md`, source, TEST_VAULT)
     expect(roundTripLoss(`${name}.md`, source, parsed)).toEqual([])
   })
 
@@ -88,7 +88,7 @@ describe('roundTripLoss — the runtime guard', () => {
       'date: 2026-04-08',
       '---',
     ].join('\n')
-    const parsed = parseToStoreItems('qr.md', source)
+    const parsed = parseToStoreItems('qr.md', source, TEST_VAULT)
     const lobotomised = {
       ...parsed,
       items: parsed.items.map(i => ({ ...i, metadata: { ...i.metadata, extra: undefined } })),
@@ -168,7 +168,7 @@ describe('Root A totality — closed leaks (regression guards)', () => {
     ].join('\n')
     assertCollapseTotality('inherited-vs-own-title', source)
     assertSourceFidelity('inherited-vs-own-title', source)
-    const { items } = parseToStoreItems('inherited-vs-own-title.md', source)
+    const { items } = parseToStoreItems('inherited-vs-own-title.md', source, TEST_VAULT)
     const inherited = items.find(i => !isSeries(i) && i.date === '2026-04-13')!
     const diverged  = items.find(i => !isSeries(i) && i.date === '2026-04-20')!
     expect(inherited.metadata.extra?.title).toBeUndefined()
@@ -197,7 +197,7 @@ describe('Root A totality — closed leaks (regression guards)', () => {
     ].join('\n')
     assertCollapseTotality('container-remainder', source)
     assertSourceFidelity('container-remainder', source)
-    const parsed = parseToStoreItems('container-remainder.md', source)
+    const parsed = parseToStoreItems('container-remainder.md', source, TEST_VAULT)
     const saved = serialize(parsed.items, parsed.root)
     expect(frontmatterOf(saved).defaults).toEqual({ project: 'apollo', reviewer: 'alice' })
   })
@@ -214,7 +214,7 @@ describe('Root A totality — closed leaks (regression guards)', () => {
   // overriding them.
   it('an unedited round trip is byte-identical: CRLF source', () => {
     const source = '---\r\ntitle: A\r\ndate: 2026-01-01\r\n---\r\n\r\nline1\r\nline2\r\n'
-    const original = parseToStoreItems('crlf.md', source)
+    const original = parseToStoreItems('crlf.md', source, TEST_VAULT)
     const saved = serialize(original.items, original.root)
     expect(saved).toBe(source)
     // The narrower invariant the report originally scoped this to, kept as an
@@ -227,7 +227,7 @@ describe('Root A totality — closed leaks (regression guards)', () => {
   // and a trailing blank line, both surviving a save that changed nothing.
   it('an unedited round trip is byte-identical: indented body, trailing blank line', () => {
     const source = '---\ntitle: A\n---\n\n  indented start\n\ncode:\n\n```\n  x = 1\n```\n\n\n'
-    const original = parseToStoreItems('indented.md', source)
+    const original = parseToStoreItems('indented.md', source, TEST_VAULT)
     const saved = serialize(original.items, original.root)
     expect(saved).toBe(source)
   })
@@ -257,7 +257,7 @@ describe('Root A totality — closed leaks (regression guards)', () => {
     assertCollapseTotality('done-null', source)
     assertSourceFidelity('done-null', source)
 
-    const { items } = parseToStoreItems('done-null.md', source)
+    const { items } = parseToStoreItems('done-null.md', source, TEST_VAULT)
     const override = items.find(i => !isSeries(i) && i.date === '2026-04-13')!
     expect(override.metadata.done).toBeUndefined()
     expect(isTracked(override)).toBe(false)
@@ -267,7 +267,7 @@ describe('Root A totality — closed leaks (regression guards)', () => {
   // back to Meridian's own default (LF, trailing newline) rather than throwing
   // or producing `undefined` anywhere in the output.
   it('a freshly-created entry with no fileConvention falls back to LF + trailing newline', () => {
-    const created = parseToStoreItems('new.md', '---\ntitle: Fresh\ndate: 2026-01-01\n---\n')
+    const created = parseToStoreItems('new.md', '---\ntitle: Fresh\ndate: 2026-01-01\n---\n', TEST_VAULT)
     const savedWithoutConvention = serialize(created.items, { ...created.root, fileConvention: undefined })
     expect(savedWithoutConvention.includes('\r')).toBe(false)
     expect(savedWithoutConvention.endsWith('\n')).toBe(true)

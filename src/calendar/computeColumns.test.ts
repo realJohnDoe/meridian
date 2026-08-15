@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeColumns } from './computeColumns'
 import type { Occurrence } from '@/types'
+import { testKey, TEST_VAULT } from '@/test-utils'
 
 function makeOcc(overrides: Partial<Occurrence> & { jsTime?: Date; duration?: string } = {}): Occurrence {
   const { jsTime, duration, ...rest } = overrides
@@ -8,9 +9,9 @@ function makeOcc(overrides: Partial<Occurrence> & { jsTime?: Date; duration?: st
     date: '2026-06-15',
     time: '09:00',
     source: 'explicit',
-    fileSlug: 'note.md',
+    entryKey: testKey('note.md'),
     id: 'occ-1',
-    metadata: { participants: [], title: '', tags: [], items: [], jsTime, duration },
+    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: '', tags: [], items: [], jsTime, duration },
     ...rest,
   }
 }

@@ -13,7 +13,35 @@ import { loadFile } from '@/fileIO'
 // survey flagged in the storage cache's mocks.
 export { collectKeyValues } from '@/model/roundTripCheck'
 import { isSeries } from '@/types'
+import { entryKey } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 import type { StoreItem, FileMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
+
+/**
+ * The vault every model fixture is parsed into. Entry identity is
+ * vault-qualified, so a parse needs a vault; one shared constant keeps every
+ * fixture's keys comparable. Deliberately duplicated from `@/test-utils`'
+ * value rather than imported: that module pulls in the Zustand store and the
+ * calendar barrel, and the model suite is pure and node-only by design.
+ */
+export const TEST_VAULT = 'test-vault'
+
+/** Where `applyEdit`'s create leg puts a brand-new entry in these fixtures. */
+export const NEW_TARGET = { vaultId: TEST_VAULT }
+
+/** `entryKey(TEST_VAULT, slug)` — the fixture form of an entry identity. */
+export function keyOf(slug: string): EntryKey {
+  return entryKey(TEST_VAULT, slug)
+}
+
+/**
+ * A `Roots` map from parsed roots, keyed the way the app keys it. Each root
+ * already carries its own `vaultId`/`fileSlug`, so this can't disagree with
+ * the items' `entryKey` the way a hand-built `new Map([[slug, root]])` could.
+ */
+export function rootsOf(...roots: FileMetadata[]): Roots {
+  return new Map(roots.map(r => [entryKey(r.vaultId, r.fileSlug), r]))
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const FIXTURE_DIR = resolve(HERE, 'fixtures')
@@ -33,7 +61,7 @@ export function fixtureNames(): string[] {
 
 /** Parse a fixture into {items, root} using the real app load path. */
 export function parseFixture(name: string): ParseResult {
-  return parseToStoreItems(`${name}.md`, loadFixture(name))
+  return parseToStoreItems(`${name}.md`, loadFixture(name), TEST_VAULT)
 }
 
 /**
@@ -72,7 +100,7 @@ export function collectUndated(items: StoreItem[], roots: Roots): OccurrenceEntr
   ) as OccurrenceEntry<AppMetadata>[]
   return undated.map(occ => ({
     ...occ,
-    metadata: joinFileMeta(occ.fileSlug, occ.metadata, roots),
+    metadata: joinFileMeta(occ.entryKey, occ.metadata, roots),
   }))
 }
 

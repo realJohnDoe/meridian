@@ -8,8 +8,9 @@ import { markInFlight, clearInFlight, getInFlightPaths } from '@/storage/inFligh
 import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
-import { collapseToYaml, parseToStoreItems, fileSlugItems, saveFile, roundTripLoss, type ParseResult } from '@/model'
-import { pathToSlug, slugToPath } from '@/fileIO'
+import { collapseToYaml, parseToStoreItems, entryKeyItems, saveFile, roundTripLoss, type ParseResult } from '@/model'
+import { pathToKey, keyToPath, keyVaultId } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 import { runInIdleBatches } from '@/lib/idle'
 import type { StoreItem, Roots } from '@/types'
 import {
@@ -31,10 +32,10 @@ export function updateSyncUI(backend: StorageBackend | null): void {
   cacheDirtyCount(backend.id).then(n => setStoreState({ syncDirtyCount: n })).catch(() => {})
 }
 
-/** A file that failed to parse, keyed by its path (see `ParseFailure.slug` for the store key). */
+/** A file that failed to parse, keyed by its path (see `ParseFailure.key` for the store key). */
 export interface ParseFailure {
   path:    string
-  slug:    string
+  key:     EntryKey
   message: string
 }
 
@@ -78,6 +79,7 @@ function auditRoundTrip(parsed: Array<{ path: string; content: string; result: P
 
 export function parseFiles(
   files: Array<{ path: string; content: string }>,
+  vaultId: string,
 ): { items: StoreItem[]; roots: Roots; failures: ParseFailure[]; auditRoundTrip: () => void } {
   const loaded: StoreItem[] = []
   const roots: Roots = new Map()
@@ -85,9 +87,9 @@ export function parseFiles(
   const parsed: Array<{ path: string; content: string; result: ParseResult }> = []
   for (const { path, content } of files) {
     try {
-      const result = parseToStoreItems(path, content)
+      const result = parseToStoreItems(path, content, vaultId)
       loaded.push(...result.items)
-      roots.set(pathToSlug(path), result.root)
+      roots.set(pathToKey(vaultId, path), result.root)
       // The round-trip guard is deferred (see auditRoundTrip above), but the
       // parse it needs is kept here rather than redone: it is only sound on an
       // UNEDITED round trip — after an edit, an intentional change reads as a
@@ -95,7 +97,7 @@ export function parseFiles(
       parsed.push({ path, content, result })
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
-      failures.push({ path, slug: pathToSlug(path), message })
+      failures.push({ path, key: pathToKey(vaultId, path), message })
       console.warn('[vault] parse failed for', path, e)
     }
   }
@@ -345,28 +347,33 @@ export function planReconcile(
 
 /**
  * Merge freshly-fetched file records into the store, keeping items/roots for
- * every other file untouched. Each record's own slug counts as affected
- * automatically; pass `alsoAffected` for slugs to evict with no replacement
+ * every other file untouched. Each record's own key counts as affected
+ * automatically; pass `alsoAffected` for keys to evict with no replacement
  * record (e.g. a delete with nothing to parse in its place).
+ *
+ * `vaultId` is the vault these records came from — every path is resolved to a
+ * key inside it, so the filters below can only ever evict this vault's entries
+ * and another vault's identically-slugged file is untouched.
  */
 function mergeChangedIntoStore(
+  vaultId: string,
   records: Array<{ path: string; content: string }>,
-  alsoAffected: Iterable<string> = [],
+  alsoAffected: Iterable<EntryKey> = [],
 ): void {
-  const affectedSlugs = new Set(alsoAffected)
-  for (const r of records) affectedSlugs.add(pathToSlug(r.path))
+  const affected = new Set(alsoAffected)
+  for (const r of records) affected.add(pathToKey(vaultId, r.path))
 
-  const keptItems = getItems().filter(item => !affectedSlugs.has(item.fileSlug))
+  const keptItems = getItems().filter(item => !affected.has(item.entryKey))
   const keptRoots: Roots = new Map(
-    [...getRoots()].filter(([slug]) => !affectedSlugs.has(slug)),
+    [...getRoots()].filter(([key]) => !affected.has(key)),
   )
   const keptUnreadable = new Map(
-    [...getUnreadableFiles()].filter(([slug]) => !affectedSlugs.has(slug)),
+    [...getUnreadableFiles()].filter(([key]) => !affected.has(key)),
   )
 
-  const { items: newItems, roots: newRoots, failures, auditRoundTrip } = parseFiles(records)
+  const { items: newItems, roots: newRoots, failures, auditRoundTrip } = parseFiles(records, vaultId)
   setData({ items: [...keptItems, ...newItems], roots: new Map([...keptRoots, ...newRoots]) })
-  for (const f of failures) keptUnreadable.set(f.slug, { path: f.path, message: f.message })
+  for (const f of failures) keptUnreadable.set(f.key, { path: f.path, message: f.message })
   setUnreadableFiles(keptUnreadable)
   reportParseFailures(failures)
   auditRoundTrip()
@@ -444,9 +451,9 @@ export async function reconcileWithBackend(
   const changedRecords = changedWritten
     .map(p => cacheMap.get(p))
     .filter((r): r is NonNullable<typeof r> => r != null)
-  const deletedSlugs = deleted.map(pathToSlug)
+  const deletedKeys = deleted.map(p => pathToKey(vaultId, p))
 
-  mergeChangedIntoStore(changedRecords, deletedSlugs)
+  mergeChangedIntoStore(vaultId, changedRecords, deletedKeys)
   updateSyncUI(backend)
 }
 
@@ -572,7 +579,7 @@ async function pushDirty(
     }
   }
 
-  if (collisionMerges.length > 0) mergeChangedIntoStore(collisionMerges)
+  if (collisionMerges.length > 0) mergeChangedIntoStore(vaultId, collisionMerges)
 
   return { hadCollision, pushed }
 }
@@ -721,14 +728,29 @@ export async function syncToBackend(): Promise<void> {
 // lives in inFlight.ts — pure in-memory bookkeeping overlaying the persisted
 // status; see its doc comment there for why marking is refcounted.
 
-export async function writeEntityToCache(fileSlug: string): Promise<void> {
-  const path = slugToPath(fileSlug)
+/**
+ * The backend that owns `key`'s vault, or null if that vault isn't mounted.
+ *
+ * The vault half of the key is what makes this checkable at all: a write
+ * addressed to a vault other than the one currently backing the store is
+ * refused rather than silently applied to whichever vault happens to be active
+ * — which is precisely what a stale closure or a late-landing commit would have
+ * done before the key carried a vault.
+ */
+function backendFor(key: EntryKey): StorageBackend | null {
+  const backend = getActiveBackend()
+  if (!backend || backend.id !== keyVaultId(key)) return null
+  return backend
+}
+
+export async function writeEntityToCache(entryKey: EntryKey): Promise<void> {
+  const path = keyToPath(entryKey)
   markInFlight(path)
   try {
-    const backend = getActiveBackend()
+    const backend = backendFor(entryKey)
     if (!backend || backend.readOnly) return
-    const slugItems = fileSlugItems(getItems(), fileSlug)
-    const root       = getRoots().get(fileSlug)
+    const slugItems = entryKeyItems(getItems(), entryKey)
+    const root       = getRoots().get(entryKey)
     if (slugItems.length === 0) {
       // Only genuinely delete when the root is gone too (the real
       // deleteByFileSlug outcome). getItems()/getRoots() here can be a
@@ -738,8 +760,8 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
       // one would silently tombstone a brand-new item whose creating commit
       // just hadn't landed in this snapshot yet. Skip: a subsequent commit
       // will write the real content.
-      if (!root) { await deleteFromBackend(fileSlug); return }
-      console.warn('[vault] writeEntityToCache: skipping — root exists but no items yet for', fileSlug)
+      if (!root) { await deleteFromBackend(entryKey); return }
+      console.warn('[vault] writeEntityToCache: skipping — root exists but no items yet for', entryKey)
       return
     }
     const frontmatter = collapseToYaml(slugItems, root)
@@ -756,11 +778,11 @@ export async function writeEntityToCache(fileSlug: string): Promise<void> {
   }
 }
 
-export async function deleteFromBackend(fileSlug: string): Promise<void> {
-  const path = slugToPath(fileSlug)
+export async function deleteFromBackend(entryKey: EntryKey): Promise<void> {
+  const path = keyToPath(entryKey)
   markInFlight(path)
   try {
-    const backend = getActiveBackend()
+    const backend = backendFor(entryKey)
     if (!backend || backend.readOnly) return
     await recordLocalDelete(backend.id, path)
     updateSyncUI(backend)

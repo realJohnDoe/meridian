@@ -8,6 +8,7 @@ import { expandRange } from '@/model/expansion'
 import { applyEdit } from '@/model/storeOps'
 import type { EditFields } from '@/model/storeOps'
 import type { Roots } from '@/types'
+import { TEST_VAULT, rootsOf, NEW_TARGET, keyOf } from './helpers'
 
 const STANDUP_YAML = `---
 title: Weekly Standup
@@ -31,8 +32,8 @@ const TO   = new Date('2026-04-30')
 
 describe('items flow through expansion', () => {
   it('items saved via applyEdit appear on expanded occurrences', () => {
-    const { items, root } = parseToStoreItems('standup.md', STANDUP_YAML)
-    const roots: Roots = new Map([['standup', root]])
+    const { items, root } = parseToStoreItems('standup.md', STANDUP_YAML, TEST_VAULT)
+    const roots: Roots = rootsOf(root)
 
     const occs0 = expandRange(items, roots, FROM, TO)
     const occ = occs0.find(o => o.date === '2026-04-20')!
@@ -52,10 +53,10 @@ describe('items flow through expansion', () => {
       duration:     '',
       repeat:       null,
     }
-    const next = applyEdit({ items, roots }, occ, 'single', fields)
+    const next = applyEdit({ items, roots }, occ, 'single', fields, NEW_TARGET)
 
     // Root must carry the items
-    const updatedRoot = next.roots.get('standup')
+    const updatedRoot = next.roots.get(keyOf('standup'))
     expect(updatedRoot?.items).toEqual(['[[project-alpha]]'])
 
     // Items must appear on every occurrence after expansion
@@ -82,8 +83,8 @@ defaults:
   done: false
 ---
 `
-    const { items, root } = parseToStoreItems('standup.md', yaml)
-    const roots: Roots = new Map([['standup', root]])
+    const { items, root } = parseToStoreItems('standup.md', yaml, TEST_VAULT)
+    const roots: Roots = rootsOf(root)
 
     expect(root.items).toEqual(['[[project-alpha]]'])
 
@@ -110,7 +111,7 @@ defaults:
   done: false
 ---
 `
-    const { root } = parseToStoreItems('standup.md', yaml)
+    const { root } = parseToStoreItems('standup.md', yaml, TEST_VAULT)
     // Legacy topics: field is ignored — items starts empty (direction is inverted, no migration)
     expect(root.items).toEqual([])
   })

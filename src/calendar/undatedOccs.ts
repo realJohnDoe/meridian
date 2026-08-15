@@ -10,7 +10,7 @@ export function undatedOccs(items: StoreItem[], roots: Roots): Occurrence[] {
   const out: Occurrence[] = []
   for (const i of items) {
     if (isStandaloneOcc(i) && i.date === '') {
-      out.push({ ...i, metadata: joinFileMeta(i.fileSlug, i.metadata, roots) })
+      out.push({ ...i, metadata: joinFileMeta(i.entryKey, i.metadata, roots) })
     }
   }
   return out

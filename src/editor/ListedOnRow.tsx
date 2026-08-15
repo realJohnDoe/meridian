@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Roots } from '@/types'
+import type { EntryKey } from '@/fileIO'
 import { fileEntries } from '@/fileOccurrence'
 import { TagChip } from '@/components'
 import { Badge } from '@/components/ui/badge'
@@ -10,50 +11,57 @@ import { rankByQuery } from '@/lib/matching'
 import { useFloatingCombobox } from '@/hooks'
 
 interface Props {
-  slugs:           string[]
-  fileSlug:        string | undefined
+  /** Entries whose `items:` list already points at this one. */
+  linkedKeys:      EntryKey[]
+  /** This entry, once it has an identity. Undefined for an untitled new draft. */
+  entryKey:        EntryKey | undefined
+  /** Which vault to offer candidates from — a wikilink never crosses a vault. */
+  vaultId:         string | null
   roots:           Roots
   onOpenWikilink?: (ref: string) => void
-  onAdd?:          (targetSlug: string) => void
-  onRemove?:       (targetSlug: string) => void
+  onAdd?:          (target: EntryKey) => void
+  onRemove?:       (target: EntryKey) => void
 }
 
-export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, onAdd, onRemove }: Props) {
+export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOpenWikilink, onAdd, onRemove }: Props) {
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const { anchorRef, listRef, placement } = useFloatingCombobox(pickerOpen, open => { setPickerOpen(open); if (!open) setPickerQuery('') })
 
-  const allFiles = fileEntries(roots)
-  const alreadyLinked = new Set(slugs)
-  const candidates = allFiles.filter(e => e.fileSlug !== fileSlug && !alreadyLinked.has(e.fileSlug))
+  const allFiles = fileEntries(roots, vaultId ?? undefined)
+  const alreadyLinked = new Set(linkedKeys)
+  const candidates = allFiles.filter(e => e.entryKey !== entryKey && !alreadyLinked.has(e.entryKey))
   const filtered = rankByQuery(pickerQuery, candidates, e => e.title)
 
-  function handleSelect(targetSlug: string) {
-    if (!fileSlug) return
-    onAdd?.(targetSlug)
+  function handleSelect(target: EntryKey) {
+    if (!entryKey) return
+    onAdd?.(target)
     setPickerQuery('')
     setPickerOpen(false)
   }
 
-  if (!slugs.length && !fileSlug) return null
+  if (!linkedKeys.length && !entryKey) return null
 
   return (
     <div className="flex flex-wrap gap-1.5 mb-4 items-center">
       <span className="text-2xs text-muted-foreground font-medium tracking-[.05em] uppercase shrink-0">Listed on</span>
-      {slugs.map(slug => {
-        const label = roots.get(slug)?.title || slug
+      {linkedKeys.map(key => {
+        const meta = roots.get(key)
+        const label = meta?.title || meta?.fileSlug || key
         return (
           <TagChip
-            key={slug}
+            key={key}
             label={label}
             isTopic
             interactive
-            onNavigate={onOpenWikilink ? () => onOpenWikilink(slug) : undefined}
-            onRemove={onRemove ? () => onRemove(slug) : undefined}
+            // The navigate callback takes a wikilink *ref* — a bare slug, what a
+            // file would actually contain — not the store's key.
+            onNavigate={onOpenWikilink && meta ? () => onOpenWikilink(meta.fileSlug) : undefined}
+            onRemove={onRemove ? () => onRemove(key) : undefined}
           />
         )
       })}
-      {fileSlug && (
+      {entryKey && (
         <div ref={anchorRef} className="inline-block">
           <Command shouldFilter={false} className="contents">
             {pickerOpen ? (
@@ -80,9 +88,9 @@ export default function ListedOnRow({ slugs, fileSlug, roots, onOpenWikilink, on
                 <CommandGroup>
                   {filtered.slice(0, 8).map(e => (
                     <CommandItem
-                      key={e.fileSlug}
-                      value={e.fileSlug}
-                      onSelect={() => handleSelect(e.fileSlug)}
+                      key={e.entryKey}
+                      value={e.entryKey}
+                      onSelect={() => handleSelect(e.entryKey)}
                     >
                       {e.title}
                     </CommandItem>

@@ -9,7 +9,8 @@
 
 import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots, EditScope, OccurrenceEntry, RepeatPattern } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
-import { titleToSlug } from '@/fileIO'
+import { titleToSlug, entryKey as makeEntryKey, parseEntryKey } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 import { dayBefore } from './dateUtils'
 import { stableOccId } from './expansion'
 import { resolveWikilink, unwrapRef } from '../wikilinks'
@@ -18,19 +19,19 @@ export interface StoreData {
   items: StoreItem[]
   roots: Roots
   /**
-   * Slugs occupied by a file that exists on disk but failed to parse, so it
-   * has neither a root nor an item of its own — see `slugTaken`/`newEntrySlug`.
+   * Entries occupied by a file that exists on disk but failed to parse, so it
+   * has neither a root nor an item of its own — see `slugTaken`/`newEntryKey`.
    * Optional: most StoreData snapshots (any edit to an existing item) have no
    * use for it and omit it.
    */
-  unreadableSlugs?: ReadonlySet<string>
+  unreadableKeys?: ReadonlySet<EntryKey>
 }
 
 // ── Lookup helpers ────────────────────────────────────────────────────────────
 
 /** Items belonging to a specific file. */
-export function fileSlugItems(items: StoreItem[], fileSlug: string): StoreItem[] {
-  return items.filter(i => i.fileSlug === fileSlug)
+export function entryKeyItems(items: StoreItem[], entryKey: EntryKey): StoreItem[] {
+  return items.filter(i => i.entryKey === entryKey)
 }
 
 /** Find the RepeatPattern that owns `occ`. Returns undefined for standalones. */
@@ -122,7 +123,7 @@ export function upsertOverride(
     date:    occ.date,
     time:    occ.time,
     source:  'explicit',
-    fileSlug: occ.fileSlug,
+    entryKey: occ.entryKey,
     id:      newId,
     ownerId: occ.ownerId,
     // The new override inherits the series' metadata as its base; collapse then
@@ -277,15 +278,22 @@ function seriesMeta(base: Partial<OccurrenceMetadata>, f: EditFields): Occurrenc
  * saved — the exact class of loss finding #8 was about, reintroduced one
  * layer up if this line is ever dropped.
  */
-function updateRoot(roots: Roots, fileSlug: string, f: EditFields): Roots {
+function updateRoot(roots: Roots, entryKey: EntryKey, f: EditFields): Roots {
   const next = new Map(roots)
-  const prev = roots.get(fileSlug)
-  next.set(fileSlug, {
+  const prev = roots.get(entryKey)
+  next.set(entryKey, {
     title: f.title,
     tags:  f.tags,
     items: f.items,
     body:  f.body || undefined,
     extra: withoutKeys(prev?.extra, ['title', 'tags', 'items']),
+    // Derived from the key rather than copied from `prev`, which is the same
+    // carry-forward as `fileConvention` above but strictly safer: it is also
+    // correct when there IS no previous entry (a brand-new file), and it makes
+    // the root's provenance and the map key incapable of disagreeing. Dropping
+    // these would leave every edited entry vault-less — wikilink resolution and
+    // routing would then silently fall back to the wrong vault.
+    ...parseEntryKey(entryKey),
     fileConvention: prev?.fileConvention,
   })
   return next
@@ -336,9 +344,20 @@ function applyFieldsToChildren(items: StoreItem[], seriesId: string, fields: Edi
 
 // ── New-entry slug allocation ─────────────────────────────────────────────────
 
-/** True when some file already occupies `fileSlug` in this snapshot. */
-function slugTaken({ items, roots, unreadableSlugs }: StoreData, fileSlug: string): boolean {
-  return roots.has(fileSlug) || items.some(i => i.fileSlug === fileSlug) || (unreadableSlugs?.has(fileSlug) ?? false)
+/**
+ * Where a brand-new entry goes. `vaultId` is the target vault (the default
+ * vault, or whatever the editor's vault chip was set to); `draftId` identifies
+ * the editor draft, so a second create-scoped save upserts onto the file the
+ * first one made instead of creating another.
+ */
+export interface NewEntryTarget {
+  vaultId:  string
+  draftId?: string
+}
+
+/** True when some file already occupies `key` in this snapshot. */
+function slugTaken({ items, roots, unreadableKeys }: StoreData, key: EntryKey): boolean {
+  return roots.has(key) || items.some(i => i.entryKey === key) || (unreadableKeys?.has(key) ?? false)
 }
 
 /**
@@ -356,32 +375,37 @@ function findDraft(items: StoreItem[], draftId: string | undefined): StoreItem |
 }
 
 /**
- * The file slug a brand-new entry will occupy.
+ * The key a brand-new entry will occupy in `vaultId`.
  *
- * A draft that already created its file keeps that file, whatever its title has
- * since become — the rename happens inside the file, not by moving it.
+ * A draft that already created its file keeps that file — and its vault —
+ * whatever its title has since become; the rename happens inside the file, not
+ * by moving it.
  *
- * Otherwise the title's slug is used, unless another entry already owns it, in
- * which case a `-2`, `-3`, … suffix is appended until a free one is found.
- * `titleToSlug` collides freely ("Buy groceries" / "Buy groceries!" / any two
- * titles agreeing in their first 60 slug characters all map to `buy-groceries`)
- * and a file write is a whole-file replace, so without this a new entry would
- * silently destroy the unrelated entry sitting on its slug. `slugTaken` also
- * consults `data.unreadableSlugs`, so a file that failed to parse (and so has
- * neither a root nor an item) still holds its slug instead of looking free.
+ * Otherwise the title's slug is used, unless another entry **in that same
+ * vault** already owns it, in which case a `-2`, `-3`, … suffix is appended
+ * until a free one is found. Collision is per vault by construction: the key
+ * carries the vault, so the same title in two vaults lands on the same slug in
+ * each rather than uniquifying against a file it will never share a directory
+ * with. `titleToSlug` collides freely ("Buy groceries" / "Buy groceries!" / any
+ * two titles agreeing in their first 60 slug characters all map to
+ * `buy-groceries`) and a file write is a whole-file replace, so without this a
+ * new entry would silently destroy the unrelated entry sitting on its slug.
+ * `slugTaken` also consults `data.unreadableKeys`, so a file that failed to
+ * parse (and so has neither a root nor an item) still holds its slug instead of
+ * looking free.
  *
- * Exported because callers need the resulting slug to know which file to
+ * Exported because callers need the resulting key to know which file to
  * persist — see `saveNode`.
  */
-export function newEntrySlug(data: StoreData, title: string, draftId?: string): string {
+export function newEntryKey(data: StoreData, vaultId: string, title: string, draftId?: string): EntryKey {
   const draft = findDraft(data.items, draftId)
-  if (draft) return draft.fileSlug
+  if (draft) return draft.entryKey
 
   const base = titleToSlug(title) || crypto.randomUUID()
-  if (!slugTaken(data, base)) return base
+  if (!slugTaken(data, makeEntryKey(vaultId, base))) return makeEntryKey(vaultId, base)
   let n = 2
-  while (slugTaken(data, `${base}-${n}`)) n++
-  return `${base}-${n}`
+  while (slugTaken(data, makeEntryKey(vaultId, `${base}-${n}`))) n++
+  return makeEntryKey(vaultId, `${base}-${n}`)
 }
 
 /**
@@ -396,29 +420,29 @@ export function newEntrySlug(data: StoreData, title: string, draftId?: string): 
  * that create genuinely one-shot entries (e.g. promoting a checklist line) can
  * omit it; they then always get a free slug.
  */
-function applyNew(data: StoreData, fields: EditFields, draftId?: string): StoreData {
+function applyNew(data: StoreData, fields: EditFields, vaultId: string, draftId?: string): StoreData {
   const { items, roots } = data
   const { scheduled, repeat } = fields
-  const fileSlug = newEntrySlug(data, fields.title, draftId)
+  const entryKey = newEntryKey(data, vaultId, fields.title, draftId)
 
   const draft = findDraft(items, draftId)
   if (draft) {
     return {
       items: items.map(i => i.id === draft.id ? applyFieldsToItem(i, fields) : i),
-      roots: updateRoot(roots, fileSlug, fields),
+      roots: updateRoot(roots, entryKey, fields),
     }
   }
 
   // Routed through updateRoot rather than a second FileMetadata literal: with no
   // previous entry it produces exactly the same shape, and there is then only
   // one place in the module where file-level metadata is assembled.
-  const newRoots = updateRoot(roots, fileSlug, fields)
+  const newRoots = updateRoot(roots, entryKey, fields)
   if (repeat) {
     const newSeries: RepeatPattern<OccurrenceMetadata> = {
       date:     scheduled?.date ?? '',
       time:     scheduled?.time || null,
       repeat,
-      fileSlug,
+      entryKey,
       id:       draftId ?? crypto.randomUUID(),
       metadata: seriesMeta({}, fields),
     }
@@ -428,7 +452,7 @@ function applyNew(data: StoreData, fields: EditFields, draftId?: string): StoreD
     date:    scheduled?.date ?? '',
     time:    scheduled?.time || null,
     source:  'explicit',
-    fileSlug,
+    entryKey,
     id:      draftId ?? crypto.randomUUID(),
     metadata: occMeta({}, fields),
   }
@@ -437,7 +461,7 @@ function applyNew(data: StoreData, fields: EditFields, draftId?: string): StoreD
 
 /** Update the series (or standalone) metadata across all occurrences. */
 function applyAll({ items, roots }: StoreData, occ: Occurrence, fields: EditFields): StoreData {
-  roots = updateRoot(roots, occ.fileSlug, fields)
+  roots = updateRoot(roots, occ.entryKey, fields)
   const matchItem = occ.ownerId
     ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
     : (i: StoreItem) => isStandaloneOcc(i) && i.id === occ.id
@@ -461,7 +485,7 @@ function applyAll({ items, roots }: StoreData, occ: Occurrence, fields: EditFiel
  */
 function applySingle({ items, roots }: StoreData, occ: Occurrence, fields: EditFields): StoreData {
   const { scheduled, repeat } = fields
-  roots = updateRoot(roots, occ.fileSlug, fields)
+  roots = updateRoot(roots, occ.entryKey, fields)
   const baseSeries = findSeries(items, occ)
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
   const newDate = scheduled?.date ?? ''
@@ -472,7 +496,7 @@ function applySingle({ items, roots }: StoreData, occ: Occurrence, fields: EditF
       date:     newDate,
       time:     newTime,
       repeat,
-      fileSlug: occ.fileSlug,
+      entryKey: occ.entryKey,
       id:       occ.id,
       metadata: seriesMeta(base, fields),
     }
@@ -493,7 +517,7 @@ function applySingle({ items, roots }: StoreData, occ: Occurrence, fields: EditF
       date:     newDate,
       time:     newTime,
       source:   'explicit',
-      fileSlug: occ.fileSlug,
+      entryKey: occ.entryKey,
       id:       movedId,
       ownerId:  occ.ownerId,
       metadata: occMeta(base, fields),
@@ -532,7 +556,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
   const newSeriesId = crypto.randomUUID()
   const newRepeat = repeat ?? series.repeat
   const newMeta = seriesMeta(series.metadata, fields)
-  roots = updateRoot(roots, occ.fileSlug, fields)
+  roots = updateRoot(roots, occ.entryKey, fields)
 
   items = items.flatMap(i => {
     if (i.id === series.id) {
@@ -545,7 +569,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
         date:     scheduled?.date ?? occDate,
         time:     scheduled?.time || null,
         repeat:   newRepeat,
-        fileSlug: series.fileSlug,
+        entryKey: series.entryKey,
         id:       newSeriesId,
         metadata: newMeta,
       }
@@ -579,13 +603,13 @@ function applyAdd({ items, roots }: StoreData, occ: Occurrence, fields: EditFiel
   const newDate = scheduled?.date ?? ''
   const baseSeries = findSeries(items, occ)
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
-  roots = updateRoot(roots, occ.fileSlug, fields)
+  roots = updateRoot(roots, occ.entryKey, fields)
   if (repeat) {
     const newSeries: RepeatPattern<OccurrenceMetadata> = {
       date:     newDate,
       time:     scheduled?.time || null,
       repeat,
-      fileSlug: occ.fileSlug,
+      entryKey: occ.entryKey,
       id:       crypto.randomUUID(),
       metadata: seriesMeta(base, fields),
     }
@@ -595,7 +619,7 @@ function applyAdd({ items, roots }: StoreData, occ: Occurrence, fields: EditFiel
     date:    newDate,
     time:    scheduled?.time || null,
     source:  'explicit',
-    fileSlug: occ.fileSlug,
+    entryKey: occ.entryKey,
     id:      crypto.randomUUID(),
     ownerId: occ.ownerId,
     metadata: { ...occMeta(base, fields), done: fields.tracked ? false : undefined },
@@ -610,19 +634,24 @@ function applyAdd({ items, roots }: StoreData, occ: Occurrence, fields: EditFiel
  * scope 'single' — upsert an explicit override for this occurrence's date.
  * scope 'future' — cap the existing series; create a new sibling series from occDate.
  * scope 'add'    — append a new explicit occurrence.
- * occ == null    — create a brand-new item (series or standalone). `draftId`
- *                  identifies the editor draft doing the creating, so a repeat
- *                  commit for the same draft upserts instead of creating a
- *                  second file — see `applyNew`.
+ * occ == null    — create a brand-new item (series or standalone) in
+ *                  `target.vaultId`. `target.draftId` identifies the editor
+ *                  draft doing the creating, so a repeat commit for the same
+ *                  draft upserts instead of creating a second file — see
+ *                  `applyNew`.
+ *
+ * `target` is consulted only on the `occ == null` leg: an existing occurrence
+ * already carries its vault inside its own key, and an edit never moves a file
+ * between vaults (that is `moveEntity`'s job, not this one's).
  */
 export function applyEdit(
   data: StoreData,
   occ: Occurrence | null,
   scope: EditScope,
   fields: EditFields,
-  draftId?: string,
+  target: NewEntryTarget,
 ): StoreData {
-  if (!occ) return applyNew(data, fields, draftId)
+  if (!occ) return applyNew(data, fields, target.vaultId, target.draftId)
   switch (scope) {
     case 'all':    return applyAll(data, occ, fields)
     case 'single': return applySingle(data, occ, fields)
@@ -666,10 +695,14 @@ export function excludeOccurrence({ items, roots }: StoreData, occ: Occurrence):
 }
 
 /**
- * Remove all items and the root entry for a fileSlug, cleaning up backlinks
+ * Remove all items and the root entry for one entry, cleaning up backlinks
  * from other files.
  *
- * Returns `affectedSlugs` — the OTHER files whose `items:` list this edited —
+ * Link cleanup is vault-scoped for free: each candidate root's items are
+ * resolved inside that root's OWN vault, so a `[[meeting-notes]]` in another
+ * vault can never resolve to this key and is left alone.
+ *
+ * Returns `affectedKeys` — the OTHER files whose `items:` list this edited —
  * alongside `data`, rather than making every caller separately consult the
  * store's backlink index to find the same set. Before this, two callers
  * (`editor/save.ts`) did that lookup by hand and one (the swipe-delete path in
@@ -683,26 +716,26 @@ export function excludeOccurrence({ items, roots }: StoreData, occ: Occurrence):
  * `storeBridge.ts`; the reactive `useStore(s => s.backlinks)` the UI panels
  * use is untouched.)
  */
-export function deleteByFileSlug(
+export function deleteByEntryKey(
   { items, roots }: StoreData,
-  fileSlug: string,
-): { data: StoreData; affectedSlugs: string[] } {
+  entryKey: EntryKey,
+): { data: StoreData; affectedKeys: EntryKey[] } {
   const nextRoots = new Map(roots)
-  const affectedSlugs: string[] = []
-  for (const [slug, meta] of nextRoots) {
-    if (slug === fileSlug) continue
+  const affectedKeys: EntryKey[] = []
+  for (const [key, meta] of nextRoots) {
+    if (key === entryKey) continue
     const filtered = meta.items.filter(
-      raw => resolveWikilink(unwrapRef(raw), roots) !== fileSlug,
+      raw => resolveWikilink(unwrapRef(raw), roots, meta.vaultId) !== entryKey,
     )
     if (filtered.length !== meta.items.length) {
-      nextRoots.set(slug, { ...meta, items: filtered })
-      affectedSlugs.push(slug)
+      nextRoots.set(key, { ...meta, items: filtered })
+      affectedKeys.push(key)
     }
   }
-  nextRoots.delete(fileSlug)
+  nextRoots.delete(entryKey)
   return {
-    data: { items: items.filter(i => i.fileSlug !== fileSlug), roots: nextRoots },
-    affectedSlugs,
+    data: { items: items.filter(i => i.entryKey !== entryKey), roots: nextRoots },
+    affectedKeys,
   }
 }
 

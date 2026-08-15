@@ -17,11 +17,13 @@ export interface WlPopupState {
 interface Props {
   popup:   WlPopupState
   roots:   Roots
+  /** Only this vault's entries are offered — a wikilink can't reach another. */
+  vaultId: string | null
   view:    EditorView
   onClose: () => void
 }
 
-export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
+export default function WikilinkPopup({ popup, roots, vaultId, view, onClose }: Props) {
   const [focusIdx, setFocusIdx] = useState(0)
 
   const occBySlug = useFileOccurrenceMap()
@@ -31,8 +33,8 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
   // haven't changed — otherwise useResetOnChange below sees a "new" array on
   // every render and setFocusIdx loops forever (React error #301).
   const matches = useMemo(
-    () => fileEntries(roots).filter(e => !q || e.title.toLowerCase().includes(q)).slice(0, 8),
-    [roots, q],
+    () => fileEntries(roots, vaultId ?? undefined).filter(e => !q || e.title.toLowerCase().includes(q)).slice(0, 8),
+    [roots, vaultId, q],
   )
 
   useResetOnChange([matches], () => setFocusIdx(0))
@@ -125,11 +127,11 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
         <div className="px-3.5 py-2 text-sm text-muted-foreground">No matches</div>
       )}
       {matches.map((e, i) => {
-        const occ = occBySlug.get(e.fileSlug)
+        const occ = occBySlug.get(e.entryKey)
         const isFocused = i === focusIdx
         const wrapCls = `rounded-lg transition-colors ${isFocused ? 'ring-2 ring-ring ring-offset-0' : ''}`
         return occ ? (
-          <div key={e.fileSlug} className={wrapCls} onMouseEnter={() => setFocusIdx(i)}>
+          <div key={e.entryKey} className={wrapCls} onMouseEnter={() => setFocusIdx(i)}>
             <OccurrenceCard
               occ={occ}
               leadingIcon="kind"
@@ -142,7 +144,7 @@ export default function WikilinkPopup({ popup, roots, view, onClose }: Props) {
           </div>
         ) : (
           <button
-            key={e.fileSlug}
+            key={e.entryKey}
             type="button"
             role="option"
             aria-selected={isFocused}

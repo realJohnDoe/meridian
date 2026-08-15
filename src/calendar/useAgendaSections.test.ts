@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { setupStore, seedStore, makeOcc, makeRoots } from '@/test-utils'
+import { setupStore, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { fmtISO } from '@/model'
 import { useAgendaSections } from './useAgendaSections'
 import type { AgendaRow } from './useAgendaSections'
@@ -47,13 +47,13 @@ describe('useAgendaSections', () => {
       id: 'overdue-1',
       date: '2026-06-10',
       time: null,
-      metadata: { participants: [], title: 'Old task', tags: [], items: [], done: false },
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'other.md', participants: [], title: 'Old task', tags: [], items: [], done: false },
     })
     const pastEvent = makeOcc({
       id: 'past-event-1',
       date: '2026-06-10',
       time: '10:00',
-      fileSlug: 'other.md',
+      entryKey: testKey('other.md'),
     })
     seedStore([overdueTask, pastEvent], new Map([...makeRoots('note.md'), ...makeRoots('other.md')]))
 
@@ -79,7 +79,7 @@ describe('useAgendaSections', () => {
       id: 'overdue-1',
       date: '2026-06-10',
       time: null,
-      metadata: { participants: [], title: 'Old task', tags: [], items: [], done: false },
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Old task', tags: [], items: [], done: false },
     })
     seedStore([overdueTask], makeRoots('note.md'))
 
@@ -99,7 +99,7 @@ describe('useAgendaSections', () => {
       id: 'overdue-1',
       date: '2026-06-10',
       time: null,
-      metadata: { participants: [], title: 'Old task', tags: [], items: [], done: false },
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Old task', tags: [], items: [], done: false },
     })
     seedStore([overdueTask], makeRoots('note.md'))
     collapseOverdue()
@@ -135,7 +135,7 @@ describe('useAgendaSections', () => {
       id: 'today-task',
       date: '2026-06-15',
       time: '09:00',
-      metadata: { participants: [], title: 'Task', tags: [], items: [], done: false },
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false },
     })
     const future = makeOcc({ id: 'future-1', date: '2026-06-20', time: '09:00' })
     seedStore([task, future], roots)

@@ -3,7 +3,7 @@ import { createRef } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import FileResultsList from './FileResultsList'
-import { setupStore, seedStore, makeOcc, makeRoots } from '@/test-utils'
+import { setupStore, seedStore, makeOcc, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
 import type { Roots } from '@/types'
 
 setupStore()
@@ -67,7 +67,7 @@ function flushDebounce() {
 
 describe('FileResultsList', () => {
   it('renders nothing for an empty query', () => {
-    const occ = makeOcc({ fileSlug: 'note.md' })
+    const occ = makeOcc({ entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md', { title: 'Standup' }))
     const { container } = renderList()
     flushDebounce()
@@ -75,7 +75,7 @@ describe('FileResultsList', () => {
   })
 
   it('shows a matching file after the debounce settles', () => {
-    const occ = makeOcc({ fileSlug: 'note.md' })
+    const occ = makeOcc({ entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md', { title: 'Standup' }))
     const { type } = renderList()
 
@@ -88,7 +88,7 @@ describe('FileResultsList', () => {
   })
 
   it('excludes files that do not match the query', () => {
-    const occ = makeOcc({ fileSlug: 'note.md' })
+    const occ = makeOcc({ entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md', { title: 'Standup' }))
     const { type } = renderList()
 
@@ -103,7 +103,7 @@ describe('FileResultsList', () => {
     // the item's own metadata over the root's — so the item's title must agree with the
     // root's for this test to observe a single, unambiguous title. The match itself,
     // though, is filtered from `fileEntries(roots)`, i.e. root-level tags/items/title.
-    const occ = makeOcc({ fileSlug: 'note.md', metadata: { participants: [], title: 'Groceries', tags: ['urgent'], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Groceries', tags: ['urgent'], items: [] } })
     const roots: Roots = makeRoots('note.md', { title: 'Groceries', tags: ['urgent'] })
     seedStore([occ], roots)
     const { type } = renderList()
@@ -115,10 +115,10 @@ describe('FileResultsList', () => {
   })
 
   it('ranks a prefix match above a scattered subsequence match', () => {
-    const a = makeOcc({ id: 'a', fileSlug: 'a.md', metadata: { participants: [], title: 'Xylophone practice', tags: [], items: [] } })
-    const b = makeOcc({ id: 'b', fileSlug: 'b.md', metadata: { participants: [], title: 'Practice notes', tags: [], items: [] } })
+    const a = makeOcc({ id: 'a', entryKey: testKey('a.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', participants: [], title: 'Xylophone practice', tags: [], items: [] } })
+    const b = makeOcc({ id: 'b', entryKey: testKey('b.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', participants: [], title: 'Practice notes', tags: [], items: [] } })
     const roots: Roots = makeRoots('a.md', { title: 'Xylophone practice' }) // 'p...r...a...c' scattered match for "pra"
-    roots.set('b.md', { title: 'Practice notes', tags: [], items: [] })     // starts with "pra" -> scoreQuery prefix bonus
+    roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'Practice notes', tags: [], items: [] }))     // starts with "pra" -> scoreQuery prefix bonus
     seedStore([a, b], roots)
     const { type, container } = renderList()
 
@@ -130,8 +130,8 @@ describe('FileResultsList', () => {
   })
 
   it('shows one card per file even when a file has multiple occurrences', () => {
-    const a = makeOcc({ id: 'a', fileSlug: 'note.md', date: '2026-06-15' })
-    const b = makeOcc({ id: 'b', fileSlug: 'note.md', date: '2026-06-16' })
+    const a = makeOcc({ id: 'a', entryKey: testKey('note.md'), date: '2026-06-15' })
+    const b = makeOcc({ id: 'b', entryKey: testKey('note.md'), date: '2026-06-16' })
     seedStore([a, b], makeRoots('note.md', { title: 'Standup' }))
     const { type, container } = renderList()
 
@@ -142,7 +142,7 @@ describe('FileResultsList', () => {
   })
 
   it('calls onOpen with the underlying occurrence when a result is clicked', () => {
-    const occ = makeOcc({ fileSlug: 'note.md' })
+    const occ = makeOcc({ entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md', { title: 'Standup' }))
     const { type, onOpen } = renderList()
 
@@ -151,15 +151,15 @@ describe('FileResultsList', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Standup' }))
 
     expect(onOpen).toHaveBeenCalledTimes(1)
-    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ fileSlug: 'note.md' }))
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('note.md') }))
   })
 
   it('shows backlinking file titles as listed-on chips', () => {
     // backlinks is derived from roots' wikilinks (buildBacklinkIndex), not directly
     // settable — other.md "links to" note.md via a wikilink in its own items.
-    const occ = makeOcc({ fileSlug: 'note.md' })
+    const occ = makeOcc({ entryKey: testKey('note.md') })
     const roots: Roots = makeRoots('note.md', { title: 'Standup' })
-    roots.set('other.md', { title: 'Linked From', tags: [], items: ['[[note.md]]'] })
+    roots.set(testKey('other.md'), makeRootMeta('other.md', { title: 'Linked From', tags: [], items: ['[[note.md]]'] }))
     seedStore([occ], roots)
     const { type } = renderList()
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseFixture, serialize } from './helpers'
+import { parseFixture, serialize, rootsOf, NEW_TARGET, keyOf } from './helpers'
 import { applyEdit } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { expandRange } from '@/model/expansion'
@@ -7,7 +7,7 @@ import type { Occurrence, Roots, StoreItem } from '@/types'
 
 function fixtureData(name: string): StoreData {
   const parsed = parseFixture(name)
-  return { items: parsed.items, roots: new Map([[name, parsed.root]]) }
+  return { items: parsed.items, roots: rootsOf(parsed.root) }
 }
 
 const FROM = new Date('2026-01-01')
@@ -56,7 +56,7 @@ describe('after_completion: the projected next slot', () => {
       ...data,
       items: [...data.items, {
         date: '2026-07-23', time: null, source: 'explicit' as const, excluded: true,
-        fileSlug: 'after-completion-timed', id: 'stub',
+        entryKey: keyOf('after-completion-timed'), id: 'stub',
         ownerId: data.items.find(i => 'repeat' in i)!.id,
         metadata: { participants: [] },
       }],
@@ -70,7 +70,7 @@ describe('after_completion: moving the projected occurrence', () => {
     let data = fixtureData('after-completion-materialised')
     const occ = occOn(data.items, data.roots, '2026-07-23')
 
-    data = applyEdit(data, occ, 'single', editFields(occ, { scheduled: { date: '2026-07-24', time: '' } }))
+    data = applyEdit(data, occ, 'single', editFields(occ, { scheduled: { date: '2026-07-24', time: '' } }), NEW_TARGET)
 
     expect(datesIn(data, '2026-07')).toEqual(['2026-07-09', '2026-07-24'])
     expect(serialize(data.items, [...data.roots.values()][0])).toContain(
@@ -84,7 +84,7 @@ describe('after_completion: moving the projected occurrence', () => {
     // (autosave, flush on close) replays the move with the same pre-move occurrence.
     const pinned = occOn(data.items, data.roots, '2026-07-23')
     const move = () => {
-      data = applyEdit(data, pinned, 'single', editFields(pinned, { scheduled: { date: '2026-07-24', time: '' } }))
+      data = applyEdit(data, pinned, 'single', editFields(pinned, { scheduled: { date: '2026-07-24', time: '' } }), NEW_TARGET)
     }
     move()
     move()
@@ -98,7 +98,7 @@ describe('after_completion: moving the projected occurrence', () => {
     const pinned = occOn(data.items, data.roots, '2026-07-23')
     expect(pinned.source).toBe('generated')
     const move = () => {
-      data = applyEdit(data, pinned, 'single', editFields(pinned, { scheduled: { date: '2026-07-24', time: '09:00' } }))
+      data = applyEdit(data, pinned, 'single', editFields(pinned, { scheduled: { date: '2026-07-24', time: '09:00' } }), NEW_TARGET)
     }
     move()
     move()

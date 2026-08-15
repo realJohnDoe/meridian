@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import AgendaView from './AgendaView'
-import { setupStore, seedStore, makeOcc, makeRoots } from '@/test-utils'
+import { setupStore, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 import { calendarView, resetCalendarOnVaultChange } from './viewState'
@@ -89,8 +89,8 @@ function overdueTask(i: number): Occurrence {
     id: `overdue-${i}`,
     date,
     time: null,
-    fileSlug: 'note.md',
-    metadata: { participants: [], title: `Overdue task ${i}`, tags: [], items: [], done: false },
+    entryKey: testKey('note.md'),
+    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Overdue task ${i}`, tags: [], items: [], done: false },
   })
 }
 
@@ -120,7 +120,7 @@ describe('AgendaView', () => {
       id: 'overdue-1',
       date: fmtISO(addDays(today, -3)),
       time: null,
-      metadata: { participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
     })
     seedStore([task], makeRoots('note.md'))
 
@@ -165,7 +165,7 @@ describe('AgendaView', () => {
       id: 'overdue-1',
       date: fmtISO(addDays(today, -3)),
       time: null,
-      metadata: { participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
     })
     seedStore([task], makeRoots('note.md'))
 

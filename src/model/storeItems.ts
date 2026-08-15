@@ -9,15 +9,16 @@
  *
  * StoreItem carries OccurrenceMetadata only (no file-level fields).
  * File-level fields (title/tags/topics/body) live in the returned FileMetadata
- * and belong in the store's roots map keyed by fileSlug.
+ * and belong in the store's roots map keyed by EntryKey.
  */
 
-import { loadFile, pathToSlug } from '@/fileIO'
+import { loadFile, pathToSlug, pathToKey } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '@/types'
-import type { StoreItem, FileMetadata, OccurrenceMetadata } from '@/types'
+import type { StoreItem, FileMetadata, FileFields, OccurrenceMetadata } from '@/types'
 import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, unknownKeys, FILE_LEVEL_SPECS, STRUCTURAL_KEYS } from './fieldRegistry'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
@@ -130,7 +131,7 @@ function withAncestorRemainder(meta: OccurrenceMetadata, ancestorRemainder: Reco
  */
 function effectiveNodeToStoreItems(
   tree: EffectiveNode,
-  fileSlug: string,
+  entryKey: EntryKey,
 ): StoreItem[] {
   const result: StoreItem[] = []
 
@@ -151,12 +152,12 @@ function effectiveNodeToStoreItems(
     if (hasRepeat(n)) {
       const anchorDate = scalarToString(n.fields.date) ?? ''
       const anchorTime = scalarToString(n.fields.time) ?? ''
-      const seriesId = stableId(`${fileSlug}|series|${anchorDate}|${anchorTime}`)
+      const seriesId = stableId(`${entryKey}|series|${anchorDate}|${anchorTime}`)
       result.push({
         date:   anchorDate,
         time:   scalarToString(n.fields.time) ?? null,
         repeat: n.fields.repeat as Repeat,
-        fileSlug,
+        entryKey,
         id:     seriesId,
         metadata: withAncestorRemainder(extractItemMetadata(base, n.ownFields, isRoot), ancestorRemainder),
       })
@@ -168,7 +169,7 @@ function effectiveNodeToStoreItems(
           date:    childDate,
           time:    scalarToString(child.fields.time) ?? null,
           source:  'explicit',
-          fileSlug,
+          entryKey,
           id:      stableId(`${seriesId}|inst|${childDate}|${childTime}`),
           ownerId: seriesId,
           ...(child.fields.excluded === true ? { excluded: true as const } : {}),
@@ -185,8 +186,8 @@ function effectiveNodeToStoreItems(
         date:   scalarToString(n.fields.date) ?? '',
         time:   scalarToString(n.fields.time) ?? null,
         source: 'explicit',
-        fileSlug,
-        id:     stableId(`${fileSlug}|occ|${occDate}|${occTime}`),
+        entryKey,
+        id:     stableId(`${entryKey}|occ|${occDate}|${occTime}`),
         metadata: withAncestorRemainder(extractItemMetadata(base, n.ownFields, isRoot), ancestorRemainder),
       })
       for (const child of n.instances) {
@@ -197,8 +198,8 @@ function effectiveNodeToStoreItems(
           date:   scalarToString(child.fields.date) ?? '',
           time:   scalarToString(child.fields.time) ?? null,
           source: 'explicit',
-          fileSlug,
-          id:     stableId(`${fileSlug}|occ|${childDate}|${childTime}`),
+          entryKey,
+          id:     stableId(`${entryKey}|occ|${childDate}|${childTime}`),
           metadata: withAncestorRemainder(extractItemMetadata({ ...base, ...child.fields }, child.ownFields, false), ancestorRemainder),
         })
       }
@@ -226,12 +227,21 @@ export interface ParseResult {
  * Parse a markdown/YAML file into StoreItem[] + FileMetadata.
  * Replaces `rawToNode` + `nodesToStoreItems`.
  */
-export function parseToStoreItems(path: string, content: string): ParseResult {
+export function parseToStoreItems(path: string, content: string, vaultId: string): ParseResult {
   const { rawNode, body, convention } = loadFile(path, content)
-  const fileSlug = pathToSlug(path)
+  const entryKey = pathToKey(vaultId, path)
   const tree = buildEffectiveTree(rawNode)
-  const items = effectiveNodeToStoreItems(tree, fileSlug)
-  return { items, root: { ...buildRoot(rawNode, body, nodeIsItem(tree)), fileConvention: convention } }
+  const items = effectiveNodeToStoreItems(tree, entryKey)
+  // vaultId/fileSlug/fileConvention are the caller's to supply — `buildRoot`
+  // returns `FileFields`, so leaving any of them out is a compile error rather
+  // than a root that silently forgot which vault it came from.
+  const root: FileMetadata = {
+    ...buildRoot(rawNode, body, nodeIsItem(tree)),
+    vaultId,
+    fileSlug: pathToSlug(path),
+    fileConvention: convention,
+  }
+  return { items, root }
 }
 
 /**
@@ -256,7 +266,7 @@ function buildRoot(
   rawNode: Record<string, unknown>,
   body: string,
   rootIsItem: boolean,
-): FileMetadata {
+): FileFields {
   const defaults = (rawNode.defaults as Record<string, unknown> | undefined) ?? {}
   return extractFileMetadata(
     { ...defaults, ...rawNode, body: body || undefined },

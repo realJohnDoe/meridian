@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { expandRange } from '@/model/expansion'
 import type { StoreSeries, Roots } from '@/types'
+import { keyOf } from './helpers'
 
 function series(overrides: Partial<StoreSeries> = {}): StoreSeries {
   return {
@@ -13,7 +14,7 @@ function series(overrides: Partial<StoreSeries> = {}): StoreSeries {
       byweekday: ['tu'],
       end: { type: 'until', date: '2026-07-14' }, // also a Tuesday
     },
-    fileSlug: 'abc.md',
+    entryKey: keyOf('abc.md'),
     id: 'series-1',
     metadata: { participants: [] },
     ...overrides,

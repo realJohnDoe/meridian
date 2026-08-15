@@ -46,7 +46,7 @@ function renderAllDayItem(
   const endD = startD && days > 1 ? addDays(startD, days - 1) : startD
   return (
     <OccurrencePill
-      key={`${o.fileSlug}-${o.date}-${i}`}
+      key={`${o.entryKey}-${o.date}-${i}`}
       state={occState(o)}
       title={multidayDisplayTitle(o, dvMidnight) ?? o.metadata.title}
       onClick={() => onOpen(o)}

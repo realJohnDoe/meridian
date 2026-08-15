@@ -12,7 +12,8 @@ import {
   dayBefore,
   saveFile,
 } from '@/model'
-import { loadFile } from '@/fileIO'
+import { loadFile, entryKey as makeEntryKey } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 import { cn } from '@/lib/cn'
 import type { Occurrence, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern, OccurrenceMetadata } from '@/types'
 import { EntryEditor, RepeatDialog, applyScope, entryFromOccurrence, usePendingLinks } from '@/editor'
@@ -26,7 +27,12 @@ function defaultEndDate(): string {
   return d.toISOString().slice(0, 10)
 }
 
+// The debugger edits a scratch snapshot, not a real vault — but entry identity
+// is vault-qualified everywhere, so the scratch file needs a vault of its own.
+// A dedicated id keeps it from ever colliding with a real one.
+const DEBUG_VAULT_ID  = 'debug'
 const DEBUG_FILE_SLUG = 'debug-node'
+const DEBUG_KEY       = makeEntryKey(DEBUG_VAULT_ID, DEBUG_FILE_SLUG)
 
 /**
  * Serialize items back to YAML content string (same path as writeEntityToCache).
@@ -315,7 +321,7 @@ export default function NodeInheritanceDebugger() {
   const [parseErrors,     setParseErrors]     = useState<string[]>([])
   const [items,           setItems]           = useState<StoreItem[]>([])
   const [debugRoot,       setDebugRoot]       = useState<FileMetadata | undefined>(undefined)
-  const debugRoots = useMemo<Roots>(() => debugRoot ? new Map([[DEBUG_FILE_SLUG, debugRoot]]) : new Map<string, FileMetadata>(), [debugRoot])
+  const debugRoots = useMemo<Roots>(() => debugRoot ? new Map([[DEBUG_KEY, debugRoot]]) : new Map<EntryKey, FileMetadata>(), [debugRoot])
   const [expandEndDate,   setExpandEndDate]   = useState<string>(defaultEndDate)
   const [selectedIdx,     setSelectedIdx]     = useState<number | null>(null)
   const [activeAction,    setActiveAction]    = useState<ActionKind | null>(null)
@@ -324,7 +330,7 @@ export default function NodeInheritanceDebugger() {
   const [debugEntry,        setDebugEntry]        = useState<EntryState | null>(null)
   const [patternDialogOpen, setPatternDialogOpen] = useState(false)
   const { handlers: dialogHandlers, openDialog, openRepeatDialog } = useDebugDialogHandlers(setDebugEntry)
-  const debugPendingLinks = usePendingLinks(debugEntry?.item ?? null, debugEntry?.title ?? '')
+  const debugPendingLinks = usePendingLinks(debugEntry?.item ?? null, debugEntry?.title ?? '', DEBUG_VAULT_ID)
 
   // ── Effective tree for viz column — re-derived from displayContent ────────
   const results = useMemo<EffectiveNode | null>(() => {
@@ -360,10 +366,10 @@ export default function NodeInheritanceDebugger() {
     setDebugRoot(undefined)
 
     try {
-      const parsed = parseToStoreItems(name || 'debug.md', content)
-      // Assign a stable debug fileSlug so expandRange can match series↔overrides.
-      const withSlug = parsed.items.map(i => ({ ...i, fileSlug: i.fileSlug || DEBUG_FILE_SLUG }))
-      setItems(withSlug)
+      const parsed = parseToStoreItems(name || 'debug.md', content, DEBUG_VAULT_ID)
+      // Assign a stable debug key so expandRange can match series↔overrides.
+      const withKey = parsed.items.map(i => ({ ...i, entryKey: i.entryKey || DEBUG_KEY }))
+      setItems(withKey)
       setDebugRoot(parsed.root)
     } catch (e) {
       setParseErrors([`Parse error: ${String(e)}`])
@@ -450,8 +456,8 @@ export default function NodeInheritanceDebugger() {
       duration: duration || '',
       repeat:   repeat ?? null,
     }
-    const next = applyEdit({ items, roots: debugRoots }, selectedOcc, editScope, fields)
-    applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), body)
+    const next = applyEdit({ items, roots: debugRoots }, selectedOcc, editScope, fields, { vaultId: DEBUG_VAULT_ID })
+    applyItems(next.items, next.roots.get(DEBUG_KEY), body)
   }, [debugEntry, selectedOcc, items, debugRoots, applyItems])
 
   const handleDebugScopeChange = useCallback((scope: EditScope) => {
@@ -619,7 +625,7 @@ export default function NodeInheritanceDebugger() {
               occurrences.length === 0
                 ? <div className="flex items-center justify-center h-full text-white/20 text-sm select-none">No occurrences before {expandEndDate}</div>
                 : occurrences.map((occ, i) => (
-                    <OccurrenceRow key={`${occ.fileSlug}-${occ.date}`} occ={occ} isSelected={selectedIdx === i} onClick={() => handleSelectOccurrence(i)} />
+                    <OccurrenceRow key={`${occ.entryKey}-${occ.date}`} occ={occ} isSelected={selectedIdx === i} onClick={() => handleSelectOccurrence(i)} />
                   ))
             )}
           </div>
@@ -658,7 +664,7 @@ export default function NodeInheritanceDebugger() {
                         const series = findSeries(items, selectedOcc)
                         const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
                           date, time: time || null, source: 'explicit',
-                          fileSlug: selectedOcc.fileSlug, id: crypto.randomUUID(),
+                          entryKey: selectedOcc.entryKey, id: crypto.randomUUID(),
                           ownerId: selectedOcc.ownerId,
                           metadata: { ...(series?.metadata ?? {}), done, participants: [] },
                         }
@@ -684,7 +690,7 @@ export default function NodeInheritanceDebugger() {
                     <EditFollowingForm occ={selectedOcc}
                       onApply={() => {
                         const next = deleteFollowing({ items, roots: debugRoots }, selectedOcc)
-                        applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), debugRoot?.body ?? '')
+                        applyItems(next.items, next.roots.get(DEBUG_KEY), debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -695,7 +701,7 @@ export default function NodeInheritanceDebugger() {
                       label="Delete occurrence"
                       onApply={() => {
                         const next = excludeOccurrence({ items, roots: debugRoots }, selectedOcc)
-                        applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), debugRoot?.body ?? '')
+                        applyItems(next.items, next.roots.get(DEBUG_KEY), debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -706,7 +712,7 @@ export default function NodeInheritanceDebugger() {
                       label="Delete this & following"
                       onApply={() => {
                         const next = deleteFollowing({ items, roots: debugRoots }, selectedOcc)
-                        applyItems(next.items, next.roots.get(DEBUG_FILE_SLUG), debugRoot?.body ?? '')
+                        applyItems(next.items, next.roots.get(DEBUG_KEY), debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -731,6 +737,7 @@ export default function NodeInheritanceDebugger() {
               hooks={{
                 entry: debugEntry,
                 series: seriesContext(items, debugEntry.item),
+                vaultId: DEBUG_VAULT_ID,
                 pendingLinks: debugPendingLinks,
                 dialogHandlers,
                 setEntry: (updater) => setDebugEntry(prev => prev ? updater(prev) : prev),

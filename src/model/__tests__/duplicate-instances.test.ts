@@ -6,6 +6,7 @@ import { collapseToYaml } from '@/model/collapse'
 import { saveFile } from '@/model/inheritance'
 import { isSeries } from '@/types'
 import type { Occurrence, Roots, StoreItem } from '@/types'
+import { TEST_VAULT, rootsOf } from './helpers'
 
 // A daily recurring series that has ended up with TWO override instances on the
 // same date — one completed, one not. This is the shape produced by e.g.
@@ -42,7 +43,7 @@ function occsOn(items: StoreItem[], roots: Roots, date: string): Occurrence[] {
 
 describe('two override instances on the same date (recurring series)', () => {
   it('parses into a series plus two distinct override children on that date', () => {
-    const parsed = parseToStoreItems('rec.md', SERIES_DUPE)
+    const parsed = parseToStoreItems('rec.md', SERIES_DUPE, TEST_VAULT)
     const overrides = parsed.items.filter(i => !isSeries(i) && i.date === '2026-07-08')
     expect(overrides).toHaveLength(2)
     // Ids are unique via the parse-time collision guard (#2 suffix).
@@ -51,8 +52,8 @@ describe('two override instances on the same date (recurring series)', () => {
   })
 
   it('expands BOTH overrides into separate occurrences (neither is shadowed)', () => {
-    const parsed = parseToStoreItems('rec.md', SERIES_DUPE)
-    const roots = new Map([['rec', parsed.root]])
+    const parsed = parseToStoreItems('rec.md', SERIES_DUPE, TEST_VAULT)
+    const roots = rootsOf(parsed.root)
     const on08 = occsOn(parsed.items, roots, '2026-07-08')
     expect(on08).toHaveLength(2)
     expect(new Set(on08.map(o => o.id)).size).toBe(2)
@@ -60,8 +61,8 @@ describe('two override instances on the same date (recurring series)', () => {
   })
 
   it('toggling the undone occurrence marks that specific instance done', () => {
-    const parsed = parseToStoreItems('rec.md', SERIES_DUPE)
-    const roots = new Map([['rec', parsed.root]])
+    const parsed = parseToStoreItems('rec.md', SERIES_DUPE, TEST_VAULT)
+    const roots = rootsOf(parsed.root)
     const undone = occsOn(parsed.items, roots, '2026-07-08').find(o => !o.metadata.done)!
     expect(undone).toBeTruthy()
 
@@ -74,8 +75,8 @@ describe('two override instances on the same date (recurring series)', () => {
   })
 
   it('toggling one instance leaves the other untouched', () => {
-    const parsed = parseToStoreItems('rec.md', SERIES_DUPE)
-    const roots = new Map([['rec', parsed.root]])
+    const parsed = parseToStoreItems('rec.md', SERIES_DUPE, TEST_VAULT)
+    const roots = rootsOf(parsed.root)
     const done = occsOn(parsed.items, roots, '2026-07-08').find(o => o.metadata.done)!
 
     // Un-complete the done one → the other stays undone.
@@ -85,8 +86,8 @@ describe('two override instances on the same date (recurring series)', () => {
   })
 
   it('excluding one instance removes only that one', () => {
-    const parsed = parseToStoreItems('rec.md', SERIES_DUPE)
-    const roots = new Map([['rec', parsed.root]])
+    const parsed = parseToStoreItems('rec.md', SERIES_DUPE, TEST_VAULT)
+    const roots = rootsOf(parsed.root)
     const undone = occsOn(parsed.items, roots, '2026-07-08').find(o => !o.metadata.done)!
 
     const next = excludeOccurrence({ items: parsed.items, roots }, undone)
@@ -96,9 +97,9 @@ describe('two override instances on the same date (recurring series)', () => {
   })
 
   it('round-trips: two same-date overrides survive collapse + reparse', () => {
-    const parsed = parseToStoreItems('rec.md', SERIES_DUPE)
+    const parsed = parseToStoreItems('rec.md', SERIES_DUPE, TEST_VAULT)
     const yaml = saveFile(collapseToYaml(parsed.items, parsed.root), parsed.root.body ?? '')
-    const reparsed = parseToStoreItems('rec.md', yaml)
+    const reparsed = parseToStoreItems('rec.md', yaml, TEST_VAULT)
     const overrides = reparsed.items.filter(i => !isSeries(i) && i.date === '2026-07-08')
     expect(overrides).toHaveLength(2)
     expect(overrides.map(o => o.metadata.done).sort()).toEqual([false, true])

@@ -4,7 +4,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import { beginSwipeDelete, toggleOccDone, reopenOcc } from './occurrenceActions'
 import { Toaster } from '@/components/ui/sonner'
 import { useStore } from '@/store'
-import { setupStore, seedStore, installFakePersistence, makeOcc, makeSeries, makeRoots } from '@/test-utils'
+import { setupStore, seedStore, installFakePersistence, makeOcc, makeSeries, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
 import type { Roots, StoreItem, StoreOcc } from '@/types'
 
 setupStore()
@@ -39,7 +39,7 @@ function flushToastMount() {
 
 describe('beginSwipeDelete', () => {
   it('optimistically removes a standalone occurrence and defers persistence to auto-close', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md' })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md'))
     render(<Toaster />)
 
@@ -53,11 +53,11 @@ describe('beginSwipeDelete', () => {
 
     act(() => { vi.advanceTimersByTime(4100) })
 
-    expect(persistence.deletes).toEqual(['note.md'])
+    expect(persistence.deletes).toEqual([testKey('note.md')])
   })
 
   it('Undo restores the snapshot, persists the restore, and the deferred commit never persists', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md' })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md'))
     render(<Toaster />)
 
@@ -71,12 +71,12 @@ describe('beginSwipeDelete', () => {
     act(() => { vi.advanceTimersByTime(5000) })
 
     expect(persistence.deletes).toEqual([])
-    expect(persistence.writes).toEqual(['note.md'])
+    expect(persistence.writes).toEqual([testKey('note.md')])
   })
 
   it('excludes (not deletes) a recurring occurrence and writes the file on auto-close', () => {
-    const series = makeSeries({ id: 'series-1', fileSlug: 'note.md', repeat: { type: 'schedule', freq: 'daily' } })
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', ownerId: 'series-1' })
+    const series = makeSeries({ id: 'series-1', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'daily' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1' })
     seedStore([series], makeRoots('note.md'))
     render(<Toaster />)
 
@@ -89,13 +89,13 @@ describe('beginSwipeDelete', () => {
 
     act(() => { vi.advanceTimersByTime(4100) })
 
-    expect(persistence.writes).toEqual(['note.md'])
+    expect(persistence.writes).toEqual([testKey('note.md')])
     expect(persistence.deletes).toEqual([])
   })
 
   it('Undo on a recurring occurrence restores the un-excluded snapshot and persists it', () => {
-    const series = makeSeries({ id: 'series-1', fileSlug: 'note.md', repeat: { type: 'schedule', freq: 'daily' } })
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', ownerId: 'series-1' })
+    const series = makeSeries({ id: 'series-1', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'daily' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1' })
     seedStore([series], makeRoots('note.md'))
     render(<Toaster />)
 
@@ -108,18 +108,18 @@ describe('beginSwipeDelete', () => {
 
     act(() => { vi.advanceTimersByTime(5000) })
 
-    expect(persistence.writes).toEqual(['note.md'])
+    expect(persistence.writes).toEqual([testKey('note.md')])
     expect(persistence.deletes).toEqual([])
   })
 
   it('undoing a delete does not revert an unrelated edit made during the toast window', () => {
-    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', date: '2026-06-15', time: null, metadata: { participants: [], title: 'A', tags: [], items: [] } })
+    const a = makeOcc({ id: 'occ-a', entryKey: testKey('a.md'), date: '2026-06-15', time: null, metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', participants: [], title: 'A', tags: [], items: [] } })
     const b = makeOcc({
-      id: 'occ-b', fileSlug: 'b.md', date: '2026-06-16', time: null,
-      metadata: { participants: [], title: 'B', tags: [], items: [], done: false },
+      id: 'occ-b', entryKey: testKey('b.md'), date: '2026-06-16', time: null,
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', participants: [], title: 'B', tags: [], items: [], done: false },
     })
     const roots: Roots = makeRoots('a.md', { title: 'A' })
-    roots.set('b.md', { title: 'B', tags: [], items: [] })
+    roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'B', tags: [], items: [] }))
     seedStore([a, b], roots)
     render(<Toaster />)
 
@@ -128,11 +128,11 @@ describe('beginSwipeDelete', () => {
     flushToastMount()
 
     act(() => { toggleOccDone(b) })
-    expect(persistence.writes).toEqual(['b.md'])
+    expect(persistence.writes).toEqual([testKey('b.md')])
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
 
-    expect(items().map(i => i.fileSlug).sort()).toEqual(['a.md', 'b.md'])
+    expect(items().map(i => i.entryKey).sort()).toEqual([testKey('a.md'), testKey('b.md')])
     expect((items().find(i => i.id === 'occ-b') as StoreOcc).metadata.done).toBe(true)
   })
 
@@ -144,10 +144,10 @@ describe('beginSwipeDelete', () => {
   // only the deleted file's own slug). Both halves are pinned here.
 
   it('persists the backlink cleanup on commit, not just in the in-memory store', () => {
-    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
-    const b = makeOcc({ id: 'occ-b', fileSlug: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
+    const a = makeOcc({ id: 'occ-a', entryKey: testKey('a.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', participants: [], title: 'A', tags: [], items: [] } })
+    const b = makeOcc({ id: 'occ-b', entryKey: testKey('b.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', participants: [], title: 'B', tags: [], items: [] } })
     const roots: Roots = makeRoots('a.md', { title: 'A' })
-    roots.set('b.md', { title: 'B', tags: [], items: ['[[a.md]]'] })
+    roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'B', tags: [], items: ['[[a.md]]'] }))
     seedStore([a, b], roots)
     render(<Toaster />)
 
@@ -156,45 +156,45 @@ describe('beginSwipeDelete', () => {
     flushToastMount()
 
     // Optimistic: the store already reflects the cleanup before the toast settles.
-    expect(useStore.getState().roots.get('b.md')?.items).toEqual([])
+    expect(useStore.getState().roots.get(testKey('b.md'))?.items).toEqual([])
     expect(persistence.writes).toEqual([])
 
     act(() => { vi.advanceTimersByTime(4100) })
 
-    expect(persistence.deletes).toEqual(['a.md'])
-    expect(persistence.writes).toEqual(['b.md'])
+    expect(persistence.deletes).toEqual([testKey('a.md')])
+    expect(persistence.writes).toEqual([testKey('b.md')])
   })
 
   it('Undo restores both the deleted entry and the wikilink other files carried to it', () => {
-    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
-    const b = makeOcc({ id: 'occ-b', fileSlug: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
+    const a = makeOcc({ id: 'occ-a', entryKey: testKey('a.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', participants: [], title: 'A', tags: [], items: [] } })
+    const b = makeOcc({ id: 'occ-b', entryKey: testKey('b.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', participants: [], title: 'B', tags: [], items: [] } })
     const roots: Roots = makeRoots('a.md', { title: 'A' })
-    roots.set('b.md', { title: 'B', tags: [], items: ['[[a.md]]'] })
+    roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'B', tags: [], items: ['[[a.md]]'] }))
     seedStore([a, b], roots)
     render(<Toaster />)
 
     const apply = beginSwipeDelete(a)
     act(() => apply())
     flushToastMount()
-    expect(useStore.getState().roots.get('b.md')?.items).toEqual([])
+    expect(useStore.getState().roots.get(testKey('b.md'))?.items).toEqual([])
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
 
     expect(items().find(i => i.id === 'occ-a')).toBeDefined()
-    expect(useStore.getState().roots.get('b.md')?.items).toEqual(['[[a.md]]'])
+    expect(useStore.getState().roots.get(testKey('b.md'))?.items).toEqual(['[[a.md]]'])
 
     act(() => { vi.advanceTimersByTime(5000) })
 
     // The restore is persisted too — both slugs, since both were reverted.
-    expect(persistence.writes.sort()).toEqual(['a.md', 'b.md'])
+    expect(persistence.writes.sort()).toEqual([testKey('a.md'), testKey('b.md')])
     expect(persistence.deletes).toEqual([])
   })
 
   it('a second delete fires the first pending commit immediately, before any timer advances', () => {
-    const a = makeOcc({ id: 'occ-a', fileSlug: 'a.md', metadata: { participants: [], title: 'A', tags: [], items: [] } })
-    const b = makeOcc({ id: 'occ-b', fileSlug: 'b.md', metadata: { participants: [], title: 'B', tags: [], items: [] } })
+    const a = makeOcc({ id: 'occ-a', entryKey: testKey('a.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', participants: [], title: 'A', tags: [], items: [] } })
+    const b = makeOcc({ id: 'occ-b', entryKey: testKey('b.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', participants: [], title: 'B', tags: [], items: [] } })
     const roots: Roots = makeRoots('a.md', { title: 'A' })
-    roots.set('b.md', { title: 'B', tags: [], items: [] })
+    roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'B', tags: [], items: [] }))
     seedStore([a, b], roots)
     render(<Toaster />)
 
@@ -204,19 +204,19 @@ describe('beginSwipeDelete', () => {
 
     let applyB!: () => void
     act(() => { applyB = beginSwipeDelete(b) })
-    expect(persistence.deletes).toEqual(['a.md'])
+    expect(persistence.deletes).toEqual([testKey('a.md')])
 
     act(() => applyB())
     act(() => { vi.advanceTimersByTime(4100) })
 
-    expect(persistence.deletes).toEqual(['a.md', 'b.md'])
+    expect(persistence.deletes).toEqual([testKey('a.md'), testKey('b.md')])
   })
 
   it('deleting the last open occurrence of an after_completion series warns that it ends the series', () => {
-    const series = makeSeries({ id: 'series-1', fileSlug: 'note.md', repeat: { type: 'after_completion', interval: '1 day' } })
+    const series = makeSeries({ id: 'series-1', entryKey: testKey('note.md'), repeat: { type: 'after_completion', interval: '1 day' } })
     const occ = makeOcc({
-      id: 'occ-1', fileSlug: 'note.md', ownerId: 'series-1',
-      metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false },
+      id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1',
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false },
     })
     seedStore([series], makeRoots('note.md'))
     render(<Toaster />)
@@ -231,17 +231,17 @@ describe('beginSwipeDelete', () => {
 
 describe('toggleOccDone', () => {
   it('flips done to true and persists the file', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))
 
     toggleOccDone(occ)
 
     expect((items().find(i => i.id === 'occ-1') as StoreOcc).metadata.done).toBe(true)
-    expect(persistence.writes).toEqual(['note.md'])
+    expect(persistence.writes).toEqual([testKey('note.md')])
   })
 
   it('flips done back to false', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: true } })
     seedStore([occ], makeRoots('note.md'))
 
     toggleOccDone(occ)
@@ -252,21 +252,21 @@ describe('toggleOccDone', () => {
 
 describe('reopenOcc', () => {
   it('reuses an existing undated standalone entry for the same file', () => {
-    const dated = makeOcc({ id: 'occ-1', fileSlug: 'note.md', date: '2026-06-15', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
-    const undated = makeOcc({ id: 'occ-2', fileSlug: 'note.md', date: '', time: null, metadata: { participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    const dated = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), date: '2026-06-15', metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    const undated = makeOcc({ id: 'occ-2', entryKey: testKey('note.md'), date: '', time: null, metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: true } })
     seedStore([dated, undated], makeRoots('note.md'))
 
     reopenOcc(dated)
 
     expect(items()).toHaveLength(2)
     expect((items().find(i => i.id === 'occ-2') as StoreOcc).metadata.done).toBe(false)
-    expect(persistence.writes).toEqual(['note.md'])
+    expect(persistence.writes).toEqual([testKey('note.md')])
   })
 
   it('creates a fresh undated entry when none exists for the file', () => {
     const occ = makeOcc({
-      id: 'occ-1', fileSlug: 'note.md', date: '2026-06-15',
-      metadata: { participants: ['alice'], title: 'Standup', tags: [], items: [], done: true, priority: 'high' },
+      id: 'occ-1', entryKey: testKey('note.md'), date: '2026-06-15',
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: ['alice'], title: 'Standup', tags: [], items: [], done: true, priority: 'high' },
     })
     seedStore([occ], makeRoots('note.md'))
 
@@ -278,14 +278,14 @@ describe('reopenOcc', () => {
     expect(created.metadata.done).toBe(false)
     expect(created.metadata.participants).toEqual(['alice'])
     expect(created.metadata.priority).toBe('high')
-    expect(persistence.writes).toEqual(['note.md'])
+    expect(persistence.writes).toEqual([testKey('note.md')])
   })
 
   it('does not reuse an undated entry belonging to a different file', () => {
-    const occA = makeOcc({ id: 'occ-1', fileSlug: 'a.md', date: '2026-06-15', metadata: { participants: [], title: 'A', tags: [], items: [], done: true } })
-    const undatedB = makeOcc({ id: 'occ-2', fileSlug: 'b.md', date: '', time: null, metadata: { participants: [], title: 'B', tags: [], items: [], done: true } })
+    const occA = makeOcc({ id: 'occ-1', entryKey: testKey('a.md'), date: '2026-06-15', metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', participants: [], title: 'A', tags: [], items: [], done: true } })
+    const undatedB = makeOcc({ id: 'occ-2', entryKey: testKey('b.md'), date: '', time: null, metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', participants: [], title: 'B', tags: [], items: [], done: true } })
     const roots: Roots = makeRoots('a.md', { title: 'A' })
-    roots.set('b.md', { title: 'B', tags: [], items: [] })
+    roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'B', tags: [], items: [] }))
     seedStore([occA, undatedB], roots)
 
     reopenOcc(occA)

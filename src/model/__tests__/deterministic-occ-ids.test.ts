@@ -20,7 +20,7 @@
  * already equals stableOccId(key) — instead of minting a new one.
  */
 import { describe, it, expect } from 'vitest'
-import { loadFixture } from './helpers'
+import { loadFixture, TEST_VAULT, rootsOf } from './helpers'
 import { parseToStoreItems } from '@/model/storeItems'
 import { expandRange, stableOccId } from '@/model/expansion'
 import { toggleDone } from '@/model/storeOps'
@@ -32,8 +32,8 @@ const TO = new Date('2026-05-31T23:59:59')
 
 function parseWeeklySeries() {
   const content = loadFixture('weekly-series')
-  const { items, root } = parseToStoreItems('weekly-series.md', content)
-  const roots: Roots = new Map([['weekly-series', root]])
+  const { items, root } = parseToStoreItems('weekly-series.md', content, TEST_VAULT)
+  const roots: Roots = rootsOf(root)
   return { items, roots }
 }
 

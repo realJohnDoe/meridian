@@ -35,10 +35,19 @@ The app is served under `/meridian/` — not `/`. When using preview tools or na
 
 ```
 http://localhost:5173/meridian/
-http://localhost:5173/meridian/?editor=<fileSlug>
+http://localhost:5173/meridian/entry/<vaultId>/<fileSlug>
 ```
 
-The `pnpm dev` server defaults to port 5173 but may bind to another port if that's taken. Entry editor search params: `editor` (fileSlug), `edate` (YYYY-MM-DD), `escope`, `etitle`.
+The `pnpm dev` server defaults to port 5173 but may bind to another port if that's taken.
+
+An entry lives at its own route, not a search param on the agenda. The URL
+carries the two halves of its `EntryKey` as separate path segments — the
+Tutorial vault's id is `example`, so its first note is
+`/meridian/entry/example/01-start-here`. Search params: `date` (YYYY-MM-DD,
+pins which occurrence of a series) and `scope` (`single`/`future`/`all`/`add`).
+`/meridian/entry/<fileSlug>` still works as a redirect to the loaded vault.
+New entries are `/meridian/entry/new`, with `title`, `date`, `time`,
+`duration` and `itemType` search params.
 
 ## Build verification
 
@@ -83,8 +92,8 @@ CI does exactly this before linting (`.github/workflows/build.yml`), which is wh
 - `types.ts` — pure domain type declarations, plus the four `isX` discriminated-union guards that belong beside their unions (`isSeries`, `isStandaloneOcc`, `isTracked`, `isEditScope`). No runtime registries or logic — the YAML field-parse registry that used to live here is `model/fieldRegistry.ts`, private to `model/` since every consumer lives there.
 - `vaultRef.ts` — the `VaultRef`/`VaultKind`/`GitHubVaultRef` family; a root leaf (not `storage/`) because `components/` is barred from importing `@/storage` at all (invariant 2), and `@/vaultActions` re-exports `VaultRef` for it.
 - `store.ts` + `storeBridge.ts` — Zustand store for durable, cross-cutting state (vault data, sync status, favorites, prefs); `storeBridge` is imported by `storage/`, `editor/`, and `occurrenceActions.ts`/`storeCommit.ts`. View-local ephemeral state does not belong here — see invariant 5 below.
-- `fileIO.ts` — YAML/frontmatter parse+serialize; used by `debug/`, `editor/`, `model/`, `storage/`
-- `wikilinks.ts` — wikilink parse+resolve; used by `editor/`, `model/`, and root
+- `fileIO.ts` — YAML/frontmatter parse+serialize, the path↔slug mapping, and the branded `EntryKey` (`${vaultId}::${fileSlug}`) that composes with it; used by `debug/`, `editor/`, `model/`, `storage/`. `EntryKey` lives here rather than in a new root file precisely because `model/` may import `fileIO.ts` (invariant 1) and this module already owns the identity mapping.
+- `wikilinks.ts` — wikilink parse+resolve; used by `editor/`, `model/`, and root. Resolution is **per vault** — files store a bare `[[slug]]`, so `resolveWikilink` takes the linking file's vaultId and `buildResolveIndex` partitions by it.
 - `occurrenceActions.ts` — user-action orchestration, including its delete-undo toast; used by `editor/` and `calendar/`
 - `storeCommit.ts` + `persistencePort.ts` — persistence-port abstraction (see invariant 3 below); used by `editor/`, `storage/`, and `occurrenceActions.ts`
 - `vaultActions.ts` — used by `components/` and `routes/`
@@ -128,6 +137,6 @@ These bit us repeatedly; follow them to avoid a long debug loop:
 - **Don't use `pnpm dev -- --port N`.** The extra `--` is forwarded to vite and silently breaks `--port` (vite stays on 5173). Use `pnpm exec vite --port N --strictPort` instead.
 - **Trust `preview_logs`, not the MCP's reported port.** The MCP reports the *configured* port; vite prints the real `Local:` URL in its logs. Check there.
 - **To verify which code is actually being served**, assert on a feature only the target branch has (e.g. for PR 3, that off-cursor wikilinks render as chips, not `.wl` marks).
-- **Don't hard-navigate (`window.location`) straight to `?editor=<slug>`** — it races vault loading and opens a blank `untitled.md` draft. Instead load `/meridian/`, wait for `[data-testid="entry-card"]` to appear, then click the card's `button[aria-label="<title>"]` (SPA nav, no reload).
+- **Don't hard-navigate (`window.location`) straight to an `/entry/<vault>/<slug>` URL** — it races vault loading, so the entry isn't in the store yet and you get "Item not found". Instead load `/meridian/`, wait for `[data-testid="entry-card"]` to appear, then click the card's `button[aria-label="<title>"]` (SPA nav, no reload).
 - **Example-vault slugs:** "Welcome to Meridian" = `01-start-here`; its linked notes are `02-your-first-task`, `03-plan-your-week`, `04-link-your-notes`, `05-make-it-yours`.
 - **Inspect CM6 state from the page:** `document.querySelector('.cm-content').cmTile.view` gives the `EditorView` (read `view.state`, `dispatch`, etc.).

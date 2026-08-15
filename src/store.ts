@@ -3,6 +3,8 @@ import type { StoreItem, Roots } from './types'
 import type { LocalePrefs } from '@/model'
 import type { VaultRef } from './vaultRef'
 import { warmFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
+import { entryKey as makeEntryKey, isEntryKey } from './fileIO'
+import type { EntryKey } from './fileIO'
 import { readVaultStringArray, writeVaultJSON, readVaultJSON } from '@/lib/vaultStorage'
 
 function detectLocalePrefs(): LocalePrefs {
@@ -35,28 +37,28 @@ interface MeridianStore {
   items: StoreItem[]
   roots: Roots
   /**
-   * Derived: targetSlug → sourceSlugs that link to it. Recomputed on every
-   * setData, which is affordable (~1 ms on a 300-file vault) and necessary —
-   * AgendaRow reads it, so it is on the first-paint path.
+   * Derived: target EntryKey → the EntryKeys that link to it. Recomputed on
+   * every setData, which is affordable (~1 ms on a 300-file vault) and
+   * necessary — AgendaRow reads it, so it is on the first-paint path.
    *
-   * Its sibling index, the fileSlug → representative Occurrence map, is
+   * Its sibling index, the EntryKey → representative Occurrence map, is
    * deliberately *not* a store field: it costs ~240 ms to build and no
    * cold-start view reads it. See `fileOccurrenceMap` in fileOccurrence.ts and
    * the `useFileOccurrenceMap` hook.
    */
-  backlinks: Map<string, string[]>
+  backlinks: Map<EntryKey, EntryKey[]>
   /** Set items and roots together atomically. */
   setData: (data: { items: StoreItem[]; roots: Roots }) => void
   /**
    * Files that failed to parse on the last load or reconcile, keyed by
-   * fileSlug. Deliberately kept out of `roots` — an unparseable file has no
+   * EntryKey. Deliberately kept out of `roots` — an unparseable file has no
    * FileMetadata to offer, and giving it a placeholder root would make it
    * look like a normal (if empty) entry to wikilink resolution, search, and
    * `applyNew`'s collision check. Consulted by `saveNode` (src/editor/save.ts)
    * so a new entry can never silently overwrite a file that couldn't be read.
    */
-  unreadableFiles: Map<string, { path: string; message: string }>
-  setUnreadableFiles: (files: Map<string, { path: string; message: string }>) => void
+  unreadableFiles: Map<EntryKey, { path: string; message: string }>
+  setUnreadableFiles: (files: Map<EntryKey, { path: string; message: string }>) => void
 
   // ── Vaults ──────────────────────────────────────────────────────
   vaults:        VaultRef[]
@@ -97,10 +99,10 @@ interface MeridianStore {
   vaultLoadProgress: { loaded: number; total: number } | null
 
   // ── Favorites ────────────────────────────────────────────────────
-  /** Ordered fileSlug array for the active vault. Stored in localStorage, never written to files. */
-  favorites:        string[]
+  /** Ordered EntryKey array for the active vault. Stored in localStorage, never written to files. */
+  favorites:        EntryKey[]
   loadFavorites:    (vaultId: string) => void
-  toggleFavorite:   (fileSlug: string) => void
+  toggleFavorite:   (key: EntryKey) => void
   reorderFavorites: (fromIdx: number, toIdx: number) => void
 
   // ── Default participants ──────────────────────────────────────────
@@ -159,6 +161,21 @@ function persistedBoolField(keyPrefix: string, field: keyof MeridianStore, defau
   }
 }
 
+/**
+ * Read this vault's favourites, upgrading anything a pre-EntryKey build wrote.
+ *
+ * Favourites are the one persisted collection of entry identities, so the
+ * bare-slug values already sitting in localStorage have to keep working. A
+ * stored value with no vault half is, by definition, from the era when only one
+ * vault could be active — and this key is that vault's — so qualifying it with
+ * `vaultId` is exact, not a guess. Migration happens on read rather than as a
+ * one-shot rewrite: it is idempotent, costs nothing, and cannot half-apply.
+ */
+function readFavorites(vaultId: string): EntryKey[] {
+  return readVaultStringArray('meridian_favorites', vaultId)
+    .map(v => isEntryKey(v) ? v : makeEntryKey(vaultId, v))
+}
+
 export const useStore = create<MeridianStore>((set, get) => {
   const favoritesField = persistedArrayField('meridian_favorites', 'favorites', set)
   const defaultParticipantsField = persistedArrayField('meridian_default_participants', 'defaultParticipants', set)
@@ -198,12 +215,14 @@ export const useStore = create<MeridianStore>((set, get) => {
     vaultLoadProgress: null,
 
     favorites: [],
-    loadFavorites: favoritesField.load,
-    toggleFavorite: (fileSlug: string) => {
+    loadFavorites: (vaultId: string) => {
+      set({ favorites: readFavorites(vaultId) })
+    },
+    toggleFavorite: (key: EntryKey) => {
       const { favorites, activeVaultId } = get()
-      const next = favorites.includes(fileSlug)
-        ? favorites.filter(s => s !== fileSlug)
-        : [...favorites, fileSlug]
+      const next = favorites.includes(key)
+        ? favorites.filter(k => k !== key)
+        : [...favorites, key]
       favoritesField.persist(activeVaultId, next)
     },
     reorderFavorites: (fromIdx: number, toIdx: number) => {
@@ -212,7 +231,7 @@ export const useStore = create<MeridianStore>((set, get) => {
       // fromIdx needs the same bounds check: an out-of-range splice() returns
       // [] and would otherwise insert `undefined` into the favorites list.
       if (fromIdx < 0 || fromIdx >= favorites.length) return
-      const next = [...favorites]
+      const next: EntryKey[] = [...favorites]
       const [item] = next.splice(fromIdx, 1)
       next.splice(toIdx, 0, item!)
       favoritesField.persist(activeVaultId, next)

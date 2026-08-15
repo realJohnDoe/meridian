@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { hasSameStructure, computeExpansionCache } from '@/model/expansionCache'
 import type { StoreSeries, StoreOcc, Roots } from '@/types'
+import { keyOf, TEST_VAULT } from './helpers'
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -9,7 +10,7 @@ function series(overrides: Partial<StoreSeries> = {}): StoreSeries {
     date: '2026-06-01',
     time: null,
     repeat: { type: 'schedule', freq: 'weekly', byweekday: ['mo'] },
-    fileSlug: 'note.md',
+    entryKey: keyOf('note.md'),
     id: 'series-1',
     metadata: { participants: [] },
     ...overrides,
@@ -21,7 +22,7 @@ function occ(overrides: Partial<StoreOcc> = {}): StoreOcc {
     date: '2026-06-01',
     time: null,
     source: 'explicit',
-    fileSlug: 'note.md',
+    entryKey: keyOf('note.md'),
     id: 'occ-1',
     metadata: { participants: [] },
     ...overrides,
@@ -47,8 +48,8 @@ describe('hasSameStructure', () => {
     expect(hasSameStructure([occ({ id: 'a' })], [occ({ id: 'b' })])).toBe(false)
   })
 
-  it('detects fileSlug changes', () => {
-    expect(hasSameStructure([occ({ fileSlug: 'a.md' })], [occ({ fileSlug: 'b.md' })])).toBe(false)
+  it('detects entryKey changes', () => {
+    expect(hasSameStructure([occ({ entryKey: keyOf('a.md') })], [occ({ entryKey: keyOf('b.md') })])).toBe(false)
   })
 
   it('detects date changes', () => {
@@ -127,13 +128,14 @@ describe('computeExpansionCache', () => {
   const from = new Date('2026-05-25T00:00:00Z')
   const to = new Date('2026-06-08T00:00:00Z')
 
+  /** Roots keyed the way the store keys them, with the provenance a parse supplies. */
   function rootsOf(entries: [string, { title: string; tags: string[]; items: string[] }][]): Roots {
-    return new Map(entries)
+    return new Map(entries.map(([slug, meta]) => [keyOf(slug), { ...meta, vaultId: TEST_VAULT, fileSlug: slug }]))
   }
 
   it('overlays a changed file title onto cached occurrences without re-expanding, leaving other files untouched', () => {
-    const a = occ({ id: 'a', fileSlug: 'note-a.md', date: '2026-06-01' })
-    const b = occ({ id: 'b', fileSlug: 'note-b.md', date: '2026-06-02' })
+    const a = occ({ id: 'a', entryKey: keyOf('note-a.md'), date: '2026-06-01' })
+    const b = occ({ id: 'b', entryKey: keyOf('note-b.md'), date: '2026-06-02' })
     const items = [a, b]
     const roots1 = rootsOf([
       ['note-a.md', { title: 'Old Title', tags: [], items: [] }],
@@ -146,7 +148,7 @@ describe('computeExpansionCache', () => {
     // Simulate editing note-a's title: storeOps.updateRoot allocates a fresh
     // map and a fresh entry for the edited slug only (see updateRoot).
     const roots2 = new Map(roots1)
-    roots2.set('note-a.md', { title: 'New Title', tags: [], items: [] })
+    roots2.set(keyOf('note-a.md'), { title: 'New Title', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'note-a.md' })
 
     const second = computeExpansionCache(first, items, roots2, from, to)
 
@@ -157,7 +159,7 @@ describe('computeExpansionCache', () => {
   })
 
   it('returns the same allOccs reference when neither items nor roots entries changed', () => {
-    const a = occ({ id: 'a', fileSlug: 'note-a.md', date: '2026-06-01' })
+    const a = occ({ id: 'a', entryKey: keyOf('note-a.md'), date: '2026-06-01' })
     const items = [a]
     const roots1 = rootsOf([['note-a.md', { title: 'Title', tags: [], items: [] }]])
 

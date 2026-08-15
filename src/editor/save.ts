@@ -1,34 +1,41 @@
 import { startOfToday } from 'date-fns'
-import { fmtISO, applyEdit, newEntrySlug, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByFileSlug, deleteFollowing, fileSlugItems, findSeries } from '@/model'
+import { fmtISO, applyEdit, newEntryKey, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
-import { getSnapshot, getItems, getRoots, getUnreadableFiles } from '@/storeBridge'
+import { getSnapshot, getItems, getRoots, getUnreadableFiles, getActiveVaultId } from '@/storeBridge'
+import { keyVaultId } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 import { commitNext, commitDelete } from '@/storeCommit'
 import type { EntryState, ItemType } from './state'
 
 // ── BACKLINK HELPERS ──────────────────────────────────────────
 
-/** Add `[[sourceSlug]]` to targetSlug's items list if not already present. */
-export function addItemLink(targetSlug: string, sourceSlug: string): void {
+// `target` is an EntryKey (which file's `items:` list is edited) but `sourceSlug`
+// is a BARE slug — it is written into that file as `[[sourceSlug]]`, and a file
+// never carries a vault id. The two halves are deliberately different types here;
+// before `EntryKey` was branded, passing one where the other belonged compiled.
+
+/** Add `[[sourceSlug]]` to `target`'s items list if not already present. */
+export function addItemLink(target: EntryKey, sourceSlug: string): void {
   const roots = getRoots()
-  const file = roots.get(targetSlug)
+  const file = roots.get(target)
   if (!file) return
   const stored = `[[${sourceSlug}]]`
   if (file.items.includes(stored)) return
   const newRoots = new Map(roots)
-  newRoots.set(targetSlug, { ...file, items: [...file.items, stored] })
-  commitNext({ items: getItems(), roots: newRoots }, [targetSlug])
+  newRoots.set(target, { ...file, items: [...file.items, stored] })
+  commitNext({ items: getItems(), roots: newRoots }, [target])
 }
 
-/** Remove `[[sourceSlug]]` from targetSlug's items list. */
-export function removeItemLink(targetSlug: string, sourceSlug: string): void {
+/** Remove `[[sourceSlug]]` from `target`'s items list. */
+export function removeItemLink(target: EntryKey, sourceSlug: string): void {
   const roots = getRoots()
-  const file = roots.get(targetSlug)
+  const file = roots.get(target)
   if (!file) return
   const stored = `[[${sourceSlug}]]`
   const newRoots = new Map(roots)
-  newRoots.set(targetSlug, { ...file, items: file.items.filter(i => i !== stored) })
-  commitNext({ items: getItems(), roots: newRoots }, [targetSlug])
+  newRoots.set(target, { ...file, items: file.items.filter(i => i !== stored) })
+  commitNext({ items: getItems(), roots: newRoots }, [target])
 }
 
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
@@ -96,8 +103,8 @@ export function entryFromOccurrence(
 
 type SaveFields = EntryState & { body: string }
 
-/** The slug of the file that was written, or null when nothing was (empty title). */
-export type SaveResult = string | null
+/** The key of the file that was written, or null when nothing was (empty title). */
+export type SaveResult = EntryKey | null
 
 /**
  * Persist an editor save.
@@ -106,20 +113,27 @@ export type SaveResult = string | null
  * second create-scoped save for the same draft upserts onto the file the first
  * one made instead of creating another — see `applyNew`.
  *
- * Returns the slug actually written rather than letting callers recompute
- * `titleToSlug(title)`: a new entry whose title slugifies onto a slug some other
- * file already owns — or one that belongs to a file that failed to parse and so
- * has no root of its own — is placed on a free one, so the two no longer agree.
+ * An existing item keeps its own vault (it rides inside its key); a new one goes
+ * to whichever vault is currently loaded. Returns the key actually written
+ * rather than letting callers recompute `titleToSlug(title)`: a new entry whose
+ * title slugifies onto a slug some other file in that vault already owns — or
+ * one that belongs to a file that failed to parse and so has no root of its
+ * own — is placed on a free one, so the two no longer agree.
  */
 export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields, draftId?: string): SaveResult {
   const { title } = fields
   if (!title) return null
 
-  // unreadableSlugs makes newEntrySlug/applyNew treat a file that failed to
+  const vaultId = item ? keyVaultId(item.entryKey) : getActiveVaultId()
+  // No vault loaded at all — there is nowhere to put a new entry, and inventing
+  // a target would create an unreachable root under a vault id nothing owns.
+  if (!vaultId) return null
+
+  // unreadableKeys makes newEntryKey/applyNew treat a file that failed to
   // parse as occupied even though it has no root: without this, a new entry
   // whose title slugifies onto that slug would look free and silently
   // overwrite the file on write — see reportParseFailures in storage/sync.ts.
-  const snapshot = { ...getSnapshot(), unreadableSlugs: new Set(getUnreadableFiles().keys()) }
+  const snapshot = { ...getSnapshot(), unreadableKeys: new Set(getUnreadableFiles().keys()) }
   const nextData = applyEdit(snapshot, item, editScope, {
     title,
     tags:         fields.tags,
@@ -132,13 +146,12 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
     scheduled:    fields.scheduled    ?? null,
     duration:     fields.duration,
     repeat:       fields.repeat       ?? null,
-  }, draftId)
-  // Same snapshot and same draftId as the applyEdit above, so this is exactly
-  // the slug applyNew allocated for it.
-  const fileSlug = item?.fileSlug ?? newEntrySlug(snapshot, title, draftId)
-  if (!fileSlug) return null   // nothing to write to; newEntrySlug never yields this
-  commitNext(nextData, [fileSlug])
-  return fileSlug
+  }, { vaultId, draftId })
+  // Same snapshot, vault and draftId as the applyEdit above, so this is exactly
+  // the key applyNew allocated for it.
+  const entryKey = item?.entryKey ?? newEntryKey(snapshot, vaultId, title, draftId)
+  commitNext(nextData, [entryKey])
+  return entryKey
 }
 
 export function deleteNode(
@@ -151,7 +164,7 @@ export function deleteNode(
   if (!item) return
   const items     = getItems()
   const series    = findSeries(items, item)
-  const slugItems = fileSlugItems(items, item.fileSlug)
+  const slugItems = entryKeyItems(items, item.entryKey)
   const isSelf      = (i: StoreItem) => i.id === item.id
   const hasSiblings = slugItems.some(i => !isSeries(i) && !isSelf(i) && !i.excluded)
   const isRecurring = !!item.ownerId
@@ -163,26 +176,26 @@ export function deleteNode(
   function excludeThis() {
     if (!item) return
     const next = excludeOccurrence(getSnapshot(), item)
-    commitNext(next, [item.fileSlug])
+    commitNext(next, [item.entryKey])
     hideSheet(); navigateBack()
   }
   function deleteAll() {
     if (!item) return
-    const { data: next, affectedSlugs } = deleteByFileSlug(getSnapshot(), item.fileSlug)
-    commitDelete(next, item.fileSlug, affectedSlugs)
+    const { data: next, affectedKeys } = deleteByEntryKey(getSnapshot(), item.entryKey)
+    commitDelete(next, item.entryKey, affectedKeys)
     hideSheet(); navigateBack()
   }
   function deleteFuture() {
     if (!item) return
     const next = deleteFollowing(getSnapshot(), item)
-    commitNext(next, [item.fileSlug])
+    commitNext(next, [item.entryKey])
     hideSheet(); navigateBack()
   }
 
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
-      const { data: next, affectedSlugs } = deleteByFileSlug(getSnapshot(), item.fileSlug)
-      commitDelete(next, item.fileSlug, affectedSlugs)
+      const { data: next, affectedKeys } = deleteByEntryKey(getSnapshot(), item.entryKey)
+      commitDelete(next, item.entryKey, affectedKeys)
       navigateBack()
     }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }

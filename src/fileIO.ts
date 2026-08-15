@@ -121,3 +121,72 @@ export function pathToSlug(path: string): string {
 export function slugToPath(slug: string): string {
   return slug + '.md'
 }
+
+// ── Entry key ─────────────────────────────────────────────────
+//
+// An entry's identity is `(vault, slug)`. `Roots` is a Map and JS Maps compare
+// object keys by reference, so a tuple can never be a lookup key — hence a
+// composite string. It lives here, beside pathToSlug/slugToPath, because this
+// module already owns the path↔slug mapping and is a root resident `model/`
+// may import (architecture invariant 1).
+
+declare const EntryKeyBrand: unique symbol
+
+/**
+ * In-memory identity of an entry: `${vaultId}::${fileSlug}`. Branded so a bare
+ * string cannot be passed where a key is required — the bare-slug-vs-key mix-up
+ * is a compile error, not a runtime bug. Never written to a file; files and URLs
+ * carry the two halves separately. Mirrors the Dexie cache's own
+ * `vp(vaultId, path)` composite key.
+ */
+export type EntryKey = string & { readonly [EntryKeyBrand]: true }
+
+/**
+ * The separator. Two colons rather than one because a vault id is a slug or a
+ * UUID (neither can contain `:`) while a file slug is a vault-relative path
+ * that theoretically can — so the FIRST occurrence always ends the vault id,
+ * and everything after it is the slug verbatim. `parseEntryKey` relies on that.
+ */
+const KEY_SEP = '::'
+
+export function entryKey(vaultId: string, fileSlug: string): EntryKey {
+  return (vaultId + KEY_SEP + fileSlug) as EntryKey
+}
+
+/**
+ * Split a key back into its halves. A string with no separator is treated as a
+ * bare slug in an unknown vault (`vaultId: ''`) rather than throwing: keys reach
+ * this from localStorage and URLs, where a value written by an older build can
+ * still turn up. Callers that care use the empty vaultId as the "unmigrated"
+ * signal — see `store.ts`'s favourites migration.
+ */
+export function parseEntryKey(key: EntryKey): { vaultId: string; fileSlug: string } {
+  const i = key.indexOf(KEY_SEP)
+  if (i === -1) return { vaultId: '', fileSlug: key }
+  return { vaultId: key.slice(0, i), fileSlug: key.slice(i + KEY_SEP.length) }
+}
+
+/** Which vault the entry belongs to. */
+export function keyVaultId(key: EntryKey): string {
+  return parseEntryKey(key).vaultId
+}
+
+/** The bare, file-level slug — what `[[wikilinks]]` and the URL carry. */
+export function keySlug(key: EntryKey): string {
+  return parseEntryKey(key).fileSlug
+}
+
+/** True when `s` already carries a vault half. Used by the one-time migrations. */
+export function isEntryKey(s: string): s is EntryKey {
+  return s.includes(KEY_SEP)
+}
+
+/** Vault path → key, for the vault that path was read from. */
+export function pathToKey(vaultId: string, path: string): EntryKey {
+  return entryKey(vaultId, pathToSlug(path))
+}
+
+/** Key → the path inside its own vault. Drops the vault half. */
+export function keyToPath(key: EntryKey): string {
+  return slugToPath(keySlug(key))
+}

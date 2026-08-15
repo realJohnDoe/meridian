@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import type * as ReactRouter from '@tanstack/react-router'
 import { useStore } from '@/store'
-import { setupStore, seedStore, installFakePersistence, makeOcc, makeRoots } from '@/test-utils'
+import { setupStore, seedStore, installFakePersistence, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import type { Occurrence } from '@/types'
 import { useEntryEditor } from './useEntryEditor'
 import EntryEditor from './EntryEditor'
@@ -40,12 +40,12 @@ afterEach(() => {
 
 function Harness({ occ }: { occ: Occurrence }) {
   const hooks = useEntryEditor(occ)
-  return <EntryEditor hooks={hooks} items={[occ]} roots={makeRoots(occ.fileSlug)} />
+  return <EntryEditor hooks={hooks} items={[occ]} roots={makeRoots(occ.entryKey)} />
 }
 
 describe('EntryEditor', () => {
   it('autosaves a body edit after the debounce and persists a checkbox toggle immediately', () => {
-    const occ = makeOcc({ id: 'occ-1', fileSlug: 'note.md', metadata: { participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))
     render(<Harness occ={occ} />)
 
@@ -54,12 +54,12 @@ describe('EntryEditor', () => {
 
     act(() => { vi.advanceTimersByTime(1500) })
 
-    expect(persistence.writes).toEqual(['note.md'])
-    expect(useStore.getState().roots.get('note.md')?.body).toBe('new body text')
+    expect(persistence.writes).toEqual([testKey('note.md')])
+    expect(useStore.getState().roots.get(testKey('note.md'))?.body).toBe('new body text')
 
     fireEvent.click(screen.getByRole('checkbox'))
 
-    expect(persistence.writes).toEqual(['note.md', 'note.md'])
+    expect(persistence.writes).toEqual([testKey('note.md'), testKey('note.md')])
     const saved = useStore.getState().items.find(i => i.id === 'occ-1') as { metadata: { done?: boolean } } | undefined
     expect(saved?.metadata.done).toBe(true)
   })

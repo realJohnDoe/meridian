@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import OccurrenceList from './OccurrenceList'
-import { setupStore, makeOcc } from '@/test-utils'
+import { setupStore, makeOcc, TEST_VAULT } from '@/test-utils'
 import type { Occurrence } from '@/types'
 
 setupStore()
@@ -55,7 +55,7 @@ function undatedTask(i: number, done = false): Occurrence {
   return makeOcc({
     id: `task-${i}`,
     time: null,
-    metadata: { participants: [], title: `Task ${i}`, tags: [], items: [], done },
+    metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: `Task ${i}`, tags: [], items: [], done },
   })
 }
 
@@ -64,22 +64,22 @@ const renderedCards = () => screen.getAllByRole('button').filter(el => el.getAtt
 
 describe('OccurrenceList', () => {
   it('shows active items immediately', () => {
-    const occ = makeOcc({ metadata: { participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
     render(<OccurrenceList {...baseProps([occ])} />)
 
     expect(screen.getByText('Open task')).toBeInTheDocument()
   })
 
   it('omits the Done section entirely when there are no done items', () => {
-    const occ = makeOcc({ metadata: { participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
     render(<OccurrenceList {...baseProps([occ])} />)
 
     expect(screen.queryByText(/^Done ·/)).not.toBeInTheDocument()
   })
 
   it('hides done items behind a collapsed Done section, revealed on click', () => {
-    const open = makeOcc({ id: 'a', metadata: { participants: [], title: 'Open task', tags: [], items: [], done: false } })
-    const done = makeOcc({ id: 'b', metadata: { participants: [], title: 'Finished task', tags: [], items: [], done: true } })
+    const open = makeOcc({ id: 'a', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const done = makeOcc({ id: 'b', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Finished task', tags: [], items: [], done: true } })
     render(<OccurrenceList {...baseProps([open, done])} />)
 
     expect(screen.getByText('Open task')).toBeInTheDocument()
@@ -93,7 +93,7 @@ describe('OccurrenceList', () => {
 
   it('calls onToggleDone when a row checkbox is clicked', () => {
     const onToggleDone = vi.fn()
-    const occ = makeOcc({ metadata: { participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
     render(<OccurrenceList {...baseProps([occ])} onToggleDone={onToggleDone} />)
 
     fireEvent.click(screen.getByRole('checkbox'))
@@ -132,8 +132,8 @@ describe('OccurrenceList', () => {
   })
 
   it('marks the Done toggle expanded only while it is open', () => {
-    const open = makeOcc({ id: 'a', metadata: { participants: [], title: 'Open task', tags: [], items: [], done: false } })
-    const done = makeOcc({ id: 'b', metadata: { participants: [], title: 'Finished task', tags: [], items: [], done: true } })
+    const open = makeOcc({ id: 'a', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const done = makeOcc({ id: 'b', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Finished task', tags: [], items: [], done: true } })
     render(<OccurrenceList {...baseProps([open, done])} />)
 
     const toggle = screen.getByRole('button', { expanded: false })

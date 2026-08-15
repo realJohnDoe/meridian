@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { expandRange } from '@/model/expansion'
 import { parseToStoreItems } from '@/model/storeItems'
 import type { Roots } from '@/types'
+import { rootsOf, TEST_VAULT } from './helpers'
 
 describe('expandRange "count" end', () => {
   it('a count-bounded series yields the same occurrences regardless of the query window', () => {
@@ -21,8 +22,9 @@ describe('expandRange "count" end', () => {
         '    occurrences: 3',
         '---',
       ].join('\n'),
+      TEST_VAULT,
     )
-    const roots: Roots = new Map([['s', p.root]])
+    const roots: Roots = rootsOf(p.root)
     const all = expandRange(
       p.items,
       roots,

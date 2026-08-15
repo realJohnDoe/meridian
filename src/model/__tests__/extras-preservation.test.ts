@@ -11,13 +11,13 @@
 import { describe, it, expect } from 'vitest'
 import * as storeOps from '@/model/storeOps'
 import type { StoreData, EditFields } from '@/model/storeOps'
-import { parseFixture } from './helpers'
+import { parseFixture, rootsOf, NEW_TARGET, keyOf } from './helpers'
 import { expandRange } from '@/model/expansion'
 import type { Occurrence, Roots, StoreItem } from '@/types'
 
 function fixtureData(name: string): StoreData {
   const parsed = parseFixture(name)
-  return { items: parsed.items, roots: new Map([[name, parsed.root]]) }
+  return { items: parsed.items, roots: rootsOf(parsed.root) }
 }
 
 function occOn(items: StoreItem[], roots: Roots, dateISO: string): Occurrence {
@@ -86,17 +86,17 @@ const ANCHOR = '2026-04-06'
 
 const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
   'applyEdit/all': d => storeOps.applyEdit(d, occOn(d.items, d.roots, ANCHOR), 'all',
-    editFields(occOn(d.items, d.roots, ANCHOR), { duration: '45m' })),
+    editFields(occOn(d.items, d.roots, ANCHOR), { duration: '45m' }), NEW_TARGET),
   'applyEdit/single': d => storeOps.applyEdit(d, occOn(d.items, d.roots, DIVERGING), 'single',
-    editFields(occOn(d.items, d.roots, DIVERGING), { priority: 'high' })),
+    editFields(occOn(d.items, d.roots, DIVERGING), { priority: 'high' }), NEW_TARGET),
   'applyEdit/single-generated': d => storeOps.applyEdit(d, occOn(d.items, d.roots, GENERATED), 'single',
-    editFields(occOn(d.items, d.roots, GENERATED), { priority: 'high' })),
+    editFields(occOn(d.items, d.roots, GENERATED), { priority: 'high' }), NEW_TARGET),
   'applyEdit/future': d => storeOps.applyEdit(d, occOn(d.items, d.roots, GENERATED), 'future',
-    editFields(occOn(d.items, d.roots, GENERATED), { duration: '15m' })),
+    editFields(occOn(d.items, d.roots, GENERATED), { duration: '15m' }), NEW_TARGET),
   'applyEdit/add': d => storeOps.applyEdit(d, occOn(d.items, d.roots, ANCHOR), 'add',
-    editFields(occOn(d.items, d.roots, ANCHOR), { scheduled: { date: '2026-08-03', time: '' } })),
+    editFields(occOn(d.items, d.roots, ANCHOR), { scheduled: { date: '2026-08-03', time: '' } }), NEW_TARGET),
   'applyEdit/new': d => storeOps.applyEdit(d, null, 'all',
-    editFields(occOn(d.items, d.roots, ANCHOR), { title: 'A brand new entry' })),
+    editFields(occOn(d.items, d.roots, ANCHOR), { title: 'A brand new entry' }), NEW_TARGET),
   // Patched with the SERIES' metadata, which is what applySingle does — the
   // shape that can clobber the target's own bag.
   upsertOverride: d => ({
@@ -111,7 +111,7 @@ const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
   deleteFollowing: d => storeOps.deleteFollowing(d, occOn(d.items, d.roots, GENERATED)),
   // Removes its target file by design; the property still holds for every file
   // it does not touch, which is what this case pins down.
-  deleteByFileSlug: d => storeOps.deleteByFileSlug(d, 'some-other-file').data,
+  deleteByEntryKey: d => storeOps.deleteByEntryKey(d, keyOf('some-other-file')).data,
 }
 
 /**
@@ -119,12 +119,12 @@ const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
  * here and not in OPERATIONS trips the coverage guard below.
  */
 const EXEMPT: Record<string, string> = {
-  fileSlugItems: 'pure filter over items — returns existing objects untouched',
+  entryKeyItems: 'pure filter over items — returns existing objects untouched',
   findSeries: 'pure lookup — returns an existing object untouched',
   seriesContext: 'read-only derivation — returns booleans plus an existing repeat spec',
   deletionEndsAfterCompletionSeries: 'predicate — returns a boolean',
   occFromAppMeta: 'metadata constructor, covered by its own test below',
-  newEntrySlug: 'pure slug allocation — returns a string, never touches metadata',
+  newEntryKey: 'pure key allocation — returns a string, never touches metadata',
 }
 
 describe('unknown keys survive every store operation', () => {

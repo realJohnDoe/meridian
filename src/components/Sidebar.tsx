@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
   useSidebar,
 } from './ui/sidebar'
-import { slugRoute } from '@/routes'
+import { keyRoute } from '@/routes'
 
 // Lazy: pulls in the settings UI plus the add-vault wizard, which isn't
 // needed on the agenda's cold-start critical path — deferred until Settings
@@ -151,20 +151,21 @@ export default function AppSidebar() {
                   the <ul> rather than wrap its contents. */}
               <FlipList items={favorites} itemAttr="data-fav-key" animateHeight>
                 <SidebarMenu>
-                  {favorites.map((slug, idx) => {
-                    const title = roots.get(slug)?.title ?? slug
+                  {favorites.map((key, idx) => {
+                    const meta = roots.get(key)
+                    const title = meta?.title ?? meta?.fileSlug ?? key
                     return (
-                      <SidebarMenuItem key={slug} data-fav-key={slug}>
+                      <SidebarMenuItem key={key} data-fav-key={key}>
                         {editingFavorites ? (
                           <div className="flex items-center gap-1 px-5 py-3 text-sm font-medium text-sidebar-foreground/60">
                             <span className="flex-1 truncate">{title}</span>
                             <IconButton hit="pad" label="Move up" title="Move up" disabled={idx === 0} onClick={() => reorderFavorites(idx, idx - 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronUp size={13} /></IconButton>
                             <IconButton hit="pad" label="Move down" title="Move down" disabled={idx === favorites.length - 1} onClick={() => reorderFavorites(idx, idx + 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronDown size={13} /></IconButton>
-                            <IconButton hit="pad" label="Remove from favorites" title="Remove from favorites" onClick={() => toggleFavorite(slug)} className="hover:text-destructive"><X size={13} /></IconButton>
+                            <IconButton hit="pad" label="Remove from favorites" title="Remove from favorites" onClick={() => toggleFavorite(key)} className="hover:text-destructive"><X size={13} /></IconButton>
                           </div>
                         ) : (
                           <SidebarMenuButton
-                            onClick={() => { close(); void navigate(slugRoute(slug)) }}
+                            onClick={() => { close(); void navigate(keyRoute(key)) }}
                             className="px-5 h-auto py-3 text-sm font-medium rounded-none"
                           >
                             <span className="truncate">{title}</span>

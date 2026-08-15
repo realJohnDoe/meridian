@@ -24,6 +24,20 @@ export const rootsField = StateField.define<Roots>({
   },
 })
 
+/**
+ * The vault the document being edited belongs to. Needed because a `[[slug]]`
+ * resolves only inside its own vault — without it the decorations would light
+ * up a link against an identically-slugged file in some other vault.
+ */
+export const setVaultIdEffect = StateEffect.define<string | null>()
+export const vaultIdField = StateField.define<string | null>({
+  create: () => null,
+  update(value, tr) {
+    for (const e of tr.effects) if (e.is(setVaultIdEffect)) return e.value
+    return value
+  },
+})
+
 export const setItemsEffect = StateEffect.define<StoreItem[]>()
 export const itemsField = StateField.define<StoreItem[]>({
   create: () => [],
@@ -87,6 +101,7 @@ export function build(
   const builder = new RangeSetBuilder<Decoration>()
   const { doc } = view.state
   const roots = view.state.field(rootsField)
+  const vaultId = view.state.field(vaultIdField)
   const cursorLines = focusedCursorLines(view)
 
   for (const { from, to } of visibleLineRanges(view)) {
@@ -95,16 +110,16 @@ export function build(
       const start = from + wl.start
       const end = from + wl.end
       const isCursor = cursorLines.has(doc.lineAt(start).number)
-      const fileSlug = resolveWikilink(wl.ref, roots)
-      const title = fileSlug ? (roots.get(fileSlug)?.title ?? wl.ref) : wl.ref
+      const target = vaultId ? resolveWikilink(wl.ref, roots, vaultId) : undefined
+      const title = target ? (roots.get(target)?.title ?? wl.ref) : wl.ref
       const displayLabel = wl.label ?? title
 
       if (isCursor) {
         builder.add(
           start, end,
-          Decoration.mark({ class: fileSlug ? 'wl' : 'wl-broken', attributes: { 'data-ref': wl.ref } }),
+          Decoration.mark({ class: target ? 'wl' : 'wl-broken', attributes: { 'data-ref': wl.ref } }),
         )
-      } else if (fileSlug) {
+      } else if (target) {
         builder.add(
           start, end,
           Decoration.replace({ widget: new ChipWidget(displayLabel, true, wl.ref, () => onOpenRef.current(wl.ref)) }),
@@ -125,8 +140,9 @@ export function build(
 
 /**
  * Creates the wikilink decoration ViewPlugin.
- * `rootsField` and `itemsField` must be registered separately in the editor
- * (via `.init()`) so their initial values are set before this plugin runs.
+ * `rootsField`, `vaultIdField` and `itemsField` must be registered separately
+ * in the editor (via `.init()`) so their initial values are set before this
+ * plugin runs.
  *
  * Pass a stable ref — the plugin reads `onOpenRef.current` at interaction time
  * so the callback can change without remounting the editor.
@@ -145,7 +161,7 @@ export function createWikilinkExtension(
           update.viewportChanged ||
           update.focusChanged ||
           update.transactions.some(tr =>
-            tr.effects.some(e => e.is(setRootsEffect)),
+            tr.effects.some(e => e.is(setRootsEffect) || e.is(setVaultIdEffect)),
           )
         if (needsRebuild) this.decorations = build(update.view, onOpenRef)
       }

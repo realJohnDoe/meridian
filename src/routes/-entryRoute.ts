@@ -1,5 +1,7 @@
 import type { Occurrence, EditScope } from '@/types'
 import type { NewEntrySeed } from '@/editor'
+import { parseEntryKey } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 
 export function newEntryRoute(title?: string, seed?: NewEntrySeed) {
   return {
@@ -14,18 +16,25 @@ export function newEntryRoute(title?: string, seed?: NewEntrySeed) {
   }
 }
 
+// The URL carries the two halves of an EntryKey separately — `/entry/<vault>/<slug>` —
+// rather than the composite string: the separator is not path-safe, and the two
+// segments read as what they are. `parseEntryKey` is the only place the split
+// happens, here as everywhere else.
+
 export function entryRoute(occ: Occurrence, scope?: EditScope) {
+  const { vaultId, fileSlug } = parseEntryKey(occ.entryKey)
   return {
-    to: '/entry/$slug' as const,
-    params: { slug: occ.fileSlug },
+    to: '/entry/$vault/$slug' as const,
+    params: { vault: vaultId, slug: fileSlug },
     search: { date: occ.date, scope: scope ?? 'single' },
   }
 }
 
-export function slugRoute(fileSlug: string) {
+export function keyRoute(entryKey: EntryKey) {
+  const { vaultId, fileSlug } = parseEntryKey(entryKey)
   return {
-    to: '/entry/$slug' as const,
-    params: { slug: fileSlug },
+    to: '/entry/$vault/$slug' as const,
+    params: { vault: vaultId, slug: fileSlug },
     search: {} as { date?: string; scope?: EditScope },
   }
 }

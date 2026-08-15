@@ -61,7 +61,7 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
     )
     return ranked.map(entry => ({
       entry,
-      listedOn: (backlinks.get(entry.fileSlug) ?? []).map(slug => roots.get(slug)?.title ?? slug),
+      listedOn: (backlinks.get(entry.entryKey) ?? []).map(key => roots.get(key)?.title ?? key),
     }))
   }, [roots, backlinks, debouncedQuery])
 
@@ -69,7 +69,7 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
     count: results.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ROW_H,
-    getItemKey: i => results[i]!.entry.fileSlug,  // count === results.length
+    getItemKey: i => results[i]!.entry.entryKey,  // count === results.length
     overscan: 8,
   })
 
@@ -88,7 +88,7 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
         {virtualItems.map(vi => {
           const { entry, listedOn } = results[vi.index]!
-          const occ = occBySlug.get(entry.fileSlug)
+          const occ = occBySlug.get(entry.entryKey)
           if (!occ) return null
           return (
             <div

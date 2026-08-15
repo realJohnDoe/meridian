@@ -3,7 +3,7 @@ import { createRef } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import SearchResults from './SearchResults'
-import { setupStore, seedStore, makeOcc, makeRoots } from '@/test-utils'
+import { setupStore, seedStore, makeOcc, makeRoots, testKey } from '@/test-utils'
 
 setupStore()
 
@@ -67,7 +67,7 @@ describe('SearchResults', () => {
   })
 
   it('renders matching file results from the nested FileResultsList', () => {
-    const occ = makeOcc({ fileSlug: 'note.md' })
+    const occ = makeOcc({ entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md', { title: 'Standup' }))
     const { type } = renderResults()
 
@@ -78,7 +78,7 @@ describe('SearchResults', () => {
   })
 
   it('calls onOpen with the occurrence when a result is clicked', () => {
-    const occ = makeOcc({ fileSlug: 'note.md' })
+    const occ = makeOcc({ entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md', { title: 'Standup' }))
     const { type, onOpen } = renderResults()
 
@@ -86,6 +86,6 @@ describe('SearchResults', () => {
     flushDebounce()
     fireEvent.click(screen.getByRole('button', { name: 'Standup' }))
 
-    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ fileSlug: 'note.md' }))
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('note.md') }))
   })
 })
