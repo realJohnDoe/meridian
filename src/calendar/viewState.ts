@@ -203,6 +203,23 @@ export function requestScrollToToday(): void {
   requestScrollToDate(fmtISO(startOfToday()))
 }
 
+/**
+ * Flags AgendaView to re-scroll to whatever day is already on screen —
+ * `currentDate` is kept in sync with the agenda's own scroll position (see
+ * markAgendaScrolled/setAgendaTopDate), so this re-affirms the current view
+ * rather than jumping anywhere.
+ *
+ * For use when something *other* than the user's own scrolling changed the
+ * row list out from under a stable pixel offset — a vault's content landing
+ * after the agenda's first paint (see storage's `VaultChange.contentAddedLate`)
+ * or the calendar filter changing (see AgendaView) — both of which can
+ * add/remove a large block of rows above the current view with nothing to
+ * correct the raw scroll offset otherwise.
+ */
+export function requestScrollToCurrentDate(): void {
+  requestScrollToDate(calendarView.getState().currentDate)
+}
+
 export function setAgendaTopDate(key: string): void {
   calendarView.setState({ agendaTopDate: key, currentDate: key })
 }

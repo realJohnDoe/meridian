@@ -9,5 +9,6 @@ export { NO_PARTICIPANT, hideParticipants, hideVaults } from './useCalendarFilte
 export { weekStartFor } from './weekRange'
 export {
   resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useWeekPreview, useAgendaTopDate, requestScrollToToday,
-  requestScrollToDate, useCurrentDate, setCurrentDate, setCurrentMonthKeepingDay, setCurrentWeekKeepingWeekday,
+  requestScrollToDate, requestScrollToCurrentDate, useCurrentDate, setCurrentDate, setCurrentMonthKeepingDay,
+  setCurrentWeekKeepingWeekday,
 } from './viewState'
