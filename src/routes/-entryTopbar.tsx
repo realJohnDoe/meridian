@@ -11,12 +11,14 @@ interface Props {
   isFavorited: boolean
   /** null disables the button — there's nothing yet for a favorite to attach to (no title). */
   onToggleFavorite: (() => void) | null
-  onDelete: () => void
+  onDelete?: () => void
   onBack: () => void
+  /** Hides the delete button — set for a `view-only` vault, where there's no source to delete from. */
+  hideDelete?: boolean
 }
 
 /** Shared topbar for both the new-entry and edit-entry routes. */
-export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack }: Props) {
+export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack, hideDelete }: Props) {
   const slotEl = useTopbarSlot()
   const { isMobile } = useSidebar()
   if (!slotEl) return null
@@ -39,9 +41,11 @@ export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack }:
       >
         <Heart size={18} className={isFavorited ? 'fill-current' : ''} />
       </IconButton>
-      <IconButton variant="ghost" className="text-destructive" onClick={onDelete} title="Delete" label="Delete">
-        <Trash2 size={18} />
-      </IconButton>
+      {!hideDelete && (
+        <IconButton variant="ghost" className="text-destructive" onClick={onDelete} title="Delete" label="Delete">
+          <Trash2 size={18} />
+        </IconButton>
+      )}
     </div>,
     slotEl,
   )
