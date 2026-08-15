@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTheme } from 'next-themes'
-import { Plus } from 'lucide-react'
+import { ChevronDown, Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
 import { setDefaultVault } from '@/vaultActions'
@@ -8,6 +8,8 @@ import { useResetOnChange } from '@/hooks'
 import {
   Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { Card } from '@/components/ui/card'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -16,6 +18,7 @@ import {
 } from '@/components/primitives/responsive-modal'
 import { AddVaultWizard } from '@/components/AddVaultWizard'
 import { VaultSettings } from '@/components/VaultSettings'
+import { VaultIcon } from '@/components/vaultIcon'
 
 type Step = 'vault' | 'adding'
 
@@ -63,7 +66,15 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
   // nothing, which is the whole point of splitting `activeVaultId` apart.
   const writableVaults = vaults.filter(v => v.kind !== 'example')
 
+  const currentThemeLabel = THEMES.find(t => t.id === activeTheme)?.label ?? 'System'
+
   const [step,            setStep]            = useState<Step>('vault')
+  // Collapsed by default: the theme grid is ten cards tall, and leaving it open
+  // pushed everything below it — including the whole per-vault region — off the
+  // first screen, which is what made the two regions impossible to perceive as
+  // two regions. Appearance is also a set-once preference, so it is the right
+  // thing to fold away behind the settings people actually come back to.
+  const [themeOpen,       setThemeOpen]       = useState(false)
   // Lazy-initialized because this component mounts already `open` (gated behind
   // `hasOpenedSettings` in Sidebar), so there's no false->true transition for
   // `useResetOnChange` below to react to on the first render.
@@ -112,91 +123,120 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
           <>
             <ResponsiveModalTitle>Settings</ResponsiveModalTitle>
 
-            <div className="flex flex-col gap-4 p-4">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-2xs font-bold tracking-[.07em] uppercase text-muted-foreground">
-                  General
-                </span>
-                <p className="text-xs text-muted-foreground">Applies to Meridian on this device.</p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <span className="text-sm font-medium">Appearance</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {THEMES.map(({ id, label, className }) => (
-                    <button
-                      key={id}
-                      onClick={() => setTheme(id)}
-                      className={cn(
-                        'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-left transition-colors bg-background text-foreground',
-                        className ?? systemClass,
-                        activeTheme === id ? 'border-primary' : 'border-border hover:border-muted-foreground',
-                      )}
-                    >
-                      {label}
-                      <span className="flex gap-1">
-                        {SWATCH_CLASSES.map(swatchClass => (
-                          <span
-                            key={swatchClass}
-                            className={cn('block size-2.5 rounded-full', swatchClass)}
-                          />
-                        ))}
-                      </span>
-                    </button>
-                  ))}
+            <div className="flex flex-col gap-5 p-4">
+              {/* ── General ─────────────────────────────────────────────
+                  Flat, uncontained content: these settings have no scope to
+                  state, so the page level *is* their scope. The per-vault
+                  region below is a card precisely because it does have one. */}
+              <section className="flex flex-col gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <h3 className="text-sm font-semibold text-foreground">General</h3>
+                  <p className="text-xs text-muted-foreground">Applies to Meridian on this device.</p>
                 </div>
-              </div>
 
-              {writableVaults.length > 0 && (
-                <div className="flex flex-col gap-2 pt-2 border-t border-border">
-                  <span className="text-sm font-medium">New entries go to</span>
-                  <p className="text-xs text-muted-foreground">
-                    The vault a new entry lands in unless you pick another one on the entry itself.
-                  </p>
-                  <Select
-                    value={defaultVaultId ?? ''}
-                    onValueChange={id => setDefaultVault(id)}
-                  >
-                    <SelectTrigger>
+                <Collapsible open={themeOpen} onOpenChange={setThemeOpen}>
+                  <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 text-left">
+                    <span className="text-xs font-medium text-foreground">Appearance</span>
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {currentThemeLabel}
+                      <ChevronDown className={cn('size-3.5 transition-transform', themeOpen && 'rotate-180')} />
+                    </span>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="grid grid-cols-2 gap-2 pt-2">
+                      {THEMES.map(({ id, label, className }) => (
+                        <button
+                          key={id}
+                          onClick={() => setTheme(id)}
+                          className={cn(
+                            'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-left transition-colors bg-background text-foreground',
+                            className ?? systemClass,
+                            activeTheme === id ? 'border-primary' : 'border-border hover:border-muted-foreground',
+                          )}
+                        >
+                          {label}
+                          <span className="flex gap-1">
+                            {SWATCH_CLASSES.map(swatchClass => (
+                              <span
+                                key={swatchClass}
+                                className={cn('block size-2.5 rounded-full', swatchClass)}
+                              />
+                            ))}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+
+                {writableVaults.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-foreground">New entries go to</span>
+                      <Select
+                        value={defaultVaultId ?? ''}
+                        onValueChange={id => setDefaultVault(id)}
+                      >
+                        <SelectTrigger className="w-auto max-w-[55%]">
+                          <SelectValue placeholder="Select vault…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {writableVaults.map(v => (
+                            <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      The vault a new entry lands in unless you pick another one on the entry itself.
+                    </p>
+                  </div>
+                )}
+              </section>
+
+              {/* ── Vaults ──────────────────────────────────────────────
+                  A card, not a caption. The picker is the card's header, so
+                  "which vault do these settings belong to?" is answered by
+                  containment rather than by reading — and the two vault
+                  dropdowns stop looking like the same control, because one is
+                  now a row in a form and the other is the lid of a box. */}
+              <section className="flex flex-col gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <h3 className="text-sm font-semibold text-foreground">Vaults</h3>
+                  <p className="text-xs text-muted-foreground">Settings for the selected vault only.</p>
+                </div>
+
+                <Card className="overflow-hidden">
+                  <Select value={selectedVaultId ?? ''} onValueChange={handleVaultSelect}>
+                    <SelectTrigger className="h-auto w-full rounded-none border-0 border-b border-border/60 bg-muted/40 px-4 py-3 text-sm text-foreground">
                       <SelectValue placeholder="Select vault…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {writableVaults.map(v => (
-                        <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                      {vaults.map(v => (
+                        <SelectItem key={v.id} value={v.id}>
+                          <span className="flex items-center gap-2">
+                            <VaultIcon kind={v.kind} className="size-3.5 stroke-[1.7] shrink-0 text-muted-foreground" />
+                            {v.name}
+                          </span>
+                        </SelectItem>
                       ))}
+                      <SelectSeparator />
+                      <SelectItem value="__add__">
+                        <span className="flex items-center gap-1.5">
+                          <Plus className="size-3.5 stroke-[1.7]" />
+                          Add new vault…
+                        </span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-              )}
 
-              <div className="flex flex-col gap-0.5 pt-4 mt-1 border-t border-border">
-                <span className="text-2xs font-bold tracking-[.07em] uppercase text-muted-foreground">
-                  Vaults
-                </span>
-                <p className="text-xs text-muted-foreground">Settings for the selected vault only.</p>
-              </div>
-
-              <Select value={selectedVaultId ?? ''} onValueChange={handleVaultSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select vault…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {vaults.map(v => (
-                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                  ))}
-                  <SelectSeparator />
-                  <SelectItem value="__add__">
-                    <span className="flex items-center gap-1.5">
-                      <Plus className="size-3.5 stroke-[1.7]" />
-                      Add new vault…
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-
-              {selectedVault && (
-                <VaultSettings key={selectedVault.id} vault={selectedVault} />
-              )}
+                  {selectedVault && (
+                    <div className="flex flex-col px-4">
+                      <VaultSettings key={selectedVault.id} vault={selectedVault} />
+                    </div>
+                  )}
+                </Card>
+              </section>
             </div>
           </>
         )}
