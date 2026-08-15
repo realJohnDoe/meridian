@@ -114,7 +114,9 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
 
             <div className="flex flex-col gap-4 p-4">
               <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-semibold">General</span>
+                <span className="text-2xs font-bold tracking-[.07em] uppercase text-muted-foreground">
+                  General
+                </span>
                 <p className="text-xs text-muted-foreground">Applies to Meridian on this device.</p>
               </div>
 
@@ -167,8 +169,10 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                 </div>
               )}
 
-              <div className="flex flex-col gap-0.5 pt-3 border-t border-border">
-                <span className="text-sm font-semibold">Vaults</span>
+              <div className="flex flex-col gap-0.5 pt-4 mt-1 border-t border-border">
+                <span className="text-2xs font-bold tracking-[.07em] uppercase text-muted-foreground">
+                  Vaults
+                </span>
                 <p className="text-xs text-muted-foreground">Settings for the selected vault only.</p>
               </div>
 

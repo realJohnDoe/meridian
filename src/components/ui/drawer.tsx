@@ -26,6 +26,13 @@ function DrawerOverlay({
 // ── Content ──────────────────────────────────────────────────────
 // Centered and width-capped to match the app shell (430 px).
 // Includes a drag handle for mobile swipe-to-dismiss affordance.
+// Capped to the dynamic viewport height and split into a fixed drag handle
+// plus a scrollable body: content taller than the screen (a long form, a
+// vault list that grows with each added vault) used to push its top past the
+// top of the viewport with nothing able to scroll it back into view, because
+// a position:fixed sheet with no height cap just keeps growing. `min-h-0` on
+// the scroll region is required for it to actually shrink inside the flex
+// column instead of forcing the column itself to grow past `max-h`.
 function DrawerContent({
   className,
   children,
@@ -37,15 +44,17 @@ function DrawerContent({
       <DrawerPrimitive.Content
         className={cn(
           'fixed bottom-0 left-1/2 z-50 -translate-x-1/2',
-          'w-full max-w-md lg:max-w-lg',
+          'w-full max-w-md lg:max-w-lg max-h-[85dvh] flex flex-col',
           'bg-background border-t border-border rounded-t-3xl',
           'pb-6 focus:outline-none',
           className,
         )}
         {...props}
       >
-        <div className="mx-auto mt-2 h-1 w-24 rounded-full bg-muted" />
-        {children}
+        <div className="mx-auto mt-2 h-1 w-24 shrink-0 rounded-full bg-muted" />
+        <div className="min-h-0 overflow-y-auto overscroll-contain">
+          {children}
+        </div>
       </DrawerPrimitive.Content>
     </DrawerPortal>
   )
