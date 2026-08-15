@@ -738,7 +738,8 @@ function attemptPush(backend: StorageBackend): void {
   void runSync(backend, { silent: true, pull: false })
 }
 
-function scheduleAutoPush(backend: StorageBackend): void {
+/** Debounced push for one vault. Exported for `moveEntry.ts`, which writes two vaults at once. */
+export function scheduleAutoPush(backend: StorageBackend): void {
   if (backend.readOnly) return
   const syncState = syncStateFor(backend.id)
   if (syncState.pushTimer) clearTimeout(syncState.pushTimer)

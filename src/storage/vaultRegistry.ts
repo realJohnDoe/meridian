@@ -14,6 +14,7 @@ import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend } from './backend'
+import { isWritableVault } from '@/vaultRef'
 import type { VaultRef, GitHubVaultRef, IcalVaultRef } from '@/vaultRef'
 import {
   getVaults, setStoreState, setVaultLayer, removeVaultLayer,
@@ -79,10 +80,14 @@ function emitVaultChanged(change: VaultChange): void {
 
 const EXAMPLE_REF: VaultRef = { id: 'example', name: 'Tutorial', kind: 'example' }
 
-/** Kinds that accept writes — the candidates for `defaultVaultId`. */
-function isWritableKind(ref: VaultRef): boolean {
-  return ref.kind === 'local' || ref.kind === 'github'
-}
+/**
+ * Kinds that accept writes — the candidates for `defaultVaultId`.
+ *
+ * The predicate itself lives on `vaultRef.ts` because `components/` asks the
+ * same question (which vaults the editor's chip may offer as a move target)
+ * and may not import `@/storage`.
+ */
+const isWritableKind = isWritableVault
 
 /**
  * Every persisted vault is mountable; only the synthesized Tutorial vault is

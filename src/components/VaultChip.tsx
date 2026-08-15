@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { useStore } from '@/store'
+import { isWritableVault } from '@/vaultRef'
 import { VaultIcon } from './vaultIcon'
 import { cn } from '@/lib/cn'
 import {
@@ -10,9 +11,13 @@ interface Props {
   vaultId: string | null
   /**
    * Set to make the chip a picker over the registered writable vaults. Null (or
-   * omitted) renders it as a static label instead — which is what an entry that
-   * already exists gets, since moving between vaults is a separate, confirmed
-   * action rather than a silent re-target.
+   * omitted) renders it as a static label instead — which is what a non-writable
+   * vault's entry gets, since a move may go neither into nor out of one.
+   *
+   * What picking does depends on the entry: before its first save it simply
+   * re-targets where the file will be created; afterwards it asks to *move* the
+   * file, which the caller confirms first (see `MoveVaultDialog`). The chip
+   * itself doesn't know the difference — it reports the choice.
    */
   onChange?: ((vaultId: string) => void) | null
   className?: string
@@ -29,10 +34,11 @@ interface Props {
 export default function VaultChip({ vaultId, onChange, className }: Props) {
   const vaults = useStore(s => s.vaults)
   const vault  = vaults.find(v => v.id === vaultId)
-  // Read-only vaults can't receive a new entry, so they're never offered as a
-  // target — even though one of them may well be the chip's current value on an
-  // entry being *viewed*.
-  const targets = vaults.filter(v => v.kind !== 'example')
+  // Only writable vaults are offered: a subscription has no file to write and
+  // the Tutorial vault discards what it's given. Either can still be the chip's
+  // *current* value on an entry being viewed — hence a filter over the targets,
+  // not over the whole list.
+  const targets = vaults.filter(isWritableVault)
 
   if (!vault) return null
 
@@ -56,7 +62,7 @@ export default function VaultChip({ vaultId, onChange, className }: Props) {
     <Select value={vault.id} onValueChange={onChange}>
       <SelectTrigger
         className={cn(base, 'h-auto hover:bg-muted [&>svg]:hidden')}
-        aria-label={`Vault: ${vault.name}. Change which vault this entry goes to`}
+        aria-label={`Vault: ${vault.name}. Change which vault this entry is in`}
       >
         <VaultIcon kind={vault.kind} className="size-3 stroke-[1.7] shrink-0" />
         <span className="truncate">{vault.name}</span>

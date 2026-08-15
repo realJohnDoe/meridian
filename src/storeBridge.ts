@@ -59,8 +59,8 @@ export const setStoreState = useStore.setState
  * synchronous localStorage read — no credential, no network — so this is
  * called before the first paint rather than after the vaults finish activating.
  *
- * Eager and cross-vault by design (see the plan's §8 table). The Favorites
- * list and the filter popover both span every registered vault at once, so
+ * Eager and cross-vault by design: the Favorites list and the filter
+ * popover both span every registered vault at once, so
  * neither can wait for a vault to "activate" the way the old per-vault
  * `loadVaultPrefs` did. `defaultParticipants` is the one field still loaded
  * lazily, one vault at a time — see `loadDefaultParticipants`.
@@ -80,6 +80,10 @@ export const loadDefaultParticipants = (vaultId: string): void =>
 
 export const setDefaultVaultId = (id: string | null): void =>
   useStore.getState().setDefaultVaultId(id)
+
+/** Follow a favourited entry that changed key — see `moveEntryToVault`. */
+export const replaceFavorite = (fromKey: EntryKey, toKey: EntryKey): void =>
+  useStore.getState().replaceFavorite(fromKey, toKey)
 
 /** One-time default hide — see `hideVaultOnce`. Used for the Tutorial vault. */
 export const hideVaultOnce = (vaultId: string): void =>

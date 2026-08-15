@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { beginSwipeDelete, toggleOccDone, reopenOcc } from './occurrenceActions'
+import { beginSwipeDelete, toggleOccDone, reopenOcc, moveEntryToVault } from './occurrenceActions'
+import { entryKey as makeEntryKey } from '@/fileIO'
 import { Toaster } from '@/components/ui/sonner'
 import { useStore } from '@/store'
 import { setupStore, seedStore, installFakePersistence, makeOcc, makeSeries, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
@@ -292,5 +293,98 @@ describe('reopenOcc', () => {
 
     expect(items()).toHaveLength(3)
     expect((items().find(i => i.id === 'occ-2') as StoreOcc).metadata.done).toBe(true)
+  })
+})
+
+describe('moveEntryToVault', () => {
+  const OTHER_VAULT = 'other-vault'
+  const otherKey = (slug: string) => makeEntryKey(OTHER_VAULT, slug)
+
+  function seedOne(slug = 'note.md') {
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey(slug) })
+    seedStore([occ], makeRoots(slug))
+    useStore.setState({ vaults: [
+      { id: TEST_VAULT, name: 'Work', kind: 'local' },
+      { id: OTHER_VAULT, name: 'Personal', kind: 'local' },
+    ] })
+    return occ
+  }
+
+  it('re-keys the entry into the target vault and reports where it landed', () => {
+    seedOne()
+
+    const landed = moveEntryToVault(testKey('note.md'), OTHER_VAULT)
+
+    expect(landed).toBe(otherKey('note.md'))
+    expect(items().map(i => i.entryKey)).toEqual([otherKey('note.md')])
+    expect(useStore.getState().roots.get(otherKey('note.md'))?.vaultId).toBe(OTHER_VAULT)
+    expect(useStore.getState().roots.has(testKey('note.md'))).toBe(false)
+  })
+
+  it('persists it as one move — never a write plus an unrelated delete', () => {
+    seedOne()
+
+    moveEntryToVault(testKey('note.md'), OTHER_VAULT)
+
+    expect(persistence.moves).toEqual([[testKey('note.md'), otherKey('note.md')]])
+    expect(persistence.writes).toEqual([])
+    expect(persistence.deletes).toEqual([])
+  })
+
+  it('allocates a free slug when the target vault already has that file', () => {
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md') })
+    const taken = makeOcc({ id: 'occ-2', entryKey: otherKey('note.md') })
+    const roots: Roots = makeRoots('note.md')
+    roots.set(otherKey('note.md'), { title: 'Theirs', tags: [], items: [], vaultId: OTHER_VAULT, fileSlug: 'note.md' })
+    seedStore([occ, taken], roots)
+    useStore.setState({ vaults: [
+      { id: TEST_VAULT, name: 'Work', kind: 'local' },
+      { id: OTHER_VAULT, name: 'Personal', kind: 'local' },
+    ] })
+
+    expect(moveEntryToVault(testKey('note.md'), OTHER_VAULT)).toBe(otherKey('note.md-2'))
+    expect(useStore.getState().roots.get(otherKey('note.md'))?.title).toBe('Theirs')
+  })
+
+  it('carries a favourite over, keeping its position', () => {
+    seedOne()
+    useStore.setState({ favorites: [testKey('a.md'), testKey('note.md'), testKey('b.md')] })
+
+    moveEntryToVault(testKey('note.md'), OTHER_VAULT)
+
+    expect(useStore.getState().favorites).toEqual([testKey('a.md'), otherKey('note.md'), testKey('b.md')])
+  })
+
+  it('leaves favourites alone when the moved entry was not one', () => {
+    seedOne()
+    useStore.setState({ favorites: [testKey('a.md')] })
+
+    moveEntryToVault(testKey('note.md'), OTHER_VAULT)
+
+    expect(useStore.getState().favorites).toEqual([testKey('a.md')])
+  })
+
+  it('does nothing when the entry is already in that vault', () => {
+    seedOne()
+
+    expect(moveEntryToVault(testKey('note.md'), TEST_VAULT)).toBeNull()
+    expect(persistence.moves).toEqual([])
+  })
+
+  it('refuses a target that is no longer a registered writable vault', () => {
+    seedOne()
+    useStore.setState({ vaults: [{ id: TEST_VAULT, name: 'Work', kind: 'local' }] })
+
+    expect(moveEntryToVault(testKey('note.md'), OTHER_VAULT)).toBeNull()
+    expect(persistence.moves).toEqual([])
+    expect(useStore.getState().roots.has(testKey('note.md'))).toBe(true)
+  })
+
+  it('does nothing when there is no such entry', () => {
+    seedOne()
+
+    expect(moveEntryToVault(testKey('gone.md'), OTHER_VAULT)).toBeNull()
+    expect(persistence.moves).toEqual([])
+    expect(items()).toHaveLength(1)
   })
 })

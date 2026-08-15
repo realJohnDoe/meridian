@@ -4,6 +4,8 @@ import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileTe
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import type { SeriesContext } from '@/model'
 import DialogStack from './DialogStack'
+import MoveVaultDialog from './dialogs/MoveVaultDialog'
+import type { PendingMove } from './dialogs/MoveVaultDialog'
 import type { DialogHandlers } from './useEntryDialogs'
 import { badgeVariants } from '@/components/ui/badge'
 import { PRIORITY_CLASS } from '@/components/primitives/occurrence-variants'
@@ -70,11 +72,16 @@ export interface EntryEditorHooks {
   /** The vault this entry lives in (or would, for a new one). Scopes links and the file picker. */
   vaultId: string | null
   /**
-   * Retarget where a brand-new entry will be created, until its first save
-   * makes the file. Null once the entry exists — its vault is then fixed in its
-   * key, and changing it is a move rather than a re-target.
+   * What the vault chip does when a vault is picked: retarget a brand-new entry
+   * before its first save, or — once the file exists — stage a move for
+   * confirmation. Null when neither applies (a sandbox or subscription entry,
+   * which may not move at all).
    */
-  setTargetVaultId: ((vaultId: string) => void) | null
+  onVaultChange: ((vaultId: string) => void) | null
+  /** A move the user picked but hasn't confirmed. Rendered by `MoveVaultDialog`. */
+  pendingMove?: PendingMove | null
+  onMoveConfirm?: () => void
+  onMoveCancel?: () => void
   pendingLinks: PendingLinks
   dialogHandlers: DialogHandlers
   setEntry: (updater: (prev: EntryState) => EntryState) => void
@@ -106,7 +113,8 @@ function autoResize(el: HTMLTextAreaElement) {
 
 export default function EntryEditor({ hooks, items, roots }: Props) {
   const {
-    entry, series, vaultId, setTargetVaultId, pendingLinks, dialogHandlers,
+    entry, series, vaultId, onVaultChange, pendingMove, onMoveConfirm, onMoveCancel,
+    pendingLinks, dialogHandlers,
     setEntry, handleSave, handleOpenDlg, handleOpenRepeatDlg, handlePromoteTask,
     scheduleAutoSave, saveMeta, handleScopeChange, handleTypeChange, handleDoneToggle,
     handleOpenWikilink, handleToggleDoneBacklink, titleMissing, focusTitleTick,
@@ -198,11 +206,11 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
               {item && (
                 <p className="font-mono text-2xs text-muted-foreground truncate">{item.metadata.fileSlug}.md</p>
               )}
-              {/* On a brand-new entry this is a picker: it says where the file
-                  will be created and lets you change it before the first save.
-                  On an existing one it is a static source label — moving an
-                  entry between vaults is a separate, confirmed action. */}
-              <VaultChip vaultId={vaultId} onChange={setTargetVaultId} />
+              {/* On a brand-new entry this is a picker over where the file will
+                  be created. On an existing one it is the move control — same
+                  chip, but picking a vault opens the confirm dialog below
+                  rather than silently re-targeting. */}
+              <VaultChip vaultId={vaultId} onChange={onVaultChange} />
             </div>
           </div>
         </div>
@@ -325,6 +333,14 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
       {/* The dialogs the property chips above open — same controller, so they
           live with the chips rather than behind another wrapper component. */}
       <DialogStack entry={entry} handlers={dialogHandlers} />
+
+      {/* The vault chip's own dialog. Outside DialogStack, which is the
+          entry-fields stack: a move edits no field, it relocates the file. */}
+      <MoveVaultDialog
+        move={pendingMove ?? null}
+        onConfirm={() => onMoveConfirm?.()}
+        onClose={() => onMoveCancel?.()}
+      />
     </section>
   )
 }

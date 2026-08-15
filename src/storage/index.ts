@@ -1,9 +1,11 @@
 // Register the storage adapter for the core persistence port once on first import.
 import { setEntityPersistence } from '../persistencePort'
 import { writeEntityToCache, deleteFromBackend } from './sync'
+import { moveEntityInCache } from './moveEntry'
 setEntityPersistence({
   writeEntity: slug => { void writeEntityToCache(slug) },
   deleteEntity: slug => { void deleteFromBackend(slug) },
+  moveEntity: (fromKey, toKey) => { void moveEntityInCache(fromKey, toKey) },
 })
 
 export {

@@ -738,8 +738,9 @@ export default function NodeInheritanceDebugger() {
                 entry: debugEntry,
                 series: seriesContext(items, debugEntry.item),
                 vaultId: DEBUG_VAULT_ID,
-                // The debugger pins one synthetic vault, so there is nothing to retarget to.
-                setTargetVaultId: null,
+                // The debugger pins one synthetic vault, so there is nowhere to
+                // retarget or move to.
+                onVaultChange: null,
                 pendingLinks: debugPendingLinks,
                 dialogHandlers,
                 setEntry: (updater) => setDebugEntry(prev => prev ? updater(prev) : prev),

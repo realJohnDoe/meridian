@@ -2,7 +2,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import type * as ReactRouter from '@tanstack/react-router'
-import { titleToSlug } from '@/fileIO'
+import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
+import type { FileMetadata, Roots } from '@/types'
+import type { VaultRef } from '@/vaultRef'
 import { useStore } from '@/store'
 import { setupStore, seedStore, installFakePersistence, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { useEntryEditor } from './useEntryEditor'
@@ -232,5 +234,126 @@ describe('useEntryEditor', () => {
     act(() => { result.current.handleSave('body') })
     expect(result.current.titleMissing).toBe(false)
     expect(backMock.mock.calls.length + navigateMock.mock.calls.length).toBeGreaterThan(0)
+  })
+})
+
+describe('useEntryEditor — moving between vaults', () => {
+  const OTHER = 'other-vault'
+  const otherKey = (slug: string) => makeEntryKey(OTHER, slug)
+  const VAULTS: VaultRef[] = [
+    { id: TEST_VAULT, name: 'Work', kind: 'local' },
+    { id: OTHER, name: 'Personal', kind: 'local' },
+  ]
+
+  function seedTwoVaults(rootMeta: Partial<FileMetadata> = {}) {
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md') })
+    seedStore([occ], makeRoots('note.md', rootMeta))
+    useStore.setState({ vaults: VAULTS })
+    return occ
+  }
+
+  it('picking a vault stages a move instead of applying one', () => {
+    const occ = seedTwoVaults()
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.onVaultChange?.(OTHER) })
+
+    expect(result.current.pendingMove).toMatchObject({
+      toVaultId: OTHER, fromVault: 'Work', toVault: 'Personal', slugTaken: false,
+    })
+    // Nothing has happened to the entry yet — the dialog decides.
+    expect(persistence.moves).toEqual([])
+    expect(useStore.getState().roots.has(testKey('note.md'))).toBe(true)
+  })
+
+  it('counts the links the move will break', () => {
+    // This entry links to `other-note`, and `linker` links back to it. Both
+    // links are inside the source vault, so both break.
+    const occ = seedTwoVaults({ items: ['[[other-note]]'] })
+    const roots = new Map(useStore.getState().roots)
+    roots.set(testKey('other-note'), { title: 'Other', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'other-note' })
+    roots.set(testKey('linker'), { title: 'Linker', tags: [], items: ['[[note.md]]'], vaultId: TEST_VAULT, fileSlug: 'linker' })
+    act(() => { useStore.getState().setData({ items: useStore.getState().items, roots }) })
+
+    const { result } = renderHook(() => useEntryEditor(occ))
+    act(() => { result.current.onVaultChange?.(OTHER) })
+
+    expect(result.current.pendingMove).toMatchObject({ inbound: 1, outbound: 1 })
+  })
+
+  it('confirming moves the entry and navigates to its new URL', () => {
+    const occ = seedTwoVaults()
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.onVaultChange?.(OTHER) })
+    act(() => { result.current.onMoveConfirm() })
+
+    expect(persistence.moves).toEqual([[testKey('note.md'), otherKey('note.md')]])
+    expect(result.current.pendingMove).toBeNull()
+    expect(navigateMock).toHaveBeenCalledWith(expect.objectContaining({
+      to: '/entry/$vault/$slug',
+      params: { vault: OTHER, slug: 'note.md' },
+      replace: true,
+    }))
+  })
+
+  it('cancelling leaves the entry where it was', () => {
+    const occ = seedTwoVaults()
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.onVaultChange?.(OTHER) })
+    act(() => { result.current.onMoveCancel() })
+
+    expect(result.current.pendingMove).toBeNull()
+    expect(persistence.moves).toEqual([])
+    expect(useStore.getState().roots.has(testKey('note.md'))).toBe(true)
+  })
+
+  it('flushes a pending body edit before counting, so a just-typed link is included', () => {
+    const occ = seedTwoVaults()
+    const roots = new Map(useStore.getState().roots)
+    roots.set(testKey('other-note'), { title: 'Other', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'other-note' })
+    act(() => { useStore.getState().setData({ items: useStore.getState().items, roots }) })
+
+    const { result } = renderHook(() => useEntryEditor(occ))
+    act(() => { result.current.scheduleAutoSave('see [[other-note]]') })
+    act(() => { result.current.onVaultChange?.(OTHER) })
+
+    expect(result.current.pendingMove).toMatchObject({ outbound: 1 })
+  })
+
+  it('warns when the target vault already owns the slug', () => {
+    const occ = seedTwoVaults()
+    const roots = new Map(useStore.getState().roots)
+    roots.set(otherKey('note.md'), { title: 'Theirs', tags: [], items: [], vaultId: OTHER, fileSlug: 'note.md' })
+    act(() => { useStore.getState().setData({ items: useStore.getState().items, roots }) })
+
+    const { result } = renderHook(() => useEntryEditor(occ))
+    act(() => { result.current.onVaultChange?.(OTHER) })
+
+    expect(result.current.pendingMove).toMatchObject({ slugTaken: true, toSlug: 'note.md-2' })
+  })
+
+  it('offers no move at all out of a non-writable vault', () => {
+    const occ = makeOcc({ id: 'occ-1', entryKey: makeEntryKey('example', 'note.md'), metadata: { vaultId: 'example', fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [] } })
+    const roots: Roots = new Map([[makeEntryKey('example', 'note.md'), { title: 'Note', tags: [], items: [], vaultId: 'example', fileSlug: 'note.md' }]])
+    seedStore([occ], roots)
+    useStore.setState({ vaults: [{ id: 'example', name: 'Tutorial', kind: 'example' }, ...VAULTS] })
+
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    expect(result.current.onVaultChange).toBeNull()
+  })
+
+  it('retargets rather than moves before the first save', () => {
+    seedStore([], new Map())
+    useStore.setState({ vaults: VAULTS })
+    const { result } = renderHook(() => useEntryEditor(null))
+
+    act(() => { result.current.onVaultChange?.(OTHER) })
+
+    expect(result.current.pendingMove).toBeNull()
+    expect(result.current.vaultId).toBe(OTHER)
+    expect(persistence.moves).toEqual([])
   })
 })

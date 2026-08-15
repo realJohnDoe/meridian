@@ -4,7 +4,7 @@ import type { StorageBackend } from './backend'
  * The mounted backends, keyed by vault id.
  *
  * Replaces the single `activeBackend` slot. "Mounted" and "registered" are the
- * same thing under the multi-vault model (see plans/multi-vault-ical.md §3):
+ * same thing under the multi-vault model:
  * every vault in `store.vaults` that could build a backend has one here, is
  * loaded into its own store layer, and is kept in sync. There is deliberately
  * no "active" entry — which vault a *new* entry goes to is `defaultVaultId` in
