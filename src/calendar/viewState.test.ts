@@ -8,7 +8,7 @@ import {
   calendarView, resetCalendarViewState,
   useMonthPreview, useDayPreview, useWeekPreview, setMonthPreview, setDayPreview, setWeekPreview,
   useAgendaAnchor, useAgendaScrollTarget, useAgendaTopDate,
-  requestScrollToToday, requestScrollToDate, setAgendaTopDate, markAgendaScrolled,
+  requestScrollToToday, requestScrollToDate, requestScrollToCurrentDate, setAgendaTopDate, markAgendaScrolled,
   setCurrentWeekKeepingWeekday,
 } from './viewState'
 
@@ -167,5 +167,20 @@ describe('useAgendaAnchor / useAgendaScrollTarget / useAgendaTopDate', () => {
     expect(targetResult.current).toBeNull()
     expect(anchorResult.current).toBe('2026-07-26')
     expect(dateResult.current).toBe('2026-07-26')
+  })
+
+  it('requestScrollToCurrentDate re-requests whatever day is already on screen, not today', () => {
+    // The agenda scrolled away from today already (markAgendaScrolled keeps
+    // currentDate in sync with wherever the user actually is).
+    act(() => requestScrollToDate('2026-12-25'))
+    act(() => markAgendaScrolled('2026-12-25'))
+
+    const { result: anchorResult } = renderHook(() => useAgendaAnchor())
+    const { result: targetResult } = renderHook(() => useAgendaScrollTarget())
+
+    act(() => requestScrollToCurrentDate())
+
+    expect(anchorResult.current).toBe('2026-12-25')
+    expect(targetResult.current).toBe('2026-12-25')
   })
 })

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import AgendaView from './AgendaView'
 import { setupStore, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
+import { useStore } from '@/store'
 import { calendarView, resetCalendarOnVaultChange } from './viewState'
 import type { Occurrence } from '@/types'
 
@@ -188,5 +189,29 @@ describe('AgendaView', () => {
     // the one carrying the "today" highlight rather than assuming uniqueness.
     const dayNumbers = screen.getAllByText(String(today.getDate()))
     expect(dayNumbers.some(el => el.className.includes('bg-primary'))).toBe(true)
+  })
+
+  // Hiding tasks drops the whole overdue section — a block of rows that can
+  // sit above whatever day the user is currently looking at. Left alone, the
+  // virtualizer's scroll offset would still point at the same pixel position,
+  // now against a shorter list, landing on a different day than before the
+  // toggle. AgendaView must re-anchor on the day already showing instead.
+  it('keeps the agenda anchored on the day already showing when the filter changes, instead of resetting to today', () => {
+    seedStore([overdueTask(0)], makeRoots('note.md'))
+
+    render(<AgendaView onOpen={vi.fn()} />)
+
+    // Simulate the user having already scrolled away from today — currentDate
+    // tracks the agenda's own scroll position (see markAgendaScrolled), and a
+    // day 30 days out is still well inside the default +90 day window.
+    const awayDate = fmtISO(addDays(today, 30))
+    act(() => { calendarView.setState({ currentDate: awayDate }) })
+
+    act(() => { useStore.getState().toggleShowTasks() })
+
+    // Re-centered on the day the user was actually looking at, not snapped
+    // back to today.
+    expect(calendarView.getState().agendaAnchor).toBe(awayDate)
+    expect(calendarView.getState().agendaScrollTarget).toBeNull()
   })
 })

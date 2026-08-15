@@ -10,10 +10,14 @@ import AgendaEmptyDayRow from './AgendaEmptyDayRow'
 import AgendaRow from './AgendaRow'
 import { useAgendaScrollRestore, useSaveAgendaScroll } from './useAgendaScrollRestore'
 import { useAgendaSections, estimateRow } from './useAgendaSections'
+import { useCalendarFilter } from './useCalendarFilter'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useToday } from '@/hooks'
 import { useNow } from './useNow'
-import { useAgendaAnchor, useAgendaScrollTarget, setAgendaTopDate, markAgendaScrolled, toggleOverdueCollapsed } from './viewState'
+import {
+  useAgendaAnchor, useAgendaScrollTarget, setAgendaTopDate, markAgendaScrolled, toggleOverdueCollapsed,
+  requestScrollToCurrentDate,
+} from './viewState'
 
 interface Props {
   onOpen: (occ: Occurrence, scope?: EditScope) => void
@@ -50,6 +54,12 @@ export default function AgendaView({ onOpen }: Props) {
   const now = useNow(60_000)
 
   const { rows, goToRowIndex } = useAgendaSections(today, now, anchor)
+
+  // Only the identity is used below (to detect a toggle), not the function
+  // itself — useAgendaSections already applies the filter internally. A
+  // second useCalendarFilter() call here is a second store subscription, not
+  // a second filtering pass.
+  const { filterOccs } = useCalendarFilter()
 
   // AgendaRow is memoized with React's default shallow compare, so these
   // handlers are genuinely part of its props comparison: an unstable reference
@@ -156,6 +166,27 @@ export default function AgendaView({ onOpen }: Props) {
     lastTopRef.current = scrollTarget
     markAgendaScrolled(scrollTarget)
   }, [scrollTarget, goToRowIndex, virtualizer])
+
+  // Toggling the calendar filter (a vault, a participant, task visibility)
+  // can remove or add a whole block of rows above the current view — the
+  // virtualizer only ever tracks a raw scroll pixel offset, so left alone
+  // that offset now points at different, unrelated rows and the agenda
+  // silently lands on a different day than the one just being looked at.
+  // Re-requesting the day already on screen re-centers agendaAnchor there and
+  // sets agendaScrollTarget, which the effect above turns into a real
+  // scrollToIndex on the next render — same settling mechanism as the Today
+  // button, just triggered by the filter instead of a click.
+  //
+  // Gated on filterOccs' identity, not its calls: useCalendarFilter's
+  // useCallback only produces a new reference when hiddenVaultIds/
+  // hiddenParticipants/showTasks actually changed, so this only fires on a
+  // genuine toggle, never on an ordinary re-render.
+  const prevFilterOccsRef = useRef(filterOccs)
+  useLayoutEffect(() => {
+    if (prevFilterOccsRef.current === filterOccs) return
+    prevFilterOccsRef.current = filterOccs
+    requestScrollToCurrentDate()
+  }, [filterOccs])
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" ref={scRef}>
