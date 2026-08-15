@@ -17,14 +17,6 @@ pnpm run build
 
 Using `npm install` will create a `package-lock.json` that must not be committed.
 
-## GitHub / Pull Requests
-
-Do **not** use the GitHub CLI (`gh`) to open pull requests. Just push the branch and leave PR creation to the user.
-
-```bash
-git push -u origin <branch-name>
-```
-
 ## Git workflow
 
 Once the first changeset of a session/task has been applied and verified (build/lint passing), commit and push it to a feature branch right away — don't wait for an explicit "commit and push" ask each time. Keep committing and pushing subsequent changesets the same way as the task progresses.
