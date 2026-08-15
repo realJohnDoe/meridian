@@ -1,4 +1,4 @@
-import { HardDrive, GitBranch, BookOpen } from 'lucide-react'
+import { HardDrive, GitBranch, BookOpen, CalendarDays } from 'lucide-react'
 import type { VaultKind } from '@/vaultRef'
 
 /**
@@ -13,5 +13,6 @@ import type { VaultKind } from '@/vaultRef'
 export function VaultIcon({ kind, className }: { kind: VaultKind; className?: string }) {
   if (kind === 'local')  return <HardDrive className={className} />
   if (kind === 'github') return <GitBranch className={className} />
+  if (kind === 'ical')   return <CalendarDays className={className} />
   return <BookOpen className={className} />
 }

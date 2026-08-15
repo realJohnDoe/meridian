@@ -100,6 +100,7 @@ function buildBlobQuery(branch: string, paths: string[]): string {
 export class GitHubBackend implements StorageBackend {
   readonly kind: VaultKind = 'github'
   readonly readOnly        = false
+  readonly hasRemote       = true
 
   private _octokit: ReturnType<typeof makeOctokit>
   private _cfg:     GitHubConfig

@@ -4,7 +4,8 @@ import { diskStatAll, diskReadFiles, diskReadAll, diskWrite, diskDelete } from '
 
 export class LocalBackend implements StorageBackend {
   readonly kind: VaultKind = 'local'
-  readonly readOnly = false
+  readonly readOnly  = false
+  readonly hasRemote = true
 
   constructor(
     readonly id:   string,

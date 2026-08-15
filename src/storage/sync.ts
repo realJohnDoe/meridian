@@ -648,9 +648,12 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
   const vaultId    = backend.id
   const syncState  = syncStateFor(vaultId)
 
-  if (backend.readOnly) {
-    // Nothing to push, and (until the iCal vault kind lands) nothing to pull
-    // either — the Tutorial vault is synthesized fresh on every load.
+  // A read-only vault is no longer a dead end — only a vault with no remote is.
+  // The Tutorial vault is synthesized fresh on every load, so there is nothing
+  // to push AND nothing to pull; a calendar subscription is equally unwritable
+  // but has a live feed behind it, and skipping it here is what used to make a
+  // separate refresh loop necessary.
+  if (!backend.hasRemote) {
     if (!opts.silent) notify(`"${backend.name}" is read-only — there is nothing to sync.`)
     updateSyncUI(backend)
     return
@@ -670,7 +673,12 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
     // no-op for them and the retry loop exits immediately via the thrown error.
     while (true) {
       try {
-        const { hadCollision, pushed } = await pushDirty(backend, vaultId)
+        // Push is skipped for a read-only vault, reconcile is not: pulling is
+        // the entire point of a subscription's cycle. `hadCollision` is
+        // vacuously false there — nothing was written, so nothing can conflict.
+        const { hadCollision, pushed } = backend.readOnly
+          ? { hadCollision: false, pushed: new Set<string>() }
+          : await pushDirty(backend, vaultId)
         if (opts.pull || hadCollision) {
           await reconcileWithBackend(backend, vaultId, pushed)
         }
@@ -796,6 +804,10 @@ export async function syncOnActivate(backend: StorageBackend): Promise<void> {
 const MIN_SYNC_INTERVAL_MS: Partial<Record<VaultKind, number>> = {
   local:  30_000,
   github: 60_000,
+  // A subscription is somebody else's calendar: it changes rarely, the fetch
+  // crosses two networks (Meridian's Worker, then the provider), and a
+  // conditional request makes most of these cycles a 304 with no body anyway.
+  ical:   15 * 60_000,
 }
 const DEFAULT_MIN_SYNC_INTERVAL_MS = 15 * 60_000
 
@@ -847,7 +859,7 @@ export function autoSyncTick(): void {
   void (async () => {
     try {
       const due = getMountedBackends()
-        .filter(b => !b.readOnly)
+        .filter(b => b.hasRemote)
         .sort((a, b) => syncStateFor(a.id).lastAttemptAt - syncStateFor(b.id).lastAttemptAt)
       for (const backend of due) {
         // Re-checked per vault rather than filtered up front: an earlier
@@ -865,8 +877,11 @@ export function autoSyncTick(): void {
 
 /**
  * Manual "Sync now". With a vault id, that vault; without, every registered
- * writable vault in turn — the topbar button speaks for the whole app, the
+ * vault that has a remote — the topbar button speaks for the whole app, the
  * per-vault rows in its popover speak for one.
+ *
+ * Read-only vaults with a remote are included: "Sync now" on a subscription is
+ * "refresh this calendar", which is exactly what the user means by it.
  *
  * Always bypasses the backoff gate: an explicit user gesture is a deliberate
  * "try again now".
@@ -874,7 +889,7 @@ export function autoSyncTick(): void {
 export async function syncToBackend(vaultId?: string): Promise<void> {
   const targets = vaultId
     ? [getBackend(vaultId)].filter((b): b is StorageBackend => !!b)
-    : getMountedBackends().filter(b => !b.readOnly)
+    : getMountedBackends().filter(b => b.hasRemote)
 
   if (targets.length === 0) {
     notify('No writable vault connected. Add a local folder first.')

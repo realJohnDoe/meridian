@@ -24,7 +24,21 @@ export interface StorageBackend {
   readonly id:       string
   readonly name:     string
   readonly kind:     VaultKind
+  /** Whether writes are pushed. False for the Tutorial vault and for iCal feeds. */
   readonly readOnly: boolean
+  /**
+   * Whether there is a remote worth reconciling against — i.e. whether this
+   * vault takes part in the cache/sync pipeline at all.
+   *
+   * Deliberately NOT the same question as `readOnly`, and the iCal vault kind is
+   * exactly why the two had to be separated. Both the Tutorial vault and a
+   * calendar subscription are read-only, but only one of them is a dead end: the
+   * Tutorial vault's files are synthesized in memory on every load, so it has no
+   * Dexie rows and nothing to poll, while a subscription has a live feed that
+   * must be pulled on a schedule. The scheduler keys off this; `readOnly` alone
+   * decides only whether `pushDirty` runs.
+   */
+  readonly hasRemote: boolean
   statAll():                               Promise<Map<string, string>>
   readFiles(paths: string[]):              Promise<RawFile[]>
   /**

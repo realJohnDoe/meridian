@@ -8,8 +8,10 @@ setEntityPersistence({
 
 export {
   restoreVaults, setDefaultVault, reconnectVault,
-  addLocalVault, addGitHubVaultOAuth, removeVault, onVaultChanged,
+  addLocalVault, addGitHubVaultOAuth, addIcalVault, removeVault, onVaultChanged,
 } from './vaultRegistry'
+
+export { previewIcalFeed } from './icalBackend'
 
 export { isFolderPickerSupported } from './fs'
 

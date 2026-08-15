@@ -12,9 +12,14 @@ export async function vaultRefsSave(refs: VaultRef[]): Promise<void> {
 function isVaultRef(v: unknown): v is VaultRef {
   if (!v || typeof v !== 'object') return false
   const r = v as Record<string, unknown>
-  return typeof r['id'] === 'string'
-    && typeof r['name'] === 'string'
-    && (r['kind'] === 'local' || r['kind'] === 'example' || r['kind'] === 'github')
+  if (typeof r['id'] !== 'string' || typeof r['name'] !== 'string') return false
+  // An iCal ref without its feed URL cannot build a backend, so it is rejected
+  // here rather than mounted into a vault that can never load.
+  if (r['kind'] === 'ical') {
+    const ical = r['ical']
+    return !!ical && typeof ical === 'object' && typeof (ical as Record<string, unknown>)['url'] === 'string'
+  }
+  return r['kind'] === 'local' || r['kind'] === 'example' || r['kind'] === 'github'
 }
 
 export async function vaultRefsLoad(): Promise<VaultRef[]> {

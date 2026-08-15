@@ -73,6 +73,17 @@ export default defineConfig({
         // always returns on the `if (db)` line above it) and isn't worth
         // contorting a test to reach.
         'src/storage/cache/db.ts': { statements: 88, branches: 70, functions: 95, lines: 95 },
+        // The iCal import: a pure text→markdown pipeline with no UI to notice a
+        // regression in, feeding a read-only vault the user cannot correct by
+        // hand. The parse and synthesis stages sit high because every branch is
+        // reachable from a fixture; rruleToRepeat is lower on purpose — its
+        // bounded-expansion fallback has arms for BY* parts no mainstream
+        // exporter emits, kept for correctness rather than for coverage.
+        'src/storage/ical/icsParse.ts':      { statements: 92, branches: 85, functions: 95, lines: 95 },
+        'src/storage/ical/icsDateTime.ts':   { statements: 95, branches: 90, functions: 95, lines: 95 },
+        'src/storage/ical/icsToEntries.ts':  { statements: 90, branches: 82, functions: 95, lines: 94 },
+        'src/storage/ical/rruleToRepeat.ts': { statements: 84, branches: 74, functions: 80, lines: 92 },
+        'src/storage/icalBackend.ts':        { statements: 93, branches: 85, functions: 95, lines: 95 },
         'src/editor/dialogs/RepeatDialog.tsx': { statements: 75, branches: 60, functions: 65, lines: 75 },
         'src/occurrenceActions.ts': { statements: 85, branches: 75, functions: 80, lines: 88 },
         'src/editor/useEntryEditor.ts': { statements: 68, branches: 55, functions: 55, lines: 70 },
