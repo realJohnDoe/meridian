@@ -1,9 +1,16 @@
-import { useLayoutEffect } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 import type { Virtualizer, VirtualItem } from '@tanstack/react-virtual'
 import { calendarView } from './viewState'
 import { estimateRow, type AgendaRow } from './agendaSections'
 
 type AgendaVirtualizer = Virtualizer<HTMLDivElement, Element>
+
+/**
+ * How far below the scroll offset a row's bottom edge must sit to count as
+ * "the top row" — a couple of pixels of the previous row peeking in doesn't
+ * make it the one the viewport is resting on.
+ */
+const TOP_ROW_EPSILON = 12
 
 /**
  * Where the virtualizer should start so that `goToRowIndex` is the top row:
@@ -66,6 +73,152 @@ export function useAgendaScrollRestore(scrollToToday: boolean, rows: AgendaRow[]
       : agendaScrollOffset,
     initialMeasurementsCache: agendaScrollMeasurements,
   }
+}
+
+/**
+ * The row the viewport was resting on, so a rebuilt `rows` can be re-pinned to
+ * the same place.
+ */
+export interface ScrollAnchor {
+  /** Key of the row at the top of the viewport (`dateKey|id|instant`). */
+  key: string
+  /** That row's day — the fallback when the row itself is gone. */
+  dateKey: string
+  /**
+   * The row's index when it was captured. The correction fires only when this
+   * changes: an index that survives a rebuild means nothing above the viewport
+   * was added or removed, so there is nothing to correct. That test is what
+   * makes the once-a-minute `now` tick free — it rebuilds `rows` wholesale
+   * (see useAgendaSections) without moving anything, and re-pinning on every
+   * tick would nudge a mid-row reading position once a minute forever.
+   */
+  index: number
+}
+
+/**
+ * Where to re-pin the viewport in a rebuilt `rows`, given the row it was
+ * resting on before the rebuild.
+ *
+ * Two levels of fallback, because a rebuild can remove the anchored row itself:
+ *
+ *  1. **Same row key** — the ordinary case (content landed somewhere else in
+ *     the list).
+ *  2. **Same day** — the anchored row is gone (its task was filtered out,
+ *     completed, or deleted). Pin to the first row of that day instead. `rows`
+ *     walks the window day by day, so `dateKey` is non-decreasing across it and
+ *     a scan for the first `dateKey >= anchor.dateKey` finds that day (or the
+ *     next surviving one, if the whole day went away).
+ *
+ * `-1` means neither matched — the anchor's day fell out of the window
+ * entirely, and the caller should leave the scroll position alone rather than
+ * guess.
+ */
+export function findAnchorIndex(rows: AgendaRow[], anchor: ScrollAnchor): number {
+  const exact = rows.findIndex(r => r.key === anchor.key)
+  if (exact >= 0) return exact
+  return rows.findIndex(r => r.dateKey >= anchor.dateKey)
+}
+
+/**
+ * Keeps the agenda on the day it is already showing when `rows` is rebuilt by
+ * something *other* than the user scrolling.
+ *
+ * The virtualizer only ever tracks a raw scroll **pixel** offset. That is right
+ * for a scroll, and wrong for everything else: when rows appear or disappear
+ * above the viewport, the same pixel offset now lands on entirely different
+ * content, and the agenda silently slides to another day. Two reports of this,
+ * with the same root cause and different triggers:
+ *
+ *  - **"Opens on today, then jumps back in time a few seconds after."** A
+ *    vault's background sync (`mergeChangedIntoStore`) replaces its layer once
+ *    the GitHub round trips land. `loadVaultContent` deliberately does not
+ *    await that sync when the cache already painted, so it completes well after
+ *    `markAgendaScrolled` cleared `agendaScrollTarget` — nothing was left to
+ *    re-assert the position. Synced-in past-dated tasks pool into the overdue
+ *    section *above* the viewport, so the agenda slid backwards.
+ *  - **"Changing the filter changes the scrolled-to day."** Hiding a vault, a
+ *    participant or tasks drops a block of rows the same way.
+ *
+ * Re-pinning the row here rather than re-requesting a scroll target is what
+ * keeps this cheap and unsurprising: `requestScrollToDate` would also re-center
+ * `agendaAnchor`, rebuilding the whole ±window and flipping `preferOverdue`
+ * (see agendaSections.ts) — a jump to a day, when all that was asked for is to
+ * stay put.
+ *
+ * **Corrects by index, not by pixel offset.** The obvious implementation —
+ * compute the anchor row's new `start` and `scrollToOffset` there — is wrong in
+ * a way that only shows up once measurements settle: the rows that just landed
+ * are unmeasured, so their `start` values are `estimateRow` guesses, and the
+ * whole block compacts under the viewport as they mount and measure. Measured
+ * against a real sync landing 60 overdue rows, a pixel-target correction
+ * overshot by ~330px and settled a month past the anchored day.
+ * `scrollToIndex` instead drives virtual-core's `reconcileScroll`, which
+ * re-resolves the target *from the index* on every frame until it is stable —
+ * the machinery built for exactly this estimate-to-actual drift, and what the
+ * scroll-to-target effect already relies on.
+ *
+ * Returns `captureAnchor` (for the scroll listener — the authoritative moment,
+ * since `virtualizer.scrollOffset` is only current after a real scroll event)
+ * and `anchorAt` (for the scroll-to-target effect, which knows exactly where it
+ * just landed without having to read it back).
+ */
+export function useAnchoredAgendaScroll(
+  virtualizer: AgendaVirtualizer,
+  rows: AgendaRow[],
+  scrollTargetPending: boolean,
+): { captureAnchor: () => void; anchorAt: (index: number, dateKey: string) => void } {
+  const anchorRef = useRef<ScrollAnchor | null>(null)
+
+  const captureAnchor = useCallback(() => {
+    const items = virtualizer.getVirtualItems()
+    if (!items.length) return
+    const offset = virtualizer.scrollOffset ?? 0
+    const top = items.find(vi => vi.end > offset + TOP_ROW_EPSILON) ?? items[0]!  // length checked
+    const row = rows[top.index]
+    if (!row) return
+    anchorRef.current = { key: row.key, dateKey: row.dateKey, index: top.index }
+  }, [virtualizer, rows])
+
+  const anchorAt = useCallback((index: number, dateKey: string) => {
+    const row = rows[index]
+    anchorRef.current = row ? { key: row.key, dateKey, index } : null
+  }, [rows])
+
+  // Seeded with the mount's own rows so the first run is a no-op — there is
+  // nothing to correct before anything has changed, and the mount path is
+  // already handled by useAgendaScrollRestore's seeded initialOffset.
+  const prevRowsRef = useRef(rows)
+
+  useLayoutEffect(() => {
+    const prevRows = prevRowsRef.current
+    prevRowsRef.current = rows
+    if (prevRows === rows) return
+
+    // An explicit jump (Today, a sidebar jump, a vault change) is already
+    // being applied this commit and outranks holding the old position.
+    if (scrollTargetPending) return
+
+    const anchor = anchorRef.current
+    if (!anchor) return
+
+    // Mid-gesture, a correction would fight the scroll — and on iOS momentum
+    // it visibly stutters. Re-capture instead, so the anchor stays consistent
+    // with where the user actually is and the *next* rebuild corrects from
+    // there rather than from a stale position.
+    if (virtualizer.isScrolling) { captureAnchor(); return }
+
+    const index = findAnchorIndex(rows, anchor)
+    if (index < 0) return
+    // Same index means nothing above the viewport was added or removed, so
+    // there is nothing to correct — and re-pinning anyway would snap a mid-row
+    // position flush to the top on every rebuild, once a minute.
+    if (index === anchor.index) return
+
+    virtualizer.scrollToIndex(index, { align: 'start' })
+    anchorRef.current = { ...anchor, index }
+  }, [rows, scrollTargetPending, virtualizer, captureAnchor])
+
+  return { captureAnchor, anchorAt }
 }
 
 /**

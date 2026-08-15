@@ -8,7 +8,7 @@ import { useStore } from '@/store'
 import { onVaultChanged } from '@/storage'
 import {
   resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useWeekPreview,
-  useAgendaTopDate, requestScrollToToday, requestScrollToCurrentDate, weekStartFor,
+  useAgendaTopDate, requestScrollToToday, weekStartFor,
 } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ViewFilterButton } from '@/components'
@@ -64,16 +64,9 @@ function AppMain() {
   // trips, it landed as a visible correction up to a second in. The agenda
   // seeds itself at today from viewState's default now, so there is genuinely
   // nothing to do on that path.
-  useEffect(() => onVaultChanged(({ contentReplaced, contentAddedLate }) => {
-    if (contentReplaced) { resetCalendarOnVaultChange(); return }
-    // A vault with nothing to paint in phase 1 loaded real content in phase
-    // 2, after the agenda already rendered from whichever other vaults did
-    // have a cache. That content can land above the current view — the
-    // reported "opens on today but jumps back in time a few seconds after" —
-    // since AgendaView's virtualizer only holds a raw scroll pixel offset.
-    // Re-request the day already on screen (not necessarily today, if the
-    // user has since navigated) so it stays put instead of drifting.
-    if (contentAddedLate) requestScrollToCurrentDate()
+  useEffect(() => onVaultChanged(({ contentReplaced }) => {
+    if (!contentReplaced) return
+    resetCalendarOnVaultChange()
   }), [])
 
   const entryMatch     = useMatch({ from: '/_app/entry/$vault/$slug', shouldThrow: false })

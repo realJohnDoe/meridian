@@ -515,44 +515,6 @@ describe('restoreVaults — cache-first paint', () => {
     expect(changes).toEqual([true])
   })
 
-  // Two registered vaults, only one cached: contentReplaced must stay false
-  // (the pre-painted GitHub vault's caches are still good), but the agenda's
-  // already-seeded scroll position was built from that vault alone — the
-  // freshly-mounted local vault's rows land in the store only once phase 2
-  // reaches it, after the first frame. That's the gap "opens on today but
-  // jumps back in time a few seconds after" came from — contentAddedLate is
-  // what lets AppMain re-anchor the agenda instead of leaving its scroll
-  // pixel offset pointed at whatever rows happen to sit there now.
-  it('reports contentAddedLate: true when one of several vaults had nothing cached', async () => {
-    metaStore.set('vaults', [LOCAL_REF, GITHUB_REF])
-    metaStore.set(`handle:${LOCAL_REF.id}`, {})
-    cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
-    // LOCAL_REF has nothing cached.
-
-    const changes: Array<{ contentReplaced: boolean; contentAddedLate: boolean }> = []
-    const off = onVaultChanged(change => changes.push(change))
-
-    await restoreVaults()
-    off()
-
-    expect(changes).toEqual([{ contentReplaced: false, contentAddedLate: true }])
-  })
-
-  it('reports contentAddedLate: false when every registered vault was already cached', async () => {
-    metaStore.set('vaults', [LOCAL_REF, GITHUB_REF])
-    metaStore.set(`handle:${LOCAL_REF.id}`, {})
-    cacheConfig.rows.set(LOCAL_REF.id,  [{ path: 'local.md',  content: '# Local' }])
-    cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'remote.md', content: '# Remote' }])
-
-    const changes: Array<{ contentReplaced: boolean; contentAddedLate: boolean }> = []
-    const off = onVaultChanged(change => changes.push(change))
-
-    await restoreVaults()
-    off()
-
-    expect(changes).toEqual([{ contentReplaced: false, contentAddedLate: false }])
-  })
-
   // The agenda's first frame is built through useCalendarFilter, which reads
   // hiddenVaultIds/hiddenParticipants/showTasks. Those are a localStorage read,
   // but they used to arrive behind the token refresh and the permission probe.
