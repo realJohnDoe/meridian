@@ -42,26 +42,6 @@ export interface VaultChange {
    * were all empty — all of which do change what the agenda is grouping.
    */
   contentReplaced: boolean
-  /**
-   * True when at least one *mountable* vault reached phase 2 of
-   * `restoreVaultsInner` with nothing painted for it in phase 1 — i.e. its
-   * content only lands in the store once its sync completes, after the
-   * agenda has already rendered (and seeded its scroll position from)
-   * whichever other vaults did have a cache.
-   *
-   * Distinct from `contentReplaced`: with two registered vaults where only one
-   * has a cache, `contentReplaced` is correctly `false` (the pre-painted
-   * vault's expansion/section caches must survive), but the *other* vault's
-   * rows still arrive later and can land above the agenda's current view —
-   * older tasks or events pushing the scroll position back a few seconds
-   * after open, since AgendaView's virtualizer only tracks a raw scroll pixel
-   * offset. Reported as "opens on today but jumps back in time a few seconds
-   * after" once multi-vault made this landing pattern common.
-   *
-   * Meaningless (and not consulted) when `contentReplaced` is true — that
-   * path already re-seeds the scroll position from scratch.
-   */
-  contentAddedLate: boolean
 }
 
 const _vaultChangedListeners = new Set<(change: VaultChange) => void>()
@@ -348,7 +328,7 @@ async function registerAndMount(ref: VaultRef, backend: StorageBackend): Promise
     // un-hiding it in the filter sticks — see `hideVaultOnce`.
     if (wasFirstRealVault) hideVaultOnce(EXAMPLE_REF.id)
     await loadVaultContent(backend)
-    emitVaultChanged({ contentReplaced: true, contentAddedLate: false })
+    emitVaultChanged({ contentReplaced: true })
   } finally {
     // Reset even on a thrown/failed load, so a retry (or the next vault) never
     // inherits a stale "N of M" from an aborted first connect.
@@ -439,11 +419,7 @@ async function restoreVaultsInner(): Promise<void> {
       }
     }
 
-    const paintedFlags = [...prePainted.values()]
-    emitVaultChanged({
-      contentReplaced: !paintedFlags.some(Boolean),
-      contentAddedLate: paintedFlags.some(v => !v),
-    })
+    emitVaultChanged({ contentReplaced: ![...prePainted.values()].some(Boolean) })
   } catch (e) {
     console.warn('[vault] restoreVaults failed:', e)
     // Even a total failure leaves the Tutorial vault, so the app has content.
@@ -640,7 +616,7 @@ export async function removeVault(id: string): Promise<void> {
     // Only after `vaults` no longer lists it, so the replacement is chosen
     // from what actually remains.
     reconcileDefaultVault(getVaults())
-    emitVaultChanged({ contentReplaced: true, contentAddedLate: false })
+    emitVaultChanged({ contentReplaced: true })
   } catch (e) {
     console.error('[vault] removeVault failed:', e)
     notifyError('Could not remove vault', e)

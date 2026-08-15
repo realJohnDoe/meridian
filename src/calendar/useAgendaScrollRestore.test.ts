@@ -4,7 +4,7 @@ import { renderHook } from '@testing-library/react'
 import type { Occurrence } from '@/types'
 import type { AgendaRow } from './agendaSections'
 import { calendarView, resetCalendarViewState } from './viewState'
-import { useAgendaScrollRestore } from './useAgendaScrollRestore'
+import { useAgendaScrollRestore, findAnchorIndex } from './useAgendaScrollRestore'
 import { testKey, TEST_VAULT } from '@/test-utils'
 
 function occ(id: string, date: string, opts: { time?: string; done?: boolean } = {}): Occurrence {
@@ -138,5 +138,54 @@ describe('useAgendaScrollRestore', () => {
 
     expect(renderHook(() => useAgendaScrollRestore(true, rows, goToRowIndex)).result.current.initialMeasurementsCache).toBe(snapshot)
     expect(renderHook(() => useAgendaScrollRestore(false, rows, goToRowIndex)).result.current.initialMeasurementsCache).toBe(snapshot)
+  })
+})
+
+describe('findAnchorIndex', () => {
+  it('finds the same row by key wherever the rebuild moved it', () => {
+    const { rows } = agenda()
+
+    // The overdue header moved from index 2 to 0 (everything above it was
+    // filtered away) — the viewport should follow the row, not the pixel it
+    // happened to be resting at.
+    expect(findAnchorIndex(rows.slice(2), { key: 'h|__overdue__', dateKey: '2026-06-15', index: 2 })).toBe(0)
+  })
+
+  it('falls back to the anchored day when the row itself is gone', () => {
+    const { rows } = agenda()
+
+    // The overdue task the viewport rested on was completed and filtered out.
+    // Its day (2026-06-15) still has the overdue header, so pin to that.
+    const withoutTask = rows.filter(r => r.key !== 'overdue-task|1')
+
+    expect(findAnchorIndex(withoutTask, { key: 'overdue-task|1', dateKey: '2026-06-15', index: 3 })).toBe(2)
+  })
+
+  it('lands on the next surviving day when the whole anchored day disappears', () => {
+    const { rows } = agenda()
+    // Hiding a vault dropped everything on 2026-06-10.
+    const later = rows.filter(r => r.dateKey !== '2026-06-10')
+
+    // rows is non-decreasing by dateKey, so the first row at/after the
+    // anchored day is the right landing spot.
+    expect(findAnchorIndex(later, { key: 'past-event|1', dateKey: '2026-06-10', index: 1 })).toBe(0)
+  })
+
+  it('reports -1 when the anchored day fell out of the window entirely', () => {
+    const { rows } = agenda()
+
+    // Nothing at or after 2027 — the caller must leave the scroll alone
+    // rather than guess a position.
+    expect(findAnchorIndex(rows, { key: 'gone|1', dateKey: '2027-01-01', index: 0 })).toBe(-1)
+  })
+
+  // The guard that keeps the once-a-minute `now` tick from nudging a mid-row
+  // reading position: the tick rebuilds `rows` wholesale but moves nothing, so
+  // every row keeps its index and the caller skips the correction.
+  it('returns the unchanged index when a rebuild moved nothing', () => {
+    const { rows } = agenda()
+    const rebuilt = rows.map(r => ({ ...r }))  // fresh objects, same order
+
+    expect(findAnchorIndex(rebuilt, { key: 'h|__overdue__', dateKey: '2026-06-15', index: 2 })).toBe(2)
   })
 })
