@@ -304,7 +304,9 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     vaultId,
     // Null once the entry exists — the chip becomes a picker only in PR 5's
     // move flow; before the first save it retargets where the file is created.
-    setTargetVaultId: entry.item ?? createdItemRef.current ? null : setTargetVaultId,
+    // Keyed off `createdKey` (state) rather than `createdItemRef` (a ref):
+    // both mark "the first save landed", but only one is readable in render.
+    setTargetVaultId: (entry.item ?? createdKey) ? null : setTargetVaultId,
     series,
     pendingLinks: { effectiveKey, pendingKeys, handleAdd, handleRemove },
     saveMeta,

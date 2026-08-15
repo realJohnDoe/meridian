@@ -5,7 +5,7 @@ import { Button } from './ui/button'
 import { Checkbox } from './ui/checkbox'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible'
-import { vaultIcon } from './vaultIcon'
+import { VaultIcon } from './vaultIcon'
 import { cn } from '@/lib/cn'
 import { keyVaultId } from '@/fileIO'
 import type { StoreItem } from '@/types'
@@ -184,7 +184,6 @@ export default function ViewFilterButton() {
           ) : groups.map(group => {
             const state    = vaultCheckState(group, hiddenVaultIds, hiddenParticipants)
             const hidden   = hiddenParticipants[group.vault.id] ?? []
-            const VaultIcon = vaultIcon(group.vault.kind)
             const hasPeople = group.participants.length > 0 || group.hasUnassigned
             const isOpen   = expanded === group.vault.id
             return (
@@ -212,7 +211,7 @@ export default function ViewFilterButton() {
                       onCheckedChange={() => toggleVaultHidden(group.vault.id)}
                       visualClassName="size-4"
                     />
-                    <VaultIcon className="size-3.5 stroke-[1.7] shrink-0 text-muted-foreground" />
+                    <VaultIcon kind={group.vault.kind} className="size-3.5 stroke-[1.7] shrink-0 text-muted-foreground" />
                     <span className="text-sm truncate">{group.vault.name}</span>
                   </label>
                 </div>

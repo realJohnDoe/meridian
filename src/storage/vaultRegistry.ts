@@ -369,6 +369,14 @@ async function restoreVaultsInner(): Promise<void> {
     // it is mounted here rather than in either phase's loop.
     await mountExampleVault()
 
+    // Someone upgrading from a single-vault build already has a real vault and
+    // has never been offered this choice, so their first launch on the layered
+    // store would otherwise drop the tutorial's sample entries into their real
+    // agenda. `registerAndMount` covers the other direction (a first vault
+    // added later in the session); both are one-time, so un-hiding it in the
+    // filter sticks.
+    if (mountable.length > 0) hideVaultOnce(EXAMPLE_REF.id)
+
     // ── Phase 2: credentials, permission, first sync ────────────────
     for (const ref of mountable) {
       try {

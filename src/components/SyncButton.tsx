@@ -6,7 +6,7 @@ import { syncToBackend, reconnectVault } from '@/vaultActions'
 import type { VaultRef } from '@/vaultActions'
 import { Button } from './ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
-import { vaultIcon } from './vaultIcon'
+import { VaultIcon } from './vaultIcon'
 import { keyVaultId } from '@/fileIO'
 
 /**
@@ -24,7 +24,6 @@ function severityOf(status: VaultSyncStatus): Severity {
 }
 
 function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus }) {
-  const VaultIcon = vaultIcon(vault.kind)
   const lastSynced = status.lastSyncedAt
     ? `Synced ${formatDistanceToNow(status.lastSyncedAt, { addSuffix: true })}`
     : status.readOnly ? null : 'Not synced yet'
@@ -32,7 +31,7 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
   return (
     <div className="flex flex-col gap-0.5 py-1.5 border-t border-border first:border-t-0">
       <div className="flex items-center gap-1.5">
-        <VaultIcon className="size-3.5 stroke-[1.7] shrink-0 text-muted-foreground" />
+        <VaultIcon kind={vault.kind} className="size-3.5 stroke-[1.7] shrink-0 text-muted-foreground" />
         <span className="flex-1 truncate text-xs font-medium">{vault.name}</span>
         {status.inProgress && <RefreshCw size={11} className="animate-spin text-muted-foreground shrink-0" />}
       </div>

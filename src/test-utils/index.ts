@@ -93,17 +93,6 @@ export function seedStore(items: StoreItem[], roots: Roots): void {
   useStore.getState().setData({ items, roots })
 }
 
-/**
- * Seed several vaults' layers at once, for tests that exercise the merge.
- * Goes through `setVaultLayer` rather than `setData` so `layers` is the source
- * of truth and `items`/`roots` are its flattening — the same path the storage
- * layer takes.
- */
-export function seedLayers(layers: Record<string, { items: StoreItem[]; roots: Roots }>): void {
-  const store = useStore.getState()
-  for (const [vaultId, data] of Object.entries(layers)) store.setVaultLayer(vaultId, data)
-}
-
 export interface FakePersistence {
   writes: string[]
   deletes: string[]

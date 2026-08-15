@@ -335,9 +335,17 @@ function readFavorites(vaultIds: string[]): EntryKey[] {
  * participants are knowable. Idempotent: the legacy key is deleted, so a later
  * layer write for the same vault is a no-op.
  */
+const _filterMigrationChecked = new Set<string>()
+
 function migrateParticipantFilter(
   vaultId: string, items: StoreItem[], current: Record<string, string[]>,
 ): Record<string, string[]> | null {
+  // `setVaultLayer` is on the reconcile path — every sync cycle writes a layer —
+  // so this must not cost a localStorage read per vault per cycle. One check
+  // per vault per session is enough: the legacy key is deleted below, and
+  // nothing recreates it.
+  if (_filterMigrationChecked.has(vaultId)) return null
+  _filterMigrationChecked.add(vaultId)
   const legacy = readVaultJSON<string[] | null>(LEGACY_PARTICIPANT_FILTER_PREFIX, vaultId, null)
   if (legacy === null) return null
   clearVaultKey(LEGACY_PARTICIPANT_FILTER_PREFIX, vaultId)

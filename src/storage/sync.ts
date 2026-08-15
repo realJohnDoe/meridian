@@ -531,6 +531,11 @@ export function dropSyncState(vaultId: string): void {
   _syncStates.delete(vaultId)
 }
 
+/** Drop every vault's sync state. Tests only — production unmounts one at a time. */
+export function dropAllSyncState(): void {
+  for (const vaultId of [..._syncStates.keys()]) dropSyncState(vaultId)
+}
+
 // ── BACKOFF STATE ─────────────────────────────────────────────────────
 const BACKOFF_BASE_MS  = 60_000
 const BACKOFF_MAX_MS   = 30 * 60_000
@@ -804,8 +809,14 @@ const DUE_TOLERANCE_MS = 5_000
 function isDue(backend: StorageBackend, now: number): boolean {
   const state = syncStateFor(backend.id)
   if (now < state.nextRetryAt) return false
+  const elapsed = now - state.lastAttemptAt
+  // A wall clock that jumped backwards (a device correcting its time, a
+  // timezone-less NTP step) would otherwise park `lastAttemptAt` in the future
+  // and starve this vault until the clock caught up. Treat it as due instead:
+  // one extra cycle costs nothing, a stranded vault costs the user their sync.
+  if (elapsed < 0) return true
   const interval = MIN_SYNC_INTERVAL_MS[backend.kind] ?? DEFAULT_MIN_SYNC_INTERVAL_MS
-  return now - state.lastAttemptAt + DUE_TOLERANCE_MS >= interval
+  return elapsed + DUE_TOLERANCE_MS >= interval
 }
 
 /** True while a scheduler pass is walking the vaults, so passes never overlap. */

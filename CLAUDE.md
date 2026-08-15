@@ -47,7 +47,8 @@ Tutorial vault's id is `example`, so its first note is
 pins which occurrence of a series) and `scope` (`single`/`future`/`all`/`add`).
 `/meridian/entry/<fileSlug>` still works as a redirect to the loaded vault.
 New entries are `/meridian/entry/new`, with `title`, `date`, `time`,
-`duration` and `itemType` search params.
+`duration`, `itemType` and `vault` search params — `vault` overrides
+`defaultVaultId` for that entry, and is what the editor's vault chip sets.
 
 ## Build verification
 

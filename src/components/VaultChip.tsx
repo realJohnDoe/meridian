@@ -1,6 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { useStore } from '@/store'
-import { vaultIcon } from './vaultIcon'
+import { VaultIcon } from './vaultIcon'
 import { cn } from '@/lib/cn'
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
@@ -35,7 +35,6 @@ export default function VaultChip({ vaultId, onChange, className }: Props) {
   const targets = vaults.filter(v => v.kind !== 'example')
 
   if (!vault) return null
-  const VaultIcon = vaultIcon(vault.kind)
 
   const base = cn(
     'inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40',
@@ -47,7 +46,7 @@ export default function VaultChip({ vaultId, onChange, className }: Props) {
   if (!onChange || targets.length < 2) {
     return (
       <span className={base}>
-        <VaultIcon className="size-3 stroke-[1.7] shrink-0" />
+        <VaultIcon kind={vault.kind} className="size-3 stroke-[1.7] shrink-0" />
         <span className="truncate">{vault.name}</span>
       </span>
     )
@@ -59,7 +58,7 @@ export default function VaultChip({ vaultId, onChange, className }: Props) {
         className={cn(base, 'h-auto hover:bg-muted [&>svg]:hidden')}
         aria-label={`Vault: ${vault.name}. Change which vault this entry goes to`}
       >
-        <VaultIcon className="size-3 stroke-[1.7] shrink-0" />
+        <VaultIcon kind={vault.kind} className="size-3 stroke-[1.7] shrink-0" />
         <span className="truncate">{vault.name}</span>
         <ChevronDown className="size-3 shrink-0 opacity-60" />
       </SelectTrigger>

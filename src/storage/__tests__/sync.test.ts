@@ -28,14 +28,17 @@ const { cacheStore, storeState, notifyFns, roundTripLossMock } = vi.hoisted(() =
     status: 'clean' | 'dirty' | 'deleted'; updatedAt: number; version?: string
   }>(),
   storeState: {
+    /** Per-vault layers — the shape the real store holds. */
+    layers: new Map<string, { items: unknown[]; roots: Map<string, unknown> }>(),
+    /** The flattening of `layers`, maintained by the setVaultLayer mock exactly as the store does. */
     items: [] as unknown[],
     roots: new Map<string, unknown>(),
     unreadableFiles: new Map<string, { path: string; message: string }>(),
-    syncDirtyCount: 0,
-    syncError: null as string | null,
-    syncOffline: false,
-    syncInProgress: false,
-    lastSyncedAt: null as number | null,
+    /** vaultId → the fields `setVaultSync` writes. */
+    syncByVault: new Map<string, {
+      dirtyCount: number; error: string | null; offline: boolean
+      inProgress: boolean; lastSyncedAt: number | null; readOnly: boolean
+    }>(),
   },
   notifyFns: { notify: vi.fn(), warn: vi.fn(), notifyError: vi.fn() },
   // The round-trip guard is the only part of @/model stubbed here: it is
@@ -113,11 +116,19 @@ vi.mock('@/storage/cache/files', () => {
 })
 
 vi.mock('@/storeBridge', () => ({
-  getItems: vi.fn(() => storeState.items),
-  getRoots: vi.fn(() => storeState.roots),
-  setData: vi.fn((d: { items: unknown[]; roots: Map<string, unknown> }) => {
-    storeState.items = d.items
-    storeState.roots = d.roots
+  getVaultLayer: vi.fn((vaultId: string) => storeState.layers.get(vaultId) ?? { items: [], roots: new Map() }),
+  setVaultLayer: vi.fn((vaultId: string, data: { items: unknown[]; roots: Map<string, unknown> }) => {
+    storeState.layers.set(vaultId, data)
+    // Re-flatten exactly as the real store does, so assertions on the merged
+    // view stay meaningful and a cross-vault leak in the merge would show up.
+    storeState.items = [...storeState.layers.values()].flatMap(l => l.items)
+    storeState.roots = new Map([...storeState.layers.values()].flatMap(l => [...l.roots]))
+  }),
+  setVaultSync: vi.fn((vaultId: string, patch: Record<string, unknown>) => {
+    const prev = storeState.syncByVault.get(vaultId) ?? {
+      dirtyCount: 0, error: null, offline: false, inProgress: false, lastSyncedAt: null, readOnly: false,
+    }
+    storeState.syncByVault.set(vaultId, { ...prev, ...patch })
   }),
   getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
   setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
@@ -133,8 +144,30 @@ vi.mock('@/model', async (importActual) => ({
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend, parseFiles, reportParseFailures } from '@/storage/sync'
-import { setActiveBackend } from '@/storage/activeBackend'
+import { syncToBackend, autoSyncTick, resetSyncBackoff, dropAllSyncState, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend, parseFiles, reportParseFailures } from '@/storage/sync'
+import { mountBackend, unmountAllBackends } from '@/storage/backends'
+
+/**
+ * One vault's row in the mocked `syncByVault`. Defaults to the single vault
+ * most of these tests use, so an assertion reads the same as it did when this
+ * state was flat.
+ */
+function seedLayer(
+  vaultId: string,
+  items: unknown[],
+  roots: Map<string, unknown> = new Map(),
+): void {
+  storeState.layers.set(vaultId, { items, roots })
+  storeState.items = [...storeState.layers.values()].flatMap(l => l.items)
+  storeState.roots = new Map([...storeState.layers.values()].flatMap(l => [...l.roots]))
+}
+
+function syncOf(vaultId = 'fake-vault') {
+  return storeState.syncByVault.get(vaultId) ?? {
+    dirtyCount: 0, error: null as string | null, offline: false,
+    inProgress: false, lastSyncedAt: null as number | null, readOnly: false,
+  }
+}
 import { recordLocalEdit, recordLocalDelete } from '@/storage/cache/files'
 
 // ── FakeBackend ──────────────────────────────────────────────────────────
@@ -302,17 +335,18 @@ beforeEach(() => {
   storeState.items = []
   storeState.roots = new Map()
   storeState.unreadableFiles = new Map()
-  storeState.syncDirtyCount = 0
-  storeState.syncError = null
-  storeState.syncOffline = false
-  storeState.syncInProgress = false
-  storeState.lastSyncedAt = null
+  storeState.layers.clear()
+  storeState.syncByVault.clear()
   notifyFns.notify.mockClear()
   notifyFns.warn.mockClear()
   notifyFns.notifyError.mockClear()
   roundTripLossMock.mockClear()
   roundTripLossMock.mockReturnValue([])
-  setActiveBackend(null)
+  unmountAllBackends()
+  // Per-vault sync state is module-level and now survives a backend being
+  // unmounted, so it has to be dropped explicitly — otherwise one test's
+  // lastAttemptAt paces the next test's scheduler.
+  dropAllSyncState()
   resetSyncBackoff()
 })
 
@@ -322,7 +356,7 @@ describe('pushDirty — write-conflict collision', () => {
   it('pulls the fresh remote copy, writes local content to a timestamped conflict copy, and warns', async () => {
     const backend = new FakeBackend()
     backend.seed('task.md', 'remote v1', 'sha1')
-    setActiveBackend(backend)
+    mountBackend(backend)
 
     // Local dirty edit derived from base 'sha1', but the backend has since
     // diverged (simulates another device pushing 'remote v2' first).
@@ -359,7 +393,7 @@ describe('pushDirty — write-conflict collision', () => {
     expect(notifyFns.warn.mock.calls[0]![0]).toContain('task.md')
 
     // The collision doesn't surface as a sync failure — it's a handled outcome.
-    expect(storeState.syncError).toBeNull()
+    expect(syncOf().error).toBeNull()
   })
 
   // Data-integrity survey, finding #1. resolveCollision used to revert the dirty
@@ -369,7 +403,7 @@ describe('pushDirty — write-conflict collision', () => {
   it('keeps the local edit recoverable when the conflict-copy write fails mid-resolution', async () => {
     const backend = new FakeBackend()
     backend.seed('task.md', 'remote v1', 'sha1')
-    setActiveBackend(backend)
+    mountBackend(backend)
     await backend.write('task.md', 'REMOTE v2', 'sha1')          // another device pushed first
     seedDirty('fake-vault', 'task.md', 'MY LOCAL EDIT', 'sha1')
     // The network drops precisely on the conflict-copy write.
@@ -393,7 +427,7 @@ describe('pushDirty — write-conflict collision', () => {
   // failure rather than being handled.
   it('finds a free name when two conflicts on one path land in the same second', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date(2026, 6, 31, 8, 0, 0).getTime())
     try {
@@ -413,7 +447,7 @@ describe('pushDirty — write-conflict collision', () => {
     const copies = backend.listPaths().filter(p => p !== 'a.md')
     expect(copies).toHaveLength(2)
     expect(copies.map(p => backend.get(p)!.content).sort()).toEqual(['local one', 'local two'])
-    expect(storeState.syncError).toBeNull()
+    expect(syncOf().error).toBeNull()
   })
 })
 
@@ -428,7 +462,7 @@ describe('pushDirty — write-conflict collision', () => {
 describe('pushDirty — the file was deleted remotely while a local edit was pending', () => {
   it('restores the local content at its original path and tells the user', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
     // The file existed (base version sha1) but another device deleted it.
     seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
 
@@ -442,12 +476,12 @@ describe('pushDirty — the file was deleted remotely while a local edit was pen
     expect(cached?.version).toBeDefined()   // a real token, so the next edit CASes correctly
     expect(notifyFns.warn).toHaveBeenCalledTimes(1)
     expect(notifyFns.warn.mock.calls[0]![0]).toContain('deleted on another device')
-    expect(storeState.syncError).toBeNull()
+    expect(syncOf().error).toBeNull()
   })
 
   it('converges — repeated syncs do not pile up conflict copies', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
 
     vi.useFakeTimers({ toFake: ['Date'] })
@@ -470,7 +504,7 @@ describe('pushDirty — the file was deleted remotely while a local edit was pen
 
   it('falls back to a conflict copy if the path is re-created mid-resolution', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
     // readFiles reports the path as gone, but a create lands before ours does —
     // the recreate must not clobber it.
@@ -491,7 +525,7 @@ describe('pushDirty — delete-conflict tombstone handling', () => {
   it('drops the tombstone and keeps the remote edit instead of destroying it', async () => {
     const backend = new FakeBackend()
     backend.seed('task.md', 'original', 'sha1')
-    setActiveBackend(backend)
+    mountBackend(backend)
 
     // A remote edit lands after the local delete was staged — the tombstone
     // still holds the stale base version 'sha1'.
@@ -511,12 +545,12 @@ describe('pushDirty — delete-conflict tombstone handling', () => {
     expect(cached?.status).toBe('clean')
     expect(cached?.content).toBe('remote edit after delete staged')
 
-    expect(storeState.syncError).toBeNull()
+    expect(syncOf().error).toBeNull()
   })
 
   it('is idempotent when the remote file is already gone', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedTombstone('fake-vault', 'gone.md', 'sha1')
 
     await syncToBackend()
@@ -524,7 +558,7 @@ describe('pushDirty — delete-conflict tombstone handling', () => {
     expect(backend.listPaths()).not.toContain('gone.md')
     expect(cacheStore.has(vp('fake-vault', 'gone.md'))).toBe(false)
     expect(notifyFns.warn).not.toHaveBeenCalled()
-    expect(storeState.syncError).toBeNull()
+    expect(syncOf().error).toBeNull()
   })
 })
 
@@ -540,7 +574,7 @@ describe('pushDirty — post-push write does not clobber a concurrent edit', () 
   it('keeps an edit that lands while the push is still in flight', async () => {
     const backend = new FakeBackend()
     backend.seed('task.md', 'original', 'sha1')
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedDirty('fake-vault', 'task.md', 'C1', 'sha1')
 
     const release = backend.blockNextWrite()
@@ -563,7 +597,7 @@ describe('pushDirty — post-push write does not clobber a concurrent edit', () 
   it('keeps a tombstone staged while the push is still in flight, with the fresh version', async () => {
     const backend = new FakeBackend()
     backend.seed('task.md', 'original', 'sha1')
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedDirty('fake-vault', 'task.md', 'C1', 'sha1')
 
     const release = backend.blockNextWrite()
@@ -590,7 +624,7 @@ describe('runSync — auth retry after 401', () => {
   it('retries once via backend.refreshAuth() and succeeds on the retry', async () => {
     const backend = new FakeBackend()
     backend.seed('task.md', 'remote', 'sha1')
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
 
     const refreshAuth = vi.fn().mockResolvedValue(true)
@@ -603,14 +637,14 @@ describe('runSync — auth retry after 401', () => {
     expect(backend.writeCallCount).toBe(2) // failed attempt + retry
     expect(backend.get('task.md')?.content).toBe('local edit')
     expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('clean')
-    expect(storeState.syncError).toBeNull()
-    expect(storeState.lastSyncedAt).not.toBeNull()
+    expect(syncOf().error).toBeNull()
+    expect(syncOf().lastSyncedAt).not.toBeNull()
   })
 
   it('surfaces an actionable error when refreshAuth fails to recover', async () => {
     const backend = new FakeBackend()
     backend.seed('task.md', 'remote', 'sha1')
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
 
     backend.refreshAuth = vi.fn().mockResolvedValue(false)
@@ -620,7 +654,7 @@ describe('runSync — auth retry after 401', () => {
 
     expect(backend.refreshAuth).toHaveBeenCalledTimes(1)
     expect(backend.writeCallCount).toBe(1) // no retry attempted
-    expect(storeState.syncError).toBe('401 unauthorized')
+    expect(syncOf().error).toBe('401 unauthorized')
     expect(notifyFns.notifyError).toHaveBeenCalledTimes(1)
     // The dirty edit is preserved locally rather than lost.
     expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('dirty')
@@ -629,7 +663,7 @@ describe('runSync — auth retry after 401', () => {
   it('does not attempt a retry when the backend has no refreshAuth recovery path', async () => {
     const backend = new FakeBackend()
     backend.seed('task.md', 'remote', 'sha1')
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
 
     backend.queueWriteError(new AuthSyncError('token revoked'))
@@ -637,7 +671,7 @@ describe('runSync — auth retry after 401', () => {
     await syncToBackend()
 
     expect(backend.writeCallCount).toBe(1)
-    expect(storeState.syncError).toBe('token revoked')
+    expect(syncOf().error).toBe('token revoked')
   })
 })
 
@@ -646,7 +680,7 @@ describe('runSync — auth retry after 401', () => {
 describe('runSync — exponential backoff on transient failures', () => {
   it('backs off after consecutive transient failures and gates autoSyncTick until it elapses, while manual sync always bypasses the gate', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
 
     let now = 1_000_000
     const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
@@ -654,7 +688,7 @@ describe('runSync — exponential backoff on transient failures', () => {
     try {
       backend.queueStatAllError(new TransientSyncError('offline'))
       await syncToBackend() // failure #1 → backoff = 60_000ms
-      expect(storeState.syncOffline).toBe(true)
+      expect(syncOf().offline).toBe(true)
       expect(backend.statAllCallCount).toBe(1)
 
       // Immediately after: still within the backoff window, autoSyncTick is gated.
@@ -675,16 +709,23 @@ describe('runSync — exponential backoff on transient failures', () => {
       autoSyncTick()
       await flush()
       expect(backend.statAllCallCount).toBe(2)
-      expect(storeState.syncOffline).toBe(true)
+      expect(syncOf().offline).toBe(true)
 
       // Manual sync bypasses the backoff gate immediately, even mid-window.
       now += 500
       await syncToBackend() // succeeds — no error queued this time
       expect(backend.statAllCallCount).toBe(3)
-      expect(storeState.syncOffline).toBe(false)
+      expect(syncOf().offline).toBe(false)
 
-      // A successful sync resets the backoff: an immediate autoSyncTick can
-      // fire right away rather than staying gated.
+      // A successful sync resets the backoff. The next tick is then paced only
+      // by this vault kind's own minimum interval (local: 30s) rather than by
+      // a backoff window that would have been 240s by now.
+      now += 500
+      autoSyncTick()
+      await flush()
+      expect(backend.statAllCallCount).toBe(3) // inside the 30s minimum
+
+      now += 30_000
       backend.queueStatAllError(new TransientSyncError('offline'))
       autoSyncTick()
       await flush()
@@ -696,7 +737,7 @@ describe('runSync — exponential backoff on transient failures', () => {
 
   it('caps backoff at 30 minutes after many consecutive failures', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
 
     let now = 1_000_000
     const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
@@ -709,7 +750,7 @@ describe('runSync — exponential backoff on transient failures', () => {
         backend.queueStatAllError(new TransientSyncError('offline'))
         await syncToBackend()
       }
-      expect(storeState.syncOffline).toBe(true)
+      expect(syncOf().offline).toBe(true)
 
       // 6th failure: backoff = min(60_000 * 2^5, 1_800_000) = min(1_920_000, 1_800_000) = 1_800_000
       now += 1_800_000 - 1
@@ -741,7 +782,7 @@ describe('reconcileWithBackend — an eventually-consistent listing must not del
     try {
       seedClean('fake-vault', 'new.md', 'content', 'v1', now)
       storeState.roots.set(K('new'), rootFor('new', { title: 'New', tags: [], items: [] }))
-      setActiveBackend(backend)
+      mountBackend(backend)
 
       now += 60_000 // one autoSyncTick interval later — well inside the 5-minute grace window
       await syncToBackend()
@@ -755,7 +796,7 @@ describe('reconcileWithBackend — an eventually-consistent listing must not del
 
   it('still propagates a genuine remote delete (old updatedAt, absent from the backend)', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedClean('fake-vault', 'old.md', 'content', 'v1', 0) // written long ago, well outside the window
     storeState.roots.set(K('old'), rootFor('old', { title: 'Old', tags: [], items: [] }))
 
@@ -775,7 +816,7 @@ describe('reconcileWithBackend — large changed sets route through readAll()', 
     // "changed" — above LARGE_RECONCILE_THRESHOLD (50), this must route through
     // readAll() rather than reproducing a 51-request readFiles() fan-out.
     for (let i = 0; i < 51; i++) backend.seed(`note-${i}.md`, `content ${i}`, `sha${i}`)
-    setActiveBackend(backend)
+    mountBackend(backend)
 
     await syncToBackend()
 
@@ -791,7 +832,7 @@ describe('reconcileWithBackend — large changed sets route through readAll()', 
   it('still uses readFiles() for small changed sets at/below the threshold', async () => {
     const backend = new FakeBackend()
     backend.seed('note.md', 'content', 'sha1')
-    setActiveBackend(backend)
+    mountBackend(backend)
 
     await syncToBackend()
 
@@ -813,9 +854,9 @@ describe('reconcileWithBackend — a local edit landing mid-reconcile is not clo
   it('does not merge stale remote content over a local edit that lands between the cache snapshot and the write-back', async () => {
     const backend = new FakeBackend()
     backend.seed('note.md', 'remote v2', 'v2')
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedClean('fake-vault', 'note.md', 'remote v1', 'v1', Date.now()) // clean, version drifted → planReconcile marks it "changed"
-    storeState.roots = new Map([[K('note'), rootFor('note', { title: 'Local Edit', tags: [], items: [] })]])
+    seedLayer('fake-vault', [], new Map([[K('note'), rootFor('note', { title: 'Local Edit', tags: [], items: [] })]]))
 
     const release = backend.blockNextReadFiles()
     const reconcilePromise = reconcileWithBackend(backend, 'fake-vault')
@@ -839,7 +880,7 @@ describe('reconcileWithBackend — a local edit landing mid-reconcile is not clo
     const backend = new FakeBackend()
     backend.seed('untouched.md', 'remote content', 'v2')
     backend.seed('edited.md', 'remote content 2', 'v2')
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedClean('fake-vault', 'untouched.md', 'old content', 'v1', Date.now())
     seedClean('fake-vault', 'edited.md', 'old content 2', 'v1', Date.now())
 
@@ -858,36 +899,39 @@ describe('reconcileWithBackend — a local edit landing mid-reconcile is not clo
   })
 })
 
-// ── reconcileWithBackend — vault switched underneath an in-flight sync ───
+// ── reconcileWithBackend — the vault unregistered underneath an in-flight sync ──
 //
-// Newly reachable now that activation fires its first sync un-awaited: the
-// user can switch vaults while it is still running. The cache writes stay
-// correct either way (they are keyed by vaultId), but merging into the store
-// would paint the old vault's content over the newly-selected one.
+// Reachable because registration fires its first sync un-awaited: the user can
+// remove a vault in Settings while it is still running. The cache writes stay
+// correct either way (they are keyed by vaultId, and removeVault drops those
+// rows itself), but merging into the store would resurrect the layer that
+// removal just dropped.
+//
+// Note what is NOT a hazard any more: another vault's reconcile landing late
+// can no longer paint over this one, because each reconcile writes only its
+// own layer.
 
-describe('reconcileWithBackend — the active vault changing mid-flight', () => {
-  it('still writes the cache but does not merge into the store when the active vault changed', async () => {
+describe('reconcileWithBackend — the vault being unregistered mid-flight', () => {
+  it('still writes the cache but does not merge into the store when the vault was unmounted', async () => {
     const backend = new FakeBackend()
     backend.seed('note.md', 'remote v2', 'v2')
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedClean('fake-vault', 'note.md', 'remote v1', 'v1', Date.now())
-    storeState.items = [{ entryKey: K('belongs-to-the-other-vault') }]
+    seedLayer('fake-vault', [{ entryKey: K('note') }])
 
     const release = backend.blockNextReadFiles()
     const reconcilePromise = reconcileWithBackend(backend, 'fake-vault')
     await flush()
 
-    // The user switches vaults while readFiles is still in flight.
-    const other = new FakeBackend()
-    Object.defineProperty(other, 'id', { value: 'other-vault' })
-    setActiveBackend(other)
+    // The user removes the vault while readFiles is still in flight.
+    unmountAllBackends()
     release()
     await reconcilePromise
 
     // Cache write completed — it is keyed by vaultId and stays correct.
     expect(cacheStore.get(vp('fake-vault', 'note.md'))?.content).toBe('remote v2')
-    // ...but the store still belongs to whichever vault is active now.
-    expect(storeState.items).toEqual([{ entryKey: K('belongs-to-the-other-vault') }])
+    // ...but the layer was not rebuilt under a vault that no longer exists.
+    expect(storeState.items).toEqual([{ entryKey: K('note') }])
   })
 })
 
@@ -898,7 +942,7 @@ describe('scheduleAutoPush / attemptPush — never strand a push dropped mid-syn
     vi.useFakeTimers()
     try {
       const backend = new FakeBackend()
-      setActiveBackend(backend)
+      mountBackend(backend)
 
       // runSync sets the module-private `_syncing` flag synchronously, before
       // its first internal await — so this captures the "sync already
@@ -931,7 +975,7 @@ describe('scheduleAutoPush / attemptPush — never strand a push dropped mid-syn
 describe('flushPendingPush', () => {
   it('pushes a pre-seeded dirty file immediately, bypassing the 1s debounce', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
     seedDirty('fake-vault', 'task.md', 'rescued content', undefined)
 
     flushPendingPush()
@@ -944,7 +988,7 @@ describe('flushPendingPush', () => {
 
   it('is a no-op when nothing is dirty', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
 
     flushPendingPush()
     await flush()
@@ -965,13 +1009,13 @@ describe('flushPendingPush', () => {
 describe('syncOnActivate', () => {
   it('pushes a previous session\'s dirty record and pulls remote changes in one cycle', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
     // Stranded by a previous session — the old flushPendingPush()'s job.
     seedDirty('fake-vault', 'stranded.md', 'written while offline', undefined)
     // Landed on the backend since we last looked — the reconcile's job.
     backend.seed('remote.md', '# From another device', 'v-remote')
 
-    await syncOnActivate()
+    await syncOnActivate(backend)
 
     expect(backend.writeCallCount).toBe(1)
     expect(backend.get('stranded.md')?.content).toBe('written while offline')
@@ -980,29 +1024,29 @@ describe('syncOnActivate', () => {
 
   it('sets lastSyncedAt, so the sync status does not read "Not synced yet" right after startup', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
 
-    await syncOnActivate()
+    await syncOnActivate(backend)
 
-    expect(storeState.lastSyncedAt).not.toBeNull()
+    expect(syncOf().lastSyncedAt).not.toBeNull()
   })
 
   it('resolves rather than rejecting when the backend is unreachable, and does not notify', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
     backend.queueStatAllError(new TransientSyncError('offline'))
 
     // Activation fires this un-awaited; a rejection here would surface as an
     // unhandled rejection rather than a degraded-to-offline vault.
-    await expect(syncOnActivate()).resolves.toBeUndefined()
+    await expect(syncOnActivate(backend)).resolves.toBeUndefined()
 
-    expect(storeState.syncOffline).toBe(true)
+    expect(syncOf().offline).toBe(true)
     expect(notifyFns.notify).not.toHaveBeenCalled()
   })
 
   it('bypasses the backoff gate that would silence an autoSyncTick', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
     // Arm the backoff with a failed sync.
     backend.queueStatAllError(new TransientSyncError('offline'))
     await syncToBackend()
@@ -1014,17 +1058,17 @@ describe('syncOnActivate', () => {
     expect(backend.statAllCallCount).toBe(1)
 
     // ...but a fresh activation is a deliberate moment and always attempts.
-    await syncOnActivate()
+    await syncOnActivate(backend)
     expect(backend.statAllCallCount).toBe(2)
   })
 
   it('clears syncInProgress once the cycle settles', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
+    mountBackend(backend)
 
-    await syncOnActivate()
+    await syncOnActivate(backend)
 
-    expect(storeState.syncInProgress).toBe(false)
+    expect(syncOf().inProgress).toBe(false)
   })
 })
 
@@ -1040,9 +1084,8 @@ describe('syncOnActivate', () => {
 describe('writeEntityToCache — self-heal delete guard', () => {
   it('does not tombstone a slug that has no items yet but still has a root (stale snapshot)', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
-    storeState.items = []
-    storeState.roots = new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]])
+    mountBackend(backend)
+    seedLayer('fake-vault', [], new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
 
     await writeEntityToCache(K('note'))
 
@@ -1053,9 +1096,8 @@ describe('writeEntityToCache — self-heal delete guard', () => {
   it('tombstones a slug that has neither items nor a root (a real delete)', async () => {
     const backend = new FakeBackend()
     backend.seed('note.md', 'existing content', 'sha1')
-    setActiveBackend(backend)
-    storeState.items = []
-    storeState.roots = new Map()
+    mountBackend(backend)
+    seedLayer('fake-vault', [], new Map())
 
     await writeEntityToCache(K('note'))
 
@@ -1082,9 +1124,8 @@ describe('in-flight write registry — protects against a concurrent reconcile',
   it('a reconcile landing mid-write does not pull remote content over the pending write', async () => {
     const backend = new FakeBackend()
     backend.seed('note.md', 'remote content', 'v2') // genuinely absent from (not yet reflected in) the cache
-    setActiveBackend(backend)
-    storeState.items = oneItem()
-    storeState.roots = new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]])
+    mountBackend(backend)
+    seedLayer('fake-vault', oneItem(), new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
 
     const originalRecordLocalEdit = vi.mocked(recordLocalEdit).getMockImplementation()!
     let releaseWrite!: () => void
@@ -1121,9 +1162,8 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     // coincidence).
     const backend = new FakeBackend()
     backend.seed('note.md', 'remote content', 'v2')
-    setActiveBackend(backend)
-    storeState.items = oneItem()
-    storeState.roots = new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]])
+    mountBackend(backend)
+    seedLayer('fake-vault', oneItem(), new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
 
     const originalRecordLocalEdit = vi.mocked(recordLocalEdit).getMockImplementation()!
     let releaseA!: () => void
@@ -1151,9 +1191,9 @@ describe('in-flight write registry — protects against a concurrent reconcile',
 
   it('clears its mark on the self-heal skip path (root exists, no items yet)', async () => {
     const backend = new FakeBackend()
-    setActiveBackend(backend)
-    storeState.items = [] // no items yet
-    storeState.roots = new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]) // root already exists
+    mountBackend(backend)
+    // No items yet, but the root already exists — the self-heal skip branch.
+    seedLayer('fake-vault', [], new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
 
     await writeEntityToCache(K('note')) // takes the self-heal "skip" branch — warns and returns
 
@@ -1256,5 +1296,187 @@ describe('reportParseFailures', () => {
   it('stays silent when there is nothing to report', () => {
     reportParseFailures([])
     expect(notifyFns.warn).not.toHaveBeenCalled()
+  })
+})
+
+// ── Several vaults, registered and synced side by side ────────────────────
+//
+// The scheduler is serial and oldest-attempted-first, and every piece of
+// per-vault state (backoff, dirty count, debounce) is keyed by vault id. What
+// these pin is that one vault can never speak for another: not for its retry
+// timing, not for its error, and not for its content.
+
+describe('multi-vault sync', () => {
+  /** A second FakeBackend under a different vault id. */
+  function otherBackend(id: string, kind: VaultKind = 'local'): FakeBackend {
+    const backend = new FakeBackend()
+    Object.defineProperty(backend, 'id',   { value: id })
+    Object.defineProperty(backend, 'name', { value: id })
+    Object.defineProperty(backend, 'kind', { value: kind })
+    return backend
+  }
+
+  it('keeps dirty counts and errors independent per vault', async () => {
+    const a = new FakeBackend()          // 'fake-vault'
+    const b = otherBackend('vault-b')
+    mountBackend(a)
+    mountBackend(b)
+
+    seedDirty('vault-b', 'only-b.md', 'b content', undefined)
+    a.queueStatAllError(new AuthSyncError('token revoked'))
+
+    await syncToBackend('fake-vault')
+    await syncToBackend('vault-b')
+
+    expect(syncOf('fake-vault').error).toBe('token revoked')
+    expect(syncOf('vault-b').error).toBeNull()
+    expect(b.get('only-b.md')?.content).toBe('b content')
+    // A's failure did not touch B's row, and vice versa.
+    expect(syncOf('vault-b').offline).toBe(false)
+  })
+
+  it('does not let one vault\'s backoff gate another vault\'s tick', async () => {
+    const a = new FakeBackend()
+    const b = otherBackend('vault-b')
+    mountBackend(a)
+    mountBackend(b)
+
+    let now = 2_000_000
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      a.queueStatAllError(new TransientSyncError('offline'))
+      await syncToBackend('fake-vault')  // A is now in a 60s backoff
+      expect(a.statAllCallCount).toBe(1)
+      expect(b.statAllCallCount).toBe(0)
+
+      now += 31_000                      // past local's 30s minimum, inside A's backoff
+      autoSyncTick()
+      await flush()
+
+      expect(a.statAllCallCount).toBe(1) // still gated
+      expect(b.statAllCallCount).toBe(1) // unaffected
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
+
+  it('honours each vault kind\'s own minimum interval', async () => {
+    const local  = new FakeBackend()                    // local: 30s
+    const github = otherBackend('vault-gh', 'github')   // github: 60s
+    mountBackend(local)
+    mountBackend(github)
+
+    let now = 3_000_000
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      autoSyncTick()
+      await flush()
+      expect(local.statAllCallCount).toBe(1)
+      expect(github.statAllCallCount).toBe(1)
+
+      // 35s on: past local's minimum, short of github's.
+      now += 35_000
+      autoSyncTick()
+      await flush()
+      expect(local.statAllCallCount).toBe(2)
+      expect(github.statAllCallCount).toBe(1)
+
+      now += 30_000
+      autoSyncTick()
+      await flush()
+      expect(github.statAllCallCount).toBe(2)
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
+
+  it('syncs oldest-attempted first, and never two cycles at once', async () => {
+    const a = new FakeBackend()
+    const b = otherBackend('vault-b')
+    mountBackend(a)
+    mountBackend(b)
+
+    // A synced recently; B has never been attempted, so B must lead.
+    const order: string[] = []
+    const originalStatAllA = a.statAll.bind(a)
+    const originalStatAllB = b.statAll.bind(b)
+    vi.spyOn(a, 'statAll').mockImplementation(async () => { order.push('a'); return originalStatAllA() })
+    vi.spyOn(b, 'statAll').mockImplementation(async () => { order.push('b'); return originalStatAllB() })
+
+    await syncToBackend('fake-vault')
+    order.length = 0
+
+    let now = Date.now() + 10 * 60_000
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      autoSyncTick()
+      await flush()
+      // B has never been attempted, so it leads despite being registered second.
+      expect(order).toEqual(['b', 'a'])
+
+      // A tick that lands while a pass is still walking is dropped, not
+      // interleaved — otherwise two cycles could run against one vault. Two
+      // calls back to back therefore produce one pass, not two.
+      now += 10 * 60_000
+      order.length = 0
+      autoSyncTick()
+      autoSyncTick()
+      await flush()
+      // Both were attempted at the same mocked instant by the previous pass, so
+      // the tie falls back to registration order.
+      expect(order).toEqual(['a', 'b'])
+    } finally {
+      nowSpy.mockRestore()
+    }
+  })
+
+  it('flushPendingPush rescues dirty writes in every vault, not just one', async () => {
+    const a = new FakeBackend()
+    const b = otherBackend('vault-b')
+    mountBackend(a)
+    mountBackend(b)
+
+    seedDirty('fake-vault', 'a.md', 'a content', undefined)
+    seedDirty('vault-b',    'b.md', 'b content', undefined)
+
+    flushPendingPush()
+    await flush()
+
+    expect(a.get('a.md')?.content).toBe('a content')
+    expect(b.get('b.md')?.content).toBe('b content')
+  })
+
+  it('writeEntityToCache refuses an unregistered vault', async () => {
+    const a = new FakeBackend()
+    mountBackend(a)
+    seedLayer('ghost-vault', [{ entryKey: 'ghost-vault::note' }],
+      new Map([['ghost-vault::note', rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+
+    await writeEntityToCache('ghost-vault::note' as EntryKey)
+
+    expect(cacheStore.get(vp('ghost-vault', 'note.md'))).toBeUndefined()
+  })
+
+  it('writeEntityToCache refuses a read-only vault', async () => {
+    const ro = otherBackend('vault-ro')
+    Object.defineProperty(ro, 'readOnly', { value: true })
+    mountBackend(ro)
+    seedLayer('vault-ro', [{ entryKey: 'vault-ro::note' }],
+      new Map([['vault-ro::note', rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+
+    await writeEntityToCache('vault-ro::note' as EntryKey)
+
+    expect(cacheStore.get(vp('vault-ro', 'note.md'))).toBeUndefined()
+  })
+
+  it('never auto-syncs a read-only vault', async () => {
+    const ro = otherBackend('vault-ro')
+    Object.defineProperty(ro, 'readOnly', { value: true })
+    mountBackend(ro)
+
+    autoSyncTick()
+    await flush()
+
+    expect(ro.statAllCallCount).toBe(0)
   })
 })
