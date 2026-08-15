@@ -12,10 +12,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Input } from '@/components/ui/input'
 import { readVaultStringArray } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
-import { syncToBackend, removeVault, cacheDirtyCount } from '@/vaultActions'
+import { syncToBackend, removeVault, renameVault, cacheDirtyCount } from '@/vaultActions'
 import { ParticipantsRow } from '@/editor'
 import type { VaultRef } from '@/vaultActions'
 
@@ -25,11 +26,18 @@ interface Props {
 
 export function VaultSettings({ vault }: Props) {
   const [syncing,  setSyncing]  = useState(false)
+  const [name, setName] = useState(vault.name)
   const [participants, setParticipants] = useState<string[]>(
     () => readVaultStringArray('meridian_default_participants', vault.id),
   )
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [dirtyCount,  setDirtyCount]  = useState(0)
+
+  function handleNameBlur() {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== vault.name) void renameVault(vault.id, trimmed)
+    else setName(vault.name)
+  }
 
   const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
   const items                  = useStore(s => s.items)
@@ -61,6 +69,20 @@ export function VaultSettings({ vault }: Props) {
 
   return (
     <>
+      {vault.kind !== 'example' && (
+        <div className="flex flex-col gap-2 pt-2 border-t border-border">
+          <span className="text-sm font-medium">Name</span>
+          <Input
+            value={name}
+            onChange={e => { setName(e.target.value) }}
+            onBlur={handleNameBlur}
+          />
+          <p className="text-xs text-muted-foreground">
+            Renaming doesn&rsquo;t change this vault&rsquo;s URL — bookmarks and links keep working.
+          </p>
+        </div>
+      )}
+
       {vault.kind === 'local' && (
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
           <div className="flex flex-col gap-0.5 min-w-0">

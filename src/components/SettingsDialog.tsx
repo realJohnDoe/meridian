@@ -113,6 +113,11 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
             <ResponsiveModalTitle>Settings</ResponsiveModalTitle>
 
             <div className="flex flex-col gap-4 p-4">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-sm font-semibold">General</span>
+                <p className="text-xs text-muted-foreground">Applies to Meridian on this device.</p>
+              </div>
+
               <div className="flex flex-col gap-2">
                 <span className="text-sm font-medium">Appearance</span>
                 <div className="grid grid-cols-2 gap-2">
@@ -162,7 +167,10 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                 </div>
               )}
 
-              <span className="text-sm font-medium pt-2 border-t border-border">Vaults</span>
+              <div className="flex flex-col gap-0.5 pt-3 border-t border-border">
+                <span className="text-sm font-semibold">Vaults</span>
+                <p className="text-xs text-muted-foreground">Settings for the selected vault only.</p>
+              </div>
 
               <Select value={selectedVaultId ?? ''} onValueChange={handleVaultSelect}>
                 <SelectTrigger>
