@@ -23,9 +23,9 @@ export function testKey(slug: string): EntryKey {
 /** Resets the store (a module singleton) to a clean, deterministic state around each test. */
 export function setupStore(): void {
   beforeEach(() => {
-    // activeVaultId is where a brand-new entry goes (see saveNode); without it
+    // defaultVaultId is where a brand-new entry goes (see saveNode); without it
     // creating an entry in a test would have no target vault at all.
-    useStore.setState({ localePrefs: { hour12: false, firstDayOfWeek: 1 }, activeVaultId: TEST_VAULT })
+    useStore.setState({ localePrefs: { hour12: false, firstDayOfWeek: 1 }, defaultVaultId: TEST_VAULT })
   })
   afterEach(() => {
     useStore.setState(initialStoreState, true)
@@ -89,8 +89,19 @@ export function setMediaQuery(initialMatches: boolean): (next: boolean) => void 
 }
 
 export function seedStore(items: StoreItem[], roots: Roots): void {
-  useStore.setState({ activeVaultId: TEST_VAULT })
+  useStore.setState({ defaultVaultId: TEST_VAULT })
   useStore.getState().setData({ items, roots })
+}
+
+/**
+ * Seed several vaults' layers at once, for tests that exercise the merge.
+ * Goes through `setVaultLayer` rather than `setData` so `layers` is the source
+ * of truth and `items`/`roots` are its flattening — the same path the storage
+ * layer takes.
+ */
+export function seedLayers(layers: Record<string, { items: StoreItem[]; roots: Roots }>): void {
+  const store = useStore.getState()
+  for (const [vaultId, data] of Object.entries(layers)) store.setVaultLayer(vaultId, data)
 }
 
 export interface FakePersistence {

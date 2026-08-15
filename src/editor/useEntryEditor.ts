@@ -12,6 +12,7 @@ import { keyVaultId, keySlug } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { toggleOccDone } from '@/occurrenceActions'
 import { getFom } from '@/storeBridge'
+import { readVaultStringArray } from '@/lib/vaultStorage'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
 import { usePendingLinks } from './usePendingLinks'
@@ -23,6 +24,8 @@ export interface NewEntrySeed {
   time?: string
   duration?: string
   itemType?: ItemType
+  /** Which vault to create in, overriding `defaultVaultId`. From the `vault` search param. */
+  vault?: string
 }
 
 function entryFromItem(item: Occurrence | null, editScope: EditScope, seed?: NewEntrySeed): EntryState {
@@ -41,10 +44,22 @@ function entryFromItem(item: Occurrence | null, editScope: EditScope, seed?: New
 }
 
 export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string, seed?: NewEntrySeed) {
-  const defaultParticipants = useStore.getState().defaultParticipants
   const today = useToday()
 
+  // Which vault a brand-new entry will land in, changeable via the vault chip
+  // until the first save creates the file. Null for an existing entry — its
+  // vault is fixed, and rides inside its own key.
+  const [targetVaultId, setTargetVaultId] = useState<string | null>(
+    () => initialOcc ? null : (seed?.vault ?? useStore.getState().defaultVaultId),
+  )
+
+  // Read from the *target* vault, not from whatever `loadDefaultParticipants`
+  // last cached: with the vault chip able to point a new entry elsewhere, the
+  // seed has to match where the entry actually lands.
   const [entry, setEntry] = useState<EntryState>(() => {
+    const defaultParticipants = (!initialOcc && targetVaultId)
+      ? readVaultStringArray('meridian_default_participants', targetVaultId)
+      : []
     const base = entryFromItem(initialOcc, initialScope, seed)
     const seeded = (!initialOcc && defaultParticipants.length > 0)
       ? { ...base, participants: [...defaultParticipants] }
@@ -68,11 +83,12 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // (not a ref) because it feeds the favourite button and the "listed on" target.
   const [createdKey, setCreatedKey] = useState<EntryKey | null>(null)
 
-  // An existing entry's vault is its own; a brand-new one lands in whichever
-  // vault is loaded. Both the link picker and wikilink resolution below are
-  // scoped to it — a `[[slug]]` only ever means a file in the same vault.
-  const activeVaultId = useStore(s => s.activeVaultId)
-  const vaultId = entry.item ? keyVaultId(entry.item.entryKey) : activeVaultId
+  // An existing entry's vault is its own; a brand-new one lands in the default
+  // vault unless the route overrode it (the new-entry vault chip). Both the
+  // link picker and wikilink resolution below are scoped to it — a `[[slug]]`
+  // only ever means a file in the same vault.
+  const defaultVaultId = useStore(s => s.defaultVaultId)
+  const vaultId = entry.item ? keyVaultId(entry.item.entryKey) : (targetVaultId ?? defaultVaultId)
 
   const { effectiveKey, pendingKeys, handleAdd, handleRemove, flushOnSave } =
     usePendingLinks(entry.item, entry.title, vaultId, createdKey)
@@ -122,7 +138,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
       return
     }
     if (!next.title) return
-    const key = saveNode(null, next.editScope, next, draftId)
+    const key = saveNode(null, next.editScope, next, draftId, targetVaultId)
     if (key === null) { setTitleMissing(true); return }
     setTitleMissing(false)
     flushLinksRef.current(keySlug(key))
@@ -209,7 +225,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     // still deliberately null, so saving must target the adopted item rather than ask
     // for another new entry. draftIdRef covers the window before that adoption lands.
     const item = entry.item ?? createdItemRef.current
-    const key = saveNode(item, entry.editScope, { ...entry, body }, draftId)
+    const key = saveNode(item, entry.editScope, { ...entry, body }, draftId, targetVaultId)
     if (key !== null) { setTitleMissing(false); goBack(); return }
     setTitleMissing(true)
     setFocusTitleTick(t => t + 1)
@@ -272,7 +288,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
       body: '', tags: [], items: [], participants: [...useStore.getState().defaultParticipants],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
-    })
+    }, undefined, targetVaultId)
     if (key === null) return null
     void navigate(keyRoute(key))
     return keySlug(key)
@@ -286,6 +302,9 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     entry, setEntry,
     createdKey,
     vaultId,
+    // Null once the entry exists — the chip becomes a picker only in PR 5's
+    // move flow; before the first save it retargets where the file is created.
+    setTargetVaultId: entry.item ?? createdItemRef.current ? null : setTargetVaultId,
     series,
     pendingLinks: { effectiveKey, pendingKeys, handleAdd, handleRemove },
     saveMeta,

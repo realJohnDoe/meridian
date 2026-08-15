@@ -24,6 +24,11 @@ export function writeVaultJSON(keyPrefix: string, vaultId: string, value: unknow
   localStorage.setItem(vaultKey(keyPrefix, vaultId), JSON.stringify(value))
 }
 
+/** Remove a per-vault key — used to retire a pref after it has been migrated. */
+export function clearVaultKey(keyPrefix: string, vaultId: string): void {
+  try { localStorage.removeItem(vaultKey(keyPrefix, vaultId)) } catch { /* private mode */ }
+}
+
 export function readVaultJSON<T>(keyPrefix: string, vaultId: string, defaultValue: T): T {
   try {
     const raw = localStorage.getItem(vaultKey(keyPrefix, vaultId))

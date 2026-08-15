@@ -17,6 +17,8 @@ interface NewEntrySearch {
   time?: string
   duration?: string
   itemType?: ItemTypeSearch
+  /** Which vault to create in, overriding `defaultVaultId`. */
+  vault?: string
 }
 
 export const Route = createFileRoute('/_app/entry/new')({
@@ -27,15 +29,16 @@ export const Route = createFileRoute('/_app/entry/new')({
     time: typeof s.time === 'string' ? s.time : undefined,
     duration: typeof s.duration === 'string' ? s.duration : undefined,
     itemType: ITEM_TYPES.includes(s.itemType as ItemTypeSearch) ? (s.itemType as ItemTypeSearch) : undefined,
+    vault: typeof s.vault === 'string' ? s.vault : undefined,
   }),
 })
 
-function NewEntryReady({ title, date, time, duration, itemType }: NewEntrySearch) {
+function NewEntryReady({ title, date, time, duration, itemType, vault }: NewEntrySearch) {
   const items          = useStore(s => s.items)
   const roots          = useStore(s => s.roots)
   const favorites      = useStore(s => s.favorites)
   const toggleFavorite = useStore(s => s.toggleFavorite)
-  const hooks = useEntryEditor(null, 'all', title, { date, time, duration, itemType })
+  const hooks = useEntryEditor(null, 'all', title, { date, time, duration, itemType, vault })
 
   // A brand-new item has no file yet, but once it has a title its eventual key is
   // predictable, so favoriting can target it immediately rather than waiting for

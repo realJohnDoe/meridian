@@ -7,34 +7,39 @@ import {
   tokenExpirySave, tokenExpiryClear,
 } from '@/storage/cache/credentials'
 import { vaultRefsSave, vaultRefsLoad, activeVaultIdSave, activeVaultIdLoad } from '@/storage/cache/registry'
-import { titleToSlug } from '@/fileIO'
+import { titleToSlug, keyVaultId } from '@/fileIO'
+import type { EntryKey } from '@/fileIO'
 import { diskPickDirectory } from './fs'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import type { VaultRef, GitHubVaultRef } from '@/vaultRef'
-import { setData, getVaults, setActiveVaultId, setStoreState, setUnreadableFiles, loadVaultPrefs } from '@/storeBridge'
+import {
+  getVaults, setStoreState, setVaultLayer, removeVaultLayer,
+  setVaultSync, removeVaultSync, getUnreadableFiles, setUnreadableFiles,
+  loadGlobalPrefs, loadDefaultParticipants, getDefaultVaultId, setDefaultVaultId, hideVaultOnce,
+} from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
-import { getActiveBackend, setActiveBackend } from './activeBackend'
-import { syncOnActivate, parseFiles, reportParseFailures, updateSyncUI } from './sync'
+import { mountBackend, unmountBackend } from './backends'
+import { syncOnActivate, parseFiles, reportParseFailures, updateSyncUI, dropSyncState } from './sync'
+
 // ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
 
 export interface VaultChange {
   /**
-   * Whether this activation replaced the store's items/roots with a *different*
-   * vault's content.
+   * Whether this change replaced content the calendar had already derived
+   * views from.
    *
    * False on the cache-first restore path, where `hydrateFromCache` painted
-   * this same vault before activation even started — so everything derived from
-   * that content (cached expansions, agenda sections, scroll position) is still
-   * valid and must not be thrown away. Discarding it there cost a full
-   * re-expansion and re-grouping of the vault on the critical path to the
-   * agenda's first correct frame, for a vault that had not changed.
+   * these same vaults before activation even started — so everything derived
+   * from that content (cached expansions, agenda sections, scroll position) is
+   * still valid and must not be thrown away. Discarding it there cost a full
+   * re-expansion and re-grouping on the critical path to the agenda's first
+   * correct frame, for content that had not changed.
    *
-   * True for a user-initiated switch, for a restore whose cache was empty, and
-   * for every fallback to the example vault — all of which do replace the
-   * content under whatever the calendar had cached.
+   * True when a vault is registered or removed, and for a restore whose caches
+   * were all empty — all of which do change what the agenda is grouping.
    */
   contentReplaced: boolean
 }
@@ -53,6 +58,11 @@ function emitVaultChanged(change: VaultChange): void {
 // ── CONSTANTS ─────────────────────────────────────────────────
 
 const EXAMPLE_REF: VaultRef = { id: 'example', name: 'Tutorial', kind: 'example' }
+
+/** Kinds that accept writes — the candidates for `defaultVaultId`. */
+function isWritableKind(ref: VaultRef): boolean {
+  return ref.kind === 'local' || ref.kind === 'github'
+}
 
 // ── VAULT IDS ─────────────────────────────────────────────────
 
@@ -100,95 +110,100 @@ async function updateVaultRefs(mutate: (current: VaultRef[]) => VaultRef[]): Pro
   const updated = mutate(current)
   await vaultRefsSave(updated)
   setStoreState({ vaults: [EXAMPLE_REF, ...updated] })
+  // Favourites and the view filter span every registered vault at once, so the
+  // registered set changing is exactly when they must be re-read.
+  loadGlobalPrefs([EXAMPLE_REF.id, ...updated.map(r => r.id)])
+}
+
+// ── DEFAULT VAULT ─────────────────────────────────────────────
+
+/**
+ * Keep `defaultVaultId` pointing at a registered, writable vault.
+ *
+ * Called after anything that changes the registered set. The default is where
+ * new entries go, so it must never dangle at a removed vault (saves would be
+ * refused by `writeEntityToCache`, silently) nor at a read-only one. `prefer`
+ * is consulted first — the legacy `activeVaultId` on the restore path, the
+ * freshly added vault on the add path.
+ */
+function reconcileDefaultVault(refs: VaultRef[], prefer?: string | null): void {
+  const writable = refs.filter(isWritableKind)
+  const current  = getDefaultVaultId()
+  if (current && writable.some(r => r.id === current)) return
+  const next = writable.find(r => r.id === prefer)?.id ?? writable[0]?.id ?? null
+  setDefaultVaultId(next)
+  // The one lazily-loaded per-vault pref follows the default: it seeds new
+  // entries, and a new entry goes to the default vault.
+  if (next) loadDefaultParticipants(next)
 }
 
 // ── ACTIVATION HELPERS ─────────────────────────────────────────
 
 /**
- * Paints the store from the Dexie cache. Returns whether there was anything
- * to paint — the caller uses that to decide whether the skeleton can come
- * down now or must stay up until the first sync fills the store.
+ * Replace this vault's contribution to `unreadableFiles`, leaving every other
+ * vault's entries alone. The map is global and keyed by `EntryKey`, so the
+ * vault half of the key is what makes the partition exact.
+ */
+function setVaultUnreadable(
+  vaultId: string, failures: Array<{ key: EntryKey; path: string; message: string }>,
+): void {
+  const next = new Map(
+    [...getUnreadableFiles()].filter(([key]) => keyVaultId(key) !== vaultId),
+  )
+  for (const f of failures) next.set(f.key, { path: f.path, message: f.message })
+  setUnreadableFiles(next)
+}
+
+/**
+ * Paints one vault's layer from the Dexie cache. Returns whether there was
+ * anything to paint — the caller uses that to decide whether the skeleton can
+ * come down now or must stay up until the first sync fills the store.
  */
 async function hydrateFromCache(vaultId: string): Promise<boolean> {
-  // Before anything paints. The participant filter and the tasks toggle decide
-  // which occurrences the agenda builds sections from, and they are a plain
-  // localStorage read — but setActiveVaultId, which normally loads them, only
-  // runs after the token refresh and the permission probe. Painting first meant
-  // the first frame used the *default* filters, and the agenda then dropped
-  // every filtered-out row — including the whole overdue section — from above
-  // its own scroll position once the real values arrived. See loadVaultPrefs.
-  loadVaultPrefs(vaultId)
   const cached = await cacheLoadAll(vaultId)
   if (cached.length === 0) {
-    // Clear rather than return early: leaving the previous vault's items in
-    // the store makes a switch to a never-loaded vault show the old vault's
-    // entries, and the reconcile that follows won't evict them
-    // (mergeChangedIntoStore preserves unaffected slugs).
-    setData({ items: [], roots: new Map() })
-    setUnreadableFiles(new Map())
+    // An empty layer, not a missing one: the vault is registered, so it must
+    // be a key in `layers` for `getVaultLayer` to report it as present.
+    setVaultLayer(vaultId, { items: [], roots: new Map() })
+    setVaultUnreadable(vaultId, [])
     return false
   }
   const { items, roots, failures, auditRoundTrip } = parseFiles(cached, vaultId)
-  setData({ items, roots })
-  setUnreadableFiles(new Map(failures.map(f => [f.key, { path: f.path, message: f.message }])))
+  setVaultLayer(vaultId, { items, roots })
+  setVaultUnreadable(vaultId, failures)
   reportParseFailures(failures)
   auditRoundTrip()
   return true
 }
 
 /**
- * The single source of truth for "which vault is active". The active-vault
- * identity lives in three places — the non-reactive backend singleton
- * (`activeBackend`), the reactive store field (`activeVaultId`), and the
- * persisted IndexedDB value — and they must always agree. Every activation path
- * funnels through here so no caller can update a subset and leave them diverged.
+ * Mount the Tutorial vault and load its synthesized content.
  *
- * `persist: false` is for the error-fallback path, which shows the example vault
- * *without* clobbering the saved id, so the next reload retries the real vault.
+ * Stays on its own cache-free path — no Dexie rows, no `runSync` — because its
+ * files are generated fresh on every load and there is no remote to reconcile
+ * against. Only the *store write* is an ordinary layer write like every other
+ * backend's: the old `setData(...)` replaced the whole store, which was
+ * harmless when this was the only vault but would now wipe out every other
+ * registered vault's content the moment the Tutorial vault (re-)mounts.
  */
-async function setActiveVaultIdentity(
-  backend: StorageBackend,
-  opts: { pendingReconnect?: string | null; persist?: boolean } = {},
-): Promise<void> {
-  const { pendingReconnect = null, persist = true } = opts
-  setActiveBackend(backend)
-  setActiveVaultId(backend.id)
-  setStoreState({ pendingDirReconnect: pendingReconnect })
-  if (persist) await activeVaultIdSave(backend.id)
-}
-
-/**
- * `persist: false` shows the tutorial content *without* overwriting the
- * saved active-vault id. Every "your real vault is temporarily unusable"
- * path must use it: the saved id is the user's choice and has to survive a
- * bad token or a mid-restore crash, so the next reload goes straight back to
- * their vault rather than being stuck on the tutorial forever.
- */
-async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<void> {
+async function mountExampleVault(): Promise<void> {
   const backend = new ExampleBackend()
-  await setActiveVaultIdentity(backend, { persist: opts.persist ?? true })
+  mountBackend(backend)
   const files = await backend.readAll()
   const { items, roots, failures, auditRoundTrip } = parseFiles(files, backend.id)
-  setData({ items, roots })
-  setUnreadableFiles(new Map(failures.map(f => [f.key, { path: f.path, message: f.message }])))
+  setVaultLayer(backend.id, { items, roots })
+  setVaultUnreadable(backend.id, failures)
   reportParseFailures(failures)
   auditRoundTrip()
   updateSyncUI(backend)
-  // Always a replacement: the example vault's content is never what was
-  // already painted, even on the fallback paths that reach here after a real
-  // vault was pre-painted from cache.
-  emitVaultChanged({ contentReplaced: true })
 }
 
 /**
- * Load a vault's content into the store — paint whatever the cache holds,
- * then sync in the background — without touching which vault is "active".
- * Deliberately separate from claiming identity (see `activateWritableVault`
- * below, which composes the two): a future multi-vault registry loads
- * several vaults' content side by side, with at most one of them "active".
+ * Load a vault's content — paint whatever the cache holds, then sync in the
+ * background.
  *
  * `prePainted` means the caller already ran hydrateFromCache for this vault
- * id *before* the network work started (the whole point of the cache-first
+ * *before* the network work started (the whole point of the cache-first
  * restore) — so we don't read the same rows out of Dexie twice.
  *
  * The first sync is deliberately not awaited when something is on screen:
@@ -204,24 +219,15 @@ async function activateExampleVault(opts: { persist?: boolean } = {}): Promise<v
 async function loadVaultContent(backend: StorageBackend, prePainted = false): Promise<void> {
   const painted = prePainted || await hydrateFromCache(backend.id)
   updateSyncUI(backend)
-  // `prePainted` is exactly the "cache-first restore of the vault already on
-  // screen" case — see VaultChange.contentReplaced.
-  emitVaultChanged({ contentReplaced: !prePainted })
 
   if (painted) {
     setStoreState({ vaultLoading: false })
     // .catch is belt-and-braces: runSync swallows its own errors, so this can
     // only ever fire if that invariant is broken later.
-    void syncOnActivate().catch((e: unknown) => console.warn('[vault] activation sync failed:', e))
+    void syncOnActivate(backend).catch((e: unknown) => console.warn('[vault] activation sync failed:', e))
   } else {
-    await syncOnActivate()
+    await syncOnActivate(backend)
   }
-}
-
-/** Activate a writable backend: claim the identity, then load its content. */
-async function activateWritableVault(backend: StorageBackend, prePainted = false): Promise<void> {
-  await setActiveVaultIdentity(backend)
-  await loadVaultContent(backend, prePainted)
 }
 
 /** Builds the backend for a local/github ref, fetching its stored credential
@@ -240,44 +246,46 @@ async function buildBackend(ref: VaultRef): Promise<StorageBackend | null> {
   return null
 }
 
-type ActivationOutcome = 'granted' | 'offline' | 'prompt' | 'denied' | 'no-credential'
+type MountOutcome = 'granted' | 'offline' | 'prompt' | 'denied' | 'no-credential'
 
 /**
- * Shared local/github activation flow used by both the restore-on-load path
- * and the user-initiated switch path. Builds the backend, checks permission,
- * and activates on success; callers only need to react to the outcome for
- * their own fallback/notification policy.
+ * Mount one local/github vault: build its backend, check permission, register
+ * it in the backend map, and load its content.
  *
- * `interactive: false` (restore) surfaces a `'prompt'` outcome by parking the
- * vault in pending-reconnect state instead of activating it. `interactive:
- * true` (user switch) actively requests permission, which never resolves to
- * `'prompt'`.
+ * `interactive: false` (restore) surfaces a `'prompt'` outcome by mounting the
+ * vault in needs-reconnect state instead of syncing it — its cached content
+ * still paints, so the entries are readable, they just can't be refreshed
+ * until the user grants permission. `interactive: true` (a reconnect click)
+ * actively requests permission, which never resolves to `'prompt'`.
  *
  * `prePainted` says the caller already hydrated this vault from cache (the
  * restore path does, before any network work) so neither branch below reads
  * the same Dexie rows a second time.
  */
-async function activateVaultRef(
+async function mountVaultRef(
   ref: VaultRef, interactive: boolean, prePainted = false,
-): Promise<ActivationOutcome> {
+): Promise<MountOutcome> {
   const backend = await buildBackend(ref)
   if (!backend) return 'no-credential'
 
   const perm = await backend.ensurePermission(interactive)
   // 'unreachable' is emphatically not 'denied': the credential is fine, the
-  // network isn't. Activate exactly as for 'granted' — writable, hydrated
-  // from cache — so offline edits are recorded as dirty in Dexie and pushed
-  // on reconnect. syncOffline and the retry backoff are set by the background
-  // sync's own transient classification in runSync, not here, so there stays
-  // exactly one writer for that state.
+  // network isn't. Mount exactly as for 'granted' — writable, hydrated from
+  // cache — so offline edits are recorded as dirty in Dexie and pushed on
+  // reconnect. The offline flag and the retry backoff are set by the
+  // background sync's own transient classification in runSync, not here, so
+  // there stays exactly one writer for that state.
   if (perm === 'granted' || perm === 'unreachable') {
-    await activateWritableVault(backend, prePainted)
+    mountBackend(backend)
+    setVaultSync(ref.id, { needsReconnect: false })
+    await loadVaultContent(backend, prePainted)
     return perm === 'granted' ? 'granted' : 'offline'
   }
   if (perm === 'prompt' && !interactive) {
-    await setActiveVaultIdentity(backend, { pendingReconnect: ref.name })
-    // No background sync here — permission isn't granted yet, so this loads
-    // only what the cache already holds rather than the full loadVaultContent.
+    // Mounted, but flagged: the scheduler will attempt it and fail harmlessly
+    // until the user clicks through from SyncButton's popover.
+    mountBackend(backend)
+    setVaultSync(ref.id, { needsReconnect: true })
     if (!prePainted) await hydrateFromCache(ref.id)
     updateSyncUI(backend)
     return 'prompt'
@@ -285,12 +293,20 @@ async function activateVaultRef(
   return 'denied'
 }
 
-async function registerAndActivate(ref: VaultRef, backend: StorageBackend): Promise<void> {
+async function registerAndMount(ref: VaultRef, backend: StorageBackend): Promise<void> {
+  const wasFirstRealVault = (await vaultRefsLoad()).filter(isWritableKind).length === 0
   await updateVaultRefs(existing => [...existing, ref])
   try {
+    mountBackend(backend)
     const files = await backend.readAll((loaded, total) => setStoreState({ vaultLoadProgress: { loaded, total } }))
     await applyRemoteBatch(backend.id, files)
-    await activateWritableVault(backend)
+    reconcileDefaultVault(getVaults(), ref.id)
+    // The Tutorial vault is synthesized on every load, so without this its
+    // sample entries would sit in a real agenda forever. One-time, so
+    // un-hiding it in the filter sticks — see `hideVaultOnce`.
+    if (wasFirstRealVault) hideVaultOnce(EXAMPLE_REF.id)
+    await loadVaultContent(backend)
+    emitVaultChanged({ contentReplaced: true })
   } finally {
     // Reset even on a thrown/failed load, so a retry (or the next vault) never
     // inherits a stale "N of M" from an aborted first connect.
@@ -308,92 +324,126 @@ export async function restoreVaults(): Promise<void> {
   }
 }
 
+/**
+ * Mount every registered vault, not just one.
+ *
+ * Registered *is* mounted under the multi-vault model: there is no "active"
+ * vault to pick, so the restore is a loop rather than a choice. The two-phase
+ * shape is what keeps first paint fast — every vault's cache is painted before
+ * *any* vault's credentials, permission probes or network round trips are
+ * touched, so the agenda renders from Dexie in one pass instead of waiting on
+ * the slowest vault's OAuth refresh.
+ *
+ * Failures are per vault: a GitHub vault with a dead token leaves its cached
+ * entries on screen and does not stop the local folder beside it from syncing.
+ */
 async function restoreVaultsInner(): Promise<void> {
-  async function fallbackToExample() {
-    setStoreState({ vaults: [EXAMPLE_REF] })
-    await activateExampleVault({ persist: false })
-  }
-
   try {
     await cacheInit()
 
     const savedRefs = await vaultRefsLoad()
     const allRefs: VaultRef[] = [EXAMPLE_REF, ...savedRefs]
     setStoreState({ vaults: allRefs })
+    loadGlobalPrefs(allRefs.map(r => r.id))
 
-    const savedActiveId = await activeVaultIdLoad()
-    const targetRef     = allRefs.find(r => r.id === savedActiveId) ?? EXAMPLE_REF
+    // The legacy single-vault pointer, still the best guess at which vault the
+    // user thinks of as theirs. Only consulted when no default has been chosen
+    // under the new model.
+    reconcileDefaultVault(allRefs, await activeVaultIdLoad())
 
-    if (targetRef.kind === 'local' || targetRef.kind === 'github') {
-      // ── Cache-first paint ──────────────────────────────────────────
-      // One indexed Dexie query; no network, no credential, no permission
-      // check. Everything after this line — buildBackend's possible OAuth
-      // refresh POST to the Worker (GitHub App tokens last 8h, so most
-      // first-open-of-the-day restores hit it), ensurePermission's two round
-      // trips, then statAll + readFiles — only *refines* content the user can
-      // already see. None of it may gate first paint.
-      //
-      // Only the store's items/roots are written here: the active-vault
-      // identity is still claimed by activateVaultRef after the permission
-      // check, so nothing observes a half-activated vault.
-      const prePainted = await hydrateFromCache(targetRef.id)
-      if (prePainted) setStoreState({ vaultLoading: false })
-
-      const outcome = await activateVaultRef(targetRef, false, prePainted)
-      // persist: false on both fallback branches below — a bad token or
-      // missing credential must not cost the user their vault selection.
-      // Persisting 'example' here would strand them on the tutorial even
-      // after they fix the token, until they manually re-select the vault.
-      if (outcome === 'no-credential') { await activateExampleVault({ persist: false }); return }
-      if (outcome === 'denied') {
-        if (targetRef.kind === 'github') {
-          notify(`Could not reconnect GitHub vault "${targetRef.name}" — check your token.`)
-        }
-        await activateExampleVault({ persist: false })
-      }
-      // 'granted' | 'offline' | 'prompt' — nothing further to do.
-    } else {
-      await activateExampleVault()
+    // ── Phase 1: cache-first paint, every vault ─────────────────────
+    // One indexed Dexie query per vault; no network, no credential, no
+    // permission check. Everything in phase 2 — buildBackend's possible OAuth
+    // refresh POST to the Worker (GitHub App tokens last 8h, so most
+    // first-open-of-the-day restores hit it), ensurePermission's two round
+    // trips, then statAll + readFiles — only *refines* content the user can
+    // already see. None of it may gate first paint.
+    const mountable = savedRefs.filter(isWritableKind)
+    const prePainted = new Map<string, boolean>()
+    for (const ref of mountable) {
+      prePainted.set(ref.id, await hydrateFromCache(ref.id))
     }
+    if ([...prePainted.values()].some(Boolean)) setStoreState({ vaultLoading: false })
+
+    // The Tutorial vault is cache-free and cheap (synthesized in memory), so
+    // it is mounted here rather than in either phase's loop.
+    await mountExampleVault()
+
+    // ── Phase 2: credentials, permission, first sync ────────────────
+    for (const ref of mountable) {
+      try {
+        const outcome = await mountVaultRef(ref, false, prePainted.get(ref.id) ?? false)
+        if (outcome === 'no-credential') {
+          warn(ref.kind === 'local'
+            ? `Vault "${ref.name}" is missing its folder permission — remove and re-add it.`
+            : `Vault "${ref.name}" is missing its GitHub token — remove and re-add it.`)
+        } else if (outcome === 'denied' && ref.kind === 'github') {
+          notify(`Could not reconnect GitHub vault "${ref.name}" — check your token.`)
+        }
+      } catch (e) {
+        // One vault's failure must not abort the others' restore.
+        console.warn(`[vault] could not mount "${ref.name}":`, e)
+      }
+    }
+
+    emitVaultChanged({ contentReplaced: ![...prePainted.values()].some(Boolean) })
   } catch (e) {
     console.warn('[vault] restoreVaults failed:', e)
-    await fallbackToExample().catch(() => {})
+    // Even a total failure leaves the Tutorial vault, so the app has content.
+    await mountExampleVault().catch(() => {})
   }
 }
 
-export async function setActiveVault(id: string): Promise<void> {
+/**
+ * Re-request filesystem permission for a local vault the restore parked in
+ * needs-reconnect state, and finish mounting it on success.
+ *
+ * This is what the "Permission needed" row in `SyncButton`'s popover clicks
+ * through to. It has to be driven by a user gesture — that is the whole reason
+ * the restore path cannot do it — which is why it lives here rather than in the
+ * scheduler.
+ */
+export async function reconnectVault(id: string): Promise<void> {
   try {
-    if (id === 'example') { await activateExampleVault(); return }
-
     const ref = getVaults().find(v => v.id === id)
-    if (!ref) return
+    if (!ref || !isWritableKind(ref)) return
 
-    if (ref.kind === 'local' || ref.kind === 'github') {
-      const outcome = await activateVaultRef(ref, true)
-      if (outcome === 'no-credential') {
-        notify(ref.kind === 'local'
-          ? 'Vault handle not found — try removing and re-adding it.'
-          : 'GitHub token not found — try removing and re-adding this vault.')
-        return
-      }
-      if (outcome === 'offline') {
-        // The vault IS active and writable — opened from its local copy. A
-        // warning, not an error: nothing is broken and nothing is lost.
-        warn(`You're offline — "${ref.name}" opened from your local copy. Changes will sync when you reconnect.`)
-        return
-      }
-      if (outcome !== 'granted') {
-        notify(ref.kind === 'local'
-          ? `Permission denied for vault "${ref.name}".`
-          : `Could not connect to GitHub vault "${ref.name}" — check your token.`)
-        return
-      }
+    const outcome = await mountVaultRef(ref, true)
+    if (outcome === 'no-credential') {
+      notify(ref.kind === 'local'
+        ? 'Vault handle not found — try removing and re-adding it.'
+        : 'GitHub token not found — try removing and re-adding this vault.')
+      return
+    }
+    if (outcome === 'offline') {
+      // The vault IS mounted and writable — opened from its local copy. A
+      // warning, not an error: nothing is broken and nothing is lost.
+      warn(`You're offline — "${ref.name}" opened from your local copy. Changes will sync when you reconnect.`)
+      return
+    }
+    if (outcome !== 'granted') {
+      notify(ref.kind === 'local'
+        ? `Permission denied for vault "${ref.name}".`
+        : `Could not connect to GitHub vault "${ref.name}" — check your token.`)
     }
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
-    console.error('[vault] setActiveVault failed:', e)
-    notifyError('Could not switch vault', e)
+    console.error('[vault] reconnectVault failed:', e)
+    notifyError('Could not reconnect vault', e)
   }
+}
+
+/**
+ * Choose which vault new entries go to. Purely a preference write — every
+ * registered vault is already mounted and synced, so nothing loads, unloads or
+ * re-syncs here. That is the whole point of splitting `activeVaultId` apart.
+ */
+export function setDefaultVault(id: string): void {
+  const ref = getVaults().find(v => v.id === id)
+  if (!ref || !isWritableKind(ref)) return
+  setDefaultVaultId(id)
+  loadDefaultParticipants(id)
+  void activeVaultIdSave(id)
 }
 
 export async function addLocalVault(): Promise<void> {
@@ -406,7 +456,7 @@ export async function addLocalVault(): Promise<void> {
 
     const ref: VaultRef = { id, name: handle.name, kind: 'local' }
     const backend = new LocalBackend(id, handle.name, handle)
-    await registerAndActivate(ref, backend)
+    await registerAndMount(ref, backend)
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
     console.error('[vault] addLocalVault failed:', e)
@@ -452,27 +502,32 @@ export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<
       kind:   'github',
       github: { owner: cfg.owner, repo: cfg.repo, branch: cfg.branch },
     }
-    await registerAndActivate(ref, backend)
+    await registerAndMount(ref, backend)
   } catch (e) {
     console.error('[vault] addGitHubVaultOAuth failed:', e)
     notifyError('Could not connect GitHub vault', e)
   }
 }
 
+/**
+ * Unregister a vault: unmount its backend, drop its layer and its sync state,
+ * clear its credential, and delete its cache rows.
+ *
+ * Unmount before anything else. A reconcile started by the scheduler can still
+ * be in flight, and `reconcileWithBackend` re-checks `getBackend(vaultId)`
+ * before merging — so removing the backend first is what stops a late-landing
+ * cycle from resurrecting the layer this is about to drop.
+ */
 export async function removeVault(id: string): Promise<void> {
   try {
     const existing = await vaultRefsLoad()
     const ref      = existing.find(r => r.id === id)
     if (!ref) return
 
-    // Switch away from the vault *before* removing it from the list, so the
-    // store never renders an activeVaultId that points to a vault no longer in
-    // `vaults`. Doing it in the other order leaves a transient inconsistent
-    // snapshot that downstream reconciliation (e.g. the Settings dropdown)
-    // latches onto.
-    if (getActiveBackend()?.id === id) {
-      await activateExampleVault()
-    }
+    unmountBackend(id)
+    dropSyncState(id)
+    removeVaultLayer(id)
+    removeVaultSync(id)
 
     if (ref.kind === 'local') await handleClear(id)
     if (ref.kind === 'github') {
@@ -483,8 +538,13 @@ export async function removeVault(id: string): Promise<void> {
 
     await cacheDeleteAll(id)
     await updateVaultRefs(current => current.filter(r => r.id !== id))
+    // Only after `vaults` no longer lists it, so the replacement is chosen
+    // from what actually remains.
+    reconcileDefaultVault(getVaults())
+    emitVaultChanged({ contentReplaced: true })
   } catch (e) {
     console.error('[vault] removeVault failed:', e)
     notifyError('Could not remove vault', e)
   }
 }
+

@@ -11,7 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
+import { readVaultStringArray } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
 import { syncToBackend, removeVault, cacheDirtyCount } from '@/vaultActions'
@@ -19,11 +19,10 @@ import { ParticipantsRow } from '@/editor'
 import type { VaultRef } from '@/vaultActions'
 
 interface Props {
-  vault:    VaultRef
-  isActive: boolean
+  vault: VaultRef
 }
 
-export function VaultSettings({ vault, isActive }: Props) {
+export function VaultSettings({ vault }: Props) {
   const [syncing,  setSyncing]  = useState(false)
   const [participants, setParticipants] = useState<string[]>(
     () => readVaultStringArray('meridian_default_participants', vault.id),
@@ -32,21 +31,22 @@ export function VaultSettings({ vault, isActive }: Props) {
   const [dirtyCount,  setDirtyCount]  = useState(0)
 
   const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
-  const activeVaultId          = useStore(s => s.activeVaultId)
   const items                  = useStore(s => s.items)
 
   const allParticipants = useAllParticipants(items)
 
   function handleParticipantsChange(next: string[]) {
     setParticipants(next)
-    writeVaultJSON('meridian_default_participants', vault.id, next)
-    if (vault.id === activeVaultId) setDefaultParticipants(next)
+    // The store action owns both the write and the "is this the vault whose
+    // values are currently loaded?" check, so Settings can edit any vault's
+    // defaults without disturbing the one a new entry would target.
+    setDefaultParticipants(vault.id, next)
   }
 
   async function handleSyncNow() {
     setSyncing(true)
     try {
-      await syncToBackend()
+      await syncToBackend(vault.id)
     } finally {
       setSyncing(false)
     }
@@ -65,11 +65,9 @@ export function VaultSettings({ vault, isActive }: Props) {
             <span className="text-sm font-medium">Folder</span>
             <span className="text-xs text-muted-foreground font-mono truncate">{vault.name}</span>
           </div>
-          {isActive && (
-            <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
-              {syncing ? 'Syncing…' : 'Sync now'}
-            </Button>
-          )}
+          <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
+            {syncing ? 'Syncing…' : 'Sync now'}
+          </Button>
         </div>
       )}
 

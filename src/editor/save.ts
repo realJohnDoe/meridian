@@ -2,7 +2,7 @@ import { startOfToday } from 'date-fns'
 import { fmtISO, applyEdit, newEntryKey, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
-import { getSnapshot, getItems, getRoots, getUnreadableFiles, getActiveVaultId } from '@/storeBridge'
+import { getSnapshot, getItems, getRoots, getUnreadableFiles, getDefaultVaultId } from '@/storeBridge'
 import { keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { commitNext, commitDelete } from '@/storeCommit'
@@ -114,17 +114,18 @@ export type SaveResult = EntryKey | null
  * one made instead of creating another — see `applyNew`.
  *
  * An existing item keeps its own vault (it rides inside its key); a new one goes
- * to whichever vault is currently loaded. Returns the key actually written
+ * to `targetVaultId` if the editor's vault chip picked one, else to the default
+ * vault. Returns the key actually written
  * rather than letting callers recompute `titleToSlug(title)`: a new entry whose
  * title slugifies onto a slug some other file in that vault already owns — or
  * one that belongs to a file that failed to parse and so has no root of its
  * own — is placed on a free one, so the two no longer agree.
  */
-export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields, draftId?: string): SaveResult {
+export function saveNode(item: Occurrence | null, editScope: EditScope, fields: SaveFields, draftId?: string, targetVaultId?: string | null): SaveResult {
   const { title } = fields
   if (!title) return null
 
-  const vaultId = item ? keyVaultId(item.entryKey) : getActiveVaultId()
+  const vaultId = item ? keyVaultId(item.entryKey) : (targetVaultId ?? getDefaultVaultId())
   // No vault loaded at all — there is nowhere to put a new entry, and inventing
   // a target would create an unreachable root under a vault id nothing owns.
   if (!vaultId) return null
