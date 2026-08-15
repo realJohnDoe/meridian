@@ -20,7 +20,11 @@ interface Props {
 }
 
 export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
-  const activeVaultId = useStore(s => s.activeVaultId)
+  // The tour is for someone who has not connected anything yet — which is now
+  // "no writable vault is registered", not "the Tutorial vault is active".
+  // Under multi-vault the Tutorial vault is always registered, so keying off
+  // its presence would replay the tour forever.
+  const hasRealVault = useStore(s => s.vaults.some(v => v.kind !== 'example'))
 
   const [active, setActive] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
@@ -66,9 +70,9 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
     },
   ], [setSidebarOpen, navigateHome])
 
-  // Auto-start once on the example vault (never again after Skip/Done)
-  useResetOnChange([activeVaultId], () => {
-    if (activeVaultId === 'example' && !isTourDone()) {
+  // Auto-start once, before any real vault exists (never again after Skip/Done)
+  useResetOnChange([hasRealVault], () => {
+    if (!hasRealVault && !isTourDone()) {
       setActive(true)
     }
   })

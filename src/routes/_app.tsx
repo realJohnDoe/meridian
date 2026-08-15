@@ -11,7 +11,7 @@ import {
   useAgendaTopDate, requestScrollToToday, weekStartFor,
 } from '@/calendar'
 import { CoachTour } from '@/onboarding'
-import { AppSidebar, SyncButton, SearchBar, ParticipantFilterButton } from '@/components'
+import { AppSidebar, SyncButton, SearchBar, ViewFilterButton } from '@/components'
 import { IconButton } from '@/components/primitives/icon-button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
@@ -217,7 +217,7 @@ function AppMain() {
           )}
           {!isEntryView && (
             <div className="flex items-center gap-0.5 shrink-0">
-              <ParticipantFilterButton />
+              <ViewFilterButton />
               <SyncButton />
               {!isListView && (
                 <IconButton variant="ghost" className="text-dim" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>

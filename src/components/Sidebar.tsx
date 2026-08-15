@@ -1,12 +1,10 @@
 import { useState, lazy, Suspense } from 'react'
-import { AlignLeft, CalendarDays, CalendarRange, CalendarClock, Settings2, AlertCircle, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
+import { AlignLeft, CalendarDays, CalendarRange, CalendarClock, Settings2, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
-import { setActiveVault } from '@/vaultActions'
 import { useResetOnChange } from '@/hooks'
 import { useCurrentDate, requestScrollToDate } from '@/calendar'
 import { FlipList } from './FlipList'
-import { vaultIcon } from './vaultIcon'
 import { Checkbox } from './ui/checkbox'
 import { IconButton } from './primitives/icon-button'
 import {
@@ -38,9 +36,7 @@ export default function AppSidebar() {
   const currentDate = useCurrentDate()
   const { isMobile, setOpenMobile } = useSidebar()
 
-  const vaults                  = useStore(s => s.vaults)
-  const activeVaultId           = useStore(s => s.activeVaultId)
-  const pendingDirReconnect     = useStore(s => s.pendingDirReconnect)
+  const defaultVaultId          = useStore(s => s.defaultVaultId)
   const favorites               = useStore(s => s.favorites)
   const roots                   = useStore(s => s.roots)
   const toggleFavorite          = useStore(s => s.toggleFavorite)
@@ -48,7 +44,7 @@ export default function AppSidebar() {
   const showTasks               = useStore(s => s.showTasks)
   const toggleShowTasks         = useStore(s => s.toggleShowTasks)
 
-  useResetOnChange([activeVaultId], () => setEditingFavorites(false))
+  useResetOnChange([defaultVaultId], () => setEditingFavorites(false))
 
   const isDayView = pathname.startsWith('/day/')
 
@@ -200,30 +196,16 @@ export default function AppSidebar() {
             </SidebarMenu>
           </SidebarGroup>
 
+          {/* No per-vault list here. Once "registered", "visible" and "default"
+              are three separate concepts, a second list of vaults beside the
+              filter's would be the same radio-vs-checkbox confusion this
+              relocates rather than solves. Each concept has exactly one home:
+              Settings owns registration and the default vault, the topbar
+              filter owns visibility, and SyncButton's popover owns per-vault
+              status — including the "needs reconnect" affordance that used to
+              live on these rows. */}
           <SidebarGroup className="p-0">
             <SidebarSeparator className="mb-2" />
-            <SidebarGroupLabel className="px-5 h-8 text-2xs font-semibold uppercase tracking-wider">Vaults</SidebarGroupLabel>
-            <SidebarMenu>
-              {vaults.map(vault => {
-                const isActive       = vault.id === activeVaultId
-                const needsReconnect = isActive && !!pendingDirReconnect && vault.kind === 'local'
-                const VaultIcon      = vaultIcon(vault.kind)
-                return (
-                  <SidebarMenuItem key={vault.id}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      onClick={() => { close(); void setActiveVault(vault.id) }}
-                      className="gap-3.5 px-5 h-auto py-3 text-sm font-medium rounded-none"
-                    >
-                      <VaultIcon className="size-4.5 stroke-[1.7] shrink-0" />
-                      <span className="flex-1 truncate text-left">{vault.name}</span>
-                      {needsReconnect && <span title="Permission needed — click to reconnect"><AlertCircle className="size-3.5 text-note shrink-0" /></span>}
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-            <SidebarSeparator className="my-2" />
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton

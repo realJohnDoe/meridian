@@ -25,6 +25,7 @@ import { fmtT, parseDateString } from '@/model'
 import { useStore } from '@/store'
 import type { PendingLinks } from './usePendingLinks'
 import { useAllParticipants } from '@/hooks'
+import { VaultChip } from '@/components'
 
 function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   icon: LucideIcon
@@ -68,6 +69,12 @@ export interface EntryEditorHooks {
   series: SeriesContext
   /** The vault this entry lives in (or would, for a new one). Scopes links and the file picker. */
   vaultId: string | null
+  /**
+   * Retarget where a brand-new entry will be created, until its first save
+   * makes the file. Null once the entry exists — its vault is then fixed in its
+   * key, and changing it is a move rather than a re-target.
+   */
+  setTargetVaultId: ((vaultId: string) => void) | null
   pendingLinks: PendingLinks
   dialogHandlers: DialogHandlers
   setEntry: (updater: (prev: EntryState) => EntryState) => void
@@ -99,14 +106,19 @@ function autoResize(el: HTMLTextAreaElement) {
 
 export default function EntryEditor({ hooks, items, roots }: Props) {
   const {
-    entry, series, vaultId, pendingLinks, dialogHandlers,
+    entry, series, vaultId, setTargetVaultId, pendingLinks, dialogHandlers,
     setEntry, handleSave, handleOpenDlg, handleOpenRepeatDlg, handlePromoteTask,
     scheduleAutoSave, saveMeta, handleScopeChange, handleTypeChange, handleDoneToggle,
     handleOpenWikilink, handleToggleDoneBacklink, titleMissing, focusTitleTick,
   } = hooks
   const hour12             = useStore(s => s.localePrefs.hour12)
   const backlinks          = useStore(s => s.backlinks)
-  const syncReadOnly       = useStore(s => s.syncReadOnly)
+  // Per vault, and named: with several vaults registered, "changes aren't
+  // saved" has to say *which* vault it is talking about. Retires the hardcoded
+  // "Tutorial vault" string — the Tutorial vault is simply the read-only vault
+  // most people meet first.
+  const readOnlyVault      = useStore(s =>
+    s.vaults.find(v => v.id === vaultId && (s.syncByVault.get(v.id)?.readOnly ?? false)))
   const titleRef  = useRef<HTMLTextAreaElement>(null)
   const viewRef   = useRef<EditorView | null>(null)
 
@@ -149,10 +161,10 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
     <section className="flex-1 min-h-0 flex flex-col">
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-3xl lg:mx-auto">
 
-        {syncReadOnly && (
+        {readOnlyVault && (
           <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 mb-3 text-xs text-muted-foreground">
             <Info size={14} className="shrink-0" />
-            Tutorial vault — changes aren't saved.
+            {readOnlyVault.name} is read-only — changes aren&rsquo;t saved.
           </div>
         )}
 
@@ -182,9 +194,16 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
                 if (editScope !== 'add') scheduleAutoSave?.(viewRef.current?.state.doc.toString().trimEnd() ?? '')
               }}
             />
-            {item && (
-              <p className="font-mono text-2xs text-muted-foreground mt-0.5">{item.metadata.fileSlug}.md</p>
-            )}
+            <div className="flex items-center gap-2 mt-0.5 min-w-0">
+              {item && (
+                <p className="font-mono text-2xs text-muted-foreground truncate">{item.metadata.fileSlug}.md</p>
+              )}
+              {/* On a brand-new entry this is a picker: it says where the file
+                  will be created and lets you change it before the first save.
+                  On an existing one it is a static source label — moving an
+                  entry between vaults is a separate, confirmed action. */}
+              <VaultChip vaultId={vaultId} onChange={setTargetVaultId} />
+            </div>
           </div>
         </div>
 

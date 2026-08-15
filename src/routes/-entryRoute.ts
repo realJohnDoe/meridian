@@ -12,6 +12,7 @@ export function newEntryRoute(title?: string, seed?: NewEntrySeed) {
       time: seed?.time ?? undefined,
       duration: seed?.duration ?? undefined,
       itemType: seed?.itemType ?? undefined,
+      vault: seed?.vault ?? undefined,
     },
   }
 }

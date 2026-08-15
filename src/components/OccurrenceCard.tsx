@@ -115,6 +115,15 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
   const listedOn = props.listedOn ?? EMPTY_LISTED_ON
   const animate = props.animate ?? true
   const hour12   = useStore(s => s.localePrefs.hour12)
+  // Which vault a card came from, but only while more than one is actually on
+  // screen. Derived here rather than passed down because AgendaRow is memoized
+  // and this is a global, not per-row, condition — and with a single visible
+  // vault the chip would sit on every card saying nothing.
+  const sourceName = useStore(s => {
+    const visible = s.vaults.filter(v => !s.hiddenVaultIds.includes(v.id))
+    if (visible.length < 2) return null
+    return visible.find(v => v.id === props.occ.metadata.vaultId)?.name ?? null
+  })
   const barClass = occState(occ, now)
   const isPast   = barClass === 'event-past'
 
@@ -156,7 +165,7 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
 
   const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime !== 'none' && (!!t || !!durationLabel))
   const hasTagsContent      = showTagsParticipants && listedOn.length > 0
-  const showMeta            = hasDateTimeContent || hasTagsContent
+  const showMeta            = hasDateTimeContent || hasTagsContent || !!sourceName
 
   return (
     <DimmableCard
@@ -212,6 +221,7 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
             {showTagsParticipants && listedOn.map(label => (
               <TagChip key={label} label={label} isTopic />
             ))}
+            {sourceName && <Badge variant="tag">{sourceName}</Badge>}
           </div>
         )}
       </div>

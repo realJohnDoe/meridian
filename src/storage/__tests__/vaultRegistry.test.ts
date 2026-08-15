@@ -1,10 +1,15 @@
 /**
  * Unit tests for the vault lifecycle in vaultRegistry.ts: restoreVaults'
- * per-kind restore branching (local/github/example, permission states, the
- * error-fallback path) and setActiveVault's activation branching. This is the
- * orchestration that keeps "which vault is active" consistent across the
- * backend singleton, the store, and IndexedDB (see setActiveVaultIdentity's
- * own docs in vaultRegistry.ts).
+ * two-phase mount of *every* registered vault (cache-first paint for all of
+ * them, then credentials/permission/first-sync one at a time), removeVault's
+ * teardown, and the default-vault reconciliation that replaces the old single
+ * "active vault" pointer.
+ *
+ * Registered is mounted: there is no vault to choose at startup and no
+ * fallback-to-Tutorial path, because the Tutorial vault is always mounted
+ * alongside whatever else is registered. What used to be "did we activate the
+ * right one?" is now "is every one of them mounted, and did one vault's
+ * failure leave the others alone?".
  *
  * All collaborators are replaced with in-memory fakes so the tests don't need
  * Dexie/IndexedDB, a real FileSystemDirectoryHandle, a DOM-backed zustand
@@ -36,11 +41,14 @@ const {
     exampleReadAllError: Error | null
     /** When set, ensurePermission awaits this before answering. */
     permissionGate: Gate | null
+    /** When set, ensurePermission throws this instead of answering. */
+    permissionError: Error | null
   } = {
     localPermission: 'granted',
     githubPermission: 'granted',
     exampleReadAllError: null,
     permissionGate: null,
+    permissionError: null,
   }
   return {
     backendConfig,
@@ -52,17 +60,24 @@ const {
       rows: new Map<string, Array<{ path: string; content: string }>>(),
     },
     storeState: {
+      /** Per-vault layers — the shape the real store holds. */
+      layers: new Map<string, { items: unknown[]; roots: Map<string, unknown> }>(),
+      /** The flattening of `layers`, maintained by the setVaultLayer mock as the store does. */
       items: [] as unknown[],
       roots: new Map<string, unknown>(),
       unreadableFiles: new Map<string, { path: string; message: string }>(),
       vaults: [] as VaultRef[],
-      activeVaultId: null as string | null,
-      pendingDirReconnect: null as string | null,
+      defaultVaultId: null as string | null,
+      /** vaultId → the fields setVaultSync writes. */
+      syncByVault: new Map<string, Record<string, unknown>>(),
       vaultLoading: false,
       vaultLoadProgress: null as { loaded: number; total: number } | null,
-      syncOffline: false,
-      /** Vault id whose localStorage prefs were last loaded — see loadVaultPrefs. */
-      prefsLoadedFor: null as string | null,
+      /** Vault ids whose cross-vault prefs were last (re)loaded — see loadGlobalPrefs. */
+      prefsLoadedFor: null as string[] | null,
+      /** Vault whose lazy defaultParticipants were last loaded. */
+      participantsLoadedFor: null as string | null,
+      /** Vaults hidden by the one-time default — see hideVaultOnce. */
+      hiddenOnce: [] as string[],
     },
     notifyFns: { notify: vi.fn(), notifyError: vi.fn(), warn: vi.fn() },
     syncFns: {
@@ -82,6 +97,7 @@ const {
       })),
       reportParseFailures: vi.fn(),
       updateSyncUI: vi.fn(),
+      dropSyncState: vi.fn(),
     },
   }
 })
@@ -133,6 +149,7 @@ vi.mock('@/storage/localBackend', () => ({
     async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> {
       callOrder.push('ensurePermission')
       if (backendConfig.permissionGate) await backendConfig.permissionGate.promise
+      if (backendConfig.permissionError) throw backendConfig.permissionError
       return backendConfig.localPermission
     }
     async statAll() { return new Map<string, string>() }
@@ -151,6 +168,7 @@ vi.mock('@/storage/githubBackend', () => ({
     async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> {
       callOrder.push('ensurePermission')
       if (backendConfig.permissionGate) await backendConfig.permissionGate.promise
+      if (backendConfig.permissionError) throw backendConfig.permissionError
       return backendConfig.githubPermission
     }
     async statAll() { return new Map<string, string>() }
@@ -185,16 +203,29 @@ vi.mock('@/storage/githubOAuth', () => ({
 }))
 
 vi.mock('@/storeBridge', () => ({
-  setData: vi.fn((d: { items: unknown[]; roots: Map<string, unknown> }) => {
-    storeState.items = d.items
-    storeState.roots = d.roots
+  setVaultLayer: vi.fn((vaultId: string, data: { items: unknown[]; roots: Map<string, unknown> }) => {
+    storeState.layers.set(vaultId, data)
+    storeState.items = [...storeState.layers.values()].flatMap(l => l.items)
+    storeState.roots = new Map([...storeState.layers.values()].flatMap(l => [...l.roots]))
   }),
+  removeVaultLayer: vi.fn((vaultId: string) => {
+    storeState.layers.delete(vaultId)
+    storeState.items = [...storeState.layers.values()].flatMap(l => l.items)
+    storeState.roots = new Map([...storeState.layers.values()].flatMap(l => [...l.roots]))
+  }),
+  setVaultSync: vi.fn((vaultId: string, patch: Record<string, unknown>) => {
+    storeState.syncByVault.set(vaultId, { ...storeState.syncByVault.get(vaultId), ...patch })
+  }),
+  removeVaultSync: vi.fn((vaultId: string) => { storeState.syncByVault.delete(vaultId) }),
   getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
   setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
   getVaults: vi.fn(() => storeState.vaults),
-  setActiveVaultId: vi.fn((id: string | null) => { storeState.activeVaultId = id }),
   setStoreState: vi.fn((partial: Partial<typeof storeState>) => { Object.assign(storeState, partial) }),
-  loadVaultPrefs: vi.fn((id: string) => { callOrder.push('loadVaultPrefs'); storeState.prefsLoadedFor = id }),
+  loadGlobalPrefs: vi.fn((ids: string[]) => { callOrder.push('loadGlobalPrefs'); storeState.prefsLoadedFor = ids }),
+  loadDefaultParticipants: vi.fn((id: string) => { storeState.participantsLoadedFor = id }),
+  getDefaultVaultId: vi.fn(() => storeState.defaultVaultId),
+  setDefaultVaultId: vi.fn((id: string | null) => { storeState.defaultVaultId = id }),
+  hideVaultOnce: vi.fn((id: string) => { storeState.hiddenOnce.push(id) }),
 }))
 
 vi.mock('@/storage/notifications', () => notifyFns)
@@ -202,26 +233,31 @@ vi.mock('@/storage/notifications', () => notifyFns)
 vi.mock('@/storage/sync', () => syncFns)
 
 // Imports of the module under test (and its non-mocked collaborators — the
-// trivial in-memory activeBackend singleton) must come after the vi.mock calls.
-import { restoreVaults, setActiveVault, removeVault, onVaultChanged, newVaultId } from '@/storage/vaultRegistry'
-import { getActiveBackend, setActiveBackend } from '@/storage/activeBackend'
+// trivial in-memory backend registry) must come after the vi.mock calls.
+import {
+  restoreVaults, reconnectVault, setDefaultVault, removeVault, onVaultChanged, newVaultId,
+} from '@/storage/vaultRegistry'
+import { getBackend, getMountedVaultIds, unmountAllBackends } from '@/storage/backends'
 import { ensureFreshAccessToken } from '@/storage/githubOAuth'
+import { vaultRefsLoad, vaultRefsSave } from '@/storage/cache/registry'
 
 const LOCAL_REF: VaultRef = { id: 'local-1', name: 'My Vault', kind: 'local' }
 const GITHUB_REF: VaultRef = { id: 'gh-1', name: 'me/repo', kind: 'github', github: { owner: 'me', repo: 'repo', branch: 'main' } }
 
 beforeEach(() => {
   metaStore.clear()
+  storeState.layers.clear()
+  storeState.syncByVault.clear()
   storeState.items = []
   storeState.roots = new Map()
   storeState.unreadableFiles = new Map()
   storeState.vaults = []
-  storeState.activeVaultId = null
-  storeState.pendingDirReconnect = null
+  storeState.defaultVaultId = null
   storeState.vaultLoading = false
   storeState.vaultLoadProgress = null
-  storeState.syncOffline = false
   storeState.prefsLoadedFor = null
+  storeState.participantsLoadedFor = null
+  storeState.hiddenOnce = []
   cacheConfig.rows.clear()
   callOrder.length = 0
   notifyFns.notify.mockClear()
@@ -235,171 +271,195 @@ beforeEach(() => {
   backendConfig.githubPermission = 'granted'
   backendConfig.exampleReadAllError = null
   backendConfig.permissionGate = null
+  backendConfig.permissionError = null
   vi.mocked(ensureFreshAccessToken).mockReset()
-  setActiveBackend(null)
+  unmountAllBackends()
 })
 
 // ── restoreVaults — no saved vault ──────────────────────────────────────
 
-describe('restoreVaults — nothing saved', () => {
-  it('activates the example vault by default', async () => {
+describe('restoreVaults — nothing registered', () => {
+  it('mounts the Tutorial vault, and leaves no default vault to point at', async () => {
     await restoreVaults()
 
-    expect(storeState.activeVaultId).toBe('example')
-    expect(metaStore.get('activeVaultId')).toBe('example')
+    expect(getMountedVaultIds()).toEqual(['example'])
+    expect(storeState.vaults.map(v => v.id)).toEqual(['example'])
+    // Nothing writable exists, so there is nowhere for a new entry to go yet.
+    expect(storeState.defaultVaultId).toBeNull()
     expect(storeState.vaultLoading).toBe(false) // reset in the outer finally
   })
 })
 
-// ── restoreVaults — local vault ──────────────────────────────────────────
+// ── restoreVaults — mounting every registered vault ──────────────────────
 
 describe('restoreVaults — local vault', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     metaStore.set('vaults', [LOCAL_REF])
-    metaStore.set('activeVaultId', LOCAL_REF.id)
   })
 
-  it('falls back to example when the directory handle was never saved', async () => {
-    await restoreVaults()
-
-    expect(storeState.activeVaultId).toBe('example')
-    expect(syncFns.syncOnActivate).not.toHaveBeenCalled()
-  })
-
-  it('activates the vault as writable when permission is already granted', async () => {
+  it('mounts and syncs the vault when permission is already granted', async () => {
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
     backendConfig.localPermission = 'granted'
 
     await restoreVaults()
 
-    expect(storeState.activeVaultId).toBe(LOCAL_REF.id)
-    expect(metaStore.get('activeVaultId')).toBe(LOCAL_REF.id)
+    expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
+    expect(storeState.defaultVaultId).toBe(LOCAL_REF.id)
     // No separate flushPendingPush assertion: syncOnActivate subsumes it —
     // it routes through runSync, whose pushDirty leg rescues a previous
     // session's dirty records in the same cycle as the reconcile.
     expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
   })
 
-  it('marks a pending reconnect (without reconciling) when permission needs a user gesture', async () => {
+  it('mounts the Tutorial vault alongside it rather than instead of it', async () => {
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+
+    await restoreVaults()
+
+    // The distinction the whole plan turns on: registering a real vault does
+    // not unregister anything. Whether the Tutorial vault is *shown* is the
+    // view filter's business, not the registry's.
+    expect(getMountedVaultIds().sort()).toEqual(['example', LOCAL_REF.id].sort())
+  })
+
+  it('flags a needed reconnect without syncing when permission wants a user gesture', async () => {
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
     backendConfig.localPermission = 'prompt'
 
     await restoreVaults()
 
-    expect(storeState.activeVaultId).toBe(LOCAL_REF.id)
-    expect(storeState.pendingDirReconnect).toBe(LOCAL_REF.name)
-    // Persisted even on the "prompt" path — persist:false is only for the
-    // error-fallback path, not for this one.
-    expect(metaStore.get('activeVaultId')).toBe(LOCAL_REF.id)
-    // Parked, not activated: no sync is started for a vault still waiting on
-    // a user gesture to re-grant permission.
+    // Mounted, so its cached entries are readable and it appears in the sync
+    // popover — but parked: no cycle is started for a vault still waiting on a
+    // gesture only the user can make.
+    expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
+    expect(storeState.syncByVault.get(LOCAL_REF.id)?.needsReconnect).toBe(true)
     expect(syncFns.syncOnActivate).not.toHaveBeenCalled()
-    expect(syncFns.updateSyncUI).toHaveBeenCalledTimes(1)
   })
 
-  it('falls back to example when permission is denied outright', async () => {
+  it('warns but keeps going when the directory handle was never saved', async () => {
+    await restoreVaults()
+
+    expect(getBackend(LOCAL_REF.id)).toBeUndefined()
+    expect(syncFns.syncOnActivate).not.toHaveBeenCalled()
+    expect(notifyFns.warn).toHaveBeenCalledTimes(1)
+    // The Tutorial vault is still there, so the app is never contentless.
+    expect(getMountedVaultIds()).toEqual(['example'])
+  })
+
+  it('does not mount a vault whose permission was denied outright', async () => {
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
     backendConfig.localPermission = 'denied'
 
     await restoreVaults()
 
-    expect(storeState.activeVaultId).toBe('example')
+    expect(getBackend(LOCAL_REF.id)).toBeUndefined()
   })
 })
-
-// ── restoreVaults — github vault ─────────────────────────────────────────
 
 describe('restoreVaults — github vault', () => {
   beforeEach(() => {
     metaStore.set('vaults', [GITHUB_REF])
-    metaStore.set('activeVaultId', GITHUB_REF.id)
   })
 
-  it('falls back to example when no usable token can be produced', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue(null)
-
-    await restoreVaults()
-
-    expect(storeState.activeVaultId).toBe('example')
-  })
-
-  it('activates the vault as writable when the token is usable and permission is granted', async () => {
+  it('mounts and syncs when the token is usable and permission is granted', async () => {
     vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
-    backendConfig.githubPermission = 'granted'
 
     await restoreVaults()
 
-    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
+    expect(getMountedVaultIds()).toContain(GITHUB_REF.id)
+    expect(storeState.defaultVaultId).toBe(GITHUB_REF.id)
     expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
   })
 
-  it('notifies and falls back to example when permission is not granted', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
-    backendConfig.githubPermission = 'denied'
-
-    await restoreVaults()
-
-    expect(notifyFns.notify).toHaveBeenCalledTimes(1)
-    expect(notifyFns.notify.mock.calls[0]![0]).toContain(GITHUB_REF.name)
-    expect(storeState.activeVaultId).toBe('example')
-  })
-
-  // Regression test for the lost-vault-selection defect: activateExampleVault
-  // used to persist unconditionally, so a bad token would overwrite the saved
-  // activeVaultId with 'example' — stranding the user on the tutorial even
-  // after they fixed the token, until they manually re-selected the vault.
-  it('a denied vault shows the tutorial but leaves the persisted active-vault id alone', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
-    backendConfig.githubPermission = 'denied'
-
-    await restoreVaults()
-
-    expect(storeState.activeVaultId).toBe('example')
-    expect(metaStore.get('activeVaultId')).toBe(GITHUB_REF.id)
-  })
-
-  it('activates the vault as writable and offline when the network is unreachable, and does not notify', async () => {
+  it('mounts as writable when the network is unreachable, and does not blame the token', async () => {
     vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
     backendConfig.githubPermission = 'unreachable'
 
     await restoreVaults()
 
-    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
-    expect(metaStore.get('activeVaultId')).toBe(GITHUB_REF.id)
+    // 'unreachable' is not 'denied': the credential is fine, the network
+    // isn't. Offline edits must still be recordable and pushed on reconnect.
+    expect(getMountedVaultIds()).toContain(GITHUB_REF.id)
+    expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
     expect(notifyFns.notify).not.toHaveBeenCalled()
-    expect(getActiveBackend()?.readOnly).toBe(false)
   })
 
-  // Transient-vs-actionable classification now lives in runSync, which
-  // syncOnActivate routes through and which never rethrows — see the
-  // syncOnActivate suite in sync.test.ts. What still matters *here* is that a
-  // background sync blowing up cannot tear down an already-painted vault,
-  // which is what the `void … .catch()` in activateWritableVault guarantees.
-  it('a rejecting activation sync does not tear down an already-painted vault', async () => {
+  it('notifies but keeps going when permission is not granted', async () => {
     vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
-    backendConfig.githubPermission = 'granted'
-    cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'note.md', content: '# Note' }])
-    syncFns.syncOnActivate.mockRejectedValueOnce(new Error('boom'))
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    backendConfig.githubPermission = 'denied'
 
     await restoreVaults()
 
-    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
+    expect(getBackend(GITHUB_REF.id)).toBeUndefined()
+    expect(notifyFns.notify).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── restoreVaults — one vault's failure must not take the others down ────
+
+describe('restoreVaults — several vaults', () => {
+  beforeEach(() => {
+    metaStore.set('vaults', [LOCAL_REF, GITHUB_REF])
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+  })
+
+  it('mounts both, each with its own layer, merged into one view', async () => {
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    cacheConfig.rows.set(LOCAL_REF.id,  [{ path: 'local.md',  content: '# Local' }])
+    cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'remote.md', content: '# Remote' }])
+
+    await restoreVaults()
+
+    expect(storeState.layers.get(LOCAL_REF.id)?.items).toHaveLength(1)
+    expect(storeState.layers.get(GITHUB_REF.id)?.items).toHaveLength(1)
+    // Plus the (empty) Tutorial layer — the merge is what every view reads.
+    expect(storeState.items).toHaveLength(2)
+    expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(2)
+  })
+
+  // The point of the per-vault try/catch: a dead GitHub token used to be a
+  // whole-app fallback to the Tutorial vault. Now it costs exactly one vault.
+  it('keeps a healthy vault mounted when another one throws while mounting', async () => {
+    vi.mocked(ensureFreshAccessToken).mockRejectedValue(new Error('token endpoint down'))
+    cacheConfig.rows.set(LOCAL_REF.id, [{ path: 'local.md', content: '# Local' }])
+
+    await restoreVaults()
+
+    expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
+    expect(getBackend(GITHUB_REF.id)).toBeUndefined()
     expect(storeState.items).toHaveLength(1)
-    spy.mockRestore()
+    expect(storeState.defaultVaultId).toBe(LOCAL_REF.id)
+  })
+
+  it('adopts the legacy active-vault id as the default when no default was ever chosen', async () => {
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    metaStore.set('activeVaultId', GITHUB_REF.id)
+
+    await restoreVaults()
+
+    // Not simply the first registered vault: the pointer the pre-multi-vault
+    // build persisted is still the best evidence of which vault the user
+    // thinks of as theirs.
+    expect(storeState.defaultVaultId).toBe(GITHUB_REF.id)
+  })
+
+  it('never points the default at the read-only Tutorial vault', async () => {
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    metaStore.set('activeVaultId', 'example')
+
+    await restoreVaults()
+
+    // A default that cannot accept writes would refuse every new entry, and
+    // silently — writeEntityToCache bails on a read-only backend.
+    expect(storeState.defaultVaultId).toBe(LOCAL_REF.id)
   })
 })
 
 // ── restoreVaults — cache-first paint ────────────────────────────────────
-//
-// The startup complaint these cover: the skeleton used to stay up for the
-// whole serial chain (token refresh → 2 permission round trips → statAll +
-// readFiles), even though the cache already held complete, correct content.
 
 describe('restoreVaults — cache-first paint', () => {
   beforeEach(() => {
     metaStore.set('vaults', [GITHUB_REF])
-    metaStore.set('activeVaultId', GITHUB_REF.id)
     vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
     storeState.vaultLoading = true
   })
@@ -416,13 +476,13 @@ describe('restoreVaults — cache-first paint', () => {
 
     // While the permission probe is still blocked, the agenda must already
     // have real content and no skeleton. This is the load-bearing assertion:
-    // it fails if hydrateFromCache ever moves back below the network work.
+    // it fails if the cache phase ever moves back below the network work.
     await vi.waitFor(() => { expect(storeState.items).toHaveLength(2) })
     expect(storeState.vaultLoading).toBe(false)
 
     gate.release()
     await restoring
-    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
+    expect(getMountedVaultIds()).toContain(GITHUB_REF.id)
   })
 
   // The reported "up to a second before it scrolls to today": the calendar
@@ -430,7 +490,7 @@ describe('restoreVaults — cache-first paint', () => {
   // two ensurePermission round trips. It must not carry `contentReplaced` on
   // this path, or the listener throws away the expansion and grouping the first
   // paint just built — and re-does them, visibly, that far into the load.
-  it('reports contentReplaced: false when the cache pre-painted this same vault', async () => {
+  it('reports contentReplaced: false when the cache pre-painted', async () => {
     cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
     const changes: boolean[] = []
     const off = onVaultChanged(({ contentReplaced }) => changes.push(contentReplaced))
@@ -441,8 +501,8 @@ describe('restoreVaults — cache-first paint', () => {
     expect(changes).toEqual([false])
   })
 
-  it('reports contentReplaced: true when the cache was empty, so nothing was pre-painted', async () => {
-    // No cached rows — activation itself paints, over whatever was there.
+  it('reports contentReplaced: true when every cache was empty', async () => {
+    // Nothing cached — the mount itself paints, over whatever was there.
     const changes: boolean[] = []
     const off = onVaultChanged(({ contentReplaced }) => changes.push(contentReplaced))
 
@@ -453,29 +513,29 @@ describe('restoreVaults — cache-first paint', () => {
   })
 
   // The agenda's first frame is built through useCalendarFilter, which reads
-  // participantFilter/showTasks. Those are a localStorage read, but they used to
-  // arrive with setActiveVaultId — behind the token refresh and the permission
-  // probe. The cache then painted unfiltered, and when the real prefs landed the
+  // hiddenVaultIds/hiddenParticipants/showTasks. Those are a localStorage read,
+  // but they used to arrive behind the token refresh and the permission probe.
+  // The cache then painted unfiltered, and when the real prefs landed the
   // filtered-out rows (the whole overdue section, with tasks hidden) vanished
   // from *above* the scroll position and slid the agenda days forward.
-  it('loads the vault preferences before painting, not after the permission probe', async () => {
+  it('loads the cross-vault preferences before painting, not after the permission probe', async () => {
     cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
     const gate = makeGate()
     backendConfig.permissionGate = gate
 
     const restoring = restoreVaults()
 
-    // Painted content and the filters that shape it must land together, while
-    // the network is still blocked.
     await vi.waitFor(() => { expect(storeState.items).toHaveLength(1) })
-    expect(storeState.prefsLoadedFor).toBe(GITHUB_REF.id)
+    // Loaded for every registered vault at once, not for one "active" one —
+    // the Favorites list and the filter popover both span all of them.
+    expect(storeState.prefsLoadedFor).toEqual(['example', GITHUB_REF.id])
 
     gate.release()
     await restoring
 
     // Ordering, not just presence — the whole point is that it precedes both.
-    expect(callOrder.indexOf('loadVaultPrefs')).toBeLessThan(callOrder.indexOf('cacheLoadAll'))
-    expect(callOrder.indexOf('loadVaultPrefs')).toBeLessThan(callOrder.indexOf('ensurePermission'))
+    expect(callOrder.indexOf('loadGlobalPrefs')).toBeLessThan(callOrder.indexOf('cacheLoadAll'))
+    expect(callOrder.indexOf('loadGlobalPrefs')).toBeLessThan(callOrder.indexOf('ensurePermission'))
   })
 
   it('reads the cache before probing permission, and only once', async () => {
@@ -486,8 +546,8 @@ describe('restoreVaults — cache-first paint', () => {
     // Ordering, not just presence: a future refactor that hydrates after the
     // permission check would still pass a "was it called?" assertion.
     expect(callOrder.indexOf('cacheLoadAll')).toBeLessThan(callOrder.indexOf('ensurePermission'))
-    // prePainted threads through activateVaultRef, so the same rows are not
-    // re-read on the way into activateWritableVault.
+    // prePainted threads through mountVaultRef, so the same rows are not
+    // re-read on the way into loadVaultContent.
     expect(callOrder.filter(c => c === 'cacheLoadAll')).toHaveLength(1)
   })
 
@@ -508,232 +568,225 @@ describe('restoreVaults — cache-first paint', () => {
   })
 })
 
-// ── restoreVaults — error-fallback path ──────────────────────────────────
+// ── restoreVaults — unexpected failure ───────────────────────────────────
 
 describe('restoreVaults — unexpected failure', () => {
-  it('recovers via fallbackToExample without persisting the example id, so a retry is still possible next reload', async () => {
+  it('still leaves the Tutorial vault mounted so the app is never contentless', async () => {
     metaStore.set('vaults', [LOCAL_REF])
-    metaStore.set('activeVaultId', LOCAL_REF.id)
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
-    // ensurePermission throwing simulates any unexpected failure mid-restore.
-    backendConfig.localPermission = 'granted'
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const { LocalBackend } = await import('@/storage/localBackend')
-    const permSpy = vi.spyOn(LocalBackend.prototype, 'ensurePermission').mockRejectedValue(new Error('disk error'))
+    // Fails inside the try, before phase 1 — the whole restore unwinds.
+    vi.mocked(vaultRefsLoad).mockRejectedValueOnce(new Error('dexie exploded'))
 
     await restoreVaults()
 
-    expect(storeState.activeVaultId).toBe('example')
-    // persist:false — the saved activeVaultId (still LOCAL_REF.id) is left
-    // alone so the next reload retries the real vault instead of being stuck
-    // on the example vault forever.
-    expect(metaStore.get('activeVaultId')).toBe(LOCAL_REF.id)
-    expect(spy).toHaveBeenCalled()
-    spy.mockRestore()
-    permSpy.mockRestore()
+    expect(getMountedVaultIds()).toEqual(['example'])
+    expect(storeState.vaultLoading).toBe(false)
   })
 
   it('still clears vaultLoading even when the fallback itself throws', async () => {
-    metaStore.set('vaults', [LOCAL_REF])
-    metaStore.set('activeVaultId', LOCAL_REF.id)
-    metaStore.set(`handle:${LOCAL_REF.id}`, {})
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const { LocalBackend } = await import('@/storage/localBackend')
-    const permSpy = vi.spyOn(LocalBackend.prototype, 'ensurePermission').mockRejectedValue(new Error('disk error'))
+    storeState.vaultLoading = true
+    vi.mocked(vaultRefsLoad).mockRejectedValueOnce(new Error('dexie exploded'))
     backendConfig.exampleReadAllError = new Error('example vault broken too')
 
-    await expect(restoreVaults()).resolves.toBeUndefined()
+    await restoreVaults()
 
     expect(storeState.vaultLoading).toBe(false)
-    spy.mockRestore()
-    permSpy.mockRestore()
   })
 })
 
-// ── setActiveVault ────────────────────────────────────────────────────────
+// ── reconnectVault ───────────────────────────────────────────────────────
+//
+// The user gesture the restore path structurally cannot make: re-requesting
+// filesystem permission has to originate from a click, which is why this is a
+// separate entry point rather than something the scheduler retries.
 
-describe('setActiveVault', () => {
-  it('activates the example vault directly for id "example"', async () => {
-    await setActiveVault('example')
-
-    expect(storeState.activeVaultId).toBe('example')
+describe('reconnectVault', () => {
+  beforeEach(() => {
+    storeState.vaults = [LOCAL_REF]
+    metaStore.set('vaults', [LOCAL_REF])
   })
 
-  it('is a no-op when the id is not in the known vault list', async () => {
-    storeState.vaults = [LOCAL_REF]
+  it('mounts and syncs the vault when permission is granted interactively', async () => {
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    backendConfig.localPermission = 'granted'
 
-    await setActiveVault('does-not-exist')
+    await reconnectVault(LOCAL_REF.id)
 
-    expect(storeState.activeVaultId).toBeNull()
+    expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
+    expect(storeState.syncByVault.get(LOCAL_REF.id)?.needsReconnect).toBe(false)
+    expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
+  })
+
+  it('notifies without mounting when the handle is missing', async () => {
+    await reconnectVault(LOCAL_REF.id)
+
+    expect(getBackend(LOCAL_REF.id)).toBeUndefined()
+    expect(notifyFns.notify).toHaveBeenCalledTimes(1)
+  })
+
+  it('notifies without mounting when permission is denied', async () => {
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    backendConfig.localPermission = 'denied'
+
+    await reconnectVault(LOCAL_REF.id)
+
+    expect(getBackend(LOCAL_REF.id)).toBeUndefined()
+    expect(notifyFns.notify).toHaveBeenCalledTimes(1)
+  })
+
+  it('warns rather than blaming the credential when the vault is offline', async () => {
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    backendConfig.localPermission = 'unreachable'
+
+    await reconnectVault(LOCAL_REF.id)
+
+    expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
+    expect(notifyFns.warn).toHaveBeenCalledTimes(1)
     expect(notifyFns.notify).not.toHaveBeenCalled()
   })
 
-  describe('local vault', () => {
-    beforeEach(() => { storeState.vaults = [LOCAL_REF] })
+  it('is a no-op for an id not in the known vault list', async () => {
+    await reconnectVault('nope')
 
-    it('notifies without activating when the handle is missing', async () => {
-      await setActiveVault(LOCAL_REF.id)
-
-      expect(notifyFns.notify).toHaveBeenCalledWith(expect.stringContaining('Vault handle not found'))
-      expect(storeState.activeVaultId).toBeNull()
-    })
-
-    it('notifies without activating when permission is denied', async () => {
-      metaStore.set(`handle:${LOCAL_REF.id}`, {})
-      backendConfig.localPermission = 'denied'
-
-      await setActiveVault(LOCAL_REF.id)
-
-      expect(notifyFns.notify).toHaveBeenCalledWith(expect.stringContaining(LOCAL_REF.name))
-      expect(storeState.activeVaultId).toBeNull()
-    })
-
-    it('activates as writable when permission is granted', async () => {
-      metaStore.set(`handle:${LOCAL_REF.id}`, {})
-      backendConfig.localPermission = 'granted'
-
-      await setActiveVault(LOCAL_REF.id)
-
-      expect(storeState.activeVaultId).toBe(LOCAL_REF.id)
-      expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('github vault', () => {
-    beforeEach(() => { storeState.vaults = [GITHUB_REF] })
-
-    it('notifies without activating when no token can be produced', async () => {
-      vi.mocked(ensureFreshAccessToken).mockResolvedValue(null)
-
-      await setActiveVault(GITHUB_REF.id)
-
-      expect(notifyFns.notify).toHaveBeenCalledWith(expect.stringContaining('GitHub token not found'))
-      expect(storeState.activeVaultId).toBeNull()
-    })
-
-    it('notifies without activating when permission is denied', async () => {
-      vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
-      backendConfig.githubPermission = 'denied'
-
-      await setActiveVault(GITHUB_REF.id)
-
-      expect(notifyFns.notify).toHaveBeenCalledWith(expect.stringContaining(GITHUB_REF.name))
-      expect(storeState.activeVaultId).toBeNull()
-    })
-
-    it('activates as writable when the token and permission both check out', async () => {
-      vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
-      backendConfig.githubPermission = 'granted'
-
-      await setActiveVault(GITHUB_REF.id)
-
-      expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
-      expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
-    })
-
-    it('activates as writable and warns instead of blaming the token when offline', async () => {
-      vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
-      backendConfig.githubPermission = 'unreachable'
-
-      await setActiveVault(GITHUB_REF.id)
-
-      expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
-      expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining(GITHUB_REF.name))
-      expect(notifyFns.notify).not.toHaveBeenCalled()
-    })
-  })
-
-  it('does not leak the previous vault\'s entries when switching to a never-loaded vault', async () => {
-    // hydrateFromCache used to return early on an empty cache, leaving the
-    // old vault's items in the store — and the reconcile that follows won't
-    // evict them, since mergeChangedIntoStore preserves unaffected slugs.
-    storeState.vaults = [LOCAL_REF, GITHUB_REF]
-    storeState.items = [{ entryKey: 'stale-from-previous-vault.md' }]
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
-    backendConfig.githubPermission = 'granted'
-
-    await setActiveVault(GITHUB_REF.id)
-
-    expect(storeState.activeVaultId).toBe(GITHUB_REF.id)
-    expect(storeState.items).toHaveLength(0)
+    expect(getMountedVaultIds()).toHaveLength(0)
+    expect(notifyFns.notify).not.toHaveBeenCalled()
   })
 
   it('silently ignores an AbortError (e.g. a directory-picker style cancel)', async () => {
-    storeState.vaults = [LOCAL_REF]
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
-    const { LocalBackend } = await import('@/storage/localBackend')
-    const abortError = Object.assign(new Error('aborted'), { name: 'AbortError' })
-    const permSpy = vi.spyOn(LocalBackend.prototype, 'ensurePermission').mockRejectedValue(abortError)
+    const abort = new Error('cancelled')
+    abort.name = 'AbortError'
+    backendConfig.permissionError = abort
 
-    await expect(setActiveVault(LOCAL_REF.id)).resolves.toBeUndefined()
+    await reconnectVault(LOCAL_REF.id)
 
-    expect(notifyFns.notify).not.toHaveBeenCalled()
     expect(notifyFns.notifyError).not.toHaveBeenCalled()
-    permSpy.mockRestore()
+    expect(notifyFns.notify).not.toHaveBeenCalled()
   })
 
   it('surfaces any other unexpected error via notifyError', async () => {
-    storeState.vaults = [LOCAL_REF]
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
-    const { LocalBackend } = await import('@/storage/localBackend')
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const permSpy = vi.spyOn(LocalBackend.prototype, 'ensurePermission').mockRejectedValue(new Error('disk error'))
+    backendConfig.permissionError = new Error('disk on fire')
 
-    await setActiveVault(LOCAL_REF.id)
+    await reconnectVault(LOCAL_REF.id)
 
     expect(notifyFns.notifyError).toHaveBeenCalledTimes(1)
-    expect(notifyFns.notifyError.mock.calls[0]![0]).toBe('Could not switch vault')
-    spy.mockRestore()
-    permSpy.mockRestore()
   })
 })
 
-// ── removeVault ───────────────────────────────────────────────────────────
+// ── setDefaultVault ──────────────────────────────────────────────────────
+
+describe('setDefaultVault', () => {
+  it('changes only where new entries go — nothing loads, unloads or re-syncs', () => {
+    storeState.vaults = [LOCAL_REF, GITHUB_REF]
+    storeState.defaultVaultId = LOCAL_REF.id
+
+    setDefaultVault(GITHUB_REF.id)
+
+    expect(storeState.defaultVaultId).toBe(GITHUB_REF.id)
+    // The lazily-loaded per-vault pref follows the target, since it seeds new entries.
+    expect(storeState.participantsLoadedFor).toBe(GITHUB_REF.id)
+    expect(syncFns.syncOnActivate).not.toHaveBeenCalled()
+    expect(storeState.layers.size).toBe(0)
+  })
+
+  it('refuses a read-only vault, which could never accept a new entry', () => {
+    storeState.vaults = [{ id: 'example', name: 'Tutorial', kind: 'example' }, LOCAL_REF]
+    storeState.defaultVaultId = LOCAL_REF.id
+
+    setDefaultVault('example')
+
+    expect(storeState.defaultVaultId).toBe(LOCAL_REF.id)
+  })
+
+  it('is a no-op for an unknown id', () => {
+    storeState.vaults = [LOCAL_REF]
+    storeState.defaultVaultId = LOCAL_REF.id
+
+    setDefaultVault('nope')
+
+    expect(storeState.defaultVaultId).toBe(LOCAL_REF.id)
+  })
+})
+
+// ── removeVault ──────────────────────────────────────────────────────────
 
 describe('removeVault', () => {
-  it('switches to the example vault before removing the currently-active vault from the registry', async () => {
+  it('unmounts, drops the layer and sync row, and clears the credential', async () => {
     metaStore.set('vaults', [LOCAL_REF])
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
-    setActiveBackend({ id: LOCAL_REF.id, name: LOCAL_REF.name, kind: 'local', readOnly: false } as never)
+    await restoreVaults()
+    expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
 
     await removeVault(LOCAL_REF.id)
 
-    expect(storeState.activeVaultId).toBe('example')
+    expect(getBackend(LOCAL_REF.id)).toBeUndefined()
+    expect(storeState.layers.has(LOCAL_REF.id)).toBe(false)
+    expect(storeState.syncByVault.has(LOCAL_REF.id)).toBe(false)
     expect(metaStore.get(`handle:${LOCAL_REF.id}`)).toBeUndefined()
     expect((metaStore.get('vaults') as VaultRef[]).find(r => r.id === LOCAL_REF.id)).toBeUndefined()
   })
 
-  it('clears github credentials and leaves the active vault alone when removing an inactive vault', async () => {
+  // Unmounting first is what stops a reconcile still in flight from merging
+  // its results back into a layer this call is about to drop — see
+  // reconcileWithBackend's own registry re-check.
+  it('unmounts before the registry write, so a late reconcile cannot resurrect the layer', async () => {
+    metaStore.set('vaults', [LOCAL_REF])
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    await restoreVaults()
+
+    let mountedAtRegistryWrite: string[] = []
+    vi.mocked(vaultRefsSave).mockImplementationOnce(async (refs: VaultRef[]) => {
+      mountedAtRegistryWrite = getMountedVaultIds()
+      metaStore.set('vaults', refs)
+    })
+
+    await removeVault(LOCAL_REF.id)
+
+    expect(mountedAtRegistryWrite).not.toContain(LOCAL_REF.id)
+  })
+
+  it('clears github credentials and leaves another registered vault alone', async () => {
     metaStore.set('vaults', [LOCAL_REF, GITHUB_REF])
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
     metaStore.set(`token:${GITHUB_REF.id}`, 't')
     metaStore.set(`refreshToken:${GITHUB_REF.id}`, 'r')
-    metaStore.set(`tokenExpiry:${GITHUB_REF.id}`, 123)
-    setActiveBackend({ id: LOCAL_REF.id, name: LOCAL_REF.name, kind: 'local', readOnly: false } as never)
+    metaStore.set(`tokenExpiry:${GITHUB_REF.id}`, 1)
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    await restoreVaults()
 
     await removeVault(GITHUB_REF.id)
 
-    expect(getActiveBackend()?.id).toBe(LOCAL_REF.id) // untouched
+    expect(getMountedVaultIds()).toContain(LOCAL_REF.id) // untouched
     expect(metaStore.get(`token:${GITHUB_REF.id}`)).toBeUndefined()
     expect(metaStore.get(`refreshToken:${GITHUB_REF.id}`)).toBeUndefined()
     expect(metaStore.get(`tokenExpiry:${GITHUB_REF.id}`)).toBeUndefined()
-    expect((metaStore.get('vaults') as VaultRef[]).map(r => r.id)).toEqual([LOCAL_REF.id])
+  })
+
+  it('re-points the default vault when the removed one was it', async () => {
+    metaStore.set('vaults', [LOCAL_REF, GITHUB_REF])
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    await restoreVaults()
+    expect(storeState.defaultVaultId).toBe(LOCAL_REF.id)
+
+    await removeVault(LOCAL_REF.id)
+
+    // A dangling default would silently refuse every new entry.
+    expect(storeState.defaultVaultId).toBe(GITHUB_REF.id)
   })
 
   it('is a no-op for an id not present in the registry', async () => {
     metaStore.set('vaults', [LOCAL_REF])
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    await restoreVaults()
 
-    await removeVault('does-not-exist')
+    await removeVault('nope')
 
-    expect((metaStore.get('vaults') as VaultRef[]).map(r => r.id)).toEqual([LOCAL_REF.id])
-    expect(notifyFns.notifyError).not.toHaveBeenCalled()
+    expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
+    expect((metaStore.get('vaults') as VaultRef[])).toHaveLength(1)
   })
 })
-
-// ── Readable vault ids ────────────────────────────────────────────────────
-//
-// The id is one identifier used four ways — Dexie partition key, credential
-// key, localStorage pref suffix, and URL segment. Only the last one cares that
-// it is readable, but it is the one the user sees.
 
 describe('newVaultId', () => {
   it('derives a readable id from the vault name', () => {

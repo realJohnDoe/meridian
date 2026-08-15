@@ -8,28 +8,30 @@ import { markInFlight, clearInFlight, getInFlightPaths } from '@/storage/inFligh
 import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
+import type { VaultKind } from '@/vaultRef'
 import { collapseToYaml, parseToStoreItems, entryKeyItems, saveFile, roundTripLoss, type ParseResult } from '@/model'
 import { pathToKey, keyToPath, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { runInIdleBatches } from '@/lib/idle'
 import type { StoreItem, Roots } from '@/types'
 import {
-  getItems, getRoots, setData,
-  setStoreState,
+  getVaultLayer, setVaultLayer,
+  setVaultSync,
   getUnreadableFiles, setUnreadableFiles,
 } from '@/storeBridge'
 import { notify, warn, notifyError } from './notifications'
-import { getActiveBackend } from './activeBackend'
+import { getBackend, getMountedBackends } from './backends'
 
 // ── HELPERS ────────────────────────────────────────────────────
 
-export function updateSyncUI(backend: StorageBackend | null): void {
-  if (!backend?.id || backend.readOnly) {
-    setStoreState({ syncDirtyCount: 0, syncReadOnly: true })
+/** Refresh one vault's row in `syncByVault` — its dirty count and read-only flag. */
+export function updateSyncUI(backend: StorageBackend): void {
+  if (backend.readOnly) {
+    setVaultSync(backend.id, { dirtyCount: 0, readOnly: true })
     return
   }
-  setStoreState({ syncReadOnly: false })
-  cacheDirtyCount(backend.id).then(n => setStoreState({ syncDirtyCount: n })).catch(() => {})
+  setVaultSync(backend.id, { readOnly: false })
+  cacheDirtyCount(backend.id).then(n => setVaultSync(backend.id, { dirtyCount: n })).catch(() => {})
 }
 
 /** A file that failed to parse, keyed by its path (see `ParseFailure.key` for the store key). */
@@ -346,14 +348,18 @@ export function planReconcile(
 }
 
 /**
- * Merge freshly-fetched file records into the store, keeping items/roots for
- * every other file untouched. Each record's own key counts as affected
- * automatically; pass `alsoAffected` for keys to evict with no replacement
- * record (e.g. a delete with nothing to parse in its place).
+ * Merge freshly-fetched file records into `vaultId`'s store layer, keeping
+ * items/roots for every other file — in this vault and every other one —
+ * untouched. Each record's own key counts as affected automatically; pass
+ * `alsoAffected` for keys to evict with no replacement record (e.g. a delete
+ * with nothing to parse in its place).
  *
- * `vaultId` is the vault these records came from — every path is resolved to a
- * key inside it, so the filters below can only ever evict this vault's entries
- * and another vault's identically-slugged file is untouched.
+ * Reads and writes **one layer**, not the merge. Filtering `getItems()` (the
+ * cross-vault merge) and writing the result back would fold every other
+ * registered vault's entries into this vault's layer, and the next reconcile
+ * for any of them would then re-flatten duplicates over the top. `vaultId` is
+ * also what every path is resolved against, so an identically-slugged file in
+ * another vault is never in this set to begin with.
  */
 function mergeChangedIntoStore(
   vaultId: string,
@@ -363,16 +369,23 @@ function mergeChangedIntoStore(
   const affected = new Set(alsoAffected)
   for (const r of records) affected.add(pathToKey(vaultId, r.path))
 
-  const keptItems = getItems().filter(item => !affected.has(item.entryKey))
+  const layer     = getVaultLayer(vaultId)
+  const keptItems = layer.items.filter(item => !affected.has(item.entryKey))
   const keptRoots: Roots = new Map(
-    [...getRoots()].filter(([key]) => !affected.has(key)),
+    [...layer.roots].filter(([key]) => !affected.has(key)),
   )
+  // `unreadableFiles` is genuinely cross-vault (one map keyed by EntryKey), but
+  // the keys carry their vault, so filtering by `affected` only ever drops this
+  // vault's entries.
   const keptUnreadable = new Map(
     [...getUnreadableFiles()].filter(([key]) => !affected.has(key)),
   )
 
   const { items: newItems, roots: newRoots, failures, auditRoundTrip } = parseFiles(records, vaultId)
-  setData({ items: [...keptItems, ...newItems], roots: new Map([...keptRoots, ...newRoots]) })
+  setVaultLayer(vaultId, {
+    items: [...keptItems, ...newItems],
+    roots: new Map([...keptRoots, ...newRoots]),
+  })
   for (const f of failures) keptUnreadable.set(f.key, { path: f.path, message: f.message })
   setUnreadableFiles(keptUnreadable)
   reportParseFailures(failures)
@@ -405,7 +418,7 @@ export async function reconcileWithBackend(
   // markInFlight/getInFlightPaths in inFlight.ts) — snapshotted here, immediately
   // before planning, so it reflects everything in flight at the moment this
   // cycle decides.
-  const inFlight = getInFlightPaths()
+  const inFlight = getInFlightPaths(vaultId)
   const effectiveSkip = inFlight.size === 0
     ? skipPaths
     : new Set([...skipPaths, ...inFlight])
@@ -437,11 +450,14 @@ export async function reconcileWithBackend(
   for (const p of deleted) cacheMap.delete(p)
 
   // Cache writes above are keyed by vaultId and stay correct regardless — but
-  // the store belongs to whichever vault is active *now*. Since activation no
-  // longer awaits the first sync (see syncOnActivate), a sync started at
-  // activation can still be in flight when the user switches vaults; merging
-  // its results would paint the old vault's content over the new one.
-  if (getActiveBackend()?.id !== vaultId) return
+  // the store layer only exists while the vault is registered. Since activation
+  // no longer awaits the first sync (see syncOnActivate), a sync started at
+  // registration can still be in flight when the user removes that vault in
+  // Settings; merging its results would resurrect a layer `removeVault` just
+  // dropped. Under the layered store this is the only remaining hazard — a
+  // *different* vault's content can no longer be painted over, because each
+  // reconcile writes only its own layer.
+  if (!getBackend(vaultId)) return
 
   const changedWritten = changed.filter(p => written.has(p))
   if (changedWritten.length === 0 && deleted.length === 0) { updateSyncUI(backend); return }
@@ -460,11 +476,11 @@ export async function reconcileWithBackend(
 // ── SYNC CORE ─────────────────────────────────────────────────────────
 
 /**
- * All of sync.ts's mutable per-vault state, collected into one record. Still
- * a single module-level instance — one vault syncs at a time today — but
- * shaped so a future multi-vault scheduler can key a `Map<vaultId,
- * VaultSyncState>` off the same fields instead of threading six independent
- * variables through every call site.
+ * All of sync.ts's mutable state for **one** vault. PR 0 collected six
+ * module-level singletons into this record; now there is one instance per
+ * registered vault, so two vaults keep independent backoff, independent
+ * debounce timers and independent error dedupe — a GitHub vault whose token
+ * expired must not stall a local folder that is syncing fine.
  */
 interface VaultSyncState {
   syncing: boolean
@@ -474,7 +490,7 @@ interface VaultSyncState {
    * explicit flushPendingPush()) while a sync was already in flight. runSync's
    * early `if (syncing) return` would otherwise silently drop that request —
    * there's no rescheduling on that path today — stranding the write until the
-   * next 60s autoSyncTick. Re-armed from runSync's `finally` once the in-flight
+   * next autoSyncTick. Re-armed from runSync's `finally` once the in-flight
    * sync settles.
    */
   pushQueued: boolean
@@ -482,24 +498,54 @@ interface VaultSyncState {
   nextRetryAt: number
   /** Dedupe toasts for actionable (non-transient) errors across silent ticks. */
   lastErrorSig: string | null
+  /**
+   * When a cycle was last *attempted* for this vault — success or failure.
+   * The scheduler's per-vault minimum interval is measured from here rather
+   * than from `lastSyncedAt`, so a vault that keeps failing is paced the same
+   * as one that keeps succeeding (the backoff below then spaces it out
+   * further).
+   */
+  lastAttemptAt: number
 }
 
 function createVaultSyncState(): VaultSyncState {
   return {
     syncing: false, pushTimer: null, pushQueued: false,
     consecutiveFailures: 0, nextRetryAt: 0, lastErrorSig: null,
+    lastAttemptAt: 0,
   }
 }
 
-const syncState: VaultSyncState = createVaultSyncState()
+const _syncStates = new Map<string, VaultSyncState>()
+
+function syncStateFor(vaultId: string): VaultSyncState {
+  let state = _syncStates.get(vaultId)
+  if (!state) { state = createVaultSyncState(); _syncStates.set(vaultId, state) }
+  return state
+}
+
+/** Forget a vault's sync state and cancel its pending debounce. Called on unmount. */
+export function dropSyncState(vaultId: string): void {
+  const state = _syncStates.get(vaultId)
+  if (state?.pushTimer) clearTimeout(state.pushTimer)
+  _syncStates.delete(vaultId)
+}
+
+/** Drop every vault's sync state. Tests only — production unmounts one at a time. */
+export function dropAllSyncState(): void {
+  for (const vaultId of [..._syncStates.keys()]) dropSyncState(vaultId)
+}
 
 // ── BACKOFF STATE ─────────────────────────────────────────────────────
 const BACKOFF_BASE_MS  = 60_000
 const BACKOFF_MAX_MS   = 30 * 60_000
 
+/** Clear the retry backoff for every registered vault (e.g. the `online` event). */
 export function resetSyncBackoff(): void {
-  syncState.consecutiveFailures = 0
-  syncState.nextRetryAt         = 0
+  for (const state of _syncStates.values()) {
+    state.consecutiveFailures = 0
+    state.nextRetryAt         = 0
+  }
 }
 
 /**
@@ -585,21 +631,35 @@ async function pushDirty(
 }
 
 /**
+ * Run one sync cycle for one vault.
+ *
  * `backend` is threaded in explicitly by every caller (each of which looks it
  * up exactly once, at its own entry point) rather than looked up again here —
- * so a backend captured at the start of a call can never silently diverge
- * from what `getActiveBackend()` would return by the time this runs.
+ * so a backend captured at the start of a call can never silently diverge from
+ * what the registry would return by the time this runs.
+ *
+ * Concurrency is per vault: the `syncing` guard below is on this vault's own
+ * state, so two vaults *can* be mid-cycle simultaneously if something drives
+ * them that way. The scheduler deliberately does not (see `autoSyncTick`), but
+ * a manual "Sync now" on one vault must not be swallowed just because another
+ * vault happens to be reconciling.
  */
-async function runSync(backend: StorageBackend | null, opts: { silent: boolean; pull: boolean }): Promise<void> {
-  if (!backend || backend.readOnly) {
-    if (!opts.silent) notify('No writable vault connected. Add a local folder first.')
+async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: boolean }): Promise<void> {
+  const vaultId    = backend.id
+  const syncState  = syncStateFor(vaultId)
+
+  if (backend.readOnly) {
+    // Nothing to push, and (until the iCal vault kind lands) nothing to pull
+    // either — the Tutorial vault is synthesized fresh on every load.
+    if (!opts.silent) notify(`"${backend.name}" is read-only — there is nothing to sync.`)
+    updateSyncUI(backend)
     return
   }
   if (syncState.syncing) return
-  syncState.syncing = true
-  setStoreState({ syncInProgress: true })
+  syncState.syncing       = true
+  syncState.lastAttemptAt = Date.now()
+  setVaultSync(vaultId, { inProgress: true })
 
-  const vaultId = backend.id
   let attemptedRefresh = false
 
   try {
@@ -624,17 +684,17 @@ async function runSync(backend: StorageBackend | null, opts: { silent: boolean; 
       }
     }
     // ── SUCCESS ──────────────────────────────────────────────────
-    setStoreState({ syncError: null, syncOffline: false, lastSyncedAt: Date.now() })
+    setVaultSync(vaultId, { error: null, offline: false, lastSyncedAt: Date.now() })
     syncState.consecutiveFailures = 0
     syncState.nextRetryAt         = 0
     syncState.lastErrorSig        = null
     updateSyncUI(backend)
   } catch (e) {
-    console.error('[vault] sync failed:', e)
+    console.error(`[vault] sync failed for ${vaultId}:`, e)
 
     if (isTransientSyncError(e)) {
       // ── TRANSIENT (offline / network drop) ───────────────────
-      setStoreState({ syncOffline: true })
+      setVaultSync(vaultId, { offline: true })
       syncState.consecutiveFailures++
       syncState.nextRetryAt = Date.now() + Math.min(
         BACKOFF_BASE_MS * Math.pow(2, syncState.consecutiveFailures - 1),
@@ -646,42 +706,52 @@ async function runSync(backend: StorageBackend | null, opts: { silent: boolean; 
     } else {
       // ── ACTIONABLE (auth, repo missing, etc.) ────────────────
       const msg = (e as Error).message || (e as Error).name || 'Unknown error'
-      setStoreState({ syncError: msg })
+      setVaultSync(vaultId, { error: msg })
+      // Dedupe per vault, and name the vault: with several registered, "Sync
+      // failed" alone leaves the user guessing which one needs attention.
       if (!opts.silent || syncState.lastErrorSig !== msg) {
-        notifyError('Sync failed', e)
+        notifyError(`Sync failed for "${backend.name}"`, e)
         syncState.lastErrorSig = msg
       }
     }
   } finally {
     syncState.syncing = false
-    setStoreState({ syncInProgress: false })
+    setVaultSync(vaultId, { inProgress: false })
     // A push that arrived mid-sync was queued (see attemptPush) instead of
     // dropped — re-arm the debounced push now that this sync has settled.
     if (syncState.pushQueued) { syncState.pushQueued = false; scheduleAutoPush(backend) }
   }
 }
 
-/** Push pending local changes, or queue the request if a sync is already running. */
-function attemptPush(backend: StorageBackend | null): void {
+/** Push one vault's pending local changes, or queue the request if its sync is already running. */
+function attemptPush(backend: StorageBackend): void {
+  const syncState = syncStateFor(backend.id)
   if (syncState.syncing) { syncState.pushQueued = true; return }
   void runSync(backend, { silent: true, pull: false })
 }
 
 function scheduleAutoPush(backend: StorageBackend): void {
   if (backend.readOnly) return
+  const syncState = syncStateFor(backend.id)
   if (syncState.pushTimer) clearTimeout(syncState.pushTimer)
   syncState.pushTimer = setTimeout(() => { syncState.pushTimer = null; attemptPush(backend) }, 1000)
 }
 
 /**
- * Push anything still dirty in the cache right now — bypassing the 1s debounce —
- * without waiting for the next 60s autoSyncTick. Used to rescue writes stranded
- * by a prior session (vault activation) or about to be stranded by the page
- * going away (tab hidden/backgrounded). A no-op when nothing is dirty: pushDirty
- * returns immediately if the cache has no dirty/tombstoned records.
+ * Push anything still dirty right now, in **every** registered vault —
+ * bypassing the 1s debounce and without waiting for the next autoSyncTick.
+ * Used to rescue writes stranded by a prior session (vault registration) or
+ * about to be stranded by the page going away (tab hidden/backgrounded).
+ *
+ * Every vault, not just one: `pagehide` is the last moment anything runs, and
+ * a vault skipped here keeps its edit stranded in Dexie until the next launch.
+ * A no-op per vault when nothing is dirty — pushDirty returns immediately if
+ * the cache has no dirty/tombstoned records — so this stays cheap.
  */
 export function flushPendingPush(): void {
-  attemptPush(getActiveBackend())
+  for (const backend of getMountedBackends()) {
+    if (!backend.readOnly) attemptPush(backend)
+  }
 }
 
 /**
@@ -706,20 +776,114 @@ export function flushPendingPush(): void {
  * Never rejects (runSync swallows everything in its own catch), so callers can
  * fire-and-forget without risking an unhandled rejection.
  */
-export async function syncOnActivate(): Promise<void> {
-  resetSyncBackoff()
-  await runSync(getActiveBackend(), { silent: true, pull: true })
+export async function syncOnActivate(backend: StorageBackend): Promise<void> {
+  const state = syncStateFor(backend.id)
+  state.consecutiveFailures = 0
+  state.nextRetryAt         = 0
+  await runSync(backend, { silent: true, pull: true })
 }
 
+// ── SCHEDULER ─────────────────────────────────────────────────────────
+
+/**
+ * How long a vault of each kind waits between automatic cycles.
+ *
+ * Per kind because the cost of a cycle is not the same for all of them: a
+ * local folder's `statAll` is a cheap filesystem walk, a GitHub vault's is a
+ * network round trip against a rate-limited API. Unknown kinds (the iCal one
+ * lands next) get the conservative default rather than the aggressive one.
+ */
+const MIN_SYNC_INTERVAL_MS: Partial<Record<VaultKind, number>> = {
+  local:  30_000,
+  github: 60_000,
+}
+const DEFAULT_MIN_SYNC_INTERVAL_MS = 15 * 60_000
+
+/**
+ * The base tick is 60s, so an interval of exactly 60s would be skipped roughly
+ * every other tick on timer drift alone. Treat a vault as due slightly early
+ * rather than letting it slip to 120s.
+ */
+const DUE_TOLERANCE_MS = 5_000
+
+function isDue(backend: StorageBackend, now: number): boolean {
+  const state = syncStateFor(backend.id)
+  if (now < state.nextRetryAt) return false
+  const elapsed = now - state.lastAttemptAt
+  // A wall clock that jumped backwards (a device correcting its time, a
+  // timezone-less NTP step) would otherwise park `lastAttemptAt` in the future
+  // and starve this vault until the clock caught up. Treat it as due instead:
+  // one extra cycle costs nothing, a stranded vault costs the user their sync.
+  if (elapsed < 0) return true
+  const interval = MIN_SYNC_INTERVAL_MS[backend.kind] ?? DEFAULT_MIN_SYNC_INTERVAL_MS
+  return elapsed + DUE_TOLERANCE_MS >= interval
+}
+
+/** True while a scheduler pass is walking the vaults, so passes never overlap. */
+let _tickRunning = false
+
+/**
+ * One scheduler pass over every registered vault.
+ *
+ * **Oldest-synced first, one at a time.** Serial rather than parallel on
+ * purpose: each `GitHubBackend` owns its own throttled Octokit client, so
+ * nothing coordinates bursts across vaults — the same secondary-rate-limit
+ * concern that already makes `reconcileWithBackend` switch to `readAll()`
+ * above 50 changed paths. It also keeps mobile wake cost flat as vaults are
+ * added: N vaults cost N cycles spread over time, not N simultaneous bursts.
+ *
+ * Ordering by last attempt means a vault that has been waiting longest goes
+ * first, so no vault can be starved by a chattier one ahead of it. Vaults
+ * whose own minimum interval hasn't elapsed, and vaults inside their retry
+ * backoff, are skipped rather than queued.
+ *
+ * Re-entrancy: a tick that is still walking (a slow vault mid-cycle when the
+ * next 60s interval fires, or a `visibilitychange` landing on top of the
+ * timer) returns immediately instead of starting a second interleaved walk.
+ */
 export function autoSyncTick(): void {
-  if (Date.now() < syncState.nextRetryAt) return
-  void runSync(getActiveBackend(), { silent: true, pull: true })
+  if (_tickRunning) return
+  _tickRunning = true
+  void (async () => {
+    try {
+      const due = getMountedBackends()
+        .filter(b => !b.readOnly)
+        .sort((a, b) => syncStateFor(a.id).lastAttemptAt - syncStateFor(b.id).lastAttemptAt)
+      for (const backend of due) {
+        // Re-checked per vault rather than filtered up front: an earlier
+        // vault's cycle can take long enough for a later one to fall due, and
+        // for the registry to change underneath us.
+        if (!getBackend(backend.id)) continue
+        if (!isDue(backend, Date.now())) continue
+        await runSync(backend, { silent: true, pull: true })
+      }
+    } finally {
+      _tickRunning = false
+    }
+  })()
 }
 
-export async function syncToBackend(): Promise<void> {
-  // Manual sync always bypasses the backoff gate.
-  syncState.nextRetryAt = 0
-  await runSync(getActiveBackend(), { silent: false, pull: true })
+/**
+ * Manual "Sync now". With a vault id, that vault; without, every registered
+ * writable vault in turn — the topbar button speaks for the whole app, the
+ * per-vault rows in its popover speak for one.
+ *
+ * Always bypasses the backoff gate: an explicit user gesture is a deliberate
+ * "try again now".
+ */
+export async function syncToBackend(vaultId?: string): Promise<void> {
+  const targets = vaultId
+    ? [getBackend(vaultId)].filter((b): b is StorageBackend => !!b)
+    : getMountedBackends().filter(b => !b.readOnly)
+
+  if (targets.length === 0) {
+    notify('No writable vault connected. Add a local folder first.')
+    return
+  }
+  for (const backend of targets) {
+    syncStateFor(backend.id).nextRetryAt = 0
+    await runSync(backend, { silent: false, pull: true })
+  }
 }
 
 // ── CACHE WRITE / DELETE ──────────────────────────────────────
@@ -729,28 +893,32 @@ export async function syncToBackend(): Promise<void> {
 // status; see its doc comment there for why marking is refcounted.
 
 /**
- * The backend that owns `key`'s vault, or null if that vault isn't mounted.
+ * The backend that owns `key`'s vault, or undefined if that vault isn't
+ * registered.
  *
- * The vault half of the key is what makes this checkable at all: a write
- * addressed to a vault other than the one currently backing the store is
- * refused rather than silently applied to whichever vault happens to be active
- * — which is precisely what a stale closure or a late-landing commit would have
- * done before the key carried a vault.
+ * The vault half of the key is what routes this at all: a write addressed to
+ * an unregistered vault is refused rather than silently applied to whichever
+ * vault happens to be at hand — which is precisely what a stale closure or a
+ * late-landing commit would have done before the key carried a vault.
  */
-function backendFor(key: EntryKey): StorageBackend | null {
-  const backend = getActiveBackend()
-  if (!backend || backend.id !== keyVaultId(key)) return null
-  return backend
+function backendFor(key: EntryKey): StorageBackend | undefined {
+  return getBackend(keyVaultId(key))
 }
 
 export async function writeEntityToCache(entryKey: EntryKey): Promise<void> {
   const path = keyToPath(entryKey)
-  markInFlight(path)
+  markInFlight(entryKey)
   try {
     const backend = backendFor(entryKey)
     if (!backend || backend.readOnly) return
-    const slugItems = entryKeyItems(getItems(), entryKey)
-    const root       = getRoots().get(entryKey)
+    // This vault's layer, not the merge. Correctness doesn't hinge on it —
+    // `EntryKey` is unique across vaults, so the merge would find the same
+    // items — but scanning it would make every save's cost grow with the total
+    // number of registered vaults, and the file being written only ever lives
+    // in one of them.
+    const layer      = getVaultLayer(backend.id)
+    const slugItems  = entryKeyItems(layer.items, entryKey)
+    const root       = layer.roots.get(entryKey)
     if (slugItems.length === 0) {
       // Only genuinely delete when the root is gone too (the real
       // deleteByFileSlug outcome). getItems()/getRoots() here can be a
@@ -774,13 +942,13 @@ export async function writeEntityToCache(entryKey: EntryKey): Promise<void> {
     console.error('[vault] writeEntityToCache failed:', e)
     notifyError('Save failed', e)
   } finally {
-    clearInFlight(path)
+    clearInFlight(entryKey)
   }
 }
 
 export async function deleteFromBackend(entryKey: EntryKey): Promise<void> {
   const path = keyToPath(entryKey)
-  markInFlight(path)
+  markInFlight(entryKey)
   try {
     const backend = backendFor(entryKey)
     if (!backend || backend.readOnly) return
@@ -791,6 +959,6 @@ export async function deleteFromBackend(entryKey: EntryKey): Promise<void> {
     console.error('[vault] deleteFromBackend failed:', e)
     notifyError('Delete failed', e)
   } finally {
-    clearInFlight(path)
+    clearInFlight(entryKey)
   }
 }

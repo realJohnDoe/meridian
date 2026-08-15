@@ -3,6 +3,7 @@ import { useTheme } from 'next-themes'
 import { Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
+import { setDefaultVault } from '@/vaultActions'
 import { useResetOnChange } from '@/hooks'
 import {
   Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue,
@@ -55,20 +56,24 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
   // active theme's colors and misrepresent what picking it would do.
   const systemClass         = systemTheme === 'light' ? 'meridian-light' : 'meridian'
 
-  const vaults        = useStore(s => s.vaults)
-  const activeVaultId = useStore(s => s.activeVaultId)
+  const vaults         = useStore(s => s.vaults)
+  const defaultVaultId = useStore(s => s.defaultVaultId)
+  // Where new entries go. Every registered vault is mounted and syncing, so
+  // this is purely a target choice — picking one loads nothing and unloads
+  // nothing, which is the whole point of splitting `activeVaultId` apart.
+  const writableVaults = vaults.filter(v => v.kind !== 'example')
 
   const [step,            setStep]            = useState<Step>('vault')
   // Lazy-initialized because this component mounts already `open` (gated behind
   // `hasOpenedSettings` in Sidebar), so there's no false->true transition for
   // `useResetOnChange` below to react to on the first render.
   const [selectedVaultId, setSelectedVaultId] = useState<string | null>(
-    () => activeVaultId ?? vaults[0]?.id ?? null,
+    () => defaultVaultId ?? vaults[0]?.id ?? null,
   )
 
   function handleOpenChange(v: boolean) {
     if (v) {
-      const id = activeVaultId ?? vaults[0]?.id ?? null
+      const id = defaultVaultId ?? vaults[0]?.id ?? null
       setSelectedVaultId(id)
     } else {
       setStep('vault')
@@ -77,15 +82,15 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
     onOpenChange(v)
   }
 
-  // If the selected vault was removed, fall back to the active vault (only if it
-  // still exists) or the first remaining vault. `activeVaultId` is in the deps so
-  // the fallback re-runs when the active vault changes underneath us — e.g. while
-  // removing a vault, `vaults` and `activeVaultId` update in separate renders.
-  useResetOnChange([vaults, activeVaultId, open], () => {
+  // If the selected vault was removed, fall back to the default vault (only if
+  // it still exists) or the first remaining vault. `defaultVaultId` is in the
+  // deps so the fallback re-runs when it changes underneath us — e.g. while
+  // removing a vault, `vaults` and `defaultVaultId` update in separate renders.
+  useResetOnChange([vaults, defaultVaultId, open], () => {
     if (!open) return
     if (selectedVaultId && vaults.some(v => v.id === selectedVaultId)) return
-    const active = vaults.find(v => v.id === activeVaultId)?.id
-    setSelectedVaultId(active ?? vaults[0]?.id ?? null)
+    const fallback = vaults.find(v => v.id === defaultVaultId)?.id
+    setSelectedVaultId(fallback ?? vaults[0]?.id ?? null)
   })
 
   function handleVaultSelect(value: string) {
@@ -135,6 +140,28 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                 </div>
               </div>
 
+              {writableVaults.length > 0 && (
+                <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                  <span className="text-sm font-medium">New entries go to</span>
+                  <p className="text-xs text-muted-foreground">
+                    The vault a new entry lands in unless you pick another one on the entry itself.
+                  </p>
+                  <Select
+                    value={defaultVaultId ?? ''}
+                    onValueChange={id => setDefaultVault(id)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vault…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {writableVaults.map(v => (
+                        <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <span className="text-sm font-medium pt-2 border-t border-border">Vaults</span>
 
               <Select value={selectedVaultId ?? ''} onValueChange={handleVaultSelect}>
@@ -143,9 +170,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   {vaults.map(v => (
-                    <SelectItem key={v.id} value={v.id}>
-                      {v.name}{v.id === activeVaultId ? ' (active)' : ''}
-                    </SelectItem>
+                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                   ))}
                   <SelectSeparator />
                   <SelectItem value="__add__">
@@ -158,11 +183,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
               </Select>
 
               {selectedVault && (
-                <VaultSettings
-                  key={selectedVault.id}
-                  vault={selectedVault}
-                  isActive={selectedVault.id === activeVaultId}
-                />
+                <VaultSettings key={selectedVault.id} vault={selectedVault} />
               )}
             </div>
           </>
