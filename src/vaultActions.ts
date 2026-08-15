@@ -1,5 +1,5 @@
 export {
-  addLocalVault, addGitHubVaultOAuth, addIcalVault, removeVault,
+  addLocalVault, addGitHubVaultOAuth, addIcalVault, removeVault, renameVault,
   setDefaultVault, reconnectVault, isFolderPickerSupported,
 } from '@/storage'
 export { previewIcalFeed } from '@/storage'

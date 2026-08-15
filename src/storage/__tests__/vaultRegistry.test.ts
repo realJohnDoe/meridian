@@ -238,7 +238,7 @@ vi.mock('@/storage/sync', () => syncFns)
 // Imports of the module under test (and its non-mocked collaborators — the
 // trivial in-memory backend registry) must come after the vi.mock calls.
 import {
-  restoreVaults, reconnectVault, setDefaultVault, removeVault, onVaultChanged, newVaultId,
+  restoreVaults, reconnectVault, setDefaultVault, removeVault, renameVault, onVaultChanged, newVaultId,
 } from '@/storage/vaultRegistry'
 import { getBackend, getMountedVaultIds, unmountAllBackends } from '@/storage/backends'
 import { ensureFreshAccessToken } from '@/storage/githubOAuth'
@@ -787,6 +787,57 @@ describe('removeVault', () => {
     await removeVault('nope')
 
     expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
+    expect((metaStore.get('vaults') as VaultRef[])).toHaveLength(1)
+  })
+})
+
+// ── renameVault ──────────────────────────────────────────────────────────
+
+describe('renameVault', () => {
+  it('changes the name but leaves the id, so URLs and cache keys survive', async () => {
+    metaStore.set('vaults', [LOCAL_REF])
+    await restoreVaults()
+
+    await renameVault(LOCAL_REF.id, 'Renamed Vault')
+
+    const persisted = (metaStore.get('vaults') as VaultRef[]).find(r => r.id === LOCAL_REF.id)
+    expect(persisted?.name).toBe('Renamed Vault')
+    expect(persisted?.id).toBe(LOCAL_REF.id)
+    expect(storeState.vaults.find(v => v.id === LOCAL_REF.id)?.name).toBe('Renamed Vault')
+  })
+
+  it('trims surrounding whitespace', async () => {
+    metaStore.set('vaults', [LOCAL_REF])
+    await restoreVaults()
+
+    await renameVault(LOCAL_REF.id, '  Renamed  ')
+
+    expect((metaStore.get('vaults') as VaultRef[]).find(r => r.id === LOCAL_REF.id)?.name).toBe('Renamed')
+  })
+
+  it('is a no-op for a blank name', async () => {
+    metaStore.set('vaults', [LOCAL_REF])
+    await restoreVaults()
+
+    await renameVault(LOCAL_REF.id, '   ')
+
+    expect((metaStore.get('vaults') as VaultRef[]).find(r => r.id === LOCAL_REF.id)?.name).toBe(LOCAL_REF.name)
+  })
+
+  it('is a no-op for the synthesized Tutorial vault, which is never in the persisted list', async () => {
+    await restoreVaults()
+
+    await renameVault('example', 'My Notes')
+
+    expect(storeState.vaults.find(v => v.id === 'example')?.name).toBe('Tutorial')
+  })
+
+  it('is a no-op for an id not present in the registry', async () => {
+    metaStore.set('vaults', [LOCAL_REF])
+    await restoreVaults()
+
+    await renameVault('nope', 'Whatever')
+
     expect((metaStore.get('vaults') as VaultRef[])).toHaveLength(1)
   })
 })

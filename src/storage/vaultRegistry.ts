@@ -479,6 +479,19 @@ export function setDefaultVault(id: string): void {
   void activeVaultIdSave(id)
 }
 
+/**
+ * Rename a registered vault. The id — and so every URL, Dexie row, credential
+ * key and pref key keyed off it — is untouched; only the display name changes.
+ *
+ * A no-op for the synthesized Tutorial vault: it is never in the persisted
+ * list `updateVaultRefs` maps over, so `id: 'example'` simply matches nothing.
+ */
+export async function renameVault(id: string, name: string): Promise<void> {
+  const trimmed = name.trim()
+  if (!trimmed) return
+  await updateVaultRefs(current => current.map(r => (r.id === id ? { ...r, name: trimmed } : r)))
+}
+
 export async function addLocalVault(): Promise<void> {
   try {
     await cacheInit()
