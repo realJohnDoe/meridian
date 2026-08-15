@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest'
 import * as storeOps from '@/model/storeOps'
 import type { StoreData, EditFields } from '@/model/storeOps'
 import { parseFixture, rootsOf, NEW_TARGET, keyOf } from './helpers'
+import { entryKey } from '@/fileIO'
 import { expandRange } from '@/model/expansion'
 import type { Occurrence, Roots, StoreItem } from '@/types'
 
@@ -112,6 +113,11 @@ const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
   // Removes its target file by design; the property still holds for every file
   // it does not touch, which is what this case pins down.
   deleteByEntryKey: d => storeOps.deleteByEntryKey(d, keyOf('some-other-file')).data,
+  // Re-keys every item of one file into another vault. The root lands under a
+  // NEW key, so the root half of the property is vacuous here and is asserted
+  // directly in move-entry.test.ts instead; the items keep their ids, so their
+  // bags are checked by the property exactly as for any other operation.
+  moveEntryKey: d => storeOps.moveEntryKey(d, [...d.roots.keys()][0]!, entryKey('other-vault', 'moved')),
 }
 
 /**
@@ -125,6 +131,8 @@ const EXEMPT: Record<string, string> = {
   deletionEndsAfterCompletionSeries: 'predicate — returns a boolean',
   occFromAppMeta: 'metadata constructor, covered by its own test below',
   newEntryKey: 'pure key allocation — returns a string, never touches metadata',
+  freeEntryKey: 'pure key allocation — returns a string, never touches metadata',
+  moveLinkBreakage: 'read-only count of what a move would break — returns keys and refs',
 }
 
 describe('unknown keys survive every store operation', () => {

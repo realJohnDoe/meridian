@@ -39,3 +39,17 @@ export interface IcalVaultRef extends VaultRefBase {
 }
 
 export type VaultRef = LocalVaultRef | ExampleVaultRef | GitHubVaultRef | IcalVaultRef
+
+/**
+ * Kinds that accept writes — where a new entry may be created, and the only
+ * vaults a move may go between (in either direction).
+ *
+ * A root leaf rather than a `storage/` helper because `components/` needs the
+ * same answer for the editor's vault chip and may not import `@/storage` at
+ * all. Keyed off the kind, like `useEntryAccess`, and for the same reason: the
+ * question "may this vault receive a file" is answerable from the ref alone,
+ * without a mounted backend or a sync-status row.
+ */
+export function isWritableVault(ref: VaultRef | undefined): boolean {
+  return ref?.kind === 'local' || ref?.kind === 'github'
+}

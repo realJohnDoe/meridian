@@ -18,8 +18,8 @@ export const NO_PARTICIPANT = '__no_participant__'
 
 // ── Global (non-vault-scoped) localStorage keys ────────────────────────────
 // Per-vault keys still go through lib/vaultStorage's `${prefix}_${vaultId}`
-// convention; these three are genuinely cross-vault (see the plan's §8 table)
-// and so carry no vault suffix.
+// convention; these three are genuinely cross-vault and so carry no vault
+// suffix.
 const FAVORITES_KEY           = 'meridian_favorites_all'
 const HIDDEN_PARTICIPANTS_KEY = 'meridian_hidden_participants'
 const HIDDEN_VAULTS_KEY       = 'meridian_hidden_vaults'
@@ -230,6 +230,11 @@ interface MeridianStore {
   loadFavorites:    (vaultIds: string[]) => void
   toggleFavorite:   (key: EntryKey) => void
   reorderFavorites: (fromIdx: number, toIdx: number) => void
+  /**
+   * Follow an entry that changed identity — today only a cross-vault move.
+   * Keeps its position in the list; a no-op when it wasn't a favourite.
+   */
+  replaceFavorite:  (fromKey: EntryKey, toKey: EntryKey) => void
 
   // ── Default participants ──────────────────────────────────────────
   /**
@@ -450,6 +455,16 @@ export const useStore = create<MeridianStore>((set, get) => {
       const next: EntryKey[] = [...favorites]
       const [item] = next.splice(fromIdx, 1)
       next.splice(toIdx, 0, item!)
+      writeJSON(FAVORITES_KEY, next)
+      set({ favorites: next })
+    },
+
+    replaceFavorite: (fromKey: EntryKey, toKey: EntryKey) => {
+      const { favorites } = get()
+      const idx = favorites.indexOf(fromKey)
+      if (idx === -1) return
+      const next: EntryKey[] = [...favorites]
+      next[idx] = toKey
       writeJSON(FAVORITES_KEY, next)
       set({ favorites: next })
     },

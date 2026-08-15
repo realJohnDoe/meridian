@@ -96,17 +96,21 @@ export function seedStore(items: StoreItem[], roots: Roots): void {
 export interface FakePersistence {
   writes: string[]
   deletes: string[]
+  /** `[fromKey, toKey]` per cross-vault move. */
+  moves: Array<[string, string]>
 }
 
 /** Registers a fake EntityPersistence so tests never touch IndexedDB/GitHub. */
 export function installFakePersistence(): FakePersistence {
-  const calls: FakePersistence = { writes: [], deletes: [] }
+  const calls: FakePersistence = { writes: [], deletes: [], moves: [] }
   beforeEach(() => {
     calls.writes = []
     calls.deletes = []
+    calls.moves = []
     setEntityPersistence({
       writeEntity: (key) => { calls.writes.push(key) },
       deleteEntity: (key) => { calls.deletes.push(key) },
+      moveEntity: (fromKey, toKey) => { calls.moves.push([fromKey, toKey]) },
     })
   })
   return calls

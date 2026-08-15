@@ -4,14 +4,16 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './save'
 import type { Occurrence, EditScope } from '@/types'
-import { fmtISO, seriesContext } from '@/model'
+import { fmtISO, seriesContext, freeEntryKey, moveLinkBreakage } from '@/model'
 import { useToday } from '@/hooks'
 import { newEntryRoute, keyRoute } from '@/routes'
 import { resolveWikilink } from '@/wikilinks'
+import { isWritableVault } from '@/vaultRef'
 import { keyVaultId, keySlug } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
-import { toggleOccDone } from '@/occurrenceActions'
-import { getFom } from '@/storeBridge'
+import { toggleOccDone, moveEntryToVault } from '@/occurrenceActions'
+import { getFom, getSnapshot, getUnreadableFiles } from '@/storeBridge'
+import type { PendingMove } from './dialogs/MoveVaultDialog'
 import { readVaultStringArray } from '@/lib/vaultStorage'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
@@ -231,6 +233,55 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     setFocusTitleTick(t => t + 1)
   }
 
+  // ── Moving this entry to another vault ──────────────────────────────────
+  //
+  // The same chip that re-targets a brand-new entry moves an existing one, but
+  // the two are not the same action: re-targeting changes where a file will be
+  // created, moving rewrites a file that exists into a different vault and
+  // breaks the wikilinks that crossed the boundary. So a move is staged here
+  // and confirmed in MoveVaultDialog, never applied on the pick itself.
+  const vaults = useStore(s => s.vaults)
+  const [pendingMove, setPendingMove] = useState<(PendingMove & { toVaultId: string }) | null>(null)
+
+  // The key of the file this editor is editing, which is not the same question
+  // as "does entry.item exist": a brand-new entry adopted its file on first
+  // save (createdKey) while entry.item is deliberately still null.
+  const savedKey = entry.item?.entryKey ?? createdKey
+  const canMove  = !!savedKey && isWritableVault(vaults.find(v => v.id === vaultId))
+
+  const requestMove = (toVaultId: string) => {
+    if (!savedKey || toVaultId === vaultId) return
+    // Flush first, so the counts below are computed against what the user can
+    // actually see — a link typed seconds ago is otherwise still only in
+    // CodeMirror, and the dialog would under-report the breakage.
+    flushAutoSave()
+    const snapshot = { ...getSnapshot(), unreadableKeys: new Set(getUnreadableFiles().keys()) }
+    const toKey = freeEntryKey(snapshot, toVaultId, keySlug(savedKey))
+    const { inbound, outbound } = moveLinkBreakage(snapshot, savedKey, toVaultId)
+    setPendingMove({
+      toVaultId,
+      title:     entry.title,
+      fromVault: vaults.find(v => v.id === vaultId)?.name ?? 'this vault',
+      toVault:   vaults.find(v => v.id === toVaultId)?.name ?? 'the other vault',
+      toSlug:    keySlug(toKey),
+      slugTaken: keySlug(toKey) !== keySlug(savedKey),
+      inbound:   inbound.length,
+      outbound:  outbound.length,
+    })
+  }
+
+  const confirmMove = () => {
+    if (!pendingMove || !savedKey) return
+    // Re-allocated inside moveEntryToVault against a fresh snapshot rather than
+    // reusing the key previewed above: a sync landing while the dialog was open
+    // could have taken that slug in the target vault.
+    const toKey = moveEntryToVault(savedKey, pendingMove.toVaultId)
+    setPendingMove(null)
+    // The entry's URL *is* its key, so it changes with the move. `replace` so
+    // Back doesn't land on a route whose entry no longer exists there.
+    if (toKey) void navigate({ ...keyRoute(toKey), replace: true })
+  }
+
   const dialogs = useEntryDialogs(entry, updateEntry)
   const { setSeriesSheetConfig, setPendingDelete } = dialogs
 
@@ -302,11 +353,17 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     entry, setEntry,
     createdKey,
     vaultId,
-    // Null once the entry exists — the chip becomes a picker only in PR 5's
-    // move flow; before the first save it retargets where the file is created.
-    // Keyed off `createdKey` (state) rather than `createdItemRef` (a ref):
-    // both mark "the first save landed", but only one is readable in render.
-    setTargetVaultId: (entry.item ?? createdKey) ? null : setTargetVaultId,
+    // One control, two actions. Before the first save the chip re-targets where
+    // the file will be created (no file exists yet, so nothing to confirm);
+    // afterwards it stages a move, which the dialog confirms. Null when neither
+    // is possible — an entry sitting in a non-writable vault can't move, since
+    // a move goes writable ↔ writable only. Keyed off `createdKey` (state)
+    // rather than `createdItemRef` (a ref): both mark "the first save landed",
+    // but only one is readable in render.
+    onVaultChange: !savedKey ? setTargetVaultId : (canMove ? requestMove : null),
+    pendingMove,
+    onMoveConfirm: confirmMove,
+    onMoveCancel:  () => setPendingMove(null),
     series,
     pendingLinks: { effectiveKey, pendingKeys, handleAdd, handleRemove },
     saveMeta,

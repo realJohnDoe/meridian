@@ -1,12 +1,14 @@
 import { toast } from 'sonner'
-import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, occFromAppMeta } from '@/model'
+import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, occFromAppMeta, freeEntryKey, moveEntryKey } from '@/model'
 import { occIsRecur } from './occView'
 import { isStandaloneOcc } from './types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots, StoreItem } from './types'
+import { keySlug, keyVaultId } from './fileIO'
 import type { EntryKey } from './fileIO'
-import { getSnapshot, getItems, getRoots, setData } from './storeBridge'
+import { isWritableVault } from './vaultRef'
+import { getSnapshot, getItems, getRoots, getUnreadableFiles, getVaults, setData, replaceFavorite } from './storeBridge'
 import { writeEntity, deleteEntity } from './persistencePort'
-import { commitNext } from './storeCommit'
+import { commitNext, commitMove } from './storeCommit'
 
 let _toastId:       string | number | null = null
 let _pendingCommit: (() => void) | null    = null
@@ -108,6 +110,39 @@ export function reopenOcc(occ: Occurrence): void {
     }
     commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.entryKey])
   }
+}
+
+/**
+ * Move one entry into another vault, store and backends together.
+ *
+ * Returns the key it landed on — not necessarily the same slug it had: the
+ * target vault may already own that slug, in which case `freeEntryKey`
+ * allocates `slug-2`, `slug-3`, … exactly as a new entry would, rather than
+ * writing over an unrelated file. Callers need the result to navigate: the
+ * entry's URL is its key, so it changes with the move.
+ *
+ * Null when there is nothing to do (the entry is already in that vault),
+ * nothing to move (no root under `fromKey`), or nowhere to move it (the target
+ * isn't a registered writable vault). The last check is a duplicate of the
+ * one the port makes against the mounted backend, on purpose: the port refuses
+ * *after* the store has been re-keyed, which would leave the entry showing in a
+ * vault whose file was never written. Checking the registry here keeps the
+ * common case — a vault removed while the confirm dialog was open — from
+ * getting that far.
+ */
+export function moveEntryToVault(fromKey: EntryKey, toVaultId: string): EntryKey | null {
+  if (keyVaultId(fromKey) === toVaultId) return null
+  if (!isWritableVault(getVaults().find(v => v.id === toVaultId))) return null
+  const snapshot = { ...getSnapshot(), unreadableKeys: new Set(getUnreadableFiles().keys()) }
+  if (!snapshot.roots.has(fromKey)) return null
+
+  const toKey = freeEntryKey(snapshot, toVaultId, keySlug(fromKey))
+  commitMove(moveEntryKey(snapshot, fromKey, toKey), fromKey, toKey)
+  // The entry's identity changed, so anything that stored the old one has to
+  // follow it. Favourites are the only such list: `backlinks` and the
+  // occurrence map are derived and rebuild off the new merge on their own.
+  replaceFavorite(fromKey, toKey)
+  return toKey
 }
 
 export function beginSwipeDelete(o: Occurrence): () => void {

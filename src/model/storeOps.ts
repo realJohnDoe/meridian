@@ -13,7 +13,7 @@ import { titleToSlug, entryKey as makeEntryKey, parseEntryKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { dayBefore } from './dateUtils'
 import { stableOccId } from './expansion'
-import { resolveWikilink, unwrapRef } from '../wikilinks'
+import { resolveWikilink, parseWikilinks, unwrapRef } from '../wikilinks'
 
 export interface StoreData {
   items: StoreItem[]
@@ -401,11 +401,26 @@ export function newEntryKey(data: StoreData, vaultId: string, title: string, dra
   const draft = findDraft(data.items, draftId)
   if (draft) return draft.entryKey
 
-  const base = titleToSlug(title) || crypto.randomUUID()
-  if (!slugTaken(data, makeEntryKey(vaultId, base))) return makeEntryKey(vaultId, base)
+  return freeEntryKey(data, vaultId, titleToSlug(title) || crypto.randomUUID())
+}
+
+/**
+ * `baseSlug` in `vaultId` if nothing owns it there, else `baseSlug-2`, `-3`, …
+ *
+ * The allocation half of `newEntryKey`, split out because a cross-vault move
+ * needs exactly the same rule against a *different* starting slug: a move keeps
+ * the entry's own slug rather than re-deriving one from its title, but must
+ * still not land on top of a file the target vault already has. Sharing the
+ * search means "how a free slug is found" has one definition — including its
+ * consultation of `unreadableKeys` through `slugTaken`, which is what stops
+ * either caller from silently overwriting a file that exists but failed to
+ * parse.
+ */
+export function freeEntryKey(data: StoreData, vaultId: string, baseSlug: string): EntryKey {
+  if (!slugTaken(data, makeEntryKey(vaultId, baseSlug))) return makeEntryKey(vaultId, baseSlug)
   let n = 2
-  while (slugTaken(data, makeEntryKey(vaultId, `${base}-${n}`))) n++
-  return makeEntryKey(vaultId, `${base}-${n}`)
+  while (slugTaken(data, makeEntryKey(vaultId, `${baseSlug}-${n}`))) n++
+  return makeEntryKey(vaultId, `${baseSlug}-${n}`)
 }
 
 /**
@@ -737,6 +752,85 @@ export function deleteByEntryKey(
     data: { items: items.filter(i => i.entryKey !== entryKey), roots: nextRoots },
     affectedKeys,
   }
+}
+
+// ── Cross-vault move ──────────────────────────────────────────────────────────
+
+/**
+ * Re-key one entry — every item plus its root — from `fromKey` to `toKey`.
+ *
+ * The whole of a move, as far as the domain is concerned: an entry's vault
+ * lives in its key, so moving it between vaults is re-keying it and nothing
+ * else. The root's `vaultId`/`fileSlug` are re-derived from `toKey` (never
+ * copied from the old root) for the same reason `updateRoot` does it — the
+ * root's provenance and the map key must be incapable of disagreeing. Every
+ * other field, including `extra` and `fileConvention`, is carried over
+ * verbatim: a move is not an edit of the file's contents.
+ *
+ * **No other file is touched, by design.** Wikilinks are per vault and stored
+ * bare, so the links pointing at this entry from its old vault — and the links
+ * inside it that pointed at that vault — now resolve to nothing. Rewriting them
+ * is not possible (there is nothing correct to rewrite them to), so they break
+ * visibly instead; `moveLinkBreakage` is what lets the caller say how much
+ * before the user commits.
+ */
+export function moveEntryKey({ items, roots }: StoreData, fromKey: EntryKey, toKey: EntryKey): StoreData {
+  const root = roots.get(fromKey)
+  const nextRoots = new Map(roots)
+  nextRoots.delete(fromKey)
+  if (root) nextRoots.set(toKey, { ...root, ...parseEntryKey(toKey) })
+  return {
+    items: items.map(i => i.entryKey === fromKey ? { ...i, entryKey: toKey } : i),
+    roots: nextRoots,
+  }
+}
+
+/** What a move to another vault will break. Counted, not repaired — see `moveEntryKey`. */
+export interface LinkBreakage {
+  /** Entries in the source vault whose `items:` list points at this one. */
+  inbound:  EntryKey[]
+  /** Refs inside this entry that resolve in the source vault but not in the target. */
+  outbound: string[]
+}
+
+/**
+ * Count both directions of link breakage a move of `fromKey` into `toVaultId`
+ * would cause, so the confirm dialog can state it plainly.
+ *
+ * Inbound is every *other* file that links here — resolved inside its own
+ * vault, which is exactly `deleteByEntryKey`'s filter, since leaving a vault
+ * looks identical to a deletion from the perspective of the files left behind.
+ *
+ * Outbound covers the moved file's own links: both its `items:` list and the
+ * `[[wikilinks]]` in its body. A ref counts only if it resolves in the source
+ * vault *and* does not resolve in the target — a link to a slug the target
+ * vault happens to have too keeps working, and saying otherwise would overstate
+ * the damage. Self-links are excluded: after the move the entry's own slug
+ * resolves to it in its new vault, so nothing breaks.
+ */
+export function moveLinkBreakage(
+  { roots }: StoreData, fromKey: EntryKey, toVaultId: string,
+): LinkBreakage {
+  const fromVaultId = parseEntryKey(fromKey).vaultId
+  const inbound: EntryKey[] = []
+  for (const [key, meta] of roots) {
+    if (key === fromKey) continue
+    if (meta.items.some(raw => resolveWikilink(unwrapRef(raw), roots, meta.vaultId) === fromKey)) {
+      inbound.push(key)
+    }
+  }
+
+  const root = roots.get(fromKey)
+  const refs = new Set<string>()
+  for (const raw of root?.items ?? []) refs.add(unwrapRef(raw))
+  for (const link of parseWikilinks(root?.body ?? '')) refs.add(link.ref)
+  const outbound = [...refs].filter(ref => {
+    const here = resolveWikilink(ref, roots, fromVaultId)
+    if (here === undefined || here === fromKey) return false
+    return resolveWikilink(ref, roots, toVaultId) === undefined
+  })
+
+  return { inbound, outbound }
 }
 
 /**
