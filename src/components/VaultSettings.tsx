@@ -70,8 +70,8 @@ export function VaultSettings({ vault }: Props) {
   return (
     <>
       {vault.kind !== 'example' && (
-        <div className="flex flex-col gap-2 pt-2 border-t border-border">
-          <span className="text-sm font-medium">Name</span>
+        <div className="flex flex-col gap-2 py-3 border-t border-border first:border-t-0">
+          <span className="text-xs font-medium text-foreground">Name</span>
           <Input
             value={name}
             onChange={e => { setName(e.target.value) }}
@@ -84,9 +84,9 @@ export function VaultSettings({ vault }: Props) {
       )}
 
       {vault.kind === 'local' && (
-        <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+        <div className="flex items-center justify-between gap-2 py-3 border-t border-border first:border-t-0">
           <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-sm font-medium">Folder</span>
+            <span className="text-xs font-medium text-foreground">Folder</span>
             <span className="text-xs text-muted-foreground font-mono truncate">{vault.name}</span>
           </div>
           <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
@@ -96,9 +96,9 @@ export function VaultSettings({ vault }: Props) {
       )}
 
       {vault.kind === 'github' && (
-        <div className="flex items-center justify-between gap-2 pt-2 border-t border-border">
+        <div className="flex items-center justify-between gap-2 py-3 border-t border-border first:border-t-0">
           <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-sm font-medium">Repository</span>
+            <span className="text-xs font-medium text-foreground">Repository</span>
             <span className="text-xs text-muted-foreground font-mono truncate">
               {vault.github.owner}/{vault.github.repo} ({vault.github.branch})
             </span>
@@ -110,10 +110,10 @@ export function VaultSettings({ vault }: Props) {
       )}
 
       {vault.kind === 'ical' && (
-        <div className="flex flex-col gap-2 pt-2 border-t border-border">
+        <div className="flex flex-col gap-2 py-3 border-t border-border first:border-t-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="text-sm font-medium">Calendar address</span>
+              <span className="text-xs font-medium text-foreground">Calendar address</span>
               {/* Deliberately not truncated to a hostname: this is a secret
                   address the user may need to copy out again, and hiding most
                   of it would make it unusable for that. */}
@@ -134,8 +134,8 @@ export function VaultSettings({ vault }: Props) {
       {/* A subscription has no writable side, so there is nothing for default
           participants to seed — new entries can never land here. */}
       {vault.kind !== 'ical' && (
-      <div className="flex flex-col gap-2 pt-2 border-t border-border">
-        <span className="text-sm font-medium">Default participants</span>
+      <div className="flex flex-col gap-2 py-3 border-t border-border first:border-t-0">
+        <span className="text-xs font-medium text-foreground">Default participants</span>
         <p className="text-xs text-muted-foreground">
           Added to new entries in this vault automatically. Stored on this device only,
           so each device (and each person sharing the vault) can set its own.
@@ -149,7 +149,7 @@ export function VaultSettings({ vault }: Props) {
       )}
 
       {vault.kind !== 'example' && (
-        <div className="flex justify-end pt-2 border-t border-border">
+        <div className="flex justify-end py-3 border-t border-border first:border-t-0">
           <Button
             variant="ghost"
             size="sm"
