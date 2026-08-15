@@ -14,7 +14,7 @@ import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
 import type { StorageBackend } from './backend'
-import type { VaultRef, GitHubVaultRef } from '@/vaultRef'
+import type { VaultRef, GitHubVaultRef, IcalVaultRef } from '@/vaultRef'
 import {
   getVaults, setStoreState, setVaultLayer, removeVaultLayer,
   setVaultSync, removeVaultSync, getUnreadableFiles, setUnreadableFiles,
@@ -62,6 +62,19 @@ const EXAMPLE_REF: VaultRef = { id: 'example', name: 'Tutorial', kind: 'example'
 /** Kinds that accept writes — the candidates for `defaultVaultId`. */
 function isWritableKind(ref: VaultRef): boolean {
   return ref.kind === 'local' || ref.kind === 'github'
+}
+
+/**
+ * Every persisted vault is mountable; only the synthesized Tutorial vault is
+ * not, because it is never in the persisted list to begin with.
+ *
+ * Deliberately not `isWritableKind`: a calendar subscription is read-only but
+ * mounts, caches and syncs exactly like any other vault — that equivalence is
+ * the whole point of splitting writability out of the vault lifecycle. The two
+ * predicates answer different questions and must not be collapsed.
+ */
+function isMountableKind(ref: VaultRef): boolean {
+  return ref.kind !== 'example'
 }
 
 // ── VAULT IDS ─────────────────────────────────────────────────
@@ -243,6 +256,12 @@ async function buildBackend(ref: VaultRef): Promise<StorageBackend | null> {
     const { GitHubBackend } = await import('./githubBackend')
     return new GitHubBackend(ref.id, ref.name, { ...ref.github, token })
   }
+  if (ref.kind === 'ical') {
+    // The feed URL travels on the ref, so a subscription has no credential to
+    // be missing — it can always build a backend.
+    const { IcalBackend } = await import('./icalBackend')
+    return new IcalBackend(ref.id, ref.name, ref.ical.url)
+  }
   return null
 }
 
@@ -294,7 +313,10 @@ async function mountVaultRef(
 }
 
 async function registerAndMount(ref: VaultRef, backend: StorageBackend): Promise<void> {
-  const wasFirstRealVault = (await vaultRefsLoad()).filter(isWritableKind).length === 0
+  // Any real vault, not only a writable one: once a subscription is showing the
+  // user their own calendar, the tutorial's sample entries are noise in that
+  // same agenda.
+  const wasFirstRealVault = (await vaultRefsLoad()).filter(isMountableKind).length === 0
   await updateVaultRefs(existing => [...existing, ref])
   try {
     mountBackend(backend)
@@ -358,7 +380,7 @@ async function restoreVaultsInner(): Promise<void> {
     // first-open-of-the-day restores hit it), ensurePermission's two round
     // trips, then statAll + readFiles — only *refines* content the user can
     // already see. None of it may gate first paint.
-    const mountable = savedRefs.filter(isWritableKind)
+    const mountable = savedRefs.filter(isMountableKind)
     const prePainted = new Map<string, boolean>()
     for (const ref of mountable) {
       prePainted.set(ref.id, await hydrateFromCache(ref.id))
@@ -388,6 +410,9 @@ async function restoreVaultsInner(): Promise<void> {
         } else if (outcome === 'denied' && ref.kind === 'github') {
           notify(`Could not reconnect GitHub vault "${ref.name}" — check your token.`)
         }
+        // An iCal vault only ever answers 'granted' or 'offline'; an
+        // unreachable feed leaves its cached events on screen and retries on
+        // the next cycle, with no message worth interrupting the user for.
       } catch (e) {
         // One vault's failure must not abort the others' restore.
         console.warn(`[vault] could not mount "${ref.name}":`, e)
@@ -514,6 +539,35 @@ export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<
   } catch (e) {
     console.error('[vault] addGitHubVaultOAuth failed:', e)
     notifyError('Could not connect GitHub vault', e)
+  }
+}
+
+/**
+ * Register a calendar subscription.
+ *
+ * The feed is fetched once before anything is persisted, so a typo'd or
+ * unreachable URL fails here — in the wizard, where it is still cheap to
+ * correct — rather than producing a permanently empty vault. `previewIcalFeed`
+ * has usually already done this a moment earlier, and `IcalBackend` memoizes,
+ * so the check normally costs nothing.
+ */
+export async function addIcalVault(feedUrl: string, name: string): Promise<void> {
+  try {
+    await cacheInit()
+    const id = newVaultId(name, await takenVaultIds())
+
+    const { IcalBackend } = await import('./icalBackend')
+    const backend = new IcalBackend(id, name, feedUrl)
+    if (await backend.ensurePermission(true) !== 'granted') {
+      notify(`Could not read the calendar at that address. Check the URL and your connection.`)
+      return
+    }
+
+    const ref: IcalVaultRef = { id, name, kind: 'ical', ical: { url: feedUrl } }
+    await registerAndMount(ref, backend)
+  } catch (e) {
+    console.error('[vault] addIcalVault failed:', e)
+    notifyError('Could not add calendar subscription', e)
   }
 }
 

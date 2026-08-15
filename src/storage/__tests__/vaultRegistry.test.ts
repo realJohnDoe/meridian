@@ -145,6 +145,7 @@ vi.mock('@/storage/localBackend', () => ({
   LocalBackend: class {
     readonly kind = 'local'
     readonly readOnly = false
+    readonly hasRemote = true
     constructor(public id: string, public name: string, public handle: unknown) {}
     async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> {
       callOrder.push('ensurePermission')
@@ -164,6 +165,7 @@ vi.mock('@/storage/githubBackend', () => ({
   GitHubBackend: class {
     readonly kind = 'github'
     readonly readOnly = false
+    readonly hasRemote = true
     constructor(public id: string, public name: string, public cfg: unknown) {}
     async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> {
       callOrder.push('ensurePermission')
@@ -186,6 +188,7 @@ vi.mock('@/storage/exampleBackend', () => ({
     readonly name = 'Tutorial'
     readonly kind = 'example'
     readonly readOnly = true
+    readonly hasRemote = false
     async ensurePermission(): Promise<PermissionOutcome> { return 'granted' }
     async statAll() { return new Map<string, string>() }
     async readFiles() { return [] }

@@ -179,6 +179,7 @@ class FakeBackend implements StorageBackend {
   readonly name     = 'Fake'
   readonly kind: VaultKind = 'local'
   readonly readOnly = false
+  readonly hasRemote = true
   refreshAuth?: () => Promise<boolean>
 
   writeCallCount     = 0
@@ -1469,14 +1470,63 @@ describe('multi-vault sync', () => {
     expect(cacheStore.get(vp('vault-ro', 'note.md'))).toBeUndefined()
   })
 
-  it('never auto-syncs a read-only vault', async () => {
-    const ro = otherBackend('vault-ro')
-    Object.defineProperty(ro, 'readOnly', { value: true })
-    mountBackend(ro)
+  // ── read-only vs. no-remote ───────────────────────────────────────────────
+  // Two independent properties, and the iCal vault kind is why they had to be
+  // separated: a subscription is read-only but IS polled, while the Tutorial
+  // vault is read-only and is not polled at all.
+
+  /** A read-only vault with a live remote — a calendar subscription. */
+  function subscriptionBackend(id: string): FakeBackend {
+    const backend = otherBackend(id, 'ical')
+    Object.defineProperty(backend, 'readOnly', { value: true })
+    return backend
+  }
+
+  it('auto-syncs a read-only vault that has a remote', async () => {
+    const feed = subscriptionBackend('vault-ical')
+    feed.seed('ical-abc.md', '---\ntitle: Event\n---\n', 'v1')
+    mountBackend(feed)
 
     autoSyncTick()
     await flush()
 
-    expect(ro.statAllCallCount).toBe(0)
+    expect(feed.statAllCallCount).toBe(1)
+    // The pull landed: the feed's entry is in the cache and in the store layer.
+    expect(cacheStore.get(vp('vault-ical', 'ical-abc.md'))?.content).toContain('title: Event')
+    expect(storeState.layers.get('vault-ical')?.items.length).toBeGreaterThan(0)
+  })
+
+  it('never pushes from a read-only vault, even when its cache holds dirty rows', async () => {
+    const feed = subscriptionBackend('vault-ical')
+    mountBackend(feed)
+    seedDirty('vault-ical', 'ical-abc.md', 'local edit', undefined)
+
+    autoSyncTick()
+    await flush()
+
+    expect(feed.writeCallCount).toBe(0)
+    expect(feed.deleteCallCount).toBe(0)
+  })
+
+  it('never auto-syncs a vault with no remote', async () => {
+    const sandbox = otherBackend('vault-sandbox', 'example')
+    Object.defineProperty(sandbox, 'readOnly',  { value: true })
+    Object.defineProperty(sandbox, 'hasRemote', { value: false })
+    mountBackend(sandbox)
+
+    autoSyncTick()
+    await flush()
+
+    expect(sandbox.statAllCallCount).toBe(0)
+  })
+
+  it('refreshes a subscription on an explicit "Sync now"', async () => {
+    const feed = subscriptionBackend('vault-ical')
+    feed.seed('ical-abc.md', '---\ntitle: Event\n---\n', 'v1')
+    mountBackend(feed)
+
+    await syncToBackend()
+
+    expect(feed.statAllCallCount).toBe(1)
   })
 })

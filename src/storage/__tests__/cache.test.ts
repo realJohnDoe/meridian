@@ -437,6 +437,7 @@ describe('cache/credentials — directory handles', () => {
 
 const localRef:  VaultRef = { id: V,     name: 'Local',  kind: 'local' }
 const githubRef: VaultRef = { id: OTHER, name: 'GitHub', kind: 'github', github: { owner: 'o', repo: 'r', branch: 'main' } }
+const icalRef:   VaultRef = { id: 'cal', name: 'Family', kind: 'ical', ical: { url: 'https://cal.example/f.ics' } }
 
 describe('cache/registry — vault list', () => {
   it('returns an empty list before anything is saved', async () => {
@@ -444,9 +445,23 @@ describe('cache/registry — vault list', () => {
   })
 
   it('round-trips the vault list', async () => {
-    await m.reg.vaultRefsSave([localRef, githubRef])
+    await m.reg.vaultRefsSave([localRef, githubRef, icalRef])
 
-    expect(await m.reg.vaultRefsLoad()).toEqual([localRef, githubRef])
+    expect(await m.reg.vaultRefsLoad()).toEqual([localRef, githubRef, icalRef])
+  })
+
+  it('drops an iCal ref that lost its feed URL', async () => {
+    // Without the URL there is no backend to build, so the vault would mount
+    // into a permanently empty layer. Rejecting it here is the cheaper failure.
+    await m.reg.vaultRefsSave([
+      icalRef,
+      { id: 'a', name: 'No ical block', kind: 'ical' },
+      { id: 'b', name: 'Empty ical block', kind: 'ical', ical: {} },
+      { id: 'c', name: 'Non-string url', kind: 'ical', ical: { url: 42 } },
+      { id: 'd', name: 'Null ical block', kind: 'ical', ical: null },
+    ] as unknown as VaultRef[])
+
+    expect(await m.reg.vaultRefsLoad()).toEqual([icalRef])
   })
 
   it('drops entries that are not vault refs', async () => {

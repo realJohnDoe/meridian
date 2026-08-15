@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatDistanceToNow } from 'date-fns'
 import { Trash2, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -32,6 +33,7 @@ export function VaultSettings({ vault }: Props) {
 
   const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
   const items                  = useStore(s => s.items)
+  const lastRefreshed          = useStore(s => s.syncByVault.get(vault.id)?.lastSyncedAt ?? null)
 
   const allParticipants = useAllParticipants(items)
 
@@ -85,6 +87,31 @@ export function VaultSettings({ vault }: Props) {
         </div>
       )}
 
+      {vault.kind === 'ical' && (
+        <div className="flex flex-col gap-2 pt-2 border-t border-border">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-sm font-medium">Calendar address</span>
+              {/* Deliberately not truncated to a hostname: this is a secret
+                  address the user may need to copy out again, and hiding most
+                  of it would make it unusable for that. */}
+              <span className="text-xs text-muted-foreground font-mono break-all">{vault.ical.url}</span>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
+              {syncing ? 'Refreshing…' : 'Refresh now'}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {lastRefreshed
+              ? `Last refreshed ${formatDistanceToNow(lastRefreshed, { addSuffix: true })}. Checked automatically every 15 minutes.`
+              : 'Checked automatically every 15 minutes.'}
+          </p>
+        </div>
+      )}
+
+      {/* A subscription has no writable side, so there is nothing for default
+          participants to seed — new entries can never land here. */}
+      {vault.kind !== 'ical' && (
       <div className="flex flex-col gap-2 pt-2 border-t border-border">
         <span className="text-sm font-medium">Default participants</span>
         <p className="text-xs text-muted-foreground">
@@ -97,6 +124,7 @@ export function VaultSettings({ vault }: Props) {
           allParticipants={allParticipants}
         />
       </div>
+      )}
 
       {vault.kind !== 'example' && (
         <div className="flex justify-end pt-2 border-t border-border">
@@ -119,6 +147,7 @@ export function VaultSettings({ vault }: Props) {
             <AlertDialogDescription>
               Remove &ldquo;{vault.name}&rdquo;? This deletes it from this device.
               {vault.kind === 'github' && ' The GitHub repository itself is not affected.'}
+              {vault.kind === 'ical' && ' The calendar itself is not affected — only this subscription to it.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {dirtyCount > 0 && (

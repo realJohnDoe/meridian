@@ -467,6 +467,8 @@ export class ExampleBackend implements StorageBackend {
   readonly name     = 'Tutorial'
   readonly kind: VaultKind = 'example'
   readonly readOnly = true
+  /** Synthesized fresh on every load — no cache rows, nothing to poll. */
+  readonly hasRemote = false
 
   async statAll(): Promise<Map<string, string>> {
     const m = new Map<string, string>()

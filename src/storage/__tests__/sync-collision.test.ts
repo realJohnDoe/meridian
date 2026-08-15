@@ -19,6 +19,7 @@ class FakeBackend implements StorageBackend {
   readonly name     = 'Fake'
   readonly kind: VaultKind = 'local'
   readonly readOnly = false
+  readonly hasRemote = true
 
   private _files = new Map<string, FakeFile>()
   private _staleTokens = new Map<string, string>()

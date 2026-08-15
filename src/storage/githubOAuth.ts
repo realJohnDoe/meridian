@@ -1,9 +1,9 @@
 import { tokenLoad, tokenSave, refreshTokenLoad, refreshTokenSave, tokenExpiryLoad, tokenExpirySave } from './cache/credentials'
+import { WORKER_ORIGIN } from './workerOrigin'
 
 const GITHUB_CLIENT_ID = 'Iv23liMpUq1CUQl4TcaT'
 export const GITHUB_APP_INSTALL_URL = 'https://github.com/apps/realjohndoe-meridian/installations/new'
 
-const WORKER_ORIGIN = 'https://meridian-oauth.realjohndoe.workers.dev'
 const REDIRECT_URI = 'https://realjohndoe.github.io/meridian/auth/callback'
 
 const VERIFIER_KEY = 'meridian_oauth_verifier'

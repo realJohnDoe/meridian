@@ -39,9 +39,14 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
       {lastSynced && <p className="text-2xs text-muted-foreground pl-5">{lastSynced}</p>}
 
       {/* Generalized from the two hardcoded "Tutorial vault — changes aren't
-          saved." strings: any read-only vault says so in its own name. */}
+          saved." strings: any read-only vault says so in its own name. A
+          subscription is worded differently on purpose — it offers no editing
+          at all, so "changes aren't saved" would describe an act the UI never
+          lets the user attempt. */}
       {status.readOnly && (
-        <p className="text-2xs text-muted-foreground pl-5">Read-only — changes aren&rsquo;t saved.</p>
+        <p className="text-2xs text-muted-foreground pl-5">
+          {vault.kind === 'ical' ? 'Subscription — read-only.' : 'Read-only — changes aren’t saved.'}
+        </p>
       )}
 
       {status.dirtyCount > 0 && (
