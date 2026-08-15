@@ -24,6 +24,8 @@ interface Props {
   viewRef:          React.RefObject<EditorView | null>
   onOpenWikilink?:  (ref: string) => void
   onChange?:        (body: string) => void
+  /** Renders CodeMirror non-editable — set by EntryViewOnly for a `view-only` vault. */
+  readOnly?:        boolean
 }
 
 const editorTheme = EditorView.theme({
@@ -75,7 +77,7 @@ const editorTheme = EditorView.theme({
   },
 })
 
-export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpenWikilink, onChange }: Props) {
+export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpenWikilink, onChange, readOnly }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [wlPopup, setWlPopup] = useState<WlPopupState | null>(null)
   const closePopup = () => setWlPopup(null)
@@ -99,12 +101,12 @@ export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpen
   // ("skipped optimizing this component because one or more React ESLint rules
   // were disabled"), so a one-line suppression silently cost this entire file
   // its memoization.
-  const seedRef = useRef({ body, roots, vaultId, items })
+  const seedRef = useRef({ body, roots, vaultId, items, readOnly })
 
   // Mount CM6 EditorView once per component lifetime (key= on parent handles remounts)
   useEffect(() => {
     if (!containerRef.current) return
-    const { body: seedBody, roots: seedRoots, vaultId: seedVaultId, items: seedItems } = seedRef.current
+    const { body: seedBody, roots: seedRoots, vaultId: seedVaultId, items: seedItems, readOnly: seedReadOnly } = seedRef.current
 
     const state = EditorState.create({
       doc: seedBody,
@@ -120,6 +122,8 @@ export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpen
         itemsField.init(() => seedItems),
         createWikilinkExtension(onOpenRef),
         wikilinkTheme,
+        // Wikilink clicks still navigate — only text edits are blocked.
+        ...(seedReadOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
         createTaskExtension(),
         taskTheme,
         editorTheme,

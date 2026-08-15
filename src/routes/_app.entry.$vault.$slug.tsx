@@ -1,8 +1,8 @@
 import { lazy, Suspense, useMemo } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
-import { useFileOccurrenceMap } from '@/hooks'
+import { useFileOccurrenceMap, useEntryAccess } from '@/hooks'
 import { useEntryEditor } from '@/editor'
 import { expandRange } from '@/model'
 import { isEditScope } from '@/types'
@@ -11,8 +11,10 @@ import { IconButton } from '@/components/primitives/icon-button'
 import { EntrySkeleton } from '@/components/primitives/entry-skeleton'
 import { EntryTopbar } from './-entryTopbar'
 import type { Occurrence, EditScope } from '@/types'
+import type { VaultRef } from '@/vaultRef'
 
 const EntryEditor = lazy(() => import('@/editor').then(m => ({ default: m.EntryEditor })))
+const EntryViewOnly = lazy(() => import('@/editor').then(m => ({ default: m.EntryViewOnly })))
 
 export const Route = createFileRoute('/_app/entry/$vault/$slug')({
   component: EntrySlugPage,
@@ -22,7 +24,7 @@ export const Route = createFileRoute('/_app/entry/$vault/$slug')({
   }),
 })
 
-function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
+function EditableEntry({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
   const items          = useStore(s => s.items)
   const roots          = useStore(s => s.roots)
   const favorites      = useStore(s => s.favorites)
@@ -44,6 +46,47 @@ function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
       </Suspense>
     </>
   )
+}
+
+// A view-only vault (an iCal subscription) has no source to write back to, so
+// there's nothing here that autosaves, deletes, or moves — just the plain
+// read view (see EntryViewOnly) and the favorite toggle, which still makes
+// sense for a subscribed event. Kept as its own component, not a branch
+// inside EditableEntry, so it never calls useEntryEditor's mutator-heavy hook
+// at all — see hooks/useEntryAccess.
+function ViewOnlyEntry({ occ, vault }: { occ: Occurrence; vault: VaultRef }) {
+  const items          = useStore(s => s.items)
+  const roots          = useStore(s => s.roots)
+  const favorites      = useStore(s => s.favorites)
+  const toggleFavorite = useStore(s => s.toggleFavorite)
+  const router         = useRouter()
+  const navigate       = useNavigate()
+
+  const isFavorited = favorites.includes(occ.entryKey)
+  const onBack = () => {
+    if (window.history.length > 1) router.history.back()
+    else void navigate({ to: '/' })
+  }
+
+  return (
+    <>
+      <EntryTopbar
+        isFavorited={isFavorited}
+        onToggleFavorite={() => toggleFavorite(occ.entryKey)}
+        onBack={onBack}
+        hideDelete
+      />
+      <Suspense fallback={<EntrySkeleton />}>
+        <EntryViewOnly occ={occ} vault={vault} items={items} roots={roots} />
+      </Suspense>
+    </>
+  )
+}
+
+function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
+  const access = useEntryAccess(occ)
+  if (access.mode === 'view-only') return <ViewOnlyEntry occ={occ} vault={access.vault} />
+  return <EditableEntry occ={occ} scope={scope} />
 }
 
 function EntrySlugPage() {

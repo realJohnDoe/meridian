@@ -1,5 +1,6 @@
 export { default as EntryEditor } from './EntryEditor'
 export type { EntryEditorHooks } from './EntryEditor'
+export { default as EntryViewOnly } from './EntryViewOnly'
 export { default as ParticipantsRow } from './ParticipantsRow'
 
 // debug-only — still public surface

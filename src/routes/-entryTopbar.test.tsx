@@ -66,6 +66,18 @@ describe('EntryTopbar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     expect(onDelete).toHaveBeenCalledTimes(1)
   })
+
+  // view-only (an iCal subscription): no source to delete from.
+  it('hides the delete button when hideDelete is set', () => {
+    const slotEl = document.createElement('div')
+    document.body.appendChild(slotEl)
+    render(
+      <TopbarSlotContext value={slotEl}>
+        <EntryTopbar isFavorited={false} onToggleFavorite={vi.fn()} onBack={vi.fn()} hideDelete />
+      </TopbarSlotContext>,
+    )
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+  })
 })
 
 describe('EntryTopbar — favorite toggle', () => {
