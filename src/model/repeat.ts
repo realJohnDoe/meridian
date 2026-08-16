@@ -6,6 +6,7 @@
 
 import type { Repeat, Weekday } from '@/types'
 import { parseDateString } from './dateUtils'
+import { parseDuration, serialiseDuration, type DurationUnit } from './duration'
 
 // JS getDay() → Weekday code / full name
 const WDAY_CODE_BY_JS_DAY: Weekday[] = ['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa']
@@ -15,21 +16,19 @@ const WDAY_NAME_BY_JS_DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursd
 
 // ── Interval string format: "2 weeks", "1 day", "3 months", … ────────────────
 
-export type IntervalParts = { n: number; unit: string }
+export type IntervalParts = { n: number; unit: DurationUnit }
 
-/** Parse "2 weeks" → { n: 2, unit: 'weeks' }.  Handles all six engine units. */
+/** Parse "2 weeks" (or "2w") → { n: 2, unit: 'weeks' }. Delegates to the same
+ * canonical parser `duration.ts` uses, so the engine and the dialogs agree on
+ * exactly one unit vocabulary. */
 export function parseInterval(s: string): IntervalParts {
   if (!s) return { n: 1, unit: 'days' }
-  const m = s.trim().match(/^(\d+)\s*(day|week|month|year|hour|minute)s?$/i)
-  if (!m) return { n: 1, unit: 'days' }
-  const unit = m[2]!.toLowerCase() + 's'  // both capture groups matched
-  return { n: parseInt(m[1]!, 10), unit }
+  return parseDuration(s) ?? { n: 1, unit: 'days' }
 }
 
 /** Serialise { n: 2, unit: 'weeks' } → "2 weeks" (singular when n === 1). */
-export function serialiseInterval(n: number, unit: string): string {
-  const label = n === 1 ? unit.replace(/s$/, '') : unit
-  return `${n} ${label}`
+export function serialiseInterval(n: number, unit: DurationUnit): string {
+  return serialiseDuration(n, unit)
 }
 
 // ── Monthly weekday spec ──────────────────────────────────────────────────────
@@ -115,7 +114,7 @@ export interface RepeatForm {
   endVal: string
   intervalNum: number
   completionNum: number
-  completionUnit: string
+  completionUnit: DurationUnit
 }
 
 export interface RepeatFormContext {

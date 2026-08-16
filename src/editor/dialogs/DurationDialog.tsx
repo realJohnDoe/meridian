@@ -4,6 +4,7 @@ import { useIsTouchDevice } from '../use-touch-device'
 import { addDays } from 'date-fns'
 import { CalendarIcon } from 'lucide-react'
 import { parseDateString, fmtISO, serialiseInterval } from '@/model'
+import type { DurationUnit } from '@/model'
 import type { Scheduled } from '@/types'
 import {
   ResponsiveModal,
@@ -28,8 +29,7 @@ import {
 import { useStore } from '@/store'
 
 // ── Types / data ──────────────────────────────────────────────────────────────
-const UNITS = ['minutes', 'hours', 'days', 'weeks', 'months', 'years'] as const
-type Unit = typeof UNITS[number]
+const UNITS: readonly DurationUnit[] = ['minutes', 'hours', 'days', 'weeks', 'months', 'years']
 type Tab  = 'interval' | 'endDate'
 
 const PRESETS: { label: string; value: string }[] = [
@@ -61,7 +61,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
 
   const [tab,  setTab]  = useState<Tab>(defaultTab)
   const [n,    setN]    = useState(1)
-  const [unit, setUnit] = useState<Unit>('hours')
+  const [unit, setUnit] = useState<DurationUnit>('hours')
   const [endDate, setEndDate] = useState('')   // YYYY-MM-DD
   const [endTime, setEndTime] = useState('')   // HH:MM
   const [dateDlgOpen, setDateDlgOpen] = useState(false)

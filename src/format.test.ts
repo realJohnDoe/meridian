@@ -59,8 +59,15 @@ describe('fmtDuration', () => {
     expect(fmtDuration('30 hours')).toBe('1 day, 6 hours')
   })
 
-  it('passes through units it does not special-case', () => {
+  it('renders units it does not special-case unchanged when already long-form', () => {
     expect(fmtDuration('3 days')).toBe('3 days')
+  })
+
+  it('normalizes short-form units to long form', () => {
+    expect(fmtDuration('3d')).toBe('3 days')
+    expect(fmtDuration('2w')).toBe('2 weeks')
+    expect(fmtDuration('1mo')).toBe('1 month')
+    expect(fmtDuration('1y')).toBe('1 year')
   })
 })
 

@@ -69,20 +69,20 @@ describe('durationBetween', () => {
   const at = (h: number, m = 0) => new Date(2026, 7, 15, h, m)
 
   it('prefers whole hours, falls back to minutes', () => {
-    expect(durationBetween(at(9), at(9, 30), false)).toBe('30m')
-    expect(durationBetween(at(9), at(10), false)).toBe('1h')
-    expect(durationBetween(at(9), at(11), false)).toBe('2h')
-    expect(durationBetween(at(9), at(10, 30), false)).toBe('90m')
+    expect(durationBetween(at(9), at(9, 30), false)).toBe('30 minutes')
+    expect(durationBetween(at(9), at(10), false)).toBe('1 hour')
+    expect(durationBetween(at(9), at(11), false)).toBe('2 hours')
+    expect(durationBetween(at(9), at(10, 30), false)).toBe('90 minutes')
   })
 
   it('uses days for whole-day timed spans', () => {
-    expect(durationBetween(new Date(2026, 7, 15, 9), new Date(2026, 7, 17, 9), false)).toBe('2d')
+    expect(durationBetween(new Date(2026, 7, 15, 9), new Date(2026, 7, 17, 9), false)).toBe('2 days')
   })
 
   it('counts all-day spans in days, and omits a single day', () => {
     // DTEND is exclusive for all-day values.
     expect(durationBetween(new Date(2026, 7, 15), new Date(2026, 7, 16), true)).toBeUndefined()
-    expect(durationBetween(new Date(2026, 7, 15), new Date(2026, 7, 18), true)).toBe('3d')
+    expect(durationBetween(new Date(2026, 7, 15), new Date(2026, 7, 18), true)).toBe('3 days')
   })
 
   it('returns undefined for a zero or negative span', () => {

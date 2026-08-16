@@ -106,7 +106,7 @@ describe('icsToEntries — dates and durations', () => {
     ])))
     expect(fm['date']).toBe('2026-09-01')
     expect(fm).not.toHaveProperty('time')
-    expect(fm['duration']).toBe('3d') // DTEND is exclusive
+    expect(fm['duration']).toBe('3 days') // DTEND is exclusive
   })
 
   it('converts a TZID wall clock to the viewer local wall clock', () => {
@@ -118,7 +118,7 @@ describe('icsToEntries — dates and durations', () => {
     ])))
     // 09:00 Berlin in August is 07:00 UTC.
     expect(fm['time']).toBe(localTimeOf(Date.UTC(2026, 7, 17, 7, 0)))
-    expect(fm['duration']).toBe('30m')
+    expect(fm['duration']).toBe('30 minutes')
     expect(fm['sourceTimezone']).toBe('Europe/Berlin')
   })
 
@@ -127,14 +127,14 @@ describe('icsToEntries — dates and durations', () => {
       'UID:a@example', 'DTSTART:20260825T100000', 'DURATION:PT90M', 'SUMMARY:Workshop',
     ])))
     expect(fm['time']).toBe('10:00')
-    expect(fm['duration']).toBe('90m')
+    expect(fm['duration']).toBe('90 minutes')
     expect(fm).not.toHaveProperty('sourceTimezone')
   })
 
   it('honours DURATION when there is no DTEND', () => {
     expect(frontmatter(only(event([
       'UID:a@example', 'DTSTART:20260825T100000', 'DURATION:PT2H', 'SUMMARY:X',
-    ])))['duration']).toBe('2h')
+    ])))['duration']).toBe('2 hours')
   })
 })
 
@@ -193,7 +193,7 @@ describe('icsToEntries — RECURRENCE-ID overrides', () => {
     ].join('\r\n')), NOW)!
 
     expect(result.entries).toHaveLength(1) // one entry, not two
-    expect(frontmatter(result.entries[0]!)['instances']).toEqual([{ date: '2026-08-10', time: '11:00', duration: '30m' }])
+    expect(frontmatter(result.entries[0]!)['instances']).toEqual([{ date: '2026-08-10', time: '11:00', duration: '30 minutes' }])
   })
 
   it('excludes the original day and adds the new one when an occurrence moves', () => {
@@ -204,7 +204,7 @@ describe('icsToEntries — RECURRENCE-ID overrides', () => {
 
     expect(frontmatter(result.entries[0]!)['instances']).toEqual([
       { date: '2026-08-10', excluded: true },
-      { date: '2026-08-12', time: '14:00', duration: '1h' },
+      { date: '2026-08-12', time: '14:00', duration: '1 hour' },
     ])
   })
 
@@ -325,7 +325,7 @@ describe('golden fixtures', () => {
     expect(fm['repeat']).toEqual({ type: 'schedule', freq: 'monthly', byweekday: ['fr'], bysetpos: 2 })
     expect(fm['instances']).toEqual([
       { date: '2026-09-11', excluded: true },
-      { date: '2026-09-12', time: '10:00', duration: '90m' },
+      { date: '2026-09-12', time: '10:00', duration: '90 minutes' },
     ])
   })
 })

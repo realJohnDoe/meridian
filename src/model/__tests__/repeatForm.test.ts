@@ -137,7 +137,7 @@ describe('formToRepeat', () => {
   })
 
   it('clamps a non-positive completion interval to 1 and singularises the unit', () => {
-    const form = { ...repeatToForm(null, ctx()), freq: 'after_completion' as const, completionNum: 0, completionUnit: 'weeks' }
+    const form = { ...repeatToForm(null, ctx()), freq: 'after_completion' as const, completionNum: 0, completionUnit: 'weeks' as const }
     expect(formToRepeat(form, DATE)).toEqual({ type: 'after_completion', interval: '1 week' })
   })
 

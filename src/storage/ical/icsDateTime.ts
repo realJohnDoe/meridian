@@ -21,6 +21,8 @@
 // exporter froze into the feed, and re-implementing VTIMEZONE's RRULE-based
 // offset rules would be a second recurrence engine for no gain.
 
+import { serialiseDuration } from '@/model'
+
 /** A DTSTART/DTEND/RECURRENCE-ID value, resolved to an instant. */
 export interface IcsInstant {
   /** The moment itself. For an all-day value, local midnight on that date. */
@@ -154,10 +156,15 @@ export function localTime(d: Date): string {
  * worth writing.
  *
  * All-day spans are counted in whole days, and a single-day event gets no
- * duration at all — `1d` is what the absence already means, and emitting it
- * would put a redundant field on nearly every all-day event in a feed.
+ * duration at all — `1 day` is what the absence already means, and emitting
+ * it would put a redundant field on nearly every all-day event in a feed.
  * Sub-day spans prefer whole hours over minutes because that is the form the
  * editor itself writes.
+ *
+ * Always written in Meridian's own canonical long-form spelling (`"3 days"`,
+ * not `"3d"`) via `serialiseDuration` — independent of however compactly ICS
+ * itself expresses spans (`PT1H30M`) — so a synthesized feed reads the same
+ * as a hand-authored entry instead of exposing an import-specific shorthand.
  */
 export function durationBetween(start: Date, end: Date, allDay: boolean): string | undefined {
   const ms = end.getTime() - start.getTime()
@@ -166,14 +173,14 @@ export function durationBetween(start: Date, end: Date, allDay: boolean): string
   if (allDay) {
     // DTEND is exclusive for all-day values, so the span is already the day count.
     const days = Math.round(ms / 86_400_000)
-    return days >= 2 ? `${days}d` : undefined
+    return days >= 2 ? serialiseDuration(days, 'days') : undefined
   }
 
   const minutes = Math.round(ms / 60_000)
-  if (minutes < 60) return `${minutes}m`
-  if (minutes % 1440 === 0) return `${minutes / 1440}d`
-  if (minutes % 60 === 0) return `${minutes / 60}h`
-  return `${minutes}m`
+  if (minutes < 60) return serialiseDuration(minutes, 'minutes')
+  if (minutes % 1440 === 0) return serialiseDuration(minutes / 1440, 'days')
+  if (minutes % 60 === 0) return serialiseDuration(minutes / 60, 'hours')
+  return serialiseDuration(minutes, 'minutes')
 }
 
 /** ISO 8601 duration (`PT1H30M`, `P2D`, `P1W`) → milliseconds; null if unparseable. */

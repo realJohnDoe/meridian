@@ -119,6 +119,12 @@ export function fmtEndTime(hhmm: string, hour12 = false): string {
   return formatHHMM(hhmm, hour12)
 }
 
+/**
+ * Always renders the long form ("3 days", never "3d") regardless of how the
+ * source vault spelled it — a vault's on-disk convention (short-form is valid
+ * hand-authored shorthand, e.g. from an iCal import or a terse edit) is a
+ * storage concern only; the UI has exactly one display convention.
+ */
 export function fmtDuration(duration: string): string {
   const p = parseDuration(duration)
   if (!p) return duration
@@ -133,7 +139,7 @@ export function fmtDuration(duration: string): string {
     const dStr = pluralize(d, 'day')
     return h > 0 ? `${dStr}, ${pluralize(h, 'hour')}` : dStr
   }
-  return duration
+  return pluralize(n, unit.replace(/s$/, ''))
 }
 
 export function fmtDurationCompact(duration: string): string {
