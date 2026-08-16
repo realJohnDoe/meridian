@@ -121,8 +121,13 @@ export default function ViewFilterButton() {
   const groups = useVaultGroups(items, vaults)
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const active = hiddenVaultIds.length > 0
-    || Object.values(hiddenParticipants).some(list => list.length > 0)
+  // Only count hidden state against vaults that still exist: a vault that
+  // was later removed leaves its hiddenVaultIds/hiddenParticipants entry
+  // behind (nothing prunes it), and that stale entry must not keep the
+  // indicator lit for a filter that no longer affects anything.
+  const liveVaultIds = new Set(vaults.map(v => v.id))
+  const active = hiddenVaultIds.some(id => liveVaultIds.has(id))
+    || Object.entries(hiddenParticipants).some(([id, list]) => liveVaultIds.has(id) && list.length > 0)
 
   // Below two vaults the tree is pure overhead — there is no second calendar to
   // distinguish anyone from — so it collapses to the flat people list
@@ -133,23 +138,25 @@ export default function ViewFilterButton() {
   if (groups.length === 0) return null
   if (flat && flatGroup && flatGroup.participants.length === 0) return null
 
-  const hiddenCount = hiddenVaultIds.length
-    + Object.values(hiddenParticipants).reduce((n, list) => n + list.length, 0)
-  const label = active ? `${hiddenCount} hidden` : null
-
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
-          size={active ? 'sm' : 'icon'}
-          className={active
-            ? 'rounded-full shrink-0 gap-1.5 max-w-40 text-accent-foreground bg-accent'
-            : 'rounded-full shrink-0 text-dim'}
-          aria-label={active ? `${hiddenCount} hidden. Change calendar and people filter` : 'Filter calendars and people'}
+          size="icon"
+          className="relative rounded-full shrink-0 text-dim"
+          aria-label={active ? 'Filters active. Change calendar and people filter' : 'Filter calendars and people'}
         >
           <Users size={18} className="shrink-0" />
-          {label && <span className="truncate text-sm">{label}</span>}
+          {active && (
+            // A plain dot, not a count: which calendars/people are hidden is
+            // one popover-click away, and a number here would just resurrect
+            // the old "N hidden" ambiguity (vaults? people? both?) in miniature.
+            <span
+              aria-hidden="true"
+              className="absolute top-1 right-1 size-2 rounded-full bg-primary ring-2 ring-background"
+            />
+          )}
         </Button>
       </PopoverTrigger>
       {/* pb-0.5 (not p-2's uniform 8px): rows already carry py-2.5/py-3 of
