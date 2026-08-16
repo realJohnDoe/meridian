@@ -42,8 +42,7 @@ function addInterval(date: Date, intervalStr: string): Date {
   if (unit === 'months')  return addMonths(date, n)
   if (unit === 'years')   return addYears(date, n)
   if (unit === 'hours')   return addHours(date, n)
-  if (unit === 'minutes') return addMinutes(date, n)
-  return date
+  return addMinutes(date, n)
 }
 
 function nodeDateTime(node: { date: string; time: string | null }): Date | null {

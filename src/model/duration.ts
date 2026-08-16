@@ -12,9 +12,15 @@
  * always writes single-unit full-word strings via serialise()).
  */
 
-import { scalarToString } from './fieldRegistry'
-
 export type DurationUnit = 'minutes' | 'hours' | 'days' | 'weeks' | 'months' | 'years'
+
+/** Coerce a raw YAML scalar to a string, without pulling in fieldRegistry.ts (which
+ * itself may need to canonicalise a duration string — see `serialiseDuration`). */
+function toStr(v: unknown): string | undefined {
+  if (typeof v === 'string') return v
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+  return undefined
+}
 
 /** Canonical single-unit parse. Returns null for unrecognised or compound strings. */
 export function parseDuration(s: string): { n: number; unit: DurationUnit } | null {
@@ -31,10 +37,16 @@ export function parseDuration(s: string): { n: number; unit: DurationUnit } | nu
   return null
 }
 
+/** Canonical serialisation: { n: 2, unit: 'weeks' } -> "2 weeks" (singular when n === 1). */
+export function serialiseDuration(n: number, unit: DurationUnit): string {
+  const label = n === 1 ? unit.replace(/s$/, '') : unit
+  return `${n} ${label}`
+}
+
 /** Whole-day count for multi-day display; null for sub-day durations. */
 export function parseDurationDays(dur: unknown): number | null {
   if (!dur) return null
-  const str = scalarToString(dur)
+  const str = toStr(dur)
   if (str === undefined) return null
   const p = parseDuration(str)
   if (!p) return null
@@ -48,7 +60,7 @@ export function parseDurationDays(dur: unknown): number | null {
 /** Fractional hours for timeline layout and sorting. Falls back to 0.75 for unparseable input. */
 export function parseDurationHours(dur: unknown): number {
   if (!dur) return 0.75
-  const str = scalarToString(dur)
+  const str = toStr(dur)
   if (str === undefined) return 0.75
   const s = str.trim()
   const p = parseDuration(s)

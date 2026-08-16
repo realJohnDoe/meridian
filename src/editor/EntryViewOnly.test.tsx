@@ -42,7 +42,10 @@ describe('EntryViewOnly', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
-  it('shows the vault as a source chip and date/time/duration/participant chips', () => {
+  it('shows the vault as a source chip and date/time/duration/participant chips, always in long form', () => {
+    // duration is stored short-form here on purpose — the UI must always render
+    // the long form regardless of how the source vault (e.g. an iCal import)
+    // spelled it on disk.
     const occ = makeOcc({
       date: '2026-06-15',
       time: '09:00',
@@ -57,7 +60,8 @@ describe('EntryViewOnly', () => {
     expect(screen.getByText('09:00')).toBeInTheDocument()
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.getByText('Bob')).toBeInTheDocument()
-    expect(screen.getByText(/30m/)).toBeInTheDocument()
+    expect(screen.getByText(/30 minutes/)).toBeInTheDocument()
+    expect(screen.queryByText(/30m\b/)).not.toBeInTheDocument()
   })
 
   it('renders location, url and organizer from extra, with url as a link', () => {

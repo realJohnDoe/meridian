@@ -1,7 +1,7 @@
 import { useReducer, useState } from 'react'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled } from '@/types'
-import type { RepeatForm, RepeatFormContext, RepeatFormFreq, ScheduleFreq, MonthlyMode, RepeatEndType } from '@/model'
+import type { RepeatForm, RepeatFormContext, RepeatFormFreq, ScheduleFreq, MonthlyMode, RepeatEndType, DurationUnit } from '@/model'
 import { parseDateString, weekStartsOn, monthlyWeekdaySpec, repeatToForm, formToRepeat } from '@/model'
 import { useStore } from '@/store'
 import { useResetOnChange } from '@/hooks'
@@ -58,8 +58,8 @@ const FREQ_UNIT_LABELS: Record<ScheduleFreq, string> = {
   daily: 'days', weekly: 'weeks', monthly: 'months', yearly: 'years',
 }
 
-const COMPLETION_UNITS: readonly string[] = ['days', 'weeks', 'months', 'years']
-function completionUnitLabel(unit: string, n: number): string {
+const COMPLETION_UNITS: readonly DurationUnit[] = ['days', 'weeks', 'months', 'years']
+function completionUnitLabel(unit: DurationUnit, n: number): string {
   return n === 1 ? unit.replace(/s$/, '') : unit
 }
 
@@ -109,7 +109,7 @@ export default function RepeatDialog({
   const setEndVal         = (endVal: string)      => dispatch({ type: 'set', patch: { endVal } })
   const setIntervalNum    = (intervalNum: number) => dispatch({ type: 'set', patch: { intervalNum } })
   const setCompletionNum  = (completionNum: number) => dispatch({ type: 'set', patch: { completionNum } })
-  const setCompletionUnit = (completionUnit: string) => dispatch({ type: 'set', patch: { completionUnit } })
+  const setCompletionUnit = (completionUnit: DurationUnit) => dispatch({ type: 'set', patch: { completionUnit } })
 
   const [endCalOpen, setEndCalOpen] = useState(false)
 
