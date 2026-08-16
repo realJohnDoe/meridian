@@ -136,7 +136,6 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
     el.scrollTop = getInitialScrollTopRef.current()
   }, [])
 
-  const totalCols = Math.max(cols.length, 1)
   const isToday   = sameDay(dvDate, today)
 
   const dvMidnight = startOfDay(dvDate)
@@ -281,19 +280,17 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
               through to the hour-cell button beneath; EventBlock opts itself
               back in with pointer-events-auto. */}
           <div className="absolute inset-y-0 pointer-events-none" style={{ left: GUTTER, right: RIGHT_PAD }}>
-            {cols.flatMap((col, ci) =>
-              col.map(({ occ, dh }) => (
-                <EventBlock
-                  key={occ.id}
-                  o={occ}
-                  dh={dh}
-                  colIndex={ci}
-                  totalCols={totalCols}
-                  hour12={hour12}
-                  onOpen={onOpen}
-                />
-              ))
-            )}
+            {cols.flat().map(({ occ, dh, colIndex, totalCols }) => (
+              <EventBlock
+                key={occ.id}
+                o={occ}
+                dh={dh}
+                colIndex={colIndex}
+                totalCols={totalCols}
+                hour12={hour12}
+                onOpen={onOpen}
+              />
+            ))}
           </div>
         </div>
       </div>
