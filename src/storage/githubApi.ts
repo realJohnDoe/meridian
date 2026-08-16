@@ -57,6 +57,12 @@ function isRateLimitError(e: unknown): boolean {
   return headers['x-ratelimit-remaining'] === '0' || headers['retry-after'] !== undefined
 }
 
+/** GitHub's own error text, capped so a journal line stays one line. */
+function gitHubMessage(e: unknown): string | undefined {
+  const msg = (e as { message?: string }).message
+  return msg ? msg.slice(0, 200) : undefined
+}
+
 export function mapGitHubError(e: unknown, path?: string): Error {
   if (e instanceof Error && 'status' in e) {
     const status = (e as { status: number }).status
@@ -69,7 +75,16 @@ export function mapGitHubError(e: unknown, path?: string): Error {
       return new AuthSyncError('GitHub access denied. Check your token permissions.')
     }
     if (status === 404) return new AuthSyncError('Repository not found or token lacks access.')
-    if (status === 409 || status === 422) return new ConflictError(path ?? 'unknown')
+    // Both statuses reach here for genuinely different reasons — a 409 is
+    // either a SHA mismatch or GitHub failing to fast-forward the branch ref
+    // behind a commit we ourselves pushed moments earlier, and a 422 is a
+    // validation error ("sha wasn't supplied" for a path that exists). Keep the
+    // status and GitHub's own message on the error: the resolution path uses
+    // them to tell a real divergence from a spurious refusal, and the sync
+    // journal records them either way.
+    if (status === 409 || status === 422) {
+      return new ConflictError(path ?? 'unknown', { status, reason: gitHubMessage(e) })
+    }
   }
   if (isTransientSyncError(e)) return new TransientSyncError((e as Error).message)
   return e instanceof Error ? e : new Error(String(e))

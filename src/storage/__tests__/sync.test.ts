@@ -40,7 +40,13 @@ const { cacheStore, storeState, notifyFns, roundTripLossMock } = vi.hoisted(() =
       inProgress: boolean; lastSyncedAt: number | null; readOnly: boolean
     }>(),
   },
-  notifyFns: { notify: vi.fn(), warn: vi.fn(), notifyError: vi.fn() },
+  // `warnWithDetails` records the *rendered* details string, not the thunk, so
+  // a test can assert on what the toast's "Copy details" action would hand the
+  // user without reaching into sonner.
+  notifyFns: {
+    notify: vi.fn(), warn: vi.fn(), notifyError: vi.fn(),
+    warnWithDetails: vi.fn((msg: string, details: () => string) => { void msg; void details() }),
+  },
   // The round-trip guard is the only part of @/model stubbed here: it is
   // expected never to fire on a real file (see roundTripCheck.ts), so the tests
   // for its *scheduling* need to drive its verdict directly. Everything else in
@@ -146,6 +152,7 @@ vi.mock('@/model', async (importActual) => ({
 // come after the vi.mock calls above.
 import { syncToBackend, autoSyncTick, resetSyncBackoff, dropAllSyncState, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend, parseFiles, reportParseFailures } from '@/storage/sync'
 import { mountBackend, unmountAllBackends } from '@/storage/backends'
+import { syncJournalEvents, clearSyncJournal } from '@/storage/syncJournal'
 
 /**
  * One vault's row in the mocked `syncByVault`. Defaults to the single vault
@@ -191,6 +198,7 @@ class FakeBackend implements StorageBackend {
   private _files = new Map<string, FakeFile>()
   private _versionCounter = 0
   private _writeErrorQueue:   Error[] = []
+  private _writeReportsNoVersion = false
   private _writeFailPattern:  { pattern: RegExp; error: () => Error } | null = null
   private _afterNextReadFiles: (() => void) | null = null
   private _deleteErrorQueue:  Error[] = []
@@ -207,6 +215,14 @@ class FakeBackend implements StorageBackend {
   listPaths(): string[] { return Array.from(this._files.keys()) }
 
   queueWriteError(e: Error): void { this._writeErrorQueue.push(e) }
+
+  /**
+   * Make write() perform the write but report no new version token — which the
+   * StorageBackend contract explicitly permits ("returns the new version token,
+   * *if the backend can determine it*"), and which `diskWrite` really does when
+   * its post-write re-stat throws.
+   */
+  writeReportsNoVersion(): void { this._writeReportsNoVersion = true }
 
   /** Fail every write whose path matches — used to simulate a network drop that
    *  lands specifically on the conflict-copy write, mid-resolution. */
@@ -297,7 +313,7 @@ class FakeBackend implements StorageBackend {
     }
     const newVersion = `v${++this._versionCounter}`
     this._files.set(path, { content, version: newVersion })
-    return newVersion
+    return this._writeReportsNoVersion ? undefined : newVersion
   }
 
   async delete(path: string, expectedVersion?: string): Promise<void> {
@@ -340,6 +356,8 @@ beforeEach(() => {
   storeState.syncByVault.clear()
   notifyFns.notify.mockClear()
   notifyFns.warn.mockClear()
+  notifyFns.warnWithDetails.mockClear()
+  clearSyncJournal()
   notifyFns.notifyError.mockClear()
   roundTripLossMock.mockClear()
   roundTripLossMock.mockReturnValue([])
@@ -390,8 +408,8 @@ describe('pushDirty — write-conflict collision', () => {
     const copyRoot = storeState.roots.get(K(copySlug)) as { body?: string } | undefined
     expect(copyRoot?.body).toBe('local edit')
 
-    expect(notifyFns.warn).toHaveBeenCalledTimes(1)
-    expect(notifyFns.warn.mock.calls[0]![0]).toContain('task.md')
+    expect(notifyFns.warnWithDetails).toHaveBeenCalledTimes(1)
+    expect(notifyFns.warnWithDetails.mock.calls[0]![0]).toContain('task.md')
 
     // The collision doesn't surface as a sync failure — it's a handled outcome.
     expect(syncOf().error).toBeNull()
@@ -517,6 +535,129 @@ describe('pushDirty — the file was deleted remotely while a local edit was pen
     const copy = backend.listPaths().find(p => p !== 'task.md')
     expect(copy).toBeDefined()
     expect(backend.get(copy!)?.content).toBe('local edit')
+  })
+})
+
+// ── Spurious conflicts: a refused write with nothing actually diverged ──
+//
+// Every case here has exactly one writer — this app, this device. A conflict
+// copy in any of them is a duplicate entry conjured out of nothing, which is
+// what the user sees: "a conflict warning and a resulting duplicate", with
+// nobody else involved.
+
+describe('pushDirty — a refused write that did not actually diverge', () => {
+  it('adopts the backend version when the backend already holds exactly our content', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    // The write landed, but the response never came back as success — GitHub's
+    // Contents API answers 409 when it cannot fast-forward the branch ref
+    // behind a commit pushed moments earlier, which is routine when one user
+    // action writes two files and then edits one again. Our base version is
+    // stale precisely because our own earlier write is what moved it.
+    backend.seed('task.md', 'local edit', 'sha2')
+    seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
+
+    await syncToBackend()
+
+    // No conflict copy anywhere — not on the backend, not in the cache, not in
+    // the store (which is where the user would see the duplicate).
+    expect(backend.listPaths()).toEqual(['task.md'])
+    const cached = cacheStore.get(vp('fake-vault', 'task.md'))
+    expect(cached?.status).toBe('clean')
+    expect(cached?.version).toBe('sha2')
+    expect(notifyFns.warnWithDetails).not.toHaveBeenCalled()
+    expect(notifyFns.warn).not.toHaveBeenCalled()
+    expect(syncOf().error).toBeNull()
+  })
+
+  it('retries once when the backend is still at the version the write was conditioned on', async () => {
+    const backend = new FakeBackend()
+    backend.seed('task.md', 'remote v1', 'sha1')
+    mountBackend(backend)
+    // A refusal that carries no divergence at all: the precondition we sent is
+    // still exactly what the backend holds, so no second writer can exist.
+    backend.queueWriteError(new ConflictError('task.md', { status: 409, reason: 'is at 0000 but expected 1111' }))
+    seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
+
+    await syncToBackend()
+
+    expect(backend.listPaths()).toEqual(['task.md'])
+    expect(backend.get('task.md')?.content).toBe('local edit')
+    const cached = cacheStore.get(vp('fake-vault', 'task.md'))
+    expect(cached?.status).toBe('clean')
+    expect(cached?.content).toBe('local edit')
+    expect(cached?.version).toBe(backend.get('task.md')?.version)
+    expect(notifyFns.warnWithDetails).not.toHaveBeenCalled()
+    expect(syncOf().error).toBeNull()
+  })
+
+  it('leaves a journal trail naming the layer each step happened in', async () => {
+    const backend = new FakeBackend()
+    backend.seed('task.md', 'remote v1', 'sha1')
+    mountBackend(backend)
+    await backend.write('task.md', 'remote v2', 'sha1')
+    seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
+    clearSyncJournal()
+
+    await syncToBackend()
+
+    const kinds = syncJournalEvents({ path: 'task.md' }).map(e => e.kind)
+    // The chain a conflict investigation has to walk, in order: what went out,
+    // that the backend refused it, and which resolution branch that led to.
+    expect(kinds).toEqual(['push', 'push-conflict', 'collision-copied'])
+
+    const copied = syncJournalEvents({ path: 'task.md' }).find(e => e.kind === 'collision-copied')!
+    expect(copied.backend).toBe('local')
+    // Both version tokens, and the fingerprints that say whether the two sides
+    // actually differ — the facts that make a spurious conflict falsifiable.
+    expect(copied.detail?.expected).toBe('sha1')
+    expect(copied.detail?.actual).not.toBe('sha1')
+    expect(copied.detail?.localHash).not.toBe(copied.detail?.remoteHash)
+  })
+
+  it('still copies out when a second refusal shows the remote genuinely moved', async () => {
+    const backend = new FakeBackend()
+    backend.seed('task.md', 'remote v1', 'sha1')
+    mountBackend(backend)
+    // First write refused with the base version still intact, so the retry
+    // fires — and loses, because a real remote edit lands in between.
+    backend.queueWriteError(new ConflictError('task.md'))
+    backend.onNextReadFiles(() => { backend.seed('task.md', 'remote v2', 'sha9') })
+    seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
+
+    await syncToBackend()
+
+    expect(backend.get('task.md')?.content).toBe('remote v2')
+    const copy = backend.listPaths().find(p => p !== 'task.md')
+    expect(copy).toBeDefined()
+    expect(backend.get(copy!)?.content).toBe('local edit')
+    expect(notifyFns.warnWithDetails).toHaveBeenCalledTimes(1)
+  })
+
+  it('records the version by re-reading when the backend cannot report one, so the next push is not a false create', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    backend.writeReportsNoVersion()
+    // A brand-new file: no base version, so this push goes out as a create.
+    seedDirty('fake-vault', 'new.md', 'first', undefined)
+
+    await syncToBackend()
+
+    // Recording `undefined` here would make the next push a create too, and
+    // "the path must be absent" is refused by every backend for a file that
+    // plainly exists — a conflict, and a duplicate, entirely of our own making.
+    const afterCreate = cacheStore.get(vp('fake-vault', 'new.md'))
+    expect(afterCreate?.status).toBe('clean')
+    expect(afterCreate?.version).toBe(backend.get('new.md')?.version)
+
+    // The second edit of the same file — the step in the reported repro that
+    // produced the conflict — must push cleanly.
+    seedDirty('fake-vault', 'new.md', 'second', afterCreate?.version)
+    await syncToBackend()
+
+    expect(backend.listPaths()).toEqual(['new.md'])
+    expect(backend.get('new.md')?.content).toBe('second')
+    expect(notifyFns.warnWithDetails).not.toHaveBeenCalled()
   })
 })
 

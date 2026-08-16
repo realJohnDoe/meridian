@@ -19,8 +19,9 @@ import {
   setVaultSync,
   getUnreadableFiles, setUnreadableFiles,
 } from '@/storeBridge'
-import { notify, warn, notifyError } from './notifications'
+import { notify, warn, warnWithDetails, notifyError } from './notifications'
 import { getBackend, getMountedBackends } from './backends'
+import { journal, hashContent, syncJournalDump } from './syncJournal'
 
 // ── HELPERS ────────────────────────────────────────────────────
 
@@ -159,13 +160,20 @@ function reportRoundTripLosses(lossy: RoundTripLoss[]): void {
 // ── COLLISION RESOLUTION ───────────────────────────────────────────
 
 /**
- * What a failed CAS write resolved to. `recreated` carries no `merges`: the
- * store already holds that content (it is where the dirty record came from),
- * so there is nothing to merge back into it.
+ * What a failed CAS write resolved to. Only `copied` carries `merges`: in every
+ * other outcome the store already holds the content that ended up on the
+ * backend (it is where the dirty record came from), so there is nothing to
+ * merge back into it.
+ *
+ * `settled` is the *spurious* outcome — the backend refused the write but
+ * nothing had actually diverged. It is not a conflict in any sense the user
+ * should hear about: no copy is made, no toast is shown, and the cycle does not
+ * need a reconcile afterwards.
  */
 type CollisionOutcome =
   | { kind: 'copied'; copy: string; merges: Array<{ path: string; content: string }> }
   | { kind: 'recreated' }
+  | { kind: 'settled' }
 
 /**
  * The version token to record for a path we just wrote.
@@ -183,6 +191,7 @@ async function versionAfterWrite(
 ): Promise<string | undefined> {
   if (fromWrite !== undefined) return fromWrite
   const [fresh] = await backend.readFiles([path])
+  journal('version-repair', backend.id, path, { actual: fresh?.version }, backend.kind)
   return fresh?.version
 }
 
@@ -216,9 +225,23 @@ async function writeConflictCopy(
 }
 
 /**
- * Handle a failed CAS write. Two outcomes, chosen by what the backend actually
+ * Handle a failed CAS write. Four outcomes, chosen by what the backend actually
  * holds now — which is why this re-reads rather than trusting the listing:
  *
+ *  - **Nothing diverged; our content is already there.** The write landed and
+ *    the refusal came after the fact — GitHub's Contents API answers 409 when
+ *    it cannot fast-forward the branch ref behind a commit pushed moments
+ *    earlier, which is routine when one user action writes two files and then
+ *    edits one of them again (promote a checklist line, then change its
+ *    priority). Nothing is preserved because nothing was lost: the record
+ *    adopts the backend's token and goes clean, with no copy and no toast.
+ *    Without this check that case produced a conflict copy whose content was
+ *    byte-identical to the original — a duplicate entry conjured out of a
+ *    conflict that never happened.
+ *  - **Nothing diverged; the backend is still at our base version.** Same
+ *    spurious refusal, caught one step earlier — the CAS precondition we sent
+ *    is *still* what the backend holds, so no second writer can exist. Retry
+ *    the write once rather than treating our own edit as a conflict.
  *  - **The remote diverged.** Someone else's content sits at `path`. Both sides
  *    are kept: the remote wins the path, the local content lands in a
  *    timestamped conflict copy.
@@ -246,8 +269,20 @@ async function resolveCollision(
   vaultId: string,
   path: string,
   localContent: string,
+  expectedVersion: string | undefined,
 ): Promise<CollisionOutcome> {
   let [remote] = await backend.readFiles([path])
+
+  // Every branch below wants the same three facts about what we just found, and
+  // the journal wants them whichever way the branch goes.
+  const localHash = hashContent(localContent)
+  const facts = () => ({
+    expected:   expectedVersion,
+    actual:     remote?.version,
+    localHash,
+    remoteHash: remote ? hashContent(remote.content) : undefined,
+    bytes:      localContent.length,
+  })
 
   if (!remote) {
     try {
@@ -258,6 +293,7 @@ async function resolveCollision(
       // the round trip above, and it must stay dirty rather than be stamped
       // clean under content it no longer holds.
       await markPushed(vaultId, path, localContent, await versionAfterWrite(backend, path, written))
+      journal('collision-recreated', vaultId, path, facts(), backend.kind)
       warn(`${path} was deleted on another device — your unsaved changes were restored. Delete it again if that was intended.`)
       return { kind: 'recreated' }
     } catch (e) {
@@ -265,6 +301,39 @@ async function resolveCollision(
       // Lost a race: the path was re-created between our two writes. Re-read and
       // fall through — there is remote content to preserve after all.
       ;[remote] = await backend.readFiles([path])
+    }
+  }
+
+  // ── Spurious #1: the backend already holds exactly what we were pushing ────
+  // Nothing was lost, so nothing needs preserving. markPushed (not
+  // setResolvedClean) because a further edit may have landed while we were
+  // reading: that edit must stay dirty and merely inherit the fresh token.
+  if (remote && remote.content === localContent) {
+    await markPushed(vaultId, path, localContent, remote.version)
+    journal('collision-already-landed', vaultId, path, facts(), backend.kind)
+    return { kind: 'settled' }
+  }
+
+  // ── Spurious #2: the backend is still at the version we CASed against ──────
+  // A precondition that still matches cannot have been violated by a second
+  // writer — the refusal came from somewhere else (a branch-ref race, a
+  // retried request). Try the same write once more. A second refusal is not
+  // retried again: at that point something really is moving underneath us, and
+  // the copy-out below is the safe answer.
+  if (remote && expectedVersion !== undefined && remote.version === expectedVersion) {
+    try {
+      const written = await backend.write(path, localContent, expectedVersion)
+      await markPushed(vaultId, path, localContent, await versionAfterWrite(backend, path, written))
+      journal('collision-retried', vaultId, path, facts(), backend.kind)
+      return { kind: 'settled' }
+    } catch (e) {
+      if (!(e instanceof ConflictError)) throw e
+      ;[remote] = await backend.readFiles([path])
+      if (remote && remote.content === localContent) {
+        await markPushed(vaultId, path, localContent, remote.version)
+        journal('collision-already-landed', vaultId, path, { ...facts(), note: 'after-retry' }, backend.kind)
+        return { kind: 'settled' }
+      }
     }
   }
 
@@ -278,7 +347,14 @@ async function resolveCollision(
     merges.unshift({ path, content: remote.content })
   }
 
-  warn(`Conflict on ${path} — your version saved as ${copy}.`)
+  journal('collision-copied', vaultId, path, { ...facts(), note: copy }, backend.kind)
+  // The details action carries this path's whole journal, not just the verdict:
+  // a conflict with no second writer is only diagnosable from the *sequence* of
+  // writes that preceded it, and in a PWA there is no console to read it from.
+  warnWithDetails(
+    `Conflict on ${path} — your version saved as ${copy}.`,
+    () => syncJournalDump({ path }),
+  )
   return { kind: 'copied', copy, merges }
 }
 
@@ -443,11 +519,22 @@ export async function reconcileWithBackend(
     for (const f of freshFiles) {
       if (!written.has(f.path)) continue
       cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, status: 'clean', updatedAt: Date.now(), version: f.version })
+      // A pull is the other way a record's base version changes, so it belongs
+      // in the same journal as the pushes — a conflict caused by a reconcile
+      // stamping an older token over a fresher one is otherwise invisible.
+      journal('pull', vaultId, f.path, {
+        expected: cached.find(r => r.path === f.path)?.version,
+        actual:   f.version,
+        remoteHash: hashContent(f.content),
+      }, backend.kind)
     }
   }
 
   await Promise.all(deleted.map(p => confirmDeleted(vaultId, p)))
-  for (const p of deleted) cacheMap.delete(p)
+  for (const p of deleted) {
+    cacheMap.delete(p)
+    journal('drop', vaultId, p, undefined, backend.kind)
+  }
 
   // Cache writes above are keyed by vaultId and stay correct regardless — but
   // the store layer only exists while the vault is registered. Since activation
@@ -573,28 +660,39 @@ async function pushDirty(
   const collisionMerges: Array<{ path: string; content: string }> = []
 
   for (const f of dirty) {
+    journal('push', vaultId, f.path, { expected: f.version, localHash: hashContent(f.content), bytes: f.content.length }, backend.kind)
     try {
       // CAS write: pass the base version as the precondition. The backend
       // throws ConflictError only when the content genuinely diverged — it
       // never false-positives due to stale listing tokens.
-      const newVersion = await backend.write(f.path, f.content, f.version)
+      const written = await backend.write(f.path, f.content, f.version)
+      // Never record the raw return value: `write` reports the new token only
+      // "if the backend can determine it", and an `undefined` recorded here
+      // makes the *next* push a create ("the path must be absent"), which every
+      // backend refuses for a file that plainly exists — a conflict, and a
+      // conflict copy, manufactured entirely by us. See versionAfterWrite.
+      const newVersion = await versionAfterWrite(backend, f.path, written)
       // markPushed (not setResolvedClean): f.content was captured before
       // this network round trip, and another edit to this same path may have
       // landed in the meantime. An unconditional clean write would silently
       // discard that edit — see its doc comment in cache/files.ts.
       await markPushed(vaultId, f.path, f.content, newVersion)
+      journal('push-ok', vaultId, f.path, { expected: f.version, actual: newVersion }, backend.kind)
       pushed.add(f.path)
     } catch (e) {
       if (e instanceof ConflictError) {
-        const outcome = await resolveCollision(backend, vaultId, f.path, f.content)
-        hadCollision = true
+        journal('push-conflict', vaultId, f.path, { expected: f.version, status: e.detail?.status, reason: e.detail?.reason }, backend.kind)
+        const outcome = await resolveCollision(backend, vaultId, f.path, f.content, f.version)
         pushed.add(f.path)
         if (outcome.kind === 'copied') {
           pushed.add(outcome.copy)
           collisionMerges.push(...outcome.merges)
         }
-        // 'recreated' contributes no merges: the store is already the source of
-        // this content, so there is nothing to merge back into it.
+        // 'settled' means the refusal was spurious and the backend now holds
+        // our content — nothing diverged, so this cycle needs no reconcile.
+        // 'recreated' contributes no merges either: the store is already the
+        // source of that content, so there is nothing to merge back into it.
+        if (outcome.kind !== 'settled') hadCollision = true
       } else {
         throw e
       }
@@ -602,14 +700,17 @@ async function pushDirty(
   }
 
   for (const f of tombstones) {
+    journal('delete-push', vaultId, f.path, { expected: f.version }, backend.kind)
     try {
       // Pass the cached version (blob SHA for GitHub) so the delete works even
       // when the backend's in-memory SHA cache is cold after a page reload.
       await backend.delete(f.path, f.version)
       await confirmDeleted(vaultId, f.path)
+      journal('delete-ok', vaultId, f.path, undefined, backend.kind)
       pushed.add(f.path)
     } catch (e) {
       if (e instanceof ConflictError) {
+        journal('delete-conflict', vaultId, f.path, { expected: f.version, status: e.detail?.status, reason: e.detail?.reason }, backend.kind)
         // The file was edited remotely after our tombstone was staged.
         // Drop the tombstone without deleting anything — leaving no cache
         // entry behind — and let this cycle's reconcile (triggered below via
@@ -952,6 +1053,9 @@ export async function writeEntityToCache(entryKey: EntryKey): Promise<void> {
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body, root?.fileConvention)
     await recordLocalEdit(backend.id, path, content)
+    // The first link in every chain a conflict investigation has to walk: when
+    // the store handed this content to the write queue, and what it was.
+    journal('edit', backend.id, path, { localHash: hashContent(content), bytes: content.length }, backend.kind)
     updateSyncUI(backend)
     scheduleAutoPush(backend)
   } catch (e) {
@@ -969,6 +1073,7 @@ export async function deleteFromBackend(entryKey: EntryKey): Promise<void> {
     const backend = backendFor(entryKey)
     if (!backend || backend.readOnly) return
     await recordLocalDelete(backend.id, path)
+    journal('delete', backend.id, path, undefined, backend.kind)
     updateSyncUI(backend)
     scheduleAutoPush(backend)
   } catch (e) {
