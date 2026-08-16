@@ -21,6 +21,10 @@ Using `npm install` will create a `package-lock.json` that must not be committed
 
 Once the first changeset of a session/task has been applied and verified (build/lint passing), commit and push it to a feature branch right away — don't wait for an explicit "commit and push" ask each time. Keep committing and pushing subsequent changesets the same way as the task progresses.
 
+After changing any files, check whether an open PR already covers the current branch; if the changes aren't included in any open PR yet, open a new one.
+
+Once a PR is open, watch it for CI failures and fix them.
+
 ## Dev server base path
 
 The app is served under `/meridian/` — not `/`. When using preview tools or navigating programmatically, always use this base path:
