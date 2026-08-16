@@ -274,6 +274,10 @@ interface MeridianStore {
   hideVaultOnce:        (vaultId: string) => void
   toggleVaultHidden:    (vaultId: string) => void
   toggleParticipantHidden: (vaultId: string, name: string) => void
+  /** Un-hide every person in one vault (but leaves the vault's own
+   *  hidden/shown state untouched). This is what clicking a `some`
+   *  (indeterminate) vault checkbox does — it never hides the vault itself. */
+  clearVaultParticipants: (vaultId: string) => void
   /** Un-hide everything, in every vault. */
   clearViewFilter:      () => void
 
@@ -513,6 +517,13 @@ export const useStore = create<MeridianStore>((set, get) => {
       // Replaced, never mutated: `useCalendarFilter` puts this object in a
       // useCallback dep list that `agendaSections` caches by reference.
       const next = { ...hiddenParticipants, [vaultId]: list }
+      writeJSON(HIDDEN_PARTICIPANTS_KEY, next)
+      set({ hiddenParticipants: next })
+    },
+    clearVaultParticipants: (vaultId: string) => {
+      const { hiddenParticipants } = get()
+      if ((hiddenParticipants[vaultId] ?? []).length === 0) return
+      const next = { ...hiddenParticipants, [vaultId]: [] }
       writeJSON(HIDDEN_PARTICIPANTS_KEY, next)
       set({ hiddenParticipants: next })
     },

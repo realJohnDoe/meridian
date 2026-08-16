@@ -101,10 +101,18 @@ function readTiming(event: IcsComponent): EventTiming | null {
  * Attendee display names.
  *
  * `CN` is the human name and is what a calendar shows; without one, the address
- * itself is a better participant than nothing — Meridian's participants are
+ * itself is a better identifier than nothing — Meridian's `extra` values are
  * free text, and "bob@example.com" at least identifies the person.
+ *
+ * These are deliberately NOT written to the `participants:` field. An ICS
+ * ATTENDEE list is an invite roster — unbounded, historical, and read-only —
+ * while Meridian's `participants` is a small, hand-curated modeling field (the
+ * family/team a user filters and assigns by). Conflating the two would flood
+ * every participant picker in the app with years of one-off meeting invitees
+ * from every subscribed feed. They still round-trip, just as `extras.attendees`
+ * rather than as participants.
  */
-function readParticipants(event: IcsComponent): string[] {
+function readAttendees(event: IcsComponent): string[] {
   const out: string[] = []
   for (const attendee of props(event, 'ATTENDEE')) {
     const cn = param(attendee, 'CN')?.trim()
@@ -116,8 +124,8 @@ function readParticipants(event: IcsComponent): string[] {
 }
 
 /** The `extra` fields: everything with no home in the model, rendered by the read view. */
-function readExtras(event: IcsComponent, uid: string, tzid: string | undefined): Record<string, string> {
-  const extras: Record<string, string> = {}
+function readExtras(event: IcsComponent, uid: string, tzid: string | undefined): Record<string, unknown> {
+  const extras: Record<string, unknown> = {}
   const location = textValue(event, 'LOCATION')?.trim()
   if (location) extras['location'] = location
   const url = propValue(event, 'URL')?.trim()
@@ -127,6 +135,8 @@ function readExtras(event: IcsComponent, uid: string, tzid: string | undefined):
     const cn = param(organizer, 'CN')?.trim()
     extras['organizer'] = cn && cn.length > 0 ? cn : unescapeText(organizer.value).trim().replace(/^mailto:/i, '')
   }
+  const attendees = readAttendees(event)
+  if (attendees.length > 0) extras['attendees'] = attendees
   extras['uid'] = uid
   // Deliberately NOT the registered `timezone` field: that one reads as "this
   // entry's date/time are expressed in this zone", and they are not — they were
@@ -202,14 +212,12 @@ function overrideInstances(event: IcsComponent): InstanceEntry[] {
  */
 function buildFrontmatter(fields: {
   title: string
-  participants: string[]
   timing: EventTiming
   repeat?: Repeat
   instances: InstanceEntry[]
-  extras: Record<string, string>
+  extras: Record<string, unknown>
 }): Record<string, unknown> {
   const out: Record<string, unknown> = { title: fields.title }
-  if (fields.participants.length > 0) out['participants'] = fields.participants
   out['date'] = fields.timing.date
   if (fields.timing.time) out['time'] = fields.timing.time
   if (fields.timing.duration) out['duration'] = fields.timing.duration
@@ -317,7 +325,6 @@ function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | null 
 
   const frontmatter = buildFrontmatter({
     title,
-    participants: readParticipants(master),
     timing: anchor,
     ...(repeat ? { repeat } : {}),
     // Sorted so a feed that reorders its EXDATEs between refreshes still
