@@ -413,7 +413,6 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
               const dKey = fmtISO(d)
               const isToday = sameDay(d, today)
               const cols = colsByDay.get(dKey) ?? []
-              const totalCols = Math.max(cols.length, 1)
               return (
                 <div key={dKey} className="relative flex-1 min-w-0">
                   {/* Hour cells — one button per hour; click/tap or Enter/Space creates an event there */}
@@ -441,20 +440,18 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
                   })()}
 
                   {/* Timed event blocks for this day */}
-                  {cols.flatMap((col, ci) =>
-                    col.map(({ occ, dh }) => (
-                      <EventBlock
-                        key={occ.id}
-                        o={occ}
-                        dh={dh}
-                        colIndex={ci}
-                        totalCols={totalCols}
-                        hour12={hour12}
-                        onOpen={onOpen}
-                        compact
-                      />
-                    ))
-                  )}
+                  {cols.flat().map(({ occ, dh, colIndex, totalCols }) => (
+                    <EventBlock
+                      key={occ.id}
+                      o={occ}
+                      dh={dh}
+                      colIndex={colIndex}
+                      totalCols={totalCols}
+                      hour12={hour12}
+                      onOpen={onOpen}
+                      compact
+                    />
+                  ))}
                 </div>
               )
             })}
