@@ -30,7 +30,7 @@ interface OccurrencePillProps {
  * Shared visual for every colored "pill" occurrence display in the day/week/
  * month grid views — day/week all-day items, week's multiday bars, and
  * month's day-cell chips/bars. Owns the state coloring (dvBlockVariants),
- * the responsive corner radius (occRadius), and the continuation-chevron +
+ * the shared corner radius (occRadius), and the continuation-chevron +
  * title layout that used to be copy-pasted across all three views. Doesn't
  * own padding/text-size/spacing — those differ per view (see `className`).
  *
