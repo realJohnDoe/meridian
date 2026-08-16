@@ -193,8 +193,32 @@ export default function ViewFilterButton() {
           ) : groups.map(group => {
             const state    = vaultCheckState(group, hiddenVaultIds, hiddenParticipants)
             const hidden   = hiddenParticipants[group.vault.id] ?? []
-            const hasPeople = group.participants.length > 0 || group.hasUnassigned
+            // Only *named* participants earn a disclosure — a vault whose
+            // entries are all unassigned has nothing a second "No
+            // participants" row would add: hiding it is identical to hiding
+            // the vault checkbox itself, so it renders as a plain leaf row.
+            const hasPeople = group.participants.length > 0
             const isOpen   = expanded === group.vault.id
+
+            if (!hasPeople) {
+              return (
+                <label
+                  key={group.vault.id}
+                  className="flex items-center gap-2 cursor-pointer px-1 py-2.5"
+                >
+                  <Checkbox
+                    checked={state === 'some' ? 'indeterminate' : state === 'all'}
+                    onCheckedChange={() => state === 'some'
+                      ? clearVaultParticipants(group.vault.id)
+                      : toggleVaultHidden(group.vault.id)}
+                    visualClassName="size-4"
+                  />
+                  <VaultIcon kind={group.vault.kind} className="size-3.5 stroke-[1.7] shrink-0 text-muted-foreground" />
+                  <span className="text-sm truncate">{group.vault.name}</span>
+                </label>
+              )
+            }
+
             return (
               <Collapsible
                 key={group.vault.id}
@@ -211,8 +235,7 @@ export default function ViewFilterButton() {
                     variant="plain"
                     label={isOpen ? `Collapse ${group.vault.name}` : `Expand ${group.vault.name}`}
                     aria-expanded={isOpen}
-                    disabled={!hasPeople}
-                    className="text-muted-foreground hover:text-foreground disabled:opacity-0"
+                    className="text-muted-foreground hover:text-foreground"
                     onClick={() => setExpanded(isOpen ? null : group.vault.id)}
                   >
                     <ChevronRight size={13} className={cn('transition-transform', isOpen && 'rotate-90')} />
@@ -233,7 +256,11 @@ export default function ViewFilterButton() {
                     <span className="text-sm truncate">{group.vault.name}</span>
                   </label>
                 </div>
-                <CollapsibleContent className="pl-7">
+                {/* pl-13 lines the participant checkboxes up under the vault's
+                    *icon*, so participant name text lands under the vault name
+                    text above it — clearer nesting for a shallow tree than
+                    matching the chevron's indent would give. */}
+                <CollapsibleContent className="pl-13">
                   {group.hasUnassigned && (
                     <PersonRow
                       label="No participants"
