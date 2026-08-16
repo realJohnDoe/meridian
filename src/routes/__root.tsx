@@ -43,6 +43,26 @@ export const THEME_CLASS: Record<string, string> = {
  */
 export const THEME_IDS = Object.keys(THEME_CLASS).filter(id => id !== 'light' && id !== 'dark')
 
+// Normalizes any CSS <color> (notably the oklch() our themes are authored
+// in) to a plain "#rrggbb" string. getComputedStyle() no longer downgrades
+// oklch() to legacy rgb() — it round-trips the original notation — and
+// <meta name="theme-color">'s own color parser rejects that syntax, so
+// writing the computed value straight through silently no-ops and Android
+// falls back to its own default (black). A 1x1 canvas readback always
+// resolves to 8-bit sRGB regardless of the source color space, so it works
+// as a normalizer no matter which CSS color syntax a theme uses.
+function toHex(cssColor: string): string {
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return cssColor
+  ctx.fillStyle = cssColor
+  ctx.fillRect(0, 0, 1, 1)
+  const data = ctx.getImageData(0, 0, 1, 1).data
+  return `#${Array.from(data.subarray(0, 3), v => v.toString(16).padStart(2, '0')).join('')}`
+}
+
 // Android colors the status/nav bar from this meta tag rather than from the
 // page's own background, so it must track the active theme's --backdrop
 // or it stays on the static dark default from index.html for light themes.
@@ -60,7 +80,8 @@ function ThemeColorSync() {
     // frame lets that effect land first.
     const raf = requestAnimationFrame(() => {
       const meta = document.querySelector('meta[name="theme-color"]')
-      meta?.setAttribute('content', getComputedStyle(document.documentElement).backgroundColor)
+      const bg = getComputedStyle(document.documentElement).backgroundColor
+      meta?.setAttribute('content', toHex(bg))
     })
     return () => cancelAnimationFrame(raf)
   }, [theme, resolvedTheme])
