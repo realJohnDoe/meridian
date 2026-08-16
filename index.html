@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#111318" />
+    <!-- Dark-theme --background (oklch(0.18 0.05 252)) as sRGB hex: the color
+         of the topbar that sits under the status bar. ThemeColorSync rewrites
+         this per theme once React mounts; this value covers the first paint.
+         Keep in sync with the manifest theme_color in vite.config.ts. -->
+    <meta name="theme-color" content="#011227" />
 <title>Meridian</title>
     <meta name="description" content="Tasks and a calendar that work on your phone, stored as plain Markdown files you own. A free, open-source PWA for Obsidian and Markdown vault users.">
     <meta property="og:type" content="website">
