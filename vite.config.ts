@@ -152,12 +152,27 @@ export default defineConfig({
         name: 'Meridian',
         short_name: 'Meridian',
         description: 'Tasks and a calendar on plain Markdown files you own — fast on a phone.',
-        // Dark-theme --background as sRGB hex — the topbar color that sits
-        // under the status bar, matching the meta tag in index.html. Some
-        // Android installs snapshot theme_color at install time rather than
-        // following the live meta tag, so this is the value a pinned/installed
-        // app falls back to.
-        theme_color: '#011227',
+        // theme_color is deliberately absent — do not add it back without
+        // reading this. Firefox for Android paints an installed app's status
+        // bar from this field and ignores the theme-color meta tag, including
+        // any JS update to it (https://bugzil.la/1464696). Because the field
+        // holds one static colour, snapshotted at install, it cannot track
+        // which of our eleven themes is active: a value picked for the dark
+        // themes reads as a black bar above a light one, and vice versa.
+        // Omitting it lets the browser use its own chrome colour, which
+        // follows the system light/dark setting and so stays legible under
+        // every theme.
+        //
+        // Set to undefined rather than omitted: vite-plugin-pwa merges its
+        // defaults with Object.assign, so leaving the key out inherits its
+        // stock '#42b883' (Vue green) instead of dropping the field. An
+        // explicit undefined overrides that default and JSON.stringify then
+        // drops the key. The plugin warns that a manifest without theme_color
+        // "will not be able to be installed" — that is inaccurate; theme_color
+        // is not part of any browser's installability criteria (name, icons,
+        // start_url and display are).
+        theme_color: undefined,
+        // Splash-screen background only — not the status bar.
         background_color: '#011227',
         display: 'standalone',
         start_url: '/meridian/',
