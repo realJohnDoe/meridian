@@ -76,8 +76,6 @@ const {
       prefsLoadedFor: null as string[] | null,
       /** Vault whose lazy defaultParticipants were last loaded. */
       participantsLoadedFor: null as string | null,
-      /** Vaults hidden by the one-time default — see hideVaultOnce. */
-      hiddenOnce: [] as string[],
     },
     notifyFns: { notify: vi.fn(), notifyError: vi.fn(), warn: vi.fn() },
     syncFns: {
@@ -137,6 +135,8 @@ vi.mock('@/storage/cache/registry', () => ({
     else metaStore.set('activeVaultId', id)
   }),
   activeVaultIdLoad: vi.fn(async () => (metaStore.get('activeVaultId') as string | undefined) ?? null),
+  exampleVaultRemovedLoad: vi.fn(async () => (metaStore.get('exampleVaultRemoved') as boolean | undefined) ?? null),
+  exampleVaultRemovedSave: vi.fn(async (removed: boolean) => { metaStore.set('exampleVaultRemoved', removed) }),
 }))
 
 vi.mock('@/storage/fs', () => ({ diskPickDirectory: vi.fn() }))
@@ -234,7 +234,6 @@ vi.mock('@/storeBridge', () => ({
   loadDefaultParticipants: vi.fn((id: string) => { storeState.participantsLoadedFor = id }),
   getDefaultVaultId: vi.fn(() => storeState.defaultVaultId),
   setDefaultVaultId: vi.fn((id: string | null) => { storeState.defaultVaultId = id }),
-  hideVaultOnce: vi.fn((id: string) => { callOrder.push(`hideVaultOnce:${id}`); storeState.hiddenOnce.push(id) }),
 }))
 
 vi.mock('@/storage/notifications', () => notifyFns)
@@ -244,11 +243,13 @@ vi.mock('@/storage/sync', () => syncFns)
 // Imports of the module under test (and its non-mocked collaborators — the
 // trivial in-memory backend registry) must come after the vi.mock calls.
 import {
-  restoreVaults, reconnectVault, setDefaultVault, removeVault, renameVault, onVaultChanged, newVaultId,
+  restoreVaults, reconnectVault, setDefaultVault, removeVault, renameVault, addExampleVault,
+  addLocalVault, addGitHubVaultOAuth, onVaultChanged, newVaultId,
 } from '@/storage/vaultRegistry'
 import { getBackend, getMountedVaultIds, unmountAllBackends } from '@/storage/backends'
 import { ensureFreshAccessToken } from '@/storage/githubOAuth'
 import { vaultRefsLoad, vaultRefsSave } from '@/storage/cache/registry'
+import { diskPickDirectory } from '@/storage/fs'
 
 const LOCAL_REF: VaultRef = { id: 'local-1', name: 'My Vault', kind: 'local' }
 const GITHUB_REF: VaultRef = { id: 'gh-1', name: 'me/repo', kind: 'github', github: { owner: 'me', repo: 'repo', branch: 'main' } }
@@ -266,7 +267,6 @@ beforeEach(() => {
   storeState.vaultLoadProgress = null
   storeState.prefsLoadedFor = null
   storeState.participantsLoadedFor = null
-  storeState.hiddenOnce = []
   cacheConfig.rows.clear()
   callOrder.length = 0
   notifyFns.notify.mockClear()
@@ -282,6 +282,7 @@ beforeEach(() => {
   backendConfig.permissionGate = null
   backendConfig.permissionError = null
   vi.mocked(ensureFreshAccessToken).mockReset()
+  vi.mocked(diskPickDirectory).mockReset()
   unmountAllBackends()
 })
 
@@ -320,14 +321,26 @@ describe('restoreVaults — local vault', () => {
     expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
   })
 
-  it('mounts the Tutorial vault alongside it rather than instead of it', async () => {
+  it('does not mount the Tutorial vault when a real vault already exists and its removal was never decided', async () => {
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
 
     await restoreVaults()
 
-    // The distinction the whole plan turns on: registering a real vault does
-    // not unregister anything. Whether the Tutorial vault is *shown* is the
-    // view filter's business, not the registry's.
+    // An install that predates the removable-Tutorial-vault feature already
+    // has a real vault and was never offered this choice — treat that the
+    // same as if it had already been dismissed, rather than resurrecting it.
+    expect(getMountedVaultIds()).toEqual([LOCAL_REF.id])
+    expect(metaStore.get('exampleVaultRemoved')).toBe(true)
+  })
+
+  it('mounts the Tutorial vault alongside a real vault once it has been explicitly kept', async () => {
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    metaStore.set('exampleVaultRemoved', false)
+
+    await restoreVaults()
+
+    // Registering a real vault does not unregister anything once the
+    // Tutorial vault's presence is an explicit choice rather than a default.
     expect(getMountedVaultIds().sort()).toEqual(['example', LOCAL_REF.id].sort())
   })
 
@@ -351,8 +364,9 @@ describe('restoreVaults — local vault', () => {
     expect(getBackend(LOCAL_REF.id)).toBeUndefined()
     expect(syncFns.syncOnActivate).not.toHaveBeenCalled()
     expect(notifyFns.warn).toHaveBeenCalledTimes(1)
-    // The Tutorial vault is still there, so the app is never contentless.
-    expect(getMountedVaultIds()).toEqual(['example'])
+    // A real vault is already registered (even though it failed to mount),
+    // so the Tutorial vault has been migrated away by default.
+    expect(getMountedVaultIds()).toEqual([])
   })
 
   it('does not mount a vault whose permission was denied outright', async () => {
@@ -421,7 +435,8 @@ describe('restoreVaults — several vaults', () => {
 
     expect(storeState.layers.get(LOCAL_REF.id)?.items).toHaveLength(1)
     expect(storeState.layers.get(GITHUB_REF.id)?.items).toHaveLength(1)
-    // Plus the (empty) Tutorial layer — the merge is what every view reads.
+    // Two real vaults already exist, so the Tutorial vault was migrated away
+    // and never mounted a layer at all — the merge is what every view reads.
     expect(storeState.items).toHaveLength(2)
     expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(2)
   })
@@ -534,6 +549,7 @@ describe('restoreVaults — cache-first paint', () => {
   it('opens the paint gate only once every cached vault is in the store', async () => {
     metaStore.set('vaults', [LOCAL_REF, GITHUB_REF])
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    metaStore.set('exampleVaultRemoved', false)
     cacheConfig.rows.set(LOCAL_REF.id,  [{ path: 'local.md',  content: '# Local' }])
     cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'remote.md', content: '# Remote' }])
 
@@ -547,17 +563,18 @@ describe('restoreVaults — cache-first paint', () => {
     }
   })
 
-  // hiddenVaultIds feeds filterOccs, so flipping it after the Tutorial layer
-  // has painted rebuilds every agenda section a second time — another row-list
-  // change landing on an already-mounted agenda.
-  it('hides the Tutorial vault before mounting it, not after', async () => {
+  // A layer landing after the paint gate opens inserts rows above the
+  // viewport and shifts the visible day (see the test above) — so a Tutorial
+  // vault migrated away by this restore must never paint a layer at all, not
+  // merely a hidden one that could still land late.
+  it('migrates the Tutorial vault away without ever mounting it, when a real vault already exists', async () => {
     cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
 
     await restoreVaults()
 
-    expect(storeState.hiddenOnce).toContain('example')
-    expect(callOrder.indexOf('hideVaultOnce:example'))
-      .toBeLessThan(callOrder.indexOf('setVaultLayer:example'))
+    expect(metaStore.get('exampleVaultRemoved')).toBe(true)
+    expect(getMountedVaultIds()).not.toContain('example')
+    expect(callOrder).not.toContain('setVaultLayer:example')
   })
 
   // The agenda's first frame is built through useCalendarFilter, which reads
@@ -575,8 +592,10 @@ describe('restoreVaults — cache-first paint', () => {
 
     await vi.waitFor(() => { expect(storeState.items).toHaveLength(1) })
     // Loaded for every registered vault at once, not for one "active" one —
-    // the Favorites list and the filter popover both span all of them.
-    expect(storeState.prefsLoadedFor).toEqual(['example', GITHUB_REF.id])
+    // the Favorites list and the filter popover both span all of them. The
+    // Tutorial vault is absent here: a real vault already existed, so it was
+    // migrated away by default.
+    expect(storeState.prefsLoadedFor).toEqual([GITHUB_REF.id])
 
     gate.release()
     await restoring
@@ -833,6 +852,95 @@ describe('removeVault', () => {
 
     expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
     expect((metaStore.get('vaults') as VaultRef[])).toHaveLength(1)
+  })
+
+  // The Tutorial vault is addable and removable like any other vault, even
+  // though — unlike a local/github/ical ref — it is never in the persisted
+  // `vaults` list; `removeVault` dispatches on the id instead.
+  it('unmounts and unregisters the Tutorial vault, same as any other vault', async () => {
+    await restoreVaults()
+    expect(getMountedVaultIds()).toEqual(['example'])
+
+    await removeVault('example')
+
+    expect(getMountedVaultIds()).toEqual([])
+    expect(storeState.layers.has('example')).toBe(false)
+    expect(storeState.syncByVault.has('example')).toBe(false)
+    expect(storeState.vaults.some(v => v.id === 'example')).toBe(false)
+    expect(metaStore.get('exampleVaultRemoved')).toBe(true)
+  })
+
+  it('leaves another registered vault mounted and untouched', async () => {
+    metaStore.set('vaults', [LOCAL_REF])
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    metaStore.set('exampleVaultRemoved', false)
+    await restoreVaults()
+
+    await removeVault('example')
+
+    expect(getMountedVaultIds()).toEqual([LOCAL_REF.id])
+    expect(storeState.defaultVaultId).toBe(LOCAL_REF.id)
+  })
+})
+
+// ── addExampleVault ────────────────────────────────────────────────────────
+
+describe('addExampleVault', () => {
+  it('re-registers and mounts the Tutorial vault after it was removed', async () => {
+    await restoreVaults()
+    await removeVault('example')
+    expect(getMountedVaultIds()).toEqual([])
+
+    await addExampleVault()
+
+    expect(getMountedVaultIds()).toEqual(['example'])
+    expect(storeState.vaults.some(v => v.id === 'example')).toBe(true)
+    expect(metaStore.get('exampleVaultRemoved')).toBe(false)
+  })
+
+  it('is a no-op when the Tutorial vault is already registered', async () => {
+    await restoreVaults()
+    expect(getMountedVaultIds()).toEqual(['example'])
+
+    await addExampleVault()
+
+    expect(getMountedVaultIds()).toEqual(['example'])
+  })
+})
+
+// ── registerAndMount — auto-removing the Tutorial vault ──────────────────
+
+describe('adding the first real vault', () => {
+  it('actually removes the Tutorial vault, not merely hides it', async () => {
+    await restoreVaults()
+    expect(getMountedVaultIds()).toEqual(['example'])
+    vi.mocked(diskPickDirectory).mockResolvedValue(
+      { name: 'My Vault' } as unknown as FileSystemDirectoryHandle,
+    )
+
+    await addLocalVault()
+
+    expect(getMountedVaultIds()).toEqual(['my-vault'])
+    expect(storeState.vaults.some(v => v.id === 'example')).toBe(false)
+    expect(metaStore.get('exampleVaultRemoved')).toBe(true)
+  })
+
+  it('leaves a second real vault add alone — the Tutorial vault is already gone', async () => {
+    metaStore.set('vaults', [LOCAL_REF])
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    metaStore.set('exampleVaultRemoved', false)
+    await restoreVaults()
+    expect(getMountedVaultIds()).toContain('example')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+
+    await addGitHubVaultOAuth({
+      owner: 'me', repo: 'repo', branch: 'main',
+      accessToken: 'a', refreshToken: 'r', expiresAt: 1,
+    })
+
+    // Not the first real vault, so the explicit choice to keep the Tutorial
+    // vault around is left alone.
+    expect(getMountedVaultIds()).toContain('example')
   })
 })
 

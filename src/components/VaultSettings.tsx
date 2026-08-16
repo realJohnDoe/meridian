@@ -148,19 +148,17 @@ export function VaultSettings({ vault }: Props) {
       </div>
       )}
 
-      {vault.kind !== 'example' && (
-        <div className="flex justify-end py-3 border-t border-border first:border-t-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
-            onClick={handleRemoveClick}
-          >
-            <Trash2 className="size-3.5 stroke-[1.7]" />
-            Remove vault
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-end py-3 border-t border-border first:border-t-0">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5"
+          onClick={handleRemoveClick}
+        >
+          <Trash2 className="size-3.5 stroke-[1.7]" />
+          Remove vault
+        </Button>
+      </div>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
@@ -170,6 +168,7 @@ export function VaultSettings({ vault }: Props) {
               Remove &ldquo;{vault.name}&rdquo;? This deletes it from this device.
               {vault.kind === 'github' && ' The GitHub repository itself is not affected.'}
               {vault.kind === 'ical' && ' The calendar itself is not affected — only this subscription to it.'}
+              {vault.kind === 'example' && ' You can add it back anytime from here.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {dirtyCount > 0 && (
