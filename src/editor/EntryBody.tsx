@@ -14,6 +14,7 @@ import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListD
 import { emptyPlaceholder, emptyPlaceholderTheme } from './cm/emptyPlaceholder'
 import { emptyLineCaret, emptyLineCaretTheme } from './cm/emptyLineCaret'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
+import { cn } from '@/lib/cn'
 
 interface Props {
   body:             string
@@ -77,6 +78,19 @@ const editorTheme = EditorView.theme({
   },
 })
 
+// A read-only body has nothing to add and nothing to place a cursor into —
+// the caret and "Add a description…" prompt both imply otherwise, so
+// suppress them rather than let the empty-state extensions built for the
+// editable case leak into the read-only one.
+const readOnlyTheme = EditorView.theme({
+  '.cm-content': {
+    cursor: 'default',
+  },
+  '.cm-cursor': {
+    borderLeftColor: 'transparent',
+  },
+})
+
 export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpenWikilink, onChange, readOnly }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [wlPopup, setWlPopup] = useState<WlPopupState | null>(null)
@@ -128,10 +142,9 @@ export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpen
         taskTheme,
         editorTheme,
         drawSelection(),
-        emptyLineCaret,
-        emptyLineCaretTheme,
-        emptyPlaceholder,
-        emptyPlaceholderTheme('Add a description…'),
+        ...(seedReadOnly
+          ? [readOnlyTheme]
+          : [emptyLineCaret, emptyLineCaretTheme, emptyPlaceholder, emptyPlaceholderTheme('Add a description…')]),
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({ spellcheck: 'false' }),
         history(),
@@ -187,7 +200,10 @@ export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpen
       <div
         ref={containerRef}
         // text-base below sm: iOS Safari auto-zooms on focus of editable content under 16px
-        className="mt-1 text-base sm:text-sm leading-[1.85] text-secondary-foreground border border-input rounded-[var(--radius-md)] focus-within:ring-2 focus-within:ring-ring"
+        className={cn(
+          'mt-1 text-base sm:text-sm leading-[1.85] text-secondary-foreground border border-input rounded-[var(--radius-md)]',
+          !readOnly && 'focus-within:ring-2 focus-within:ring-ring',
+        )}
       />
       {wlPopup && view && (
         <WikilinkPopup
