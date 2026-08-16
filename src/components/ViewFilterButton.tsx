@@ -154,7 +154,7 @@ export default function ViewFilterButton() {
             // the old "N hidden" ambiguity (vaults? people? both?) in miniature.
             <span
               aria-hidden="true"
-              className="absolute top-1 right-1 size-2 rounded-full bg-primary ring-2 ring-background"
+              className="absolute top-2.5 right-2.5 size-2 rounded-full bg-primary ring-2 ring-background"
             />
           )}
         </Button>
