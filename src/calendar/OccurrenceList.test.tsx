@@ -3,7 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import OccurrenceList from './OccurrenceList'
 import { setupStore, makeOcc, TEST_VAULT } from '@/test-utils'
+import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
+import type { VaultRef } from '@/vaultRef'
 
 setupStore()
 
@@ -61,6 +63,16 @@ function undatedTask(i: number, done = false): Occurrence {
 
 /** Every rendered occurrence card — SurfaceButton carries aria-label={title}. */
 const renderedCards = () => screen.getAllByRole('button').filter(el => el.getAttribute('aria-label'))
+
+/** Swipes the row containing `title` fully left, as if deleting it. */
+function swipeLeft(title: string) {
+  const card = screen.getByRole('button', { name: title })
+  const row = card.closest('.swipe-row')
+  if (!row) throw new Error(`no .swipe-row ancestor for "${title}"`)
+  fireEvent.touchStart(row, { touches: [{ clientX: 300, clientY: 0 }] })
+  fireEvent.touchMove(row, { touches: [{ clientX: 0, clientY: 0 }] })
+  fireEvent.touchEnd(row, { changedTouches: [{ clientX: 0, clientY: 0 }] })
+}
 
 describe('OccurrenceList', () => {
   it('shows active items immediately', () => {
@@ -129,6 +141,40 @@ describe('OccurrenceList', () => {
     // handing them to a Collapsible that would mount all 500 at once.
     expect(screen.getByText('Task 1000')).toBeInTheDocument()
     expect(renderedCards().length).toBeLessThan(40)
+  })
+
+  it('swipe-deletes a row in a normal vault', () => {
+    const onSwipeDelete = vi.fn(() => vi.fn())
+    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    render(<OccurrenceList {...baseProps([occ])} onSwipeDelete={onSwipeDelete} />)
+
+    swipeLeft('Open task')
+
+    expect(onSwipeDelete).toHaveBeenCalledWith(occ)
+  })
+
+  it('swipe-deletes a row in the Tutorial sandbox vault', () => {
+    const vault: VaultRef = { id: TEST_VAULT, name: 'Tutorial', kind: 'example' }
+    useStore.setState({ vaults: [vault] })
+    const onSwipeDelete = vi.fn(() => vi.fn())
+    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    render(<OccurrenceList {...baseProps([occ])} onSwipeDelete={onSwipeDelete} />)
+
+    swipeLeft('Open task')
+
+    expect(onSwipeDelete).toHaveBeenCalledWith(occ)
+  })
+
+  it('does not swipe-delete a row in a read-only (iCal) vault', () => {
+    const vault: VaultRef = { id: TEST_VAULT, name: 'Family calendar', kind: 'ical', ical: { url: 'https://example.com/cal.ics' } }
+    useStore.setState({ vaults: [vault] })
+    const onSwipeDelete = vi.fn(() => vi.fn())
+    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    render(<OccurrenceList {...baseProps([occ])} onSwipeDelete={onSwipeDelete} />)
+
+    swipeLeft('Open task')
+
+    expect(onSwipeDelete).not.toHaveBeenCalled()
   })
 
   it('marks the Done toggle expanded only while it is open', () => {

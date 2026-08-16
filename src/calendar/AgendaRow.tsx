@@ -5,6 +5,7 @@ import { OccurrenceCard } from '@/components'
 import { occState } from '@/occView'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
+import { useEntryAccess } from '@/hooks'
 import { DayBadge } from './DayBadge'
 
 interface Props {
@@ -64,6 +65,12 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
   // in practice.
   const dimmed = !!occ.metadata.done || occState(occ, now) === 'event-past'
 
+  // View-only vaults (an iCal subscription) have no source to write back to —
+  // see hooks/useEntryAccess — so the swipe gesture is disabled there. The
+  // Tutorial's sandbox vault is deliberately excluded from this: its mode is
+  // 'sandbox', not 'view-only', so it keeps the gesture like a normal vault.
+  const isViewOnly = useEntryAccess(occ).mode === 'view-only'
+
   const wrapRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const hintRef = useRef<HTMLDivElement>(null)
@@ -81,6 +88,7 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
   useEffect(() => {
     // Guard: should never be null when mounted, but required for type safety.
     if (!wrapRef.current || !rowRef.current || !hintRef.current || !iconRef.current) return
+    if (isViewOnly) return
     // Non-null assertions: narrowing doesn't carry into nested closure functions,
     // so we re-bind as non-nullable types here.
     const wrap  = wrapRef.current
@@ -173,7 +181,7 @@ function AgendaRow({ occ, now, onOpen, onToggleDone, onSwipeDelete, showDate, ba
       row.removeEventListener('touchend', onTouchEnd)
       clearTimeout(deleteTimeout)
     }
-  }, []) // listeners are stable; callback accessed via ref
+  }, [isViewOnly]) // listeners are stable; callback accessed via ref
 
   return (
     // items-start, and no min-height: this row must size to the card alone.
