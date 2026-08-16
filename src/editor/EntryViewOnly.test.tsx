@@ -76,6 +76,20 @@ describe('EntryViewOnly', () => {
     expect(link).toHaveAttribute('target', '_blank')
   })
 
+  it('renders attendees from extra, separately from participant chips', () => {
+    const occ = makeOcc({
+      metadata: {
+        vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Team sync', tags: [], items: [],
+        participants: ['Alice'],
+        extra: { attendees: ['Alice', 'bob@example.com'], uid: 'xyz' },
+      },
+    })
+    render(<EntryViewOnly occ={occ} vault={VAULT} items={[occ]} roots={makeRoots('note.md')} />)
+
+    expect(screen.getAllByText('Alice')).toHaveLength(1) // participant chip only — attendees render as one joined line
+    expect(screen.getByText(/Alice, bob@example\.com/)).toBeInTheDocument()
+  })
+
   it('passes body through EntryBody as read-only', () => {
     const occ = makeOcc({
       metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Team sync', tags: [], items: [], participants: [], body: 'Agenda here' },

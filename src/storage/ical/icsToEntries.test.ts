@@ -81,18 +81,21 @@ describe('icsToEntries — basics', () => {
     expect(icsToEntries(event(['UID:a@example', 'SUMMARY:No date']), NOW)!.entries).toEqual([])
   })
 
-  it('collects attendees, with and without CN', () => {
+  it('collects attendees as an extra field, with and without CN', () => {
     const fm = frontmatter(only(event([
       'UID:a@example', 'DTSTART:20260817T090000',
       'ATTENDEE;CN=Alice Adams:mailto:alice@example.com',
       'ATTENDEE:mailto:bob@example.com',
       'ATTENDEE;CN=Alice Adams:mailto:alice@example.com',
     ])))
-    expect(fm['participants']).toEqual(['Alice Adams', 'bob@example.com'])
+    expect(fm['attendees']).toEqual(['Alice Adams', 'bob@example.com'])
+    expect(fm).not.toHaveProperty('participants')
   })
 
-  it('omits participants entirely when there are no attendees', () => {
-    expect(frontmatter(only(event(['UID:a@example', 'DTSTART:20260817T090000'])))).not.toHaveProperty('participants')
+  it('omits attendees entirely when there are none, and never writes participants', () => {
+    const fm = frontmatter(only(event(['UID:a@example', 'DTSTART:20260817T090000'])))
+    expect(fm).not.toHaveProperty('attendees')
+    expect(fm).not.toHaveProperty('participants')
   })
 })
 
@@ -284,7 +287,8 @@ describe('golden fixtures', () => {
     const fm = frontmatter(standup!)
 
     expect(fm['title']).toBe('Team standup: morning')
-    expect(fm['participants']).toEqual(['Alice Adams', 'bob@example.com'])
+    expect(fm['attendees']).toEqual(['Alice Adams', 'bob@example.com'])
+    expect(fm).not.toHaveProperty('participants')
     expect(fm['organizer']).toBe('Alice Adams')
     expect(fm['location']).toBe('Meeting room 2, second floor')
     expect(fm['repeat']).toEqual({ type: 'schedule', freq: 'weekly', byweekday: ['mo', 'we', 'fr'] })

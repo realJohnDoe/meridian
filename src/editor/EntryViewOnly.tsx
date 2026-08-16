@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import type { EditorView } from '@codemirror/view'
 import { useNavigate } from '@tanstack/react-router'
-import { MapPin, Link2, User } from 'lucide-react'
+import { MapPin, Link2, User, Users } from 'lucide-react'
 import type { Occurrence, Roots, StoreItem } from '@/types'
 import type { VaultRef } from '@/vaultRef'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +25,14 @@ function extraString(extra: Record<string, unknown> | undefined, key: string): s
   return typeof value === 'string' ? value : undefined
 }
 
+/** The read-only counterpart of `readAttendees` in icsToEntries.ts — an invite
+ *  roster, not `participants`, so it renders separately from the participant
+ *  chips above rather than merging into them. */
+function extraStringArray(extra: Record<string, unknown> | undefined, key: string): string[] {
+  const value = extra?.[key]
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
+}
+
 /**
  * The plain, non-editable entry view for a `view-only` vault (an iCal
  * subscription — see hooks/useEntryAccess). There is no source to write back
@@ -46,6 +54,7 @@ export default function EntryViewOnly({ occ, vault, items, roots }: Props) {
   const location  = extraString(extra, 'location')
   const url       = extraString(extra, 'url')
   const organizer = extraString(extra, 'organizer')
+  const attendees = extraStringArray(extra, 'attendees')
 
   const dateBadge = (() => {
     const d = parseDateString(occ.date)
@@ -84,7 +93,7 @@ export default function EntryViewOnly({ occ, vault, items, roots }: Props) {
           {participants.map(p => <Badge key={p} variant="tag">{p}</Badge>)}
         </div>
 
-        {(location || url || organizer) && (
+        {(location || url || organizer || attendees.length > 0) && (
           <div className="flex flex-col gap-1.5 mb-4 text-xs text-muted-foreground">
             {location && (
               <span className="flex items-center gap-1.5"><MapPin size={13} className="shrink-0" />{location}</span>
@@ -97,6 +106,12 @@ export default function EntryViewOnly({ occ, vault, items, roots }: Props) {
             )}
             {organizer && (
               <span className="flex items-center gap-1.5"><User size={13} className="shrink-0" />{organizer}</span>
+            )}
+            {attendees.length > 0 && (
+              <span className="flex items-start gap-1.5">
+                <Users size={13} className="shrink-0 mt-px" />
+                {attendees.join(', ')}
+              </span>
             )}
           </div>
         )}
