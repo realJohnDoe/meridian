@@ -2,6 +2,11 @@
 
 Survey this codebase for code health issues across the categories below.
 
+Shared process, scoring, and reporting rules — model-tier ratings, the
+ranking formula, category-verdict conventions, and how to report results —
+live in [the shared survey conventions](./README.md). Read that first; this
+file states only what's specific to this survey.
+
 ## Process
 
 - **Scan first, write second.** State your scan plan before you start, complete the full scan, and only then write the report. In the scan plan, for each category, state what you'll look for beyond the listed examples — the bullets are illustrations, not your search space. Do not draft the verdict early and select findings to confirm it.
@@ -21,6 +26,10 @@ Survey this codebase for code health issues across the categories below.
 
 ## Output structure
 
+**Reporting:** write findings to `health-survey-results.md` in this
+directory, per the [shared reporting conventions](./README.md#reporting) —
+including suggested improvements to this survey file itself.
+
 ### 1. Health verdict (~5 sentences)
 
 A plain-language summary of the repo's overall health. Name the **worst one or two areas** (by directory or subsystem, e.g. "the `auth/` layer" — not individual findings) and the **single biggest structural theme** running through the findings — explicitly consider whether that theme is **overengineering** (abstraction, configuration, or indirection outpacing the problem's actual complexity) as often as you'd consider underengineering (leakage, duplication, missing boundaries). Complexity added without a present need is exactly as much a health problem as complexity avoided where it was needed — weigh both with the same seriousness. This is the headline answer; the list below is the supporting evidence.
@@ -34,13 +43,9 @@ A plain-language summary of the repo's overall health. Name the **worst one or t
 
 ### 3. Category verdicts
 
-One line per category (1–10), with one of three verdicts:
-
-- **clean** — the scan plan for this category was fully executed and nothing worth reporting turned up
-- **findings: #N, #M** — pointing at the numbered findings below
-- **partially assessed** — state what part of the scan was skipped and why
-
-This makes the absence of findings distinguishable from the absence of scanning. A category may only be called **clean** if its scan plan was actually executed — never as a default for categories that ran out of budget.
+One line per category (1–10). Verdicts follow the
+[shared convention](./README.md#category-verdicts): **clean** /
+**findings: #N, #M** / **partially assessed**.
 
 ### 4. Findings
 
@@ -50,14 +55,12 @@ For each finding, output:
 - **Category** — one or more tags from: `architecture` `overengineering` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`
 - **Impact** — 1–10 (10 = catastrophic/systemic; 5 = e.g. a DRY violation duplicated across ~4 files, or a missing error state on a primary user flow; 1 = trivial/cosmetic)
 - **Breadth** — number of **files** affected. Counts must come from an actual search (grep/glob), and you should be able to name the search you ran; if you estimated instead, write "est." next to the number.
-- **Recommended model** — which model tier is capable enough to do this fix well: **Haiku 4.5** / **Sonnet 5** / **Opus 5** / **Opus 5 in plan mode, for a plan spanning multiple PRs** (or the current equivalent tier, if these names have moved on). Judge by how much of the fix is load-bearing judgment versus mechanical edit, and by **how the fix fails**: a wrong-but-plausible change that breaks the build, a type-check, or a test is far safer to hand down-tier than one that fails silently (a re-hidden bug class, a lint rule that passes but no longer catches what it should, a "dead" export that's actually reached dynamically, a boundary that still resolves but now leaks). Reserve plan mode + multi-PR for findings that need an architecture change **or** a product decision the user should make (e.g. "narrow the type" vs "restructure the module boundary"). **State the specific hazard that sets the tier** — the trap that would void the fix, the invariant that fails quietly, the interacting call site that's easy to miss. A tier without a named hazard is not useful. If naming that hazard makes a lower tier sufficient, say so explicitly (e.g. "Sonnet 5 if the import boundary to preserve is specified in the task; else Opus 5") — that turns the field into a prompt-writing hint, not just a rating.
+- **Recommended model** — tier per the [shared rubric](./README.md#recommended-model-tiers). Here, **how the fix fails** is the tell: a wrong-but-plausible change that breaks the build, a type-check, or a test is far safer to hand down-tier than one that fails silently (a re-hidden bug class, a lint rule that passes but no longer catches what it should, a "dead" export that's actually reached dynamically, a boundary that still resolves but now leaks). Reserve plan mode + multi-PR for findings that need an architecture change **or** a product decision the user should make (e.g. "narrow the type" vs "restructure the module boundary"). Example hazard note: "Sonnet 5 if the import boundary to preserve is specified in the task; else Opus 5."
 - **Evidence** — at least one file path plus a short **verbatim code quote** from that file (line number optional). The quote must be copy-pasted, not paraphrased — I will spot-check by grepping for it. For toolchain findings, the evidence may be a config quote plus a dry-run result.
 - **Problem** — one sentence: what is wrong and why it matters
 - **Fix** — one sentence: what the concrete fix looks like
 
-Rank findings by a rough `(impact × breadth) ÷ effort` intuition, where `effort` is the recommended-model tier read as an ordinal — Haiku 4.5 = 1, Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode/multi-PR = 5 — but report Impact, Breadth, and Recommended model as the separate fields above rather than collapsing them into one number, so the reader can re-sort by what they care about. Also add a short **summary table** (finding → recommended model) above the findings, so the tiers can be read at a glance without scrolling the full entries. Where findings touch the same code, add a one-line **sequencing note** saying which order avoids rebasing the same file twice.
-
-Note that the tier rates **the fix**, not its verification: re-running the build, lint, or the test suite to confirm a landed fix is fully scripted and suits the cheapest tier regardless of which tier the fix itself needed.
+Rank and report findings per the [shared convention](./README.md#ranking-findings). Here, "confirming" a fix means re-running the build, lint, or the test suite.
 
 **Strongly prefer systemic and structural issues over isolated, line-level ones.** A finding that affects 10 files beats one that affects 1 function. Cite real code — no generic observations.
 

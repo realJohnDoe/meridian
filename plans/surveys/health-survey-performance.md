@@ -2,6 +2,11 @@
 
 Survey this codebase for UI performance issues. The goal: the app should feel **instantly responsive** in everyday use. Find the **top 5 performance issues** affecting the most common user flows, each with a **measured baseline** so proposed fixes can be verified by re-measurement.
 
+Shared process, scoring, and reporting rules — model-tier ratings, the
+ranking formula, and how to report results — live in
+[the shared survey conventions](./README.md). Read that first; this file
+states only what's specific to this survey.
+
 ## Target user flows (the hot paths)
 
 Findings must be anchored to one or more of these flows — an issue that no common flow ever hits scores near zero regardless of how wasteful the code looks:
@@ -43,6 +48,10 @@ Findings must be anchored to one or more of these flows — an issue that no com
 
 ## Output structure
 
+**Reporting:** write findings to `health-survey-performance-results.md` in
+this directory, per the [shared reporting conventions](./README.md#reporting)
+— including suggested improvements to this survey file itself.
+
 ### 1. Snappiness verdict (~5 sentences)
 
 Plain-language summary: overall, where does the app do unnecessary or badly-timed work? Name the **worst one or two flows** from the list above (with their headline numbers) and the **single biggest structural theme** (e.g. "every mutation re-renders the whole visible agenda because subscriptions are file-granular, not occurrence-granular"). This is the headline; the findings are the evidence.
@@ -64,14 +73,12 @@ For each finding:
 - **Baseline measurement** — the number(s) captured on the test vault (ms, render count, kB, …), stated with the conditions (vault size, view, interaction)
 - **Measurement recipe** — the exact re-runnable steps and instrumentation that produced the baseline, precise enough that a later session can rerun it unchanged to verify a fix
 - **Breadth** — number of files (or components-per-screen, where multiplication is the point) affected; counts from an actual search or build output — name the search/command; write "est." if estimated
-- **Recommended model** — which model tier is capable enough to do this fix well: **Haiku 4.5** / **Sonnet 5** / **Opus 5** / **Opus 5 in plan mode, for a plan spanning multiple PRs** (or the current equivalent tier, if these names have moved on). Judge by how much of the fix is load-bearing judgment versus mechanical edit, and by **how the fix fails**: a wrong-but-plausible change that breaks the build or a test is far safer to hand down-tier than one that fails silently (stale state, wrong ordering, misplaced pixels, or a bundle change that doesn't actually move the number). Reserve plan mode + multi-PR for findings that need an architecture change **or** a product decision the user should make (e.g. "cap the list" vs "restructure the virtualizer"). **State the specific hazard that sets the tier** — the trap that would void the fix, the invariant that fails quietly, the interacting call site that's easy to miss. A tier without a named hazard is not useful. If naming that hazard makes a lower tier sufficient, say so explicitly (e.g. "Sonnet 5 if the cache key is specified in the task; else Opus 5") — that turns the field into a prompt-writing hint, not just a rating.
+- **Recommended model** — tier per the [shared rubric](./README.md#recommended-model-tiers). Here, **how the fix fails** is the tell: a wrong-but-plausible change that breaks the build or a test is far safer to hand down-tier than one that fails silently (stale state, wrong ordering, misplaced pixels, or a bundle change that doesn't actually move the number). Reserve plan mode + multi-PR for findings that need an architecture change **or** a product decision the user should make (e.g. "cap the list" vs "restructure the virtualizer"). Example hazard note: "Sonnet 5 if the cache key is specified in the task; else Opus 5."
 - **Evidence** — at least one file path plus a short **verbatim code quote** (copy-pasted, not paraphrased — I will spot-check by grepping) identifying the code responsible for the measured cost
 - **Problem** — one sentence: what work is unnecessary, too frequent, or wrongly timed — and what the user feels as a result
 - **Fix** — one sentence: the concrete change, plus the **expected effect on the baseline number** (e.g. "render count per toggle should drop from ~180 to ~2")
 
-Rank by `(impact × breadth) ÷ effort`, where `effort` is the recommended-model tier read as an ordinal — Haiku 4.5 = 1, Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode/multi-PR = 5 — but report the fields separately so the reader can re-sort. Also add a short **summary table** (finding → recommended model) above the findings, so the tiers can be read at a glance without scrolling the full entries.
-
-Note that the tier rates **the fix**, not the re-measurement: re-running a measurement recipe to verify a landed fix is fully scripted and suits the cheapest tier regardless of which tier the fix itself needed. Where findings touch the same code, add a one-line **sequencing note** saying which order avoids rebasing the same file twice.
+Rank and report findings per the [shared convention](./README.md#ranking-findings). Here, "confirming" a fix means re-running the measurement recipe.
 
 **Strongly prefer structural findings over isolated ones.** "Every occurrence row subscribes to the whole store" beats "this one component lacks `useCallback`." Cite real code and real numbers — no generic React-performance boilerplate.
 

@@ -2,6 +2,11 @@
 
 Survey this codebase for ways it can **lose, corrupt, or silently mangle the user's content**. Meridian owns a directory of plain Markdown files that the user may also edit by hand, on more than one device, through three different backends. The goal: find the **top 8 integrity risks**, each with a **reproduction** so the fix can be verified by re-running it.
 
+Shared process, scoring, and reporting rules — model-tier ratings, the
+ranking formula, category-verdict conventions, and how to report results —
+live in [the shared survey conventions](./README.md). Read that first; this
+file states only what's specific to this survey.
+
 This survey is about correctness under adversity, not about code aesthetics. A finding that makes the code nicer but cannot lose a byte belongs in the general health survey, not here.
 
 ## Target invariants (the things that must never break)
@@ -68,6 +73,12 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 
 ## Output structure
 
+**Reporting:** this survey's results live in-place in the "Known suspects"
+section above (verdicts appended per suspect) plus
+`health-survey-data-integrity-results.md` for the full report — see that
+section for the existing pattern. Also append suggested improvements to this
+survey file itself, per the [shared reporting conventions](./README.md#reporting).
+
 ### 1. Integrity verdict (~5 sentences)
 
 Plain-language summary: can this app lose the user's writing, and if so, how? Name the **worst one or two invariants** (with the headline repro) and the **single biggest structural theme** (e.g. "the cache is treated as authoritative in three places where the backend version token is the only real source of truth"). This is the headline; the findings are the evidence.
@@ -82,13 +93,10 @@ Plain-language summary: can this app lose the user's writing, and if so, how? Na
 
 ### 3. Category verdicts
 
-One line per category (1–7), with one of three verdicts:
-
-- **clean** — the threat plan for this category was fully executed and nothing worth reporting turned up
-- **findings: #N, #M** — pointing at the numbered findings below
-- **partially assessed** — state what part of the probe was skipped and why
-
-This makes the absence of findings distinguishable from the absence of probing. A category may only be called **clean** if its threat plan was actually executed — never as a default for categories that ran out of budget.
+One line per category (1–7). Verdicts follow the
+[shared convention](./README.md#category-verdicts): **clean** /
+**findings: #N, #M** / **partially assessed** (here, "the plan" means the
+threat plan, and "scanning" means probing).
 
 ### 4. Findings — top 8
 
@@ -101,14 +109,12 @@ For each finding:
 - **Impact** — 1–10, where 10 = silent, unrecoverable loss or corruption of user-authored content on a common path; 5 = recoverable or visible corruption, or silent loss on a rare path; 1 = cosmetic normalization the user would not miss
 - **Repro** — the starting file content (verbatim), the operation sequence, the observed result, and the expected result. Include the failing test verbatim where you wrote one
 - **Breadth** — number of files affected, or the fraction of vault files that could hit it; counts from an actual search — name the search you ran; write "est." if estimated
-- **Recommended model** — which model tier is capable enough to do this fix well: **Haiku 4.5** / **Sonnet 5** / **Opus 5** / **Opus 5 in plan mode, for a plan spanning multiple PRs** (or the current equivalent tier, if these names have moved on). Judge by how much of the fix is load-bearing judgment versus mechanical edit, and by **how the fix fails**: a wrong-but-plausible change that breaks the build or a test is far safer to hand down-tier than one that fails silently — and in this domain the silent failures are especially nasty, because the obvious "fix" often just moves the corruption (a round-trip assertion loosened until it passes, a conflict resolved by always preferring local, a cache invalidation that works on one device and rots on the second, a repeat-rule fix correct in the author's timezone only). Reserve plan mode + multi-PR for findings that need a structural change **or** a product decision the user should make (e.g. "preserve comments" vs "declare the file format normalized on save"). **State the specific hazard that sets the tier** — the trap that would void the fix, the invariant that fails quietly, the interacting call site that's easy to miss. A tier without a named hazard is not useful. If naming that hazard makes a lower tier sufficient, say so explicitly (e.g. "Sonnet 5 if the CAS precondition to preserve is spelled out in the task; else Opus 5") — that turns the field into a prompt-writing hint, not just a rating.
+- **Recommended model** — tier per the [shared rubric](./README.md#recommended-model-tiers). Here, **how the fix fails** is especially nasty, because the obvious "fix" often just moves the corruption (a round-trip assertion loosened until it passes, a conflict resolved by always preferring local, a cache invalidation that works on one device and rots on the second, a repeat-rule fix correct in the author's timezone only). Reserve plan mode + multi-PR for findings that need a structural change **or** a product decision the user should make (e.g. "preserve comments" vs "declare the file format normalized on save"). Example hazard note: "Sonnet 5 if the CAS precondition to preserve is spelled out in the task; else Opus 5."
 - **Evidence** — at least one file path plus a short **verbatim code quote** (copy-pasted, not paraphrased — I will spot-check by grepping) identifying the code responsible
 - **Problem** — one sentence: what breaks, and what the user loses as a result
 - **Fix** — one sentence: the concrete change, plus **how the repro should behave afterwards**
 
-Rank by `(impact × breadth) ÷ effort`, where `effort` is the recommended-model tier read as an ordinal — Haiku 4.5 = 1, Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode/multi-PR = 5 — but report the fields separately so the reader can re-sort. Also add a short **summary table** (finding → invariant → failure mode → recommended model) above the findings, so the risk profile can be read at a glance without scrolling the full entries.
-
-Note that the tier rates **the fix**, not its verification: re-running a repro or the test suite to confirm a landed fix is fully scripted and suits the cheapest tier regardless of which tier the fix itself needed. Where findings touch the same code, add a one-line **sequencing note** saying which order avoids rebasing the same file twice.
+Rank and report findings per the [shared convention](./README.md#ranking-findings) — here the summary table adds `invariant` and `failure mode` columns (finding → invariant → failure mode → recommended model). "Confirming" a fix means re-running a repro or the test suite.
 
 **Strongly prefer systemic findings over isolated ones.** "Every save path drops unknown frontmatter keys" beats "this one date helper is off by one." Cite real code and real repros — no generic data-safety boilerplate.
 
