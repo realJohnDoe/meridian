@@ -136,7 +136,7 @@ describe('ViewFilterButton', () => {
     expect(screen.queryByText('Alice')).not.toBeInTheDocument()
   })
 
-  it('disables the chevron for a registered vault with no entries at all', () => {
+  it('renders a vault with no entries at all as a plain leaf row, with no chevron', () => {
     useStore.setState({
       // VAULT_A is registered but has contributed no items yet — nothing to expand into.
       vaults: [VAULT_A, VAULT_B],
@@ -145,10 +145,11 @@ describe('ViewFilterButton', () => {
     render(<ViewFilterButton />)
     openPopover()
 
-    expect(screen.getByRole('button', { name: 'Expand Family' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Expand Family' })).not.toBeInTheDocument()
+    expect(within(vaultRow('Family')).getByRole('checkbox')).toBeInTheDocument()
   })
 
-  it('keeps the chevron enabled when a vault has only the "no participants" row', () => {
+  it('renders a vault with only unassigned items as a plain leaf row, not an expandable "No participants" group', () => {
     useStore.setState({
       vaults: [VAULT_A, VAULT_B],
       items: [occIn(VAULT_A.id, 'a', []), occIn(VAULT_B.id, 'c', ['Carol'])],
@@ -156,6 +157,7 @@ describe('ViewFilterButton', () => {
     render(<ViewFilterButton />)
     openPopover()
 
-    expect(screen.getByRole('button', { name: 'Expand Family' })).not.toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Expand Family' })).not.toBeInTheDocument()
+    expect(screen.queryByText('No participants')).not.toBeInTheDocument()
   })
 })

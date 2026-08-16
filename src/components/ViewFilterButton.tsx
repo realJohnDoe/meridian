@@ -202,20 +202,19 @@ export default function ViewFilterButton() {
 
             if (!hasPeople) {
               return (
-                <label
-                  key={group.vault.id}
-                  className="flex items-center gap-2 cursor-pointer px-1 py-2.5"
-                >
-                  <Checkbox
-                    checked={state === 'some' ? 'indeterminate' : state === 'all'}
-                    onCheckedChange={() => state === 'some'
-                      ? clearVaultParticipants(group.vault.id)
-                      : toggleVaultHidden(group.vault.id)}
-                    visualClassName="size-4"
-                  />
-                  <VaultIcon kind={group.vault.kind} className="size-3.5 stroke-[1.7] shrink-0 text-muted-foreground" />
-                  <span className="text-sm truncate">{group.vault.name}</span>
-                </label>
+                <div key={group.vault.id} className="flex items-center px-1 py-2.5">
+                  <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                    <Checkbox
+                      checked={state === 'some' ? 'indeterminate' : state === 'all'}
+                      onCheckedChange={() => state === 'some'
+                        ? clearVaultParticipants(group.vault.id)
+                        : toggleVaultHidden(group.vault.id)}
+                      visualClassName="size-4"
+                    />
+                    <VaultIcon kind={group.vault.kind} className="size-3.5 stroke-[1.7] shrink-0 text-muted-foreground" />
+                    <span className="text-sm truncate">{group.vault.name}</span>
+                  </label>
+                </div>
               )
             }
 
