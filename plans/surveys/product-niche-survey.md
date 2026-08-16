@@ -7,6 +7,11 @@ Survey **Meridian's relationship to its own market niche**. Two questions, weigh
 
 Produce the **top 5 findings** across both, each anchored to a verbatim quote from a real surface.
 
+Shared process, scoring, and reporting rules — model-tier ratings, the
+ranking formula, category-verdict conventions, and how to report results —
+live in [the shared survey conventions](./README.md). Read that first; this
+file states only what's specific to this survey.
+
 **Scope.** This is a survey of our own product and its positioning — not vendor research, and not a shopping exercise for components to integrate. Competing and adjacent products enter only as _the context that defines the niche_, and primarily through the set the README already names (Obsidian + TaskNotes, Google Calendar, GitHub Issues/Projects, Todoist, Google Keep). **One bounded exception:** the README makes factual claims about those products in its comparison table, and a stale claim about a competitor costs more trust than a missing feature does — so verifying those specific claims is in scope. Anything beyond that is a separate market-research exercise; record it as out of scope rather than drifting into it.
 
 Code quality, UI implementation, speed, and data safety belong to the other surveys ([health-survey.md](health-survey.md), [health-survey-ui.md](health-survey-ui.md), [health-survey-performance.md](health-survey-performance.md), [health-survey-data-integrity.md](health-survey-data-integrity.md)) — cite them, don't duplicate them. A feature gap matters here only when it changes whether the target user can adopt the product.
@@ -70,6 +75,10 @@ Then state the gaps plainly. **Declared vs. revealed** is a strategy question �
 
 ## Output structure
 
+**Reporting:** write findings to `product-niche-survey-results.md` in this
+directory, per the [shared reporting conventions](./README.md#reporting) —
+including suggested improvements to this survey file itself.
+
 ### 1. Niche verdict (~6 sentences)
 
 State the three niches from Phase 0 in one line each, then answer the two headline questions directly: how well does the product fit its niche, and how well does it communicate it? Name the **widest of the three gaps** and the **single change that would close the most of it**. This is the answer; the findings are the evidence.
@@ -83,7 +92,10 @@ State the three niches from Phase 0 in one line each, then answer the two headli
 
 ### 3. Category verdicts
 
-One line per category (1–7): **clean** (the walk for this category was executed and nothing turned up), **findings: #N, #M**, or **partially assessed** (say what was skipped and why). Clean is only available to categories actually walked.
+One line per category (1–7). Verdicts follow the
+[shared convention](./README.md#category-verdicts): **clean** /
+**findings: #N, #M** / **partially assessed** (here, "the plan" means the
+walk). Clean is only available to categories actually walked.
 
 A category can also be walked, turn up something real, and still lose its slot to the top-5 cap. Don't round that to "clean" — it isn't — and don't pad the findings list to accommodate it. Mark the category **findings: below the cut**, and record the item in a single short paragraph after the findings, with its quote and an impact score, clearly marked as sub-threshold. One or two of these is a sign the cap is working; five means the cap is wrong for this run and you should say that instead.
 
@@ -101,11 +113,11 @@ For each finding:
 - **Impact** — 1–10, where 10 = the product targets a niche it cannot serve, or the right visitor cannot tell the product is for them; 5 = a real differentiator goes unrecognised, or a segment is attracted and then disappointed; 1 = a wording nit with no selection consequence
 - **Evidence** — verbatim quote(s) with file paths; for fit findings, also the product evidence (feature, constraint, or code) that creates the gap
 - **Breadth** — how many surfaces carry it; from an actual search — name it; "est." if estimated
-- **Recommended model** — which tier is capable enough to do this fix well: **Haiku 4.5** / **Sonnet 5** / **Opus 5** / **Opus 5 in plan mode, for a plan spanning multiple PRs** (or the current equivalent tier). Judge by how much of the fix is load-bearing judgment versus mechanical edit, and by **how the fix fails** — here the dangerous failure is a confident rewrite that sounds better and positions worse: copy broadened until it selects nobody, a differentiator sharpened into a claim the product can't back, a term unified on one surface so the vocabulary fractures further, a comparison row "corrected" without checking the competitor. Reserve plan mode + multi-PR for anything that changes **what the product is or who it's for** — the niche itself, the headline, the lead differentiator, whether to chase an emerging audience. Those are the user's decisions: the plan lays out options and consequences, it does not pick. **State the specific hazard that sets the tier**, and say when naming it would allow a lower one (e.g. "Haiku 4.5 if the approved headline text is given in the task; else Opus 5 in plan mode")
+- **Recommended model** — tier per the [shared rubric](./README.md#recommended-model-tiers). Here, **how the fix fails** is the tell: the dangerous failure is a confident rewrite that sounds better and positions worse — copy broadened until it selects nobody, a differentiator sharpened into a claim the product can't back, a term unified on one surface so the vocabulary fractures further, a comparison row "corrected" without checking the competitor. Reserve plan mode + multi-PR for anything that changes **what the product is or who it's for** — the niche itself, the headline, the lead differentiator, whether to chase an emerging audience. Those are the user's decisions: the plan lays out options and consequences, it does not pick. Example hazard note: "Haiku 4.5 if the approved headline text is given in the task; else Opus 5 in plan mode."
 - **Problem** — one sentence: what the target user misunderstands, misses, or walks away from
 - **Fix** — one sentence: the concrete change; for anything touching the niche itself, present options rather than asserting one
 
-Rank by `(impact × breadth) ÷ effort`, where `effort` is the tier as an ordinal — Haiku 4.5 = 1, Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode/multi-PR = 5 — but report the fields separately so the reader can re-sort. Add a **summary table** (finding → gap → question → recommended model) above the findings.
+Rank and report findings per the [shared convention](./README.md#ranking-findings) — here the summary table adds `gap` and `question` columns (finding → gap → question → recommended model).
 
 **This formula routinely inverts the impact ordering, and that is intended, not a bug to correct.** A cheap mechanical fix touching five surfaces will outrank a strategy finding twice its impact, because the formula ranks return on effort, not importance. It therefore appears to contradict the scoring guidance at the foot of this document ("a gap that makes the right user bounce outranks any amount of imprecise wording"). Resolve it this way, explicitly, every time: **the niche verdict leads on impact** — it names the widest gap and the single change that would close the most of it, regardless of cost — while **the findings list ranks on the formula**. When the two orderings disagree, say so in one line above the findings table, so the reader is not left thinking the report buried its own headline.
 

@@ -218,7 +218,7 @@ single _connect_ click.) Finding a backend at all was harder than I expected: I 
 password-protected folder in the cloud with an API, and most options either want access to
 _everything_ in your account or don't send the CORS headers a browser app needs. I
 compared the candidates in
-[plans/storage-backend-survey.md](https://github.com/realJohnDoe/meridian/blob/main/plans/storage-backend-survey.md);
+[plans/surveys/storage-backend-survey.md](https://github.com/realJohnDoe/meridian/blob/main/plans/surveys/storage-backend-survey.md);
 Dropbox and OneDrive are the strongest alternatives, and I may add them.
 
 The recurrence engine was where readable files paid off most. When it misbehaved —

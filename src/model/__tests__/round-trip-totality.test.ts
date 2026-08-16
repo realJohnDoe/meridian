@@ -1,5 +1,5 @@
 /**
- * Root-A ratchet — see plans/health-survey-data-integrity-results.md §2 ("Root A —
+ * Root-A ratchet — see plans/surveys/health-survey-data-integrity-results.md §2 ("Root A —
  * the projection isn't required to be total") and the survey's Root B section.
  *
  * Every save regenerates a file from the store, so the store is only as faithful
