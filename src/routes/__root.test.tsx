@@ -196,6 +196,30 @@ describe('__root — theme-color sync', () => {
       act(() => { vi.advanceTimersByTime(32) })
     }).not.toThrow()
   })
+
+  // Regression test for the actual Android bug this file guards against:
+  // getComputedStyle() round-trips oklch() rather than downgrading it to
+  // rgb(), and <meta name="theme-color"> can't parse oklch() — so the write
+  // must go through the canvas-based hex normalizer, never the raw
+  // getComputedStyle() string, for oklch (or any other non-legacy) colors.
+  it('normalizes an oklch() computed background to hex instead of writing it raw', () => {
+    const fakeCtx = {
+      fillStyle: '',
+      fillRect: vi.fn(),
+      getImageData: () => ({ data: new Uint8ClampedArray([17, 19, 24, 255]) }),
+    }
+    const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue(fakeCtx as unknown as CanvasRenderingContext2D)
+
+    const meta = withThemeColorMeta('#000000')
+    document.documentElement.style.backgroundColor = 'oklch(0.13 0.04 252)'
+    render(<Root />)
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(meta.getAttribute('content')).toBe('#111318')
+    getContextSpy.mockRestore()
+  })
 })
 
 describe('__root — resuming', () => {
