@@ -4,7 +4,8 @@ import { useStore, NO_PARTICIPANT } from '@/store'
 import { Button } from './ui/button'
 import { Checkbox } from './ui/checkbox'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible'
+import { Collapsible, CollapsibleContent } from './ui/collapsible'
+import { IconButton } from './primitives/icon-button'
 import { VaultIcon } from './vaultIcon'
 import { cn } from '@/lib/cn'
 import { keyVaultId } from '@/fileIO'
@@ -84,7 +85,11 @@ function PersonRow({
   label, italic, checked, onToggle,
 }: { label: string; italic?: boolean; checked: boolean; onToggle: () => void }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer px-1 py-1.5">
+    // py-3 (rather than the tighter px-1 py-1.5 rows elsewhere) keeps this row
+    // at least 44px tall: the checkbox's own invisible touch zone already
+    // reaches ~40px via `before:-inset-3`, and a shorter row would let
+    // neighbouring rows' zones overlap and mis-tap the wrong person.
+    <label className="flex items-center gap-2 cursor-pointer px-1 py-3">
       <Checkbox checked={checked} onCheckedChange={onToggle} visualClassName="size-4" />
       <span className={cn('text-sm truncate', italic && 'text-muted-foreground italic')}>{label}</span>
     </label>
@@ -110,6 +115,7 @@ export default function ViewFilterButton() {
   const hiddenParticipants       = useStore(s => s.hiddenParticipants)
   const toggleVaultHidden        = useStore(s => s.toggleVaultHidden)
   const toggleParticipantHidden  = useStore(s => s.toggleParticipantHidden)
+  const clearVaultParticipants   = useStore(s => s.clearVaultParticipants)
   const clearViewFilter          = useStore(s => s.clearViewFilter)
 
   const groups = useVaultGroups(items, vaults)
@@ -153,7 +159,10 @@ export default function ViewFilterButton() {
           </span>
           {active && (
             <button
-              className="text-2xs text-muted-foreground hover:text-foreground transition-colors"
+              // Real padding (not the checkbox's overlapping ::before trick):
+              // this sits alone in the header with room to grow, so a plain
+              // 24px-plus hit area is simpler and clears the AA floor.
+              className="text-2xs text-muted-foreground hover:text-foreground transition-colors -my-2 -mr-1 px-1.5 py-2"
               onClick={clearViewFilter}
             >
               Clear
@@ -192,23 +201,32 @@ export default function ViewFilterButton() {
                 open={isOpen}
                 onOpenChange={open => setExpanded(open ? group.vault.id : null)}
               >
-                <div className="flex items-center gap-1 px-1 py-1.5">
-                  <CollapsibleTrigger asChild>
-                    <button
-                      className="shrink-0 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-0"
-                      disabled={!hasPeople}
-                      aria-label={isOpen ? `Collapse ${group.vault.name}` : `Expand ${group.vault.name}`}
-                    >
-                      <ChevronRight size={13} className={cn('transition-transform', isOpen && 'rotate-90')} />
-                    </button>
-                  </CollapsibleTrigger>
+                <div className="flex items-center gap-1 px-1 py-2.5">
+                  {/* A plain IconButton, not CollapsibleTrigger asChild: IconButton
+                      isn't ref-forwarding, which Radix's Slot needs to manage focus
+                      cleanly. `aria-expanded` is set by hand to keep the a11y
+                      contract CollapsibleTrigger would otherwise have provided. */}
+                  <IconButton
+                    hit="pad"
+                    variant="plain"
+                    label={isOpen ? `Collapse ${group.vault.name}` : `Expand ${group.vault.name}`}
+                    aria-expanded={isOpen}
+                    disabled={!hasPeople}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-0"
+                    onClick={() => setExpanded(isOpen ? null : group.vault.id)}
+                  >
+                    <ChevronRight size={13} className={cn('transition-transform', isOpen && 'rotate-90')} />
+                  </IconButton>
                   {/* The vault checkbox shows and hides the whole calendar; its
                       indeterminate state reports that some of its people are
-                      hidden, and clicking it from there shows everything again. */}
-                  <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                      hidden, and clicking it from there shows everything again
+                      — it never hides the vault itself from a mixed state. */}
+                  <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0 py-0.5">
                     <Checkbox
                       checked={state === 'some' ? 'indeterminate' : state === 'all'}
-                      onCheckedChange={() => toggleVaultHidden(group.vault.id)}
+                      onCheckedChange={() => state === 'some'
+                        ? clearVaultParticipants(group.vault.id)
+                        : toggleVaultHidden(group.vault.id)}
                       visualClassName="size-4"
                     />
                     <VaultIcon kind={group.vault.kind} className="size-3.5 stroke-[1.7] shrink-0 text-muted-foreground" />
