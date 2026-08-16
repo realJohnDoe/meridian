@@ -311,7 +311,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} vaultId={vaultId} items={items} onOpenWikilink={handleOpenWikilink} onChange={editScope !== 'add' ? scheduleAutoSave : undefined} readOnly={!!readOnlyVault} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} vaultId={vaultId} items={items} onOpenWikilink={handleOpenWikilink} onChange={editScope !== 'add' ? scheduleAutoSave : undefined} />
 
         <ItemsList
           items={listItems}
