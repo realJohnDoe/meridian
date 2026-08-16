@@ -148,19 +148,97 @@ describe('__root — theme-color sync', () => {
     return meta
   }
 
-  afterEach(() => { document.querySelector('meta[name="theme-color"]')?.remove() })
+  // The real theme tokens, and the sRGB each resolves to — --backdrop is the
+  // near-black that reading the wrong variable used to put in the status bar.
+  const BACKDROP_DARK = 'oklch(0.13 0.04 252)'   // -> #000717
+  const BACKGROUND_DARK = 'oklch(0.18 0.05 252)' // -> #011227
+  const PALETTE: Record<string, [number, number, number]> = {
+    '#ff00ff':          [255, 0, 255],   // toHex's parse probe
+    [BACKDROP_DARK]:    [0, 7, 23],
+    [BACKGROUND_DARK]:  [1, 18, 39],
+  }
+
+  /**
+   * jsdom ships no canvas, so toHex()'s 1x1 readback needs a stand-in. This
+   * models the two behaviours the normalizer leans on: an unparseable
+   * fillStyle is silently ignored (the previous value survives), and the
+   * filled pixel reads back as 8-bit sRGB.
+   */
+  function stubCanvas() {
+    let fill = '#000000'
+    const ctx = {
+      get fillStyle() { return fill },
+      set fillStyle(v: string) { if (v in PALETTE) fill = v },
+      fillRect: vi.fn(),
+      getImageData: () => ({ data: new Uint8ClampedArray([...(PALETTE[fill] ?? [0, 0, 0]), 255]) }),
+    }
+    return vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue(ctx as unknown as CanvasRenderingContext2D)
+  }
+
+  let canvasSpy: ReturnType<typeof stubCanvas>
+  beforeEach(() => { canvasSpy = stubCanvas() })
+  afterEach(() => {
+    canvasSpy.mockRestore()
+    document.querySelector('meta[name="theme-color"]')?.remove()
+    document.documentElement.style.removeProperty('--background')
+    document.documentElement.style.backgroundColor = ''
+  })
 
   // Android colours the status bar from this meta tag, not from the page
   // background, so it has to track the active theme or it stays on the static
-  // dark default from index.html.
-  it('writes the resolved background colour into the theme-color meta tag', () => {
+  // default from index.html.
+  it('writes the active theme --background into the theme-color meta tag', () => {
     const meta = withThemeColorMeta()
-    document.documentElement.style.backgroundColor = 'rgb(1, 2, 3)'
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
     render(<Root />)
 
     act(() => { vi.advanceTimersByTime(32) })
 
-    expect(meta.getAttribute('content')).toBe('rgb(1, 2, 3)')
+    expect(meta.getAttribute('content')).toBe('#011227')
+  })
+
+  // The regression this file exists for. html paints --backdrop, the letterbox
+  // behind the 430px app column that a phone never shows; the topbar under the
+  // status bar is --background. Sourcing the status bar from html's own
+  // background painted it near-black (#000717) against a #011227 topbar.
+  it('reads --background rather than the html element background', () => {
+    const meta = withThemeColorMeta()
+    document.documentElement.style.backgroundColor = BACKDROP_DARK
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+    render(<Root />)
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(meta.getAttribute('content')).toBe('#011227')
+    expect(meta.getAttribute('content')).not.toBe('#000717')
+  })
+
+  // getComputedStyle round-trips oklch() rather than downgrading it to rgb(),
+  // and <meta name="theme-color"> cannot parse oklch() — so the write must go
+  // through the canvas normalizer, never the raw token.
+  it('normalizes the oklch() token to hex instead of writing it raw', () => {
+    const meta = withThemeColorMeta()
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+    render(<Root />)
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(meta.getAttribute('content')).not.toContain('oklch')
+    expect(meta.getAttribute('content')).toMatch(/^#[0-9a-f]{6}$/)
+  })
+
+  // Canvas ignores an unparseable fillStyle instead of throwing, leaving the
+  // default #000000 behind — writing that through would reintroduce the black
+  // bar. An unreadable colour must leave the existing meta value alone.
+  it('leaves the meta tag untouched when the colour does not parse', () => {
+    const meta = withThemeColorMeta('#011227')
+    document.documentElement.style.setProperty('--background', 'not-a-color')
+    render(<Root />)
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(meta.getAttribute('content')).toBe('#011227')
   })
 
   // next-themes applies the theme class in its own effect on ThemeProvider,
@@ -169,19 +247,19 @@ describe('__root — theme-color sync', () => {
   // deferral to the next frame.
   it('defers the read to the next frame rather than reading during the effect', () => {
     const meta = withThemeColorMeta('#000000')
-    document.documentElement.style.backgroundColor = 'rgb(1, 2, 3)'
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
     render(<Root />)
 
     expect(meta.getAttribute('content')).toBe('#000000')
 
     act(() => { vi.advanceTimersByTime(32) })
 
-    expect(meta.getAttribute('content')).toBe('rgb(1, 2, 3)')
+    expect(meta.getAttribute('content')).toBe('#011227')
   })
 
   it('cancels the pending frame on unmount instead of writing after teardown', () => {
     const meta = withThemeColorMeta('#000000')
-    document.documentElement.style.backgroundColor = 'rgb(1, 2, 3)'
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
     const { unmount } = render(<Root />)
 
     unmount()
@@ -195,30 +273,6 @@ describe('__root — theme-color sync', () => {
       render(<Root />)
       act(() => { vi.advanceTimersByTime(32) })
     }).not.toThrow()
-  })
-
-  // Regression test for the actual Android bug this file guards against:
-  // getComputedStyle() round-trips oklch() rather than downgrading it to
-  // rgb(), and <meta name="theme-color"> can't parse oklch() — so the write
-  // must go through the canvas-based hex normalizer, never the raw
-  // getComputedStyle() string, for oklch (or any other non-legacy) colors.
-  it('normalizes an oklch() computed background to hex instead of writing it raw', () => {
-    const fakeCtx = {
-      fillStyle: '',
-      fillRect: vi.fn(),
-      getImageData: () => ({ data: new Uint8ClampedArray([17, 19, 24, 255]) }),
-    }
-    const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
-      .mockReturnValue(fakeCtx as unknown as CanvasRenderingContext2D)
-
-    const meta = withThemeColorMeta('#000000')
-    document.documentElement.style.backgroundColor = 'oklch(0.13 0.04 252)'
-    render(<Root />)
-
-    act(() => { vi.advanceTimersByTime(32) })
-
-    expect(meta.getAttribute('content')).toBe('#111318')
-    getContextSpy.mockRestore()
   })
 })
 

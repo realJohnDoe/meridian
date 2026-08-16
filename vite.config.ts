@@ -152,8 +152,13 @@ export default defineConfig({
         name: 'Meridian',
         short_name: 'Meridian',
         description: 'Tasks and a calendar on plain Markdown files you own — fast on a phone.',
-        theme_color: '#111318',
-        background_color: '#111318',
+        // Dark-theme --background as sRGB hex — the topbar color that sits
+        // under the status bar, matching the meta tag in index.html. Some
+        // Android installs snapshot theme_color at install time rather than
+        // following the live meta tag, so this is the value a pinned/installed
+        // app falls back to.
+        theme_color: '#011227',
+        background_color: '#011227',
         display: 'standalone',
         start_url: '/meridian/',
         icons: [

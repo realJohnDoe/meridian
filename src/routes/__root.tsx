@@ -43,29 +43,46 @@ export const THEME_CLASS: Record<string, string> = {
  */
 export const THEME_IDS = Object.keys(THEME_CLASS).filter(id => id !== 'light' && id !== 'dark')
 
-// Normalizes any CSS <color> (notably the oklch() our themes are authored
-// in) to a plain "#rrggbb" string. getComputedStyle() no longer downgrades
-// oklch() to legacy rgb() — it round-trips the original notation — and
-// <meta name="theme-color">'s own color parser rejects that syntax, so
-// writing the computed value straight through silently no-ops and Android
-// falls back to its own default (black). A 1x1 canvas readback always
-// resolves to 8-bit sRGB regardless of the source color space, so it works
-// as a normalizer no matter which CSS color syntax a theme uses.
-function toHex(cssColor: string): string {
+/**
+ * Sentinel used to detect a color canvas refused to parse. Any value works as
+ * long as it is not a color a theme would plausibly resolve to.
+ */
+const PARSE_PROBE = '#ff00ff'
+
+/**
+ * Normalizes any CSS <color> to a plain "#rrggbb" string, or null when the
+ * value does not parse.
+ *
+ * Our themes are authored in oklch(), and both getComputedStyle() and
+ * getPropertyValue() hand modern color syntax back as-authored rather than
+ * downgrading it to legacy rgb(). <meta name="theme-color">'s own parser only
+ * understands the legacy set, so an oklch() written straight through is
+ * silently dropped and Android falls back to its own default. A 1x1 canvas
+ * readback resolves any color space down to 8-bit sRGB — exactly the subset
+ * that parser accepts.
+ *
+ * Canvas rejects an unparseable fillStyle *silently*, keeping whatever was set
+ * before (default #000000). Left undetected that would hand back an accidental
+ * black and recreate the very bar this code exists to prevent, so the assign is
+ * probed rather than trusted.
+ */
+function toHex(cssColor: string): string | null {
   const canvas = document.createElement('canvas')
   canvas.width = 1
   canvas.height = 1
   const ctx = canvas.getContext('2d')
-  if (!ctx) return cssColor
+  if (!ctx) return null
+  ctx.fillStyle = PARSE_PROBE
   ctx.fillStyle = cssColor
+  if (ctx.fillStyle === PARSE_PROBE && cssColor.trim().toLowerCase() !== PARSE_PROBE) return null
   ctx.fillRect(0, 0, 1, 1)
   const data = ctx.getImageData(0, 0, 1, 1).data
   return `#${Array.from(data.subarray(0, 3), v => v.toString(16).padStart(2, '0')).join('')}`
 }
 
-// Android colors the status/nav bar from this meta tag rather than from the
-// page's own background, so it must track the active theme's --backdrop
-// or it stays on the static dark default from index.html for light themes.
+// Android colors the status bar from this meta tag rather than from the page
+// itself, so it must track the active theme or it stays on the static default
+// from index.html for every theme but the dark one.
 function ThemeColorSync() {
   // `resolvedTheme` is the dependency that matters, not `theme`: on the
   // system setting `theme` stays the constant 'system' while the OS flipping
@@ -80,8 +97,17 @@ function ThemeColorSync() {
     // frame lets that effect land first.
     const raf = requestAnimationFrame(() => {
       const meta = document.querySelector('meta[name="theme-color"]')
-      const bg = getComputedStyle(document.documentElement).backgroundColor
-      meta?.setAttribute('content', toHex(bg))
+      if (!meta) return
+      // --background, *not* the html element's own background. html paints
+      // --backdrop, the letterbox behind the 430px app column, which is only
+      // ever visible on viewports wider than that column. On a phone the
+      // column fills the width and what actually sits under the status bar is
+      // the topbar (_app.tsx), painted bg-background and extended up into the
+      // notch via safe-area-inset-top. Reading --backdrop matched the status
+      // bar to a near-black (#000717 in the dark theme) that clashed with the
+      // topbar directly below it.
+      const hex = toHex(getComputedStyle(document.documentElement).getPropertyValue('--background'))
+      if (hex) meta.setAttribute('content', hex)
     })
     return () => cancelAnimationFrame(raf)
   }, [theme, resolvedTheme])
