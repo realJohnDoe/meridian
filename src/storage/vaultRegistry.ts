@@ -390,11 +390,6 @@ async function restoreVaultsInner(): Promise<void> {
     for (const ref of mountable) {
       prePainted.set(ref.id, await hydrateFromCache(ref.id))
     }
-    if ([...prePainted.values()].some(Boolean)) setStoreState({ vaultLoading: false })
-
-    // The Tutorial vault is cache-free and cheap (synthesized in memory), so
-    // it is mounted here rather than in either phase's loop.
-    await mountExampleVault()
 
     // Someone upgrading from a single-vault build already has a real vault and
     // has never been offered this choice, so their first launch on the layered
@@ -402,7 +397,33 @@ async function restoreVaultsInner(): Promise<void> {
     // agenda. `registerAndMount` covers the other direction (a first vault
     // added later in the session); both are one-time, so un-hiding it in the
     // filter sticks.
+    //
+    // Ahead of the mount below so the filter is already in place when the
+    // layer lands: `hiddenVaultIds` feeds `filterOccs`, and changing it after
+    // the fact rebuilds every agenda section a second time.
     if (mountable.length > 0) hideVaultOnce(EXAMPLE_REF.id)
+
+    // The Tutorial vault is cache-free and cheap (synthesized in memory), so
+    // it is mounted here rather than in either phase's loop.
+    await mountExampleVault()
+
+    // ── The paint gate ──────────────────────────────────────────────
+    // Released only once *every* cached vault — the Tutorial vault included —
+    // is in the store, never after the first one lands.
+    //
+    // The agenda seeds its scroll position from the row list it first mounts
+    // with (see useAgendaScrollRestore), so a vault whose layer arrives after
+    // that inserts rows above the viewport and shifts the day on screen. The
+    // anchoring in AgendaView recovers from it, but recovery is approximate —
+    // it re-pins to an estimated row position — and there is no reason to need
+    // it here: phase 1 is all indexed Dexie reads, so waiting for the rest of
+    // it costs a few milliseconds and makes the first frame the correct one.
+    //
+    // This is why a lone GitHub vault always looked fine while GitHub +
+    // Tutorial or GitHub + iCal drifted: nothing to do with the vault kinds
+    // (they hydrate through this identical loop), only with whether a second
+    // layer landed after the gate had already been released.
+    if ([...prePainted.values()].some(Boolean)) setStoreState({ vaultLoading: false })
 
     // ── Phase 2: credentials, permission, first sync ────────────────
     for (const ref of mountable) {

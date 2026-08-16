@@ -30,13 +30,25 @@ function AgendaSkeleton() {
 
 function AgendaPage() {
   const vaultLoading = useStore(s => s.vaultLoading)
-  const items = useStore(s => s.items)
   const onOpen = useOpenEntry()
 
-  // Skeleton only when there is genuinely nothing to show. Once the cache has
-  // painted, the agenda renders immediately and the background sync refines it
-  // in place — matching the entry route's `vaultLoading && !occ` guard.
-  if (vaultLoading && items.length === 0) {
+  // Skeleton until the cache-first paint is *complete*, not until the first
+  // vault's rows show up.
+  //
+  // This used to be `vaultLoading && items.length === 0`, which mounts the
+  // agenda the moment any one vault hydrates. With several vaults that is
+  // mid-way through restoreVaults' phase-1 loop: the agenda seeds its scroll
+  // position from a partial row list (see useAgendaScrollRestore), and the
+  // remaining vaults then insert rows above the viewport, shifting the day on
+  // screen. A lone GitHub vault never showed it because there was no second
+  // layer to land.
+  //
+  // `vaultLoading` is only ever true during startup (set at store creation,
+  // cleared by restoreVaults' own finally), so this cannot stall a later
+  // navigation. Phase 1 is indexed Dexie reads with no network, and the
+  // background sync still refines the agenda in place afterwards — so the
+  // cost is a few milliseconds against a first frame that is actually right.
+  if (vaultLoading) {
     return (
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]">
         <AgendaSkeleton />

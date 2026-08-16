@@ -207,6 +207,7 @@ vi.mock('@/storage/githubOAuth', () => ({
 
 vi.mock('@/storeBridge', () => ({
   setVaultLayer: vi.fn((vaultId: string, data: { items: unknown[]; roots: Map<string, unknown> }) => {
+    callOrder.push(`setVaultLayer:${vaultId}`)
     storeState.layers.set(vaultId, data)
     storeState.items = [...storeState.layers.values()].flatMap(l => l.items)
     storeState.roots = new Map([...storeState.layers.values()].flatMap(l => [...l.roots]))
@@ -223,12 +224,17 @@ vi.mock('@/storeBridge', () => ({
   getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
   setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
   getVaults: vi.fn(() => storeState.vaults),
-  setStoreState: vi.fn((partial: Partial<typeof storeState>) => { Object.assign(storeState, partial) }),
+  setStoreState: vi.fn((partial: Partial<typeof storeState>) => {
+    // The cache-first paint gate — the moment AgendaPage stops showing the
+    // skeleton and mounts the agenda against whatever is in the store.
+    if (partial.vaultLoading === false) callOrder.push('paintGate')
+    Object.assign(storeState, partial)
+  }),
   loadGlobalPrefs: vi.fn((ids: string[]) => { callOrder.push('loadGlobalPrefs'); storeState.prefsLoadedFor = ids }),
   loadDefaultParticipants: vi.fn((id: string) => { storeState.participantsLoadedFor = id }),
   getDefaultVaultId: vi.fn(() => storeState.defaultVaultId),
   setDefaultVaultId: vi.fn((id: string | null) => { storeState.defaultVaultId = id }),
-  hideVaultOnce: vi.fn((id: string) => { storeState.hiddenOnce.push(id) }),
+  hideVaultOnce: vi.fn((id: string) => { callOrder.push(`hideVaultOnce:${id}`); storeState.hiddenOnce.push(id) }),
 }))
 
 vi.mock('@/storage/notifications', () => notifyFns)
@@ -513,6 +519,45 @@ describe('restoreVaults — cache-first paint', () => {
     off()
 
     expect(changes).toEqual([true])
+  })
+
+  // The agenda seeds its scroll position from the row list it first mounts
+  // with, so every vault layer has to be in the store before the paint gate
+  // opens. A layer landing afterwards inserts rows above the viewport and
+  // shifts the visible day — reported as "GitHub alone is fine, GitHub +
+  // Tutorial lands half a screen off, GitHub + iCal lands a month early".
+  //
+  // The vault kinds are a red herring: every mountable vault hydrates through
+  // the same phase-1 loop. What differed was only whether a second layer
+  // landed after the gate — and the Tutorial vault always did, because it was
+  // mounted after it.
+  it('opens the paint gate only once every cached vault is in the store', async () => {
+    metaStore.set('vaults', [LOCAL_REF, GITHUB_REF])
+    metaStore.set(`handle:${LOCAL_REF.id}`, {})
+    cacheConfig.rows.set(LOCAL_REF.id,  [{ path: 'local.md',  content: '# Local' }])
+    cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'remote.md', content: '# Remote' }])
+
+    await restoreVaults()
+
+    const gate = callOrder.indexOf('paintGate')
+    expect(gate).toBeGreaterThan(-1)
+    for (const id of [LOCAL_REF.id, GITHUB_REF.id, 'example']) {
+      expect(callOrder.indexOf(`setVaultLayer:${id}`)).toBeGreaterThan(-1)
+      expect(callOrder.indexOf(`setVaultLayer:${id}`)).toBeLessThan(gate)
+    }
+  })
+
+  // hiddenVaultIds feeds filterOccs, so flipping it after the Tutorial layer
+  // has painted rebuilds every agenda section a second time — another row-list
+  // change landing on an already-mounted agenda.
+  it('hides the Tutorial vault before mounting it, not after', async () => {
+    cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
+
+    await restoreVaults()
+
+    expect(storeState.hiddenOnce).toContain('example')
+    expect(callOrder.indexOf('hideVaultOnce:example'))
+      .toBeLessThan(callOrder.indexOf('setVaultLayer:example'))
   })
 
   // The agenda's first frame is built through useCalendarFilter, which reads
