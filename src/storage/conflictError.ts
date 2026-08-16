@@ -1,6 +1,21 @@
+/**
+ * Why a backend refused a write. Carried on `ConflictError` so the resolution
+ * path can record *which* refusal it was rather than flattening every cause
+ * into one message: GitHub answers 409 both for a genuine SHA mismatch and for
+ * a branch-ref race between two commits pushed seconds apart, and 422 for "no
+ * sha supplied for an existing file" — three very different stories that look
+ * identical once the status is dropped.
+ */
+export interface ConflictDetail {
+  /** HTTP status, for backends that have one. */
+  status?: number
+  /** The backend's own message, trimmed to something pasteable. */
+  reason?: string
+}
+
 /** Thrown by StorageBackend.write when the CAS precondition fails. */
 export class ConflictError extends Error {
-  constructor(path: string) {
+  constructor(readonly path: string, readonly detail?: ConflictDetail) {
     super(`Conflict on ${path}: backend version diverged since last sync.`)
     this.name = 'ConflictError'
   }

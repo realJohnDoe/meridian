@@ -294,7 +294,7 @@ export class GitHubBackend implements StorageBackend {
         this._shas.delete(path)
         return
       }
-      throw mapGitHubError(e)
+      throw mapGitHubError(e, path)
     }
   }
 
