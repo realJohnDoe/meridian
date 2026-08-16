@@ -3,7 +3,8 @@
 Investigation of "ideally Meridian would support a superset of the iCal / RRule
 standard — where are the gaps?" (2026-08-16).
 
-**Status: investigation only.** Nothing here is fixed yet. Every claim marked
+**Status: investigation only.** Nothing here is fixed yet. The work is broken
+into PRs in [ical-rrule-implementation.md](./ical-rrule-implementation.md). Every claim marked
 _observed_ was run against the current engine; every claim marked _read_ comes
 from the code with the line cited.
 
