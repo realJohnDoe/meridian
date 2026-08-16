@@ -84,7 +84,3 @@ export const setDefaultVaultId = (id: string | null): void =>
 /** Follow a favourited entry that changed key — see `moveEntryToVault`. */
 export const replaceFavorite = (fromKey: EntryKey, toKey: EntryKey): void =>
   useStore.getState().replaceFavorite(fromKey, toKey)
-
-/** One-time default hide — see `hideVaultOnce`. Used for the Tutorial vault. */
-export const hideVaultOnce = (vaultId: string): void =>
-  useStore.getState().hideVaultOnce(vaultId)

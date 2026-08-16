@@ -6,7 +6,10 @@ import {
   refreshTokenSave, refreshTokenClear,
   tokenExpirySave, tokenExpiryClear,
 } from '@/storage/cache/credentials'
-import { vaultRefsSave, vaultRefsLoad, activeVaultIdSave, activeVaultIdLoad } from '@/storage/cache/registry'
+import {
+  vaultRefsSave, vaultRefsLoad, activeVaultIdSave, activeVaultIdLoad,
+  exampleVaultRemovedLoad, exampleVaultRemovedSave,
+} from '@/storage/cache/registry'
 import { titleToSlug, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { diskPickDirectory } from './fs'
@@ -19,7 +22,7 @@ import type { VaultRef, GitHubVaultRef, IcalVaultRef } from '@/vaultRef'
 import {
   getVaults, setStoreState, setVaultLayer, removeVaultLayer,
   setVaultSync, removeVaultSync, getUnreadableFiles, setUnreadableFiles,
-  loadGlobalPrefs, loadDefaultParticipants, getDefaultVaultId, setDefaultVaultId, hideVaultOnce,
+  loadGlobalPrefs, loadDefaultParticipants, getDefaultVaultId, setDefaultVaultId,
 } from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
 import { mountBackend, unmountBackend } from './backends'
@@ -127,10 +130,33 @@ async function updateVaultRefs(mutate: (current: VaultRef[]) => VaultRef[]): Pro
   const current = await vaultRefsLoad()
   const updated = mutate(current)
   await vaultRefsSave(updated)
-  setStoreState({ vaults: [EXAMPLE_REF, ...updated] })
+  const vaults = (await exampleVaultRemovedLoad()) ? updated : [EXAMPLE_REF, ...updated]
+  setStoreState({ vaults })
   // Favourites and the view filter span every registered vault at once, so the
   // registered set changing is exactly when they must be re-read.
-  loadGlobalPrefs([EXAMPLE_REF.id, ...updated.map(r => r.id)])
+  loadGlobalPrefs(vaults.map(r => r.id))
+}
+
+/**
+ * Unregister the Tutorial vault.
+ *
+ * Separate from the generic `removeVault` path below because the Tutorial
+ * vault is never one of the refs `updateVaultRefs` persists — it is
+ * synthesized, not backed by a credential — so its "removed" state is its own
+ * flag rather than an absence from that list. Idempotent: safe to call
+ * whether or not the vault is currently mounted.
+ */
+async function removeExampleVault(): Promise<void> {
+  unmountBackend(EXAMPLE_REF.id)
+  dropSyncState(EXAMPLE_REF.id)
+  removeVaultLayer(EXAMPLE_REF.id)
+  removeVaultSync(EXAMPLE_REF.id)
+  await exampleVaultRemovedSave(true)
+  const vaults = getVaults().filter(v => v.id !== EXAMPLE_REF.id)
+  setStoreState({ vaults })
+  loadGlobalPrefs(vaults.map(r => r.id))
+  reconcileDefaultVault(vaults)
+  emitVaultChanged({ contentReplaced: true })
 }
 
 // ── DEFAULT VAULT ─────────────────────────────────────────────
@@ -328,10 +354,11 @@ async function registerAndMount(ref: VaultRef, backend: StorageBackend): Promise
     const files = await backend.readAll((loaded, total) => setStoreState({ vaultLoadProgress: { loaded, total } }))
     await applyRemoteBatch(backend.id, files)
     reconcileDefaultVault(getVaults(), ref.id)
-    // The Tutorial vault is synthesized on every load, so without this its
-    // sample entries would sit in a real agenda forever. One-time, so
-    // un-hiding it in the filter sticks — see `hideVaultOnce`.
-    if (wasFirstRealVault) hideVaultOnce(EXAMPLE_REF.id)
+    // Once a real vault is showing the user their own calendar, the
+    // Tutorial's sample entries are noise in that same agenda — remove it by
+    // default, the same as if the user had removed it themselves. A no-op if
+    // it was already removed (e.g. the user removed it earlier this session).
+    if (wasFirstRealVault) await removeExampleVault().catch((e: unknown) => console.warn('[vault] removeExampleVault failed:', e))
     await loadVaultContent(backend)
     emitVaultChanged({ contentReplaced: true })
   } finally {
@@ -369,7 +396,21 @@ async function restoreVaultsInner(): Promise<void> {
     await cacheInit()
 
     const savedRefs = await vaultRefsLoad()
-    const allRefs: VaultRef[] = [EXAMPLE_REF, ...savedRefs]
+    const mountable = savedRefs.filter(isMountableKind)
+
+    // `null` means no decision has ever been recorded — either a fresh
+    // install, or one that predates this flag. An install that predates it
+    // and already has a real vault already dismissed the Tutorial vault under
+    // the old one-time hide-from-the-filter behavior; migrate that into an
+    // explicit removal, once, rather than resurrecting it. A fresh install
+    // (no real vault yet) keeps the Tutorial vault registered.
+    let exampleRemoved = await exampleVaultRemovedLoad()
+    if (exampleRemoved === null) {
+      exampleRemoved = mountable.length > 0
+      await exampleVaultRemovedSave(exampleRemoved)
+    }
+
+    const allRefs: VaultRef[] = exampleRemoved ? savedRefs : [EXAMPLE_REF, ...savedRefs]
     setStoreState({ vaults: allRefs })
     loadGlobalPrefs(allRefs.map(r => r.id))
 
@@ -385,27 +426,15 @@ async function restoreVaultsInner(): Promise<void> {
     // first-open-of-the-day restores hit it), ensurePermission's two round
     // trips, then statAll + readFiles — only *refines* content the user can
     // already see. None of it may gate first paint.
-    const mountable = savedRefs.filter(isMountableKind)
     const prePainted = new Map<string, boolean>()
     for (const ref of mountable) {
       prePainted.set(ref.id, await hydrateFromCache(ref.id))
     }
 
-    // Someone upgrading from a single-vault build already has a real vault and
-    // has never been offered this choice, so their first launch on the layered
-    // store would otherwise drop the tutorial's sample entries into their real
-    // agenda. `registerAndMount` covers the other direction (a first vault
-    // added later in the session); both are one-time, so un-hiding it in the
-    // filter sticks.
-    //
-    // Ahead of the mount below so the filter is already in place when the
-    // layer lands: `hiddenVaultIds` feeds `filterOccs`, and changing it after
-    // the fact rebuilds every agenda section a second time.
-    if (mountable.length > 0) hideVaultOnce(EXAMPLE_REF.id)
-
     // The Tutorial vault is cache-free and cheap (synthesized in memory), so
-    // it is mounted here rather than in either phase's loop.
-    await mountExampleVault()
+    // it is mounted here rather than in either phase's loop — only when it is
+    // still registered; once removed it stays unmounted like any other vault.
+    if (!exampleRemoved) await mountExampleVault()
 
     // ── The paint gate ──────────────────────────────────────────────
     // Released only once *every* cached vault — the Tutorial vault included —
@@ -536,6 +565,26 @@ export async function addLocalVault(): Promise<void> {
   }
 }
 
+/**
+ * Re-register the Tutorial vault after it has been removed. A no-op if it is
+ * already registered.
+ */
+export async function addExampleVault(): Promise<void> {
+  try {
+    await cacheInit()
+    if (!(await exampleVaultRemovedLoad())) return
+    await exampleVaultRemovedSave(false)
+    const vaults = [EXAMPLE_REF, ...getVaults().filter(v => v.id !== EXAMPLE_REF.id)]
+    setStoreState({ vaults })
+    loadGlobalPrefs(vaults.map(r => r.id))
+    await mountExampleVault()
+    emitVaultChanged({ contentReplaced: true })
+  } catch (e) {
+    console.error('[vault] addExampleVault failed:', e)
+    notifyError('Could not add Tutorial vault', e)
+  }
+}
+
 export interface GitHubOAuthVaultConfig {
   owner:        string
   repo:         string
@@ -618,9 +667,18 @@ export async function addIcalVault(feedUrl: string, name: string): Promise<void>
  * be in flight, and `reconcileWithBackend` re-checks `getBackend(vaultId)`
  * before merging — so removing the backend first is what stops a late-landing
  * cycle from resurrecting the layer this is about to drop.
+ *
+ * The Tutorial vault is never in the persisted list this walks — it goes
+ * through `removeExampleVault` instead, which the id check below dispatches
+ * to first.
  */
 export async function removeVault(id: string): Promise<void> {
   try {
+    if (id === EXAMPLE_REF.id) {
+      await removeExampleVault()
+      return
+    }
+
     const existing = await vaultRefsLoad()
     const ref      = existing.find(r => r.id === id)
     if (!ref) return

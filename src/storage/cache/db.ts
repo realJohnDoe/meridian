@@ -23,7 +23,7 @@ export interface DexieFileRow {
  * cache/credentials.ts (handles, tokens) and cache/registry.ts (vault list). */
 interface MetaRecord {
   key:   string
-  value: FileSystemDirectoryHandle | string | number | VaultRef[]
+  value: FileSystemDirectoryHandle | string | number | boolean | VaultRef[]
 }
 
 export class MeridianDB extends Dexie {

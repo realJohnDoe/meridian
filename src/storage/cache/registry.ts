@@ -44,3 +44,19 @@ export async function activeVaultIdLoad(): Promise<string | null> {
   const v = record?.value
   return typeof v === 'string' ? v : null
 }
+
+/**
+ * Whether the Tutorial vault has been removed — `null` when no decision has
+ * ever been recorded (a fresh install, or one that predates this flag).
+ */
+export async function exampleVaultRemovedLoad(): Promise<boolean | null> {
+  const d = await cacheInit()
+  const record = await d.meta.get('exampleVaultRemoved')
+  const v = record?.value
+  return typeof v === 'boolean' ? v : null
+}
+
+export async function exampleVaultRemovedSave(removed: boolean): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.put({ key: 'exampleVaultRemoved', value: removed })
+}

@@ -65,6 +65,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
   // this is purely a target choice — picking one loads nothing and unloads
   // nothing, which is the whole point of splitting `activeVaultId` apart.
   const writableVaults = vaults.filter(v => v.kind !== 'example')
+  const offerTutorial  = !vaults.some(v => v.kind === 'example')
 
   const currentThemeLabel = THEMES.find(t => t.id === activeTheme)?.label ?? 'System'
 
@@ -245,6 +246,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
           <AddVaultWizard
             onClose={() => { setStep('vault'); onOpenChange(false) }}
             onBack={() => setStep('vault')}
+            offerTutorial={offerTutorial}
           />
         )}
       </ResponsiveModalContent>

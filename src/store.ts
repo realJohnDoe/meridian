@@ -261,17 +261,6 @@ interface MeridianStore {
   /** vaultId → hidden participant names in that vault. `NO_PARTICIPANT` = the no-people row. */
   hiddenParticipants: Record<string, string[]>
   loadViewFilter:       () => void
-  /**
-   * Hide a vault, but only the first time it is ever asked for.
-   *
-   * Exists for exactly one case: the Tutorial vault is synthesized into the
-   * list on every load, so once a real vault is registered its sample entries
-   * would otherwise sit in that vault's agenda forever. Hiding it is a
-   * one-time default, not a policy — a user who un-hides it in the filter must
-   * not have it re-hidden on the next launch, which is what the marker key
-   * guarantees.
-   */
-  hideVaultOnce:        (vaultId: string) => void
   toggleVaultHidden:    (vaultId: string) => void
   toggleParticipantHidden: (vaultId: string, name: string) => void
   /** Un-hide every person in one vault (but leaves the vault's own
@@ -492,16 +481,6 @@ export const useStore = create<MeridianStore>((set, get) => {
       hiddenVaultIds: readJSON<string[]>(HIDDEN_VAULTS_KEY, []).filter(v => typeof v === 'string'),
       hiddenParticipants: readJSON<Record<string, string[]>>(HIDDEN_PARTICIPANTS_KEY, {}),
     }),
-    hideVaultOnce: (vaultId: string) => {
-      const marker = `${HIDDEN_VAULTS_KEY}_once_${vaultId}`
-      if (localStorage.getItem(marker) !== null) return
-      try { localStorage.setItem(marker, '1') } catch { /* private mode */ }
-      const { hiddenVaultIds } = get()
-      if (hiddenVaultIds.includes(vaultId)) return
-      const next = [...hiddenVaultIds, vaultId]
-      writeJSON(HIDDEN_VAULTS_KEY, next)
-      set({ hiddenVaultIds: next })
-    },
     toggleVaultHidden: (vaultId: string) => {
       const { hiddenVaultIds } = get()
       const next = hiddenVaultIds.includes(vaultId)

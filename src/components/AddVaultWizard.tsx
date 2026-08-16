@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { HardDrive, GitBranch, CalendarDays } from 'lucide-react'
+import { HardDrive, GitBranch, CalendarDays, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
 import {
-  addLocalVault, addIcalVault, startGitHubSignIn, isFolderPickerSupported,
+  addLocalVault, addIcalVault, addExampleVault, startGitHubSignIn, isFolderPickerSupported,
   previewIcalFeed,
 } from '@/vaultActions'
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/components/primitives/responsive-modal'
 
 type WizardStep = 'source' | 'github' | 'ical'
-type Source = 'local' | 'github' | 'ical'
+type Source = 'local' | 'github' | 'ical' | 'example'
 
 const SOURCE_CARDS: { id: Source; Icon: typeof HardDrive; title: string; desc: string }[] = [
   {
@@ -35,9 +35,18 @@ const SOURCE_CARDS: { id: Source; Icon: typeof HardDrive; title: string; desc: s
   },
 ]
 
+const TUTORIAL_CARD: { id: Source; Icon: typeof HardDrive; title: string; desc: string } = {
+  id:    'example',
+  Icon:  BookOpen,
+  title: 'Tutorial vault',
+  desc:  'Sample notes that show how Meridian works. Safe to remove once you have a vault of your own.',
+}
+
 interface Props {
-  onClose: () => void
-  onBack:  () => void
+  onClose:       () => void
+  onBack:        () => void
+  /** Whether the Tutorial vault is currently removed, so it can be offered as a source again. */
+  offerTutorial: boolean
 }
 
 const localFolderSupported = isFolderPickerSupported()
@@ -51,7 +60,7 @@ interface FeedPreview {
   eventCount: number
 }
 
-export function AddVaultWizard({ onClose, onBack }: Props) {
+export function AddVaultWizard({ onClose, onBack, offerTutorial }: Props) {
   const [step,      setStep]      = useState<WizardStep>('source')
   const [source,    setSource]    = useState<Source>('github')
   const [signingIn, setSigningIn] = useState(false)
@@ -62,6 +71,8 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
   const [feedError, setFeedError] = useState<string | null>(null)
   const [preview,   setPreview]   = useState<FeedPreview | null>(null)
 
+  const sourceCards = offerTutorial ? [...availableSourceCards, TUTORIAL_CARD] : availableSourceCards
+
   async function handleSignIn() {
     setSigningIn(true)
     await startGitHubSignIn() // full-page redirect — component unmounts
@@ -71,6 +82,9 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
     if (source === 'local') {
       onClose()
       await addLocalVault()
+    } else if (source === 'example') {
+      onClose()
+      await addExampleVault()
     } else if (source === 'ical') {
       setStep('ical')
     } else {
@@ -112,7 +126,7 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
         <ResponsiveModalTitle>Add vault</ResponsiveModalTitle>
 
         <div className="flex flex-col gap-3 p-4">
-          {availableSourceCards.map(({ id, Icon, title, desc }) => (
+          {sourceCards.map(({ id, Icon, title, desc }) => (
             <button
               key={id}
               onClick={() => setSource(id)}
@@ -135,7 +149,7 @@ export function AddVaultWizard({ onClose, onBack }: Props) {
         <div className="flex justify-between px-4 pb-4">
           <Button variant="ghost" onClick={onBack}>Back</Button>
           <Button onClick={handleNext}>
-            {source === 'local' ? 'Choose folder' : 'Next'}
+            {source === 'local' ? 'Choose folder' : source === 'example' ? 'Add' : 'Next'}
           </Button>
         </div>
       </>
