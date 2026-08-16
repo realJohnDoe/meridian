@@ -512,3 +512,24 @@ describe('cache/registry — active vault', () => {
     expect(await m.reg.activeVaultIdLoad()).toBeNull()
   })
 })
+
+describe('cache/registry — Tutorial vault removed flag', () => {
+  it('is null when no decision has ever been recorded', async () => {
+    expect(await m.reg.exampleVaultRemovedLoad()).toBeNull()
+  })
+
+  it('round-trips true and false', async () => {
+    await m.reg.exampleVaultRemovedSave(true)
+    expect(await m.reg.exampleVaultRemovedLoad()).toBe(true)
+
+    await m.reg.exampleVaultRemovedSave(false)
+    expect(await m.reg.exampleVaultRemovedLoad()).toBe(false)
+  })
+
+  it('ignores a stored value of the wrong type', async () => {
+    const d = await open()
+    await d.meta.put({ key: 'exampleVaultRemoved', value: 'yes' })
+
+    expect(await m.reg.exampleVaultRemovedLoad()).toBeNull()
+  })
+})
