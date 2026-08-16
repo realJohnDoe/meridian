@@ -152,7 +152,11 @@ export default function ViewFilterButton() {
           {label && <span className="truncate text-sm">{label}</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-2" align="end">
+      {/* pb-0.5 (not p-2's uniform 8px): rows already carry py-2.5/py-3 of
+          their own, so an 8px bottom on top of that left more space under
+          the last row than px-2 leaves to its left. pb-0.5 brings the two
+          back in line for the common (nothing expanded) resting state. */}
+      <PopoverContent className="w-64 px-2 pt-2 pb-0.5" align="end">
         <div className="flex items-center px-1 pb-1">
           <span className="flex-1 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
             {flat ? 'Filter by person' : 'Calendars & people'}
@@ -202,7 +206,12 @@ export default function ViewFilterButton() {
 
             if (!hasPeople) {
               return (
-                <div key={group.vault.id} className="flex items-center px-1 py-2.5">
+                <div key={group.vault.id} className="flex items-center gap-1 px-1 py-2.5">
+                  {/* Empty spacer matching the chevron IconButton's footprint
+                      (p-1.5 padding + a 13px icon = 25px) so this leaf row's
+                      checkbox lines up with expandable rows' checkboxes, even
+                      though it has no disclosure triangle of its own. */}
+                  <span aria-hidden="true" className="inline-block size-[25px] shrink-0" />
                   <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
                     <Checkbox
                       checked={state === 'some' ? 'indeterminate' : state === 'all'}
