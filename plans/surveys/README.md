@@ -85,14 +85,21 @@ in-place, is the exception: that survey keeps its suspects list live in the
 survey file itself rather than a separate results doc — follow whichever
 pattern the survey you're running already uses.
 
-**Suggest improvements to the survey itself.** These survey files are
-themselves living specs, and a real run is evidence about where they're
-unclear, stale, or wrong in a way a cold read never surfaces — an ambiguous
-instruction, a budget item that turned out to be unmeasurable, a category
-boundary that didn't hold, a scoring rule that produced a counterintuitive
-order, a "known suspect" that's now stale. After finishing a run, append a
-**"Suggested improvements to this survey"** section to the results file with
-concrete proposed edits to the survey `.md` file (quote the current text and
-the proposed replacement). Propose, don't silently rewrite the survey file —
-the user decides whether to apply them, the same way findings about the
-product itself are proposed, not auto-applied.
+**Suggest improvements to the survey itself, as a diff on the survey file.**
+These survey files are themselves living specs, and a real run is evidence
+about where they're unclear, stale, or wrong in a way a cold read never
+surfaces — an ambiguous instruction, a budget item that turned out to be
+unmeasurable, a category boundary that didn't hold, a scoring rule that
+produced a counterintuitive order, a "known suspect" that's now stale. After
+finishing a run, edit the survey `.md` file directly with the proposed
+improvements, as its own commit separate from the results file and from any
+fixes to the product itself — that way the suggestion shows up as an
+ordinary reviewable diff in the PR (GitHub's review UI, comments,
+approve/request-changes) instead of prose the user has to re-transcribe by
+hand to apply it. Keep the edit scoped to genuine process learnings, not
+findings that belong in the results file. Still propose rather than
+silently commit past review: open it on the survey's own PR (or as a
+`survey-run/<name>` branch if the results themselves aren't going through a
+PR) so the user reviews and merges it like any other change, and note in the
+results file, in one line, that the survey file was updated and why, so the
+two stay linked.
