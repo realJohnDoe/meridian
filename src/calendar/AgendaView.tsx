@@ -92,7 +92,7 @@ export default function AgendaView({ onOpen }: Props) {
   // than a scroll — a vault's background sync landing, a filter toggle. See
   // the hook for why this corrects the offset rather than re-requesting a
   // scroll target.
-  const { captureAnchor, anchorAt } = useAnchoredAgendaScroll(virtualizer, rows, scrollTarget !== null)
+  const { captureAnchor, anchorAt } = useAnchoredAgendaScroll(scRef, virtualizer, rows, scrollTarget !== null)
 
   const virtualItems = virtualizer.getVirtualItems()
 

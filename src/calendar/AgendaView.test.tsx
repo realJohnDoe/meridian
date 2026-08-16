@@ -321,6 +321,13 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     id: `up-${i}`, date: fmtISO(addDays(today, 1 + i * 2)), time: '14:00', entryKey: testKey('note.md'),
     metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Upcoming ${i}`, tags: [], items: [] },
   }))
+  /** Past-dated events — no `done`, so `occKind` is 'event' and they stay on
+   * their own past days instead of pooling into overdue the way tasks do.
+   * This is the shape an iCal subscription's history has. */
+  const pastEvents = (n: number) => Array.from({ length: n }, (_, i) => makeOcc({
+    id: `past-${i}`, date: fmtISO(addDays(today, -(1 + i * 2))), time: '10:00', entryKey: testKey('note.md'),
+    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Past ${i}`, tags: [], items: [] },
+  }))
 
   // The virtualizer only clears `isScrolling` on a debounce timer
   // (isScrollingResetDelay, 150ms). Left ticking on real timers it never fires
@@ -338,6 +345,46 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     await act(async () => { scrollContainer().scrollTop += px; await Promise.resolve() })
     await settle()
   }
+
+  /** Flush pending microtasks without letting the isScrolling debounce fire. */
+  const flush = async () => {
+    await act(async () => { await Promise.resolve() })
+  }
+
+  // The startup shape, and the one the first fix missed. A vault whose content
+  // needs no network — the synthesized Tutorial vault, or an iCal/GitHub vault
+  // hydrating from Dexie — lands *milliseconds* after the first vault painted,
+  // well inside virtual-core's 150ms isScrollingResetDelay. The mount's own
+  // programmatic scroll is still marked `isScrolling`, so a correction gated on
+  // that flag is skipped, and since nothing rebuilds `rows` again the agenda
+  // stays parked wherever the insertion left it — permanently, not for 150ms.
+  //
+  // Reported as: GitHub vault alone is fine (its sync lands seconds later,
+  // outside the window), GitHub + Tutorial lands half a screen off, and a
+  // dense iCal vault lands about a month early.
+  it('holds the visible day when a second vault lands right after the first paint', async () => {
+    seedStore([todayTask(), ...upcoming()], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await flush()
+
+    const before = calendarView.getState().agendaTopDate
+    expect(before).toBe(fmtISO(today))
+
+    // Past-dated *events*, not tasks — an iCal subscription's back catalogue.
+    // They build real past-day sections above today rather than pooling into
+    // the overdue section, so an uncorrected viewport lands on one of those
+    // past days instead of on today. (Overdue rows all carry todayKey, which
+    // is why a task-shaped fixture cannot tell the two outcomes apart.)
+    //
+    // Deliberately no settle() before this — that is the whole point.
+    await act(async () => {
+      seedStore([todayTask(), ...upcoming(), ...pastEvents(60)], makeRoots('note.md'))
+      await Promise.resolve()
+    })
+    await settle()
+
+    expect(calendarView.getState().agendaTopDate).toBe(before)
+  })
 
   it('holds the visible day when a vault sync lands past-dated content above it', async () => {
     seedStore([todayTask(), ...upcoming()], makeRoots('note.md'))
@@ -385,6 +432,29 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     // fallback (see findAnchorIndex) is what holds the position then.
     expect(calendarView.getState().agendaTopDate).toBe(before)
     expect(scrollContainer().scrollTop).toBeLessThan(offsetBefore)
+  })
+
+  // The guard the isScrolling flag was standing in for, now stated directly:
+  // while a finger is actually down, re-pinning would drag content out from
+  // under the gesture. Programmatic settling (the startup case above) is no
+  // longer caught by it.
+  it('does not re-pin while a finger is down on the list', async () => {
+    seedStore([todayTask(), ...upcoming()], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await settle()
+    await scrollDownBy(400)
+
+    const offsetBefore = scrollContainer().scrollTop
+
+    act(() => { scrollContainer().dispatchEvent(new Event('touchstart')) })
+    await act(async () => {
+      seedStore([todayTask(), ...upcoming(), ...pastEvents(60)], makeRoots('note.md'))
+      await Promise.resolve()
+    })
+    await settle()
+
+    // Untouched: the gesture owns the scroll position until the finger lifts.
+    expect(scrollContainer().scrollTop).toBe(offsetBefore)
   })
 
   it('leaves the position alone when the rebuild moved nothing above the viewport', async () => {

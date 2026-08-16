@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { Virtualizer, VirtualItem } from '@tanstack/react-virtual'
 import { calendarView } from './viewState'
 import { estimateRow, type AgendaRow } from './agendaSections'
@@ -163,11 +163,49 @@ export function findAnchorIndex(rows: AgendaRow[], anchor: ScrollAnchor): number
  * just landed without having to read it back).
  */
 export function useAnchoredAgendaScroll(
+  scrollRef: React.RefObject<HTMLDivElement | null>,
   virtualizer: AgendaVirtualizer,
   rows: AgendaRow[],
   scrollTargetPending: boolean,
 ): { captureAnchor: () => void; anchorAt: (index: number, dateKey: string) => void } {
   const anchorRef = useRef<ScrollAnchor | null>(null)
+
+  // Whether a finger is currently down on the list — the one state in which
+  // re-pinning is the wrong move, because it would drag content out from under
+  // an in-progress gesture.
+  //
+  // Deliberately *not* `virtualizer.isScrolling`, which was the first version
+  // of this guard and the bug behind "GitHub alone is fine, but adding the
+  // Tutorial or an iCal vault lands a month early". That flag is set by any
+  // scroll, including the mount's own programmatic scrollToIndex, and only
+  // clears on a 150ms debounce. A vault that needs no network — the
+  // synthesized Tutorial vault, or one hydrating straight from Dexie — lands
+  // its content well inside that window, so every startup correction was
+  // skipped. Nothing rebuilds `rows` again afterwards, so the miss was
+  // permanent rather than 150ms long. A GitHub vault's sync lands seconds
+  // later, outside the window, which is why that one case looked fine.
+  //
+  // touch rather than pointer events: a touch-scroll fires `pointercancel` the
+  // moment the browser takes the gesture over for scrolling, which would clear
+  // the flag exactly when it is needed. Momentum after `touchend` is left
+  // correctable on purpose — nothing is fighting the user then, and holding
+  // the reading position beats letting content teleport under it.
+  const touchingRef = useRef(false)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const down = () => { touchingRef.current = true }
+    const up = () => { touchingRef.current = false }
+    el.addEventListener('touchstart', down, { passive: true })
+    // On the window, so a finger lifted outside the list still clears.
+    window.addEventListener('touchend', up, { passive: true })
+    window.addEventListener('touchcancel', up, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', down)
+      window.removeEventListener('touchend', up)
+      window.removeEventListener('touchcancel', up)
+    }
+  }, [scrollRef])
 
   const captureAnchor = useCallback(() => {
     const items = virtualizer.getVirtualItems()
@@ -201,11 +239,10 @@ export function useAnchoredAgendaScroll(
     const anchor = anchorRef.current
     if (!anchor) return
 
-    // Mid-gesture, a correction would fight the scroll — and on iOS momentum
-    // it visibly stutters. Re-capture instead, so the anchor stays consistent
-    // with where the user actually is and the *next* rebuild corrects from
-    // there rather than from a stale position.
-    if (virtualizer.isScrolling) { captureAnchor(); return }
+    // A finger is down: re-capture rather than correct, so the anchor tracks
+    // where the user is dragging to and the next rebuild corrects from there
+    // instead of from a position they have already left.
+    if (touchingRef.current) { captureAnchor(); return }
 
     const index = findAnchorIndex(rows, anchor)
     if (index < 0) return
