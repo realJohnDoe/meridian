@@ -134,10 +134,10 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   }
 
   function promote(idx: number, text: string, done: boolean) {
-    const slug = onPromote(text, done)
-    if (!slug) return
+    const fileSlug = onPromote(text, done)
+    if (!fileSlug) return
     const next = [...items]
-    next[idx] = `[[${slug}]]`
+    next[idx] = `[[${fileSlug}]]`
     onChange(next)
   }
 

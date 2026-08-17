@@ -3,8 +3,8 @@ import { setEntityPersistence } from '../persistencePort'
 import { writeEntityToCache, deleteFromBackend } from './sync'
 import { moveEntityInCache } from './moveEntry'
 setEntityPersistence({
-  writeEntity: slug => { void writeEntityToCache(slug) },
-  deleteEntity: slug => { void deleteFromBackend(slug) },
+  writeEntity: key => { void writeEntityToCache(key) },
+  deleteEntity: key => { void deleteFromBackend(key) },
   moveEntity: (fromKey, toKey) => { void moveEntityInCache(fromKey, toKey) },
 })
 

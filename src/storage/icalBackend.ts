@@ -125,7 +125,7 @@ export class IcalBackend implements StorageBackend {
   }
 
   private static path(entry: SynthesizedEntry): string {
-    return `${entry.slug}.md`
+    return `${entry.fileSlug}.md`
   }
 
   /**
