@@ -64,10 +64,15 @@ function parseRetired(text: string): string[] {
 /**
  * Whether `symbol` is *declared* in `source` — a top-level definition, not a
  * mention in a comment or an import. Non-exported declarations count: a
- * glossary entry may legitimately point at a module-private helper.
+ * glossary entry may legitimately point at a module-private helper (or at a
+ * component declared bare and default-exported further down, as AgendaRow is).
+ *
+ * `default` is optional-but-matched because most view components are written
+ * `export default function Foo(` — without it every such component reads as
+ * undeclared.
  */
 function declares(source: string, symbol: string): boolean {
-  const decl = String.raw`^\s*(export\s+)?(async\s+)?(function|const|let|type|interface|class)\s+${symbol}\b`
+  const decl = String.raw`^\s*(export\s+)?(default\s+)?(async\s+)?(function|const|let|type|interface|class)\s+${symbol}\b`
   return new RegExp(decl, 'm').test(source)
 }
 
