@@ -52,6 +52,8 @@ Always use `pnpm run build` (which runs `tsc -b`) to verify the full project bui
 
 `tsc --noEmit` runs in single-file mode and misses unused-import errors and stricter checks that the composite project build (`tsc -b`) enforces. CI runs `pnpm run build`, so failures can show up there even if `--noEmit` is clean.
 
+`worker/` is a separate pnpm workspace package with its own `tsconfig.json` and `vitest.config.ts` — it is **not** covered by the root `tsc -b` project references or the root `vitest` config. Root `pnpm run build` and `pnpm run test` fan out to it explicitly (`pnpm --filter meridian-oauth-worker run typecheck` / `run test`), so both gates cover `worker/` too; don't widen the root `vitest.config.ts` `include` glob or `tsconfig.json` references to reach it instead, since worker tests would then incorrectly inherit the root's `setupFiles` and `@` alias.
+
 ## Linting (generated types must exist first)
 
 The type-aware lint rules (`no-unsafe-*`, etc.) resolve types from **gitignored generated files**. On a fresh worktree these don't exist yet, so `pnpm run lint` reports a flood of spurious "type that cannot be resolved" / "error typed value" errors — the code is fine, the types just haven't been generated. **Don't hand-fix these or add `eslint-disable`s.** Generate the types first:

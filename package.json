@@ -6,9 +6,9 @@
   "packageManager": "pnpm@11.3.0",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && tsc -b --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "build": "vite build && tsc -b --noEmit && tsc -p tsconfig.test.json --noEmit && pnpm --filter meridian-oauth-worker run typecheck",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run && pnpm --filter meridian-oauth-worker run test",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src worker/src --max-warnings=12",
