@@ -37,7 +37,7 @@ export function formatHourBoundary(h: number, hour12: boolean): string {
  * a positioned container that already carries those insets (DayPane's hour-
  * cells container, or a week view's single day column). That's what lets the
  * same geometry serve a 1-column-wide day pane and an N-column-wide week
- * pane without EventBlock itself knowing which one it's in.
+ * pane without TimedBlock itself knowing which one it's in.
  */
 export function blockGeometry(colIndex: number, totalCols: number): { left: string; width: string } {
   const colWidth = `(100% - ${(totalCols - 1) * COL_GAP}px) / ${totalCols}`

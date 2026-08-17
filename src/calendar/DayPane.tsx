@@ -15,7 +15,7 @@ import { useToday } from '@/hooks'
 import { useFilteredOccs } from './useCalendarFilter'
 import { useNow } from './useNow'
 import { computeColumns } from './computeColumns'
-import { EventBlock } from './EventBlock'
+import { TimedBlock } from './TimedBlock'
 import { DayBadge } from './DayBadge'
 import {
   HOURS, HP, GUTTER, RIGHT_PAD, TOP_PAD, BOTTOM_PAD, DEFAULT_CREATE_DURATION,
@@ -272,16 +272,16 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
           })()}
 
           {/* Timed event blocks. Same gutter/right-pad inset as the hour
-              cells above, so EventBlock's column geometry is relative to
+              cells above, so TimedBlock's column geometry is relative to
               this container rather than the whole pane — kept as its own
               sibling (not nested inside the hour-cells div above) so DOM/
               paint order is unchanged from before this container existed.
               pointer-events-none so empty timeline space still click-creates
-              through to the hour-cell button beneath; EventBlock opts itself
+              through to the hour-cell button beneath; TimedBlock opts itself
               back in with pointer-events-auto. */}
           <div className="absolute inset-y-0 pointer-events-none" style={{ left: GUTTER, right: RIGHT_PAD }}>
             {cols.flat().map(({ occ, dh, colIndex, totalCols }) => (
-              <EventBlock
+              <TimedBlock
                 key={occ.id}
                 o={occ}
                 dh={dh}

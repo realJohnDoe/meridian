@@ -16,7 +16,7 @@ import { useFilteredOccs } from './useCalendarFilter'
 import { useNow } from './useNow'
 import { computeColumns } from './computeColumns'
 import { computeMultidayLanes, compactRowLanes } from './computeMultidayLanes'
-import { EventBlock } from './EventBlock'
+import { TimedBlock } from './TimedBlock'
 import { BADGE_CLASS } from './MonthGrid'
 import { weekDays, weekContains, weekNumberFor } from './weekRange'
 import {
@@ -404,7 +404,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
           ))}
 
           {/* Day columns — each one is its own positioning context for its
-              hour cells and event blocks, so EventBlock's column-relative
+              hour cells and event blocks, so TimedBlock's column-relative
               geometry needs no shared gutter-inset wrapper the way DayPane's
               does (there, "columns" are overlapping events within one day;
               here they're the days themselves). */}
@@ -441,7 +441,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
 
                   {/* Timed event blocks for this day */}
                   {cols.flat().map(({ occ, dh, colIndex, totalCols }) => (
-                    <EventBlock
+                    <TimedBlock
                       key={occ.id}
                       o={occ}
                       dh={dh}
