@@ -90,7 +90,7 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 | 3 | Directory & File Layout | **clean** — barrels consistent, `lib/` residents each have 2+ consumers, no co-change/distance mismatch in the 60-day sample |
 | 4 | Security | **clean** — SSRF guards, CSP, CORS, and token storage all reviewed; no XSS/injection surface (see #7 for the dependency-side note) |
 | 5 | Testing & Error Handling | **clean** |
-| 6 | Code Health & DRY | findings: **#5** |
+| 6 | Code Health & DRY | **clean** |
 | 7 | Toolchain & Developer Feedback Loops | findings: **#8** |
 | 8 | Dependencies & Library Fit | findings: **#6**, **#7** |
 | 9 | Styling & UX | **clean** — no bypassed shadcn components, no `onClick` on non-interactive elements, inline styles confined to virtualizer/positioning transforms |
@@ -102,7 +102,6 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 
 | # | Finding | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|
-| 5 | `model/AGENTS.md` names files and functions that no longer exist | 5 | 1 | Haiku 4.5 | 5.0 |
 | 6 | undici pin's own revisit condition has been met | 5 | 2 | Sonnet 5 | 5.0 |
 | 7 | postcss advisory missing from the overrides block | 4 | 1 | Haiku 4.5 | 4.0 |
 | 8 | `.npmrc` comment contradicts its own setting | 2 | 1 | Haiku 4.5 | 2.0 |
@@ -114,41 +113,6 @@ Findings are numbered and listed in `(impact × breadth) ÷ effort` order.
 block — do #6 (jsdom 30 + drop the undici cap) first, then #7 (add postcss) in
 the same file, so the lockfile regenerates once. Everything else is
 independent.
-
----
-
-### #5 — `model/AGENTS.md` names files and functions that no longer exist
-
-- **Category:** `naming` `architecture` `dead-code`
-- **Impact:** 5
-- **Breadth:** 1 file (`src/model/AGENTS.md`, 324 lines, describing the 13-file `model/` module)
-- **Recommended model:** **Haiku 4.5** if the task supplies the specific corrections (the four renames and the two dead paths, listed below); else **Sonnet 5**. A doc edit fails completely silently — nothing type-checks prose — so the tier is set by whether the diff is spelled out rather than by the editing itself.
-- **Evidence:**
-
-  The "Layering rules" table at the end of `AGENTS.md` routes two whole concerns to files that do not exist:
-  ```
-  | Persistence / Dexie cache | `src/meridian.ts` |
-  | React state / store mutations | `src/App.tsx`, `src/store.ts` |
-  ```
-  `test -f` on both: **missing**. Persistence actually lives in `src/storage/cache/`; React state lives in `src/routes/` plus `src/store.ts`.
-
-  The `storeOps.ts` section documents four functions under pre-`EntryKey`-migration names. Verified by grepping `src/model/` for each definition:
-
-  | Documented name | Definitions found | Actual name today |
-  |---|---|---|
-  | `deleteByFileSlug` | 0 | `deleteByEntryKey` |
-  | `fileSlugItems` | 0 | `entryKeyItems` |
-  | `newEntrySlug` | 0 | `newEntryKey` |
-  | `parseYamlToStoreItems` | 0 | removed |
-
-  For example the doc still says:
-  ```
-  - `toggleDone`, `excludeOccurrence`, `deleteByFileSlug`, `deleteFollowing`
-  ```
-  whereas `src/model/index.ts` exports `deleteByEntryKey`. The remaining eight documented functions all check out, so the drift is specifically the `fileSlug` → `EntryKey` rename sweep not reaching this file.
-
-- **Problem:** In a repo where CLAUDE.md and AGENTS.md are the primary onboarding surface for the agents doing the work, `model/`'s architecture doc sends a reader to two nonexistent files and four nonexistent function names, which is worse than no doc because it is confidently wrong.
-- **Fix:** Apply the four renames, replace the two dead paths in the layering table with `src/storage/cache/` and `src/routes/` + `src/store.ts`, and drop the `parseYamlToStoreItems` bullet.
 
 ---
 
