@@ -1,0 +1,258 @@
+# Glossary
+
+Meridian's ubiquitous language: the ~35 terms that carry domain meaning, and
+which word to reach for when two are close enough to confuse.
+
+## How to use (and extend) this file
+
+**This is an index, not an encyclopedia.** Each entry is one sentence of
+orientation plus a pointer to the authoritative definition in code. The
+definition itself lives at the symbol — usually as a doc comment in
+`src/types.ts` or `src/model/AGENTS.md` — and is *not* restated here.
+
+That constraint is load-bearing. `src/glossary.test.ts` asserts every symbol
+named below still resolves, which is only checkable because entries name
+symbols rather than describe behaviour. A rename that misses this file fails
+the test suite. Two rules follow:
+
+- **Never restate behaviour here.** If you want to explain *how* something
+  works, put it beside the code. This file says which term to use and where to
+  look, nothing more.
+- **Pointers name a file and symbols, never line numbers.** Line numbers drift
+  on every edit above them; a symbol name drifts only on rename, which is
+  exactly the event worth catching.
+
+Entry format — the pointer is the last line:
+
+```
+### term
+One sentence of orientation.
+→ `relative/path.ts` · `symbolA`, `symbolB`
+```
+
+---
+
+## Identity
+
+### EntryKey
+An entry's vault-qualified identity, `vaultId::fileSlug`. Branded, so the
+compiler rejects a bare slug passed where one of these belongs.
+→ `fileIO.ts` · `EntryKey`, `entryKey`, `parseEntryKey`
+
+### fileSlug
+The bare, file-level slug — what `[[wikilinks]]` and the URL carry, and the
+second half of an `EntryKey`. Not unique on its own: the same slug in two
+vaults is two distinct entries.
+→ `fileIO.ts` · `keySlug`, `titleToSlug`
+
+### slug (avoid)
+Ambiguous — it has meant both `fileSlug` and `EntryKey` since the EntryKey
+migration. Always write `fileSlug` or `entryKey`; never bare `slug`.
+→ `types.ts` · `FileMetadata`
+
+### path
+A backend-relative file path (`notes/foo.md`). Storage-layer vocabulary only —
+above `storage/` an entry is identified by its `EntryKey`.
+→ `fileIO.ts` · `pathToKey`, `keyToPath`
+
+---
+
+## Vaults and backends
+
+### Vault
+One registered source of entries. Registered *is* mounted: every vault syncs
+and contributes a layer. There is deliberately no "active vault".
+→ `vaultRef.ts` · `VaultRef`, `VaultKind`
+
+### VaultLayer
+One vault's parsed content. `store.items`/`store.roots` are the flattened merge
+of every layer.
+→ `store.ts` · `VaultLayer`, `vaultLayer`
+
+### Roots
+`Map<EntryKey, FileMetadata>` — file-level metadata for every entry, kept beside
+`items` rather than on them.
+→ `types.ts` · `Roots`, `FileMetadata`
+
+### StorageBackend
+The per-vault I/O interface (local FS, GitHub, iCal, example). Four real
+implementations.
+→ `storage/backend.ts` · `StorageBackend`, `RawFile`
+
+### mounted
+A backend present in the registry and syncing. Synonymous with "registered" —
+they are the same state, not two.
+→ `storage/backends.ts` · `mountBackend`, `getBackend`
+
+### hasRemote vs readOnly
+Two different questions. `readOnly` gates whether writes are pushed;
+`hasRemote` gates whether there is anything to poll. The Tutorial vault is
+read-only with no remote; an iCal feed is read-only *with* one.
+→ `storage/backend.ts` · `StorageBackend`
+
+### view-only vs sandbox
+UI access modes, deliberately not called "read-only" so they can never be
+confused with the backend flag above. `sandbox` is the Tutorial vault (full
+edit UI, writes discarded); `view-only` is a subscription (no edit
+affordances).
+→ `hooks/useEntryAccess.ts` · `EntryAccess`, `useEntryAccess`
+
+---
+
+## An entry and its parts
+
+### Entry
+One Markdown file in a vault — the aggregate. Its file-level fields live in
+`FileMetadata`, its schedule in one or more `StoreItem`s.
+→ `types.ts` · `FileMetadata`
+
+### items (disambiguation)
+Two unrelated meanings. `FileMetadata.items` is a **frontmatter checklist**
+(`string[]`). `StoreItem[]` / `store.items` is the **parsed store records**.
+→ `types.ts` · `FileMetadata`, `StoreItem`
+
+### extra
+Frontmatter keys the model has no name for, carried verbatim so a save never
+deletes hand-authored data. Owned per node — by the file root *or* by an item,
+never both.
+→ `types.ts` · `FileMetadata`, `OccurrenceMetadata`
+
+### fileConvention
+The source file's line-ending / trailing-newline convention, captured at parse
+time so a save doesn't rewrite every `\r` because one field changed.
+→ `fileIO.ts` · `FileConvention`
+
+---
+
+## Store records
+
+### StoreItem
+A parsed, unexpanded record: either a `StoreSeries` (recurring) or a
+`StoreOcc` (single). Carries occurrence-level metadata only — no file-level
+fields.
+→ `types.ts` · `StoreItem`, `StoreSeries`, `StoreOcc`
+
+### series
+A recurring rule that generates occurrences. Stored flat, never nested.
+→ `types.ts` · `RepeatPattern`, `isSeries`
+
+### standalone
+A single dated occurrence that is neither a series nor an override child of
+one.
+→ `types.ts` · `isStandaloneOcc`
+
+### override
+A stored child of a series that replaces the generated occurrence on one date.
+Also called an *instance* in YAML (`instances:`) and in `model/AGENTS.md`.
+→ `model/storeOps.ts` · `upsertOverride`, `findSeries`
+
+### exclusion
+An override that suppresses a generated occurrence rather than replacing it.
+Metadata written on it survives.
+→ `model/storeOps.ts` · `excludeOccurrence`
+
+### tracked
+An item whose `done` field is *present* — i.e. a task. A presence check, not
+truthiness: `done: false` is still tracked.
+→ `types.ts` · `isTracked`
+
+---
+
+## Generated values
+
+### Occurrence
+A concrete, dated occurrence produced by expansion, with file-level metadata
+joined in. This is what every view renders.
+→ `types.ts` · `Occurrence`, `OccurrenceEntry`
+
+### AppMetadata
+An expanded occurrence's metadata: occurrence-level fields plus the file-level
+ones joined from `roots`. Raw store items never carry this.
+→ `types.ts` · `AppMetadata`, `OccurrenceMetadata`
+
+### OccState
+The display-styling vocabulary (`task-p1`, `event-past`, `done`, …) — one
+domain word per visual variant, derived from occurrence data.
+→ `occView.ts` · `OccState`, `occState`, `occKind`
+
+---
+
+## Domain operations
+
+### expansion
+Turning stored series and standalones into concrete dated `Occurrence`s within
+a window. Inverse of collapse.
+→ `model/expansion.ts` · `expandRange`, `expandWithMultiday`
+
+### collapse
+Turning store records back into the most compact YAML that round-trips to the
+same state. Inverse of expansion.
+→ `model/collapse.ts` · `collapseToYaml`
+
+### inheritance
+Loading-direction propagation of a `defaults:` block down into children,
+producing a tree where every node carries resolved values. Field-agnostic.
+→ `model/inheritance.ts` · `buildEffectiveTree`, `EffectiveNode`
+
+### hoisting
+The saving-direction inverse of inheritance: lifting fields shared by all items
+back into a `defaults:` block.
+→ `model/collapse.ts` · `computeSharedFields`, `serializeChildren`
+
+### EditScope
+Which occurrences an editor save applies to: `single`, `future`, `all`, or
+`add`.
+→ `types.ts` · `EditScope`, `isEditScope`
+
+### wikilink
+A `[[slug]]` reference. Resolution is **per vault** — files store a bare slug,
+so resolving one needs the linking file's `vaultId`.
+→ `wikilinks.ts` · `resolveWikilink`, `buildResolveIndex`
+
+### backlink
+The reverse index of wikilinks: target `EntryKey` → the keys that link to it.
+Surfaced in the UI as "listed on".
+→ `fileOccurrence.ts` · `buildBacklinkIndex`
+
+---
+
+## Sync and durability
+
+### reconcile
+Comparing a backend's current state against the cache and folding the
+differences into the store.
+→ `storage/sync.ts` · `syncToBackend`, `autoSyncTick`
+
+### dirty
+A cached entry with local edits not yet pushed. Counted per vault for the sync
+indicator.
+→ `storage/cache/files.ts` · `cacheDirtyCount`
+
+### ConflictError
+Raised when a compare-and-swap write loses — the backend's version token no
+longer matches what the writer saw.
+→ `storage/conflictError.ts` · `ConflictError`
+
+### persistence port
+The indirection core edit code calls instead of `@/storage`, so `storeCommit`
+and `occurrenceActions` don't depend on the storage layer. The adapter
+registers the implementation at startup.
+→ `persistencePort.ts` · `EntityPersistence`, `setEntityPersistence`
+
+---
+
+## Retired names
+
+Renamed or removed. Listed so a stale doc, an old commit message, or a
+months-old PR comment can be translated forward. `src/glossary.test.ts`
+asserts none of these have come back.
+
+| Retired | Now |
+|---|---|
+| `fileSlugItems` | `entryKeyItems` |
+| `deleteByFileSlug` | `deleteByEntryKey` |
+| `newEntrySlug` | `newEntryKey` |
+| `parseYamlToStoreItems` | removed — use `parseToStoreItems` |
+| `hoistSharedMetadata` | `computeSharedFields` |
+| `activeVaultId` | `defaultVaultId` (plus the view filter and per-vault sync) |
+| `participantFilter` | `hiddenParticipants` (inverted: hidden, not shown) |
