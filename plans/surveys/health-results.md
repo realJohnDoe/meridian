@@ -406,7 +406,7 @@ latter overlaps #1, so land #1 first. Everything else is independent.
 
 ## Survey file updated
 
-`plans/surveys/health-survey.md` was edited in a separate commit with process
+`plans/surveys/health.md` was edited in a separate commit with process
 improvements from this run — chiefly that the Budget section should require
 running the package manager's **audit** alongside the other gates (the postcss
 finding surfaced only because I ran it at a lower threshold than CI does), that
