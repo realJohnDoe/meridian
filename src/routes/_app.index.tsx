@@ -38,7 +38,7 @@ function AgendaPage() {
   // This used to be `vaultLoading && items.length === 0`, which mounts the
   // agenda the moment any one vault hydrates. With several vaults that is
   // mid-way through restoreVaults' phase-1 loop: the agenda seeds its scroll
-  // position from a partial row list (see useAgendaScrollRestore), and the
+  // position from a partial row list (see computeAgendaScrollRestore), and the
   // remaining vaults then insert rows above the viewport, shifting the day on
   // screen. A lone GitHub vault never showed it because there was no second
   // layer to land.

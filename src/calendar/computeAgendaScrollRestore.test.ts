@@ -4,7 +4,7 @@ import { renderHook } from '@testing-library/react'
 import type { Occurrence } from '@/types'
 import type { AgendaRow } from './agendaSections'
 import { calendarView, resetCalendarViewState } from './viewState'
-import { useAgendaScrollRestore, findAnchorIndex } from './useAgendaScrollRestore'
+import { computeAgendaScrollRestore, findAnchorIndex } from './computeAgendaScrollRestore'
 import { testKey, TEST_VAULT } from '@/test-utils'
 
 function occ(id: string, date: string, opts: { time?: string; done?: boolean } = {}): Occurrence {
@@ -32,7 +32,7 @@ function occ(id: string, date: string, opts: { time?: string; done?: boolean } =
  * the real [today-365, today+90] window always carries dozens of week/month
  * divider rows before any actual content, which would make the offset math
  * below a function of exact calendar arithmetic instead of the row-summing
- * logic this hook actually owns. A week divider, a badged past-day
+ * logic this function actually owns. A week divider, a badged past-day
  * occurrence, then the overdue header (the scroll-to-today target) — so
  * there are exactly two rows above `goToRowIndex`, mirroring the shape a
  * real agenda produces just ahead of Overdue.
@@ -59,12 +59,12 @@ beforeEach(() => {
   resetCalendarViewState()
 })
 
-describe('useAgendaScrollRestore', () => {
+describe('computeAgendaScrollRestore', () => {
   it('seeds the offset at the scroll-to-today target using row estimates', () => {
     const { rows, goToRowIndex } = agenda()
     expect(goToRowIndex).toBe(2)
 
-    const { result } = renderHook(() => useAgendaScrollRestore(true, rows, goToRowIndex))
+    const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex))
 
     // The week divider (36) plus one timed occurrence row (68) above the
     // overdue header. Starting anywhere else means the first painted frame
@@ -81,7 +81,7 @@ describe('useAgendaScrollRestore', () => {
       ],
     })
 
-    const { result } = renderHook(() => useAgendaScrollRestore(true, rows, goToRowIndex))
+    const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex))
 
     expect(result.current.initialOffset).toBe(85)
   })
@@ -94,7 +94,7 @@ describe('useAgendaScrollRestore', () => {
       ],
     })
 
-    const { result } = renderHook(() => useAgendaScrollRestore(true, rows, goToRowIndex))
+    const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex))
 
     expect(result.current.initialOffset).toBe(30 + 68)
   })
@@ -110,7 +110,7 @@ describe('useAgendaScrollRestore', () => {
 
     expect(pending).toBe(true)
 
-    const { result } = renderHook(() => useAgendaScrollRestore(pending, rows, goToRowIndex))
+    const { result } = renderHook(() => computeAgendaScrollRestore(pending, rows, goToRowIndex))
     expect(result.current.initialOffset).toBe(104)
     expect(result.current.initialOffset).not.toBe(calendarView.getState().agendaScrollOffset)
   })
@@ -119,7 +119,7 @@ describe('useAgendaScrollRestore', () => {
     const { rows, goToRowIndex } = agenda()
     calendarView.setState({ agendaScrollOffset: 1234 })
 
-    const { result } = renderHook(() => useAgendaScrollRestore(false, rows, goToRowIndex))
+    const { result } = renderHook(() => computeAgendaScrollRestore(false, rows, goToRowIndex))
 
     expect(result.current.initialOffset).toBe(1234)
   })
@@ -127,8 +127,8 @@ describe('useAgendaScrollRestore', () => {
   it('starts at the top when the target is the first row or missing', () => {
     const { rows } = agenda()
 
-    expect(renderHook(() => useAgendaScrollRestore(true, rows, 0)).result.current.initialOffset).toBe(0)
-    expect(renderHook(() => useAgendaScrollRestore(true, rows, -1)).result.current.initialOffset).toBe(0)
+    expect(renderHook(() => computeAgendaScrollRestore(true, rows, 0)).result.current.initialOffset).toBe(0)
+    expect(renderHook(() => computeAgendaScrollRestore(true, rows, -1)).result.current.initialOffset).toBe(0)
   })
 
   it('always passes the measurement snapshot through, seeded or restored', () => {
@@ -136,8 +136,8 @@ describe('useAgendaScrollRestore', () => {
     const snapshot = [{ index: 0, start: 0, end: 30, size: 30, key: rows[0]!.key, lane: 0 }]
     calendarView.setState({ agendaScrollMeasurements: snapshot })
 
-    expect(renderHook(() => useAgendaScrollRestore(true, rows, goToRowIndex)).result.current.initialMeasurementsCache).toBe(snapshot)
-    expect(renderHook(() => useAgendaScrollRestore(false, rows, goToRowIndex)).result.current.initialMeasurementsCache).toBe(snapshot)
+    expect(renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex)).result.current.initialMeasurementsCache).toBe(snapshot)
+    expect(renderHook(() => computeAgendaScrollRestore(false, rows, goToRowIndex)).result.current.initialMeasurementsCache).toBe(snapshot)
   })
 })
 

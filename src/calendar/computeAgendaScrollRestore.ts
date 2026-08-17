@@ -62,7 +62,7 @@ function offsetOfRow(rows: AgendaRow[], goToRowIndex: number, snapshot: VirtualI
  * corrective scrollToIndex — but it now starts from a few pixels out instead
  * of a year.
  */
-export function useAgendaScrollRestore(scrollToToday: boolean, rows: AgendaRow[], goToRowIndex: number): {
+export function computeAgendaScrollRestore(scrollToToday: boolean, rows: AgendaRow[], goToRowIndex: number): {
   initialOffset: number
   initialMeasurementsCache: VirtualItem[]
 } {
@@ -224,7 +224,7 @@ export function useAnchoredAgendaScroll(
 
   // Seeded with the mount's own rows so the first run is a no-op — there is
   // nothing to correct before anything has changed, and the mount path is
-  // already handled by useAgendaScrollRestore's seeded initialOffset.
+  // already handled by computeAgendaScrollRestore's seeded initialOffset.
   const prevRowsRef = useRef(rows)
 
   useLayoutEffect(() => {

@@ -50,9 +50,9 @@ export function useVirtualFlip(
   rowsKey: unknown,
   isScrolling: boolean,
 ): void {
-  const prevStarts = useRef<Map<string, number>>(new Map())
-  const prevRowsKey = useRef<unknown>(undefined)
-  const anims = useRef<Animation[]>([])
+  const prevStartsRef = useRef<Map<string, number>>(new Map())
+  const prevRowsKeyRef = useRef<unknown>(undefined)
+  const animsRef = useRef<Animation[]>([])
 
   useLayoutEffect(() => {
     const container = containerRef.current
@@ -61,15 +61,15 @@ export function useVirtualFlip(
     const starts = new Map<string, number>()
     for (const vi of virtualItems) starts.set(String(vi.key), vi.start)
 
-    const prev = prevStarts.current
-    const firstRun = prevRowsKey.current === undefined
-    const rowsChanged = !firstRun && prevRowsKey.current !== rowsKey
+    const prev = prevStartsRef.current
+    const firstRun = prevRowsKeyRef.current === undefined
+    const rowsChanged = !firstRun && prevRowsKeyRef.current !== rowsKey
 
     // Recorded unconditionally, including on the renders we don't animate: the
     // next data change has to glide from where the rows actually are now, which
     // includes any pure-measurement shifts that happened in between.
-    prevStarts.current = starts
-    prevRowsKey.current = rowsKey
+    prevStartsRef.current = starts
+    prevRowsKeyRef.current = rowsKey
 
     // A glide is pure polish, and this runs inside a layout effect where an
     // exception takes the whole agenda down with it. Skip rather than throw
@@ -105,12 +105,12 @@ export function useVirtualFlip(
       if (k !== null) els.set(k, el)
     }
 
-    for (const a of anims.current) a.cancel()
-    anims.current = []
+    for (const a of animsRef.current) a.cancel()
+    animsRef.current = []
     for (const { key, delta } of moved) {
       const el = els.get(key)
       if (!el) continue
-      anims.current.push(el.animate(
+      animsRef.current.push(el.animate(
         [{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }],
         { duration: DURATION, easing: EASING },
       ))
@@ -118,7 +118,7 @@ export function useVirtualFlip(
   }, [containerRef, virtualItems, rowsKey, isScrolling])
 
   useLayoutEffect(() => () => {
-    for (const a of anims.current) a.cancel()
-    anims.current = []
+    for (const a of animsRef.current) a.cancel()
+    animsRef.current = []
   }, [])
 }

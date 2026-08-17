@@ -59,10 +59,10 @@ function useFlipTransition(
   attr: string,
   animateHeight: boolean,
 ) {
-  const prevTops   = useRef<Record<string, number> | null>(null)
-  const prevHeight = useRef<number | null>(null)
-  const rowAnims   = useRef<Animation[]>([])
-  const heightAnim = useRef<Animation | null>(null)
+  const prevTopsRef   = useRef<Record<string, number> | null>(null)
+  const prevHeightRef = useRef<number | null>(null)
+  const rowAnimsRef   = useRef<Animation[]>([])
+  const heightAnimRef = useRef<Animation | null>(null)
 
   useLayoutEffect(() => {
     const container = containerRef.current
@@ -79,8 +79,8 @@ function useFlipTransition(
     // clamp never fires and the fold below owns the shrink from start to end.
     // (A fold already in flight holds the box open by itself; see the inline
     // height it parks there.)
-    const heldForRead = animateHeight && !heightAnim.current && prevHeight.current !== null
-    if (heldForRead) container.style.height = `${prevHeight.current}px`
+    const heldForRead = animateHeight && !heightAnimRef.current && prevHeightRef.current !== null
+    if (heldForRead) container.style.height = `${prevHeightRef.current}px`
 
     // Read while the box is still held open, so this is the offset from before
     // the row left rather than a clamped one.
@@ -108,7 +108,7 @@ function useFlipTransition(
     const tops: Record<string, number> = {}
     for (const m of measured) tops[m.key] = m.layout
 
-    const prev        = prevTops.current
+    const prev        = prevTopsRef.current
     const keysChanged = prev === null || !sameKeys(prev, tops)
     const anyMoved    = prev !== null && measured.some(m => {
       const prevTop = prev[m.key]
@@ -123,12 +123,12 @@ function useFlipTransition(
       return
     }
 
-    for (const a of rowAnims.current) a.cancel()
-    rowAnims.current = []
+    for (const a of rowAnimsRef.current) a.cancel()
+    rowAnimsRef.current = []
     for (const { row, key, layout, ty } of measured) {
       const from = prev?.[key] === undefined ? 0 : prev[key] - layout + ty
       if (Math.abs(from) <= 1) continue
-      rowAnims.current.push(row.animate(
+      rowAnimsRef.current.push(row.animate(
         [{ transform: `translateY(${from}px)` }, { transform: 'translateY(0)' }],
         { duration: DURATION, easing: EASING },
       ))
@@ -138,10 +138,10 @@ function useFlipTransition(
       // A running height animation pins the container, so its measured height
       // is the animated value: that's where the fold has to resume from, but
       // the natural target can only be read back once it's cancelled.
-      const running = heightAnim.current
-      const from    = running ? cRect.height : prevHeight.current
+      const running = heightAnimRef.current
+      const from    = running ? cRect.height : prevHeightRef.current
       running?.cancel()
-      heightAnim.current = null
+      heightAnimRef.current = null
       // Drop every hold — this run's pre-read one and any a previous fold
       // parked — so what we measure is the natural height, not one of ours.
       container.style.height = ''
@@ -162,7 +162,7 @@ function useFlipTransition(
           [{ height: `${from}px` }, { height: `${target}px` }],
           { duration: DURATION, easing: EASING },
         )
-        heightAnim.current = anim
+        heightAnimRef.current = anim
 
         // Reading `target` above unheld the box for one layout, which is
         // enough for a bottom-pinned scroller to clamp. Put the offset back
@@ -172,8 +172,8 @@ function useFlipTransition(
 
         void anim.finished.then(
           () => {
-            if (heightAnim.current !== anim) return
-            heightAnim.current = null
+            if (heightAnimRef.current !== anim) return
+            heightAnimRef.current = null
             container.style.overflow = ''
             container.style.height = ''
           },
@@ -182,12 +182,12 @@ function useFlipTransition(
       } else {
         container.style.overflow = ''
       }
-      prevHeight.current = target
+      prevHeightRef.current = target
     } else if (heldForRead) {
       container.style.height = ''
     }
 
-    prevTops.current = tops
+    prevTopsRef.current = tops
   }, [items, containerRef, attr, animateHeight])
 }
 

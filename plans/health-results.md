@@ -91,7 +91,7 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 | 4 | Security | **clean** — SSRF guards, CSP, CORS, and token storage all reviewed; no XSS/injection surface (see #7 for the dependency-side note) |
 | 5 | Testing & Error Handling | findings: **#4** |
 | 6 | Code Health & DRY | findings: **#5** |
-| 7 | Toolchain & Developer Feedback Loops | findings: **#2**, **#4**, **#8** |
+| 7 | Toolchain & Developer Feedback Loops | findings: **#4**, **#8** |
 | 8 | Dependencies & Library Fit | findings: **#6**, **#7** |
 | 9 | Styling & UX | **clean** — no bypassed shadcn components, no `onClick` on non-interactive elements, inline styles confined to virtualizer/positioning transforms |
 | 10 | Performance | findings: **#9** |
@@ -102,7 +102,6 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 
 | # | Finding | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|
-| 2 | `--max-warnings=12` budget is 2/3 permanent noise | 4 | 8 | Sonnet 5 | 16.0 |
 | 4 | Global coverage floor drifted 14 points below actual | 6 | 3 | Sonnet 5 | 9.0 |
 | 5 | `model/AGENTS.md` names files and functions that no longer exist | 5 | 1 | Haiku 4.5 | 5.0 |
 | 6 | undici pin's own revisit condition has been met | 5 | 2 | Sonnet 5 | 5.0 |
@@ -110,41 +109,12 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 | 8 | `.npmrc` comment contradicts its own setting | 2 | 1 | Haiku 4.5 | 2.0 |
 | 9 | 639 KB `public/icon.png` ships as a dead asset | 2 | 1 | Haiku 4.5 | 2.0 |
 
-Findings are numbered and listed in `(impact × breadth) ÷ effort` order. One
-note for re-sorting: #2 ranks second on breadth alone and is the cheapest item
-here to land — sort by raw impact if that is what you care about.
+Findings are numbered and listed in `(impact × breadth) ÷ effort` order.
 
 **Sequencing note:** #6 and #7 both edit `pnpm-workspace.yaml`'s `overrides`
 block — do #6 (jsdom 30 + drop the undici cap) first, then #7 (add postcss) in
 the same file, so the lockfile regenerates once. Everything else is
 independent.
-
----
-
-### #2 — the `--max-warnings=12` budget is two-thirds permanent noise
-
-- **Category:** `toolchain`
-- **Impact:** 4
-- **Breadth:** 8 files (`package.json` plus the 7 warning-source files, from `pnpm exec eslint src worker/src -f json` tallied by rule and file: `calendar/AgendaView.tsx`, `calendar/OccurrenceList.tsx`, `calendar/useAgendaScrollRestore.ts`, `calendar/useVirtualFlip.ts`, `components/FlipList.tsx`, `components/primitives/responsive-modal.tsx`, `search/FileResultsList.tsx`)
-- **Recommended model:** **Sonnet 5** — hazard: the tempting fix is lowering the number, which turns CI red immediately. The correct fix is disabling the two stylistic rules *first*, then lowering the cap to what remains. A wrong-but-plausible change here fails loudly (red CI), which is why this stays below Opus.
-- **Evidence:**
-
-  `package.json`:
-  ```
-      "lint": "eslint src worker/src --max-warnings=12",
-  ```
-  A full `pnpm run lint` run on this commit ends with `✖ 12 problems (0 errors, 12 warnings)` — exactly at the ceiling. The distribution:
-
-  | Rule | Count | Actionable? |
-  |---|---|---|
-  | `@eslint-react/naming-convention-ref-name` | 7 | no — deliberate naming |
-  | `@eslint-react/naming-convention-context-name` | 1 | no — deliberate naming |
-  | `react-hooks/incompatible-library` | 3 | yes — real memoization hazard |
-  | `@eslint-react/no-unnecessary-use-prefix` | 1 | borderline |
-  | **total** | **12** | 8 of 12 permanently unactionable |
-
-- **Problem:** Eight of twelve budget slots are consumed by naming-convention warnings nobody intends to satisfy, so the ratchet that is supposed to gate genuinely meaningful warnings (`react-hooks/incompatible-library`, which flags an API React Compiler cannot memoize safely, and already accounts for 3) has only one slot of headroom left, and the budget number no longer communicates anything about code health.
-- **Fix:** Turn off `@eslint-react/naming-convention-ref-name` and `naming-convention-context-name` in `eslint.config.js` (they are style, and the repo has deliberately chosen otherwise), then lower `--max-warnings` to the remaining count so the budget tracks only actionable signal.
 
 ---
 
