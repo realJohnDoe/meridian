@@ -1,13 +1,12 @@
 # Survey conventions
 
 Shared process, scoring, and reporting rules used by every survey in this
-directory (`health-survey.md`, `health-survey-performance.md`,
-`health-survey-ui.md`, `health-survey-data-integrity.md`,
-`product-niche-survey.md`). Each survey states only what's specific to it —
-its categories, its findings cap, its target invariants/flows/niches — and
-points back here for the rest. `storage-backend-survey.md` is a finished
-research report, not a runnable survey template, so none of this applies to
-it.
+directory (`health.md`, `performance.md`, `health-ui.md`,
+`data-integrity.md`, `product-niche.md`). Each survey states only what's
+specific to it — its categories, its findings cap, its target
+invariants/flows/niches — and points back here for the rest.
+`storage-backend.md` is a finished research report, not a runnable survey
+template, so none of this applies to it.
 
 Read this once before running (or editing) any survey.
 
@@ -74,12 +73,12 @@ long one built on speculation.
 ## Reporting
 
 **Write the findings to a file.** After a run, write its findings to
-`<survey-name>-results.md` in this directory (e.g. `health-survey.md` →
-`health-survey-results.md`) so they survive the session and can be worked
+`<survey-name>-results.md` in this directory (e.g. `health.md` →
+`health-results.md`) so they survive the session and can be worked
 from as a checklist. Once every finding is fixed or explicitly dropped,
 delete the results file in the same commit/PR that closes the last one out —
 see `git log -- plans/` for the established pattern (results docs get added,
-then removed once resolved). `health-survey-data-integrity.md`'s "Known
+then removed once resolved). `data-integrity.md`'s "Known
 suspects" section, which appends a verdict to each suspect's hypothesis
 in-place, is the exception: that survey keeps its suspects list live in the
 survey file itself rather than a separate results doc — follow whichever

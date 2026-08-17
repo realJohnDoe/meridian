@@ -40,7 +40,7 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 ## Known suspects
 
 > **Surveyed 2026-07-31 — verdicts below.** Full report with reproductions:
-> [health-survey-data-integrity-results.md](health-survey-data-integrity-results.md).
+> [data-integrity-results.md](data-integrity-results.md).
 > Each suspect's original hypothesis is kept verbatim, with the verdict appended.
 
 - **The `collapseToYaml` contract is the central claim of the whole model layer.** `src/model/AGENTS.md` describes its output as "the most compact `Record<string, unknown>` that round-trips back to the same store state." Verify that claim adversarially — especially the three hoisting branches (simple, single-series-with-instances, multi-series/container) and the `hoistSharedMetadata` diffing — rather than trusting it.
@@ -69,13 +69,13 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 - **Exercise realistic scale where it matters.** A deterministic large-vault generator exists at `src/storage/devFixtures/testVaultGen.ts` (set `localStorage.setItem('meridian_bigvault', '300')`, then reload the Tutorial vault). Use it for anything where volume changes behaviour — batch writes, partial failure, reconcile over many files. It is dev-only and absent from production builds.
 - **Run the quality gates once** — `pnpm run build`, `pnpm run lint`, `pnpm test` — and report each gate's status in the coverage statement. On a fresh worktree, generate the gitignored types before trusting lint (`pnpm run build` for `src/routeTree.gen.ts`, `pnpm --filter meridian-oauth-worker run cf-typegen` for the worker types); without them the type-aware rules flood with spurious errors that are **not** a finding.
 - **Check coverage where it is cheap:** `pnpm run test:coverage` is already configured. Use it to find integrity-critical branches with no coverage at all — but treat the number as a pointer to look, never as a finding by itself.
-- Skim the rest of the tree so nothing is invisible. UI presentation, styling, and render performance are **out of scope** — they have their own surveys ([health-survey-ui.md](health-survey-ui.md), [health-survey-performance.md](health-survey-performance.md)) — except where a UI affordance causes an integrity failure (e.g. a save path that reports success before the write is durable, or a destructive gesture with no undo).
+- Skim the rest of the tree so nothing is invisible. UI presentation, styling, and render performance are **out of scope** — they have their own surveys ([health-ui.md](health-ui.md), [performance.md](performance.md)) — except where a UI affordance causes an integrity failure (e.g. a save path that reports success before the write is durable, or a destructive gesture with no undo).
 
 ## Output structure
 
 **Reporting:** this survey's results live in-place in the "Known suspects"
 section above (verdicts appended per suspect) plus
-`health-survey-data-integrity-results.md` for the full report — see that
+`data-integrity-results.md` for the full report — see that
 section for the existing pattern. Also append suggested improvements to this
 survey file itself, per the [shared reporting conventions](./README.md#reporting).
 
