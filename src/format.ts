@@ -1,5 +1,5 @@
-import { addDays, addWeeks, addMonths, addYears, addMinutes, getDate, isSameDay, differenceInDays, differenceInMinutes } from 'date-fns'
-import { parseDateString, parseDateTime, fmtISO, parseDuration, formatHHMM } from '@/model'
+import { addDays, addWeeks, addMonths, addYears, addMinutes, getDate, isSameDay, differenceInDays, differenceInMinutes, differenceInCalendarMonths, differenceInCalendarYears } from 'date-fns'
+import { parseDateString, parseDateTime, fmtISO, parseDuration, serialiseDuration, formatHHMM } from '@/model'
 import type { Scheduled } from '@/types'
 
 export { addDays, isSameDay as sameDay }
@@ -88,15 +88,34 @@ export function durationToEndDateTime(startDateStr: string, startTimeStr: string
   }
 }
 
+// Tries calendar-unit candidates against durationToEndDate (the inverse this must
+// match) rather than dividing the day count, since months/years aren't fixed-length
+// and durationToEndDate's inclusiveCalendarEnd clamp (e.g. Jan 31 + 1 month -> Feb 28)
+// has no consistent day-count inverse. The clamp's trailing -1 day can shift the
+// inclusive end date's calendar month/year back by one relative to `start`, so the
+// raw calendar diff is off by 0 or 1 depending on whether the clamp fired — try both.
+function tryCalendarUnit(startStr: string, endDateStr: string, n: number, unit: 'years' | 'months'): string | null {
+  if (n <= 0) return null
+  const candidate = serialiseDuration(n, unit)
+  return durationToEndDate(startStr, candidate) === endDateStr ? candidate : null
+}
+
 export function endDateToDuration(startStr: string, endDateStr: string): string | null {
   const start = parseDateString(startStr) ?? new Date()
   const end   = parseDateString(endDateStr) ?? new Date()
   const days  = differenceInDays(end, start) + 1  // end date is inclusive
   if (days <= 0) return null
-  if (days % 365 === 0) { const y = days / 365; return pluralize(y, 'year') }
-  if (days % 30  === 0) { const m = days / 30;  return pluralize(m, 'month') }
-  if (days % 7   === 0) { const w = days / 7;   return pluralize(w, 'week') }
-  return pluralize(days, 'day')
+
+  const years = differenceInCalendarYears(end, start)
+  const yearMatch = tryCalendarUnit(startStr, endDateStr, years, 'years') ?? tryCalendarUnit(startStr, endDateStr, years + 1, 'years')
+  if (yearMatch) return yearMatch
+
+  const months = differenceInCalendarMonths(end, start)
+  const monthMatch = tryCalendarUnit(startStr, endDateStr, months, 'months') ?? tryCalendarUnit(startStr, endDateStr, months + 1, 'months')
+  if (monthMatch) return monthMatch
+
+  if (days % 7 === 0) return serialiseDuration(days / 7, 'weeks')
+  return serialiseDuration(days, 'days')
 }
 
 export function endDateTimeToDuration(startDateStr: string, startTimeStr: string, endDateStr: string, endTimeStr: string): string | null {

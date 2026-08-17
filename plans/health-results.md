@@ -13,9 +13,7 @@ XSS or injection surface. The weakest area is not a source directory at all
 but the **worker/ package's position in the toolchain**: the app's most
 security-sensitive code (the GitHub client secret, the SSRF-guarded calendar
 proxy) sits outside both `pnpm run build` and `pnpm run test`, so 39 of its
-tests only ever execute in a separate CI job. The second weakest is
-**`format.ts`'s duration inverse**, which hand-rolls modulo arithmetic beside
-the calendar-correct `date-fns` math its own forward function uses.
+tests only ever execute in a separate CI job.
 
 The single biggest structural theme is **enforcement asymmetry, not
 over- or under-engineering**: everything expressed as a lint rule or a CI step
@@ -91,10 +89,10 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 | 2 | Simplicity & Overengineering | **clean** — every port, optional prop, and config knob checked for a second real caller; all passed |
 | 3 | Directory & File Layout | **clean** — barrels consistent, `lib/` residents each have 2+ consumers, no co-change/distance mismatch in the 60-day sample |
 | 4 | Security | **clean** — SSRF guards, CSP, CORS, and token storage all reviewed; no XSS/injection surface (see #7 for the dependency-side note) |
-| 5 | Testing & Error Handling | findings: **#3**, **#4** |
-| 6 | Code Health & DRY | findings: **#3**, **#5** |
+| 5 | Testing & Error Handling | findings: **#4** |
+| 6 | Code Health & DRY | findings: **#5** |
 | 7 | Toolchain & Developer Feedback Loops | findings: **#2**, **#4**, **#8** |
-| 8 | Dependencies & Library Fit | findings: **#3**, **#6**, **#7** |
+| 8 | Dependencies & Library Fit | findings: **#6**, **#7** |
 | 9 | Styling & UX | **clean** — no bypassed shadcn components, no `onClick` on non-interactive elements, inline styles confined to virtualizer/positioning transforms |
 | 10 | Performance | findings: **#9** |
 
@@ -105,7 +103,6 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 | # | Finding | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|
 | 2 | `--max-warnings=12` budget is 2/3 permanent noise | 4 | 8 | Sonnet 5 | 16.0 |
-| 3 | `endDateToDuration` inverts calendar units with 365/30 modulo | 6 | 3 | Sonnet 5 | 9.0 |
 | 4 | Global coverage floor drifted 14 points below actual | 6 | 3 | Sonnet 5 | 9.0 |
 | 5 | `model/AGENTS.md` names files and functions that no longer exist | 5 | 1 | Haiku 4.5 | 5.0 |
 | 6 | undici pin's own revisit condition has been met | 5 | 2 | Sonnet 5 | 5.0 |
@@ -113,10 +110,9 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 | 8 | `.npmrc` comment contradicts its own setting | 2 | 1 | Haiku 4.5 | 2.0 |
 | 9 | 639 KB `public/icon.png` ships as a dead asset | 2 | 1 | Haiku 4.5 | 2.0 |
 
-Findings are numbered and listed in `(impact × breadth) ÷ effort` order. Two
-notes for re-sorting: #2 ranks second on breadth alone and is the cheapest
-item here to land, while #3 is the only finding that is a **user-visible
-correctness bug** — sort by raw impact if that is what you care about.
+Findings are numbered and listed in `(impact × breadth) ÷ effort` order. One
+note for re-sorting: #2 ranks second on breadth alone and is the cheapest item
+here to land — sort by raw impact if that is what you care about.
 
 **Sequencing note:** #6 and #7 both edit `pnpm-workspace.yaml`'s `overrides`
 block — do #6 (jsdom 30 + drop the undici cap) first, then #7 (add postcss) in
@@ -149,46 +145,6 @@ independent.
 
 - **Problem:** Eight of twelve budget slots are consumed by naming-convention warnings nobody intends to satisfy, so the ratchet that is supposed to gate genuinely meaningful warnings (`react-hooks/incompatible-library`, which flags an API React Compiler cannot memoize safely, and already accounts for 3) has only one slot of headroom left, and the budget number no longer communicates anything about code health.
 - **Fix:** Turn off `@eslint-react/naming-convention-ref-name` and `naming-convention-context-name` in `eslint.config.js` (they are style, and the repo has deliberately chosen otherwise), then lower `--max-warnings` to the remaining count so the budget tracks only actionable signal.
-
----
-
-### #3 — `endDateToDuration` inverts calendar durations with fixed 365/30-day modulo
-
-- **Category:** `dry` `library-fit` `testing`
-- **Impact:** 6
-- **Breadth:** 3 files (`grep -rn "endDateToDuration" src` → `src/format.ts`, `src/editor/dialogs/DurationDialog.tsx` (3 call sites), and `src/format.test.ts` which never mentions it)
-- **Recommended model:** **Sonnet 5** if the task states that the inverse must mirror `durationToEndDate` — i.e. re-derive the candidate end date with `addMonths`/`addYears` + the existing `inclusiveCalendarEnd` clamp and compare, rather than dividing a day count; else **Opus 5**. This is the archetypal silent failure: a plausible fix reaching for `differenceInCalendarMonths` alone still mishandles the Jan-31 → Feb-28 clamp that `durationToEndDate` deliberately implements, and no test would catch it.
-- **Evidence:**
-
-  `src/format.ts:91-100` — the inverse hand-rolls modulo arithmetic:
-  ```ts
-  export function endDateToDuration(startStr: string, endDateStr: string): string | null {
-    const start = parseDateString(startStr) ?? new Date()
-    const end   = parseDateString(endDateStr) ?? new Date()
-    const days  = differenceInDays(end, start) + 1  // end date is inclusive
-    if (days <= 0) return null
-    if (days % 365 === 0) { const y = days / 365; return pluralize(y, 'year') }
-    if (days % 30  === 0) { const m = days / 30;  return pluralize(m, 'month') }
-    if (days % 7   === 0) { const w = days / 7;   return pluralize(w, 'week') }
-    return pluralize(days, 'day')
-  }
-  ```
-  while the forward direction in the same file uses calendar-correct `date-fns`:
-  ```ts
-    if (p.unit === 'months')  return fmtISO(inclusiveCalendarEnd(start, addMonths(start, p.n)))
-  ```
-  Measured by round-tripping both functions in a temporary vitest file (since removed) — **5 of 9 cases break**:
-  ```
-  BAD 2026-01-31 + "1 month"  -> 2026-02-28 -> "29 days"
-  BAD 2026-02-01 + "1 month"  -> 2026-02-28 -> "4 weeks"
-  BAD 2024-01-01 + "1 year"   -> 2024-12-31 -> "366 days"    (leap year)
-  BAD 2026-06-01 + "3 months" -> 2026-08-31 -> "92 days"
-  BAD 2026-06-01 + "2 years"  -> 2028-05-31 -> "731 days"
-  ```
-  `src/format.test.ts` tests `durationToEndDate` across seven cases including the Jan-31 clamp, but contains **zero** references to `endDateToDuration`.
-
-- **Problem:** `DurationDialog`'s end-date picker silently rewrites a user's "3 months" as "92 days" on the next open, because the only calendar-aware duration inverse in the codebase assumes every month is 30 days and every year 365 — the exact assumption its own forward counterpart was written with `date-fns` to avoid.
-- **Fix:** Re-implement `endDateToDuration` to try candidate calendar units against `durationToEndDate` (or `differenceInCalendarMonths`/`Years` plus the `inclusiveCalendarEnd` clamp) and return the first that reproduces the given end date, and add the round-trip cases above to `format.test.ts`.
 
 ---
 
