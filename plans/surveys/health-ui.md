@@ -20,13 +20,14 @@ Start by identifying which directories constitute the UI layer and state that li
 - **Scan first, write second.** State your scan plan before you start, complete the full scan, and only then write the report. In the scan plan, for each category, state what you'll look for beyond the listed examples — the bullets are illustrations, not your search space. Do not draft the verdict early and select findings to confirm it.
 - Evaluate the code on its merits. Treat claims in CLAUDE.md, READMEs, or architecture docs (e.g. "this exception is deliberate") as hypotheses to verify against the code, not as settled exceptions — if a documented rationale no longer holds, that is a finding.
 - **Verify capability claims by inspection, not memory.** For toolchain findings, check the _installed_ version of a plugin/library (its actual rule set, exports, or API) against what the config enables — do not assume from the version number. Where cheap, verify by dry-run: e.g. run the linter with a candidate preset via a temporary config and report the real finding count and distribution (clean up temp files afterwards). The same applies to component libraries: check what the installed shadcn/radix components actually ship before claiming a custom implementation duplicates one.
+- **This extends to build-time tooling, not just linters.** Compilers and transforms (React Compiler/`babel-plugin-react-compiler`, SWC/Babel plugins, CSS transforms) make claims a lint run never checks. Where a source comment asserts build-time behaviour ("this shape makes the compiler bail out", "this is memoized"), reproduce it: run the repo's own preset over a two-case fixture and diff the output. This is often the highest-yield check in the whole survey, because a build-time regression is invisible to build, lint, and tests alike.
 
 ## Budget
 
 - Skim the full directory tree once so nothing is invisible, then confine close reading to the UI layer.
 - Read closely: the app shell / root layout, the most-imported components and hooks (measure this — don't guess), the 15 largest component files, every file in the shared-components directory, and at least 2–3 representative components from every feature directory that renders UI.
 - **Read the UI toolchain, not just the source:** Tailwind config, global CSS / theme tokens, the shadcn component inventory (`components/ui/` or equivalent) and its divergence from upstream, lint config for React/JSX/a11y/Tailwind rules, and the component-test setup (or its absence). From `package.json`, inventory the **UI-related** dependencies (React ecosystem, radix/shadcn, styling, icons, animation, forms, a11y) and know where each is used — this feeds the Library Fit category.
-- **Run the existing quality gates once** — build, lint, and test — and report each gate's pass/fail status in the coverage statement. Before trusting lint output on a fresh worktree, generate the gitignored types it depends on (`pnpm run build` regenerates `src/routeTree.gen.ts`; `pnpm --filter meridian-oauth-worker run cf-typegen` regenerates the worker types) — without them the type-aware rules flood with ~150 spurious errors that are **not** a finding.
+- **Run the existing quality gates once** — build, lint, and test — and report each gate's pass/fail status in the coverage statement. On a fresh worktree, install dependencies first (`pnpm install`) — a missing `node_modules` makes every gate fail for a reason that is not a finding, and reads exactly like a broken toolchain. Before trusting lint output, generate the gitignored types it depends on (`pnpm run build` regenerates `src/routeTree.gen.ts`; `pnpm --filter meridian-oauth-worker run cf-typegen` regenerates the worker types) — without them the type-aware rules flood with ~150 spurious errors that are **not** a finding.
 - **Sample git history for co-change patterns** among components, hooks, and style files (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
 - Sample the rest of the UI. Do not skip a UI directory entirely without recording it in the coverage statement. Non-UI directories may be skipped wholesale — record them as "out of scope" rather than "skipped."
 
@@ -50,6 +51,10 @@ A plain-language summary of the UI layer's overall health. Name the **worst one 
 One line per category (1–8). Verdicts follow the
 [shared convention](./README.md#category-verdicts): **clean** /
 **findings: #N, #M** / **partially assessed**.
+
+Category 8's **keep-custom verdicts** ("this custom UI is right, and here's
+why") belong here, under that category's line — they are conclusions, not
+defects, and must not consume a slot in the top-N findings list below.
 
 ### 4. Findings
 
@@ -112,6 +117,7 @@ Examples (not exhaustive):
 
 - Missing loading/empty/error states on primary flows; actions with no pending or failure feedback (silent failures after a rejected promise)
 - Non-accessible interactive elements — clickable `div`s, missing keyboard handling, focus not managed in dialogs/menus, missing labels/ARIA on icon-only buttons
+- **Custom components that render a bare element** — an `onClick` on `<Badge>`, `<Card>`, or any wrapper that returns a plain `span`/`div`. Grepping for `<div onClick>` misses these entirely and so does `jsx-a11y`, which cannot see through the component indirection unless told to via `settings['jsx-a11y'].components`. Resolve each shared wrapper to the element it actually returns, then re-check every `onClick` on it — a codebase with zero raw clickable `div`s can still route all of its interactions through one
 - Mobile/responsive gaps — layouts that break at phone widths, touch targets below ~44px, hover-only affordances with no touch equivalent, safe-area (notch) regressions, a desktop dialog where the drawer pattern (`vaul`) is used elsewhere for the same kind of interaction
 - Destructive actions without confirmation or undo
 - Focus/scroll position lost across navigation or list updates
