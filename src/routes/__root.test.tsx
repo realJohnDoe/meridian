@@ -140,29 +140,19 @@ describe('__root — going away', () => {
 })
 
 describe('__root — theme-color sync', () => {
-  function withThemeColorMeta(initial = '#000000') {
-    const meta = document.createElement('meta')
-    meta.setAttribute('name', 'theme-color')
-    meta.setAttribute('content', initial)
-    document.head.appendChild(meta)
-    return meta
-  }
-
-  // The real theme tokens, and the sRGB each resolves to — --backdrop is the
-  // near-black that reading the wrong variable used to put in the status bar.
-  const BACKDROP_DARK = 'oklch(0.13 0.04 252)'   // -> #000717
-  const BACKGROUND_DARK = 'oklch(0.18 0.05 252)' // -> #011227
+  const BACKGROUND_DARK = 'oklch(0.18 0.05 252)'  // -> #011227
+  const BACKGROUND_LIGHT = 'oklch(0.945 0.010 252)' // -> #e8edf4
   const PALETTE: Record<string, [number, number, number]> = {
-    '#ff00ff':          [255, 0, 255],   // toHex's parse probe
-    [BACKDROP_DARK]:    [0, 7, 23],
-    [BACKGROUND_DARK]:  [1, 18, 39],
+    '#ff00ff':           [255, 0, 255],   // toHex's parse probe
+    [BACKGROUND_DARK]:   [1, 18, 39],
+    [BACKGROUND_LIGHT]:  [232, 237, 244],
   }
 
   /**
-   * jsdom ships no canvas, so toHex()'s 1x1 readback needs a stand-in. This
-   * models the two behaviours the normalizer leans on: an unparseable
-   * fillStyle is silently ignored (the previous value survives), and the
-   * filled pixel reads back as 8-bit sRGB.
+   * jsdom ships no canvas, so toHex()'s 1x1 readback needs a stand-in. Models
+   * the two behaviours it leans on: an unparseable fillStyle is silently
+   * ignored (the previous value survives), and the filled pixel reads back as
+   * 8-bit sRGB.
    */
   function stubCanvas() {
     let fill = '#000000'
@@ -176,103 +166,146 @@ describe('__root — theme-color sync', () => {
       .mockReturnValue(ctx as unknown as CanvasRenderingContext2D)
   }
 
+  /** The static fallback tags index.html ships, in their shipped order. */
+  function withStaticTags() {
+    const specs = [
+      { content: '#011227', media: '(prefers-color-scheme: dark)' },
+      { content: '#e8edf4', media: '(prefers-color-scheme: light)' },
+      { content: '#011227', media: null },
+    ]
+    return specs.map(({ content, media }) => {
+      const meta = document.createElement('meta')
+      meta.setAttribute('name', 'theme-color')
+      meta.setAttribute('content', content)
+      if (media) meta.setAttribute('media', media)
+      document.head.appendChild(meta)
+      return meta
+    })
+  }
+
+  const allTags = () => [...document.querySelectorAll('meta[name="theme-color"]')]
+  const syncedTag = () => document.querySelector('meta[name="theme-color"][data-theme-synced]')
+
   let canvasSpy: ReturnType<typeof stubCanvas>
   beforeEach(() => { canvasSpy = stubCanvas() })
   afterEach(() => {
     canvasSpy.mockRestore()
-    document.querySelector('meta[name="theme-color"]')?.remove()
+    allTags().forEach(m => { m.remove() })
     document.documentElement.style.removeProperty('--background')
-    document.documentElement.style.backgroundColor = ''
   })
 
-  // Android colours the status bar from this meta tag, not from the page
-  // background, so it has to track the active theme or it stays on the static
-  // default from index.html.
-  it('writes the active theme --background into the theme-color meta tag', () => {
-    const meta = withThemeColorMeta()
+  it('writes the active theme --background into a theme-color tag', () => {
+    withStaticTags()
     document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
     render(<Root />)
 
     act(() => { vi.advanceTimersByTime(32) })
 
-    expect(meta.getAttribute('content')).toBe('#011227')
+    expect(syncedTag()?.getAttribute('content')).toBe('#011227')
   })
 
-  // The regression this file exists for. html paints --backdrop, the letterbox
-  // behind the 430px app column that a phone never shows; the topbar under the
-  // status bar is --background. Sourcing the status bar from html's own
-  // background painted it near-black (#000717) against a #011227 topbar.
-  it('reads --background rather than the html element background', () => {
-    const meta = withThemeColorMeta()
-    document.documentElement.style.backgroundColor = BACKDROP_DARK
-    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+  // The invariant the whole approach rests on. The UA returns the FIRST
+  // theme-color element in tree order whose media matches, so a synced tag
+  // appended after the static ones would never be consulted whenever a
+  // prefers-color-scheme query matches — i.e. precisely when the chosen theme
+  // disagrees with the system appearance, the case this exists to handle.
+  it('inserts its tag ahead of the static fallbacks in tree order', () => {
+    const statics = withStaticTags()
+    document.documentElement.style.setProperty('--background', BACKGROUND_LIGHT)
     render(<Root />)
 
     act(() => { vi.advanceTimersByTime(32) })
 
-    expect(meta.getAttribute('content')).toBe('#011227')
-    expect(meta.getAttribute('content')).not.toBe('#000717')
+    const tags = allTags()
+    expect(tags[0]).toBe(syncedTag())
+    expect(tags.slice(1)).toEqual(statics)
+    // and it must not carry a media attribute, or it could fail to match
+    expect(syncedTag()?.hasAttribute('media')).toBe(false)
   })
 
-  // getComputedStyle round-trips oklch() rather than downgrading it to rgb(),
-  // and <meta name="theme-color"> cannot parse oklch() — so the write must go
-  // through the canvas normalizer, never the raw token.
-  it('normalizes the oklch() token to hex instead of writing it raw', () => {
-    const meta = withThemeColorMeta()
+  // The tag outlives any one mount, so a later run has to find and update it
+  // rather than append a second — two synced tags would leave the stale one
+  // first in tree order, and the UA would keep returning that.
+  it('reuses its own tag on a later run instead of stacking up new ones', () => {
+    withStaticTags()
     document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
-    render(<Root />)
+    const { unmount } = render(<Root />)
+    act(() => { vi.advanceTimersByTime(32) })
+    const first = syncedTag()
+    unmount()
 
+    document.documentElement.style.setProperty('--background', BACKGROUND_LIGHT)
+    render(<Root />)
     act(() => { vi.advanceTimersByTime(32) })
 
-    expect(meta.getAttribute('content')).not.toContain('oklch')
-    expect(meta.getAttribute('content')).toMatch(/^#[0-9a-f]{6}$/)
+    expect(document.querySelectorAll('meta[name="theme-color"][data-theme-synced]')).toHaveLength(1)
+    expect(syncedTag()).toBe(first)
+    expect(syncedTag()?.getAttribute('content')).toBe('#e8edf4')
   })
 
-  // Canvas ignores an unparseable fillStyle instead of throwing, leaving the
-  // default #000000 behind — writing that through would reintroduce the black
-  // bar. An unreadable colour must leave the existing meta value alone.
-  it('leaves the meta tag untouched when the colour does not parse', () => {
-    const meta = withThemeColorMeta('#011227')
+  // The static tags are the fallback layer; a colour we cannot resolve must
+  // leave them in charge rather than publish an accidental black.
+  it('creates no tag at all when the colour does not parse', () => {
+    const statics = withStaticTags()
     document.documentElement.style.setProperty('--background', 'not-a-color')
     render(<Root />)
 
     act(() => { vi.advanceTimersByTime(32) })
 
-    expect(meta.getAttribute('content')).toBe('#011227')
+    expect(syncedTag()).toBeNull()
+    expect(allTags()).toEqual(statics)
   })
 
-  // next-themes applies the theme class in its own effect on ThemeProvider,
-  // which commits *after* this child effect. Reading the computed style
-  // synchronously would therefore always see the previous theme — hence the
-  // deferral to the next frame.
-  it('defers the read to the next frame rather than reading during the effect', () => {
-    const meta = withThemeColorMeta('#000000')
+  // getComputedStyle round-trips oklch() rather than downgrading it to rgb().
+  // oklch() is a valid CSS <color> and so spec-legal in `content`, but hex is
+  // what every engine can actually read.
+  it('normalizes the oklch() token to hex rather than writing it raw', () => {
+    withStaticTags()
     document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
     render(<Root />)
 
-    expect(meta.getAttribute('content')).toBe('#000000')
+    act(() => { vi.advanceTimersByTime(32) })
+
+    const content = syncedTag()?.getAttribute('content')
+    expect(content).not.toContain('oklch')
+    expect(content).toMatch(/^#[0-9a-f]{6}$/)
+  })
+
+  // next-themes applies the theme class in its own effect on ThemeProvider,
+  // which commits *after* this child effect, so a synchronous read would see
+  // the previous theme.
+  it('defers the read to the next frame rather than reading during the effect', () => {
+    withStaticTags()
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+    render(<Root />)
+
+    expect(syncedTag()).toBeNull()
 
     act(() => { vi.advanceTimersByTime(32) })
 
-    expect(meta.getAttribute('content')).toBe('#011227')
+    expect(syncedTag()?.getAttribute('content')).toBe('#011227')
   })
 
   it('cancels the pending frame on unmount instead of writing after teardown', () => {
-    const meta = withThemeColorMeta('#000000')
+    withStaticTags()
     document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
     const { unmount } = render(<Root />)
 
     unmount()
     act(() => { vi.advanceTimersByTime(32) })
 
-    expect(meta.getAttribute('content')).toBe('#000000')
+    expect(syncedTag()).toBeNull()
   })
 
-  it('does not throw when the page has no theme-color meta tag', () => {
-    expect(() => {
-      render(<Root />)
-      act(() => { vi.advanceTimersByTime(32) })
-    }).not.toThrow()
+  // The tag is created on demand, so a page shipping none of the static ones
+  // still gets a synced one rather than throwing.
+  it('still works on a page with no static theme-color tags', () => {
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+    render(<Root />)
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(syncedTag()?.getAttribute('content')).toBe('#011227')
   })
 })
 
