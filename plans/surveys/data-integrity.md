@@ -40,7 +40,7 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 ## Known suspects
 
 > **Surveyed 2026-07-31 — verdicts below.** Full report with reproductions:
-> [data-integrity-results.md](data-integrity-results.md).
+> [data-integrity-results.md](../data-integrity-results.md).
 > Each suspect's original hypothesis is kept verbatim, with the verdict appended.
 
 - **The `collapseToYaml` contract is the central claim of the whole model layer.** `src/model/AGENTS.md` describes its output as "the most compact `Record<string, unknown>` that round-trips back to the same store state." Verify that claim adversarially — especially the three hoisting branches (simple, single-series-with-instances, multi-series/container) and the `hoistSharedMetadata` diffing — rather than trusting it.
@@ -74,10 +74,10 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 ## Output structure
 
 **Reporting:** this survey's results live in-place in the "Known suspects"
-section above (verdicts appended per suspect) plus
-`data-integrity-results.md` for the full report — see that
-section for the existing pattern. Also append suggested improvements to this
-survey file itself, per the [shared reporting conventions](./README.md#reporting).
+section above (verdicts appended per suspect), plus the full report per the
+[shared reporting conventions](./README.md#reporting) — see that section for
+the existing pattern. Also append suggested improvements to this survey file
+itself, per the same conventions.
 
 ### 1. Integrity verdict (~5 sentences)
 
