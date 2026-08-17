@@ -31,7 +31,15 @@ interface IconButtonProps extends React.ComponentProps<'button'> {
   variant?: 'plain' | 'ghost'
 }
 
-function IconButton({ label, hit = 'expand', variant = 'plain', className, type, children, ...props }: IconButtonProps) {
+// `hit`/`variant`/etc. take their defaults via `??` in the body rather than
+// as destructured-parameter defaults: that shape (an AssignmentPattern
+// inside a destructured parameter) makes babel-plugin-react-compiler bail
+// out of optimizing this whole component, silently — no build or lint
+// error, just no memoization. See OccurrenceCard.tsx for the full rationale.
+function IconButton(props: IconButtonProps) {
+  const { label, hit: hitProp, variant: variantProp, className, type, children, ...rest } = props
+  const hit = hitProp ?? 'expand'
+  const variant = variantProp ?? 'plain'
   return (
     <button
       type={type ?? 'button'}
@@ -47,7 +55,7 @@ function IconButton({ label, hit = 'expand', variant = 'plain', className, type,
         variant === 'ghost' && 'h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground',
         className,
       )}
-      {...props}
+      {...rest}
     >
       {children}
     </button>

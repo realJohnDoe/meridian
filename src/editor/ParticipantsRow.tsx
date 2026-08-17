@@ -14,7 +14,13 @@ interface Props {
   allParticipants?: string[]
 }
 
-export default function ParticipantsRow({ participants, onChange, allParticipants = EMPTY_PARTICIPANTS }: Props) {
+// `allParticipants` takes its default via `??` in the body rather than as a
+// destructured-parameter default — that shape makes
+// babel-plugin-react-compiler silently skip memoizing this component. See
+// OccurrenceCard.tsx for the full rationale.
+export default function ParticipantsRow(props: Props) {
+  const { participants, onChange } = props
+  const allParticipants = props.allParticipants ?? EMPTY_PARTICIPANTS
   const [open,  setOpen]  = useState(false)
   const [query, setQuery] = useState('')
   const { anchorRef, listRef, placement } = useFloatingCombobox(open, o => { setOpen(o); if (!o) setQuery('') })

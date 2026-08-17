@@ -32,14 +32,15 @@ interface Props {
  * a child. That split is what `animateHeight` rests on — pinning a *flex*
  * container to a height below its content makes the flex algorithm squash the
  * rows, where a block box clips them, which is the fold we're after.
+ *
+ * `animateHeight` takes its default via `??` in the body rather than as a
+ * destructured-parameter default — that shape makes
+ * babel-plugin-react-compiler silently skip memoizing this component. See
+ * OccurrenceCard.tsx for the full rationale.
  */
-export function FlipList({
-  items,
-  itemAttr,
-  animateHeight = false,
-  containerRef,
-  children,
-}: Props) {
+export function FlipList(props: Props) {
+  const { items, itemAttr, containerRef, children } = props
+  const animateHeight = props.animateHeight ?? false
   const ownRef = useRef<HTMLDivElement>(null)
   const ref = containerRef ?? ownRef
   useFlipTransition(ref, items, itemAttr, animateHeight)

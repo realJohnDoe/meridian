@@ -29,12 +29,11 @@ bypassed in favour of a bare `<Badge onClick>` or a bare `role="dialog"` div.
 The single biggest structural theme is **correctness that lives in a comment
 instead of in the toolchain**. This codebase discovers subtle hazards, fixes
 them precisely at one site, writes an excellent comment explaining why — and
-then does not encode the rule anywhere a machine can check it. The React
-Compiler bailout (#1), the URL-scheme allowlist (#5), and the per-theme ink
-tokens (#4) are all cases where the correct pattern exists in exactly one file
-and the other call sites silently drifted. Every top finding below is
-mechanically preventable, and five of them come with a dry-run-verified lint
-rule or settings key.
+then does not encode the rule anywhere a machine can check it. The
+URL-scheme allowlist (#5) and the per-theme ink tokens (#4) are cases where
+the correct pattern exists in exactly one file and the other call sites
+silently drifted. Every top finding below is mechanically preventable, and
+several come with a dry-run-verified lint rule or settings key.
 
 ---
 
@@ -103,13 +102,13 @@ directory was skipped.
 
 | # | Category | Verdict |
 |---|---|---|
-| 1 | Component Architecture & Boundaries | **findings: #1, #6** |
+| 1 | Component Architecture & Boundaries | **findings: #6** |
 | 2 | Styling System Consistency | **findings: #4, #7** |
 | 3 | UX States & Accessibility | **findings: #2, #3** |
 | 4 | Security (UI-facing) | **findings: #5** |
 | 5 | Code Health & DRY | **findings: #6** |
-| 6 | React Performance | **findings: #1** |
-| 7 | UI Toolchain & Feedback Loops | **findings: #1, #2, #8** |
+| 6 | React Performance | no open findings |
+| 7 | UI Toolchain & Feedback Loops | **findings: #2, #8** |
 | 8 | UI Dependencies & Library Fit | **findings: #3** — plus three explicit keep-custom verdicts, below |
 
 **Category 8 — keep-custom verdicts (status quo is correct):**
@@ -133,7 +132,6 @@ directory was skipped.
 
 | # | Title | Category | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 1 | React Compiler silently skips memoizing 6 components | `performance` `toolchain` `component-architecture` | 6 | 6 files | **Sonnet 5** |
 | 2 | Primary "add" affordances are clickable `<span>`/`<div>` | `a11y` `ux` `toolchain` | 7 | 4 files | **Sonnet 5** |
 | 3 | Two hand-rolled overlays with no focus trap | `a11y` `library-fit` | 6 | 2 files | **Opus 5** |
 | 4 | Hardcoded toast ink fails WCAG AA in 7 of 9 themes | `styling` `a11y` | 6 | 1 file | **Opus 5** |
@@ -149,114 +147,9 @@ and breadth reported separately so the list can be re-sorted.
 `editor/ItemsList.tsx` and `onboarding/CoachTour.tsx`, and #2 replaces the
 offending elements with real `<button>`s (which need a `type` anyway), so
 running #8 first means #2 lands on already-correct markup instead of
-re-editing the same lines. **#1 and #2 both touch
-`editor/ParticipantsRow.tsx`** — do #1 first (it changes the signature line,
-#2 changes the JSX body; opposite ends of the file, but #1's diff is
-mechanical and #2's needs review). #3 and #8 both touch `CoachTour.tsx`; #3
+re-editing the same lines. #3 and #8 both touch `CoachTour.tsx`; #3
 subsumes #8's fix there, so do #3 first or accept one trivial rebase. All
 others are independent.
-
----
-
-### Finding #1 — React Compiler silently skips memoizing 6 components
-
-- **Category:** `performance` `toolchain` `component-architecture`
-- **Impact:** 6
-- **Breadth:** 6 first-party files (11 more in `components/ui/`). Counted with a
-  dry-run of the candidate lint rule below — 8 violations across 6 files, and
-  `grep -rnE 'function [A-Z][A-Za-z]*\(\{[^}]*='` for the signature form.
-- **Recommended model:** **Sonnet 5.** The edit is mechanical and the hazard is
-  fully nameable: *convert each destructured default to a `props.x ?? default`
-  assignment in the body, and do not "tidy" it back*. The trap that would void
-  the fix is that nothing catches a regression — build, lint, and tests all stay
-  green whether the component is memoized or not — so the task must also land
-  the lint rule below. **Opus 5 only if the fix is expected to decide what to do
-  about `components/ui/`**, which is a policy call (see below), not a code call.
-
-**Evidence** — `src/components/OccurrenceCard.tsx:97`, the one place the hazard
-is documented:
-
-```
-  // Defaults are pulled out into `??` assignments below rather than written
-  // as `showTime = 'inline'` etc. in the destructured params: that shape
-  // (an AssignmentPattern inside a destructured parameter) makes
-  // babel-plugin-react-compiler bail out of optimizing this whole component,
-  // silently — no build or lint error, just no memoization.
-```
-
-The same shape survives untouched in `src/components/primitives/icon-button.tsx:34`:
-
-```
-function IconButton({ label, hit = 'expand', variant = 'plain', className, type, children, ...props }: IconButtonProps) {
-```
-
-and in `src/components/KindIcon.tsx:22`:
-
-```
-export default function KindIcon({ item, size = 13, className }: Props) {
-```
-
-and in `src/editor/ParticipantsRow.tsx:17`:
-
-```
-export default function ParticipantsRow({ participants, onChange, allParticipants = EMPTY_PARTICIPANTS }: Props) {
-```
-
-plus `components/FlipList.tsx:39` and
-`components/primitives/responsive-modal.tsx:104`.
-
-**Verification (not taken from the comment).** I ran the repo's own compiler
-configuration — `reactCompilerPreset({ target: '19' })` from
-`@vitejs/plugin-react`, exactly as `vite.config.ts:139` wires it — over three
-minimal components and checked for the compiler's `_c(N)` cache-init call:
-
-| Signature form | Memoized? |
-|---|---|
-| `function W({ label, size = 13, className })` | **false** |
-| `function W(props)` + `props.size ?? 13` in body | true |
-| `function W({ label, size, className })` (no default) | true |
-
-The documented rationale holds exactly as written.
-
-**Problem:** `IconButton` and `KindIcon` are two of the most frequently
-rendered components in the app — `IconButton` appears in every topbar, the
-sidebar, the search overlay and every editor row, and `KindIcon` renders once
-per occurrence card in a virtualized list — and all six are excluded from the
-auto-memoization the whole codebase is otherwise architected around (the
-`react-hooks` preset, the `purity` rule, and the ref-instead-of-suppression
-pattern in `DayPane.tsx:132` all exist to keep components compiler-eligible).
-
-**Fix:** Rewrite the six signatures to take `props` and apply defaults with
-`??` in the body (the exact shape `OccurrenceCard.tsx:105-116` already uses),
-then add this rule to `eslint.config.js` so the class cannot come back:
-
-```js
-{
-  files: ['src/**/*.tsx'],
-  ignores: ['src/components/ui/**', 'src/**/*.test.tsx'],
-  rules: {
-    'no-restricted-syntax': ['error', {
-      selector: 'FunctionDeclaration > ObjectPattern > Property > AssignmentPattern',
-      message: 'A default in a destructured parameter makes babel-plugin-react-compiler silently skip memoizing this component. Use `props.x ?? default` in the body (see OccurrenceCard.tsx).',
-    }],
-  },
-}
-```
-
-**Dry-run result:** 8 errors across exactly the 6 files listed, **zero false
-positives** outside `components/ui/`.
-
-> **Note on `components/ui/`:** 11 shadcn components (`Button`,
-> `SidebarProvider`, `SelectContent`, `PopoverContent`, `SheetContent`,
-> `TooltipContent`, `Calendar`, `Separator`, `Sidebar`, `SidebarGroupLabel`,
-> `SidebarMenuButton`) carry the same shape and are therefore also unmemoized.
-> The proposed rule deliberately excludes that directory, because CLAUDE.md's
-> "faithful mirror of the shadcn registry — only files the shadcn CLI wrote"
-> policy outranks this optimization. **I checked this rationale rather than
-> assuming it, and it holds**: hand-patching them would break `shadcn diff` and
-> the coverage exclusion that depends on the mirror being true. Worth stating
-> explicitly in the results so the gap is a known, accepted cost rather than an
-> oversight.
 
 ---
 
