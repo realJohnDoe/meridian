@@ -62,7 +62,7 @@ inspected as artifacts only), `blog/` and `plans/` (prose, not shipped code),
 | Test | `pnpm run test:coverage` | **pass** — 1,462 tests, 0 failures |
 | Coverage | thresholds in `vitest.config.ts` | **pass** — 71.05% stmts / 65.72% br / 62.69% fn / 73.45% lines |
 | Dead code | `pnpm run knip` | **pass** — no unused files, exports, or deps |
-| Audit | `pnpm audit --audit-level=high` | **pass** (1 moderate advisory below the gate — see #7) |
+| Audit | `pnpm audit --audit-level=high` | **pass** (1 moderate advisory below the gate at run time, since fixed) |
 
 Fraction of the codebase this report rests on: roughly **40% read line-by-line**,
 with structural checks (imports, types, a11y, churn, dependency currency) run
@@ -88,11 +88,11 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 | 1 | Architecture & Domain Separation | **clean** — full import-graph scan; zero cross-module deep imports, `model/` purity and the persistence port both hold |
 | 2 | Simplicity & Overengineering | **clean** — every port, optional prop, and config knob checked for a second real caller; all passed |
 | 3 | Directory & File Layout | **clean** — barrels consistent, `lib/` residents each have 2+ consumers, no co-change/distance mismatch in the 60-day sample |
-| 4 | Security | **clean** — SSRF guards, CSP, CORS, and token storage all reviewed; no XSS/injection surface (see #7 for the dependency-side note) |
+| 4 | Security | **clean** — SSRF guards, CSP, CORS, and token storage all reviewed; no XSS/injection surface |
 | 5 | Testing & Error Handling | **clean** |
 | 6 | Code Health & DRY | **clean** |
 | 7 | Toolchain & Developer Feedback Loops | findings: **#8** |
-| 8 | Dependencies & Library Fit | findings: **#7** |
+| 8 | Dependencies & Library Fit | **clean** — the one dependency finding from this run has been fixed |
 | 9 | Styling & UX | **clean** — no bypassed shadcn components, no `onClick` on non-interactive elements, inline styles confined to virtualizer/positioning transforms |
 | 10 | Performance | findings: **#9** |
 
@@ -102,42 +102,10 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 
 | # | Finding | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|
-| 7 | postcss advisory missing from the overrides block | 4 | 1 | Haiku 4.5 | 4.0 |
 | 8 | `.npmrc` comment contradicts its own setting | 2 | 1 | Haiku 4.5 | 2.0 |
 | 9 | 639 KB `public/icon.png` ships as a dead asset | 2 | 1 | Haiku 4.5 | 2.0 |
 
 Findings are numbered and listed in `(impact × breadth) ÷ effort` order.
-
----
-
-### #7 — the postcss advisory is missing from the overrides block that already pins its own sibling
-
-- **Category:** `dependencies` `security`
-- **Impact:** 4
-- **Breadth:** 1 file (`pnpm-workspace.yaml`)
-- **Recommended model:** **Haiku 4.5** — one line in an established block; an unsatisfiable floor fails loudly at install.
-- **Evidence:**
-
-  `pnpm audit --audit-level=moderate` on this commit:
-  ```
-  │ moderate            │ PostCSS: incomplete fix of GHSA-6g55-p6wh-862q —       │
-  │                     │ attacker-controlled sourceMappingURL reads arbitrary   │
-  │                     │ .map files when `from` is unset                        │
-  │ Package             │ postcss                                                │
-  │ Vulnerable versions │ <=8.5.22                                               │
-  │ Patched versions    │ >=8.5.23                                               │
-  │ Paths               │ .>@rolldown/plugin-babel>vite>postcss   (14 paths)      │
-  ```
-  CI gates at `pnpm audit --audit-level=high`, so this never fires there. The repo already pins six dev-only transitive advisories in exactly this shape — and the `nanoid` entry is pinned *because of* postcss:
-  ```
-  # nanoid <3.3.17 has GHSA-2v37-7h3g-55p8 (custom generators loop indefinitely
-  # when size is zero). Pulled in transitively (dev-only) via postcss, itself a
-  # dependency of vite.
-  ```
-  So postcss is already a known node in this dependency path; only its own advisory is unpinned.
-
-- **Problem:** An established, deliberate supply-chain practice — pin every dev-only transitive advisory with a comment explaining it — has one gap, and the CI gate's `high` threshold guarantees nothing will surface it.
-- **Fix:** Add `postcss: ">=8.5.23"` to the `overrides` block with the customary comment; optionally lower the CI audit gate to `--audit-level=moderate` so the pattern is enforced rather than remembered.
 
 ---
 
