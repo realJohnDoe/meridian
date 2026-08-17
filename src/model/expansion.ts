@@ -172,6 +172,58 @@ function mergeNode<M>(parent: ExpandNode<M>, child: ExpandNode<M>): ExpandNode<M
   }
 }
 
+/**
+ * Backstop on how many periods either walk in `generateScheduledDates` will
+ * visit. Both walks already have a real stopping condition — a date bound, or
+ * the tally reaching `count` — so this is reached only by a rule that can never
+ * match (`bymonthday: [-32]` resolves below day 1 in every month) or by a query
+ * window far wider than a calendar view asks for.
+ *
+ * The size is the point. The previous cap was 500 periods, low enough that
+ * ordinary rules hit it: a `count: 1000` daily series stopped at 500, because
+ * the cap counts *periods* and a daily series yields one occurrence per period
+ * (gap K in the iCal/RRULE survey). A cap that a legitimate rule can reach is a
+ * silent-truncation bug wearing a guard's clothing. 20k periods is ~55 years of
+ * a daily series; sparse rules need the headroom, since they take more periods
+ * than they yield occurrences — a Feb-29 yearly anchor lands one year in four,
+ * `bymonthday: [31]` seven months in twelve.
+ *
+ * Cost is bounded independently of this number: the main walk visits only the
+ * periods between the query window's edges (everything before `from` is skipped
+ * analytically), and the count-resolving walk runs at most once per
+ * (rule, anchor) pair thanks to `countBoundCache`.
+ */
+const PERIOD_WALK_LIMIT = 20_000
+
+/**
+ * Memo for resolved `count` bounds, keyed by rule object and then by anchor
+ * (one `repeat` can be inherited by children anchored on different dates).
+ *
+ * Weak on the rule so entries are collected along with the store items that
+ * own them. A re-parse produces fresh `repeat` objects and so misses the memo,
+ * which costs one walk per series — the same order as the re-parse itself.
+ */
+const countBoundCache = new WeakMap<object, Map<string, number>>()
+
+function cachedCountBound(
+  sched: object,
+  anchor: Date,
+  anchorTimeStr: string | null,
+  resolve: () => Date,
+): Date {
+  const key = `${anchor.getTime()}|${anchorTimeStr ?? ''}`
+  let perAnchor = countBoundCache.get(sched)
+  if (!perAnchor) {
+    perAnchor = new Map<string, number>()
+    countBoundCache.set(sched, perAnchor)
+  }
+  const hit = perAnchor.get(key)
+  if (hit !== undefined) return new Date(hit)
+  const bound = resolve()
+  perAnchor.set(key, bound.getTime())
+  return bound
+}
+
 function generateScheduledDates(
   anchor: Date,
   anchorTimeStr: string | null,
@@ -182,16 +234,6 @@ function generateScheduledDates(
   const { freq, byweekday, bymonthday, bysetpos, interval = 1, end } = sched
   const results: Date[] = []
   const untilDate = end?.type === 'until' ? toDate(end.date || end.time) : null
-  // `end.date` is a date-only value (no time-of-day); treat it as inclusive of
-  // the entire day so occurrences scheduled later that day are still included.
-  // A `count` end must enumerate from the anchor regardless of the query
-  // window — bounding by `to` here would make the same series yield different
-  // occurrences depending on which page the caller happens to view.
-  const dateBound = untilDate ? endOfDay(untilDate) : (end?.type === 'count' ? null : to)
-  // The anchor itself is occurrence #1 (emitted separately by expandNode), so
-  // only `occurrences - 1` further dates are generated here.
-  const maxCount = end?.type === 'count' ? Math.max(0, end.occurrences - 1) : Infinity
-  let count = 0
 
   function withTime(d: Date): Date {
     const r = startOfDay(d)
@@ -320,26 +362,96 @@ function generateScheduledDates(
     return dates
   }
 
+  /**
+   * One period's generated dates: after the anchor, ascending, deduplicated.
+   *
+   * The dedup matters beyond tidiness. RFC 5545's `BYxxx` parts are *sets*, so
+   * a rule naming the same day twice (`bymonthday: [15, 15]`) describes one
+   * occurrence, not two. Emitting it twice would also break the equivalence
+   * `resolveCountBound` relies on, by making "the first N dates" and "every
+   * date up to the Nth" disagree at the boundary.
+   */
+  function periodDates(periodStart: Date): Date[] {
+    const byInstant = new Map<number, Date>()
+    for (const d of matchesInPeriod(periodStart)) {
+      if (d > anchor) byInstant.set(d.getTime(), d)
+    }
+    return [...byInstant.values()].sort((a, b) => a.getTime() - b.getTime())
+  }
+
+  /**
+   * The instant of the last occurrence of a `count`-bounded series — i.e. the
+   * `until` bound that admits exactly the same dates.
+   *
+   * Walking from the anchor is unavoidable here: `COUNT` is tallied from the
+   * anchor, so unlike a date bound it cannot be evaluated locally to a query
+   * window. The point of doing it *once*, behind `countBoundCache`, is that
+   * every later expansion gets a plain date bound and can use the analytic
+   * skip-ahead below.
+   */
+  function resolveCountBound(remaining: number): Date {
+    let cursor = new Date(anchor)
+    let last = new Date(anchor)
+    let seen = 0
+    for (let iter = 0; seen < remaining && iter < PERIOD_WALK_LIMIT; iter++) {
+      for (const d of periodDates(cursor)) {
+        last = d
+        if (++seen >= remaining) break
+      }
+      const next = nextBase(cursor)
+      if (next <= cursor) break  // interval <= 0: the cursor would never advance
+      cursor = next
+    }
+    return last
+  }
+
+  // A `count` end is resolved to the date of its last occurrence and from here
+  // on enumerated exactly like an `until`-bounded series. The two describe the
+  // same set — `COUNT` only ever truncates the tail, so bounding at the Nth
+  // occurrence's instant admits precisely the first N dates (`periodDates`
+  // rules out a tie at the boundary) — and the resolved bound is a function of
+  // (anchor, rule) alone. That is what a `count` series requires: bounding by
+  // the query window's `to` instead would make the same series yield different
+  // occurrences depending on which page the caller happens to be viewing.
+  //
+  // `end.date` on an `until` is a date-only value (no time-of-day); treat it as
+  // inclusive of the entire day so occurrences scheduled later that day are
+  // still included.
+  //
+  // The anchor itself is occurrence #1 (emitted separately by expandNode), so
+  // only `occurrences - 1` further dates are ever generated here.
+  const dateBound = untilDate ? endOfDay(untilDate)
+    : end?.type === 'count'
+      ? cachedCountBound(sched, anchor, anchorTimeStr, () => resolveCountBound(Math.max(0, end.occurrences - 1)))
+      : to
+
   let cursor = new Date(anchor)
-  // `end: { type: 'count' }` must keep enumerating from the anchor so the
-  // occurrence count stays independent of the query window — only skip
-  // ahead for open-ended/until-bounded series, where every period from the
-  // anchor to `from` is equivalent to "not a match" and can be bypassed.
-  if (maxCount === Infinity && from > cursor) {
+  // Every period between the anchor and `from` is equivalent to "not a match"
+  // and can be bypassed analytically rather than walked.
+  if (from > cursor) {
     const steps = periodsBetween(from)
     if (steps > 0) cursor = advanceCursor(cursor, steps)
   }
-  const LIMIT = 500; let iter = 0
-  while ((dateBound === null || cursor <= dateBound) && count < maxCount && iter++ < LIMIT) {
-    const dates = matchesInPeriod(cursor).filter(d => d > anchor && (dateBound === null || d <= dateBound))
-    for (const d of dates.sort((a, b) => a.getTime() - b.getTime())) {
-      if (d > anchor && count < maxCount) { results.push(d); count++ }
+  // Walk to whichever end comes first, the series' or the query window's:
+  // dates past `to` are dropped by the final filter either way, so continuing
+  // to a far-future `until`/resolved-count bound is pure waste. Between this
+  // and the skip-ahead above, the periods visited scale with the width of the
+  // window the caller asked for, not with the length of the series.
+  //
+  // PERIOD_WALK_LIMIT is therefore only a backstop against a rule that would
+  // otherwise run away — a cap low enough to bite a legitimate query is a
+  // silent-truncation bug rather than a guard, which is exactly how the old
+  // 500-period cap produced gap K.
+  const walkBound = dateBound < to ? dateBound : to
+  let iter = 0
+  while (cursor <= walkBound && iter++ < PERIOD_WALK_LIMIT) {
+    for (const d of periodDates(cursor)) {
+      if (d <= dateBound) results.push(d)
     }
-    cursor = nextBase(cursor)
-    if (dateBound !== null && cursor > dateBound) break
+    const next = nextBase(cursor)
+    if (next <= cursor) break  // interval <= 0: the cursor would never advance
+    cursor = next
   }
-  // Enumeration above is independent of the query window for count-bounded
-  // series (see dateBound); clip to the window only now, at the very end.
   return results.filter(d => d >= from && d <= to)
 }
 
