@@ -32,7 +32,7 @@ Start by identifying which directories constitute the UI layer and state that li
 
 ## Output structure
 
-**Reporting:** write findings to `results/health-ui-results.md`, per the
+**Reporting:** write findings to `../health-ui-results.md`, per the
 [shared reporting conventions](./README.md#reporting) — including suggested
 improvements to this survey file itself.
 

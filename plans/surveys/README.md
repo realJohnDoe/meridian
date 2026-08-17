@@ -73,19 +73,20 @@ long one built on speculation.
 ## Reporting
 
 **Write the findings to a file.** After a run, write its findings to
-`results/<survey-name>-results.md` (e.g. `health.md` →
-`results/health-results.md`) so they survive the session and can be worked
-from as a checklist. Once every finding is fixed or explicitly dropped,
-delete the results file in the same commit/PR that closes the last one out —
-see `git log -- plans/` for the established pattern (results docs get added,
-then removed once resolved). `data-integrity.md`'s "Known
-suspects" section, which appends a verdict to each suspect's hypothesis
-in-place, is the exception: that survey keeps its suspects list live in the
-survey file itself rather than a separate results doc — follow whichever
-pattern the survey you're running already uses.
+`../<survey-name>-results.md` — i.e. `plans/<survey-name>-results.md`, one
+level up from this directory (e.g. `health.md` → `plans/health-results.md`)
+— so they survive the session and can be worked from as a checklist. Once
+every finding is fixed or explicitly dropped, delete the results file in the
+same commit/PR that closes the last one out — see `git log -- plans/` for
+the established pattern (results docs get added, then removed once
+resolved). `data-integrity.md`'s "Known suspects" section, which appends a
+verdict to each suspect's hypothesis in-place, is the exception: that survey
+keeps its suspects list live in the survey file itself rather than a
+separate results doc — follow whichever pattern the survey you're running
+already uses.
 
-Results files live in `plans/surveys/results/`; survey files themselves
-(`health.md`, `performance.md`, etc.) stay directly in `plans/surveys/`.
+Results files live directly in `plans/`; survey files themselves
+(`health.md`, `performance.md`, etc.) stay in `plans/surveys/`.
 
 **Suggest improvements to the survey itself, as a diff on the survey file.**
 These survey files are themselves living specs, and a real run is evidence

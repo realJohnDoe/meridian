@@ -28,7 +28,7 @@ file states only what's specific to this survey.
 
 ## Output structure
 
-**Reporting:** write findings to `results/health-results.md`, per the
+**Reporting:** write findings to `../health-results.md`, per the
 [shared reporting conventions](./README.md#reporting) — including suggested
 improvements to this survey file itself.
 
