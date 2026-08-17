@@ -7,7 +7,7 @@
 // the golden tests pin that by asserting the emitted markdown parses with an
 // empty `roundTripLoss`.
 //
-// Nothing here mints an identifier at parse time. A slug is a deterministic hash
+// Nothing here mints an identifier at parse time. A fileSlug is a deterministic hash
 // of the event's own `UID`, so a feed re-fetched unchanged produces
 // byte-identical files and reconcile sees no change at all.
 
@@ -20,10 +20,10 @@ import {
 import { parseIcsDateTime, localDate, localTime, durationBetween, parseIsoDuration } from './icsDateTime'
 import { rruleToRepeat } from './rruleToRepeat'
 
-/** One synthesized entry file. `slug` is the bare file slug, no `.md`. */
+/** One synthesized entry file. `fileSlug` is the bare file slug, no `.md`. */
 export interface SynthesizedEntry {
-  slug:    string
-  content: string
+  fileSlug: string
+  content:  string
 }
 
 export interface IcalSynthesis {
@@ -37,8 +37,8 @@ export interface IcalSynthesis {
  *
  * FNV-1a: tiny, synchronous (Web Crypto's digest is async, and this runs
  * hundreds of times per refresh), and — the only property that actually matters
- * here — deterministic. The same UID must produce the same slug on every device
- * and every refresh forever, because that slug is the entry's identity: its URL,
+ * here — deterministic. The same UID must produce the same fileSlug on every device
+ * and every refresh forever, because that fileSlug is the entry's identity: its URL,
  * its wikilink target, and its cache key.
  *
  * Collisions are handled by the caller rather than by widening the hash, since
@@ -53,7 +53,7 @@ export function shortHash(text: string): string {
   return h.toString(16).padStart(8, '0')
 }
 
-/** `ical-<hash>` — flat and URL-safe, with no `/` to break the `$slug` path segment. */
+/** `ical-<hash>` — flat and URL-safe, with no `/` to break the `$fileSlug` path segment. */
 function slugForUid(uid: string): string {
   return `ical-${shortHash(uid)}`
 }
@@ -265,7 +265,7 @@ function groupByUid(events: IcsComponent[]): EventGroup[] {
     if (propValue(event, 'STATUS')?.trim().toUpperCase() === 'CANCELLED') continue
     const uid = propValue(event, 'UID')?.trim()
     // No UID is a spec violation, but feeds in the wild do it. Fall back to the
-    // event's own content so the slug stays deterministic across refreshes.
+    // event's own content so the fileSlug stays deterministic across refreshes.
     const key = uid && uid.length > 0
       ? uid
       : `${propValue(event, 'SUMMARY') ?? ''}|${propValue(event, 'DTSTART') ?? ''}`
@@ -333,7 +333,7 @@ function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | null 
     extras: readExtras(master, group.uid, timing.tzid),
   })
 
-  return { slug: slugForUid(group.uid), content: renderEntry(frontmatter, body) }
+  return { fileSlug: slugForUid(group.uid), content: renderEntry(frontmatter, body) }
 }
 
 /**
@@ -359,10 +359,10 @@ export function icsToEntries(text: string, now: Date = new Date()): IcalSynthesi
     // A hash collision (or a feed repeating a UID) must resolve the same way on
     // every device and every refresh, so the suffix comes from the order the
     // feed lists them in — not from a counter that depends on what else parsed.
-    let slug = entry.slug
-    for (let n = 2; seen.has(slug); n++) slug = `${entry.slug}-${n}`
-    seen.add(slug)
-    entries.push({ ...entry, slug })
+    let fileSlug = entry.fileSlug
+    for (let n = 2; seen.has(fileSlug); n++) fileSlug = `${entry.fileSlug}-${n}`
+    seen.add(fileSlug)
+    entries.push({ ...entry, fileSlug })
   }
 
   const name = calendarName(calendar)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { durationToEndDate, formatDurationChip, fmtDuration, fmtEndDate, fmtTopBarWeek } from '@/format'
+import { durationToEndDate, endDateToDuration, formatDurationChip, fmtDuration, fmtEndDate, fmtTopBarWeek } from '@/format'
 import type { Scheduled } from '@/types'
 
 describe('durationToEndDate', () => {
@@ -35,6 +35,25 @@ describe('durationToEndDate', () => {
   it('uses calendar-correct month arithmetic across a short month', () => {
     // Jan 31 + 1 month should land on Feb 28, not roll into March
     expect(durationToEndDate('2026-01-31', '1 month')).toBe('2026-02-28')
+  })
+})
+
+describe('endDateToDuration', () => {
+  it('round-trips days and weeks', () => {
+    expect(endDateToDuration('2026-06-01', '2026-06-03')).toBe('3 days')
+    expect(endDateToDuration('2026-06-01', '2026-06-14')).toBe('2 weeks')
+  })
+
+  it('round-trips months and years using calendar arithmetic, not a fixed day count', () => {
+    expect(endDateToDuration('2026-01-31', '2026-02-28')).toBe('1 month')
+    expect(endDateToDuration('2026-02-01', '2026-02-28')).toBe('1 month')
+    expect(endDateToDuration('2024-01-01', '2024-12-31')).toBe('1 year')
+    expect(endDateToDuration('2026-06-01', '2026-08-31')).toBe('3 months')
+    expect(endDateToDuration('2026-06-01', '2028-05-31')).toBe('2 years')
+  })
+
+  it('returns null for a non-positive range', () => {
+    expect(endDateToDuration('2026-06-01', '2026-05-31')).toBeNull()
   })
 })
 

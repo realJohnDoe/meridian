@@ -224,7 +224,7 @@ describe('icsToEntries — slugs', () => {
   const feed = event(['UID:standup-abc123@google.com', 'DTSTART:20260817T090000', 'SUMMARY:Standup'])
 
   it('derives a flat, URL-safe slug from the UID', () => {
-    expect(only(feed).slug).toMatch(/^ical-[0-9a-f]{8}$/)
+    expect(only(feed).fileSlug).toMatch(/^ical-[0-9a-f]{8}$/)
   })
 
   it('re-parsing an unchanged feed yields byte-identical slugs and content', () => {
@@ -235,7 +235,7 @@ describe('icsToEntries — slugs', () => {
 
   it('gives different UIDs different slugs', () => {
     const other = event(['UID:other@google.com', 'DTSTART:20260817T090000', 'SUMMARY:Standup'])
-    expect(only(feed).slug).not.toBe(only(other).slug)
+    expect(only(feed).fileSlug).not.toBe(only(other).fileSlug)
   })
 
   it('disambiguates a repeated UID deterministically', () => {
@@ -250,8 +250,8 @@ describe('icsToEntries — slugs', () => {
 
   it('stays deterministic for an event with no UID', () => {
     const noUid = event(['DTSTART:20260817T090000', 'SUMMARY:Anonymous'])
-    expect(only(noUid).slug).toBe(only(noUid).slug)
-    expect(only(noUid).slug).toMatch(/^ical-[0-9a-f]{8}$/)
+    expect(only(noUid).fileSlug).toBe(only(noUid).fileSlug)
+    expect(only(noUid).fileSlug).toMatch(/^ical-[0-9a-f]{8}$/)
   })
 
   it('sorts instances so a reordered feed still produces identical bytes', () => {
@@ -273,7 +273,7 @@ describe('golden fixtures', () => {
     expect(result.entries).toHaveLength(2) // the cancelled event is skipped
 
     for (const entry of result.entries) {
-      const path = `${entry.slug}.md`
+      const path = `${entry.fileSlug}.md`
       const parsed = parseToStoreItems(path, entry.content, 'family-cal')
       expect(parsed.items.length).toBeGreaterThan(0)
       // The synthesized markdown must survive Meridian's own save path
@@ -307,7 +307,7 @@ describe('golden fixtures', () => {
     expect(result.entries).toHaveLength(2)
 
     for (const entry of result.entries) {
-      const path = `${entry.slug}.md`
+      const path = `${entry.fileSlug}.md`
       const parsed = parseToStoreItems(path, entry.content, 'work-cal')
       expect(roundTripLoss(path, entry.content, parsed)).toEqual([])
     }
