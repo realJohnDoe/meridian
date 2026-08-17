@@ -97,6 +97,7 @@ export default function OccurrenceList({ occs, onOpen, onToggleDone, onSwipeDele
     return out
   }, [occs, doneOpen])
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns functions the compiler can't memoize safely; it correctly skips optimizing this component instead.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scRef.current,

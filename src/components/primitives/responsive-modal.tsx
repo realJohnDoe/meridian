@@ -5,7 +5,7 @@ import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerActions } 
 import { Separator } from '../ui/separator'
 import { cn } from '@/lib/cn'
 
-const ModalCtx = React.createContext(false) // false = mobile (drawer)
+const ModalContext = React.createContext(false) // false = mobile (drawer)
 
 // ── Root ─────────────────────────────────────────────────────────
 
@@ -20,12 +20,12 @@ function ResponsiveModal({ open, onOpenChange, forceDialog, children }: {
 }) {
   const isDesktop = useMediaQuery("(min-width: 768px)") || !!forceDialog
   return (
-    <ModalCtx value={isDesktop}>
+    <ModalContext value={isDesktop}>
       {isDesktop
         ? <Dialog open={open} onOpenChange={onOpenChange}>{children}</Dialog>
         : <Drawer open={open} onOpenChange={onOpenChange}>{children}</Drawer>
       }
-    </ModalCtx>
+    </ModalContext>
   )
 }
 
@@ -37,7 +37,7 @@ function ResponsiveModalContent({ className, children }: {
   className?: string
   children: React.ReactNode
 }) {
-  const isDesktop = React.use(ModalCtx)
+  const isDesktop = React.use(ModalContext)
   if (!isDesktop) {
     return <DrawerContent className={cn('pt-3', className)}>{children}</DrawerContent>
   }
@@ -56,7 +56,7 @@ function ResponsiveModalTitle({ children, className }: {
   children: React.ReactNode
   className?: string
 }) {
-  const isDesktop = React.use(ModalCtx)
+  const isDesktop = React.use(ModalContext)
   if (!isDesktop) {
     return (
       <>
@@ -82,7 +82,7 @@ function ResponsiveModalTitle({ children, className }: {
 // ── Description (always sr-only) ──────────────────────────────────
 
 function ResponsiveModalDescription({ children }: { children: React.ReactNode }) {
-  const isDesktop = React.use(ModalCtx)
+  const isDesktop = React.use(ModalContext)
   if (!isDesktop) {
     return <DrawerDescription className="sr-only">{children}</DrawerDescription>
   }
@@ -103,7 +103,7 @@ interface ResponsiveModalActionsProps {
 function ResponsiveModalActions({
   onRemove, onCancel, onSet, removeLabel = 'Remove', setDisabled,
 }: ResponsiveModalActionsProps) {
-  const isDesktop = React.use(ModalCtx)
+  const isDesktop = React.use(ModalContext)
   return (
     <DrawerActions
       onRemove={onRemove}

@@ -65,6 +65,7 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
     }))
   }, [roots, backlinks, debouncedQuery])
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns functions the compiler can't memoize safely; it correctly skips optimizing this component instead.
   const virtualizer = useVirtualizer({
     count: results.length,
     getScrollElement: () => scrollRef.current,

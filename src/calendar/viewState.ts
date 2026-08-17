@@ -12,7 +12,7 @@ interface CalendarViewState {
    * Scroll position snapshot so AgendaView restores it across remounts (e.g.
    * navigating to month/day and back) instead of resetting to the top. Written
    * on unmount, read to seed the virtualizer's initial* options on the next
-   * mount — see useAgendaScrollRestore/useSaveAgendaScroll and
+   * mount — see computeAgendaScrollRestore/useSaveAgendaScroll and
    * resetCalendarOnVaultChange (cleared on vault change, since a snapshot from a
    * different vault's agenda is meaningless).
    */
@@ -47,7 +47,7 @@ interface CalendarViewState {
    *
    * **Starts at today, not null.** Landing on today is what the agenda should
    * do the first time it mounts in a session; null meant "no target", which
-   * sent useAgendaScrollRestore down its `agendaScrollOffset` branch — and that
+   * sent computeAgendaScrollRestore down its `agendaScrollOffset` branch — and that
    * is 0 on a cold start, i.e. the top of the ~455-day window, about ten
    * screens above today. The correct target used to arrive only when
    * `onVaultChanged` fired, which on a GitHub vault is behind an OAuth token

@@ -441,7 +441,7 @@ async function restoreVaultsInner(): Promise<void> {
     // is in the store, never after the first one lands.
     //
     // The agenda seeds its scroll position from the row list it first mounts
-    // with (see useAgendaScrollRestore), so a vault whose layer arrives after
+    // with (see computeAgendaScrollRestore), so a vault whose layer arrives after
     // that inserts rows above the viewport and shifts the day on screen. The
     // anchoring in AgendaView recovers from it, but recovery is approximate —
     // it re-pins to an estimated row position — and there is no reason to need

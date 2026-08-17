@@ -8,7 +8,7 @@ import AgendaHeaderRow from './AgendaHeaderRow'
 import AgendaDividerRow from './AgendaDividerRow'
 import AgendaEmptyDayRow from './AgendaEmptyDayRow'
 import AgendaRow from './AgendaRow'
-import { useAgendaScrollRestore, useSaveAgendaScroll, useAnchoredAgendaScroll } from './useAgendaScrollRestore'
+import { computeAgendaScrollRestore, useSaveAgendaScroll, useAnchoredAgendaScroll } from './computeAgendaScrollRestore'
 import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useToday } from '@/hooks'
@@ -30,9 +30,9 @@ export default function AgendaView({ onOpen }: Props) {
   //
   // Note: the compiler already auto-skips memoizing this function because it
   // detects the incompatible library, so this directive doesn't change
-  // compiled output or silence the lint warning — it just makes the opt-out
-  // explicit and future-proofs against that auto-detection changing. The
-  // eslint warning here is expected and permanent; see eslint.config.js.
+  // compiled output — it just makes the opt-out explicit and future-proofs
+  // against that auto-detection changing. The eslint warning itself is
+  // silenced at its source below (see the disable comment on useVirtualizer).
   const today = useToday()
   // agendaAnchor centers the expansion window (see viewState.ts) — normally
   // today, but re-centered by a jump from Month/Day via the sidebar (a day
@@ -68,13 +68,14 @@ export default function AgendaView({ onOpen }: Props) {
   // the first painted frame is already in the right place rather than at the
   // top of the list.
   const scRef = useRef<HTMLDivElement>(null)
-  const { initialOffset, initialMeasurementsCache } = useAgendaScrollRestore(scrollTarget !== null, rows, goToRowIndex)
+  const { initialOffset, initialMeasurementsCache } = computeAgendaScrollRestore(scrollTarget !== null, rows, goToRowIndex)
 
   // Counts *rows*, not sections. Section-granular virtualization mounted every
   // row a section owned the moment it entered the viewport, and the overdue
   // section pools every undone past task with no cap — on a large vault that
   // was thousands of AgendaRows (each with three touch listeners, two
   // store subscriptions and a backlink lookup) in one synchronous commit.
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns functions the compiler can't memoize safely; it correctly skips optimizing this component instead.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scRef.current,
@@ -161,7 +162,7 @@ export default function AgendaView({ onOpen }: Props) {
   // showed wherever the list happened to start, then jumped. Running it in the
   // layout phase keeps it in the same frame as the commit.
   //
-  // On mount this is now only a correction: useAgendaScrollRestore already
+  // On mount this is now only a correction: computeAgendaScrollRestore already
   // seeded the virtualizer at the target row, and this fixes up the residual
   // error between the estimated row sizes it summed and the real measured
   // ones. The case it still carries on its own is the Today button (or a
