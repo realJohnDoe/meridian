@@ -30,14 +30,13 @@ engine", which is Sonnet work with an exact reference — not open-ended design.
 
 ## Ordering
 
-PRs 2–4 are independent of each other and of everything else; run them in
+PRs 3–4 are independent of each other and of everything else; run them in
 parallel if you want. **PR 4 should land before PR 6**, because it is the
 regression net for the expressiveness work — it would have caught the yearly gap
 on its own.
 
 ```
-PR2 ─┐
-PR3 ─┤ (independent, parallel)
+PR3 ─┐
 PR4 ─┴──────────────► PR6 ──► PR7 ──► PR8
 PR5 ─ (independent, but PR4 guards it)
 PR9 ─ (optional, any time)
@@ -47,7 +46,6 @@ PR9 ─ (optional, any time)
 
 | # | Title | Model | Est. | Touches format? |
 |---|---|---|---|---|
-| 2 | Engine: count-bounded series stop truncating at 500 | **Opus 5** | 1d | no |
 | 3 | `UNTIL` keeps its time-of-day | Sonnet 5 | 0.5d | yes (`end.time`) |
 | 4 | `repeatToRrule` + round-trip property test | **Opus 5** | 1d | no |
 | 5 | `bysetpos` as a list; drop importer's `< -1` refusal | Sonnet 5 | 0.5d | yes (`bysetpos`) |
@@ -56,57 +54,15 @@ PR9 ─ (optional, any time)
 | 8 | ICS export: file emission + entry point | Sonnet 5 | 1.5–2d | no |
 | 9 | `WKST` (optional) | **Opus 5** | 1d | yes (`wkst`) |
 
-Total PRs 2–8: **6.5–8 days** (PR1's 0.5d has already shipped). That is higher
-than the 6–10-day range in the survey's bottom row only in bookkeeping: the
-survey counted implementation, this counts implementation plus per-PR tests,
-review and CI.
+Total PRs 3–8: **5.5–7 days** (PR1's 0.5d has shipped and PR2's 1d is out for
+review — see status above). That is higher than the 6–10-day range in the
+survey's bottom row only in bookkeeping: the survey counted implementation,
+this counts implementation plus per-PR tests, review and CI.
 
 The four PRs that touch `types.ts` are the ones to slow down on. `repeat:` is
 written to YAML verbatim and read back with an unchecked cast, so there is no
 schema to migrate — which cuts both ways: widening the type is free, and
 nothing will catch a mistake.
-
----
-
-### PR 2 — Engine: count-bounded series stop truncating at 500
-
-**Model: Opus 5** · 1d · no format change
-
-Fixes gap K: `{ freq: daily, end: { type: count, occurrences: 1000 } }` returns
-500 occurrences.
-
-**Why Opus:** the obvious fix is wrong. `LIMIT = 500` (`expansion.ts:316`) caps
-periods, and count-bounded series can't use the analytic skip-ahead above it
-(`expansion.ts:312`, gated on `maxCount === Infinity`) because `COUNT` has to be
-tallied from the anchor. Just raising the constant trades a correctness bug for
-a latency bug: a `count: 5000` daily series would then walk 5000 periods on
-every agenda re-expansion — on exactly the cold-start path
-[time-to-today.md](./time-to-today.md) was written about.
-
-Options to weigh in the PR:
-- **(a)** Give count-bounded series their own analytic skip by computing
-  occurrences-per-period (constant for most shapes: daily 1, weekly
-  `|byweekday|`, monthly `|bymonthday|`), handling the anchor's partial first
-  period as the special case it is.
-- **(b)** Memoise the enumerated date list per series in
-  `model/expansionCache.ts`, so the walk happens once rather than per window.
-- **(c)** Raise the cap and measure — acceptable only with a number attached.
-
-**Acceptance:** the `count: 1000` repro returns 1000, plus a timing assertion
-that a large-count series doesn't regress expansion latency.
-
-**Taken ([#757](https://github.com/realJohnDoe/meridian/pull/757)):** a variant
-of (b) — resolve `count` to the date of its last occurrence *once*, then
-enumerate the series as if it were `until`-bounded. Memoising the date list
-alone (b) still pays a full walk per window; memoising the *bound* pays it once
-ever, because the existing analytic skip-ahead then applies. It also avoids
-(a)'s second counting implementation: occurrences-per-period isn't constant for
-`bymonthday: [31]` or a Feb-29 yearly anchor, so (a) needs a fallback path
-regardless, and two counting paths that must agree is where a silent divergence
-would live. (c) is folded in — the cap became a 20k backstop, with the walk now
-stopping at the query window's end rather than the series'. Warm expansion of a
-`count: 5000` daily series: 0.26ms, against 0.23ms for the open-ended
-equivalent.
 
 ---
 
@@ -199,8 +155,8 @@ expansion-vs-limit table.
 
 **Watch:** the yearly branch currently returns at most one date per period.
 `periodsBetween`'s analytic skip (`expansion.ts:212`) must stay correct once
-yearly can produce many dates per period, and the `LIMIT` interaction from PR 2
-applies here too.
+yearly can produce many dates per period, and `PERIOD_WALK_LIMIT` (the backstop
+PR 2 left behind) applies here too.
 
 **Why Opus:** this decides what `yearly` *means* in the file format. A subtly
 wrong answer is silent, lands in vault files, and survives.
