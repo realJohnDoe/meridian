@@ -4,7 +4,9 @@ Implementation plan for the gaps surveyed in
 [ical-rrule-gaps.md](./ical-rrule-gaps.md), plus ICS export. Originally nine
 PRs, each independently shippable, with a recommended model per PR.
 
-**Status: PR1 shipped ([#750](https://github.com/realJohnDoe/meridian/pull/750)). PRs 2–9 not started.**
+**Status: PR1 shipped ([#750](https://github.com/realJohnDoe/meridian/pull/750)).
+PR2 open ([#757](https://github.com/realJohnDoe/meridian/pull/757)). PRs 3–9 not
+started.**
 
 ---
 
@@ -92,6 +94,19 @@ Options to weigh in the PR:
 
 **Acceptance:** the `count: 1000` repro returns 1000, plus a timing assertion
 that a large-count series doesn't regress expansion latency.
+
+**Taken ([#757](https://github.com/realJohnDoe/meridian/pull/757)):** a variant
+of (b) — resolve `count` to the date of its last occurrence *once*, then
+enumerate the series as if it were `until`-bounded. Memoising the date list
+alone (b) still pays a full walk per window; memoising the *bound* pays it once
+ever, because the existing analytic skip-ahead then applies. It also avoids
+(a)'s second counting implementation: occurrences-per-period isn't constant for
+`bymonthday: [31]` or a Feb-29 yearly anchor, so (a) needs a fallback path
+regardless, and two counting paths that must agree is where a silent divergence
+would live. (c) is folded in — the cap became a 20k backstop, with the walk now
+stopping at the query window's end rather than the series'. Warm expansion of a
+`count: 5000` daily series: 0.26ms, against 0.23ms for the open-ended
+equivalent.
 
 ---
 
