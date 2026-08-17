@@ -49,10 +49,10 @@ export default defineConfig({
         // entirely. This catches that: adding a sizeable unexercised module
         // drags the project total below the floor and fails CI. Kept a few
         // points under the measured total so ordinary UI work doesn't trip it.
-        statements: 57,
-        branches: 54,
-        functions: 48,
-        lines: 59,
+        statements: 68,
+        branches: 62,
+        functions: 59,
+        lines: 70,
         'src/model/collapse.ts': { statements: 90, branches: 80, functions: 95, lines: 90 },
         'src/editor/cm/taskLines.ts': { statements: 90, branches: 80, functions: 95, lines: 95 },
         'src/editor/cm/markdownFormatting.ts': { statements: 88, branches: 78, functions: 70, lines: 87 },

@@ -89,9 +89,9 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 | 2 | Simplicity & Overengineering | **clean** — every port, optional prop, and config knob checked for a second real caller; all passed |
 | 3 | Directory & File Layout | **clean** — barrels consistent, `lib/` residents each have 2+ consumers, no co-change/distance mismatch in the 60-day sample |
 | 4 | Security | **clean** — SSRF guards, CSP, CORS, and token storage all reviewed; no XSS/injection surface (see #7 for the dependency-side note) |
-| 5 | Testing & Error Handling | findings: **#4** |
+| 5 | Testing & Error Handling | **clean** |
 | 6 | Code Health & DRY | findings: **#5** |
-| 7 | Toolchain & Developer Feedback Loops | findings: **#4**, **#8** |
+| 7 | Toolchain & Developer Feedback Loops | findings: **#8** |
 | 8 | Dependencies & Library Fit | findings: **#6**, **#7** |
 | 9 | Styling & UX | **clean** — no bypassed shadcn components, no `onClick` on non-interactive elements, inline styles confined to virtualizer/positioning transforms |
 | 10 | Performance | findings: **#9** |
@@ -102,7 +102,6 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 
 | # | Finding | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|
-| 4 | Global coverage floor drifted 14 points below actual | 6 | 3 | Sonnet 5 | 9.0 |
 | 5 | `model/AGENTS.md` names files and functions that no longer exist | 5 | 1 | Haiku 4.5 | 5.0 |
 | 6 | undici pin's own revisit condition has been met | 5 | 2 | Sonnet 5 | 5.0 |
 | 7 | postcss advisory missing from the overrides block | 4 | 1 | Haiku 4.5 | 4.0 |
@@ -115,41 +114,6 @@ Findings are numbered and listed in `(impact × breadth) ÷ effort` order.
 block — do #6 (jsdom 30 + drop the undici cap) first, then #7 (add postcss) in
 the same file, so the lockfile regenerates once. Everything else is
 independent.
-
----
-
-### #4 — the global coverage floor has drifted 14 points below actual, and a shipped module already slipped through
-
-- **Category:** `testing` `toolchain`
-- **Impact:** 6
-- **Breadth:** 3 files (`vitest.config.ts` plus the two `src/onboarding/` files at 0%; the floor itself governs all 326 source files)
-- **Recommended model:** **Sonnet 5** — hazard: raise the global floor to a few points under measured (≈68/62/59/70), **not** to the measured value, or ordinary UI work trips the gate on every PR; and do not touch the ~30 per-file thresholds in the same pass, since several are deliberately set below measured for documented reasons (`rruleToRepeat.ts`, `db.ts`). Fails loudly (red CI) if overshot.
-- **Evidence:**
-
-  `vitest.config.ts` states the floor's purpose explicitly:
-  ```
-          // Global floor. Per-file thresholds only guard the files they name, so
-          // a brand-new untested logic module used to slip through the gate
-          // entirely. This catches that: adding a sizeable unexercised module
-          // drags the project total below the floor and fails CI. Kept a few
-          // points under the measured total so ordinary UI work doesn't trip it.
-          statements: 57,
-          branches: 54,
-          functions: 48,
-          lines: 59,
-  ```
-  Measured this run: `Statements : 71.05% ( 5689/8007 )`. The gap is 14 points, not "a few". Solving `5689 / (8007 + x) = 0.57` gives **x ≈ 1,974** — nearly 2,000 fully-uncovered statements, **24.6% of the current codebase**, can land before the floor fires.
-
-  The mechanism has already failed once. `src/onboarding/` is at 0% across the board:
-  ```
-   src/onboarding    |       0 |        0 |       0 |       0 |
-    CoachTour.tsx    |       0 |        0 |       0 |       0 | 7-107
-    tourState.ts     |       0 |      100 |       0 |       0 | 1-8
-  ```
-  and it is not dead code — `src/routes/_app.tsx:13` does `import { CoachTour } from '@/onboarding'` and mounts it at line 236. A 162-line first-run onboarding flow ships to every new user with no test at all, and the gate the config says exists to catch exactly this stayed green.
-
-- **Problem:** The global coverage floor no longer performs the function its own comment claims, so whole untested feature modules reach production without the gate noticing — as `src/onboarding/` demonstrates today.
-- **Fix:** Raise the global thresholds to a few points under measured (≈68/62/59/70) so the floor tracks reality again, and add tests for `tourState.ts`'s localStorage guards and `CoachTour`'s step advance/dismiss paths.
 
 ---
 
