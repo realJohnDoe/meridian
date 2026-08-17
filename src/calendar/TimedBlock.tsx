@@ -28,7 +28,7 @@ const TIME_ONLY_WIDTH_GATE = '@max-[96px]:hidden'   // start-time chip alone
 const eventPillCls =
   'inline-flex items-center rounded-md px-1.5 py-0.5 text-2xs font-medium leading-none bg-current/20 whitespace-nowrap'
 
-interface EventBlockProps {
+interface TimedBlockProps {
   o: Occurrence
   dh: number
   colIndex: number
@@ -44,7 +44,7 @@ interface EventBlockProps {
 // pane-frozen clockValue a caller might have on hand — see DayPane's
 // AllDayItem for the fuller rationale (painting doesn't need the same
 // non-live-clock fallback sortOccs relies on).
-export function EventBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact }: EventBlockProps) {
+export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact }: TimedBlockProps) {
   const h   = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
   const top = h * HP + TOP_PAD + 1
   const height = Math.max(dh * HP - 4, 28)

@@ -252,17 +252,19 @@ like alternatives but aren't, or where the relationship between them is
 invisible from the names. A component whose name already answers the question
 (`SearchBar`, `SettingsDialog`) is deliberately absent, and one whose subtlety
 is already explained in its own header comment (`DayView`'s carousel seam,
-`EventBlock`'s badge gating) stays explained there.
+`TimedBlock`'s badge gating) stays explained there.
 
 ### occurrence renderers
 Three, chosen by context, all rendering the same `Occurrence`.
 `OccurrenceCard` is the **list** renderer (agenda, search, backlog, wikilink
 popup); `OccurrencePill` is the **compact grid** renderer (month cells, all-day
-strips); `EventBlock` is the **timeline** renderer, placed by time geometry —
-and it wraps `OccurrenceCard` rather than replacing it.
+strips); `TimedBlock` is the **timeline** renderer, placed by time geometry —
+and it wraps `OccurrenceCard` rather than replacing it. Named for the one
+thing it actually keys off (`!!o.time`), not for occurrence kind: a timed task
+renders here too, not just events.
 → `components/OccurrenceCard.tsx` · `OccurrenceCard`
 → `calendar/OccurrencePill.tsx` · `OccurrencePill`
-→ `calendar/EventBlock.tsx` · `EventBlock`
+→ `calendar/TimedBlock.tsx` · `TimedBlock`
 
 ### MarkdownTaskCard
 Despite the shape of the name, **not** a fourth occurrence renderer: it draws
