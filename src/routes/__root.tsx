@@ -43,28 +43,27 @@ export const THEME_CLASS: Record<string, string> = {
  */
 export const THEME_IDS = Object.keys(THEME_CLASS).filter(id => id !== 'light' && id !== 'dark')
 
-/**
- * Sentinel used to detect a color canvas refused to parse. Any value works as
- * long as it is not a color a theme would plausibly resolve to.
- */
+/** Marks the one theme-color tag this module owns, so it is never confused
+ *  with the static tags index.html ships. */
+const SYNCED_ATTR = 'data-theme-synced'
+
+/** Probe for detecting a color canvas refused to parse — see toHex(). Any
+ *  value works as long as no theme would plausibly resolve to it. */
 const PARSE_PROBE = '#ff00ff'
 
 /**
- * Normalizes any CSS <color> to a plain "#rrggbb" string, or null when the
- * value does not parse.
+ * Normalizes any CSS <color> to "#rrggbb", or null when it does not parse.
  *
- * Our themes are authored in oklch(), and both getComputedStyle() and
- * getPropertyValue() hand modern color syntax back as-authored rather than
- * downgrading it to legacy rgb(). <meta name="theme-color">'s own parser only
- * understands the legacy set, so an oklch() written straight through is
- * silently dropped and Android falls back to its own default. A 1x1 canvas
- * readback resolves any color space down to 8-bit sRGB — exactly the subset
- * that parser accepts.
+ * Hex is not required by the spec — `content` takes any CSS <color>, oklch()
+ * included — but it is the form every engine can read, so normalizing costs
+ * nothing in compliance and buys compatibility. It also gamut-clamps: our
+ * darkest surfaces sit fractionally outside sRGB, and the computed value for
+ * those serializes with negative channels (`color(srgb -0.0006 …)`), which is
+ * valid CSS but a poor thing to hand a status bar.
  *
- * Canvas rejects an unparseable fillStyle *silently*, keeping whatever was set
- * before (default #000000). Left undetected that would hand back an accidental
- * black and recreate the very bar this code exists to prevent, so the assign is
- * probed rather than trusted.
+ * Canvas rejects an unparseable fillStyle *silently*, keeping the previous
+ * value, so the assignment is probed rather than trusted — otherwise a colour
+ * that failed to parse would come back as an accidental #000000.
  */
 function toHex(cssColor: string): string | null {
   const canvas = document.createElement('canvas')
@@ -80,9 +79,47 @@ function toHex(cssColor: string): string | null {
   return `#${Array.from(data.subarray(0, 3), v => v.toString(16).padStart(2, '0')).join('')}`
 }
 
-// Android colors the status bar from this meta tag rather than from the page
-// itself, so it must track the active theme or it stays on the static default
-// from index.html for every theme but the dark one.
+/**
+ * The tag ThemeColorSync drives, created on first use.
+ *
+ * Placement is load-bearing, not cosmetic. To obtain a page's theme colour the
+ * UA walks the theme-color elements *in tree order* and returns the first one
+ * whose media matches, so this tag has to precede the static tags in
+ * index.html: appended after them it would be dead weight, because their
+ * prefers-color-scheme queries already match whenever the JS value differs
+ * from the system appearance — exactly the case this exists to cover. It
+ * carries no media attribute of its own, so once present it always wins.
+ *
+ * The static tags stay useful behind it: they paint the first frame before
+ * React mounts, cover JS being unavailable, and — since a *parse failure* also
+ * advances the algorithm to the next candidate — catch a value this hands over
+ * that the UA cannot read.
+ */
+function syncedThemeColorMeta(): HTMLMetaElement {
+  const existing = document.querySelector<HTMLMetaElement>(`meta[${SYNCED_ATTR}]`)
+  if (existing) return existing
+
+  const meta = document.createElement('meta')
+  meta.setAttribute('name', 'theme-color')
+  meta.setAttribute(SYNCED_ATTR, '')
+
+  const first = document.querySelector('meta[name="theme-color"]')
+  if (first?.parentNode) first.parentNode.insertBefore(meta, first)
+  else document.head.appendChild(meta)
+  return meta
+}
+
+/**
+ * Points the OS status bar at the active theme's surface colour.
+ *
+ * A progressive enhancement, deliberately: rewriting a theme-color tag's
+ * content is what the HTML standard prescribes — UAs must re-run the theme
+ * colour algorithm when a theme-color element's content attribute changes — so
+ * this is correct wherever that is implemented, and simply inert where it is
+ * not. Firefox for Android is currently in the latter camp
+ * (https://bugzil.la/1464696); it needs no special-casing here and will start
+ * working on its own once that is fixed.
+ */
 function ThemeColorSync() {
   // `resolvedTheme` is the dependency that matters, not `theme`: on the
   // system setting `theme` stays the constant 'system' while the OS flipping
@@ -96,18 +133,12 @@ function ThemeColorSync() {
     // would therefore always see the previous theme. Deferring to the next
     // frame lets that effect land first.
     const raf = requestAnimationFrame(() => {
-      const meta = document.querySelector('meta[name="theme-color"]')
-      if (!meta) return
-      // --background, *not* the html element's own background. html paints
-      // --backdrop, the letterbox behind the 430px app column, which is only
-      // ever visible on viewports wider than that column. On a phone the
-      // column fills the width and what actually sits under the status bar is
-      // the topbar (_app.tsx), painted bg-background and extended up into the
-      // notch via safe-area-inset-top. Reading --backdrop matched the status
-      // bar to a near-black (#000717 in the dark theme) that clashed with the
-      // topbar directly below it.
+      // --background is the app column and topbar; the topbar is what extends
+      // up under the status bar via safe-area-inset-top. html itself paints
+      // --backdrop, the letterbox behind the 430px column, which a phone never
+      // shows — matching the bar to that reads as near-black.
       const hex = toHex(getComputedStyle(document.documentElement).getPropertyValue('--background'))
-      if (hex) meta.setAttribute('content', hex)
+      if (hex) syncedThemeColorMeta().setAttribute('content', hex)
     })
     return () => cancelAnimationFrame(raf)
   }, [theme, resolvedTheme])
