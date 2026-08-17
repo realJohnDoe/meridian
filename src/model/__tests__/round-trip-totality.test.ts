@@ -1,5 +1,5 @@
 /**
- * Root-A ratchet — see plans/surveys/health-survey-data-integrity-results.md §2 ("Root A —
+ * Root-A ratchet — see plans/surveys/data-integrity-results.md §2 ("Root A —
  * the projection isn't required to be total") and the survey's Root B section.
  *
  * Every save regenerates a file from the store, so the store is only as faithful
@@ -31,7 +31,7 @@
  * Deliberately NOT here: #2 (clearing a field inherited from `defaults:`) is not
  * a load→save case — it only exists relative to an `applyEdit` call — so it falls
  * outside what an unedited-round-trip check can express. #2's own regression test
- * (health-survey-data-integrity-results.md finding #2) is what pins it instead.
+ * (data-integrity-results.md finding #2) is what pins it instead.
  */
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'

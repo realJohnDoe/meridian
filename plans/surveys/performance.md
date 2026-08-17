@@ -48,7 +48,7 @@ Findings must be anchored to one or more of these flows — an issue that no com
 
 ## Output structure
 
-**Reporting:** write findings to `health-survey-performance-results.md` in
+**Reporting:** write findings to `performance-results.md` in
 this directory, per the [shared reporting conventions](./README.md#reporting)
 — including suggested improvements to this survey file itself.
 
