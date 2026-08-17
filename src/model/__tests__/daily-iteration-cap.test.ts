@@ -47,7 +47,10 @@ describe('expandRange far from the anchor', () => {
     expect(dates).toHaveLength(0)
   })
 
-  it('a count-bounded series far from the anchor is unaffected by the seek-forward optimization', () => {
+  // A count-bounded series does use the seek-forward optimization, but only
+  // after its `count` has been resolved to the date of its last occurrence —
+  // so a window past that date is still empty rather than silently re-anchored.
+  it('a count-bounded series far from the anchor stays bounded by its count', () => {
     const dates = expandRange(
       [series({
         id: 'series-4',
