@@ -5,8 +5,8 @@ Implementation plan for the gaps surveyed in
 PRs, each independently shippable, with a recommended model per PR.
 
 **Status: PR1 shipped ([#750](https://github.com/realJohnDoe/meridian/pull/750)).
-PR2 open ([#757](https://github.com/realJohnDoe/meridian/pull/757)). PRs 3–9 not
-started.**
+PR2 shipped ([#757](https://github.com/realJohnDoe/meridian/pull/757)). PRs 3–9
+not started.**
 
 ---
 
