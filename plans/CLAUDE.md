@@ -13,8 +13,11 @@ results file as part of that same PR.
   file — other findings, the summary table row for each, coverage statement,
   category verdicts — untouched other than deleting the closed-out rows/
   sections.
-- If a results file's findings are all resolved this way, delete the file
-  entirely in the same commit, per `plans/surveys/README.md`.
+- **If the finding(s) removed were the last ones still open in that results
+  file, delete the file entirely** in the same commit — don't leave behind an
+  empty shell of headers and a summary table with no rows. This is not a
+  separate cleanup step to do later; check it every time you remove a
+  finding, per `plans/surveys/README.md`.
 - This applies to `plans/*.md` implementation plans too: once a plan (or a
   numbered step/section within one) has been implemented, remove that
   content from the plan file in the PR that implements it, rather than
