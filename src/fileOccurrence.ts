@@ -52,7 +52,7 @@ export function fileEntries(roots: Roots, vaultId?: string): FilePickerEntry[] {
 const _3YR_MS = 365 * 3 * 86_400_000
 
 /**
- * Per-slug resolution primitive used by `updateFileOccurrenceMap`.
+ * Per-key resolution primitive used by `updateFileOccurrenceMap`.
  *
  * Fill order (first match wins — future events, open tasks, past events, done tasks):
  *  1. Nearest upcoming event (dated, no `done` field, in the ±3yr window).
@@ -61,28 +61,28 @@ const _3YR_MS = 365 * 3 * 86_400_000
  *     ones, since "earliest" just means smallest date).
  *  4. Most-recent past event.
  *  5. Latest done occurrence in the ±3yr window (past or future).
- *  6. Fallback for slugs with nothing in the window: the first standalone item
+ *  6. Fallback for keys with nothing in the window: the first standalone item
  *     as-is, or — for a series entirely outside the window — a synthetic
  *     occurrence built from the series' own anchor date (RepeatPattern isn't
  *     itself an Occurrence, so expandRange can't hand us one).
  */
 function resolveOneKey(
   entryKey: EntryKey,
-  slugItems: StoreItem[],
+  keyItems: StoreItem[],
   roots: Roots,
   now: Date,
   AHEAD: Date,
   BACK: Date,
 ): Occurrence | null {
   const nowMs    = now.getTime()
-  const inWindow = expandRange(slugItems, roots, BACK, AHEAD) // ascending by time
+  const inWindow = expandRange(keyItems, roots, BACK, AHEAD) // ascending by time
 
   // 1. Nearest upcoming event.
   const futureEvent = inWindow.find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs)
   if (futureEvent) return futureEvent
 
   // 2. Undated open standalone task.
-  const undatedOpen = slugItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
+  const undatedOpen = keyItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
   if (undatedOpen) {
     return { ...undatedOpen, metadata: joinFileMeta(entryKey, undatedOpen.metadata, roots) } as Occurrence
   }
@@ -100,7 +100,7 @@ function resolveOneKey(
   if (latestDone) return latestDone
 
   // 6. Fallback: standalone as-is, or a synthesized anchor for an out-of-window series.
-  for (const item of slugItems) {
+  for (const item of keyItems) {
     if (isStandaloneOcc(item)) {
       return { ...item, metadata: joinFileMeta(entryKey, item.metadata, roots) }
     }
@@ -126,10 +126,10 @@ function resolveOneKey(
  * Re-resolves only entries whose items group or root entry actually changed.
  * An entry is reusable when:
  *   - its items group has the same length and the same element references, AND
- *   - prevRoots.get(slug) === roots.get(slug)  (reference equality)
+ *   - prevRoots.get(key) === roots.get(key)  (reference equality)
  *
  * Mutation helpers (upsertOverride, updateRoot, …) create new object references
- * only for the touched slug(s), so reference checks correctly identify exactly
+ * only for the touched key(s), so reference checks correctly identify exactly
  * what changed without deep comparison.
  */
 export function updateFileOccurrenceMap(
@@ -144,36 +144,36 @@ export function updateFileOccurrenceMap(
   const BACK  = new Date(now.getTime() - _3YR_MS)
 
   // Group previous items by key for reference comparison.
-  const prevBySlug = new Map<EntryKey, StoreItem[]>()
+  const prevByKey = new Map<EntryKey, StoreItem[]>()
   for (const item of prevItems) {
-    let group = prevBySlug.get(item.entryKey)
-    if (!group) { group = []; prevBySlug.set(item.entryKey, group) }
+    let group = prevByKey.get(item.entryKey)
+    if (!group) { group = []; prevByKey.set(item.entryKey, group) }
     group.push(item)
   }
 
   // Group new items by key and build the updated map.
-  const newBySlug = new Map<EntryKey, StoreItem[]>()
+  const newByKey = new Map<EntryKey, StoreItem[]>()
   for (const item of items) {
-    let group = newBySlug.get(item.entryKey)
-    if (!group) { group = []; newBySlug.set(item.entryKey, group) }
+    let group = newByKey.get(item.entryKey)
+    if (!group) { group = []; newByKey.set(item.entryKey, group) }
     group.push(item)
   }
 
   const map = new Map<EntryKey, Occurrence>()
-  for (const [slug, slugItems] of newBySlug) {
-    const prevGroup    = prevBySlug.get(slug)
-    const rootSame     = prevRoots.get(slug) === roots.get(slug)
+  for (const [key, keyItems] of newByKey) {
+    const prevGroup    = prevByKey.get(key)
+    const rootSame     = prevRoots.get(key) === roots.get(key)
     const groupSame    = prevGroup !== undefined
-      && prevGroup.length === slugItems.length
-      && prevGroup.every((item, i) => item === slugItems[i])
+      && prevGroup.length === keyItems.length
+      && prevGroup.every((item, i) => item === keyItems[i])
 
     if (rootSame && groupSame) {
-      const cached = prevFom.get(slug)
-      if (cached !== undefined) { map.set(slug, cached); continue }
+      const cached = prevFom.get(key)
+      if (cached !== undefined) { map.set(key, cached); continue }
     }
 
-    const occ = resolveOneKey(slug, slugItems, roots, now, AHEAD, BACK)
-    if (occ) map.set(slug, occ)
+    const occ = resolveOneKey(key, keyItems, roots, now, AHEAD, BACK)
+    if (occ) map.set(key, occ)
   }
 
   return map
@@ -184,7 +184,7 @@ export function updateFileOccurrenceMap(
 // `updateFileOccurrenceMap` used to run synchronously inside `setData`, which
 // put it between the Dexie read and the agenda's first paint. On a 300-file
 // vault that measured ~240 ms — larger than the YAML parse and the agenda's
-// whole expansion+grouping stage — because `resolveOneSlug` expands every slug
+// whole expansion+grouping stage — because `resolveOneKey` expands every key
 // over the ±3-year window above, generating ~28.5k occurrences to pick 300
 // representatives. See plans/time-to-today.md.
 //
@@ -216,7 +216,7 @@ const NO_FOM: Map<EntryKey, Occurrence> = new Map()
  * inputs returns the same Map by reference, so it behaves as a pure derivation.
  *
  * A miss still goes through `updateFileOccurrenceMap`, so it re-resolves only
- * the slugs that actually changed since the last call — the incremental path is
+ * the keys that actually changed since the last call — the incremental path is
  * unchanged, it just runs on read rather than on write.
  */
 export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<EntryKey, Occurrence> {
