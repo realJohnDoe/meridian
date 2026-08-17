@@ -1,10 +1,10 @@
 # Closing the iCal/RRULE gaps: PR plan
 
 Implementation plan for the gaps surveyed in
-[ical-rrule-gaps.md](./ical-rrule-gaps.md), plus ICS export. Nine PRs, each
-independently shippable, with a recommended model per PR.
+[ical-rrule-gaps.md](./ical-rrule-gaps.md), plus ICS export. Originally nine
+PRs, each independently shippable, with a recommended model per PR.
 
-**Status: not started.**
+**Status: PR1 shipped ([#750](https://github.com/realJohnDoe/meridian/pull/750)). PRs 2–9 not started.**
 
 ---
 
@@ -28,15 +28,14 @@ engine", which is Sonnet work with an exact reference — not open-ended design.
 
 ## Ordering
 
-PRs 1–4 are independent of each other and of everything else; run them in
+PRs 2–4 are independent of each other and of everything else; run them in
 parallel if you want. **PR 4 should land before PR 6**, because it is the
 regression net for the expressiveness work — it would have caught the yearly gap
 on its own.
 
 ```
-PR1 ─┐
-PR2 ─┤ (independent, parallel)
-PR3 ─┤
+PR2 ─┐
+PR3 ─┤ (independent, parallel)
 PR4 ─┴──────────────► PR6 ──► PR7 ──► PR8
 PR5 ─ (independent, but PR4 guards it)
 PR9 ─ (optional, any time)
@@ -46,7 +45,6 @@ PR9 ─ (optional, any time)
 
 | # | Title | Model | Est. | Touches format? |
 |---|---|---|---|---|
-| 1 | Engine: negative `bymonthday`, daily `BY*` limits | Sonnet 5 | 0.5d | no |
 | 2 | Engine: count-bounded series stop truncating at 500 | **Opus 5** | 1d | no |
 | 3 | `UNTIL` keeps its time-of-day | Sonnet 5 | 0.5d | yes (`end.time`) |
 | 4 | `repeatToRrule` + round-trip property test | **Opus 5** | 1d | no |
@@ -56,43 +54,15 @@ PR9 ─ (optional, any time)
 | 8 | ICS export: file emission + entry point | Sonnet 5 | 1.5–2d | no |
 | 9 | `WKST` (optional) | **Opus 5** | 1d | yes (`wkst`) |
 
-Total PRs 1–8: **7–8.5 days**. That is higher than the 6–10-day range in the
-survey's bottom row only in bookkeeping: the survey counted implementation, this
-counts implementation plus per-PR tests, review and CI.
+Total PRs 2–8: **6.5–8 days** (PR1's 0.5d has already shipped). That is higher
+than the 6–10-day range in the survey's bottom row only in bookkeeping: the
+survey counted implementation, this counts implementation plus per-PR tests,
+review and CI.
 
 The four PRs that touch `types.ts` are the ones to slow down on. `repeat:` is
 written to YAML verbatim and read back with an unchecked cast, so there is no
 schema to migrate — which cuts both ways: widening the type is free, and
 nothing will catch a mistake.
-
----
-
-### PR 1 — Engine: negative `bymonthday`, and `daily` honours `byweekday`/`bymonthday`
-
-**Model: Sonnet 5** · 0.5d · no format change
-
-Fixes gaps D and F. Two independent silent-wrongness bugs in
-`src/model/expansion.ts`, both with a working reference implementation in this
-repo:
-
-- Monthly branch (`expansion.ts:277`): resolve `mday < 0` as
-  `daysInMonth + mday + 1` and skip when the result falls outside
-  `[1, daysInMonth]`. Copy the shape of `monthDaysIn` (`rruleToRepeat.ts:317`).
-  Today `bymonthday: [-1]` yields Feb 27 / Mar 30 instead of the last day of
-  each month.
-- Daily branch (`expansion.ts:235`): apply `byweekday` and `bymonthday` as
-  *filters* on `periodStart`. Per RFC 5545 §3.3.10 they are limits at DAILY
-  frequency, not expansions. Copy the shape of `passesLimits`
-  (`rruleToRepeat.ts:392`). Today they are ignored entirely, so
-  `{ freq: daily, byweekday: [mo,tu,we,th,fr] }` emits all seven days.
-
-**Why Sonnet:** the correct behaviour is fully specified by the RFC and already
-implemented twenty files away. No judgment call.
-
-**Acceptance:** a regression test per bug, using the repros in the survey.
-Before writing them, read `src/model/__tests__/month-end-overflow.test.ts` and
-`fixtures/monthly-setpos.md` and confirm neither encodes the current wrong
-behaviour as expected output.
 
 ---
 
