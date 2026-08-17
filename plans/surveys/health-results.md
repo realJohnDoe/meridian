@@ -81,7 +81,7 @@ it is most likely in the sync state machine.
 `src/calendar` 423 file-touches, `src/editor` 199, `src/routes` 176, root `src`
 160, `src/storage` 142. Hottest single files: `storage/vaultRegistry.ts` (22),
 `storage/sync.ts` (17), `calendar/AgendaRow.tsx` (17). `worker/` saw 34 —
-low-churn, which is part of why finding #1 has gone unnoticed.
+low-churn, which is part of why its toolchain gap had gone unnoticed.
 
 ## 3. Category verdicts
 
@@ -91,9 +91,9 @@ low-churn, which is part of why finding #1 has gone unnoticed.
 | 2 | Simplicity & Overengineering | **clean** — every port, optional prop, and config knob checked for a second real caller; all passed |
 | 3 | Directory & File Layout | **clean** — barrels consistent, `lib/` residents each have 2+ consumers, no co-change/distance mismatch in the 60-day sample |
 | 4 | Security | **clean** — SSRF guards, CSP, CORS, and token storage all reviewed; no XSS/injection surface (see #7 for the dependency-side note) |
-| 5 | Testing & Error Handling | findings: **#1**, **#3**, **#4** |
+| 5 | Testing & Error Handling | findings: **#3**, **#4** |
 | 6 | Code Health & DRY | findings: **#3**, **#5** |
-| 7 | Toolchain & Developer Feedback Loops | findings: **#1**, **#2**, **#4**, **#8** |
+| 7 | Toolchain & Developer Feedback Loops | findings: **#2**, **#4**, **#8** |
 | 8 | Dependencies & Library Fit | findings: **#3**, **#6**, **#7** |
 | 9 | Styling & UX | **clean** — no bypassed shadcn components, no `onClick` on non-interactive elements, inline styles confined to virtualizer/positioning transforms |
 | 10 | Performance | findings: **#9** |
@@ -104,7 +104,6 @@ low-churn, which is part of why finding #1 has gone unnoticed.
 
 | # | Finding | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|
-| 1 | worker/ escapes `pnpm build` and `pnpm test` | 7 | 7 | Sonnet 5 | 24.5 |
 | 2 | `--max-warnings=12` budget is 2/3 permanent noise | 4 | 8 | Sonnet 5 | 16.0 |
 | 3 | `endDateToDuration` inverts calendar units with 365/30 modulo | 6 | 3 | Sonnet 5 | 9.0 |
 | 4 | Global coverage floor drifted 14 points below actual | 6 | 3 | Sonnet 5 | 9.0 |
@@ -121,41 +120,8 @@ correctness bug** — sort by raw impact if that is what you care about.
 
 **Sequencing note:** #6 and #7 both edit `pnpm-workspace.yaml`'s `overrides`
 block — do #6 (jsdom 30 + drop the undici cap) first, then #7 (add postcss) in
-the same file, so the lockfile regenerates once. #1 and #4 both touch test
-configuration but different files (`package.json` vs `vitest.config.ts`) and
-do not conflict. #2 edits `eslint.config.js` and `package.json`; only the
-latter overlaps #1, so land #1 first. Everything else is independent.
-
----
-
-### #1 — worker/ escapes both `pnpm run build` and `pnpm run test`
-
-- **Category:** `toolchain` `testing` `security`
-- **Impact:** 7
-- **Breadth:** 7 files (`find worker/src -name '*.ts'` → 7, of which 3 are test files carrying 39 tests)
-- **Recommended model:** **Sonnet 5** — hazard: the obvious fix (widening the root `vitest.config.ts` `include` glob to `worker/**`) is wrong and fails *loudly but confusingly*, because worker tests would then inherit the root's `setupFiles: ['src/test-utils/setup.ts']` and `@` alias, which the worker package neither has nor needs. The fix must compose `pnpm --filter meridian-oauth-worker` scripts into root `build`/`test` scripts so each package keeps its own vitest config. With that constraint stated in the task, Sonnet 5 is sufficient; without it, Opus 5.
-- **Evidence:**
-
-  `vitest.config.ts` scopes the root suite to `src/` only:
-  ```
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
-  ```
-  `tsconfig.json` references only the app and node projects — `worker/tsconfig.json` is not among them:
-  ```json
-    "references": [
-      { "path": "./tsconfig.app.json" },
-      { "path": "./tsconfig.node.json" }
-    ]
-  ```
-  and `package.json`'s gates are correspondingly root-only:
-  ```
-      "build": "vite build && tsc -b --noEmit && tsc -p tsconfig.test.json --noEmit",
-      "test": "vitest run",
-  ```
-  Measured: `pnpm exec vitest list` at the root returns 1,462 tests, **0** of them from `worker/`; `cd worker && pnpm exec vitest list` returns **39**. Only `pnpm run lint` (`eslint src worker/src`) covers the package. CI compensates via a separate `worker-checks` job in `ci.yml`, so this is invisible from CI green.
-
-- **Problem:** The package `eslint.config.js` itself calls "the most security-sensitive code in the repo, since it handles the GitHub client secret" is the one package whose tests and typecheck a developer or agent following CLAUDE.md's own instruction — *"Always use `pnpm run build` … to verify the full project build"* — never runs, so a broken OAuth exchange or a regressed SSRF guard reaches CI unnoticed locally.
-- **Fix:** Add root scripts that fan out to the worker (`"test": "vitest run && pnpm --filter meridian-oauth-worker run test"`, and likewise append `pnpm --filter meridian-oauth-worker run typecheck` to `build`), and correct CLAUDE.md's "Build verification" section to match.
+the same file, so the lockfile regenerates once. Everything else is
+independent.
 
 ---
 
@@ -410,7 +376,8 @@ latter overlaps #1, so land #1 first. Everything else is independent.
 improvements from this run — chiefly that the Budget section should require
 running the package manager's **audit** alongside the other gates (the postcss
 finding surfaced only because I ran it at a lower threshold than CI does), that
-"quality gates" should name **which workspace** each gate covers (finding #1 is
-exactly the failure mode of assuming a root gate covers a monorepo), and that
+"quality gates" should name **which workspace** each gate covers (the `worker/`
+toolchain gap found in this run is exactly the failure mode of assuming a root
+gate covers a monorepo), and that
 the Output structure should ask for the **gate-vs-workspace matrix** explicitly.
 See that commit's diff for the exact wording.
