@@ -74,7 +74,7 @@ CI does exactly this before linting (`.github/workflows/build.yml`), which is wh
 
 ## Domain vocabulary
 
-`GLOSSARY.md` (repo root) is the ubiquitous language: ~35 terms, which word to reach for when two are close enough to confuse (`hasRemote` vs `readOnly`, `view-only` vs `sandbox`, the two meanings of `items`), and a table of retired names so a stale doc or an old commit message can be translated forward. Read it before naming anything new.
+`GLOSSARY.md` (repo root) is the ubiquitous language: ~40 terms, which word to reach for when two are close enough to confuse (`hasRemote` vs `readOnly`, `view-only` vs `sandbox`, the two meanings of `items`, which of the three occurrence renderers a context wants), and a table of retired names so a stale doc or an old commit message can be translated forward. Read it before naming anything new.
 
 It is an **index, not an encyclopedia** — each entry is one sentence plus a pointer at the authoritative definition in code, which stays where it already lives (`src/types.ts` doc comments, `src/model/AGENTS.md`). Do not restate behaviour there; explanations belong beside the code.
 

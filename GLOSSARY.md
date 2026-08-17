@@ -22,13 +22,17 @@ the test suite. Two rules follow:
   on every edit above them; a symbol name drifts only on rename, which is
   exactly the event worth catching.
 
-Entry format — the pointer is the last line:
+Entry format — pointers come last, one line per file:
 
 ```
 ### term
 One sentence of orientation.
 → `relative/path.ts` · `symbolA`, `symbolB`
 ```
+
+An entry that contrasts things living in different files carries one pointer
+line each (see *occurrence renderers*), which is how a disambiguation entry
+gets every side of the contrast checked rather than just the first.
 
 ---
 
@@ -240,6 +244,57 @@ registers the implementation at startup.
 → `persistencePort.ts` · `EntityPersistence`, `setEntityPersistence`
 
 ---
+
+## View layer
+
+Only the view names that are *not* self-explanatory: where two components look
+like alternatives but aren't, or where the relationship between them is
+invisible from the names. A component whose name already answers the question
+(`SearchBar`, `SettingsDialog`) is deliberately absent, and one whose subtlety
+is already explained in its own header comment (`DayView`'s carousel seam,
+`EventBlock`'s badge gating) stays explained there.
+
+### occurrence renderers
+Three, chosen by context, all rendering the same `Occurrence`.
+`OccurrenceCard` is the **list** renderer (agenda, search, backlog, wikilink
+popup); `OccurrencePill` is the **compact grid** renderer (month cells, all-day
+strips); `EventBlock` is the **timeline** renderer, placed by time geometry —
+and it wraps `OccurrenceCard` rather than replacing it.
+→ `components/OccurrenceCard.tsx` · `OccurrenceCard`
+→ `calendar/OccurrencePill.tsx` · `OccurrencePill`
+→ `calendar/EventBlock.tsx` · `EventBlock`
+
+### MarkdownTaskCard
+Despite the shape of the name, **not** a fourth occurrence renderer: it draws
+one `FileMetadata.items` checklist line (`text` + `done`), which is the other
+meaning of *items*. Its `onPromote` is what turns such a line into a real
+entry.
+→ `components/MarkdownTaskCard.tsx` · `MarkdownTaskCard`
+
+### View vs Pane / Grid
+A `*View` is the swipeable carousel container; the `*Pane` or `*Grid` inside it
+is one page's content. Holds uniformly — `DayView`→`DayPane`,
+`WeekView`→`WeekPane`, `MonthView`→`MonthGrid`. Reach for the Pane/Grid when
+changing what a day or month *shows*, the View when changing navigation
+between them.
+→ `calendar/DayView.tsx` · `DayView`
+→ `calendar/DayPane.tsx` · `DayPane`
+→ `calendar/MonthGrid.tsx` · `MonthGrid`
+
+### AgendaRow (disambiguation)
+Two things in one directory, kept apart only by TypeScript's separate type and
+value namespaces. The **type** is a row descriptor in the agenda's flat
+virtualized list (`header` / `month` / `week` / `occ` / `day-empty`); the
+**component** renders just the `occ` case.
+→ `calendar/agendaSections.ts` · `AgendaRow`
+→ `calendar/AgendaRow.tsx` · `AgendaRow`
+
+### ui/ vs primitives/
+`components/ui/` mirrors the **shadcn registry** — only CLI-written files;
+`components/primitives/` holds **our own** shared primitives. The split is
+load-bearing for coverage, knip, and `shadcn diff`; see CLAUDE.md's *Directory
+structure* for what each exemption keys off.
+→ `components/primitives/responsive-modal.tsx` · `ResponsiveModal`
 
 ## Retired names
 
