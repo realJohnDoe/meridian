@@ -48,9 +48,9 @@ Findings must be anchored to one or more of these flows — an issue that no com
 
 ## Output structure
 
-**Reporting:** write findings to `performance-results.md` in
-this directory, per the [shared reporting conventions](./README.md#reporting)
-— including suggested improvements to this survey file itself.
+**Reporting:** write findings to `results/performance-results.md`, per the
+[shared reporting conventions](./README.md#reporting) — including suggested
+improvements to this survey file itself.
 
 ### 1. Snappiness verdict (~5 sentences)
 

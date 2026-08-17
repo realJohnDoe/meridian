@@ -75,9 +75,9 @@ Then state the gaps plainly. **Declared vs. revealed** is a strategy question �
 
 ## Output structure
 
-**Reporting:** write findings to `product-niche-results.md` in this
-directory, per the [shared reporting conventions](./README.md#reporting) —
-including suggested improvements to this survey file itself.
+**Reporting:** write findings to `results/product-niche-results.md`, per the
+[shared reporting conventions](./README.md#reporting) — including suggested
+improvements to this survey file itself.
 
 ### 1. Niche verdict (~6 sentences)
 
