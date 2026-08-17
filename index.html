@@ -11,17 +11,19 @@
          phone never shows). Keep in sync with src/index.css and the manifest
          theme_color in vite.config.ts.
 
-         Deliberately static and declarative. A previous version rewrote this
-         tag from JS on every theme change so all eleven themes could tint the
-         bar; that never worked on Firefox for Android and is not worth another
-         attempt debugging blind — Android status-bar theming is inconsistent
-         across browsers and installed-vs-browser contexts, and an installed app
-         may snapshot the manifest theme_color at install time and ignore this
-         tag entirely. Static tags apply at first paint with no JS, and cover
-         the two themes that `prefers-color-scheme` resolves to.
+         These are the fallback layer. ThemeColorSync (routes/__root.tsx)
+         inserts a tag ahead of these once React mounts and keeps it on the
+         active theme, so all eleven palettes tint the bar wherever the UA
+         implements the standard. These three cover what it cannot: the first
+         frame before React mounts, JS being unavailable, and — because a parse
+         failure advances the algorithm to the next candidate — a synced value
+         the UA cannot read. Between them they resolve the two themes that
+         `prefers-color-scheme` maps to.
 
-         Order matters: browsers take the FIRST tag whose media matches, so the
-         unconditional fallback has to come last. -->
+         Order matters: the UA takes the FIRST tag in tree order whose media
+         matches, so the unconditional fallback has to come last. That same rule
+         is why ThemeColorSync inserts its tag *before* this block rather than
+         appending it. -->
     <meta name="theme-color" content="#011227" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#e8edf4" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#011227" />

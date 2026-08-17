@@ -139,6 +139,176 @@ describe('__root — going away', () => {
   })
 })
 
+describe('__root — theme-color sync', () => {
+  const BACKGROUND_DARK = 'oklch(0.18 0.05 252)'  // -> #011227
+  const BACKGROUND_LIGHT = 'oklch(0.945 0.010 252)' // -> #e8edf4
+  const PALETTE: Record<string, [number, number, number]> = {
+    '#ff00ff':           [255, 0, 255],   // toHex's parse probe
+    [BACKGROUND_DARK]:   [1, 18, 39],
+    [BACKGROUND_LIGHT]:  [232, 237, 244],
+  }
+
+  /**
+   * jsdom ships no canvas, so toHex()'s 1x1 readback needs a stand-in. Models
+   * the two behaviours it leans on: an unparseable fillStyle is silently
+   * ignored (the previous value survives), and the filled pixel reads back as
+   * 8-bit sRGB.
+   */
+  function stubCanvas() {
+    let fill = '#000000'
+    const ctx = {
+      get fillStyle() { return fill },
+      set fillStyle(v: string) { if (v in PALETTE) fill = v },
+      fillRect: vi.fn(),
+      getImageData: () => ({ data: new Uint8ClampedArray([...(PALETTE[fill] ?? [0, 0, 0]), 255]) }),
+    }
+    return vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockReturnValue(ctx as unknown as CanvasRenderingContext2D)
+  }
+
+  /** The static fallback tags index.html ships, in their shipped order. */
+  function withStaticTags() {
+    const specs = [
+      { content: '#011227', media: '(prefers-color-scheme: dark)' },
+      { content: '#e8edf4', media: '(prefers-color-scheme: light)' },
+      { content: '#011227', media: null },
+    ]
+    return specs.map(({ content, media }) => {
+      const meta = document.createElement('meta')
+      meta.setAttribute('name', 'theme-color')
+      meta.setAttribute('content', content)
+      if (media) meta.setAttribute('media', media)
+      document.head.appendChild(meta)
+      return meta
+    })
+  }
+
+  const allTags = () => [...document.querySelectorAll('meta[name="theme-color"]')]
+  const syncedTag = () => document.querySelector('meta[name="theme-color"][data-theme-synced]')
+
+  let canvasSpy: ReturnType<typeof stubCanvas>
+  beforeEach(() => { canvasSpy = stubCanvas() })
+  afterEach(() => {
+    canvasSpy.mockRestore()
+    allTags().forEach(m => { m.remove() })
+    document.documentElement.style.removeProperty('--background')
+  })
+
+  it('writes the active theme --background into a theme-color tag', () => {
+    withStaticTags()
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+    render(<Root />)
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(syncedTag()?.getAttribute('content')).toBe('#011227')
+  })
+
+  // The invariant the whole approach rests on. The UA returns the FIRST
+  // theme-color element in tree order whose media matches, so a synced tag
+  // appended after the static ones would never be consulted whenever a
+  // prefers-color-scheme query matches — i.e. precisely when the chosen theme
+  // disagrees with the system appearance, the case this exists to handle.
+  it('inserts its tag ahead of the static fallbacks in tree order', () => {
+    const statics = withStaticTags()
+    document.documentElement.style.setProperty('--background', BACKGROUND_LIGHT)
+    render(<Root />)
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    const tags = allTags()
+    expect(tags[0]).toBe(syncedTag())
+    expect(tags.slice(1)).toEqual(statics)
+    // and it must not carry a media attribute, or it could fail to match
+    expect(syncedTag()?.hasAttribute('media')).toBe(false)
+  })
+
+  // The tag outlives any one mount, so a later run has to find and update it
+  // rather than append a second — two synced tags would leave the stale one
+  // first in tree order, and the UA would keep returning that.
+  it('reuses its own tag on a later run instead of stacking up new ones', () => {
+    withStaticTags()
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+    const { unmount } = render(<Root />)
+    act(() => { vi.advanceTimersByTime(32) })
+    const first = syncedTag()
+    unmount()
+
+    document.documentElement.style.setProperty('--background', BACKGROUND_LIGHT)
+    render(<Root />)
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(document.querySelectorAll('meta[name="theme-color"][data-theme-synced]')).toHaveLength(1)
+    expect(syncedTag()).toBe(first)
+    expect(syncedTag()?.getAttribute('content')).toBe('#e8edf4')
+  })
+
+  // The static tags are the fallback layer; a colour we cannot resolve must
+  // leave them in charge rather than publish an accidental black.
+  it('creates no tag at all when the colour does not parse', () => {
+    const statics = withStaticTags()
+    document.documentElement.style.setProperty('--background', 'not-a-color')
+    render(<Root />)
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(syncedTag()).toBeNull()
+    expect(allTags()).toEqual(statics)
+  })
+
+  // getComputedStyle round-trips oklch() rather than downgrading it to rgb().
+  // oklch() is a valid CSS <color> and so spec-legal in `content`, but hex is
+  // what every engine can actually read.
+  it('normalizes the oklch() token to hex rather than writing it raw', () => {
+    withStaticTags()
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+    render(<Root />)
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    const content = syncedTag()?.getAttribute('content')
+    expect(content).not.toContain('oklch')
+    expect(content).toMatch(/^#[0-9a-f]{6}$/)
+  })
+
+  // next-themes applies the theme class in its own effect on ThemeProvider,
+  // which commits *after* this child effect, so a synchronous read would see
+  // the previous theme.
+  it('defers the read to the next frame rather than reading during the effect', () => {
+    withStaticTags()
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+    render(<Root />)
+
+    expect(syncedTag()).toBeNull()
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(syncedTag()?.getAttribute('content')).toBe('#011227')
+  })
+
+  it('cancels the pending frame on unmount instead of writing after teardown', () => {
+    withStaticTags()
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+    const { unmount } = render(<Root />)
+
+    unmount()
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(syncedTag()).toBeNull()
+  })
+
+  // The tag is created on demand, so a page shipping none of the static ones
+  // still gets a synced one rather than throwing.
+  it('still works on a page with no static theme-color tags', () => {
+    document.documentElement.style.setProperty('--background', BACKGROUND_DARK)
+    render(<Root />)
+
+    act(() => { vi.advanceTimersByTime(32) })
+
+    expect(syncedTag()?.getAttribute('content')).toBe('#011227')
+  })
+})
+
 describe('__root — resuming', () => {
   it('syncs when the tab becomes visible again', () => {
     render(<Root />)
