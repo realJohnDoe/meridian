@@ -5,8 +5,9 @@ Implementation plan for the gaps surveyed in
 PRs, each independently shippable, with a recommended model per PR.
 
 **Status: PR1 shipped ([#750](https://github.com/realJohnDoe/meridian/pull/750)).
-PR2 shipped ([#757](https://github.com/realJohnDoe/meridian/pull/757)). PRs 3–9
-not started.**
+PR2 shipped ([#757](https://github.com/realJohnDoe/meridian/pull/757)). PR3
+open ([#759](https://github.com/realJohnDoe/meridian/pull/759)). PRs 4–9 not
+started.**
 
 ---
 
@@ -30,14 +31,12 @@ engine", which is Sonnet work with an exact reference — not open-ended design.
 
 ## Ordering
 
-PRs 3–4 are independent of each other and of everything else; run them in
-parallel if you want. **PR 4 should land before PR 6**, because it is the
-regression net for the expressiveness work — it would have caught the yearly gap
-on its own.
+PR 4 is independent of everything else; run it whenever you want. **PR 4
+should land before PR 6**, because it is the regression net for the
+expressiveness work — it would have caught the yearly gap on its own.
 
 ```
-PR3 ─┐
-PR4 ─┴──────────────► PR6 ──► PR7 ──► PR8
+PR4 ──────────────► PR6 ──► PR7 ──► PR8
 PR5 ─ (independent, but PR4 guards it)
 PR9 ─ (optional, any time)
 ```
@@ -46,7 +45,6 @@ PR9 ─ (optional, any time)
 
 | # | Title | Model | Est. | Touches format? |
 |---|---|---|---|---|
-| 3 | `UNTIL` keeps its time-of-day | Sonnet 5 | 0.5d | yes (`end.time`) |
 | 4 | `repeatToRrule` + round-trip property test | **Opus 5** | 1d | no |
 | 5 | `bysetpos` as a list; drop importer's `< -1` refusal | Sonnet 5 | 0.5d | yes (`bysetpos`) |
 | 6 | `bymonth` + yearly `BY*` in the engine | **Opus 5** | 1.5–2d | yes (`bymonth`) |
@@ -54,37 +52,15 @@ PR9 ─ (optional, any time)
 | 8 | ICS export: file emission + entry point | Sonnet 5 | 1.5–2d | no |
 | 9 | `WKST` (optional) | **Opus 5** | 1d | yes (`wkst`) |
 
-Total PRs 3–8: **5.5–7 days** (PR1's 0.5d has shipped and PR2's 1d is out for
-review — see status above). That is higher than the 6–10-day range in the
+Total PRs 4–8: **5–6.5 days** (PR1 and PR2 have shipped and PR3's 0.5d is out
+for review — see status above). That is higher than the 6–10-day range in the
 survey's bottom row only in bookkeeping: the survey counted implementation,
 this counts implementation plus per-PR tests, review and CI.
 
-The four PRs that touch `types.ts` are the ones to slow down on. `repeat:` is
-written to YAML verbatim and read back with an unchecked cast, so there is no
-schema to migrate — which cuts both ways: widening the type is free, and
-nothing will catch a mistake.
-
----
-
-### PR 3 — `UNTIL` keeps its time-of-day
-
-**Model: Sonnet 5** · 0.5d · touches format (`end.time`)
-
-Fixes gap J. `UNTIL=20260601T120000Z` currently keeps an 18:00 occurrence on
-June 1, because the importer drops the clock time (`endOf`,
-`rruleToRepeat.ts:102`) and the engine rounds up to `endOfDay`
-(`expansion.ts:185`).
-
-`RepeatEnd` already has a `time?` field that is effectively vestigial. **The PR
-description must state its chosen meaning** — recommended: "time-of-day
-accompanying `date`", i.e. `date` alone stays inclusive-to-end-of-day, `date` +
-`time` bounds on the instant. Then update `repeatToForm`'s documented lossy
-round-trip contract (`repeat.ts:79-100`, point 4), which currently says an
-`until` carrying only `time` is written back out as `date`.
-
-**Why Sonnet:** small and mechanical *once that meaning is fixed*. If you'd
-rather the meaning be decided inside the PR, make it Opus — it's a file-format
-semantics call.
+The three remaining PRs that touch `types.ts` are the ones to slow down on.
+`repeat:` is written to YAML verbatim and read back with an unchecked cast, so
+there is no schema to migrate — which cuts both ways: widening the type is
+free, and nothing will catch a mistake.
 
 ---
 
@@ -253,6 +229,6 @@ Per [CLAUDE.md](../CLAUDE.md):
   flood of spurious type-resolution errors.
 - A regression test per fix, in `src/model/__tests__/` or
   `src/storage/ical/*.test.ts`.
-- For the four format-touching PRs (3, 5, 6, 9): a YAML round-trip case, and a
+- For the three format-touching PRs (5, 6, 9): a YAML round-trip case, and a
   check that no existing fixture or snapshot in
   `src/model/__tests__/__snapshots__/` silently encodes the old behaviour.
