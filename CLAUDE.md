@@ -70,6 +70,14 @@ CI does exactly this before linting (`.github/workflows/build.yml`), which is wh
 
 `typescript` is intentionally pinned below the TS 7 major in both `package.json` (root) and `worker/package.json`. `typescript-eslint` (even at latest, 8.65.0) hard-refuses to run against TS 7: `eslint` exits with `typescript-eslint does not support TS 7.0`. `vite build`/`tsc -b` themselves are fine under TS 7 — only the lint step breaks. Tracked upstream: https://github.com/typescript-eslint/typescript-eslint/issues/10940 (support for TS ≥7.1). Don't attempt the TS 7 bump again until that lands — re-check the issue first.
 
+## Domain vocabulary
+
+`GLOSSARY.md` (repo root) is the ubiquitous language: ~35 terms, which word to reach for when two are close enough to confuse (`hasRemote` vs `readOnly`, `view-only` vs `sandbox`, the two meanings of `items`), and a table of retired names so a stale doc or an old commit message can be translated forward. Read it before naming anything new.
+
+It is an **index, not an encyclopedia** — each entry is one sentence plus a pointer at the authoritative definition in code, which stays where it already lives (`src/types.ts` doc comments, `src/model/AGENTS.md`). Do not restate behaviour there; explanations belong beside the code.
+
+`src/glossary.test.ts` enforces this: every referenced file must exist, every referenced symbol must still be declared in it, and no retired name may come back. **A rename therefore has to update `GLOSSARY.md` or the test suite fails** — that is the point, and it is why entries name symbols rather than describe them.
+
 ## Directory structure
 
 **Placement rule:** a file moves into a subdirectory only when every caller already lives in that subdirectory (or a layer that naturally depends on it). Do not propose moving a file just because it "feels" like it belongs somewhere — check the actual import graph first.
