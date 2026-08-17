@@ -155,6 +155,11 @@ interface ExpandedOcc<M = Record<string, unknown>> {
 
 const WDAYS_MAP: Record<string, number> = { su: 0, mo: 1, tu: 2, we: 3, th: 4, fr: 5, sa: 6 }
 
+/** Resolve a BYMONTHDAY entry (negative counts back from month end, -1 = last) against one month's length. */
+function resolveMonthDay(mday: number, daysInMonth: number): number {
+  return mday > 0 ? mday : daysInMonth + mday + 1
+}
+
 function mergeNode<M>(parent: ExpandNode<M>, child: ExpandNode<M>): ExpandNode<M> {
   return {
     date:      child.date || parent.date,
@@ -233,7 +238,17 @@ function generateScheduledDates(
   function matchesInPeriod(periodStart: Date): Date[] {
     const dates: Date[] = []
     if (freq === 'daily') {
-      dates.push(withTime(periodStart))
+      // Per RFC 5545 §3.3.10, BYDAY and BYMONTHDAY are *limits* at DAILY
+      // frequency (a daily period is a single day, so they can only narrow
+      // it), not expansions the way they are at coarser frequencies.
+      const passesWeekday = !byweekday || !byweekday.length
+        || byweekday.some(d => WDAYS_MAP[d.toLowerCase()] === periodStart.getDay())
+      const passesMonthday = !bymonthday || !bymonthday.length
+        || bymonthday.some(mday => {
+          const daysInMonth = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0).getDate()
+          return resolveMonthDay(mday, daysInMonth) === periodStart.getDate()
+        })
+      if (passesWeekday && passesMonthday) dates.push(withTime(periodStart))
     } else if (freq === 'weekly') {
       if (!byweekday || !byweekday.length) {
         dates.push(withTime(periodStart))
@@ -271,10 +286,11 @@ function generateScheduledDates(
       const daysInMonth = new Date(year, month + 1, 0).getDate()
       if (bymonthday && bymonthday.length) {
         for (const mday of bymonthday) {
-          // A day-of-month that doesn't exist in this month (e.g. 31 in April) is
-          // skipped rather than overflowing into the next month's 1st.
-          if (mday > daysInMonth) continue
-          dates.push(withTime(new Date(year, month, mday)))
+          const resolved = resolveMonthDay(mday, daysInMonth)
+          // A day-of-month that doesn't exist in this month (e.g. 31 in April,
+          // or -32) is skipped rather than overflowing into another month.
+          if (resolved < 1 || resolved > daysInMonth) continue
+          dates.push(withTime(new Date(year, month, resolved)))
         }
       } else if (byweekday && byweekday.length && bysetpos !== undefined) {
         const candidates: Date[] = []
