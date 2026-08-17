@@ -70,10 +70,10 @@ describe('repeatToForm / formToRepeat round-trip', () => {
       expect(roundTrip(repeat, null)).toEqual({ type: 'schedule', freq: 'monthly', interval: 1 })
     })
 
-    it('rewrites an until-end carrying only a time into a date', () => {
-      const repeat: Repeat = { type: 'schedule', freq: 'weekly', interval: 1, byweekday: ['mo'], end: { type: 'until', time: '2026-12-31T09:00' } }
+    it('drops the time-of-day from an until end', () => {
+      const repeat: Repeat = { type: 'schedule', freq: 'weekly', interval: 1, byweekday: ['mo'], end: { type: 'until', date: '2026-12-31', time: '09:00' } }
       expect(roundTrip(repeat)).toEqual({
-        type: 'schedule', freq: 'weekly', interval: 1, byweekday: ['mo'], end: { type: 'until', date: '2026-12-31T09:00' },
+        type: 'schedule', freq: 'weekly', interval: 1, byweekday: ['mo'], end: { type: 'until', date: '2026-12-31' },
       })
     })
 

@@ -12,7 +12,7 @@
 // weekday), the argument is written out at the check.
 
 import type { Repeat, Weekday } from '@/types'
-import { parseIcsDateTime, localDate } from './icsDateTime'
+import { parseIcsDateTime, localDate, localTime } from './icsDateTime'
 
 /** How far a fallback expansion reaches, relative to today. */
 const WINDOW_BEFORE_MS = 365 * 86_400_000
@@ -97,9 +97,15 @@ function endOf(parts: RRuleParts): Repeat['end'] | undefined {
     // UNTIL is UTC whenever it carries a time, so it goes through the same
     // conversion as DTSTART — an event ending 23:59:59Z ends the *next* local
     // day east of Greenwich, and clipping the series a day early is a visible
-    // wrong answer.
+    // wrong answer. When it does carry a time, that clock time is kept too —
+    // a date-only UNTIL still bounds the whole day, but one with a time bounds
+    // that exact instant.
     const instant = parseIcsDateTime(until)
-    if (instant) return { type: 'until', date: localDate(instant.when) }
+    if (instant) {
+      return instant.allDay
+        ? { type: 'until', date: localDate(instant.when) }
+        : { type: 'until', date: localDate(instant.when), time: localTime(instant.when) }
+    }
   }
   return undefined
 }

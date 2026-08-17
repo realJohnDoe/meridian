@@ -8,6 +8,11 @@ export type Weekday = 'mo' | 'tu' | 'we' | 'th' | 'fr' | 'sa' | 'su'
 
 // ── Repeat ───────────────────────────────────────────────────────────────────
 
+/**
+ * `until.time` (`HH:mm`, viewer-local) names an instant within `until.date` and
+ * is only meaningful alongside it — `date` bounds the series inclusive of the
+ * entire day; `date` + `time` bounds it at that instant.
+ */
 type RepeatEnd =
   | { type: 'until'; date?: string; time?: string }
   | { type: 'count'; occurrences: number }
