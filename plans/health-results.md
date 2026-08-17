@@ -92,7 +92,7 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 | 5 | Testing & Error Handling | **clean** |
 | 6 | Code Health & DRY | **clean** |
 | 7 | Toolchain & Developer Feedback Loops | findings: **#8** |
-| 8 | Dependencies & Library Fit | findings: **#6**, **#7** |
+| 8 | Dependencies & Library Fit | findings: **#7** |
 | 9 | Styling & UX | **clean** — no bypassed shadcn components, no `onClick` on non-interactive elements, inline styles confined to virtualizer/positioning transforms |
 | 10 | Performance | findings: **#9** |
 
@@ -102,50 +102,11 @@ low-churn, which is part of why its toolchain gap had gone unnoticed.
 
 | # | Finding | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|
-| 6 | undici pin's own revisit condition has been met | 5 | 2 | Sonnet 5 | 5.0 |
 | 7 | postcss advisory missing from the overrides block | 4 | 1 | Haiku 4.5 | 4.0 |
 | 8 | `.npmrc` comment contradicts its own setting | 2 | 1 | Haiku 4.5 | 2.0 |
 | 9 | 639 KB `public/icon.png` ships as a dead asset | 2 | 1 | Haiku 4.5 | 2.0 |
 
 Findings are numbered and listed in `(impact × breadth) ÷ effort` order.
-
-**Sequencing note:** #6 and #7 both edit `pnpm-workspace.yaml`'s `overrides`
-block — do #6 (jsdom 30 + drop the undici cap) first, then #7 (add postcss) in
-the same file, so the lockfile regenerates once. Everything else is
-independent.
-
----
-
-### #6 — the undici pin's own stated revisit condition has now been met
-
-- **Category:** `dependencies` `security`
-- **Impact:** 5
-- **Breadth:** 2 files (`pnpm-workspace.yaml`, `package.json`)
-- **Recommended model:** **Sonnet 5** — hazard: jsdom 30 is a major bump and the vitest `jsdom` environment must still boot, so the verdict is a green `pnpm run test:coverage` (which exercises every `// @vitest-environment jsdom` file), not merely a successful install. Fails loudly.
-- **Evidence:**
-
-  `pnpm-workspace.yaml` states the cap and its expiry condition in the same breath:
-  ```
-  # undici <7.29.0 has GHSA-4cwx-7wf7-3272 (cross-user info disclosure and
-  # parse-time crash via degenerate private cache-control directives). Pulled
-  # in transitively (dev-only) via jsdom (vitest/coverage-v8's DOM env), which
-  # `require()`s undici's internal lib/handler/{wrap,unwrap}-handler.js paths —
-  # those moved in undici 8, so the floor is capped below 8.0.0 to avoid a
-  # MODULE_NOT_FOUND at jsdom import time; revisit once jsdom ships a release
-  # built against undici 8.
-  ```
-  ```
-    undici: ">=7.29.0 <8.0.0"
-  ```
-  Verified against the registry (not memory): `pnpm outdated` reports `jsdom 29.1.1 → 30.0.1`, and `npm view jsdom@30 dependencies.undici` returns:
-  ```
-  jsdom@30.0.0 dependencies.undici = '^8.7.0'
-  jsdom@30.0.1 dependencies.undici = '^8.9.0'
-  ```
-  jsdom has shipped exactly the release the comment was waiting for.
-
-- **Problem:** A `<8.0.0` cap written as a temporary workaround now holds the entire dev tree on the undici 7 line for a reason that has expired, and because the rationale is recorded only in a comment nothing will ever re-check it.
-- **Fix:** Bump `jsdom` to `^30.0.1` in `package.json`, drop the `<8.0.0` half of the override to `undici: ">=8.9.0"`, and confirm with a green `pnpm run test:coverage`.
 
 ---
 
