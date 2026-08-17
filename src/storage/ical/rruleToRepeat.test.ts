@@ -77,6 +77,12 @@ describe('rruleToRepeat — representable rules', () => {
     expect(repeatOf('FREQ=WEEKLY;UNTIL=20261231', monday).end).toEqual({ type: 'until', date: '2026-12-31' })
   })
 
+  it('keeps the clock time from a datetime UNTIL', () => {
+    // The test environment runs in UTC, so the Z timestamp needs no conversion.
+    expect(repeatOf('FREQ=DAILY;UNTIL=20260601T120000Z', monday).end)
+      .toEqual({ type: 'until', date: '2026-06-01', time: '12:00' })
+  })
+
   it('maps biweekly BYDAY when the RFC and Meridian windows agree', () => {
     // Anchor Monday, WKST Monday, BYDAY=MO,WE — both listed days fall on or
     // after the anchor's weekday inside the RFC week, so the two agree.

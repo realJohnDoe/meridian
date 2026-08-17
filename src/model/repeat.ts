@@ -90,8 +90,9 @@ export function monthlyWeekdaySpec(jsDate: Date): MonthlyWeekdaySpec {
 //  3. `repeatToForm` infers `monthly: 'weekday-pattern'` only from the pair
 //     (`byweekday` present AND `bysetpos` present) — `bysetpos` alone, or
 //     `byweekday` alone on a monthly repeat, stays 'same-day'.
-//  4. An `end: { type: 'until' }` carrying only `time` is read into the form's
-//     `endVal` but written back out as `date`.
+//  4. An `end: { type: 'until' }` carrying a `time` loses it: the form has no
+//     field for time-of-day on an end date, so `repeatToForm` reads only
+//     `date` into `endVal` and `formToRepeat` writes back `date` alone.
 //  5. `after_completion` has no form fields for weekdays, monthly mode or an
 //     end condition, so those are dropped from any `after_completion` repeat
 //     that passes through the form.
@@ -173,7 +174,7 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
   let endVal = ''
   if (s.end?.type === 'until') {
     endType = 'until'
-    endVal = s.end.date ?? s.end.time ?? ''
+    endVal = s.end.date ?? ''
   } else if (s.end?.type === 'count') {
     endType = 'count'
     endVal = String(s.end.occurrences)

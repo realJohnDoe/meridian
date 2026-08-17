@@ -233,7 +233,10 @@ function generateScheduledDates(
 ): Date[] {
   const { freq, byweekday, bymonthday, bysetpos, interval = 1, end } = sched
   const results: Date[] = []
-  const untilDate = end?.type === 'until' ? toDate(end.date || end.time) : null
+  // `end.time` only ever accompanies `end.date` — it names an instant within
+  // that day, not a bound on its own.
+  const untilDate = end?.type === 'until' && end.date ? toDate(end.date) : null
+  const untilTime = end?.type === 'until' ? end.time : undefined
 
   function withTime(d: Date): Date {
     const r = startOfDay(d)
@@ -414,13 +417,15 @@ function generateScheduledDates(
   // the query window's `to` instead would make the same series yield different
   // occurrences depending on which page the caller happens to be viewing.
   //
-  // `end.date` on an `until` is a date-only value (no time-of-day); treat it as
-  // inclusive of the entire day so occurrences scheduled later that day are
-  // still included.
+  // `end.date` alone on an `until` is inclusive of the entire day, so
+  // occurrences scheduled later that day are still included. `end.time`
+  // narrows the bound to that instant — an `UNTIL` that carried a clock time
+  // in the source RRULE means exactly that instant, not end-of-day.
   //
   // The anchor itself is occurrence #1 (emitted separately by expandNode), so
   // only `occurrences - 1` further dates are ever generated here.
-  const dateBound = untilDate ? endOfDay(untilDate)
+  const dateBound = untilDate
+    ? (untilTime ? parseDateTime(fmtISO(untilDate), untilTime) ?? endOfDay(untilDate) : endOfDay(untilDate))
     : end?.type === 'count'
       ? cachedCountBound(sched, anchor, anchorTimeStr, () => resolveCountBound(Math.max(0, end.occurrences - 1)))
       : to
