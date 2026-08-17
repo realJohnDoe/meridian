@@ -333,13 +333,20 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // file. saveNode reports which key that was — the checklist line is rewritten
   // to a wikilink pointing at its BARE slug (that is what goes in a file), so it
   // must be the real one, not titleToSlug(title).
+  //
+  // Lands in `vaultId` (the parent entry's own vault), not `targetVaultId` (only
+  // set while a brand-new entry hasn't saved yet) — the rewritten `[[slug]]`
+  // link is resolved within that same vault. Participants are read straight
+  // from that vault's localStorage rather than the store's `defaultParticipants`,
+  // which only caches whichever vault is currently the *default* one and goes
+  // stale the moment the parent entry lives elsewhere.
   const handlePromoteTask = (title: string, done: boolean): string | null => {
     const key = saveNode(null, 'all', {
       item: null, title, tracked: true, itemType: 'task', done,
-      body: '', tags: [], items: [], participants: [...useStore.getState().defaultParticipants],
+      body: '', tags: [], items: [], participants: vaultId ? readVaultStringArray('meridian_default_participants', vaultId) : [],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
-    }, undefined, targetVaultId)
+    }, undefined, vaultId)
     if (key === null) return null
     void navigate(keyRoute(key))
     return keySlug(key)
