@@ -51,8 +51,6 @@ only `OccurrenceMetadata` (no file-level fields); file-level identity is in `roo
 
 - `parseToStoreItems(path, content): ParseResult` — full parse pipeline:
   `yamlParse` → `buildEffectiveTree` → `effectiveNodeToStoreItems` + `buildRoot`.
-- `parseYamlToStoreItems(yaml, fileSlug): ParseResult` — same but from a raw
-  YAML string (used for seed data).
 - `effectiveNodeToStoreItems(tree, fileSlug)` — walks an `EffectiveNode` tree and
   emits a flat `StoreItem[]` using `extractOccurrenceMetadata` (no file-level):
   - Series node (`repeat` present) → `RepeatPattern` + child `OccurrenceEntry`
@@ -128,7 +126,6 @@ distinction before assuming an encoding change would help.
   `jsTime` and `ownerId` populated.
 - `expandWithMultiday` — like `expandRange` but also generates virtual
   occurrences for days 2..N of multi-day events.
-- `collectUndated` — collects store items with no date.
 - `joinFileMeta`, `stableOccId` — metadata join and deterministic occurrence ID.
 
 ### `collapse.ts`
@@ -141,7 +138,7 @@ distinction before assuming an encoding change would help.
   occurrence fields (done, priority, duration, …) are emitted via the hoisting
   algorithm.
 
-  The inheritance algorithm is driven by `hoistSharedMetadata`:
+  The inheritance algorithm is driven by `computeSharedFields`:
   - **Simple cases** (single item, no override children): flat output — metadata
     alongside structural fields at root, no `defaults:` block.
   - **Single series with instances**: `defaults:` carries all series metadata;
@@ -151,10 +148,16 @@ distinction before assuming an encoding change would help.
     *all* series and standalones; each series root holds only structural fields;
     series-specific metadata goes in the series' local `defaults:` block.
 
-- `hoistSharedMetadata(metas)` — pure, domain-agnostic helper.  Given N
-  `InlineMetadata` objects, returns `rootDefaults` (fields shared by all) and
-  `localDefaults` (per-item diverging fields).  Knows nothing about YAML
-  structure, dates, or series.
+- `computeSharedFields(metas)` — pure, domain-agnostic helper.  Given N
+  metadata objects, returns the fields every one of them carries with an equal
+  value (unknown keys included, by structural equality).  Knows nothing about
+  YAML structure, dates, or series.
+
+  It replaced `hoistSharedMetadata`, which also returned a parallel
+  `localDefaults` array of per-item diffs.  That half is gone: each item is now
+  emitted with `occMetaToYaml(item.metadata, rootDefaults)`, which makes the
+  same decision without materialising an intermediate array that had to be kept
+  1:1 with the metadata list by index.
 
 - `serializeChildren(children, seriesMeta)` — serialises override instances,
   diffing each against the series metadata.
@@ -227,7 +230,7 @@ of scope here: absent-vs-empty for required arrays.
   written on it.
 - **Fields on nested container nodes** — a container's own remainder (no
   `StoreItem` of its own to hang it on) is now carried down to its descendant
-  items instead of discarded; `hoistSharedMetadata` collapses it back to a
+  items instead of discarded; `computeSharedFields` collapses it back to a
   shared `defaults:` block when every descendant agrees. See `storeItems.ts`'s
   `containerOwnRemainder`.
 - **Markdown-body leading/trailing whitespace, and the file's line-ending
@@ -286,16 +289,16 @@ No store, React, or file I/O dependencies.
   With `occ == null` it creates a brand-new entry; `draftId` is the editor draft's
   identity, stamped on the created item so a repeat commit for the same draft
   upserts instead of creating a second file.
-- `newEntrySlug(data, title, draftId?): string` — the slug a new entry will occupy.
-  Never returns a slug another file already owns: colliding titles (`titleToSlug`
-  collapses punctuation, accents, and everything past 60 chars) get a `-2`, `-3`, …
-  suffix rather than overwriting the file already there. Callers persist the slug
-  this returns, not `titleToSlug(title)`.
-- `updateRoot(roots, fileSlug, fields): Roots` — update file-level metadata for
-  one slug and return a new roots map.
-- `toggleDone`, `excludeOccurrence`, `deleteByFileSlug`, `deleteFollowing`
+- `newEntryKey(data, vaultId, title, draftId?): EntryKey` — the key a new entry
+  will occupy. Never returns a key another file already owns: colliding titles
+  (`titleToSlug` collapses punctuation, accents, and everything past 60 chars)
+  get a `-2`, `-3`, … suffix rather than overwriting the file already there.
+  Callers persist the key this returns, not `titleToSlug(title)`.
+- `updateRoot(roots, entryKey, fields): Roots` — update file-level metadata for
+  one entry and return a new roots map.
+- `toggleDone`, `excludeOccurrence`, `deleteByEntryKey`, `deleteFollowing`
   — take and return `StoreItem[]` only (no roots needed).
-- `upsertOverride`, `findSeries`, `fileSlugItems`
+- `upsertOverride`, `findSeries`, `entryKeyItems`
 
 ### `__tests__/`
 Test suite (Vitest).  See `__tests__/fixtures/` for canonical `.md` files used
@@ -310,9 +313,9 @@ as round-trip and edit-operation golden inputs.
 | Domain field names used in logic | `storeOps.ts`, `storeItems.ts`, `collapse.ts` via `INLINE_FIELDS` registry |
 | Field-agnostic tree / inheritance | `inheritance.ts`, `nodeSchema.ts` |
 | Structural-field expansion (generic pass-through metadata) | `expandNode`, `mergeNode` (internal) in `expansion.ts` |
-| Persistence / Dexie cache | `src/meridian.ts` |
-| React state / store mutations | `src/App.tsx`, `src/store.ts` |
-| UI formatting, dialogs, editor state | `src/components/`, `src/debug/` |
+| Persistence / Dexie cache | `src/storage/cache/` |
+| React state / store mutations | `src/routes/`, `src/store.ts` |
+| UI formatting, dialogs, editor state | `src/editor/`, `src/components/`, `src/format.ts` |
 
 The `inheritance.ts` / `nodeSchema.ts` files remain fully field-agnostic.
 `expansion.ts`'s internal engine (`expandNode`, `mergeNode`) knows only the
