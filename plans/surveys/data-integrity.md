@@ -74,10 +74,10 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 ## Output structure
 
 **Reporting:** this survey's results live in-place in the "Known suspects"
-section above (verdicts appended per suspect) plus
-`../data-integrity-results.md` for the full report — see that
-section for the existing pattern. Also append suggested improvements to this
-survey file itself, per the [shared reporting conventions](./README.md#reporting).
+section above (verdicts appended per suspect), plus the full report per the
+[shared reporting conventions](./README.md#reporting) — see that section for
+the existing pattern. Also append suggested improvements to this survey file
+itself, per the same conventions.
 
 ### 1. Integrity verdict (~5 sentences)
 
