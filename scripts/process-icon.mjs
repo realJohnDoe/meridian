@@ -11,7 +11,7 @@ import sharp from 'sharp'
 // corners) without touching similarly dark pixels deeper inside the body.
 const THRESHOLD = 4 // max channel at/below this counts as "field" during flood fill
 
-const { data, info } = await sharp('public/icon.png')
+const { data, info } = await sharp('assets/icon.png')
   .ensureAlpha()
   .raw()
   .toBuffer({ resolveWithObject: true })
