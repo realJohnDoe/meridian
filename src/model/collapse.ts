@@ -1,6 +1,7 @@
 import type { StoreItem, OccurrenceMetadata, FileMetadata, OccurrenceEntry } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
 import { OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, STRUCTURAL_KEYS, inlineFieldEqual, inlineFieldEmpty, absentFieldValue, deepEqual } from './fieldRegistry'
+import { saveFile } from './inheritance'
 
 type AnyOcc = OccurrenceEntry<OccurrenceMetadata>
 
@@ -284,3 +285,18 @@ function computeSharedFields(metas: Partial<OccurrenceMetadata>[]): Partial<Occu
 // (`if (v === undefined) continue`) is likewise gone: that was the other half
 // of the same bug, silently discarding an untracked override before it could
 // be emitted as `done: null`.
+
+/**
+ * One entry's store state as the bytes of its file — `collapseToYaml` plus the
+ * body, in the one order that is correct.
+ *
+ * The pair used to be written out by hand at each of the three places that
+ * needed it (the cache write, the cross-vault move, and the model suite's own
+ * `serialize` helper, whose comment promised it "mirrors writeEntityToCache").
+ * Three copies of a serialization rule agreeing by convention is how a
+ * divergence goes unnoticed, and it is what the write path is now handed
+ * instead of a key it has to resolve for itself.
+ */
+export function serializeEntry(items: StoreItem[], root?: FileMetadata): string {
+  return saveFile(collapseToYaml(items, root), root?.body ?? '', root?.fileConvention)
+}

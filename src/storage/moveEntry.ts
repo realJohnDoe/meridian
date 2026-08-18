@@ -1,9 +1,7 @@
 import { recordLocalEdit, recordLocalDelete } from '@/storage/cache/files'
 import { markInFlight, clearInFlight } from '@/storage/inFlight'
-import { collapseToYaml, entryKeyItems, saveFile } from '@/model'
 import { keyToPath, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
-import { getVaultLayer } from '@/storeBridge'
 import type { StorageBackend } from './backend'
 import { getBackend } from './backends'
 import { updateSyncUI, scheduleAutoPush } from './sync'
@@ -42,11 +40,15 @@ function writableBackend(key: EntryKey): StorageBackend | null {
  * as one action — so the confirm dialog carries the weight instead (see
  * `moveLinkBreakage`, which tells the user what the move costs before it runs).
  *
- * The content comes from the *target* vault's layer, because the store has
- * already been re-keyed by the time this runs (`commitMove` sets the store
- * first). Reading the source layer here would find nothing.
+ * `content` is the entry as it exists at `toKey`, handed in by `commitMove`
+ * rather than resolved from the store here — see `EntityPersistence`. It used
+ * to be read back out of the target vault's layer, which meant this function
+ * could disagree with the commit that triggered it and had to carry its own
+ * "the entry isn't in the target vault" guard, fired *after* the store was
+ * already re-keyed. That decision now sits in `commitMove`, before it commits
+ * anything.
  */
-export async function moveEntityInCache(fromKey: EntryKey, toKey: EntryKey): Promise<void> {
+export async function moveEntityInCache(fromKey: EntryKey, toKey: EntryKey, content: string): Promise<void> {
   const from = writableBackend(fromKey)
   const to   = writableBackend(toKey)
   if (!from || !to) {
@@ -57,18 +59,6 @@ export async function moveEntityInCache(fromKey: EntryKey, toKey: EntryKey): Pro
   markInFlight(toKey)
   markInFlight(fromKey)
   try {
-    const layer = getVaultLayer(to.id)
-    const items = entryKeyItems(layer.items, toKey)
-    const root  = layer.roots.get(toKey)
-    if (items.length === 0 && !root) {
-      // The store re-key is this function's precondition, so an empty target
-      // means the commit never landed. Writing an empty file over the target
-      // and tombstoning the source would then destroy the entry outright.
-      notify('Move failed: the entry is not in the target vault.')
-      return
-    }
-    const content = saveFile(collapseToYaml(items, root), root?.body ?? '', root?.fileConvention)
-
     await recordLocalEdit(to.id, keyToPath(toKey), content)
     await recordLocalDelete(from.id, keyToPath(fromKey))
 

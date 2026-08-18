@@ -9,7 +9,7 @@ import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
 import type { VaultKind } from '@/vaultRef'
-import { collapseToYaml, parseToStoreItems, entryKeyItems, saveFile, roundTripLoss, type ParseResult } from '@/model'
+import { parseToStoreItems, roundTripLoss, type ParseResult } from '@/model'
 import { pathToKey, keyToPath, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { runInIdleBatches } from '@/lib/idle'
@@ -1038,33 +1038,23 @@ function backendFor(key: EntryKey): StorageBackend | undefined {
   return getBackend(keyVaultId(key))
 }
 
-export async function writeEntityToCache(entryKey: EntryKey): Promise<void> {
+/**
+ * Make one entry's file durable in the cache, and queue it for push.
+ *
+ * `content` is handed in by the committing layer rather than resolved from the
+ * store here — see `EntityPersistence`. That is what makes this function a
+ * straight line: there is no lookup that could miss, no way for this side to
+ * disagree with the caller about what the entry holds, and so no "it looks
+ * incomplete, skip it" branch to silently drop a write. Whether a key is a
+ * write or a delete is likewise the caller's call (`persistEntries`), made
+ * against the data it is committing.
+ */
+export async function writeEntityToCache(entryKey: EntryKey, content: string): Promise<void> {
   const path = keyToPath(entryKey)
   markInFlight(entryKey)
   try {
     const backend = backendFor(entryKey)
     if (!backend || backend.readOnly) return
-    // This vault's layer, not the merge. Correctness doesn't hinge on it —
-    // `EntryKey` is unique across vaults, so the merge would find the same
-    // items — but scanning it would make every save's cost grow with the total
-    // number of registered vaults, and the file being written only ever lives
-    // in one of them.
-    const layer      = getVaultLayer(backend.id)
-    const slugItems  = entryKeyItems(layer.items, entryKey)
-    const root       = layer.roots.get(entryKey)
-    // Only a root that is gone too is a real delete (the deleteByEntryKey
-    // outcome). A root that survives with zero occurrences is an entry whose
-    // file-level fields are all that is left — it must still be written, not
-    // treated as a delete and not skipped. Skipping is what silently lost a
-    // just-created entry: nothing ever came back to write it, so it lived in
-    // memory until the tab closed and was gone on the next load, while search
-    // still listed its root. `collapseToYaml` emits the file-level fields on
-    // their own, and re-parsing those yields an occurrence again, so the entry
-    // heals itself rather than staying occurrence-less.
-    if (slugItems.length === 0 && !root) { await deleteFromBackend(entryKey); return }
-    const frontmatter = collapseToYaml(slugItems, root)
-    const body        = root?.body ?? ''
-    const content     = saveFile(frontmatter, body, root?.fileConvention)
     await recordLocalEdit(backend.id, path, content)
     // The first link in every chain a conflict investigation has to walk: when
     // the store handed this content to the write queue, and what it was.

@@ -326,7 +326,7 @@ describe('moveEntryToVault', () => {
 
     moveEntryToVault(testKey('note.md'), OTHER_VAULT)
 
-    expect(persistence.moves).toEqual([[testKey('note.md'), otherKey('note.md')]])
+    expect(persistence.moves).toEqual([[testKey('note.md'), otherKey('note.md'), expect.stringContaining('title: Note')]])
     expect(persistence.writes).toEqual([])
     expect(persistence.deletes).toEqual([])
   })

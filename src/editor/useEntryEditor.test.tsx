@@ -123,6 +123,12 @@ describe('useEntryEditor', () => {
     const key = testKey(titleToSlug('My New Task'))
 
     expect(persistence.writes).toEqual([key])
+    // Asserting the *content*, not just that a save was requested for the key.
+    // The key-only assertion this used to make passed for the whole time the
+    // write path was silently dropping the file — "a save was requested for K"
+    // and "K was written" are different claims, and only one of them was ever
+    // checked anywhere in the suite.
+    expect(persistence.contentByKey.get(key)).toContain('title: My New Task')
     // Navigating away mid-session used to tear down the editor (and any open
     // dialog) the instant the first save landed — see the duplicate-entry
     // investigation. The created item is now adopted internally instead, so
@@ -218,6 +224,11 @@ describe('useEntryEditor', () => {
     expect(items).toHaveLength(1)
     expect(items[0]!.metadata.priority).toBe('high')
     expect(persistence.writes).toEqual([key, key])
+    // The file the second save carried is a whole entry, not an empty document
+    // — which is what the store would have serialized to with the root alone.
+    const content = persistence.contentByKey.get(key)
+    expect(content).toContain('title: handy')
+    expect(content).toContain('priority: high')
   })
 
   it('editScope "add" suppresses both the meta save and the autosave', () => {
@@ -311,7 +322,7 @@ describe('useEntryEditor — moving between vaults', () => {
     act(() => { result.current.onVaultChange?.(OTHER) })
     act(() => { result.current.onMoveConfirm() })
 
-    expect(persistence.moves).toEqual([[testKey('note.md'), otherKey('note.md')]])
+    expect(persistence.moves).toEqual([[testKey('note.md'), otherKey('note.md'), expect.stringContaining('title:')]])
     expect(result.current.pendingMove).toBeNull()
     expect(navigateMock).toHaveBeenCalledWith(expect.objectContaining({
       to: '/entry/$vault/$slug',
