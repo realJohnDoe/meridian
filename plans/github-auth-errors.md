@@ -1,4 +1,4 @@
-# "Could not reconnect GitHub vault — check your token": investigation and plan
+# "Could not reconnect GitHub vault — check your token": investigation and PR plan
 
 Investigation of two field reports (2026-08-18):
 
@@ -101,7 +101,7 @@ Both field reports sit in this table:
 
 ## Why this is hard to fix and harder to test (the architectural part)
 
-Six structural causes. The plan below is organized around removing them, not
+Six structural causes. The PRs below are organized around removing them, not
 around patching the strings.
 
 **A. Two parallel classification paths, and the worse one greets the user.**
@@ -142,136 +142,392 @@ react differently.
 
 ---
 
-## Plan
+## How the model recommendation was made
 
-Six PRs, each shippable and independently testable. 1–3 fix the misleading
-error; 4 adds re-authentication; 5 removes the cause of Report A; 6 is wording.
+**Opus 5** where the PR decides *semantics with a silent, durable failure mode*
+— concurrency around a single-use credential, or a rule about when a credential
+is declared dead. Getting these wrong doesn't fail loudly in CI; it bricks one
+user's vault weeks later, which is exactly the bug this plan exists to fix.
 
-### PR 1 — One classifier, status-shaped, with a table-driven test
+**Sonnet 5** where the decision is already made — pinned by a table, a type
+signature, or a copy deck written out below — and the work is a mechanical edit
+plus the listed tests.
 
-New `src/storage/failureKind.ts`, a **pure function** `classifyFailure(e: unknown):
-Failure`:
+**Haiku 4.5** for purely additive or find-and-replace work against an explicit
+list.
+
+**This split was engineered, not observed.** The judgment calls were pulled
+*forward into this document* — the classification table (PR 1), the mount
+decision table (PR 2), the state type and its transitions (PR 3), the copy deck
+(PR 4, PR 9), and the security invariants of the re-auth round trip (PR 5) are
+all decided here, so the PRs that carry them are transcription plus tests. Where
+that was not honestly possible — PR 7 — the PR is kept small and left with Opus
+rather than being papered over with a spec that reads more certain than it is.
+
+The same instinct also drove the PR boundaries: **PRs are split along the
+judgment/mechanical seam**, not along file boundaries. PR 3 and PR 4 are one
+feature cut into "the state" and "the UI that renders it"; PR 6 and PR 7 are one
+credential fix cut into "write it atomically" and "decide when it's dead".
+
+## The PRs
+
+| # | Title | Model | Est. | Blocked by |
+|---|---|---|---|---|
+| 1 | `classifyFailure` + table-driven test | Sonnet 5 | 0.5d | — |
+| 2 | Drop the mount-time probe for network backends | Sonnet 5 | 0.5d | 1 |
+| 3 | `needsAttention` replaces `needsReconnect` (state only) | Sonnet 5 | 0.5d | 1 |
+| 4 | Attention rows + actions in `SyncButton`/`VaultSettings` | Sonnet 5 | 0.5d | 3 |
+| 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | 3 |
+| 6 | Atomic `credentialsSave` | **Haiku 4.5** | 0.25d | — |
+| 7 | Single-flight refresh + typed refresh failures | **Opus 5** | 1d | 6 |
+| 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | 1 |
+| 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | 4 |
+
+**Eight of nine are Sonnet or Haiku.** Total ≈ 4.75d including per-PR tests and
+review.
+
+### Ordering
+
+```
+PR1 ──┬─► PR2
+      ├─► PR3 ──┬─► PR4 ──► PR9
+      │         └─► PR5
+      └─► PR8
+PR6 ──────► PR7        (independent of everything above)
+```
+
+**PR 1 + PR 2 alone fix Report B** and retire the misleading message. **PR 6 +
+PR 7 alone fix Report A.** PR 5 makes either recoverable in one tap.
+
+---
+
+### PR 1 — `classifyFailure` + table-driven test
+
+**Model: Sonnet 5** · 0.5d · new file + two adapters
+
+New `src/storage/failureKind.ts`. One **pure** function, no octokit import, no
+I/O:
 
 ```ts
 export type FailureKind =
   | 'transient'   // never reached GitHub, or GitHub is unwell — retry, stay quiet
-  | 'auth'        // credentials rejected — try a refresh, then ask for sign-in
+  | 'auth'        // credentials rejected — refresh, then ask for sign-in
   | 'access'      // the App/user has no access to this repo any more
   | 'config'      // repo or branch renamed/deleted — the vault's settings are wrong
-  | 'conflict'    // unchanged: 409/422
+  | 'conflict'    // 409/422 — unchanged, still handled by ConflictError
+
 export interface Failure { kind: FailureKind; status?: number; message: string }
+
+export function classifyFailure(e: unknown): Failure
 ```
 
-The load-bearing rule, which is the actual fix for most of the table:
+The decision table, in order. **Row 1 is the fix** — everything below it only
+matters once an error has actually reached GitHub:
 
-> **No HTTP status ⇒ `transient`.** A real auth failure always carries a
-> response. An error that never reached GitHub cannot be about credentials.
+| # | Condition | Kind |
+|---|---|---|
+| 1 | no numeric `status` on the error | `transient` |
+| 2 | `status === 401` | `auth` |
+| 3 | `status === 403` and (`x-ratelimit-remaining === '0'` or `retry-after` present or `/rate limit\|secondary\|abuse/i` on the message) | `transient` |
+| 4 | `status === 403` | `access` |
+| 5 | `status === 404` | `config` |
+| 6 | `status === 408 \|\| 429 \|\| status >= 500` | `transient` |
+| 7 | `status === 409 \|\| 422` | `conflict` |
+| 8 | anything else | `transient` |
 
-That inversion retires the message-regex whack-a-mole (all the iOS wordings,
-`AbortError`, DNS, captive portals) in one move. Then: 401 → `auth`; 403 with
-rate-limit headers or a rate-limit/abuse message → `transient`; other 403 →
-`access`; 404 → `config`; 408/429/5xx → `transient`; 409/422 → `conflict`.
+> **Rule 1 is load-bearing and must be stated in the file's doc comment:** a
+> real auth failure always carries a response. An error that never reached
+> GitHub cannot be about credentials. This is what retires the message-regex
+> whack-a-mole — every iOS wording, `AbortError`, DNS and captive portals are
+> covered by the *absence* of a status rather than by matching their prose.
 
-`mapGitHubError` and `isTransientSyncError` become thin adapters over it, so the
-existing `AuthSyncError`/`TransientSyncError` call sites keep working.
+Adapters, so no other call site changes shape:
 
-*Testability:* one table test enumerating every row of the failure table above,
-including the verbatim iOS Safari strings and a status-less `TypeError`. This is
-the artifact that stops the class of bug from coming back silently.
+- `mapGitHubError` keeps its `path` parameter and its `ConflictError`
+  construction, but chooses the error class from `classifyFailure(e).kind`.
+- `isTransientSyncError` keeps the `navigator.onLine === false` check and the
+  `TransientSyncError` instance check, then delegates to
+  `classifyFailure(e).kind === 'transient'`. **Keep the existing regex as a
+  fallback** — `sync.test.ts` constructs bare `TransientSyncError('Failed to
+  fetch')` values (`sync.test.ts:429`) and a status-less real error must stay
+  transient anyway under rule 1.
 
-### PR 2 — Delete the mount-time probe for network backends
+**Tests** — `src/storage/__tests__/failureKind.test.ts`, one `it.each` over a
+literal table with **one row per row of the failure table above**, including
+verbatim:
 
-In `mountVaultRef`, stop calling `ensurePermission` for remote backends on the
-restore path; mount optimistically and let the first `syncOnActivate` cycle *be*
-the probe. It already has everything the mount path lacks: forced refresh and
-retry on 401, transient/actionable split, backoff, persistent per-vault error,
-deduped notification.
+```
+'Failed to fetch' · 'Load failed' · 'The network connection was lost.'
+'The Internet connection appears to be offline.' · 'NetworkError when attempting to fetch resource.'
+DOMException('…', 'AbortError') · a bare TypeError · { status: 502 } · { status: 429 }
+{ status: 403, headers: { 'retry-after': '60' } } · { status: 403 } (no headers)
+```
 
-Keep `ensurePermission(interactive: true)` in `addGitHubVaultOAuth` — there a
-human is waiting and "does the App have write access to this repo?" is a genuine
-pre-flight check. Keep the local-FS path untouched: an FS handle really does need
-a permission gate before use. The honest framing is that `ensurePermission` is a
-*local-filesystem* concern that was generalized to backends which have no
-permissions, only failures.
+**Hazard to name in review:** `isRateLimitError` (`githubApi.ts:54`) reads
+`e.response.headers`; octokit's `RequestError` also exposes `e.status` at the top
+level. Row 3 must read headers through the same accessor the existing helper
+uses, not invent a second one — move `isRateLimitError` into the new file and
+have `githubApi.ts` import it, rather than leaving two copies.
 
-Payoffs: one code path instead of two; the restore path can no longer produce a
-bogus credential accusation; a failed vault stays mounted, so `online`,
-`visibilitychange` and `autoSyncTick` retry it automatically (Report B
-self-heals in seconds instead of at next launch); and −2 GitHub round trips per
-vault per cold start, off the launch path.
+**Not in scope:** changing any user-facing string (PR 9) or any caller's
+behaviour (PR 2, PR 3). This PR should be behaviour-preserving except for the
+newly-transient rows.
 
-### PR 3 — A vault needing attention is *state*, not a toast
+---
 
-Replace `needsReconnect: boolean` in `VaultSyncStatus` with a discriminated field:
+### PR 2 — Drop the mount-time probe for network backends
+
+**Model: Sonnet 5** · 0.5d · depends on PR 1
+
+The architectural point: `ensurePermission` is a *local-filesystem* concern that
+was generalized to backends which have no permissions, only failures. Remote
+backends get their probe for free — the first sync is one.
+
+**The decision table for `mountVaultRef(ref, interactive, prePainted)`** —
+implement exactly this; there is nothing left to decide:
+
+| Vault kind | `interactive` | Behaviour |
+|---|---|---|
+| `local` | either | unchanged — `ensurePermission` still gates the mount |
+| `github` / `ical` | `false` (restore) | **skip the probe**; mount, `setVaultSync(needsAttention: null)`, `loadVaultContent` |
+| `github` / `ical` | `true` (add-vault, reconnect click) | unchanged — the probe stays; a human is waiting on the answer |
+| any | — | `buildBackend` returning `null` still yields `'no-credential'` |
+
+Leave `ensurePermission` on the `StorageBackend` interface and leave both
+implementations alone — `addGitHubVaultOAuth` and `addIcalVault` still call it,
+and "does the App have write access to this repo?" is a genuine pre-flight there.
+
+Then delete the `'denied' && ref.kind === 'github'` branch at
+`vaultRegistry.ts:465` — after this change the restore path cannot produce it.
+
+**Tests to update** (they encode the old behaviour and will fail loudly, which is
+the point): `vaultRegistry.test.ts:372` and `:412`. The github case flips from
+"does not mount, notifies" to "mounts, syncs, no notification". Add one new test:
+*a GitHub vault whose `ensurePermission` would answer `'denied'` is still mounted
+on restore, and `syncOnActivate` is called for it.*
+
+**Payoffs to state in the PR description:** one code path instead of two; a
+failed vault stays mounted, so `online`, `visibilitychange` and `autoSyncTick`
+retry it automatically (Report B self-heals in seconds instead of at next
+launch); and two fewer GitHub round trips per vault per cold start, off the
+launch critical path described in `restoreVaultsInner`'s phase comments.
+
+**Hazard:** phase 2 of `restoreVaultsInner` is `await`ed per vault in a loop. It
+must stay that way — do not parallelize as a drive-by; the serial walk is
+deliberate (see `autoSyncTick`'s doc comment on secondary rate limits).
+
+---
+
+### PR 3 — `needsAttention` replaces `needsReconnect` (state only, no UI)
+
+**Model: Sonnet 5** · 0.5d · depends on PR 1
+
+In `store.ts`, replace `needsReconnect: boolean` with:
 
 ```ts
-needsAttention: null | { kind: 'fs-permission' | 'reauth' | 'access' | 'config'; message: string }
+export type AttentionKind = 'fs-permission' | 'reauth' | 'access' | 'config'
+export interface VaultAttention { kind: AttentionKind; message: string }
+// on VaultSyncStatus:
+needsAttention: VaultAttention | null   // default null
 ```
 
-`runSync` sets it from PR 1's `Failure` — `auth` only after a forced refresh has
-already failed. `SyncButton` renders one row per kind with the matching action
-(Reconnect / Sign in again / Open GitHub App settings / Fix branch in Settings),
-and the red icon persists after the toast is gone.
+Who writes it — the complete list, no other writers:
 
-Also fix `syncToBackend`'s "Add a local folder first." for the named-vault case.
+| Site | Condition | Value |
+|---|---|---|
+| `mountVaultRef` | local `'prompt'`, non-interactive | `{ kind: 'fs-permission', … }` |
+| `mountVaultRef` | mounted successfully | `null` |
+| `runSync` catch | `classifyFailure` → `auth`, **and** the forced-refresh retry already failed | `{ kind: 'reauth', … }` |
+| `runSync` catch | → `access` | `{ kind: 'access', … }` |
+| `runSync` catch | → `config` | `{ kind: 'config', … }` |
+| `runSync` success | always | `null` |
+| `runSync` catch | → `transient` | **unchanged** — sets `offline`, never `needsAttention` |
 
-*Testability:* assertions move from toast strings to a store field. Add to
-`GLOSSARY.md` under "Vaults and backends" (and list `needsReconnect` as retired).
+`severityOf` in `SyncButton.tsx:21` swaps `status.needsReconnect` for
+`status.needsAttention !== null`; the existing "Permission needed — reconnect"
+row keeps working for `kind === 'fs-permission'`. **No other UI change in this
+PR** — that is PR 4.
 
-### PR 4 — Re-authenticate an existing vault, without re-adding it
+Also in this PR, because it is the same one-line class of bug: `syncToBackend`
+with a `vaultId` that resolves to no mounted backend must not say *"Add a local
+folder first."* (`sync.ts:996`). Split the message — the no-argument case keeps
+today's text, the named-vault case says the vault isn't connected and names it.
 
-- `startGitHubSignIn({ reconnectVaultId })` stashes the vault id in
-  `sessionStorage` beside the verifier and state.
-- `auth/callback` branches on it: verify the vault still exists and that
-  `fetchInstalledRepos` still lists its `owner/repo`, then call a new
-  `reauthGitHubVault(vaultId, tokens)` — save credentials, (re)mount, clear
-  `needsAttention`, sync. No repo picker, no new vault.
-- If the repo is gone from the installation, say so by name and link the App's
-  install/configure page instead of blaming the credential.
-- Entry points: the `needsAttention` row in `SyncButton`, and a "Sign in with
-  GitHub again" button in `VaultSettings`' GitHub section.
+**Tests:** assertions move from `notifyFns.notify` strings to the store field —
+that is the durable win here. Update `vaultRegistry.test.ts:694` and the
+`sync.test.ts` auth cases (`:774`, `:793`, `:811`, `:1468`) to assert
+`syncByVault.get(id).needsAttention`.
 
-The point beyond convenience: the vault id is unchanged, so Dexie rows,
-favourites, prefs, URLs **and unpushed local edits all survive** — unlike the
-remove-and-re-add workaround, which deletes them.
+**Glossary:** `GLOSSARY.md` §"Vaults and backends" gets a `needsAttention` entry
+(one sentence + the `store.ts` pointer), and `needsReconnect` goes in the retired
+-names table. `src/glossary.test.ts` enforces this — a rename that skips it fails
+the suite, which is the intended tripwire.
 
-### PR 5 — Make token rotation survivable (the cause of Report A)
+---
 
-- **Atomic:** one `credentialsSave(vaultId, { accessToken, refreshToken, expiresAt })`
-  writing all three keys in a single Dexie transaction (`meta.bulkPut`). No
-  interruption can leave a new access token beside a dead refresh token.
-- **Single-flight:** a per-vault in-flight promise map in `githubOAuth.ts`, so two
-  callers can never spend the same one-use refresh token.
-- **Typed refresh failure:** have the Worker pass GitHub's `error` through, and
-  split `exchangeForTokens` into "GitHub rejected the refresh token"
-  (`invalid_grant`/`bad_refresh_token` → definitive, set `needsAttention:
-  'reauth'`, stop retrying) versus network/5xx/non-JSON (→ `TransientSyncError`,
-  keep the existing token, retry later, say nothing about credentials).
-- **Journal it:** add `auth-refresh` / `auth-failed` events to `syncJournal.ts`
-  (kind + status only, never a token). It is already the flight recorder with a
-  "Copy details" surface — this is the difference between diagnosing the next
-  report from evidence and guessing from a screenshot.
+### PR 4 — Attention rows and their actions
 
-### PR 6 — Vocabulary
+**Model: Sonnet 5** · 0.5d · depends on PR 3
 
-No user-facing string says "token" any more. Each names something the user can
-act on:
+Render `needsAttention` as one row per kind in `SyncButton`'s popover, and mirror
+the two actionable ones into `VaultSettings`' GitHub section. The copy deck —
+implement verbatim, no rewording:
 
-| Now | Proposed |
+| Kind | Row text | Action |
+|---|---|---|
+| `fs-permission` | Permission needed — reconnect | `reconnectVault(id)` *(existing)* |
+| `reauth` | Signed out of GitHub — sign in again | `startGitHubSignIn({ reconnectVaultId: id })` *(PR 5; until then, disabled)* |
+| `access` | Meridian no longer has access to `{owner}/{repo}` | link to `GITHUB_APP_INSTALL_URL` |
+| `config` | `{owner}/{repo}` (`{branch}`) isn't reachable — it may have been renamed or deleted | opens this vault's Settings |
+
+Row styling follows the existing `needsReconnect` row (`SyncButton.tsx:67-76`):
+`text-2xs`, `AlertCircle`, `text-note`. The red icon now persists after the toast
+is gone, which is the actual user-visible fix.
+
+**Ship PR 4 before PR 5 if you want** — the `reauth` row renders disabled with
+the same text, and PR 5 just wires its `onClick`.
+
+---
+
+### PR 5 — Re-authenticate an existing vault
+
+**Model: Sonnet 5** · 1d · depends on PR 3
+
+The flow, end to end:
+
+1. `startGitHubSignIn(opts?: { reconnectVaultId?: string })` stashes the id in
+   `sessionStorage` under `meridian_oauth_reconnect`, beside the existing
+   verifier and state keys, and clears it on the same path they are cleared.
+2. `auth/callback` reads it **after** `completeGitHubSignIn` has validated state
+   and verifier — never before, and never as a substitute for either.
+3. Reconnect branch: look the vault up in `getVaults()`; call
+   `fetchInstalledRepos(tokens.accessToken)`; **require the vault's own
+   `owner/repo` to be in that list**; then call a new
+   `reauthGitHubVault(vaultId, tokens)` in `vaultRegistry.ts` — save credentials
+   (via PR 6's `credentialsSave`), unmount any existing backend, mount a fresh
+   `GitHubBackend`, clear `needsAttention`, sync. No repo picker, no new vault,
+   no `newVaultId`.
+4. Failure branches: vault no longer registered → fall through to today's normal
+   add flow. Repo not in the installation → the `no-installations` screen's
+   sibling, naming the repo and linking the App's configure page.
+
+**Security invariants — call these out in the PR description and check them in
+review:**
+
+- The reconnect id **never** short-circuits PKCE state/verifier validation.
+- Credentials are saved **only** after the repo-membership check above passes.
+  This is what stops a sign-in as a *different GitHub account* from writing that
+  account's tokens onto this vault.
+- The id lives in `sessionStorage`, not the URL — it must not be reachable from a
+  crafted callback link.
+
+**Why this matters beyond convenience:** the vault id is unchanged, so Dexie
+rows, favourites, prefs, URLs **and unpushed local edits survive** — unlike
+remove-and-re-add, which calls `cacheDeleteAll` and destroys them.
+
+**Tests:** extend `auth.callback.test.tsx` (it already mocks the three OAuth
+entry points) with: reconnect id present + repo still installed → `reauth` called,
+`addGitHubVaultOAuth` **not** called; reconnect id present + repo missing → neither
+called, install screen shown; no reconnect id → today's behaviour unchanged.
+
+---
+
+### PR 6 — Atomic `credentialsSave`
+
+**Model: Haiku 4.5** · 0.25d · independent
+
+Purely mechanical, and it removes the cause of Report A. Add to
+`cache/credentials.ts`:
+
+```ts
+export async function credentialsSave(
+  vaultId: string,
+  c: { accessToken: string; refreshToken: string; expiresAt: number },
+): Promise<void>
+```
+
+implemented as a single `d.meta.bulkPut([...])` — one Dexie transaction, so no
+interruption can leave a new access token beside a dead refresh token. Call it
+from the two places that write all three keys together: `githubOAuth.ts:143-145`
+and `addGitHubVaultOAuth` (`vaultRegistry.ts:616-618`). Leave the individual
+setters in place for the tests that use them.
+
+**Test:** one case asserting a single `bulkPut` call rather than three `put`s
+(the in-memory credential fake in `githubOAuth.test.ts` needs the new function
+added to its mock).
+
+---
+
+### PR 7 — Single-flight refresh + typed refresh failures
+
+**Model: Opus 5** · 1d · depends on PR 6
+
+**The one PR left with Opus, deliberately.** Three coupled decisions, each with a
+failure mode that is silent, durable, and invisible to CI — a wrong call here
+brings back exactly the bug this plan is closing.
+
+1. **Single-flight.** A per-vault `Map<string, Promise<string | null>>` in
+   `githubOAuth.ts`, so two callers can never spend the same one-use refresh
+   token. The judgment: a `force: true` call must **not** join an in-flight
+   *non-forced* one whose result may be the stale token — but it must also not
+   start a second refresh on top of one that is already rotating. Getting the
+   join rule wrong burns the refresh token, which is unrecoverable.
+2. **`invalid_grant` vs. everything else.** Have the Worker pass GitHub's `error`
+   field through, and split `exchangeForTokens` into "GitHub rejected the refresh
+   token" (`invalid_grant` / `bad_refresh_token` → definitive: set
+   `needsAttention: 'reauth'`, stop retrying) versus network/5xx/non-JSON (→
+   `TransientSyncError`: keep the existing token, retry later, and say nothing
+   about credentials). The judgment is which GitHub error codes are genuinely
+   terminal — treating a recoverable one as terminal nags the user to re-auth for
+   nothing; the reverse hides a dead credential behind an infinite retry.
+3. **Clock skew.** `ensureFreshAccessToken` trusts the local clock
+   (`githubOAuth.ts:137-138`). A phone hours out of sync either refreshes constantly
+   (harmless) or skips a refresh it needed (a 401 the mount path used to
+   mishandle). Decide whether the server's 401 becomes the only authority on
+   expiry, or the local expiry stays a hint.
+
+Worker side: `worker/src/oauthToken.ts` already forwards GitHub's JSON body and
+status verbatim, so (2) may need no Worker change at all — verify before
+touching it, and if it does, `worker/src/oauthToken.test.ts` is the seam.
+
+---
+
+### PR 8 — Auth events in the sync journal
+
+**Model: Sonnet 5** · 0.25d · depends on PR 1
+
+`syncJournal.ts` is already the bounded in-memory flight recorder with a "Copy
+details" surface, built for exactly this: a failure on a phone with no devtools
+attached. It currently records nothing about auth.
+
+Add three `SyncEventKind`s — `auth-refresh`, `auth-refreshed`, `auth-failed` —
+and record `{ kind: FailureKind, status }` from PR 1's classifier plus the vault
+id. **Never a token, never a token prefix, never a refresh token length** — the
+file's own doc comment sets that bar ("No file content, ever") and it applies
+doubly here.
+
+This is what turns the next report from a screenshot into evidence.
+
+---
+
+### PR 9 — Vocabulary pass
+
+**Model: Haiku 4.5** · 0.25d · depends on PR 4
+
+Find-and-replace against this exact list. No user-facing string says "token";
+each names something the user can act on.
+
+| Now | Replace with |
 |---|---|
-| `Could not reconnect GitHub vault "X" — check your token.` | *(gone — PR 2/3 replace it with a persistent row)* |
-| `GitHub token is invalid or expired.` | `Meridian's access to GitHub expired — sign in again.` |
-| `GitHub access denied. Check your token permissions.` | `Meridian no longer has write access to X — check the App's repository access on GitHub.` |
-| `Repository not found or token lacks access.` | `X/Y (branch Z) isn't reachable — it may have been renamed, deleted, or removed from the App.` |
-| `Vault "X" is missing its GitHub token — remove and re-add it.` | `Vault "X" isn't signed in to GitHub — sign in again.` |
+| `Could not reconnect GitHub vault "X" — check your token.` (`vaultRegistry.ts:466`) | *deleted in PR 2* |
+| `Could not connect to GitHub vault "X" — check your token.` (`:515`) | `Could not connect to "X" — sign in to GitHub again.` |
+| `Vault "X" is missing its GitHub token — remove and re-add it.` (`:464`) | `Vault "X" isn't signed in to GitHub — sign in again.` |
+| `GitHub token not found — try removing and re-adding this vault.` (`:503`) | `"X" isn't signed in to GitHub — sign in again.` |
+| `GitHub token is invalid or expired.` (`githubApi.ts:69`) | `Meridian's access to GitHub expired — sign in again.` |
+| `GitHub access denied. Check your token permissions.` (`:75`) | `Meridian no longer has write access — check the App's repository access on GitHub.` |
+| `Repository not found or token lacks access.` (`:77`) | `That repository or branch isn't reachable — it may have been renamed, deleted, or removed from the App.` |
 
-## Sequencing and cost
+Leave `addGitHubVaultOAuth`'s "check the App has write access to it" alone — it
+is already correct.
 
-PR 1 is a prerequisite for 2 and 3; 4 and 5 are independent of each other and of
-1–3. Rough sizes: PR 1 small (one file plus a table test), PR 2 small (a deletion
-plus test updates), PR 3 medium (store field + UI rows), PR 4 medium (the sign-in
-round trip and its callback branch), PR 5 small-to-medium, PR 6 trivial.
-
-Shipping only PR 1 + PR 2 already fixes Report B and removes the misleading
-message. PR 5 alone removes the cause of Report A; PR 4 makes it recoverable in
-one tap when it happens for any other reason.
+**Check after replacing:** `rg -i "your token" src/` returns nothing.
