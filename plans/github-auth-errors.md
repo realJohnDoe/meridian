@@ -7,9 +7,11 @@ Investigation of two field reports (2026-08-18):
 - **Report B** (yesterday, iPhone/LTE): the same toast appeared; nothing was
   re-added; sync worked again by itself.
 
-**Status: PR 6 and PR 7 have shipped — hence the gap in the numbering below.
-Everything still listed is outstanding.** Every claim marked _read_ comes from
-the code with the line cited.
+**Status: PR 1 (`src/storage/failureKind.ts`), PR 6 and PR 7 have shipped —
+hence the gaps in the numbering below. Everything still listed is
+outstanding.** Every claim marked _read_ comes from the code with the line
+cited; the investigation sections below describe the code as it stood when the
+reports came in, so a citation there may predate a shipped PR.
 
 ---
 
@@ -164,110 +166,33 @@ credential fix cut into "write it atomically" and "decide when it's dead".
 
 | # | Title | Model | Est. | Blocked by |
 |---|---|---|---|---|
-| 1 | `classifyFailure` + table-driven test | Sonnet 5 | 0.5d | — |
-| 2 | Drop the mount-time probe for network backends | Sonnet 5 | 0.5d | 1 |
-| 3 | `needsAttention` replaces `needsReconnect` (state only) | Sonnet 5 | 0.5d | 1 |
+| 2 | Drop the mount-time probe for network backends | Sonnet 5 | 0.5d | — |
+| 3 | `needsAttention` replaces `needsReconnect` (state only) | Sonnet 5 | 0.5d | — |
 | 4 | Attention rows + actions in `SyncButton`/`VaultSettings` | Sonnet 5 | 0.5d | 3 |
 | 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | 3 |
-| 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | 1 |
+| 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | — |
 | 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | 4 |
 
-**Six of seven remaining PRs are Sonnet; the seventh is Haiku.** Total ≈ 3.5d
-including per-PR tests and review.
+Total ≈ 3d remaining, including per-PR tests and review.
 
 ### Ordering
 
 ```
-PR1 ──┬─► PR2
-      ├─► PR3 ──┬─► PR4 ──► PR9
-      │         └─► PR5
-      └─► PR8
+PR2
+PR3 ──┬─► PR4 ──► PR9
+      └─► PR5
+PR8
 ```
 
-**PR 1 + PR 2 alone fix Report B** and retire the misleading message. Report A
-is already fixed — PR 6's atomic `credentialsSave` and PR 7's single-flight,
-typed refresh failures have both shipped. PR 5 makes either recoverable in one
-tap.
-
----
-
-### PR 1 — `classifyFailure` + table-driven test
-
-**Model: Sonnet 5** · 0.5d · new file + two adapters
-
-New `src/storage/failureKind.ts`. One **pure** function, no octokit import, no
-I/O:
-
-```ts
-export type FailureKind =
-  | 'transient'   // never reached GitHub, or GitHub is unwell — retry, stay quiet
-  | 'auth'        // credentials rejected — refresh, then ask for sign-in
-  | 'access'      // the App/user has no access to this repo any more
-  | 'config'      // repo or branch renamed/deleted — the vault's settings are wrong
-  | 'conflict'    // 409/422 — unchanged, still handled by ConflictError
-
-export interface Failure { kind: FailureKind; status?: number; message: string }
-
-export function classifyFailure(e: unknown): Failure
-```
-
-The decision table, in order. **Row 1 is the fix** — everything below it only
-matters once an error has actually reached GitHub:
-
-| # | Condition | Kind |
-|---|---|---|
-| 1 | no numeric `status` on the error | `transient` |
-| 2 | `status === 401` | `auth` |
-| 3 | `status === 403` and (`x-ratelimit-remaining === '0'` or `retry-after` present or `/rate limit\|secondary\|abuse/i` on the message) | `transient` |
-| 4 | `status === 403` | `access` |
-| 5 | `status === 404` | `config` |
-| 6 | `status === 408 \|\| 429 \|\| status >= 500` | `transient` |
-| 7 | `status === 409 \|\| 422` | `conflict` |
-| 8 | anything else | `transient` |
-
-> **Rule 1 is load-bearing and must be stated in the file's doc comment:** a
-> real auth failure always carries a response. An error that never reached
-> GitHub cannot be about credentials. This is what retires the message-regex
-> whack-a-mole — every iOS wording, `AbortError`, DNS and captive portals are
-> covered by the *absence* of a status rather than by matching their prose.
-
-Adapters, so no other call site changes shape:
-
-- `mapGitHubError` keeps its `path` parameter and its `ConflictError`
-  construction, but chooses the error class from `classifyFailure(e).kind`.
-- `isTransientSyncError` keeps the `navigator.onLine === false` check and the
-  `TransientSyncError` instance check, then delegates to
-  `classifyFailure(e).kind === 'transient'`. **Keep the existing regex as a
-  fallback** — `sync.test.ts` constructs bare `TransientSyncError('Failed to
-  fetch')` values (`sync.test.ts:429`) and a status-less real error must stay
-  transient anyway under rule 1.
-
-**Tests** — `src/storage/__tests__/failureKind.test.ts`, one `it.each` over a
-literal table with **one row per row of the failure table above**, including
-verbatim:
-
-```
-'Failed to fetch' · 'Load failed' · 'The network connection was lost.'
-'The Internet connection appears to be offline.' · 'NetworkError when attempting to fetch resource.'
-DOMException('…', 'AbortError') · a bare TypeError · { status: 502 } · { status: 429 }
-{ status: 403, headers: { 'retry-after': '60' } } · { status: 403 } (no headers)
-```
-
-**Hazard to name in review:** `isRateLimitError` (`githubApi.ts:54`) reads
-`e.response.headers`; octokit's `RequestError` also exposes `e.status` at the top
-level. Row 3 must read headers through the same accessor the existing helper
-uses, not invent a second one — move `isRateLimitError` into the new file and
-have `githubApi.ts` import it, rather than leaving two copies.
-
-**Not in scope:** changing any user-facing string (PR 9) or any caller's
-behaviour (PR 2, PR 3). This PR should be behaviour-preserving except for the
-newly-transient rows.
+**PR 2 alone fixes Report B** and retires the misleading message. Report A is
+already fixed — PR 6's atomic `credentialsSave` and PR 7's single-flight, typed
+refresh failures have both shipped. PR 5 makes either recoverable in one tap.
 
 ---
 
 ### PR 2 — Drop the mount-time probe for network backends
 
-**Model: Sonnet 5** · 0.5d · depends on PR 1
+**Model: Sonnet 5** · 0.5d
 
 The architectural point: `ensurePermission` is a *local-filesystem* concern that
 was generalized to backends which have no permissions, only failures. Remote
@@ -310,7 +235,7 @@ deliberate (see `autoSyncTick`'s doc comment on secondary rate limits).
 
 ### PR 3 — `needsAttention` replaces `needsReconnect` (state only, no UI)
 
-**Model: Sonnet 5** · 0.5d · depends on PR 1
+**Model: Sonnet 5** · 0.5d
 
 In `store.ts`, replace `needsReconnect: boolean` with:
 
@@ -424,14 +349,15 @@ called, install screen shown; no reconnect id → today's behaviour unchanged.
 
 ### PR 8 — Auth events in the sync journal
 
-**Model: Sonnet 5** · 0.25d · depends on PR 1
+**Model: Sonnet 5** · 0.25d
 
 `syncJournal.ts` is already the bounded in-memory flight recorder with a "Copy
 details" surface, built for exactly this: a failure on a phone with no devtools
 attached. It currently records nothing about auth.
 
 Add three `SyncEventKind`s — `auth-refresh`, `auth-refreshed`, `auth-failed` —
-and record `{ kind: FailureKind, status }` from PR 1's classifier plus the vault
+and record `{ kind: FailureKind, status }` from `classifyFailure`
+(`src/storage/failureKind.ts`) plus the vault
 id. **Never a token, never a token prefix, never a refresh token length** — the
 file's own doc comment sets that bar ("No file content, ever") and it applies
 doubly here.

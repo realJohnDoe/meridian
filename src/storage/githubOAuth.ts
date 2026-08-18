@@ -96,7 +96,21 @@ const DEAD_GRANT_ERRORS = new Set([
   'access_denied',         // the user or an org admin revoked the authorization
 ])
 
-/** Statuses that carry no verdict on the credential — the endpoint is unwell, not the grant. */
+/**
+ * Statuses that carry no verdict on the credential — the endpoint is unwell,
+ * not the grant.
+ *
+ * Deliberately *not* `classifyFailure` from `failureKind.ts`, which answers a
+ * different question about a different object: it classifies a thrown GitHub
+ * API error, where the absence of a status is itself the signal and 401 means
+ * "refresh the credential". Here the subject is the token endpoint's own
+ * `Response` — it always has a status, a rejected grant arrives as **200 with
+ * an error body**, and 401 would mean the refresh we are already performing.
+ * Its fall-through ("any other status is transient") is the part that must not
+ * be borrowed: a 400 carrying `invalid_grant` has to reach the check below.
+ * The one row the two share is this one, so keep it in step with
+ * `classifyFailure`'s 408/429/5xx row.
+ */
 function isUnwellStatus(status: number): boolean {
   return status >= 500 || status === 408 || status === 429
 }

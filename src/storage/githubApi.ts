@@ -41,21 +41,8 @@ export function decodeBase64(b64: string): string {
 
 // ── Error mapping ──────────────────────────────────────────────
 
-import { ConflictError, AuthSyncError, TransientSyncError, isTransientSyncError } from './conflictError'
-
-/**
- * A 403 that still carries rate-limit headers means the throttling plugin's
- * retries were exhausted (or the response leaked past it), not that the
- * request was actually denied — e.g. a burst against a large vault. Without
- * this check such a 403 gets misclassified as a bad token below, which is
- * what sends users down a fruitless remove-and-re-add-the-vault path instead
- * of just waiting out the rate limit.
- */
-function isRateLimitError(e: unknown): boolean {
-  const headers = (e as { response?: { headers?: Record<string, string> } }).response?.headers
-  if (!headers) return false
-  return headers['x-ratelimit-remaining'] === '0' || headers['retry-after'] !== undefined
-}
+import { ConflictError, AuthSyncError, TransientSyncError } from './conflictError'
+import { classifyFailure } from './failureKind'
 
 /** GitHub's own error text, capped so a journal line stays one line. */
 function gitHubMessage(e: unknown): string | undefined {
@@ -64,28 +51,19 @@ function gitHubMessage(e: unknown): string | undefined {
 }
 
 export function mapGitHubError(e: unknown, path?: string): Error {
-  if (e instanceof Error && 'status' in e) {
-    const status = (e as { status: number }).status
-    if (status === 401) return new AuthSyncError('GitHub token is invalid or expired.')
-    if (status === 403) {
-      if (isRateLimitError(e)) {
-        return new TransientSyncError('GitHub rate limit reached — will retry automatically.')
-      }
-      // A 403 without rate-limit headers is most likely a permission issue.
-      return new AuthSyncError('GitHub access denied. Check your token permissions.')
-    }
-    if (status === 404) return new AuthSyncError('Repository not found or token lacks access.')
-    // Both statuses reach here for genuinely different reasons — a 409 is
-    // either a SHA mismatch or GitHub failing to fast-forward the branch ref
-    // behind a commit we ourselves pushed moments earlier, and a 422 is a
-    // validation error ("sha wasn't supplied" for a path that exists). Keep the
-    // status and GitHub's own message on the error: the resolution path uses
-    // them to tell a real divergence from a spurious refusal, and the sync
-    // journal records them either way.
-    if (status === 409 || status === 422) {
-      return new ConflictError(path ?? 'unknown', { status, reason: gitHubMessage(e) })
-    }
+  const failure = classifyFailure(e)
+  if (failure.kind === 'auth') return new AuthSyncError('GitHub token is invalid or expired.')
+  if (failure.kind === 'access') return new AuthSyncError('GitHub access denied. Check your token permissions.')
+  if (failure.kind === 'config') return new AuthSyncError('Repository not found or token lacks access.')
+  // Both statuses reach here for genuinely different reasons — a 409 is
+  // either a SHA mismatch or GitHub failing to fast-forward the branch ref
+  // behind a commit we ourselves pushed moments earlier, and a 422 is a
+  // validation error ("sha wasn't supplied" for a path that exists). Keep the
+  // status and GitHub's own message on the error: the resolution path uses
+  // them to tell a real divergence from a spurious refusal, and the sync
+  // journal records them either way.
+  if (failure.kind === 'conflict') {
+    return new ConflictError(path ?? 'unknown', { status: failure.status, reason: gitHubMessage(e) })
   }
-  if (isTransientSyncError(e)) return new TransientSyncError((e as Error).message)
-  return e instanceof Error ? e : new Error(String(e))
+  return e instanceof TransientSyncError ? e : new TransientSyncError(failure.message)
 }
