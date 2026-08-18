@@ -1,6 +1,7 @@
 import { tokenLoad, refreshTokenLoad, tokenExpiryLoad, credentialsSave } from './cache/credentials'
 import { TransientSyncError } from './conflictError'
 import { WORKER_ORIGIN } from './workerOrigin'
+import { journal } from './syncJournal'
 
 const GITHUB_CLIENT_ID = 'Iv23liMpUq1CUQl4TcaT'
 export const GITHUB_APP_INSTALL_URL = 'https://github.com/apps/realjohndoe-meridian/installations/new'
@@ -320,22 +321,26 @@ async function resolveFreshToken(vaultId: string, force: boolean, rotationsSeen:
     return { status: 'ok', token }
   }
 
+  journal('auth-refresh', vaultId, undefined, undefined, 'github')
   try {
     const fresh = await refreshAccessToken(refreshToken)
     await credentialsSave(vaultId, fresh)
     rotationCounts.set(vaultId, (rotationCounts.get(vaultId) ?? 0) + 1)
+    journal('auth-refreshed', vaultId, undefined, undefined, 'github')
     return { status: 'ok', token: fresh.accessToken }
   } catch (e) {
     if (e instanceof OAuthCredentialError) {
       console.warn(`[oauth] GitHub rejected the refresh token for ${vaultId} (${e.code}) — sign-in required`)
+      journal('auth-failed', vaultId, undefined, { kind: 'auth', note: e.code }, 'github')
       return { status: 'needs-reauth', token }
     }
     // Everything that is not a refusal of the grant is treated as retryable,
     // including an App-configuration fault: those are not the user's to fix,
     // and telling them to sign in again would achieve nothing. They stay
-    // visible in the console (and, once the sync journal records auth events,
-    // in "Copy details") rather than in a misdirected prompt.
+    // visible in the console and, now, the sync journal's "Copy details"
+    // rather than in a misdirected prompt.
     console.warn(`[oauth] token refresh for ${vaultId} could not complete:`, e)
+    journal('auth-failed', vaultId, undefined, { kind: 'transient' }, 'github')
     return { status: 'transient', token }
   }
 }

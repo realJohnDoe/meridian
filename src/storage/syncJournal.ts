@@ -27,6 +27,8 @@
  * without the user having to read their own notes first to check what is in it.
  */
 
+import type { FailureKind } from './failureKind'
+
 /** What happened. One kind per meaningful step in a file's journey to the backend. */
 export type SyncEventKind =
   // ── local queue ───────────────────────────────────────────────
@@ -48,6 +50,10 @@ export type SyncEventKind =
   | 'pull'                 // reconcile pulled fresh remote content over a clean record
   | 'drop'                 // reconcile evicted a record the backend no longer lists
   | 'version-repair'       // a backend that could not report its new token was re-read
+  // ── auth ──────────────────────────────────────────────────────
+  | 'auth-refresh'         // a stored GitHub credential was due (or forced) to rotate
+  | 'auth-refreshed'       // …and it succeeded — the new token is stored
+  | 'auth-failed'          // …and it did not — transiently, or the grant is dead
 
 /**
  * Structured facts about one event. Deliberately flat and JSON-safe so the dump
@@ -66,6 +72,8 @@ export interface SyncEventDetail {
   bytes?:         number
   /** Backend HTTP status, when the backend had one (GitHub 409 vs 422 read very differently). */
   status?:        number
+  /** Why an `auth-failed` event failed — `'auth'` for a dead grant, `'transient'` for a blip. */
+  kind?:          FailureKind
   /** The backend's own error text, trimmed. */
   reason?:        string
   /** Milliseconds since the last event for this same path, if any. */
