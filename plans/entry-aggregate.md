@@ -74,29 +74,60 @@ Consequences worth having:
   write-vs-delete answer.
 - `collapseToYaml`'s `items.length === 0` branch becomes dead.
 
-## Recommended models
+## The work, as six PRs
+
+Each is green and shippable on its own, and each is defensible to a reviewer
+without reference to the ones after it. **They are not all independently
+*valuable*, though, and it's worth being straight about which are which:** PRs 1
+and 2 stand on their own merits and can be done at any time, even if the rest
+never happens. PRs 3–5 are one migration delivered in three reviewable slices —
+only the last of them pays out. PR 6 is optional cleanup.
 
 Tiers follow [the survey conventions](./surveys/README.md#recommended-model-tiers):
-the cheapest tier that can do the step well, each with the specific hazard that
-sets it. The tier rates **the fix** — re-running `build`, `lint`, the suites and
-the round-trip fixtures to confirm one is fully scripted and suits the cheapest
-tier regardless.
+the cheapest tier that can do the PR well, each with the hazard that sets it,
+and a lower tier named where stating the hazard in the task is what makes it
+viable. The tier rates **the change** — re-running `build`, `lint`, the suites
+and the round-trip fixtures to confirm one is fully scripted and suits the
+cheapest tier regardless.
 
-| Step | What it changes | Recommended model |
-|---|---|---|
-| 1 | `layers` becomes a view, not a stored copy | **Sonnet 5** — if the task states the merged-order rule; else **Opus 5** |
-| 2.1–2.2 | `Entries` stored; `items`/`roots` as derived selectors | **Opus 5** |
-| 2.3 | `storeOps.ts` takes and returns `Entries` | **Opus 5** |
-| 2.4 | `fileOccurrence` / sync merge / `occurrenceActions` | **Sonnet 5** — if 2.1–2.3 have landed and the eviction semantics are stated; else **Opus 5** |
-| 2.5 | push `Entries` into `expandRange` | **Opus 5** to decide *whether*; **Sonnet 5** for the edit once decided |
-| whole plan | as one piece of work | **Opus 5 in plan mode, multi-PR** |
+| PR | Delivers | Stands alone? | Recommended model |
+|---|---|---|---|
+| 1 | Two missing invariant tests | Yes — real coverage gaps today | **Sonnet 5** — if the task says to assert reference identity |
+| 2 | `layers` stops being a stored copy | Yes — removes a representation | **Sonnet 5** — if the task states the merged-order rule; else **Opus 5** |
+| 3 | Store holds `Entries`; flat arrays derived | Shippable, not yet valuable | **Opus 5** |
+| 4 | `storeOps.ts` on `Entries` | Shippable, not yet valuable | **Opus 5** |
+| 5 | Non-empty items; workarounds deleted | **This is the payoff** | **Opus 5** |
+| 6 | Remaining consumers read `Entries` | Optional cleanup | **Sonnet 5** — if 3–5 landed and the eviction contract is stated; else **Opus 5** |
 
-**Sequencing note:** 2.1–2.3 all touch `store.ts` and `storeOps.ts`; doing them
-as one PR avoids rebasing both files three times. Step 1 is independent of
-everything else and can land first or last — first is better, since it shrinks
-what 2.1 has to reason about.
+**Where you can stop.** After PR 2: one less representation, no migration debt.
+After PR 5: the bug is a compile error and the plan is done — 6 is garnish.
+Stopping *between* 3 and 5 is the one bad outcome: the store is reshaped and
+nothing has been collected for it yet, so don't start 3 without intending to
+reach 5.
 
-## Step 1 — collapse `layers` into the same structure
+---
+
+### PR 1 — Pin the two invariants this migration can break quietly
+
+Tests only, no production change.
+
+- A **memo-identity test**: an edit to one entry leaves every other entry's root
+  and item references untouched, and leaves `roots` itself reference-identical
+  when only an occurrence changed.
+- An **`extra`/`fileConvention` carry-forward test** across all four edit
+  scopes, asserting on serialized output rather than on the store.
+
+Worth having whether or not the rest of this plan ever runs: both properties are
+load-bearing today and neither is covered.
+
+- **Recommended model:** **Sonnet 5**, *if the task says the memo test must
+  assert reference identity* (`toBe`, and `expect(next.roots).toBe(prev.roots)`)
+  — otherwise **Opus 5**. The hazard is that the obvious way to write it,
+  `toEqual`, passes against a full rebuild and so passes forever, leaving a test
+  that looks like a guard and guards nothing. That is the same failure the whole
+  plan exists to prevent, reproduced in the test suite.
+
+### PR 2 — `layers` becomes a derived view
 
 [store.ts](../src/store.ts) holds a *third* and *fourth* representation of the
 same data: `layers` (per vault) alongside the merged `items`/`roots`, kept in
@@ -106,15 +137,14 @@ depending on which entry point you came through:
 - `setData` treats merged `items`/`roots` as canonical and re-derives `layers`.
 - `setVaultLayer` treats `layers` as canonical and re-derives merged.
 
-Two representations, each authoritative on alternate code paths, is why
-"where does this data actually live?" has no single answer — and why tracing
-this bug meant ruling the sync path in and out repeatedly.
+Two representations, each authoritative on alternate code paths, is why "where
+does this data actually live?" has no single answer — and why tracing the
+original bug meant ruling the sync path in and out repeatedly.
 
-With `Entries`, a layer is a *view*, not a stored copy: every entry carries its
-vault in its key, so "this vault's entries" is a filter, not a partition to
-maintain. `partitionLayers`/`flattenLayers` both delete. Do this step first —
-it is self-contained, it removes a whole class of "which one is stale?", and it
-shrinks the surface the rest of the migration has to touch.
+**This does not need `Entries`.** Every entry already carries its vault in its
+key, so `getVaultLayer(vaultId)` is a memoized filter over the merged store, and
+`setVaultLayer(vaultId, data)` is "replace this vault's slice". That is why it
+sits before the migration rather than inside it.
 
 Cheaper than the comments in `store.ts` suggest. `partitionLayers`' `seedIds`
 machinery exists so a registered-but-empty vault stays a key in `layers`, "or
@@ -137,36 +167,45 @@ that still holds, then drop the machinery rather than porting it.
   order decides the merged order, and `Map` preserves it"); any replacement has
   to preserve a stable order per entry, and say which.
 
-## Step 2 — `Entries` as the stored form, flat arrays as derived views
+### PR 3 — The store holds `Entries`; `items`/`roots` become derived
 
-The widest blast radius is `expandRange(items, roots, from, to)`
-([model/expansion.ts](../src/model/expansion.ts)) and every calendar view behind
-it. Don't migrate them in the same pass:
+`Entry` is born at the parse boundary, where it has real consumers on day one:
+`parseToStoreItems` already returns `{ items, root }` and only needs its key, so
+`parseFiles` hands `Entry[]` to the store instead of two shredded collections.
+`store.ts` then holds `Entries` as its single stored form, and exposes
+`items`/`roots` as memoized selectors so `expandRange`, the calendar,
+`storeOps.ts` and every view keep their current signatures and change nothing.
 
-**2.1** Add `Entry`/`Entries` and make `store.ts` hold `Entries` as the single
-stored form.
+**The non-empty tuple can be enforced from birth, here.** Verified against the
+current parser: across empty files, bare `title:`, `instances: []`,
+`instances:` null, all-excluded children, nested empty containers and
+body-only files, `parseToStoreItems` always returns at least one item. The one
+probed input that yields nothing does so by *throwing* — `---\n---\n`, an empty
+frontmatter block, which YAML reads as two documents — and that already routes
+to `unreadableFiles`, which holds neither a root nor items and so is consistent
+with the invariant rather than a hole in it. The boundary therefore needs a
+**narrowing that is provably total**, not a fallback branch. Keep the throw path
+exactly as it is; re-run the probe before relying on this.
 
-**2.2** Derive `items`/`roots` from it as memoized selectors, so `expandRange`
-and the calendar keep their current signatures and no view changes.
-
-- **Recommended model (2.1–2.2):** **Opus 5.** This is the highest-risk step in
-  the plan and the one that fails most quietly. Reference identity is load-
-  bearing in at least four independent caches, none of which have a test that
-  would go red if it stopped holding:
-  `setData` reuses the backlink index when `roots === prevRoots`
-  ([store.ts](../src/store.ts)); `fileOccurrenceMap` memoizes on `items`/`roots`
-  identity and its incremental path on `prevRoots.get(key) === roots.get(key)`
+- **Recommended model:** **Opus 5.** The highest-risk PR in the plan and the one
+  that fails most quietly. Reference identity is load-bearing in four
+  independent caches: `setData` reuses the backlink index when
+  `roots === prevRoots` ([store.ts](../src/store.ts)); `fileOccurrenceMap`
+  memoizes on `items`/`roots` identity and its incremental path on
+  `prevRoots.get(key) === roots.get(key)`
   ([fileOccurrence.ts](../src/fileOccurrence.ts)); `computeExpansionCache`
   overlays only items failing `item === prev.items[i]`; `useAgendaSections`
   caches on top of that. A selector that rebuilds a fresh array or Map per call
   satisfies every type and every assertion in the suite while turning all four
-  into full rebuilds on every keystroke. Whoever does this needs to hold "which
-  references must stay stable, and across which transitions" in their head the
-  whole way, and to add a memo-identity test — there is none today.
+  into full rebuilds on every keystroke. PR 1's memo-identity test is what turns
+  that from a reading exercise into a red test — which is the entire reason it
+  goes first.
 
-**2.3** Migrate `storeOps.ts` to take and return `Entries`. This is where the
-payoff is — each `apply*` function then updates one object instead of two
-collections, and `updateRoot` stops being callable on its own.
+### PR 4 — `storeOps.ts` takes and returns `Entries`
+
+Each `apply*` function updates one object instead of two collections, and
+`updateRoot` stops being callable on its own — which is the specific two-line
+slip that produced the original bug.
 
 - **Recommended model:** **Opus 5.** Most of a wrong edit here lands loudly on
   the round-trip fixtures, which is what makes the *quiet* part worth naming:
@@ -175,62 +214,71 @@ collections, and `updateRoot` stops being callable on its own.
   across every edit. Both are optional fields, so dropping either type-checks,
   passes the scope tests, and silently deletes hand-authored YAML or rewrites
   every `\r\n` in the file — visible to the user only as a mystery git diff
-  later. Four `apply*` scopes plus `applyNew` each have to keep that
-  carry-forward through the reshape.
+  weeks later. PR 1's second test covers exactly this.
 
-**2.4** Migrate `fileOccurrence.ts`, `storage/sync.ts`'s merge path, and
-`occurrenceActions.ts`.
+### PR 5 — Non-empty items, and delete what worked around their absence
 
-- **Recommended model:** **Sonnet 5**, *if 2.1–2.3 have landed and the task
-  states `mergeChangedIntoStore`'s evict-then-reparse contract* — otherwise
-  **Opus 5.** The trap is that the merge path evicts an affected key's items and
-  roots together and re-adds whatever parses, so a port that evicts by one shape
-  and re-adds by another drops entries on a sync rather than at edit time —
-  a delayed, hard-to-attribute failure. `restoreEntries`' undo semantics
-  (absent entry ⇒ delete) have to survive the reshape too; that one at least is
-  covered by `storeCommit.test.ts`.
+The payoff, and a mostly-deletion diff. `items: [StoreItem, ...StoreItem[]]`
+makes `{ root, items: [] }` a compile error, and these all become dead:
 
-**2.5** Only then, if it still looks worthwhile, push `Entries` down into
-`expandRange`. It may not be: expansion genuinely wants a flat occurrence list,
-and a memoized selector at that boundary is a reasonable permanent answer.
+- `applyEdit`'s "the entry has no items left, rebuild it" branch
+  ([model/storeOps.ts](../src/model/storeOps.ts));
+- `entryContent`'s null case in [storeCommit.ts](../src/storeCommit.ts) — key
+  presence in `Entries` *is* the write-vs-delete answer;
+- `collapseToYaml`'s `items.length === 0` branch
+  ([model/collapse.ts](../src/model/collapse.ts));
+- `fileOccurrence.ts`'s root-only fallback loop, after which the occurrence map
+  is total by construction rather than by an explicit sweep.
 
-- **Recommended model:** **Opus 5** to decide *whether* — it is a judgment call
-  about where the aggregate should stop, and the honest answer may be "don't" —
-  then **Sonnet 5** for the edit once the boundary is settled and written down.
+- **Recommended model:** **Opus 5.** The hazard is the regression tests, not the
+  code. Each of those four workarounds has tests asserting the behaviour that is
+  about to become impossible — `entry-without-occurrences.test.ts`,
+  the root-only cases in `linking.test.ts` and `FileResultsList.test.tsx`, and
+  `storeCommit.test.ts`'s delete case. Deleting them along with the code loses
+  the regression; each needs re-pointing at whatever still enforces the property
+  (a compile-time check, or the parse boundary's narrowing) rather than removing.
+  A PR that just makes the suite green by deletion is the failure mode here.
 
-Steps 1, 2.1–2.3 are where the invariant is won. 2.4–2.5 are cleanup and can be
-dropped or deferred without losing the guarantee.
+### PR 6 — Remaining consumers read `Entries` directly (optional)
+
+`fileOccurrence.ts`, `storage/sync.ts`'s merge path, and `occurrenceActions.ts`
+stop going through the derived flat views. Cleanup only — the invariant is
+already won by PR 5.
+
+- **Recommended model:** **Sonnet 5**, *if 3–5 have landed and the task states
+  `mergeChangedIntoStore`'s evict-then-reparse contract* — otherwise **Opus 5.**
+  The trap is that the merge path evicts an affected key's items and roots
+  together and re-adds whatever parses, so a port that evicts by one shape and
+  re-adds by another drops entries on a sync rather than at edit time: a
+  delayed, hard-to-attribute failure. `restoreEntries`' undo semantics (absent
+  entry ⇒ delete) have to survive too; that one is covered by
+  `storeCommit.test.ts`.
+
+### Deliberately not planned — pushing `Entries` into `expandRange`
+
+`expandRange(items, roots, from, to)`
+([model/expansion.ts](../src/model/expansion.ts)) and the calendar behind it
+keep taking flat arrays. Expansion genuinely wants a flat occurrence list, the
+memoized selector at that boundary is a reasonable permanent answer, and the
+invariant is already won without it. Revisit only if a feature makes it
+necessary — the honest default is "don't".
 
 ## Cost, honestly
 
-Step 1 is contained — `store.ts` plus its two callers in
+PRs 1 and 2 are contained: tests, plus `store.ts` and its two callers in
 [storage/vaultRegistry.ts](../src/storage/vaultRegistry.ts) and
 [storage/sync.ts](../src/storage/sync.ts).
 
-Steps 2.1–2.3 touch `storeOps.ts` (the largest file in `model/`) and every test
-that builds a `StoreData` literal — including the fixtures in
-`src/model/__tests__/`. That is a large mechanical diff with a real risk of
-smuggling in a behaviour change while "just" reshaping data. It wants its own
-PR, its own review, and the round-trip fixtures (`yaml-roundtrip.test.ts`,
-`round-trip-totality.test.ts`) run before and after with identical output as the
-gate.
+PRs 3–5 touch `storeOps.ts` (the largest file in `model/`) and every test that
+builds a `StoreData` literal — including the fixtures in `src/model/__tests__/`.
+That is a large mechanical diff with a real risk of smuggling in a behaviour
+change while "just" reshaping data. Run the round-trip fixtures
+(`yaml-roundtrip.test.ts`, `round-trip-totality.test.ts`) before and after each,
+and require byte-identical output as the gate.
 
-Two of the hazards above have no test that would catch them today. Adding those
-first makes the whole plan cheaper, and both are worth having regardless of
-whether it ever runs:
-
-- a **memo-identity test** — that an edit to one entry leaves the other entries'
-  root and item references untouched, and leaves `roots` itself untouched when
-  only an occurrence changed;
-- an **`extra`/`fileConvention` carry-forward test** across all four edit
-  scopes, asserting on serialized output rather than on the store.
-
-With those in place, 2.1–2.3 drop from "Opus 5 with a named silent-failure
-hazard" to "Opus 5 with a red test if it goes wrong" — the difference between
-reviewing a large diff by reading and reviewing it by running.
-
-Not worth doing as a background refactor. Worth doing the next time this area
-is being changed for a feature reason anyway.
+Not worth doing as a background refactor. Worth doing the next time this area is
+being changed for a feature reason anyway — and PRs 1 and 2 are worth doing
+before then, on their own account.
 
 ## What already shipped
 
