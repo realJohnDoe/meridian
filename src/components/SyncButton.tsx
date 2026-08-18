@@ -2,7 +2,7 @@ import { RefreshCw, AlertCircle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { useStore, emptySyncStatus } from '@/store'
 import type { VaultSyncStatus } from '@/store'
-import { syncToBackend, reconnectVault, GITHUB_APP_INSTALL_URL } from '@/vaultActions'
+import { syncToBackend, reconnectVault, startGitHubSignIn, GITHUB_APP_INSTALL_URL } from '@/vaultActions'
 import type { VaultRef } from '@/vaultActions'
 import { Button } from './ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
@@ -75,12 +75,10 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
         </button>
       )}
 
-      {/* Disabled until PR 5 wires startGitHubSignIn({ reconnectVaultId }) —
-          the row still announces the fix so the icon doesn't dead-end. */}
       {status.needsAttention?.kind === 'reauth' && (
         <button
-          disabled
-          className="flex items-center gap-1 pl-5 text-2xs text-note text-left disabled:opacity-60 disabled:cursor-default"
+          className="flex items-center gap-1 pl-5 text-2xs text-note hover:underline text-left"
+          onClick={() => void startGitHubSignIn({ reconnectVaultId: vault.id })}
         >
           <AlertCircle className="size-3 shrink-0" />
           Signed out of GitHub — sign in again

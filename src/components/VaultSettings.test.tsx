@@ -14,6 +14,18 @@ const GITHUB_VAULT: VaultRef = {
 }
 
 describe('VaultSettings — GitHub attention rows', () => {
+  it('renders a reauth row that offers to sign in again', () => {
+    useStore.setState({
+      syncByVault: new Map([[GITHUB_VAULT.id, {
+        ...emptySyncStatus(),
+        needsAttention: { kind: 'reauth', message: 'x' },
+      }]]),
+    })
+    render(<VaultSettings vault={GITHUB_VAULT} />)
+
+    expect(screen.getByRole('button', { name: /Signed out of GitHub — sign in again/ })).toBeInTheDocument()
+  })
+
   it('mirrors the access row as a link to the App install page', () => {
     useStore.setState({
       syncByVault: new Map([[GITHUB_VAULT.id, {

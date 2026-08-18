@@ -15,6 +15,7 @@ import { diskPickDirectory } from './fs'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
+import type { OAuthTokens } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import { isWritableVault } from '@/vaultRef'
 import type { VaultRef, GitHubVaultRef, IcalVaultRef } from '@/vaultRef'
@@ -646,6 +647,32 @@ export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<
     console.error('[vault] addGitHubVaultOAuth failed:', e)
     notifyError('Could not connect GitHub vault', e)
   }
+}
+
+/**
+ * Re-authenticate an existing GitHub vault after a fresh "Sign in with
+ * GitHub" round trip, without touching its id — so Dexie rows, favourites,
+ * prefs, URLs and any unpushed local edits all survive, unlike
+ * remove-and-re-add, which calls `cacheDeleteAll` and destroys them.
+ *
+ * The caller (`auth/callback`) must already have confirmed that this vault's
+ * `owner/repo` is in `fetchInstalledRepos(tokens.accessToken)` — that is what
+ * stops a sign-in as a *different* GitHub account from writing that
+ * account's tokens onto this vault. This function trusts that check rather
+ * than repeating it, which would mean a second, redundant GitHub call.
+ */
+export async function reauthGitHubVault(vaultId: string, tokens: OAuthTokens): Promise<void> {
+  const ref = getVaults().find(v => v.id === vaultId)
+  if (!ref || ref.kind !== 'github') return
+
+  await credentialsSave(vaultId, tokens)
+
+  unmountBackend(vaultId)
+  const { GitHubBackend } = await import('./githubBackend')
+  const backend = new GitHubBackend(vaultId, ref.name, { ...ref.github, token: tokens.accessToken })
+  mountBackend(backend)
+  setVaultSync(vaultId, { needsAttention: null })
+  await loadVaultContent(backend)
 }
 
 /**
