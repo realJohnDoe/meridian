@@ -8,8 +8,9 @@ Investigation of two field reports (2026-08-18):
   re-added; sync worked again by itself.
 
 **Status: PR 1 (`src/storage/failureKind.ts`), PR 2 (`mountVaultRef` in
-`src/storage/vaultRegistry.ts`), PR 6 and PR 7 have shipped — hence the gaps in
-the numbering below. Everything still listed is outstanding.** Every claim
+`src/storage/vaultRegistry.ts`), PR 3, PR 4, PR 6 and PR 7 have shipped —
+hence the gaps in the numbering below. Everything still listed is
+outstanding.** Every claim
 marked _read_ comes from the code with the line cited; the investigation
 sections below describe the code as it stood when the reports came in, so a
 citation there may predate a shipped PR.
@@ -167,17 +168,16 @@ credential fix cut into "write it atomically" and "decide when it's dead".
 
 | # | Title | Model | Est. | Blocked by |
 |---|---|---|---|---|
-| 4 | Attention rows + actions in `SyncButton`/`VaultSettings` | Sonnet 5 | 0.5d | — |
 | 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | — |
 | 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | — |
-| 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | 4 |
+| 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | — |
 
-Total ≈ 2.5d remaining, including per-PR tests and review.
+Total ≈ 1.5d remaining, including per-PR tests and review.
 
 ### Ordering
 
 ```
-PR4 ──► PR9
+PR9
 PR5
 PR8
 ```
@@ -185,30 +185,6 @@ PR8
 Report A is already fixed — PR 6's atomic `credentialsSave` and PR 7's
 single-flight, typed refresh failures have both shipped. PR 5 makes it
 recoverable in one tap. (Report B was fixed by PR 2.)
-
----
-
-### PR 4 — Attention rows and their actions
-
-**Model: Sonnet 5** · 0.5d
-
-Render `needsAttention` (`store.ts`) as one row per kind in `SyncButton`'s
-popover, and mirror the two actionable ones into `VaultSettings`' GitHub
-section. The copy deck — implement verbatim, no rewording:
-
-| Kind | Row text | Action |
-|---|---|---|
-| `fs-permission` | Permission needed — reconnect | `reconnectVault(id)` *(existing)* |
-| `reauth` | Signed out of GitHub — sign in again | `startGitHubSignIn({ reconnectVaultId: id })` *(PR 5; until then, disabled)* |
-| `access` | Meridian no longer has access to `{owner}/{repo}` | link to `GITHUB_APP_INSTALL_URL` |
-| `config` | `{owner}/{repo}` (`{branch}`) isn't reachable — it may have been renamed or deleted | opens this vault's Settings |
-
-Row styling follows the existing `needsAttention?.kind === 'fs-permission'` row
-(`SyncButton.tsx:67-76`): `text-2xs`, `AlertCircle`, `text-note`. The red icon
-now persists after the toast is gone, which is the actual user-visible fix.
-
-**Ship PR 4 before PR 5 if you want** — the `reauth` row renders disabled with
-the same text, and PR 5 just wires its `onClick`.
 
 ---
 
@@ -276,7 +252,7 @@ This is what turns the next report from a screenshot into evidence.
 
 ### PR 9 — Vocabulary pass
 
-**Model: Haiku 4.5** · 0.25d · depends on PR 4
+**Model: Haiku 4.5** · 0.25d
 
 Find-and-replace against this exact list. No user-facing string says "token";
 each names something the user can act on.

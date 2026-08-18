@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { Trash2, TriangleAlert } from 'lucide-react'
+import { Trash2, TriangleAlert, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { readVaultStringArray } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
-import { syncToBackend, removeVault, renameVault, cacheDirtyCount } from '@/vaultActions'
+import { syncToBackend, removeVault, renameVault, cacheDirtyCount, GITHUB_APP_INSTALL_URL } from '@/vaultActions'
 import { ParticipantsRow } from '@/editor'
 import type { VaultRef } from '@/vaultActions'
 
@@ -42,6 +42,7 @@ export function VaultSettings({ vault }: Props) {
   const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
   const items                  = useStore(s => s.items)
   const lastRefreshed          = useStore(s => s.syncByVault.get(vault.id)?.lastSyncedAt ?? null)
+  const needsAttention         = useStore(s => s.syncByVault.get(vault.id)?.needsAttention ?? null)
 
   const allParticipants = useAllParticipants(items)
 
@@ -96,16 +97,40 @@ export function VaultSettings({ vault }: Props) {
       )}
 
       {vault.kind === 'github' && (
-        <div className="flex items-center justify-between gap-2 py-3 border-t border-border first:border-t-0">
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-xs font-medium text-foreground">Repository</span>
-            <span className="text-xs text-muted-foreground font-mono truncate">
-              {vault.github.owner}/{vault.github.repo} ({vault.github.branch})
-            </span>
+        <div className="flex flex-col gap-1.5 py-3 border-t border-border first:border-t-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-0.5 min-w-0">
+              <span className="text-xs font-medium text-foreground">Repository</span>
+              <span className="text-xs text-muted-foreground font-mono truncate">
+                {vault.github.owner}/{vault.github.repo} ({vault.github.branch})
+              </span>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
+              {syncing ? 'Syncing…' : 'Sync now'}
+            </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="shrink-0">
-            {syncing ? 'Syncing…' : 'Sync now'}
-          </Button>
+
+          {/* Mirrors SyncButton's popover rows for the two attention kinds
+              that already have a real action — `reauth` stays out until PR 5
+              wires sign-in, and `fs-permission` never applies to GitHub. */}
+          {needsAttention?.kind === 'access' && (
+            <a
+              href={GITHUB_APP_INSTALL_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 text-2xs text-note hover:underline"
+            >
+              <AlertCircle className="size-3 shrink-0" />
+              Meridian no longer has access to {vault.github.owner}/{vault.github.repo}
+            </a>
+          )}
+
+          {needsAttention?.kind === 'config' && (
+            <p className="flex items-center gap-1 text-2xs text-note">
+              <AlertCircle className="size-3 shrink-0" />
+              {vault.github.owner}/{vault.github.repo} ({vault.github.branch}) isn&rsquo;t reachable — it may have been renamed or deleted
+            </p>
+          )}
         </div>
       )}
 
