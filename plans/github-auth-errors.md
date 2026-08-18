@@ -170,14 +170,12 @@ credential fix cut into "write it atomically" and "decide when it's dead".
 |---|---|---|---|---|
 | 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | — |
 | 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | — |
-| 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | — |
 
-Total ≈ 1.5d remaining, including per-PR tests and review.
+Total ≈ 1.25d remaining, including per-PR tests and review.
 
 ### Ordering
 
 ```
-PR9
 PR5
 PR8
 ```
@@ -247,27 +245,3 @@ file's own doc comment sets that bar ("No file content, ever") and it applies
 doubly here.
 
 This is what turns the next report from a screenshot into evidence.
-
----
-
-### PR 9 — Vocabulary pass
-
-**Model: Haiku 4.5** · 0.25d
-
-Find-and-replace against this exact list. No user-facing string says "token";
-each names something the user can act on.
-
-| Now | Replace with |
-|---|---|
-| `Could not reconnect GitHub vault "X" — check your token.` (`vaultRegistry.ts:466`) | *deleted in PR 2* |
-| `Could not connect to GitHub vault "X" — check your token.` (`:515`) | `Could not connect to "X" — sign in to GitHub again.` |
-| `Vault "X" is missing its GitHub token — remove and re-add it.` (`:464`) | `Vault "X" isn't signed in to GitHub — sign in again.` |
-| `GitHub token not found — try removing and re-adding this vault.` (`:503`) | `"X" isn't signed in to GitHub — sign in again.` |
-| `GitHub token is invalid or expired.` (`githubApi.ts:69`) | `Meridian's access to GitHub expired — sign in again.` |
-| `GitHub access denied. Check your token permissions.` (`:75`) | `Meridian no longer has write access — check the App's repository access on GitHub.` |
-| `Repository not found or token lacks access.` (`:77`) | `That repository or branch isn't reachable — it may have been renamed, deleted, or removed from the App.` |
-
-Leave `addGitHubVaultOAuth`'s "check the App has write access to it" alone — it
-is already correct.
-
-**Check after replacing:** `rg -i "your token" src/` returns nothing.

@@ -482,7 +482,7 @@ async function restoreVaultsInner(): Promise<void> {
         if (outcome === 'no-credential') {
           warn(ref.kind === 'local'
             ? `Vault "${ref.name}" is missing its folder permission — remove and re-add it.`
-            : `Vault "${ref.name}" is missing its GitHub token — remove and re-add it.`)
+            : `Vault "${ref.name}" isn't signed in to GitHub — sign in again.`)
         }
         // `github`/`ical` skip the probe on restore (see mountVaultRef), so
         // `outcome` is always 'granted' for them here — never 'denied', never
@@ -520,7 +520,7 @@ export async function reconnectVault(id: string): Promise<void> {
     if (outcome === 'no-credential') {
       notify(ref.kind === 'local'
         ? 'Vault handle not found — try removing and re-adding it.'
-        : 'GitHub token not found — try removing and re-adding this vault.')
+        : `"${ref.name}" isn't signed in to GitHub — sign in again.`)
       return
     }
     if (outcome === 'offline') {
@@ -532,7 +532,7 @@ export async function reconnectVault(id: string): Promise<void> {
     if (outcome !== 'granted') {
       notify(ref.kind === 'local'
         ? `Permission denied for vault "${ref.name}".`
-        : `Could not connect to GitHub vault "${ref.name}" — check your token.`)
+        : `Could not connect to "${ref.name}" — sign in to GitHub again.`)
     }
   } catch (e) {
     if ((e as Error).name === 'AbortError') return

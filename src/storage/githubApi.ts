@@ -52,9 +52,9 @@ function gitHubMessage(e: unknown): string | undefined {
 
 export function mapGitHubError(e: unknown, path?: string): Error {
   const failure = classifyFailure(e)
-  if (failure.kind === 'auth') return new AuthSyncError('GitHub token is invalid or expired.', 'auth')
-  if (failure.kind === 'access') return new AuthSyncError('GitHub access denied. Check your token permissions.', 'access')
-  if (failure.kind === 'config') return new AuthSyncError('Repository not found or token lacks access.', 'config')
+  if (failure.kind === 'auth') return new AuthSyncError("Meridian's access to GitHub expired — sign in again.", 'auth')
+  if (failure.kind === 'access') return new AuthSyncError('Meridian no longer has write access — check the App\'s repository access on GitHub.', 'access')
+  if (failure.kind === 'config') return new AuthSyncError("That repository or branch isn't reachable — it may have been renamed, deleted, or removed from the App.", 'config')
   // Both statuses reach here for genuinely different reasons — a 409 is
   // either a SHA mismatch or GitHub failing to fast-forward the branch ref
   // behind a commit we ourselves pushed moments earlier, and a 422 is a

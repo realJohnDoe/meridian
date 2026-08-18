@@ -835,24 +835,24 @@ describe('runSync — needsAttention by AuthSyncError kind', () => {
   it('sets needsAttention: access when the App/user has lost repo access', async () => {
     const backend = new FakeBackend()
     mountBackend(backend)
-    backend.queueStatAllError(new AuthSyncError('GitHub access denied. Check your token permissions.', 'access'))
+    backend.queueStatAllError(new AuthSyncError('Meridian no longer has write access — check the App\'s repository access on GitHub.', 'access'))
 
     await syncToBackend()
 
     expect(syncOf().needsAttention).toEqual({
-      kind: 'access', message: 'GitHub access denied. Check your token permissions.',
+      kind: 'access', message: 'Meridian no longer has write access — check the App\'s repository access on GitHub.',
     })
   })
 
   it('sets needsAttention: config when the repo or branch is gone', async () => {
     const backend = new FakeBackend()
     mountBackend(backend)
-    backend.queueStatAllError(new AuthSyncError('Repository not found or token lacks access.', 'config'))
+    backend.queueStatAllError(new AuthSyncError("That repository or branch isn't reachable — it may have been renamed, deleted, or removed from the App.", 'config'))
 
     await syncToBackend()
 
     expect(syncOf().needsAttention).toEqual({
-      kind: 'config', message: 'Repository not found or token lacks access.',
+      kind: 'config', message: "That repository or branch isn't reachable — it may have been renamed, deleted, or removed from the App.",
     })
   })
 

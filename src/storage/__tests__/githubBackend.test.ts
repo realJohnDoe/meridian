@@ -49,9 +49,9 @@ describe('mapGitHubError', () => {
   it('maps 401 to AuthSyncError',       () => expect(mapGitHubError(makeErr(401))).toBeInstanceOf(AuthSyncError))
   it('maps 403 to AuthSyncError',       () => expect(mapGitHubError(makeErr(403))).toBeInstanceOf(AuthSyncError))
   it('maps 404 to AuthSyncError',       () => expect(mapGitHubError(makeErr(404))).toBeInstanceOf(AuthSyncError))
-  it('maps 401 to token message',       () => expect(mapGitHubError(makeErr(401)).message).toMatch(/invalid or expired/i))
-  it('maps 403 to access/rate message', () => expect(mapGitHubError(makeErr(403)).message).toMatch(/access denied/i))
-  it('maps 404 to not-found message',   () => expect(mapGitHubError(makeErr(404)).message).toMatch(/not found|lacks access/i))
+  it('maps 401 to token message',       () => expect(mapGitHubError(makeErr(401)).message).toMatch(/expired/i))
+  it('maps 403 to access/rate message', () => expect(mapGitHubError(makeErr(403)).message).toMatch(/no longer has write access/i))
+  it('maps 404 to not-found message',   () => expect(mapGitHubError(makeErr(404)).message).toMatch(/isn't reachable/i))
   it('maps 409 to ConflictError',       () => expect(mapGitHubError(makeErr(409))).toBeInstanceOf(ConflictError))
   it('maps 422 to ConflictError',       () => expect(mapGitHubError(makeErr(422))).toBeInstanceOf(ConflictError))
   it('maps a status-less error to TransientSyncError (it never reached GitHub)', () => {
@@ -64,8 +64,8 @@ describe('mapGitHubError', () => {
   })
 
   // A 403 that survived the throttling plugin's retries but still carries
-  // rate-limit headers is a burst/limit issue, not a bad token — must not be
-  // reported to the user as "check your token permissions".
+  // rate-limit headers is a burst/limit issue, not a lost-access issue — must
+  // not be reported to the user as lost write access.
   it('maps a 403 with x-ratelimit-remaining: 0 to TransientSyncError', () => {
     const e = makeErr(403, { 'x-ratelimit-remaining': '0' })
     expect(mapGitHubError(e)).toBeInstanceOf(TransientSyncError)
