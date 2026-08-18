@@ -326,7 +326,7 @@ async function mountVaultRef(
   // there stays exactly one writer for that state.
   if (perm === 'granted' || perm === 'unreachable') {
     mountBackend(backend)
-    setVaultSync(ref.id, { needsReconnect: false })
+    setVaultSync(ref.id, { needsAttention: null })
     await loadVaultContent(backend, prePainted)
     return perm === 'granted' ? 'granted' : 'offline'
   }
@@ -334,7 +334,9 @@ async function mountVaultRef(
     // Mounted, but flagged: the scheduler will attempt it and fail harmlessly
     // until the user clicks through from SyncButton's popover.
     mountBackend(backend)
-    setVaultSync(ref.id, { needsReconnect: true })
+    setVaultSync(ref.id, {
+      needsAttention: { kind: 'fs-permission', message: `Permission needed for "${ref.name}" — reconnect.` },
+    })
     if (!prePainted) await hydrateFromCache(ref.id)
     updateSyncUI(backend)
     return 'prompt'

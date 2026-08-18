@@ -94,6 +94,12 @@ Two different questions. `readOnly` gates whether writes are pushed;
 read-only with no remote; an iCal feed is read-only *with* one.
 → `storage/backend.ts` · `StorageBackend`
 
+### needsAttention
+Replaces the boolean `needsReconnect`: null, or which of four actionable
+states a vault is in (`fs-permission`, `reauth`, `access`, `config`) plus a
+message, so the UI can render more than one row shape instead of a flag.
+→ `store.ts` · `VaultAttention`, `AttentionKind`
+
 ### view-only vs sandbox
 UI access modes, deliberately not called "read-only" so they can never be
 confused with the backend flag above. `sandbox` is the Tutorial vault (full
@@ -313,3 +319,4 @@ asserts none of these have come back.
 | `hoistSharedMetadata` | `computeSharedFields` |
 | `activeVaultId` | `defaultVaultId` (plus the view filter and per-vault sync) |
 | `participantFilter` | `hiddenParticipants` (inverted: hidden, not shown) |
+| `needsReconnect` | `needsAttention` (a typed reason, not a boolean) |
