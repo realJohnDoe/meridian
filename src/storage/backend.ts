@@ -65,6 +65,11 @@ export interface StorageBackend {
    * token) and swap the new credentials into the backend in place. Returns
    * whether recovery succeeded and the failed operation should be retried.
    * Backends with no such recovery path (local, example) omit this.
+   *
+   * `false` is a verdict on the credential — recovery is impossible and the
+   * original auth error should be surfaced. An implementation that could not
+   * *reach* its auth service throws `TransientSyncError` instead, so a blip in
+   * the recovery attempt is never mistaken for a dead credential.
    */
   refreshAuth?(): Promise<boolean>
 }

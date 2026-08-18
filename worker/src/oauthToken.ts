@@ -66,7 +66,18 @@ export async function handleOAuthToken(
     return badRequest('grant_type must be authorization_code or refresh_token')
   }
 
-  const githubResponse = await exchange(params)
+  // A rejected fetch would otherwise escape as an unhandled throw, and the
+  // runtime's own 500 carries an HTML body — which the client can only read as
+  // "unexpected response". Answering with the same JSON shape as every other
+  // failure keeps "GitHub was unreachable" distinguishable from "GitHub
+  // refused the grant", which is the whole point of forwarding its body.
+  let githubResponse: Response
+  try {
+    githubResponse = await exchange(params)
+  } catch {
+    return badGateway('Could not reach GitHub')
+  }
+
   let data: unknown
   try {
     data = await githubResponse.json()

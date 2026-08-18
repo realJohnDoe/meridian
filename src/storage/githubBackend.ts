@@ -3,7 +3,7 @@ import { isVaultFile } from './backend'
 import type { VaultKind } from '@/vaultRef'
 import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError } from './githubApi'
 import { ensureFreshAccessToken } from './githubOAuth'
-import { isTransientSyncError } from './conflictError'
+import { isTransientSyncError, TransientSyncError } from './conflictError'
 
 interface GitHubConfig {
   owner:  string
@@ -123,10 +123,18 @@ export class GitHubBackend implements StorageBackend {
   }
 
   async refreshAuth(): Promise<boolean> {
-    const fresh = await ensureFreshAccessToken(this.id, { force: true })
-    if (!fresh) return false
-    this.updateToken(fresh)
-    return true
+    const result = await ensureFreshAccessToken(this.id, { force: true })
+    if (result.status === 'ok') {
+      this.updateToken(result.token)
+      return true
+    }
+    // The refresh POST never got an answer — the network dropped, or the
+    // Worker/Cloudflare hiccuped. The credential is not implicated, so this
+    // must not surface as the 401 that triggered it: rethrowing as transient
+    // keeps sync on its backoff instead of telling the user to sign in again
+    // over a blip they had nothing to do with.
+    if (result.status === 'transient') throw new TransientSyncError('Could not reach GitHub to refresh sign-in.')
+    return false
   }
 
   // ── StorageBackend ─────────────────────────────────────────────

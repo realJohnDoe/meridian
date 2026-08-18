@@ -281,10 +281,15 @@ async function buildBackend(ref: VaultRef): Promise<StorageBackend | null> {
     return handle ? new LocalBackend(ref.id, ref.name, handle) : null
   }
   if (ref.kind === 'github') {
-    const token = await ensureFreshAccessToken(ref.id)
-    if (!token) return null
+    // A refresh that failed transiently, or a credential GitHub has since
+    // refused, still hands back the last known token — the backend is built
+    // with it and the first API call becomes the real test, which is where the
+    // sync path's classification and recovery already live. Only "nothing
+    // stored at all" is a reason not to build one.
+    const result = await ensureFreshAccessToken(ref.id)
+    if (result.status === 'no-credential') return null
     const { GitHubBackend } = await import('./githubBackend')
-    return new GitHubBackend(ref.id, ref.name, { ...ref.github, token })
+    return new GitHubBackend(ref.id, ref.name, { ...ref.github, token: result.token })
   }
   if (ref.kind === 'ical') {
     // The feed URL travels on the ref, so a subscription has no credential to
