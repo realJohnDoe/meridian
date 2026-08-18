@@ -20,6 +20,7 @@ import {
   getUnreadableFiles, setUnreadableFiles,
   getVaults,
 } from '@/storeBridge'
+import type { AttentionKind } from '@/store'
 import { notify, warn, warnWithDetails, notifyError } from './notifications'
 import { getBackend, getMountedBackends } from './backends'
 import { journal, hashContent, syncJournalDump } from './syncJournal'
@@ -820,11 +821,11 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
       // "the App lost this repo" and "the branch is gone" — no re-parsing the
       // message. Anything else actionable (e.g. ConflictError) leaves
       // needsAttention as it was; only these three kinds are ever its writer.
+      const attentionKind: AttentionKind | null =
+        e instanceof AuthSyncError ? (e.kind === 'auth' ? 'reauth' : e.kind) : null
       setVaultSync(vaultId, {
         error: msg,
-        ...(e instanceof AuthSyncError
-          ? { needsAttention: { kind: e.kind === 'auth' ? 'reauth' : e.kind, message: msg } }
-          : {}),
+        ...(attentionKind ? { needsAttention: { kind: attentionKind, message: msg } } : {}),
       })
       // Dedupe per vault, and name the vault: with several registered, "Sync
       // failed" alone leaves the user guessing which one needs attention.
