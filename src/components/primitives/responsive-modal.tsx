@@ -100,9 +100,13 @@ interface ResponsiveModalActionsProps {
   setDisabled?: boolean
 }
 
-function ResponsiveModalActions({
-  onRemove, onCancel, onSet, removeLabel = 'Remove', setDisabled,
-}: ResponsiveModalActionsProps) {
+// `removeLabel` takes its default via `??` in the body rather than as a
+// destructured-parameter default — that shape makes
+// babel-plugin-react-compiler silently skip memoizing this component. See
+// OccurrenceCard.tsx for the full rationale.
+function ResponsiveModalActions(props: ResponsiveModalActionsProps) {
+  const { onRemove, onCancel, onSet, setDisabled } = props
+  const removeLabel = props.removeLabel ?? 'Remove'
   const isDesktop = React.use(ModalContext)
   return (
     <DrawerActions

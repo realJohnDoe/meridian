@@ -18,8 +18,15 @@ interface Props {
  * Logic mirrors occKind(): task (done tracked) → CheckSquare,
  * event (has date) → CalendarDays, note → FileText.
  * Treats undefined item as a note.
+ *
+ * `size` takes its default via `??` in the body rather than as a
+ * destructured-parameter default — that shape makes
+ * babel-plugin-react-compiler silently skip memoizing this component. See
+ * OccurrenceCard.tsx for the full rationale.
  */
-export default function KindIcon({ item, size = 13, className }: Props) {
+export default function KindIcon(props: Props) {
+  const { item, className } = props
+  const size = props.size ?? 13
   if (isTracked(item))
     return <CheckSquare size={size} className={className} />
   if (item?.date)

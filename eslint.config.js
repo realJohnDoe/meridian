@@ -290,6 +290,27 @@ export default [
     ),
   },
 
+  // A default inside a destructured function parameter (an AssignmentPattern
+  // inside an ObjectPattern) makes babel-plugin-react-compiler silently bail
+  // out of memoizing the whole component — no build or lint error otherwise.
+  // Use `props.x ?? default` in the body instead (see OccurrenceCard.tsx).
+  // components/ui/ is excluded: those files are a faithful mirror of the
+  // shadcn registry (only the shadcn CLI writes them), so hand-patching them
+  // would break `shadcn diff` and CLAUDE.md's mirror-fidelity policy.
+  // src/debug/ is excluded for the same reason it's excluded from jsx-a11y
+  // above: developer-only tooling that never ships, so the memoization
+  // concern this rule guards against doesn't apply.
+  {
+    files: ['src/**/*.tsx'],
+    ignores: ['src/components/ui/**', 'src/debug/**', 'src/**/*.test.tsx'],
+    rules: {
+      'no-restricted-syntax': ['error', {
+        selector: 'FunctionDeclaration > ObjectPattern > Property > AssignmentPattern',
+        message: 'A default in a destructured parameter makes babel-plugin-react-compiler silently skip memoizing this component. Use `props.x ?? default` in the body (see OccurrenceCard.tsx).',
+      }],
+    },
+  },
+
   // Within a module, relative imports into its own subdirectories (e.g.
   // editor/ importing './dialogs/RepeatDialog') are ordinary internal
   // structure, not a boundary violation — the no-restricted-paths zones above
