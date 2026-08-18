@@ -8,7 +8,7 @@ Investigation of two field reports (2026-08-18):
   re-added; sync worked again by itself.
 
 **Status: PR 1 (`src/storage/failureKind.ts`), PR 2 (`mountVaultRef` in
-`src/storage/vaultRegistry.ts`), PR 3, PR 4, PR 6 and PR 7 have shipped —
+`src/storage/vaultRegistry.ts`), PR 3, PR 4, PR 6, PR 7 and PR 8 have shipped —
 hence the gaps in the numbering below. Everything still listed is
 outstanding.** Every claim
 marked _read_ comes from the code with the line cited; the investigation
@@ -169,15 +169,13 @@ credential fix cut into "write it atomically" and "decide when it's dead".
 | # | Title | Model | Est. | Blocked by |
 |---|---|---|---|---|
 | 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | — |
-| 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | — |
 
-Total ≈ 1.25d remaining, including per-PR tests and review.
+Total ≈ 1d remaining, including per-PR tests and review.
 
 ### Ordering
 
 ```
 PR5
-PR8
 ```
 
 Report A is already fixed — PR 6's atomic `credentialsSave` and PR 7's
@@ -226,22 +224,3 @@ remove-and-re-add, which calls `cacheDeleteAll` and destroys them.
 entry points) with: reconnect id present + repo still installed → `reauth` called,
 `addGitHubVaultOAuth` **not** called; reconnect id present + repo missing → neither
 called, install screen shown; no reconnect id → today's behaviour unchanged.
-
----
-
-### PR 8 — Auth events in the sync journal
-
-**Model: Sonnet 5** · 0.25d
-
-`syncJournal.ts` is already the bounded in-memory flight recorder with a "Copy
-details" surface, built for exactly this: a failure on a phone with no devtools
-attached. It currently records nothing about auth.
-
-Add three `SyncEventKind`s — `auth-refresh`, `auth-refreshed`, `auth-failed` —
-and record `{ kind: FailureKind, status }` from `classifyFailure`
-(`src/storage/failureKind.ts`) plus the vault
-id. **Never a token, never a token prefix, never a refresh token length** — the
-file's own doc comment sets that bar ("No file content, ever") and it applies
-doubly here.
-
-This is what turns the next report from a screenshot into evidence.
