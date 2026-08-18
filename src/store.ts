@@ -127,9 +127,24 @@ function partitionLayers(
 // ── PER-VAULT SYNC STATUS ───────────────────────────────────────────────────
 
 /**
+ * Why a vault needs a user action before it can sync cleanly again.
+ * `fs-permission` is a local vault waiting on a filesystem-permission
+ * gesture; the other three are GitHub failures classified by
+ * `storage/failureKind.ts`'s `FailureKind` (`auth` renamed to `reauth` here
+ * since it names the fix, not the cause).
+ */
+export type AttentionKind = 'fs-permission' | 'reauth' | 'access' | 'config'
+
+export interface VaultAttention {
+  kind:    AttentionKind
+  message: string
+}
+
+/**
  * What `SyncButton` shows for one vault. Written by `storage/sync.ts` (the
- * first five fields) and by `storage/vaultRegistry.ts` (`needsReconnect`) —
- * one map rather than two so a row renders from a single lookup.
+ * first five fields, plus `needsAttention` on an actionable sync failure) and
+ * by `storage/vaultRegistry.ts` (`needsAttention` on mount) — one map rather
+ * than two so a row renders from a single lookup.
  */
 export interface VaultSyncStatus {
   dirtyCount:   number
@@ -139,13 +154,13 @@ export interface VaultSyncStatus {
   lastSyncedAt: number | null
   /** Informational, not an error — the vault's backend doesn't accept writes. */
   readOnly:     boolean
-  /** Local vault whose filesystem permission needs a user gesture to re-grant. */
-  needsReconnect: boolean
+  /** Set when the vault needs a user action to sync again; null otherwise. */
+  needsAttention: VaultAttention | null
 }
 
 export const emptySyncStatus = (): VaultSyncStatus => ({
   dirtyCount: 0, error: null, offline: false, inProgress: false,
-  lastSyncedAt: null, readOnly: false, needsReconnect: false,
+  lastSyncedAt: null, readOnly: false, needsAttention: null,
 })
 
 interface MeridianStore {

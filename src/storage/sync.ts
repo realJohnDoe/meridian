@@ -18,7 +18,9 @@ import {
   getVaultLayer, setVaultLayer,
   setVaultSync,
   getUnreadableFiles, setUnreadableFiles,
+  getVaults,
 } from '@/storeBridge'
+import type { AttentionKind } from '@/store'
 import { notify, warn, warnWithDetails, notifyError } from './notifications'
 import { getBackend, getMountedBackends } from './backends'
 import { journal, hashContent, syncJournalDump } from './syncJournal'
@@ -793,7 +795,7 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
       }
     }
     // ── SUCCESS ──────────────────────────────────────────────────
-    setVaultSync(vaultId, { error: null, offline: false, lastSyncedAt: Date.now() })
+    setVaultSync(vaultId, { error: null, offline: false, lastSyncedAt: Date.now(), needsAttention: null })
     syncState.consecutiveFailures = 0
     syncState.nextRetryAt         = 0
     syncState.lastErrorSig        = null
@@ -815,7 +817,16 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
     } else {
       // ── ACTIONABLE (auth, repo missing, etc.) ────────────────
       const msg = (e as Error).message || (e as Error).name || 'Unknown error'
-      setVaultSync(vaultId, { error: msg })
+      // AuthSyncError's own `kind` is how "sign in again" gets told apart from
+      // "the App lost this repo" and "the branch is gone" — no re-parsing the
+      // message. Anything else actionable (e.g. ConflictError) leaves
+      // needsAttention as it was; only these three kinds are ever its writer.
+      const attentionKind: AttentionKind | null =
+        e instanceof AuthSyncError ? (e.kind === 'auth' ? 'reauth' : e.kind) : null
+      setVaultSync(vaultId, {
+        error: msg,
+        ...(attentionKind ? { needsAttention: { kind: attentionKind, message: msg } } : {}),
+      })
       // Dedupe per vault, and name the vault: with several registered, "Sync
       // failed" alone leaves the user guessing which one needs attention.
       if (!opts.silent || syncState.lastErrorSig !== msg) {
@@ -994,7 +1005,12 @@ export async function syncToBackend(vaultId?: string): Promise<void> {
     : getMountedBackends().filter(b => b.hasRemote)
 
   if (targets.length === 0) {
-    notify('No writable vault connected. Add a local folder first.')
+    if (vaultId) {
+      const name = getVaults().find(v => v.id === vaultId)?.name ?? vaultId
+      notify(`"${name}" isn't connected — it may still be restoring, or failed to mount.`)
+    } else {
+      notify('No writable vault connected. Add a local folder first.')
+    }
     return
   }
   for (const backend of targets) {

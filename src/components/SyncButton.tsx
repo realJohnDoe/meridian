@@ -18,7 +18,7 @@ import { keyVaultId } from '@/fileIO'
 type Severity = 'error' | 'pending' | 'idle'
 
 function severityOf(status: VaultSyncStatus): Severity {
-  if (status.error !== null || status.needsReconnect) return 'error'
+  if (status.error !== null || status.needsAttention !== null) return 'error'
   if (status.offline || status.dirtyCount > 0) return 'pending'
   return 'idle'
 }
@@ -64,7 +64,7 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
       {/* Absorbed from the sidebar's old per-vault list, which is gone: this is
           now the one place a local vault can ask for its permission back, and
           the click is the user gesture the FS API requires. */}
-      {status.needsReconnect && (
+      {status.needsAttention?.kind === 'fs-permission' && (
         <button
           className="flex items-center gap-1 pl-5 text-2xs text-note hover:underline text-left"
           onClick={() => void reconnectVault(vault.id)}

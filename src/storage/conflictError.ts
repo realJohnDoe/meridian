@@ -1,4 +1,4 @@
-import { classifyFailure } from './failureKind'
+import { classifyFailure, type FailureKind } from './failureKind'
 
 /**
  * Why a backend refused a write. Carried on `ConflictError` so the resolution
@@ -31,9 +31,15 @@ export class TransientSyncError extends Error {
   }
 }
 
-/** Thrown for auth/access failures that require user action (invalid token, missing repo). */
+/**
+ * Thrown for auth/access failures that require user action (invalid token,
+ * missing repo). `kind` is the `FailureKind` that produced it, narrowed to
+ * the three that ever map here — carried so `runSync` can tell "sign in
+ * again" apart from "the App lost this repo" apart from "the branch is gone"
+ * without re-parsing the message.
+ */
 export class AuthSyncError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly kind: Extract<FailureKind, 'auth' | 'access' | 'config'> = 'auth') {
     super(message)
     this.name = 'AuthSyncError'
   }

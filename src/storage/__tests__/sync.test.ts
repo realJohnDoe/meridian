@@ -14,6 +14,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { StorageBackend, RawFile } from '@/storage/backend'
 import type { VaultKind } from '@/vaultRef'
+import type { VaultAttention } from '@/store'
 import { ConflictError, AuthSyncError, TransientSyncError } from '@/storage/conflictError'
 import type * as MeridianModel from '@/model'
 import { entryKey } from '@/fileIO'
@@ -38,6 +39,7 @@ const { cacheStore, storeState, notifyFns, roundTripLossMock } = vi.hoisted(() =
     syncByVault: new Map<string, {
       dirtyCount: number; error: string | null; offline: boolean
       inProgress: boolean; lastSyncedAt: number | null; readOnly: boolean
+      needsAttention: VaultAttention | null
     }>(),
   },
   // `warnWithDetails` records the *rendered* details string, not the thunk, so
@@ -133,6 +135,7 @@ vi.mock('@/storeBridge', () => ({
   setVaultSync: vi.fn((vaultId: string, patch: Record<string, unknown>) => {
     const prev = storeState.syncByVault.get(vaultId) ?? {
       dirtyCount: 0, error: null, offline: false, inProgress: false, lastSyncedAt: null, readOnly: false,
+      needsAttention: null,
     }
     storeState.syncByVault.set(vaultId, { ...prev, ...patch })
   }),
@@ -173,6 +176,7 @@ function syncOf(vaultId = 'fake-vault') {
   return storeState.syncByVault.get(vaultId) ?? {
     dirtyCount: 0, error: null as string | null, offline: false,
     inProgress: false, lastSyncedAt: null as number | null, readOnly: false,
+    needsAttention: null as VaultAttention | null,
   }
 }
 import { recordLocalEdit, recordLocalDelete } from '@/storage/cache/files'
@@ -781,6 +785,7 @@ describe('runSync — auth retry after 401', () => {
     expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('clean')
     expect(syncOf().error).toBeNull()
     expect(syncOf().lastSyncedAt).not.toBeNull()
+    expect(syncOf().needsAttention).toBeNull()
   })
 
   it('surfaces an actionable error when refreshAuth fails to recover', async () => {
@@ -797,6 +802,7 @@ describe('runSync — auth retry after 401', () => {
     expect(backend.refreshAuth).toHaveBeenCalledTimes(1)
     expect(backend.writeCallCount).toBe(1) // no retry attempted
     expect(syncOf().error).toBe('401 unauthorized')
+    expect(syncOf().needsAttention).toEqual({ kind: 'reauth', message: '401 unauthorized' })
     expect(notifyFns.notifyError).toHaveBeenCalledTimes(1)
     // The dirty edit is preserved locally rather than lost.
     expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('dirty')
@@ -814,6 +820,57 @@ describe('runSync — auth retry after 401', () => {
 
     expect(backend.writeCallCount).toBe(1)
     expect(syncOf().error).toBe('token revoked')
+    expect(syncOf().needsAttention).toEqual({ kind: 'reauth', message: 'token revoked' })
+  })
+})
+
+// ── needsAttention by failure kind ────────────────────────────────────────
+//
+// AuthSyncError carries the FailureKind that produced it (see
+// storage/failureKind.ts and mapGitHubError). runSync's job is only to
+// translate that into the store's AttentionKind — 'auth' becomes 'reauth'
+// since it names the fix, the other two pass through unchanged.
+
+describe('runSync — needsAttention by AuthSyncError kind', () => {
+  it('sets needsAttention: access when the App/user has lost repo access', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    backend.queueStatAllError(new AuthSyncError('GitHub access denied. Check your token permissions.', 'access'))
+
+    await syncToBackend()
+
+    expect(syncOf().needsAttention).toEqual({
+      kind: 'access', message: 'GitHub access denied. Check your token permissions.',
+    })
+  })
+
+  it('sets needsAttention: config when the repo or branch is gone', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    backend.queueStatAllError(new AuthSyncError('Repository not found or token lacks access.', 'config'))
+
+    await syncToBackend()
+
+    expect(syncOf().needsAttention).toEqual({
+      kind: 'config', message: 'Repository not found or token lacks access.',
+    })
+  })
+
+  it('leaves needsAttention untouched for an actionable failure that is not an AuthSyncError', async () => {
+    const backend = new FakeBackend()
+    backend.seed('task.md', 'remote', 'sha1')
+    mountBackend(backend)
+    seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
+    // Not wrapped as ConflictError (that's auto-resolved inside pushDirty and
+    // never reaches this catch) — a generic actionable error that isn't
+    // AuthSyncError is the case this guards: needsAttention is only ever
+    // written for the three AuthSyncError kinds.
+    backend.queueWriteError(Object.assign(new Error('validation failed'), { status: 422 }))
+
+    await syncToBackend()
+
+    expect(syncOf().error).not.toBeNull()
+    expect(syncOf().needsAttention).toBeNull()
   })
 })
 
@@ -1471,7 +1528,9 @@ describe('multi-vault sync', () => {
     await syncToBackend('vault-b')
 
     expect(syncOf('fake-vault').error).toBe('token revoked')
+    expect(syncOf('fake-vault').needsAttention).toEqual({ kind: 'reauth', message: 'token revoked' })
     expect(syncOf('vault-b').error).toBeNull()
+    expect(syncOf('vault-b').needsAttention).toBeNull()
     expect(b.get('only-b.md')?.content).toBe('b content')
     // A's failure did not touch B's row, and vice versa.
     expect(syncOf('vault-b').offline).toBe(false)

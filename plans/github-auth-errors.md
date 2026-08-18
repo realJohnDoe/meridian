@@ -167,9 +167,8 @@ credential fix cut into "write it atomically" and "decide when it's dead".
 
 | # | Title | Model | Est. | Blocked by |
 |---|---|---|---|---|
-| 3 | `needsAttention` replaces `needsReconnect` (state only) | Sonnet 5 | 0.5d | — |
-| 4 | Attention rows + actions in `SyncButton`/`VaultSettings` | Sonnet 5 | 0.5d | 3 |
-| 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | 3 |
+| 4 | Attention rows + actions in `SyncButton`/`VaultSettings` | Sonnet 5 | 0.5d | — |
+| 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | — |
 | 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | — |
 | 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | 4 |
 
@@ -178,8 +177,8 @@ Total ≈ 2.5d remaining, including per-PR tests and review.
 ### Ordering
 
 ```
-PR3 ──┬─► PR4 ──► PR9
-      └─► PR5
+PR4 ──► PR9
+PR5
 PR8
 ```
 
@@ -189,60 +188,13 @@ recoverable in one tap. (Report B was fixed by PR 2.)
 
 ---
 
-### PR 3 — `needsAttention` replaces `needsReconnect` (state only, no UI)
+### PR 4 — Attention rows and their actions
 
 **Model: Sonnet 5** · 0.5d
 
-In `store.ts`, replace `needsReconnect: boolean` with:
-
-```ts
-export type AttentionKind = 'fs-permission' | 'reauth' | 'access' | 'config'
-export interface VaultAttention { kind: AttentionKind; message: string }
-// on VaultSyncStatus:
-needsAttention: VaultAttention | null   // default null
-```
-
-Who writes it — the complete list, no other writers:
-
-| Site | Condition | Value |
-|---|---|---|
-| `mountVaultRef` | local `'prompt'`, non-interactive | `{ kind: 'fs-permission', … }` |
-| `mountVaultRef` | mounted successfully | `null` |
-| `runSync` catch | `classifyFailure` → `auth`, **and** the forced-refresh retry already failed | `{ kind: 'reauth', … }` |
-| `runSync` catch | → `access` | `{ kind: 'access', … }` |
-| `runSync` catch | → `config` | `{ kind: 'config', … }` |
-| `runSync` success | always | `null` |
-| `runSync` catch | → `transient` | **unchanged** — sets `offline`, never `needsAttention` |
-
-`severityOf` in `SyncButton.tsx:21` swaps `status.needsReconnect` for
-`status.needsAttention !== null`; the existing "Permission needed — reconnect"
-row keeps working for `kind === 'fs-permission'`. **No other UI change in this
-PR** — that is PR 4.
-
-Also in this PR, because it is the same one-line class of bug: `syncToBackend`
-with a `vaultId` that resolves to no mounted backend must not say *"Add a local
-folder first."* (`sync.ts:996`). Split the message — the no-argument case keeps
-today's text, the named-vault case says the vault isn't connected and names it.
-
-**Tests:** assertions move from `notifyFns.notify` strings to the store field —
-that is the durable win here. Update `vaultRegistry.test.ts:694` and the
-`sync.test.ts` auth cases (`:774`, `:793`, `:811`, `:1468`) to assert
-`syncByVault.get(id).needsAttention`.
-
-**Glossary:** `GLOSSARY.md` §"Vaults and backends" gets a `needsAttention` entry
-(one sentence + the `store.ts` pointer), and `needsReconnect` goes in the retired
--names table. `src/glossary.test.ts` enforces this — a rename that skips it fails
-the suite, which is the intended tripwire.
-
----
-
-### PR 4 — Attention rows and their actions
-
-**Model: Sonnet 5** · 0.5d · depends on PR 3
-
-Render `needsAttention` as one row per kind in `SyncButton`'s popover, and mirror
-the two actionable ones into `VaultSettings`' GitHub section. The copy deck —
-implement verbatim, no rewording:
+Render `needsAttention` (`store.ts`) as one row per kind in `SyncButton`'s
+popover, and mirror the two actionable ones into `VaultSettings`' GitHub
+section. The copy deck — implement verbatim, no rewording:
 
 | Kind | Row text | Action |
 |---|---|---|
@@ -251,9 +203,9 @@ implement verbatim, no rewording:
 | `access` | Meridian no longer has access to `{owner}/{repo}` | link to `GITHUB_APP_INSTALL_URL` |
 | `config` | `{owner}/{repo}` (`{branch}`) isn't reachable — it may have been renamed or deleted | opens this vault's Settings |
 
-Row styling follows the existing `needsReconnect` row (`SyncButton.tsx:67-76`):
-`text-2xs`, `AlertCircle`, `text-note`. The red icon now persists after the toast
-is gone, which is the actual user-visible fix.
+Row styling follows the existing `needsAttention?.kind === 'fs-permission'` row
+(`SyncButton.tsx:67-76`): `text-2xs`, `AlertCircle`, `text-note`. The red icon
+now persists after the toast is gone, which is the actual user-visible fix.
 
 **Ship PR 4 before PR 5 if you want** — the `reauth` row renders disabled with
 the same text, and PR 5 just wires its `onClick`.
@@ -262,7 +214,7 @@ the same text, and PR 5 just wires its `onClick`.
 
 ### PR 5 — Re-authenticate an existing vault
 
-**Model: Sonnet 5** · 1d · depends on PR 3
+**Model: Sonnet 5** · 1d
 
 The flow, end to end:
 

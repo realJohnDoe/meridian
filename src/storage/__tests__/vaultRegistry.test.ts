@@ -359,7 +359,8 @@ describe('restoreVaults — local vault', () => {
     // popover — but parked: no cycle is started for a vault still waiting on a
     // gesture only the user can make.
     expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
-    expect(storeState.syncByVault.get(LOCAL_REF.id)?.needsReconnect).toBe(true)
+    const attention = storeState.syncByVault.get(LOCAL_REF.id)?.needsAttention as { kind: string } | null | undefined
+    expect(attention?.kind).toBe('fs-permission')
     expect(syncFns.syncOnActivate).not.toHaveBeenCalled()
   })
 
@@ -688,7 +689,7 @@ describe('reconnectVault', () => {
     await reconnectVault(LOCAL_REF.id)
 
     expect(getMountedVaultIds()).toContain(LOCAL_REF.id)
-    expect(storeState.syncByVault.get(LOCAL_REF.id)?.needsReconnect).toBe(false)
+    expect(storeState.syncByVault.get(LOCAL_REF.id)?.needsAttention).toBeNull()
     expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
   })
 
