@@ -125,6 +125,11 @@ vi.mock('@/storage/cache/credentials', () => ({
   refreshTokenClear: vi.fn(async (id: string) => { metaStore.delete(`refreshToken:${id}`) }),
   tokenExpirySave: vi.fn(async (id: string, e: number) => { metaStore.set(`tokenExpiry:${id}`, e) }),
   tokenExpiryClear: vi.fn(async (id: string) => { metaStore.delete(`tokenExpiry:${id}`) }),
+  credentialsSave: vi.fn(async (id: string, c: { accessToken: string; refreshToken: string; expiresAt: number }) => {
+    metaStore.set(`token:${id}`, c.accessToken)
+    metaStore.set(`refreshToken:${id}`, c.refreshToken)
+    metaStore.set(`tokenExpiry:${id}`, c.expiresAt)
+  }),
 }))
 
 vi.mock('@/storage/cache/registry', () => ({

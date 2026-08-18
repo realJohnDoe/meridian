@@ -1,4 +1,4 @@
-import { tokenLoad, tokenSave, refreshTokenLoad, refreshTokenSave, tokenExpiryLoad, tokenExpirySave } from './cache/credentials'
+import { tokenLoad, refreshTokenLoad, tokenExpiryLoad, credentialsSave } from './cache/credentials'
 import { WORKER_ORIGIN } from './workerOrigin'
 
 const GITHUB_CLIENT_ID = 'Iv23liMpUq1CUQl4TcaT'
@@ -140,9 +140,7 @@ export async function ensureFreshAccessToken(vaultId: string, opts?: { force?: b
 
   try {
     const fresh = await refreshAccessToken(refreshToken)
-    await tokenSave(vaultId, fresh.accessToken)
-    await refreshTokenSave(vaultId, fresh.refreshToken)
-    await tokenExpirySave(vaultId, fresh.expiresAt)
+    await credentialsSave(vaultId, fresh)
     return fresh.accessToken
   } catch (e) {
     console.warn('[oauth] token refresh failed:', e)

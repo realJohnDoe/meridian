@@ -413,6 +413,24 @@ describe('cache/credentials — tokens', () => {
   })
 })
 
+describe('cache/credentials — credentialsSave (atomic write)', () => {
+  it('writes the token, refresh token, and expiry in a single bulkPut, not three puts', async () => {
+    const d = await open()
+    const bulkPutSpy = vi.spyOn(d.meta, 'bulkPut')
+    const putSpy = vi.spyOn(d.meta, 'put')
+
+    await m.creds.credentialsSave(V, {
+      accessToken: 'access-1', refreshToken: 'refresh-1', expiresAt: 1_700_000_000_000,
+    })
+
+    expect(bulkPutSpy).toHaveBeenCalledTimes(1)
+    expect(putSpy).not.toHaveBeenCalled()
+    expect(await m.creds.tokenLoad(V)).toBe('access-1')
+    expect(await m.creds.refreshTokenLoad(V)).toBe('refresh-1')
+    expect(await m.creds.tokenExpiryLoad(V)).toBe(1_700_000_000_000)
+  })
+})
+
 describe('cache/credentials — directory handles', () => {
   it('round-trips a directory handle and clears it', async () => {
     expect(await m.creds.handleLoad(V)).toBeNull()
