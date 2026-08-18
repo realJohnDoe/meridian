@@ -13,6 +13,7 @@ import {
 import { RangeSetBuilder } from '@codemirror/state'
 import { focusedCursorLines } from './viewUtils'
 import { buildTaskLineMap } from './taskLines'
+import { isSafeUrl } from '../urlSafety'
 
 // ── Language ──────────────────────────────────────────────────────
 
@@ -62,8 +63,7 @@ class LinkWidget extends WidgetType {
     span.className = 'cm-md-link'
     span.addEventListener('mousedown', e => {
       e.preventDefault()
-      const safe = /^(https?|mailto):/i.test(this.url)
-      if (safe) window.open(this.url, '_blank', 'noopener,noreferrer')
+      if (isSafeUrl(this.url)) window.open(this.url, '_blank', 'noopener,noreferrer')
     })
     return span
   }

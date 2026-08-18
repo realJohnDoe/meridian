@@ -105,7 +105,7 @@ directory was skipped.
 | 1 | Component Architecture & Boundaries | **findings: #6** |
 | 2 | Styling System Consistency | **findings: #4, #7** |
 | 3 | UX States & Accessibility | **findings: #2, #3** |
-| 4 | Security (UI-facing) | **findings: #5** |
+| 4 | Security (UI-facing) | no open findings |
 | 5 | Code Health & DRY | **findings: #6** |
 | 6 | React Performance | no open findings |
 | 7 | UI Toolchain & Feedback Loops | **findings: #2, #8** |
@@ -135,7 +135,6 @@ directory was skipped.
 | 2 | Primary "add" affordances are clickable `<span>`/`<div>` | `a11y` `ux` `toolchain` | 7 | 4 files | **Sonnet 5** |
 | 3 | Two hand-rolled overlays with no focus trap | `a11y` `library-fit` | 6 | 2 files | **Opus 5** |
 | 4 | Hardcoded toast ink fails WCAG AA in 7 of 9 themes | `styling` `a11y` | 6 | 1 file | **Opus 5** |
-| 5 | `href` from an iCal feed with no scheme allowlist | `security` | 5 | 1 file | **Sonnet 5** |
 | 6 | DayPane/WeekPane share a copy-pasted timeline scaffold | `dry` `component-architecture` | 5 | 2 files | **Opus 5** |
 | 7 | `:root` and `.meridian` duplicate 47 tokens with nothing enforcing it | `styling` `dry` | 3 | 1 file | **Sonnet 5** |
 | 8 | 24 raw `<button>`s with no `type` attribute | `toolchain` `code-health` | 2 | 11 files | **Haiku 4.5** |
@@ -349,63 +348,6 @@ ink for all nine.
 with a per-theme token following the `--*-foreground` pattern already in
 `@theme inline`, and re-check the two rules' contrast against the *mixed*
 background rather than the pure swatch.
-
----
-
-### Finding #5 — `href` from an iCal feed with no scheme allowlist
-
-- **Category:** `security`
-- **Impact:** 5
-- **Breadth:** 1 file. Found by grepping `href={|src={|target="_blank"|window.open`
-  across `src` — 4 hits total, of which this is the only one taking
-  file-derived input.
-- **Recommended model:** **Sonnet 5.** The correct predicate already exists in
-  this repo and can be named in the task, so there is no judgment left. Hazard
-  to state: the guard must reject before render, not on click — an `<a href>`
-  fires on middle-click, context-menu "open in new tab", and Enter, so a
-  click-handler guard (the shape used in `markdownFormatting.ts`) is **not**
-  sufficient here; the element must not carry an unsafe `href` at all.
-
-**Threat model.** User- and file-supplied content rendered by this UI: markdown
-bodies, YAML frontmatter, wikilinks, file names, and — the relevant one —
-`extra` fields synthesized from a **remote `.ics` subscription feed**, a
-third-party URL the user subscribes to and does not control the contents of.
-There is no `dangerouslySetInnerHTML` or `innerHTML` anywhere in `src`, and CM6
-widgets use `textContent` throughout, so injection is limited to URL sinks.
-
-**Evidence** — `src/editor/EntryViewOnly.tsx:102`:
-
-```
-              <a href={url} target="_blank" rel="noreferrer"
-```
-
-`url` traces directly to the feed, unvalidated —
-`src/storage/ical/icsToEntries.ts:131`:
-
-```
-  const url = propValue(event, 'URL')?.trim()
-```
-
-The repo already knows the correct guard and applies it on the *other* URL sink,
-`src/editor/cm/markdownFormatting.ts:65`:
-
-```
-      const safe = /^(https?|mailto):/i.test(this.url)
-```
-
-**Problem:** A `URL:javascript:…` property in a subscribed calendar feed
-renders as a clickable link that executes in the app's origin — which holds
-GitHub OAuth tokens in IndexedDB. The CSP in `vite.config.ts` does not help:
-`javascript:` URI execution is governed by `script-src`, and the policy there is
-`'self'`, which historically does **not** block `javascript:` navigations in all
-engines — and regardless, the app should not be constructing the link. The
-mitigating factor is that it requires the user to subscribe to a hostile feed
-*and* click the link, which is why this is impact 5 rather than higher.
-
-**Fix:** Apply the same `^(https?|mailto):` test in `EntryViewOnly` and render
-the URL as plain text (not an anchor) when it fails; better, lift the predicate
-out of `markdownFormatting.ts` into a shared helper so there is one definition
-rather than two.
 
 ---
 
