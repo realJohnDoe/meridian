@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Plus, Users } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { badgeVariants } from '@/components/ui/badge'
 import { TagChip } from '@/components'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 import { FloatingComboboxList } from './FloatingComboboxList'
 import { useFloatingCombobox } from '@/hooks'
+import { cn } from '@/lib/cn'
 
 const EMPTY_PARTICIPANTS: string[] = []
 
@@ -69,13 +70,13 @@ export default function ParticipantsRow(props: Props) {
               />
             </div>
           ) : (
-            <Badge
-              variant="tag"
-              className="cursor-pointer text-primary bg-primary/12 gap-1"
+            <button
+              type="button"
+              className={cn(badgeVariants({ variant: 'tag' }), 'min-h-6 cursor-pointer text-primary bg-primary/12 gap-1')}
               onClick={() => setOpen(true)}
             >
               <Plus size={9} />person
-            </Badge>
+            </button>
           )}
           <FloatingComboboxList placement={placement} listRef={listRef} className="w-48">
             <CommandList>

@@ -9,7 +9,6 @@ import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
 import { OccurrenceCard, MarkdownTaskCard, TagChip, FlipList, captureFlipLeaveRect, type FlipLeaveRect } from '@/components'
 import { isDimmed, priorityRank, doneKindOrder } from '@/calendar'
-import { Card } from '@/components/ui/card'
 import { IconButton } from '@/components/primitives/icon-button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
@@ -301,13 +300,14 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
                   />
                 </div>
               ) : (
-                <Card
-                  className="flex items-center gap-2 pl-2 pr-2.5 py-2 border-dashed border-input bg-card/50 shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-lg border border-dashed border-input bg-card/50 pl-2 pr-2.5 py-2 text-left text-muted-foreground shadow-none transition-colors hover:bg-accent"
                   onClick={() => setPickerOpen(true)}
                 >
                   <Plus size={13} className="shrink-0" />
                   <span className="text-sm">Add item…</span>
-                </Card>
+                </button>
               )}
               <FloatingComboboxList placement={placement} listRef={listRef} className="w-64">
                 <CommandList>

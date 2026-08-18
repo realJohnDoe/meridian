@@ -104,11 +104,11 @@ directory was skipped.
 |---|---|---|
 | 1 | Component Architecture & Boundaries | **findings: #6** |
 | 2 | Styling System Consistency | **findings: #4, #7** |
-| 3 | UX States & Accessibility | **findings: #2, #3** |
+| 3 | UX States & Accessibility | **findings: #3** |
 | 4 | Security (UI-facing) | no open findings |
 | 5 | Code Health & DRY | **findings: #6** |
 | 6 | React Performance | no open findings |
-| 7 | UI Toolchain & Feedback Loops | **findings: #2, #8** |
+| 7 | UI Toolchain & Feedback Loops | **findings: #8** |
 | 8 | UI Dependencies & Library Fit | **findings: #3** — plus three explicit keep-custom verdicts, below |
 
 **Category 8 — keep-custom verdicts (status quo is correct):**
@@ -132,7 +132,6 @@ directory was skipped.
 
 | # | Title | Category | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 2 | Primary "add" affordances are clickable `<span>`/`<div>` | `a11y` `ux` `toolchain` | 7 | 4 files | **Sonnet 5** |
 | 3 | Two hand-rolled overlays with no focus trap | `a11y` `library-fit` | 6 | 2 files | **Opus 5** |
 | 4 | Hardcoded toast ink fails WCAG AA in 7 of 9 themes | `styling` `a11y` | 6 | 1 file | **Opus 5** |
 | 6 | DayPane/WeekPane share a copy-pasted timeline scaffold | `dry` `component-architecture` | 5 | 2 files | **Opus 5** |
@@ -142,86 +141,9 @@ directory was skipped.
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
 and breadth reported separately so the list can be re-sorted.
 
-**Sequencing note:** do **#8 before #2** — both touch
-`editor/ItemsList.tsx` and `onboarding/CoachTour.tsx`, and #2 replaces the
-offending elements with real `<button>`s (which need a `type` anyway), so
-running #8 first means #2 lands on already-correct markup instead of
-re-editing the same lines. #3 and #8 both touch `CoachTour.tsx`; #3
-subsumes #8's fix there, so do #3 first or accept one trivial rebase. All
-others are independent.
-
----
-
-### Finding #2 — Primary "add" affordances are clickable `<span>`/`<div>`
-
-- **Category:** `a11y` `ux` `toolchain`
-- **Impact:** 7
-- **Breadth:** 4 files. Counted by a dry-run of the `jsx-a11y` settings change
-  below — 8 errors (2 rules × 4 sites), no others.
-- **Recommended model:** **Sonnet 5**, *if the task names the replacement*
-  ("swap `<Badge onClick>` for `<Badge asChild><button type='button'>`, keep the
-  chip styling, keep the 44px target rule from `IconButton`'s doc comment").
-  **Else Opus 5** — the silent-failure mode here is a fix that renders
-  identically and still isn't reachable: adding `tabIndex={0}` + `onKeyDown`
-  to the span satisfies the linter while leaving a non-semantic control that
-  screen readers still announce as text. The tell that the fix is right is a
-  real `<button>` in the DOM, not a green lint run.
-
-**Evidence** — `src/editor/ListedOnRow.tsx:77`:
-
-```
-              <Badge
-                variant="tag"
-                className="cursor-pointer text-primary bg-primary/12 gap-1"
-                onClick={() => setPickerOpen(true)}
-              >
-                <Plus size={9} />add to list
-              </Badge>
-```
-
-`Badge` renders a bare span — `src/components/ui/badge.tsx:32`:
-
-```
-  return <span className={cn(badgeVariants({ variant }), className)} {...props} />
-```
-
-The identical pattern is at `src/editor/ParticipantsRow.tsx:66` (`+ person`),
-`src/components/TagChip.tsx:43` (topic navigation), and — as a `<div>` via
-`Card` — at `src/editor/ItemsList.tsx:304`:
-
-```
-                <Card
-                  className="flex items-center gap-2 pl-2 pr-2.5 py-2 border-dashed border-input bg-card/50 shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
-                  onClick={() => setPickerOpen(true)}
-                >
-```
-
-**Problem:** These are the three primary "add" controls of the entry editor —
-add an item, add a participant, add a file to the list — plus topic navigation.
-None is keyboard-reachable, none is announced as a control, and the `Badge`
-ones are ~18px tall, under both the 44px thumb target and the 24px WCAG 2.5.8
-floor that this codebase's own `IconButton` doc comment cites as the standard
-it holds itself to. `jsx-a11y` runs at `recommended` and the whole repo has
-**zero** raw clickable `<div>`s — so this class slipped through purely because
-the rule cannot see through a custom component to the `<span>` it renders.
-
-**Fix:** Replace each with a real `<button type="button">` (or `<Badge asChild>`
-wrapping one), sized to clear 24px, and add the component→element mapping so
-`jsx-a11y` can see through the indirection:
-
-```js
-settings: {
-  'jsx-a11y': {
-    components: { Badge: 'span', Card: 'div', DimmableCard: 'div', CardContent: 'div', CardHeader: 'div' },
-  },
-}
-```
-
-**Dry-run result:** with that one settings key and no rule changes, the existing
-`recommended` preset produces 8 errors —
-`jsx-a11y/click-events-have-key-events` and
-`jsx-a11y/no-static-element-interactions` — at exactly those 4 sites and nowhere
-else. This is the highest-leverage single line in the report.
+**Sequencing note:** #3 and #8 both touch `CoachTour.tsx`; #3 subsumes #8's
+fix there, so do #3 first or accept one trivial rebase. All others are
+independent.
 
 ---
 
