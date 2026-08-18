@@ -116,4 +116,37 @@ describe('handleOAuthToken', () => {
     expect(res.status).toBe(502)
     expect(await res.json()).toMatchObject({ error: 'server_error' })
   })
+
+  // Without this the throw escapes as the runtime's own HTML 500, which the
+  // client can only read as "unexpected response" — indistinguishable from a
+  // refusal, and the client's whole point is telling those two apart.
+  it('returns a structured 502 when GitHub cannot be reached at all', async () => {
+    const exchange = vi.fn(() => Promise.reject(new TypeError('Failed to fetch')))
+
+    const res = await handleOAuthToken(
+      formRequest({ grant_type: 'refresh_token', refresh_token: 'ghr_xyz' }),
+      env,
+      exchange,
+    )
+
+    expect(res.status).toBe(502)
+    expect(await res.json()).toMatchObject({ error: 'server_error' })
+  })
+
+  // The client splits "the grant is dead" from "we could not ask" on GitHub's
+  // own `error` code, so it has to arrive intact — GitHub answers 200 here.
+  it('forwards a refresh-token rejection verbatim, code and status', async () => {
+    const exchange = vi.fn(async () =>
+      Response.json({ error: 'bad_refresh_token', error_description: 'The refresh token is incorrect or expired.' }),
+    )
+
+    const res = await handleOAuthToken(
+      formRequest({ grant_type: 'refresh_token', refresh_token: 'ghr_dead' }),
+      env,
+      exchange,
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ error: 'bad_refresh_token' })
+  })
 })
