@@ -7,6 +7,7 @@ import type { VaultRef } from '@/vaultRef'
 import { Badge } from '@/components/ui/badge'
 import { VaultChip } from '@/components'
 import EntryBody from './EntryBody'
+import { isSafeUrl } from './urlSafety'
 import { fmtT, parseDateString } from '@/model'
 import { fmtShort, formatDurationChip, fmtDuration } from '@/format'
 import { useStore } from '@/store'
@@ -98,12 +99,16 @@ export default function EntryViewOnly({ occ, vault, items, roots }: Props) {
             {location && (
               <span className="flex items-center gap-1.5"><MapPin size={13} className="shrink-0" />{location}</span>
             )}
-            {url && (
+            {url && (isSafeUrl(url) ? (
               <a href={url} target="_blank" rel="noreferrer"
                 className="flex items-center gap-1.5 w-fit text-primary hover:underline">
                 <Link2 size={13} className="shrink-0" />{url}
               </a>
-            )}
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <Link2 size={13} className="shrink-0" />{url}
+              </span>
+            ))}
             {organizer && (
               <span className="flex items-center gap-1.5"><User size={13} className="shrink-0" />{organizer}</span>
             )}

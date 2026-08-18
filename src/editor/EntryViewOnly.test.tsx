@@ -80,6 +80,19 @@ describe('EntryViewOnly', () => {
     expect(link).toHaveAttribute('target', '_blank')
   })
 
+  it('renders a javascript: url from a feed as plain text, not a link', () => {
+    const occ = makeOcc({
+      metadata: {
+        vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Team sync', tags: [], items: [], participants: [],
+        extra: { url: 'javascript:alert(1)', uid: 'xyz' },
+      },
+    })
+    render(<EntryViewOnly occ={occ} vault={VAULT} items={[occ]} roots={makeRoots('note.md')} />)
+
+    expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /javascript/ })).not.toBeInTheDocument()
+  })
+
   it('renders attendees from extra, separately from participant chips', () => {
     const occ = makeOcc({
       metadata: {
