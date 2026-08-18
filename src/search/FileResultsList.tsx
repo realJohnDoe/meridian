@@ -59,11 +59,22 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
       e => [e.title, ...e.tags, ...e.items].join(' '),
       e => e.title,
     )
-    return ranked.map(entry => ({
-      entry,
-      listedOn: (backlinks.get(entry.entryKey) ?? []).map(key => roots.get(key)?.title ?? key),
-    }))
-  }, [roots, backlinks, debouncedQuery])
+    // The occurrence is resolved here, not in the render body: a row that
+    // cannot resolve one must never reach the virtualizer, or `count` promises
+    // a row that nothing draws — the virtualizer still reserves its height and
+    // the result is an invisible gap between real results. `fileOccurrenceMap`
+    // is total over `roots`, so this drops nothing today; it is what keeps the
+    // count and what is drawn incapable of disagreeing if that ever changes.
+    return ranked.flatMap(entry => {
+      const occ = occBySlug.get(entry.entryKey)
+      if (!occ) return []
+      return [{
+        entry,
+        occ,
+        listedOn: (backlinks.get(entry.entryKey) ?? []).map(key => roots.get(key)?.title ?? key),
+      }]
+    })
+  }, [roots, backlinks, occBySlug, debouncedQuery])
 
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns functions the compiler can't memoize safely; it correctly skips optimizing this component instead.
   const virtualizer = useVirtualizer({
@@ -88,9 +99,7 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
     <div className="px-3.5 pt-2">
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
         {virtualItems.map(vi => {
-          const { entry, listedOn } = results[vi.index]!
-          const occ = occBySlug.get(entry.entryKey)
-          if (!occ) return null
+          const { occ, listedOn } = results[vi.index]!
           return (
             <div
               key={vi.key}

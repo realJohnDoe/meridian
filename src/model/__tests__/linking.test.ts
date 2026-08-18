@@ -429,6 +429,36 @@ instances:
     expect(occ!.metadata.done).toBe(false)
   })
 
+  it('is total for a root that has no items at all', () => {
+    // The reported bug: an entry whose root survived with zero occurrences had
+    // no place in the map, so the search results list reserved a row for it and
+    // drew nothing — an invisible gap where the entry should have been. An
+    // entry is its root, so it gets a representative occurrence built from the
+    // file-level fields.
+    const { items } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const roots: Roots = new Map([[keyOf('handy'), { title: 'handy', tags: ['errands'], items: [], vaultId: TEST_VAULT, fileSlug: 'handy' }]])
+
+    const occ = buildFom(items.filter(i => i.entryKey !== keyOf('handy')), roots).get(keyOf('handy'))
+
+    expect(occ).toBeDefined()
+    expect(occ!.entryKey).toBe(keyOf('handy'))
+    expect(occ!.metadata.title).toBe('handy')
+    expect(occ!.date).toBe('')
+  })
+
+  it('drops the occurrence resolved from items a key has since lost', () => {
+    // The incremental path may only reuse a cached entry when the key had no
+    // items *before* either — otherwise a key whose items were just evicted
+    // would keep pointing at an occurrence that no longer exists.
+    const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const withItems = buildFom(items, roots)
+    expect(withItems.get(keyOf('project-alpha'))!.date).not.toBe('')
+
+    const after = updateFileOccurrenceMap(withItems, items, roots, [], roots)
+
+    expect(after.get(keyOf('project-alpha'))!.date).toBe('')
+  })
+
   it('returns equal maps for identical inputs', () => {
     const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const map1 = buildFom(items, roots)

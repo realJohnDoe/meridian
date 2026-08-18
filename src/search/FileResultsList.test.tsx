@@ -154,6 +154,22 @@ describe('FileResultsList', () => {
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('note.md') }))
   })
 
+  it('renders a card for an entry whose root has no occurrences, instead of a blank row', () => {
+    // The reported bug: an entry created from the search overlay whose root
+    // landed in the store without an occurrence still matched the query, so
+    // the virtualizer counted it and reserved a row — and then drew nothing,
+    // leaving a gap between the "Create" row and the first real result. An
+    // entry is its root, so it gets a representative occurrence and a card.
+    seedStore([], makeRoots('handy', { title: 'handy' }))
+    const { type, container } = renderList()
+
+    type('handy')
+    flushDebounce()
+
+    expect(container.querySelectorAll('[data-testid="entry-card"]')).toHaveLength(1)
+    expect(screen.getByText('handy')).toBeInTheDocument()
+  })
+
   it('shows backlinking file titles as listed-on chips', () => {
     // backlinks is derived from roots' wikilinks (buildBacklinkIndex), not directly
     // settable — other.md "links to" note.md via a wikilink in its own items.

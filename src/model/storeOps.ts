@@ -437,7 +437,6 @@ export function freeEntryKey(data: StoreData, vaultId: string, baseSlug: string)
  */
 function applyNew(data: StoreData, fields: EditFields, vaultId: string, draftId?: string): StoreData {
   const { items, roots } = data
-  const { scheduled, repeat } = fields
   const entryKey = newEntryKey(data, vaultId, fields.title, draftId)
 
   const draft = findDraft(items, draftId)
@@ -451,27 +450,42 @@ function applyNew(data: StoreData, fields: EditFields, vaultId: string, draftId?
   // Routed through updateRoot rather than a second FileMetadata literal: with no
   // previous entry it produces exactly the same shape, and there is then only
   // one place in the module where file-level metadata is assembled.
-  const newRoots = updateRoot(roots, entryKey, fields)
+  return {
+    items: [...items, freshItem(entryKey, fields, draftId ?? crypto.randomUUID())],
+    roots: updateRoot(roots, entryKey, fields),
+  }
+}
+
+/**
+ * The one item a brand-new entry starts life as — a series when the editor's
+ * fields carry a repeat, a standalone otherwise.
+ *
+ * Shared by `applyNew` and by `applyEdit`'s revival branch, which needs exactly
+ * the same construction against a key that already exists rather than a freshly
+ * allocated one.
+ */
+function freshItem(entryKey: EntryKey, fields: EditFields, id: string): StoreItem {
+  const { scheduled, repeat } = fields
   if (repeat) {
-    const newSeries: RepeatPattern<OccurrenceMetadata> = {
+    const series: RepeatPattern<OccurrenceMetadata> = {
       date:     scheduled?.date ?? '',
       time:     scheduled?.time || null,
       repeat,
       entryKey,
-      id:       draftId ?? crypto.randomUUID(),
+      id,
       metadata: seriesMeta({}, fields),
     }
-    return { items: [...items, newSeries], roots: newRoots }
+    return series
   }
-  const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
+  const occ: OccurrenceEntry<OccurrenceMetadata> = {
     date:    scheduled?.date ?? '',
     time:    scheduled?.time || null,
     source:  'explicit',
     entryKey,
-    id:      draftId ?? crypto.randomUUID(),
+    id,
     metadata: occMeta({}, fields),
   }
-  return { items: [...items, newOcc], roots: newRoots }
+  return occ
 }
 
 /** Update the series (or standalone) metadata across all occurrences. */
@@ -667,6 +681,19 @@ export function applyEdit(
   target: NewEntryTarget,
 ): StoreData {
   if (!occ) return applyNew(data, fields, target.vaultId, target.draftId)
+  // The occurrence the editor is holding has no item behind it any more — its
+  // file was deleted remotely, in another tab, or by a reconcile, while the
+  // editor stayed open on it. Every scope below would still run `updateRoot`
+  // and then match nothing, leaving a root with zero occurrences: an entry that
+  // renders as a blank row in search and that the write path can only guess at.
+  // Rebuild the item on the entry's own key instead, so the edit lands on a
+  // whole entry rather than half of one.
+  if (entryKeyItems(data.items, occ.entryKey).length === 0) {
+    return {
+      items: [...data.items, freshItem(occ.entryKey, fields, occ.ownerId ?? occ.id)],
+      roots: updateRoot(data.roots, occ.entryKey, fields),
+    }
+  }
   switch (scope) {
     case 'all':    return applyAll(data, occ, fields)
     case 'single': return applySingle(data, occ, fields)

@@ -197,6 +197,29 @@ describe('useEntryEditor', () => {
     expect(useStore.getState().items).toHaveLength(1)
   })
 
+  it('a save after the entry lost its items keeps it whole instead of leaving a bare root', () => {
+    // The reported bug, end to end: create from the search overlay, then change
+    // the priority. The editor holds the occurrence its first save created, so
+    // if the entry's items go while it stays open — a reconcile re-merging the
+    // vault layer, another tab, a remote delete — the next save updated the
+    // root and matched no item. That left a root with zero occurrences: search
+    // reserved a row for it and drew nothing, and the write path refused to
+    // persist it, so the entry died with the tab.
+    const { result } = renderHook(() => useEntryEditor(null, 'all', 'handy', { date: '2026-08-18' }))
+    const key = testKey(titleToSlug('handy'))
+    expect(persistence.writes).toEqual([key])
+
+    // The items disappear from under the open editor; the root survives.
+    act(() => { useStore.getState().setData({ items: [], roots: useStore.getState().roots }) })
+
+    act(() => { result.current.dialogHandlers.onPriority('high') })
+
+    const items = useStore.getState().items.filter(i => i.entryKey === key)
+    expect(items).toHaveLength(1)
+    expect(items[0]!.metadata.priority).toBe('high')
+    expect(persistence.writes).toEqual([key, key])
+  })
+
   it('editScope "add" suppresses both the meta save and the autosave', () => {
     const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false } })
     seedStore([occ], makeRoots('note.md'))

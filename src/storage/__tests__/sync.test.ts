@@ -1271,24 +1271,28 @@ describe('syncOnActivate', () => {
   })
 })
 
-// ── writeEntityToCache — self-heal delete guard ─────────────────────────
+// ── writeEntityToCache — an entry with a root but no occurrences ───────────
 //
-// getItems()/getRoots() here can be a snapshot that lags the commit that
-// triggered the call (e.g. a second setData landing in between), so a slug
-// with zero items but a surviving root must NOT be treated as "the file was
-// deleted" — that would tombstone a brand-new item whose creating commit
-// simply hadn't landed in this snapshot yet. Only a slug with neither items
-// nor a root reflects a real delete.
+// A slug with zero items but a surviving root is an entry whose file-level
+// fields are all that is left. It is NOT a delete — treating it as one would
+// tombstone a file the store still lists — and it must not be skipped either:
+// skipping is what silently lost a just-created entry, because nothing ever
+// came back to write it, so it lived in memory until the tab closed while
+// search kept listing its root. Only a slug with neither items nor a root
+// reflects a real delete.
 
-describe('writeEntityToCache — self-heal delete guard', () => {
-  it('does not tombstone a slug that has no items yet but still has a root (stale snapshot)', async () => {
+describe('writeEntityToCache — an entry with a root but no occurrences', () => {
+  it('writes the root\'s file-level fields instead of tombstoning or skipping', async () => {
     const backend = new FakeBackend()
     mountBackend(backend)
-    seedLayer('fake-vault', [], new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+    seedLayer('fake-vault', [], new Map([[K('note'), rootFor('note', { title: 'Note', tags: ['inbox'], items: [] })]]))
 
     await writeEntityToCache(K('note'))
 
-    expect(cacheStore.has(vp('fake-vault', 'note.md'))).toBe(false)
+    const cached = cacheStore.get(vp('fake-vault', 'note.md'))
+    expect(cached?.status).toBe('dirty')
+    expect(cached?.content).toContain('title: Note')
+    expect(cached?.content).toContain('inbox')
     expect(notifyFns.notifyError).not.toHaveBeenCalled()
   })
 

@@ -24,7 +24,14 @@ type AnyOcc = OccurrenceEntry<OccurrenceMetadata>
  * - Override instances diff against the series' full metadata.
  */
 export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<string, unknown> {
-  if (items.length === 0) return {}
+  // A root with no occurrences is still a file, and its file-level fields are
+  // the only thing left to write. Emitting `{}` here would blank the title,
+  // tags and `items:` list on the next save, which is why the write path used
+  // to refuse such an entry outright — and then never write it at all, losing
+  // it with the tab (see `writeEntityToCache`). What this emits re-parses into
+  // one undated occurrence (`nodeIsItem` treats a leaf root as an item), so the
+  // entry comes back whole on the next load rather than staying occurrence-less.
+  if (items.length === 0) return root ? fileMetaToYaml(root) : {}
 
   const fileLevel = root ? fileMetaToYaml(root) : {}
 
