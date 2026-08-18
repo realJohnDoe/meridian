@@ -305,7 +305,9 @@ type MountOutcome = 'granted' | 'offline' | 'prompt' | 'denied' | 'no-credential
  * vault in needs-reconnect state instead of syncing it — its cached content
  * still paints, so the entries are readable, they just can't be refreshed
  * until the user grants permission. `interactive: true` (a reconnect click)
- * actively requests permission, which never resolves to `'prompt'`.
+ * actively requests permission, which never resolves to `'prompt'`. This
+ * applies to `local` only — a `github`/`ical` ref skips the probe entirely on
+ * a non-interactive restore; see the check below.
  *
  * `prePainted` says the caller already hydrated this vault from cache (the
  * restore path does, before any network work) so neither branch below reads
@@ -316,6 +318,19 @@ async function mountVaultRef(
 ): Promise<MountOutcome> {
   const backend = await buildBackend(ref)
   if (!backend) return 'no-credential'
+
+  // A network backend has no permission gate, only failures — the first sync
+  // IS the probe. Skip it on restore (interactive: false) so one dropped
+  // request can no longer leave the vault unmounted for the rest of the
+  // session; runSync's own classification, retry and backoff take over from
+  // here. A reconnect click (interactive: true) still probes, because a
+  // human is waiting on the answer.
+  if ((ref.kind === 'github' || ref.kind === 'ical') && !interactive) {
+    mountBackend(backend)
+    setVaultSync(ref.id, { needsReconnect: false })
+    await loadVaultContent(backend, prePainted)
+    return 'granted'
+  }
 
   const perm = await backend.ensurePermission(interactive)
   // 'unreachable' is emphatically not 'denied': the credential is fine, the
@@ -461,12 +476,11 @@ async function restoreVaultsInner(): Promise<void> {
           warn(ref.kind === 'local'
             ? `Vault "${ref.name}" is missing its folder permission — remove and re-add it.`
             : `Vault "${ref.name}" is missing its GitHub token — remove and re-add it.`)
-        } else if (outcome === 'denied' && ref.kind === 'github') {
-          notify(`Could not reconnect GitHub vault "${ref.name}" — check your token.`)
         }
-        // An iCal vault only ever answers 'granted' or 'offline'; an
-        // unreachable feed leaves its cached events on screen and retries on
-        // the next cycle, with no message worth interrupting the user for.
+        // `github`/`ical` skip the probe on restore (see mountVaultRef), so
+        // `outcome` is always 'granted' for them here — never 'denied', never
+        // 'prompt'. A dropped request just means a failed first sync, which
+        // runSync retries on its own; there is nothing to notify about.
       } catch (e) {
         // One vault's failure must not abort the others' restore.
         console.warn(`[vault] could not mount "${ref.name}":`, e)
