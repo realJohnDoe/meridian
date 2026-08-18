@@ -390,7 +390,7 @@ describe('restoreVaults — github vault', () => {
   })
 
   it('mounts and syncs when the token is usable and permission is granted', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue({ status: 'ok', token: 'access-token' })
 
     await restoreVaults()
 
@@ -400,7 +400,7 @@ describe('restoreVaults — github vault', () => {
   })
 
   it('mounts as writable when the network is unreachable, and does not blame the token', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue({ status: 'ok', token: 'access-token' })
     backendConfig.githubPermission = 'unreachable'
 
     await restoreVaults()
@@ -413,7 +413,7 @@ describe('restoreVaults — github vault', () => {
   })
 
   it('notifies but keeps going when permission is not granted', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue({ status: 'ok', token: 'access-token' })
     backendConfig.githubPermission = 'denied'
 
     await restoreVaults()
@@ -432,7 +432,7 @@ describe('restoreVaults — several vaults', () => {
   })
 
   it('mounts both, each with its own layer, merged into one view', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue({ status: 'ok', token: 'access-token' })
     cacheConfig.rows.set(LOCAL_REF.id,  [{ path: 'local.md',  content: '# Local' }])
     cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'remote.md', content: '# Remote' }])
 
@@ -461,7 +461,7 @@ describe('restoreVaults — several vaults', () => {
   })
 
   it('adopts the legacy active-vault id as the default when no default was ever chosen', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue({ status: 'ok', token: 'access-token' })
     metaStore.set('activeVaultId', GITHUB_REF.id)
 
     await restoreVaults()
@@ -473,7 +473,7 @@ describe('restoreVaults — several vaults', () => {
   })
 
   it('never points the default at the read-only Tutorial vault', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue({ status: 'ok', token: 'access-token' })
     metaStore.set('activeVaultId', 'example')
 
     await restoreVaults()
@@ -489,7 +489,7 @@ describe('restoreVaults — several vaults', () => {
 describe('restoreVaults — cache-first paint', () => {
   beforeEach(() => {
     metaStore.set('vaults', [GITHUB_REF])
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue({ status: 'ok', token: 'access-token' })
     storeState.vaultLoading = true
   })
 
@@ -824,7 +824,7 @@ describe('removeVault', () => {
     metaStore.set(`token:${GITHUB_REF.id}`, 't')
     metaStore.set(`refreshToken:${GITHUB_REF.id}`, 'r')
     metaStore.set(`tokenExpiry:${GITHUB_REF.id}`, 1)
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue({ status: 'ok', token: 'access-token' })
     await restoreVaults()
 
     await removeVault(GITHUB_REF.id)
@@ -838,7 +838,7 @@ describe('removeVault', () => {
   it('re-points the default vault when the removed one was it', async () => {
     metaStore.set('vaults', [LOCAL_REF, GITHUB_REF])
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue({ status: 'ok', token: 'access-token' })
     await restoreVaults()
     expect(storeState.defaultVaultId).toBe(LOCAL_REF.id)
 
@@ -936,7 +936,7 @@ describe('adding the first real vault', () => {
     metaStore.set('exampleVaultRemoved', false)
     await restoreVaults()
     expect(getMountedVaultIds()).toContain('example')
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
+    vi.mocked(ensureFreshAccessToken).mockResolvedValue({ status: 'ok', token: 'access-token' })
 
     await addGitHubVaultOAuth({
       owner: 'me', repo: 'repo', branch: 'main',

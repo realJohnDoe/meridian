@@ -1,4 +1,5 @@
 import { tokenLoad, refreshTokenLoad, tokenExpiryLoad, credentialsSave } from './cache/credentials'
+import { TransientSyncError } from './conflictError'
 import { WORKER_ORIGIN } from './workerOrigin'
 
 const GITHUB_CLIENT_ID = 'Iv23liMpUq1CUQl4TcaT'
@@ -56,24 +57,103 @@ export interface OAuthTokens {
   expiresAt:    number // ms epoch
 }
 
+/**
+ * GitHub rejected the credential itself. Definitive: the grant is gone and no
+ * amount of retrying brings it back — the only cure is a fresh sign-in.
+ *
+ * Extends `OAuthCallbackError` so the sign-in screen keeps rendering its
+ * message verbatim; the subclass exists so the *refresh* path can tell "this
+ * credential is dead" apart from "we could not ask".
+ */
+export class OAuthCredentialError extends OAuthCallbackError {
+  constructor(message: string, readonly code: string) {
+    super(message)
+    this.name = 'OAuthCredentialError'
+  }
+}
+
+/**
+ * GitHub `error` codes that mean the presented grant is permanently gone.
+ *
+ * The list is deliberately short. Getting it wrong is expensive in both
+ * directions: a code treated as terminal that isn't nags the user to sign in
+ * again for nothing, and a genuinely dead credential treated as recoverable
+ * hides behind an infinite retry — the exact shape of the bug this file's
+ * single-flight machinery exists to close. So a code is only listed here when
+ * it names *the grant we sent*, never when it names the app or the request.
+ *
+ * Everything else GitHub can answer with — `incorrect_client_credentials`,
+ * `redirect_uri_mismatch`, `unsupported_grant_type`, `application_suspended` —
+ * is a fault in Meridian's own App configuration. Those are not transient, but
+ * they are also not a verdict on the user's credential: signing in again would
+ * fail identically, so they must never be reported as "sign in again".
+ */
+const DEAD_GRANT_ERRORS = new Set([
+  'invalid_grant',         // OAuth 2.0's own code for a rejected/expired/revoked grant
+  'bad_refresh_token',     // GitHub's spelling of the same thing on the refresh leg
+  'expired_token',         // the refresh token aged out (6 months, or the App was reinstalled)
+  'bad_verification_code', // authorization-code leg: the code was already spent or expired
+  'access_denied',         // the user or an org admin revoked the authorization
+])
+
+/** Statuses that carry no verdict on the credential — the endpoint is unwell, not the grant. */
+function isUnwellStatus(status: number): boolean {
+  return status >= 500 || status === 408 || status === 429
+}
+
+/**
+ * POSTs to the Worker's token endpoint and classifies whatever comes back.
+ *
+ * Three outcomes, and keeping them apart is the point:
+ *
+ * - success — tokens.
+ * - `TransientSyncError` — the request never got an answer from GitHub: the
+ *   network dropped, the Worker or Cloudflare answered instead, or GitHub is
+ *   having a bad day. The stored credential is untouched and uncondemned.
+ * - `OAuthCredentialError` / `OAuthCallbackError` — GitHub answered, and the
+ *   answer was a refusal. Only the former means the credential is dead.
+ *
+ * Collapsing the first two is what used to report a Worker hiccup as a bad
+ * credential; `DEAD_GRANT_ERRORS` above is where that line is drawn.
+ */
 async function exchangeForTokens(body: Record<string, string>): Promise<OAuthTokens> {
-  const res = await fetch(`${WORKER_ORIGIN}/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(body).toString(),
-  })
-
-  const data = (await res.json()) as Record<string, unknown>
-  if (typeof data.access_token !== 'string' || typeof data.refresh_token !== 'string' || typeof data.expires_in !== 'number') {
-    const description = typeof data.error_description === 'string' ? data.error_description : 'Token exchange failed.'
-    throw new OAuthCallbackError(description)
+  let res: Response
+  try {
+    res = await fetch(`${WORKER_ORIGIN}/oauth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(body).toString(),
+    })
+  } catch {
+    // Never reached the Worker: offline, DNS, captive portal, or the request
+    // was killed by backgrounding. Nothing about this is a credential.
+    throw new TransientSyncError('Could not reach GitHub to refresh sign-in.')
   }
 
-  return {
-    accessToken:  data.access_token,
-    refreshToken: data.refresh_token,
-    expiresAt:    Date.now() + data.expires_in * 1000,
+  let data: Record<string, unknown>
+  try {
+    data = (await res.json()) as Record<string, unknown>
+  } catch {
+    // The Worker forwards GitHub's JSON verbatim, so a non-JSON body means
+    // something in front of it answered instead — an edge error page, a
+    // captive portal's login form. Transient by construction.
+    throw new TransientSyncError('Sign-in service returned an unexpected response.')
   }
+
+  if (typeof data.access_token === 'string' && typeof data.refresh_token === 'string' && typeof data.expires_in === 'number') {
+    return {
+      accessToken:  data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt:    Date.now() + data.expires_in * 1000,
+    }
+  }
+
+  const code = typeof data.error === 'string' ? data.error : null
+  const description = typeof data.error_description === 'string' ? data.error_description : 'Token exchange failed.'
+
+  if (isUnwellStatus(res.status)) throw new TransientSyncError(description)
+  if (code !== null && DEAD_GRANT_ERRORS.has(code)) throw new OAuthCredentialError(description, code)
+  throw new OAuthCallbackError(description)
 }
 
 /**
@@ -105,46 +185,144 @@ async function refreshAccessToken(refreshToken: string): Promise<OAuthTokens> {
 }
 
 const REFRESH_MARGIN_MS = 5 * 60_000 // refresh if expiring within 5 minutes
+/**
+ * A GitHub App user access token lives 8 hours. Nothing we store can
+ * legitimately claim to outlast that — see `refreshDue` for why we care.
+ */
+const MAX_TOKEN_LIFETIME_MS = 8 * 60 * 60_000
 
 /**
- * Returns a usable access token for a GitHub vault, refreshing it first if
- * it has a stored refresh token and is expired or expiring soon (or
- * unconditionally, if `force` is set — used when a live API call came back
- * 401 despite a fresh-looking local expiry).
+ * Whether the stored expiry says a refresh is due.
  *
- * A vault with no stored refresh token predates the app's "Sign in with
- * GitHub" flow and can't be refreshed — its token passes through unchanged.
- * On a non-forced refresh failure, falls back to the existing (possibly
- * stale) token — the caller's own permission/API check will surface the
- * failure if it's truly invalid, same as before this existed. On a forced
- * refresh failure, returns null so the caller knows recovery isn't possible
- * and the original error should be surfaced.
+ * **The local clock is a hint here, never the authority.** The authority is
+ * GitHub's 401, which `sync.ts` turns into a forced refresh that skips this
+ * check entirely. That split is what makes clock skew safe to live with:
+ *
+ * - `expiresAt` is written as `Date.now() + expires_in`, so a clock that is
+ *   merely *offset* — even by hours — cancels out: both ends of the
+ *   subtraction below use the same wrong clock. Only a clock that *jumps*
+ *   between the write and the read can mislead this check at all.
+ * - A jump forward makes a live token look expired, so we refresh early.
+ *   Harmless: rotation is atomic (`credentialsSave`) and single-flight (below).
+ * - A jump backward makes an expired token look live, suppressing the refresh
+ *   until the API 401s — and that 401 is exactly what the forced path is for,
+ *   so it self-heals within one sync cycle.
+ *
+ * The one case worth catching here is a backward jump large enough to suppress
+ * refreshes *indefinitely*: an expiry further out than a token can possibly
+ * live is not a valid expiry, so it is disbelieved rather than trusted.
  */
-export async function ensureFreshAccessToken(vaultId: string, opts?: { force?: boolean }): Promise<string | null> {
+function refreshDue(expiresAt: number | null): boolean {
+  if (expiresAt === null) return true
+  const now = Date.now()
+  if (expiresAt - now > MAX_TOKEN_LIFETIME_MS) return true
+  return now >= expiresAt - REFRESH_MARGIN_MS
+}
+
+/**
+ * What `ensureFreshAccessToken` found. The failure variants still carry the
+ * last known access token: a non-forced caller can carry on with it exactly as
+ * before (the caller's own API call is the real test), while a forced caller —
+ * one that already watched that token 401 — ignores it and acts on `status`.
+ */
+export type FreshTokenResult =
+  /** Usable: freshly rotated, or stored and not yet due for rotation. */
+  | { status: 'ok';           token: string }
+  /** The refresh could not be *asked* — network, Worker, or GitHub 5xx. Retry later; the credential is not implicated. */
+  | { status: 'transient';    token: string }
+  /** GitHub refused the grant, or there is nothing left to refresh with. Only a fresh sign-in fixes this. */
+  | { status: 'needs-reauth'; token: string }
+  /** No access token stored for this vault at all. */
+  | { status: 'no-credential' }
+
+/**
+ * Per-vault serialization of the whole read-decide-rotate-store sequence, and
+ * a count of completed rotations.
+ *
+ * The refresh token is **single-use**: GitHub rotates it on every exchange and
+ * invalidates the one presented. Two overlapping refreshes therefore race to
+ * spend the same token, and the loser gets `bad_refresh_token` — a permanent
+ * failure for a vault whose credential was in fact fine, recoverable only by
+ * signing in again. Deduping just the network call would not be enough: a
+ * caller that read the old refresh token *before* a rotation would still spend
+ * it afterwards. So the storage reads are inside the critical section too.
+ */
+const refreshChains   = new Map<string, Promise<unknown>>()
+const rotationCounts  = new Map<string, number>()
+
+/** Runs `fn` after any previously queued work for this vault, whatever its outcome. */
+function serializePerVault<T>(vaultId: string, fn: () => Promise<T>): Promise<T> {
+  const previous = refreshChains.get(vaultId) ?? Promise.resolve()
+  const next     = previous.then(fn, fn)
+  // The chain is only a turnstile — a predecessor's rejection must not reject
+  // every call queued behind it, so what is stored is a swallowed copy.
+  refreshChains.set(vaultId, next.catch(() => undefined))
+  return next
+}
+
+/**
+ * Returns a usable access token for a GitHub vault, rotating it first if the
+ * stored expiry says it is due — or unconditionally when `force` is set, which
+ * is what `sync.ts` does after a live API call came back 401 despite a
+ * fresh-looking local expiry.
+ *
+ * **Why a forced call queues behind an in-flight call rather than joining it:**
+ * a non-forced call may legitimately decide no rotation is needed and hand back
+ * the very token that just 401'd. Joining it would return a known-dead token to
+ * the one caller that already knows it is dead. Queuing costs a turn and
+ * re-decides against the storage state the predecessor left behind.
+ *
+ * **And why that does not double-rotate:** the counterpart hazard is the forced
+ * call spending a second single-use refresh token on top of a rotation that
+ * just completed. A forced caller records the vault's rotation count on entry;
+ * if that count moved while it waited, the stored token is strictly newer than
+ * the one it saw fail, so it takes that token instead of rotating again. (If
+ * that token also 401s, `runSync`'s one-shot `attemptedRefresh` guard stops the
+ * loop — there is no path here that retries forever.)
+ *
+ * A vault with no stored refresh token predates the "Sign in with GitHub" flow.
+ * Its token passes through untouched on a non-forced call; a forced call means
+ * that token just failed, and for a credential that cannot be refreshed the
+ * only cure is signing in.
+ */
+export async function ensureFreshAccessToken(vaultId: string, opts?: { force?: boolean }): Promise<FreshTokenResult> {
+  const force         = opts?.force ?? false
+  // Sampled before queuing, so it reflects what this caller knew when it decided to force.
+  const rotationsSeen = rotationCounts.get(vaultId) ?? 0
+  return serializePerVault(vaultId, () => resolveFreshToken(vaultId, force, rotationsSeen))
+}
+
+/** The body of `ensureFreshAccessToken`, always running inside the per-vault turnstile. */
+async function resolveFreshToken(vaultId: string, force: boolean, rotationsSeen: number): Promise<FreshTokenResult> {
   const token = await tokenLoad(vaultId)
-  if (!token) return null
+  if (!token) return { status: 'no-credential' }
 
   const refreshToken = await refreshTokenLoad(vaultId)
-  if (!refreshToken) {
-    // No refresh token stored — nothing to refresh. On a forced call
-    // (post-401 retry in sync.ts), signal "can't recover" rather than handing
-    // back the same token that just failed, so the caller doesn't retry
-    // pointlessly.
-    return opts?.force ? null : token
-  }
+  if (!refreshToken) return force ? { status: 'needs-reauth', token } : { status: 'ok', token }
 
-  if (!opts?.force) {
-    const expiresAt = await tokenExpiryLoad(vaultId)
-    if (expiresAt !== null && Date.now() < expiresAt - REFRESH_MARGIN_MS) return token
+  if (force) {
+    if ((rotationCounts.get(vaultId) ?? 0) > rotationsSeen) return { status: 'ok', token }
+  } else if (!refreshDue(await tokenExpiryLoad(vaultId))) {
+    return { status: 'ok', token }
   }
 
   try {
     const fresh = await refreshAccessToken(refreshToken)
     await credentialsSave(vaultId, fresh)
-    return fresh.accessToken
+    rotationCounts.set(vaultId, (rotationCounts.get(vaultId) ?? 0) + 1)
+    return { status: 'ok', token: fresh.accessToken }
   } catch (e) {
-    console.warn('[oauth] token refresh failed:', e)
-    return opts?.force ? null : token
+    if (e instanceof OAuthCredentialError) {
+      console.warn(`[oauth] GitHub rejected the refresh token for ${vaultId} (${e.code}) — sign-in required`)
+      return { status: 'needs-reauth', token }
+    }
+    // Everything that is not a refusal of the grant is treated as retryable,
+    // including an App-configuration fault: those are not the user's to fix,
+    // and telling them to sign in again would achieve nothing. They stay
+    // visible in the console (and, once the sync journal records auth events,
+    // in "Copy details") rather than in a misdirected prompt.
+    console.warn(`[oauth] token refresh for ${vaultId} could not complete:`, e)
+    return { status: 'transient', token }
   }
 }
 

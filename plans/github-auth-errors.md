@@ -7,8 +7,9 @@ Investigation of two field reports (2026-08-18):
 - **Report B** (yesterday, iPhone/LTE): the same toast appeared; nothing was
   re-added; sync worked again by itself.
 
-**Status: investigation + plan. Nothing here is implemented yet.** Every claim
-marked _read_ comes from the code with the line cited.
+**Status: PR 6 and PR 7 have shipped — hence the gap in the numbering below.
+Everything still listed is outstanding.** Every claim marked _read_ comes from
+the code with the line cited.
 
 ---
 
@@ -70,7 +71,6 @@ So `denied` means "not classified as transient". Two collaborators decide that:
 | Refresh token dead (rotated away, App reinstalled, 6-month expiry) | 401 after a failed refresh | denied, "check your token" | **needs re-auth** — offer sign-in |
 | App uninstalled, or repo dropped from the installation | 403 / 404 | denied, "check your token" | needs install/permission change |
 | Configured branch renamed or deleted | 404 | denied, "check your token" | vault config is wrong |
-| Worker/Cloudflare hiccup *during the refresh POST* | — | silent, then 401 → **denied** | transient; never blame the credential |
 
 Both field reports sit in this table:
 
@@ -78,15 +78,15 @@ Both field reports sit in this table:
   `'denied'` → the vault is never mounted → the session is dead for that vault
   → next launch works. The screenshot is a phone on LTE, mid-launch. It matches
   exactly, and no credential was ever involved.
-- **Report A** is the "refresh token dead" row. GitHub App user tokens last 8h
-  and the refresh token **rotates on every use**; the app then writes the new
-  pair as *three separate Dexie puts* (`src/storage/githubOAuth.ts:143-145`).
-  A tab killed between put #1 and put #2 — routine on iOS — stores a new access
-  token beside a *dead* refresh token. From then on every refresh fails
-  silently (`console.warn`, `githubOAuth.ts:147`), the stale token 401s, and the
-  vault is permanently "check your token" until re-added. Re-adding re-runs
-  sign-in, which GitHub approves without a prompt because the App is still
-  authorized — precisely what was observed.
+- **Report A** is the "refresh token dead" row, and **its cause is now fixed**.
+  GitHub App user tokens last 8h and the refresh token **rotates on every
+  use**; the app used to write the new pair as three separate Dexie puts, so a
+  tab killed mid-write — routine on iOS — stored a new access token beside a
+  *dead* refresh token, after which every refresh failed silently and the vault
+  was permanently "check your token" until re-added. PR 6 made that write
+  atomic and PR 7 made rotation single-flight and its failures typed. What is
+  still missing is the *recovery*: the row's "should be" column — offer
+  sign-in — is PR 3 + PR 4 + PR 5.
 
 ### Two further confirmed defects found on the way
 
@@ -101,7 +101,7 @@ Both field reports sit in this table:
 
 ## Why this is hard to fix and harder to test (the architectural part)
 
-Six structural causes. The PRs below are organized around removing them, not
+Four structural causes. The PRs below are organized around removing them, not
 around patching the strings.
 
 **A. Two parallel classification paths, and the worse one greets the user.**
@@ -130,21 +130,11 @@ exists for mounted vaults, and `needsReconnect` is set solely for the local-FS
 return. So the tests assert on toast *strings* (`notifyFns.notify`), which is
 both brittle and the wrong layer.
 
-**E. Credential rotation is neither atomic nor single-flight.** Three sequential
-`meta.put`s, no transaction (`cache/credentials.ts:28-77`), and no in-flight
-dedupe around a **single-use** refresh token.
-
-**F. The Worker flattens every failure into one message.** `exchangeForTokens`
-throws `OAuthCallbackError('Token exchange failed.')` (`githubOAuth.ts:68`) both
-for "GitHub rejected this refresh token" (definitive — re-auth needed) and for
-"the Worker 502'd" (transient). The client cannot tell them apart, so it cannot
-react differently.
-
 ---
 
 ## How the model recommendation was made
 
-**Opus 5** where the PR decides *semantics with a silent, durable failure mode*
+**Opus 5** where a PR decides *semantics with a silent, durable failure mode*
 — concurrency around a single-use credential, or a rule about when a credential
 is declared dead. Getting these wrong doesn't fail loudly in CI; it bricks one
 user's vault weeks later, which is exactly the bug this plan exists to fix.
@@ -161,12 +151,13 @@ list.
 decision table (PR 2), the state type and its transitions (PR 3), the copy deck
 (PR 4, PR 9), and the security invariants of the re-auth round trip (PR 5) are
 all decided here, so the PRs that carry them are transcription plus tests. Where
-that was not honestly possible — PR 7 — the PR is kept small and left with Opus
-rather than being papered over with a spec that reads more certain than it is.
+that was not honestly possible, the PR was kept small and left with Opus rather
+than being papered over with a spec that reads more certain than it is — which
+is how the now-shipped PR 7 was scoped.
 
 The same instinct also drove the PR boundaries: **PRs are split along the
 judgment/mechanical seam**, not along file boundaries. PR 3 and PR 4 are one
-feature cut into "the state" and "the UI that renders it"; PR 6 and PR 7 are one
+feature cut into "the state" and "the UI that renders it"; PR 6 and PR 7 were one
 credential fix cut into "write it atomically" and "decide when it's dead".
 
 ## The PRs
@@ -178,12 +169,11 @@ credential fix cut into "write it atomically" and "decide when it's dead".
 | 3 | `needsAttention` replaces `needsReconnect` (state only) | Sonnet 5 | 0.5d | 1 |
 | 4 | Attention rows + actions in `SyncButton`/`VaultSettings` | Sonnet 5 | 0.5d | 3 |
 | 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | 3 |
-| 7 | Single-flight refresh + typed refresh failures | **Opus 5** | 1d | — |
 | 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | 1 |
 | 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | 4 |
 
-**Seven of eight remaining PRs are Sonnet or Haiku.** Total ≈ 4.5d including
-per-PR tests and review.
+**Six of seven remaining PRs are Sonnet; the seventh is Haiku.** Total ≈ 3.5d
+including per-PR tests and review.
 
 ### Ordering
 
@@ -192,12 +182,12 @@ PR1 ──┬─► PR2
       ├─► PR3 ──┬─► PR4 ──► PR9
       │         └─► PR5
       └─► PR8
-PR7                     (independent of everything above)
 ```
 
-**PR 1 + PR 2 alone fix Report B** and retire the misleading message. **PR 7
-finishes fixing Report A** (PR 6's atomic `credentialsSave` already shipped).
-PR 5 makes either recoverable in one tap.
+**PR 1 + PR 2 alone fix Report B** and retire the misleading message. Report A
+is already fixed — PR 6's atomic `credentialsSave` and PR 7's single-flight,
+typed refresh failures have both shipped. PR 5 makes either recoverable in one
+tap.
 
 ---
 
@@ -429,40 +419,6 @@ remove-and-re-add, which calls `cacheDeleteAll` and destroys them.
 entry points) with: reconnect id present + repo still installed → `reauth` called,
 `addGitHubVaultOAuth` **not** called; reconnect id present + repo missing → neither
 called, install screen shown; no reconnect id → today's behaviour unchanged.
-
----
-
-### PR 7 — Single-flight refresh + typed refresh failures
-
-**Model: Opus 5** · 1d · independent
-
-**The one PR left with Opus, deliberately.** Three coupled decisions, each with a
-failure mode that is silent, durable, and invisible to CI — a wrong call here
-brings back exactly the bug this plan is closing.
-
-1. **Single-flight.** A per-vault `Map<string, Promise<string | null>>` in
-   `githubOAuth.ts`, so two callers can never spend the same one-use refresh
-   token. The judgment: a `force: true` call must **not** join an in-flight
-   *non-forced* one whose result may be the stale token — but it must also not
-   start a second refresh on top of one that is already rotating. Getting the
-   join rule wrong burns the refresh token, which is unrecoverable.
-2. **`invalid_grant` vs. everything else.** Have the Worker pass GitHub's `error`
-   field through, and split `exchangeForTokens` into "GitHub rejected the refresh
-   token" (`invalid_grant` / `bad_refresh_token` → definitive: set
-   `needsAttention: 'reauth'`, stop retrying) versus network/5xx/non-JSON (→
-   `TransientSyncError`: keep the existing token, retry later, and say nothing
-   about credentials). The judgment is which GitHub error codes are genuinely
-   terminal — treating a recoverable one as terminal nags the user to re-auth for
-   nothing; the reverse hides a dead credential behind an infinite retry.
-3. **Clock skew.** `ensureFreshAccessToken` trusts the local clock
-   (`githubOAuth.ts:137-138`). A phone hours out of sync either refreshes constantly
-   (harmless) or skips a refresh it needed (a 401 the mount path used to
-   mishandle). Decide whether the server's 401 becomes the only authority on
-   expiry, or the local expiry stays a hint.
-
-Worker side: `worker/src/oauthToken.ts` already forwards GitHub's JSON body and
-status verbatim, so (2) may need no Worker change at all — verify before
-touching it, and if it does, `worker/src/oauthToken.test.ts` is the seam.
 
 ---
 
