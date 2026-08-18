@@ -7,11 +7,12 @@ Investigation of two field reports (2026-08-18):
 - **Report B** (yesterday, iPhone/LTE): the same toast appeared; nothing was
   re-added; sync worked again by itself.
 
-**Status: PR 1 (`src/storage/failureKind.ts`), PR 6 and PR 7 have shipped —
-hence the gaps in the numbering below. Everything still listed is
-outstanding.** Every claim marked _read_ comes from the code with the line
-cited; the investigation sections below describe the code as it stood when the
-reports came in, so a citation there may predate a shipped PR.
+**Status: PR 1 (`src/storage/failureKind.ts`), PR 2 (`mountVaultRef` in
+`src/storage/vaultRegistry.ts`), PR 6 and PR 7 have shipped — hence the gaps in
+the numbering below. Everything still listed is outstanding.** Every claim
+marked _read_ comes from the code with the line cited; the investigation
+sections below describe the code as it stood when the reports came in, so a
+citation there may predate a shipped PR.
 
 ---
 
@@ -166,70 +167,25 @@ credential fix cut into "write it atomically" and "decide when it's dead".
 
 | # | Title | Model | Est. | Blocked by |
 |---|---|---|---|---|
-| 2 | Drop the mount-time probe for network backends | Sonnet 5 | 0.5d | — |
 | 3 | `needsAttention` replaces `needsReconnect` (state only) | Sonnet 5 | 0.5d | — |
 | 4 | Attention rows + actions in `SyncButton`/`VaultSettings` | Sonnet 5 | 0.5d | 3 |
 | 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | 3 |
 | 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | — |
 | 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | 4 |
 
-Total ≈ 3d remaining, including per-PR tests and review.
+Total ≈ 2.5d remaining, including per-PR tests and review.
 
 ### Ordering
 
 ```
-PR2
 PR3 ──┬─► PR4 ──► PR9
       └─► PR5
 PR8
 ```
 
-**PR 2 alone fixes Report B** and retires the misleading message. Report A is
-already fixed — PR 6's atomic `credentialsSave` and PR 7's single-flight, typed
-refresh failures have both shipped. PR 5 makes either recoverable in one tap.
-
----
-
-### PR 2 — Drop the mount-time probe for network backends
-
-**Model: Sonnet 5** · 0.5d
-
-The architectural point: `ensurePermission` is a *local-filesystem* concern that
-was generalized to backends which have no permissions, only failures. Remote
-backends get their probe for free — the first sync is one.
-
-**The decision table for `mountVaultRef(ref, interactive, prePainted)`** —
-implement exactly this; there is nothing left to decide:
-
-| Vault kind | `interactive` | Behaviour |
-|---|---|---|
-| `local` | either | unchanged — `ensurePermission` still gates the mount |
-| `github` / `ical` | `false` (restore) | **skip the probe**; mount, `setVaultSync(needsAttention: null)`, `loadVaultContent` |
-| `github` / `ical` | `true` (add-vault, reconnect click) | unchanged — the probe stays; a human is waiting on the answer |
-| any | — | `buildBackend` returning `null` still yields `'no-credential'` |
-
-Leave `ensurePermission` on the `StorageBackend` interface and leave both
-implementations alone — `addGitHubVaultOAuth` and `addIcalVault` still call it,
-and "does the App have write access to this repo?" is a genuine pre-flight there.
-
-Then delete the `'denied' && ref.kind === 'github'` branch at
-`vaultRegistry.ts:465` — after this change the restore path cannot produce it.
-
-**Tests to update** (they encode the old behaviour and will fail loudly, which is
-the point): `vaultRegistry.test.ts:372` and `:412`. The github case flips from
-"does not mount, notifies" to "mounts, syncs, no notification". Add one new test:
-*a GitHub vault whose `ensurePermission` would answer `'denied'` is still mounted
-on restore, and `syncOnActivate` is called for it.*
-
-**Payoffs to state in the PR description:** one code path instead of two; a
-failed vault stays mounted, so `online`, `visibilitychange` and `autoSyncTick`
-retry it automatically (Report B self-heals in seconds instead of at next
-launch); and two fewer GitHub round trips per vault per cold start, off the
-launch critical path described in `restoreVaultsInner`'s phase comments.
-
-**Hazard:** phase 2 of `restoreVaultsInner` is `await`ed per vault in a loop. It
-must stay that way — do not parallelize as a drive-by; the serial walk is
-deliberate (see `autoSyncTick`'s doc comment on secondary rate limits).
+Report A is already fixed — PR 6's atomic `credentialsSave` and PR 7's
+single-flight, typed refresh failures have both shipped. PR 5 makes it
+recoverable in one tap. (Report B was fixed by PR 2.)
 
 ---
 
