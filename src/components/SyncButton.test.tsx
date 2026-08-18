@@ -6,14 +6,16 @@ import { setupStore } from '@/test-utils'
 import type { VaultRef } from '@/vaultRef'
 import SyncButton from './SyncButton'
 
-const { reconnectVault, requestVaultSettings } = vi.hoisted(() => ({
+const { reconnectVault, requestVaultSettings, startGitHubSignIn } = vi.hoisted(() => ({
   reconnectVault: vi.fn(),
   requestVaultSettings: vi.fn(),
+  startGitHubSignIn: vi.fn(),
 }))
 
 vi.mock('@/vaultActions', () => ({
   syncToBackend: vi.fn(),
   reconnectVault,
+  startGitHubSignIn,
   GITHUB_APP_INSTALL_URL: 'https://github.com/apps/test-app/installations/new',
 }))
 
@@ -47,7 +49,7 @@ describe('SyncButton — attention rows', () => {
     expect(reconnectVault).toHaveBeenCalledWith(LOCAL_VAULT.id)
   })
 
-  it('renders the reauth row disabled, with no wired action yet', () => {
+  it('renders the reauth row and starts a reconnect sign-in on click', () => {
     useStore.setState({
       vaults: [GITHUB_VAULT],
       syncByVault: new Map([[GITHUB_VAULT.id, {
@@ -58,8 +60,8 @@ describe('SyncButton — attention rows', () => {
     render(<SyncButton />)
     openPopover()
 
-    const row = screen.getByText('Signed out of GitHub — sign in again')
-    expect(row.closest('button')).toBeDisabled()
+    fireEvent.click(screen.getByText('Signed out of GitHub — sign in again'))
+    expect(startGitHubSignIn).toHaveBeenCalledWith({ reconnectVaultId: GITHUB_VAULT.id })
   })
 
   it('renders the access row as a link to the App install page', () => {

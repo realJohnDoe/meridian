@@ -5,12 +5,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useStore } from '@/store'
 import { setupStore } from '@/test-utils'
 
-const { navigateMock, completeGitHubSignIn, fetchInstalledRepos, addGitHubVaultOAuth, searchMock, OAuthCallbackError } =
+const { navigateMock, completeGitHubSignIn, fetchInstalledRepos, addGitHubVaultOAuth, reauthGitHubVault, searchMock, OAuthCallbackError } =
   vi.hoisted(() => ({
     navigateMock: vi.fn(),
     completeGitHubSignIn: vi.fn(),
     fetchInstalledRepos: vi.fn(),
     addGitHubVaultOAuth: vi.fn(),
+    reauthGitHubVault: vi.fn(),
     // Typed so the createFileRoute mock's useSearch does not return `any`.
     searchMock: vi.fn<() => { code?: string; state?: string; error?: string }>(),
     // Must be the same class the component checks with `instanceof`, so it is
@@ -34,6 +35,7 @@ vi.mock('@/vaultActions', () => ({
   completeGitHubSignIn,
   fetchInstalledRepos,
   addGitHubVaultOAuth,
+  reauthGitHubVault,
   OAuthCallbackError,
   GITHUB_APP_INSTALL_URL: 'https://github.com/apps/test-app/installations/new',
 }))
@@ -60,6 +62,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   searchMock.mockReturnValue({ code: 'abc', state: 'xyz' })
   addGitHubVaultOAuth.mockResolvedValue(undefined)
+  reauthGitHubVault.mockResolvedValue(undefined)
 })
 
 describe('auth.callback — validateSearch', () => {
@@ -251,5 +254,86 @@ describe('auth.callback — failure', () => {
     await waitFor(() => expect(fetchInstalledRepos).toHaveBeenCalled())
     expect(addGitHubVaultOAuth).not.toHaveBeenCalled()
     expect(navigateMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('auth.callback — reconnect', () => {
+  const githubVault = {
+    id: 'v1', name: 'acme/notes', kind: 'github' as const,
+    github: { owner: 'acme', repo: 'notes', branch: 'main' },
+  }
+
+  it('reauthenticates the vault when its repo is still installed, without adding a new one', async () => {
+    completeGitHubSignIn.mockResolvedValue({ ...TOKENS, reconnectVaultId: 'v1' })
+    fetchInstalledRepos.mockResolvedValue([repo('notes')])
+    useStore.setState({ vaultLoading: false, vaults: [githubVault] })
+
+    render(<AuthCallbackPage />)
+
+    await waitFor(() => expect(reauthGitHubVault).toHaveBeenCalledWith(
+      'v1', expect.objectContaining({ accessToken: 'at', reconnectVaultId: 'v1' }),
+    ))
+    expect(addGitHubVaultOAuth).not.toHaveBeenCalled()
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith({ to: '/' }))
+  })
+
+  it('sends the user to the App configure screen when the repo is no longer installed, without saving anything', async () => {
+    completeGitHubSignIn.mockResolvedValue({ ...TOKENS, reconnectVaultId: 'v1' })
+    fetchInstalledRepos.mockResolvedValue([repo('some-other-repo')])
+    useStore.setState({ vaultLoading: false, vaults: [githubVault] })
+
+    render(<AuthCallbackPage />)
+
+    expect(await screen.findByText('Repository not available')).toBeInTheDocument()
+    expect(screen.getByText(/acme\/notes/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Configure on GitHub' }))
+      .toHaveAttribute('href', 'https://github.com/apps/test-app/installations/new')
+    expect(reauthGitHubVault).not.toHaveBeenCalled()
+    expect(addGitHubVaultOAuth).not.toHaveBeenCalled()
+  })
+
+  it('falls through to the normal add flow when the vault is no longer registered', async () => {
+    completeGitHubSignIn.mockResolvedValue({ ...TOKENS, reconnectVaultId: 'gone' })
+    fetchInstalledRepos.mockResolvedValue([repo('notes')])
+    useStore.setState({ vaultLoading: false, vaults: [] })
+
+    render(<AuthCallbackPage />)
+
+    await waitFor(() => expect(addGitHubVaultOAuth).toHaveBeenCalledTimes(1))
+    expect(reauthGitHubVault).not.toHaveBeenCalled()
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith({ to: '/' }))
+  })
+
+  // The reconnect redirect lands on a fresh page load, so `store.vaults` is
+  // only populated once restoreVaults() (kicked off by the root route) has
+  // run — this proves the vault lookup waits for that instead of reading an
+  // empty list and wrongly falling through to the add flow.
+  it('waits for vault restore to finish before deciding the vault is unregistered', async () => {
+    completeGitHubSignIn.mockResolvedValue({ ...TOKENS, reconnectVaultId: 'v1' })
+    fetchInstalledRepos.mockResolvedValue([repo('notes')])
+    useStore.setState({ vaultLoading: true, vaults: [] })
+
+    render(<AuthCallbackPage />)
+
+    await new Promise(r => setTimeout(r, 0))
+    expect(reauthGitHubVault).not.toHaveBeenCalled()
+    expect(addGitHubVaultOAuth).not.toHaveBeenCalled()
+
+    useStore.setState({ vaultLoading: false, vaults: [githubVault] })
+
+    await waitFor(() => expect(reauthGitHubVault).toHaveBeenCalledWith(
+      'v1', expect.objectContaining({ accessToken: 'at' }),
+    ))
+  })
+
+  it('does not consult reconnect vaults when no reconnect id is present', async () => {
+    completeGitHubSignIn.mockResolvedValue(TOKENS)
+    fetchInstalledRepos.mockResolvedValue([repo('notes')])
+    useStore.setState({ vaultLoading: true, vaults: [] })
+
+    render(<AuthCallbackPage />)
+
+    await waitFor(() => expect(addGitHubVaultOAuth).toHaveBeenCalledTimes(1))
+    expect(reauthGitHubVault).not.toHaveBeenCalled()
   })
 })
