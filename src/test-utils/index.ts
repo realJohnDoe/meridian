@@ -94,23 +94,33 @@ export function seedStore(items: StoreItem[], roots: Roots): void {
 }
 
 export interface FakePersistence {
+  /** Keys written, in order — for tests that only care that a save was made. */
   writes: string[]
+  /**
+   * What each write actually carried, keyed by entry. This is the half that
+   * used to be missing: the fake recorded only keys, so `writes` asserted that
+   * a save was *requested* for K and nothing anywhere asserted that K's file
+   * got the right bytes — or any bytes at all. A write path that silently did
+   * nothing passed every editor test in the suite.
+   */
+  contentByKey: Map<string, string>
   deletes: string[]
-  /** `[fromKey, toKey]` per cross-vault move. */
-  moves: Array<[string, string]>
+  /** `[fromKey, toKey, content]` per cross-vault move. */
+  moves: Array<[string, string, string]>
 }
 
 /** Registers a fake EntityPersistence so tests never touch IndexedDB/GitHub. */
 export function installFakePersistence(): FakePersistence {
-  const calls: FakePersistence = { writes: [], deletes: [], moves: [] }
+  const calls: FakePersistence = { writes: [], contentByKey: new Map(), deletes: [], moves: [] }
   beforeEach(() => {
     calls.writes = []
+    calls.contentByKey = new Map()
     calls.deletes = []
     calls.moves = []
     setEntityPersistence({
-      writeEntity: (key) => { calls.writes.push(key) },
+      writeEntity: (key, content) => { calls.writes.push(key); calls.contentByKey.set(key, content) },
       deleteEntity: (key) => { calls.deletes.push(key) },
-      moveEntity: (fromKey, toKey) => { calls.moves.push([fromKey, toKey]) },
+      moveEntity: (fromKey, toKey, content) => { calls.moves.push([fromKey, toKey, content]) },
     })
   })
   return calls

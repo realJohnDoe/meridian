@@ -5,7 +5,7 @@ export type { StoreData, EditorFields, EditFields, SeriesContext, NewEntryTarget
 export { entryKeyItems, findSeries, seriesContext, upsertOverride, applyEdit, newEntryKey, freeEntryKey, moveEntryKey, moveLinkBreakage, toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, occFromAppMeta } from './storeOps'
 export { parseToStoreItems } from './storeItems'
 export type { ParseResult } from './storeItems'
-export { collapseToYaml } from './collapse'
+export { collapseToYaml, serializeEntry } from './collapse'
 export { roundTripLoss } from './roundTripCheck'
 export { parseDuration, parseDurationDays, parseDurationHours, serialiseDuration } from './duration'
 export type { DurationUnit } from './duration'

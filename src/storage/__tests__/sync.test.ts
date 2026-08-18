@@ -1271,43 +1271,10 @@ describe('syncOnActivate', () => {
   })
 })
 
-// ── writeEntityToCache — an entry with a root but no occurrences ───────────
-//
-// A slug with zero items but a surviving root is an entry whose file-level
-// fields are all that is left. It is NOT a delete — treating it as one would
-// tombstone a file the store still lists — and it must not be skipped either:
-// skipping is what silently lost a just-created entry, because nothing ever
-// came back to write it, so it lived in memory until the tab closed while
-// search kept listing its root. Only a slug with neither items nor a root
-// reflects a real delete.
-
-describe('writeEntityToCache — an entry with a root but no occurrences', () => {
-  it('writes the root\'s file-level fields instead of tombstoning or skipping', async () => {
-    const backend = new FakeBackend()
-    mountBackend(backend)
-    seedLayer('fake-vault', [], new Map([[K('note'), rootFor('note', { title: 'Note', tags: ['inbox'], items: [] })]]))
-
-    await writeEntityToCache(K('note'))
-
-    const cached = cacheStore.get(vp('fake-vault', 'note.md'))
-    expect(cached?.status).toBe('dirty')
-    expect(cached?.content).toContain('title: Note')
-    expect(cached?.content).toContain('inbox')
-    expect(notifyFns.notifyError).not.toHaveBeenCalled()
-  })
-
-  it('tombstones a slug that has neither items nor a root (a real delete)', async () => {
-    const backend = new FakeBackend()
-    backend.seed('note.md', 'existing content', 'sha1')
-    mountBackend(backend)
-    seedLayer('fake-vault', [], new Map())
-
-    await writeEntityToCache(K('note'))
-
-    const cached = cacheStore.get(vp('fake-vault', 'note.md'))
-    expect(cached?.status).toBe('deleted')
-  })
-})
+// Whether a key is a write or a delete is decided by `persistEntries` against
+// the data being committed, not inferred here from an absence — see
+// `src/storeCommit.test.ts`. This file's job stops at "the bytes it was handed
+// become durable".
 
 // ── In-flight write registry ──────────────────────────────────────────────
 //
@@ -1341,7 +1308,7 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     // markInFlight('note.md') fires synchronously inside writeEntityToCache,
     // before its first await — so it is already in effect the instant this
     // call returns control here, well before recordLocalEdit's gated write settles.
-    const writePromise = writeEntityToCache(K('note'))
+    const writePromise = writeEntityToCache(K('note'), 'gated content')
 
     await reconcileWithBackend(backend, 'fake-vault')
     expect(backend.readFilesCallCount).toBe(0)
@@ -1377,8 +1344,8 @@ describe('in-flight write registry — protects against a concurrent reconcile',
       .mockImplementationOnce(async (...args: Parameters<typeof recordLocalEdit>) => { await gateA; return originalRecordLocalEdit(...args) })
       .mockImplementationOnce(async (...args: Parameters<typeof recordLocalEdit>) => { await gateB; return originalRecordLocalEdit(...args) })
 
-    const writeA = writeEntityToCache(K('note'))
-    const writeB = writeEntityToCache(K('note'))
+    const writeA = writeEntityToCache(K('note'), 'content A')
+    const writeB = writeEntityToCache(K('note'), 'content B')
 
     releaseA()
     await writeA // the first write settles; the second is still in flight
@@ -1392,14 +1359,17 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     expect(cacheStore.get(vp('fake-vault', 'note.md'))?.status).toBe('dirty')
   })
 
-  it('clears its mark on the self-heal skip path (root exists, no items yet)', async () => {
+  it('clears its mark when the write itself fails', async () => {
+    // The path that does not reach `recordLocalEdit`'s success — the one where
+    // a leaked mark is easiest to introduce, since nothing downstream runs.
     const backend = new FakeBackend()
     mountBackend(backend)
-    // No items yet, but the root already exists — the self-heal skip branch.
-    seedLayer('fake-vault', [], new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+    seedLayer('fake-vault', oneItem(), new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+    vi.mocked(recordLocalEdit).mockRejectedValueOnce(new Error('quota exceeded'))
 
-    await writeEntityToCache(K('note')) // takes the self-heal "skip" branch — warns and returns
+    await writeEntityToCache(K('note'), 'content')
 
+    expect(notifyFns.notifyError).toHaveBeenCalled()
     // A leaked mark here would keep 'note.md' in skipPaths forever, hiding a
     // genuine remote delete from ever being reconciled.
     seedClean('fake-vault', 'note.md', 'old content', 'v1', 0) // long-past updatedAt — outside PR1's grace window
@@ -1657,7 +1627,7 @@ describe('multi-vault sync', () => {
     seedLayer('ghost-vault', [{ entryKey: 'ghost-vault::note' }],
       new Map([['ghost-vault::note', rootFor('note', { title: 'Note', tags: [], items: [] })]]))
 
-    await writeEntityToCache('ghost-vault::note' as EntryKey)
+    await writeEntityToCache('ghost-vault::note' as EntryKey, 'content')
 
     expect(cacheStore.get(vp('ghost-vault', 'note.md'))).toBeUndefined()
   })
@@ -1669,7 +1639,7 @@ describe('multi-vault sync', () => {
     seedLayer('vault-ro', [{ entryKey: 'vault-ro::note' }],
       new Map([['vault-ro::note', rootFor('note', { title: 'Note', tags: [], items: [] })]]))
 
-    await writeEntityToCache('vault-ro::note' as EntryKey)
+    await writeEntityToCache('vault-ro::note' as EntryKey, 'content')
 
     expect(cacheStore.get(vp('vault-ro', 'note.md'))).toBeUndefined()
   })

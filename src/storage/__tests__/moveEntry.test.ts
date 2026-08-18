@@ -22,7 +22,7 @@ import type { VaultKind } from '@/vaultRef'
 import { entryKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import type { Roots, StoreItem } from '@/types'
-import { parseToStoreItems } from '@/model'
+import { parseToStoreItems, serializeEntry } from '@/model'
 
 const { order, editError, syncFns, notifyFns, storeLayers } = vi.hoisted(() => ({
   order: [] as string[],
@@ -109,6 +109,16 @@ function seedLayer(vaultId: string, slug: string, content = MEETING): void {
   storeLayers.set(vaultId, layer)
 }
 
+/**
+ * The bytes `commitMove` hands to the port for the moved entry — this module no
+ * longer derives them itself, so the tests supply them the same way production
+ * does.
+ */
+function movedContent(content = MEETING): string {
+  const parsed = parseToStoreItems('meeting-notes.md', content, HOME)
+  return serializeEntry(parsed.items, parsed.root)
+}
+
 async function rowsOf(vaultId: string) {
   return await cacheLoadAll(vaultId)
 }
@@ -141,7 +151,7 @@ describe('moveEntityInCache', () => {
 
   it('makes the target durable before it even starts the source tombstone', async () => {
     await seedMoved()
-    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'))
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
 
     expect(order).toEqual([
       `edit:start:${HOME}`,
@@ -153,7 +163,7 @@ describe('moveEntityInCache', () => {
 
   it('leaves the entry dirty in the target and tombstoned in the source', async () => {
     await seedMoved()
-    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'))
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
 
     const target = (await rowsOf(HOME)).find(r => r.path === 'meeting-notes.md')
     expect(target?.status).toBe('dirty')
@@ -167,14 +177,14 @@ describe('moveEntityInCache', () => {
   it('writes the entry under the slug it was allocated, not the one it had', async () => {
     await recordLocalEdit(WORK, 'meeting-notes.md', MEETING)
     seedLayer(HOME, 'meeting-notes-2')
-    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes-2'))
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes-2'), movedContent())
 
     expect((await rowsOf(HOME)).map(r => r.path)).toEqual(['meeting-notes-2.md'])
   })
 
   it('pushes both vaults, so neither half waits for the next tick', async () => {
     await seedMoved()
-    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'))
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
 
     expect(syncFns.scheduleAutoPush.mock.calls.map(([b]) => (b as StorageBackend).id).sort())
       .toEqual([HOME, WORK])
@@ -185,7 +195,7 @@ describe('moveEntityInCache', () => {
   it('keeps the source when the target write fails — never a tombstone without a target', async () => {
     await seedMoved()
     editError.next = new Error('quota exceeded')
-    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'))
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
 
     expect(order).toEqual([`edit:start:${HOME}`])
     expect((await rowsOf(WORK)).find(r => r.path === 'meeting-notes.md')?.status).toBe('dirty')
@@ -197,7 +207,7 @@ describe('moveEntityInCache', () => {
     await seedMoved()
     unmountAllBackends()
     mountBackend(new FakeBackend(WORK))
-    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'))
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
 
     expect(order).toEqual([])
     expect((await rowsOf(WORK)).find(r => r.path === 'meeting-notes.md')?.status).toBe('dirty')
@@ -209,7 +219,7 @@ describe('moveEntityInCache', () => {
     unmountAllBackends()
     mountBackend(new FakeBackend(WORK))
     mountBackend(new FakeBackend(HOME, true, 'ical'))
-    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'))
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
 
     expect(order).toEqual([])
     expect(await rowsOf(HOME)).toEqual([])
@@ -220,21 +230,14 @@ describe('moveEntityInCache', () => {
     unmountAllBackends()
     mountBackend(new FakeBackend(WORK, true, 'ical'))
     mountBackend(new FakeBackend(HOME))
-    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'))
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
 
     expect(order).toEqual([])
     expect(await rowsOf(HOME)).toEqual([])
   })
 
-  it('refuses when the store has no content under the target key', async () => {
-    // The store re-key is this function's precondition; without it, writing
-    // would put an empty file in the target and tombstone the source anyway.
-    await recordLocalEdit(WORK, 'meeting-notes.md', MEETING)
-    order.length = 0
-    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'))
-
-    expect(order).toEqual([])
-    expect((await rowsOf(WORK)).find(r => r.path === 'meeting-notes.md')?.status).toBe('dirty')
-    expect(notifyFns.notify).toHaveBeenCalled()
-  })
+  // "the store has no content under the target key" is no longer reachable
+  // here: the content is handed in, so that check belongs to — and now lives
+  // in — `commitMove`, which makes it *before* committing the re-key rather
+  // than after. See `src/storeCommit.test.ts`.
 })

@@ -7,8 +7,8 @@ import { keySlug, keyVaultId } from './fileIO'
 import type { EntryKey } from './fileIO'
 import { isWritableVault } from './vaultRef'
 import { getSnapshot, getItems, getRoots, getUnreadableFiles, getVaults, setData, replaceFavorite } from './storeBridge'
-import { writeEntity, deleteEntity } from './persistencePort'
-import { commitNext, commitMove } from './storeCommit'
+import { deleteEntity } from './persistencePort'
+import { commitNext, commitMove, persistEntries } from './storeCommit'
 
 let _toastId:       string | number | null = null
 let _pendingCommit: (() => void) | null    = null
@@ -38,8 +38,12 @@ function restoreEntries(snapshot: { items: StoreItem[]; roots: Roots }, entryKey
     if (snapshotRoot) roots.set(key, snapshotRoot)
     else roots.delete(key)
   }
-  setData({ items, roots })
-  for (const key of keys) writeEntity(key)
+  const restored = { items, roots }
+  setData(restored)
+  // Undoing a create restores an entry that has no root and no items to go
+  // back to — `persistEntries` reads that as the delete it is, rather than
+  // leaving the file the create already wrote behind on disk.
+  persistEntries(restored, keys)
 }
 
 function showDeleteToast(
@@ -154,7 +158,10 @@ export function beginSwipeDelete(o: Occurrence): () => void {
     const next = excludeOccurrence(snapshot, o)
     const endsSeries = deletionEndsAfterCompletionSeries(snapshot.items, o)
     showDeleteToast(title,
-      () => { writeEntity(o.entryKey) },
+      // Serialized when the toast settles, not when it was armed: `next` is
+      // only committed by the apply below, and an unrelated edit may have
+      // landed on this entry in between.
+      () => { persistEntries(getSnapshot(), [o.entryKey]) },
       () => { cancelled = true; restoreEntries(snapshot, [o.entryKey]) },
       { endsSeries },
     )
@@ -172,7 +179,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
     // reasoning already governing `next` here for the recurring branch above.
     let affectedKeys: EntryKey[] = []
     showDeleteToast(title,
-      () => { for (const key of affectedKeys) writeEntity(key); deleteEntity(o.entryKey) },
+      () => { persistEntries(getSnapshot(), affectedKeys); deleteEntity(o.entryKey) },
       () => {
         cancelled = true
         if (!getItems().find(i => i.id === o.id)) restoreEntries(snapshot, [o.entryKey, ...affectedKeys])

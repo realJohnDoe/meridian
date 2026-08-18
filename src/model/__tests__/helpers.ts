@@ -3,8 +3,6 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { parseToStoreItems } from '@/model/storeItems'
 import type { ParseResult } from '@/model/storeItems'
-import { collapseToYaml } from '@/model/collapse'
-import { saveFile } from '@/model/inheritance'
 import { joinFileMeta } from '@/model/expansion'
 import { loadFile } from '@/fileIO'
 // Re-exported from production rather than duplicated: this is the exact
@@ -65,15 +63,15 @@ export function parseFixture(name: string): ParseResult {
 }
 
 /**
- * Serialize StoreItem[] + FileMetadata back to file content — mirrors writeEntityToCache():
- * collapse to canonical YAML, then attach the body.
- * This is the exact path the app uses when persisting, so tests exercise it.
+ * Serialize StoreItem[] + FileMetadata back to file content.
+ *
+ * Re-exported from production rather than re-implemented: this used to be a
+ * hand-written copy whose comment promised it "mirrors writeEntityToCache" —
+ * the same agree-by-convention pattern the data-integrity survey flagged in the
+ * storage cache's mocks, and one more place a serialization change could
+ * diverge without any test noticing.
  */
-export function serialize(items: StoreItem[], root?: FileMetadata): string {
-  const frontmatter = collapseToYaml(items, root)
-  const body = root?.body ?? ''
-  return saveFile(frontmatter, body, root?.fileConvention)
-}
+export { serializeEntry as serialize } from '@/model'
 
 
 /** Parsed frontmatter of a file's raw content. */
