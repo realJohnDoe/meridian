@@ -400,27 +400,19 @@ describe('restoreVaults — github vault', () => {
     expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
   })
 
-  it('mounts as writable when the network is unreachable, and does not blame the token', async () => {
-    vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
-    backendConfig.githubPermission = 'unreachable'
-
-    await restoreVaults()
-
-    // 'unreachable' is not 'denied': the credential is fine, the network
-    // isn't. Offline edits must still be recordable and pushed on reconnect.
-    expect(getMountedVaultIds()).toContain(GITHUB_REF.id)
-    expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
-    expect(notifyFns.notify).not.toHaveBeenCalled()
-  })
-
-  it('notifies but keeps going when permission is not granted', async () => {
+  it('mounts and syncs on restore no matter what ensurePermission would answer', async () => {
     vi.mocked(ensureFreshAccessToken).mockResolvedValue('access-token')
     backendConfig.githubPermission = 'denied'
 
     await restoreVaults()
 
-    expect(getBackend(GITHUB_REF.id)).toBeUndefined()
-    expect(notifyFns.notify).toHaveBeenCalledTimes(1)
+    // A network backend has no permission gate, only failures — restore skips
+    // the probe entirely for github/ical, so 'denied' (and equally
+    // 'unreachable') never reaches this path. The first sync IS the probe now;
+    // runSync classifies and retries, so there is nothing to notify about here.
+    expect(getMountedVaultIds()).toContain(GITHUB_REF.id)
+    expect(syncFns.syncOnActivate).toHaveBeenCalledTimes(1)
+    expect(notifyFns.notify).not.toHaveBeenCalled()
   })
 })
 
@@ -494,19 +486,22 @@ describe('restoreVaults — cache-first paint', () => {
     storeState.vaultLoading = true
   })
 
-  it('paints cached content and clears the skeleton without waiting on ensurePermission', async () => {
+  it('paints cached content and clears the skeleton without waiting on the token refresh', async () => {
     cacheConfig.rows.set(GITHUB_REF.id, [
       { path: 'a.md', content: '# A' },
       { path: 'b.md', content: '# B' },
     ])
     const gate = makeGate()
-    backendConfig.permissionGate = gate
+    vi.mocked(ensureFreshAccessToken).mockImplementation(async () => {
+      await gate.promise
+      return 'access-token'
+    })
 
     const restoring = restoreVaults()
 
-    // While the permission probe is still blocked, the agenda must already
-    // have real content and no skeleton. This is the load-bearing assertion:
-    // it fails if the cache phase ever moves back below the network work.
+    // While the OAuth refresh is still blocked, the agenda must already have
+    // real content and no skeleton. This is the load-bearing assertion: it
+    // fails if the cache phase ever moves back below the network work.
     await vi.waitFor(() => { expect(storeState.items).toHaveLength(2) })
     expect(storeState.vaultLoading).toBe(false)
 
@@ -516,10 +511,10 @@ describe('restoreVaults — cache-first paint', () => {
   })
 
   // The reported "up to a second before it scrolls to today": the calendar
-  // listens on this signal, and it only arrives after the OAuth refresh and the
-  // two ensurePermission round trips. It must not carry `contentReplaced` on
-  // this path, or the listener throws away the expansion and grouping the first
-  // paint just built — and re-does them, visibly, that far into the load.
+  // listens on this signal, and it only arrives after the OAuth refresh round
+  // trip. It must not carry `contentReplaced` on this path, or the listener
+  // throws away the expansion and grouping the first paint just built — and
+  // re-does them, visibly, that far into the load.
   it('reports contentReplaced: false when the cache pre-painted', async () => {
     cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
     const changes: boolean[] = []
@@ -585,14 +580,18 @@ describe('restoreVaults — cache-first paint', () => {
 
   // The agenda's first frame is built through useCalendarFilter, which reads
   // hiddenVaultIds/hiddenParticipants/showTasks. Those are a localStorage read,
-  // but they used to arrive behind the token refresh and the permission probe.
-  // The cache then painted unfiltered, and when the real prefs landed the
-  // filtered-out rows (the whole overdue section, with tasks hidden) vanished
-  // from *above* the scroll position and slid the agenda days forward.
-  it('loads the cross-vault preferences before painting, not after the permission probe', async () => {
+  // but they used to arrive behind the token refresh. The cache then painted
+  // unfiltered, and when the real prefs landed the filtered-out rows (the
+  // whole overdue section, with tasks hidden) vanished from *above* the
+  // scroll position and slid the agenda days forward.
+  it('loads the cross-vault preferences before painting, not after the token refresh', async () => {
     cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
     const gate = makeGate()
-    backendConfig.permissionGate = gate
+    vi.mocked(ensureFreshAccessToken).mockImplementation(async () => {
+      callOrder.push('ensureFreshAccessToken')
+      await gate.promise
+      return 'access-token'
+    })
 
     const restoring = restoreVaults()
 
@@ -608,17 +607,21 @@ describe('restoreVaults — cache-first paint', () => {
 
     // Ordering, not just presence — the whole point is that it precedes both.
     expect(callOrder.indexOf('loadGlobalPrefs')).toBeLessThan(callOrder.indexOf('cacheLoadAll'))
-    expect(callOrder.indexOf('loadGlobalPrefs')).toBeLessThan(callOrder.indexOf('ensurePermission'))
+    expect(callOrder.indexOf('loadGlobalPrefs')).toBeLessThan(callOrder.indexOf('ensureFreshAccessToken'))
   })
 
-  it('reads the cache before probing permission, and only once', async () => {
+  it('reads the cache before refreshing the token, and only once', async () => {
     cacheConfig.rows.set(GITHUB_REF.id, [{ path: 'a.md', content: '# A' }])
+    vi.mocked(ensureFreshAccessToken).mockImplementation(async () => {
+      callOrder.push('ensureFreshAccessToken')
+      return 'access-token'
+    })
 
     await restoreVaults()
 
     // Ordering, not just presence: a future refactor that hydrates after the
-    // permission check would still pass a "was it called?" assertion.
-    expect(callOrder.indexOf('cacheLoadAll')).toBeLessThan(callOrder.indexOf('ensurePermission'))
+    // token refresh would still pass a "was it called?" assertion.
+    expect(callOrder.indexOf('cacheLoadAll')).toBeLessThan(callOrder.indexOf('ensureFreshAccessToken'))
     // prePainted threads through mountVaultRef, so the same rows are not
     // re-read on the way into loadVaultContent.
     expect(callOrder.filter(c => c === 'cacheLoadAll')).toHaveLength(1)
