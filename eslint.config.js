@@ -87,6 +87,13 @@ export default [
       'import-x/resolver-next': [
         createTypeScriptImportResolver({ project: './tsconfig.app.json' }),
       ],
+      // Badge/Card render bare span/div elements — teach jsx-a11y's
+      // interaction-handler rules to see through the indirection so a
+      // clickable Badge/Card is caught the same way a raw <span onClick>
+      // already is.
+      'jsx-a11y': {
+        components: { Badge: 'span', Card: 'div', DimmableCard: 'div', CardContent: 'div', CardHeader: 'div' },
+      },
     },
     rules: {
       // ── jsx-a11y ─────────────────────────────────────────────────────────────

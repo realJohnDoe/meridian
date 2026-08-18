@@ -4,11 +4,12 @@ import type { Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
 import { fileEntries } from '@/fileOccurrence'
 import { TagChip } from '@/components'
-import { Badge } from '@/components/ui/badge'
+import { badgeVariants } from '@/components/ui/badge'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 import { FloatingComboboxList } from './FloatingComboboxList'
 import { rankByQuery } from '@/lib/matching'
 import { useFloatingCombobox } from '@/hooks'
+import { cn } from '@/lib/cn'
 
 interface Props {
   /** Entries whose `items:` list already points at this one. */
@@ -74,13 +75,13 @@ export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOp
                 />
               </div>
             ) : (
-              <Badge
-                variant="tag"
-                className="cursor-pointer text-primary bg-primary/12 gap-1"
+              <button
+                type="button"
+                className={cn(badgeVariants({ variant: 'tag' }), 'min-h-6 cursor-pointer text-primary bg-primary/12 gap-1')}
                 onClick={() => setPickerOpen(true)}
               >
                 <Plus size={9} />add to list
-              </Badge>
+              </button>
             )}
             <FloatingComboboxList placement={placement} listRef={listRef} className="w-64">
               <CommandList>

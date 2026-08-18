@@ -39,16 +39,23 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
   )
 
   if (isTopic) {
+    const canNavigate = interactive && onNavigate
     return (
-      <Badge
-        variant="link"
-        className={cn(
-          interactive && onNavigate && 'cursor-pointer underline underline-offset-2 decoration-indigo-400/60',
-          className,
+      <Badge variant="link" className={className}>
+        {canNavigate ? (
+          // A sibling of removeButton, not a wrapper around it — Badge stays
+          // a plain span so the two controls never nest (invalid HTML: a
+          // <button> can't contain another <button>).
+          <button
+            type="button"
+            className="cursor-pointer underline underline-offset-2 decoration-indigo-400/60"
+            onClick={onNavigate}
+          >
+            {label}
+          </button>
+        ) : (
+          label
         )}
-        onClick={interactive && onNavigate ? onNavigate : undefined}
-      >
-        {label}
         {removeButton}
       </Badge>
     )
