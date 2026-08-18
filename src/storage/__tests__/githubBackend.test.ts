@@ -54,9 +54,9 @@ describe('mapGitHubError', () => {
   it('maps 404 to not-found message',   () => expect(mapGitHubError(makeErr(404)).message).toMatch(/not found|lacks access/i))
   it('maps 409 to ConflictError',       () => expect(mapGitHubError(makeErr(409))).toBeInstanceOf(ConflictError))
   it('maps 422 to ConflictError',       () => expect(mapGitHubError(makeErr(422))).toBeInstanceOf(ConflictError))
-  it('passes through unknown errors',   () => {
+  it('maps a status-less error to TransientSyncError (it never reached GitHub)', () => {
     const e = new Error('network failure')
-    expect(mapGitHubError(e)).toBe(e)
+    expect(mapGitHubError(e)).toBeInstanceOf(TransientSyncError)
   })
   it('maps TypeError fetch failure to TransientSyncError', () => {
     const e = new TypeError('Failed to fetch')
@@ -98,8 +98,8 @@ describe('isTransientSyncError', () => {
     const wrapped = Object.assign(new Error('Failed to fetch'), { status: 0 })
     expect(isTransientSyncError(wrapped)).toBe(true)
   })
-  it('returns false for plain Error with non-network message', () => {
-    expect(isTransientSyncError(new Error('something unexpected'))).toBe(false)
+  it('returns true for a status-less Error even with a non-network message (it never reached GitHub)', () => {
+    expect(isTransientSyncError(new Error('something unexpected'))).toBe(true)
   })
 })
 

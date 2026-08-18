@@ -1,3 +1,5 @@
+import { classifyFailure } from './failureKind'
+
 /**
  * Why a backend refused a write. Carried on `ConflictError` so the resolution
  * path can record *which* refusal it was rather than flattening every cause
@@ -41,9 +43,19 @@ const TRANSIENT_MSG_RE = /failed to fetch|networkerror|load failed|network reque
 
 export function isTransientSyncError(e: unknown): boolean {
   if (e instanceof TransientSyncError) return true
+  // AuthSyncError and ConflictError are already-classified domain errors that
+  // don't carry a top-level `status` (ConflictError's lives under `.detail`).
+  // Without this check, classifyFailure's rule 1 ("no status -> transient")
+  // would misclassify them via the delegation below — they are never transient.
+  if (e instanceof AuthSyncError || e instanceof ConflictError) return false
   // navigator.onLine === false means the browser explicitly reports offline.
   // undefined (e.g. in tests or SSR) means unknown — don't classify.
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
+  if (classifyFailure(e).kind === 'transient') return true
+  // Fallback for values classifyFailure can't see a status on but that still
+  // carry a recognizable network-failure message (e.g. a bare
+  // TransientSyncError constructed directly in tests, already caught above,
+  // or a status-less error whose wording we want to keep matching).
   // Octokit wraps browser TypeErrors in its own RequestError, so check the
   // message pattern on any Error rather than requiring instanceof TypeError.
   if (e instanceof Error && TRANSIENT_MSG_RE.test(e.message)) return true
