@@ -92,6 +92,9 @@ describe('isTransientSyncError', () => {
   it('returns false for AuthSyncError', () => {
     expect(isTransientSyncError(new AuthSyncError('bad token'))).toBe(false)
   })
+  it('returns false for ConflictError', () => {
+    expect(isTransientSyncError(new ConflictError('task.md', { status: 409 }))).toBe(false)
+  })
   it('returns true for Octokit-wrapped RequestError with fetch-failure message', () => {
     // Octokit wraps TypeError: Failed to fetch in its own RequestError (not a TypeError),
     // which has a status property. The message is still "Failed to fetch".

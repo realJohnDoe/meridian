@@ -39,8 +39,6 @@ export class AuthSyncError extends Error {
   }
 }
 
-const TRANSIENT_MSG_RE = /failed to fetch|networkerror|load failed|network request failed/i
-
 export function isTransientSyncError(e: unknown): boolean {
   if (e instanceof TransientSyncError) return true
   // AuthSyncError and ConflictError are already-classified domain errors that
@@ -51,13 +49,5 @@ export function isTransientSyncError(e: unknown): boolean {
   // navigator.onLine === false means the browser explicitly reports offline.
   // undefined (e.g. in tests or SSR) means unknown — don't classify.
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
-  if (classifyFailure(e).kind === 'transient') return true
-  // Fallback for values classifyFailure can't see a status on but that still
-  // carry a recognizable network-failure message (e.g. a bare
-  // TransientSyncError constructed directly in tests, already caught above,
-  // or a status-less error whose wording we want to keep matching).
-  // Octokit wraps browser TypeErrors in its own RequestError, so check the
-  // message pattern on any Error rather than requiring instanceof TypeError.
-  if (e instanceof Error && TRANSIENT_MSG_RE.test(e.message)) return true
-  return false
+  return classifyFailure(e).kind === 'transient'
 }
