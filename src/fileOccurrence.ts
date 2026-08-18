@@ -121,7 +121,34 @@ function resolveOneKey(
 
 
 /**
+ * The representative for an entry whose root survives with no occurrences.
+ *
+ * `resolveOneKey` can only speak for keys that have items, so such an entry had
+ * no place in this map at all — and every consumer reads that as "no entry":
+ * the search results list still counted its root, reserved a row for it and
+ * drew nothing (a blank gap between real results), and its own route reported
+ * "Item not found" for a file search had just listed. An entry *is* its root,
+ * so it gets a representative here too — an undated occurrence carrying the
+ * file-level fields, which is exactly what the file re-parses into once
+ * `collapseToYaml` writes the root back out.
+ */
+function rootOnlyOccurrence(entryKey: EntryKey, roots: Roots): Occurrence {
+  return {
+    date:     '',
+    time:     null,
+    source:   'explicit',
+    entryKey,
+    id:       stableOccId(`${entryKey}|root-only`),
+    metadata: joinFileMeta(entryKey, { participants: [] }, roots),
+  }
+}
+
+/**
  * Incremental update of the EntryKey → representative Occurrence map.
+ *
+ * **Total over `roots`**: every entry gets a representative, including one
+ * whose root survives with no items of its own — see `rootOnlyOccurrence` for
+ * why a `.get()` miss there is a defect rather than an absence.
  *
  * Re-resolves only entries whose items group or root entry actually changed.
  * An entry is reusable when:
@@ -174,6 +201,18 @@ export function updateFileOccurrenceMap(
 
     const occ = resolveOneKey(key, keyItems, roots, now, AHEAD, BACK)
     if (occ) map.set(key, occ)
+  }
+
+  // Entries whose root carries no items of its own — see `rootOnlyOccurrence`.
+  // Reused from the previous map only when the root is reference-identical AND
+  // the key had no items last time either: a key that has just lost its items
+  // must not keep the occurrence resolved from them.
+  for (const [key, meta] of roots) {
+    if (map.has(key)) continue
+    const cached = prevByKey.get(key) === undefined && prevRoots.get(key) === meta
+      ? prevFom.get(key)
+      : undefined
+    map.set(key, cached ?? rootOnlyOccurrence(key, roots))
   }
 
   return map

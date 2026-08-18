@@ -1052,19 +1052,16 @@ export async function writeEntityToCache(entryKey: EntryKey): Promise<void> {
     const layer      = getVaultLayer(backend.id)
     const slugItems  = entryKeyItems(layer.items, entryKey)
     const root       = layer.roots.get(entryKey)
-    if (slugItems.length === 0) {
-      // Only genuinely delete when the root is gone too (the real
-      // deleteByFileSlug outcome). getItems()/getRoots() here can be a
-      // snapshot that lags the commit that triggered this call — e.g. a
-      // second setData landing in between — so a root surviving with zero
-      // items is a transient inconsistency, not a real delete. Treating it as
-      // one would silently tombstone a brand-new item whose creating commit
-      // just hadn't landed in this snapshot yet. Skip: a subsequent commit
-      // will write the real content.
-      if (!root) { await deleteFromBackend(entryKey); return }
-      console.warn('[vault] writeEntityToCache: skipping — root exists but no items yet for', entryKey)
-      return
-    }
+    // Only a root that is gone too is a real delete (the deleteByEntryKey
+    // outcome). A root that survives with zero occurrences is an entry whose
+    // file-level fields are all that is left — it must still be written, not
+    // treated as a delete and not skipped. Skipping is what silently lost a
+    // just-created entry: nothing ever came back to write it, so it lived in
+    // memory until the tab closed and was gone on the next load, while search
+    // still listed its root. `collapseToYaml` emits the file-level fields on
+    // their own, and re-parsing those yields an occurrence again, so the entry
+    // heals itself rather than staying occurrence-less.
+    if (slugItems.length === 0 && !root) { await deleteFromBackend(entryKey); return }
     const frontmatter = collapseToYaml(slugItems, root)
     const body        = root?.body ?? ''
     const content     = saveFile(frontmatter, body, root?.fileConvention)
