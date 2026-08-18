@@ -8,8 +8,8 @@ Investigation of two field reports (2026-08-18):
   re-added; sync worked again by itself.
 
 **Status: PR 1 (`src/storage/failureKind.ts`), PR 2 (`mountVaultRef` in
-`src/storage/vaultRegistry.ts`), PR 3, PR 4, PR 6, PR 7 and PR 8 have shipped —
-hence the gaps in the numbering below. Everything still listed is
+`src/storage/vaultRegistry.ts`), PR 3, PR 4, PR 5, PR 6, PR 7 and PR 8 have
+shipped — hence the gaps in the numbering below. Everything still listed is
 outstanding.** Every claim
 marked _read_ comes from the code with the line cited; the investigation
 sections below describe the code as it stood when the reports came in, so a
@@ -168,64 +168,19 @@ credential fix cut into "write it atomically" and "decide when it's dead".
 
 | # | Title | Model | Est. | Blocked by |
 |---|---|---|---|---|
-| 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | — |
 | 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | — |
 
-Total ≈ 1.25d remaining, including per-PR tests and review.
+Total ≈ 0.25d remaining, including per-PR tests and review.
 
 ### Ordering
 
 ```
 PR9
-PR5
 ```
 
 Report A is already fixed — PR 6's atomic `credentialsSave` and PR 7's
-single-flight, typed refresh failures have both shipped. PR 5 makes it
+single-flight, typed refresh failures have both shipped, and PR 5 made it
 recoverable in one tap. (Report B was fixed by PR 2.)
-
----
-
-### PR 5 — Re-authenticate an existing vault
-
-**Model: Sonnet 5** · 1d
-
-The flow, end to end:
-
-1. `startGitHubSignIn(opts?: { reconnectVaultId?: string })` stashes the id in
-   `sessionStorage` under `meridian_oauth_reconnect`, beside the existing
-   verifier and state keys, and clears it on the same path they are cleared.
-2. `auth/callback` reads it **after** `completeGitHubSignIn` has validated state
-   and verifier — never before, and never as a substitute for either.
-3. Reconnect branch: look the vault up in `getVaults()`; call
-   `fetchInstalledRepos(tokens.accessToken)`; **require the vault's own
-   `owner/repo` to be in that list**; then call a new
-   `reauthGitHubVault(vaultId, tokens)` in `vaultRegistry.ts` — save credentials
-   (via PR 6's `credentialsSave`), unmount any existing backend, mount a fresh
-   `GitHubBackend`, clear `needsAttention`, sync. No repo picker, no new vault,
-   no `newVaultId`.
-4. Failure branches: vault no longer registered → fall through to today's normal
-   add flow. Repo not in the installation → the `no-installations` screen's
-   sibling, naming the repo and linking the App's configure page.
-
-**Security invariants — call these out in the PR description and check them in
-review:**
-
-- The reconnect id **never** short-circuits PKCE state/verifier validation.
-- Credentials are saved **only** after the repo-membership check above passes.
-  This is what stops a sign-in as a *different GitHub account* from writing that
-  account's tokens onto this vault.
-- The id lives in `sessionStorage`, not the URL — it must not be reachable from a
-  crafted callback link.
-
-**Why this matters beyond convenience:** the vault id is unchanged, so Dexie
-rows, favourites, prefs, URLs **and unpushed local edits survive** — unlike
-remove-and-re-add, which calls `cacheDeleteAll` and destroys them.
-
-**Tests:** extend `auth.callback.test.tsx` (it already mocks the three OAuth
-entry points) with: reconnect id present + repo still installed → `reauth` called,
-`addGitHubVaultOAuth` **not** called; reconnect id present + repo missing → neither
-called, install screen shown; no reconnect id → today's behaviour unchanged.
 
 ---
 

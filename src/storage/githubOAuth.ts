@@ -10,6 +10,7 @@ const REDIRECT_URI = 'https://realjohndoe.github.io/meridian/auth/callback'
 
 const VERIFIER_KEY = 'meridian_oauth_verifier'
 const STATE_KEY = 'meridian_oauth_state'
+const RECONNECT_KEY = 'meridian_oauth_reconnect'
 
 function base64url(bytes: Uint8Array): string {
   let binary = ''
@@ -30,8 +31,15 @@ async function codeChallengeFor(verifier: string): Promise<string> {
 
 export class OAuthCallbackError extends Error {}
 
-/** Kicks off the GitHub App sign-in flow via a full-page redirect. */
-export async function startGitHubSignIn(): Promise<void> {
+/**
+ * Kicks off the GitHub App sign-in flow via a full-page redirect.
+ *
+ * `reconnectVaultId`, when given, marks this sign-in as re-authenticating an
+ * *existing* vault rather than adding a new one — `auth/callback` reads it
+ * back (via `completeGitHubSignIn`) once it has validated the returned state
+ * and verifier, never before and never as a substitute for that check.
+ */
+export async function startGitHubSignIn(opts?: { reconnectVaultId?: string }): Promise<void> {
   const verifier = randomBase64url(32)
   const state = randomBase64url(16)
   const challenge = await codeChallengeFor(verifier)
@@ -41,6 +49,8 @@ export async function startGitHubSignIn(): Promise<void> {
   // redirect naturally does.
   sessionStorage.setItem(VERIFIER_KEY, verifier)
   sessionStorage.setItem(STATE_KEY, state)
+  if (opts?.reconnectVaultId) sessionStorage.setItem(RECONNECT_KEY, opts.reconnectVaultId)
+  else sessionStorage.removeItem(RECONNECT_KEY)
 
   const url = new URL('https://github.com/login/oauth/authorize')
   url.searchParams.set('client_id', GITHUB_CLIENT_ID)
@@ -56,6 +66,13 @@ export interface OAuthTokens {
   accessToken:  string
   refreshToken: string
   expiresAt:    number // ms epoch
+  /**
+   * Set only by `completeGitHubSignIn`, and only when this sign-in started
+   * from `startGitHubSignIn({ reconnectVaultId })`. Carried on the resolved
+   * value rather than a side channel so a caller can never read it before the
+   * state/verifier check that gates whether this promise resolves at all.
+   */
+  reconnectVaultId?: string
 }
 
 /**
@@ -183,15 +200,22 @@ export async function completeGitHubSignIn(searchParams: URLSearchParams): Promi
 
   const storedVerifier = sessionStorage.getItem(VERIFIER_KEY)
   const storedState = sessionStorage.getItem(STATE_KEY)
+  // Read and cleared alongside the verifier/state on every path through this
+  // function — success, failure, or retry — so a stale reconnect id can never
+  // outlive the sign-in attempt it was stashed for. It is attached to the
+  // return value below only once the checks past this point have passed.
+  const reconnectVaultId = sessionStorage.getItem(RECONNECT_KEY) ?? undefined
   sessionStorage.removeItem(VERIFIER_KEY)
   sessionStorage.removeItem(STATE_KEY)
+  sessionStorage.removeItem(RECONNECT_KEY)
 
   if (error) throw new OAuthCallbackError(`GitHub sign-in was not completed (${error}).`)
   if (!code) throw new OAuthCallbackError('Missing authorization code from GitHub.')
   if (!storedVerifier || !storedState) throw new OAuthCallbackError('Sign-in session expired — please try again.')
   if (state !== storedState) throw new OAuthCallbackError('Sign-in state mismatch — please try again.')
 
-  return exchangeForTokens({ grant_type: 'authorization_code', code, code_verifier: storedVerifier })
+  const tokens = await exchangeForTokens({ grant_type: 'authorization_code', code, code_verifier: storedVerifier })
+  return reconnectVaultId ? { ...tokens, reconnectVaultId } : tokens
 }
 
 /** Silently exchanges a refresh token for a fresh access token + refresh token. */

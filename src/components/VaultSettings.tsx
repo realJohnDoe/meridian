@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { readVaultStringArray } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
-import { syncToBackend, removeVault, renameVault, cacheDirtyCount, GITHUB_APP_INSTALL_URL } from '@/vaultActions'
+import { syncToBackend, removeVault, renameVault, cacheDirtyCount, startGitHubSignIn, GITHUB_APP_INSTALL_URL } from '@/vaultActions'
 import { ParticipantsRow } from '@/editor'
 import type { VaultRef } from '@/vaultActions'
 
@@ -110,9 +110,18 @@ export function VaultSettings({ vault }: Props) {
             </Button>
           </div>
 
-          {/* Mirrors SyncButton's popover rows for the two attention kinds
-              that already have a real action — `reauth` stays out until PR 5
-              wires sign-in, and `fs-permission` never applies to GitHub. */}
+          {/* Mirrors SyncButton's popover rows for the attention kinds that
+              apply to a GitHub vault — `fs-permission` never does. */}
+          {needsAttention?.kind === 'reauth' && (
+            <button
+              className="flex items-center gap-1 text-2xs text-note hover:underline text-left"
+              onClick={() => void startGitHubSignIn({ reconnectVaultId: vault.id })}
+            >
+              <AlertCircle className="size-3 shrink-0" />
+              Signed out of GitHub — sign in again
+            </button>
+          )}
+
           {needsAttention?.kind === 'access' && (
             <a
               href={GITHUB_APP_INSTALL_URL}
