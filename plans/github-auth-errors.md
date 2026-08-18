@@ -8,8 +8,8 @@ Investigation of two field reports (2026-08-18):
   re-added; sync worked again by itself.
 
 **Status: PR 1 (`src/storage/failureKind.ts`), PR 2 (`mountVaultRef` in
-`src/storage/vaultRegistry.ts`), PR 3, PR 4, PR 5, PR 6 and PR 7 have shipped —
-hence the gaps in the numbering below. Everything still listed is
+`src/storage/vaultRegistry.ts`), PR 3, PR 4, PR 5, PR 6, PR 7 and PR 8 have
+shipped — hence the gaps in the numbering below. Everything still listed is
 outstanding.** Every claim
 marked _read_ comes from the code with the line cited; the investigation
 sections below describe the code as it stood when the reports came in, so a
@@ -168,40 +168,19 @@ credential fix cut into "write it atomically" and "decide when it's dead".
 
 | # | Title | Model | Est. | Blocked by |
 |---|---|---|---|---|
-| 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | — |
 | 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | — |
 
-Total ≈ 0.5d remaining, including per-PR tests and review.
+Total ≈ 0.25d remaining, including per-PR tests and review.
 
 ### Ordering
 
 ```
 PR9
-PR8
 ```
 
 Report A is already fixed — PR 6's atomic `credentialsSave` and PR 7's
 single-flight, typed refresh failures have both shipped, and PR 5 made it
 recoverable in one tap. (Report B was fixed by PR 2.)
-
----
-
-### PR 8 — Auth events in the sync journal
-
-**Model: Sonnet 5** · 0.25d
-
-`syncJournal.ts` is already the bounded in-memory flight recorder with a "Copy
-details" surface, built for exactly this: a failure on a phone with no devtools
-attached. It currently records nothing about auth.
-
-Add three `SyncEventKind`s — `auth-refresh`, `auth-refreshed`, `auth-failed` —
-and record `{ kind: FailureKind, status }` from `classifyFailure`
-(`src/storage/failureKind.ts`) plus the vault
-id. **Never a token, never a token prefix, never a refresh token length** — the
-file's own doc comment sets that bar ("No file content, ever") and it applies
-doubly here.
-
-This is what turns the next report from a screenshot into evidence.
 
 ---
 

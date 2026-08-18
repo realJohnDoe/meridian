@@ -43,6 +43,7 @@ vi.mock('@/storage/cache/credentials', () => ({
 }))
 
 import { ensureFreshAccessToken, OAuthCredentialError } from '@/storage/githubOAuth'
+import { syncJournalEvents, clearSyncJournal } from '@/storage/syncJournal'
 
 const REFRESH_MARGIN_MS     = 5 * 60_000
 const MAX_TOKEN_LIFETIME_MS = 8 * 60 * 60_000
@@ -75,6 +76,7 @@ beforeEach(() => {
   tokenStore.clear()
   credentialsSaveMock.mockClear()
   vi.unstubAllGlobals()
+  clearSyncJournal()
   VAULT_ID = `vault-${++nextVaultId}`
 })
 
@@ -190,6 +192,56 @@ describe('ensureFreshAccessToken — refresh success', () => {
     expect(tokenStore.get(`token:${VAULT_ID}`)).toBe('access-2')
     expect(tokenStore.get(`refreshToken:${VAULT_ID}`)).toBe('refresh-2')
     expect(tokenStore.get(`tokenExpiry:${VAULT_ID}`)).toBeGreaterThanOrEqual(before + 3600 * 1000)
+  })
+})
+
+// The sync journal is the only trace of a refresh left once the toast has
+// scrolled off a phone screen — these pin what a "Copy details" dump would
+// actually show for each outcome, and that it never carries a token.
+describe('ensureFreshAccessToken — sync journal', () => {
+  it('records auth-refresh then auth-refreshed on success', async () => {
+    seed({ token: 'access-1', refreshToken: 'refresh-1', expiresAt: Date.now() - 1000 })
+    mockFetchOnce({ body: ROTATED })
+
+    await ensureFreshAccessToken(VAULT_ID)
+
+    const events = syncJournalEvents({ vaultId: VAULT_ID })
+    expect(events.map(e => e.kind)).toEqual(['auth-refresh', 'auth-refreshed'])
+    expect(events.every(e => e.backend === 'github')).toBe(true)
+    expect(JSON.stringify(events)).not.toContain('access-')
+    expect(JSON.stringify(events)).not.toContain('refresh-')
+  })
+
+  it('records auth-refresh then auth-failed(kind: auth) on a dead grant, without the token', async () => {
+    seed({ token: 'stale-access', refreshToken: 'refresh-1', expiresAt: Date.now() - 1000 })
+    mockFetchOnce({ body: { error: 'invalid_grant', error_description: 'refresh token revoked' } })
+
+    await ensureFreshAccessToken(VAULT_ID)
+
+    const events = syncJournalEvents({ vaultId: VAULT_ID })
+    expect(events.map(e => e.kind)).toEqual(['auth-refresh', 'auth-failed'])
+    expect(events[1]!.detail?.kind).toBe('auth')
+    expect(JSON.stringify(events)).not.toContain('stale-access')
+    expect(JSON.stringify(events)).not.toContain('refresh-1')
+  })
+
+  it('records auth-refresh then auth-failed(kind: transient) on a network drop', async () => {
+    seed({ token: 'stale-access', refreshToken: 'refresh-1', expiresAt: Date.now() - 1000 })
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+    await ensureFreshAccessToken(VAULT_ID)
+
+    const events = syncJournalEvents({ vaultId: VAULT_ID })
+    expect(events.map(e => e.kind)).toEqual(['auth-refresh', 'auth-failed'])
+    expect(events[1]!.detail?.kind).toBe('transient')
+  })
+
+  it('does not record a refresh attempt when no refresh was due', async () => {
+    seed({ token: 'access-1', refreshToken: 'refresh-1', expiresAt: Date.now() + 60 * 60_000 })
+
+    await ensureFreshAccessToken(VAULT_ID)
+
+    expect(syncJournalEvents({ vaultId: VAULT_ID })).toHaveLength(0)
   })
 })
 
