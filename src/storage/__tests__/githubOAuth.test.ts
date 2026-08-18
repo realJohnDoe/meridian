@@ -14,28 +14,30 @@ const { tokenStore } = vi.hoisted(() => ({
   tokenStore: new Map<string, string | number>(),
 }))
 
+const { credentialsSaveMock } = vi.hoisted(() => ({
+  credentialsSaveMock: vi.fn(),
+}))
+
 vi.mock('@/storage/cache/credentials', () => ({
   tokenLoad: vi.fn(async (vaultId: string) => {
     const v = tokenStore.get(`token:${vaultId}`)
     return typeof v === 'string' ? v : null
   }),
-  tokenSave: vi.fn(async (vaultId: string, token: string) => {
-    tokenStore.set(`token:${vaultId}`, token)
-  }),
   refreshTokenLoad: vi.fn(async (vaultId: string) => {
     const v = tokenStore.get(`refreshToken:${vaultId}`)
     return typeof v === 'string' ? v : null
-  }),
-  refreshTokenSave: vi.fn(async (vaultId: string, token: string) => {
-    tokenStore.set(`refreshToken:${vaultId}`, token)
   }),
   tokenExpiryLoad: vi.fn(async (vaultId: string) => {
     const v = tokenStore.get(`tokenExpiry:${vaultId}`)
     return typeof v === 'number' ? v : null
   }),
-  tokenExpirySave: vi.fn(async (vaultId: string, expiresAt: number) => {
-    tokenStore.set(`tokenExpiry:${vaultId}`, expiresAt)
-  }),
+  credentialsSave: credentialsSaveMock.mockImplementation(
+    async (vaultId: string, c: { accessToken: string; refreshToken: string; expiresAt: number }) => {
+      tokenStore.set(`token:${vaultId}`, c.accessToken)
+      tokenStore.set(`refreshToken:${vaultId}`, c.refreshToken)
+      tokenStore.set(`tokenExpiry:${vaultId}`, c.expiresAt)
+    },
+  ),
 }))
 
 import { ensureFreshAccessToken } from '@/storage/githubOAuth'

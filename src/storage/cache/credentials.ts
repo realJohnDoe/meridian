@@ -80,3 +80,21 @@ export async function tokenExpiryClear(vaultId: string): Promise<void> {
   const d = await cacheInit()
   await d.meta.delete(`tokenExpiry:${vaultId}`)
 }
+
+// ── Atomic credential write ────────────────────────────────────
+// Writes the access token, refresh token, and expiry in a single Dexie
+// transaction, so a tab killed mid-write can never leave a new access token
+// beside a dead refresh token (the three individual setters above do not
+// give that guarantee).
+
+export async function credentialsSave(
+  vaultId: string,
+  c: { accessToken: string; refreshToken: string; expiresAt: number },
+): Promise<void> {
+  const d = await cacheInit()
+  await d.meta.bulkPut([
+    { key: `token:${vaultId}`, value: c.accessToken },
+    { key: `refreshToken:${vaultId}`, value: c.refreshToken },
+    { key: `tokenExpiry:${vaultId}`, value: c.expiresAt },
+  ])
+}

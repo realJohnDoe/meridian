@@ -2,9 +2,8 @@ import { cacheInit } from '@/storage/cache/db'
 import { cacheLoadAll, applyRemoteBatch, cacheDeleteAll } from '@/storage/cache/files'
 import {
   handleSave, handleLoad, handleClear,
-  tokenSave, tokenClear,
-  refreshTokenSave, refreshTokenClear,
-  tokenExpirySave, tokenExpiryClear,
+  tokenClear, refreshTokenClear, tokenExpiryClear,
+  credentialsSave,
 } from '@/storage/cache/credentials'
 import {
   vaultRefsSave, vaultRefsLoad, activeVaultIdSave, activeVaultIdLoad,
@@ -613,9 +612,7 @@ export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<
       return
     }
 
-    await tokenSave(id, cfg.accessToken)
-    await refreshTokenSave(id, cfg.refreshToken)
-    await tokenExpirySave(id, cfg.expiresAt)
+    await credentialsSave(id, { accessToken: cfg.accessToken, refreshToken: cfg.refreshToken, expiresAt: cfg.expiresAt })
 
     const ref: GitHubVaultRef = {
       id,

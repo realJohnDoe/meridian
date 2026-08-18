@@ -178,13 +178,12 @@ credential fix cut into "write it atomically" and "decide when it's dead".
 | 3 | `needsAttention` replaces `needsReconnect` (state only) | Sonnet 5 | 0.5d | 1 |
 | 4 | Attention rows + actions in `SyncButton`/`VaultSettings` | Sonnet 5 | 0.5d | 3 |
 | 5 | Re-authenticate an existing vault | Sonnet 5 | 1d | 3 |
-| 6 | Atomic `credentialsSave` | **Haiku 4.5** | 0.25d | — |
-| 7 | Single-flight refresh + typed refresh failures | **Opus 5** | 1d | 6 |
+| 7 | Single-flight refresh + typed refresh failures | **Opus 5** | 1d | — |
 | 8 | Auth events in the sync journal | Sonnet 5 | 0.25d | 1 |
 | 9 | Vocabulary pass | **Haiku 4.5** | 0.25d | 4 |
 
-**Eight of nine are Sonnet or Haiku.** Total ≈ 4.75d including per-PR tests and
-review.
+**Seven of eight remaining PRs are Sonnet or Haiku.** Total ≈ 4.5d including
+per-PR tests and review.
 
 ### Ordering
 
@@ -193,11 +192,12 @@ PR1 ──┬─► PR2
       ├─► PR3 ──┬─► PR4 ──► PR9
       │         └─► PR5
       └─► PR8
-PR6 ──────► PR7        (independent of everything above)
+PR7                     (independent of everything above)
 ```
 
-**PR 1 + PR 2 alone fix Report B** and retire the misleading message. **PR 6 +
-PR 7 alone fix Report A.** PR 5 makes either recoverable in one tap.
+**PR 1 + PR 2 alone fix Report B** and retire the misleading message. **PR 7
+finishes fixing Report A** (PR 6's atomic `credentialsSave` already shipped).
+PR 5 makes either recoverable in one tap.
 
 ---
 
@@ -432,35 +432,9 @@ called, install screen shown; no reconnect id → today's behaviour unchanged.
 
 ---
 
-### PR 6 — Atomic `credentialsSave`
-
-**Model: Haiku 4.5** · 0.25d · independent
-
-Purely mechanical, and it removes the cause of Report A. Add to
-`cache/credentials.ts`:
-
-```ts
-export async function credentialsSave(
-  vaultId: string,
-  c: { accessToken: string; refreshToken: string; expiresAt: number },
-): Promise<void>
-```
-
-implemented as a single `d.meta.bulkPut([...])` — one Dexie transaction, so no
-interruption can leave a new access token beside a dead refresh token. Call it
-from the two places that write all three keys together: `githubOAuth.ts:143-145`
-and `addGitHubVaultOAuth` (`vaultRegistry.ts:616-618`). Leave the individual
-setters in place for the tests that use them.
-
-**Test:** one case asserting a single `bulkPut` call rather than three `put`s
-(the in-memory credential fake in `githubOAuth.test.ts` needs the new function
-added to its mock).
-
----
-
 ### PR 7 — Single-flight refresh + typed refresh failures
 
-**Model: Opus 5** · 1d · depends on PR 6
+**Model: Opus 5** · 1d · independent
 
 **The one PR left with Opus, deliberately.** Three coupled decisions, each with a
 failure mode that is silent, durable, and invisible to CI — a wrong call here
