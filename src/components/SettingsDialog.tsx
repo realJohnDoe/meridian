@@ -48,9 +48,12 @@ const SWATCH_CLASSES = ['bg-event', 'bg-priority-1', 'bg-priority-3', 'bg-task',
 interface Props {
   open:         boolean
   onOpenChange: (open: boolean) => void
+  /** Vault to select on open, overriding the default-vault fallback — set when
+   *  Settings was opened via requestVaultSettings rather than the sidebar link. */
+  initialVaultId?: string | null
 }
 
-export default function SettingsDialog({ open, onOpenChange }: Props) {
+export default function SettingsDialog({ open, onOpenChange, initialVaultId }: Props) {
   const { theme, setTheme, systemTheme } = useTheme()
   const activeTheme         = theme ?? 'system'
   // The System card has no class of its own, so it previews whichever of the
@@ -80,12 +83,12 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
   // `hasOpenedSettings` in Sidebar), so there's no false->true transition for
   // `useResetOnChange` below to react to on the first render.
   const [selectedVaultId, setSelectedVaultId] = useState<string | null>(
-    () => defaultVaultId ?? vaults[0]?.id ?? null,
+    () => initialVaultId ?? defaultVaultId ?? vaults[0]?.id ?? null,
   )
 
   function handleOpenChange(v: boolean) {
     if (v) {
-      const id = defaultVaultId ?? vaults[0]?.id ?? null
+      const id = initialVaultId ?? defaultVaultId ?? vaults[0]?.id ?? null
       setSelectedVaultId(id)
     } else {
       setStep('vault')
