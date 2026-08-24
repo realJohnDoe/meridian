@@ -151,6 +151,7 @@ export default function SettingsDialog({ open, onOpenChange, initialVaultId }: P
                       {THEMES.map(({ id, label, className }) => (
                         <button
                           key={id}
+                          type="button"
                           onClick={() => setTheme(id)}
                           className={cn(
                             'flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium text-left transition-colors bg-background text-foreground',

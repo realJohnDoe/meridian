@@ -114,6 +114,7 @@ export function VaultSettings({ vault }: Props) {
               apply to a GitHub vault — `fs-permission` never does. */}
           {needsAttention?.kind === 'reauth' && (
             <button
+              type="button"
               className="flex items-center gap-1 text-2xs text-note hover:underline text-left"
               onClick={() => void startGitHubSignIn({ reconnectVaultId: vault.id })}
             >

@@ -67,6 +67,7 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
           the click is the user gesture the FS API requires. */}
       {status.needsAttention?.kind === 'fs-permission' && (
         <button
+          type="button"
           className="flex items-center gap-1 pl-5 text-2xs text-note hover:underline text-left"
           onClick={() => void reconnectVault(vault.id)}
         >
@@ -77,6 +78,7 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
 
       {status.needsAttention?.kind === 'reauth' && (
         <button
+          type="button"
           className="flex items-center gap-1 pl-5 text-2xs text-note hover:underline text-left"
           onClick={() => void startGitHubSignIn({ reconnectVaultId: vault.id })}
         >
@@ -99,6 +101,7 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
 
       {status.needsAttention?.kind === 'config' && vault.kind === 'github' && (
         <button
+          type="button"
           className="flex items-center gap-1 pl-5 text-2xs text-note hover:underline text-left"
           onClick={() => requestVaultSettings(vault.id)}
         >
