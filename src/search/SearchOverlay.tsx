@@ -23,12 +23,14 @@ interface Props {
  *
  * - Mobile/tablet: full-screen layer, input pinned at the top (auto-focused
  *   so the keyboard rises), results scrolling beneath, back button to close.
- * - Desktop: panel pinned below the topbar (same top-aligned shape as the
- *   mobile layer, so a short result list can't end up hidden behind an
- *   on-screen keyboard the way a bottom-anchored, shrink-to-fit popover
- *   would on a landscape iPad), with a backdrop that only covers the
- *   content area to the right of the sidebar (offset by --sidebar-width
- *   when the sidebar is expanded) rather than the sidebar itself.
+ * - Desktop: panel pinned below the search bar, which SearchBar.tsx itself
+ *   docks to the top of the screen (under the topbar) for exactly this same
+ *   condition — see its `dockTop` — instead of leaving it at the bottom
+ *   edge, where an on-screen keyboard (e.g. a landscape iPad, which hits
+ *   this same breakpoint) would otherwise cover the bar it's meant to be
+ *   typed into. A backdrop covers the content area to the right of the
+ *   sidebar (offset by --sidebar-width when expanded) rather than the
+ *   sidebar itself.
  */
 export default function SearchOverlay({ open, query, onQueryChange, onClose, onOpen, onCreate }: Props) {
   const { isMobile, open: sidebarOpen } = useSidebar()
@@ -124,7 +126,10 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
       <div
         id="filterOverlay"
         className={cn(
-          'fixed top-[var(--th)] right-0 h-[calc(100dvh-var(--th)-80px)] z-search-panel pointer-events-auto flex flex-col transition-[left] duration-200 ease-linear',
+          // top clears the topbar plus the now-top-docked search bar's own
+          // ~80px height (padding + the 52px search-bar-wrap) — the same
+          // clearance this panel used to reserve at the bottom for it.
+          'fixed top-[calc(var(--th)+80px)] right-0 bottom-0 z-search-panel pointer-events-auto flex flex-col transition-[left] duration-200 ease-linear',
           sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0',
         )}
       >

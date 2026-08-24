@@ -7,6 +7,7 @@ import { Input } from './ui/input'
 import { newEntryRoute } from '@/routes'
 import { useOpenEntry } from '@/hooks'
 import { useCurrentDate } from '@/calendar'
+import { useSidebar } from './ui/sidebar'
 import { cn } from '@/lib/cn'
 
 // Lazy: SearchResults/FileResultsList pull in enough weight that they
@@ -20,6 +21,7 @@ export default function SearchBar() {
   const navigate = useNavigate()
   const openEntry = useOpenEntry()
   const currentDate = useCurrentDate()
+  const { isMobile, open: sidebarOpen } = useSidebar()
 
   const searchOpen = sq !== undefined
   const urlQuery = sq ?? ''
@@ -42,6 +44,15 @@ export default function SearchBar() {
     setFilterState({ query: urlQuery, syncedUrlQuery: urlQuery })
   }
   const filterQuery = filterState.query
+
+  // Docked below the topbar instead of at the screen's bottom edge once the
+  // results panel is showing (SearchOverlay's desktop branch renders under
+  // this exact condition — see its `showing`) on non-mobile widths: an
+  // on-screen keyboard — e.g. a landscape iPad, which hits this same
+  // isMobile breakpoint — rises from the bottom and would otherwise cover
+  // the very bar it's meant to be typed into. Keyed off the same isMobile
+  // flag as the panel, not a separate touch check, so the two can't disagree.
+  const dockTop = searchOpen && !isMobile && !!filterQuery
 
   function openSearch() {
     void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: '' }) })
@@ -69,7 +80,14 @@ export default function SearchBar() {
   }
 
   return (
-    <div className="shrink-0 relative z-30 pointer-events-none">
+    <div
+      className={cn(
+        'z-30 pointer-events-none',
+        dockTop
+          ? cn('fixed top-[var(--th)] right-0 transition-[left] duration-200 ease-linear', sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0')
+          : 'shrink-0 relative',
+      )}
+    >
       {/* Full-screen layer on mobile/tablet, popover + scoped backdrop on desktop */}
       {searchOpen && (
         <Suspense fallback={null}>
@@ -86,8 +104,11 @@ export default function SearchBar() {
 
       {/* Gradient fade blending content into the sheet. Short fade (20px)
           that reaches full sheet opacity right at the sheet's top edge; the
-          -mb-px overlap hides the backdrop-blur seam. */}
-      <div className="absolute inset-x-0 bottom-full -mb-px h-5 bg-gradient-to-b from-transparent to-background pointer-events-none" />
+          -mb-px overlap hides the backdrop-blur seam. Only makes sense
+          docked at the bottom — nothing scrolls up behind a top-docked bar. */}
+      {!dockTop && (
+        <div className="absolute inset-x-0 bottom-full -mb-px h-5 bg-gradient-to-b from-transparent to-background pointer-events-none" />
+      )}
 
       <div className={cn('relative z-search-bar px-3.5 pt-3.5 pb-[max(14px,env(safe-area-inset-bottom))] flex flex-col gap-2', searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm')}>
         <div className="search-bar-wrap w-full max-w-xl mx-auto">
