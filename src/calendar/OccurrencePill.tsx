@@ -38,6 +38,12 @@ interface OccurrencePillProps {
  * claim their own width and the title truncates against them instead of
  * running underneath. Nothing here is absolutely positioned, so no caller
  * has to reserve padding to keep the two apart.
+ *
+ * The title span is `flex-1`: it grows to fill whatever width the container
+ * doesn't need, so a short title on a wide multiday bar still pushes the
+ * right chevron out to the bar's far edge instead of leaving it stranded
+ * right after the text. `min-w-0` lets it shrink back below that content
+ * width so `truncate` still applies once the title itself is the long side.
  */
 export function OccurrencePill({
   state, title, onClick, continuesLeft, continuesRight,
@@ -48,7 +54,7 @@ export function OccurrencePill({
   const content = (
     <>
       {continuesLeft && <ContinuationChevron side="left" className={chevronCls} />}
-      <span className="truncate min-w-0">{title}</span>
+      <span className="flex-1 truncate min-w-0">{title}</span>
       {continuesRight && <ContinuationChevron side="right" className={chevronCls} />}
     </>
   )
