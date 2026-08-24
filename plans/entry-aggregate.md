@@ -74,12 +74,12 @@ Consequences worth having:
   write-vs-delete answer.
 - `collapseToYaml`'s `items.length === 0` branch becomes dead.
 
-## The work, as six PRs
+## The work, as five PRs
 
 Each is green and shippable on its own, and each is defensible to a reviewer
 without reference to the ones after it. **They are not all independently
-*valuable*, though, and it's worth being straight about which are which:** PRs 1
-and 2 stand on their own merits and can be done at any time, even if the rest
+*valuable*, though, and it's worth being straight about which are which:** PR 2
+stands on its own merits and can be done at any time, even if the rest
 never happens. PRs 3–5 are one migration delivered in three reviewable slices —
 only the last of them pays out. PR 6 is optional cleanup.
 
@@ -92,7 +92,6 @@ cheapest tier regardless.
 
 | PR | Delivers | Stands alone? | Recommended model |
 |---|---|---|---|
-| 1 | Two missing invariant tests | Yes — real coverage gaps today | **Sonnet 5** — if the task says to assert reference identity |
 | 2 | `layers` stops being a stored copy | Yes — removes a representation | **Sonnet 5** — if the task states the merged-order rule; else **Opus 5** |
 | 3 | Store holds `Entries`; flat arrays derived | Shippable, not yet valuable | **Opus 5** |
 | 4 | `storeOps.ts` on `Entries` | Shippable, not yet valuable | **Opus 5** |
@@ -106,26 +105,6 @@ nothing has been collected for it yet, so don't start 3 without intending to
 reach 5.
 
 ---
-
-### PR 1 — Pin the two invariants this migration can break quietly
-
-Tests only, no production change.
-
-- A **memo-identity test**: an edit to one entry leaves every other entry's root
-  and item references untouched, and leaves `roots` itself reference-identical
-  when only an occurrence changed.
-- An **`extra`/`fileConvention` carry-forward test** across all four edit
-  scopes, asserting on serialized output rather than on the store.
-
-Worth having whether or not the rest of this plan ever runs: both properties are
-load-bearing today and neither is covered.
-
-- **Recommended model:** **Sonnet 5**, *if the task says the memo test must
-  assert reference identity* (`toBe`, and `expect(next.roots).toBe(prev.roots)`)
-  — otherwise **Opus 5**. The hazard is that the obvious way to write it,
-  `toEqual`, passes against a full rebuild and so passes forever, leaving a test
-  that looks like a guard and guards nothing. That is the same failure the whole
-  plan exists to prevent, reproduced in the test suite.
 
 ### PR 2 — `layers` becomes a derived view
 
@@ -197,9 +176,10 @@ exactly as it is; re-run the probe before relying on this.
   overlays only items failing `item === prev.items[i]`; `useAgendaSections`
   caches on top of that. A selector that rebuilds a fresh array or Map per call
   satisfies every type and every assertion in the suite while turning all four
-  into full rebuilds on every keystroke. PR 1's memo-identity test is what turns
-  that from a reading exercise into a red test — which is the entire reason it
-  goes first.
+  into full rebuilds on every keystroke.
+  [`memo-identity.test.ts`](../src/model/__tests__/memo-identity.test.ts) is
+  what turns that from a reading exercise into a red test — which is why it
+  exists ahead of this PR.
 
 ### PR 4 — `storeOps.ts` takes and returns `Entries`
 
@@ -214,7 +194,9 @@ slip that produced the original bug.
   across every edit. Both are optional fields, so dropping either type-checks,
   passes the scope tests, and silently deletes hand-authored YAML or rewrites
   every `\r\n` in the file — visible to the user only as a mystery git diff
-  weeks later. PR 1's second test covers exactly this.
+  weeks later.
+  [`carry-forward-serialized.test.ts`](../src/model/__tests__/carry-forward-serialized.test.ts)
+  covers exactly this.
 
 ### PR 5 — Non-empty items, and delete what worked around their absence
 
@@ -265,7 +247,7 @@ necessary — the honest default is "don't".
 
 ## Cost, honestly
 
-PRs 1 and 2 are contained: tests, plus `store.ts` and its two callers in
+PR 2 is contained: `store.ts` and its two callers in
 [storage/vaultRegistry.ts](../src/storage/vaultRegistry.ts) and
 [storage/sync.ts](../src/storage/sync.ts).
 
@@ -277,8 +259,8 @@ change while "just" reshaping data. Run the round-trip fixtures
 and require byte-identical output as the gate.
 
 Not worth doing as a background refactor. Worth doing the next time this area is
-being changed for a feature reason anyway — and PRs 1 and 2 are worth doing
-before then, on their own account.
+being changed for a feature reason anyway — and PR 2 is worth doing
+before then, on its own account.
 
 ## What already shipped
 
