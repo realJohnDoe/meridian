@@ -128,6 +128,9 @@ describe('expandRange "count" end beyond the period cap', () => {
     for (let i = 0; i < 200; i++) expandRange(items, noRoots, from, to)
     const perExpansion = (performance.now() - started) / 200
 
-    expect(perExpansion).toBeLessThan(1)
+    // 1ms flaked repeatedly on CI runner jitter even though nothing was re-walking; a regression
+    // that actually re-walks 5000 periods per call lands orders of magnitude above this, so 5ms
+    // still catches it comfortably.
+    expect(perExpansion).toBeLessThan(5)
   })
 })
