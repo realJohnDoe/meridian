@@ -6,7 +6,8 @@ PRs, each independently shippable, with a recommended model per PR.
 
 **Status: PR1 shipped ([#750](https://github.com/realJohnDoe/meridian/pull/750)).
 PR2 shipped ([#757](https://github.com/realJohnDoe/meridian/pull/757)). PR3
-shipped ([#759](https://github.com/realJohnDoe/meridian/pull/759)). PRs 4–9 not
+shipped ([#759](https://github.com/realJohnDoe/meridian/pull/759)). PR4 open
+([#799](https://github.com/realJohnDoe/meridian/pull/799)). PRs 5–9 not
 started.**
 
 ---
