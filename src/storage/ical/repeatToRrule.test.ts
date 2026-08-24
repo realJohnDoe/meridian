@@ -193,9 +193,13 @@ function ruleBodies(): Case[] {
     for (const days of [[15], [1, 15], [31], [10, 20, 30]]) {
       push(`FREQ=MONTHLY${iv};BYMONTHDAY=${days.join(',')}`, monthDayAnchor(days))
     }
-    for (const [days, pos] of [[['FR'], 2], [['MO'], 1], [['TU'], -1], [['MO', 'WE'], 3], [['MO', 'TU', 'WE', 'TH', 'FR'], -1]] as Array<[string[], number]>) {
+    for (const [days, pos] of [[['FR'], 2], [['MO'], 1], [['TU'], -1], [['MO', 'WE'], 3], [['MO', 'TU', 'WE', 'TH', 'FR'], -1], [['FR'], -2]] as Array<[string[], number]>) {
       push(`FREQ=MONTHLY${iv};BYDAY=${days.join(',')};BYSETPOS=${pos}`, setPosAnchor(days, pos))
       if (days.length === 1) push(`FREQ=MONTHLY${iv};BYDAY=${pos}${days[0]}`, setPosAnchor(days, pos))
+    }
+    // A BYSETPOS list — "first and third Monday", "first and last Friday".
+    for (const [days, positions] of [[['MO'], [1, 3]], [['FR'], [1, -1]]] as Array<[string[], number[]]>) {
+      push(`FREQ=MONTHLY${iv};BYDAY=${days.join(',')};BYSETPOS=${positions.join(',')}`, setPosAnchor(days, positions[0]!))
     }
 
     // YEARLY: bare, and the two BY* spellings that restate the anchor's own
@@ -231,8 +235,6 @@ const CLAIMED = CORPUS.filter(c => rruleToRepeat(c.rrule, c.anchor, NOW).kind ==
 const STILL_DECLINED: Array<{ rrule: string; anchor: Date; why: string }> = [
   { rrule: 'FREQ=DAILY;BYDAY=MO,WE,FR', anchor: BASE, why: 'daily takes no BY* part' },
   { rrule: 'FREQ=MONTHLY;BYMONTHDAY=-1', anchor: monthDayAnchor([-1]), why: 'negative day-of-month' },
-  { rrule: 'FREQ=MONTHLY;BYDAY=FR;BYSETPOS=-2', anchor: setPosAnchor(['FR'], -2), why: 'only -1 is expressible' },
-  { rrule: 'FREQ=MONTHLY;BYDAY=MO;BYSETPOS=1,3', anchor: setPosAnchor(['MO'], 1), why: 'bysetpos is a scalar' },
   { rrule: 'FREQ=YEARLY;BYMONTH=11;BYDAY=4TH', anchor: new Date(2025, 10, 27), why: 'yearly reads no BY* part' },
   { rrule: 'FREQ=YEARLY;BYMONTH=3,9', anchor: new Date(2026, 2, 10), why: 'no bymonth in the engine' },
   { rrule: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=SU,MO', anchor: new Date(2025, 7, 10), why: 'the two weeks disagree' },

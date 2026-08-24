@@ -137,12 +137,14 @@ export function repeatToRrule(repeat: Repeat, anchor: Date): string | null {
       // in both engines (`resolveMonthDay`, and the RFC's own `-1` = last).
       parts.push(`BYMONTHDAY=${bymonthday.join(',')}`)
     } else if (days.length > 0 && bysetpos !== undefined) {
-      // Meridian applies ONE position to the combined candidate list of every
-      // named weekday, which is the `BYDAY=...;BYSETPOS=n` spelling. The
-      // equivalent `BYDAY=2FR` spelling exists only for a single weekday, so
-      // this one form covers every case the engine can express.
-      if (bysetpos === 0) return null // no such position; the engine emits nothing
-      parts.push(`BYDAY=${days.join(',')}`, `BYSETPOS=${bysetpos}`)
+      // Meridian applies one or more positions to the combined candidate list
+      // of every named weekday, which is the `BYDAY=...;BYSETPOS=n[,n...]`
+      // spelling. The equivalent `BYDAY=2FR` spelling exists only for a single
+      // weekday and a single position, so this one form covers every case the
+      // engine can express.
+      const positions = Array.isArray(bysetpos) ? bysetpos : [bysetpos]
+      if (positions.length === 0 || positions.some(p => p === 0)) return null // no such position; the engine emits nothing
+      parts.push(`BYDAY=${days.join(',')}`, `BYSETPOS=${positions.join(',')}`)
     }
     // Neither: the monthly arm repeats the anchor's own day-of-month, which
     // DTSTART already carries. A `byweekday` with no `bysetpos` lands here and

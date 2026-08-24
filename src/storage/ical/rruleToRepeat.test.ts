@@ -67,6 +67,16 @@ describe('rruleToRepeat — representable rules', () => {
       .toEqual({ type: 'schedule', freq: 'monthly', byweekday: ['mo', 'tu', 'we', 'th', 'fr'], bysetpos: -1 })
   })
 
+  it('maps a BYSETPOS beyond -1 — the engine resolves it correctly', () => {
+    expect(repeatOf('FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-2', monday))
+      .toEqual({ type: 'schedule', freq: 'monthly', byweekday: ['mo', 'tu', 'we', 'th', 'fr'], bysetpos: -2 })
+  })
+
+  it('maps a BYSETPOS list to bysetpos as an array', () => {
+    expect(repeatOf('FREQ=MONTHLY;BYDAY=FR;BYSETPOS=1,-1', monday))
+      .toEqual({ type: 'schedule', freq: 'monthly', byweekday: ['fr'], bysetpos: [1, -1] })
+  })
+
   it('maps a yearly rule whose BY parts restate the anchor', () => {
     expect(repeatOf('FREQ=YEARLY', monday)).toEqual({ type: 'schedule', freq: 'yearly' })
     expect(repeatOf('FREQ=YEARLY;BYMONTH=8;BYMONTHDAY=10', monday)).toEqual({ type: 'schedule', freq: 'yearly' })
@@ -126,12 +136,6 @@ describe('rruleToRepeat — bounded expansion fallback', () => {
     // US Thanksgiving: fourth Thursday in November.
     const dates = datesOf('FREQ=YEARLY;BYMONTH=11;BYDAY=4TH', new Date(2025, 10, 27))
     expect(dates.slice(0, 3)).toEqual(['2025-11-27', '2026-11-26', '2027-11-25'])
-  })
-
-  it('honours BYSETPOS over a period it could not represent', () => {
-    // Second-to-last weekday of the month.
-    const dates = datesOf('FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-2', new Date(2026, 7, 1))
-    expect(dates.slice(0, 2)).toEqual(['2026-08-28', '2026-09-29'])
   })
 
   it('stops at UNTIL', () => {

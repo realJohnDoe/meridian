@@ -7,8 +7,8 @@ PRs, each independently shippable, with a recommended model per PR.
 **Status: PR1 shipped ([#750](https://github.com/realJohnDoe/meridian/pull/750)).
 PR2 shipped ([#757](https://github.com/realJohnDoe/meridian/pull/757)). PR3
 shipped ([#759](https://github.com/realJohnDoe/meridian/pull/759)). PR4 open
-([#799](https://github.com/realJohnDoe/meridian/pull/799)). PRs 5–9 not
-started.**
+([#799](https://github.com/realJohnDoe/meridian/pull/799)). PR5 shipped. PRs
+6–9 not started.**
 
 ---
 
@@ -38,7 +38,6 @@ expressiveness work below is guarded as it lands. Extend its corpus with each
 newly representable shape.
 
 ```
-PR5 ─ (independent)
 PR6 ──► PR7 ──► PR8
 PR9 ─ (optional, any time)
 ```
@@ -47,39 +46,20 @@ PR9 ─ (optional, any time)
 
 | # | Title | Model | Est. | Touches format? |
 |---|---|---|---|---|
-| 5 | `bysetpos` as a list; drop importer's `< -1` refusal | Sonnet 5 | 0.5d | yes (`bysetpos`) |
 | 6 | `bymonth` + yearly `BY*` in the engine | **Opus 5** | 1.5–2d | yes (`bymonth`) |
 | 7 | Importer claims the yearly/`bymonth` shapes | **Opus 5** | 0.5–1d | no |
 | 8 | ICS export: file emission + entry point | Sonnet 5 | 1.5–2d | no |
 | 9 | `WKST` (optional) | **Opus 5** | 1d | yes (`wkst`) |
 
-Total PRs 5–8: **4–5.5 days** (PRs 1–4 have shipped — see status above). That is
+Total PRs 6–8: **3.5–5 days** (PRs 1–5 have shipped — see status above). That is
 higher than the 6–10-day range in the survey's bottom row only in bookkeeping:
 the survey counted implementation, this counts implementation plus per-PR tests,
 review and CI.
 
-The three remaining PRs that touch `types.ts` are the ones to slow down on.
+The two remaining PRs that touch `types.ts` are the ones to slow down on.
 `repeat:` is written to YAML verbatim and read back with an unchecked cast, so
 there is no schema to migrate — which cuts both ways: widening the type is
 free, and nothing will catch a mistake.
-
----
-
-### PR 5 — `bysetpos` as a list; drop the importer's `< -1` refusal
-
-**Model: Sonnet 5** · 0.5d · touches format (`bysetpos`)
-
-Fixes gaps C and E. `bysetpos?: number | number[]` in `types.ts`, reading the
-scalar for back-compat. The engine's single index lookup (`expansion.ts:286`)
-becomes a loop over positions with dedup and sort. The importer stops rejecting
-`bysetpos.length !== 1` (`rruleToRepeat.ts:195`) and `pos < -1`
-(`rruleToRepeat.ts:191`) — the engine already resolves `-2` correctly, verified
-in the survey, so that rejection is pure over-conservatism.
-
-No UI change: the dialog keeps deriving one position from the anchor date.
-
-**Why Sonnet:** mechanical once the type shape is chosen, and
-`repeatToRrule.test.ts`'s round-trip corpus guards it.
 
 ---
 
@@ -204,6 +184,6 @@ Per [CLAUDE.md](../CLAUDE.md):
   `src/storage/ical/*.test.ts`, plus the round-trip corpus in
   `src/storage/ical/repeatToRrule.test.ts` where the fix widens what the engine
   can represent.
-- For the three format-touching PRs (5, 6, 9): a YAML round-trip case, and a
+- For the two remaining format-touching PRs (6, 9): a YAML round-trip case, and a
   check that no existing fixture or snapshot in
   `src/model/__tests__/__snapshots__/` silently encodes the old behaviour.

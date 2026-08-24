@@ -344,8 +344,14 @@ function generateScheduledDates(
           const d2 = new Date(year, month, day)
           if (targetDays.includes(d2.getDay())) candidates.push(d2)
         }
-        const pos = bysetpos < 0 ? candidates.length + bysetpos : bysetpos - 1
-        if (candidates[pos]) dates.push(withTime(candidates[pos]))
+        const positions = Array.isArray(bysetpos) ? bysetpos : [bysetpos]
+        const picked = new Set<number>()
+        for (const setpos of positions) {
+          const idx = setpos < 0 ? candidates.length + setpos : setpos - 1
+          const candidate = candidates[idx]
+          if (candidate) picked.add(candidate.getTime())
+        }
+        for (const t of [...picked].sort((a, b) => a - b)) dates.push(withTime(new Date(t)))
       } else {
         // Same day-of-month as the anchor every month; skip months too short to
         // have that day instead of overflowing into the next month's 1st.
