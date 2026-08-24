@@ -2,10 +2,9 @@ import { afterEach, beforeEach } from 'vitest'
 import { useStore } from '@/store'
 import { setEntityPersistence } from '@/persistencePort'
 import { resetCalendarOnVaultChange } from '@/calendar'
-import { groupIntoEntries } from '@/model'
 import { entryKey as makeEntryKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
-import type { Occurrence, StoreSeries, StoreItem, Roots, FileMetadata } from '@/types'
+import type { Occurrence, StoreSeries, StoreItem, Roots, FileMetadata, Entries } from '@/types'
 
 const initialStoreState = useStore.getInitialState()
 
@@ -89,9 +88,33 @@ export function setMediaQuery(initialMatches: boolean): (next: boolean) => void 
   }
 }
 
+/**
+ * Group a flat `items`/`roots` pair into `Entries`.
+ *
+ * Tests describe a store the flat way — it reads better at the call site, and
+ * most of them predate the aggregate — so the grouping happens here, once,
+ * rather than in every test that seeds a store.
+ */
+export function entriesOf(items: StoreItem[], roots: Roots): Entries {
+  const entries: Entries = new Map()
+  for (const [key, root] of roots) entries.set(key, { key, root, items: [] })
+  for (const item of items) {
+    const entry = entries.get(item.entryKey)
+    if (entry) entry.items.push(item)
+    else entries.set(item.entryKey, { key: item.entryKey, root: rootFor(item.entryKey), items: [item] })
+  }
+  return entries
+}
+
+/** A minimal root for an item whose key the caller gave no root for. */
+function rootFor(key: EntryKey): FileMetadata {
+  const [vaultId = '', fileSlug = ''] = key.split('::')
+  return { title: '', tags: [], items: [], vaultId, fileSlug }
+}
+
 export function seedStore(items: StoreItem[], roots: Roots): void {
   useStore.setState({ defaultVaultId: TEST_VAULT })
-  useStore.getState().setData(groupIntoEntries({ items, roots }))
+  useStore.getState().setData(entriesOf(items, roots))
 }
 
 export interface FakePersistence {

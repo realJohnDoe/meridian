@@ -1,6 +1,10 @@
 /**
  * Reference-identity guarantees storeOps must keep across an edit.
  *
+ * The other half of this — that the store's `deriveViews` actually converts
+ * those guarantees into reference-stable `items`/`roots` containers — lives in
+ * `src/store.test.ts`, because `model/` may not import the store (invariant 1).
+ *
  * Several caches downstream memoize on object identity rather than value
  * equality — `setData` reuses the backlink index when `roots === prevRoots`,
  * `fileOccurrenceMap` and `computeExpansionCache` overlay only items that fail
@@ -20,7 +24,7 @@ import type { EditFields, StoreData } from '@/model/storeOps'
 import { expandRange } from '@/model/expansion'
 import { entryKey } from '@/fileIO'
 import type { Roots, StoreItem, Occurrence } from '@/types'
-import { TEST_VAULT, NEW_TARGET } from './helpers'
+import { TEST_VAULT, NEW_TARGET, dataOf, itemsOf, rootsIn } from './helpers'
 
 const YAML_ALPHA = `---
 title: Alpha
@@ -42,13 +46,11 @@ date: "2026-05-03"
 /** Parse `yaml` into a slug, appending to a growing snapshot — same shape as move-entry.test.ts's `add`. */
 function add(data: StoreData, slug: string, yaml: string): StoreData {
   const parsed = parseToStoreItems(`${slug}.md`, yaml, TEST_VAULT)
-  const roots: Roots = new Map(data.roots)
-  roots.set(entryKey(TEST_VAULT, slug), parsed.root)
-  return { items: [...data.items, ...parsed.items], roots }
+  return { entries: new Map(data.entries).set(entryKey(TEST_VAULT, slug), parsed) }
 }
 
 function snapshot(): StoreData {
-  let d: StoreData = { items: [], roots: new Map() }
+  let d: StoreData = dataOf([])
   d = add(d, 'alpha', YAML_ALPHA)
   d = add(d, 'beta', YAML_BETA)
   d = add(d, 'gamma', YAML_GAMMA)
@@ -76,31 +78,38 @@ function editFields(occ: Occurrence, over: Partial<EditFields> = {}): EditFields
 }
 
 describe('memo identity', () => {
-  it('an edit to one entry leaves every other entry\'s root and item references untouched', () => {
+  it('an edit to one entry leaves every other entry untouched, by reference', () => {
     const before = snapshot()
-    const occ = occOn(before.items, before.roots, '2026-05-01')
+    const occ = occOn(itemsOf(before), rootsIn(before), '2026-05-01')
     const after = applyEdit(before, occ, 'single', editFields(occ, { priority: 'high' }), NEW_TARGET)
 
-    const untouchedKeys = [...before.roots.keys()].filter(k => k !== occ.entryKey)
+    const untouchedKeys = [...before.entries.keys()].filter(k => k !== occ.entryKey)
     expect(untouchedKeys).toHaveLength(2)
+    // One assertion where there used to be two: an entry is one object, so
+    // "its root and its items came through untouched" is a single reference
+    // check rather than two that could disagree.
     for (const key of untouchedKeys) {
-      expect(after.roots.get(key)).toBe(before.roots.get(key))
+      expect(after.entries.get(key)).toBe(before.entries.get(key))
     }
-
-    const otherBefore = before.items.filter(i => i.entryKey !== occ.entryKey)
-    const otherAfter = after.items.filter(i => i.entryKey !== occ.entryKey)
-    expect(otherAfter).toHaveLength(otherBefore.length)
-    otherBefore.forEach((item, i) => expect(otherAfter[i]).toBe(item))
   })
 
   it.each(['toggleDone', 'excludeOccurrence'] as const)(
-    'leaves roots reference-identical when %s changes only an occurrence, not a file-level field',
+    'leaves the edited entry\'s root reference-identical when %s changes only an occurrence',
     (opName) => {
       const before = snapshot()
-      const occ = occOn(before.items, before.roots, '2026-05-02')
+      const occ = occOn(itemsOf(before), rootsIn(before), '2026-05-02')
       const op = opName === 'toggleDone' ? toggleDone : excludeOccurrence
       const after = op(before, occ)
-      expect(after.roots).toBe(before.roots)
+
+      // The file-level fields did not change, so the root object must be the
+      // very one it already was — this is what `deriveViews` needs in order to
+      // hand back the same `roots` Map, and what `setData` needs in order to
+      // reuse the backlink index instead of rebuilding it on every keystroke.
+      expect(after.entries.get(occ.entryKey)!.root).toBe(before.entries.get(occ.entryKey)!.root)
+      for (const key of [...before.entries.keys()].filter(k => k !== occ.entryKey)) {
+        expect(after.entries.get(key)).toBe(before.entries.get(key))
+      }
     },
   )
+
 })

@@ -9,7 +9,7 @@
  * point of the port taking it.
  */
 import { describe, it, expect } from 'vitest'
-import { setupStore, installFakePersistence, testKey, makeOcc, makeRoots, makeRootMeta, TEST_VAULT } from '@/test-utils'
+import { setupStore, installFakePersistence, testKey, makeOcc, makeRoots, makeRootMeta, entriesOf, TEST_VAULT } from '@/test-utils'
 import { entryKey as makeEntryKey } from '@/fileIO'
 import type { StoreData } from '@/model'
 import type { Roots } from '@/types'
@@ -24,8 +24,10 @@ const KEY = testKey('handy')
 /** A store holding one ordinary entry. */
 function oneEntry(): StoreData {
   return {
-    items: [makeOcc({ id: 'occ-1', entryKey: KEY, date: '2026-08-18', metadata: { vaultId: TEST_VAULT, fileSlug: 'handy', participants: [], title: 'handy', tags: ['errands'], items: [] } })],
-    roots: makeRoots('handy', { title: 'handy', tags: ['errands'], body: 'Compare the plans.' }),
+    entries: entriesOf(
+      [makeOcc({ id: 'occ-1', entryKey: KEY, date: '2026-08-18', metadata: { vaultId: TEST_VAULT, fileSlug: 'handy', participants: [], title: 'handy', tags: ['errands'], items: [] } })],
+      makeRoots('handy', { title: 'handy', tags: ['errands'], body: 'Compare the plans.' }),
+    ),
   }
 }
 
@@ -46,8 +48,10 @@ describe('commitNext', () => {
     const before = oneEntry()
     commitNext(before, [KEY])
     const renamed: StoreData = {
-      items: before.items,
-      roots: makeRoots('handy', { title: 'Neues Handy', tags: [], body: '' }),
+      entries: entriesOf(
+        [...before.entries.values()].flatMap(e => e.items),
+        makeRoots('handy', { title: 'Neues Handy', tags: [], body: '' }),
+      ),
     }
 
     commitNext(renamed, [KEY])
@@ -58,14 +62,14 @@ describe('commitNext', () => {
   it('writes an entry whose root has no occurrences rather than deleting it', () => {
     // Its file-level fields are what is left of it; a delete here would drop a
     // file the store still lists.
-    commitNext({ items: [], roots: makeRoots('handy', { title: 'handy' }) }, [KEY])
+    commitNext({ entries: entriesOf([], makeRoots('handy', { title: 'handy' })) }, [KEY])
 
     expect(persistence.deletes).toEqual([])
     expect(persistence.contentByKey.get(KEY)).toContain('title: handy')
   })
 
   it('deletes a key the committed data no longer holds at all', () => {
-    commitNext({ items: [], roots: new Map() }, [KEY])
+    commitNext({ entries: new Map() }, [KEY])
 
     expect(persistence.writes).toEqual([])
     expect(persistence.deletes).toEqual([KEY])
@@ -76,7 +80,7 @@ describe('commitDelete', () => {
   it('deletes the primary and rewrites the backlink-edited entries with their new content', () => {
     const linker = testKey('linker')
     const roots: Roots = new Map([[linker, makeRootMeta('linker', { title: 'Linker', items: [] })]])
-    const data: StoreData = { items: [makeOcc({ id: 'l1', entryKey: linker })], roots }
+    const data: StoreData = { entries: entriesOf([makeOcc({ id: 'l1', entryKey: linker })], roots) }
 
     commitDelete(data, KEY, [linker])
 
@@ -91,8 +95,10 @@ describe('commitMove', () => {
 
   it('hands the port the entry as it exists at the target key', () => {
     const moved: StoreData = {
-      items: [makeOcc({ id: 'occ-1', entryKey: toKey, metadata: { vaultId: OTHER, fileSlug: 'handy', participants: [], title: 'handy', tags: [], items: [] } })],
-      roots: new Map([[toKey, { title: 'handy', tags: [], items: [], vaultId: OTHER, fileSlug: 'handy' }]]),
+      entries: entriesOf(
+        [makeOcc({ id: 'occ-1', entryKey: toKey, metadata: { vaultId: OTHER, fileSlug: 'handy', participants: [], title: 'handy', tags: [], items: [] } })],
+        new Map([[toKey, { title: 'handy', tags: [], items: [], vaultId: OTHER, fileSlug: 'handy' }]]),
+      ),
     }
 
     commitMove(moved, KEY, toKey)
@@ -112,7 +118,7 @@ describe('commitMove', () => {
     commitNext(seeded, [KEY])
     const rootsBefore = useStore.getState().roots
 
-    commitMove({ items: [], roots: new Map() }, KEY, toKey)
+    commitMove({ entries: new Map() }, KEY, toKey)
 
     expect(persistence.moves).toEqual([])
     expect(useStore.getState().roots).toBe(rootsBefore)
@@ -124,7 +130,7 @@ describe('persistEntries', () => {
     // How Undo-of-a-create reaches the backend: `restoreEntries` puts the store
     // back to a state with no such entry, and the file the create already wrote
     // has to go with it.
-    persistEntries({ items: [], roots: new Map() }, [KEY])
+    persistEntries({ entries: new Map() }, [KEY])
 
     expect(persistence.deletes).toEqual([KEY])
   })

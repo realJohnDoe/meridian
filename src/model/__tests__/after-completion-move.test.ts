@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseFixture, serialize, rootsOf, NEW_TARGET, keyOf } from './helpers'
+import { parseFixture, serialize, rootsOf, NEW_TARGET, keyOf, dataOf, itemsOf, rootsIn } from './helpers'
 import { applyEdit } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { expandRange } from '@/model/expansion'
@@ -7,7 +7,7 @@ import type { Occurrence, Roots, StoreItem } from '@/types'
 
 function fixtureData(name: string): StoreData {
   const parsed = parseFixture(name)
-  return { items: parsed.items, roots: rootsOf(parsed.root) }
+  return dataOf(parsed.items, rootsOf(parsed.root))
 }
 
 const FROM = new Date('2026-01-01')
@@ -20,7 +20,7 @@ function occOn(items: StoreItem[], roots: Roots, dateISO: string): Occurrence {
 }
 
 function datesIn(data: StoreData, monthPrefix: string): string[] {
-  return expandRange(data.items, data.roots, FROM, TO)
+  return expandRange(itemsOf(data), rootsIn(data), FROM, TO)
     .filter(o => o.date.startsWith(monthPrefix))
     .map(o => o.date)
 }
@@ -42,9 +42,9 @@ describe('after_completion: the projected next slot', () => {
     const data = fixtureData('after-completion-materialised')
     // 2026-07-09 is done, interval is 2 weeks -> 2026-07-23 is the projected slot,
     // and it already exists as a bare instance row.
-    expect(occOn(data.items, data.roots, '2026-07-23').source).toBe('generated')
+    expect(occOn(itemsOf(data), rootsIn(data), '2026-07-23').source).toBe('generated')
     // A row that is not on the projected slot stays explicit.
-    expect(occOn(data.items, data.roots, '2026-07-09').source).toBe('explicit')
+    expect(occOn(itemsOf(data), rootsIn(data), '2026-07-09').source).toBe('explicit')
   })
 
   it('honours a date-only exclusion stub on a timed series', () => {
@@ -52,15 +52,15 @@ describe('after_completion: the projected next slot', () => {
     expect(datesIn(data, '2026-07')).toEqual(['2026-07-09', '2026-07-23'])
 
     // A hand-written, date-only `excluded` stub must suppress the 09:00 slot.
-    const withStub: StoreData = {
-      ...data,
-      items: [...data.items, {
+    const withStub: StoreData = dataOf(
+      [...itemsOf(data), {
         date: '2026-07-23', time: null, source: 'explicit' as const, excluded: true,
         entryKey: keyOf('after-completion-timed'), id: 'stub',
-        ownerId: data.items.find(i => 'repeat' in i)!.id,
+        ownerId: itemsOf(data).find(i => 'repeat' in i)!.id,
         metadata: { participants: [] },
       }],
-    }
+      rootsIn(data),
+    )
     expect(datesIn(withStub, '2026-07')).toEqual(['2026-07-09'])
   })
 })
@@ -68,12 +68,12 @@ describe('after_completion: the projected next slot', () => {
 describe('after_completion: moving the projected occurrence', () => {
   it('suppresses the old slot instead of leaving a duplicate behind', () => {
     let data = fixtureData('after-completion-materialised')
-    const occ = occOn(data.items, data.roots, '2026-07-23')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-07-23')
 
     data = applyEdit(data, occ, 'single', editFields(occ, { scheduled: { date: '2026-07-24', time: '' } }), NEW_TARGET)
 
     expect(datesIn(data, '2026-07')).toEqual(['2026-07-09', '2026-07-24'])
-    expect(serialize(data.items, [...data.roots.values()][0])).toContain(
+    expect(serialize(itemsOf(data), [...rootsIn(data).values()][0])).toContain(
       '  - date: 2026-07-23\n    excluded: true',
     )
   })
@@ -82,7 +82,7 @@ describe('after_completion: moving the projected occurrence', () => {
     let data = fixtureData('after-completion-materialised')
     // useEntryEditor pins entry.item for the whole session, so every later save
     // (autosave, flush on close) replays the move with the same pre-move occurrence.
-    const pinned = occOn(data.items, data.roots, '2026-07-23')
+    const pinned = occOn(itemsOf(data), rootsIn(data), '2026-07-23')
     const move = () => {
       data = applyEdit(data, pinned, 'single', editFields(pinned, { scheduled: { date: '2026-07-24', time: '' } }), NEW_TARGET)
     }
@@ -95,7 +95,7 @@ describe('after_completion: moving the projected occurrence', () => {
 
   it('also stays idempotent for a purely virtual occurrence', () => {
     let data = fixtureData('after-completion-timed')
-    const pinned = occOn(data.items, data.roots, '2026-07-23')
+    const pinned = occOn(itemsOf(data), rootsIn(data), '2026-07-23')
     expect(pinned.source).toBe('generated')
     const move = () => {
       data = applyEdit(data, pinned, 'single', editFields(pinned, { scheduled: { date: '2026-07-24', time: '09:00' } }), NEW_TARGET)

@@ -11,7 +11,7 @@ export const getRoots         = (): Roots          => useStore.getState().roots
 export const getFom           = (): Map<EntryKey, Occurrence> => fileOccurrenceMap(getItems(), getRoots())
 export const getEntries       = (): Entries        => useStore.getState().entries
 export const setData          = (entries: Entries) => useStore.getState().setData(entries)
-export const getSnapshot      = (): { items: StoreItem[]; roots: Roots } => ({ items: getItems(), roots: getRoots() })
+export const getSnapshot      = (): { entries: Entries } => ({ entries: getEntries() })
 export const getVaults        = (): VaultRef[]     => useStore.getState().vaults
 /** Where a brand-new entry goes unless the editor overrides it per entry. */
 export const getDefaultVaultId = (): string | null => useStore.getState().defaultVaultId

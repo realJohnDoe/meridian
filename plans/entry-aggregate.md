@@ -16,7 +16,7 @@ an entry created from the search overlay ended up with a root and no
 occurrences, which rendered as an invisible gap in search and was never written
 to disk. That instance is fixed; the shape that allowed it is not.
 
-**Status: PR 3 shipped.** The cheap half of this analysis has shipped — the
+**Status: PRs 3 and 4 shipped.** The cheap half of this analysis has shipped — the
 persistence port now carries content rather than a key, so the store↔disk seam
 can no longer disagree with itself (see [What already
 shipped](#what-already-shipped)). What remains is the store's own shape.
@@ -91,7 +91,6 @@ cheapest tier regardless.
 
 | PR | Delivers | Stands alone? | Recommended model |
 |---|---|---|---|
-| 4 | `storeOps.ts` on `Entries` | Shippable, not yet valuable | **Opus 5** |
 | 5 | Non-empty items; workarounds deleted | **This is the payoff** | **Opus 5** |
 | 6 | Remaining consumers read `Entries` | Optional cleanup | **Sonnet 5** — if 3–5 landed and the eviction contract is stated; else **Opus 5** |
 
@@ -101,23 +100,6 @@ store is reshaped and nothing has been collected for it yet, so don't start 3
 without intending to reach 5.
 
 ---
-
-### PR 4 — `storeOps.ts` takes and returns `Entries`
-
-Each `apply*` function updates one object instead of two collections, and
-`updateRoot` stops being callable on its own — which is the specific two-line
-slip that produced the original bug.
-
-- **Recommended model:** **Opus 5.** Most of a wrong edit here lands loudly on
-  the round-trip fixtures, which is what makes the *quiet* part worth naming:
-  `updateRoot` deliberately carries `prev?.extra` (the user's unknown
-  frontmatter keys) and `prev?.fileConvention` (their line endings) forward
-  across every edit. Both are optional fields, so dropping either type-checks,
-  passes the scope tests, and silently deletes hand-authored YAML or rewrites
-  every `\r\n` in the file — visible to the user only as a mystery git diff
-  weeks later.
-  [`carry-forward-serialized.test.ts`](../src/model/__tests__/carry-forward-serialized.test.ts)
-  covers exactly this.
 
 ### PR 5 — Non-empty items, and delete what worked around their absence
 

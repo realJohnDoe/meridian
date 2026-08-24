@@ -11,9 +11,10 @@ import { loadFile } from '@/fileIO'
 // survey flagged in the storage cache's mocks.
 export { collectKeyValues } from '@/model/roundTripCheck'
 import { isSeries } from '@/types'
-import { entryKey } from '@/fileIO'
+import { entryKey, parseEntryKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
-import type { StoreItem, FileMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
+import type { StoreItem, FileMetadata, AppMetadata, Roots, OccurrenceEntry, Entry, Entries } from '@/types'
+import type { StoreData } from '@/model'
 
 /**
  * The vault every model fixture is parsed into. Entry identity is
@@ -39,6 +40,44 @@ export function keyOf(slug: string): EntryKey {
  */
 export function rootsOf(...roots: FileMetadata[]): Roots {
   return new Map(roots.map(r => [entryKey(r.vaultId, r.fileSlug), r]))
+}
+
+/**
+ * A `StoreData` snapshot from a flat `items`/`roots` pair.
+ *
+ * The store holds `Entries` (one object per entry), but a test reads better
+ * describing items and roots separately — so the grouping happens here rather
+ * than at every call site. An item whose key has no root gets a minimal one,
+ * which is what the parse boundary would have produced for it anyway.
+ */
+export function dataOf(items: StoreItem[], roots: Roots = new Map()): StoreData {
+  const entries: Entries = new Map()
+  for (const [key, root] of roots) entries.set(key, { key, root, items: [] })
+  for (const item of items) {
+    let entry = entries.get(item.entryKey)
+    if (!entry) {
+      const { vaultId, fileSlug } = parseEntryKey(item.entryKey)
+      entry = { key: item.entryKey, root: { title: '', tags: [], items: [], vaultId, fileSlug }, items: [] }
+      entries.set(item.entryKey, entry)
+    }
+    entry.items.push(item)
+  }
+  return { entries }
+}
+
+/** The one entry `key` names, for asserting on what an operation produced. */
+export function entryOf(data: StoreData, key: EntryKey): Entry | undefined {
+  return data.entries.get(key)
+}
+
+/** Every item across every entry — the flat view most assertions still want. */
+export function itemsOf(data: StoreData): StoreItem[] {
+  return [...data.entries.values()].flatMap(e => e.items)
+}
+
+/** A `Roots` view of a snapshot. */
+export function rootsIn(data: StoreData): Roots {
+  return new Map([...data.entries].map(([key, entry]) => [key, entry.root]))
 }
 
 const HERE = dirname(fileURLToPath(import.meta.url))

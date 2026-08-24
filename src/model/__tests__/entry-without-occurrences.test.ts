@@ -12,7 +12,7 @@
  * file.
  */
 import { describe, it, expect } from 'vitest'
-import { rootsOf, TEST_VAULT, NEW_TARGET, keyOf, serialize, frontmatterOf } from './helpers'
+import { rootsOf, TEST_VAULT, NEW_TARGET, keyOf, serialize, frontmatterOf, dataOf, itemsOf, rootsIn } from './helpers'
 import { applyEdit } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { collapseToYaml } from '@/model/collapse'
@@ -39,7 +39,7 @@ const fields: EditFields = {
 
 /** Store state where the entry's root is all that is left. */
 function occurrencelessData(): StoreData {
-  return { items: [], roots: rootsOf(root) }
+  return dataOf([], rootsOf(root))
 }
 
 describe('applyEdit on an entry whose items are gone', () => {
@@ -48,9 +48,9 @@ describe('applyEdit on an entry whose items are gone', () => {
     scope => {
       const next = applyEdit(occurrencelessData(), occ, scope, fields, NEW_TARGET)
 
-      const items = next.items.filter(i => i.entryKey === keyOf('handy'))
+      const items = itemsOf(next).filter(i => i.entryKey === keyOf('handy'))
       expect(items).toHaveLength(1)
-      expect(next.roots.get(keyOf('handy'))?.title).toBe('handy')
+      expect(rootsIn(next).get(keyOf('handy'))?.title).toBe('handy')
       expect(items[0]!.metadata.priority).toBe('high')
     },
   )
@@ -62,7 +62,7 @@ describe('applyEdit on an entry whose items are gone', () => {
     const first  = applyEdit(occurrencelessData(), occ, 'all', fields, NEW_TARGET)
     const second = applyEdit(first, occ, 'all', { ...fields, priority: 'low' }, NEW_TARGET)
 
-    const items = second.items.filter(i => i.entryKey === keyOf('handy'))
+    const items = itemsOf(second).filter(i => i.entryKey === keyOf('handy'))
     expect(items).toHaveLength(1)
     expect(items[0]!.metadata.priority).toBe('low')
   })
@@ -74,7 +74,7 @@ describe('applyEdit on an entry whose items are gone', () => {
       NEW_TARGET,
     )
 
-    const items = next.items.filter(i => i.entryKey === keyOf('handy'))
+    const items = itemsOf(next).filter(i => i.entryKey === keyOf('handy'))
     expect(items).toHaveLength(1)
     expect(isSeries(items[0]!)).toBe(true)
   })
@@ -83,15 +83,15 @@ describe('applyEdit on an entry whose items are gone', () => {
     // The guard must be narrow: it fires only when the entry has NO items at
     // all, never for a series occurrence whose siblings are simply out of range.
     const existing = { ...occ, metadata: { ...occ.metadata, participants: [] } }
-    const data: StoreData = {
-      items: [{ date: '2026-08-18', time: null, source: 'explicit', entryKey: keyOf('handy'), id: 'occ-1', metadata: { participants: [], done: false } }],
-      roots: rootsOf(root),
-    }
+    const data: StoreData = dataOf(
+      [{ date: '2026-08-18', time: null, source: 'explicit', entryKey: keyOf('handy'), id: 'occ-1', metadata: { participants: [], done: false } }],
+      rootsOf(root),
+    )
 
     const next = applyEdit(data, existing, 'all', fields, NEW_TARGET)
 
-    expect(next.items.filter(i => i.entryKey === keyOf('handy'))).toHaveLength(1)
-    expect(next.items[0]!.id).toBe('occ-1') // upserted in place, not appended alongside
+    expect(itemsOf(next).filter(i => i.entryKey === keyOf('handy'))).toHaveLength(1)
+    expect(itemsOf(next)[0]!.id).toBe('occ-1') // upserted in place, not appended alongside
   })
 })
 

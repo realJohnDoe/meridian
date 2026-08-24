@@ -8,7 +8,7 @@
  * SOURCE file instead.
  */
 import { describe, it, expect } from 'vitest'
-import { fixtureNames, loadFixture, parseFixture, serialize, collectKeyValues, frontmatterOf, TEST_VAULT, rootsOf, NEW_TARGET, keyOf } from './helpers'
+import { fixtureNames, loadFixture, parseFixture, serialize, collectKeyValues, frontmatterOf, TEST_VAULT, rootsOf, NEW_TARGET, keyOf, itemsOf, rootsIn, dataOf } from './helpers'
 import { parseToStoreItems } from '@/model/storeItems'
 import { collapseToYaml } from '@/model/collapse'
 import { saveFile } from '@/model/inheritance'
@@ -213,13 +213,13 @@ describe('known fields carrying an unexpected type', () => {
     const p = parseFixture('malformed-known')
     const roots = rootsOf(p.root)
     const occ = expandRange(p.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))[0]!
-    const next = applyEdit({ items: p.items, roots }, occ, 'all', {
+    const next = applyEdit(dataOf(p.items, roots), occ, 'all', {
       title: 'Malformed fields', tags: ['work'], items: [], participants: [],
       tracked: false, done: false, priority: null,
       scheduled: { date: '2026-04-08', time: '' }, duration: '30m', repeat: null,
       body: '',
     }, NEW_TARGET)
-    const yaml = serialize(next.items.filter(i => i.entryKey === keyOf('malformed-known')), next.roots.get(keyOf('malformed-known')))
+    const yaml = serialize(itemsOf(next).filter(i => i.entryKey === keyOf('malformed-known')), rootsIn(next).get(keyOf('malformed-known')))
     const fm = frontmatterOf(yaml)
     expect(fm.duration).toBe('30m')
     expect(fm.tags).toEqual(['work'])
