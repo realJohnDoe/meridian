@@ -9,7 +9,7 @@ import { fileOccurrenceMap } from './fileOccurrence'
 export const getItems         = (): StoreItem[]    => useStore.getState().items
 /** Module-private: `getFom` is the only reader left now that the domain layer edits `Entries`. */
 const getRoots                = (): Roots          => useStore.getState().roots
-export const getFom           = (): Map<EntryKey, Occurrence> => fileOccurrenceMap(getItems(), getRoots())
+export const getFom           = (): Map<EntryKey, Occurrence> => fileOccurrenceMap(getEntries(), getRoots())
 export const getEntries       = (): Entries        => useStore.getState().entries
 export const setData          = (entries: Entries) => useStore.getState().setData(entries)
 export const getSnapshot      = (): { entries: Entries } => ({ entries: getEntries() })

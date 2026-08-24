@@ -163,7 +163,7 @@ export type Roots = Map<EntryKey, FileMetadata>
  * An entry *is* the pair. Keeping them in one object is what stops "update the
  * root, then match no item" from being a two-line slip that type-checks — the
  * failure that once produced a root with no occurrences, invisible in search
- * and never written to disk (see plans/entry-aggregate.md).
+ * and never written to disk.
  *
  * `items` is non-empty by construction: the parse boundary
  * (`parseToStoreItems`) always yields at least one item for any file it can
