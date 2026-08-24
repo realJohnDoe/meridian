@@ -24,13 +24,14 @@ interface Props {
  * - Mobile/tablet: full-screen layer, input pinned at the top (auto-focused
  *   so the keyboard rises), results scrolling beneath, back button to close.
  * - Desktop: panel pinned below the search bar, which SearchBar.tsx itself
- *   docks to the top of the screen (under the topbar) for exactly this same
- *   condition — see its `dockTop` — instead of leaving it at the bottom
- *   edge, where an on-screen keyboard (e.g. a landscape iPad, which hits
- *   this same breakpoint) would otherwise cover the bar it's meant to be
- *   typed into. A backdrop covers the content area to the right of the
- *   sidebar (offset by --sidebar-width when expanded) rather than the
- *   sidebar itself.
+ *   docks to the top of the screen for exactly this same condition — see
+ *   its `dockTop` — replacing the main topbar for as long as search is
+ *   open, rather than stacking below it (redundant) or leaving the bar at
+ *   the bottom edge, where an on-screen keyboard (e.g. a landscape iPad,
+ *   which hits this same breakpoint) would otherwise cover the bar it's
+ *   meant to be typed into. A backdrop covers the content area to the
+ *   right of the sidebar (offset by --sidebar-width when expanded) rather
+ *   than the sidebar itself.
  */
 export default function SearchOverlay({ open, query, onQueryChange, onClose, onOpen, onCreate }: Props) {
   const { isMobile, open: sidebarOpen } = useSidebar()
@@ -72,7 +73,7 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
         className="mobile-search-overlay fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto"
       >
         {/* Top input row — pinned, always visible */}
-        <div className="relative z-10 shrink-0 flex items-center gap-2 px-3.5 pt-[max(14px,env(safe-area-inset-top))] pb-3.5 border-b border-border shadow-md">
+        <div className="relative z-10 shrink-0 flex items-center gap-2 px-3.5 pt-[var(--search-top-inset)] pb-3.5 border-b border-border shadow-md">
           <IconButton
             variant="ghost"
             className="w-9 h-9 text-muted-foreground"
@@ -126,10 +127,10 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
       <div
         id="filterOverlay"
         className={cn(
-          // top clears the topbar plus the now-top-docked search bar's own
-          // ~80px height (padding + the 52px search-bar-wrap) — the same
-          // clearance this panel used to reserve at the bottom for it.
-          'fixed top-[calc(var(--th)+80px)] right-0 bottom-0 z-search-panel pointer-events-auto flex flex-col transition-[left] duration-200 ease-linear',
+          // top clears the top-docked search bar itself: its own internal
+          // top padding (--search-top-inset, clearing the OS chrome) plus
+          // the 52px search-bar-wrap and ~14px bottom padding below it.
+          'fixed top-[calc(var(--search-top-inset)+66px)] right-0 bottom-0 z-search-panel pointer-events-auto flex flex-col transition-[left] duration-200 ease-linear',
           sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0',
         )}
       >

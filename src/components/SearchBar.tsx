@@ -45,7 +45,8 @@ export default function SearchBar() {
   }
   const filterQuery = filterState.query
 
-  // Docked below the topbar instead of at the screen's bottom edge once the
+  // Docked to the top of the screen — replacing the main topbar rather than
+  // stacking below it — instead of at the screen's bottom edge, once the
   // results panel is showing (SearchOverlay's desktop branch renders under
   // this exact condition — see its `showing`) on non-mobile widths: an
   // on-screen keyboard — e.g. a landscape iPad, which hits this same
@@ -84,7 +85,7 @@ export default function SearchBar() {
       className={cn(
         'z-30 pointer-events-none',
         dockTop
-          ? cn('fixed top-[var(--th)] right-0 transition-[left] duration-200 ease-linear', sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0')
+          ? cn('fixed top-0 right-0 transition-[left] duration-200 ease-linear', sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0')
           : 'shrink-0 relative',
       )}
     >
@@ -110,7 +111,14 @@ export default function SearchBar() {
         <div className="absolute inset-x-0 bottom-full -mb-px h-5 bg-gradient-to-b from-transparent to-background pointer-events-none" />
       )}
 
-      <div className={cn('relative z-search-bar px-3.5 pt-3.5 pb-[max(14px,env(safe-area-inset-bottom))] flex flex-col gap-2', searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm')}>
+      <div className={cn(
+        'relative z-search-bar px-3.5 pb-[max(14px,env(safe-area-inset-bottom))] flex flex-col gap-2',
+        // Docked: clear the OS chrome from the true top edge, same as the
+        // mobile overlay's own row. Undocked: plain fixed spacing under
+        // whatever sits above it (the app topbar handles its own inset).
+        dockTop ? 'pt-[var(--search-top-inset)]' : 'pt-3.5',
+        searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm',
+      )}>
         <div className="search-bar-wrap w-full max-w-xl mx-auto">
           <Search size={15} className="shrink-0 stroke-card-foreground fill-none" />
           {/*
