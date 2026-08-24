@@ -32,8 +32,10 @@ export const setUnreadableFiles = (files: Map<EntryKey, { path: string; message:
  * Returns an empty layer for an unregistered vault rather than `undefined`,
  * so callers that are only reading never need a null branch.
  */
-export const getVaultLayer   = (vaultId: string): VaultLayer =>
-  vaultLayer(useStore.getState().layers, vaultId)
+export const getVaultLayer   = (vaultId: string): VaultLayer => {
+  const { items, roots } = useStore.getState()
+  return vaultLayer(items, roots, vaultId)
+}
 export const setVaultLayer   = (vaultId: string, data: VaultLayer): void =>
   useStore.getState().setVaultLayer(vaultId, data)
 export const removeVaultLayer = (vaultId: string): void =>
