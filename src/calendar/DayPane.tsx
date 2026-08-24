@@ -52,7 +52,7 @@ function renderAllDayItem(
       onClick={() => onOpen(o)}
       continuesLeft={!!startD && startD < dvMidnight}
       continuesRight={!!endD && endD > dvMidnight}
-      className="w-full px-2 py-0.5 text-xs mb-0.5"
+      className="w-full px-0.5 sm:px-1.5 py-0.5 text-xs mb-0.5"
     />
   )
 }
