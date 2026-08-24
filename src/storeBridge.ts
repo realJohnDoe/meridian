@@ -7,7 +7,8 @@ import { fileOccurrenceMap } from './fileOccurrence'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
 export const getItems         = (): StoreItem[]    => useStore.getState().items
-export const getRoots         = (): Roots          => useStore.getState().roots
+/** Module-private: `getFom` is the only reader left now that the domain layer edits `Entries`. */
+const getRoots                = (): Roots          => useStore.getState().roots
 export const getFom           = (): Map<EntryKey, Occurrence> => fileOccurrenceMap(getItems(), getRoots())
 export const getEntries       = (): Entries        => useStore.getState().entries
 export const setData          = (entries: Entries) => useStore.getState().setData(entries)
@@ -22,9 +23,9 @@ export const setUnreadableFiles = (files: Map<EntryKey, { path: string; message:
 /**
  * One registered vault's content, isolated from the merge.
  *
- * `getItems()`/`getRoots()` are the *merged* view across every registered
- * vault, which is what views want and what the domain layer edits against —
- * but two sites in `storage/sync.ts` must see a single vault instead:
+ * `getEntries()` is the *merged* view across every registered vault, which is
+ * what the domain layer edits against — but two sites in `storage/sync.ts` must
+ * see a single vault instead:
  * `mergeChangedIntoStore` (rebuilds one vault's content by filtering out
  * affected keys) and `writeEntityToCache` (collapses one file back to YAML).
  * Reading the merge there would fold every other vault's entries into the

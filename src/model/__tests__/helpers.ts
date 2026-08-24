@@ -13,7 +13,7 @@ export { collectKeyValues } from '@/model/roundTripCheck'
 import { isSeries } from '@/types'
 import { entryKey, parseEntryKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
-import type { StoreItem, FileMetadata, AppMetadata, Roots, OccurrenceEntry, Entry, Entries } from '@/types'
+import type { StoreItem, FileMetadata, AppMetadata, Roots, OccurrenceEntry, Entries } from '@/types'
 import type { StoreData } from '@/model'
 
 /**
@@ -87,11 +87,6 @@ export function serializeOnly(data: StoreData): string {
   const [entry] = [...data.entries.values()]
   if (!entry) throw new Error('snapshot holds no entry')
   return serialize(entry.items, entry.root)
-}
-
-/** The one entry `key` names, for asserting on what an operation produced. */
-export function entryOf(data: StoreData, key: EntryKey): Entry | undefined {
-  return data.entries.get(key)
 }
 
 /** Every item across every entry — the flat view most assertions still want. */
