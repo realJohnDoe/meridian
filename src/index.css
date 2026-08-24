@@ -217,12 +217,14 @@
      (main topbar, sidebar header, Sonner offset, search overlay max-height)
      grows to clear the notch/rounded corners together */
   --th: calc(54px + env(safe-area-inset-top, 0px));
-  /* Minimum clearance from the physical top edge for top-pinned search UI
-     that replaces rather than stacks below the main topbar (the mobile
-     overlay's own input row, and the desktop-width docked search bar) —
-     just enough to clear the OS chrome (status bar in standalone/PWA mode)
-     without leaving room for a second topbar's worth of empty space. */
-  --search-top-inset: max(20px, env(safe-area-inset-top, 0px));
+  /* Clearance from the physical top edge for top-pinned search UI that
+     replaces rather than stacks below the main topbar (the mobile overlay's
+     own input row, and the desktop-width docked search bar). Deliberately
+     just the safe-area inset — same as the main topbar's own --th — and no
+     extra synthetic minimum, so search lines up with the distance every
+     other view already keeps from the OS chrome instead of inventing its
+     own, different spacing. */
+  --search-top-inset: env(safe-area-inset-top, 0px);
 }
 
 /* Class-scoped restatement of the Meridian tokens above, mirroring the other
