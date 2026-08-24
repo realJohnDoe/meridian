@@ -59,8 +59,7 @@ interface RoundTripLoss {
  * vault the guard measured 75% of the total parse cost (and 70 of its 92 ms was
  * the two extra `loadFile` calls it makes internally), all of it blocking the
  * agenda's first paint. Coverage is unchanged — every file is still checked,
- * and `reportRoundTripLosses` still toasts — only the timing moved. See
- * plans/time-to-today.md.
+ * and `reportRoundTripLosses` still toasts — only the timing moved.
  *
  * Deliberately not cancellable from the outside: a sweep that started for a
  * vault which has since been switched away still reports a genuine defect in a

@@ -53,7 +53,7 @@ interface CalendarViewState {
    * `onVaultChanged` fired, which on a GitHub vault is behind an OAuth token
    * refresh and two API round trips: the reported "up to a second before it
    * scrolls to today". Defaulting it here makes the first painted frame right
-   * without waiting to be told. See plans/time-to-today.md.
+   * without waiting to be told.
    *
    * Offset 0 is not a restored scroll position, it is the *absence* of one —
    * nothing is lost by preferring today for that case. Within a session
