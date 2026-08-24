@@ -102,7 +102,7 @@ directory was skipped.
 | # | Category | Verdict |
 |---|---|---|
 | 1 | Component Architecture & Boundaries | **findings: #6** |
-| 2 | Styling System Consistency | **findings: #7** |
+| 2 | Styling System Consistency | no open findings |
 | 3 | UX States & Accessibility | **findings: #3** |
 | 4 | Security (UI-facing) | no open findings |
 | 5 | Code Health & DRY | **findings: #6** |
@@ -133,7 +133,6 @@ directory was skipped.
 |---|---|---|---|---|---|
 | 3 | Two hand-rolled overlays with no focus trap | `a11y` `library-fit` | 6 | 2 files | **Opus 5** |
 | 6 | DayPane/WeekPane share a copy-pasted timeline scaffold | `dry` `component-architecture` | 5 | 2 files | **Opus 5** |
-| 7 | `:root` and `.meridian` duplicate 47 tokens with nothing enforcing it | `styling` `dry` | 3 | 1 file | **Sonnet 5** |
 | 8 | 24 raw `<button>`s with no `type` attribute | `toolchain` `code-health` | 2 | 11 files | **Haiku 4.5** |
 
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
@@ -266,52 +265,6 @@ hook (scroller ref + mount seed + `createAt`/`handleHourClick`) and a
 `<TimelineGrid>` component (hour labels + hour cells + now-line, taking the
 `left`/`right` inset and the aria-label formatter as props). Leave the two
 all-day strips alone — they are legitimately different.
-
----
-
-### Finding #7 — `:root` and `.meridian` duplicate 47 tokens with nothing enforcing it
-
-- **Category:** `styling` `dry`
-- **Impact:** 3
-- **Breadth:** 1 file. Counted by parsing both blocks and intersecting the
-  declared custom-property names.
-- **Recommended model:** **Sonnet 5.** Mechanical, but with a hazard worth
-  naming: the dark themes deliberately **omit** `--chip-border`, `--shadow-card`,
-  `--shadow-float` and `--shadow-float-focus` so they inherit `:root`'s
-  dark-tuned values, while the five light themes override all four. I verified
-  this by diffing the token sets across all 9 blocks. Any restructuring that
-  moves Meridian's values out of `:root` must re-home those four for the four
-  other dark themes, or every dark theme silently loses its card shadows.
-
-**Evidence** — `src/index.css:222`:
-
-```
-/* Class-scoped restatement of the Meridian tokens above, mirroring the other
-   theme classes below. Needed so an explicitly meridian-scoped element (e.g.
-   the theme preview button) renders Meridian's own colors even while another
-   theme's class is active on <html> and has overridden :root globally. */
-.meridian {
-```
-
-**Verification.** The stated rationale is sound — a theme-preview swatch does
-need class-scoped tokens. But the *implementation* is a verbatim second copy:
-parsing both blocks shows **47 shared token names, currently 0 value drift** —
-i.e. they agree today, by hand, with no test or build step checking it. Editing
-`:root` without editing `.meridian` (or vice versa) produces a theme-preview
-swatch that disagrees with the theme it previews, and nothing fails.
-
-**Problem:** 57 lines of duplicated design tokens whose correctness rests
-entirely on whoever edits them remembering the other copy exists — in a file
-whose header comment explicitly designates `@theme` + `:root` as the single
-source of truth ("6. @theme + :root tokens below are the design system —
-extend here, not in components").
-
-**Fix:** Make `.meridian` the only definition and have `<html>` always carry a
-theme class (defaulting to `meridian`), leaving `:root` to hold only the
-genuinely un-themed tokens (`--control-h`, `--font`, `--th`, `--radius`) and
-the derived ones — or, if the pre-hydration fallback in `:root` must stay, add a
-check to `src/glossary.test.ts`'s style (parse `index.css`, assert the two
-blocks agree) so drift fails the suite instead of shipping.
 
 ---
 
