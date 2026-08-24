@@ -36,6 +36,7 @@
      tuned per theme for contrast on a saturated surface) applies here too */
   --color-destructive-foreground: var(--primary-foreground);
   --color-warning:              var(--warning);
+  --color-warning-foreground:   var(--warning-foreground);
   --color-border:               var(--border);
   --color-input:                var(--input);
   --color-ring:                 var(--ring);
@@ -142,6 +143,7 @@
   /* Destructive */
   --destructive: oklch(0.72 0.20 15);   /* rose */
   --warning:     oklch(0.86 0.16 74);   /* amber */
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 92%);   /* slate at ~8% */
@@ -257,6 +259,7 @@
 
   --destructive: oklch(0.72 0.20 15);
   --warning:     oklch(0.86 0.16 74);
+  --warning-foreground: var(--ink-dark);
 
   --border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 92%);
   --input:  color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);
@@ -338,6 +341,7 @@
   /* Destructive / warning — darkened to read on light surfaces */
   --destructive: oklch(0.55 0.20 15);
   --warning:     oklch(0.62 0.14 74);
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, oklch(0.525 0.038 250), transparent 78%);
@@ -424,6 +428,7 @@
   /* Destructive / warning */
   --destructive: #f7768e;
   --warning:     #e0af68;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #565f89, transparent 80%);
@@ -497,6 +502,7 @@
   /* Destructive / warning */
   --destructive: #b4637a;
   --warning:     #ea9d34;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #9893a5, transparent 78%);
@@ -579,6 +585,7 @@
   /* Destructive / warning */
   --destructive: #dc322f;
   --warning:     #b58900;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #839496, transparent 78%);
@@ -664,6 +671,7 @@
   /* Destructive / warning */
   --destructive: #dc322f;
   --warning:     #b58900;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #586e75, transparent 80%);
@@ -740,6 +748,7 @@
   /* Destructive / warning */
   --destructive: #ff5555;
   --warning:     #f1fa8c;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #6272a4, transparent 80%);
@@ -815,6 +824,7 @@
   /* Destructive / warning */
   --destructive: #d20f39;   /* red */
   --warning:     #df8e1d;   /* yellow */
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #9ca0b0, transparent 78%);
@@ -904,6 +914,7 @@
   /* Destructive / warning */
   --destructive: #f38ba8;
   --warning:     #f9e2af;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #6c7086, transparent 80%);
@@ -982,18 +993,21 @@
   font-family: var(--font);
 }
 
-/* Error toast — rose brand color */
+/* Error toast — same solid destructive swatch + paired ink as the
+   destructive button variant (button.tsx), instead of a one-off mixed
+   background paired with a hardcoded literal that drifts from it per theme. */
 [data-sonner-toast][data-type='error'][data-styled='true'] {
-  background: color-mix(in oklab, var(--destructive), var(--background) 20%);
-  border-color: color-mix(in oklab, var(--destructive), transparent 40%);
-  color: #fff;
+  background: var(--destructive);
+  border-color: var(--destructive);
+  color: var(--destructive-foreground);
 }
 
-/* Warning toast — amber brand color */
+/* Warning toast — solid warning swatch + its own per-theme ink pick,
+   following the same pattern as the domain-color foreground tokens above. */
 [data-sonner-toast][data-type='warning'][data-styled='true'] {
-  background: color-mix(in oklab, var(--warning), var(--background) 20%);
-  border-color: color-mix(in oklab, var(--warning), transparent 40%);
-  color: oklch(0.15 0.02 74);
+  background: var(--warning);
+  border-color: var(--warning);
+  color: var(--warning-foreground);
 }
 
 /* Action button — override Sonner's [data-button] defaults (030) with 040 so
