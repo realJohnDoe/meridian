@@ -206,8 +206,6 @@ function setVaultUnreadable(
 async function hydrateFromCache(vaultId: string): Promise<boolean> {
   const cached = await cacheLoadAll(vaultId)
   if (cached.length === 0) {
-    // An empty layer, not a missing one: the vault is registered, so it must
-    // be a key in `layers` for `getVaultLayer` to report it as present.
     setVaultLayer(vaultId, { items: [], roots: new Map() })
     setVaultUnreadable(vaultId, [])
     return false

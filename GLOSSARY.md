@@ -69,8 +69,8 @@ and contributes a layer. There is deliberately no "active vault".
 → `vaultRef.ts` · `VaultRef`, `VaultKind`
 
 ### VaultLayer
-One vault's parsed content. `store.items`/`store.roots` are the flattened merge
-of every layer.
+One vault's slice of the merged `store.items`/`store.roots`, derived on demand
+rather than stored.
 → `store.ts` · `VaultLayer`, `vaultLayer`
 
 ### Roots

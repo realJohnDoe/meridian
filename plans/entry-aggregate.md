@@ -74,13 +74,12 @@ Consequences worth having:
   write-vs-delete answer.
 - `collapseToYaml`'s `items.length === 0` branch becomes dead.
 
-## The work, as five PRs
+## The work, as four PRs
 
 Each is green and shippable on its own, and each is defensible to a reviewer
 without reference to the ones after it. **They are not all independently
-*valuable*, though, and it's worth being straight about which are which:** PR 2
-stands on its own merits and can be done at any time, even if the rest
-never happens. PRs 3–5 are one migration delivered in three reviewable slices —
+*valuable*, though, and it's worth being straight about which are which:**
+PRs 3–5 are one migration delivered in three reviewable slices —
 only the last of them pays out. PR 6 is optional cleanup.
 
 Tiers follow [the survey conventions](./surveys/README.md#recommended-model-tiers):
@@ -92,59 +91,17 @@ cheapest tier regardless.
 
 | PR | Delivers | Stands alone? | Recommended model |
 |---|---|---|---|
-| 2 | `layers` stops being a stored copy | Yes — removes a representation | **Sonnet 5** — if the task states the merged-order rule; else **Opus 5** |
 | 3 | Store holds `Entries`; flat arrays derived | Shippable, not yet valuable | **Opus 5** |
 | 4 | `storeOps.ts` on `Entries` | Shippable, not yet valuable | **Opus 5** |
 | 5 | Non-empty items; workarounds deleted | **This is the payoff** | **Opus 5** |
 | 6 | Remaining consumers read `Entries` | Optional cleanup | **Sonnet 5** — if 3–5 landed and the eviction contract is stated; else **Opus 5** |
 
-**Where you can stop.** After PR 2: one less representation, no migration debt.
-After PR 5: the bug is a compile error and the plan is done — 6 is garnish.
-Stopping *between* 3 and 5 is the one bad outcome: the store is reshaped and
-nothing has been collected for it yet, so don't start 3 without intending to
-reach 5.
+**Where you can stop.** After PR 5: the bug is a compile error and the plan is
+done — 6 is garnish. Stopping *between* 3 and 5 is the one bad outcome: the
+store is reshaped and nothing has been collected for it yet, so don't start 3
+without intending to reach 5.
 
 ---
-
-### PR 2 — `layers` becomes a derived view
-
-[store.ts](../src/store.ts) holds a *third* and *fourth* representation of the
-same data: `layers` (per vault) alongside the merged `items`/`roots`, kept in
-step by `partitionLayers` and `flattenLayers`. The derivation runs **both ways**
-depending on which entry point you came through:
-
-- `setData` treats merged `items`/`roots` as canonical and re-derives `layers`.
-- `setVaultLayer` treats `layers` as canonical and re-derives merged.
-
-Two representations, each authoritative on alternate code paths, is why "where
-does this data actually live?" has no single answer — and why tracing the
-original bug meant ruling the sync path in and out repeatedly.
-
-**This does not need `Entries`.** Every entry already carries its vault in its
-key, so `getVaultLayer(vaultId)` is a memoized filter over the merged store, and
-`setVaultLayer(vaultId, data)` is "replace this vault's slice". That is why it
-sits before the migration rather than inside it.
-
-Cheaper than the comments in `store.ts` suggest. `partitionLayers`' `seedIds`
-machinery exists so a registered-but-empty vault stays a key in `layers`, "or
-`getVaultLayer` would report it as missing" — but `vaultLayer()` returns
-`EMPTY_LAYER` for a missing vault anyway, and since the persistence port started
-carrying content there is exactly **one** production reader left
-(`mergeChangedIntoStore`, [storage/sync.ts](../src/storage/sync.ts)), which
-filters the layer's items and roots and so cannot tell empty from absent. Check
-that still holds, then drop the machinery rather than porting it.
-
-- **Recommended model:** **Sonnet 5**, *if the task states the merged-order
-  rule* — otherwise **Opus 5**. The hazard is not the layer map, it is the order
-  of the flat `items` array that falls out of it. `hasSameStructure` and
-  `computeExpansionCache` ([model/expansionCache.ts](../src/model/expansionCache.ts))
-  compare `a[i]` against `prev.items[i]` **positionally**, so a rebuild that
-  emits entries in a different order makes every item look changed: the
-  incremental overlay silently degrades to a full re-expansion of every file.
-  Nothing fails — the app is just slower, and only on vaults large enough to
-  notice. `flattenLayers` documents the current guarantee ("layer insertion
-  order decides the merged order, and `Map` preserves it"); any replacement has
-  to preserve a stable order per entry, and say which.
 
 ### PR 3 — The store holds `Entries`; `items`/`roots` become derived
 
@@ -247,10 +204,6 @@ necessary — the honest default is "don't".
 
 ## Cost, honestly
 
-PR 2 is contained: `store.ts` and its two callers in
-[storage/vaultRegistry.ts](../src/storage/vaultRegistry.ts) and
-[storage/sync.ts](../src/storage/sync.ts).
-
 PRs 3–5 touch `storeOps.ts` (the largest file in `model/`) and every test that
 builds a `StoreData` literal — including the fixtures in `src/model/__tests__/`.
 That is a large mechanical diff with a real risk of smuggling in a behaviour
@@ -259,8 +212,7 @@ change while "just" reshaping data. Run the round-trip fixtures
 and require byte-identical output as the gate.
 
 Not worth doing as a background refactor. Worth doing the next time this area is
-being changed for a feature reason anyway — and PR 2 is worth doing
-before then, on its own account.
+being changed for a feature reason anyway.
 
 ## What already shipped
 
