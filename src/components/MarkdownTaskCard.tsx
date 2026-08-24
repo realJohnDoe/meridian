@@ -1,9 +1,11 @@
+import { useRef } from 'react'
 import { CircleFadingArrowUp } from 'lucide-react'
 import { Checkbox } from './ui/checkbox'
 import { DimmableCard } from './DimmableCard'
 import { IconButton } from './primitives/icon-button'
 import { Input } from './ui/input'
 import { cn } from '@/lib/cn'
+import { useScrollIntoViewAboveKeyboard } from '@/hooks'
 
 interface MarkdownTaskCardProps {
   text:          string
@@ -23,6 +25,8 @@ export default function MarkdownTaskCard({
   onClickText, editValue, onEditChange, onEditCommit, onEditCancel,
 }: MarkdownTaskCardProps) {
   const isEditing = editValue !== undefined
+  const inputRef = useRef<HTMLInputElement>(null)
+  useScrollIntoViewAboveKeyboard(isEditing, inputRef)
 
   return (
     <DimmableCard dimmed={done} className="flex items-stretch gap-2.5 pl-2 pr-2.5 py-2">
@@ -36,6 +40,7 @@ export default function MarkdownTaskCard({
         />
         {isEditing ? (
           <Input
+            ref={inputRef}
             // eslint-disable-next-line jsx-a11y/no-autofocus -- opens in response to a user click (promote to inline edit), not on page load
             autoFocus
             variant="ghost"

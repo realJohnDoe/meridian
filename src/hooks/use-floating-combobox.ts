@@ -1,18 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { computeFloatingPlacement, type FloatingPlacement } from '@/lib/floatingPlacement'
+import { findScrollParent } from '@/lib/scrollParent'
 import { useVisualViewportHeight, useVisualViewportOffsetTop } from './use-visual-viewport'
 
 export type FloatingComboboxPlacement = FloatingPlacement
-
-function findScrollParent(el: HTMLElement): Element | null {
-  let node = el.parentElement
-  while (node) {
-    const style = getComputedStyle(node)
-    if (/(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight) return node
-    node = node.parentElement
-  }
-  return document.scrollingElement
-}
 
 // Anchors a combobox's input in place (it never moves) and floats the
 // suggestion list independently: below the input when there's room, above it
