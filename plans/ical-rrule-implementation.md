@@ -6,7 +6,7 @@ PRs, each independently shippable, with a recommended model per PR.
 
 **Status: PR1 shipped ([#750](https://github.com/realJohnDoe/meridian/pull/750)).
 PR2 shipped ([#757](https://github.com/realJohnDoe/meridian/pull/757)). PR3
-open ([#759](https://github.com/realJohnDoe/meridian/pull/759)). PRs 4–9 not
+shipped ([#759](https://github.com/realJohnDoe/meridian/pull/759)). PRs 4–9 not
 started.**
 
 ---
@@ -52,10 +52,10 @@ PR9 ─ (optional, any time)
 | 8 | ICS export: file emission + entry point | Sonnet 5 | 1.5–2d | no |
 | 9 | `WKST` (optional) | **Opus 5** | 1d | yes (`wkst`) |
 
-Total PRs 4–8: **5–6.5 days** (PR1 and PR2 have shipped and PR3's 0.5d is out
-for review — see status above). That is higher than the 6–10-day range in the
-survey's bottom row only in bookkeeping: the survey counted implementation,
-this counts implementation plus per-PR tests, review and CI.
+Total PRs 4–8: **5–6.5 days** (PRs 1–3 have shipped — see status above). That is
+higher than the 6–10-day range in the survey's bottom row only in bookkeeping:
+the survey counted implementation, this counts implementation plus per-PR tests,
+review and CI.
 
 The three remaining PRs that touch `types.ts` are the ones to slow down on.
 `repeat:` is written to YAML verbatim and read back with an unchecked cast, so
