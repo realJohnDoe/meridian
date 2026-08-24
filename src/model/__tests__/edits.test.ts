@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseFixture, serialize, rootMeta, collectUndated, TEST_VAULT, rootsOf, NEW_TARGET, keyOf, dataOf, itemsOf, rootsIn } from './helpers'
+import { parseFixture, serialize, rootMeta, collectUndated, TEST_VAULT, rootsOf, NEW_TARGET, keyOf, dataOf, itemsOf, rootsIn, serializeKey, serializeOnly } from './helpers'
 import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing, deletionEndsAfterCompletionSeries } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { parseToStoreItems } from '@/model/storeItems'
@@ -23,8 +23,7 @@ function occOn(items: StoreItem[], roots: Roots, dateISO: string): Occurrence {
 
 /** Serialize a StoreData back to file content. */
 function serializeData(data: StoreData): string {
-  const root = [...rootsIn(data).values()][0]
-  return serialize(itemsOf(data), root)
+  return serializeOnly(data)
 }
 
 /** Build EditFields from an occurrence, overriding only what a scenario changes. */
@@ -113,7 +112,7 @@ describe('edit operations → serialized YAML', () => {
       scheduled: { date: '2026-04-20', time: '09:00' },
     }), NEW_TARGET)
 
-    const reparsed = parseToStoreItems('ts.md', serialize(itemsOf(next), rootsIn(next).get(keyOf('ts'))), TEST_VAULT)
+    const reparsed = parseToStoreItems('ts.md', serializeKey(next, keyOf('ts')), TEST_VAULT)
     const after = expandRange(reparsed.items, rootsOf(reparsed.root),
       new Date('2026-01-01'), new Date('2026-12-31'))
     expect(after.find(o => o.date === '2026-04-20')!.metadata.participants).toEqual([])
@@ -798,7 +797,7 @@ describe('unknown keys survive every edit scope', () => {
     expect(reparsedOverride.metadata.extra?.owner).toBe('bob')
   })
 
-  it('updateRoot keeps a container root\'s unknown key across an edit', () => {
+  it('editedEntry keeps a container root\'s unknown key across an edit', () => {
     const data = fixtureData('unknown-keys-container')
     const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-06')
     const next = applyEdit(data, occ, 'all', editFields(occ, { duration: '45m' }), NEW_TARGET)
@@ -852,7 +851,7 @@ describe('unknown keys survive every edit scope', () => {
     const occ = occOn(p.items, roots, '2026-04-13')
 
     const next = excludeOccurrence(dataOf(p.items, roots), occ)
-    const out = serialize(itemsOf(next), rootsIn(next).get(keyOf('s2')))
+    const out = serializeKey(next, keyOf('s2'))
 
     expect(out).toContain('minutesUrl: https://example.com/notes/13')
     expect(out).toContain('done: true')

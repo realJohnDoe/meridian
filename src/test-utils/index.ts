@@ -97,11 +97,17 @@ export function setMediaQuery(initialMatches: boolean): (next: boolean) => void 
  */
 export function entriesOf(items: StoreItem[], roots: Roots): Entries {
   const entries: Entries = new Map()
-  for (const [key, root] of roots) entries.set(key, { key, root, items: [] })
   for (const item of items) {
     const entry = entries.get(item.entryKey)
     if (entry) entry.items.push(item)
     else entries.set(item.entryKey, { key: item.entryKey, root: rootFor(item.entryKey), items: [item] })
+  }
+  // Roots second, so a key with items keeps them and only gains its real root.
+  // A root with no items is silently dropped: `Entry['items']` is non-empty, so
+  // there is no entry for it to become — which is the invariant, not a gap.
+  for (const [key, root] of roots) {
+    const entry = entries.get(key)
+    if (entry) entries.set(key, { ...entry, root })
   }
   return entries
 }

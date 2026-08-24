@@ -435,34 +435,45 @@ instances:
     expect(occ!.metadata.done).toBe(false)
   })
 
-  it('is total for a root that has no items at all', () => {
+  it('is total over the store, including an entry whose only occurrence is undated', () => {
     // The reported bug: an entry whose root survived with zero occurrences had
     // no place in the map, so the search results list reserved a row for it and
-    // drew nothing — an invisible gap where the entry should have been. An
-    // entry is its root, so it gets a representative occurrence built from the
-    // file-level fields.
-    const { items } = makeFlat([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
-    const roots: Roots = new Map([[keyOf('handy'), { title: 'handy', tags: ['errands'], items: [], vaultId: TEST_VAULT, fileSlug: 'handy' }]])
+    // drew nothing — an invisible gap where the entry should have been. The map
+    // used to close that hole with an explicit sweep that synthesized a
+    // representative for every root it had not already resolved.
+    //
+    // That sweep is gone, because the hole is: `Entry['items']` is non-empty,
+    // so every key in the store has items to resolve from and the map is total
+    // by construction. What is pinned here is the case the sweep was really
+    // for — a file carrying only file-level fields, which parses into one
+    // undated occurrence and must still get a representative.
+    const rootOnly = parseToStoreItems('handy.md', '---\ntitle: handy\ntags: [errands]\n---\n', TEST_VAULT)
+    const { items, roots } = makeFlat([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const allItems = [...items, ...rootOnly.items]
+    const allRoots: Roots = new Map(roots).set(keyOf('handy'), rootOnly.root)
 
-    const occ = buildFom(items.filter(i => i.entryKey !== keyOf('handy')), roots).get(keyOf('handy'))
+    const map = buildFom(allItems, allRoots)
 
-    expect(occ).toBeDefined()
+    // Total: every key the store holds resolves to something.
+    for (const key of allRoots.keys()) expect(map.get(key)).toBeDefined()
+    const occ = map.get(keyOf('handy'))
     expect(occ!.entryKey).toBe(keyOf('handy'))
     expect(occ!.metadata.title).toBe('handy')
     expect(occ!.date).toBe('')
   })
 
-  it('drops the occurrence resolved from items a key has since lost', () => {
-    // The incremental path may only reuse a cached entry when the key had no
-    // items *before* either — otherwise a key whose items were just evicted
-    // would keep pointing at an occurrence that no longer exists.
+  it('drops a key whose items are gone, rather than keeping the occurrence they resolved to', () => {
+    // The incremental path must not let a key that has just lost its items keep
+    // pointing at an occurrence resolved from them. Losing every item now means
+    // losing the entry, so the key leaves the map entirely — where it used to
+    // fall through to a synthesized root-only representative.
     const { items, roots } = makeFlat([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const withItems = buildFom(items, roots)
     expect(withItems.get(keyOf('project-alpha'))!.date).not.toBe('')
 
-    const after = updateFileOccurrenceMap(withItems, items, roots, [], roots)
+    const after = updateFileOccurrenceMap(withItems, items, roots, [], new Map())
 
-    expect(after.get(keyOf('project-alpha'))!.date).toBe('')
+    expect(after.has(keyOf('project-alpha'))).toBe(false)
   })
 
   it('returns equal maps for identical inputs', () => {

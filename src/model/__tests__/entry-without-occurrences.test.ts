@@ -7,15 +7,25 @@
  * store state: a root with zero items. Nothing renders such an entry, and the
  * write path used to refuse to persist it, so it lived in memory only.
  *
- * These tests pin the two model-level guarantees that make that state
- * survivable: an edit never *produces* it, and serializing it never blanks the
- * file.
+ * **That state is now unrepresentable.** `Entry['items']` is a non-empty tuple,
+ * so `{ root, items: [] }` does not compile — the store cannot hold the thing
+ * these tests were written to survive. What is pinned here is therefore no
+ * longer "the state is survivable" but the two things that keep it from
+ * arising in the first place, which is where the guarantee moved rather than
+ * where it went away:
+ *
+ *  - an editor holding an occurrence whose entry has vanished rebuilds the
+ *    entry whole, root and occurrence together, rather than writing a root
+ *    that matches no item;
+ *  - a file on disk that carries only file-level fields parses into one undated
+ *    occurrence, so the entry arrives whole and its `title`/`tags`/`items:`
+ *    survive the round trip. This is the parse boundary's totality — the same
+ *    clause of `nodeIsItem` that makes the non-empty tuple safe to assert.
  */
 import { describe, it, expect } from 'vitest'
 import { rootsOf, TEST_VAULT, NEW_TARGET, keyOf, serialize, frontmatterOf, dataOf, itemsOf, rootsIn } from './helpers'
 import { applyEdit } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
-import { collapseToYaml } from '@/model/collapse'
 import { parseToStoreItems } from '@/model/storeItems'
 import { isSeries, isStandaloneOcc } from '@/types'
 import type { FileMetadata, Occurrence } from '@/types'
@@ -37,12 +47,17 @@ const fields: EditFields = {
   scheduled: { date: '2026-08-18', time: '' }, duration: '', repeat: null,
 }
 
-/** Store state where the entry's root is all that is left. */
+/**
+ * Store state where the entry is gone but the editor is still holding one of
+ * its occurrences. `dataOf` drops a root with no items on purpose: there is no
+ * `Entry` for it to become, so "the entry's items are gone" and "the entry is
+ * gone" are now the same state — which is the point.
+ */
 function occurrencelessData(): StoreData {
   return dataOf([], rootsOf(root))
 }
 
-describe('applyEdit on an entry whose items are gone', () => {
+describe('applyEdit on an entry that is no longer in the store', () => {
   it.each(['all', 'single', 'future', 'add'] as const)(
     'rebuilds the occurrence instead of updating the root alone (scope %s)',
     scope => {
@@ -95,25 +110,44 @@ describe('applyEdit on an entry whose items are gone', () => {
   })
 })
 
-describe('serializing an entry that has only a root', () => {
-  it('keeps the file-level fields instead of emitting an empty document', () => {
-    const yaml = collapseToYaml([], root)
+describe('a file that carries only file-level fields', () => {
+  it('parses into one undated occurrence, so the entry arrives whole', () => {
+    // The clause that makes `Entry['items']` safe to assert as non-empty:
+    // `nodeIsItem` treats a leaf root as an item. Without it a root-only file
+    // would load as a root with no occurrences — the state this file is named
+    // for — and the parse boundary's narrowing would have to invent an item or
+    // throw on a file the user legitimately wrote.
+    const content = ['---', 'title: handy', 'tags: [errands]', '---', '', 'Compare the plans.'].join('\n')
 
-    expect(yaml).toMatchObject({ title: 'handy', tags: ['errands'] })
+    const parsed = parseToStoreItems('handy.md', content, TEST_VAULT)
+
+    expect(parsed.items).toHaveLength(1)
+    expect(isStandaloneOcc(parsed.items[0])).toBe(true)
+    expect(parsed.root.title).toBe('handy')
   })
 
-  it('round-trips back into a single undated occurrence, so the entry heals', () => {
-    const content = serialize([], root)
-    expect(frontmatterOf(content)).toMatchObject({ title: 'handy' })
+  it('keeps its file-level fields across a save, rather than blanking them', () => {
+    // The original regression: a save that emitted an empty document would
+    // wipe title, tags and the `items:` list. Serializing goes through the
+    // entry, so the root always rides along with the occurrence it belongs to.
+    const parsed = parseToStoreItems('handy.md', ['---', 'title: handy', 'tags: [errands]', '---'].join('\n'), TEST_VAULT)
 
-    const reparsed = parseToStoreItems('handy.md', content, TEST_VAULT)
+    const saved = serialize(parsed.items, parsed.root)
 
+    expect(frontmatterOf(saved)).toMatchObject({ title: 'handy', tags: ['errands'] })
+    // …and it survives a second trip, so the shape is stable rather than
+    // merely non-empty once.
+    const reparsed = parseToStoreItems('handy.md', saved, TEST_VAULT)
     expect(reparsed.root.title).toBe('handy')
     expect(reparsed.items).toHaveLength(1)
-    expect(isStandaloneOcc(reparsed.items[0]!)).toBe(true)
   })
 
-  it('still emits an empty document when there is no root either', () => {
-    expect(collapseToYaml([], undefined)).toEqual({})
+  it('routes a file that describes no occurrence to the caller\'s catch', () => {
+    // The one input that yields nothing yields it by throwing, which is what
+    // `parseFiles` records in `unreadableFiles` — holding neither a root nor
+    // items, and so consistent with the non-empty invariant rather than a hole
+    // in it. `collapseToYaml`'s old `items.length === 0` branch is gone with
+    // the state it existed for.
+    expect(() => parseToStoreItems('empty.md', '---\n---\n', TEST_VAULT)).toThrow()
   })
 })

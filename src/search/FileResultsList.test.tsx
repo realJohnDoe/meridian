@@ -154,13 +154,25 @@ describe('FileResultsList', () => {
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('note.md') }))
   })
 
-  it('renders a card for an entry whose root has no occurrences, instead of a blank row', () => {
+  it('renders a card for an entry whose only occurrence is undated, instead of a blank row', () => {
     // The reported bug: an entry created from the search overlay whose root
     // landed in the store without an occurrence still matched the query, so
     // the virtualizer counted it and reserved a row — and then drew nothing,
-    // leaving a gap between the "Create" row and the first real result. An
-    // entry is its root, so it gets a representative occurrence and a card.
-    seedStore([], makeRoots('handy', { title: 'handy' }))
+    // leaving a gap between the "Create" row and the first real result.
+    //
+    // That store state is now unrepresentable (`Entry['items']` is non-empty),
+    // and `fileOccurrenceMap` is total by construction rather than by a sweep
+    // that synthesized a representative for root-only entries. What is left to
+    // pin is the shape such an entry actually has: one undated occurrence,
+    // which is what both the search overlay creates and what a file carrying
+    // only file-level fields parses into. It must draw a card, not a gap.
+    seedStore(
+      [makeOcc({
+        id: 'occ-handy', entryKey: testKey('handy'), date: '', time: null,
+        metadata: { participants: [], title: 'handy', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'handy' },
+      })],
+      makeRoots('handy', { title: 'handy' }),
+    )
     const { type, container } = renderList()
 
     type('handy')
@@ -176,7 +188,9 @@ describe('FileResultsList', () => {
     const occ = makeOcc({ entryKey: testKey('note.md') })
     const roots: Roots = makeRoots('note.md', { title: 'Standup' })
     roots.set(testKey('other.md'), makeRootMeta('other.md', { title: 'Linked From', tags: [], items: ['[[note.md]]'] }))
-    seedStore([occ], roots)
+    // `other.md` needs an occurrence of its own: an entry is its root *and* its
+    // occurrences, so a root on its own is no longer a state the store holds.
+    seedStore([occ, makeOcc({ id: 'occ-other', entryKey: testKey('other.md') })], roots)
     const { type } = renderList()
 
     type('stand')

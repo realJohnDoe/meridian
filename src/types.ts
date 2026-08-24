@@ -63,7 +63,7 @@ export interface FileMetadata {
    * changed (data-integrity survey, finding #8). `undefined` for a
    * freshly-created entry with no source file yet — `saveFile` then falls
    * back to `DEFAULT_FILE_CONVENTION`. Never user-editable, so it is carried
-   * forward across edits the same way `extra` is — see `updateRoot` in
+   * forward across edits the same way `extra` is — see `editedEntry` in
    * `storeOps.ts`; forgetting to would silently revert the file to LF the
    * moment the user makes their first edit through the app.
    */
@@ -173,7 +173,22 @@ export type Roots = Map<EntryKey, FileMetadata>
 export interface Entry {
   key:   EntryKey
   root:  FileMetadata
-  items: StoreItem[]
+  /**
+   * Non-empty by construction: `{ root, items: [] }` does not compile.
+   *
+   * That is the point of the tuple rather than an array. The bug this whole
+   * shape exists for — an entry with file-level fields and no occurrences,
+   * invisible in search and never written to disk — becomes unrepresentable
+   * rather than merely tested for, and the branches that used to cope with it
+   * become dead code.
+   *
+   * The invariant holds at the two places an entry is born:
+   * `parseToStoreItems` always yields at least one item for any file it can
+   * read (a file it cannot read routes to `unreadableFiles`, which holds
+   * neither a root nor items), and `applyNew` creates the entry's first item
+   * in the same expression as its root.
+   */
+  items: [StoreItem, ...StoreItem[]]
 }
 
 /** Every entry across every registered vault, keyed the way the app keys them. */

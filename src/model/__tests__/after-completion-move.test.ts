@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseFixture, serialize, rootsOf, NEW_TARGET, keyOf, dataOf, itemsOf, rootsIn } from './helpers'
+import { parseFixture, rootsOf, NEW_TARGET, keyOf, dataOf, itemsOf, rootsIn, serializeOnly } from './helpers'
 import { applyEdit } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { expandRange } from '@/model/expansion'
@@ -73,7 +73,7 @@ describe('after_completion: moving the projected occurrence', () => {
     data = applyEdit(data, occ, 'single', editFields(occ, { scheduled: { date: '2026-07-24', time: '' } }), NEW_TARGET)
 
     expect(datesIn(data, '2026-07')).toEqual(['2026-07-09', '2026-07-24'])
-    expect(serialize(itemsOf(data), [...rootsIn(data).values()][0])).toContain(
+    expect(serializeOnly(data)).toContain(
       '  - date: 2026-07-23\n    excluded: true',
     )
   })

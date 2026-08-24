@@ -1,5 +1,5 @@
 /**
- * `updateRoot` (model/storeOps.ts) carries two things forward on every edit
+ * `editedEntry` (model/storeOps.ts) carries two things forward on every edit
  * scope without the editor ever seeing them: the file's unknown frontmatter
  * keys (`extra`) and its line-ending convention (`fileConvention`). Both are
  * optional fields, so an edit that rebuilds FileMetadata field-by-field and
@@ -8,7 +8,7 @@
  * to disk, weeks later, as a mystery git diff.
  *
  * These assertions therefore run against `serialize`'s output, not the store,
- * and across all four edit scopes updateRoot is reachable from.
+ * and across all four edit scopes editedEntry is reachable from.
  */
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
@@ -16,13 +16,13 @@ import { applyEdit } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { expandRange } from '@/model/expansion'
 import type { EditScope, Occurrence, Roots, StoreItem } from '@/types'
-import { loadFixture, serialize, rootsOf, TEST_VAULT, NEW_TARGET, itemsOf, rootsIn, dataOf } from './helpers'
+import { loadFixture, rootsOf, TEST_VAULT, NEW_TARGET, itemsOf, rootsIn, dataOf, serializeOnly } from './helpers'
 
 /**
  * `unknown-keys-container.md` re-parsed with every newline forced to `\r\n`,
  * so `fileConvention.crlf` is detected true from the file's own bytes — same
  * as a real CRLF file loaded from disk. Its root carries `project: apollo`,
- * an unknown key `updateRoot` never mints and must not drop.
+ * an unknown key `editedEntry` never mints and must not drop.
  */
 function crlfFixtureData(): StoreData {
   const crlfSource = loadFixture('unknown-keys-container').replace(/\n/g, '\r\n')
@@ -51,7 +51,7 @@ function editFields(occ: Occurrence, over: Partial<EditFields> = {}): EditFields
 }
 
 function serializeData(data: StoreData): string {
-  return serialize(itemsOf(data), [...rootsIn(data).values()][0])
+  return serializeOnly(data)
 }
 
 const ANCHOR = '2026-04-06'

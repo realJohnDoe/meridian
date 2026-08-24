@@ -31,10 +31,16 @@ title: Alpha
 date: "2026-05-01"
 ---
 `
+// Two occurrences on purpose: excluding one of them must leave the entry
+// standing, so the assertions below are about the root being untouched rather
+// than about the entry disappearing (removing the last occurrence removes the
+// entry — see `excludeOccurrence`).
 const YAML_BETA = `---
 title: Beta
 done: false
-date: "2026-05-02"
+instances:
+  - date: "2026-05-02"
+  - date: "2026-05-09"
 ---
 `
 const YAML_GAMMA = `---

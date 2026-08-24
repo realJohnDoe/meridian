@@ -59,16 +59,26 @@ describe('commitNext', () => {
     expect(persistence.contentByKey.get(KEY)).toContain('title: Neues Handy')
   })
 
-  it('writes an entry whose root has no occurrences rather than deleting it', () => {
-    // Its file-level fields are what is left of it; a delete here would drop a
-    // file the store still lists.
-    commitNext({ entries: entriesOf([], makeRoots('handy', { title: 'handy' })) }, [KEY])
+  it('writes the entry\'s file-level fields, not just its occurrences', () => {
+    // This used to be "writes an entry whose root has no occurrences rather
+    // than deleting it" — the write path once refused such an entry outright
+    // and so never wrote it at all, losing it with the tab. That entry cannot
+    // exist now (`Entry['items']` is non-empty), so what is left to pin is the
+    // half of it that was actually at risk: the root's fields reaching the
+    // file. They ride along because the entry is serialized whole.
+    commitNext(oneEntry(), [KEY])
 
     expect(persistence.deletes).toEqual([])
-    expect(persistence.contentByKey.get(KEY)).toContain('title: handy')
+    const content = persistence.contentByKey.get(KEY)
+    expect(content).toContain('title: handy')
+    expect(content).toContain('errands')
   })
 
-  it('deletes a key the committed data no longer holds at all', () => {
+  it('deletes a key the committed data no longer holds', () => {
+    // Key presence in `entries` *is* the write-vs-delete answer. There is no
+    // longer a half-present entry for the write path to have to interpret:
+    // `entryContent`'s "items but no root, or root but no items" branch is
+    // gone with the states it was deciding between.
     commitNext({ entries: new Map() }, [KEY])
 
     expect(persistence.writes).toEqual([])

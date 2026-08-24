@@ -2,7 +2,7 @@ import { toast } from 'sonner'
 import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, occFromAppMeta, freeEntryKey, moveEntryKey } from '@/model'
 import { occIsRecur } from './occView'
 import { isStandaloneOcc } from './types'
-import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Entries, StoreItem } from './types'
+import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Entries, Entry, StoreItem } from './types'
 import { keySlug, keyVaultId } from './fileIO'
 import type { EntryKey } from './fileIO'
 import { isWritableVault } from './vaultRef'
@@ -91,18 +91,19 @@ export function reopenOcc(occ: Occurrence): void {
   const entries = getEntries()
   const entry = entries.get(occ.entryKey)
   if (!entry) return
-  const withItems = (items: StoreItem[]): void => {
+  const withItems = (items: Entry['items']): void => {
     commitNext({ entries: new Map(entries).set(occ.entryKey, { ...entry, items }) }, [occ.entryKey])
   }
+  const [head, ...tail] = entry.items
   const existingUndated = entry.items.find(
     i => isStandaloneOcc(i) && i.date === '',
   ) as OccurrenceEntry<OccurrenceMetadata> | undefined
 
   if (existingUndated) {
-    withItems(entry.items.map(i => i.id === existingUndated.id
+    const reopen = (i: StoreItem): StoreItem => i.id === existingUndated.id
       ? { ...existingUndated, metadata: { ...existingUndated.metadata, done: false } }
-      : i,
-    ))
+      : i
+    withItems([reopen(head), ...tail.map(reopen)])
   } else {
     const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
       date:     '',
@@ -112,7 +113,7 @@ export function reopenOcc(occ: Occurrence): void {
       id:       crypto.randomUUID(),
       metadata: { ...occFromAppMeta(occ.metadata), done: false },
     }
-    withItems([...entry.items, newOcc])
+    withItems([head, ...tail, newOcc])
   }
 }
 

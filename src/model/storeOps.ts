@@ -52,6 +52,35 @@ function withEntry(entries: Entries, entry: Entry): Entries {
   return next
 }
 
+// `Entry['items']` is non-empty, and TypeScript drops that across `map` and a
+// spread. These three put it back without a cast: each one is non-empty by
+// construction, because it names the head element explicitly.
+
+/** `items.map(f)`, keeping the non-empty guarantee. */
+function mapItems(items: Entry['items'], f: (item: StoreItem) => StoreItem): Entry['items'] {
+  const [head, ...tail] = items
+  return [f(head), ...tail.map(f)]
+}
+
+/** `[...items, item]`, keeping the non-empty guarantee. */
+function addItem(items: Entry['items'], item: StoreItem): Entry['items'] {
+  const [head, ...tail] = items
+  return [head, ...tail, item]
+}
+
+/**
+ * `items.filter(p)` — but a filter can empty an entry, and an entry with no
+ * occurrences is the state this whole shape exists to rule out. `undefined`
+ * means "nothing is left of this entry", which callers turn into a deletion.
+ */
+function filterItems(
+  items: Entry['items'],
+  p: (item: StoreItem) => boolean,
+): Entry['items'] | undefined {
+  const [head, ...tail] = items.filter(p)
+  return head ? [head, ...tail] : undefined
+}
+
 // ── Lookup helpers ────────────────────────────────────────────────────────────
 
 /** Items belonging to a specific file. */
@@ -105,12 +134,12 @@ export function seriesContext(items: StoreItem[], occ: Occurrence | null): Serie
  * If an override already exists for that date, it's replaced; otherwise appended.
  */
 export function upsertOverride(
-  items: StoreItem[],
+  items: Entry['items'],
   occ: Occurrence,
   patch: Partial<OccurrenceEntry<OccurrenceMetadata>>,
-): StoreItem[] {
+): Entry['items'] {
   if (!occ.ownerId) {
-    return items.map(i => {
+    return mapItems(items, i => {
       if (isSeries(i)) return i
       const io = i
       if (io.ownerId) return i   // skip child overrides of a series
@@ -129,7 +158,7 @@ export function upsertOverride(
     i => !isSeries(i) && i.ownerId === occ.ownerId && i.id === occ.id,
   )
   if (existing) {
-    return items.map(i =>
+    return mapItems(items, i =>
       i.id === existing.id
         ? { ...i, ...patch, metadata: mergeOccMeta(i.metadata, patch.metadata) }
         : i,
@@ -156,7 +185,7 @@ export function upsertOverride(
     metadata: mergeOccMeta(series?.metadata ?? occFromAppMeta(occ.metadata), patch.metadata),
     ...patch,
   }
-  return [...items, newOverride]
+  return addItem(items, newOverride)
 }
 
 /**
@@ -169,12 +198,15 @@ export function upsertOverride(
  * date; `expandNode`'s override lookup returns the first array match, which
  * can be the stale excluded stub, silently hiding the real occurrence.
  */
-function dropExclusionStub(items: StoreItem[], ownerId: string, date: string): StoreItem[] {
-  return items.filter(i => {
+function dropExclusionStub(items: Entry['items'], ownerId: string, date: string): Entry['items'] {
+  // Only ever called on an entry that has `ownerId`'s series, and a series is
+  // never a stub — so something always survives, and the `?? items` is
+  // unreachable rather than a fallback with behaviour of its own.
+  return filterItems(items, i => {
     if (isSeries(i)) return true
     const io = i
     return !(io.ownerId === ownerId && io.date === date && io.excluded)
-  })
+  }) ?? items
 }
 
 // ── Edit operations ───────────────────────────────────────────────────────────
@@ -200,7 +232,7 @@ export interface EditFields extends EditorFields {
 //
 // THE four places a metadata value is built: `occFromAppMeta` (convert),
 // `mergeOccMeta` (combine two), `occMeta`/`seriesMeta` (from editor fields), and
-// `updateRoot` (file level). Nothing else in this module may assemble an
+// `editedEntry` (file level). Nothing else in this module may assemble an
 // OccurrenceMetadata or FileMetadata field-by-field — a literal that forgets
 // `extra` silently deletes the user's unknown frontmatter keys on the next save,
 // and nothing type-checks that omission because `extra` is optional. Spreading
@@ -313,7 +345,7 @@ function editedEntry(
   prev: Entry | undefined,
   key: EntryKey,
   fields: EditFields,
-  items: StoreItem[],
+  items: Entry['items'],
 ): Entry {
   const prevRoot = prev?.root
   return {
@@ -373,8 +405,8 @@ function applyFieldsToItem(item: StoreItem, fields: EditFields): StoreItem {
  * Spreading `occMeta`'s result rather than assembling a literal is the
  * sanctioned form — see the "Metadata constructors" note above.
  */
-function applyFieldsToChildren(items: StoreItem[], seriesId: string, fields: EditFields): StoreItem[] {
-  return items.map(i => {
+function applyFieldsToChildren(items: Entry['items'], seriesId: string, fields: EditFields): Entry['items'] {
+  return mapItems(items, i => {
     if (isSeries(i) || i.ownerId !== seriesId) return i
     return { ...i, metadata: { ...occMeta(i.metadata, fields), done: i.metadata.done } }
   })
@@ -483,7 +515,7 @@ function applyNew(data: StoreData, fields: EditFields, vaultId: string, draftId?
 
   const draft = findDraft(entries, draftId)
   if (draft) {
-    const items = draft.items.map(i => i.id === draftId ? applyFieldsToItem(i, fields) : i)
+    const items = mapItems(draft.items, i => i.id === draftId ? applyFieldsToItem(i, fields) : i)
     return { ...data, entries: withEntry(entries, editedEntry(draft, draft.key, fields, items)) }
   }
 
@@ -492,7 +524,8 @@ function applyNew(data: StoreData, fields: EditFields, vaultId: string, draftId?
   // one place in the module where file-level metadata is assembled. The entry is
   // born with its item, not with a root that a later statement has to remember
   // to match.
-  const items = [...(prev?.items ?? []), freshItem(entryKey, fields, draftId ?? crypto.randomUUID())]
+  const fresh = freshItem(entryKey, fields, draftId ?? crypto.randomUUID())
+  const items: Entry['items'] = prev ? addItem(prev.items, fresh) : [fresh]
   return { ...data, entries: withEntry(entries, editedEntry(prev, entryKey, fields, items)) }
 }
 
@@ -535,7 +568,7 @@ function applyAll(data: StoreData, occ: Occurrence, fields: EditFields): StoreDa
   const matchItem = occ.ownerId
     ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
     : (i: StoreItem) => isStandaloneOcc(i) && i.id === occ.id
-  let items = entry.items.map(i => matchItem(i) ? applyFieldsToItem(i, fields) : i)
+  let items = mapItems(entry.items, i => matchItem(i) ? applyFieldsToItem(i, fields) : i)
   // …and onto the series' override children, so "all events" reaches the
   // occurrences the user already overrode — see `applyFieldsToChildren`.
   if (occ.ownerId) items = applyFieldsToChildren(items, occ.ownerId, fields)
@@ -557,9 +590,9 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields): Stor
   const { scheduled, repeat } = fields
   const entry = data.entries.get(occ.entryKey)
   if (!entry) return data
-  const commit = (items: StoreItem[]): StoreData =>
+  const commit = (items: Entry['items']): StoreData =>
     ({ ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items)) })
-  let items = entry.items
+  let items: Entry['items'] = entry.items
   const baseSeries = findSeries(items, occ)
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
   const newDate = scheduled?.date ?? ''
@@ -574,7 +607,7 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields): Stor
       id:       occ.id,
       metadata: seriesMeta(base, fields),
     }
-    return commit(items.map(i => i.id === occ.id ? newSeries : i))
+    return commit(mapItems(items, i => i.id === occ.id ? newSeries : i))
   }
 
   if (occ.ownerId && occ.source === 'generated' && newDate && newDate !== occ.date) {
@@ -597,7 +630,7 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields): Stor
       metadata: occMeta(base, fields),
     }
     const already = items.some(i => i.id === movedId)
-    return commit(already ? items.map(i => i.id === movedId ? moved : i) : [...items, moved])
+    return commit(already ? mapItems(items, i => i.id === movedId ? moved : i) : addItem(items, moved))
   }
 
   if (occ.ownerId && newDate && newDate !== occ.date) {
@@ -626,7 +659,8 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
   const newRepeat = repeat ?? series.repeat
   const newMeta = seriesMeta(series.metadata, fields)
 
-  const items = entry.items.flatMap(i => {
+  const [head, ...tail] = entry.items
+  const expand = (i: StoreItem): StoreItem[] => {
     if (i.id === series.id) {
       const capped: RepeatPattern<OccurrenceMetadata> = {
         ...(i as RepeatPattern<OccurrenceMetadata>),
@@ -653,7 +687,12 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
       return [{ ...i, ownerId: newSeriesId, metadata: { ...occMeta(i.metadata, fields), done: i.metadata.done } }]
     }
     return [i]
-  })
+  }
+  // `expand` maps each item to at least one item — the series' own leg returns
+  // the capped series plus its new sibling — so expanding the head keeps the
+  // result non-empty without a cast.
+  const [first = head, ...restOfHead] = expand(head)
+  const items: Entry['items'] = [first, ...restOfHead, ...tail.flatMap(expand)]
   return { ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items)) }
 }
 
@@ -671,7 +710,7 @@ function applyAdd(data: StoreData, occ: Occurrence, fields: EditFields): StoreDa
   const entry = data.entries.get(occ.entryKey)
   if (!entry) return data
   const items = entry.items
-  const commit = (next: StoreItem[]): StoreData =>
+  const commit = (next: Entry['items']): StoreData =>
     ({ ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, next)) })
   const newDate = scheduled?.date ?? ''
   const baseSeries = findSeries(items, occ)
@@ -685,7 +724,7 @@ function applyAdd(data: StoreData, occ: Occurrence, fields: EditFields): StoreDa
       id:       crypto.randomUUID(),
       metadata: seriesMeta(base, fields),
     }
-    return commit([...items, newSeries])
+    return commit(addItem(items, newSeries))
   }
   const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
     date:    newDate,
@@ -696,7 +735,7 @@ function applyAdd(data: StoreData, occ: Occurrence, fields: EditFields): StoreDa
     ownerId: occ.ownerId,
     metadata: { ...occMeta(base, fields), done: fields.tracked ? false : undefined },
   }
-  return commit([...items, newOcc])
+  return commit(addItem(items, newOcc))
 }
 
 /**
@@ -724,14 +763,19 @@ export function applyEdit(
   target: NewEntryTarget,
 ): StoreData {
   if (!occ) return applyNew(data, fields, target.vaultId, target.draftId)
-  // The occurrence the editor is holding has no item behind it any more — its
+  // The occurrence the editor is holding has no entry behind it any more — its
   // file was deleted remotely, in another tab, or by a reconcile, while the
-  // editor stayed open on it. Rebuild the item on the entry's own key instead,
-  // so the edit lands on a whole entry rather than half of one.
+  // editor stayed open on it. Rebuild the entry on its own key, whole.
+  //
+  // This used to have a second arm: an entry that was *present* but had no
+  // items, which every scope below would have updated the root of and then
+  // matched nothing on, leaving a root with zero occurrences. `Entry['items']`
+  // is non-empty, so that arm is now a state the store cannot be in — the
+  // absent entry is the only case left to handle.
   const existing = data.entries.get(occ.entryKey)
-  if (!existing || existing.items.length === 0) {
-    const items = [...(existing?.items ?? []), freshItem(occ.entryKey, fields, occ.ownerId ?? occ.id)]
-    return { ...data, entries: withEntry(data.entries, editedEntry(existing, occ.entryKey, fields, items)) }
+  if (!existing) {
+    const items: Entry['items'] = [freshItem(occ.entryKey, fields, occ.ownerId ?? occ.id)]
+    return { ...data, entries: withEntry(data.entries, editedEntry(undefined, occ.entryKey, fields, items)) }
   }
   switch (scope) {
     case 'all':    return applyAll(data, occ, fields)
@@ -773,14 +817,34 @@ export function deletionEndsAfterCompletionSeries(items: StoreItem[], occ: Occur
   })
 }
 
-/** Mark a recurring occurrence as excluded; remove a standalone by id. */
+/**
+ * Mark a recurring occurrence as excluded; remove a standalone by id.
+ *
+ * Removing the last occurrence removes the entry: an entry *is* its
+ * occurrences plus its file-level fields, so with none left there is nothing
+ * for the root to be the file-level fields *of*, and leaving one behind is the
+ * root-with-no-occurrences state this shape exists to rule out. Absence from
+ * `entries` is what the write path already reads as a delete.
+ *
+ * In practice the UI never gets here for a lone standalone — `seriesSheet`
+ * (editor/save.ts) routes a standalone with no siblings to `deleteByEntryKey`,
+ * which also cleans up the backlinks a bare delete would leave dangling. This
+ * is the domain layer agreeing with that rather than inventing a third answer.
+ */
 export function excludeOccurrence(data: StoreData, occ: Occurrence): StoreData {
   const entry = data.entries.get(occ.entryKey)
   if (!entry) return data
-  const items = occ.ownerId
-    ? upsertOverride(entry.items, occ, { excluded: true })
-    : entry.items.filter(i => i.id !== occ.id)
-  // Root untouched, same as `toggleDone`.
+  if (occ.ownerId) {
+    const items = upsertOverride(entry.items, occ, { excluded: true })
+    // Root untouched, same as `toggleDone`.
+    return { ...data, entries: withEntry(data.entries, { ...entry, items }) }
+  }
+  const items = filterItems(entry.items, i => i.id !== occ.id)
+  if (!items) {
+    const next = new Map(data.entries)
+    next.delete(occ.entryKey)
+    return { ...data, entries: next }
+  }
   return { ...data, entries: withEntry(data.entries, { ...entry, items }) }
 }
 
@@ -839,7 +903,7 @@ export function deleteByEntryKey(
  * The whole of a move, as far as the domain is concerned: an entry's vault
  * lives in its key, so moving it between vaults is re-keying it and nothing
  * else. The root's `vaultId`/`fileSlug` are re-derived from `toKey` (never
- * copied from the old root) for the same reason `updateRoot` does it — the
+ * copied from the old root) for the same reason `editedEntry` does it — the
  * root's provenance and the map key must be incapable of disagreeing. Every
  * other field, including `extra` and `fileConvention`, is carried over
  * verbatim: a move is not an edit of the file's contents.
@@ -859,7 +923,7 @@ export function moveEntryKey(data: StoreData, fromKey: EntryKey, toKey: EntryKey
   next.set(toKey, {
     key:   toKey,
     root:  { ...entry.root, ...parseEntryKey(toKey) },
-    items: entry.items.map(i => ({ ...i, entryKey: toKey })),
+    items: mapItems(entry.items, i => ({ ...i, entryKey: toKey })),
   })
   return { ...data, entries: next }
 }
@@ -925,7 +989,7 @@ export function deleteFollowing(data: StoreData, occ: Occurrence): StoreData {
   const occDate = occ.date
   return {
     ...data,
-    entries: withEntry(data.entries, { ...entry, items: entry.items.map(i => {
+    entries: withEntry(data.entries, { ...entry, items: mapItems(entry.items, i => {
       if (i.id === series.id) {
         return { ...i as RepeatPattern<OccurrenceMetadata>,
           repeat: { ...(i as RepeatPattern<OccurrenceMetadata>).repeat,

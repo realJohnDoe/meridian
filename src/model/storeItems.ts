@@ -243,7 +243,20 @@ export function parseToStoreItems(path: string, content: string, vaultId: string
   const { rawNode, body, convention } = loadFile(path, content)
   const entryKey = pathToKey(vaultId, path)
   const tree = buildEffectiveTree(rawNode)
-  const items = effectiveNodeToStoreItems(tree, entryKey)
+  const [first, ...rest] = effectiveNodeToStoreItems(tree, entryKey)
+  // The narrowing that makes `Entry['items']` non-empty, and it is total rather
+  // than a fallback: a node becomes an item when it repeats, carries a date, or
+  // has no `instances` of its own, and that last clause catches every otherwise
+  // empty shape — an empty file, a bare `title:`, `instances: []`, `instances:`
+  // null, all-excluded children, nested empty containers, a body-only file.
+  //
+  // Nothing readable reaches this throw. What does reach it would be a file
+  // Meridian cannot represent, and it lands where every such file already
+  // lands: the caller's catch, which records it in `unreadableFiles` — holding
+  // neither a root nor items, and so consistent with the invariant rather than
+  // a hole in it. Synthesizing a placeholder item instead would put the entry
+  // back in the store as something the user never wrote.
+  if (!first) throw new Error(`${path}: frontmatter describes no occurrence`)
   // vaultId/fileSlug/fileConvention are the caller's to supply — `buildRoot`
   // returns `FileFields`, so leaving any of them out is a compile error rather
   // than a root that silently forgot which vault it came from.
@@ -253,7 +266,7 @@ export function parseToStoreItems(path: string, content: string, vaultId: string
     fileSlug: pathToSlug(path),
     fileConvention: convention,
   }
-  return { key: entryKey, root, items }
+  return { key: entryKey, root, items: [first, ...rest] }
 }
 
 /**

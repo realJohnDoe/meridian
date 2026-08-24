@@ -100,7 +100,7 @@ describe('vault-qualified entry identity', () => {
     expect(affectedKeys).toEqual([])
   })
 
-  // Regression guard for the whole point of the carry-forward in `updateRoot`:
+  // Regression guard for the whole point of the carry-forward in `editedEntry`:
   // rebuilding FileMetadata from EditFields would otherwise leave the root with
   // no vault, and wikilink resolution and routing would fall back to the wrong one.
   it('an edit preserves vaultId/fileSlug on the root it rewrites', () => {
@@ -112,7 +112,7 @@ describe('vault-qualified entry identity', () => {
     const root = rootsIn(next).get(entryKey(PERSONAL, 'weekly-review'))!
     expect(root.vaultId).toBe(PERSONAL)
     expect(root.fileSlug).toBe('weekly-review')
-    // ...and everything else `updateRoot` carries forward still rides along.
+    // ...and everything else `editedEntry` carries forward still rides along.
     expect(root.fileConvention).toEqual(rootsIn(data).get(entryKey(PERSONAL, 'weekly-review'))!.fileConvention)
   })
 
@@ -126,9 +126,10 @@ describe('vault-qualified entry identity', () => {
   })
 
   it('never writes vaultId or fileSlug back to the file', () => {
-    const { items, roots } = twoVaultsFlat()
+    const data = twoVaults()
     const key = entryKey(WORK, 'weekly-review')
-    const yaml = collapseToYaml(items.filter(i => i.entryKey === key), roots.get(key))
+    const entry = data.entries.get(key)!
+    const yaml = collapseToYaml(entry.items, entry.root)
     expect(yaml).not.toHaveProperty('vaultId')
     expect(yaml).not.toHaveProperty('fileSlug')
     // Belt and braces: nothing nested carries them either.

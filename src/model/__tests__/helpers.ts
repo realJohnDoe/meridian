@@ -52,17 +52,41 @@ export function rootsOf(...roots: FileMetadata[]): Roots {
  */
 export function dataOf(items: StoreItem[], roots: Roots = new Map()): StoreData {
   const entries: Entries = new Map()
-  for (const [key, root] of roots) entries.set(key, { key, root, items: [] })
   for (const item of items) {
-    let entry = entries.get(item.entryKey)
-    if (!entry) {
+    const entry = entries.get(item.entryKey)
+    if (entry) entry.items.push(item)
+    else {
       const { vaultId, fileSlug } = parseEntryKey(item.entryKey)
-      entry = { key: item.entryKey, root: { title: '', tags: [], items: [], vaultId, fileSlug }, items: [] }
-      entries.set(item.entryKey, entry)
+      entries.set(item.entryKey, {
+        key: item.entryKey,
+        root: { title: '', tags: [], items: [], vaultId, fileSlug },
+        items: [item],
+      })
     }
-    entry.items.push(item)
+  }
+  // Roots second, so a key that has items keeps them and only gains its real
+  // root. A root with no items is dropped rather than becoming an entry:
+  // `Entry['items']` is non-empty, so there is no such entry to build. A test
+  // that wants to describe one is describing a state the store cannot hold.
+  for (const [key, root] of roots) {
+    const entry = entries.get(key)
+    if (entry) entries.set(key, { ...entry, root })
   }
   return { entries }
+}
+
+/** One entry of a snapshot as the bytes of its file. */
+export function serializeKey(data: StoreData, key: EntryKey): string {
+  const entry = data.entries.get(key)
+  if (!entry) throw new Error(`no entry at ${key}`)
+  return serialize(entry.items, entry.root)
+}
+
+/** The same, for a snapshot holding exactly one entry. */
+export function serializeOnly(data: StoreData): string {
+  const [entry] = [...data.entries.values()]
+  if (!entry) throw new Error('snapshot holds no entry')
+  return serialize(entry.items, entry.root)
 }
 
 /** The one entry `key` names, for asserting on what an operation produced. */
@@ -111,6 +135,7 @@ export function parseFixture(name: string): ParseResult {
  * diverge without any test noticing.
  */
 export { serializeEntry as serialize } from '@/model'
+import { serializeEntry as serialize } from '@/model'
 
 
 /** Parsed frontmatter of a file's raw content. */

@@ -325,3 +325,5 @@ asserts none of these have come back.
 | `activeVaultId` | `defaultVaultId` (plus the view filter and per-vault sync) |
 | `participantFilter` | `hiddenParticipants` (inverted: hidden, not shown) |
 | `needsReconnect` | `needsAttention` (a typed reason, not a boolean) |
+| `updateRoot` | `editedEntry` (takes the entry's occurrences too, so a root can't be updated alone) |
+| `rootOnlyOccurrence` | removed — `Entry['items']` is non-empty, so `fileOccurrenceMap` is total by construction |

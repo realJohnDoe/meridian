@@ -100,12 +100,17 @@ const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
     editFields(occOn(itemsOf(d), rootsIn(d), ANCHOR), { title: 'A brand new entry' }), NEW_TARGET),
   // Patched with the SERIES' metadata, which is what applySingle does — the
   // shape that can clobber the target's own bag.
-  upsertOverride: d => dataOf(
-    storeOps.upsertOverride(itemsOf(d), occOn(itemsOf(d), rootsIn(d), DIVERGING), {
-      metadata: storeOps.occFromAppMeta(occOn(itemsOf(d), rootsIn(d), ANCHOR).metadata),
-    }),
-    rootsIn(d),
-  ),
+  upsertOverride: d => {
+    // `upsertOverride` takes one entry's occurrences now, not the whole store's.
+    const [entry] = [...d.entries.values()]
+    if (!entry) throw new Error('fixture has no entry')
+    return dataOf(
+      storeOps.upsertOverride(entry.items, occOn(itemsOf(d), rootsIn(d), DIVERGING), {
+        metadata: storeOps.occFromAppMeta(occOn(itemsOf(d), rootsIn(d), ANCHOR).metadata),
+      }),
+      rootsIn(d),
+    )
+  },
   toggleDone: d => storeOps.toggleDone(d, occOn(itemsOf(d), rootsIn(d), DIVERGING)),
   'toggleDone/generated': d => storeOps.toggleDone(d, occOn(itemsOf(d), rootsIn(d), GENERATED)),
   excludeOccurrence: d => storeOps.excludeOccurrence(d, occOn(itemsOf(d), rootsIn(d), GENERATED)),
@@ -145,7 +150,7 @@ describe('unknown keys survive every store operation', () => {
 
   // Same operations against a CONTAINER-rooted file, where the unknown keys are
   // owned by FileMetadata rather than by an item — a different code path
-  // (updateRoot) with its own way to drop them. The fixture's first series is
+  // (editedEntry) with its own way to drop them. The fixture's first series is
   // weekly-Monday from 2026-04-01, so it has occurrences on the same dates.
   it.each(Object.keys(OPERATIONS))('%s preserves a container root\'s extras', (name) => {
     const before = fixtureData('unknown-keys-container')
