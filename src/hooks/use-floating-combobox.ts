@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { computeFloatingPlacement, type FloatingPlacement } from '@/lib/floatingPlacement'
 import { findScrollParent } from '@/lib/scrollParent'
-import { useVisualViewportHeight, useVisualViewportOffsetTop } from './use-visual-viewport'
+import { useVisibleViewport } from './use-visual-viewport'
 
 export type FloatingComboboxPlacement = FloatingPlacement
 
@@ -17,8 +17,7 @@ export function useFloatingCombobox(open: boolean, onOpenChange: (open: boolean)
   const [rawPlacement, setPlacement] = useState<FloatingComboboxPlacement | null>(null)
   const scrolledRef = useRef(false)
 
-  const viewportHeight    = useVisualViewportHeight()
-  const viewportOffsetTop = useVisualViewportOffsetTop()
+  const visible = useVisibleViewport()
 
   useEffect(() => {
     if (!open) {
@@ -30,8 +29,8 @@ export function useFloatingCombobox(open: boolean, onOpenChange: (open: boolean)
       const el = anchorRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
-      const visibleTop    = viewportOffsetTop ?? 0
-      const visibleBottom = visibleTop + (viewportHeight ?? window.innerHeight)
+      const visibleTop    = visible.top
+      const visibleBottom = visibleTop + visible.height
       const placement = computeFloatingPlacement(rect, {
         visibleTop,
         visibleBottom,
@@ -65,7 +64,7 @@ export function useFloatingCombobox(open: boolean, onOpenChange: (open: boolean)
       vv?.removeEventListener('resize', recompute)
       vv?.removeEventListener('scroll', recompute)
     }
-  }, [open, viewportHeight, viewportOffsetTop])
+  }, [open, visible])
 
   useEffect(() => {
     if (!open) return

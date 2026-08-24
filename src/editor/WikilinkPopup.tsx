@@ -4,7 +4,7 @@ import type { EditorView } from '@codemirror/view'
 import type { Roots } from '@/types'
 import { OccurrenceCard } from '@/components'
 import { fileEntries } from '@/fileOccurrence'
-import { useResetOnChange, useVisualViewportHeight, useVisualViewportOffsetTop, useFileOccurrenceMap } from '@/hooks'
+import { useResetOnChange, useVisibleViewport, useFileOccurrenceMap } from '@/hooks'
 import { computeFloatingPlacement } from '@/lib/floatingPlacement'
 import { cn } from '@/lib/cn'
 
@@ -91,12 +91,11 @@ export default function WikilinkPopup({ popup, roots, vaultId, view, onClose }: 
   // flip above when there isn't room, and clamp width/height to the
   // viewport. Same placement math as useFloatingCombobox (@/lib/floatingPlacement),
   // anchored to a point (the cursor coords) instead of an element's rect.
-  const viewportHeight    = useVisualViewportHeight()
-  const viewportOffsetTop = useVisualViewportOffsetTop()
-  const visibleTop = viewportOffsetTop ?? 0
+  const visible = useVisibleViewport()
+  const visibleTop = visible.top
   const placement = computeFloatingPlacement(popup.coords, {
     visibleTop,
-    visibleBottom: visibleTop + (viewportHeight ?? window.innerHeight),
+    visibleBottom: visibleTop + visible.height,
     innerWidth:  window.innerWidth,
     innerHeight: window.innerHeight,
   })

@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { fmtISO } from '@/model'
+import { useVisibleViewportCssVars } from '@/hooks'
 import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush } from '@/storage'
 import { requestScrollToToday, setCurrentDate } from '@/calendar'
 import { Toaster } from '@/components/ui/sonner'
@@ -145,6 +146,16 @@ function ThemeColorSync() {
   return null
 }
 
+/**
+ * Publishes --vv-top/--vv-height/--kb-inset on <html>, once for the whole app.
+ * Mounted here rather than per-consumer so every keyboard-aware surface reads
+ * one measurement taken by one subscriber; see hooks/use-visual-viewport.ts.
+ */
+function VisibleViewportVars() {
+  useVisibleViewportCssVars()
+  return null
+}
+
 function Root() {
   // Tracks the calendar day the app was last known to be on, so a resume
   // after a multi-day background suspend (mobile PWAs freeze timers rather
@@ -203,6 +214,7 @@ function Root() {
       storageKey="meridian_theme"
     >
       <ThemeColorSync />
+      <VisibleViewportVars />
       <div id="app" className="flex flex-col">
         <Outlet />
       </div>

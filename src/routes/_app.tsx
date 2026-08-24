@@ -3,7 +3,7 @@ import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-
 import { Menu, CalendarCheck2 } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth, weekStartsOn } from '@/model'
-import { useToday } from '@/hooks'
+import { useToday, useShellMode } from '@/hooks'
 import { useStore } from '@/store'
 import { onVaultChanged } from '@/storage'
 import {
@@ -30,6 +30,7 @@ function AppLayout() {
   return (
     <SidebarProvider
       className="flex-1 min-h-0 overflow-hidden"
+      data-shell-pane
       style={{ '--sidebar-width': '260px' } as React.CSSProperties}
     >
       <AppSidebar />
@@ -88,6 +89,12 @@ function AppMain() {
   const ws            = weekStartsOn(useStore(s => s.localePrefs))
 
   const isEntryView  = !!entryMatch || !!entryLegacyMatch || !!entryNewMatch
+
+  // The entry routes are the only ones with a text input inside a scrolling
+  // pane, and the only ones with no virtualizer — so they get the flow shell,
+  // where the browser scrolls a focused input above the keyboard itself. Every
+  // other route keeps the fixed shell the virtualizers require.
+  useShellMode(isEntryView ? 'flow' : 'fixed')
   const isDayView    = !!dayMatch
   const isWeekView   = !!weekMatch
   const isMonthView  = !!monthMatch
@@ -139,10 +146,11 @@ function AppMain() {
 
   return (
     <TopbarSlotContext value={slotEl}>
-      <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden">
+      <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden" data-shell-pane>
         <header
           id="mainTop"
           className="h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10 shadow-md"
+          data-shell-topbar
         >
           {isEntryView ? (
             // Portal target — entry route injects topbar controls here via createPortal
@@ -222,7 +230,7 @@ function AppMain() {
           )}
         </header>
 
-        <section className="flex flex-1 flex-col overflow-hidden min-h-0">
+        <section className="flex flex-1 flex-col overflow-hidden min-h-0" data-shell-pane>
           <Outlet />
         </section>
 

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { cn } from '@/lib/cn'
-import { useVisualViewportHeight } from '@/hooks'
+import { useKeyboardInset } from '@/hooks'
 
 const Popover = PopoverPrimitive.Root
 const PopoverTrigger = PopoverPrimitive.Trigger
@@ -16,28 +16,19 @@ function PopoverContent({
   // where the trigger is usually near an edge to begin with. 14px matches the
   // screen edge (AgendaRow's mx-3.5) the rest of the app sits on.
   collisionPadding = 14,
-  style,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
-  // Same iOS/iPadOS keyboard issue as dialog.tsx: cap against the visual viewport,
-  // not just Radix's own collision detection, so the combobox never renders taller
-  // than what's actually visible above the keyboard.
-  const viewportHeight = useVisualViewportHeight()
-
-  // The on-screen keyboard shrinks the *visual* viewport but not the *layout*
-  // viewport that Radix's collision detection measures against — so by default a
-  // popover anchored to a low trigger opens straight into the keyboard. Feed the
-  // keyboard-covered strip in as bottom collision padding so Radix flips the
-  // popover above the trigger instead. The input lives at the top of the
-  // Command, so a flipped-up popover keeps it in the visible band.
+  // The one part of the keyboard correction that CSS cannot express, and so the
+  // only reason this file still diverges from the shadcn registry: Radix measures
+  // collisions against the *layout* viewport, which an on-screen keyboard does not
+  // shrink, so a popover anchored to a low trigger opens straight into the
+  // keyboard. Feeding the covered strip in as bottom collision padding makes Radix
+  // flip it above the trigger instead — and the Command's input sits at the top of
+  // the popover, so a flipped-up one keeps that input in the visible band.
   //
-  // The 120px floor distinguishes a real keyboard from the small viewport/layout
-  // delta desktop browsers show (scrollbars, chrome) so those don't add padding.
-  const rawInset =
-    viewportHeight != null && typeof window !== 'undefined'
-      ? window.innerHeight - viewportHeight
-      : 0
-  const keyboardInset = rawInset > 120 ? rawInset : 0
+  // Height capping needs no JS: --vv-height (published by useVisibleViewportCssVars)
+  // already tracks the visible strip, so the max-h utility below handles it.
+  const keyboardInset = useKeyboardInset()
   const resolvedCollisionPadding =
     keyboardInset > 0 ? { top: 14, bottom: keyboardInset + 14, left: 14, right: 14 } : collisionPadding
 
@@ -47,11 +38,8 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         collisionPadding={resolvedCollisionPadding}
-        style={{
-          ...(viewportHeight != null ? { maxHeight: `calc(${viewportHeight}px - 2rem)` } : {}),
-          ...style,
-        }}
         className={cn(
+          'max-h-[calc(var(--vv-height,100svh)-2rem)]',
           'z-50 w-72 rounded-lg border border-input bg-popover p-0 shadow-lg overflow-y-auto',
           'outline-none data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',

@@ -304,6 +304,20 @@ load-bearing for coverage, knip, and `shadcn diff`; see CLAUDE.md's *Directory
 structure* for what each exemption keys off.
 → `components/primitives/responsive-modal.tsx` · `ResponsiveModal`
 
+### visible viewport
+The strip of the layout viewport not covered by an on-screen keyboard — `top`,
+`height`, and the `keyboardInset` the keyboard eats. The one measurement every
+keyboard-aware surface reads, reconciling three incompatible platform APIs.
+→ `hooks/use-visual-viewport.ts` · `useVisibleViewport`, `useKeyboardInset`, `readVisibleViewport`
+
+### fixed shell vs flow shell
+The two whole-app layout modes, selected by `data-shell` on `<html>`. **Fixed**
+(default) caps the document at one screen and gives each pane its own scroller —
+what the virtualized calendar routes require. **Flow** lets the document scroll,
+so the browser itself lifts a focused input above the keyboard; entry routes
+only, since they mount no virtualizer.
+→ `hooks/use-shell-mode.ts` · `useShellMode`, `ShellMode`
+
 ## Retired names
 
 Renamed or removed. Listed so a stale doc, an old commit message, or a
@@ -320,3 +334,4 @@ asserts none of these have come back.
 | `activeVaultId` | `defaultVaultId` (plus the view filter and per-vault sync) |
 | `participantFilter` | `hiddenParticipants` (inverted: hidden, not shown) |
 | `needsReconnect` | `needsAttention` (a typed reason, not a boolean) |
+| `useVisualViewportHeight` / `useVisualViewportOffsetTop` | `useVisibleViewport` (one snapshot, with the Firefox-Android fallback) |
