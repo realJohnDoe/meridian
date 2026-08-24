@@ -180,6 +180,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
               {PRESETS.map(p => (
                 <button
                   key={p.value}
+                  type="button"
                   className={cn(
                     badgeVariants({ variant: 'chip' }),
                     'cursor-pointer',
@@ -212,6 +213,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
             <div className="space-y-2">
               <div className="flex gap-2">
                 <button
+                  type="button"
                   className="flex-1 flex items-center justify-between bg-background border border-border/50 hover:border-border focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-normal text-foreground transition-colors"
                   onClick={() => setDateDlgOpen(true)}
                 >
@@ -223,6 +225,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
 
                 {hasTime && isTouch && (
                   <button
+                    type="button"
                     className="bg-background border border-border/50 hover:border-border focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors"
                     onClick={() => setTimeDlgOpen(true)}
                   >

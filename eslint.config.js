@@ -156,6 +156,10 @@ export default [
       '@eslint-react/no-forward-ref': 'error',
       '@eslint-react/no-use-context': 'error',
       '@eslint-react/no-context-provider': 'error',
+      // An unqualified <button> defaults to type="submit"; inside a <form>
+      // that silently submits and reloads the page. No <form> exists today,
+      // but the failure mode is only latent, not absent.
+      '@eslint-react/dom-no-missing-button-type': 'error',
 
       // ── TypeScript ───────────────────────────────────────────────────────────
       // Full type-checked rule set (await-thenable, no-unsafe-*,

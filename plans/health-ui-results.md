@@ -107,7 +107,7 @@ directory was skipped.
 | 4 | Security (UI-facing) | no open findings |
 | 5 | Code Health & DRY | **findings: #6** |
 | 6 | React Performance | no open findings |
-| 7 | UI Toolchain & Feedback Loops | **findings: #8** |
+| 7 | UI Toolchain & Feedback Loops | no open findings |
 | 8 | UI Dependencies & Library Fit | **findings: #3** — plus three explicit keep-custom verdicts, below |
 
 **Category 8 — keep-custom verdicts (status quo is correct):**
@@ -133,14 +133,9 @@ directory was skipped.
 |---|---|---|---|---|---|
 | 3 | Two hand-rolled overlays with no focus trap | `a11y` `library-fit` | 6 | 2 files | **Opus 5** |
 | 6 | DayPane/WeekPane share a copy-pasted timeline scaffold | `dry` `component-architecture` | 5 | 2 files | **Opus 5** |
-| 8 | 24 raw `<button>`s with no `type` attribute | `toolchain` `code-health` | 2 | 11 files | **Haiku 4.5** |
 
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
 and breadth reported separately so the list can be re-sorted.
-
-**Sequencing note:** #3 and #8 both touch `CoachTour.tsx`; #3 subsumes #8's
-fix there, so do #3 first or accept one trivial rebase. All others are
-independent.
 
 ---
 
@@ -268,47 +263,6 @@ all-day strips alone — they are legitimately different.
 
 ---
 
-### Finding #8 — 24 raw `<button>`s with no `type` attribute
-
-- **Category:** `toolchain` `code-health`
-- **Impact:** 2
-- **Breadth:** 11 non-test files, 24 sites. Counted by dry-running
-  `@eslint-react/dom-no-missing-button-type`.
-- **Recommended model:** **Haiku 4.5.** Purely additive (`type="button"`), and
-  the failure mode is loud: the accompanying lint rule fails the build if a site
-  is missed. No hazard beyond not skipping `src/debug/`.
-
-**Evidence** — dry-run of `@eslint-react/dom-no-missing-button-type` (a rule the
-installed `@eslint-react/eslint-plugin@5.17.3` ships in its `all` preset but
-which `recommended-type-checked` does not enable) reports 24 errors across:
-`components/AddVaultWizard.tsx`, `components/SettingsDialog.tsx`,
-`components/SyncButton.tsx`, `components/ViewFilterButton.tsx`,
-`editor/EntryEditor.tsx`, `editor/dialogs/DurationDialog.tsx`,
-`editor/dialogs/PriorityDrawer.tsx`, `editor/dialogs/RepeatDialog.tsx`,
-`onboarding/CoachTour.tsx`, `routes/auth.callback.tsx`, and
-`debug/NodeInheritanceDebugger.tsx`.
-
-For example `src/editor/EntryEditor.tsx:41`:
-
-```
-    <button className={cn(badgeVariants({ variant: 'chip' }), className)} aria-pressed={pressed} onClick={onClick}>
-```
-
-**Problem:** This is **latent, not live** — I checked, and `grep -rn '<form'`
-across `src` returns nothing, so today every one of these defaults to
-`type="submit"` with no form to submit and behaves correctly. It is on the list
-because the day someone adds a `<form>` (the `AddVaultWizard` and
-`auth.callback` flows are the obvious candidates), every unqualified button
-inside it silently becomes a submit button that reloads the page. Impact 2
-reflects that it costs nothing today; the breadth and the free enforcement are
-why it still earns a slot.
-
-**Fix:** Add `type="button"` at the 24 sites and enable
-`'@eslint-react/dom-no-missing-button-type': 'error'` in `eslint.config.js`
-alongside the other individually-enabled `@eslint-react` rules.
-
----
-
 ## Appendix — toolchain rules evaluated and *not* recommended
 
 Per the survey's instruction to verify capability claims by inspection rather
@@ -338,8 +292,9 @@ than memory, and to evaluate rather than reflexively recommend:
   `preserve-manual-memoization` and `static-components`. **The comment is
   accurate.**
 - **`@eslint-react` unenabled rules** — of the 17 in `all` but not in
-  `recommended-type-checked`, only `dom-no-missing-button-type` (finding #8) and
-  `jsx-no-useless-fragment` (1 hit, `CoachTour.tsx:108`) fire at all.
+  `recommended-type-checked`, `dom-no-missing-button-type` has since been
+  enabled (formerly finding #8), and `jsx-no-useless-fragment` (1 hit,
+  `CoachTour.tsx:108`) is the only other one that fires.
   `dom-no-unsafe-target-blank` reports **0** — it accepts `rel="noreferrer"`,
   which is why it does not catch finding #5. Worth stating plainly: **no
   available lint rule catches finding #5**; it needs the code fix.

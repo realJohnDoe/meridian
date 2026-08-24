@@ -4,7 +4,7 @@ import { buildResolveIndex, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc } from './types'
 import { occKind } from './occView'
 import { onIdle } from '@/lib/idle'
-import type { Occurrence, StoreItem, Roots } from './types'
+import type { Occurrence, StoreItem, Roots, Entries } from './types'
 import type { EntryKey } from './fileIO'
 
 /**
@@ -127,56 +127,31 @@ function resolveOneKey(
  * least one item (`Entry['items']` is non-empty), so `resolveOneKey` can always
  * speak for it. A `.get()` miss is therefore a defect rather than an absence.
  *
- * Re-resolves only entries whose items group or root entry actually changed.
- * An entry is reusable when:
- *   - its items group has the same length and the same element references, AND
- *   - prevRoots.get(key) === roots.get(key)  (reference equality)
- *
- * Mutation helpers (upsertOverride, editedEntry, …) create new object references
- * only for the touched key(s), so reference checks correctly identify exactly
- * what changed without deep comparison.
+ * Re-resolves only entries whose `Entry` object actually changed — reusable
+ * when `prevEntries.get(key) === entries.get(key)` (reference equality). An
+ * entry is one object, so that single check covers both halves at once:
+ * `withEntry`/`editedEntry` (model/storeOps.ts) create a new `Entry` reference
+ * for a key whenever either its root or its items change, and leave every
+ * other key's reference untouched.
  */
 export function updateFileOccurrenceMap(
-  prevFom:   Map<EntryKey, Occurrence>,
-  prevItems: StoreItem[],
-  prevRoots: Roots,
-  items:     StoreItem[],
-  roots:     Roots,
+  prevFom:     Map<EntryKey, Occurrence>,
+  prevEntries: Entries,
+  entries:     Entries,
+  roots:       Roots,
 ): Map<EntryKey, Occurrence> {
   const now   = startOfToday()
   const AHEAD = new Date(now.getTime() + _3YR_MS)
   const BACK  = new Date(now.getTime() - _3YR_MS)
 
-  // Group previous items by key for reference comparison.
-  const prevByKey = new Map<EntryKey, StoreItem[]>()
-  for (const item of prevItems) {
-    let group = prevByKey.get(item.entryKey)
-    if (!group) { group = []; prevByKey.set(item.entryKey, group) }
-    group.push(item)
-  }
-
-  // Group new items by key and build the updated map.
-  const newByKey = new Map<EntryKey, StoreItem[]>()
-  for (const item of items) {
-    let group = newByKey.get(item.entryKey)
-    if (!group) { group = []; newByKey.set(item.entryKey, group) }
-    group.push(item)
-  }
-
   const map = new Map<EntryKey, Occurrence>()
-  for (const [key, keyItems] of newByKey) {
-    const prevGroup    = prevByKey.get(key)
-    const rootSame     = prevRoots.get(key) === roots.get(key)
-    const groupSame    = prevGroup !== undefined
-      && prevGroup.length === keyItems.length
-      && prevGroup.every((item, i) => item === keyItems[i])
-
-    if (rootSame && groupSame) {
+  for (const [key, entry] of entries) {
+    if (prevEntries.get(key) === entry) {
       const cached = prevFom.get(key)
       if (cached !== undefined) { map.set(key, cached); continue }
     }
 
-    const occ = resolveOneKey(key, keyItems, roots, now, AHEAD, BACK)
+    const occ = resolveOneKey(key, entry.items, roots, now, AHEAD, BACK)
     if (occ) map.set(key, occ)
   }
 
@@ -205,7 +180,7 @@ export function updateFileOccurrenceMap(
 // agenda. So the map is derived on demand instead, and merely *warmed* during
 // idle time so those consumers almost never pay for it either.
 
-interface FomMemo { items: StoreItem[]; roots: Roots; map: Map<EntryKey, Occurrence> }
+interface FomMemo { entries: Entries; roots: Roots; map: Map<EntryKey, Occurrence> }
 
 // A one-entry Map rather than a `let` or a mutable object field, because
 // `fileOccurrenceMap` is called during render (via useFileOccurrenceMap): the
@@ -215,45 +190,45 @@ interface FomMemo { items: StoreItem[]; roots: Roots; map: Map<EntryKey, Occurre
 const FOM_KEY = 'fom'
 const fomMemo = new Map<typeof FOM_KEY, FomMemo>()
 
-// Typed empties for the cold-start call below; a bare `new Map()` there infers
+// Typed empty for the cold-start call below; a bare `new Map()` there infers
 // Map<any, any> and trips the no-unsafe-argument rule.
-const NO_ITEMS: StoreItem[] = []
-const NO_ROOTS: Roots = new Map()
+const NO_ENTRIES: Entries = new Map()
 const NO_FOM: Map<EntryKey, Occurrence> = new Map()
 
 /**
- * The EntryKey → representative Occurrence map for `items`/`roots`, memoized on
- * their identity. Safe to call during render: repeating the call with the same
- * inputs returns the same Map by reference, so it behaves as a pure derivation.
+ * The EntryKey → representative Occurrence map for `entries`/`roots`, memoized
+ * on their identity. Safe to call during render: repeating the call with the
+ * same inputs returns the same Map by reference, so it behaves as a pure
+ * derivation.
  *
  * A miss still goes through `updateFileOccurrenceMap`, so it re-resolves only
  * the keys that actually changed since the last call — the incremental path is
  * unchanged, it just runs on read rather than on write.
  */
-export function fileOccurrenceMap(items: StoreItem[], roots: Roots): Map<EntryKey, Occurrence> {
+export function fileOccurrenceMap(entries: Entries, roots: Roots): Map<EntryKey, Occurrence> {
   const prev = fomMemo.get(FOM_KEY)
-  if (prev && prev.items === items && prev.roots === roots) return prev.map
+  if (prev && prev.entries === entries && prev.roots === roots) return prev.map
 
   const map = updateFileOccurrenceMap(
-    prev?.map ?? NO_FOM, prev?.items ?? NO_ITEMS, prev?.roots ?? NO_ROOTS, items, roots,
+    prev?.map ?? NO_FOM, prev?.entries ?? NO_ENTRIES, entries, roots,
   )
-  fomMemo.set(FOM_KEY, { items, roots, map })
+  fomMemo.set(FOM_KEY, { entries, roots, map })
   return map
 }
 
 let cancelWarm = (): void => {}
 
 /**
- * Pre-build the map for `items`/`roots` during idle time, so the first
+ * Pre-build the map for `entries`/`roots` during idle time, so the first
  * consumer to mount gets a memo hit instead of paying the full resolve inline.
  *
  * Called from `setData`. Re-entrant: a newer store write cancels the pending
  * warm-up rather than queueing a second one, so a burst of sync merges does the
  * work once, for the final state.
  */
-export function warmFileOccurrenceMap(items: StoreItem[], roots: Roots): void {
+export function warmFileOccurrenceMap(entries: Entries, roots: Roots): void {
   cancelWarm()
-  cancelWarm = onIdle(() => { fileOccurrenceMap(items, roots) })
+  cancelWarm = onIdle(() => { fileOccurrenceMap(entries, roots) })
 }
 
 /**

@@ -38,7 +38,7 @@ function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   className?: string
 }) {
   return (
-    <button className={cn(badgeVariants({ variant: 'chip' }), className)} aria-pressed={pressed} onClick={onClick}>
+    <button type="button" className={cn(badgeVariants({ variant: 'chip' }), className)} aria-pressed={pressed} onClick={onClick}>
       <Icon size={13} />{label}
       {value && <span className="text-2xs font-mono opacity-80 ml-px">{value}</span>}
     </button>

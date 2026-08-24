@@ -18,7 +18,7 @@ function Harness() {
   const { dialogHandlers, handleOpenRepeatDlg } = useEntryDialogs(ENTRY, vi.fn())
   return (
     <>
-      <button onClick={() => handleOpenRepeatDlg()}>open repeat</button>
+      <button type="button" onClick={() => handleOpenRepeatDlg()}>open repeat</button>
       <DialogStack entry={ENTRY} handlers={dialogHandlers} />
     </>
   )

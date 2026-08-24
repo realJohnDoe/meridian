@@ -154,8 +154,8 @@ export function vaultLayer(entries: Entries, vaultId: string): VaultLayer {
  * equality is not enough for any of them:
  *
  * - `setData` reuses the backlink index when `roots === prevRoots`;
- * - `fileOccurrenceMap` memoizes on `items`/`roots` identity, and its
- *   incremental path on `prevRoots.get(key) === roots.get(key)`;
+ * - `fileOccurrenceMap` memoizes on `entries`/`roots` identity, and its
+ *   incremental path on `prevEntries.get(key) === entries.get(key)`;
  * - `computeExpansionCache` overlays only items failing `item === prev.items[i]`;
  * - `useAgendaSections` caches on top of that.
  *
@@ -479,7 +479,7 @@ export const useStore = create<MeridianStore>((set, get) => {
     // Off the critical path on purpose — this is the expensive derived index,
     // and nothing painted at cold start reads it. Warming it during idle keeps
     // the editor/search consumers from paying for it on open either.
-    warmFileOccurrenceMap(items, roots)
+    warmFileOccurrenceMap(entries, roots)
   }
 
   return {

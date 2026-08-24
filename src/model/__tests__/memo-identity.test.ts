@@ -7,11 +7,12 @@
  *
  * Several caches downstream memoize on object identity rather than value
  * equality — `setData` reuses the backlink index when `roots === prevRoots`,
- * `fileOccurrenceMap` and `computeExpansionCache` overlay only items that fail
- * `item === prev.items[i]` (see the "Why the split is the problem" and PR 3's
- * hazard note in plans/entry-aggregate.md). A helper that rebuilds a fresh
- * array or Map on every call satisfies every type and every value-equality
- * assertion while turning all of those into full rebuilds on every keystroke.
+ * `fileOccurrenceMap` reuses a cached representative only when
+ * `prevEntries.get(key) === entries.get(key)`, and `computeExpansionCache`
+ * overlays only items that fail `item === prev.items[i]`. A helper that
+ * rebuilds a fresh array or Map on every call satisfies every type and every
+ * value-equality assertion while turning all of those into full rebuilds on
+ * every keystroke.
  *
  * `toEqual` cannot catch that regression — it passes against a full rebuild
  * just as happily as against a reused reference. These assertions are
