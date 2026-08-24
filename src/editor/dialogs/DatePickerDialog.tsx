@@ -80,6 +80,13 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
             onSelect={setSelected}
             month={month}
             onMonthChange={setMonth}
+            // react-day-picker formats weekday/caption text via date-fns with an
+            // enUS default locale — these override it to match the localized
+            // `toLocaleDateString` formatting used everywhere else in the app.
+            formatters={{
+              formatWeekdayName: (date) => date.toLocaleDateString(undefined, { weekday: 'short' }),
+              formatCaption: (date) => date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+            }}
             className="w-full [--cell-size:2.25rem] p-0"
           />
 

@@ -51,7 +51,13 @@ interface Props {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 // Display labels for `RepeatForm.wdays` — same Monday-first index order.
-const WDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+// Localized via Intl (Jan 6 2025 is a Monday); sliced to 2 chars to match the
+// toggle chips' narrow width — Intl's 'short' weekday is already 2 chars in
+// some locales (e.g. German "Mo", "Di") and 3 in others (e.g. English "Mon",
+// "Tue"), so slicing keeps a consistent width instead of an inconsistent one.
+const WDAY_LABELS = Array.from({ length: 7 }, (_, i) =>
+  new Date(2025, 0, 6 + i).toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 2)
+)
 
 const FREQ_UNITS: readonly ScheduleFreq[] = ['daily', 'weekly', 'monthly', 'yearly']
 const FREQ_UNIT_LABELS: Record<ScheduleFreq, string> = {
