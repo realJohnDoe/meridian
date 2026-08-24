@@ -79,12 +79,15 @@ interface AddChipProps {
  * "+ label" trigger button that opens an add-picker (participants, listed-on).
  * Same indigo chip look as the wikilink/topic chips (Badge variant="link"),
  * so the trigger reads as part of the same chip family it's about to add to.
+ * No min-height override: the pill look comes from the badge's fixed
+ * border-radius being close to half its *natural* height — forcing a taller
+ * box while keeping that radius fixed would flatten it into a rounded rect.
  */
 export function AddChip({ label, onClick }: AddChipProps) {
   return (
     <button
       type="button"
-      className={cn(badgeVariants({ variant: 'link' }), 'min-h-6 cursor-pointer gap-1')}
+      className={cn(badgeVariants({ variant: 'link' }), 'cursor-pointer gap-1')}
       onClick={onClick}
     >
       <Plus size={9} />
