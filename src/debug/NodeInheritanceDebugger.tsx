@@ -13,9 +13,8 @@ import {
   saveFile,
 } from '@/model'
 import { loadFile, entryKey as makeEntryKey } from '@/fileIO'
-import type { EntryKey } from '@/fileIO'
 import { cn } from '@/lib/cn'
-import type { Occurrence, Repeat as RepeatType, StoreItem, Roots, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern, OccurrenceMetadata } from '@/types'
+import type { Occurrence, Repeat as RepeatType, StoreItem, Roots, Entries, FileMetadata, EditScope, OccurrenceEntry, RepeatPattern, OccurrenceMetadata } from '@/types'
 import { EntryEditor, RepeatDialog, applyScope, entryFromOccurrence, usePendingLinks } from '@/editor'
 import type { EntryState, DialogHandlers, EntryEditorHooks } from '@/editor'
 
@@ -33,13 +32,20 @@ function defaultEndDate(): string {
 const DEBUG_VAULT_ID  = 'debug'
 const DEBUG_FILE_SLUG = 'debug-node'
 const DEBUG_KEY       = makeEntryKey(DEBUG_VAULT_ID, DEBUG_FILE_SLUG)
+/** Stands in until a file is parsed, so the debugger's one entry is always whole. */
+const EMPTY_DEBUG_ROOT: FileMetadata = {
+  title: '', tags: [], items: [], vaultId: DEBUG_VAULT_ID, fileSlug: DEBUG_FILE_SLUG,
+}
 
 /**
  * Serialize items back to YAML content string (same path as writeEntityToCache).
  */
 function itemsToYaml(items: StoreItem[], root: FileMetadata | undefined, body: string): string {
-  if (items.length === 0) return ''
-  const frontmatter = collapseToYaml(items, root)
+  // The debugger's list is empty until a file is parsed. That guard was always
+  // here; it now also does the narrowing `collapseToYaml` needs.
+  const [head, ...tail] = items
+  if (!head) return ''
+  const frontmatter = collapseToYaml([head, ...tail], root)
   return saveFile(frontmatter, body, root?.fileConvention)
 }
 
@@ -321,7 +327,19 @@ export default function NodeInheritanceDebugger() {
   const [parseErrors,     setParseErrors]     = useState<string[]>([])
   const [items,           setItems]           = useState<StoreItem[]>([])
   const [debugRoot,       setDebugRoot]       = useState<FileMetadata | undefined>(undefined)
-  const debugRoots = useMemo<Roots>(() => debugRoot ? new Map([[DEBUG_KEY, debugRoot]]) : new Map<EntryKey, FileMetadata>(), [debugRoot])
+  // The debugger drives storeOps against a single synthetic entry, so it packs
+  // its local item list and root into `Entries` on the way in and unpacks the
+  // one entry on the way out.
+  // Empty until a file is parsed, and `Entry['items']` is non-empty — so an
+  // unparsed debugger has no entry at all, which is the same answer the store
+  // gives for a file that has not been read yet.
+  const debugEntries = useMemo<Entries>(() => {
+    const [head, ...tail] = items
+    if (!head) return new Map()
+    return new Map([[DEBUG_KEY, { key: DEBUG_KEY, root: debugRoot ?? EMPTY_DEBUG_ROOT, items: [head, ...tail] }]])
+  }, [debugRoot, items])
+  /** The flat view `expandRange` and `EntryEditor` still take. */
+  const debugRoots = useMemo<Roots>(() => new Map([[DEBUG_KEY, debugRoot ?? EMPTY_DEBUG_ROOT]]), [debugRoot])
   const [expandEndDate,   setExpandEndDate]   = useState<string>(defaultEndDate)
   const [selectedIdx,     setSelectedIdx]     = useState<number | null>(null)
   const [activeAction,    setActiveAction]    = useState<ActionKind | null>(null)
@@ -456,9 +474,10 @@ export default function NodeInheritanceDebugger() {
       duration: duration || '',
       repeat:   repeat ?? null,
     }
-    const next = applyEdit({ items, roots: debugRoots }, selectedOcc, editScope, fields, { vaultId: DEBUG_VAULT_ID })
-    applyItems(next.items, next.roots.get(DEBUG_KEY), body)
-  }, [debugEntry, selectedOcc, items, debugRoots, applyItems])
+    const next = applyEdit({ entries: debugEntries }, selectedOcc, editScope, fields, { vaultId: DEBUG_VAULT_ID })
+    const entry = next.entries.get(DEBUG_KEY)
+    applyItems(entry?.items ?? [], entry?.root, body)
+  }, [debugEntry, selectedOcc, debugEntries, applyItems])
 
   const handleDebugScopeChange = useCallback((scope: EditScope) => {
     setDebugEntry(prev => {
@@ -677,10 +696,13 @@ export default function NodeInheritanceDebugger() {
                   {activeAction === 'edit-occurrence' && (
                     <EditOccurrenceForm occ={selectedOcc}
                       onApply={(date, time, done) => {
-                        const next = upsertOverride(items, selectedOcc, {
-                          date, time: time || null,
-                          metadata: { ...selectedOcc.metadata, done },
-                        })
+                        const entry = debugEntries.get(DEBUG_KEY)
+                        const next = entry
+                          ? upsertOverride(entry.items, selectedOcc, {
+                            date, time: time || null,
+                            metadata: { ...selectedOcc.metadata, done },
+                          })
+                          : items
                         applyItems(next, debugRoot, debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
@@ -689,8 +711,9 @@ export default function NodeInheritanceDebugger() {
                   {activeAction === 'edit-following' && (
                     <EditFollowingForm occ={selectedOcc}
                       onApply={() => {
-                        const next = deleteFollowing({ items, roots: debugRoots }, selectedOcc)
-                        applyItems(next.items, next.roots.get(DEBUG_KEY), debugRoot?.body ?? '')
+                        const next = deleteFollowing({ entries: debugEntries }, selectedOcc)
+                        const entry = next.entries.get(DEBUG_KEY)
+                        applyItems(entry?.items ?? [], entry?.root, debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -700,8 +723,9 @@ export default function NodeInheritanceDebugger() {
                       message={selectedOcc.source === 'generated' ? `Mark ${selectedOcc.date} as excluded.` : `Remove explicit instance on ${selectedOcc.date}.`}
                       label="Delete occurrence"
                       onApply={() => {
-                        const next = excludeOccurrence({ items, roots: debugRoots }, selectedOcc)
-                        applyItems(next.items, next.roots.get(DEBUG_KEY), debugRoot?.body ?? '')
+                        const next = excludeOccurrence({ entries: debugEntries }, selectedOcc)
+                        const entry = next.entries.get(DEBUG_KEY)
+                        applyItems(entry?.items ?? [], entry?.root, debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />
@@ -711,8 +735,9 @@ export default function NodeInheritanceDebugger() {
                       message={`End the series on ${dayBefore(selectedOcc.date)}. Occurrences from ${selectedOcc.date} onwards will be removed.`}
                       label="Delete this & following"
                       onApply={() => {
-                        const next = deleteFollowing({ items, roots: debugRoots }, selectedOcc)
-                        applyItems(next.items, next.roots.get(DEBUG_KEY), debugRoot?.body ?? '')
+                        const next = deleteFollowing({ entries: debugEntries }, selectedOcc)
+                        const entry = next.entries.get(DEBUG_KEY)
+                        applyItems(entry?.items ?? [], entry?.root, debugRoot?.body ?? '')
                         setActiveAction(null)
                       }}
                       onCancel={() => setActiveAction(null)} />

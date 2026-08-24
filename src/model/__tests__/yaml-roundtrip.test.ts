@@ -110,7 +110,7 @@ describe('structural expectations', () => {
     ].join('\n'), TEST_VAULT)
 
     expect(parsed.root.title).not.toContain('[object Object]')
-    expect(parsed.items[0]!.date).not.toContain('[object Object]')
+    expect(parsed.items[0].date).not.toContain('[object Object]')
   })
 })
 
@@ -226,10 +226,10 @@ describe('YAML scalar handling', () => {
   it('parses dates as strings, not Date objects', () => {
     const quoted = parseToStoreItems('q.md', '---\ntitle: A\ndate: "2026-04-08"\n---\n', TEST_VAULT)
     const bare = parseToStoreItems('b.md', '---\ntitle: A\ndate: 2026-04-08\n---\n', TEST_VAULT)
-    expect(typeof quoted.items[0]!.date).toBe('string')
-    expect(quoted.items[0]!.date).toBe('2026-04-08')
-    expect(typeof bare.items[0]!.date).toBe('string')
-    expect(bare.items[0]!.date).toBe('2026-04-08')
+    expect(typeof quoted.items[0].date).toBe('string')
+    expect(quoted.items[0].date).toBe('2026-04-08')
+    expect(typeof bare.items[0].date).toBe('string')
+    expect(bare.items[0].date).toBe('2026-04-08')
   })
 
   it('round-trips titles that need quoting', () => {

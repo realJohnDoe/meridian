@@ -1,4 +1,4 @@
-import type { StoreItem, Roots, Occurrence } from './types'
+import type { StoreItem, Roots, Occurrence, Entries } from './types'
 import type { EntryKey } from './fileIO'
 import type { VaultRef } from './vaultRef'
 import { useStore, vaultLayer } from './store'
@@ -7,10 +7,12 @@ import { fileOccurrenceMap } from './fileOccurrence'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
 export const getItems         = (): StoreItem[]    => useStore.getState().items
-export const getRoots         = (): Roots          => useStore.getState().roots
+/** Module-private: `getFom` is the only reader left now that the domain layer edits `Entries`. */
+const getRoots                = (): Roots          => useStore.getState().roots
 export const getFom           = (): Map<EntryKey, Occurrence> => fileOccurrenceMap(getItems(), getRoots())
-export const setData          = (d: { items: StoreItem[]; roots: Roots }) => useStore.getState().setData(d)
-export const getSnapshot      = (): { items: StoreItem[]; roots: Roots } => ({ items: getItems(), roots: getRoots() })
+export const getEntries       = (): Entries        => useStore.getState().entries
+export const setData          = (entries: Entries) => useStore.getState().setData(entries)
+export const getSnapshot      = (): { entries: Entries } => ({ entries: getEntries() })
 export const getVaults        = (): VaultRef[]     => useStore.getState().vaults
 /** Where a brand-new entry goes unless the editor overrides it per entry. */
 export const getDefaultVaultId = (): string | null => useStore.getState().defaultVaultId
@@ -21,9 +23,9 @@ export const setUnreadableFiles = (files: Map<EntryKey, { path: string; message:
 /**
  * One registered vault's content, isolated from the merge.
  *
- * `getItems()`/`getRoots()` are the *merged* view across every registered
- * vault, which is what views want and what the domain layer edits against —
- * but two sites in `storage/sync.ts` must see a single vault instead:
+ * `getEntries()` is the *merged* view across every registered vault, which is
+ * what the domain layer edits against — but two sites in `storage/sync.ts` must
+ * see a single vault instead:
  * `mergeChangedIntoStore` (rebuilds one vault's content by filtering out
  * affected keys) and `writeEntityToCache` (collapses one file back to YAML).
  * Reading the merge there would fold every other vault's entries into the
@@ -32,10 +34,7 @@ export const setUnreadableFiles = (files: Map<EntryKey, { path: string; message:
  * Returns an empty layer for an unregistered vault rather than `undefined`,
  * so callers that are only reading never need a null branch.
  */
-export const getVaultLayer   = (vaultId: string): VaultLayer => {
-  const { items, roots } = useStore.getState()
-  return vaultLayer(items, roots, vaultId)
-}
+export const getVaultLayer   = (vaultId: string): VaultLayer => vaultLayer(useStore.getState().entries, vaultId)
 export const setVaultLayer   = (vaultId: string, data: VaultLayer): void =>
   useStore.getState().setVaultLayer(vaultId, data)
 export const removeVaultLayer = (vaultId: string): void =>

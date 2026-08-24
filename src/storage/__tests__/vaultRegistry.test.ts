@@ -60,9 +60,9 @@ const {
       rows: new Map<string, Array<{ path: string; content: string }>>(),
     },
     storeState: {
-      /** Per-vault layers — the shape the real store holds. */
-      layers: new Map<string, { items: unknown[]; roots: Map<string, unknown> }>(),
-      /** The flattening of `layers`, maintained by the setVaultLayer mock as the store does. */
+      /** Per-vault layers — the shape the real store holds: one `Entries` map per vault. */
+      layers: new Map<string, Map<string, { key: string; root: unknown; items: unknown[] }>>(),
+      /** The flat views derived from `layers`, maintained by the setVaultLayer mock as the store does. */
       items: [] as unknown[],
       roots: new Map<string, unknown>(),
       unreadableFiles: new Map<string, { path: string; message: string }>(),
@@ -82,11 +82,13 @@ const {
       // Stands in for the real syncOnActivate, which never rejects (runSync
       // swallows its own errors) — so this never throws either.
       syncOnActivate: vi.fn(async () => {}),
-      // Echo one item/root per file so "did the cache paint?" is observable
+      // Echo one entry per file so "did the cache paint?" is observable
       // via storeState.items.length.
       parseFiles: vi.fn((files: Array<{ path: string; content: string }>) => ({
-        items: files.map(f => ({ entryKey: f.path })),
-        roots: new Map(files.map(f => [f.path, { body: f.content }])),
+        entries: new Map(files.map(f => [
+          f.path,
+          { key: f.path, root: { body: f.content }, items: [{ entryKey: f.path }] },
+        ])),
         failures: [] as Array<{ path: string; slug: string; message: string }>,
         // The round-trip guard is deferred out of parseFiles now (see
         // auditRoundTrip in sync.ts); callers invoke this thunk instead of
@@ -210,17 +212,22 @@ vi.mock('@/storage/githubOAuth', () => ({
   ensureFreshAccessToken: vi.fn(),
 }))
 
+/** Flatten `layers` into the derived `items`/`roots`, exactly as the store's `deriveViews` does. */
+function rederive(): void {
+  const all = [...storeState.layers.values()].flatMap(layer => [...layer.values()])
+  storeState.items = all.flatMap(entry => entry.items)
+  storeState.roots = new Map(all.map(entry => [entry.key, entry.root]))
+}
+
 vi.mock('@/storeBridge', () => ({
-  setVaultLayer: vi.fn((vaultId: string, data: { items: unknown[]; roots: Map<string, unknown> }) => {
+  setVaultLayer: vi.fn((vaultId: string, data: Map<string, { key: string; root: unknown; items: unknown[] }>) => {
     callOrder.push(`setVaultLayer:${vaultId}`)
     storeState.layers.set(vaultId, data)
-    storeState.items = [...storeState.layers.values()].flatMap(l => l.items)
-    storeState.roots = new Map([...storeState.layers.values()].flatMap(l => [...l.roots]))
+    rederive()
   }),
   removeVaultLayer: vi.fn((vaultId: string) => {
     storeState.layers.delete(vaultId)
-    storeState.items = [...storeState.layers.values()].flatMap(l => l.items)
-    storeState.roots = new Map([...storeState.layers.values()].flatMap(l => [...l.roots]))
+    rederive()
   }),
   setVaultSync: vi.fn((vaultId: string, patch: Record<string, unknown>) => {
     storeState.syncByVault.set(vaultId, { ...storeState.syncByVault.get(vaultId), ...patch })
@@ -431,8 +438,8 @@ describe('restoreVaults — several vaults', () => {
 
     await restoreVaults()
 
-    expect(storeState.layers.get(LOCAL_REF.id)?.items).toHaveLength(1)
-    expect(storeState.layers.get(GITHUB_REF.id)?.items).toHaveLength(1)
+    expect(storeState.layers.get(LOCAL_REF.id)?.size).toBe(1)
+    expect(storeState.layers.get(GITHUB_REF.id)?.size).toBe(1)
     // Two real vaults already exist, so the Tutorial vault was migrated away
     // and never mounted a layer at all — the merge is what every view reads.
     expect(storeState.items).toHaveLength(2)

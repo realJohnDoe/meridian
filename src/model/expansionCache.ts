@@ -84,7 +84,7 @@ export function computeExpansionCache(
     // Only non-structural metadata changed — find altered items/files and overlay.
     // `roots` identity is deliberately NOT part of the fast-path gate above: a
     // title/tags/body edit on one file allocates a brand-new `roots` map (see
-    // storeOps.ts's updateRoot), but that alone is never structural, so it must
+    // storeOps.ts's editedEntry), but that alone is never structural, so it must
     // not force a full re-expansion of every other file's occurrences too.
     const changedById = new Map<string, StoreOcc>()
     // Series (repeat pattern) items whose own metadata changed. Tracked

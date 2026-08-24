@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseFixture, serialize, rootMeta, collectUndated, TEST_VAULT, rootsOf, NEW_TARGET, keyOf } from './helpers'
+import { parseFixture, serialize, rootMeta, collectUndated, TEST_VAULT, rootsOf, NEW_TARGET, keyOf, dataOf, itemsOf, rootsIn, serializeKey, serializeOnly } from './helpers'
 import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing, deletionEndsAfterCompletionSeries } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { parseToStoreItems } from '@/model/storeItems'
@@ -10,7 +10,7 @@ import type { Occurrence, Roots, StoreItem } from '@/types'
 /** Build a StoreData from a ParseResult (single-file fixture). */
 function fixtureData(name: string): StoreData {
   const parsed = parseFixture(name)
-  return { items: parsed.items, roots: rootsOf(parsed.root) }
+  return dataOf(parsed.items, rootsOf(parsed.root))
 }
 
 /** Expand items and return the occurrence on `dateISO`. */
@@ -23,8 +23,7 @@ function occOn(items: StoreItem[], roots: Roots, dateISO: string): Occurrence {
 
 /** Serialize a StoreData back to file content. */
 function serializeData(data: StoreData): string {
-  const root = [...data.roots.values()][0]
-  return serialize(data.items, root)
+  return serializeOnly(data)
 }
 
 /** Build EditFields from an occurrence, overriding only what a scenario changes. */
@@ -49,14 +48,14 @@ function editFields(occ: Occurrence, over: Partial<EditFields> = {}): EditFields
 describe('edit operations → serialized YAML', () => {
   it('toggleDone on a generated occurrence adds a done override', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = toggleDone(data, occ)
     expect(serializeData(next)).toMatchSnapshot()
   })
 
   it('single-scope edit overrides one occurrence (priority) without touching the series', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'single', editFields(occ, { priority: 'high' }), NEW_TARGET)
     expect(serializeData(next)).toMatchSnapshot()
   })
@@ -68,7 +67,7 @@ describe('edit operations → serialized YAML', () => {
     // to reach an overridden occurrence looks like on disk. They keep only their
     // genuine divergence (`done: true`).
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'all', editFields(occ, {
       duration: '45m',
       title: 'Team Standup',
@@ -108,12 +107,12 @@ describe('edit operations → serialized YAML', () => {
     const occ = occOn(p.items, roots, '2026-04-20')
     expect(occ.metadata.participants).toEqual(['alice', 'bob'])   // inherited, not its own
 
-    const next = applyEdit({ items: p.items, roots }, occ, 'single', editFields(occ, {
+    const next = applyEdit(dataOf(p.items, roots), occ, 'single', editFields(occ, {
       participants: [],
       scheduled: { date: '2026-04-20', time: '09:00' },
     }), NEW_TARGET)
 
-    const reparsed = parseToStoreItems('ts.md', serialize(next.items, next.roots.get(keyOf('ts'))), TEST_VAULT)
+    const reparsed = parseToStoreItems('ts.md', serializeKey(next, keyOf('ts')), TEST_VAULT)
     const after = expandRange(reparsed.items, rootsOf(reparsed.root),
       new Date('2026-01-01'), new Date('2026-12-31'))
     expect(after.find(o => o.date === '2026-04-20')!.metadata.participants).toEqual([])
@@ -123,7 +122,7 @@ describe('edit operations → serialized YAML', () => {
 
   it('single-scope untracking one occurrence survives a save + reload', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     expect(occ.metadata.done).toBe(false)   // the series makes every occurrence a task
 
     const next = applyEdit(data, occ, 'single', editFields(occ, {
@@ -147,7 +146,7 @@ describe('edit operations → serialized YAML', () => {
     // file in every vault. A flat standalone inherits nothing, so an empty list
     // there is still just absent.
     const data = fixtureData('standalone-task')
-    const occ = occOn(data.items, data.roots, '2026-04-09')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-09')
     const next = applyEdit(data, occ, 'all', editFields(occ, { participants: [] }), NEW_TARGET)
     expect(serializeData(next)).not.toMatch(/participants:/)
   })
@@ -156,7 +155,7 @@ describe('edit operations → serialized YAML', () => {
 
   it('all-scope reaches an occurrence the user had already overridden', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'all', editFields(occ, {
       duration: '45m',
       scheduled: { date: '2026-04-06', time: '09:00' },
@@ -171,7 +170,7 @@ describe('edit operations → serialized YAML', () => {
 
   it('all-scope does not un-complete an occurrence it reaches', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'all', editFields(occ, {
       duration: '45m',
       scheduled: { date: '2026-04-06', time: '09:00' },
@@ -188,74 +187,74 @@ describe('edit operations → serialized YAML', () => {
     // `owner: bob` diverges from the series' `owner: alice`; an edit that never
     // mentioned `owner` must not flatten it (an edit never mints unknown keys).
     const data = fixtureData('unknown-keys-series')
-    const occ = occOn(data.items, data.roots, '2026-04-13')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-13')
     const next = applyEdit(data, occ, 'all', editFields(occ, { duration: '45m' }), NEW_TARGET)
-    const override = next.items.find(i => !isSeries(i) && i.date === '2026-04-20')!
+    const override = itemsOf(next).find(i => !isSeries(i) && i.date === '2026-04-20')!
     expect(override.metadata.extra?.owner).toBe('bob')
   })
 
   it('future-scope reaches overridden occurrences in the range it splits off', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-13')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-13')
     const next = applyEdit(data, occ, 'future', editFields(occ, {
       duration: '45m',
       scheduled: { date: '2026-04-13', time: '09:00' },
     }), NEW_TARGET)
     // 04-13 and 04-14 are overrides at/after the cut — they move to the new
     // series and must take its metadata, not the old series' 30m.
-    const moved = next.items.filter(i => !isSeries(i) && i.date >= '2026-04-13')
+    const moved = itemsOf(next).filter(i => !isSeries(i) && i.date >= '2026-04-13')
     expect(moved.map(i => i.metadata.duration)).toEqual(['45m', '45m'])
     expect(moved.map(i => i.metadata.done)).toEqual([true, true])
   })
 
   it('future-scope edit splits the series at the occurrence date', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'future', editFields(occ, { duration: '15m' }), NEW_TARGET)
     // Two series for the same file: capped original + new split.
-    expect(next.items.filter(isSeries)).toHaveLength(2)
+    expect(itemsOf(next).filter(isSeries)).toHaveLength(2)
     expect(serializeData(next)).toMatchSnapshot()
   })
 
   it('excludeOccurrence drops a single generated occurrence', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = excludeOccurrence(data, occ)
     expect(serializeData(next)).toMatchSnapshot()
   })
 
   it('deletionEndsAfterCompletionSeries is true for the series\' only open occurrence', () => {
     const data = fixtureData('after-completion')
-    const occ = occOn(data.items, data.roots, '2026-05-14')
-    expect(deletionEndsAfterCompletionSeries(data.items, occ)).toBe(true)
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-05-14')
+    expect(deletionEndsAfterCompletionSeries(itemsOf(data), occ)).toBe(true)
   })
 
   it('deletionEndsAfterCompletionSeries is false for a done occurrence', () => {
     const data = fixtureData('after-completion')
-    const occ = occOn(data.items, data.roots, '2026-05-11')
-    expect(deletionEndsAfterCompletionSeries(data.items, occ)).toBe(false)
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-05-11')
+    expect(deletionEndsAfterCompletionSeries(itemsOf(data), occ)).toBe(false)
   })
 
   it('deletionEndsAfterCompletionSeries is false for a schedule-type series', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
-    expect(deletionEndsAfterCompletionSeries(data.items, occ)).toBe(false)
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
+    expect(deletionEndsAfterCompletionSeries(itemsOf(data), occ)).toBe(false)
   })
 
   it('deleteFollowing caps the series end before the occurrence', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = deleteFollowing(data, occ)
     expect(serializeData(next)).toMatchSnapshot()
   })
 
   it('single-scope move excludes the original slot and re-adds at the new date', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'single', editFields(occ, {
       scheduled: { date: '2026-04-22', time: '09:00' },
     }), NEW_TARGET)
-    const dates = expandRange(next.items, next.roots, new Date('2026-04-19'), new Date('2026-04-23'))
+    const dates = expandRange(itemsOf(next), rootsIn(next), new Date('2026-04-19'), new Date('2026-04-23'))
       .map(o => o.date)
     // Original generated slot suppressed, moved occurrence present.
     expect(dates).toContain('2026-04-22')
@@ -265,32 +264,32 @@ describe('edit operations → serialized YAML', () => {
 
   it('moving an occurrence back to its original date un-hides it', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const moved = applyEdit(data, occ, 'single', editFields(occ, {
       scheduled: { date: '2026-04-22', time: '09:00' },
     }), NEW_TARGET)
-    const movedOcc = occOn(moved.items, moved.roots, '2026-04-22')
+    const movedOcc = occOn(itemsOf(moved), rootsIn(moved), '2026-04-22')
     const back = applyEdit(moved, movedOcc, 'single', editFields(movedOcc, {
       scheduled: { date: '2026-04-20', time: '09:00' },
     }), NEW_TARGET)
-    const dates = expandRange(back.items, back.roots, new Date('2026-04-19'), new Date('2026-04-23'))
+    const dates = expandRange(itemsOf(back), rootsIn(back), new Date('2026-04-19'), new Date('2026-04-23'))
       .map(o => o.date)
     expect(dates).toContain('2026-04-20')
     expect(dates).not.toContain('2026-04-22')
     // No stray excluded stub left behind.
-    expect(back.items.filter(i => !isSeries(i) && (i as { excluded?: boolean }).excluded)).toHaveLength(0)
+    expect(itemsOf(back).filter(i => !isSeries(i) && (i as { excluded?: boolean }).excluded)).toHaveLength(0)
     expect(serializeData(back)).toMatchSnapshot()
   })
 
   it('moving an occurrence onto a date excluded for an unrelated reason un-hides that date', () => {
     const data = fixtureData('weekly-series')
-    const excludedOcc = occOn(data.items, data.roots, '2026-04-27')
+    const excludedOcc = occOn(itemsOf(data), rootsIn(data), '2026-04-27')
     const withExclusion = excludeOccurrence(data, excludedOcc)
-    const occ = occOn(withExclusion.items, withExclusion.roots, '2026-04-20')
+    const occ = occOn(itemsOf(withExclusion), rootsIn(withExclusion), '2026-04-20')
     const next = applyEdit(withExclusion, occ, 'single', editFields(occ, {
       scheduled: { date: '2026-04-27', time: '09:00' },
     }), NEW_TARGET)
-    const dates = expandRange(next.items, next.roots, new Date('2026-04-19'), new Date('2026-04-28'))
+    const dates = expandRange(itemsOf(next), rootsIn(next), new Date('2026-04-19'), new Date('2026-04-28'))
       .map(o => o.date)
     expect(dates).toContain('2026-04-27')
     expect(dates).not.toContain('2026-04-20')
@@ -307,7 +306,7 @@ describe('edit operations → serialized YAML', () => {
     const data = fixtureData('split-series')
     // The after_completion series starts Apr 10 (done:true via override).
     // Its next generated occurrence is Apr 12 (interval: 2 days from Apr 10).
-    const occ = occOn(data.items, data.roots, '2026-04-12')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-12')
     expect(occ.metadata.done).toBe(false)  // generated, not yet done
     const next = toggleDone(data, occ)
     expect(serializeData(next)).toMatchSnapshot()
@@ -319,7 +318,7 @@ describe('edit operations → serialized YAML', () => {
     // Editing "all" on a series that has no `done` (was converted from task to
     // event) must not re-introduce done into the serialized output.
     const data = fixtureData('task-to-event')
-    const occ = occOn(data.items, data.roots, '2026-05-07')   // a generated occurrence (no override)
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-05-07')   // a generated occurrence (no override)
     const next = applyEdit(data, occ, 'all', editFields(occ, {
       scheduled: { date: '2026-05-01', time: '14:00' },  // keep series root date
       title: 'Team Meeting (renamed)',
@@ -335,7 +334,7 @@ describe('edit operations → serialized YAML', () => {
 
   it('adding a new occurrence to an irregular-instances file keeps shared defaults', () => {
     const data = fixtureData('irregular-instances')
-    const existing = occOn(data.items, data.roots, '2026-04-15')
+    const existing = occOn(itemsOf(data), rootsIn(data), '2026-04-15')
     const next = applyEdit(data, existing, 'add', editFields(existing, {
       scheduled: { date: '2026-07-10', time: '10:00' },
       title: 'Project Review',
@@ -361,8 +360,8 @@ repeat:
 ---
 `
     const parsed = parseToStoreItems('test-series.md', firstFriday, TEST_VAULT)
-    const data: StoreData = { items: parsed.items, roots: rootsOf(parsed.root) }
-    const existing = occOn(data.items, data.roots, '2026-07-03')
+    const data: StoreData = dataOf(parsed.items, rootsOf(parsed.root))
+    const existing = occOn(itemsOf(data), rootsIn(data), '2026-07-03')
 
     const next = applyEdit(data, existing, 'add', editFields(existing, {
       scheduled: { date: '2026-07-10', time: '' },
@@ -370,12 +369,12 @@ repeat:
     }), NEW_TARGET)
 
     // Two flat sibling series in one file — no child instance carrying the repeat.
-    const series = next.items.filter(isSeries)
+    const series = itemsOf(next).filter(isSeries)
     expect(series).toHaveLength(2)
-    expect(next.items.filter(i => !isSeries(i))).toHaveLength(0)
+    expect(itemsOf(next).filter(i => !isSeries(i))).toHaveLength(0)
 
     // Both rules expand: first Friday (Jul 3) and second Friday (Jul 10).
-    const dates = expandRange(next.items, next.roots, new Date('2026-07-01'), new Date('2026-07-31'))
+    const dates = expandRange(itemsOf(next), rootsIn(next), new Date('2026-07-01'), new Date('2026-07-31'))
       .map(o => o.date)
     expect(dates).toContain('2026-07-03')
     expect(dates).toContain('2026-07-10')
@@ -389,12 +388,12 @@ repeat:
 
   it('adding a new instance to a done task initializes the new instance as not done', () => {
     const data = fixtureData('standalone-task')
-    const existing = occOn(data.items, data.roots, '2026-04-09')
+    const existing = occOn(itemsOf(data), rootsIn(data), '2026-04-09')
     expect(existing.metadata.done).toBe(true)
     const next = applyEdit(data, existing, 'add', editFields(existing, {
       scheduled: { date: '2026-05-01', time: '' },
     }), NEW_TARGET)
-    const occs = expandRange(next.items, next.roots, new Date('2026-01-01'), new Date('2026-12-31'))
+    const occs = expandRange(itemsOf(next), rootsIn(next), new Date('2026-01-01'), new Date('2026-12-31'))
     const newOcc = occs.find(o => o.date === '2026-05-01')
     expect(newOcc).toBeDefined()
     expect(newOcc!.metadata.done).toBe(false)
@@ -404,7 +403,7 @@ repeat:
 
   it('excludeOccurrence on a series in a mixed file leaves other series and standalone intact', () => {
     const data = fixtureData('mixed-series-standalones')
-    const occ = occOn(data.items, data.roots, '2026-04-08')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-08')
     const next = excludeOccurrence(data, occ)
     const yaml = serializeData(next)
     expect(yaml).toMatchSnapshot()
@@ -415,7 +414,7 @@ repeat:
   })
 
   it('creating a new standalone task serializes to a single file', () => {
-    const emptyData: StoreData = { items: [], roots: new Map() }
+    const emptyData: StoreData = dataOf([])
     const next = applyEdit(emptyData, null, 'all', {
       title: 'Buy groceries',
       tags: ['errand'],
@@ -439,7 +438,7 @@ repeat:
     // metadata save already created the file). Without the draft id to recognise
     // the re-run by, applyNew would append a second item, producing either a
     // silent duplicate `instances[]` entry or a stray second file.
-    const emptyData: StoreData = { items: [], roots: new Map() }
+    const emptyData: StoreData = dataOf([])
     const fields: EditFields = {
       title: 'Board game night',
       tags: [], items: [], participants: [],
@@ -449,20 +448,20 @@ repeat:
     }
     const draftId = 'draft-1'
     const afterFirst = applyEdit(emptyData, null, 'all', fields, { vaultId: TEST_VAULT, draftId: draftId })
-    expect(afterFirst.items).toHaveLength(1)
-    expect(afterFirst.items[0]!.id).toBe(draftId)
+    expect(itemsOf(afterFirst)).toHaveLength(1)
+    expect(itemsOf(afterFirst)[0]!.id).toBe(draftId)
 
     const afterSecond = applyEdit(afterFirst, null, 'all', { ...fields, duration: '1 hour' }, { vaultId: TEST_VAULT, draftId: draftId })
-    expect(afterSecond.items).toHaveLength(1)
-    expect(afterSecond.items[0]!.metadata.duration).toBe('1 hour')
-    expect([...afterSecond.roots.keys()]).toEqual([keyOf('board-game-night')])
+    expect(itemsOf(afterSecond)).toHaveLength(1)
+    expect(itemsOf(afterSecond)[0]!.metadata.duration).toBe('1 hour')
+    expect([...rootsIn(afterSecond).keys()]).toEqual([keyOf('board-game-night')])
   })
 
   it('a draft that has already created its file keeps it when the title is retyped', () => {
     // The editor saves as the user types, so the file is created from a partial
     // title. Renaming happens inside that file — the draft must not go allocate a
     // second one once the title grows.
-    const emptyData: StoreData = { items: [], roots: new Map() }
+    const emptyData: StoreData = dataOf([])
     const fields: EditFields = {
       title: 'Board', tags: [], items: [], participants: [],
       body: '', tracked: false, done: false, priority: null,
@@ -472,9 +471,9 @@ repeat:
     const afterFirst = applyEdit(emptyData, null, 'all', fields, { vaultId: TEST_VAULT, draftId: draftId })
     const afterRename = applyEdit(afterFirst, null, 'all', { ...fields, title: 'Board game night' }, { vaultId: TEST_VAULT, draftId: draftId })
 
-    expect([...afterRename.roots.keys()]).toEqual([keyOf('board')])
-    expect(afterRename.roots.get(keyOf('board'))!.title).toBe('Board game night')
-    expect(afterRename.items).toHaveLength(1)
+    expect([...rootsIn(afterRename).keys()]).toEqual([keyOf('board')])
+    expect(rootsIn(afterRename).get(keyOf('board'))!.title).toBe('Board game night')
+    expect(itemsOf(afterRename)).toHaveLength(1)
   })
 
   it('creating an entry on a taken slug does not overwrite the existing file', () => {
@@ -487,7 +486,7 @@ repeat:
       '---\ntitle: Buy groceries\ntags: [errands]\ndone: false\ndate: "2026-04-08"\n---\n\nRemember the bags.',
       TEST_VAULT,
     )
-    const data: StoreData = { items: existing.items, roots: rootsOf(existing.root) }
+    const data: StoreData = dataOf(existing.items, rootsOf(existing.root))
 
     const next = applyEdit(data, null, 'all', {
       title: 'Buy groceries!',
@@ -497,15 +496,15 @@ repeat:
       scheduled: null, duration: '', repeat: null,
     }, { vaultId: TEST_VAULT, draftId: 'draft-1' })
 
-    const untouched = next.roots.get(keyOf('buy-groceries'))!
+    const untouched = rootsIn(next).get(keyOf('buy-groceries'))!
     expect(untouched.title).toBe('Buy groceries')
     expect(untouched.tags).toEqual(['errands'])
     expect(untouched.body).toContain('Remember the bags')
 
-    const created = next.roots.get(keyOf('buy-groceries-2'))!
+    const created = rootsIn(next).get(keyOf('buy-groceries-2'))!
     expect(created.title).toBe('Buy groceries!')
     expect(created.body).toBe('totally different note')
-    expect(next.items.filter(i => i.entryKey === keyOf('buy-groceries-2'))).toHaveLength(1)
+    expect(itemsOf(next).filter(i => i.entryKey === keyOf('buy-groceries-2'))).toHaveLength(1)
   })
 
   it('a third colliding title keeps counting up rather than landing on a taken slug', () => {
@@ -514,35 +513,51 @@ repeat:
       tracked: false, done: false, priority: null,
       scheduled: null, duration: '', repeat: null,
     })
-    let data: StoreData = { items: [], roots: new Map() }
+    let data: StoreData = dataOf([])
     data = applyEdit(data, null, 'all', fields('Q3 review'), { vaultId: TEST_VAULT, draftId: 'draft-1' })
     data = applyEdit(data, null, 'all', fields('Q3-review'), { vaultId: TEST_VAULT, draftId: 'draft-2' })
     data = applyEdit(data, null, 'all', fields('Q3 Review!'), { vaultId: TEST_VAULT, draftId: 'draft-3' })
 
-    expect([...data.roots.keys()]).toEqual([keyOf('q3-review'), keyOf('q3-review-2'), keyOf('q3-review-3')])
-    expect(data.items.map(i => i.entryKey).sort()).toEqual([keyOf('q3-review'), keyOf('q3-review-2'), keyOf('q3-review-3')].sort())
+    expect([...rootsIn(data).keys()]).toEqual([keyOf('q3-review'), keyOf('q3-review-2'), keyOf('q3-review-3')])
+    expect(itemsOf(data).map(i => i.entryKey).sort()).toEqual([keyOf('q3-review'), keyOf('q3-review-2'), keyOf('q3-review-3')].sort())
   })
 
-  it('a new entry avoids a slug held by items whose file failed to reach roots', () => {
-    // roots and items can disagree — a file that fails to parse leaves no root
-    // entry. Keying the collision check off roots alone would let a new entry
-    // adopt a slug that items still point at.
-    const orphan: StoreData = {
-      items: [{ date: '2026-04-08', time: null, source: 'explicit', entryKey: keyOf('cafe'), id: 'orphan-1', metadata: { participants: [] } }],
-      roots: new Map(),
+  // The slug a new entry lands on must dodge everything that already holds one.
+  // This used to have a third case — an item whose file left no root behind, so
+  // that `items` and `roots` disagreed about whether the slug was occupied. An
+  // entry is now one object, so that disagreement is not a state the store can
+  // be in, and the two holders below are the whole set.
+  it('a new entry avoids a slug an existing entry already holds', () => {
+    const cafeFields = {
+      title: 'Café', tags: [], items: [], participants: [], body: '',
+      tracked: false, done: false, priority: null,
+      scheduled: null, duration: '', repeat: null,
     }
-    const next = applyEdit(orphan, null, 'all', {
+    const first = applyEdit(dataOf([]), null, 'all', cafeFields, { vaultId: TEST_VAULT, draftId: 'draft-1' })
+    const next  = applyEdit(first, null, 'all', cafeFields, { vaultId: TEST_VAULT, draftId: 'draft-2' })
+
+    expect([...next.entries.keys()]).toEqual([keyOf('cafe'), keyOf('cafe-2')])
+    // Neither entry lost half of itself to the other — the failure the slug
+    // check exists to prevent is a new entry writing over a live file.
+    for (const entry of next.entries.values()) expect(entry.items).toHaveLength(1)
+  })
+
+  it('a new entry avoids a slug held by a file that failed to parse', () => {
+    // An unreadable file has no entry at all — it is not in `entries` — so
+    // `unreadableKeys` is what keeps its slug reserved. Without it a new entry
+    // would silently overwrite a file whose contents nobody could read.
+    const data: StoreData = { ...dataOf([]), unreadableKeys: new Set([keyOf('cafe')]) }
+    const next = applyEdit(data, null, 'all', {
       title: 'Café', tags: [], items: [], participants: [], body: '',
       tracked: false, done: false, priority: null,
       scheduled: null, duration: '', repeat: null,
     }, { vaultId: TEST_VAULT, draftId: 'draft-1' })
 
-    expect([...next.roots.keys()]).toEqual([keyOf('cafe-2')])
-    expect(next.items.find(i => i.id === 'orphan-1')!.entryKey).toBe(keyOf('cafe'))
+    expect([...next.entries.keys()]).toEqual([keyOf('cafe-2')])
   })
 
   it('creating an undated task persists and stays searchable but off the calendar', () => {
-    const emptyData: StoreData = { items: [], roots: new Map() }
+    const emptyData: StoreData = dataOf([])
     const next = applyEdit(emptyData, null, 'all', {
       title: 'Buy milk',
       tags: [], items: [], participants: [], body: '',
@@ -550,7 +565,7 @@ repeat:
       scheduled: null, duration: '', repeat: null,
     }, NEW_TARGET)
     // A standalone occurrence with an empty date is created.
-    const standalone = next.items.find(i => !isSeries(i)) as StoreItem
+    const standalone = itemsOf(next).find(i => !isSeries(i)) as StoreItem
     expect(standalone.date).toBe('')
     expect(standalone.metadata.done).toBe(false)
 
@@ -577,14 +592,14 @@ repeat:
 
   it('single-scope title/tags/items change updates the root, not the override', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'single', editFields(occ, {
       title: 'Team Standup Renamed',
       tags: ['work', 'renamed'],
       items: ['[[project-alpha]]'],
     }), NEW_TARGET)
     // The per-file root carries the new title, tags, and items.
-    const root = [...next.roots.values()][0]!
+    const root = [...rootsIn(next).values()][0]!
     expect(root.title).toBe('Team Standup Renamed')
     expect(root.tags).toEqual(['work', 'renamed'])
     expect(root.items).toEqual(['[[project-alpha]]'])
@@ -598,13 +613,13 @@ repeat:
 
   it('done/priority edits in single scope stay per-occurrence, not on the root', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'single', editFields(occ, { priority: 'high', done: true }), NEW_TARGET)
-    const series = next.items.filter(isSeries)
+    const series = itemsOf(next).filter(isSeries)
     // Series root priority unchanged (was undefined)
     expect(series[0]!.metadata.priority).toBeUndefined()
     // Override carries the priority
-    const overrides = next.items.filter(i => !isSeries(i))
+    const overrides = itemsOf(next).filter(i => !isSeries(i))
     const override = overrides.find(o => o.date === '2026-04-20')
     expect(override?.metadata.priority).toBe('high')
   })
@@ -615,7 +630,7 @@ repeat:
     // Even when the editor's done flag is true, a brand-new RepeatPattern must
     // start with done: false — otherwise every generated occurrence inherits
     // done: true (the after_completion poisoning bug).
-    const emptyData: StoreData = { items: [], roots: new Map() }
+    const emptyData: StoreData = dataOf([])
     const next = applyEdit(emptyData, null, 'all', {
       title: 'Take Vitamins',
       tags: ['health'], items: [], participants: [], body: '',
@@ -624,7 +639,7 @@ repeat:
       duration: '',
       repeat: { type: 'after_completion', interval: '1 day' },
     }, NEW_TARGET)
-    const series = next.items.filter(isSeries)
+    const series = itemsOf(next).filter(isSeries)
     expect(series).toHaveLength(1)
     expect(series[0]!.metadata.done).toBe(false)
   })
@@ -633,28 +648,28 @@ repeat:
     // Editing "all" while the current occurrence is done must keep the series
     // root at done: false; per-occurrence completion lives in overrides only.
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'all', editFields(occ, {
       done: true,
       title: 'Weekly Standup',
       scheduled: { date: '2026-04-06', time: '09:00' },
     }), NEW_TARGET)
-    const series = next.items.filter(isSeries)
+    const series = itemsOf(next).filter(isSeries)
     expect(series[0]!.metadata.done).toBe(false)
   })
 
   it('future-scope split keeps the new series root at done: false', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'future', editFields(occ, { done: true }), NEW_TARGET)
-    for (const s of next.items.filter(isSeries)) {
+    for (const s of itemsOf(next).filter(isSeries)) {
       expect(s.metadata.done).not.toBe(true)
     }
   })
 
   it('items round-trips through parse → serialize', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'all', editFields(occ, {
       title: 'Weekly Standup',
       items: ['[[project-alpha]]', '[[weekly-log]]'],
@@ -670,7 +685,7 @@ repeat:
 
   it('file-level fields are emitted at the top-level root, never inside defaults:', () => {
     const data = fixtureData('weekly-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = applyEdit(data, occ, 'all', editFields(occ, {
       title: 'Weekly Standup',
       tags: ['work'],
@@ -755,7 +770,7 @@ describe('unknown keys survive every edit scope', () => {
     '%s-scope edit keeps the series\' unknown keys',
     (scope) => {
       const data = fixtureData('unknown-keys-series')
-      const occ = occOn(data.items, data.roots, '2026-04-06')
+      const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-06')
       const next = applyEdit(data, occ, scope, editFields(occ, { duration: '45m' }), NEW_TARGET)
       const reparsed = parseToStoreItems('unknown-keys-series.md', serializeData(next), TEST_VAULT)
 
@@ -770,11 +785,11 @@ describe('unknown keys survive every edit scope', () => {
 
   it('single-scope edit on a diverging override keeps its own unknown key ("target wins")', () => {
     const data = fixtureData('unknown-keys-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')  // override carries owner: bob
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')  // override carries owner: bob
     expect(occ.metadata.extra?.owner).toBe('bob')
     const next = applyEdit(data, occ, 'single', editFields(occ, { duration: '45m' }), NEW_TARGET)
 
-    const override = next.items.find(i => !isSeries(i) && i.date === '2026-04-20')!
+    const override = itemsOf(next).find(i => !isSeries(i) && i.date === '2026-04-20')!
     expect(override.metadata.extra?.owner).toBe('bob')
 
     const reparsed = parseToStoreItems('unknown-keys-series.md', serializeData(next), TEST_VAULT)
@@ -782,27 +797,27 @@ describe('unknown keys survive every edit scope', () => {
     expect(reparsedOverride.metadata.extra?.owner).toBe('bob')
   })
 
-  it('updateRoot keeps a container root\'s unknown key across an edit', () => {
+  it('editedEntry keeps a container root\'s unknown key across an edit', () => {
     const data = fixtureData('unknown-keys-container')
-    const occ = occOn(data.items, data.roots, '2026-04-06')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-06')
     const next = applyEdit(data, occ, 'all', editFields(occ, { duration: '45m' }), NEW_TARGET)
-    const root = [...next.roots.values()][0]!
+    const root = [...rootsIn(next).values()][0]!
     expect(root.extra).toEqual({ project: 'apollo' })
   })
 
   it('toggleDone preserves an override\'s unknown key (upsertOverride merge)', () => {
     const data = fixtureData('unknown-keys-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = toggleDone(data, occ)
-    const override = next.items.find(i => !isSeries(i) && i.date === '2026-04-20')!
+    const override = itemsOf(next).find(i => !isSeries(i) && i.date === '2026-04-20')!
     expect(override.metadata.extra?.owner).toBe('bob')
   })
 
   it('excludeOccurrence preserves an override\'s unknown key on the store item, AND on save', () => {
     const data = fixtureData('unknown-keys-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = excludeOccurrence(data, occ)
-    const override = next.items.find(i => !isSeries(i) && i.date === '2026-04-20')!
+    const override = itemsOf(next).find(i => !isSeries(i) && i.date === '2026-04-20')!
     expect(override.metadata.extra?.owner).toBe('bob')
     // Regression guard for finding #3 (data-integrity survey): serializeChildren
     // used to emit only date/time/excluded for an excluded child, silently
@@ -835,8 +850,8 @@ describe('unknown keys survive every edit scope', () => {
     const roots = rootsOf(p.root)
     const occ = occOn(p.items, roots, '2026-04-13')
 
-    const next = excludeOccurrence({ items: p.items, roots }, occ)
-    const out = serialize(next.items, next.roots.get(keyOf('s2')))
+    const next = excludeOccurrence(dataOf(p.items, roots), occ)
+    const out = serializeKey(next, keyOf('s2'))
 
     expect(out).toContain('minutesUrl: https://example.com/notes/13')
     expect(out).toContain('done: true')
@@ -884,7 +899,7 @@ instances:
     const afternoon = occs.find(o => o.date === '2026-06-01' && o.time === '14:00')!
 
     // Toggle done on morning only
-    const { items: nextItems } = toggleDone({ items, roots }, morning)
+    const nextItems = itemsOf(toggleDone(dataOf(items, roots), morning))
     // Re-expand and check afternoon is untouched
     const nextOccs = expandRange(nextItems, roots, new Date('2026-01-01'), new Date('2026-12-31'))
     const nextAfternoon = nextOccs.find(o => o.id === afternoon.id)

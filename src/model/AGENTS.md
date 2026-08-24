@@ -243,7 +243,7 @@ of scope here: absent-vs-empty for required arrays.
   convention as `FileMetadata.fileConvention`, and `wrapFrontmatter` re-applies
   it to the structural glue it generates — never to the body's own bytes,
   which were never touched to begin with. `fileConvention` is carried forward
-  across edits by `updateRoot` in `storeOps.ts`, the same way `extra` is;
+  across edits by `editedEntry` in `storeOps.ts`, the same way `extra` is;
   omitting that carry-forward is the trap that would silently revert a file to
   LF on its next edit.
 
@@ -294,10 +294,15 @@ No store, React, or file I/O dependencies.
   (`titleToSlug` collapses punctuation, accents, and everything past 60 chars)
   get a `-2`, `-3`, … suffix rather than overwriting the file already there.
   Callers persist the key this returns, not `titleToSlug(title)`.
-- `updateRoot(roots, entryKey, fields): Roots` — update file-level metadata for
-  one entry and return a new roots map.
+- `editedEntry(prev, key, fields, items): Entry` — the entry after an edit:
+  file-level fields from `fields`, occurrences from `items`. The occurrences are
+  a required argument, so the root cannot be updated without saying what the
+  entry now contains — the slip that used to leave a root matching no item.
+  Replaces `updateRoot`, which took and returned the roots map alone.
 - `toggleDone`, `excludeOccurrence`, `deleteByEntryKey`, `deleteFollowing`
-  — take and return `StoreItem[]` only (no roots needed).
+  — take and return `StoreData` (`{ entries }`), editing one `Entry` in place.
+  Removing an entry's last occurrence removes the entry: `Entry['items']` is
+  non-empty, so there is no root-with-no-occurrences state to leave behind.
 - `upsertOverride`, `findSeries`, `entryKeyItems`
 
 ### `__tests__/`

@@ -1,6 +1,6 @@
 import { setData } from './storeBridge'
 import { writeEntity, deleteEntity, moveEntity } from './persistencePort'
-import { entryKeyItems, serializeEntry } from '@/model'
+import { serializeEntry } from '@/model'
 import type { StoreData } from '@/model'
 import type { EntryKey } from './fileIO'
 
@@ -8,15 +8,14 @@ import type { EntryKey } from './fileIO'
  * One entry's file content as of `data`, or null when `data` no longer holds
  * that entry at all.
  *
- * Null is the delete signal, and it is deliberately narrow: an entry with a
- * root but no occurrences is still an entry (its file-level fields are what is
- * left of it) and serializes fine. Only a key with neither is gone.
+ * Null is the delete signal, and key presence in `entries` *is* that answer:
+ * an entry is one object, so there is no longer a state where half of it is
+ * present and the write path has to decide what that means.
  */
 function entryContent(data: StoreData, key: EntryKey): string | null {
-  const items = entryKeyItems(data.items, key)
-  const root  = data.roots.get(key)
-  if (items.length === 0 && !root) return null
-  return serializeEntry(items, root)
+  const entry = data.entries.get(key)
+  if (!entry) return null
+  return serializeEntry(entry.items, entry.root)
 }
 
 /**
@@ -37,13 +36,13 @@ export function persistEntries(data: StoreData, keys: Iterable<EntryKey>): void 
 
 /** Commit to store and persist every listed entry. */
 export function commitNext(next: StoreData, keys: EntryKey[]): void {
-  setData(next)
+  setData(next.entries)
   persistEntries(next, keys)
 }
 
 /** Commit to store, persist the backlink-edited entries, and delete the primary from its backend. */
 export function commitDelete(next: StoreData, key: EntryKey, backlinkKeys: Iterable<EntryKey>): void {
-  setData(next)
+  setData(next.entries)
   persistEntries(next, backlinkKeys)
   deleteEntity(key)
 }
@@ -65,6 +64,6 @@ export function commitDelete(next: StoreData, key: EntryKey, backlinkKeys: Itera
 export function commitMove(next: StoreData, fromKey: EntryKey, toKey: EntryKey): void {
   const content = entryContent(next, toKey)
   if (content === null) return
-  setData(next)
+  setData(next.entries)
   moveEntity(fromKey, toKey, content)
 }

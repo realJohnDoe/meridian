@@ -20,7 +20,7 @@
  * already equals stableOccId(key) — instead of minting a new one.
  */
 import { describe, it, expect } from 'vitest'
-import { loadFixture, TEST_VAULT, rootsOf } from './helpers'
+import { loadFixture, TEST_VAULT, rootsOf, itemsOf, rootsIn, dataOf } from './helpers'
 import { parseToStoreItems } from '@/model/storeItems'
 import { expandRange, stableOccId } from '@/model/expansion'
 import { toggleDone } from '@/model/storeOps'
@@ -56,14 +56,14 @@ describe('generated occurrence IDs stay stable across a done-toggle', () => {
     expect(before.metadata.done).toBe(false)
     expect(before.id).toBe(stableOccId(`${seriesId}|2026-04-20|09:00`))
 
-    const next = toggleDone({ items, roots }, before)
-    const after = expandRange(next.items, next.roots, FROM, TO).find(o => o.date === '2026-04-20')!
+    const next = toggleDone(dataOf(items, roots), before)
+    const after = expandRange(itemsOf(next), rootsIn(next), FROM, TO).find(o => o.date === '2026-04-20')!
 
     expect(after.metadata.done).toBe(true)
     expect(after.id).toBe(before.id)
     // Still exactly one occurrence on that date — the override replaced the
     // generated slot rather than duplicating it.
-    expect(expandRange(next.items, next.roots, FROM, TO).filter(o => o.date === '2026-04-20')).toHaveLength(1)
+    expect(expandRange(itemsOf(next), rootsIn(next), FROM, TO).filter(o => o.date === '2026-04-20')).toHaveLength(1)
   })
 
   it('toggling one occurrence does not change the id of any other generated occurrence', () => {
@@ -74,9 +74,9 @@ describe('generated occurrence IDs stay stable across a done-toggle', () => {
     )
 
     const toggled = expandRange(items, roots, FROM, TO).find(o => o.date === '2026-04-20')!
-    const next = toggleDone({ items, roots }, toggled)
+    const next = toggleDone(dataOf(items, roots), toggled)
     const afterIds = new Map(
-      expandRange(next.items, next.roots, FROM, TO).map(o => [o.date, o.id]),
+      expandRange(itemsOf(next), rootsIn(next), FROM, TO).map(o => [o.date, o.id]),
     )
 
     for (const [date, id] of beforeIds) {
@@ -88,11 +88,11 @@ describe('generated occurrence IDs stay stable across a done-toggle', () => {
   it('a second toggle on the now-materialised override still preserves the id', () => {
     const { items, roots } = parseWeeklySeries()
     const first = expandRange(items, roots, FROM, TO).find(o => o.date === '2026-04-20')!
-    const afterFirst = toggleDone({ items, roots }, first)
+    const afterFirst = toggleDone(dataOf(items, roots), first)
 
-    const second = expandRange(afterFirst.items, afterFirst.roots, FROM, TO).find(o => o.date === '2026-04-20')!
+    const second = expandRange(itemsOf(afterFirst), rootsIn(afterFirst), FROM, TO).find(o => o.date === '2026-04-20')!
     const afterSecond = toggleDone(afterFirst, second)
-    const third = expandRange(afterSecond.items, afterSecond.roots, FROM, TO).find(o => o.date === '2026-04-20')!
+    const third = expandRange(itemsOf(afterSecond), rootsIn(afterSecond), FROM, TO).find(o => o.date === '2026-04-20')!
 
     expect(second.id).toBe(first.id)
     expect(third.id).toBe(first.id)

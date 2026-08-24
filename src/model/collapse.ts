@@ -1,4 +1,4 @@
-import type { StoreItem, OccurrenceMetadata, FileMetadata, OccurrenceEntry } from '@/types'
+import type { OccurrenceMetadata, FileMetadata, OccurrenceEntry, Entry } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
 import { OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, STRUCTURAL_KEYS, inlineFieldEqual, inlineFieldEmpty, absentFieldValue, deepEqual } from './fieldRegistry'
 import { saveFile } from './inheritance'
@@ -24,16 +24,12 @@ type AnyOcc = OccurrenceEntry<OccurrenceMetadata>
  * - Series-specific metadata goes into the series' local defaults: block.
  * - Override instances diff against the series' full metadata.
  */
-export function collapseToYaml(items: StoreItem[], root?: FileMetadata): Record<string, unknown> {
-  // A root with no occurrences is still a file, and its file-level fields are
-  // the only thing left to write. Emitting `{}` here would blank the title,
-  // tags and `items:` list on the next save, which is why the write path used
-  // to refuse such an entry outright — and then never write it at all, losing
-  // it with the tab (see `writeEntityToCache`). What this emits re-parses into
-  // one undated occurrence (`nodeIsItem` treats a leaf root as an item), so the
-  // entry comes back whole on the next load rather than staying occurrence-less.
-  if (items.length === 0) return root ? fileMetaToYaml(root) : {}
-
+export function collapseToYaml(items: Entry['items'], root?: FileMetadata): Record<string, unknown> {
+  // No `items.length === 0` branch: it used to emit the root's file-level
+  // fields alone, so that a root with no occurrences was written rather than
+  // blanked. `Entry['items']` is non-empty, so that entry cannot exist and no
+  // caller can reach here with nothing — the debugger's own preview guards on
+  // an empty list before it gets this far (`itemsToYaml`).
   const fileLevel = root ? fileMetaToYaml(root) : {}
 
   const series      = items.filter(isSeries)
@@ -297,6 +293,6 @@ function computeSharedFields(metas: Partial<OccurrenceMetadata>[]): Partial<Occu
  * divergence goes unnoticed, and it is what the write path is now handed
  * instead of a key it has to resolve for itself.
  */
-export function serializeEntry(items: StoreItem[], root?: FileMetadata): string {
-  return saveFile(collapseToYaml(items, root), root?.body ?? '', root?.fileConvention)
+export function serializeEntry(items: Entry['items'], root: FileMetadata): string {
+  return saveFile(collapseToYaml(items, root), root.body ?? '', root.fileConvention)
 }

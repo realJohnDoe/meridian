@@ -145,8 +145,8 @@ describe('computeExpansionCache', () => {
     const first = computeExpansionCache(null, items, roots1, from, to)
     expect(first.allOccs.find(o => o.id === 'a')?.metadata.title).toBe('Old Title')
 
-    // Simulate editing note-a's title: storeOps.updateRoot allocates a fresh
-    // map and a fresh entry for the edited slug only (see updateRoot).
+    // Simulate editing note-a's title: storeOps.editedEntry allocates a fresh
+    // entry for the edited key only (see editedEntry / withEntry).
     const roots2 = new Map(roots1)
     roots2.set(keyOf('note-a.md'), { title: 'New Title', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'note-a.md' })
 

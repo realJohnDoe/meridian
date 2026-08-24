@@ -8,7 +8,7 @@
  * SOURCE file instead.
  */
 import { describe, it, expect } from 'vitest'
-import { fixtureNames, loadFixture, parseFixture, serialize, collectKeyValues, frontmatterOf, TEST_VAULT, rootsOf, NEW_TARGET, keyOf } from './helpers'
+import { fixtureNames, loadFixture, parseFixture, serialize, collectKeyValues, frontmatterOf, TEST_VAULT, rootsOf, NEW_TARGET, keyOf, dataOf, serializeKey } from './helpers'
 import { parseToStoreItems } from '@/model/storeItems'
 import { collapseToYaml } from '@/model/collapse'
 import { saveFile } from '@/model/inheritance'
@@ -65,7 +65,7 @@ describe('unknown keys at the file root (flat file)', () => {
 
   it('keeps scalar types and the markdown body', () => {
     const p = parseFixture('unknown-keys-flat')
-    expect(p.items[0]!.metadata.extra).toEqual({
+    expect(p.items[0].metadata.extra).toEqual({
       project: 'apollo',
       url: 'https://example.com/ticket/42',
       estimate: 3,
@@ -172,24 +172,24 @@ describe('known fields carrying an unexpected type', () => {
   it('keeps the typed field honest while the raw value round-trips', () => {
     const p = parseFixture('malformed-known')
     // The typed fields fall back to their usual absent/empty/filtered value...
-    expect(p.items[0]!.metadata.duration).toBeUndefined()
+    expect(p.items[0].metadata.duration).toBeUndefined()
     expect(p.root.tags).toEqual([])
     // ...including priority and done: a value outside their declared union
     // is exactly as malformed as a wrong container shape (health survey
     // finding #1 — a `Priority` field silently holding `7`, or a `boolean`
     // field holding an arbitrary string, made every downstream `===` check
     // on them a silent no-op instead of a loud failure).
-    expect(p.items[0]!.metadata.priority).toBeUndefined()
-    expect(p.items[0]!.metadata.extra?.priority).toBe(7)
-    expect(p.items[0]!.metadata.done).toBeUndefined()
-    expect(p.items[0]!.metadata.extra?.done).toBe('yes')
+    expect(p.items[0].metadata.priority).toBeUndefined()
+    expect(p.items[0].metadata.extra?.priority).toBe(7)
+    expect(p.items[0].metadata.done).toBeUndefined()
+    expect(p.items[0].metadata.extra?.done).toBe('yes')
     // A stringArray with SOME unrepresentable elements (a nested mapping)
     // keeps its representable elements typed — coerced, not dropped whole —
     // while the untouched raw array survives in extra for the save.
     expect(p.root.items).toEqual(['1', '[[real-note]]'])
     expect(p.root.extra?.items).toEqual([1, { nested: true }, '[[real-note]]'])
     // ...but the raw values for duration/tags survive under their own key.
-    expect(p.items[0]!.metadata.extra?.duration).toEqual([1, 2])
+    expect(p.items[0].metadata.extra?.duration).toEqual([1, 2])
     expect(p.root.extra?.tags).toBe('not-a-list')
   })
 
@@ -213,13 +213,13 @@ describe('known fields carrying an unexpected type', () => {
     const p = parseFixture('malformed-known')
     const roots = rootsOf(p.root)
     const occ = expandRange(p.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))[0]!
-    const next = applyEdit({ items: p.items, roots }, occ, 'all', {
+    const next = applyEdit(dataOf(p.items, roots), occ, 'all', {
       title: 'Malformed fields', tags: ['work'], items: [], participants: [],
       tracked: false, done: false, priority: null,
       scheduled: { date: '2026-04-08', time: '' }, duration: '30m', repeat: null,
       body: '',
     }, NEW_TARGET)
-    const yaml = serialize(next.items.filter(i => i.entryKey === keyOf('malformed-known')), next.roots.get(keyOf('malformed-known')))
+    const yaml = serializeKey(next, keyOf('malformed-known'))
     const fm = frontmatterOf(yaml)
     expect(fm.duration).toBe('30m')
     expect(fm.tags).toEqual(['work'])

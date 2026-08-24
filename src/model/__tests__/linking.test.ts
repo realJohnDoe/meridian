@@ -3,24 +3,30 @@ import { parseToStoreItems } from '@/model/storeItems'
 import { resolveWikilink, buildResolveIndex, unwrapRef } from '@/wikilinks'
 import { fileEntries, buildBacklinkIndex, updateFileOccurrenceMap, fileOccurrenceMap } from '@/fileOccurrence'
 import { toggleDone } from '@/model/storeOps'
-import type { StoreItem, Roots, Occurrence } from '@/types'
+import type { StoreItem, Roots, Occurrence, Entries } from '@/types'
+import type { StoreData } from '@/model'
 import type { EntryKey } from '@/fileIO'
 import { entryKey } from '@/fileIO'
-import { TEST_VAULT, keyOf } from './helpers'
+import { TEST_VAULT, keyOf, dataOf, itemsOf, rootsIn } from './helpers'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-interface StoreSnapshot { items: StoreItem[]; roots: Roots }
+/**
+ * The flat `items`/`roots` pair, for the resolvers below that still take one —
+ * `resolveWikilink` and the occurrence map both work across every entry at
+ * once, so a flat view is what they want.
+ */
+function makeFlat(yamls: Array<{ slug: string; yaml: string }>): { items: StoreItem[]; roots: Roots } {
+  const data = makeStore(yamls)
+  return { items: itemsOf(data), roots: rootsIn(data) }
+}
 
-function makeStore(yamls: Array<{ slug: string; yaml: string }>): StoreSnapshot {
-  const items: StoreItem[] = []
-  const roots: Roots = new Map()
+function makeStore(yamls: Array<{ slug: string; yaml: string }>): StoreData {
+  const entries: Entries = new Map()
   for (const { slug, yaml } of yamls) {
-    const result = parseToStoreItems(`${slug}.md`, yaml, TEST_VAULT)
-    items.push(...result.items)
-    roots.set(keyOf(slug), result.root)
+    entries.set(keyOf(slug), parseToStoreItems(`${slug}.md`, yaml, TEST_VAULT))
   }
-  return { items, roots }
+  return { entries }
 }
 
 const ALPHA_YAML = `---
@@ -55,7 +61,7 @@ defaults:
 // ── resolveWikilink ───────────────────────────────────────────────────────────
 
 describe('resolveWikilink', () => {
-  const { roots } = makeStore([
+  const { roots } = makeFlat([
     { slug: 'project-alpha', yaml: ALPHA_YAML },
     { slug: 'beta-notes',    yaml: BETA_YAML  },
   ])
@@ -182,7 +188,7 @@ describe('unwrapRef', () => {
 // ── fileEntries ───────────────────────────────────────────────────────────────
 
 describe('fileEntries', () => {
-  const { roots } = makeStore([
+  const { roots } = makeFlat([
     { slug: 'project-alpha', yaml: ALPHA_YAML },
     { slug: 'beta-notes',    yaml: BETA_YAML  },
   ])
@@ -224,7 +230,7 @@ describe('fileEntries', () => {
 // ── buildResolveIndex (parity with resolveWikilink) ──────────────────────────
 
 describe('buildResolveIndex', () => {
-  const { roots } = makeStore([
+  const { roots } = makeFlat([
     { slug: 'project-alpha', yaml: ALPHA_YAML },
     { slug: 'beta-notes',    yaml: BETA_YAML  },
   ])
@@ -253,7 +259,7 @@ describe('buildBacklinkIndex', () => {
   // by title alias, and (delta) via both — delta must still be counted once.
   const withItems = (title: string, items: string[]) =>
     `---\ntitle: ${title}\ntags: []\nitems: [${items.map(i => `"${i}"`).join(', ')}]\n---\n`
-  const { roots } = makeStore([
+  const { roots } = makeFlat([
     { slug: 'project-alpha', yaml: withItems('Project Alpha', ['[[project-alpha]]', '[[beta-notes]]']) },
     { slug: 'beta-notes',    yaml: withItems('Beta Notes',    ['[[project-alpha]]']) },
     { slug: 'gamma-doc',     yaml: withItems('Gamma Doc',     ['[[Project Alpha]]']) },
@@ -292,7 +298,7 @@ describe('buildBacklinkIndex', () => {
   // here with "stored.match is not a function" inside unwrapRef, taking the
   // whole vault load down instead of degrading just this one file.
   it('does not crash on a root whose items list holds a malformed element', () => {
-    const { roots } = makeStore([
+    const { roots } = makeFlat([
       { slug: 'note', yaml: '---\ntitle: Note\ntags: []\nitems: [42, "[[real-note]]"]\n---\n' },
       { slug: 'real-note', yaml: '---\ntitle: Real Note\ntags: []\nitems: []\n---\n' },
     ])
@@ -329,21 +335,21 @@ done: false
 
 describe('representative occurrence resolution', () => {
   it('returns an occurrence for a file with a recurring series', () => {
-    const { items, roots } = makeStore([{ slug: 'weekly-standup', yaml: RECUR_YAML }])
+    const { items, roots } = makeFlat([{ slug: 'weekly-standup', yaml: RECUR_YAML }])
     const map = buildFom(items, roots)
     expect(map.get(keyOf('weekly-standup'))).toBeDefined()
     expect(map.get(keyOf('weekly-standup'))!.entryKey).toBe(keyOf('weekly-standup'))
   })
 
   it('returns an occurrence for a standalone past item', () => {
-    const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const { items, roots } = makeFlat([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const map = buildFom(items, roots)
     expect(map.get(keyOf('project-alpha'))).toBeDefined()
     expect(map.get(keyOf('project-alpha'))!.entryKey).toBe(keyOf('project-alpha'))
   })
 
   it('returns undefined for an unknown fileSlug (slug not in roots)', () => {
-    const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const { items, roots } = makeFlat([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const map = buildFom(items, roots)
     expect(map.get(keyOf('no-such-file'))).toBeUndefined()
   })
@@ -352,7 +358,7 @@ describe('representative occurrence resolution', () => {
     // Before fileOccurrenceMap: handleOpenWikilink used targetOccurrence (expandRange)
     // which skips undated items, then fell through to create-new. This test confirms
     // the total map covers undated notes so the click handler can open them.
-    const { items, roots } = makeStore([{ slug: 'grocery-list', yaml: NOTE_YAML }])
+    const { items, roots } = makeFlat([{ slug: 'grocery-list', yaml: NOTE_YAML }])
     const map = buildFom(items, roots)
     const occ = map.get(keyOf('grocery-list'))
     expect(occ).toBeDefined()
@@ -364,7 +370,7 @@ describe('representative occurrence resolution', () => {
   it('out-of-±3yr-window single dated item resolves via step-2 standalone fill', () => {
     // FAR_PAST_YAML has date 2020-01-01, well outside the ±3yr window from 2026.
     // expandRange won't produce it; step 2 (isStandaloneOcc) must catch it.
-    const { items, roots } = makeStore([{ slug: 'old-project', yaml: FAR_PAST_YAML }])
+    const { items, roots } = makeFlat([{ slug: 'old-project', yaml: FAR_PAST_YAML }])
     const map = buildFom(items, roots)
     const occ = map.get(keyOf('old-project'))
     expect(occ).toBeDefined()
@@ -373,7 +379,7 @@ describe('representative occurrence resolution', () => {
   })
 
   it('is total — every slug present in roots has a .get() hit', () => {
-    const { items, roots } = makeStore([
+    const { items, roots } = makeFlat([
       { slug: 'project-alpha',  yaml: ALPHA_YAML   },
       { slug: 'beta-notes',     yaml: BETA_YAML    },
       { slug: 'weekly-standup', yaml: RECUR_YAML   },
@@ -400,7 +406,7 @@ instances:
   - done: false
 ---
 `
-    const { items, roots } = makeStore([{ slug: 'bargeld', yaml: DONE_DATED_PLUS_UNDATED_OPEN }])
+    const { items, roots } = makeFlat([{ slug: 'bargeld', yaml: DONE_DATED_PLUS_UNDATED_OPEN }])
     const map = buildFom(items, roots)
     const occ = map.get(keyOf('bargeld'))
     expect(occ).toBeDefined()
@@ -421,7 +427,7 @@ instances:
   - done: false
 ---
 `
-    const { items, roots } = makeStore([{ slug: 'sync-bug', yaml: DONE_TODAY_PLUS_UNDATED_OPEN }])
+    const { items, roots } = makeFlat([{ slug: 'sync-bug', yaml: DONE_TODAY_PLUS_UNDATED_OPEN }])
     const map = buildFom(items, roots)
     const occ = map.get(keyOf('sync-bug'))
     expect(occ).toBeDefined()
@@ -429,38 +435,49 @@ instances:
     expect(occ!.metadata.done).toBe(false)
   })
 
-  it('is total for a root that has no items at all', () => {
+  it('is total over the store, including an entry whose only occurrence is undated', () => {
     // The reported bug: an entry whose root survived with zero occurrences had
     // no place in the map, so the search results list reserved a row for it and
-    // drew nothing — an invisible gap where the entry should have been. An
-    // entry is its root, so it gets a representative occurrence built from the
-    // file-level fields.
-    const { items } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
-    const roots: Roots = new Map([[keyOf('handy'), { title: 'handy', tags: ['errands'], items: [], vaultId: TEST_VAULT, fileSlug: 'handy' }]])
+    // drew nothing — an invisible gap where the entry should have been. The map
+    // used to close that hole with an explicit sweep that synthesized a
+    // representative for every root it had not already resolved.
+    //
+    // That sweep is gone, because the hole is: `Entry['items']` is non-empty,
+    // so every key in the store has items to resolve from and the map is total
+    // by construction. What is pinned here is the case the sweep was really
+    // for — a file carrying only file-level fields, which parses into one
+    // undated occurrence and must still get a representative.
+    const rootOnly = parseToStoreItems('handy.md', '---\ntitle: handy\ntags: [errands]\n---\n', TEST_VAULT)
+    const { items, roots } = makeFlat([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const allItems = [...items, ...rootOnly.items]
+    const allRoots: Roots = new Map(roots).set(keyOf('handy'), rootOnly.root)
 
-    const occ = buildFom(items.filter(i => i.entryKey !== keyOf('handy')), roots).get(keyOf('handy'))
+    const map = buildFom(allItems, allRoots)
 
-    expect(occ).toBeDefined()
+    // Total: every key the store holds resolves to something.
+    for (const key of allRoots.keys()) expect(map.get(key)).toBeDefined()
+    const occ = map.get(keyOf('handy'))
     expect(occ!.entryKey).toBe(keyOf('handy'))
     expect(occ!.metadata.title).toBe('handy')
     expect(occ!.date).toBe('')
   })
 
-  it('drops the occurrence resolved from items a key has since lost', () => {
-    // The incremental path may only reuse a cached entry when the key had no
-    // items *before* either — otherwise a key whose items were just evicted
-    // would keep pointing at an occurrence that no longer exists.
-    const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+  it('drops a key whose items are gone, rather than keeping the occurrence they resolved to', () => {
+    // The incremental path must not let a key that has just lost its items keep
+    // pointing at an occurrence resolved from them. Losing every item now means
+    // losing the entry, so the key leaves the map entirely — where it used to
+    // fall through to a synthesized root-only representative.
+    const { items, roots } = makeFlat([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const withItems = buildFom(items, roots)
     expect(withItems.get(keyOf('project-alpha'))!.date).not.toBe('')
 
-    const after = updateFileOccurrenceMap(withItems, items, roots, [], roots)
+    const after = updateFileOccurrenceMap(withItems, items, roots, [], new Map())
 
-    expect(after.get(keyOf('project-alpha'))!.date).toBe('')
+    expect(after.has(keyOf('project-alpha'))).toBe(false)
   })
 
   it('returns equal maps for identical inputs', () => {
-    const { items, roots } = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
+    const { items, roots } = makeFlat([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const map1 = buildFom(items, roots)
     const map2 = buildFom(items, roots)
     expect([...map1.entries()]).toStrictEqual([...map2.entries()])
@@ -513,7 +530,7 @@ done: false
 
 describe('updateFileOccurrenceMap', () => {
   it('unchanged snapshot reuses all cached entries', () => {
-    const { items, roots } = makeStore([
+    const { items, roots } = makeFlat([
       { slug: 'project-alpha',  yaml: ALPHA_YAML },
       { slug: 'weekly-standup', yaml: RECUR_YAML },
     ])
@@ -531,13 +548,13 @@ describe('updateFileOccurrenceMap', () => {
       { slug: 'my-task',        yaml: TASK_YAML  },
       { slug: 'future-event',   yaml: FUTURE_YAML },
     ])
-    const prevFom = buildFom(base.items, base.roots)
+    const prevFom = buildFom(itemsOf(base), rootsIn(base))
     const taskOcc = prevFom.get(keyOf('my-task'))!
 
     const next = toggleDone(base, taskOcc)
 
-    const incremental = updateFileOccurrenceMap(prevFom, base.items, base.roots, next.items, next.roots)
-    const full        = buildFom(next.items, next.roots)
+    const incremental = updateFileOccurrenceMap(prevFom, itemsOf(base), rootsIn(base), itemsOf(next), rootsIn(next))
+    const full        = buildFom(itemsOf(next), rootsIn(next))
     assertMapsEquivalent(incremental, full)
 
     // Unchanged slug reuses the cached reference.
@@ -548,15 +565,15 @@ describe('updateFileOccurrenceMap', () => {
 
   it('adding a new file includes it in the incremental map', () => {
     const base = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
-    const prevFom = buildFom(base.items, base.roots)
+    const prevFom = buildFom(itemsOf(base), rootsIn(base))
 
     // Extend the existing snapshot by appending the new file's items/root so
     // project-alpha's item references remain identical (same objects).
     const added = makeStore([{ slug: 'my-task', yaml: TASK_YAML }])
-    const nextItems = [...base.items, ...added.items]
-    const nextRoots: Roots = new Map([...base.roots, ...added.roots])
+    const nextItems = [...itemsOf(base), ...itemsOf(added)]
+    const nextRoots: Roots = new Map([...rootsIn(base), ...rootsIn(added)])
 
-    const incremental = updateFileOccurrenceMap(prevFom, base.items, base.roots, nextItems, nextRoots)
+    const incremental = updateFileOccurrenceMap(prevFom, itemsOf(base), rootsIn(base), nextItems, nextRoots)
     const full        = buildFom(nextItems, nextRoots)
     assertMapsEquivalent(incremental, full)
     expect(incremental.get(keyOf('my-task'))).toBeDefined()
@@ -569,13 +586,13 @@ describe('updateFileOccurrenceMap', () => {
     // item references can be shared with the post-delete "next" snapshot.
     const alpha = makeStore([{ slug: 'project-alpha', yaml: ALPHA_YAML }])
     const task  = makeStore([{ slug: 'my-task',       yaml: TASK_YAML  }])
-    const baseItems = [...alpha.items, ...task.items]
-    const baseRoots: Roots = new Map([...alpha.roots, ...task.roots])
+    const baseItems = [...itemsOf(alpha), ...itemsOf(task)]
+    const baseRoots: Roots = new Map([...rootsIn(alpha), ...rootsIn(task)])
     const prevFom = buildFom(baseItems, baseRoots)
 
     // "Delete" my-task — reuse the same alpha item refs in the next snapshot.
-    const incremental = updateFileOccurrenceMap(prevFom, baseItems, baseRoots, alpha.items, alpha.roots)
-    const full        = buildFom(alpha.items, alpha.roots)
+    const incremental = updateFileOccurrenceMap(prevFom, baseItems, baseRoots, itemsOf(alpha), rootsIn(alpha))
+    const full        = buildFom(itemsOf(alpha), rootsIn(alpha))
     assertMapsEquivalent(incremental, full)
     expect(incremental.get(keyOf('my-task'))).toBeUndefined()
   })
@@ -585,15 +602,15 @@ describe('updateFileOccurrenceMap', () => {
       { slug: 'project-alpha', yaml: ALPHA_YAML },
       { slug: 'my-task',       yaml: TASK_YAML  },
     ])
-    const prevFom = buildFom(base.items, base.roots)
+    const prevFom = buildFom(itemsOf(base), rootsIn(base))
 
     // Rename project-alpha's title — new Map entry = new reference for that slug.
-    const newRoots: Roots = new Map(base.roots)
-    newRoots.set(keyOf('project-alpha'), { ...base.roots.get(keyOf('project-alpha'))!, title: 'Project Alpha Renamed' })
-    const next = { items: base.items, roots: newRoots }
+    const newRoots: Roots = new Map(rootsIn(base))
+    newRoots.set(keyOf('project-alpha'), { ...rootsIn(base).get(keyOf('project-alpha'))!, title: 'Project Alpha Renamed' })
+    const next = dataOf(itemsOf(base), newRoots)
 
-    const incremental = updateFileOccurrenceMap(prevFom, base.items, base.roots, next.items, next.roots)
-    const full        = buildFom(next.items, next.roots)
+    const incremental = updateFileOccurrenceMap(prevFom, itemsOf(base), rootsIn(base), itemsOf(next), rootsIn(next))
+    const full        = buildFom(itemsOf(next), rootsIn(next))
     assertMapsEquivalent(incremental, full)
     expect(incremental.get(keyOf('project-alpha'))!.metadata.title).toBe('Project Alpha Renamed')
     // Unaffected slug reuses cached reference.
@@ -605,13 +622,13 @@ describe('updateFileOccurrenceMap', () => {
       { slug: 'weekly-standup', yaml: RECUR_YAML },
       { slug: 'my-task',        yaml: TASK_YAML  },
     ])
-    const prevFom = buildFom(base.items, base.roots)
+    const prevFom = buildFom(itemsOf(base), rootsIn(base))
     const seriesOcc = prevFom.get(keyOf('weekly-standup'))!
 
     const next = toggleDone(base, seriesOcc)
 
-    const incremental = updateFileOccurrenceMap(prevFom, base.items, base.roots, next.items, next.roots)
-    const full        = buildFom(next.items, next.roots)
+    const incremental = updateFileOccurrenceMap(prevFom, itemsOf(base), rootsIn(base), itemsOf(next), rootsIn(next))
+    const full        = buildFom(itemsOf(next), rootsIn(next))
     assertMapsEquivalent(incremental, full)
     // Unrelated slug reuses cached reference.
     expect(incremental.get(keyOf('my-task'))).toBe(prevFom.get(keyOf('my-task')))
@@ -631,7 +648,7 @@ describe('updateFileOccurrenceMap', () => {
 
 describe('fileOccurrenceMap', () => {
   it('returns the same Map by reference for the same items/roots', () => {
-    const { items, roots } = makeStore([
+    const { items, roots } = makeFlat([
       { slug: 'project-alpha',  yaml: ALPHA_YAML },
       { slug: 'weekly-standup', yaml: RECUR_YAML },
     ])
@@ -647,13 +664,13 @@ describe('fileOccurrenceMap', () => {
       { slug: 'weekly-standup', yaml: RECUR_YAML },
       { slug: 'my-task',        yaml: TASK_YAML  },
     ])
-    const before = fileOccurrenceMap(base.items, base.roots)
+    const before = fileOccurrenceMap(itemsOf(base), rootsIn(base))
 
     const next = toggleDone(base, before.get(keyOf('weekly-standup'))!)
-    const after = fileOccurrenceMap(next.items, next.roots)
+    const after = fileOccurrenceMap(itemsOf(next), rootsIn(next))
 
     expect(after).not.toBe(before)
-    assertMapsEquivalent(after, buildFom(next.items, next.roots))
+    assertMapsEquivalent(after, buildFom(itemsOf(next), rootsIn(next)))
   })
 
   it('is correct even when several store writes are skipped between reads', () => {
@@ -665,18 +682,18 @@ describe('fileOccurrenceMap', () => {
       { slug: 'weekly-standup', yaml: RECUR_YAML },
       { slug: 'my-task',        yaml: TASK_YAML  },
     ])
-    const seed = fileOccurrenceMap(base.items, base.roots)
+    const seed = fileOccurrenceMap(itemsOf(base), rootsIn(base))
 
     const once  = toggleDone(base, seed.get(keyOf('weekly-standup'))!)
-    const twice = toggleDone(once, fileOccurrenceMap(once.items, once.roots).get(keyOf('my-task'))!)
+    const twice = toggleDone(once, fileOccurrenceMap(itemsOf(once), rootsIn(once)).get(keyOf('my-task'))!)
 
     // Jump straight from `base` to `twice` without reading the state between.
     const skipped = makeStore([
       { slug: 'weekly-standup', yaml: RECUR_YAML },
       { slug: 'my-task',        yaml: TASK_YAML  },
     ])
-    fileOccurrenceMap(skipped.items, skipped.roots)
+    fileOccurrenceMap(itemsOf(skipped), rootsIn(skipped))
 
-    assertMapsEquivalent(fileOccurrenceMap(twice.items, twice.roots), buildFom(twice.items, twice.roots))
+    assertMapsEquivalent(fileOccurrenceMap(itemsOf(twice), rootsIn(twice)), buildFom(itemsOf(twice), rootsIn(twice)))
   })
 })

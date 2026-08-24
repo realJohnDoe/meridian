@@ -37,6 +37,7 @@ import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
 import { roundTripLoss } from '@/model/roundTripCheck'
 import { isSeries, isTracked } from '@/types'
+import type { StoreItem, Entry } from '@/types'
 import { fixtureNames, loadFixture, frontmatterOf, normalizeIds, serialize, TEST_VAULT } from './helpers'
 
 /** Check 1 — collapse totality. Store must survive its own serialization. */
@@ -89,10 +90,9 @@ describe('roundTripLoss — the runtime guard', () => {
       '---',
     ].join('\n')
     const parsed = parseToStoreItems('qr.md', source, TEST_VAULT)
-    const lobotomised = {
-      ...parsed,
-      items: parsed.items.map(i => ({ ...i, metadata: { ...i.metadata, extra: undefined } })),
-    }
+    const strip = (i: StoreItem): StoreItem => ({ ...i, metadata: { ...i.metadata, extra: undefined } })
+    const [head, ...tail] = parsed.items
+    const lobotomised: Entry = { ...parsed, items: [strip(head), ...tail.map(strip)] }
     expect(roundTripLoss('qr.md', source, lobotomised)).toEqual(['project="apollo"'])
   })
 })

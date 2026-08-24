@@ -206,12 +206,12 @@ function setVaultUnreadable(
 async function hydrateFromCache(vaultId: string): Promise<boolean> {
   const cached = await cacheLoadAll(vaultId)
   if (cached.length === 0) {
-    setVaultLayer(vaultId, { items: [], roots: new Map() })
+    setVaultLayer(vaultId, new Map())
     setVaultUnreadable(vaultId, [])
     return false
   }
-  const { items, roots, failures, auditRoundTrip } = parseFiles(cached, vaultId)
-  setVaultLayer(vaultId, { items, roots })
+  const { entries, failures, auditRoundTrip } = parseFiles(cached, vaultId)
+  setVaultLayer(vaultId, entries)
   setVaultUnreadable(vaultId, failures)
   reportParseFailures(failures)
   auditRoundTrip()
@@ -232,8 +232,8 @@ async function mountExampleVault(): Promise<void> {
   const backend = new ExampleBackend()
   mountBackend(backend)
   const files = await backend.readAll()
-  const { items, roots, failures, auditRoundTrip } = parseFiles(files, backend.id)
-  setVaultLayer(backend.id, { items, roots })
+  const { entries, failures, auditRoundTrip } = parseFiles(files, backend.id)
+  setVaultLayer(backend.id, entries)
   setVaultUnreadable(backend.id, failures)
   reportParseFailures(failures)
   auditRoundTrip()

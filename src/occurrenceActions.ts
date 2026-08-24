@@ -2,11 +2,11 @@ import { toast } from 'sonner'
 import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, occFromAppMeta, freeEntryKey, moveEntryKey } from '@/model'
 import { occIsRecur } from './occView'
 import { isStandaloneOcc } from './types'
-import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots, StoreItem } from './types'
+import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Entries, Entry, StoreItem } from './types'
 import { keySlug, keyVaultId } from './fileIO'
 import type { EntryKey } from './fileIO'
 import { isWritableVault } from './vaultRef'
-import { getSnapshot, getItems, getRoots, getUnreadableFiles, getVaults, setData, replaceFavorite } from './storeBridge'
+import { getSnapshot, getItems, getEntries, getUnreadableFiles, getVaults, setData, replaceFavorite } from './storeBridge'
 import { deleteEntity } from './persistencePort'
 import { commitNext, commitMove, persistEntries } from './storeCommit'
 
@@ -25,24 +25,22 @@ const TOAST_MS = 4000
 // back while leaving every other file's wikilink to it stripped, which is the
 // half of finding #7 that was specific to Undo (the missing persistence was
 // the other half, fixed at the two `beginSwipeDelete` call sites below).
-function restoreEntries(snapshot: { items: StoreItem[]; roots: Roots }, entryKeys: readonly EntryKey[]): void {
+function restoreEntries(snapshot: { entries: Entries }, entryKeys: readonly EntryKey[]): void {
   const keys = new Set(entryKeys)
-  const current = getSnapshot()
-  const items = [
-    ...current.items.filter(i => !keys.has(i.entryKey)),
-    ...snapshot.items.filter(i => keys.has(i.entryKey)),
-  ]
-  const roots = new Map(current.roots)
+  const entries = new Map(getSnapshot().entries)
   for (const key of keys) {
-    const snapshotRoot = snapshot.roots.get(key)
-    if (snapshotRoot) roots.set(key, snapshotRoot)
-    else roots.delete(key)
+    const was = snapshot.entries.get(key)
+    // Restoring an entry restores it whole, and an entry the snapshot never had
+    // is restored to *absent* — one decision per key instead of two that could
+    // disagree about whether the entry is back.
+    if (was) entries.set(key, was)
+    else entries.delete(key)
   }
-  const restored = { items, roots }
-  setData(restored)
-  // Undoing a create restores an entry that has no root and no items to go
-  // back to — `persistEntries` reads that as the delete it is, rather than
-  // leaving the file the create already wrote behind on disk.
+  const restored = { entries }
+  setData(entries)
+  // Undoing a create restores an entry that was never there — `persistEntries`
+  // reads absence as the delete it is, rather than leaving the file the create
+  // already wrote behind on disk.
   persistEntries(restored, keys)
 }
 
@@ -90,19 +88,22 @@ export function toggleOccDone(o: Occurrence): void {
 // Re-opens a done, undated occurrence: reuses an existing undated entry for
 // the file if one exists, otherwise creates a fresh undated entry.
 export function reopenOcc(occ: Occurrence): void {
-  const allItems = getItems()
-  const existingUndated = allItems.find(
-    i => isStandaloneOcc(i) && i.entryKey === occ.entryKey && i.date === '',
+  const entries = getEntries()
+  const entry = entries.get(occ.entryKey)
+  if (!entry) return
+  const withItems = (items: Entry['items']): void => {
+    commitNext({ entries: new Map(entries).set(occ.entryKey, { ...entry, items }) }, [occ.entryKey])
+  }
+  const [head, ...tail] = entry.items
+  const existingUndated = entry.items.find(
+    i => isStandaloneOcc(i) && i.date === '',
   ) as OccurrenceEntry<OccurrenceMetadata> | undefined
 
   if (existingUndated) {
-    commitNext({
-      items: allItems.map(i => i.id === existingUndated.id
-        ? { ...existingUndated, metadata: { ...existingUndated.metadata, done: false } }
-        : i,
-      ),
-      roots: getRoots(),
-    }, [occ.entryKey])
+    const reopen = (i: StoreItem): StoreItem => i.id === existingUndated.id
+      ? { ...existingUndated, metadata: { ...existingUndated.metadata, done: false } }
+      : i
+    withItems([reopen(head), ...tail.map(reopen)])
   } else {
     const newOcc: OccurrenceEntry<OccurrenceMetadata> = {
       date:     '',
@@ -112,7 +113,7 @@ export function reopenOcc(occ: Occurrence): void {
       id:       crypto.randomUUID(),
       metadata: { ...occFromAppMeta(occ.metadata), done: false },
     }
-    commitNext({ items: [...allItems, newOcc], roots: getRoots() }, [occ.entryKey])
+    withItems([head, ...tail, newOcc])
   }
 }
 
@@ -138,7 +139,7 @@ export function moveEntryToVault(fromKey: EntryKey, toVaultId: string): EntryKey
   if (keyVaultId(fromKey) === toVaultId) return null
   if (!isWritableVault(getVaults().find(v => v.id === toVaultId))) return null
   const snapshot = { ...getSnapshot(), unreadableKeys: new Set(getUnreadableFiles().keys()) }
-  if (!snapshot.roots.has(fromKey)) return null
+  if (!snapshot.entries.has(fromKey)) return null
 
   const toKey = freeEntryKey(snapshot, toVaultId, keySlug(fromKey))
   commitMove(moveEntryKey(snapshot, fromKey, toKey), fromKey, toKey)
@@ -156,7 +157,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
 
   if (occIsRecur(o)) {
     const next = excludeOccurrence(snapshot, o)
-    const endsSeries = deletionEndsAfterCompletionSeries(snapshot.items, o)
+    const endsSeries = deletionEndsAfterCompletionSeries(snapshot.entries.get(o.entryKey)?.items ?? [], o)
     showDeleteToast(title,
       // Serialized when the toast settles, not when it was armed: `next` is
       // only committed by the apply below, and an unrelated edit may have
@@ -165,7 +166,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
       () => { cancelled = true; restoreEntries(snapshot, [o.entryKey]) },
       { endsSeries },
     )
-    return () => { if (!cancelled) setData(next) }
+    return () => { if (!cancelled) setData(next.entries) }
   } else {
     // deleteByEntryKey's backlink cleanup — the OTHER files whose `items:`
     // list pointed at this one — is captured here so the deferred commit and
@@ -189,7 +190,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
       if (cancelled) return
       const { data, affectedKeys: computed } = deleteByEntryKey(getSnapshot(), o.entryKey)
       affectedKeys = computed
-      setData(data)
+      setData(data.entries)
     }
   }
 }
