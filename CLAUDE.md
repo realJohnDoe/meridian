@@ -40,7 +40,9 @@ An entry lives at its own route, not a search param on the agenda. The URL
 carries the two halves of its `EntryKey` as separate path segments — the
 Tutorial vault's id is `example`, so its first note is
 `/meridian/entry/example/01-start-here`. Search params: `date` (YYYY-MM-DD,
-pins which occurrence of a series) and `scope` (`single`/`future`/`all`/`add`).
+pins which occurrence of a series), `id` (the occurrence's stable id, breaking
+ties when two occurrences of the same file land on the same date), and
+`scope` (`single`/`future`/`all`/`add`).
 `/meridian/entry/<fileSlug>` still works as a redirect to the loaded vault.
 New entries are `/meridian/entry/new`, with `title`, `date`, `time`,
 `duration`, `itemType` and `vault` search params — `vault` overrides

@@ -54,10 +54,10 @@ describe('entryRoute', () => {
   // The URL carries the two halves of the EntryKey as separate path segments —
   // `::` is not path-safe, and `/entry/<vault>/<slug>` reads as what it is.
   it('routes to the occurrence\'s vault and file slug, defaulting to single-occurrence scope', () => {
-    expect(entryRoute(makeOcc({ entryKey: testKey('standup.md'), date: '2026-06-15' }))).toEqual({
+    expect(entryRoute(makeOcc({ entryKey: testKey('standup.md'), date: '2026-06-15', id: 'occ-1' }))).toEqual({
       to: '/entry/$vault/$slug',
       params: { vault: TEST_VAULT, slug: 'standup.md' },
-      search: { date: '2026-06-15', scope: 'single' },
+      search: { date: '2026-06-15', scope: 'single', id: 'occ-1' },
     })
   })
 
@@ -76,6 +76,13 @@ describe('entryRoute', () => {
   // _app.entry.$vault.$slug.tsx uses it to expandRange before falling back to the file.
   it('passes the occurrence date so a series opens on the right instance', () => {
     expect(entryRoute(makeOcc({ date: '2026-07-01' })).search.date).toBe('2026-07-01')
+  })
+
+  // Date alone doesn't disambiguate two override instances of the same file on
+  // the same date (e.g. neither has a time) — `id` is what
+  // _app.entry.$vault.$slug.tsx matches on to land on the exact one clicked.
+  it('passes the occurrence id so same-date siblings resolve to the right one', () => {
+    expect(entryRoute(makeOcc({ id: 'occ-2' })).search.id).toBe('occ-2')
   })
 })
 
