@@ -1,5 +1,5 @@
-import { X } from 'lucide-react'
-import { Badge } from './ui/badge'
+import { Plus, X } from 'lucide-react'
+import { Badge, badgeVariants } from './ui/badge'
 import { cn } from '@/lib/cn'
 
 interface TagChipProps {
@@ -66,5 +66,29 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
       {label}
       {removeButton}
     </Badge>
+  )
+}
+
+interface AddChipProps {
+  /** Trigger label, e.g. "add to list" or "person". */
+  label: string
+  onClick: () => void
+}
+
+/**
+ * "+ label" trigger button that opens an add-picker (participants, listed-on).
+ * Same indigo chip look as the wikilink/topic chips (Badge variant="link"),
+ * so the trigger reads as part of the same chip family it's about to add to.
+ */
+export function AddChip({ label, onClick }: AddChipProps) {
+  return (
+    <button
+      type="button"
+      className={cn(badgeVariants({ variant: 'link' }), 'min-h-6 cursor-pointer gap-1')}
+      onClick={onClick}
+    >
+      <Plus size={9} />
+      {label}
+    </button>
   )
 }
