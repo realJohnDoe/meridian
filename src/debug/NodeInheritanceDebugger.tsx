@@ -169,7 +169,7 @@ function ActionBtn({
   disabled?: boolean; title?: string; onClick: () => void
 }) {
   return (
-    <button onClick={onClick} disabled={disabled} title={title}
+    <button type="button" onClick={onClick} disabled={disabled} title={title}
       className={cn(
         'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-2xs transition-colors',
         disabled
@@ -209,8 +209,8 @@ function AddOccurrenceForm({ onApply, onCancel }: {
         <input type="checkbox" checked={done} onChange={e => setDone(e.target.checked)} className="accent-emerald-500" />
       </div>
       <div className="flex gap-2">
-        <button onClick={() => date && onApply(date, time, done)} disabled={!date} className={btnApply}>Add</button>
-        <button onClick={onCancel} className={btnCancel}>Cancel</button>
+        <button type="button" onClick={() => date && onApply(date, time, done)} disabled={!date} className={btnApply}>Add</button>
+        <button type="button" onClick={onCancel} className={btnCancel}>Cancel</button>
       </div>
     </div>
   )
@@ -235,8 +235,8 @@ function EditOccurrenceForm({ occ, onApply, onCancel }: {
         <input type="checkbox" checked={done} onChange={e => setDone(e.target.checked)} className="accent-emerald-500" />
       </div>
       <div className="flex gap-2">
-        <button onClick={() => onApply(date, time, done)} className={btnApply}>Apply</button>
-        <button onClick={onCancel} className={btnCancel}>Cancel</button>
+        <button type="button" onClick={() => onApply(date, time, done)} className={btnApply}>Apply</button>
+        <button type="button" onClick={onCancel} className={btnCancel}>Cancel</button>
       </div>
     </div>
   )
@@ -255,11 +255,11 @@ function EditFollowingForm({ occ, onApply, onCancel }: {
         pattern — use <span className="text-white/60">Edit pattern</span> afterwards to change it.
       </p>
       <div className="flex gap-2">
-        <button onClick={onApply}
+        <button type="button" onClick={onApply}
           className="px-3 py-1 text-xs rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors">
           Split series
         </button>
-        <button onClick={onCancel} className={btnCancel}>Cancel</button>
+        <button type="button" onClick={onCancel} className={btnCancel}>Cancel</button>
       </div>
     </div>
   )
@@ -272,11 +272,11 @@ function DeleteConfirmForm({ message, label, onApply, onCancel }: {
     <div className="p-3 space-y-2 border-t border-white/5">
       <p className="text-2xs text-white/50 leading-relaxed">{message}</p>
       <div className="flex gap-2">
-        <button onClick={onApply}
+        <button type="button" onClick={onApply}
           className="px-3 py-1 text-xs rounded bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors">
           {label}
         </button>
-        <button onClick={onCancel} className={btnCancel}>Cancel</button>
+        <button type="button" onClick={onCancel} className={btnCancel}>Cancel</button>
       </div>
     </div>
   )
@@ -533,7 +533,7 @@ export default function NodeInheritanceDebugger() {
         </>)}
         <div className="ml-auto flex items-center gap-2">
           {isCollapsed && (
-            <button onClick={handleReset} title="Reset to original file"
+            <button type="button" onClick={handleReset} title="Reset to original file"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-xs text-white/60 transition-colors">
               <RotateCcw size={12} /> Original
             </button>
@@ -569,7 +569,7 @@ export default function NodeInheritanceDebugger() {
 
         {/* Divider with ‹ button */}
         <div className="flex flex-col items-center justify-center w-8 shrink-0 border-r border-white/10 bg-white/[0.02]">
-          <button onClick={handleCollapse} disabled={items.length === 0}
+          <button type="button" onClick={handleCollapse} disabled={items.length === 0}
             title={items.length > 0 ? 'Collapse effective nodes → compact YAML' : 'Load a file first'}
             className={cn(
               'flex items-center justify-center w-6 h-6 rounded transition-colors',

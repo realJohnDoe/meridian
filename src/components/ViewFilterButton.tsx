@@ -170,6 +170,7 @@ export default function ViewFilterButton() {
           </span>
           {active && (
             <button
+              type="button"
               // Real padding (not the checkbox's overlapping ::before trick):
               // this sits alone in the header with room to grow, so a plain
               // 24px-plus hit area is simpler and clears the AA floor.

@@ -122,6 +122,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
             {stepIndex + 1} / {steps.length}
           </span>
           <button
+            type="button"
             className="text-2xs text-muted-foreground hover:text-foreground transition-colors"
             onClick={dismiss}
             aria-label="Skip tour"
