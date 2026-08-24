@@ -5,6 +5,7 @@ import type * as ReactRouter from '@tanstack/react-router'
 import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
 import type { FileMetadata, Roots } from '@/types'
 import type { VaultRef } from '@/vaultRef'
+import { groupIntoEntries } from '@/model'
 import { useStore } from '@/store'
 import { setupStore, seedStore, installFakePersistence, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { useEntryEditor } from './useEntryEditor'
@@ -228,7 +229,7 @@ describe('useEntryEditor', () => {
     expect(persistence.writes).toEqual([key])
 
     // The items disappear from under the open editor; the root survives.
-    act(() => { useStore.getState().setData({ items: [], roots: useStore.getState().roots }) })
+    act(() => { useStore.getState().setData(groupIntoEntries({ items: [], roots: useStore.getState().roots })) })
 
     act(() => { result.current.dialogHandlers.onPriority('high') })
 
@@ -319,7 +320,7 @@ describe('useEntryEditor — moving between vaults', () => {
     const roots = new Map(useStore.getState().roots)
     roots.set(testKey('other-note'), { title: 'Other', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'other-note' })
     roots.set(testKey('linker'), { title: 'Linker', tags: [], items: ['[[note.md]]'], vaultId: TEST_VAULT, fileSlug: 'linker' })
-    act(() => { useStore.getState().setData({ items: useStore.getState().items, roots }) })
+    act(() => { useStore.getState().setData(groupIntoEntries({ items: useStore.getState().items, roots })) })
 
     const { result } = renderHook(() => useEntryEditor(occ))
     act(() => { result.current.onVaultChange?.(OTHER) })
@@ -359,7 +360,7 @@ describe('useEntryEditor — moving between vaults', () => {
     const occ = seedTwoVaults()
     const roots = new Map(useStore.getState().roots)
     roots.set(testKey('other-note'), { title: 'Other', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'other-note' })
-    act(() => { useStore.getState().setData({ items: useStore.getState().items, roots }) })
+    act(() => { useStore.getState().setData(groupIntoEntries({ items: useStore.getState().items, roots })) })
 
     const { result } = renderHook(() => useEntryEditor(occ))
     act(() => { result.current.scheduleAutoSave('see [[other-note]]') })
@@ -372,7 +373,7 @@ describe('useEntryEditor — moving between vaults', () => {
     const occ = seedTwoVaults()
     const roots = new Map(useStore.getState().roots)
     roots.set(otherKey('note.md'), { title: 'Theirs', tags: [], items: [], vaultId: OTHER, fileSlug: 'note.md' })
-    act(() => { useStore.getState().setData({ items: useStore.getState().items, roots }) })
+    act(() => { useStore.getState().setData(groupIntoEntries({ items: useStore.getState().items, roots })) })
 
     const { result } = renderHook(() => useEntryEditor(occ))
     act(() => { result.current.onVaultChange?.(OTHER) })

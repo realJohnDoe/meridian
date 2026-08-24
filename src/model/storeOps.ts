@@ -7,7 +7,7 @@
  * No store / React / fileIO dependencies — shared by the main app and the debug view.
  */
 
-import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots, EditScope, OccurrenceEntry, RepeatPattern } from '@/types'
+import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots, EditScope, OccurrenceEntry, RepeatPattern, Entries } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
 import { titleToSlug, entryKey as makeEntryKey, parseEntryKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
@@ -32,6 +32,33 @@ export interface StoreData {
 /** Items belonging to a specific file. */
 export function entryKeyItems(items: StoreItem[], entryKey: EntryKey): StoreItem[] {
   return items.filter(i => i.entryKey === entryKey)
+}
+
+/**
+ * TEMPORARY (PR 3 of plans/entry-aggregate.md): regroup a shredded
+ * `{ items, roots }` pair back into `Entries` at the store's door.
+ *
+ * This is the very re-grouping the aggregate exists to delete — it survives
+ * only while `storeOps` still speaks in two collections, and goes away with
+ * PR 4, when the apply* functions take and return `Entries` themselves.
+ *
+ * `roots` decides which keys exist: an item whose key has no root would be
+ * dropped here. That asymmetry is the mirror image of the bug this plan is
+ * about, and it does not occur — every entry is born at the parse boundary or
+ * in `applyNew`, and both write a root and at least one item together.
+ */
+export function groupIntoEntries(data: StoreData): Entries {
+  const entries: Entries = new Map()
+  const itemsByKey = new Map<EntryKey, StoreItem[]>()
+  for (const item of data.items) {
+    let list = itemsByKey.get(item.entryKey)
+    if (!list) { list = []; itemsByKey.set(item.entryKey, list) }
+    list.push(item)
+  }
+  for (const [key, root] of data.roots) {
+    entries.set(key, { key, root, items: itemsByKey.get(key) ?? [] })
+  }
+  return entries
 }
 
 /** Find the RepeatPattern that owns `occ`. Returns undefined for standalones. */

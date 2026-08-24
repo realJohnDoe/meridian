@@ -16,7 +16,7 @@ an entry created from the search overlay ended up with a root and no
 occurrences, which rendered as an invisible gap in search and was never written
 to disk. That instance is fixed; the shape that allowed it is not.
 
-**Status: not started.** The cheap half of this analysis has shipped — the
+**Status: PR 3 shipped.** The cheap half of this analysis has shipped — the
 persistence port now carries content rather than a key, so the store↔disk seam
 can no longer disagree with itself (see [What already
 shipped](#what-already-shipped)). What remains is the store's own shape.
@@ -91,7 +91,6 @@ cheapest tier regardless.
 
 | PR | Delivers | Stands alone? | Recommended model |
 |---|---|---|---|
-| 3 | Store holds `Entries`; flat arrays derived | Shippable, not yet valuable | **Opus 5** |
 | 4 | `storeOps.ts` on `Entries` | Shippable, not yet valuable | **Opus 5** |
 | 5 | Non-empty items; workarounds deleted | **This is the payoff** | **Opus 5** |
 | 6 | Remaining consumers read `Entries` | Optional cleanup | **Sonnet 5** — if 3–5 landed and the eviction contract is stated; else **Opus 5** |
@@ -102,41 +101,6 @@ store is reshaped and nothing has been collected for it yet, so don't start 3
 without intending to reach 5.
 
 ---
-
-### PR 3 — The store holds `Entries`; `items`/`roots` become derived
-
-`Entry` is born at the parse boundary, where it has real consumers on day one:
-`parseToStoreItems` already returns `{ items, root }` and only needs its key, so
-`parseFiles` hands `Entry[]` to the store instead of two shredded collections.
-`store.ts` then holds `Entries` as its single stored form, and exposes
-`items`/`roots` as memoized selectors so `expandRange`, the calendar,
-`storeOps.ts` and every view keep their current signatures and change nothing.
-
-**The non-empty tuple can be enforced from birth, here.** Verified against the
-current parser: across empty files, bare `title:`, `instances: []`,
-`instances:` null, all-excluded children, nested empty containers and
-body-only files, `parseToStoreItems` always returns at least one item. The one
-probed input that yields nothing does so by *throwing* — `---\n---\n`, an empty
-frontmatter block, which YAML reads as two documents — and that already routes
-to `unreadableFiles`, which holds neither a root nor items and so is consistent
-with the invariant rather than a hole in it. The boundary therefore needs a
-**narrowing that is provably total**, not a fallback branch. Keep the throw path
-exactly as it is; re-run the probe before relying on this.
-
-- **Recommended model:** **Opus 5.** The highest-risk PR in the plan and the one
-  that fails most quietly. Reference identity is load-bearing in four
-  independent caches: `setData` reuses the backlink index when
-  `roots === prevRoots` ([store.ts](../src/store.ts)); `fileOccurrenceMap`
-  memoizes on `items`/`roots` identity and its incremental path on
-  `prevRoots.get(key) === roots.get(key)`
-  ([fileOccurrence.ts](../src/fileOccurrence.ts)); `computeExpansionCache`
-  overlays only items failing `item === prev.items[i]`; `useAgendaSections`
-  caches on top of that. A selector that rebuilds a fresh array or Map per call
-  satisfies every type and every assertion in the suite while turning all four
-  into full rebuilds on every keystroke.
-  [`memo-identity.test.ts`](../src/model/__tests__/memo-identity.test.ts) is
-  what turns that from a reading exercise into a red test — which is why it
-  exists ahead of this PR.
 
 ### PR 4 — `storeOps.ts` takes and returns `Entries`
 

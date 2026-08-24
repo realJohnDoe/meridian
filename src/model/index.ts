@@ -2,7 +2,7 @@ export { weekStartsOn, fmtISO, fmtMonth, parseMonth, fmtT, formatHHMM, parseDate
 export type { LocalePrefs } from './dateUtils'
 export { multidayDisplayTitle, treeHasOccurrences, stableOccId, expandRange, joinFileMeta } from './expansion'
 export type { StoreData, EditorFields, EditFields, SeriesContext, NewEntryTarget, LinkBreakage } from './storeOps'
-export { entryKeyItems, findSeries, seriesContext, upsertOverride, applyEdit, newEntryKey, freeEntryKey, moveEntryKey, moveLinkBreakage, toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, occFromAppMeta } from './storeOps'
+export { entryKeyItems, groupIntoEntries, findSeries, seriesContext, upsertOverride, applyEdit, newEntryKey, freeEntryKey, moveEntryKey, moveLinkBreakage, toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, occFromAppMeta } from './storeOps'
 export { parseToStoreItems } from './storeItems'
 export type { ParseResult } from './storeItems'
 export { collapseToYaml, serializeEntry } from './collapse'

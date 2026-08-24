@@ -29,9 +29,9 @@ const { cacheStore, storeState, notifyFns, roundTripLossMock } = vi.hoisted(() =
     status: 'clean' | 'dirty' | 'deleted'; updatedAt: number; version?: string
   }>(),
   storeState: {
-    /** Per-vault layers — the shape the real store holds. */
-    layers: new Map<string, { items: unknown[]; roots: Map<string, unknown> }>(),
-    /** The flattening of `layers`, maintained by the setVaultLayer mock exactly as the store does. */
+    /** Per-vault layers — the shape the real store holds: one `Entries` map per vault. */
+    layers: new Map<string, Map<string, { key: string; root: unknown; items: unknown[] }>>(),
+    /** The flat views derived from `layers`, maintained by the setVaultLayer mock exactly as the store does. */
     items: [] as unknown[],
     roots: new Map<string, unknown>(),
     unreadableFiles: new Map<string, { path: string; message: string }>(),
@@ -124,13 +124,14 @@ vi.mock('@/storage/cache/files', () => {
 })
 
 vi.mock('@/storeBridge', () => ({
-  getVaultLayer: vi.fn((vaultId: string) => storeState.layers.get(vaultId) ?? { items: [], roots: new Map() }),
-  setVaultLayer: vi.fn((vaultId: string, data: { items: unknown[]; roots: Map<string, unknown> }) => {
+  getVaultLayer: vi.fn((vaultId: string) => storeState.layers.get(vaultId) ?? new Map()),
+  setVaultLayer: vi.fn((vaultId: string, data: Map<string, { key: string; root: unknown; items: unknown[] }>) => {
     storeState.layers.set(vaultId, data)
-    // Re-flatten exactly as the real store does, so assertions on the merged
+    // Re-derive exactly as the real store does, so assertions on the merged
     // view stay meaningful and a cross-vault leak in the merge would show up.
-    storeState.items = [...storeState.layers.values()].flatMap(l => l.items)
-    storeState.roots = new Map([...storeState.layers.values()].flatMap(l => [...l.roots]))
+    const all = [...storeState.layers.values()].flatMap(layer => [...layer.values()])
+    storeState.items = all.flatMap(entry => entry.items)
+    storeState.roots = new Map(all.map(entry => [entry.key, entry.root]))
   }),
   setVaultSync: vi.fn((vaultId: string, patch: Record<string, unknown>) => {
     const prev = storeState.syncByVault.get(vaultId) ?? {
@@ -167,9 +168,21 @@ function seedLayer(
   items: unknown[],
   roots: Map<string, unknown> = new Map(),
 ): void {
-  storeState.layers.set(vaultId, { items, roots })
-  storeState.items = [...storeState.layers.values()].flatMap(l => l.items)
-  storeState.roots = new Map([...storeState.layers.values()].flatMap(l => [...l.roots]))
+  // Callers still describe a layer the flat way — it reads better at the call
+  // site — so the grouping into `Entries` happens here, once.
+  const layer = new Map<string, { key: string; root: unknown; items: unknown[] }>()
+  const entryFor = (key: string): { key: string; root: unknown; items: unknown[] } => {
+    let entry = layer.get(key)
+    if (!entry) { entry = { key, root: undefined, items: [] }; layer.set(key, entry) }
+    return entry
+  }
+  for (const item of items) entryFor((item as { entryKey: string }).entryKey).items.push(item)
+  for (const [key, root] of roots) entryFor(key).root = root
+
+  storeState.layers.set(vaultId, layer)
+  const all = [...storeState.layers.values()].flatMap(l => [...l.values()])
+  storeState.items = all.flatMap(entry => entry.items)
+  storeState.roots = new Map(all.map(entry => [entry.key, entry.root]))
 }
 
 function syncOf(vaultId = 'fake-vault') {
@@ -1391,9 +1404,9 @@ describe('parseFiles', () => {
       { path: 'also-good.md', content: '---\ntitle: Also good\n---' },
     ]
 
-    const { roots, failures } = parseFiles(files, VAULT)
+    const { entries, failures } = parseFiles(files, VAULT)
 
-    expect([...roots.keys()].sort()).toEqual([K('also-good'), K('good')].sort())
+    expect([...entries.keys()].sort()).toEqual([K('also-good'), K('good')].sort())
     expect(failures.map(f => f.key).sort()).toEqual([K('bad'), K('dup'), K('tabs')].sort())
     // Every failure carries enough to act on, and to reserve its slug.
     for (const f of failures) {
@@ -1419,9 +1432,9 @@ describe('parseFiles — round-trip guard scheduling', () => {
   ]
 
   it('does not run the guard during the parse itself', () => {
-    const { items } = parseFiles(files, VAULT)
+    const { entries } = parseFiles(files, VAULT)
 
-    expect(items).toBeDefined()
+    expect(entries.size).toBeGreaterThan(0)
     expect(roundTripLossMock).not.toHaveBeenCalled()
   })
 
@@ -1667,7 +1680,7 @@ describe('multi-vault sync', () => {
     expect(feed.statAllCallCount).toBe(1)
     // The pull landed: the feed's entry is in the cache and in the store layer.
     expect(cacheStore.get(vp('vault-ical', 'ical-abc.md'))?.content).toContain('title: Event')
-    expect(storeState.layers.get('vault-ical')?.items.length).toBeGreaterThan(0)
+    expect(storeState.layers.get('vault-ical')?.size).toBeGreaterThan(0)
   })
 
   it('never pushes from a read-only vault, even when its cache holds dirty rows', async () => {

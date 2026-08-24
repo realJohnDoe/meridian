@@ -2,6 +2,7 @@ import { afterEach, beforeEach } from 'vitest'
 import { useStore } from '@/store'
 import { setEntityPersistence } from '@/persistencePort'
 import { resetCalendarOnVaultChange } from '@/calendar'
+import { groupIntoEntries } from '@/model'
 import { entryKey as makeEntryKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import type { Occurrence, StoreSeries, StoreItem, Roots, FileMetadata } from '@/types'
@@ -90,7 +91,7 @@ export function setMediaQuery(initialMatches: boolean): (next: boolean) => void 
 
 export function seedStore(items: StoreItem[], roots: Roots): void {
   useStore.setState({ defaultVaultId: TEST_VAULT })
-  useStore.getState().setData({ items, roots })
+  useStore.getState().setData(groupIntoEntries({ items, roots }))
 }
 
 export interface FakePersistence {

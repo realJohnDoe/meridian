@@ -3,8 +3,7 @@
  *
  * This is the single load path for both disk files and seed YAML strings.
  * RawNode / EffectiveNode are implementation details of this pipeline — callers
- * receive { items: StoreItem[], root: FileMetadata } and never need the YAML
- * shape. The one exception is NodeInheritanceDebugger, which imports
+ * receive an `Entry` ({ key, root, items }) and never need the YAML shape. The one exception is NodeInheritanceDebugger, which imports
  * EffectiveNode from inheritance.ts directly to visualise the parse tree.
  *
  * StoreItem carries OccurrenceMetadata only (no file-level fields).
@@ -18,7 +17,7 @@ import { buildEffectiveTree } from './inheritance'
 import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '@/types'
-import type { StoreItem, FileMetadata, FileFields, OccurrenceMetadata } from '@/types'
+import type { StoreItem, FileMetadata, FileFields, OccurrenceMetadata, Entry } from '@/types'
 import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, unknownKeys, FILE_LEVEL_SPECS, STRUCTURAL_KEYS } from './fieldRegistry'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
@@ -218,14 +217,27 @@ function effectiveNodeToStoreItems(
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export interface ParseResult {
-  items: StoreItem[]
-  root:  FileMetadata
-}
+/**
+ * What the parse boundary yields for one file: an `Entry`.
+ *
+ * This is the shape the store keeps, and the shape `serializeEntry` takes at
+ * the far end of the pipeline — the parse and write ends have always agreed on
+ * it; only the middle used to shred it into two flat collections.
+ */
+export type ParseResult = Entry
 
 /**
- * Parse a markdown/YAML file into StoreItem[] + FileMetadata.
+ * Parse a markdown/YAML file into the `Entry` it describes.
  * Replaces `rawToNode` + `nodesToStoreItems`.
+ *
+ * Always yields at least one item for any file it can read: a node becomes an
+ * item when it repeats, carries a date, or has no `instances` of its own, and
+ * that last clause makes even an empty file, a bare `title:`, `instances: []`
+ * and a body-only file yield one. The one input that yields nothing does so by
+ * *throwing* — `---\n---\n`, an empty frontmatter block, which YAML reads as
+ * two documents — and that routes to `unreadableFiles`, which holds neither a
+ * root nor items. Keep that throw path as it is: `Entry`'s non-empty `items`
+ * depends on it.
  */
 export function parseToStoreItems(path: string, content: string, vaultId: string): ParseResult {
   const { rawNode, body, convention } = loadFile(path, content)
@@ -241,7 +253,7 @@ export function parseToStoreItems(path: string, content: string, vaultId: string
     fileSlug: pathToSlug(path),
     fileConvention: convention,
   }
-  return { items, root }
+  return { key: entryKey, root, items }
 }
 
 /**

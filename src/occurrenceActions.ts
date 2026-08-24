@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, occFromAppMeta, freeEntryKey, moveEntryKey } from '@/model'
+import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, occFromAppMeta, freeEntryKey, moveEntryKey, groupIntoEntries } from '@/model'
 import { occIsRecur } from './occView'
 import { isStandaloneOcc } from './types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Roots, StoreItem } from './types'
@@ -39,7 +39,7 @@ function restoreEntries(snapshot: { items: StoreItem[]; roots: Roots }, entryKey
     else roots.delete(key)
   }
   const restored = { items, roots }
-  setData(restored)
+  setData(groupIntoEntries(restored))
   // Undoing a create restores an entry that has no root and no items to go
   // back to — `persistEntries` reads that as the delete it is, rather than
   // leaving the file the create already wrote behind on disk.
@@ -165,7 +165,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
       () => { cancelled = true; restoreEntries(snapshot, [o.entryKey]) },
       { endsSeries },
     )
-    return () => { if (!cancelled) setData(next) }
+    return () => { if (!cancelled) setData(groupIntoEntries(next)) }
   } else {
     // deleteByEntryKey's backlink cleanup — the OTHER files whose `items:`
     // list pointed at this one — is captured here so the deferred commit and
@@ -189,7 +189,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
       if (cancelled) return
       const { data, affectedKeys: computed } = deleteByEntryKey(getSnapshot(), o.entryKey)
       affectedKeys = computed
-      setData(data)
+      setData(groupIntoEntries(data))
     }
   }
 }

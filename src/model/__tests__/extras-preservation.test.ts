@@ -133,6 +133,7 @@ const EXEMPT: Record<string, string> = {
   newEntryKey: 'pure key allocation — returns a string, never touches metadata',
   freeEntryKey: 'pure key allocation — returns a string, never touches metadata',
   moveLinkBreakage: 'read-only count of what a move would break — returns keys and refs',
+  groupIntoEntries: 'pure regrouping — carries the same root and item objects into one map, by reference',
 }
 
 describe('unknown keys survive every store operation', () => {

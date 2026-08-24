@@ -156,6 +156,29 @@ export type StoreItem   = StoreSeries | StoreOcc
 /** keyed by EntryKey — the same slug in two vaults is two distinct entries */
 export type Roots = Map<EntryKey, FileMetadata>
 
+/**
+ * One entry: its file-level fields and the occurrences that share its key,
+ * as a single object rather than two halves in two unrelated collections.
+ *
+ * An entry *is* the pair. Keeping them in one object is what stops "update the
+ * root, then match no item" from being a two-line slip that type-checks — the
+ * failure that once produced a root with no occurrences, invisible in search
+ * and never written to disk (see plans/entry-aggregate.md).
+ *
+ * `items` is non-empty by construction: the parse boundary
+ * (`parseToStoreItems`) always yields at least one item for any file it can
+ * read at all, and a file it cannot read routes to `unreadableFiles`, which
+ * holds neither a root nor items.
+ */
+export interface Entry {
+  key:   EntryKey
+  root:  FileMetadata
+  items: StoreItem[]
+}
+
+/** Every entry across every registered vault, keyed the way the app keys them. */
+export type Entries = Map<EntryKey, Entry>
+
 export function isSeries(item: StoreItem): item is StoreSeries {
   return 'repeat' in item
 }

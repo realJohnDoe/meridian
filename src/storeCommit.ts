@@ -1,6 +1,6 @@
 import { setData } from './storeBridge'
 import { writeEntity, deleteEntity, moveEntity } from './persistencePort'
-import { entryKeyItems, serializeEntry } from '@/model'
+import { entryKeyItems, serializeEntry, groupIntoEntries } from '@/model'
 import type { StoreData } from '@/model'
 import type { EntryKey } from './fileIO'
 
@@ -37,13 +37,13 @@ export function persistEntries(data: StoreData, keys: Iterable<EntryKey>): void 
 
 /** Commit to store and persist every listed entry. */
 export function commitNext(next: StoreData, keys: EntryKey[]): void {
-  setData(next)
+  setData(groupIntoEntries(next))
   persistEntries(next, keys)
 }
 
 /** Commit to store, persist the backlink-edited entries, and delete the primary from its backend. */
 export function commitDelete(next: StoreData, key: EntryKey, backlinkKeys: Iterable<EntryKey>): void {
-  setData(next)
+  setData(groupIntoEntries(next))
   persistEntries(next, backlinkKeys)
   deleteEntity(key)
 }
@@ -65,6 +65,6 @@ export function commitDelete(next: StoreData, key: EntryKey, backlinkKeys: Itera
 export function commitMove(next: StoreData, fromKey: EntryKey, toKey: EntryKey): void {
   const content = entryContent(next, toKey)
   if (content === null) return
-  setData(next)
+  setData(groupIntoEntries(next))
   moveEntity(fromKey, toKey, content)
 }
