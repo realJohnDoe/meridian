@@ -307,7 +307,12 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const handleScopeChange = (scope: EditScope) => {
     if (!entry.item) return
     const { scheduled, repeat } = applyScope(entry.item, scope)
-    updateEntry({ ...entry, editScope: scope, scheduled, repeat })
+    // 'add' creates a brand-new occurrence rather than editing entry.item, so it
+    // must not inherit that occurrence's done state — carrying it over is what
+    // made a freshly added occurrence show up checked when the one it was
+    // switched from happened to be done.
+    const done = scope === 'add' ? false : entry.done
+    updateEntry({ ...entry, editScope: scope, scheduled, repeat, done })
   }
 
   const handleTypeChange = (t: ItemType) => {

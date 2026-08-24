@@ -18,9 +18,10 @@ const EntryViewOnly = lazy(() => import('@/editor').then(m => ({ default: m.Entr
 
 export const Route = createFileRoute('/_app/entry/$vault/$slug')({
   component: EntrySlugPage,
-  validateSearch: (s: Record<string, unknown>): { date?: string; scope?: EditScope } => ({
+  validateSearch: (s: Record<string, unknown>): { date?: string; scope?: EditScope; id?: string } => ({
     date:  typeof s.date  === 'string' ? s.date  : undefined,
     scope: isEditScope(s.scope) ? s.scope : undefined,
+    id:    typeof s.id    === 'string' ? s.id    : undefined,
   }),
 })
 
@@ -91,7 +92,7 @@ function EntryReady({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
 
 function EntrySlugPage() {
   const { vault, slug }  = Route.useParams()
-  const { date, scope }  = Route.useSearch()
+  const { date, scope, id } = Route.useSearch()
   const navigate         = useNavigate()
 
   const items        = useStore(s => s.items)
@@ -106,11 +107,16 @@ function EntrySlugPage() {
     if (date) {
       const d = new Date(date + 'T00:00:00')
       const next = new Date(d); next.setDate(next.getDate() + 1)
-      const found = expandRange(items, roots, d, next).find(o => o.entryKey === entryKey)
+      const candidates = expandRange(items, roots, d, next).filter(o => o.entryKey === entryKey)
+      // Two occurrences of the same file can land on the same date (e.g. two
+      // override instances with no time) — `id` picks the exact one that was
+      // opened; without it (older links, or none matching) fall back to the
+      // first candidate, same as before `id` existed.
+      const found = (id ? candidates.find(o => o.id === id) : undefined) ?? candidates[0]
       if (found) return found
     }
     return fom.get(entryKey) ?? null
-  }, [fom, items, roots, entryKey, date])
+  }, [fom, items, roots, entryKey, date, id])
 
   if (vaultLoading && !occ) return <EntrySkeleton />
   if (!occ) return (
@@ -124,5 +130,5 @@ function EntrySlugPage() {
     </div>
   )
 
-  return <EntryReady key={`${entryKey}-${date ?? ''}-${scope ?? ''}`} occ={occ} scope={scope} />
+  return <EntryReady key={`${entryKey}-${date ?? ''}-${id ?? ''}-${scope ?? ''}`} occ={occ} scope={scope} />
 }

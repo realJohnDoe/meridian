@@ -27,7 +27,10 @@ export function entryRoute(occ: Occurrence, scope?: EditScope) {
   return {
     to: '/entry/$vault/$slug' as const,
     params: { vault: vaultId, slug: fileSlug },
-    search: { date: occ.date, scope: scope ?? 'single' },
+    // `id` disambiguates two occurrences of the same file landing on the same
+    // date (e.g. two override instances with no time) — date alone can't tell
+    // them apart, so _app.entry.$vault.$slug.tsx matches on it when present.
+    search: { date: occ.date, scope: scope ?? 'single', id: occ.id },
   }
 }
 

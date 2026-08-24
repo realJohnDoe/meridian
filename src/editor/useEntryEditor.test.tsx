@@ -45,6 +45,18 @@ describe('useEntryEditor', () => {
     expect(result.current.entry.done).toBe(true)
   })
 
+  it('switching scope to "add" resets done, even though it was done just before the switch', () => {
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    seedStore([occ], makeRoots('note.md'))
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    expect(result.current.entry.done).toBe(true)
+
+    act(() => { result.current.handleScopeChange('add') })
+
+    expect(result.current.entry.done).toBe(false)
+  })
+
   it('autosave debounces body writes by 1500ms and commits the latest scheduled body', () => {
     const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md'))

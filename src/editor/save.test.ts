@@ -30,6 +30,12 @@ describe('entryFromOccurrence', () => {
     expect(entry.done).toBe(false)
   })
 
+  it('resets done to false for "add" scope even when the source occurrence is done', () => {
+    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: true } })
+    const entry = entryFromOccurrence(occ, 'add')
+    expect(entry.done).toBe(false)
+  })
+
   it('copies array-valued metadata fields instead of aliasing them', () => {
     const tags = ['work']
     const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: ['alice'], title: 'T', tags, items: [], done: true } })

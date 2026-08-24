@@ -90,7 +90,10 @@ export function entryFromOccurrence(
     duration:     m.duration || '',
     tracked,
     itemType,
-    done:         m.done     ?? false,
+    // 'add' starts a brand-new occurrence off `item`'s other fields (title,
+    // tags, ...) — but not its done state, which belongs to that occurrence,
+    // not the one being created.
+    done:         editScope === 'add' ? false : (m.done ?? false),
     tags:         [...m.tags],
     items:        [...m.items],
     participants: [...m.participants],
