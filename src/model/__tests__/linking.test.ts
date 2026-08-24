@@ -624,7 +624,7 @@ describe('updateFileOccurrenceMap', () => {
 // on a 300-file vault it measured ~240 ms of blocking work before the agenda's
 // first paint, for an index no cold-start view reads (its consumers are the
 // editor, the search overlay, and the entry route). It is derived on demand and
-// warmed during idle instead — see fileOccurrence.ts and plans/time-to-today.md.
+// warmed during idle instead — see fileOccurrence.ts.
 //
 // Being called during render, the memo has to behave as a pure derivation:
 // same inputs must give back the very same Map, not an equal copy.

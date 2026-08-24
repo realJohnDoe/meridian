@@ -225,7 +225,7 @@ export function updateFileOccurrenceMap(
 // vault that measured ~240 ms — larger than the YAML parse and the agenda's
 // whole expansion+grouping stage — because `resolveOneKey` expands every key
 // over the ±3-year window above, generating ~28.5k occurrences to pick 300
-// representatives. See plans/time-to-today.md.
+// representatives.
 //
 // Nothing rendered at cold start reads it. Its consumers are the editor
 // (ItemsList, WikilinkPopup, useEntryEditor), the search overlay

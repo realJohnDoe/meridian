@@ -1409,7 +1409,7 @@ describe('parseFiles', () => {
 // the total parse cost on a 300-file vault — all of it between the Dexie read
 // and the agenda's first paint. It now runs in idle batches afterwards. What
 // must not change is its coverage: every file that parsed still gets checked,
-// and a real loss still reaches the user. See plans/time-to-today.md.
+// and a real loss still reaches the user.
 
 describe('parseFiles — round-trip guard scheduling', () => {
   const files = [
