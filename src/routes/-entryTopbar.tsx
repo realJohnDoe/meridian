@@ -2,7 +2,6 @@ import { createPortal } from 'react-dom'
 import { ArrowLeft, Heart, Trash2 } from 'lucide-react'
 import { SyncButton } from '@/components'
 import { IconButton } from '@/components/primitives/icon-button'
-import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import { useTopbarSlot } from './-topbarSlot'
 import { topbarEdgePadding } from './-topbarEdgePadding'
@@ -20,13 +19,13 @@ interface Props {
 /** Shared topbar for both the new-entry and edit-entry routes. */
 export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack, hideDelete }: Props) {
   const slotEl = useTopbarSlot()
-  const { isMobile } = useSidebar()
   if (!slotEl) return null
   return createPortal(
-    // Right edge always leads with an icon button; left edge only does on mobile (back button) —
-    // desktop hides it, leaving nothing leading the left edge.
-    <div className={cn('flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto', topbarEdgePadding(isMobile, true))}>
-      <IconButton variant="ghost" className="text-dim lg:hidden" onClick={onBack} title="Back" label="Back">
+    // Both edges always lead with an icon button — the back button on the left, regardless of
+    // screen size (the sidebar's own hamburger stays mobile-only; large screens keep the sidebar
+    // docked open, so the back button is the only way out of the editor there).
+    <div className={cn('flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto', topbarEdgePadding(true, true))}>
+      <IconButton variant="ghost" className="text-dim" onClick={onBack} title="Back" label="Back">
         <ArrowLeft size={18} />
       </IconButton>
       <div className="flex-1" />

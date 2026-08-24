@@ -1,14 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { TopbarSlotContext } from './-topbarSlot'
 import { EntryTopbar } from './-entryTopbar'
 
-const { isMobile } = vi.hoisted(() => ({ isMobile: { value: false } }))
-
-// Both are collaborators, not the subject: useSidebar needs a SidebarProvider
-// above it, and SyncButton drags in the whole sync/store stack.
-vi.mock('@/components/ui/sidebar', () => ({ useSidebar: () => ({ isMobile: isMobile.value }) }))
+// A collaborator, not the subject: SyncButton drags in the whole sync/store stack.
 vi.mock('@/components', () => ({ SyncButton: () => <div data-testid="sync-button" /> }))
 
 interface Opts {
@@ -35,8 +31,6 @@ function renderTopbar({ isFavorited = false, favoritable = true, slot }: Opts = 
   )
   return { ...view, slotEl, onToggleFavorite, onDelete, onBack }
 }
-
-beforeEach(() => { isMobile.value = false })
 
 describe('EntryTopbar', () => {
   // _app.tsx sets the slot with a callback ref, so the first render of an
@@ -117,17 +111,11 @@ describe('EntryTopbar — favorite toggle', () => {
 })
 
 describe('EntryTopbar — edge padding', () => {
-  // The left edge leads with the back button only on mobile; desktop hides it
-  // (lg:hidden), leaving nothing there, so the roomier padding applies.
-  it('tightens the left edge on mobile, where the back button leads', () => {
-    isMobile.value = true
+  // The back button leads the left edge on every screen size now, so both
+  // edges always get the tighter icon-button padding.
+  it('tightens the left edge, which leads with the back button', () => {
     const { slotEl } = renderTopbar()
     expect(slotEl!.firstElementChild?.className).toContain('pl-1.75')
-  })
-
-  it('keeps the roomier left edge on desktop, where the back button is hidden', () => {
-    const { slotEl } = renderTopbar()
-    expect(slotEl!.firstElementChild?.className).toContain('pl-3.5')
   })
 
   it('always tightens the right edge, which leads with an icon button in both layouts', () => {
