@@ -31,13 +31,14 @@ engine", which is Sonnet work with an exact reference — not open-ended design.
 
 ## Ordering
 
-PR 4 is independent of everything else; run it whenever you want. **PR 4
-should land before PR 6**, because it is the regression net for the
-expressiveness work — it would have caught the yearly gap on its own.
+The regression net is already in place: `storage/ical/repeatToRrule.test.ts`
+expands every rule through both engines and compares the dates, so the
+expressiveness work below is guarded as it lands. Extend its corpus with each
+newly representable shape.
 
 ```
-PR4 ──────────────► PR6 ──► PR7 ──► PR8
-PR5 ─ (independent, but PR4 guards it)
+PR5 ─ (independent)
+PR6 ──► PR7 ──► PR8
 PR9 ─ (optional, any time)
 ```
 
@@ -45,14 +46,13 @@ PR9 ─ (optional, any time)
 
 | # | Title | Model | Est. | Touches format? |
 |---|---|---|---|---|
-| 4 | `repeatToRrule` + round-trip property test | **Opus 5** | 1d | no |
 | 5 | `bysetpos` as a list; drop importer's `< -1` refusal | Sonnet 5 | 0.5d | yes (`bysetpos`) |
 | 6 | `bymonth` + yearly `BY*` in the engine | **Opus 5** | 1.5–2d | yes (`bymonth`) |
 | 7 | Importer claims the yearly/`bymonth` shapes | **Opus 5** | 0.5–1d | no |
 | 8 | ICS export: file emission + entry point | Sonnet 5 | 1.5–2d | no |
 | 9 | `WKST` (optional) | **Opus 5** | 1d | yes (`wkst`) |
 
-Total PRs 4–8: **5–6.5 days** (PRs 1–3 have shipped — see status above). That is
+Total PRs 5–8: **4–5.5 days** (PRs 1–4 have shipped — see status above). That is
 higher than the 6–10-day range in the survey's bottom row only in bookkeeping:
 the survey counted implementation, this counts implementation plus per-PR tests,
 review and CI.
@@ -61,35 +61,6 @@ The three remaining PRs that touch `types.ts` are the ones to slow down on.
 `repeat:` is written to YAML verbatim and read back with an unchecked cast, so
 there is no schema to migrate — which cuts both ways: widening the type is
 free, and nothing will catch a mistake.
-
----
-
-### PR 4 — `repeatToRrule` + round-trip property test
-
-**Model: Opus 5** · 1d · no format change
-
-The oracle. New `src/storage/ical/repeatToRrule.ts`: a pure
-`Repeat → RRULE string` inverse of `rruleToRepeat`. No UI, no file emission, no
-product decisions — that's PR 8. `after_completion` returns `null`; it has no
-RRULE equivalent.
-
-Then the test that pays for this whole plan: **for every RRULE that
-`tryRepresent` claims, expanding the resulting `Repeat` through `expandRange`
-over a fixed window must produce exactly the dates `expandRRule` produces for
-the same rule.** Both engines already exist in the repo; the test only asserts
-they agree. Build the rule corpus as an inline cross-product of FREQ × INTERVAL
-× BYDAY × BYMONTHDAY × BYSETPOS × end-condition. `fast-check` is not in the
-dependency tree, and adding it is a separate call — a hand-rolled cross-product
-covers this surface fine.
-
-**Why Opus:** the value is entirely in the test's design. The failure mode is a
-test that passes vacuously — mismatched window bounds, disagreement about
-whether DTSTART/the anchor is included, or a corpus that never exercises the
-shapes `tryRepresent` actually claims. That's judgment, not typing.
-
-**Placement:** beside its inverse in `storage/ical/`. That directory has no
-`index.ts`, so it isn't a module under architecture invariant 2 — deep imports
-within `storage/` are fine, and outside code reaches it through `@/storage`.
 
 ---
 
@@ -106,8 +77,8 @@ in the survey, so that rejection is pure over-conservatism.
 
 No UI change: the dialog keeps deriving one position from the anchor date.
 
-**Why Sonnet:** mechanical once the type shape is chosen, and PR 4's round-trip
-test now guards it.
+**Why Sonnet:** mechanical once the type shape is chosen, and
+`repeatToRrule.test.ts`'s round-trip corpus guards it.
 
 ---
 
@@ -139,8 +110,9 @@ wrong answer is silent, lands in vault files, and survives.
 
 **Acceptance:** Thanksgiving (`FREQ=YEARLY;BYMONTH=11;BYDAY=4TH`), Mother's Day
 (`FREQ=YEARLY;BYMONTH=5;BYDAY=2SU`), and a twice-yearly `BYMONTH=3,9` all
-produce correct dates across a leap year. PR 4's round-trip test extended to
-cover the newly representable shapes.
+produce correct dates across a leap year. `repeatToRrule.test.ts`'s corpus
+extended to cover the newly representable shapes, and the `STILL_DECLINED` list
+in it trimmed of the entries this PR claims.
 
 ---
 
@@ -155,7 +127,7 @@ every newly claimed shape gets its equivalence argument written at the check.
 **Why Opus:** the entire purpose of `tryRepresent` is refusing to claim a rule
 the engine gets subtly wrong — "a series that looks right and silently sits on
 the wrong days" is the failure its header comment names. Deciding which shapes
-are *now* provably equivalent is the same reasoning PR 6 established. PR 4's
+are *now* provably equivalent is the same reasoning PR 6 established. The
 round-trip test is a safety net, not a substitute for that judgment.
 
 **Downgrade to Sonnet** if PR 6's description ends with an explicit list of
@@ -168,7 +140,7 @@ edit.
 
 **Model: Sonnet 5** · 1.5–2d · no format change
 
-Wraps PR 4's mapping into an actual `.ics`:
+Wraps `storage/ical/repeatToRrule.ts` into an actual `.ics`:
 
 - VCALENDAR/VEVENT emission for a vault or a single entry.
 - `instances` → `RDATE` / `EXDATE` / `RECURRENCE-ID`. Meridian's per-occurrence
@@ -185,9 +157,9 @@ Wraps PR 4's mapping into an actual `.ics`:
 3. Meridian times are local wall clock. Emit floating times, or `TZID` with the
    viewer's zone?
 
-**Why Sonnet:** once PR 4 exists, the hard part — the recurrence mapping — is
-done and tested. What's left is serialization and plumbing. The open questions
-above want *your* answer, not a bigger model.
+**Why Sonnet:** the hard part — the recurrence mapping — is already done and
+tested. What's left is serialization and plumbing. The open questions above want
+*your* answer, not a bigger model.
 
 ---
 
@@ -228,7 +200,9 @@ Per [CLAUDE.md](../CLAUDE.md):
   `pnpm --filter meridian-oauth-worker run cf-typegen` first, or you'll get a
   flood of spurious type-resolution errors.
 - A regression test per fix, in `src/model/__tests__/` or
-  `src/storage/ical/*.test.ts`.
+  `src/storage/ical/*.test.ts`, plus the round-trip corpus in
+  `src/storage/ical/repeatToRrule.test.ts` where the fix widens what the engine
+  can represent.
 - For the three format-touching PRs (5, 6, 9): a YAML round-trip case, and a
   check that no existing fixture or snapshot in
   `src/model/__tests__/__snapshots__/` silently encodes the old behaviour.
