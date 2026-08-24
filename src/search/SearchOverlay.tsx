@@ -23,10 +23,12 @@ interface Props {
  *
  * - Mobile/tablet: full-screen layer, input pinned at the top (auto-focused
  *   so the keyboard rises), results scrolling beneath, back button to close.
- * - Desktop: popover floating above the search bar, with a backdrop that
- *   only covers the content area to the right of the sidebar (offset by
- *   --sidebar-width when the sidebar is expanded) rather than the sidebar
- *   itself.
+ * - Desktop: panel pinned below the topbar (same top-aligned shape as the
+ *   mobile layer, so a short result list can't end up hidden behind an
+ *   on-screen keyboard the way a bottom-anchored, shrink-to-fit popover
+ *   would on a landscape iPad), with a backdrop that only covers the
+ *   content area to the right of the sidebar (offset by --sidebar-width
+ *   when the sidebar is expanded) rather than the sidebar itself.
  */
 export default function SearchOverlay({ open, query, onQueryChange, onClose, onOpen, onCreate }: Props) {
   const { isMobile, open: sidebarOpen } = useSidebar()
@@ -119,11 +121,15 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
         onClick={onClose}
         className={cn('fixed inset-y-0 right-0 z-search-backdrop bg-background/80 backdrop-blur-sm pointer-events-auto transition-[left] duration-200 ease-linear', sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0')}
       />
-      <div id="filterOverlay" className="absolute bottom-full left-0 right-0 z-search-panel pointer-events-auto">
-        <div className="relative max-h-[calc(100dvh-var(--th)-80px)] flex flex-col">
-          <div ref={desktopScrollRef} className="overflow-y-auto [-webkit-overflow-scrolling:touch] bg-background flex-1 min-h-0">
-            <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} scrollRef={desktopScrollRef} />
-          </div>
+      <div
+        id="filterOverlay"
+        className={cn(
+          'fixed top-[var(--th)] right-0 h-[calc(100dvh-var(--th)-80px)] z-search-panel pointer-events-auto flex flex-col transition-[left] duration-200 ease-linear',
+          sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0',
+        )}
+      >
+        <div ref={desktopScrollRef} className="overflow-y-auto [-webkit-overflow-scrolling:touch] bg-background flex-1 min-h-0">
+          <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} scrollRef={desktopScrollRef} />
         </div>
       </div>
     </>
