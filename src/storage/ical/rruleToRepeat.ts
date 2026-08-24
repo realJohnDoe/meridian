@@ -509,8 +509,14 @@ function boundsOf(parts: RRuleParts): { maxOccurrences: number; untilMs: number 
  * An empty result means "no recurrence": an unreadable or unsupported `FREQ`,
  * or a series that ended before the window. The caller renders a single
  * occurrence.
+ *
+ * Exported for `repeatToRrule.test.ts`, which uses it as the RFC-side oracle:
+ * production callers get it through `rruleToRepeat`, which only reaches it for
+ * rules `tryRepresent` declined. The round-trip test needs it for the rules
+ * `tryRepresent` *claims* — that is the whole point of the comparison — so it
+ * has to call in directly.
  */
-function expandRRule(parts: RRuleParts, anchor: Date, now: Date): string[] {
+export function expandRRule(parts: RRuleParts, anchor: Date, now: Date): string[] {
   const freq = (parts['FREQ'] ?? '').toUpperCase()
   const stepMs = FREQ_STEP_MS[freq]
   if (stepMs !== undefined) return expandSubDaily(stepMs, parts, anchor, now)
