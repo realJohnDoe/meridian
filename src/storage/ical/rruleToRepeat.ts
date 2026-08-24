@@ -194,14 +194,12 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
       if (bySetPos.length > 0 || ordinals.size > 1 || byDay.some(d => d.ordinal === undefined)) return null
       const [pos] = [...ordinals]
       if (pos === undefined || pos === 0) return null
-      // Only the last-of-month negative is expressible; `-2FR` is not.
-      if (pos < -1) return null
       return { ...base, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: pos }
     }
-    if (bySetPos.length !== 1) return null
-    const pos = bySetPos[0]
-    if (pos === undefined || pos === 0 || pos < -1) return null
-    return { ...base, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: pos }
+    if (bySetPos.length === 0) return null
+    if (bySetPos.some(p => p === 0)) return null
+    const positions = bySetPos.length === 1 ? bySetPos[0]! : bySetPos
+    return { ...base, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: positions }
   }
 
   // Yearly: the engine repeats the anchor's own month and day, and reads no

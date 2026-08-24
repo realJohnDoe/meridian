@@ -18,7 +18,7 @@ type RepeatEnd =
   | { type: 'count'; occurrences: number }
 
 export type Repeat =
-  | { type: 'schedule'; freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; byweekday?: Weekday[]; bymonthday?: number[]; bysetpos?: number; interval?: number; end?: RepeatEnd }
+  | { type: 'schedule'; freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; byweekday?: Weekday[]; bymonthday?: number[]; bysetpos?: number | number[]; interval?: number; end?: RepeatEnd }
   | { type: 'after_completion'; interval: string; end?: RepeatEnd }
 
 // ── Metadata types ────────────────────────────────────────────────────────────
