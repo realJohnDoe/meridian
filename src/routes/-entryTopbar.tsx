@@ -24,7 +24,12 @@ export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack, h
     // Both edges always lead with an icon button — the back button on the left, regardless of
     // screen size (the sidebar's own hamburger stays mobile-only; large screens keep the sidebar
     // docked open, so the back button is the only way out of the editor there).
-    <div className={cn('flex items-center gap-1 w-full lg:max-w-3xl lg:mx-auto', topbarEdgePadding(true, true))}>
+    //
+    // No lg:max-w-3xl centering here, unlike the entry body below: every other topbar (agenda,
+    // day/week/month) spans the full header and pins its icon buttons to the true screen edges,
+    // leaving only the *content* column centered at 768px. Centering the topbar itself would
+    // strand these buttons far from the edge on anything wider than that column.
+    <div className={cn('flex items-center gap-1 w-full', topbarEdgePadding(true, true))}>
       <IconButton variant="ghost" className="text-dim" onClick={onBack} title="Back" label="Back">
         <ArrowLeft size={18} />
       </IconButton>
