@@ -96,7 +96,7 @@ export function repeatToRrule(repeat: Repeat, anchor: Date): string | null {
   // would drift the moment the user is a day late.
   if (repeat.type !== 'schedule') return null
 
-  const { freq, byweekday, bymonthday, bysetpos, interval = 1, end } = repeat
+  const { freq, byweekday, bymonthday, bymonth, bysetpos, interval = 1, end } = repeat
   if (!['daily', 'weekly', 'monthly', 'yearly'].includes(freq)) return null
   // `interval` reaches here from YAML through an unchecked cast, so it can be
   // anything. The engine's cursor never advances on a non-positive interval —
@@ -107,8 +107,19 @@ export function repeatToRrule(repeat: Repeat, anchor: Date): string | null {
     .map(d => ICS_BY_WEEKDAY[d.toLowerCase() as Weekday])
     .filter((d): d is string => !!d)
 
+  // The engine drops out-of-range months before it reads them, so the RRULE
+  // has to name the months it will actually visit, not the ones the object
+  // lists. A `bymonth` that survives none of them selects nothing at all,
+  // which no RRULE says — `BYMONTH=` is not a legal empty value.
+  const months = (bymonth ?? []).filter(m => Number.isInteger(m) && m >= 1 && m <= 12)
+  if (bymonth?.length && months.length === 0) return null
+
   const parts: string[] = [`FREQ=${freq.toUpperCase()}`]
   if (interval > 1) parts.push(`INTERVAL=${interval}`)
+  // BYMONTH limits the finer frequencies in both engines alike (RFC 5545
+  // §3.3.10), so it carries across verbatim; YEARLY, where it *expands*, emits
+  // it from its own arm below because the month list there is never empty.
+  if (freq !== 'yearly' && months.length > 0) parts.push(`BYMONTH=${months.join(',')}`)
 
   if (freq === 'daily') {
     // At DAILY both engines read these as limits on a single-day period, not
@@ -149,10 +160,45 @@ export function repeatToRrule(repeat: Repeat, anchor: Date): string | null {
     // Neither: the monthly arm repeats the anchor's own day-of-month, which
     // DTSTART already carries. A `byweekday` with no `bysetpos` lands here and
     // is dead data — see the header.
+  } else {
+    // YEARLY expands over the months `bymonth` names and fills each one the
+    // way the monthly arm would. Two things follow.
+    //
+    // First, a day-naming part with no `bymonth` means "in the anchor's own
+    // month" to the engine, but "in all twelve" to the RFC — so the anchor's
+    // month is stated explicitly rather than left to DTSTART. With nothing
+    // naming a day, DTSTART does carry the whole rule and `FREQ=YEARLY` alone
+    // is exact.
+    //
+    // Second, the position parts split by how many months are in play.
+    // `BYSETPOS` applies once per period, and a yearly period is the whole
+    // year, so it only reproduces the engine's per-month reading when there is
+    // a single month. Across several months the equivalent is an *ordinal*
+    // `BYDAY` (§3.3.10: under `FREQ=YEARLY;BYMONTH`, `1MO` counts within each
+    // month) — which distributes the position over each named weekday
+    // separately, so it says what the engine does only for a single weekday
+    // and a single position. Anything else has no faithful RRULE.
+    const namesADay = !!bymonthday?.length || (days.length > 0 && bysetpos !== undefined)
+    const yearMonths = months.length > 0 ? months : namesADay ? [anchor.getMonth() + 1] : []
+    if (yearMonths.length > 0) parts.push(`BYMONTH=${yearMonths.join(',')}`)
+
+    if (bymonthday?.length) {
+      // As monthly: `bymonthday` wins and a `byweekday` alongside it is dead.
+      parts.push(`BYMONTHDAY=${bymonthday.join(',')}`)
+    } else if (days.length > 0 && bysetpos !== undefined) {
+      const positions = Array.isArray(bysetpos) ? bysetpos : [bysetpos]
+      if (positions.length === 0 || positions.some(p => p === 0)) return null // no such position; the engine emits nothing
+      if (yearMonths.length === 1) {
+        parts.push(`BYDAY=${days.join(',')}`, `BYSETPOS=${positions.join(',')}`)
+      } else if (days.length === 1 && positions.length === 1) {
+        parts.push(`BYDAY=${positions[0]!}${days[0]!}`)
+      } else {
+        return null
+      }
+    }
+    // Neither: the year's months repeat the anchor's day-of-month, which
+    // DTSTART carries. A `byweekday` with no `bysetpos` is dead data here too.
   }
-  // YEARLY reads no BY* part at all: the arm repeats the anchor's month and
-  // day, so DTSTART carries the whole rule and anything else on the object is
-  // dead data. `FREQ=YEARLY` alone means precisely that.
 
   const bound = endPart(end)
   if (bound) parts.push(bound)

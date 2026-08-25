@@ -7,8 +7,18 @@ PRs, each independently shippable, with a recommended model per PR.
 **Status: PR1 shipped ([#750](https://github.com/realJohnDoe/meridian/pull/750)).
 PR2 shipped ([#757](https://github.com/realJohnDoe/meridian/pull/757)). PR3
 shipped ([#759](https://github.com/realJohnDoe/meridian/pull/759)). PR4 open
-([#799](https://github.com/realJohnDoe/meridian/pull/799)). PR5 shipped. PRs
-6–9 not started.**
+([#799](https://github.com/realJohnDoe/meridian/pull/799)). PR5 shipped. PR6
+implemented — the engine, the exporter and the format now carry `bymonth`. PRs
+7–9 not started.**
+
+**PRs 6 and 7 ship together.** The round-trip corpus in
+`storage/ical/repeatToRrule.test.ts` is built by feeding RRULEs through the
+*importer*, and it pins `CLAIMED.length === CORPUS.length` — so a corpus entry
+the importer still declines fails the suite rather than covering anything, and
+`STILL_DECLINED`'s yearly rows can only be trimmed by the PR that claims them.
+PR 6's stated acceptance is therefore not reachable from the engine side alone.
+Both engines' oracle — the RFC-shaped walk `expandRRule` — is untouched by
+either PR, which is what keeps the combined change honest: do not edit it.
 
 ---
 
@@ -38,7 +48,7 @@ expressiveness work below is guarded as it lands. Extend its corpus with each
 newly representable shape.
 
 ```
-PR6 ──► PR7 ──► PR8
+PR7 ──► PR8
 PR9 ─ (optional, any time)
 ```
 
@@ -46,54 +56,18 @@ PR9 ─ (optional, any time)
 
 | # | Title | Model | Est. | Touches format? |
 |---|---|---|---|---|
-| 6 | `bymonth` + yearly `BY*` in the engine | **Opus 5** | 1.5–2d | yes (`bymonth`) |
 | 7 | Importer claims the yearly/`bymonth` shapes | **Opus 5** | 0.5–1d | no |
 | 8 | ICS export: file emission + entry point | Sonnet 5 | 1.5–2d | no |
 | 9 | `WKST` (optional) | **Opus 5** | 1d | yes (`wkst`) |
 
-Total PRs 6–8: **3.5–5 days** (PRs 1–5 have shipped — see status above). That is
-higher than the 6–10-day range in the survey's bottom row only in bookkeeping:
-the survey counted implementation, this counts implementation plus per-PR tests,
-review and CI.
+Total PRs 7–8: **2–3 days** (PRs 1–6 are done — see status above). That is
+higher than the survey's bottom row only in bookkeeping: the survey counted
+implementation, this counts implementation plus per-PR tests, review and CI.
 
-The two remaining PRs that touch `types.ts` are the ones to slow down on.
+PR 9, the last one that touches `types.ts`, is the one to slow down on.
 `repeat:` is written to YAML verbatim and read back with an unchecked cast, so
 there is no schema to migrate — which cuts both ways: widening the type is
 free, and nothing will catch a mistake.
-
----
-
-### PR 6 — `bymonth` + yearly `BY*` in the engine
-
-**Model: Opus 5** · 1.5–2d · touches format (`bymonth`)
-
-The design PR. Fixes gaps A and B — the one gap with real user-visible weight
-(Thanksgiving, Mother's Day, quarterly-on-the-first-Monday).
-
-- Add `bymonth?: number[]` to `Repeat`.
-- Restructure `matchesInPeriod` (`expansion.ts:233`) so the yearly branch
-  expands over the months `bymonth` names — defaulting to the anchor's month —
-  and within each month reuses the monthly branch's candidate selection
-  (`bymonthday`, or `byweekday` + `bysetpos`, or the anchor's day).
-- Apply `bymonth` as a *limit* for daily/weekly/monthly.
-
-The exact shape to port is `periodCandidates` / `monthCandidates` /
-`passesLimits` (`rruleToRepeat.ts:328-410`), already written against the RFC's
-expansion-vs-limit table.
-
-**Watch:** the yearly branch currently returns at most one date per period.
-`periodsBetween`'s analytic skip (`expansion.ts:212`) must stay correct once
-yearly can produce many dates per period, and `PERIOD_WALK_LIMIT` (the backstop
-PR 2 left behind) applies here too.
-
-**Why Opus:** this decides what `yearly` *means* in the file format. A subtly
-wrong answer is silent, lands in vault files, and survives.
-
-**Acceptance:** Thanksgiving (`FREQ=YEARLY;BYMONTH=11;BYDAY=4TH`), Mother's Day
-(`FREQ=YEARLY;BYMONTH=5;BYDAY=2SU`), and a twice-yearly `BYMONTH=3,9` all
-produce correct dates across a leap year. `repeatToRrule.test.ts`'s corpus
-extended to cover the newly representable shapes, and the `STILL_DECLINED` list
-in it trimmed of the entries this PR claims.
 
 ---
 
@@ -101,9 +75,32 @@ in it trimmed of the entries this PR claims.
 
 **Model: Opus 5** (Sonnet 5 if PR 6 enumerates the shapes) · 0.5–1d
 
-Delete the anchor-equality checks at `rruleToRepeat.ts:205-208`, map `BYMONTH`,
-and allow yearly with `BYDAY` + `BYSETPOS`. Following the file's own convention,
-every newly claimed shape gets its equivalence argument written at the check.
+Delete the anchor-equality checks in `rruleToRepeat.ts`'s yearly arm, map
+`BYMONTH`, and allow yearly with `BYDAY` + `BYSETPOS`. Following the file's own
+convention, every newly claimed shape gets its equivalence argument written at
+the check.
+
+PR 6 settled which shapes are equivalent, and `repeatToRrule`'s yearly arm
+already states each one as an emitted spelling:
+
+- Yearly with `BYMONTH` and no day-naming part — the day comes from DTSTART in
+  both engines.
+- Yearly with `BYMONTH` (any number of months) + `BYMONTHDAY`, negatives
+  included: resolved per month on both sides.
+- Yearly with **one** month + `BYDAY` + `BYSETPOS`: a yearly period holds that
+  single month, so the RFC's per-period position and the engine's per-month one
+  coincide.
+- Yearly with several months and an **ordinal** `BYDAY` naming one weekday
+  (`BYMONTH=1,4,7,10;BYDAY=1MO`): §3.3.10 resolves the ordinal within each
+  month, which is the engine's reading.
+- `BYMONTH` as a limit on daily, weekly and monthly.
+
+Still not equivalent, and still to be declined: several months carrying a
+`BYSETPOS` (the RFC applies it once across the year), an ordinal `BYDAY` naming
+several weekdays or several positions, and any yearly day-naming part with no
+`BYMONTH` at all (the RFC expands it over all twelve months; the engine reads
+the anchor's). The corresponding `STILL_DECLINED` rows to trim are the two
+yearly ones; the remaining four stay.
 
 **Why Opus:** the entire purpose of `tryRepresent` is refusing to claim a rule
 the engine gets subtly wrong — "a series that looks right and silently sits on
@@ -184,6 +181,6 @@ Per [CLAUDE.md](../CLAUDE.md):
   `src/storage/ical/*.test.ts`, plus the round-trip corpus in
   `src/storage/ical/repeatToRrule.test.ts` where the fix widens what the engine
   can represent.
-- For the two remaining format-touching PRs (6, 9): a YAML round-trip case, and a
+- For the last format-touching PR (9): a YAML round-trip case, and a
   check that no existing fixture or snapshot in
   `src/model/__tests__/__snapshots__/` silently encodes the old behaviour.

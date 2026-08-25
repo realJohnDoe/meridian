@@ -402,9 +402,79 @@ const HAND_BUILT: Array<{ label: string; repeat: Repeat; anchor: Date }> = [
     anchor: setPosAnchor(['MO', 'TU', 'WE', 'TH', 'FR'], -1),
   },
   {
-    label: 'yearly with BY* fields the yearly branch ignores entirely',
-    repeat: { type: 'schedule', freq: 'yearly', byweekday: ['fr'], bymonthday: [3], bysetpos: 2 },
+    label: 'yearly with a byweekday but no bysetpos — still dead data, as monthly',
+    repeat: { type: 'schedule', freq: 'yearly', byweekday: ['fr'] },
     anchor: new Date(2025, 7, 20),
+  },
+  {
+    label: 'yearly with bymonthday winning over a byweekday alongside it',
+    repeat: { type: 'schedule', freq: 'yearly', bymonthday: [3], byweekday: ['fr'], bysetpos: 2 },
+    anchor: new Date(2025, 7, 3),
+  },
+  {
+    label: 'yearly on a day-of-month with no bymonth — the anchor\'s month, stated explicitly',
+    // The engine reads this as "the 3rd of the anchor's month"; the RFC would
+    // read a bare `FREQ=YEARLY;BYMONTHDAY=3` as the 3rd of all twelve. The
+    // export has to name the month for the two to agree.
+    repeat: { type: 'schedule', freq: 'yearly', bymonthday: [3] },
+    anchor: new Date(2025, 7, 3),
+  },
+  {
+    label: 'yearly, the fourth Thursday of November',
+    repeat: { type: 'schedule', freq: 'yearly', bymonth: [11], byweekday: ['th'], bysetpos: 4 },
+    anchor: new Date(2025, 10, 27),
+  },
+  {
+    label: 'yearly, the second Sunday of May',
+    repeat: { type: 'schedule', freq: 'yearly', bymonth: [5], byweekday: ['su'], bysetpos: 2 },
+    anchor: new Date(2026, 4, 10),
+  },
+  {
+    label: 'yearly in two months, on the anchor\'s day-of-month',
+    repeat: { type: 'schedule', freq: 'yearly', bymonth: [3, 9] },
+    anchor: new Date(2026, 2, 10),
+  },
+  {
+    label: 'yearly in four months, one weekday and one position — the ordinal BYDAY spelling',
+    // BYSETPOS would be applied once across the whole year; an ordinal BYDAY
+    // is resolved within each month, which is what the engine does.
+    repeat: { type: 'schedule', freq: 'yearly', bymonth: [1, 4, 7, 10], byweekday: ['mo'], bysetpos: 1 },
+    anchor: new Date(2026, 0, 5),
+  },
+  {
+    label: 'yearly in three months, on the last Friday of each — a negative ordinal BYDAY',
+    repeat: { type: 'schedule', freq: 'yearly', bymonth: [2, 5, 8], byweekday: ['fr'], bysetpos: -1 },
+    anchor: new Date(2026, 1, 27),
+  },
+  {
+    label: 'yearly in two months with a byweekday but no bysetpos — dead data, as monthly',
+    repeat: { type: 'schedule', freq: 'yearly', bymonth: [3, 9], byweekday: ['fr'] },
+    anchor: new Date(2026, 2, 10),
+  },
+  {
+    label: 'yearly in two months, on a day one of them cannot hold',
+    repeat: { type: 'schedule', freq: 'yearly', bymonth: [1, 2], bymonthday: [31] },
+    anchor: new Date(2026, 0, 31),
+  },
+  {
+    label: 'yearly on the last day of two months',
+    repeat: { type: 'schedule', freq: 'yearly', bymonth: [2, 6], bymonthday: [-1] },
+    anchor: new Date(2026, 1, 28),
+  },
+  {
+    label: 'weekly narrowed to two months — BYMONTH as a limit',
+    repeat: { type: 'schedule', freq: 'weekly', byweekday: ['mo'], bymonth: [1, 2] },
+    anchor: new Date(2026, 0, 5),
+  },
+  {
+    label: 'monthly narrowed to four months — quarterly, spelled as a limit',
+    repeat: { type: 'schedule', freq: 'monthly', bymonthday: [15], bymonth: [3, 6, 9, 12] },
+    anchor: new Date(2026, 2, 15),
+  },
+  {
+    label: 'daily narrowed to one month',
+    repeat: { type: 'schedule', freq: 'daily', bymonth: [2] },
+    anchor: new Date(2026, 1, 26),
   },
   {
     label: 'monthly on the 31st, with a count that outlives the window',
@@ -491,8 +561,37 @@ describe('repeatToRrule — spelling', () => {
       .toBe('FREQ=MONTHLY;BYMONTHDAY=9')
     expect(repeatToRrule(sched({ freq: 'weekly', byweekday: ['fr'], bymonthday: [9], bysetpos: 2 }), MON))
       .toBe('FREQ=WEEKLY;BYDAY=FR')
+    // Yearly reads `bymonthday` now, and it wins over a `byweekday` beside it
+    // exactly as it does monthly — but the month it applies to comes from the
+    // anchor, so the RRULE has to say which one.
     expect(repeatToRrule(sched({ freq: 'yearly', byweekday: ['fr'], bymonthday: [9], bysetpos: 2 }), MON))
-      .toBe('FREQ=YEARLY')
+      .toBe('FREQ=YEARLY;BYMONTH=8;BYMONTHDAY=9')
+    // Nothing names a day, so DTSTART carries the whole rule.
+    expect(repeatToRrule(sched({ freq: 'yearly', byweekday: ['fr'] }), MON)).toBe('FREQ=YEARLY')
+  })
+
+  it('writes a yearly month list, and the day-position spelling each month count needs', () => {
+    expect(repeatToRrule(sched({ freq: 'yearly', bymonth: [3, 9] }), MON))
+      .toBe('FREQ=YEARLY;BYMONTH=3,9')
+    // One month: BYSETPOS applies once per period, and the period holds a
+    // single month, so the engine's per-month reading is reproduced exactly.
+    expect(repeatToRrule(sched({ freq: 'yearly', bymonth: [11], byweekday: ['th'], bysetpos: 4 }), MON))
+      .toBe('FREQ=YEARLY;BYMONTH=11;BYDAY=TH;BYSETPOS=4')
+    // Several months: BYSETPOS would pick once across all of them, so the
+    // position moves onto the BYDAY, where the RFC resolves it per month.
+    expect(repeatToRrule(sched({ freq: 'yearly', bymonth: [1, 4, 7, 10], byweekday: ['mo'], bysetpos: 1 }), MON))
+      .toBe('FREQ=YEARLY;BYMONTH=1,4,7,10;BYDAY=1MO')
+    expect(repeatToRrule(sched({ freq: 'yearly', bymonth: [3, 9], bymonthday: [15] }), MON))
+      .toBe('FREQ=YEARLY;BYMONTH=3,9;BYMONTHDAY=15')
+  })
+
+  it('writes BYMONTH as a plain limit at the finer frequencies', () => {
+    expect(repeatToRrule(sched({ freq: 'daily', bymonth: [2] }), MON))
+      .toBe('FREQ=DAILY;BYMONTH=2')
+    expect(repeatToRrule(sched({ freq: 'weekly', byweekday: ['mo'], bymonth: [1, 2] }), MON))
+      .toBe('FREQ=WEEKLY;BYMONTH=1,2;BYDAY=MO')
+    expect(repeatToRrule(sched({ freq: 'monthly', bymonthday: [15], bymonth: [3, 6, 9, 12] }), MON))
+      .toBe('FREQ=MONTHLY;BYMONTH=3,6,9,12;BYMONTHDAY=15')
   })
 
   it('keeps BYDAY and BYMONTHDAY at daily frequency, where both are limits', () => {
@@ -524,6 +623,16 @@ describe('repeatToRrule — spelling', () => {
     expect(repeatToRrule(sched({ interval: -2 }), MON)).toBeNull()
     expect(repeatToRrule(sched({ freq: 'fortnightly' as 'daily' }), MON)).toBeNull()
     expect(repeatToRrule(sched({ freq: 'monthly', byweekday: ['fr'], bysetpos: 0 }), MON)).toBeNull()
+    // A `bymonth` naming no real month selects nothing; `BYMONTH=` is not a
+    // value RFC 5545 has.
+    expect(repeatToRrule(sched({ freq: 'yearly', bymonth: [0, 13] }), MON)).toBeNull()
+    // Several months with a position applied to the *combined* candidate list
+    // is the one shape the two engines read differently — BYSETPOS spans the
+    // year, an ordinal BYDAY distributes over each weekday separately, and
+    // neither says what the engine does. See `monthCandidates` in
+    // `model/expansion.ts`.
+    expect(repeatToRrule(sched({ freq: 'yearly', bymonth: [3, 9], byweekday: ['mo', 'we'], bysetpos: 1 }), MON)).toBeNull()
+    expect(repeatToRrule(sched({ freq: 'yearly', bymonth: [3, 9], byweekday: ['mo'], bysetpos: [1, -1] }), MON)).toBeNull()
   })
 })
 

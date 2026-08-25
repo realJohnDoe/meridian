@@ -12,9 +12,13 @@ const ctx = (over: { scheduledDate?: string | null; hasSchedule?: boolean; hasTr
   hasTracking: over.hasTracking ?? false,
 })
 
-/** Open the form on `repeat` and immediately encode it back — the open-and-Set cycle. */
+/**
+ * Open the form on `repeat` and immediately encode it back — the open-and-Set
+ * cycle. `repeat` is passed back as `previous` because that is what
+ * `RepeatDialog` does: it holds the value it was opened on.
+ */
 function roundTrip(repeat: Repeat, scheduledDate: string | null = DATE): Repeat {
-  return formToRepeat(repeatToForm(repeat, ctx({ scheduledDate })), scheduledDate)
+  return formToRepeat(repeatToForm(repeat, ctx({ scheduledDate })), scheduledDate, repeat)
 }
 
 describe('repeatToForm / formToRepeat round-trip', () => {
@@ -23,6 +27,13 @@ describe('repeatToForm / formToRepeat round-trip', () => {
       ['weekly with several weekdays', { type: 'schedule', freq: 'weekly', interval: 2, byweekday: ['mo', 'we', 'fr'] }],
       ['daily', { type: 'schedule', freq: 'daily', interval: 3 }],
       ['yearly', { type: 'schedule', freq: 'yearly', interval: 1 }],
+      // The form shows no month or weekday-position control for a yearly
+      // repeat, so these survive only by being carried across — see asymmetry
+      // 6 in `repeat.ts`. Without that they would come back as "every June
+      // 15th", which is a different holiday.
+      ['yearly in named months', { type: 'schedule', freq: 'yearly', interval: 1, bymonth: [3, 9] }],
+      ['yearly on the fourth Thursday of November', { type: 'schedule', freq: 'yearly', interval: 1, bymonth: [11], byweekday: ['th'], bysetpos: 4 }],
+      ['yearly on a day-of-month', { type: 'schedule', freq: 'yearly', interval: 1, bymonthday: [3] }],
       ['weekly with an until end', { type: 'schedule', freq: 'weekly', interval: 1, byweekday: ['mo'], end: { type: 'until', date: '2026-12-31' } }],
       ['weekly with a count end', { type: 'schedule', freq: 'weekly', interval: 1, byweekday: ['mo'], end: { type: 'count', occurrences: 10 } }],
       ['monthly on the scheduled day-of-month', { type: 'schedule', freq: 'monthly', interval: 1, bymonthday: [15] }],
@@ -144,6 +155,32 @@ describe('formToRepeat', () => {
   it('ignores weekday selection for non-weekly frequencies', () => {
     const form = { ...repeatToForm(null, ctx()), freq: 'daily' as const, wdays: [true, true, false, false, false, false, false] }
     expect(formToRepeat(form, DATE)).toEqual({ type: 'schedule', freq: 'daily', interval: 1 })
+  })
+
+  it('carries a yearly repeat\'s BY* fields across, since the form cannot show them', () => {
+    const previous: Repeat = { type: 'schedule', freq: 'yearly', bymonth: [11], byweekday: ['th'], bysetpos: 4 }
+    const form = { ...repeatToForm(previous, ctx()), intervalNum: 2 }
+    expect(formToRepeat(form, DATE, previous)).toEqual({
+      type: 'schedule', freq: 'yearly', interval: 2, bymonth: [11], byweekday: ['th'], bysetpos: 4,
+    })
+  })
+
+  it('drops them when the user picks a different frequency', () => {
+    // Carrying them into a monthly or weekly rule would mean something else
+    // entirely: `bysetpos` is read per month there, and `bymonth` as a limit.
+    const previous: Repeat = { type: 'schedule', freq: 'yearly', bymonth: [11], byweekday: ['th'], bysetpos: 4 }
+    const form = { ...repeatToForm(previous, ctx()), freq: 'weekly' as const }
+    // `byweekday` comes out empty because `repeatToForm` reads that field into
+    // `wdays` only for a weekly repeat — the pre-existing asymmetry 2, not
+    // anything the carry-across does.
+    expect(formToRepeat(form, DATE, previous)).toEqual({
+      type: 'schedule', freq: 'weekly', interval: 1, byweekday: [],
+    })
+  })
+
+  it('carries nothing across when the form was opened on no repeat at all', () => {
+    const form = { ...repeatToForm(null, ctx()), freq: 'yearly' as const }
+    expect(formToRepeat(form, DATE, null)).toEqual({ type: 'schedule', freq: 'yearly', interval: 1 })
   })
 
   it('omits an end condition when the value is blank', () => {

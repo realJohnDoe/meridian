@@ -96,6 +96,13 @@ export function monthlyWeekdaySpec(jsDate: Date): MonthlyWeekdaySpec {
 //  5. `after_completion` has no form fields for weekdays, monthly mode or an
 //     end condition, so those are dropped from any `after_completion` repeat
 //     that passes through the form.
+//  6. A yearly repeat's `bymonth`/`bymonthday`/`byweekday`+`bysetpos` are
+//     carried across from the repeat the form was opened on, not rebuilt from
+//     form state. The form has no control for any of them, so rebuilding would
+//     turn "the fourth Thursday of November" into "November 27th" the first
+//     time someone opened the dialog and pressed Set — silently, and on a rule
+//     they never touched. The monthly fields above are the opposite case: the
+//     form *does* express them, so they are re-derived from the anchor.
 //
 // Changing any of these changes which vault files survive an open-and-Set
 // cycle unchanged — see `model/__tests__/repeatForm.test.ts`.
@@ -197,8 +204,12 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
  * Build a Repeat value from form state. `scheduledDate` anchors monthly
  * patterns — with no parseable date, a monthly repeat carries neither
  * `bymonthday` nor `byweekday`/`bysetpos`.
+ *
+ * `previous` is the repeat the form was opened on, and exists only to carry
+ * yearly's BY* fields through a form that cannot show them — see asymmetry 6
+ * in the header. Omitting it drops them.
  */
-export function formToRepeat(form: RepeatForm, scheduledDate?: string | null): Repeat {
+export function formToRepeat(form: RepeatForm, scheduledDate?: string | null, previous?: Repeat | null): Repeat {
   const { freq, wdays, monthly, endType, endVal } = form
 
   if (freq === 'after_completion') {
@@ -228,6 +239,17 @@ export function formToRepeat(form: RepeatForm, scheduledDate?: string | null): R
         r.byweekday = spec.byweekday
         r.bysetpos = spec.bysetpos
       }
+    }
+  }
+
+  if (freq === 'yearly' && previous?.type === 'schedule' && previous.freq === 'yearly') {
+    // Only what the form cannot express, and only when the frequency it
+    // belongs to is still the one selected.
+    if (previous.bymonth?.length) r.bymonth = previous.bymonth
+    if (previous.bymonthday?.length) r.bymonthday = previous.bymonthday
+    if (previous.byweekday?.length && previous.bysetpos !== undefined) {
+      r.byweekday = previous.byweekday
+      r.bysetpos = previous.bysetpos
     }
   }
 

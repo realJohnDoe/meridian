@@ -17,8 +17,14 @@ type RepeatEnd =
   | { type: 'until'; date?: string; time?: string }
   | { type: 'count'; occurrences: number }
 
+/**
+ * `bymonth` holds calendar month numbers, 1–12. It *expands* a yearly repeat
+ * into the months it names and *limits* every finer frequency to them, which
+ * is RFC 5545 §3.3.10's own split; `model/expansion.ts` is where that is
+ * carried out and where the per-month reading of `bysetpos` is argued.
+ */
 export type Repeat =
-  | { type: 'schedule'; freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; byweekday?: Weekday[]; bymonthday?: number[]; bysetpos?: number | number[]; interval?: number; end?: RepeatEnd }
+  | { type: 'schedule'; freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; byweekday?: Weekday[]; bymonthday?: number[]; bymonth?: number[]; bysetpos?: number | number[]; interval?: number; end?: RepeatEnd }
   | { type: 'after_completion'; interval: string; end?: RepeatEnd }
 
 // ── Metadata types ────────────────────────────────────────────────────────────

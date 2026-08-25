@@ -53,6 +53,19 @@ describe('structural expectations', () => {
     expect(dates).toEqual(['2026-01-02', '2026-01-16', '2026-02-06', '2026-02-20'])
   })
 
+  it('preserves a yearly bymonth rule, and expands it in the months it names', () => {
+    const parsed = parseFixture('yearly-bymonth')
+    const series = parsed.items.filter(isSeries)
+    expect(series).toHaveLength(1)
+    expect(series[0]!.repeat).toMatchObject({
+      type: 'schedule', freq: 'yearly', bymonth: [11], byweekday: ['th'], bysetpos: 4,
+    })
+
+    const roots = rootsOf(parsed.root)
+    const dates = expandRange(parsed.items, roots, new Date('2025-01-01'), new Date('2027-12-31')).map(o => o.date)
+    expect(dates).toEqual(['2025-11-27', '2026-11-26', '2027-11-25'])
+  })
+
   it('preserves the after_completion repeat type and interval', () => {
     const parsed = parseFixture('after-completion')
     const series = parsed.items.filter(isSeries)
