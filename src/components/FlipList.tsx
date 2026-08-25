@@ -198,6 +198,18 @@ function useFlipTransition(
  * one later, and a scroller cached as null then would stay null for good.
  * Deliberately doesn't require the pane to *currently* overflow, for the same
  * reason — whether it does is a property of this commit, not of the element.
+ *
+ * Falls back to the document scroller rather than null. Under the flow shell
+ * (hooks/use-shell-mode.ts) the entry route's panes are `overflow: visible` and
+ * the *document* is what scrolls, so the walk above finds nothing — and a null
+ * scroller silently turns both halves of the scroll hold below into no-ops.
+ * The fold then loses its pin, the offset clamps in the one layout that reads
+ * the natural height, and the list snaps to its new size instead of shrinking
+ * in step with the animation.
+ *
+ * Kept separate from lib/scrollParent.ts on purpose: that one additionally
+ * requires the ancestor to be overflowing *right now*, which is exactly the
+ * condition the comment above explains this must not test.
  */
 function findScrollParent(el: HTMLElement): HTMLElement | null {
   let node = el.parentElement
@@ -206,7 +218,7 @@ function findScrollParent(el: HTMLElement): HTMLElement | null {
     if (overflowY === 'auto' || overflowY === 'scroll') return node
     node = node.parentElement
   }
-  return null
+  return (document.scrollingElement as HTMLElement | null) ?? null
 }
 
 function translateY(el: HTMLElement): number {

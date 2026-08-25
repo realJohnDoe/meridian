@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { computeFloatingPlacement, type FloatingPlacement } from '@/lib/floatingPlacement'
 import { findScrollParent } from '@/lib/scrollParent'
+import { topChromeBottom } from '@/lib/topChrome'
 import { useVisibleViewport } from './use-visual-viewport'
 
 export type FloatingComboboxPlacement = FloatingPlacement
@@ -29,8 +30,10 @@ export function useFloatingCombobox(open: boolean, onOpenChange: (open: boolean)
       const el = anchorRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
-      const visibleTop    = visible.top
-      const visibleBottom = visibleTop + visible.height
+      // The sticky topbar paints over the top of the viewport, so the band a
+      // panel may occupy starts below it, not at the visual viewport's edge.
+      const visibleTop    = Math.max(visible.top, topChromeBottom())
+      const visibleBottom = visible.top + visible.height
       const placement = computeFloatingPlacement(rect, {
         visibleTop,
         visibleBottom,
@@ -39,7 +42,9 @@ export function useFloatingCombobox(open: boolean, onOpenChange: (open: boolean)
       })
       setPlacement(placement)
 
-      if (placement.side === 'top' && !scrolledRef.current) {
+      // No placement means the anchor has scrolled out of the usable band, so
+      // there is nothing to flip and nothing to nudge toward.
+      if (placement?.side === 'top' && !scrolledRef.current) {
         scrolledRef.current = true
         const targetBottom = visibleBottom - 16
         const delta = rect.bottom - targetBottom
