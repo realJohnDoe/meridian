@@ -1,13 +1,12 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import { Menu, CalendarCheck2 } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth, weekStartsOn } from '@/model'
 import { useToday, useShellMode } from '@/hooks'
 import { useStore } from '@/store'
-import { onVaultChanged } from '@/storage'
 import {
-  resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useWeekPreview,
+  useMonthPreview, useDayPreview, useWeekPreview,
   useAgendaTopDate, requestScrollToToday, weekStartFor,
 } from '@/calendar'
 import { CoachTour } from '@/onboarding'
@@ -46,28 +45,6 @@ function AppMain() {
   }, [isMobile, setOpenMobile])
 
   const navigate = useNavigate()
-
-  // When a vault activates with *different* content, discard the previous
-  // vault's calendar-view state (saved agenda scroll, cached occurrence
-  // expansions, cached agenda sections — see resetCalendarOnVaultChange). That
-  // reset also re-targets the agenda at today, so nothing further is needed.
-  //
-  // Registered here — not in AgendaPage — because AppMain stays mounted across
-  // every app route: a vault switch made while in the editor, month, day, or a
-  // list view would otherwise be missed (AgendaPage is unmounted then), leaving
-  // the next agenda visit to restore a stale, cross-vault offset near the top.
-  //
-  // `contentReplaced` is false on the cache-first restore, where the vault
-  // being activated is the one already painted from Dexie. Resetting there
-  // threw away the expansion and grouping the first paint had just built — and
-  // since that emission is gated on an OAuth refresh plus two GitHub round
-  // trips, it landed as a visible correction up to a second in. The agenda
-  // seeds itself at today from viewState's default now, so there is genuinely
-  // nothing to do on that path.
-  useEffect(() => onVaultChanged(({ contentReplaced }) => {
-    if (!contentReplaced) return
-    resetCalendarOnVaultChange()
-  }), [])
 
   const entryMatch     = useMatch({ from: '/_app/entry/$vault/$slug', shouldThrow: false })
   // The pre-multi-vault `/entry/<slug>` URL, which redirects to the route above

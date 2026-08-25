@@ -4,8 +4,8 @@ import { startOfToday } from 'date-fns'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { fmtISO } from '@/model'
 import { useVisibleViewportCssVars } from '@/hooks'
-import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush } from '@/storage'
-import { requestScrollToToday, setCurrentDate } from '@/calendar'
+import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged } from '@/storage'
+import { requestScrollToToday, setCurrentDate, resetCalendarOnVaultChange } from '@/calendar'
 import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createRootRoute({
@@ -202,6 +202,29 @@ function Root() {
       window.removeEventListener('pagehide', flushPendingPush)
     }
   }, [])
+
+  // When a vault activates with *different* content, discard the previous
+  // vault's calendar-view state (saved agenda scroll, cached occurrence
+  // expansions, cached agenda sections — see resetCalendarOnVaultChange). That
+  // reset also re-targets the agenda at today, so nothing further is needed.
+  //
+  // Registered here — not in AgendaPage — because the root route stays
+  // mounted across every route, including auth callbacks: a vault switch made
+  // while in the editor, month, day, or a list view would otherwise be
+  // missed (AgendaPage is unmounted then), leaving the next agenda visit to
+  // restore a stale, cross-vault offset near the top.
+  //
+  // `contentReplaced` is false on the cache-first restore, where the vault
+  // being activated is the one already painted from Dexie. Resetting there
+  // threw away the expansion and grouping the first paint had just built — and
+  // since that emission is gated on an OAuth refresh plus two GitHub round
+  // trips, it landed as a visible correction up to a second in. The agenda
+  // seeds itself at today from viewState's default now, so there is genuinely
+  // nothing to do on that path.
+  useEffect(() => onVaultChanged(({ contentReplaced }) => {
+    if (!contentReplaced) return
+    resetCalendarOnVaultChange()
+  }), [])
 
   return (
     <ThemeProvider

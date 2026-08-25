@@ -7,14 +7,24 @@ import { resolve } from 'node:path'
 
 const {
   restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, requestScrollToToday, setCurrentDate,
-} = vi.hoisted(() => ({
-  restoreVaults: vi.fn(),
-  autoSyncTick: vi.fn(),
-  resetSyncBackoff: vi.fn(),
-  flushPendingPush: vi.fn(),
-  requestScrollToToday: vi.fn(),
-  setCurrentDate: vi.fn(),
-}))
+  resetCalendarOnVaultChange, onVaultChanged, triggerVaultChanged,
+} = vi.hoisted(() => {
+  const listeners = new Set<(change: { contentReplaced: boolean }) => void>()
+  return {
+    restoreVaults: vi.fn(),
+    autoSyncTick: vi.fn(),
+    resetSyncBackoff: vi.fn(),
+    flushPendingPush: vi.fn(),
+    requestScrollToToday: vi.fn(),
+    setCurrentDate: vi.fn(),
+    resetCalendarOnVaultChange: vi.fn(),
+    onVaultChanged: vi.fn((fn: (change: { contentReplaced: boolean }) => void) => {
+      listeners.add(fn)
+      return () => listeners.delete(fn)
+    }),
+    triggerVaultChanged: (change: { contentReplaced: boolean }) => { listeners.forEach(fn => fn(change)) },
+  }
+})
 
 // createFileRoute is mocked to hand back the component directly — the real
 // root route is bound to the generated tree. Outlet needs router context it
@@ -28,8 +38,8 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   }
 })
 
-vi.mock('@/storage', () => ({ restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush }))
-vi.mock('@/calendar', () => ({ requestScrollToToday, setCurrentDate }))
+vi.mock('@/storage', () => ({ restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged }))
+vi.mock('@/calendar', () => ({ requestScrollToToday, setCurrentDate, resetCalendarOnVaultChange }))
 vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }))
 
 // The createRootRoute mock hands back the plain options object at runtime; the
@@ -306,6 +316,39 @@ describe('__root — theme-color sync', () => {
     act(() => { vi.advanceTimersByTime(32) })
 
     expect(syncedTag()?.getAttribute('content')).toBe('#011227')
+  })
+})
+
+describe('__root — vault-changed subscription', () => {
+  // The regression PR 2 of plans/entry-layout-route.md would otherwise
+  // introduce: the entry routes unmount whatever previously hosted this
+  // subscription while the editor is open, so it has to live on the root
+  // route, which stays mounted across every route. Root's Outlet is stubbed
+  // to a plain div rather than the real agenda, standing in for any
+  // non-agenda route — this must fire regardless.
+  it('resets calendar view state on a vault change while the rendered route is not the agenda', () => {
+    render(<Root />)
+
+    triggerVaultChanged({ contentReplaced: true })
+
+    expect(resetCalendarOnVaultChange).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores a vault change that did not replace content', () => {
+    render(<Root />)
+
+    triggerVaultChanged({ contentReplaced: false })
+
+    expect(resetCalendarOnVaultChange).not.toHaveBeenCalled()
+  })
+
+  it('stops listening after unmount', () => {
+    const { unmount } = render(<Root />)
+    unmount()
+
+    triggerVaultChanged({ contentReplaced: true })
+
+    expect(resetCalendarOnVaultChange).not.toHaveBeenCalled()
   })
 })
 
