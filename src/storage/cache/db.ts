@@ -17,6 +17,20 @@ export interface DexieFileRow {
   dirty:     number
   updatedAt: number
   version?:  string
+  /**
+   * The content the backend held at `version` — the common ancestor a dirty
+   * record's edit was made from, kept so a collision can be merged rather
+   * than only copied out (see `mergeFileContent`).
+   *
+   * Set on dirty records only: a clean record's `content` *is* its base, and
+   * storing a second copy of every file would double the cache for nothing.
+   * Absent on a dirty record written before this field existed, which is why
+   * every reader treats "no base" as "cannot merge" rather than as a default.
+   *
+   * Not indexed, so it needs no Dexie version bump — `stores()` below declares
+   * the primary key and indexes, not the row's shape.
+   */
+  baseContent?: string
 }
 
 /** Row shape stored in Dexie's `meta` table — the key/value store behind

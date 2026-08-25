@@ -210,6 +210,42 @@ describe('cache/files — recordLocalEdit', () => {
 
     expect((await rawRow(V, 'a.md'))?.dirty).toBe(0)
   })
+
+  it('captures the clean content as the ancestor the edit derives from', async () => {
+    // `version` alone identifies the ancestor; `baseContent` is that ancestor,
+    // and without it a collision can only be copied out, never merged.
+    await m.files.setResolvedClean(V, 'a.md', 'remote', 'sha1')
+    await m.files.recordLocalEdit(V, 'a.md', 'edited')
+
+    expect((await rawRow(V, 'a.md'))?.baseContent).toBe('remote')
+  })
+
+  it('keeps the first edit ancestor across a run of edits', async () => {
+    // A burst of keystrokes must still merge against what the backend holds,
+    // not against the previous keystroke.
+    await m.files.setResolvedClean(V, 'a.md', 'remote', 'sha1')
+    await m.files.recordLocalEdit(V, 'a.md', 'v1')
+    await m.files.recordLocalEdit(V, 'a.md', 'v2')
+
+    expect(await rawRow(V, 'a.md')).toMatchObject({ content: 'v2', baseContent: 'remote', version: 'sha1' })
+  })
+
+  it('leaves a locally-created file with no ancestor at all', async () => {
+    await m.files.recordLocalEdit(V, 'new.md', 'body')
+
+    expect((await rawRow(V, 'new.md'))?.baseContent).toBeUndefined()
+  })
+
+  it('refuses to invent an ancestor for a dirty row that predates the field', async () => {
+    // A row written by an older build: dirty, with local content and no
+    // baseContent. Falling back to its `content` would make a merge conclude
+    // the local side changed nothing and silently take the remote.
+    const d = await m.db.cacheInit()
+    await d.files.put({ vaultPath: 'vault-1::a.md', vaultId: V, path: 'a.md', content: 'local', dirty: 1, updatedAt: Date.now(), version: 'sha1' })
+    await m.files.recordLocalEdit(V, 'a.md', 'local edited further')
+
+    expect((await rawRow(V, 'a.md'))?.baseContent).toBeUndefined()
+  })
 })
 
 // ── files.ts: push confirmation (the mid-push CAS) ─────────────
@@ -247,6 +283,55 @@ describe('cache/files — markPushed', () => {
     const row = await rawRow(V, 'a.md')
     expect(row).toMatchObject({ content: 'body', dirty: 0 })
     expect(row?.version).toBeUndefined()
+  })
+
+  it('drops the ancestor when the record goes clean — content is then its own base', async () => {
+    await m.files.setResolvedClean(V, 'a.md', 'remote', 'sha1')
+    await m.files.recordLocalEdit(V, 'a.md', 'body')
+    await m.files.markPushed(V, 'a.md', 'body', 'sha2')
+
+    expect((await rawRow(V, 'a.md'))?.baseContent).toBeUndefined()
+  })
+
+  it('re-bases an edit that landed during the push onto what was actually pushed', async () => {
+    // The record stays dirty, so it keeps an ancestor — but the backend now
+    // holds `v1`, so merging its next collision against the older base would
+    // re-apply changes the push already delivered.
+    await m.files.setResolvedClean(V, 'a.md', 'remote', 'sha1')
+    await m.files.recordLocalEdit(V, 'a.md', 'v1')
+    await m.files.recordLocalEdit(V, 'a.md', 'v2')
+    await m.files.markPushed(V, 'a.md', 'v1', 'sha2')
+
+    expect(await rawRow(V, 'a.md')).toMatchObject({ content: 'v2', dirty: 1, version: 'sha2', baseContent: 'v1' })
+  })
+})
+
+// ── files.ts: merge adoption ───────────────────────────────────
+
+describe('cache/files — markMerged', () => {
+  it('adopts the merged content as clean when the record still holds what went into it', async () => {
+    await m.files.setResolvedClean(V, 'a.md', 'remote', 'sha1')
+    await m.files.recordLocalEdit(V, 'a.md', 'local')
+    await m.files.markMerged(V, 'a.md', 'local', 'merged', 'sha2')
+
+    const row = await rawRow(V, 'a.md')
+    expect(row).toMatchObject({ content: 'merged', dirty: 0, version: 'sha2' })
+    expect(row?.baseContent).toBeUndefined()
+  })
+
+  it('keeps an edit that landed during the merge, re-based onto the merged content', async () => {
+    // markPushed cannot do this job: its precondition is "the record still
+    // holds what we pushed", and a merge writes something the record never
+    // held — so it would take this branch every time and leave the pre-merge
+    // content dirty for the next cycle to push back over the merge.
+    await m.files.setResolvedClean(V, 'a.md', 'remote', 'sha1')
+    await m.files.recordLocalEdit(V, 'a.md', 'local')
+    await m.files.recordLocalEdit(V, 'a.md', 'local+more')
+    await m.files.markMerged(V, 'a.md', 'local', 'merged', 'sha2')
+
+    expect(await rawRow(V, 'a.md')).toMatchObject({
+      content: 'local+more', dirty: 1, version: 'sha2', baseContent: 'merged',
+    })
   })
 })
 

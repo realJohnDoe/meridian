@@ -36,12 +36,19 @@ export interface CacheRecord {
    * drift. Undefined for files created locally that were never pulled/pushed.
    */
   version?:  string
+  /**
+   * The backend's content at `version` — the ancestor this record's edit was
+   * made from, for a three-way merge on collision. Dirty records only; see
+   * `DexieFileRow.baseContent`.
+   */
+  baseContent?: string
 }
 
 function toCacheRecord(r: DexieFileRow): CacheRecord {
   return {
     vaultPath: r.vaultPath, vaultId: r.vaultId, path: r.path, content: r.content,
     status: toStatus(r.dirty), updatedAt: r.updatedAt, version: r.version,
+    baseContent: r.baseContent,
   }
 }
 
@@ -67,8 +74,32 @@ export async function recordLocalEdit(vaultId: string, path: string, content: st
   await d.transaction('rw', d.files, async () => {
     const existing = await d.files.get(key)
     if (existing && existing.content === content) return
-    await d.files.put({ vaultPath: key, vaultId, path, content, dirty: DIRTY_BY_STATUS.dirty, updatedAt: Date.now(), version: existing?.version })
+    await d.files.put({
+      vaultPath: key, vaultId, path, content,
+      dirty: DIRTY_BY_STATUS.dirty, updatedAt: Date.now(),
+      version: existing?.version,
+      baseContent: baseFor(existing),
+    })
   })
+}
+
+/**
+ * The ancestor content to carry onto a record about to go dirty.
+ *
+ * A clean record's own content *is* the ancestor — this is the moment it gets
+ * captured, since the next edit will overwrite `content` with the local
+ * version. A record already dirty keeps the base its first edit captured, so a
+ * run of keystrokes still merges against what the backend actually holds
+ * rather than against the previous keystroke.
+ *
+ * A dirty row written before `baseContent` existed answers `undefined` — the
+ * fallback must not be `existing.content`, which for a dirty row is the local
+ * edit itself: a merge told that base equals local concludes the local side
+ * changed nothing and silently takes the remote, discarding the user's work.
+ */
+function baseFor(existing: DexieFileRow | undefined): string | undefined {
+  if (!existing) return undefined
+  return existing.dirty === DIRTY_BY_STATUS.clean ? existing.content : existing.baseContent
 }
 
 /** Unconditional clean write — used only by resolveCollision, where the
@@ -96,10 +127,45 @@ export async function markPushed(
   await d.transaction('rw', d.files, async () => {
     const existing = await d.files.get(key)
     if (existing && existing.content !== pushedContent) {
-      await d.files.put({ ...existing, version, updatedAt: Date.now() })
+      // The record moved on mid-push, so it stays dirty — but the backend now
+      // holds `pushedContent`, so that, not the older ancestor, is what its
+      // next collision has to merge against.
+      await d.files.put({ ...existing, version, updatedAt: Date.now(), baseContent: pushedContent })
       return
     }
+    // Clean again: content is its own ancestor, so no separate base is kept.
     await d.files.put({ vaultPath: key, vaultId, path, content: pushedContent, dirty: DIRTY_BY_STATUS.clean, updatedAt: Date.now(), version })
+  })
+}
+
+/**
+ * Adopt the result of a three-way merge that has already been written to the
+ * backend — the record's local edit is *inside* `mergedContent`, so replacing
+ * it is preserving it, not discarding it.
+ *
+ * `markPushed` cannot serve here: its precondition is "the record still holds
+ * exactly what we pushed", and a merge deliberately writes something the
+ * record never held. It would take its diverged branch every time and leave
+ * the pre-merge local content dirty, which the next cycle would push straight
+ * back over the merge.
+ *
+ * So the precondition is the one that actually matters — the record still
+ * holds the content that *went into* the merge. When it doesn't, a further
+ * edit landed during the round trip and stays dirty, re-based on the merged
+ * content the backend now holds.
+ */
+export async function markMerged(
+  vaultId: string, path: string, mergedFrom: string, mergedContent: string, version?: string,
+): Promise<void> {
+  const d = await cacheInit()
+  const key = vp(vaultId, path)
+  await d.transaction('rw', d.files, async () => {
+    const existing = await d.files.get(key)
+    if (existing && existing.content !== mergedFrom) {
+      await d.files.put({ ...existing, version, updatedAt: Date.now(), baseContent: mergedContent })
+      return
+    }
+    await d.files.put({ vaultPath: key, vaultId, path, content: mergedContent, dirty: DIRTY_BY_STATUS.clean, updatedAt: Date.now(), version })
   })
 }
 

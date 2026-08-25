@@ -100,6 +100,17 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const flushLinksRef = useRef(flushOnSave)
   useEffect(() => { flushLinksRef.current = flushOnSave })
 
+  // What this editor last knew the store to agree with: the fields as loaded,
+  // then advanced to each save it makes. `saveNode` writes only what `entry`
+  // changes relative to this, so a field nobody here touched is left at
+  // whatever the store holds by then rather than reverted to what was on
+  // screen when the editor opened — see `touchedFieldsOnly`.
+  //
+  // Advanced on save rather than left at the mount-time values: after a commit
+  // the editor and the store agree again, and a base that never moves would
+  // keep re-writing every field of every earlier edit forever.
+  const baseRef = useRef(entry)
+
   // Always points to the latest entry so timer callbacks don't close over stale state
   const entryRef = useRef(entry)
   useEffect(() => { entryRef.current = entry }, [entry])
@@ -130,19 +141,20 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const commitEntry = (next: EntryState) => {
     const item = next.item ?? createdItemRef.current
     if (item) {
-      const key = saveNode(item, next.editScope, next)
+      const key = saveNode(item, next.editScope, next, { base: baseRef.current })
       setTitleMissing(key === null)
       // No-op once `next.item` itself is set (usePendingLinks already flushes
       // immediately in that case) — but while item only lives in
       // createdItemRef, entry.item is still null, so pending "listed on" links
       // added after creation would otherwise never get flushed again.
-      if (key) flushLinksRef.current(keySlug(key))
+      if (key) { baseRef.current = next; flushLinksRef.current(keySlug(key)) }
       return
     }
     if (!next.title) return
-    const key = saveNode(null, next.editScope, next, draftId, targetVaultId)
+    const key = saveNode(null, next.editScope, next, { draftId, targetVaultId })
     if (key === null) { setTitleMissing(true); return }
     setTitleMissing(false)
+    baseRef.current = next
     flushLinksRef.current(keySlug(key))
     setCreatedKey(key)
     createdItemRef.current = getFom().get(key) ?? null
@@ -227,7 +239,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     // still deliberately null, so saving must target the adopted item rather than ask
     // for another new entry. draftIdRef covers the window before that adoption lands.
     const item = entry.item ?? createdItemRef.current
-    const key = saveNode(item, entry.editScope, { ...entry, body }, draftId, targetVaultId)
+    const key = saveNode(item, entry.editScope, { ...entry, body }, { draftId, targetVaultId, base: baseRef.current })
     if (key !== null) { setTitleMissing(false); goBack(); return }
     setTitleMissing(true)
     setFocusTitleTick(t => t + 1)
@@ -351,7 +363,7 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
       body: '', tags: [], items: [], participants: vaultId ? readVaultStringArray('meridian_default_participants', vaultId) : [],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
-    }, undefined, vaultId)
+    }, { targetVaultId: vaultId })
     if (key === null) return null
     void navigate(keyRoute(key))
     return keySlug(key)

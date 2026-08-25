@@ -1,7 +1,7 @@
 import {
   recordLocalEdit, applyRemoteBatch, confirmDeleted, cacheGetDirty,
   setResolvedClean, markPushed, cacheDirtyCount, cacheLoadAll,
-  recordLocalDelete, cacheGetTombstones,
+  recordLocalDelete, cacheGetTombstones, markMerged,
 } from '@/storage/cache/files'
 import type { CacheRecord } from '@/storage/cache/files'
 import { markInFlight, clearInFlight, getInFlightPaths } from '@/storage/inFlight'
@@ -9,7 +9,7 @@ import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
 import type { VaultKind } from '@/vaultRef'
-import { parseToStoreItems, roundTripLoss, type ParseResult } from '@/model'
+import { parseToStoreItems, roundTripLoss, mergeFileContent, type ParseResult } from '@/model'
 import { pathToKey, keyToPath, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { runInIdleBatches } from '@/lib/idle'
@@ -159,18 +159,25 @@ function reportRoundTripLosses(lossy: RoundTripLoss[]): void {
 // ── COLLISION RESOLUTION ───────────────────────────────────────────
 
 /**
- * What a failed CAS write resolved to. Only `copied` carries `merges`: in every
- * other outcome the store already holds the content that ended up on the
- * backend (it is where the dirty record came from), so there is nothing to
- * merge back into it.
+ * What a failed CAS write resolved to. `copied` and `merged` carry `merges`
+ * because both put content on the backend that the store has never seen — the
+ * other side's, combined with ours or beside it. In the remaining outcomes the
+ * store already holds what ended up there (it is where the dirty record came
+ * from), so there is nothing to merge back into it.
  *
  * `settled` is the *spurious* outcome — the backend refused the write but
  * nothing had actually diverged. It is not a conflict in any sense the user
  * should hear about: no copy is made, no toast is shown, and the cycle does not
  * need a reconcile afterwards.
+ *
+ * `merged` is the *resolved* outcome — something did diverge, and the two sides
+ * turned out to be disjoint, so both changes are now in the file at `path`.
+ * Also silent: a conflict the user would have had to do nothing about is not
+ * worth interrupting them for. The journal records it either way.
  */
 type CollisionOutcome =
   | { kind: 'copied'; copy: string; merges: Array<{ path: string; content: string }> }
+  | { kind: 'merged'; merges: Array<{ path: string; content: string }> }
   | { kind: 'recreated' }
   | { kind: 'settled' }
 
@@ -241,9 +248,18 @@ async function writeConflictCopy(
  *    spurious refusal, caught one step earlier — the CAS precondition we sent
  *    is *still* what the backend holds, so no second writer can exist. Retry
  *    the write once rather than treating our own edit as a conflict.
- *  - **The remote diverged.** Someone else's content sits at `path`. Both sides
- *    are kept: the remote wins the path, the local content lands in a
- *    timestamped conflict copy.
+ *  - **The remote diverged, on fields we did not touch.** Someone else's content
+ *    sits at `path`, but the two edits are disjoint — the classic case being one
+ *    person rescheduling a task while another writes its description. A
+ *    three-way merge against `baseContent` produces a file with both changes in
+ *    it, which goes out as a CAS write against the remote's own version. No
+ *    copy, no toast: nothing was lost, so there is nothing to tell the user
+ *    about. Needs an ancestor to work from, so a record with no `baseContent`
+ *    (created before the field existed) skips straight to the copy below.
+ *  - **The remote diverged, over the same ground.** Someone else's content sits
+ *    at `path` and the two edits overlap — the same frontmatter key set two
+ *    ways, or both bodies rewritten. Both sides are kept: the remote wins the
+ *    path, the local content lands in a timestamped conflict copy.
  *  - **The remote is gone.** The file was deleted (or renamed) on another device
  *    while we held an unpushed edit. There is nothing to preserve from the other
  *    side, so the local content is re-created at its original path. Keeping the
@@ -269,6 +285,7 @@ async function resolveCollision(
   path: string,
   localContent: string,
   expectedVersion: string | undefined,
+  baseContent: string | undefined,
 ): Promise<CollisionOutcome> {
   let [remote] = await backend.readFiles([path])
 
@@ -336,7 +353,28 @@ async function resolveCollision(
     }
   }
 
-  // ── Diverged: copy out first, revert the original second ──────────────────
+  // ── Diverged on disjoint fields: merge, and nobody needs to hear about it ──
+  // Conditioned on the remote's *current* version, so a third writer landing
+  // between the read above and this write is refused rather than overwritten.
+  // One attempt only: a refusal here means the path is moving under us, and
+  // the copy-out below is the answer that cannot lose anything.
+  if (remote && baseContent !== undefined) {
+    const merged = mergeFileContent(path, baseContent, localContent, remote.content)
+    if (merged !== null) {
+      try {
+        const written = await backend.write(path, merged, remote.version)
+        const mergedVersion = await versionAfterWrite(backend, path, written)
+        await markMerged(vaultId, path, localContent, merged, mergedVersion)
+        journal('collision-merged', vaultId, path, { ...facts(), note: hashContent(merged) }, backend.kind)
+        return { kind: 'merged', merges: [{ path, content: merged }] }
+      } catch (e) {
+        if (!(e instanceof ConflictError)) throw e
+        ;[remote] = await backend.readFiles([path])
+      }
+    }
+  }
+
+  // ── Diverged over the same ground: copy out first, revert the original second ──
   const { copy, version: copyVersion } = await writeConflictCopy(backend, path, localContent)
   await setResolvedClean(vaultId, copy, localContent, copyVersion)
   const merges: Array<{ path: string; content: string }> = [{ path: copy, content: localContent }]
@@ -681,17 +719,18 @@ async function pushDirty(
     } catch (e) {
       if (e instanceof ConflictError) {
         journal('push-conflict', vaultId, f.path, { expected: f.version, status: e.detail?.status, reason: e.detail?.reason }, backend.kind)
-        const outcome = await resolveCollision(backend, vaultId, f.path, f.content, f.version)
+        const outcome = await resolveCollision(backend, vaultId, f.path, f.content, f.version, f.baseContent)
         pushed.add(f.path)
-        if (outcome.kind === 'copied') {
-          pushed.add(outcome.copy)
-          collisionMerges.push(...outcome.merges)
-        }
-        // 'settled' means the refusal was spurious and the backend now holds
-        // our content — nothing diverged, so this cycle needs no reconcile.
-        // 'recreated' contributes no merges either: the store is already the
-        // source of that content, so there is nothing to merge back into it.
-        if (outcome.kind !== 'settled') hadCollision = true
+        if (outcome.kind === 'copied') pushed.add(outcome.copy)
+        if (outcome.kind === 'copied' || outcome.kind === 'merged') collisionMerges.push(...outcome.merges)
+        // Only the outcomes that leave something un-pulled ask for a reconcile.
+        // 'settled' means the refusal was spurious and the backend now holds our
+        // content; 'merged' means we just wrote the combined version and know
+        // exactly what is there. Both are fully accounted for. 'recreated'
+        // contributes no merges either — the store is already the source of that
+        // content — but it does re-run reconcile, since a file that vanished
+        // remotely suggests the listing moved in ways this cycle hasn't seen.
+        if (outcome.kind === 'copied' || outcome.kind === 'recreated') hadCollision = true
       } else {
         throw e
       }
