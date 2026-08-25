@@ -66,7 +66,7 @@ started. Each finding states its own confidence separately.
 
 | # | Category | Verdict |
 |---|---|---|
-| 1 | Conflict detection & resolution | **findings: #3** |
+| 1 | Conflict detection & resolution | no open findings |
 | 2 | Sync scheduling & cadence | **findings: #7** |
 | 3 | Write-path durability | **findings: #4, #5** |
 | 4 | Observability | **findings: #6** |
@@ -82,7 +82,6 @@ started. Each finding states its own confidence separately.
 
 | # | Title | Category | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 3 | `delete` trusts a stale SHA cache that `write` refuses to | `conflict-detection` | 8 | 1 file (1 line) | **Sonnet 5** |
 | 4 | A save into an unregistered vault vanishes silently | `durability` | 6 | 1 file (2 sites) | **Haiku 4.5** |
 | 5 | A cross-vault move is two writes with no transaction | `durability` | 7 | 1 file | **Opus 5** |
 | 6 | The sync journal does not survive a reload | `observability` | 5 | 1 file | **Sonnet 5** |
@@ -90,71 +89,6 @@ started. Each finding states its own confidence separately.
 
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
 and breadth reported separately so the list can be re-sorted.
-
----
-
-### Finding #3 — `delete` trusts a stale SHA cache that `write` refuses to
-
-- **Category:** `conflict-detection`
-- **Impact:** 8. A delete conditioned on a stale SHA destroys a remote edit that
-  the same reasoning, one function earlier, is explicitly written to protect.
-- **Breadth:** 1 file, 1 line.
-- **Recommended model:** **Sonnet 5.** The hazard that makes this more than a
-  one-line deletion: `delete` returns early when it has no SHA —
-  `githubBackend.ts:285`, `if (!sha) return // File doesn't exist on GitHub` —
-  and `pushDirty`'s tombstone loop reads that as success and calls
-  `confirmDeleted`, dropping the tombstone. So simply removing the `_shas`
-  fallback converts "delete with a cold cache" into "silently forget the
-  delete". The fix must fetch a fresh SHA instead of falling back to the cached
-  one, and must keep the genuine 404-is-success path
-  (`githubBackend.ts:301-304`) intact. With that named, Sonnet 5.
-
-**Evidence.** `write` documents why the cache must not be trusted —
-`storage/githubBackend.ts:256-262`:
-
-```ts
-  async write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> {
-    try {
-      // Use the caller-supplied expectedVersion as the CAS SHA.
-      // Avoid falling back to _shas here — that cache may be stale from a
-      // prior statAll() call, which is eventually-consistent on GitHub.
-```
-
-`delete` then does the fallback anyway — `storage/githubBackend.ts:279-285`:
-
-```ts
-  async delete(path: string, expectedVersion?: string): Promise<void> {
-    // Prefer the caller-supplied expectedVersion as the CAS SHA, matching
-    // write()'s policy — avoid falling back to _shas first here, since that
-    // cache may be stale from a prior statAll() call and could mask a genuine
-    // remote edit that happened after the tombstone was staged.
-    const sha = expectedVersion ?? this._shas.get(path)
-    if (!sha) return // File doesn't exist on GitHub; nothing to do
-```
-
-Note the comment says it avoids the fallback; the code on the next line performs
-it. `_shas` is populated from `statAll`'s tree listing (`githubBackend.ts:160`)
-— exactly the eventually-consistent source `write`'s comment names.
-
-**Problem.** `recordLocalDelete` (`cache/files.ts`) preserves the record's
-`version`, so in the normal path `expectedVersion` is defined and the fallback
-never fires. It fires when the tombstone has **no** base version — a file
-created and deleted locally before it ever synced, or a record whose version was
-lost. In that case the delete goes out with whatever SHA the last tree listing
-happened to hold, which may predate another device's edit, and GitHub accepts
-it. The tombstone loop in `pushDirty` has a careful
-`delete-conflict` branch that keeps the remote version instead of destroying it
-— this path bypasses that branch entirely by never producing a conflict.
-
-**Fix.** Drop the `_shas` fallback. When `expectedVersion` is undefined, do a
-fresh `readFiles([path])` and use that SHA; if the file genuinely isn't there,
-keep the current early-return. Add a journal event for the re-read so the
-distinction between "already gone" and "re-read then deleted" is visible.
-
-**Test to add** (`storage/__tests__/sync.test.ts`, alongside the existing
-`pushDirty — delete-conflict tombstone handling` suite): a tombstone with no base version, against a
-backend whose content changed since the last `statAll`, must produce a
-`delete-conflict` and keep the remote file — not delete it.
 
 ---
 
