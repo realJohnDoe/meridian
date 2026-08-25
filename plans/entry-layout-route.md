@@ -4,11 +4,11 @@ Implementation plan for removing the two-mode app shell introduced by
 [#808](https://github.com/realJohnDoe/meridian/pull/808), by making the entry
 routes a sibling layout instead of children of `_app`.
 
-**Status: not started.** Prerequisites
+**Status: PR 1 shipped.** Prerequisites
 [#808](https://github.com/realJohnDoe/meridian/pull/808) and
 [#811](https://github.com/realJohnDoe/meridian/pull/811) shipped; the two
-remaining flow-shell fixes ride along in this same PR (`src/lib/topChrome.ts`
-and `src/lib/floatingPlacement.test.ts` are added here), so everything named
+remaining flow-shell fixes ride along in PR 2 (`src/lib/topChrome.ts`
+and `src/lib/floatingPlacement.test.ts` are added there), so everything named
 below exists on `main` once this merges.
 
 ---
@@ -70,67 +70,15 @@ git history.
 ## Ordering
 
 ```
-PR1 ──► PR2 ──► PR3
-                PR4 ─ (independent, any time)
+PR2 ──► PR3
+        PR4 ─ (independent, any time)
 ```
 
 | # | Title | Model | Est. | Deletes |
 |---|---|---|---|---|
-| 1 | Move the vault-changed subscription to the root route | Sonnet 5 | 0.5d | — |
 | 2 | `_entry` layout route; entry routes move under it | Sonnet 5 | 1–1.5d | the topbar portal |
 | 3 | Delete the two-mode shell | Sonnet 5 | 0.5–1d | `useShellMode`, `data-shell*`, `shellPanes.test.ts` |
 | 4 | One `findScrollParent` | Sonnet 5 | 0.5d | a duplicate implementation |
-
----
-
-### PR 1 — Move the vault-changed subscription to the root route
-
-**Model: Sonnet 5** · 0.5d · no user-visible change
-
-**This PR exists to make PR 2 safe. It ships on its own and changes nothing
-today.**
-
-`src/routes/_app.tsx`'s `AppMain` registers:
-
-```ts
-useEffect(() => onVaultChanged(({ contentReplaced }) => {
-  ...
-  resetCalendarOnVaultChange()
-```
-
-Its own comment states why it lives there:
-
-> Registered here — not in AgendaPage — because AppMain stays mounted across
-> every app route: a vault switch made while in the editor, month, day, or a
-> list view would otherwise be missed (AgendaPage is unmounted then), leaving
-> the next agenda visit to restore a stale, cross-vault offset near the top.
-
-PR 2 moves the entry routes out of `_app`, which unmounts `AppMain` while the
-editor is open — reintroducing exactly the bug that comment describes. Move the
-subscription up to `src/routes/__root.tsx`'s `Root`, which stays mounted across
-every route including auth callbacks.
-
-**Steps**
-
-1. Move the `useEffect(() => onVaultChanged(...))` block from `AppMain` to
-   `Root` in `__root.tsx`, keeping the comment and updating its first line to
-   say the root route is what stays mounted.
-2. Move the `onVaultChanged` / `resetCalendarOnVaultChange` imports with it.
-   `__root.tsx` already imports from `@/storage` and `@/calendar`, so no new
-   module edges.
-3. `Root` already has a `useEffect` for sync lifecycle — keep them separate
-   rather than merging; they have different dependency shapes.
-
-**Test to add.** `src/routes/__root.test.tsx` exists and has coverage
-thresholds (`vitest.config.ts` floors `__root.tsx` at 92% statements). Add a
-case asserting that a vault change fires `resetCalendarOnVaultChange` while the
-rendered route is *not* the agenda — that is the regression PR 2 would
-otherwise introduce, and it must fail if this subscription is ever moved back
-down.
-
-**Verify.** `pnpm run build && pnpm run lint && pnpm run test`. Coverage floors
-for both `__root.tsx` and `_app*.tsx` must still pass; note `src/routes/_app*.tsx`
-is coverage-excluded, so moving logic *out* of it can only help.
 
 ---
 
