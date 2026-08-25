@@ -66,7 +66,7 @@ started. Each finding states its own confidence separately.
 
 | # | Category | Verdict |
 |---|---|---|
-| 1 | Conflict detection & resolution | **findings: #2, #3** |
+| 1 | Conflict detection & resolution | **findings: #3** |
 | 2 | Sync scheduling & cadence | **findings: #7** |
 | 3 | Write-path durability | **findings: #4, #5** |
 | 4 | Observability | **findings: #6** |
@@ -82,7 +82,6 @@ started. Each finding states its own confidence separately.
 
 | # | Title | Category | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 2 | The local-vault CAS token can't detect some real changes | `conflict-detection` | 9 | 1 file (6 sites) | **Sonnet 5** |
 | 3 | `delete` trusts a stale SHA cache that `write` refuses to | `conflict-detection` | 8 | 1 file (1 line) | **Sonnet 5** |
 | 4 | A save into an unregistered vault vanishes silently | `durability` | 6 | 1 file (2 sites) | **Haiku 4.5** |
 | 5 | A cross-vault move is two writes with no transaction | `durability` | 7 | 1 file | **Opus 5** |
@@ -91,92 +90,6 @@ started. Each finding states its own confidence separately.
 
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
 and breadth reported separately so the list can be re-sorted.
-
-**Sequencing note:** #2 and #3 are the same
-*class* of bug in two different backends but touch disjoint files
-(`storage/fs.ts` vs `storage/githubBackend.ts`) and can go in either order or in
-parallel. Everything else is independent.
-
----
-
-### Finding #2 — The local-vault CAS token can't detect some real changes
-
-- **Category:** `conflict-detection`
-- **Impact:** 9. The failure mode is **silent overwrite** — no conflict, no
-  copy, no journal entry, no toast. That is strictly worse than the bug #816
-  fixed, where the user at least got a conflict copy and a warning.
-- **Breadth:** 1 file, 6 construction sites, all in `storage/fs.ts`. Affects
-  every local (File System Access) vault; GitHub vaults use blob SHAs and are
-  unaffected.
-- **Recommended model:** **Sonnet 5.** The named hazard: **the token is
-  persisted.** It is stored as `version` on every Dexie cache record
-  (`cache/db.ts` · `DexieFileRow.version`) and survives reloads. Changing its
-  shape means every existing local-vault record's `version` is from the old
-  scheme, so the first CAS after the upgrade compares a hash against an
-  `mtime:size` string and refuses **every** write — a vault-wide conflict storm
-  on first launch. The fix must detect a legacy-shaped token and treat it as
-  "re-stat and adopt" rather than as a mismatch. Also note `statVersion` is used
-  by both `diskWrite` and `diskDelete` (`fs.ts:178`, `fs.ts:204`) and all four
-  read paths (`fs.ts:110,127,147,188`) must produce the identical shape or CAS
-  breaks silently. With both named, Sonnet 5; without, Opus 5.
-
-**Evidence** — `storage/fs.ts:53-60`:
-
-```ts
-async function statVersion(
-  dh: FileSystemDirectoryHandle,
-  path: string,
-): Promise<string | undefined> {
-  try {
-    const fh   = await resolveFileHandle(dh, path)
-    const file = await fh.getFile()
-    return `${file.lastModified}:${file.size}`
-```
-
-and the CAS itself, `storage/fs.ts:178-179`:
-
-```ts
-  const cur = await statVersion(dh, path)
-  if (cur !== expectedVersion) throw new ConflictError(path)
-```
-
-**Problem.** `mtime:size` is a heuristic for content identity, not content
-identity. It fails to notice a change when:
-
-- Another process rewrites the file to the **same byte length** within the same
-  `lastModified` stamp. `File.lastModified` is milliseconds, so this needs a
-  same-millisecond write — unlikely from a human, entirely possible from a sync
-  daemon.
-- More importantly, a **file-sync client preserves mtime**. Dropbox, iCloud
-  Drive, Syncthing and `rsync -t` all routinely write a file with the source's
-  original mtime. If such a client lands another device's version of a note into
-  the vault folder, the token can be unchanged while the content is completely
-  different — and Meridian's CAS says "nothing moved", writes over it, and never
-  tells anyone.
-
-This matters more now than before #816: `baseContent` makes merging available on
-local vaults too, but only if the CAS actually **fires**. A missed CAS means no
-merge *and* no copy — just loss.
-
-There is a second, smaller issue in the same function: the check is
-stat-then-write with an `await` in between (`fs.ts:178` → `fs.ts:181-184`), so a
-writer landing inside that window is lost regardless. The File System Access API
-offers no atomic compare-and-swap, so this cannot be closed — but it can be
-*detected* by re-statting after the write and journalling a surprise.
-
-**Fix.** Replace the token with a content hash. `storage/syncJournal.ts` already
-exports `hashContent` for journal fields; either reuse it (check it is
-collision-resistant enough for this use — it is a short display hash, so
-probably **not**; prefer SubtleCrypto SHA-256 truncated, or FNV-1a 64-bit) or
-add a dedicated one. `statVersion` then reads the file and hashes it, which
-costs a read where it previously cost a stat — acceptable for a notes vault,
-and `statAll` (`fs.ts:110`) already reads every file's `File` object anyway.
-Handle the legacy-token migration per the hazard above.
-
-**Confidence.** High on the mechanism (it is plain from the code). **Unknown on
-frequency** — it depends entirely on whether anything else writes into the
-user's vault folders. Worth asking the user before prioritising: if they only
-ever use GitHub vaults, this drops to impact 3.
 
 ---
 

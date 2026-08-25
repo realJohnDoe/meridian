@@ -46,9 +46,29 @@ async function resolveFileHandle(
 }
 
 /**
- * Current version token for `path`, or `undefined` when it does not exist.
- * Same `${lastModified}:${size}` shape statAll/readFiles hand out, so a token
- * from either can be compared against a fresh stat here.
+ * Hex-encoded SHA-256 of `content`. Content identity, not a heuristic — unlike
+ * `mtime:size`, this can't miss a same-millisecond same-length rewrite, and it
+ * isn't fooled by a sync client (Dropbox/iCloud/Syncthing/`rsync -t`) landing
+ * different content under a preserved mtime.
+ */
+async function contentHash(content: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(content))
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * A pre-upgrade `${lastModified}:${size}` token, as opposed to the current
+ * hash-shaped one. `version` is persisted (`DexieFileRow.version`), so a
+ * record cached before this change carries one of these, and a hash can never
+ * equal it — which would otherwise turn every local vault's first CAS after
+ * the upgrade into a conflict storm. See `checkCas`.
+ */
+const LEGACY_VERSION_RE = /^\d+:\d+$/
+
+/**
+ * Current content-hash version token for `path`, or `undefined` when it does
+ * not exist. Same shape statAll/readFiles hand out, so a token from either
+ * can be compared against a fresh stat here.
  */
 async function statVersion(
   dh: FileSystemDirectoryHandle,
@@ -57,12 +77,50 @@ async function statVersion(
   try {
     const fh   = await resolveFileHandle(dh, path)
     const file = await fh.getFile()
-    return `${file.lastModified}:${file.size}`
+    return await contentHash(await file.text())
   } catch (e) {
     // The file, or an ancestor directory, is not there — both mean "absent".
     if ((e as { name?: string }).name === 'NotFoundError') return undefined
     throw e
   }
+}
+
+/** `${lastModified}:${size}` for `path`, or `undefined` when it does not exist. */
+async function legacyStatVersion(
+  dh: FileSystemDirectoryHandle,
+  path: string,
+): Promise<string | undefined> {
+  try {
+    const fh   = await resolveFileHandle(dh, path)
+    const file = await fh.getFile()
+    return `${file.lastModified}:${file.size}`
+  } catch (e) {
+    if ((e as { name?: string }).name === 'NotFoundError') return undefined
+    throw e
+  }
+}
+
+/**
+ * CAS precondition check, migration-aware. A legacy-shaped `expectedVersion`
+ * predates the content-hash scheme and can never equal a fresh `statVersion`
+ * — compare it against the old `mtime:size` shape instead, so an unchanged
+ * file adopts the new scheme on its next write/delete rather than being
+ * treated as a mismatch. Throws `ConflictError` on a real mismatch.
+ *
+ * `absentIsMatch` mirrors `diskDelete`'s idempotency rule: an already-gone
+ * file is never a CAS mismatch there, only a genuine drift is (`diskWrite`
+ * wants the opposite — absence must match an absent `expectedVersion`).
+ */
+async function checkCas(
+  dh: FileSystemDirectoryHandle,
+  path: string,
+  expectedVersion: string | undefined,
+  absentIsMatch: boolean,
+): Promise<void> {
+  const legacy = expectedVersion !== undefined && LEGACY_VERSION_RE.test(expectedVersion)
+  const cur = legacy ? await legacyStatVersion(dh, path) : await statVersion(dh, path)
+  if (absentIsMatch && cur === undefined) return
+  if (cur !== expectedVersion) throw new ConflictError(path)
 }
 
 async function resolveParentDir(
@@ -107,7 +165,7 @@ export async function diskStatAll(
     handles.map(async ([path, fh]) => {
       try {
         const file = await fh.getFile()
-        tokens.set(path, `${file.lastModified}:${file.size}`)
+        tokens.set(path, await contentHash(await file.text()))
       } catch (e) { console.warn('[storage] could not stat', path, e) }
     })
   )
@@ -124,7 +182,7 @@ export async function diskReadFiles(
         const fh   = await resolveFileHandle(dh, path)
         const file = await fh.getFile()
         const content = await file.text()
-        return { path, content, version: `${file.lastModified}:${file.size}` }
+        return { path, content, version: await contentHash(content) }
       } catch (e) {
         console.warn('[storage] could not read', path, e)
         return null
@@ -144,7 +202,7 @@ export async function diskReadAll(
       try {
         const file = await fh.getFile()
         const content = await file.text()
-        return { path, content, version: `${file.lastModified}:${file.size}` }
+        return { path, content, version: await contentHash(content) }
       } catch (e) {
         console.warn('[storage] could not read', path, e)
         return null
@@ -175,20 +233,15 @@ export async function diskWrite(
   // GitHub's Contents API rejects with a 422 on a `PUT` with no `sha`.
   // The local FS is always consistent, so this stat is authoritative (no
   // eventual-consistency lag).
-  const cur = await statVersion(dh, path)
-  if (cur !== expectedVersion) throw new ConflictError(path)
+  await checkCas(dh, path, expectedVersion, false)
 
   const fh = await resolveFileHandle(dh, path, true)
   const w  = await fh.createWritable()
   await w.write(content)
   await w.close()
-  // Re-stat so the caller can record the new version token.
-  try {
-    const file = await fh.getFile()
-    return `${file.lastModified}:${file.size}`
-  } catch {
-    return undefined
-  }
+  // The token is a hash of content, which is exactly what was just written —
+  // no need to re-read the file to report the new version.
+  return await contentHash(content)
 }
 
 export async function diskDelete(
@@ -201,8 +254,7 @@ export async function diskDelete(
   // edited meanwhile — deleting then destroys content the app never read.
   // An absent file is deliberately not a mismatch: the removeEntry below is
   // idempotent by design (see its catch) and must stay that way.
-  const cur = await statVersion(dh, path)
-  if (cur !== undefined && cur !== expectedVersion) throw new ConflictError(path)
+  await checkCas(dh, path, expectedVersion, true)
 
   try {
     const [dir, name] = await resolveParentDir(dh, path)
