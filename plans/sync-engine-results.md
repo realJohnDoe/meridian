@@ -67,7 +67,7 @@ started. Each finding states its own confidence separately.
 | # | Category | Verdict |
 |---|---|---|
 | 1 | Conflict detection & resolution | **findings: #2, #3** |
-| 2 | Sync scheduling & cadence | **findings: #1, #7** |
+| 2 | Sync scheduling & cadence | **findings: #7** |
 | 3 | Write-path durability | **findings: #4, #5** |
 | 4 | Observability | **findings: #6** |
 | 5 | Cache transitions (`cache/files.ts`) | no open findings — six transitions, each with its precondition inside one Dexie transaction; covered at 95%+ by `storage/__tests__/cache.test.ts` against real Dexie |
@@ -82,7 +82,6 @@ started. Each finding states its own confidence separately.
 
 | # | Title | Category | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 1 | Every push defers the next pull by a full interval | `cadence` | 8 | 2 files | **Sonnet 5** |
 | 2 | The local-vault CAS token can't detect some real changes | `conflict-detection` | 9 | 1 file (6 sites) | **Sonnet 5** |
 | 3 | `delete` trusts a stale SHA cache that `write` refuses to | `conflict-detection` | 8 | 1 file (1 line) | **Sonnet 5** |
 | 4 | A save into an unregistered vault vanishes silently | `durability` | 6 | 1 file (2 sites) | **Haiku 4.5** |
@@ -93,113 +92,10 @@ started. Each finding states its own confidence separately.
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
 and breadth reported separately so the list can be re-sorted.
 
-**Sequencing note:** #1 and #7 both touch `storage/sync.ts`'s scheduler block
-(`attemptPush` through `autoSyncTick`) — do #1 first, then #7 on top of it. #2 and #3 are the same
+**Sequencing note:** #2 and #3 are the same
 *class* of bug in two different backends but touch disjoint files
 (`storage/fs.ts` vs `storage/githubBackend.ts`) and can go in either order or in
 parallel. Everything else is independent.
-
----
-
-### Finding #1 — Every push defers the next pull by a full interval
-
-- **Category:** `cadence`
-- **Impact:** 8. This is the *cause* of the incident PR #816 made harmless.
-  Merging means a collision loses nothing; this is what would stop the
-  collisions happening in the first place.
-- **Breadth:** 2 files. `storage/sync.ts` (scheduler), `storage/githubBackend.ts`
-  (conditional request).
-- **Recommended model:** **Sonnet 5.** The change is small and localised, but
-  the hazard is real and must be stated in the task: **`lastAttemptAt` is load-
-  bearing for the retry backoff as well as for the pull interval**
-  (`sync.ts:970-981`, `isDue`). Splitting out a `lastPullAt` must not stop the
-  backoff from pacing a vault that keeps failing — a naive split that leaves the
-  backoff reading a field only successful pulls advance turns a failing vault
-  into a hot loop against a rate-limited API. Keep `lastAttemptAt` exactly as it
-  is for backoff, and add `lastPullAt` purely as the pull-interval clock. With
-  that named, this is Sonnet 5; without it, Opus 5.
-
-**Evidence.** `runSync` stamps the attempt clock unconditionally —
-`storage/sync.ts:802`:
-
-```ts
-  syncState.lastAttemptAt = Date.now()
-```
-
-`isDue` measures the per-kind interval from that field —
-`storage/sync.ts:970-981`:
-
-```ts
-function isDue(backend: StorageBackend, now: number): boolean {
-  const state = syncStateFor(backend.id)
-  if (now < state.nextRetryAt) return false
-  const elapsed = now - state.lastAttemptAt
-  ...
-  const interval = MIN_SYNC_INTERVAL_MS[backend.kind] ?? DEFAULT_MIN_SYNC_INTERVAL_MS
-  return elapsed + DUE_TOLERANCE_MS >= interval
-}
-```
-
-But the debounced push path runs a **push-only** cycle —
-`storage/sync.ts:883-887`:
-
-```ts
-function attemptPush(backend: StorageBackend): void {
-  const syncState = syncStateFor(backend.id)
-  if (syncState.syncing) { syncState.pushQueued = true; return }
-  void runSync(backend, { silent: true, pull: false })
-}
-```
-
-**Problem.** Editor autosave (1500 ms, `editor/useEntryEditor.ts`) →
-`scheduleAutoPush` (1000 ms debounce, `sync.ts:890-896`) → `attemptPush` →
-`runSync({ pull: false })` → `lastAttemptAt = now`. The GitHub interval is
-60 s (`sync.ts:953-956`). So **anyone typing at least once a minute never
-pulls.** The user most likely to collide is the one who sees other people's
-changes least often. In the real incident the losing device went ~200 s between
-its last push and the conflicting edit with no pull in between.
-
-`onVisible` (`routes/__root.tsx:180`) calls `autoSyncTick()`, which is gated by
-the same `isDue`, so returning to the app doesn't guarantee a pull either.
-
-**Why the interval is 60 s at all** is a rate-limit budget — and that budget is
-mostly imaginary, because the GitHub backend sends no conditional-request
-header. `storage/githubBackend.ts:142-149`:
-
-```ts
-  async statAll(): Promise<Map<string, string>> {
-    try {
-      const { data } = await this._octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
-```
-
-No `If-None-Match`, no stored ETag. GitHub's REST API returns `304 Not Modified`
-for a conditional request **and does not count it against the rate limit**. The
-iCal backend already does exactly this — `storage/icalBackend.ts:100`:
-
-```ts
-        const headers: HeadersInit = cached?.etag ? { 'If-None-Match': cached.etag } : {}
-```
-
-**Fix, in three parts:**
-
-1. Add `lastPullAt: number` to `VaultSyncState` (the interface above
-   `createVaultSyncState` in `sync.ts`), set it in
-   `runSync` **only when `opts.pull || hadCollision`** was true — i.e. where
-   `reconcileWithBackend` actually ran. Have `isDue` measure the interval from
-   `lastPullAt`, leaving `nextRetryAt`/`lastAttemptAt` untouched for backoff.
-2. In `attemptPush`, pass `pull: true` when the vault is overdue for a pull —
-   it is the same round trip the write already pays for.
-3. Store the ETag from the trees response on `GitHubBackend` and send
-   `If-None-Match` on the next `statAll`; on `304`, return the previous token
-   map. Then lower `MIN_SYNC_INTERVAL_MS.github` (15–20 s is defensible once
-   unchanged polls are free).
-
-**Tests to add** (`storage/__tests__/sync.test.ts` — model on the existing
-`runSync — exponential backoff on transient failures` suite, and note there is
-already a `flushPendingPush` suite and a `multi-vault sync` suite in the same
-file): a push-only cycle must not defer a due pull; a vault
-inside its retry backoff must still be skipped; a `304` from `statAll` must
-reconcile against the cached token map without evicting anything.
 
 ---
 

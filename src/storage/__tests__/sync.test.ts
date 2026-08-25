@@ -168,7 +168,7 @@ vi.mock('@/model', async (importActual) => ({
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { syncToBackend, autoSyncTick, resetSyncBackoff, dropAllSyncState, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend, parseFiles, reportParseFailures } from '@/storage/sync'
+import { syncToBackend, autoSyncTick, resetSyncBackoff, dropAllSyncState, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend, parseFiles, reportParseFailures, scheduleAutoPush } from '@/storage/sync'
 import { mountBackend, unmountAllBackends } from '@/storage/backends'
 import { syncJournalEvents, clearSyncJournal, syncJournalDump } from '@/storage/syncJournal'
 
@@ -1337,15 +1337,87 @@ describe('flushPendingPush', () => {
     expect(cacheStore.get(vp('fake-vault', 'task.md'))?.status).toBe('clean')
   })
 
-  it('is a no-op when nothing is dirty', async () => {
+  it('is a no-op when nothing is dirty and the vault is not yet due for a pull', async () => {
     const backend = new FakeBackend()
     mountBackend(backend)
+    // Establishes lastPullAt, so the vault isn't immediately due again — see
+    // 'attemptPush piggybacks a pull when the vault is overdue' below for the
+    // case where it is.
+    await syncOnActivate(backend)
+    const statAllAfterActivate = backend.statAllCallCount
 
     flushPendingPush()
     await flush()
 
     expect(backend.writeCallCount).toBe(0)
-    expect(backend.statAllCallCount).toBe(0) // pull:false — no reconcile triggered either
+    expect(backend.statAllCallCount).toBe(statAllAfterActivate) // not due — no reconcile triggered
+  })
+})
+
+// ── attemptPush piggybacks an overdue pull (finding #1) ──────────────────
+//
+// The debounced push a keystroke triggers used to always run push-only —
+// `runSync(backend, { silent: true, pull: false })` — which meant a vault
+// edited more often than its pull interval (autosave debounces to 1s; every
+// vault kind's pull interval is far longer) never reached the reconcile that
+// would pull someone else's change. See finding #1's evidence: a device that
+// keeps typing sees other people's changes least often, which is backwards.
+
+describe('attemptPush — piggybacks a pull once the vault is overdue for one', () => {
+  it('a push-only cycle does not defer a due pull: pulling while typing reaches the same reconcile a full sync would', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    backend.seed('remote.md', '# from another device', 'v-remote')
+
+    let now = 5_000_000
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+
+      seedDirty('fake-vault', 'task.md', 'local edit', undefined)
+      scheduleAutoPush(backend)
+      await vi.advanceTimersByTimeAsync(1000) // the 1s debounce fires attemptPush
+
+      // First cycle ever for this vault: lastPullAt is still its initial 0, so
+      // it's overdue by construction — attemptPush must pull, not just push.
+      expect(backend.writeCallCount).toBe(1)
+      expect(cacheStore.get(vp('fake-vault', 'remote.md'))?.content).toBe('# from another device')
+
+      // Advance well past the local vault's 30s pull interval, then edit again.
+      // A vault inside its own interval must still skip the pull (see the
+      // no-op test above) — this is the case where it's actually overdue.
+      now += 40_000
+      seedDirty('fake-vault', 'task.md', 'second local edit', backend.get('task.md')?.version)
+      backend.seed('remote2.md', '# a second remote file', 'v-remote2')
+      scheduleAutoPush(backend)
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(backend.writeCallCount).toBe(2)
+      expect(cacheStore.get(vp('fake-vault', 'remote2.md'))?.content).toBe('# a second remote file')
+    } finally {
+      vi.useRealTimers()
+      nowSpy.mockRestore()
+    }
+  })
+
+  it('a vault inside its own pull interval still gets a push-only cycle', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    await syncOnActivate(backend) // establishes lastPullAt just now
+    backend.seed('remote.md', '# should not be pulled yet', 'v-remote')
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      seedDirty('fake-vault', 'task.md', 'local edit', undefined)
+      scheduleAutoPush(backend)
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(backend.writeCallCount).toBe(1) // the push still happens
+      // ...but no reconcile: the remote-only file must not have been pulled in.
+      expect(cacheStore.has(vp('fake-vault', 'remote.md'))).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -1689,7 +1761,7 @@ describe('multi-vault sync', () => {
 
   it('honours each vault kind\'s own minimum interval', async () => {
     const local  = new FakeBackend()                    // local: 30s
-    const github = otherBackend('vault-gh', 'github')   // github: 60s
+    const github = otherBackend('vault-gh', 'github')   // github: 20s (see finding #1 — conditional statAll makes an unchanged poll free)
     mountBackend(local)
     mountBackend(github)
 
@@ -1701,17 +1773,18 @@ describe('multi-vault sync', () => {
       expect(local.statAllCallCount).toBe(1)
       expect(github.statAllCallCount).toBe(1)
 
-      // 35s on: past local's minimum, short of github's.
-      now += 35_000
+      // 22s on: past github's minimum, short of local's.
+      now += 22_000
+      autoSyncTick()
+      await flush()
+      expect(local.statAllCallCount).toBe(1)
+      expect(github.statAllCallCount).toBe(2)
+
+      // 32s since the first pull: past local's minimum too.
+      now += 10_000
       autoSyncTick()
       await flush()
       expect(local.statAllCallCount).toBe(2)
-      expect(github.statAllCallCount).toBe(1)
-
-      now += 30_000
-      autoSyncTick()
-      await flush()
-      expect(github.statAllCallCount).toBe(2)
     } finally {
       nowSpy.mockRestore()
     }

@@ -218,6 +218,51 @@ describe('GitHubBackend', () => {
     await expect(backend.statAll()).rejects.toThrow(/truncated/i)
   })
 
+  // Finding #1: an unchanged tree must go out as a conditional request and be
+  // read as "nothing moved" rather than a real refusal — GitHub does not
+  // count a 304 against the rate limit, which is what makes it safe to poll
+  // github vaults far more often than the old fixed 60s budget assumed.
+  describe('statAll — conditional requests (ETag / If-None-Match)', () => {
+    it('sends no If-None-Match on the first call, then the previous ETag on the next', async () => {
+      mockFetch(makeTreeResponse([{ path: 'note.md', sha: 'sha1' }]))
+      // mockFetch's Headers carry no etag — swap in one that does for this test.
+      fetchSpy.mockResolvedValueOnce({
+        ...makeJsonResp(makeTreeResponse([{ path: 'note.md', sha: 'sha1' }])),
+        headers: new Headers({ 'content-type': 'application/json', 'x-ratelimit-remaining': '4999', etag: '"abc123"' }),
+      })
+
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+      await backend.statAll()
+      const [, firstInit] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect((firstInit.headers as Record<string, string>)['if-none-match']).toBeUndefined()
+
+      await backend.statAll()
+      const [, secondInit] = fetchSpy.mock.calls[1] as [string, RequestInit]
+      expect((secondInit.headers as Record<string, string>)['if-none-match']).toBe('"abc123"')
+    })
+
+    it('treats a 304 as unchanged and returns the previous listing rather than an error', async () => {
+      fetchSpy.mockResolvedValueOnce({
+        ...makeJsonResp(makeTreeResponse([{ path: 'note.md', sha: 'sha1' }])),
+        headers: new Headers({ 'content-type': 'application/json', 'x-ratelimit-remaining': '4999', etag: '"abc123"' }),
+      })
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+      const first = await backend.statAll()
+
+      fetchSpy.mockResolvedValueOnce(makeJsonResp({}, 304))
+      const second = await backend.statAll()
+
+      expect(second).toEqual(first)
+    })
+
+    it('still fetches the full tree normally when there is no prior ETag to send', async () => {
+      mockFetch(makeTreeResponse([{ path: 'note.md', sha: 'sha1' }]))
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+      const tokens = await backend.statAll()
+      expect(tokens.get('note.md')).toBe('sha1')
+    })
+  })
+
   it('readFiles fetches each file and decodes content', async () => {
     const content = '# Hello\nWorld'
     mockFetch(makeFileResponse('note.md', content, 'sha1'))
