@@ -995,7 +995,11 @@
 .swipe-row{transform:translateX(var(--swipe-x,0px))}
 
 /* ── CURRENT-TIME LINE — functional indicator, kept ── */
-.now-line{position:absolute;left:64px;right:0;height:2px;background:var(--destructive);z-index:5;border-radius:1px}
+/* Horizontal span comes from the NowLine component (calendar/timelineScaffold.tsx),
+   not from here: the day and week views hang the line off different
+   containers, and the inset that separates them is GUTTER — a JS constant in
+   timelineGeometry.ts that a stylesheet can only mirror, never track. */
+.now-line{position:absolute;height:2px;background:var(--destructive);z-index:5;border-radius:1px}
 .now-dot{position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--destructive)}
 
 /* ── OCCURRENCE CARD ENTRANCE ANIMATION ── */
