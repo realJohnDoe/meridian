@@ -4,12 +4,12 @@ Implementation plan for removing the two-mode app shell introduced by
 [#808](https://github.com/realJohnDoe/meridian/pull/808), by making the entry
 routes a sibling layout instead of children of `_app`.
 
-**Status: not started.** Prerequisite
-[#808](https://github.com/realJohnDoe/meridian/pull/808) shipped;
-[#811](https://github.com/realJohnDoe/meridian/pull/811) (three follow-up bug
-fixes to the flow shell) should land first — this plan deletes the mechanism
-those fixes patch, and several files named below (`src/lib/topChrome.ts`,
-`src/lib/floatingPlacement.test.ts`) arrive with it.
+**Status: not started.** Prerequisites
+[#808](https://github.com/realJohnDoe/meridian/pull/808) and
+[#811](https://github.com/realJohnDoe/meridian/pull/811) shipped; the two
+remaining flow-shell fixes ride along in this same PR (`src/lib/topChrome.ts`
+and `src/lib/floatingPlacement.test.ts` are added here), so everything named
+below exists on `main` once this merges.
 
 ---
 
