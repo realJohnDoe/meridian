@@ -73,7 +73,7 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
         className="mobile-search-overlay fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto"
       >
         {/* Top input row — pinned, always visible */}
-        <div className="relative z-10 shrink-0 flex items-center gap-2 px-3.5 pt-[var(--search-top-inset)] pb-3.5 border-b border-border shadow-md">
+        <div className="relative z-10 shrink-0 flex items-center gap-2 px-3.5 pt-[var(--search-top-inset)] pb-4 border-b border-border shadow-md">
           <IconButton
             variant="ghost"
             className="w-9 h-9 text-muted-foreground"
@@ -129,8 +129,9 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
         className={cn(
           // top clears the top-docked search bar itself: its own internal
           // top padding (--search-top-inset, clearing the OS chrome) plus
-          // the 52px search-bar-wrap and ~14px bottom padding below it.
-          'fixed top-[calc(var(--search-top-inset)+66px)] right-0 bottom-0 z-search-panel pointer-events-auto flex flex-col transition-[left] duration-200 ease-linear',
+          // the 52px search-bar-wrap and its own bottom padding
+          // (--search-bottom-inset, 16px baseline) below it.
+          'fixed top-[calc(var(--search-top-inset)+52px+var(--search-bottom-inset))] right-0 bottom-0 z-search-panel pointer-events-auto flex flex-col transition-[left] duration-200 ease-linear',
           sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0',
         )}
       >
