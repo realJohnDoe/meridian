@@ -8,4 +8,3 @@ export { useScrollIntoViewAboveKeyboard } from './use-scroll-into-view-above-key
 export { useAllParticipants } from './useAllParticipants'
 export { useFileOccurrenceMap } from './useFileOccurrenceMap'
 export { useEntryAccess } from './useEntryAccess'
-export { useShellMode } from './use-shell-mode'

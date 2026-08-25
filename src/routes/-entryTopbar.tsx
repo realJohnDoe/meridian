@@ -18,7 +18,7 @@ export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack, h
   return (
     <header
       className="sticky top-0 z-10 h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background shadow-md"
-      data-shell-topbar
+      data-topbar
     >
       <TopbarShell
         // The back button always leads the left edge, regardless of screen size (the sidebar's own

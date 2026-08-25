@@ -4,13 +4,13 @@ Implementation plan for removing the two-mode app shell introduced by
 [#808](https://github.com/realJohnDoe/meridian/pull/808), by making the entry
 routes a sibling layout instead of children of `_app`.
 
-**Status: PR 1 and PR 2 shipped.** Prerequisites
+**Status: PR 1, PR 2, and PR 3 shipped.** Prerequisites
 [#808](https://github.com/realJohnDoe/meridian/pull/808) and
 [#811](https://github.com/realJohnDoe/meridian/pull/811) shipped as part of
 PR 1; PR 2 gave the entry routes their own `_entry` layout route and deleted
-the topbar portal. What's left is PR 3 (delete the two-mode shell) and PR 4
+the topbar portal; PR 3 deleted the two-mode shell. What's left is PR 4
 (unify `findScrollParent`), so everything named below exists on `main` once
-those merge.
+it merges.
 
 ---
 
@@ -71,60 +71,12 @@ git history.
 ## Ordering
 
 ```
-PR3
 PR4 ─ (independent, any time)
 ```
 
 | # | Title | Model | Est. | Deletes |
 |---|---|---|---|---|
-| 3 | Delete the two-mode shell | Sonnet 5 | 0.5–1d | `useShellMode`, `data-shell*`, `shellPanes.test.ts` |
 | 4 | One `findScrollParent` | Sonnet 5 | 0.5d | a duplicate implementation |
-
----
-
-### PR 3 — Delete the two-mode shell
-
-**Model: Sonnet 5** · 0.5–1d
-
-With `_app` and `_entry` owning separate wrapper chains, nothing needs to
-release a shared one.
-
-**The one genuinely global bit** is `src/index.css`:
-
-```css
-html{height:100svh;overflow:hidden;background:var(--backdrop)}
-body{height:100%;overflow:hidden;background:var(--backdrop)}
-```
-
-That caps the *document*, which no per-subtree class can undo. Invert the
-ownership: let the document flow by default, and let `_app` — the shell that
-actually wants to be exactly one screen tall — clip itself.
-
-1. `html`/`body` → `min-height:100svh` with default overflow. Drop
-   `height:100%`; keep the `--backdrop` background.
-2. `#root`, `#app` → `min-height:100svh`, no `height:100%`.
-3. `_app`'s outermost wrapper (the `SidebarProvider` in `AppLayout`) gains
-   `h-svh overflow-hidden`. The rest of `_app`'s existing `flex-1 min-h-0
-   overflow-hidden` chain is unchanged and now caps against that.
-4. Delete: `src/hooks/use-shell-mode.ts` + `use-shell-mode.test.tsx`, its barrel
-   export, both `useShellMode` call sites, `src/shellPanes.test.ts`, every
-   `data-shell-pane` marker (`_app.tsx` ×3, `EntryEditor.tsx` ×2,
-   `EntryViewOnly.tsx` ×2), `data-shell-topbar`, and the whole
-   `html[data-shell="flow"]` block in `index.css`.
-5. `GLOSSARY.md`: remove the **fixed shell vs flow shell** entry and add
-   `useShellMode` / `ShellMode` to the retired-names table. `src/glossary.test.ts`
-   enforces both halves.
-
-**Watch for.** A document that flows by default may rubber-band on iOS on the
-calendar routes even though `_app` clips internally. Test that specifically. If
-it is objectionable, the fallback is to keep a *two-rule* `data-shell` toggle
-for `html`/`body` only — still a large simplification, since the pane markers,
-the row/col axis distinction, and `shellPanes.test.ts` all go regardless. Say in
-the PR body which of the two shipped.
-
-**Verify.** Full gate, plus on a device: the agenda does not scroll as a
-document, the entry editor does, and the entry topbar stays put while its
-content scrolls under it.
 
 ---
 
@@ -166,10 +118,5 @@ modes and for the document fallback — the case that regressed.
   `interactive-widget` support, so the visualViewport corrections stay
   necessary regardless of layout. Do not remove them as part of this work.
 - `lib/topChrome.ts` (arrives with #811). Floating panels still need to know
-  where the chrome ends; after PR 2 it resolves `_entry`'s own sticky header
-  instead of `_app`'s. It selects on `[data-shell-topbar]`, which PR 3 deletes —
-  **retarget it in the same PR** to a stable `data-topbar` hook present on both
-  layouts' headers, or panels silently stop avoiding the chrome. Its tests in
-  `src/lib/floatingPlacement.test.ts` are pure and will not catch that; add a
-  case that `topChromeBottom()` resolves a non-zero value with a header
-  rendered.
+  where the chrome ends; it selects on `[data-topbar]`, present on both
+  `_app`'s and the entry routes' headers, so it resolves under either layout.

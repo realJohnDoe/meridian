@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest'
+// @vitest-environment jsdom
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { computeFloatingPlacement } from './floatingPlacement'
+import { topChromeBottom } from './topChrome'
 
 // A phone-sized band whose top edge sits below a 54px sticky topbar — the
 // callers pass an already-chrome-adjusted visibleTop (see lib/topChrome.ts),
@@ -77,5 +79,29 @@ describe('computeFloatingPlacement', () => {
     it('hides once the anchor is below the band (behind the keyboard)', () => {
       expect(computeFloatingPlacement(at(820), band)).toBeNull()
     })
+  })
+})
+
+describe('topChromeBottom', () => {
+  afterEach(() => { document.body.innerHTML = '' })
+
+  // jsdom does no layout, so getBoundingClientRect always reports zeros
+  // regardless of the CSS applied — stub it the way the topbar's sticky
+  // header would actually resolve, to guard against the bare `[data-topbar]`
+  // selector silently going unmatched (both `_app` and the entry routes'
+  // headers carry it — see routes/_app.tsx and routes/-entryTopbar.tsx).
+  it('resolves a non-zero value with a header rendered', () => {
+    const header = document.createElement('header')
+    header.setAttribute('data-topbar', '')
+    document.body.appendChild(header)
+    vi.spyOn(header, 'getBoundingClientRect').mockReturnValue(
+      { bottom: 54 } as DOMRect,
+    )
+
+    expect(topChromeBottom()).toBe(54)
+  })
+
+  it('reports 0 when the route has no topbar', () => {
+    expect(topChromeBottom()).toBe(0)
   })
 })
