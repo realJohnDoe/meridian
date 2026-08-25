@@ -5,6 +5,7 @@ import SearchResults from './SearchResults'
 import { IconButton } from '@/components/primitives/icon-button'
 import { Input } from '@/components/ui/input'
 import { useSidebar } from '@/components/ui/sidebar'
+import { useFocusTrap } from '@/hooks'
 import { cn } from '@/lib/cn'
 
 interface Props {
@@ -36,13 +37,23 @@ interface Props {
 export default function SearchOverlay({ open, query, onQueryChange, onClose, onOpen, onCreate }: Props) {
   const { isMobile, open: sidebarOpen } = useSidebar()
   const inputRef = useRef<HTMLInputElement>(null)
+  const mobileLayerRef = useRef<HTMLDivElement>(null)
   const mobileScrollRef = useRef<HTMLDivElement>(null)
   const desktopScrollRef = useRef<HTMLDivElement>(null)
 
-  // Focus the input whenever the mobile layer opens so the keyboard comes up immediately.
-  useEffect(() => {
-    if (open && isMobile) inputRef.current?.focus()
-  }, [open, isMobile])
+  // Mobile only: the layer covers the whole screen and says aria-modal, so Tab
+  // has to stay inside it — otherwise the markup claims the app behind is
+  // inert while the keyboard walks straight into it. `initialFocus` keeps the
+  // old behaviour of focusing the input on open so the soft keyboard comes up
+  // immediately. Focus is deliberately *not* restored on close: what held it
+  // is SearchBar's own input (tapping it is what opens this layer), and
+  // re-focusing that from the close tap would raise the keyboard again on a
+  // screen the user just dismissed the keyboard from.
+  //
+  // The desktop branch is untrapped on purpose — its focus legitimately sits
+  // outside this component's tree, in SearchBar's input above the panel (same
+  // reason its Escape listener is document-level, below).
+  useFocusTrap(mobileLayerRef, isMobile && open, { initialFocus: inputRef, restoreFocus: false })
 
   // Desktop renders nothing until there's a query (see the early return below),
   // so the overlay is only actually on screen in these two cases.
@@ -67,10 +78,12 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
 
     return (
       <div
+        ref={mobileLayerRef}
         role="dialog"
         aria-modal="true"
         aria-label="Search"
-        className="mobile-search-overlay fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto"
+        tabIndex={-1}
+        className="mobile-search-overlay outline-none fixed inset-0 z-50 flex flex-col bg-background pointer-events-auto"
       >
         {/* Top input row — pinned, always visible */}
         <div className="relative z-10 shrink-0 flex items-center gap-2 px-3.5 pt-[var(--search-top-inset)] pb-4 border-b border-border shadow-md">

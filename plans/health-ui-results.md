@@ -20,11 +20,10 @@ The design system is unusually disciplined: 9 themes over a single token set,
 overwhelming majority are `data-[state=…]` variants rather than hardcoded
 design values.
 
-The two weakest areas are **`src/editor/`'s row components**
-(`ItemsList`/`ListedOnRow`/`ParticipantsRow`) and **the two hand-rolled
-overlays** (`search/SearchOverlay`, `onboarding/CoachTour`) — both places where
-the app's own excellent primitives (`IconButton`, `ResponsiveModal`) were
-bypassed in favour of a bare `<Badge onClick>` or a bare `role="dialog"` div.
+The weakest area is **`src/editor/`'s row components**
+(`ItemsList`/`ListedOnRow`/`ParticipantsRow`) — a place where the app's own
+excellent primitives (`IconButton`) were bypassed in favour of a bare
+`<Badge onClick>`.
 
 The single biggest structural theme is **correctness that lives in a comment
 instead of in the toolchain**. This codebase discovers subtle hazards, fixes
@@ -103,12 +102,12 @@ directory was skipped.
 |---|---|---|
 | 1 | Component Architecture & Boundaries | **findings: #6** |
 | 2 | Styling System Consistency | no open findings |
-| 3 | UX States & Accessibility | **findings: #3** |
+| 3 | UX States & Accessibility | no open findings |
 | 4 | Security (UI-facing) | no open findings |
 | 5 | Code Health & DRY | **findings: #6** |
 | 6 | React Performance | no open findings |
 | 7 | UI Toolchain & Feedback Loops | no open findings |
-| 8 | UI Dependencies & Library Fit | **findings: #3** — plus three explicit keep-custom verdicts, below |
+| 8 | UI Dependencies & Library Fit | no open findings — plus three explicit keep-custom verdicts, below |
 
 **Category 8 — keep-custom verdicts (status quo is correct):**
 - **`editor/dialogs/TimeWheels.tsx`** — a scroll-snap time picker. No radix
@@ -131,69 +130,10 @@ directory was skipped.
 
 | # | Title | Category | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 3 | Two hand-rolled overlays with no focus trap | `a11y` `library-fit` | 6 | 2 files | **Opus 5** |
 | 6 | DayPane/WeekPane share a copy-pasted timeline scaffold | `dry` `component-architecture` | 5 | 2 files | **Opus 5** |
 
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
 and breadth reported separately so the list can be re-sorted.
-
----
-
-### Finding #3 — Two hand-rolled overlays with no focus trap
-
-- **Category:** `a11y` `library-fit`
-- **Impact:** 6
-- **Breadth:** 2 files. Found by grepping `role="dialog"` across `src` and
-  cross-checking each hit against `ResponsiveModal` usage.
-- **Recommended model:** **Opus 5.** This is the survey's canonical
-  silent-failure case — "a focus trap that still renders but no longer traps."
-  Both overlays will look pixel-identical after any change, and the regression
-  is only observable by tabbing. `SearchOverlay` additionally has real
-  constraints a naive port breaks: it is mobile-only (`isMobile` branch),
-  auto-focuses its input to raise the soft keyboard, and its desktop branch
-  deliberately keeps focus *outside* the component
-  (`SearchOverlay.tsx:48` — "focus can sit outside this component's tree").
-  Porting it to `ResponsiveModal` without preserving that will break desktop
-  search. `CoachTour` alone would be Sonnet 5.
-
-**Evidence** — `src/onboarding/CoachTour.tsx:112`:
-
-```
-      <div
-        role="dialog"
-        aria-label={`Tour: ${step.title}`}
-        className="fixed z-tour flex max-h-[70dvh] flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl
-```
-
-and `src/search/SearchOverlay.tsx:64`:
-
-```
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Search"
-```
-
-Grepping both files for `focus|tabIndex|inert|aria-modal` returns, in total: one
-`aria-modal` (SearchOverlay), and one `inputRef.current?.focus()`. There is no
-focus trap, no focus restore, and no `inert`/`aria-hidden` on the background in
-either file.
-
-**Problem:** `CoachTour` renders at `z-tour` (70 — above literally everything,
-per the token's own comment in `index.css:105`) with `role="dialog"` but **no
-`aria-modal`** and no focus management at all: a keyboard user tabbing through
-the onboarding tour walks straight into the application behind it. `SearchOverlay`
-is worse in one specific way — it *claims* `aria-modal="true"`, which tells a
-screen reader the background is inert, while Tab still escapes into it. Meanwhile
-the repo has `@radix-ui/react-dialog` and `vaul` installed and a tested
-`ResponsiveModal` primitive that provides trap, restore, escape and scroll-lock
-for free, used by 8 other dialogs.
-
-**Fix:** Port `CoachTour` to `ResponsiveModal` (`forceDialog`, since the tour
-card is deliberately positioned rather than a bottom sheet); for
-`SearchOverlay`'s mobile branch either port it or add an explicit focus trap
-plus focus restore, keeping the desktop branch's out-of-tree focus behaviour
-intact.
 
 ---
 

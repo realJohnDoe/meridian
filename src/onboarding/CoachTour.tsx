@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useStore } from '@/store'
 import { isTourDone, markTourDone } from './tourState'
 import { Button } from '@/components/ui/button'
-import { useResetOnChange } from '@/hooks'
+import { useResetOnChange, useFocusTrap } from '@/hooks'
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 
@@ -28,6 +28,15 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
 
   const [active, setActive] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  // The card sits at z-tour over an app that stays visible and clickable on
+  // purpose — the tour points at the agenda, the search bar and the sidebar it
+  // opens for the last step — so it can't be a ResponsiveModal: radix's
+  // backdrop would black out the very thing each step is pointing at. It still
+  // owes a keyboard user the other half of `role="dialog" aria-modal`, so the
+  // trap is explicit. Skip/Done (and Escape, below) are the ways out.
+  useFocusTrap(cardRef, active)
 
   // A short spatial orientation only — concepts are taught by the vault notes
   // themselves (open "Welcome to Meridian"). Purely Next/Back: nothing
@@ -92,6 +101,22 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
     navigateHome()
   }, [setSidebarOpen, navigateHome])
 
+  // Escape dismisses, like Skip. Bound to the card rather than the document
+  // because the app behind stays interactive: an Escape aimed at something the
+  // user opened on top (the search overlay has its own document-level
+  // listener) must not close the tour out from under it as well. Focus is
+  // trapped in the card, so an Escape meant for the tour always originates
+  // here.
+  useEffect(() => {
+    const card = cardRef.current
+    if (!active || !card) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); dismiss() }
+    }
+    card.addEventListener('keydown', onKeyDown)
+    return () => card.removeEventListener('keydown', onKeyDown)
+  }, [active, dismiss])
+
   // Run each step's before() side-effects (navigation, sidebar) on change.
   useEffect(() => {
     if (!active) return
@@ -110,9 +135,12 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
           utilities: near-full-width above the search bar on mobile, a fixed
           320px card bottom-centered from `sm` up. Always within the viewport. */}
       <div
+        ref={cardRef}
         role="dialog"
+        aria-modal="true"
         aria-label={`Tour: ${step.title}`}
-        className="fixed z-tour flex max-h-[70dvh] flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl
+        tabIndex={-1}
+        className="fixed z-tour outline-none flex max-h-[70dvh] flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl
           inset-x-4 bottom-[calc(6rem_+_env(safe-area-inset-bottom,0px))]
           sm:inset-x-auto sm:left-1/2 sm:w-80 sm:-translate-x-1/2"
       >

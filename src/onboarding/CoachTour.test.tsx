@@ -88,6 +88,36 @@ describe('CoachTour', () => {
     expect(isTourDone()).toBe(true)
   })
 
+  it('traps Tab inside the card so the tour cannot be tabbed out of', () => {
+    mountAndDropVault()
+
+    // The card takes focus when the tour starts, and Back is disabled on step
+    // 1, so the trapped range is Skip → Next.
+    const card = screen.getByRole('dialog')
+    expect(document.activeElement).toBe(card)
+
+    const next = screen.getByRole('button', { name: 'Next →' })
+    next.focus()
+    fireEvent.keyDown(next, { key: 'Tab' })
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Skip tour' }))
+  })
+
+  it('marks the card as a modal dialog', () => {
+    mountAndDropVault()
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true')
+  })
+
+  it('Escape dismisses the tour', () => {
+    mountAndDropVault()
+
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(isTourDone()).toBe(true)
+  })
+
   it('Skip dismisses the tour from any step', () => {
     mountAndDropVault()
 
