@@ -85,7 +85,7 @@ in that band and likely deserves its own look.
 
 ## 3. Category verdicts
 
-1. **Architecture & Domain Separation** — findings: #10
+1. **Architecture & Domain Separation** — findings: #10 (part A is ready to fix; part B is deferred by design — see the finding)
 2. **Simplicity & Overengineering** — findings: #6
 3. **Directory & File Layout** — findings: #2, #7
 4. **Security** — clean. Threat model: a client-side PWA over user-owned
@@ -141,24 +141,41 @@ in that band and likely deserves its own look.
 
 ## 4. Findings
 
-| # | Finding | Cat | Impact | Breadth | Recommended model |
-|---|---|---|---|---|---|
-| 1 | `noImplicitOverride` off — 12 silent-override sites in `editor/cm/` | toolchain, types | 5 | 6 | Haiku 4.5 |
-| 2 | `BADGE_CLASS` is a design token exported from a view, with its pixel math hand-copied into two files | layout, styling | 4 | 4 | Haiku 4.5 |
-| 3 | `worker/` has no coverage measurement at all | toolchain, testing | 6 | 5 | Sonnet 5 |
-| 4 | `store.ts` at 38.99%, with three irreversible migrations untested | testing | 7 | 3 | Sonnet 5 |
-| 5 | Coverage floors omit the two largest domain files | toolchain, testing | 3 | 3 | Haiku 4.5 |
-| 6 | Half of `EntryEditorHooks` is optional for a dev-only page | overengineering, types | 5 | 4 | Opus 5 |
-| 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
-| 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
-| 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | Opus 5 |
-| 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | Opus 5 |
+Every finding below carries a **Task context** block: the specific file, line,
+value list or hazard a fixer needs in order to work at the named tier without
+re-deriving it. Nine of the ten are Haiku- or Sonnet-tier as written *because*
+of those blocks — drop the context and most revert to Opus 5.
+
+**`#` is a stable identity, not a priority** (the category verdicts above
+reference these numbers, and they don't move as findings get closed out). The
+table is sorted by **Rank** — `(impact × breadth) ÷ effort` — while the
+detailed sections below stay in `#` order so they're findable.
+
+| Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
+|---|---|---|---|---|---|---|
+| 1 | 1 | `noImplicitOverride` off — 12 silent-override sites in `editor/cm/` | toolchain, types | 5 | 6 | Haiku 4.5 |
+| 2 | 2 | `BADGE_CLASS` is a design token exported from a view, with its pixel math hand-copied into two files | layout, styling | 4 | 4 | Haiku 4.5 |
+| 3 | 3 | `worker/` has no coverage measurement at all | toolchain, testing | 6 | 5 | Sonnet 5 |
+| 4 | 4 | `store.ts` at 38.99%, with three irreversible migrations untested | testing | 7 | 3 | Sonnet 5 |
+| 5 | 6 | Half of `EntryEditorHooks` is optional for a dev-only page | overengineering, types | 5 | 4 | **Sonnet 5** |
+| 6 | 5 | Coverage floors omit the two largest domain files | toolchain, testing | 3 | 3 | Haiku 4.5 |
+| 7 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
+| 8 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
+| 9 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
+| 10 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
 
 > **The order above is `(impact × breadth) ÷ effort`, not raw impact.** Two
 > cheap, wide toolchain fixes (#1, #2) outrank the highest-impact finding in
 > the report. A reader sorting by what actually matters most should start at
 > **#4** (`store.ts` — impact 7, and the only finding where the failure mode
 > is silent user-data loss), then **#3**.
+>
+> **Three findings moved down a tier** once their Task context was written out
+> — #6 and #9 from Opus 5 to Sonnet 5 outright, and #10 partially. One thing
+> did **not** move: `sync.ts`'s scheduler/backoff half (#10 part B) shares the
+> `_syncStates` map with sync core, so splitting it needs a design decision
+> rather than a specified edit. It is the only Opus-tier work left in the
+> report, and it is genuinely Opus-tier — see #10 for why.
 
 **Sequencing:** #3 and #5 both edit coverage config — do #5 first (root
 `vitest.config.ts`), then #3 (`worker/vitest.config.ts` + `package.json`), so
@@ -204,6 +221,14 @@ split has to preserve. Everything else is independent.
 - **Fix** — Add `"noImplicitOverride": true` to `tsconfig.app.json` and the
   `override` keyword at the 12 reported sites; confirm with `pnpm run build`
   in the repo root.
+- **Task context** — The 12 sites, from the dry run (add `override` before
+  each member; do not rename anything):
+  `src/editor/cm/ReactWidget.ts` lines 47, 61 · `markdownFormatting.ts` lines
+  71, 75, 87, 88, 102, 103 · `taskDecorations.ts` lines 23, 36 ·
+  `wikilinkDecorations.ts` lines 60, 90. All are members of classes extending
+  CodeMirror's `WidgetType` or the local `ReactWidget`. Reproduce the list
+  before and after with a throwaway tsconfig extending `tsconfig.app.json`
+  with `noImplicitOverride: true` — the count must go 12 → 0.
 
 ### 2. `BADGE_CLASS` is a design token exported from a view component, and its pixel height is hand-copied into two other files
 
@@ -238,6 +263,16 @@ split has to preserve. Everything else is independent.
   geometry constants, and export a `BADGE_H = 20` from there that
   `ALLDAY_ROW_H` and `MonthView`'s comment both reference; confirm with
   `pnpm run build && pnpm run lint` in the repo root.
+- **Task context** — Destination is `src/calendar/timelineGeometry.ts`, which
+  already holds the shared geometry constants `GUTTER` and `COL_RIGHT_PAD`
+  that `WeekPane` imports. Move all three class constants out of
+  `MonthGrid.tsx` and update the four importers: `MonthGrid.tsx` itself,
+  `MonthView.tsx:4`, `WeekPane.tsx:19`, `DayBadge.tsx:2`. Then export
+  `export const BADGE_H = 20` alongside them, replace `WeekPane.tsx`'s
+  `const ALLDAY_ROW_H = 20` with an import of it, and update the arithmetic
+  comment at `MonthView.tsx:13` to reference `BADGE_H` rather than restating
+  `20`. `MonthGrid.tsx` has no default-export change — it keeps
+  `export default MonthGrid`, only the named class constants move.
 
 ### 3. The `worker/` package's tests run in CI but its coverage is never measured
 
@@ -280,6 +315,20 @@ split has to preserve. Everything else is independent.
   `worker/package.json`, and fan the root `test:coverage` out to it the way
   `test` already does; confirm with `pnpm --filter meridian-oauth-worker run
   test:coverage`, then `pnpm run test:coverage` from the root.
+- **Task context** — `worker/` has four sources to threshold:
+  `src/icalFetch.ts` (286 lines), `src/oauthToken.ts` (88), `src/index.ts`
+  (36), `src/cors.ts` (24), against three test files
+  (`icalFetch.test.ts` 224, `oauthToken.test.ts` 152, `index.test.ts` 51).
+  Run `pnpm --filter meridian-oauth-worker exec vitest run --coverage` once to
+  get the measured baseline, then set each floor a few points under it — the
+  convention `vitest.config.ts` states at the root ("Set a few points below
+  measured coverage to leave headroom"). `@vitest/coverage-v8` is already in
+  the root workspace but **not** in `worker/package.json`; add it there.
+  Finally add `&& pnpm --filter meridian-oauth-worker run test:coverage` to
+  the root `test:coverage` script so it fans out the way `test` already does.
+  Note CI already runs the worker's tests in a separate `worker-checks` job in
+  `.github/workflows/ci.yml` — that job is where coverage will start being
+  enforced, so no workflow edit is needed if the root script fans out.
 
 ### 4. `src/store.ts` is the repo's worst-covered core module, and its three irreversible migrations are untested
 
@@ -318,6 +367,29 @@ split has to preserve. Everything else is independent.
   run after the key was cleared — and add a per-file coverage floor for
   `src/store.ts` once it is up; confirm with `pnpm run test:coverage` in the
   repo root.
+- **Task context** — The three migrations, all in `src/store.ts`:
+  1. `readFavorites(vaultIds)` (line ~401) — reads `meridian_favorites`
+     (`FAVORITES_KEY`), folds in per-vault `meridian_favorites_<id>`
+     (`LEGACY_FAVORITES_PREFIX`), clears each legacy key at lines 411 and 418,
+     writes back if `changed || flat === null`.
+  2. `migrateParticipantFilter(vaultId, items, current)` (line ~440) — reads
+     `meridian_participant_filter_<id>`, clears it at line 451, converts the
+     old *inclusive* filter to the new *hidden* semantics as
+     `hidden = allParticipants − oldFilter`, writes `HIDDEN_PARTICIPANTS_KEY`.
+     Called from `setVaultLayer`.
+  3. The show-tasks fold at lines ~622–625 — reads
+     `meridian_show_tasks_<id>` (`LEGACY_SHOW_TASKS_PREFIX`), clears every
+     vault's copy. This is the one sitting in the coverage report's uncovered
+     `609-627` range.
+
+  All three read/write through `src/lib/vaultStorage.ts`
+  (`readVaultStringArray`, `readVaultJSON`, `writeVaultJSON`, `clearVaultKey`),
+  which is itself at 35.71% — testing the migrations lifts it too.
+  `src/test-utils/setup.ts` is already the global setup file; check whether it
+  resets `localStorage` between tests before adding your own teardown.
+  The four cases per migration: populated legacy key, absent legacy key, empty
+  legacy value, and a second run after the key was cleared. The fourth is the
+  one that needs `vi.resetModules()` — see the hazard above.
 
 ### 5. The coverage floors skip the two largest domain files, against the config's own stated policy
 
@@ -347,6 +419,18 @@ split has to preserve. Everything else is independent.
 - **Fix** — Add per-file threshold entries for `src/model/storeOps.ts` and
   `src/model/expansion.ts` a few points under their measured values; confirm
   with `pnpm run test:coverage` in the repo root.
+- **Task context** — Measured on this run: `src/model/storeOps.ts` is
+  **92.41 / 96.55 / 95.31 / 87.15** and `src/model/expansion.ts` is
+  **91.38 / 95.77 / 98.30 / 81.35** (statements / lines / functions /
+  branches). Following the file's own "a few points below measured"
+  convention gives roughly
+  `'src/model/storeOps.ts': { statements: 88, branches: 82, functions: 92, lines: 92 }`
+  and
+  `'src/model/expansion.ts': { statements: 87, branches: 76, functions: 94, lines: 92 }`.
+  Re-measure before committing rather than trusting these numbers — they will
+  drift as other findings land. Insert them beside the existing
+  `'src/model/collapse.ts'` and `'src/model/fieldRegistry.ts'` entries so the
+  `model/` floors stay grouped.
 
 ### 6. Half of `EntryEditorHooks` is optional solely to accommodate a dev-only debug page
 
@@ -355,11 +439,13 @@ split has to preserve. Everything else is independent.
 - **Breadth** — 4 files (`editor/EntryEditor.tsx`,
   `debug/NodeInheritanceDebugger.tsx`, `routes/_entry.entry.new.tsx`,
   `routes/_entry.entry.$vault.$slug.tsx`).
-- **Recommended model** — **Opus 5.** This needs a decision, not an edit:
-  either the debugger supplies explicit no-ops for the 12 fields, or it gets
-  its own narrower prop type and `EntryEditor` splits its rendering. Picking
-  wrong either re-weakens the contract or breaks the debug page — which has
-  **0% coverage and no test at all**, so nothing will tell you.
+- **Recommended model** — **Sonnet 5**, given the Task context below. (It was
+  Opus 5 until the decision was made here: take the no-op route, not the
+  separate-prop-type route.) The one hazard that survives is named and located
+  — `ListedOnRow.tsx:57` branches on `onOpenWikilink` being `undefined`, so a
+  no-op there is *not* behaviour-preserving. Everything else coalesces
+  internally. Without that pointer this is Opus 5, because the debug page has
+  **0% coverage and no test at all**, so a wrong no-op fails silently.
 - **Evidence** — `src/editor/EntryEditor.tsx:62-66` states the reason
   outright:
   ```
@@ -387,9 +473,42 @@ split has to preserve. Everything else is independent.
   swallowed no-op instead of a compile error, on the app's primary editing
   surface.
 - **Fix** — Make the 12 fields required on `EntryEditorHooks` and have
-  `NodeInheritanceDebugger` pass explicit no-ops (or give it a dedicated
-  `ScratchEditorHooks` type); confirm with `pnpm run build` in the repo root,
-  which type-checks `src/debug/` too.
+  `NodeInheritanceDebugger` pass explicit no-ops; confirm with `pnpm run
+  build` in the repo root, which type-checks `src/debug/` too.
+- **Task context** — Drop the `?` from all 12 fields at
+  `src/editor/EntryEditor.tsx:82-100`, then extend the object literal at
+  `src/debug/NodeInheritanceDebugger.tsx:762-779`. It already supplies
+  `entry`, `series`, `vaultId`, `onVaultChange: null`, `pendingLinks`,
+  `dialogHandlers`, `setEntry`, `handleSave`, `handleOpenDlg`,
+  `handleOpenRepeatDlg`, `handleScopeChange` and `handlePromoteTask`. The 11
+  to add, with the values that preserve current behaviour:
+
+  ```
+  pendingMove: null,               onMoveConfirm: () => {},
+  onMoveCancel: () => {},          scheduleAutoSave: () => {},
+  saveMeta: () => {},              handleTypeChange: () => {},
+  handleDoneToggle: () => {},      handleToggleDoneBacklink: () => {},
+  titleMissing: false,             focusTitleTick: 0,
+  handleOpenWikilink: () => {},    // ← see the trap below
+  ```
+
+  **The trap.** Two of these are passed straight through to children, and only
+  one of the children treats `undefined` as meaningful:
+  - `EntryBody.tsx:104-107` coalesces both `onOpenWikilink` and `onChange` to
+    `() => {}` internally, so a no-op is exactly equivalent — safe.
+  - `ItemsList.tsx:192` calls `onOpenWikilink?.(…)` — safe.
+  - **`ListedOnRow.tsx:57` is not safe**:
+    `onNavigate={onOpenWikilink && meta ? () => onOpenWikilink(meta.fileSlug) : undefined}`.
+    A no-op makes `onNavigate` truthy, so the row renders as navigable and
+    then does nothing when clicked. Handle it by keeping the debugger's
+    `handleOpenWikilink` genuinely absent at *that* call site — thread the
+    debugger's own "no navigation" state down, or have `EntryEditor` pass
+    `undefined` to `ListedOnRow` when navigation is unavailable — rather than
+    by reverting the field to optional.
+
+  `EntryEditor` destructures all 12 at lines 115-121; no call-site changes are
+  needed there beyond the `?.` operators becoming unnecessary (leaving them is
+  harmless, so don't churn them unless lint asks).
 
 ### 7. `exampleBackend.ts` is 79% Tutorial content wrapped around a 32-line adapter
 
@@ -421,6 +540,30 @@ split has to preserve. Everything else is independent.
   `src/storage/devFixtures/tutorialVault.ts`, leaving `exampleBackend.ts` as
   the adapter plus `loadEntries`/`VERSION`; confirm with `pnpm run build &&
   pnpm run test` in the repo root.
+- **Task context** — Move lines 59–450 of `src/storage/exampleBackend.ts`
+  (`buildEntries`) plus the four helpers it depends on — `d` (line 14),
+  `lastWeekdayDate` (19), `weekdaysBeforeToday` (25), `doneInstances` (46) —
+  and the `const MON = 1, WED = 3, FRI = 5` line (57) into
+  `src/storage/devFixtures/tutorialVault.ts`. What stays in
+  `exampleBackend.ts`: `loadEntries()` (451), `const ENTRIES` (461),
+  `const VERSION = 'example-v4'` (463) and the `ExampleBackend` class
+  (465–496).
+
+  Two things must not change value:
+  - `VERSION` gates cache invalidation for every existing user's Tutorial
+    vault. Leave the string exactly `'example-v4'` — bumping it re-seeds
+    everyone's sandbox, and it is not a version of the file's location.
+  - The entry ids `01-start-here`, `02-your-first-task`, `03-plan-your-week`,
+    `04-link-your-notes`, `05-make-it-yours` are referenced by `CLAUDE.md`
+    (the agent-navigation notes) and by the onboarding tour. Grep for them
+    after the move.
+
+  `devFixtures/testVaultGen.ts` is the sibling precedent and already imports
+  `fmtISO` from `@/model` and `addDays` from `@/format`, exactly as
+  `buildEntries` does — so the new file's imports mirror one that already
+  passes lint in that directory. `exampleBackend.ts` currently imports
+  `generateBigVault` from `./devFixtures/testVaultGen`; it will gain a second
+  import from the same directory.
 
 ### 8. Three list views hand-copy the same virtualized-row scaffold
 
@@ -460,19 +603,45 @@ split has to preserve. Everything else is independent.
   extracted from `DayPane`/`WeekPane` in `cb05ea1`; confirm with `pnpm run
   test` in the repo root (`AgendaView.test.tsx`, `OccurrenceList.test.tsx`
   and `FileResultsList.test.tsx` all exist).
+- **Task context** — `src/calendar/timelineScaffold.tsx` is the precedent to
+  copy — read it and commit `cb05ea1` first; it solved the identical problem
+  for `DayPane`/`WeekPane` and its commit message explains the arity-not-flag
+  split principle. The three call sites:
+  - `AgendaView.tsx:184-207` — outer `pb-24 lg:max-w-3xl lg:mx-auto`
+  - `OccurrenceList.tsx:118-141` — outer `pt-2 pb-24 lg:max-w-3xl lg:mx-auto`
+    (the `pt-2` is the only class that differs; make it a prop, don't
+    normalise it away)
+  - `FileResultsList.tsx` — same shape, but its style object adds two extra
+    keys (a `--stagger` custom property set from `vi.index * 0.025` seconds,
+    and `paddingBottom: 6`) and casts the object to `React.CSSProperties` so
+    the custom property type-checks. Thread extra style keys through rather
+    than dropping them.
+
+  The invariant to preserve: **two nested divs, not one.** The outer div
+  carries `data-index`, `ref={virtualizer.measureElement}` and the
+  `translateY` transform; the inner div carries only `{[FLIP_KEY_ATTR]: vi.key}`
+  and is what `useVirtualFlip` animates. The five-line comment duplicated in
+  both files explains why merging them breaks the list — carry that comment
+  into the extracted component so it doesn't get lost.
+
+  `AgendaView` additionally calls `useVirtualFlip(scRef, virtualItems, rows,
+  virtualizer.isScrolling)` and drives scroll restore through `anchorAt` /
+  `markAgendaScrolled`; leave all of that in the call sites and extract only
+  the render scaffold. Tests exist for all three
+  (`AgendaView.test.tsx`, `OccurrenceList.test.tsx`, `FileResultsList.test.tsx`).
 
 ### 9. `useEntryEditor` is a 366-line hook returning 26 keys across eight concerns
 
 - **Category** — `srp`, `architecture`
 - **Impact** — 5
 - **Breadth** — 2 files (`editor/useEntryEditor.ts`, its 411-line test).
-- **Recommended model** — **Opus 5.** Hazard: the autosave path holds three
-  refs whose teardown ordering is load-bearing — `flushAutoSaveRef` is
-  invoked from an unmount effect (`useEffect(() => () => {
-  flushAutoSaveRef.current() }, [])`) that must still see the current
-  `bodyRef`. Moving autosave into its own hook changes unmount order between
-  the two hooks and can silently drop the user's last edit; no test covers
-  unmount-mid-edit, so this fails quietly.
+- **Recommended model** — **Sonnet 5**, scoped to the `useAutoSave`
+  extraction with the member list below. (Opus 5 without it: the trap is that
+  `commitEntry` *looks* like part of the autosave cluster and is not — it
+  reaches `baseRef`, `flushLinksRef`, `createdItemRef`, `setCreatedKey`,
+  `setTitleMissing`, `draftId` and `targetVaultId`, so moving it into the new
+  hook drags half the file along and changes when the first save creates the
+  file.) Pass `commitEntry` **in** as a parameter and the seam is clean.
 - **Evidence** — `src/editor/useEntryEditor.ts:48`:
   ```
   export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string, seed?: NewEntrySeed) {
@@ -492,6 +661,41 @@ split has to preserve. Everything else is independent.
   test` in the repo root, and check the `src/editor/useEntryEditor.ts`
   coverage floor in `vitest.config.ts` still holds under
   `pnpm run test:coverage`.
+- **Task context** — Do the `useAutoSave` half first; it is the larger win and
+  the better-defined seam. Signature:
+
+  ```
+  useAutoSave(commitEntry: (next: EntryState) => void, entryRef: RefObject<EntryState>)
+    → { scheduleAutoSave, flushAutoSave, cancelAutoSave, bodyRef }
+  ```
+
+  Moves into the new hook (all currently in `src/editor/useEntryEditor.ts`):
+  `autosaveTimerRef` (line 75), `bodyRef` (line 80), `flushAutoSave`
+  (line 170), `cancelAutoSave` (line 181), the `flushAutoSaveRef` latest-ref
+  pair and its unmount effect (lines 190-192), and `scheduleAutoSave`
+  (line 210).
+
+  **Stays behind** in `useEntryEditor`: `commitEntry` (line 141), `saveMeta`
+  (line 163), `updateEntry`, `entryRef`, `baseRef`, `createdItemRef`, `flushLinksRef`,
+  `initialCommitRef` and its mount effect. `saveMeta` reads `bodyRef`, so
+  return `bodyRef` from the hook rather than duplicating it.
+
+  Three specifics that are easy to get wrong:
+  - The debounce is **1500 ms** and `scheduleAutoSave` returns early when
+    `entryRef.current.editScope === 'add'` — preserve both.
+  - `handleDelete` (line 300) calls `cancelAutoSave()` *before* `deleteNode`,
+    deliberately, so `goBack`'s flush can't resurrect the item being deleted.
+    That ordering must survive the move.
+  - The unmount effect is written as a latest-ref pair specifically to avoid
+    an `exhaustive-deps` suppression, which the file's comment notes "would
+    have opted this hook out of React Compiler optimization entirely". Keep
+    the same shape; do not replace it with a dependency array.
+
+  `src/editor/useEntryEditor.test.tsx` (411 lines) already exercises autosave
+  and is the regression net. `vitest.config.ts` pins
+  `'src/editor/useEntryEditor.ts': { statements: 68, branches: 55, functions: 55, lines: 70 }`
+  — after the split that key covers a smaller file, so re-check it holds and
+  add a floor for the new hook file.
 
 ### 10. `sync.ts` carries seven concerns behind banner comments instead of module boundaries
 
@@ -499,14 +703,17 @@ split has to preserve. Everything else is independent.
 - **Impact** — 4
 - **Breadth** — 3 files (`storage/sync.ts`, `storage/index.ts`,
   `vitest.config.ts` — whose per-file floor is keyed to the current path).
-- **Recommended model** — **Opus 5.** Not plan-mode: the seams are already
-  drawn by the file's own banners and the module's barrel is unchanged, so a
-  wrong split breaks the build loudly. Hazards to name: `_syncStates`,
-  `_reportedLossy` and the backoff state are module-level singletons that must
-  land in exactly one file each (duplicating one silently gives two vaults
-  independent backoff), and the `'src/storage/sync.ts'` coverage-threshold key
-  in `vitest.config.ts` must be re-pointed or the gate silently stops guarding
-  anything.
+- **Recommended model** — **split by half.** **Part A (parse/report) is
+  Sonnet 5** — verified one-way seam, specified below. **Part B
+  (scheduler/backoff) stays Opus 5**, and this is the one place in the report
+  where more context does not lower the tier: `resetSyncBackoff` iterates
+  `_syncStates.values()` and mutates `consecutiveFailures`/`nextRetryAt` on
+  entries that SYNC CORE owns and writes, so the scheduler and the sync core
+  share one mutable map. Separating them means either exporting `_syncStates`
+  (which dissolves the singleton the file is built around) or lifting
+  `VaultSyncState` into a third module that both import — a design decision,
+  not a specified edit. Do part A now; leave part B until someone wants to
+  make that call.
 - **Evidence** — `src/storage/sync.ts` is 1159 lines divided by seven of its
   own section banners:
   ```
@@ -525,13 +732,46 @@ split has to preserve. Everything else is independent.
   history. The cost is concentrated where changes actually land — its
   1931-line test file is the largest test in the repo, because every concern
   must be set up through the same module.
-- **Fix** — Split the two most independent sections into
-  `storage/syncScheduler.ts` (backoff + scheduler, ~130 lines) and
-  `storage/parseReport.ts` (the parse/round-trip reporting helpers, ~130
-  lines), leaving collision/reconcile/sync-core in `sync.ts`; confirm with
-  `pnpm run build && pnpm run lint && pnpm run test:coverage` in the repo root
-  (lint enforces the module-barrel boundary, coverage confirms the re-keyed
-  threshold).
+- **Fix (part A)** — Move the parse/round-trip reporting cluster into
+  `src/storage/parseReport.ts`, leaving collision/reconcile/sync-core and the
+  scheduler in `sync.ts`; confirm with `pnpm run build && pnpm run lint &&
+  pnpm run test:coverage` in the repo root (lint enforces the module-barrel
+  boundary, coverage confirms the re-keyed threshold).
+- **Task context (part A)** — Lines 40–157 of `src/storage/sync.ts` move as a
+  block: the `ParseFailure` and `RoundTripLoss` interfaces, `auditRoundTrip`,
+  `parseFiles`, `reportParseFailures`, the `_reportedLossy` module-level Set
+  (line 130) and `reportRoundTripLosses`. The seam was verified in both
+  directions:
+  - **Outbound** — the cluster's only imports are `warn`/`warnWithDetails`
+    from `./notifications`, `runInIdleBatches` from `@/lib/idle`,
+    `parseToStoreItems`/`roundTripLoss` from `@/model`, and `pathToKey` from
+    `@/fileIO`. It touches no sync state — not `_syncStates`, not the backoff
+    constants, not `getBackend`.
+  - **Inbound** — exactly one caller inside `sync.ts` remains:
+    `mergeChangedIntoStore` at lines 496–505 (`parseFiles`,
+    `reportParseFailures`, `auditRoundTrip`), which becomes an ordinary
+    import. External callers are `storage/vaultRegistry.ts` and
+    `editor/save.ts`; both import from `@/storage/sync` today and must be
+    re-pointed.
+
+  `_reportedLossy` must exist in exactly one module — it is the
+  "already warned about this path" dedupe, so a duplicated copy silently
+  re-toasts the user on every reconcile. Note `parseFiles` and
+  `reportParseFailures` are **not** re-exported from `src/storage/index.ts`,
+  so the barrel needs no change; the importers are inside `storage/` and in
+  `editor/save.ts`, which reaches them by deep path today — check
+  `pnpm run lint` after, since the import-boundary zones will judge the new
+  file the same way.
+
+  `vitest.config.ts` pins
+  `'src/storage/sync.ts': { statements: 68, branches: 55, functions: 55, lines: 72 }`.
+  After the move that key guards a smaller file; re-measure and add a floor
+  for `parseReport.ts` too, or the extracted code ends up guarded by nothing
+  but the global floor.
+- **Fix (part B, deferred)** — Lifting BACKOFF STATE + SCHEDULER (lines
+  673–691 and 966–1072, ~130 lines) into `storage/syncScheduler.ts` requires
+  first deciding where `VaultSyncState` and the `_syncStates` map should live.
+  Worth doing, but as its own change with that decision made explicitly.
 
 ---
 
@@ -543,7 +783,18 @@ describes the design `expandWithMultiday` replaced, which does the opposite
 ("adds days 2..N"). knip can't see it because a test keeps it alive. Cheap to
 close out alongside any other `model/` work; it scored just below #10.
 
-**Survey file updated:** `plans/surveys/health.md` was edited in a separate
+**Survey files updated:** `plans/surveys/health.md` was edited in a separate
 commit with three process learnings from this run — pinning down what
 "largest files" means, splitting coverage from test on the gate×workspace
-matrix axis, and a note about per-workspace `pnpm audit` invocation.
+matrix axis, and a note about per-workspace `pnpm audit` invocation — plus a
+`Task context` entry in its finding-output spec.
+
+`plans/surveys/README.md` gained a new shared section, *"Write findings down
+to Sonnet 5 where you honestly can"*, making the Task context block a
+convention for **every** survey rather than just this one: rate the tier
+against the finding *with* its context written out, don't fake a downgrade
+that a judgement call blocks, re-rank afterwards because `effort` feeds the
+formula, and keep `#N` stable when the order moves. The other four survey
+files inherit it through the README without needing their own edit; only
+`health.md` also got the explicit output field, since that is the one this
+run exercised.
