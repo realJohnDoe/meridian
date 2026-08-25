@@ -98,13 +98,13 @@ in that band and likely deserves its own look.
    `script-src 'self'`; the Worker's `/ical` proxy validates hosts on the
    original URL *and* every redirect hop, including IPv6-embedded IPv4;
    `pnpm audit --audit-level=low` clean in both workspaces.
-5. **Testing & Error Handling** — findings: #3, #4, #5. Error handling
+5. **Testing & Error Handling** — findings: #3, #4. Error handling
    itself is clean: exactly two `.catch(() => {})` in non-test source, both
    deliberate and documented.
 6. **Code Health & DRY** — findings: #8. A 6-line-window duplicate scan
    across all non-test, non-`components/ui` source found no cross-file
    duplication other than import lists and #8.
-7. **Toolchain & Developer Feedback Loops** — findings: #1, #3, #5
+7. **Toolchain & Developer Feedback Loops** — findings: #1, #3
 8. **Dependencies & Library Fit** — clean; three keep-verdicts stated below.
 9. **Styling & UX** — findings: #2. Zero `<div onClick>`/`<span onClick>` in
    non-test source; `jsx-a11y` recommended is enabled with Radix/Badge/Card
@@ -158,11 +158,10 @@ detailed sections below stay in `#` order so they're findable.
 | 3 | 3 | `worker/` has no coverage measurement at all | toolchain, testing | 6 | 5 | Sonnet 5 |
 | 4 | 4 | `store.ts` at 38.99%, with three irreversible migrations untested | testing | 7 | 3 | Sonnet 5 |
 | 5 | 6 | Half of `EntryEditorHooks` is optional for a dev-only page | overengineering, types | 5 | 4 | **Sonnet 5** |
-| 6 | 5 | Coverage floors omit the two largest domain files | toolchain, testing | 3 | 3 | Haiku 4.5 |
-| 7 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
-| 8 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
-| 9 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
-| 10 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
+| 6 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
+| 7 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
+| 8 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
+| 9 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
 
 > **The order above is `(impact × breadth) ÷ effort`, not raw impact.** Two
 > cheap, wide toolchain fixes (#1, #2) outrank the highest-impact finding in
@@ -177,9 +176,7 @@ detailed sections below stay in `#` order so they're findable.
 > rather than a specified edit. It is the only Opus-tier work left in the
 > report, and it is genuinely Opus-tier — see #10 for why.
 
-**Sequencing:** #3 and #5 both edit coverage config — do #5 first (root
-`vitest.config.ts`), then #3 (`worker/vitest.config.ts` + `package.json`), so
-the root file is touched once. #9 and #6 both touch the editor's hook/prop
+**Sequencing:** #9 and #6 both touch the editor's hook/prop
 contract — do #6 first, since making the optionals required narrows what #9's
 split has to preserve. Everything else is independent.
 
@@ -390,47 +387,6 @@ split has to preserve. Everything else is independent.
   The four cases per migration: populated legacy key, absent legacy key, empty
   legacy value, and a second run after the key was cleared. The fourth is the
   one that needs `vi.resetModules()` — see the hazard above.
-
-### 5. The coverage floors skip the two largest domain files, against the config's own stated policy
-
-- **Category** — `toolchain`, `testing`
-- **Impact** — 3
-- **Breadth** — 3 files (`vitest.config.ts` plus the two files left unguarded).
-- **Recommended model** — **Haiku 4.5.** The fix is adding two threshold
-  entries read off a coverage run. Failure is loud: a floor set above measured
-  coverage fails CI on the next run. Hazard: read the numbers from an actual
-  `pnpm run test:coverage`, don't guess, and follow the file's convention of
-  sitting a few points under measured.
-- **Evidence** — `vitest.config.ts` states the policy:
-  ```
-  // Per-file floors for modules already well-covered, so they can't
-  // silently regress. Set a few points below measured coverage to leave
-  // headroom for legitimate branches added later.
-  ```
-  and then names 30+ files, including much smaller `model/` neighbours —
-  `'src/model/collapse.ts': { statements: 90, branches: 80, functions: 95, lines: 90 }`
-  — while `src/model/storeOps.ts` (1004 lines, measured 92.41%) and
-  `src/model/expansion.ts` (905 lines, measured 91.38%) have no entry at all.
-- **Problem** — The two biggest files in the domain core, both already
-  excellently covered, are guarded only by the global floor of `statements:
-  68` — so either could shed more than twenty points of coverage without
-  failing CI, which is precisely the silent regression the per-file floors
-  were introduced to prevent.
-- **Fix** — Add per-file threshold entries for `src/model/storeOps.ts` and
-  `src/model/expansion.ts` a few points under their measured values; confirm
-  with `pnpm run test:coverage` in the repo root.
-- **Task context** — Measured on this run: `src/model/storeOps.ts` is
-  **92.41 / 96.55 / 95.31 / 87.15** and `src/model/expansion.ts` is
-  **91.38 / 95.77 / 98.30 / 81.35** (statements / lines / functions /
-  branches). Following the file's own "a few points below measured"
-  convention gives roughly
-  `'src/model/storeOps.ts': { statements: 88, branches: 82, functions: 92, lines: 92 }`
-  and
-  `'src/model/expansion.ts': { statements: 87, branches: 76, functions: 94, lines: 92 }`.
-  Re-measure before committing rather than trusting these numbers — they will
-  drift as other findings land. Insert them beside the existing
-  `'src/model/collapse.ts'` and `'src/model/fieldRegistry.ts'` entries so the
-  `model/` floors stay grouped.
 
 ### 6. Half of `EntryEditorHooks` is optional solely to accommodate a dev-only debug page
 
