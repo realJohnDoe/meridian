@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import { Menu, CalendarCheck2 } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
@@ -13,7 +13,6 @@ import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ViewFilterButton } from '@/components'
 import { IconButton } from '@/components/primitives/icon-button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
-import { TopbarSlotContext } from './-topbarSlot'
 import { TopbarShell } from './-topbarShell'
 import { PagedTopbar } from './-pagedTopbar'
 import { TopbarLabel } from './-topbarLabel'
@@ -46,12 +45,6 @@ function AppMain() {
 
   const navigate = useNavigate()
 
-  const entryMatch     = useMatch({ from: '/_app/entry/$vault/$slug', shouldThrow: false })
-  // The pre-multi-vault `/entry/<slug>` URL, which redirects to the route above
-  // once the vault is restored. Counted as an entry view too, so the layout
-  // doesn't flash the agenda's topbar and search bar during that hop.
-  const entryLegacyMatch = useMatch({ from: '/_app/entry/$slug', shouldThrow: false })
-  const entryNewMatch  = useMatch({ from: '/_app/entry/new', shouldThrow: false })
   const dayMatch       = useMatch({ from: '/_app/day/$date', shouldThrow: false })
   const weekMatch      = useMatch({ from: '/_app/week/$date', shouldThrow: false })
   const monthMatch     = useMatch({ from: '/_app/calendar/$month', shouldThrow: false })
@@ -65,13 +58,10 @@ function AppMain() {
   const weekPreview   = useWeekPreview()
   const ws            = weekStartsOn(useStore(s => s.localePrefs))
 
-  const isEntryView  = !!entryMatch || !!entryLegacyMatch || !!entryNewMatch
-
-  // The entry routes are the only ones with a text input inside a scrolling
-  // pane, and the only ones with no virtualizer — so they get the flow shell,
-  // where the browser scrolls a focused input above the keyboard itself. Every
-  // other route keeps the fixed shell the virtualizers require.
-  useShellMode(isEntryView ? 'flow' : 'fixed')
+  // The calendar routes' lists are virtualized, so they need the fixed shell —
+  // see hooks/use-shell-mode.ts. The entry routes get the flow shell from
+  // their own `_entry` layout instead.
+  useShellMode('fixed')
   const isDayView    = !!dayMatch
   const isWeekView   = !!weekMatch
   const isMonthView  = !!monthMatch
@@ -118,106 +108,98 @@ function AppMain() {
   const navigateHome   = useCallback(() => void navigate({ to: '/' }), [navigate])
   const openSidebar    = () => setSidebarOpen(true)
 
-  // Callback ref so the portal target is available synchronously after mount.
-  const [slotEl, setSlotEl] = useState<HTMLDivElement | null>(null)
-
   return (
-    <TopbarSlotContext value={slotEl}>
+    <>
       <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden" data-shell-pane="row">
         <header
           id="mainTop"
           className="h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10 shadow-md"
           data-shell-topbar
         >
-          {isEntryView ? (
-            // Portal target — entry route injects topbar controls here via createPortal
-            <div ref={setSlotEl} className="flex flex-1 items-center h-full overflow-hidden" />
-          ) : (
-            <TopbarShell
-              leftHasButton={isMobile}
-              left={
-                isDayView && dvDate && dvDisplayDate ? (
-                  // replace: true on nav — mirrors the day carousel's swipe-to-page
-                  // semantics (see DayView) so chevron taps and swipes leave the
-                  // same, single history entry per visit instead of chevron taps
-                  // alone stacking up a back-press-per-day trail. Label is just the
-                  // month (like month view's own PagedTopbar below) — the weekday
-                  // and day-of-month already show in DayPane's own corner badge.
-                  <PagedTopbar
-                    isMobile={isMobile}
-                    openSidebar={openSidebar}
-                    label={fmtTopBarMonth(dvDisplayDate, today)}
-                    prevLabel="Previous day"
-                    nextLabel="Next day"
-                    onPrev={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}
-                    onNext={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}
-                  />
-                ) : isWeekView && weekStartDate && weekDisplayStart && weekDisplayEnd ? (
-                  // replace: true on nav — mirrors the day/month carousels' swipe-to-page
-                  // semantics (see WeekView) so chevron taps and swipes leave the
-                  // same, single history entry per visit instead of chevron taps
-                  // alone stacking up a back-press-per-week trail. Label is just the
-                  // month of the week's first day, like Day/Month's own topbar —
-                  // the day-of-month range shows in WeekPane's own column badges.
-                  <PagedTopbar
-                    isMobile={isMobile}
-                    openSidebar={openSidebar}
-                    label={fmtTopBarMonth(weekDisplayStart, today)}
-                    prevLabel="Previous week"
-                    nextLabel="Next week"
-                    onPrev={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true })}
-                    onNext={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true })}
-                  />
-                ) : isMonthView && monthViewDate && monthDisplayDate ? (
-                  // replace: true on nav — mirrors the month carousel's swipe-to-page
-                  // semantics (see MonthView) so chevron taps and swipes leave
-                  // the same, single history entry per visit instead of chevron
-                  // taps alone stacking up a back-press-per-month trail.
-                  <PagedTopbar
-                    isMobile={isMobile}
-                    openSidebar={openSidebar}
-                    label={fmtTopBarMonth(monthDisplayDate, today)}
-                    prevLabel="Previous month"
-                    nextLabel="Next month"
-                    onPrev={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}
-                    onNext={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}
-                  />
-                ) : (
-                  <div className="flex flex-1 items-center gap-2 min-w-0" id="tbDefault">
-                    {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
-                    {/* flex-1 here (and on the row above) is load-bearing, not cosmetic: TopbarLabel's
-                        @container needs a size that comes from the flex algorithm's available-space
-                        distribution. A shrink-to-fit width (flex-basis: auto, sized from content) would
-                        collapse to 0 instead, because container-type: inline-size makes the browser
-                        disregard the label's own content when computing that shrink-to-fit size. */}
-                    <TopbarLabel long={topBarLabel} short={topBarLabelShort} className="flex-1 text-base text-foreground" />
-                  </div>
-                )
-              }
-              right={
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <ViewFilterButton />
-                  <SyncButton />
-                  {!isListView && (
-                    <IconButton variant="ghost" className="text-dim" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>
-                  )}
+          <TopbarShell
+            leftHasButton={isMobile}
+            left={
+              isDayView && dvDate && dvDisplayDate ? (
+                // replace: true on nav — mirrors the day carousel's swipe-to-page
+                // semantics (see DayView) so chevron taps and swipes leave the
+                // same, single history entry per visit instead of chevron taps
+                // alone stacking up a back-press-per-day trail. Label is just the
+                // month (like month view's own PagedTopbar below) — the weekday
+                // and day-of-month already show in DayPane's own corner badge.
+                <PagedTopbar
+                  isMobile={isMobile}
+                  openSidebar={openSidebar}
+                  label={fmtTopBarMonth(dvDisplayDate, today)}
+                  prevLabel="Previous day"
+                  nextLabel="Next day"
+                  onPrev={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}
+                  onNext={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}
+                />
+              ) : isWeekView && weekStartDate && weekDisplayStart && weekDisplayEnd ? (
+                // replace: true on nav — mirrors the day/month carousels' swipe-to-page
+                // semantics (see WeekView) so chevron taps and swipes leave the
+                // same, single history entry per visit instead of chevron taps
+                // alone stacking up a back-press-per-week trail. Label is just the
+                // month of the week's first day, like Day/Month's own topbar —
+                // the day-of-month range shows in WeekPane's own column badges.
+                <PagedTopbar
+                  isMobile={isMobile}
+                  openSidebar={openSidebar}
+                  label={fmtTopBarMonth(weekDisplayStart, today)}
+                  prevLabel="Previous week"
+                  nextLabel="Next week"
+                  onPrev={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true })}
+                  onNext={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true })}
+                />
+              ) : isMonthView && monthViewDate && monthDisplayDate ? (
+                // replace: true on nav — mirrors the month carousel's swipe-to-page
+                // semantics (see MonthView) so chevron taps and swipes leave
+                // the same, single history entry per visit instead of chevron
+                // taps alone stacking up a back-press-per-month trail.
+                <PagedTopbar
+                  isMobile={isMobile}
+                  openSidebar={openSidebar}
+                  label={fmtTopBarMonth(monthDisplayDate, today)}
+                  prevLabel="Previous month"
+                  nextLabel="Next month"
+                  onPrev={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}
+                  onNext={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}
+                />
+              ) : (
+                <div className="flex flex-1 items-center gap-2 min-w-0" id="tbDefault">
+                  {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
+                  {/* flex-1 here (and on the row above) is load-bearing, not cosmetic: TopbarLabel's
+                      @container needs a size that comes from the flex algorithm's available-space
+                      distribution. A shrink-to-fit width (flex-basis: auto, sized from content) would
+                      collapse to 0 instead, because container-type: inline-size makes the browser
+                      disregard the label's own content when computing that shrink-to-fit size. */}
+                  <TopbarLabel long={topBarLabel} short={topBarLabelShort} className="flex-1 text-base text-foreground" />
                 </div>
-              }
-            />
-          )}
+              )
+            }
+            right={
+              <div className="flex items-center gap-0.5 shrink-0">
+                <ViewFilterButton />
+                <SyncButton />
+                {!isListView && (
+                  <IconButton variant="ghost" className="text-dim" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>
+                )}
+              </div>
+            }
+          />
         </header>
 
         <section className="flex flex-1 flex-col overflow-hidden min-h-0" data-shell-pane="col">
           <Outlet />
         </section>
 
-        {!isEntryView && <SearchBar />}
+        <SearchBar />
       </div>
 
       <CoachTour
         setSidebarOpen={setSidebarOpen}
         navigateHome={navigateHome}
       />
-    </TopbarSlotContext>
+    </>
   )
 }
