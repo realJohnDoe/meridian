@@ -1,4 +1,4 @@
-import { useMemo, useLayoutEffect, useRef, useState, useCallback, type MouseEvent } from 'react'
+import { useMemo, useState } from 'react'
 import { differenceInCalendarDays } from 'date-fns'
 import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
@@ -7,7 +7,6 @@ import { fmtT, fmtISO, parseDurationDays } from '@/model'
 import { sameDay, fmtShort } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
-import { occRadius } from '@/components/primitives/occurrence-variants'
 import { OccurrencePill } from './OccurrencePill'
 import { AllDayOverflowToggle, ALL_DAY_THRESHOLD } from './AllDayOverflowToggle'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
@@ -19,10 +18,8 @@ import { computeMultidayLanes, compactRowLanes } from './computeMultidayLanes'
 import { TimedBlock } from './TimedBlock'
 import { BADGE_CLASS } from './MonthGrid'
 import { weekDays, weekContains, weekNumberFor } from './weekRange'
-import {
-  HOURS, HP, GUTTER, COL_RIGHT_PAD, TOP_PAD, BOTTOM_PAD, DEFAULT_CREATE_DURATION,
-  formatHourBoundary, snapCreateTime,
-} from './timelineGeometry'
+import { GUTTER, COL_RIGHT_PAD } from './timelineGeometry'
+import { TimelineScroller, HourCells, NowLine } from './timelineScaffold'
 
 // Fixed row height for the all-day strip's bars/pills — unlike MonthGrid's
 // rowH (measured via ResizeObserver so it can track responsive font/padding
@@ -202,34 +199,6 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
 
   const [allDayExpanded, setAllDayExpanded] = useState(false)
 
-  const scRef = useRef<HTMLDivElement | null>(null)
-  const setScrollerRef = useCallback((el: HTMLDivElement | null) => {
-    scRef.current = el
-    registerScroller(weekStartKey, el)
-  }, [weekStartKey, registerScroller])
-
-  // Seeds this pane's scroll position from the carousel's shared vertical
-  // offset — see DayPane's own mount effect for the full rationale, mirrored
-  // here verbatim.
-  const getInitialScrollTopRef = useRef(getInitialScrollTop)
-  useLayoutEffect(() => {
-    const el = scRef.current
-    if (!el) return
-    el.scrollTop = getInitialScrollTopRef.current()
-  }, [])
-
-  // minutesWithinHour is 0 for keyboard-triggered activation (Enter/Space on
-  // the hour button) — see DayPane's own createAt for the full rationale.
-  const createAt = (day: Date, h: number, minutesWithinHour: number) => {
-    onCreate?.(day, snapCreateTime(h, minutesWithinHour), DEFAULT_CREATE_DURATION)
-  }
-
-  const handleHourClick = (day: Date, h: number) => (e: MouseEvent<HTMLButtonElement>) => {
-    if (e.detail === 0) { createAt(day, h, 0); return }
-    const rect = e.currentTarget.getBoundingClientRect()
-    createAt(day, h, ((e.clientY - rect.top) / HP) * 60)
-  }
-
   // Chevrons show at every viewport width here, unlike MonthGrid's bars
   // (which hide them below `sm:`). A month cell is a fixed 1/7 width no
   // matter the span, and its bar competes with the day's own chips for a few
@@ -382,82 +351,59 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
         </div>
       )}
 
-      {/* Scrollable timeline. pb-5 (20px) matches the search-bar gradient
-          height so the 24:00 boundary can scroll clear of the overlaid fade
-          — mirrors DayPane. */}
-      <div
-        className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch] relative pb-5"
-        ref={setScrollerRef}
-        onScroll={e => onVerticalScroll(weekStartKey, e.currentTarget.scrollTop)}
+      {/* Scrollable timeline — the scroller, canvas and hour labels are the
+          scaffold DayPane shares; what differs is only what's positioned
+          against the canvas below. */}
+      <TimelineScroller
+        paneKey={weekStartKey}
+        registerScroller={registerScroller}
+        onVerticalScroll={onVerticalScroll}
+        getInitialScrollTop={getInitialScrollTop}
+        hour12={hour12}
       >
-        <div className="relative" style={{ height: HOURS * HP + TOP_PAD + BOTTOM_PAD }}>
+        {/* Day columns — each one is its own positioning context for its
+            hour cells and event blocks, so TimedBlock's column-relative
+            geometry needs no shared gutter-inset wrapper the way DayPane's
+            does (there, "columns" are overlapping events within one day;
+            here they're the days themselves). That's also why HourCells and
+            NowLine are repeated seven times here and rendered once there. */}
+        <div className="absolute inset-y-0 flex gap-0.5 divide-x divide-border/60" style={{ left: GUTTER, right: COL_RIGHT_PAD }}>
+          {days.map(d => {
+            const dKey = fmtISO(d)
+            const isToday = sameDay(d, today)
+            const cols = colsByDay.get(dKey) ?? []
+            return (
+              <div key={dKey} className="relative flex-1 min-w-0">
+                <HourCells
+                  date={d}
+                  hour12={hour12}
+                  onCreate={onCreate}
+                  hourAriaLabel={t => `Create event on ${fmtShort(d)} at ${t}`}
+                />
 
-          {/* Hour-boundary labels (0:00 … 24:00) */}
-          {Array.from({ length: HOURS + 1 }, (_, h) => h).map(h => (
-            <span
-              key={h}
-              className="absolute text-2xs font-mono text-muted-foreground text-right"
-              style={{ top: h * HP + TOP_PAD, left: 0, width: GUTTER - 8, transform: 'translateY(-50%)' }}
-            >
-              {formatHourBoundary(h, hour12)}
-            </span>
-          ))}
+                {/* Current-time indicator, scoped to today's own column —
+                    the default full span of whatever container it sits in,
+                    which here is one day column rather than DayPane's canvas. */}
+                {isToday && <NowLine now={now} />}
 
-          {/* Day columns — each one is its own positioning context for its
-              hour cells and event blocks, so TimedBlock's column-relative
-              geometry needs no shared gutter-inset wrapper the way DayPane's
-              does (there, "columns" are overlapping events within one day;
-              here they're the days themselves). */}
-          <div className="absolute inset-y-0 flex gap-0.5 divide-x divide-border/60" style={{ left: GUTTER, right: COL_RIGHT_PAD }}>
-            {days.map(d => {
-              const dKey = fmtISO(d)
-              const isToday = sameDay(d, today)
-              const cols = colsByDay.get(dKey) ?? []
-              return (
-                <div key={dKey} className="relative flex-1 min-w-0">
-                  {/* Hour cells — one button per hour; click/tap or Enter/Space creates an event there */}
-                  {Array.from({ length: HOURS }, (_, h) => h).map(h => (
-                    <button
-                      key={h}
-                      type="button"
-                      className={cn(occRadius, 'absolute inset-x-0 bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}
-                      style={{ top: h * HP + TOP_PAD + 1, height: HP - 2 }}
-                      onClick={handleHourClick(d, h)}
-                      aria-label={`Create event on ${fmtShort(d)} at ${formatHourBoundary(h, hour12)}`}
-                    />
-                  ))}
-
-                  {/* Current-time indicator, scoped to today's own column
-                      (not the .now-line default full-width span — left/right
-                      overridden inline to size to this column instead) */}
-                  {isToday && (() => {
-                    const nh = now.getHours() + now.getMinutes() / 60
-                    return (
-                      <div className="now-line" style={{ top: nh * HP + TOP_PAD, left: 0, right: 0 }}>
-                        <div className="now-dot" />
-                      </div>
-                    )
-                  })()}
-
-                  {/* Timed event blocks for this day */}
-                  {cols.flat().map(({ occ, dh, colIndex, totalCols }) => (
-                    <TimedBlock
-                      key={occ.id}
-                      o={occ}
-                      dh={dh}
-                      colIndex={colIndex}
-                      totalCols={totalCols}
-                      hour12={hour12}
-                      onOpen={onOpen}
-                      compact
-                    />
-                  ))}
-                </div>
-              )
-            })}
-          </div>
+                {/* Timed event blocks for this day */}
+                {cols.flat().map(({ occ, dh, colIndex, totalCols }) => (
+                  <TimedBlock
+                    key={occ.id}
+                    o={occ}
+                    dh={dh}
+                    colIndex={colIndex}
+                    totalCols={totalCols}
+                    hour12={hour12}
+                    onOpen={onOpen}
+                    compact
+                  />
+                ))}
+              </div>
+            )
+          })}
         </div>
-      </div>
+      </TimelineScroller>
     </>
   )
 }

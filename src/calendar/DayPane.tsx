@@ -1,4 +1,4 @@
-import { useMemo, useLayoutEffect, useRef, useState, useCallback, type MouseEvent } from 'react'
+import { useMemo, useState } from 'react'
 import { startOfDay } from 'date-fns'
 import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
@@ -7,7 +7,6 @@ import { multidayDisplayTitle, fmtT, parseDateString, parseDurationDays } from '
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
-import { occRadius } from '@/components/primitives/occurrence-variants'
 import { OccurrencePill } from './OccurrencePill'
 import { AllDayOverflowToggle } from './AllDayOverflowToggle'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
@@ -17,10 +16,8 @@ import { useNow } from './useNow'
 import { computeColumns } from './computeColumns'
 import { TimedBlock } from './TimedBlock'
 import { DayBadge } from './DayBadge'
-import {
-  HOURS, HP, GUTTER, RIGHT_PAD, TOP_PAD, BOTTOM_PAD, DEFAULT_CREATE_DURATION,
-  formatHourBoundary, snapCreateTime,
-} from './timelineGeometry'
+import { GUTTER, RIGHT_PAD } from './timelineGeometry'
+import { TimelineScroller, HourCells, NowLine } from './timelineScaffold'
 
 // Google Calendar's day view always keeps 2 all-day rows visible (even when
 // empty) and only switches to a "+N" label once a 3rd item shows up — a
@@ -107,35 +104,6 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
     return { allDay, cols: computeColumns(timed) }  // cols: LayoutEvent[][]
   }, [dvOccs, clockValue])
 
-  const scRef = useRef<HTMLDivElement | null>(null)
-  const setScrollerRef = useCallback((el: HTMLDivElement | null) => {
-    scRef.current = el
-    registerScroller(dateKey, el)
-  }, [dateKey, registerScroller])
-
-  // Seeds this pane's scroll position from the carousel's shared vertical
-  // offset (7am by default, or wherever the user last scrolled) instead of
-  // always resetting to 7am — this is what makes the position carry across a
-  // swipe: a pane sliding in from off-screen already starts here, and a pane
-  // reused via keyed reconciliation just keeps its own scrollTop untouched.
-  // Runs before paint so there's no visible jump, replacing the old fixed
-  // 50ms-then-scrollTo timer (which only ever ran once per date, always
-  // resetting to 7am — the deliberate behaviour change here is that scroll
-  // position now persists across day navigation instead).
-  // Mount-only: this pane's scroll position is then owned by the user/the
-  // cross-pane mirror in DayView, not by getInitialScrollTop changing later.
-  // Held in a ref rather than declared via an exhaustive-deps suppression —
-  // useRef keeps the mount-time value and nothing else, which is the same
-  // semantics, and it keeps DayPane eligible for the React Compiler (a single
-  // react-hooks suppression anywhere in a component opts the whole component
-  // out of compilation).
-  const getInitialScrollTopRef = useRef(getInitialScrollTop)
-  useLayoutEffect(() => {
-    const el = scRef.current
-    if (!el) return
-    el.scrollTop = getInitialScrollTopRef.current()
-  }, [])
-
   const isToday   = sameDay(dvDate, today)
 
   const dvMidnight = startOfDay(dvDate)
@@ -149,21 +117,6 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
   const allDayOverflowing = allDay.length > ALL_DAY_VISIBLE_ROWS + 1
   const shownAllDayCount = allDayOverflowing ? ALL_DAY_VISIBLE_ROWS : allDay.length
   const hiddenCount = allDay.length - shownAllDayCount
-
-  // minutesWithinHour is 0 for keyboard-triggered activation (Enter/Space on
-  // the hour button), since there's no pointer position to derive it from —
-  // that lands the new event at the hour boundary, which is a sensible default.
-  const createAt = (h: number, minutesWithinHour: number) => {
-    onCreate?.(dvDate, snapCreateTime(h, minutesWithinHour), DEFAULT_CREATE_DURATION)
-  }
-
-  const handleHourClick = (h: number) => (e: MouseEvent<HTMLButtonElement>) => {
-    // e.detail === 0 for a keyboard-activated click (Enter/Space) — no
-    // pointer position to read, so fall back to the top of the hour.
-    if (e.detail === 0) { createAt(h, 0); return }
-    const rect = e.currentTarget.getBoundingClientRect()
-    createAt(h, ((e.clientY - rect.top) / HP) * 60)
-  }
 
   return (
     <>
@@ -227,73 +180,56 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
         </div>
       </div>
 
-      {/* Scrollable timeline. pb-5 (20px) matches the search-bar gradient
-          height so the 24:00 boundary can scroll clear of the overlaid fade. */}
-      <div
-        className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch] relative pb-5"
-        ref={setScrollerRef}
-        onScroll={e => onVerticalScroll(dateKey, e.currentTarget.scrollTop)}
+      {/* Scrollable timeline — the scroller, canvas and hour labels are the
+          scaffold WeekPane shares; what differs is only what's positioned
+          against the canvas below. */}
+      <TimelineScroller
+        paneKey={dateKey}
+        registerScroller={registerScroller}
+        onVerticalScroll={onVerticalScroll}
+        getInitialScrollTop={getInitialScrollTop}
+        hour12={hour12}
       >
-        <div className="relative" style={{ height: HOURS * HP + TOP_PAD + BOTTOM_PAD }}>
-
-          {/* Hour-boundary labels (0:00 … 24:00) */}
-          {Array.from({ length: HOURS + 1 }, (_, h) => h).map(h => (
-            <span
-              key={h}
-              className="absolute text-2xs font-mono text-muted-foreground text-right"
-              style={{ top: h * HP + TOP_PAD, left: 0, width: GUTTER - 8, transform: 'translateY(-50%)' }}
-            >
-              {formatHourBoundary(h, hour12)}
-            </span>
-          ))}
-
-          {/* Hour cells — one button per hour; click/tap or Enter/Space creates an event there */}
-          <div className="absolute inset-y-0" style={{ left: GUTTER, right: RIGHT_PAD }}>
-            {Array.from({ length: HOURS }, (_, h) => h).map(h => (
-              <button
-                key={h}
-                type="button"
-                className={cn(occRadius, 'absolute inset-x-0 bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}
-                style={{ top: h * HP + TOP_PAD + 1, height: HP - 2 }}
-                onClick={handleHourClick(h)}
-                aria-label={`Create event at ${formatHourBoundary(h, hour12)}`}
-              />
-            ))}
-          </div>
-
-          {/* Current-time indicator */}
-          {isToday && (() => {
-            const nh = now.getHours() + now.getMinutes() / 60
-            return (
-              <div className="now-line" style={{ top: nh * HP + TOP_PAD }}>
-                <div className="now-dot" />
-              </div>
-            )
-          })()}
-
-          {/* Timed event blocks. Same gutter/right-pad inset as the hour
-              cells above, so TimedBlock's column geometry is relative to
-              this container rather than the whole pane — kept as its own
-              sibling (not nested inside the hour-cells div above) so DOM/
-              paint order is unchanged from before this container existed.
-              pointer-events-none so empty timeline space still click-creates
-              through to the hour-cell button beneath; TimedBlock opts itself
-              back in with pointer-events-auto. */}
-          <div className="absolute inset-y-0 pointer-events-none" style={{ left: GUTTER, right: RIGHT_PAD }}>
-            {cols.flat().map(({ occ, dh, colIndex, totalCols }) => (
-              <TimedBlock
-                key={occ.id}
-                o={occ}
-                dh={dh}
-                colIndex={colIndex}
-                totalCols={totalCols}
-                hour12={hour12}
-                onOpen={onOpen}
-              />
-            ))}
-          </div>
+        {/* Hour cells. A single column spanning the whole pane, inset past the
+            label gutter — unlike WeekPane, which repeats HourCells once per
+            day column. */}
+        <div className="absolute inset-y-0" style={{ left: GUTTER, right: RIGHT_PAD }}>
+          <HourCells
+            date={dvDate}
+            hour12={hour12}
+            onCreate={onCreate}
+            hourAriaLabel={t => `Create event at ${t}`}
+          />
         </div>
-      </div>
+
+        {/* Current-time indicator. Hung off the canvas rather than the
+            hour-cell container above, so it keeps running the extra RIGHT_PAD
+            to the pane's edge (left={GUTTER}, right 0) — WeekPane's is scoped
+            to one day column instead and takes the default full span. */}
+        {isToday && <NowLine now={now} left={GUTTER} />}
+
+        {/* Timed event blocks. Same gutter/right-pad inset as the hour
+            cells above, so TimedBlock's column geometry is relative to
+            this container rather than the whole pane — kept as its own
+            sibling (not nested inside the hour-cells div above) so DOM/
+            paint order is unchanged from before this container existed.
+            pointer-events-none so empty timeline space still click-creates
+            through to the hour-cell button beneath; TimedBlock opts itself
+            back in with pointer-events-auto. */}
+        <div className="absolute inset-y-0 pointer-events-none" style={{ left: GUTTER, right: RIGHT_PAD }}>
+          {cols.flat().map(({ occ, dh, colIndex, totalCols }) => (
+            <TimedBlock
+              key={occ.id}
+              o={occ}
+              dh={dh}
+              colIndex={colIndex}
+              totalCols={totalCols}
+              hour12={hour12}
+              onOpen={onOpen}
+            />
+          ))}
+        </div>
+      </TimelineScroller>
     </>
   )
 }
