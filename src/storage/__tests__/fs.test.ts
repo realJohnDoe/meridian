@@ -136,6 +136,32 @@ describe('diskWrite — CAS', () => {
     expect(dh.files.get('note.md')!.content).toBe('v2')
     expect(v2).toBeDefined()
   })
+
+  it('detects a same-mtime same-size content swap that mtime:size would miss', async () => {
+    // The motivating case: a file-sync client (Dropbox/iCloud/Syncthing,
+    // `rsync -t`) lands another device's content under the source's original
+    // mtime. Same length, same millisecond stamp, different bytes.
+    const seeded = { content: 'aaaa', lastModified: 1000 }
+    const dh = makeHandle({ 'note.md': seeded })
+    const version = (await diskStatAll(dh)).get('note.md')!
+
+    dh.files.set('note.md', { content: 'bbbb', lastModified: seeded.lastModified })
+
+    await expect(diskWrite(dh, 'note.md', 'local edit', version))
+      .rejects.toBeInstanceOf(ConflictError)
+    expect(dh.files.get('note.md')!.content).toBe('bbbb')
+  })
+
+  it('adopts a legacy mtime:size token when the file is unchanged since it was cached', async () => {
+    const seeded = { content: 'v1', lastModified: 1000 }
+    const dh = makeHandle({ 'note.md': seeded })
+    const legacyToken = tokenOf(seeded)  // shape a pre-upgrade Dexie row would carry
+
+    const version = await diskWrite(dh, 'note.md', 'v2', legacyToken)
+
+    expect(dh.files.get('note.md')!.content).toBe('v2')
+    expect(version).toMatch(/^[0-9a-f]{64}$/)  // hands back a hash-shaped token
+  })
 })
 
 // ── delete ─────────────────────────────────────────────────────

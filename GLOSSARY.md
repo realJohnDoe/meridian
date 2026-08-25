@@ -250,7 +250,7 @@ longer matches what the writer saw.
 
 ### base version / base content
 Two halves of the same ancestor, on one dirty cache record. The **base
-version** is the backend's opaque token (GitHub blob SHA, FS `mtime:size`) —
+version** is the backend's opaque token (GitHub blob SHA, FS content hash) —
 enough to detect that the remote drifted. The **base content** is the file at
 that token — enough to work out *what* each side changed, which is what a
 three-way merge needs and a version token alone can never supply. Kept on
