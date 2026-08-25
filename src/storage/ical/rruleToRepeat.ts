@@ -113,6 +113,9 @@ function endOf(parts: RRuleParts): Repeat['end'] | undefined {
 /** Parts that carry real meaning and that Meridian has no way to express. */
 const UNSUPPORTED_PARTS = ['BYYEARDAY', 'BYWEEKNO', 'BYHOUR', 'BYMINUTE', 'BYSECOND', 'BYEASTER']
 
+/** The months a yearly rule spans when it names none but does name a day. */
+const ALL_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
 /**
  * Map an RRULE onto a `Repeat` when the two engines agree, otherwise expand it.
  *
@@ -149,6 +152,15 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
   const bySetPos = intList(parts['BYSETPOS'])
   if (!bySetPos) return null
 
+  // `bymonth` is a *set* of calendar months to both engines, so the order a
+  // feed happens to list them in carries no meaning — normalising here keeps
+  // the value stable across an import/export/import cycle. A month outside
+  // 1–12 is not a rule either engine can act on, so it goes to expansion
+  // rather than being silently dropped from the set.
+  if (byMonth.some(m => m < 1 || m > 12)) return null
+  const months = [...new Set(byMonth)].sort((a, b) => a - b)
+  const monthPart = months.length > 0 ? { bymonth: months } : {}
+
   const end = endOf(parts)
   // A COUNT/UNTIL the parser could not read must not become an endless series.
   if (parts['COUNT'] !== undefined && end?.type !== 'count') return null
@@ -158,30 +170,35 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
 
   if (freq === 'daily') {
     // Meridian's daily branch emits exactly one date per period; a BYDAY or
-    // BYMONTHDAY filter on top of it has no representation.
-    return byDay.length === 0 && byMonthDay.length === 0 && bySetPos.length === 0 && byMonth.length === 0
-      ? base
-      : null
+    // BYMONTHDAY filter on top of it has no representation. BYMONTH is the
+    // exception: it limits a daily rule to the months it names in both
+    // engines alike (RFC 5545 §3.3.10), which is what `bymonth` does at every
+    // frequency below yearly.
+    if (byDay.length > 0 || byMonthDay.length > 0 || bySetPos.length > 0) return null
+    return { ...base, ...monthPart }
   }
 
   if (freq === 'weekly') {
-    if (byMonthDay.length > 0 || bySetPos.length > 0 || byMonth.length > 0) return null
-    if (byDay.length === 0) return base
+    if (byMonthDay.length > 0 || bySetPos.length > 0) return null
+    if (byDay.length === 0) return { ...base, ...monthPart }
     if (byDay.some(d => d.ordinal !== undefined)) return null // `2FR` is meaningless weekly
     if (!weeklyWindowsAgree(byDay, parts, anchor, interval)) return null
-    return { ...base, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d) }
+    // BYMONTH limits which of the selected days survive; it cannot move the
+    // 7-day windows themselves, so `weeklyWindowsAgree` above still decides.
+    return { ...base, ...monthPart, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d) }
   }
 
   if (freq === 'monthly') {
-    if (byMonth.length > 0) return null
     if (byDay.length === 0) {
-      // Plain "same day-of-month", optionally listing that day explicitly.
-      // Negative days (`-1` = last day of the month) have no representation:
-      // Meridian's bymonthday is a literal day number.
+      // Plain "same day-of-month", optionally listing the days explicitly.
+      // Negative days carry across as they are written: `resolveMonthDay` in
+      // the engine and `monthDaysIn` in the walk below both count back from
+      // the end of each month, so `-1` is the last day to either of them. Day
+      // 0 does not exist, and a magnitude past 31 names no day in any month.
       if (bySetPos.length > 0) return null
-      if (byMonthDay.length === 0) return base
-      if (byMonthDay.some(d => d < 1 || d > 31)) return null
-      return { ...base, bymonthday: byMonthDay }
+      if (byMonthDay.length === 0) return { ...base, ...monthPart }
+      if (byMonthDay.some(d => d === 0 || d < -31 || d > 31)) return null
+      return { ...base, ...monthPart, bymonthday: byMonthDay }
     }
     if (byMonthDay.length > 0) return null
 
@@ -194,23 +211,81 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
       if (bySetPos.length > 0 || ordinals.size > 1 || byDay.some(d => d.ordinal === undefined)) return null
       const [pos] = [...ordinals]
       if (pos === undefined || pos === 0) return null
-      return { ...base, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: pos }
+      // The two spellings coincide only for a single weekday. `BYDAY=1MO,1FR`
+      // is the first Monday *and* the first Friday — two dates a month —
+      // whereas one `bysetpos` over the pair's combined candidate list picks
+      // whichever of them falls earlier, and only that one.
+      if (byDay.length > 1) return null
+      return { ...base, ...monthPart, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: pos }
     }
     if (bySetPos.length === 0) return null
     if (bySetPos.some(p => p === 0)) return null
     const positions = bySetPos.length === 1 ? bySetPos[0]! : bySetPos
-    return { ...base, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: positions }
+    return { ...base, ...monthPart, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: positions }
   }
 
-  // Yearly: the engine repeats the anchor's own month and day, and reads no
-  // BY* part at all. So the rule is only representable when its BY* parts say
-  // exactly that — otherwise `BYMONTH=3;BYDAY=2SU` would come out as "the
-  // anchor's date, annually", which is a different day most years.
-  if (byDay.length > 0 || bySetPos.length > 0) return null
-  if (byMonth.length > 1 || byMonthDay.length > 1) return null
-  if (byMonth.length === 1 && byMonth[0] !== anchor.getMonth() + 1) return null
-  if (byMonthDay.length === 1 && byMonthDay[0] !== anchor.getDate()) return null
-  return base
+  // Yearly. The engine expands over the months `bymonth` names and fills each
+  // with the same selection a monthly rule would make (`monthCandidates`,
+  // `model/expansion.ts`). That covers most of what the RFC's yearly branch
+  // does, and the places it doesn't are the declines below.
+  const namesADay = byDay.length > 0 || byMonthDay.length > 0
+
+  // With no BYMONTH the engine reads a day-naming part inside the anchor's own
+  // month, while §3.3.10 spreads it over all twelve. Stating the twelve makes
+  // the two agree; it is a faithful reading of the rule, and a far smaller
+  // thing to write into a vault file than the several hundred dates bounded
+  // expansion would put in `instances:`. With nothing naming a day, both
+  // engines fall back to the anchor's own month and no list is needed.
+  const yearMonths = months.length > 0 ? months : namesADay ? ALL_MONTHS : []
+  const yearMonthPart = yearMonths.length > 0 ? { bymonth: yearMonths } : {}
+
+  if (!namesADay) {
+    // A BYSETPOS with nothing to pick from selects nothing at all, which is
+    // not what the engine would do with the rule.
+    if (bySetPos.length > 0) return null
+    return { ...base, ...yearMonthPart }
+  }
+
+  if (byMonthDay.length > 0) {
+    // The engine reads `bymonthday` first and treats a `byweekday` beside it
+    // as dead data, where the RFC intersects the two. Claim the pair only when
+    // BYMONTHDAY stands alone; negatives resolve per month exactly as they do
+    // monthly.
+    if (byDay.length > 0 || bySetPos.length > 0) return null
+    if (byMonthDay.some(d => d === 0 || d < -31 || d > 31)) return null
+    return { ...base, ...yearMonthPart, bymonthday: byMonthDay }
+  }
+
+  const yearOrdinals = new Set(byDay.map(d => d.ordinal).filter((o): o is number => o !== undefined))
+  if (yearOrdinals.size > 0) {
+    // `BYMONTH=11;BYDAY=4TH` — §3.3.10 resolves an ordinal BYDAY within each
+    // named month when BYMONTH is present, which is exactly the engine's
+    // per-month `bysetpos`. Without BYMONTH the same ordinal counts within the
+    // *year* ("the 20th Monday"), which the engine has no way to say — and
+    // which `expandRRule` gets wrong too, resolving it per month, so the
+    // round-trip test would agree with itself rather than with the RFC.
+    if (months.length === 0) return null
+    if (bySetPos.length > 0 || yearOrdinals.size > 1 || byDay.some(d => d.ordinal === undefined)) return null
+    const [pos] = [...yearOrdinals]
+    if (pos === undefined || pos === 0) return null
+    // As monthly: one ordinal distributes over each named weekday separately,
+    // one `bysetpos` picks from their combined list. Equal for one weekday.
+    if (byDay.length > 1) return null
+    return { ...base, ...yearMonthPart, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: pos }
+  }
+
+  // A plain BYDAY with no position is every matching weekday of the month to
+  // the RFC, and dead data to the engine's yearly arm — it would fall through
+  // to the anchor's day-of-month.
+  if (bySetPos.length === 0) return null
+  if (bySetPos.some(p => p === 0)) return null
+  // BYSETPOS picks once per *period*, and a yearly period is the whole year;
+  // the engine picks once per month. The two coincide only when the year holds
+  // a single month. `BYMONTH=3,9;BYDAY=MO;BYSETPOS=1` is the first Monday of
+  // March alone to the RFC, and of both months to the engine.
+  if (yearMonths.length !== 1) return null
+  const yearPositions = bySetPos.length === 1 ? bySetPos[0]! : bySetPos
+  return { ...base, ...yearMonthPart, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: yearPositions }
 }
 
 /**

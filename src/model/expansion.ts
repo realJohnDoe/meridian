@@ -231,7 +231,7 @@ function generateScheduledDates(
   from: Date,
   to: Date,
 ): Date[] {
-  const { freq, byweekday, bymonthday, bysetpos, interval = 1, end } = sched
+  const { freq, byweekday, bymonthday, bymonth, bysetpos, interval = 1, end } = sched
   const results: Date[] = []
   // `end.time` only ever accompanies `end.date` — it names an instant within
   // that day, not a bound on its own.
@@ -247,12 +247,24 @@ function generateScheduledDates(
     return r
   }
 
+  // The next period's start: a day, a 7-day window opening on the anchor's
+  // weekday, a calendar month, or a calendar year.
+  //
+  // Yearly normalises to January 1 rather than keeping the anchor's month.
+  // Before `bymonth` the two were interchangeable — a yearly rule placed its
+  // date in the anchor's own month, so the cursor and the date it produced sat
+  // in the same month and the walk's bounds could not disagree with the dates.
+  // `bymonth` breaks that: a cursor on the anchor's August with `bymonth: [3]`
+  // produces a March date *outside* the window the walk thinks it is visiting,
+  // and the `to`-side stop below would drop the last one. Which years the rule
+  // selects is unchanged either way — `periodsBetween` has always counted them
+  // with `getFullYear()`.
   function nextBase(d: Date): Date {
     const n = new Date(d)
     if (freq === 'daily')        n.setDate(n.getDate() + interval)
     else if (freq === 'weekly')  n.setDate(n.getDate() + 7 * interval)
     else if (freq === 'monthly') { n.setDate(1); n.setMonth(n.getMonth() + interval) }
-    else                         { n.setDate(1); n.setFullYear(n.getFullYear() + interval) }
+    else                         { n.setMonth(0, 1); n.setFullYear(n.getFullYear() + interval) }
     return n
   }
 
@@ -276,8 +288,73 @@ function generateScheduledDates(
     if (freq === 'daily')        n.setDate(n.getDate() + interval * steps)
     else if (freq === 'weekly')  n.setDate(n.getDate() + 7 * interval * steps)
     else if (freq === 'monthly') { n.setDate(1); n.setMonth(n.getMonth() + interval * steps) }
-    else                         { n.setDate(1); n.setFullYear(n.getFullYear() + interval * steps) }
+    else                         { n.setMonth(0, 1); n.setFullYear(n.getFullYear() + interval * steps) }
     return n
+  }
+
+  /**
+   * The months `bymonth` names, 0-indexed — `null` when it names none, which
+   * is what every rule already on disk carries.
+   *
+   * Out-of-range entries are dropped rather than clamped, on the same footing
+   * as an unresolvable `bymonthday`: `repeat:` reaches the engine through an
+   * unchecked cast, so a rule naming only impossible months matches nothing
+   * rather than quietly being read as some other rule.
+   */
+  const monthSet = bymonth?.length
+    ? new Set(bymonth.filter(m => Number.isInteger(m) && m >= 1 && m <= 12).map(m => m - 1))
+    : null
+
+  /**
+   * The days one calendar month contributes: `bymonthday` if it names any,
+   * else `byweekday` + `bysetpos`, else the anchor's own day-of-month.
+   *
+   * This is the monthly branch's selection, lifted out so the yearly branch is
+   * the same choice applied to each month `bymonth` names. That reuse is what
+   * fixes `bysetpos` to a *per-month* reading at yearly frequency: `bymonth:
+   * [3, 9]` + `byweekday: ['mo']` + `bysetpos: 1` is the first Monday of March
+   * *and* of September, not the first among the two months' Mondays together.
+   * RFC 5545 spells that reading `BYDAY=1MO` (§3.3.10: an ordinal `BYDAY` under
+   * `FREQ=YEARLY;BYMONTH=...` counts within the month), so it is expressible —
+   * but its own `BYSETPOS` applies once per period, which for yearly is the
+   * whole year. The two therefore part company on a multi-month rule carrying
+   * a combined position, and only there; `storage/ical/` states the anchor's
+   * month explicitly and declines that one shape rather than mistranslating it.
+   */
+  function monthCandidates(year: number, month: number): Date[] {
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const out: Date[] = []
+    if (bymonthday && bymonthday.length) {
+      for (const mday of bymonthday) {
+        const resolved = resolveMonthDay(mday, daysInMonth)
+        // A day-of-month that doesn't exist in this month (e.g. 31 in April,
+        // or -32) is skipped rather than overflowing into another month.
+        if (resolved < 1 || resolved > daysInMonth) continue
+        out.push(new Date(year, month, resolved))
+      }
+    } else if (byweekday && byweekday.length && bysetpos !== undefined) {
+      const candidates: Date[] = []
+      const targetDays = byweekday.map(d => WDAYS_MAP[d.toLowerCase()] ?? 0)
+      for (let day = 1; day <= daysInMonth; day++) {
+        const d2 = new Date(year, month, day)
+        if (targetDays.includes(d2.getDay())) candidates.push(d2)
+      }
+      const positions = Array.isArray(bysetpos) ? bysetpos : [bysetpos]
+      const picked = new Set<number>()
+      for (const setpos of positions) {
+        const idx = setpos < 0 ? candidates.length + setpos : setpos - 1
+        const candidate = candidates[idx]
+        if (candidate) picked.add(candidate.getTime())
+      }
+      for (const t of [...picked].sort((a, b) => a - b)) out.push(new Date(t))
+    } else {
+      // Nothing names a day, so the month repeats the anchor's own
+      // day-of-month; a month too short to hold it is skipped instead of
+      // overflowing into the next month's 1st. At yearly frequency this is
+      // also what makes a Feb 29 anchor land only in leap years.
+      if (anchor.getDate() <= daysInMonth) out.push(new Date(year, month, anchor.getDate()))
+    }
+    return out
   }
 
   function matchesInPeriod(periodStart: Date): Date[] {
@@ -293,10 +370,10 @@ function generateScheduledDates(
           const daysInMonth = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0).getDate()
           return resolveMonthDay(mday, daysInMonth) === periodStart.getDate()
         })
-      if (passesWeekday && passesMonthday) dates.push(withTime(periodStart))
+      if (passesWeekday && passesMonthday) dates.push(periodStart)
     } else if (freq === 'weekly') {
       if (!byweekday || !byweekday.length) {
-        dates.push(withTime(periodStart))
+        dates.push(periodStart)
       } else {
         // The period is the 7 days starting at `periodStart`, which always
         // falls on the ANCHOR's weekday (the cursor only ever moves in whole
@@ -323,52 +400,26 @@ function generateScheduledDates(
           const target = WDAYS_MAP[dStr.toLowerCase()] ?? 0
           const dayCandidate = new Date(periodStart)
           dayCandidate.setDate(periodStart.getDate() + (target - anchorDow + 7) % 7)
-          dates.push(withTime(dayCandidate))
+          dates.push(dayCandidate)
         }
       }
     } else if (freq === 'monthly') {
-      const year = periodStart.getFullYear(), month = periodStart.getMonth()
-      const daysInMonth = new Date(year, month + 1, 0).getDate()
-      if (bymonthday && bymonthday.length) {
-        for (const mday of bymonthday) {
-          const resolved = resolveMonthDay(mday, daysInMonth)
-          // A day-of-month that doesn't exist in this month (e.g. 31 in April,
-          // or -32) is skipped rather than overflowing into another month.
-          if (resolved < 1 || resolved > daysInMonth) continue
-          dates.push(withTime(new Date(year, month, resolved)))
-        }
-      } else if (byweekday && byweekday.length && bysetpos !== undefined) {
-        const candidates: Date[] = []
-        const targetDays = byweekday.map(d => WDAYS_MAP[d.toLowerCase()] ?? 0)
-        for (let day = 1; day <= daysInMonth; day++) {
-          const d2 = new Date(year, month, day)
-          if (targetDays.includes(d2.getDay())) candidates.push(d2)
-        }
-        const positions = Array.isArray(bysetpos) ? bysetpos : [bysetpos]
-        const picked = new Set<number>()
-        for (const setpos of positions) {
-          const idx = setpos < 0 ? candidates.length + setpos : setpos - 1
-          const candidate = candidates[idx]
-          if (candidate) picked.add(candidate.getTime())
-        }
-        for (const t of [...picked].sort((a, b) => a - b)) dates.push(withTime(new Date(t)))
-      } else {
-        // Same day-of-month as the anchor every month; skip months too short to
-        // have that day instead of overflowing into the next month's 1st.
-        if (anchor.getDate() <= daysInMonth) {
-          dates.push(withTime(new Date(year, month, anchor.getDate())))
-        }
-      }
+      dates.push(...monthCandidates(periodStart.getFullYear(), periodStart.getMonth()))
     } else {
+      // Yearly: `bymonth` expands the year into the months it names, and each
+      // of those is filled by the same selection a monthly rule would make.
+      // Naming no month means the anchor's own — which, with no day-naming
+      // part either, is the anchor's month and day annually: what every yearly
+      // rule written before `bymonth` existed already means.
       const year = periodStart.getFullYear()
-      const daysInTargetMonth = new Date(year, anchor.getMonth() + 1, 0).getDate()
-      // Feb 29 anchors are skipped in non-leap years instead of overflowing into
-      // March 1st.
-      if (anchor.getDate() <= daysInTargetMonth) {
-        dates.push(withTime(new Date(year, anchor.getMonth(), anchor.getDate())))
-      }
+      for (const month of monthSet ?? [anchor.getMonth()]) dates.push(...monthCandidates(year, month))
     }
-    return dates
+    // `bymonth` *expands* at yearly frequency — it chose the months above —
+    // and *limits* at every finer one, which is RFC 5545 §3.3.10's own split:
+    // a daily, weekly or monthly period already sits inside a single month (a
+    // weekly one inside two), so naming months there can only narrow it.
+    const limited = freq === 'yearly' || !monthSet ? dates : dates.filter(d => monthSet.has(d.getMonth()))
+    return limited.map(withTime)
   }
 
   /**

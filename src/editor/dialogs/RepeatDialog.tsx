@@ -133,7 +133,7 @@ export default function RepeatDialog({
       : 'Choose how often this scheduled item repeats.'
 
   function handleSet() {
-    onConfirm(formToRepeat(state, scheduled?.date))
+    onConfirm(formToRepeat(state, scheduled?.date, repeat))
     onClose()
   }
 
