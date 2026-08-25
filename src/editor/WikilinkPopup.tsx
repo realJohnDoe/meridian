@@ -6,6 +6,7 @@ import { OccurrenceCard } from '@/components'
 import { fileEntries } from '@/fileOccurrence'
 import { useResetOnChange, useVisibleViewport, useFileOccurrenceMap } from '@/hooks'
 import { computeFloatingPlacement } from '@/lib/floatingPlacement'
+import { topChromeBottom } from '@/lib/topChrome'
 import { cn } from '@/lib/cn'
 
 export interface WlPopupState {
@@ -92,13 +93,19 @@ export default function WikilinkPopup({ popup, roots, vaultId, view, onClose }: 
   // viewport. Same placement math as useFloatingCombobox (@/lib/floatingPlacement),
   // anchored to a point (the cursor coords) instead of an element's rect.
   const visible = useVisibleViewport()
-  const visibleTop = visible.top
+  // Band excludes the sticky topbar — see lib/topChrome.ts.
+  const visibleTop = Math.max(visible.top, topChromeBottom())
   const placement = computeFloatingPlacement(popup.coords, {
     visibleTop,
-    visibleBottom: visibleTop + visible.height,
+    visibleBottom: visible.top + visible.height,
     innerWidth:  window.innerWidth,
     innerHeight: window.innerHeight,
   })
+
+  // Null placement = the cursor has scrolled out of the usable band (behind the
+  // topbar, or below the keyboard). Every hook above has already run, so this
+  // early return is safe.
+  if (!placement) return null
 
   const style = {
     position: 'fixed' as const,
