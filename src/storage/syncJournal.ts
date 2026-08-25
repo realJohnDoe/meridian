@@ -45,7 +45,8 @@ export type SyncEventKind =
   | 'collision-already-landed'  // the backend already holds exactly our content
   | 'collision-retried'         // nothing had diverged — the CAS was retried and took
   | 'collision-recreated'       // the file was gone remotely; our content was restored
-  | 'collision-copied'          // genuine divergence; both sides kept
+  | 'collision-merged'          // divergence on disjoint fields; both changes combined
+  | 'collision-copied'          // divergence over the same ground; both sides kept
   // ── pull ──────────────────────────────────────────────────────
   | 'pull'                 // reconcile pulled fresh remote content over a clean record
   | 'drop'                 // reconcile evicted a record the backend no longer lists

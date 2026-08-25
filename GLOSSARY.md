@@ -248,6 +248,33 @@ Raised when a compare-and-swap write loses — the backend's version token no
 longer matches what the writer saw.
 → `storage/conflictError.ts` · `ConflictError`
 
+### base version / base content
+Two halves of the same ancestor, on one dirty cache record. The **base
+version** is the backend's opaque token (GitHub blob SHA, FS `mtime:size`) —
+enough to detect that the remote drifted. The **base content** is the file at
+that token — enough to work out *what* each side changed, which is what a
+three-way merge needs and a version token alone can never supply. Kept on
+dirty records only; a clean record's content is its own ancestor.
+→ `storage/cache/db.ts` · `DexieFileRow`
+
+### merge / conflict copy
+The two outcomes of a genuine divergence, in that order. A **merge** combines
+both sides when they touched different things (one reschedules, the other
+writes the description) and is silent — nothing was lost. A **conflict copy**
+is the fallback when they touched the same thing: the remote keeps the path,
+the local content lands beside it under a timestamped name, and the user is
+told. A merge needs a base content to work from; without one, every divergence
+is a conflict copy.
+→ `model/merge.ts` · `mergeFileContent`
+→ `storage/conflictName.ts` · `conflictPath`
+
+### touched fields
+The fields an editor actually changed, as opposed to the eleven it is holding.
+A save writes only these, leaving the rest at whatever the store holds by then
+— an editor never re-reads its fields, so writing them all reverts anything
+that moved underneath it. Same three-way rule as `merge`, one layer up.
+→ `model/merge.ts` · `mergeEditFields`
+
 ### persistence port
 The indirection core edit code calls instead of `@/storage`, so `storeCommit`
 and `occurrenceActions` don't depend on the storage layer. The adapter

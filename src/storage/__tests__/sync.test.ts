@@ -27,6 +27,7 @@ const { cacheStore, storeState, notifyFns, roundTripLossMock } = vi.hoisted(() =
   cacheStore: new Map<string, {
     vaultPath: string; vaultId: string; path: string; content: string
     status: 'clean' | 'dirty' | 'deleted'; updatedAt: number; version?: string
+    baseContent?: string
   }>(),
   storeState: {
     /** Per-vault layers — the shape the real store holds: one `Entries` map per vault. */
@@ -74,7 +75,11 @@ vi.mock('@/storage/cache/files', () => {
       const key = vp(vaultId, path)
       const existing = cacheStore.get(key)
       if (existing && existing.content === content) return
-      cacheStore.set(key, { vaultPath: key, vaultId, path, content, status: 'dirty', updatedAt: Date.now(), version: existing?.version })
+      cacheStore.set(key, {
+        vaultPath: key, vaultId, path, content, status: 'dirty', updatedAt: Date.now(),
+        version: existing?.version,
+        baseContent: existing?.status === 'clean' ? existing.content : existing?.baseContent,
+      })
     }),
     setResolvedClean: vi.fn(async (vaultId: string, path: string, content: string, version?: string) => {
       const key = vp(vaultId, path)
@@ -84,10 +89,19 @@ vi.mock('@/storage/cache/files', () => {
       const key = vp(vaultId, path)
       const existing = cacheStore.get(key)
       if (existing && existing.content !== pushedContent) {
-        cacheStore.set(key, { ...existing, version, updatedAt: Date.now() })
+        cacheStore.set(key, { ...existing, version, updatedAt: Date.now(), baseContent: pushedContent })
         return
       }
       cacheStore.set(key, { vaultPath: key, vaultId, path, content: pushedContent, status: 'clean', updatedAt: Date.now(), version })
+    }),
+    markMerged: vi.fn(async (vaultId: string, path: string, mergedFrom: string, mergedContent: string, version?: string) => {
+      const key = vp(vaultId, path)
+      const existing = cacheStore.get(key)
+      if (existing && existing.content !== mergedFrom) {
+        cacheStore.set(key, { ...existing, version, updatedAt: Date.now(), baseContent: mergedContent })
+        return
+      }
+      cacheStore.set(key, { vaultPath: key, vaultId, path, content: mergedContent, status: 'clean', updatedAt: Date.now(), version })
     }),
     applyRemoteBatch: vi.fn(async (vaultId: string, records: Array<{ path: string; content: string; version?: string }>) => {
       const written: string[] = []
@@ -156,7 +170,7 @@ vi.mock('@/model', async (importActual) => ({
 // come after the vi.mock calls above.
 import { syncToBackend, autoSyncTick, resetSyncBackoff, dropAllSyncState, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend, parseFiles, reportParseFailures } from '@/storage/sync'
 import { mountBackend, unmountAllBackends } from '@/storage/backends'
-import { syncJournalEvents, clearSyncJournal } from '@/storage/syncJournal'
+import { syncJournalEvents, clearSyncJournal, syncJournalDump } from '@/storage/syncJournal'
 
 /**
  * One vault's row in the mocked `syncByVault`. Defaults to the single vault
@@ -349,6 +363,12 @@ function seedDirty(vaultId: string, path: string, content: string, version: stri
   cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content, status: 'dirty', updatedAt: Date.now(), version })
 }
 
+/** A dirty record that also remembers the content its edit was made from — the
+ *  precondition for a three-way merge (see `mergeFileContent`). */
+function seedDirtyWithBase(vaultId: string, path: string, content: string, version: string | undefined, baseContent: string): void {
+  cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content, status: 'dirty', updatedAt: Date.now(), version, baseContent })
+}
+
 function seedTombstone(vaultId: string, path: string, version: string | undefined): void {
   cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content: '', status: 'deleted', updatedAt: Date.now(), version })
 }
@@ -387,6 +407,125 @@ beforeEach(() => {
 })
 
 // ── Write-conflict collision copy-out ───────────────────────────────────
+
+// The incident this was built for: two people edit one note at the same time,
+// one changing only frontmatter and the other only the body. Nothing is lost,
+// so nothing should be copied out — and nothing should interrupt either of
+// them. See `mergeFileContent` for the merge itself; these pin the wiring.
+
+describe('pushDirty — a divergence on disjoint fields is merged, not copied', () => {
+  const BASE   = '---\ntitle: Essensplan\n---\n'
+  const LOCAL  = '---\ntitle: Essensplan\nrepeat: weekly\n---\n'
+  const REMOTE = '---\ntitle: Essensplan\n---\n\nNudeln am Dienstag\n'
+
+  it('keeps both changes at the original path, with no conflict copy and no toast', async () => {
+    const backend = new FakeBackend()
+    backend.seed('essensplan.md', BASE, 'sha1')
+    mountBackend(backend)
+
+    // The other device's body edit landed first; ours is still pending.
+    await backend.write('essensplan.md', REMOTE, 'sha1')
+    seedDirtyWithBase('fake-vault', 'essensplan.md', LOCAL, 'sha1', BASE)
+
+    await syncToBackend()
+
+    const merged = backend.get('essensplan.md')?.content ?? ''
+    expect(merged).toContain('repeat: weekly')
+    expect(merged).toContain('Nudeln am Dienstag')
+
+    // No copy — the whole point.
+    expect(backend.listPaths()).toEqual(['essensplan.md'])
+    expect(notifyFns.warnWithDetails).not.toHaveBeenCalled()
+    expect(notifyFns.warn).not.toHaveBeenCalled()
+
+    // The record goes clean on the merged content, so the next cycle has
+    // nothing left to push and cannot re-open the same conflict.
+    const cached = cacheStore.get(vp('fake-vault', 'essensplan.md'))
+    expect(cached?.status).toBe('clean')
+    expect(cached?.content).toBe(merged)
+    expect(syncOf().error).toBeNull()
+  })
+
+  it('puts the merged content in the store, not just the cache', async () => {
+    // Same reason the conflict-copy path merges into the store directly: this
+    // cycle's reconcile skips the paths it already resolved, so a store left
+    // holding the pre-merge version would show the user their own edit with
+    // the other side's missing until a later reconcile or a restart.
+    const backend = new FakeBackend()
+    backend.seed('essensplan.md', BASE, 'sha1')
+    mountBackend(backend)
+    await backend.write('essensplan.md', REMOTE, 'sha1')
+    seedDirtyWithBase('fake-vault', 'essensplan.md', LOCAL, 'sha1', BASE)
+
+    await syncToBackend()
+
+    const root = storeState.roots.get(K('essensplan')) as { body?: string } | undefined
+    expect(root?.body).toBe('Nudeln am Dienstag')
+  })
+
+  it('records the merge in the journal', async () => {
+    const backend = new FakeBackend()
+    backend.seed('essensplan.md', BASE, 'sha1')
+    mountBackend(backend)
+    await backend.write('essensplan.md', REMOTE, 'sha1')
+    seedDirtyWithBase('fake-vault', 'essensplan.md', LOCAL, 'sha1', BASE)
+
+    await syncToBackend()
+
+    expect(syncJournalDump({ path: 'essensplan.md' })).toContain('collision-merged')
+  })
+
+  it('falls back to a conflict copy when the two sides overlap', async () => {
+    const backend = new FakeBackend()
+    backend.seed('essensplan.md', BASE, 'sha1')
+    mountBackend(backend)
+    // Both sides wrote a body: a genuine overlap, which must still be preserved
+    // on both sides rather than merged away.
+    await backend.write('essensplan.md', '---\ntitle: Essensplan\n---\n\nTheirs\n', 'sha1')
+    seedDirtyWithBase('fake-vault', 'essensplan.md', '---\ntitle: Essensplan\n---\n\nMine\n', 'sha1', BASE)
+
+    await syncToBackend()
+
+    const copyPath = backend.listPaths().find(p => p !== 'essensplan.md')
+    expect(copyPath).toBeDefined()
+    expect(backend.get(copyPath!)?.content).toContain('Mine')
+    expect(backend.get('essensplan.md')?.content).toContain('Theirs')
+    expect(notifyFns.warnWithDetails).toHaveBeenCalledTimes(1)
+  })
+
+  it('copies out rather than merging when the record has no ancestor to merge against', async () => {
+    // A dirty row written before `baseContent` existed. Guessing an ancestor
+    // here would silently drop one side; the copy is the honest answer.
+    const backend = new FakeBackend()
+    backend.seed('essensplan.md', BASE, 'sha1')
+    mountBackend(backend)
+    await backend.write('essensplan.md', REMOTE, 'sha1')
+    seedDirty('fake-vault', 'essensplan.md', LOCAL, 'sha1')
+
+    await syncToBackend()
+
+    expect(backend.listPaths().find(p => p !== 'essensplan.md')).toBeDefined()
+  })
+
+  it('copies out when a third writer moves the path between the read and the merge write', async () => {
+    // The merge conditions its write on the version it just read. A writer
+    // landing inside that window makes the CAS fail, and the merge does not
+    // loop: the copy is the outcome that cannot lose anything.
+    const backend = new FakeBackend()
+    backend.seed('essensplan.md', BASE, 'sha1')
+    mountBackend(backend)
+    await backend.write('essensplan.md', REMOTE, 'sha1')
+    seedDirtyWithBase('fake-vault', 'essensplan.md', LOCAL, 'sha1', BASE)
+
+    backend.onNextReadFiles(() => { backend.seed('essensplan.md', '---\ntitle: Essensplan\n---\n\nA third version\n', 'sha9') })
+
+    await syncToBackend()
+
+    const copyPath = backend.listPaths().find(p => p !== 'essensplan.md')
+    expect(copyPath).toBeDefined()
+    expect(backend.get(copyPath!)?.content).toBe(LOCAL)
+  })
+})
 
 describe('pushDirty — write-conflict collision', () => {
   it('pulls the fresh remote copy, writes local content to a timestamped conflict copy, and warns', async () => {
