@@ -1,5 +1,6 @@
 import { useRef, useLayoutEffect } from 'react'
 import type React from 'react'
+import { findScrollParent } from '@/lib/scrollParent'
 
 const DURATION = 350
 const EASING   = 'cubic-bezier(.4,0,.2,1)'
@@ -85,7 +86,17 @@ function useFlipTransition(
 
     // Read while the box is still held open, so this is the offset from before
     // the row left rather than a clamped one.
-    const scroller       = animateHeight ? findScrollParent(container) : null
+    //
+    // requireOverflow: false — resolved per commit rather than cached on
+    // mount, a list that doesn't overflow its pane yet still grows into one
+    // later, and what's being asked here is which ancestor's *scroll
+    // position* to pin, not whether it currently has anything to scroll. The
+    // default (true) would find nothing yet, the scroller would cache as
+    // null, and both halves of the scroll hold below would stay no-ops for
+    // good: the fold would lose its pin, the offset would clamp in the one
+    // layout that reads the natural height, and the list would snap to its
+    // new size instead of shrinking in step with the animation.
+    const scroller       = animateHeight ? findScrollParent(container, { requireOverflow: false }) : null
     const savedScrollTop = scroller ? scroller.scrollTop : 0
 
     const rows  = [...container.querySelectorAll<HTMLElement>(`[${attr}]`)]
@@ -190,35 +201,6 @@ function useFlipTransition(
 
     prevTopsRef.current = tops
   }, [items, containerRef, attr, animateHeight])
-}
-
-/**
- * Nearest ancestor that scrolls vertically. Resolved per commit rather than
- * cached on mount: a list that doesn't overflow its pane yet still grows into
- * one later, and a scroller cached as null then would stay null for good.
- * Deliberately doesn't require the pane to *currently* overflow, for the same
- * reason — whether it does is a property of this commit, not of the element.
- *
- * Falls back to the document scroller rather than null. The entry routes have
- * no pane of their own — the *document* is what scrolls — so the walk above
- * finds nothing there, and a null scroller silently turns both halves of the
- * scroll hold below into no-ops.
- * The fold then loses its pin, the offset clamps in the one layout that reads
- * the natural height, and the list snaps to its new size instead of shrinking
- * in step with the animation.
- *
- * Kept separate from lib/scrollParent.ts on purpose: that one additionally
- * requires the ancestor to be overflowing *right now*, which is exactly the
- * condition the comment above explains this must not test.
- */
-function findScrollParent(el: HTMLElement): HTMLElement | null {
-  let node = el.parentElement
-  while (node) {
-    const overflowY = getComputedStyle(node).overflowY
-    if (overflowY === 'auto' || overflowY === 'scroll') return node
-    node = node.parentElement
-  }
-  return (document.scrollingElement as HTMLElement | null) ?? null
 }
 
 function translateY(el: HTMLElement): number {
