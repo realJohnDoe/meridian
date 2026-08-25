@@ -106,6 +106,16 @@ export class GitHubBackend implements StorageBackend {
   private _cfg:     GitHubConfig
   /** Blob SHA cache — required by the Contents API for updates and deletes. */
   private _shas = new Map<string, string>()
+  /**
+   * The ETag from the last successful (non-304) tree listing, and the tokens
+   * it produced. `statAll` sends the ETag as `If-None-Match`; GitHub answers
+   * 304 with no body when the tree hasn't changed, and — unlike a normal
+   * 200 — that response doesn't count against the rate limit, which is the
+   * whole point of sending it (see finding #1). On a 304 there is nothing to
+   * re-derive tokens from, so the previous listing is returned as-is.
+   */
+  private _treeEtag:   string | undefined
+  private _treeTokens: Map<string, string> | undefined
 
   constructor(
     readonly id:   string,
@@ -141,11 +151,12 @@ export class GitHubBackend implements StorageBackend {
 
   async statAll(): Promise<Map<string, string>> {
     try {
-      const { data } = await this._octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
+      const { data, headers } = await this._octokit.request('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', {
         owner:     this._cfg.owner,
         repo:      this._cfg.repo,
         tree_sha:  this._cfg.branch,
         recursive: '1',
+        ...(this._treeEtag ? { headers: { 'if-none-match': this._treeEtag } } : {}),
       })
       const { tree: items, truncated } = data as { tree: TreeItem[]; truncated?: boolean }
       // A truncated tree silently omits paths past the API's size/entry limit,
@@ -159,8 +170,16 @@ export class GitHubBackend implements StorageBackend {
         tokens.set(item.path, item.sha)
         this._shas.set(item.path, item.sha)
       }
+      this._treeEtag   = headers.etag
+      this._treeTokens = tokens
       return tokens
     } catch (e) {
+      // 304: the tree hasn't changed since the ETag above was recorded — return
+      // the same tokens as last time rather than treating "nothing changed" as
+      // an error. Only trusted when we actually have a prior listing to fall
+      // back to (we always do, since a 304 requires having sent an ETag from
+      // one), so the `undefined` case can only be a genuine failure.
+      if ((e as { status?: number }).status === 304 && this._treeTokens) return this._treeTokens
       throw mapGitHubError(e)
     }
   }

@@ -624,19 +624,29 @@ interface VaultSyncState {
   lastErrorSig: string | null
   /**
    * When a cycle was last *attempted* for this vault — success or failure.
-   * The scheduler's per-vault minimum interval is measured from here rather
-   * than from `lastSyncedAt`, so a vault that keeps failing is paced the same
-   * as one that keeps succeeding (the backoff below then spaces it out
-   * further).
+   * Used only to order `autoSyncTick`'s walk (oldest-attempted first) — the
+   * pull interval itself is paced from `lastPullAt` below, not from this.
    */
   lastAttemptAt: number
+  /**
+   * When a cycle last actually **pulled** — i.e. `reconcileWithBackend` ran,
+   * whether because the cycle asked for a pull or a collision forced one.
+   * `isDue` measures the per-vault pull interval from here rather than from
+   * `lastAttemptAt`, so a push-only cycle (the debounced auto-push from
+   * typing) advancing `lastAttemptAt` on every keystroke can no longer make a
+   * vault look "recently synced" when it has not actually pulled in minutes —
+   * see finding #1, "every push defers the next pull by a full interval".
+   * Deliberately a separate field from `lastAttemptAt`, which the retry
+   * backoff and the scheduler's ordering still need untouched.
+   */
+  lastPullAt: number
 }
 
 function createVaultSyncState(): VaultSyncState {
   return {
     syncing: false, pushTimer: null, pushQueued: false,
     consecutiveFailures: 0, nextRetryAt: 0, lastErrorSig: null,
-    lastAttemptAt: 0,
+    lastAttemptAt: 0, lastPullAt: 0,
   }
 }
 
@@ -803,6 +813,7 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
   setVaultSync(vaultId, { inProgress: true })
 
   let attemptedRefresh = false
+  let pulled = false
 
   try {
     // A single retry-after-refresh: a 401 here means the access token expired
@@ -820,6 +831,7 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
           : await pushDirty(backend, vaultId)
         if (opts.pull || hadCollision) {
           await reconcileWithBackend(backend, vaultId, pushed)
+          pulled = true
         }
         break
       } catch (e) {
@@ -835,6 +847,7 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
     syncState.consecutiveFailures = 0
     syncState.nextRetryAt         = 0
     syncState.lastErrorSig        = null
+    if (pulled) syncState.lastPullAt = Date.now()
     updateSyncUI(backend)
   } catch (e) {
     console.error(`[vault] sync failed for ${vaultId}:`, e)
@@ -879,11 +892,21 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
   }
 }
 
-/** Push one vault's pending local changes, or queue the request if its sync is already running. */
+/**
+ * Push one vault's pending local changes, or queue the request if its sync is
+ * already running.
+ *
+ * Piggybacks a pull when the vault is already overdue for one (`isDue`) —
+ * it's the same round trip the write already pays for. Without this, a vault
+ * edited more often than its pull interval (the common case: autosave debounces
+ * to a 1s push, well under any pull interval) never reaches the `autoSyncTick`
+ * that would otherwise pull it, because every push-only cycle used to advance
+ * the same clock the pull interval was paced from. See finding #1.
+ */
 function attemptPush(backend: StorageBackend): void {
   const syncState = syncStateFor(backend.id)
   if (syncState.syncing) { syncState.pushQueued = true; return }
-  void runSync(backend, { silent: true, pull: false })
+  void runSync(backend, { silent: true, pull: isDue(backend, Date.now()) })
 }
 
 /** Debounced push for one vault. Exported for `moveEntry.ts`, which writes two vaults at once. */
@@ -952,7 +975,12 @@ export async function syncOnActivate(backend: StorageBackend): Promise<void> {
  */
 const MIN_SYNC_INTERVAL_MS: Partial<Record<VaultKind, number>> = {
   local:  30_000,
-  github: 60_000,
+  // GitHub's git-trees listing now goes out as a conditional request (see
+  // GitHubBackend.statAll's ETag/If-None-Match handling) — an unchanged tree
+  // answers 304 and doesn't count against the rate limit, so this can afford
+  // to be much closer to the local-folder interval than the old 60s budget
+  // that assumed every poll was a full, metered request.
+  github: 20_000,
   // A subscription is somebody else's calendar: it changes rarely, the fetch
   // crosses two networks (Meridian's Worker, then the provider), and a
   // conditional request makes most of these cycles a 304 with no body anyway.
@@ -967,12 +995,19 @@ const DEFAULT_MIN_SYNC_INTERVAL_MS = 15 * 60_000
  */
 const DUE_TOLERANCE_MS = 5_000
 
+/**
+ * Whether `backend` is due for a **pull** — measured from `lastPullAt`, not
+ * `lastAttemptAt` (see that field's doc comment). Two callers: `autoSyncTick`,
+ * to decide whether a vault's periodic full cycle runs at all, and
+ * `attemptPush`, to decide whether a debounced push should piggyback a pull
+ * it would otherwise have to wait a full interval for.
+ */
 function isDue(backend: StorageBackend, now: number): boolean {
   const state = syncStateFor(backend.id)
   if (now < state.nextRetryAt) return false
-  const elapsed = now - state.lastAttemptAt
+  const elapsed = now - state.lastPullAt
   // A wall clock that jumped backwards (a device correcting its time, a
-  // timezone-less NTP step) would otherwise park `lastAttemptAt` in the future
+  // timezone-less NTP step) would otherwise park `lastPullAt` in the future
   // and starve this vault until the clock caught up. Treat it as due instead:
   // one extra cycle costs nothing, a stranded vault costs the user their sync.
   if (elapsed < 0) return true
