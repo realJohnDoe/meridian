@@ -39,6 +39,7 @@ export type SyncEventKind =
   | 'push-ok'              // …and was accepted
   | 'push-conflict'        // …and the backend refused the precondition
   | 'delete-push'          // a staged delete went out
+  | 'delete-reread'        // no base version to CAS a delete against; re-read the current sha first
   | 'delete-ok'
   | 'delete-conflict'
   // ── collision resolution (why a push-conflict resolved the way it did) ──

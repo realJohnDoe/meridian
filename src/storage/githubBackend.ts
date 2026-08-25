@@ -4,6 +4,7 @@ import type { VaultKind } from '@/vaultRef'
 import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError } from './githubApi'
 import { ensureFreshAccessToken } from './githubOAuth'
 import { isTransientSyncError, TransientSyncError } from './conflictError'
+import { journal } from './syncJournal'
 
 interface GitHubConfig {
   owner:  string
@@ -297,11 +298,21 @@ export class GitHubBackend implements StorageBackend {
 
   async delete(path: string, expectedVersion?: string): Promise<void> {
     // Prefer the caller-supplied expectedVersion as the CAS SHA, matching
-    // write()'s policy — avoid falling back to _shas first here, since that
-    // cache may be stale from a prior statAll() call and could mask a genuine
-    // remote edit that happened after the tombstone was staged.
-    const sha = expectedVersion ?? this._shas.get(path)
-    if (!sha) return // File doesn't exist on GitHub; nothing to do
+    // write()'s policy — never fall back to _shas here, since that cache may
+    // be stale from a prior statAll() call and could mask a genuine remote
+    // edit that happened after the tombstone was staged.
+    let sha = expectedVersion
+    if (!sha) {
+      // No base version to CAS against — a file created and deleted locally
+      // before it ever synced, or a tombstone whose version was lost. Re-read
+      // the current state instead of trusting the stale cache, narrowing the
+      // race window to the gap between this read and the delete call below
+      // (which the CAS delete itself still guards against a conflict).
+      const [fresh] = await this.readFiles([path])
+      journal('delete-reread', this.id, path, { actual: fresh?.version }, this.kind)
+      sha = fresh?.version
+      if (!sha) return // File genuinely doesn't exist on GitHub; nothing to do
+    }
     try {
       await this._octokit.request('DELETE /repos/{owner}/{repo}/contents/{path}', {
         owner:   this._cfg.owner,
