@@ -59,6 +59,8 @@ export default defineConfig({
         'src/editor/cm/markdownFormatting.ts': { statements: 88, branches: 78, functions: 70, lines: 87 },
         'src/editor/cm/ReactWidget.ts': { statements: 78, branches: 90, functions: 50, lines: 77 },
         'src/model/fieldRegistry.ts': { statements: 90, branches: 80, functions: 85, lines: 90 },
+        'src/model/storeOps.ts': { statements: 88, branches: 82, functions: 92, lines: 92 },
+        'src/model/expansion.ts': { statements: 87, branches: 76, functions: 94, lines: 92 },
         'src/storage/conflictError.ts': { statements: 90, branches: 85, functions: 95, lines: 95 },
         // The durability + credentials layer: unsynced edits, tombstones and
         // GitHub tokens. Every other suite that touches it swaps in an
