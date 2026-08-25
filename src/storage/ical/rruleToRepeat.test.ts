@@ -72,14 +72,62 @@ describe('rruleToRepeat — representable rules', () => {
       .toEqual({ type: 'schedule', freq: 'monthly', byweekday: ['mo', 'tu', 'we', 'th', 'fr'], bysetpos: -2 })
   })
 
+  it('maps a negative BYMONTHDAY, which both engines count back from month end', () => {
+    expect(repeatOf('FREQ=MONTHLY;BYMONTHDAY=-1', monday))
+      .toEqual({ type: 'schedule', freq: 'monthly', bymonthday: [-1] })
+    expect(repeatOf('FREQ=MONTHLY;BYMONTHDAY=1,-1', monday))
+      .toEqual({ type: 'schedule', freq: 'monthly', bymonthday: [1, -1] })
+    // Day 0 names nothing, and no month has a 32nd-from-last day.
+    expect(rruleToRepeat('FREQ=MONTHLY;BYMONTHDAY=0', monday).kind).toBe('dates')
+    expect(rruleToRepeat('FREQ=MONTHLY;BYMONTHDAY=-32', monday).kind).toBe('dates')
+  })
+
   it('maps a BYSETPOS list to bysetpos as an array', () => {
     expect(repeatOf('FREQ=MONTHLY;BYDAY=FR;BYSETPOS=1,-1', monday))
       .toEqual({ type: 'schedule', freq: 'monthly', byweekday: ['fr'], bysetpos: [1, -1] })
   })
 
-  it('maps a yearly rule whose BY parts restate the anchor', () => {
+  it('maps a bare yearly rule to the anchor\'s own month and day', () => {
     expect(repeatOf('FREQ=YEARLY', monday)).toEqual({ type: 'schedule', freq: 'yearly' })
-    expect(repeatOf('FREQ=YEARLY;BYMONTH=8;BYMONTHDAY=10', monday)).toEqual({ type: 'schedule', freq: 'yearly' })
+  })
+
+  it('maps the yearly BY* parts to the months and days they name', () => {
+    // The anchor is 2026-08-10, so these no longer have to restate it.
+    expect(repeatOf('FREQ=YEARLY;BYMONTH=8;BYMONTHDAY=10', monday))
+      .toEqual({ type: 'schedule', freq: 'yearly', bymonth: [8], bymonthday: [10] })
+    expect(repeatOf('FREQ=YEARLY;BYMONTH=3,9', monday))
+      .toEqual({ type: 'schedule', freq: 'yearly', bymonth: [3, 9] })
+    // US Thanksgiving, in both spellings the RFC allows for one month.
+    expect(repeatOf('FREQ=YEARLY;BYMONTH=11;BYDAY=4TH', monday))
+      .toEqual({ type: 'schedule', freq: 'yearly', bymonth: [11], byweekday: ['th'], bysetpos: 4 })
+    expect(repeatOf('FREQ=YEARLY;BYMONTH=11;BYDAY=TH;BYSETPOS=4', monday))
+      .toEqual({ type: 'schedule', freq: 'yearly', bymonth: [11], byweekday: ['th'], bysetpos: 4 })
+    // Several months: only the ordinal spelling, which the RFC resolves within
+    // each of them.
+    expect(repeatOf('FREQ=YEARLY;BYMONTH=1,4,7,10;BYDAY=1MO', monday))
+      .toEqual({ type: 'schedule', freq: 'yearly', bymonth: [1, 4, 7, 10], byweekday: ['mo'], bysetpos: 1 })
+  })
+
+  it('normalises a BYMONTH list to a sorted set', () => {
+    expect(repeatOf('FREQ=YEARLY;BYMONTH=9,3,9', monday))
+      .toEqual({ type: 'schedule', freq: 'yearly', bymonth: [3, 9] })
+  })
+
+  it('states all twelve months for a yearly day rule that names none', () => {
+    // `FREQ=YEARLY;BYMONTHDAY=15` is the 15th of every month to RFC 5545
+    // §3.3.10, not the 15th of the anchor's month once a year.
+    expect(repeatOf('FREQ=YEARLY;BYMONTHDAY=15', monday)).toEqual({
+      type: 'schedule', freq: 'yearly', bymonth: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], bymonthday: [15],
+    })
+  })
+
+  it('maps BYMONTH as a plain limit at the finer frequencies', () => {
+    expect(repeatOf('FREQ=DAILY;BYMONTH=2', monday))
+      .toEqual({ type: 'schedule', freq: 'daily', bymonth: [2] })
+    expect(repeatOf('FREQ=WEEKLY;BYDAY=MO;BYMONTH=1,2', monday))
+      .toEqual({ type: 'schedule', freq: 'weekly', byweekday: ['mo'], bymonth: [1, 2] })
+    expect(repeatOf('FREQ=MONTHLY;BYMONTHDAY=15;BYMONTH=3,6,9,12', monday))
+      .toEqual({ type: 'schedule', freq: 'monthly', bymonth: [3, 6, 9, 12], bymonthday: [15] })
   })
 
   it('maps COUNT and UNTIL to an end condition', () => {
@@ -122,20 +170,24 @@ describe('rruleToRepeat — bounded expansion fallback', () => {
     expect(dates.slice(0, 4)).toEqual(['2026-08-07', '2026-08-21', '2026-09-04', '2026-09-18'])
   })
 
-  it('expands "last day of the month" (negative BYMONTHDAY)', () => {
-    const dates = datesOf('FREQ=MONTHLY;BYMONTHDAY=-1', new Date(2026, 7, 31))
-    expect(dates.slice(0, 3)).toEqual(['2026-08-31', '2026-09-30', '2026-10-31'])
-  })
-
   it('expands "every Friday of the month" (BYDAY with no position)', () => {
     const dates = datesOf('FREQ=MONTHLY;BYDAY=FR', new Date(2026, 7, 7))
     expect(dates.slice(0, 4)).toEqual(['2026-08-07', '2026-08-14', '2026-08-21', '2026-08-28'])
   })
 
-  it('expands a yearly nth-weekday-of-a-named-month rule', () => {
-    // US Thanksgiving: fourth Thursday in November.
-    const dates = datesOf('FREQ=YEARLY;BYMONTH=11;BYDAY=4TH', new Date(2025, 10, 27))
-    expect(dates.slice(0, 3)).toEqual(['2025-11-27', '2026-11-26', '2027-11-25'])
+  it('expands a yearly rule whose BYSETPOS spans the whole year', () => {
+    // The engine reads a position per month, the RFC once per period, and a
+    // yearly period is every month the rule names — so this is the first
+    // Monday of March and nothing in September.
+    const dates = datesOf('FREQ=YEARLY;BYMONTH=3,9;BYDAY=MO;BYSETPOS=1', new Date(2026, 2, 2))
+    expect(dates.slice(0, 3)).toEqual(['2026-03-02', '2027-03-01', '2028-03-06'])
+  })
+
+  it('expands an ordinal BYDAY that names several weekdays', () => {
+    // `1MO,1FR` is the first Monday *and* the first Friday; one `bysetpos`
+    // over their combined candidates would pick only whichever came first.
+    const dates = datesOf('FREQ=MONTHLY;BYDAY=1MO,1FR', new Date(2026, 0, 2))
+    expect(dates.slice(0, 4)).toEqual(['2026-01-02', '2026-01-05', '2026-02-02', '2026-02-06'])
   })
 
   it('stops at UNTIL', () => {
@@ -167,7 +219,7 @@ describe('rruleToRepeat — bounded expansion fallback', () => {
   })
 
   it('falls back for parts it cannot express', () => {
-    expect(datesOf('FREQ=MONTHLY;BYMONTHDAY=-1', wednesday).length).toBeGreaterThan(0)
+    expect(datesOf('FREQ=MONTHLY;BYDAY=1FR,3FR', wednesday).length).toBeGreaterThan(0)
     expect(datesOf('FREQ=WEEKLY;BYWEEKNO=1', wednesday)).toBeDefined()
   })
 
