@@ -947,14 +947,30 @@ html[data-shell="flow"] body{height:auto;min-height:100svh;overflow:visible}
 html[data-shell="flow"] #root{height:auto;min-height:100svh}
 html[data-shell="flow"] #app{height:auto;min-height:100svh}
 
-/* The chain between #app and the entry pane: four nested flex wrappers that all
-   clip and cap in the fixed shell (marked data-shell-pane in _app.tsx and the
-   entry panes). Released together — releasing only some leaves the document
-   still unable to overflow, and deleting overflow:hidden from html alone does
-   nothing at all while any of them still holds. Attribute selectors outrank the
-   Tailwind utilities they override, which is why this lives here rather than as
-   a conditional className threaded through three components. */
-html[data-shell="flow"] [data-shell-pane]{overflow:visible;min-height:0;height:auto;flex:1 0 auto}
+/* The chain between #app and the entry pane: nested flex wrappers that all clip
+   and cap in the fixed shell (marked data-shell-pane in _app.tsx and the entry
+   panes). Released together — releasing only some leaves the document still
+   unable to overflow, and deleting overflow:hidden from html alone does nothing
+   at all while any of them still holds. Attribute selectors outrank the Tailwind
+   utilities they override, which is why this lives here rather than as a
+   conditional className threaded through three components.
+
+   The marker names which axis the pane's own flex sizing governs, because the
+   chain alternates between row and column parents and the two need opposite
+   treatment. Releasing both with one blanket rule is wrong in a way the fixed
+   shell used to hide: flex-basis/shrink on a *row* item sizes its width, so
+   overriding them there stops the pane shrinking to the viewport, and — with the
+   document no longer clipping — the overflow shows as the app column ending
+   short of the screen edge with the backdrop beside it. */
+
+/* Row-axis (item of a row parent — SidebarProvider in #app, the main column in
+   SidebarProvider): width is not this shell's business. Release the clip only. */
+html[data-shell="flow"] [data-shell-pane="row"]{overflow:visible}
+
+/* Column-axis (item of a `flex-col` parent): here flex sizing *is* the height
+   cap. `flex:0 0 auto` with `height:auto` sizes each pane to its content, where
+   `flex-1` + `min-h-0` distributed a fixed height from a capped parent. */
+html[data-shell="flow"] [data-shell-pane="col"]{overflow:visible;height:auto;min-height:0;flex:0 0 auto}
 
 /* Sticky, not fixed: the topbar is a flex child of the scrolling column, and
    `fixed` would take it out of flow and collapse the space it occupies. It
