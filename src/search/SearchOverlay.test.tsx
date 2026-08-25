@@ -72,6 +72,38 @@ describe('SearchOverlay dismissal', () => {
     expect(dialog).toHaveAttribute('aria-modal', 'true')
   })
 
+  it('focuses the input when the mobile layer opens, so the keyboard rises', () => {
+    renderOverlay({ mobile: true })
+
+    expect(document.activeElement).toBe(screen.getByPlaceholderText('Search or create…'))
+  })
+
+  it('traps Tab inside the mobile layer, making its aria-modal claim true', () => {
+    renderOverlay({ mobile: true })
+
+    // Trapped range: Close search → input → Clear search (the query is 'foo',
+    // so the clear button is showing).
+    const clear = screen.getByRole('button', { name: 'Clear search' })
+    clear.focus()
+    act(() => { fireEvent.keyDown(clear, { key: 'Tab' }) })
+
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close search' }))
+  })
+
+  it('leaves focus outside its own tree alone on desktop', () => {
+    // Desktop's input lives in SearchBar, above this component — trapping Tab
+    // here would yank focus out of the field being typed into.
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    renderOverlay({ mobile: false })
+    outside.focus()
+
+    act(() => { fireEvent.keyDown(outside, { key: 'Tab' }) })
+
+    expect(document.activeElement).toBe(outside)
+    outside.remove()
+  })
+
   it('stays inert on desktop until there is a query', () => {
     // Desktop renders nothing for an empty query, so Escape must not fire a
     // close for an overlay that isn't on screen.
