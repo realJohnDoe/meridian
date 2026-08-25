@@ -56,9 +56,9 @@ const _3YR_MS = 365 * 3 * 86_400_000
  *
  * Fill order (first match wins — future events, open tasks, past events, done tasks):
  *  1. Nearest upcoming event (dated, no `done` field, in the ±3yr window).
- *  2. Undated open standalone task.
- *  3. Earliest undone task in the ±3yr window (overdue tasks sort before future
- *     ones, since "earliest" just means smallest date).
+ *  2. Earliest undone scheduled (dated) task in the ±3yr window (overdue tasks
+ *     sort before future ones, since "earliest" just means smallest date).
+ *  3. Undone unscheduled (undated) standalone task.
  *  4. Most-recent past event.
  *  5. Latest done occurrence in the ±3yr window (past or future).
  *  6. Fallback for keys with nothing in the window: the first standalone item
@@ -81,15 +81,15 @@ function resolveOneKey(
   const futureEvent = inWindow.find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs)
   if (futureEvent) return futureEvent
 
-  // 2. Undated open standalone task.
+  // 2. Earliest undone scheduled task.
+  const earliestTask = inWindow.find(o => occKind(o) === 'task' && !o.metadata.done)
+  if (earliestTask) return earliestTask
+
+  // 3. Undone unscheduled (undated) standalone task.
   const undatedOpen = keyItems.find(i => isStandaloneOcc(i) && i.date === '' && !i.metadata.done)
   if (undatedOpen) {
     return { ...undatedOpen, metadata: joinFileMeta(entryKey, undatedOpen.metadata, roots) } as Occurrence
   }
-
-  // 3. Earliest undone task.
-  const earliestTask = inWindow.find(o => occKind(o) === 'task' && !o.metadata.done)
-  if (earliestTask) return earliestTask
 
   // 4. Most-recent past event.
   const pastEvent = [...inWindow].reverse().find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) < nowMs)
