@@ -30,7 +30,7 @@ function AppLayout() {
   return (
     <SidebarProvider
       className="flex-1 min-h-0 overflow-hidden"
-      data-shell-pane
+      data-shell-pane="row"
       style={{ '--sidebar-width': '260px' } as React.CSSProperties}
     >
       <AppSidebar />
@@ -146,7 +146,7 @@ function AppMain() {
 
   return (
     <TopbarSlotContext value={slotEl}>
-      <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden" data-shell-pane>
+      <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden" data-shell-pane="row">
         <header
           id="mainTop"
           className="h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10 shadow-md"
@@ -230,7 +230,7 @@ function AppMain() {
           )}
         </header>
 
-        <section className="flex flex-1 flex-col overflow-hidden min-h-0" data-shell-pane>
+        <section className="flex flex-1 flex-col overflow-hidden min-h-0" data-shell-pane="col">
           <Outlet />
         </section>
 
