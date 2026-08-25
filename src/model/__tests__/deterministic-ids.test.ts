@@ -72,7 +72,7 @@ describe('deterministic ID format', () => {
     const { items } = parseToStoreItems('single-event.md', content, TEST_VAULT)
     expect(items).toHaveLength(1)
     // ID starts with the entryKey|occ| prefix
-    expect(items[0]!.id.startsWith(`${keyOf('single-event')}|occ|`)).toBe(true)
+    expect(items[0].id.startsWith(`${keyOf('single-event')}|occ|`)).toBe(true)
   })
 
   it('multi-series fixture: two series get distinct IDs', () => {
@@ -89,7 +89,7 @@ describe('deterministic ID format', () => {
     const yaml = `---\ninstances:\n  - date: 2026-01-01\n  - date: 2026-01-01\n---\n`
     const { items } = parseToStoreItems('dup.md', yaml, TEST_VAULT)
     expect(items).toHaveLength(2)
-    expect(items[0]!.id).toBe(`${keyOf('dup')}|occ|2026-01-01|`)
+    expect(items[0].id).toBe(`${keyOf('dup')}|occ|2026-01-01|`)
     expect(items[1]!.id).toBe(`${keyOf('dup')}|occ|2026-01-01|#2`)
   })
 })

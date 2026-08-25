@@ -129,6 +129,7 @@ export function AddVaultWizard({ onClose, onBack, offerTutorial }: Props) {
           {sourceCards.map(({ id, Icon, title, desc }) => (
             <button
               key={id}
+              type="button"
               onClick={() => setSource(id)}
               className={cn(
                 'flex items-start gap-3 rounded-lg border p-4 text-left transition-colors',

@@ -195,6 +195,7 @@ function AuthCallbackPage() {
         {phase.repos.map(repo => (
           <button
             key={`${repo.owner}/${repo.repo}`}
+            type="button"
             onClick={() => connect(phase.tokens, repo)}
             className="rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
           >

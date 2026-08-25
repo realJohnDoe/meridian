@@ -69,13 +69,18 @@ and contributes a layer. There is deliberately no "active vault".
 → `vaultRef.ts` · `VaultRef`, `VaultKind`
 
 ### VaultLayer
-One vault's parsed content. `store.items`/`store.roots` are the flattened merge
-of every layer.
+One vault's slice of the store's `Entries`, derived on demand rather than stored.
 → `store.ts` · `VaultLayer`, `vaultLayer`
 
+### Entry / Entries
+One entry as a single object — its `key`, its `root`, and the non-empty `items`
+sharing that key. `Entries` is the whole store, keyed by `EntryKey`; it is the
+store's single stored form, and `items`/`roots` are derived from it.
+→ `types.ts` · `Entry`, `Entries`
+
 ### Roots
-`Map<EntryKey, FileMetadata>` — file-level metadata for every entry, kept beside
-`items` rather than on them.
+`Map<EntryKey, FileMetadata>` — file-level metadata for every entry. A view
+derived from `Entries`, not a stored collection of its own.
 → `types.ts` · `Roots`, `FileMetadata`
 
 ### StorageBackend
@@ -334,4 +339,6 @@ asserts none of these have come back.
 | `activeVaultId` | `defaultVaultId` (plus the view filter and per-vault sync) |
 | `participantFilter` | `hiddenParticipants` (inverted: hidden, not shown) |
 | `needsReconnect` | `needsAttention` (a typed reason, not a boolean) |
+| `updateRoot` | `editedEntry` (takes the entry's occurrences too, so a root can't be updated alone) |
+| `rootOnlyOccurrence` | removed — `Entry['items']` is non-empty, so `fileOccurrenceMap` is total by construction |
 | `useVisualViewportHeight` / `useVisualViewportOffsetTop` | `useVisibleViewport` (one snapshot, with the Firefox-Android fallback) |

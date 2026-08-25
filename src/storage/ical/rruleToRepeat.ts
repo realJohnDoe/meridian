@@ -194,14 +194,12 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
       if (bySetPos.length > 0 || ordinals.size > 1 || byDay.some(d => d.ordinal === undefined)) return null
       const [pos] = [...ordinals]
       if (pos === undefined || pos === 0) return null
-      // Only the last-of-month negative is expressible; `-2FR` is not.
-      if (pos < -1) return null
       return { ...base, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: pos }
     }
-    if (bySetPos.length !== 1) return null
-    const pos = bySetPos[0]
-    if (pos === undefined || pos === 0 || pos < -1) return null
-    return { ...base, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: pos }
+    if (bySetPos.length === 0) return null
+    if (bySetPos.some(p => p === 0)) return null
+    const positions = bySetPos.length === 1 ? bySetPos[0]! : bySetPos
+    return { ...base, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: positions }
   }
 
   // Yearly: the engine repeats the anchor's own month and day, and reads no
@@ -509,8 +507,14 @@ function boundsOf(parts: RRuleParts): { maxOccurrences: number; untilMs: number 
  * An empty result means "no recurrence": an unreadable or unsupported `FREQ`,
  * or a series that ended before the window. The caller renders a single
  * occurrence.
+ *
+ * Exported for `repeatToRrule.test.ts`, which uses it as the RFC-side oracle:
+ * production callers get it through `rruleToRepeat`, which only reaches it for
+ * rules `tryRepresent` declined. The round-trip test needs it for the rules
+ * `tryRepresent` *claims* — that is the whole point of the comparison — so it
+ * has to call in directly.
  */
-function expandRRule(parts: RRuleParts, anchor: Date, now: Date): string[] {
+export function expandRRule(parts: RRuleParts, anchor: Date, now: Date): string[] {
   const freq = (parts['FREQ'] ?? '').toUpperCase()
   const stepMs = FREQ_STEP_MS[freq]
   if (stepMs !== undefined) return expandSubDaily(stepMs, parts, anchor, now)

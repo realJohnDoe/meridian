@@ -4,7 +4,9 @@ import { renderHook, act } from '@testing-library/react'
 import type * as ReactRouter from '@tanstack/react-router'
 import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
 import type { FileMetadata, Roots } from '@/types'
+import type { EntryKey } from '@/fileIO'
 import type { VaultRef } from '@/vaultRef'
+import { entriesOf } from '@/test-utils'
 import { useStore } from '@/store'
 import { setupStore, seedStore, installFakePersistence, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { useEntryEditor } from './useEntryEditor'
@@ -228,7 +230,7 @@ describe('useEntryEditor', () => {
     expect(persistence.writes).toEqual([key])
 
     // The items disappear from under the open editor; the root survives.
-    act(() => { useStore.getState().setData({ items: [], roots: useStore.getState().roots }) })
+    act(() => { useStore.getState().setData(entriesOf([], useStore.getState().roots)) })
 
     act(() => { result.current.dialogHandlers.onPriority('high') })
 
@@ -312,14 +314,22 @@ describe('useEntryEditor — moving between vaults', () => {
     expect(useStore.getState().roots.has(testKey('note.md'))).toBe(true)
   })
 
+  /**
+   * Seed one more entry into the store — root *and* an occurrence, because an
+   * entry is both. A root on its own is no longer a state the store can hold.
+   */
+  function seedEntry(key: EntryKey, root: FileMetadata): void {
+    const items = [...useStore.getState().items, makeOcc({ id: `occ-${root.fileSlug}`, entryKey: key, date: '2026-01-01' })]
+    const roots = new Map(useStore.getState().roots).set(key, root)
+    act(() => { useStore.getState().setData(entriesOf(items, roots)) })
+  }
+
   it('counts the links the move will break', () => {
     // This entry links to `other-note`, and `linker` links back to it. Both
     // links are inside the source vault, so both break.
     const occ = seedTwoVaults({ items: ['[[other-note]]'] })
-    const roots = new Map(useStore.getState().roots)
-    roots.set(testKey('other-note'), { title: 'Other', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'other-note' })
-    roots.set(testKey('linker'), { title: 'Linker', tags: [], items: ['[[note.md]]'], vaultId: TEST_VAULT, fileSlug: 'linker' })
-    act(() => { useStore.getState().setData({ items: useStore.getState().items, roots }) })
+    seedEntry(testKey('other-note'), { title: 'Other', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'other-note' })
+    seedEntry(testKey('linker'), { title: 'Linker', tags: [], items: ['[[note.md]]'], vaultId: TEST_VAULT, fileSlug: 'linker' })
 
     const { result } = renderHook(() => useEntryEditor(occ))
     act(() => { result.current.onVaultChange?.(OTHER) })
@@ -357,9 +367,7 @@ describe('useEntryEditor — moving between vaults', () => {
 
   it('flushes a pending body edit before counting, so a just-typed link is included', () => {
     const occ = seedTwoVaults()
-    const roots = new Map(useStore.getState().roots)
-    roots.set(testKey('other-note'), { title: 'Other', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'other-note' })
-    act(() => { useStore.getState().setData({ items: useStore.getState().items, roots }) })
+    seedEntry(testKey('other-note'), { title: 'Other', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'other-note' })
 
     const { result } = renderHook(() => useEntryEditor(occ))
     act(() => { result.current.scheduleAutoSave('see [[other-note]]') })
@@ -370,9 +378,7 @@ describe('useEntryEditor — moving between vaults', () => {
 
   it('warns when the target vault already owns the slug', () => {
     const occ = seedTwoVaults()
-    const roots = new Map(useStore.getState().roots)
-    roots.set(otherKey('note.md'), { title: 'Theirs', tags: [], items: [], vaultId: OTHER, fileSlug: 'note.md' })
-    act(() => { useStore.getState().setData({ items: useStore.getState().items, roots }) })
+    seedEntry(otherKey('note.md'), { title: 'Theirs', tags: [], items: [], vaultId: OTHER, fileSlug: 'note.md' })
 
     const { result } = renderHook(() => useEntryEditor(occ))
     act(() => { result.current.onVaultChange?.(OTHER) })

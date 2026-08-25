@@ -13,7 +13,7 @@ import { parseToStoreItems, roundTripLoss, type ParseResult } from '@/model'
 import { pathToKey, keyToPath, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { runInIdleBatches } from '@/lib/idle'
-import type { StoreItem, Roots } from '@/types'
+import type { Entries } from '@/types'
 import {
   getVaultLayer, setVaultLayer,
   setVaultSync,
@@ -59,8 +59,7 @@ interface RoundTripLoss {
  * vault the guard measured 75% of the total parse cost (and 70 of its 92 ms was
  * the two extra `loadFile` calls it makes internally), all of it blocking the
  * agenda's first paint. Coverage is unchanged — every file is still checked,
- * and `reportRoundTripLosses` still toasts — only the timing moved. See
- * plans/time-to-today.md.
+ * and `reportRoundTripLosses` still toasts — only the timing moved.
  *
  * Deliberately not cancellable from the outside: a sweep that started for a
  * vault which has since been switched away still reports a genuine defect in a
@@ -85,16 +84,14 @@ function auditRoundTrip(parsed: Array<{ path: string; content: string; result: P
 export function parseFiles(
   files: Array<{ path: string; content: string }>,
   vaultId: string,
-): { items: StoreItem[]; roots: Roots; failures: ParseFailure[]; auditRoundTrip: () => void } {
-  const loaded: StoreItem[] = []
-  const roots: Roots = new Map()
+): { entries: Entries; failures: ParseFailure[]; auditRoundTrip: () => void } {
+  const entries: Entries = new Map()
   const failures: ParseFailure[] = []
   const parsed: Array<{ path: string; content: string; result: ParseResult }> = []
   for (const { path, content } of files) {
     try {
       const result = parseToStoreItems(path, content, vaultId)
-      loaded.push(...result.items)
-      roots.set(pathToKey(vaultId, path), result.root)
+      entries.set(result.key, result)
       // The round-trip guard is deferred (see auditRoundTrip above), but the
       // parse it needs is kept here rather than redone: it is only sound on an
       // UNEDITED round trip — after an edit, an intentional change reads as a
@@ -106,7 +103,7 @@ export function parseFiles(
       console.warn('[vault] parse failed for', path, e)
     }
   }
-  return { items: loaded, roots, failures, auditRoundTrip: () => { auditRoundTrip(parsed) } }
+  return { entries, failures, auditRoundTrip: () => { auditRoundTrip(parsed) } }
 }
 
 /**
@@ -447,10 +444,9 @@ function mergeChangedIntoStore(
   const affected = new Set(alsoAffected)
   for (const r of records) affected.add(pathToKey(vaultId, r.path))
 
-  const layer     = getVaultLayer(vaultId)
-  const keptItems = layer.items.filter(item => !affected.has(item.entryKey))
-  const keptRoots: Roots = new Map(
-    [...layer.roots].filter(([key]) => !affected.has(key)),
+  const layer = getVaultLayer(vaultId)
+  const kept: Entries = new Map(
+    [...layer].filter(([key]) => !affected.has(key)),
   )
   // `unreadableFiles` is genuinely cross-vault (one map keyed by EntryKey), but
   // the keys carry their vault, so filtering by `affected` only ever drops this
@@ -459,11 +455,12 @@ function mergeChangedIntoStore(
     [...getUnreadableFiles()].filter(([key]) => !affected.has(key)),
   )
 
-  const { items: newItems, roots: newRoots, failures, auditRoundTrip } = parseFiles(records, vaultId)
-  setVaultLayer(vaultId, {
-    items: [...keptItems, ...newItems],
-    roots: new Map([...keptRoots, ...newRoots]),
-  })
+  const { entries: reparsed, failures, auditRoundTrip } = parseFiles(records, vaultId)
+  // Evict-then-re-add, both sides in the same shape. An entry is one object, so
+  // a key is either kept whole or replaced whole — there is no longer a way for
+  // the eviction and the re-add to disagree about what an entry is and drop one
+  // half of it on a sync.
+  setVaultLayer(vaultId, new Map([...kept, ...reparsed]))
   for (const f of failures) keptUnreadable.set(f.key, { path: f.path, message: f.message })
   setUnreadableFiles(keptUnreadable)
   reportParseFailures(failures)

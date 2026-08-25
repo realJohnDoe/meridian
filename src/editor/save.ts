@@ -2,7 +2,7 @@ import { startOfToday } from 'date-fns'
 import { fmtISO, applyEdit, newEntryKey, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
-import { getSnapshot, getItems, getRoots, getUnreadableFiles, getDefaultVaultId } from '@/storeBridge'
+import { getSnapshot, getEntries, getItems, getUnreadableFiles, getDefaultVaultId } from '@/storeBridge'
 import { keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { commitNext, commitDelete } from '@/storeCommit'
@@ -17,25 +17,25 @@ import type { EntryState, ItemType } from './state'
 
 /** Add `[[sourceSlug]]` to `target`'s items list if not already present. */
 export function addItemLink(target: EntryKey, sourceSlug: string): void {
-  const roots = getRoots()
-  const file = roots.get(target)
-  if (!file) return
+  const entries = getEntries()
+  const entry = entries.get(target)
+  if (!entry) return
   const stored = `[[${sourceSlug}]]`
-  if (file.items.includes(stored)) return
-  const newRoots = new Map(roots)
-  newRoots.set(target, { ...file, items: [...file.items, stored] })
-  commitNext({ items: getItems(), roots: newRoots }, [target])
+  if (entry.root.items.includes(stored)) return
+  const next = new Map(entries)
+  next.set(target, { ...entry, root: { ...entry.root, items: [...entry.root.items, stored] } })
+  commitNext({ entries: next }, [target])
 }
 
 /** Remove `[[sourceSlug]]` from `target`'s items list. */
 export function removeItemLink(target: EntryKey, sourceSlug: string): void {
-  const roots = getRoots()
-  const file = roots.get(target)
-  if (!file) return
+  const entries = getEntries()
+  const entry = entries.get(target)
+  if (!entry) return
   const stored = `[[${sourceSlug}]]`
-  const newRoots = new Map(roots)
-  newRoots.set(target, { ...file, items: file.items.filter(i => i !== stored) })
-  commitNext({ items: getItems(), roots: newRoots }, [target])
+  const next = new Map(entries)
+  next.set(target, { ...entry, root: { ...entry.root, items: entry.root.items.filter(i => i !== stored) } })
+  commitNext({ entries: next }, [target])
 }
 
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────

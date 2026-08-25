@@ -30,7 +30,7 @@ The single biggest structural theme is **correctness that lives in a comment
 instead of in the toolchain**. This codebase discovers subtle hazards, fixes
 them precisely at one site, writes an excellent comment explaining why — and
 then does not encode the rule anywhere a machine can check it. The
-URL-scheme allowlist (#5) and the per-theme ink tokens (#4) are cases where
+URL-scheme allowlist (#5) is a case where
 the correct pattern exists in exactly one file and the other call sites
 silently drifted. Every top finding below is mechanically preventable, and
 several come with a dry-run-verified lint rule or settings key.
@@ -93,8 +93,7 @@ directory was skipped.
   (22 components) and checked element types, but did **not** run
   `shadcn diff` against the registry, so I cannot claim the mirror is faithful.
 - **Runtime behaviour.** Per CLAUDE.md I did not start a dev server; every
-  finding below is from static analysis, dry-runs, or arithmetic. The contrast
-  numbers in #4 are computed, not screenshotted.
+  finding below is from static analysis, dry-runs, or arithmetic.
 
 ---
 
@@ -103,12 +102,12 @@ directory was skipped.
 | # | Category | Verdict |
 |---|---|---|
 | 1 | Component Architecture & Boundaries | **findings: #6** |
-| 2 | Styling System Consistency | **findings: #4, #7** |
+| 2 | Styling System Consistency | no open findings |
 | 3 | UX States & Accessibility | **findings: #3** |
 | 4 | Security (UI-facing) | no open findings |
 | 5 | Code Health & DRY | **findings: #6** |
 | 6 | React Performance | no open findings |
-| 7 | UI Toolchain & Feedback Loops | **findings: #8** |
+| 7 | UI Toolchain & Feedback Loops | no open findings |
 | 8 | UI Dependencies & Library Fit | **findings: #3** — plus three explicit keep-custom verdicts, below |
 
 **Category 8 — keep-custom verdicts (status quo is correct):**
@@ -133,17 +132,10 @@ directory was skipped.
 | # | Title | Category | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
 | 3 | Two hand-rolled overlays with no focus trap | `a11y` `library-fit` | 6 | 2 files | **Opus 5** |
-| 4 | Hardcoded toast ink fails WCAG AA in 7 of 9 themes | `styling` `a11y` | 6 | 1 file | **Opus 5** |
 | 6 | DayPane/WeekPane share a copy-pasted timeline scaffold | `dry` `component-architecture` | 5 | 2 files | **Opus 5** |
-| 7 | `:root` and `.meridian` duplicate 47 tokens with nothing enforcing it | `styling` `dry` | 3 | 1 file | **Sonnet 5** |
-| 8 | 24 raw `<button>`s with no `type` attribute | `toolchain` `code-health` | 2 | 11 files | **Haiku 4.5** |
 
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
 and breadth reported separately so the list can be re-sorted.
-
-**Sequencing note:** #3 and #8 both touch `CoachTour.tsx`; #3 subsumes #8's
-fix there, so do #3 first or accept one trivial rebase. All others are
-independent.
 
 ---
 
@@ -202,74 +194,6 @@ card is deliberately positioned rather than a bottom sheet); for
 `SearchOverlay`'s mobile branch either port it or add an explicit focus trap
 plus focus restore, keeping the desktop branch's out-of-tree focus behaviour
 intact.
-
----
-
-### Finding #4 — Hardcoded toast ink fails WCAG AA in 7 of 9 themes
-
-- **Category:** `styling` `a11y`
-- **Impact:** 6
-- **Breadth:** 1 file (`src/index.css`), affecting every toast in the app across
-  7 of 9 themes. Found by reading the `@layer`/kept-signature block and grepping
-  `#[0-9a-fA-F]{3,8}` plus `oklch(` inside the Sonner rules.
-- **Recommended model:** **Opus 5.** The survey names this failure shape
-  exactly — "a token swap that looks right in light mode and wrong in dark."
-  There is also a genuine design decision embedded: the toast background is
-  `color-mix(--destructive, --background 20%)`, a *desaturated* destructive,
-  whereas the existing `--destructive-foreground` token was tuned against the
-  *pure* swatch — so dropping that token in is not automatically correct. The
-  fixer must either re-tune per theme or change the background to the pure
-  swatch. Naming which of those two the user wants would bring this to Sonnet 5.
-
-**Evidence** — `src/index.css:977-982`:
-
-```
-/* Error toast — rose brand color */
-[data-sonner-toast][data-type='error'][data-styled='true'] {
-  background: color-mix(in oklab, var(--destructive), var(--background) 20%);
-  border-color: color-mix(in oklab, var(--destructive), transparent 40%);
-  color: #fff;
-}
-```
-
-This directly contradicts the file's own convention, stated at
-`src/index.css:9`:
-
-```
- * 3. Colors                     → semantic tokens only (bg-card, text-muted-foreground…).
- *                                 No raw oklch(…) or #hex in component markup.
-```
-
-**Measured result.** Computing the mixed background per theme in OKLab and the
-WCAG 2.x contrast ratio against `#fff`:
-
-| Theme | error toast: `#fff` on mixed bg | AA (4.5:1) |
-|---|---|---|
-| `meridian` (default dark) | 4.19:1 | **FAIL** |
-| `meridian-light` (default light) | 4.24:1 | **FAIL** |
-| `tokyo-night` | 3.73:1 | **FAIL** |
-| `rose-pine-dawn` | 3.17:1 | **FAIL** |
-| `solarized-light` | 3.74:1 | **FAIL** |
-| `dracula` | 4.35:1 | **FAIL** |
-| `catppuccin-mocha` | 3.32:1 | **FAIL** |
-| `solarized-dark` | 6.32:1 | pass |
-| `catppuccin-latte` | 4.53:1 | pass |
-
-Both shipped default themes fail. The neighbouring warning rule's hardcoded
-`color: oklch(0.15 0.02 74)` passes everywhere (4.51:1 worst case, on
-`solarized-dark`) — so this is specifically the error toast, and it is the
-surface that carries failure messages and the delete-undo action.
-
-**Problem:** The toast is the **only** coloured surface in the app that opted
-out of the per-theme ink system. Every domain chip uses `--ink-light`/`--ink-dark`
-precisely so each theme picks whichever of its two inks contrasts against its own
-swatch — `index.css:64-73` explains this at length — and the toast hardcodes one
-ink for all nine.
-
-**Fix:** Replace `color: #fff` (and the warning rule's literal, for consistency)
-with a per-theme token following the `--*-foreground` pattern already in
-`@theme inline`, and re-check the two rules' contrast against the *mixed*
-background rather than the pure swatch.
 
 ---
 
@@ -339,93 +263,6 @@ all-day strips alone — they are legitimately different.
 
 ---
 
-### Finding #7 — `:root` and `.meridian` duplicate 47 tokens with nothing enforcing it
-
-- **Category:** `styling` `dry`
-- **Impact:** 3
-- **Breadth:** 1 file. Counted by parsing both blocks and intersecting the
-  declared custom-property names.
-- **Recommended model:** **Sonnet 5.** Mechanical, but with a hazard worth
-  naming: the dark themes deliberately **omit** `--chip-border`, `--shadow-card`,
-  `--shadow-float` and `--shadow-float-focus` so they inherit `:root`'s
-  dark-tuned values, while the five light themes override all four. I verified
-  this by diffing the token sets across all 9 blocks. Any restructuring that
-  moves Meridian's values out of `:root` must re-home those four for the four
-  other dark themes, or every dark theme silently loses its card shadows.
-
-**Evidence** — `src/index.css:222`:
-
-```
-/* Class-scoped restatement of the Meridian tokens above, mirroring the other
-   theme classes below. Needed so an explicitly meridian-scoped element (e.g.
-   the theme preview button) renders Meridian's own colors even while another
-   theme's class is active on <html> and has overridden :root globally. */
-.meridian {
-```
-
-**Verification.** The stated rationale is sound — a theme-preview swatch does
-need class-scoped tokens. But the *implementation* is a verbatim second copy:
-parsing both blocks shows **47 shared token names, currently 0 value drift** —
-i.e. they agree today, by hand, with no test or build step checking it. Editing
-`:root` without editing `.meridian` (or vice versa) produces a theme-preview
-swatch that disagrees with the theme it previews, and nothing fails.
-
-**Problem:** 57 lines of duplicated design tokens whose correctness rests
-entirely on whoever edits them remembering the other copy exists — in a file
-whose header comment explicitly designates `@theme` + `:root` as the single
-source of truth ("6. @theme + :root tokens below are the design system —
-extend here, not in components").
-
-**Fix:** Make `.meridian` the only definition and have `<html>` always carry a
-theme class (defaulting to `meridian`), leaving `:root` to hold only the
-genuinely un-themed tokens (`--control-h`, `--font`, `--th`, `--radius`) and
-the derived ones — or, if the pre-hydration fallback in `:root` must stay, add a
-check to `src/glossary.test.ts`'s style (parse `index.css`, assert the two
-blocks agree) so drift fails the suite instead of shipping.
-
----
-
-### Finding #8 — 24 raw `<button>`s with no `type` attribute
-
-- **Category:** `toolchain` `code-health`
-- **Impact:** 2
-- **Breadth:** 11 non-test files, 24 sites. Counted by dry-running
-  `@eslint-react/dom-no-missing-button-type`.
-- **Recommended model:** **Haiku 4.5.** Purely additive (`type="button"`), and
-  the failure mode is loud: the accompanying lint rule fails the build if a site
-  is missed. No hazard beyond not skipping `src/debug/`.
-
-**Evidence** — dry-run of `@eslint-react/dom-no-missing-button-type` (a rule the
-installed `@eslint-react/eslint-plugin@5.17.3` ships in its `all` preset but
-which `recommended-type-checked` does not enable) reports 24 errors across:
-`components/AddVaultWizard.tsx`, `components/SettingsDialog.tsx`,
-`components/SyncButton.tsx`, `components/ViewFilterButton.tsx`,
-`editor/EntryEditor.tsx`, `editor/dialogs/DurationDialog.tsx`,
-`editor/dialogs/PriorityDrawer.tsx`, `editor/dialogs/RepeatDialog.tsx`,
-`onboarding/CoachTour.tsx`, `routes/auth.callback.tsx`, and
-`debug/NodeInheritanceDebugger.tsx`.
-
-For example `src/editor/EntryEditor.tsx:41`:
-
-```
-    <button className={cn(badgeVariants({ variant: 'chip' }), className)} aria-pressed={pressed} onClick={onClick}>
-```
-
-**Problem:** This is **latent, not live** — I checked, and `grep -rn '<form'`
-across `src` returns nothing, so today every one of these defaults to
-`type="submit"` with no form to submit and behaves correctly. It is on the list
-because the day someone adds a `<form>` (the `AddVaultWizard` and
-`auth.callback` flows are the obvious candidates), every unqualified button
-inside it silently becomes a submit button that reloads the page. Impact 2
-reflects that it costs nothing today; the breadth and the free enforcement are
-why it still earns a slot.
-
-**Fix:** Add `type="button"` at the 24 sites and enable
-`'@eslint-react/dom-no-missing-button-type': 'error'` in `eslint.config.js`
-alongside the other individually-enabled `@eslint-react` rules.
-
----
-
 ## Appendix — toolchain rules evaluated and *not* recommended
 
 Per the survey's instruction to verify capability claims by inspection rather
@@ -455,8 +292,9 @@ than memory, and to evaluate rather than reflexively recommend:
   `preserve-manual-memoization` and `static-components`. **The comment is
   accurate.**
 - **`@eslint-react` unenabled rules** — of the 17 in `all` but not in
-  `recommended-type-checked`, only `dom-no-missing-button-type` (finding #8) and
-  `jsx-no-useless-fragment` (1 hit, `CoachTour.tsx:108`) fire at all.
+  `recommended-type-checked`, `dom-no-missing-button-type` has since been
+  enabled (formerly finding #8), and `jsx-no-useless-fragment` (1 hit,
+  `CoachTour.tsx:108`) is the only other one that fires.
   `dom-no-unsafe-target-blank` reports **0** — it accepts `rel="noreferrer"`,
   which is why it does not catch finding #5. Worth stating plainly: **no
   available lint rule catches finding #5**; it needs the code fix.

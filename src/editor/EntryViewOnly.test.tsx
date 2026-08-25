@@ -19,7 +19,7 @@ vi.mock('./EntryBody', () => ({
   default: ({ body, readOnly, onOpenWikilink }: { body: string; readOnly?: boolean; onOpenWikilink?: (ref: string) => void }) => (
     <div data-testid="entry-body" data-readonly={String(!!readOnly)}>
       {body}
-      <button onClick={() => onOpenWikilink?.('other-note')}>open-wikilink</button>
+      <button type="button" onClick={() => onOpenWikilink?.('other-note')}>open-wikilink</button>
     </div>
   ),
 }))

@@ -42,6 +42,17 @@ describe('structural expectations', () => {
     expect(series[0]!.repeat).toMatchObject({ type: 'schedule', freq: 'weekly', byweekday: ['mo'] })
   })
 
+  it('preserves a bysetpos list, and expands every named position', () => {
+    const parsed = parseFixture('monthly-setpos-list')
+    const series = parsed.items.filter(isSeries)
+    expect(series).toHaveLength(1)
+    expect(series[0]!.repeat).toMatchObject({ freq: 'monthly', byweekday: ['fr'], bysetpos: [1, 3] })
+
+    const roots = rootsOf(parsed.root)
+    const dates = expandRange(parsed.items, roots, new Date('2026-01-01'), new Date('2026-02-28')).map(o => o.date)
+    expect(dates).toEqual(['2026-01-02', '2026-01-16', '2026-02-06', '2026-02-20'])
+  })
+
   it('preserves the after_completion repeat type and interval', () => {
     const parsed = parseFixture('after-completion')
     const series = parsed.items.filter(isSeries)
@@ -99,7 +110,7 @@ describe('structural expectations', () => {
     ].join('\n'), TEST_VAULT)
 
     expect(parsed.root.title).not.toContain('[object Object]')
-    expect(parsed.items[0]!.date).not.toContain('[object Object]')
+    expect(parsed.items[0].date).not.toContain('[object Object]')
   })
 })
 
@@ -215,10 +226,10 @@ describe('YAML scalar handling', () => {
   it('parses dates as strings, not Date objects', () => {
     const quoted = parseToStoreItems('q.md', '---\ntitle: A\ndate: "2026-04-08"\n---\n', TEST_VAULT)
     const bare = parseToStoreItems('b.md', '---\ntitle: A\ndate: 2026-04-08\n---\n', TEST_VAULT)
-    expect(typeof quoted.items[0]!.date).toBe('string')
-    expect(quoted.items[0]!.date).toBe('2026-04-08')
-    expect(typeof bare.items[0]!.date).toBe('string')
-    expect(bare.items[0]!.date).toBe('2026-04-08')
+    expect(typeof quoted.items[0].date).toBe('string')
+    expect(quoted.items[0].date).toBe('2026-04-08')
+    expect(typeof bare.items[0].date).toBe('string')
+    expect(bare.items[0].date).toBe('2026-04-08')
   })
 
   it('round-trips titles that need quoting', () => {

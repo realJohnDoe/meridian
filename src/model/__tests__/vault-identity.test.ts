@@ -11,9 +11,10 @@ import { parseToStoreItems } from '@/model/storeItems'
 import { collapseToYaml } from '@/model/collapse'
 import { applyEdit, newEntryKey, deleteByEntryKey } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
+import { itemsOf, rootsIn } from './helpers'
 import { expandRange } from '@/model/expansion'
 import { roundTripLoss } from '@/model/roundTripCheck'
-import type { Roots } from '@/types'
+import type { Roots, Entries, StoreItem } from '@/types'
 
 const WORK = 'work'
 const PERSONAL = 'personal'
@@ -39,19 +40,23 @@ function fields(overrides: Partial<EditFields> = {}): EditFields {
 
 /** The same file content parsed into two vaults. */
 function twoVaults(): StoreData {
-  const roots: Roots = new Map()
-  const items = []
+  const entries: Entries = new Map()
   for (const vault of [WORK, PERSONAL]) {
-    const parsed = parseToStoreItems('weekly-review.md', NOTE_YAML, vault)
-    roots.set(entryKey(vault, 'weekly-review'), parsed.root)
-    items.push(...parsed.items)
+    entries.set(entryKey(vault, 'weekly-review'),
+      parseToStoreItems('weekly-review.md', NOTE_YAML, vault))
   }
-  return { items, roots }
+  return { entries }
+}
+
+/** The same two vaults as the flat `items`/`roots` pair `expandRange` and `collapseToYaml` take. */
+function twoVaultsFlat(): { items: StoreItem[]; roots: Roots } {
+  const data = twoVaults()
+  return { items: itemsOf(data), roots: rootsIn(data) }
 }
 
 describe('vault-qualified entry identity', () => {
   it('keeps the same slug in two vaults as two distinct entries', () => {
-    const { items, roots } = twoVaults()
+    const { items, roots } = twoVaultsFlat()
     expect(roots.size).toBe(2)
     expect(new Set(items.map(i => i.entryKey)).size).toBe(2)
     // Item ids must differ too — they are compared across the whole store, and
@@ -60,7 +65,7 @@ describe('vault-qualified entry identity', () => {
   })
 
   it('stamps each root with the vault it was read from, and the bare slug', () => {
-    const { roots } = twoVaults()
+    const { roots } = twoVaultsFlat()
     const work = roots.get(entryKey(WORK, 'weekly-review'))!
     expect(work.vaultId).toBe(WORK)
     expect(work.fileSlug).toBe('weekly-review')
@@ -68,7 +73,7 @@ describe('vault-qualified entry identity', () => {
   })
 
   it('hands every expanded occurrence its vault and bare slug for free', () => {
-    const { items, roots } = twoVaults()
+    const { items, roots } = twoVaultsFlat()
     const occs = expandRange(items, roots, new Date('2026-05-01'), new Date('2026-05-31'))
     expect(occs).toHaveLength(2)
     for (const occ of occs) {
@@ -79,36 +84,36 @@ describe('vault-qualified entry identity', () => {
 
   it('edits one vault\'s copy without touching the other\'s', () => {
     const data = twoVaults()
-    const occ = expandRange(data.items, data.roots, new Date('2026-05-01'), new Date('2026-05-31'))
+    const occ = expandRange(itemsOf(data), rootsIn(data), new Date('2026-05-01'), new Date('2026-05-31'))
       .find(o => keyVaultId(o.entryKey) === WORK)!
     const next = applyEdit(data, occ, 'all', fields({ title: 'Renamed in Work' }), { vaultId: WORK })
 
-    expect(next.roots.get(entryKey(WORK, 'weekly-review'))!.title).toBe('Renamed in Work')
-    expect(next.roots.get(entryKey(PERSONAL, 'weekly-review'))!.title).toBe('Weekly review')
+    expect(rootsIn(next).get(entryKey(WORK, 'weekly-review'))!.title).toBe('Renamed in Work')
+    expect(rootsIn(next).get(entryKey(PERSONAL, 'weekly-review'))!.title).toBe('Weekly review')
   })
 
   it('deletes one vault\'s copy without touching the other\'s', () => {
     const { data, affectedKeys } = deleteByEntryKey(twoVaults(), entryKey(WORK, 'weekly-review'))
-    expect(data.roots.has(entryKey(WORK, 'weekly-review'))).toBe(false)
-    expect(data.roots.has(entryKey(PERSONAL, 'weekly-review'))).toBe(true)
-    expect(data.items.every(i => keyVaultId(i.entryKey) === PERSONAL)).toBe(true)
+    expect(rootsIn(data).has(entryKey(WORK, 'weekly-review'))).toBe(false)
+    expect(rootsIn(data).has(entryKey(PERSONAL, 'weekly-review'))).toBe(true)
+    expect(itemsOf(data).every(i => keyVaultId(i.entryKey) === PERSONAL)).toBe(true)
     expect(affectedKeys).toEqual([])
   })
 
-  // Regression guard for the whole point of the carry-forward in `updateRoot`:
+  // Regression guard for the whole point of the carry-forward in `editedEntry`:
   // rebuilding FileMetadata from EditFields would otherwise leave the root with
   // no vault, and wikilink resolution and routing would fall back to the wrong one.
   it('an edit preserves vaultId/fileSlug on the root it rewrites', () => {
     const data = twoVaults()
-    const occ = expandRange(data.items, data.roots, new Date('2026-05-01'), new Date('2026-05-31'))
+    const occ = expandRange(itemsOf(data), rootsIn(data), new Date('2026-05-01'), new Date('2026-05-31'))
       .find(o => keyVaultId(o.entryKey) === PERSONAL)!
     const next = applyEdit(data, occ, 'all', fields({ title: 'Edited' }), { vaultId: PERSONAL })
 
-    const root = next.roots.get(entryKey(PERSONAL, 'weekly-review'))!
+    const root = rootsIn(next).get(entryKey(PERSONAL, 'weekly-review'))!
     expect(root.vaultId).toBe(PERSONAL)
     expect(root.fileSlug).toBe('weekly-review')
-    // ...and everything else `updateRoot` carries forward still rides along.
-    expect(root.fileConvention).toEqual(data.roots.get(entryKey(PERSONAL, 'weekly-review'))!.fileConvention)
+    // ...and everything else `editedEntry` carries forward still rides along.
+    expect(root.fileConvention).toEqual(rootsIn(data).get(entryKey(PERSONAL, 'weekly-review'))!.fileConvention)
   })
 
   it('gives a brand-new entry the target vault, and allocates slugs per vault', () => {
@@ -121,9 +126,10 @@ describe('vault-qualified entry identity', () => {
   })
 
   it('never writes vaultId or fileSlug back to the file', () => {
-    const { items, roots } = twoVaults()
+    const data = twoVaults()
     const key = entryKey(WORK, 'weekly-review')
-    const yaml = collapseToYaml(items.filter(i => i.entryKey === key), roots.get(key))
+    const entry = data.entries.get(key)!
+    const yaml = collapseToYaml(entry.items, entry.root)
     expect(yaml).not.toHaveProperty('vaultId')
     expect(yaml).not.toHaveProperty('fileSlug')
     // Belt and braces: nothing nested carries them either.

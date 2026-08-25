@@ -8,7 +8,7 @@ import { expandRange } from '@/model/expansion'
 import { applyEdit } from '@/model/storeOps'
 import type { EditFields } from '@/model/storeOps'
 import type { Roots } from '@/types'
-import { TEST_VAULT, rootsOf, NEW_TARGET, keyOf } from './helpers'
+import { TEST_VAULT, rootsOf, NEW_TARGET, keyOf, itemsOf, rootsIn, dataOf } from './helpers'
 
 const STANDUP_YAML = `---
 title: Weekly Standup
@@ -53,14 +53,14 @@ describe('items flow through expansion', () => {
       duration:     '',
       repeat:       null,
     }
-    const next = applyEdit({ items, roots }, occ, 'single', fields, NEW_TARGET)
+    const next = applyEdit(dataOf(items, roots), occ, 'single', fields, NEW_TARGET)
 
     // Root must carry the items
-    const updatedRoot = next.roots.get(keyOf('standup'))
+    const updatedRoot = rootsIn(next).get(keyOf('standup'))
     expect(updatedRoot?.items).toEqual(['[[project-alpha]]'])
 
     // Items must appear on every occurrence after expansion
-    const occs1 = expandRange(next.items, next.roots, FROM, TO)
+    const occs1 = expandRange(itemsOf(next), rootsIn(next), FROM, TO)
     expect(occs1.length).toBeGreaterThan(0)
     for (const o of occs1) {
       expect(o.metadata.items).toEqual(['[[project-alpha]]'])

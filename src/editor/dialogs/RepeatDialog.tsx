@@ -239,6 +239,7 @@ export default function RepeatDialog({
                     return options.map(o => (
                       <button
                         key={o.id}
+                        type="button"
                         onClick={() => setMonthly(o.id)}
                         className={cn(
                           "px-3 py-2.5 rounded-lg border text-xs text-left transition-all cursor-pointer",
@@ -276,6 +277,7 @@ export default function RepeatDialog({
 
                 {endType === 'until' && (
                   <button
+                    type="button"
                     onClick={() => setEndCalOpen(true)}
                     className="w-full flex items-center justify-between bg-secondary border border-border/50 hover:bg-secondary/80 focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary transition-colors cursor-pointer"
                   >

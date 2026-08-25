@@ -36,6 +36,7 @@
      tuned per theme for contrast on a saturated surface) applies here too */
   --color-destructive-foreground: var(--primary-foreground);
   --color-warning:              var(--warning);
+  --color-warning-foreground:   var(--warning-foreground);
   --color-border:               var(--border);
   --color-input:                var(--input);
   --color-ring:                 var(--ring);
@@ -112,7 +113,13 @@
 }
 
 /* ── MERIDIAN THEME ─────────────────────────────────────────── */
-:root {
+/* Grouped selector: :root (the default theme, and the pre-hydration/no-JS
+   fallback before next-themes applies a class to <html>) and .meridian (an
+   explicitly meridian-scoped element — e.g. the theme preview swatch in
+   SettingsDialog, which must render Meridian's own colors even while a
+   different theme's class is active on <html>) share one written value per
+   token, rather than two independently-maintained copies that can drift. */
+:root, .meridian {
   /* Surfaces — 4-step elevation ramp */
   --backdrop:   oklch(0.13 0.04 252);   /* html bg behind the 430px column */
   --background: oklch(0.18 0.05 252);   /* app column, topbar, agenda stream */
@@ -142,6 +149,7 @@
   /* Destructive */
   --destructive: oklch(0.72 0.20 15);   /* rose */
   --warning:     oklch(0.86 0.16 74);   /* amber */
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 92%);   /* slate at ~8% */
@@ -176,6 +184,22 @@
   --sidebar-border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);
   --sidebar-ring:               oklch(0.71 0.20 278);
 
+  /* ── Derived — not authored per-theme ── */
+  --primary-dark:    oklch(0.63 0.20 278);   /* darker shades for gradients (brand button, search bar) */
+  --brand-cyan-dark: oklch(0.68 0.14 208);
+  --surface-raised:  oklch(0.33 0.05 252);   /* elevated surface for past/done bars */
+}
+
+/* :root-only. Two kinds of token live here rather than in the grouped
+   selector above: layout/font values that are never themed at all, and
+   color-mix()-derived tokens that resolve through whichever theme is
+   currently active. Both are meaningless to restate per-.meridian-swatch —
+   a swatch already renders correctly by inheriting them from its nearest
+   ancestor, same as before this file stopped duplicating the tokens above.
+   (chip-border and the three shadow-* tokens ARE restated, but only by the
+   light themes below, which need visibly different values on a light
+   surface — see .meridian-light etc.) */
+:root {
   /* Chip border — transparent on dark themes, visible on light */
   --chip-border: transparent;
 
@@ -183,12 +207,6 @@
   --done-overlay: color-mix(in oklab, var(--background), transparent 30%);
 
   --radius: 0.625rem;
-
-  /* ── Derived — not authored per-theme ── */
-
-  /* Darker shades for gradients (brand button, search bar) */
-  --primary-dark:    oklch(0.63 0.20 278);
-  --brand-cyan-dark: oklch(0.68 0.14 208);
 
   /* Search bar surface — subtle primary tint over accent */
   --search-bar-bg: color-mix(in oklab, var(--primary), var(--accent) 92%);
@@ -207,9 +225,6 @@
   /* event-border used in EntryBody wikilink underline */
   --event-border: color-mix(in oklab, var(--event), transparent 68%);
 
-  /* Elevated surface for past/done bars */
-  --surface-raised: oklch(0.33 0.05 252);
-
   /* Layout & fonts (not themed) */
   --control-h: 1.75rem;
   --font: 'DM Sans', system-ui, sans-serif;
@@ -225,69 +240,6 @@
      other view already keeps from the OS chrome instead of inventing its
      own, different spacing. */
   --search-top-inset: env(safe-area-inset-top, 0px);
-}
-
-/* Class-scoped restatement of the Meridian tokens above, mirroring the other
-   theme classes below. Needed so an explicitly meridian-scoped element (e.g.
-   the theme preview button) renders Meridian's own colors even while another
-   theme's class is active on <html> and has overridden :root globally. */
-.meridian {
-  --backdrop:   oklch(0.13 0.04 252);
-  --background: oklch(0.18 0.05 252);
-  --card:       oklch(0.24 0.05 252);
-  --popover:    oklch(0.24 0.05 252);
-  --secondary:  oklch(0.28 0.06 252);
-  --muted:      oklch(0.28 0.06 252);
-  --accent:     oklch(0.28 0.06 252);
-
-  --foreground:           oklch(0.96 0.02 270);
-  --card-foreground:      oklch(0.96 0.02 270);
-  --popover-foreground:   oklch(0.96 0.02 270);
-  --accent-foreground:    oklch(0.96 0.02 270);
-  --secondary-foreground: oklch(0.86 0.07 272);
-  --muted-foreground:     oklch(0.54 0.04 250);
-  --dim:                  oklch(0.69 0.03 250);
-
-  --primary:            oklch(0.68 0.22 278);
-  --primary-foreground: var(--ink-dark);
-  --ring:               oklch(0.71 0.20 278);
-
-  --ink-dark:  var(--background);
-  --ink-light: oklch(1 0 0);
-
-  --destructive: oklch(0.72 0.20 15);
-  --warning:     oklch(0.86 0.16 74);
-
-  --border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 92%);
-  --input:  color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);
-
-  --event:        oklch(0.71 0.20 278);
-  --task:         oklch(0.84 0.17 145);
-  --note:         oklch(0.75 0.17 215);
-  --brand-cyan:   oklch(0.77 0.14 208);
-  --priority-1:   oklch(0.72 0.19 22);
-  --priority-2:   oklch(0.76 0.17 48);
-  --priority-3:   oklch(0.88 0.18 82);
-
-  --event-foreground:      var(--ink-light);
-  --task-foreground:       var(--ink-dark);
-  --note-foreground:       var(--ink-dark);
-  --priority-1-foreground: var(--ink-light);
-  --priority-2-foreground: var(--ink-light);
-  --priority-3-foreground: var(--ink-dark);
-
-  --sidebar:                    oklch(0.24 0.05 252);
-  --sidebar-foreground:         oklch(0.86 0.07 272);
-  --sidebar-primary:            oklch(0.71 0.20 278);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent:             oklch(0.28 0.06 252);
-  --sidebar-accent-foreground:  oklch(0.96 0.02 270);
-  --sidebar-border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);
-  --sidebar-ring:               oklch(0.71 0.20 278);
-
-  --primary-dark:    oklch(0.63 0.20 278);
-  --brand-cyan-dark: oklch(0.68 0.14 208);
-  --surface-raised:  oklch(0.33 0.05 252);
 }
 
 /* ── MERIDIAN LIGHT THEME ───────────────────────────────────────── */
@@ -338,6 +290,7 @@
   /* Destructive / warning — darkened to read on light surfaces */
   --destructive: oklch(0.55 0.20 15);
   --warning:     oklch(0.62 0.14 74);
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, oklch(0.525 0.038 250), transparent 78%);
@@ -424,6 +377,7 @@
   /* Destructive / warning */
   --destructive: #f7768e;
   --warning:     #e0af68;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #565f89, transparent 80%);
@@ -497,6 +451,7 @@
   /* Destructive / warning */
   --destructive: #b4637a;
   --warning:     #ea9d34;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #9893a5, transparent 78%);
@@ -579,6 +534,7 @@
   /* Destructive / warning */
   --destructive: #dc322f;
   --warning:     #b58900;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #839496, transparent 78%);
@@ -664,6 +620,7 @@
   /* Destructive / warning */
   --destructive: #dc322f;
   --warning:     #b58900;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #586e75, transparent 80%);
@@ -740,6 +697,7 @@
   /* Destructive / warning */
   --destructive: #ff5555;
   --warning:     #f1fa8c;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #6272a4, transparent 80%);
@@ -815,6 +773,7 @@
   /* Destructive / warning */
   --destructive: #d20f39;   /* red */
   --warning:     #df8e1d;   /* yellow */
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #9ca0b0, transparent 78%);
@@ -904,6 +863,7 @@
   /* Destructive / warning */
   --destructive: #f38ba8;
   --warning:     #f9e2af;
+  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #6c7086, transparent 80%);
@@ -1018,18 +978,21 @@ html[data-shell="flow"] [data-shell-topbar]{position:sticky;top:0}
   font-family: var(--font);
 }
 
-/* Error toast — rose brand color */
+/* Error toast — same solid destructive swatch + paired ink as the
+   destructive button variant (button.tsx), instead of a one-off mixed
+   background paired with a hardcoded literal that drifts from it per theme. */
 [data-sonner-toast][data-type='error'][data-styled='true'] {
-  background: color-mix(in oklab, var(--destructive), var(--background) 20%);
-  border-color: color-mix(in oklab, var(--destructive), transparent 40%);
-  color: #fff;
+  background: var(--destructive);
+  border-color: var(--destructive);
+  color: var(--destructive-foreground);
 }
 
-/* Warning toast — amber brand color */
+/* Warning toast — solid warning swatch + its own per-theme ink pick,
+   following the same pattern as the domain-color foreground tokens above. */
 [data-sonner-toast][data-type='warning'][data-styled='true'] {
-  background: color-mix(in oklab, var(--warning), var(--background) 20%);
-  border-color: color-mix(in oklab, var(--warning), transparent 40%);
-  color: oklch(0.15 0.02 74);
+  background: var(--warning);
+  border-color: var(--warning);
+  color: var(--warning-foreground);
 }
 
 /* Action button — override Sonner's [data-button] defaults (030) with 040 so

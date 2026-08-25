@@ -24,7 +24,7 @@
  * These tests assert the correct post-Fix-C behaviour.
  */
 import { describe, it, expect } from 'vitest'
-import { loadFixture, parseFixture, TEST_VAULT, rootsOf } from './helpers'
+import { loadFixture, parseFixture, TEST_VAULT, rootsOf, itemsOf, dataOf } from './helpers'
 import { parseToStoreItems } from '@/model/storeItems'
 import { toggleDone } from '@/model/storeOps'
 import { expandRange } from '@/model/expansion'
@@ -74,15 +74,15 @@ describe('toggle works across a simulated reconcile (Fix A + Fix C)', () => {
 
     // parse2: reconcile rebuilds the store from the same content
     const parse2 = parseToStoreItems('weekly-series.md', content, TEST_VAULT)
-    const freshStore: StoreData = { items: parse2.items, roots }
+    const freshStore: StoreData = dataOf(parse2.items, roots)
 
     // With deterministic IDs, occ.ownerId matches the series in the fresh store
-    const freshSeriesIds = new Set(freshStore.items.filter(isSeries).map(i => i.id))
+    const freshSeriesIds = new Set(itemsOf(freshStore).filter(isSeries).map(i => i.id))
     expect(freshSeriesIds.has(occ.ownerId!)).toBe(true)
 
     // toggleDone against the fresh store correctly creates an override
     const next = toggleDone(freshStore, occ)
-    const nextOccs = expandRange(next.items, roots, new Date('2026-01-01'), new Date('2026-12-31'))
+    const nextOccs = expandRange(itemsOf(next), roots, new Date('2026-01-01'), new Date('2026-12-31'))
     const toggled = nextOccs.find(o => o.date === '2026-04-20')!
     expect(toggled).toBeDefined()
     expect(toggled.metadata.done).toBe(true)

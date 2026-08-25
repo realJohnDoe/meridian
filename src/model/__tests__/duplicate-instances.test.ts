@@ -6,7 +6,7 @@ import { collapseToYaml } from '@/model/collapse'
 import { saveFile } from '@/model/inheritance'
 import { isSeries } from '@/types'
 import type { Occurrence, Roots, StoreItem } from '@/types'
-import { TEST_VAULT, rootsOf } from './helpers'
+import { TEST_VAULT, rootsOf, itemsOf, rootsIn, dataOf } from './helpers'
 
 // A daily recurring series that has ended up with TWO override instances on the
 // same date — one completed, one not. This is the shape produced by e.g.
@@ -66,8 +66,8 @@ describe('two override instances on the same date (recurring series)', () => {
     const undone = occsOn(parsed.items, roots, '2026-07-08').find(o => !o.metadata.done)!
     expect(undone).toBeTruthy()
 
-    const next = toggleDone({ items: parsed.items, roots }, undone)
-    const after = occsOn(next.items, next.roots, '2026-07-08')
+    const next = toggleDone(dataOf(parsed.items, roots), undone)
+    const after = occsOn(itemsOf(next), rootsIn(next), '2026-07-08')
     // Both instances are now done — the toggle hit the undone one, not the
     // already-completed sibling.
     expect(after).toHaveLength(2)
@@ -80,8 +80,8 @@ describe('two override instances on the same date (recurring series)', () => {
     const done = occsOn(parsed.items, roots, '2026-07-08').find(o => o.metadata.done)!
 
     // Un-complete the done one → the other stays undone.
-    const next = toggleDone({ items: parsed.items, roots }, done)
-    const after = occsOn(next.items, next.roots, '2026-07-08')
+    const next = toggleDone(dataOf(parsed.items, roots), done)
+    const after = occsOn(itemsOf(next), rootsIn(next), '2026-07-08')
     expect(after.every(o => o.metadata.done === false)).toBe(true)
   })
 
@@ -90,8 +90,8 @@ describe('two override instances on the same date (recurring series)', () => {
     const roots = rootsOf(parsed.root)
     const undone = occsOn(parsed.items, roots, '2026-07-08').find(o => !o.metadata.done)!
 
-    const next = excludeOccurrence({ items: parsed.items, roots }, undone)
-    const after = occsOn(next.items, next.roots, '2026-07-08')
+    const next = excludeOccurrence(dataOf(parsed.items, roots), undone)
+    const after = occsOn(itemsOf(next), rootsIn(next), '2026-07-08')
     expect(after).toHaveLength(1)
     expect(after[0]!.metadata.done).toBe(true)  // the completed one survives
   })

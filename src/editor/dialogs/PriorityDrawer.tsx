@@ -41,6 +41,7 @@ export default function PriorityDrawer({ open, value, onSelect, onClose }: Props
           {PRIORITIES.map((p) => (
             <button
               key={p.value}
+              type="button"
               onClick={() => setPending(p.value)}
               aria-pressed={pending === p.value}
               className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center', PRIORITY_CLASS[p.value])}

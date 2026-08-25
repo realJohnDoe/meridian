@@ -11,14 +11,14 @@
 import { describe, it, expect } from 'vitest'
 import * as storeOps from '@/model/storeOps'
 import type { StoreData, EditFields } from '@/model/storeOps'
-import { parseFixture, rootsOf, NEW_TARGET, keyOf } from './helpers'
+import { parseFixture, rootsOf, NEW_TARGET, keyOf, dataOf, itemsOf, rootsIn } from './helpers'
 import { entryKey } from '@/fileIO'
 import { expandRange } from '@/model/expansion'
 import type { Occurrence, Roots, StoreItem } from '@/types'
 
 function fixtureData(name: string): StoreData {
   const parsed = parseFixture(name)
-  return { items: parsed.items, roots: rootsOf(parsed.root) }
+  return dataOf(parsed.items, rootsOf(parsed.root))
 }
 
 function occOn(items: StoreItem[], roots: Roots, dateISO: string): Occurrence {
@@ -52,14 +52,14 @@ function editFields(occ: Occurrence, over: Partial<EditFields> = {}): EditFields
  * dropping the bag.
  */
 function expectExtrasPreserved(before: StoreData, after: StoreData): void {
-  const beforeItems = new Map(before.items.map(i => [i.id, i]))
-  for (const item of after.items) {
+  const beforeItems = new Map(itemsOf(before).map(i => [i.id, i]))
+  for (const item of itemsOf(after)) {
     const prev = beforeItems.get(item.id)
     if (!prev?.metadata.extra) continue
     expect(item.metadata.extra, `item ${item.id} (${item.date})`).toMatchObject(prev.metadata.extra)
   }
-  for (const [slug, root] of after.roots) {
-    const prev = before.roots.get(slug)
+  for (const [slug, root] of rootsIn(after)) {
+    const prev = rootsIn(before).get(slug)
     if (!prev?.extra) continue
     expect(root.extra, `root ${slug}`).toMatchObject(prev.extra)
   }
@@ -86,30 +86,35 @@ const GENERATED = '2026-04-27'
 const ANCHOR = '2026-04-06'
 
 const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
-  'applyEdit/all': d => storeOps.applyEdit(d, occOn(d.items, d.roots, ANCHOR), 'all',
-    editFields(occOn(d.items, d.roots, ANCHOR), { duration: '45m' }), NEW_TARGET),
-  'applyEdit/single': d => storeOps.applyEdit(d, occOn(d.items, d.roots, DIVERGING), 'single',
-    editFields(occOn(d.items, d.roots, DIVERGING), { priority: 'high' }), NEW_TARGET),
-  'applyEdit/single-generated': d => storeOps.applyEdit(d, occOn(d.items, d.roots, GENERATED), 'single',
-    editFields(occOn(d.items, d.roots, GENERATED), { priority: 'high' }), NEW_TARGET),
-  'applyEdit/future': d => storeOps.applyEdit(d, occOn(d.items, d.roots, GENERATED), 'future',
-    editFields(occOn(d.items, d.roots, GENERATED), { duration: '15m' }), NEW_TARGET),
-  'applyEdit/add': d => storeOps.applyEdit(d, occOn(d.items, d.roots, ANCHOR), 'add',
-    editFields(occOn(d.items, d.roots, ANCHOR), { scheduled: { date: '2026-08-03', time: '' } }), NEW_TARGET),
+  'applyEdit/all': d => storeOps.applyEdit(d, occOn(itemsOf(d), rootsIn(d), ANCHOR), 'all',
+    editFields(occOn(itemsOf(d), rootsIn(d), ANCHOR), { duration: '45m' }), NEW_TARGET),
+  'applyEdit/single': d => storeOps.applyEdit(d, occOn(itemsOf(d), rootsIn(d), DIVERGING), 'single',
+    editFields(occOn(itemsOf(d), rootsIn(d), DIVERGING), { priority: 'high' }), NEW_TARGET),
+  'applyEdit/single-generated': d => storeOps.applyEdit(d, occOn(itemsOf(d), rootsIn(d), GENERATED), 'single',
+    editFields(occOn(itemsOf(d), rootsIn(d), GENERATED), { priority: 'high' }), NEW_TARGET),
+  'applyEdit/future': d => storeOps.applyEdit(d, occOn(itemsOf(d), rootsIn(d), GENERATED), 'future',
+    editFields(occOn(itemsOf(d), rootsIn(d), GENERATED), { duration: '15m' }), NEW_TARGET),
+  'applyEdit/add': d => storeOps.applyEdit(d, occOn(itemsOf(d), rootsIn(d), ANCHOR), 'add',
+    editFields(occOn(itemsOf(d), rootsIn(d), ANCHOR), { scheduled: { date: '2026-08-03', time: '' } }), NEW_TARGET),
   'applyEdit/new': d => storeOps.applyEdit(d, null, 'all',
-    editFields(occOn(d.items, d.roots, ANCHOR), { title: 'A brand new entry' }), NEW_TARGET),
+    editFields(occOn(itemsOf(d), rootsIn(d), ANCHOR), { title: 'A brand new entry' }), NEW_TARGET),
   // Patched with the SERIES' metadata, which is what applySingle does — the
   // shape that can clobber the target's own bag.
-  upsertOverride: d => ({
-    items: storeOps.upsertOverride(d.items, occOn(d.items, d.roots, DIVERGING), {
-      metadata: storeOps.occFromAppMeta(occOn(d.items, d.roots, ANCHOR).metadata),
-    }),
-    roots: d.roots,
-  }),
-  toggleDone: d => storeOps.toggleDone(d, occOn(d.items, d.roots, DIVERGING)),
-  'toggleDone/generated': d => storeOps.toggleDone(d, occOn(d.items, d.roots, GENERATED)),
-  excludeOccurrence: d => storeOps.excludeOccurrence(d, occOn(d.items, d.roots, GENERATED)),
-  deleteFollowing: d => storeOps.deleteFollowing(d, occOn(d.items, d.roots, GENERATED)),
+  upsertOverride: d => {
+    // `upsertOverride` takes one entry's occurrences now, not the whole store's.
+    const [entry] = [...d.entries.values()]
+    if (!entry) throw new Error('fixture has no entry')
+    return dataOf(
+      storeOps.upsertOverride(entry.items, occOn(itemsOf(d), rootsIn(d), DIVERGING), {
+        metadata: storeOps.occFromAppMeta(occOn(itemsOf(d), rootsIn(d), ANCHOR).metadata),
+      }),
+      rootsIn(d),
+    )
+  },
+  toggleDone: d => storeOps.toggleDone(d, occOn(itemsOf(d), rootsIn(d), DIVERGING)),
+  'toggleDone/generated': d => storeOps.toggleDone(d, occOn(itemsOf(d), rootsIn(d), GENERATED)),
+  excludeOccurrence: d => storeOps.excludeOccurrence(d, occOn(itemsOf(d), rootsIn(d), GENERATED)),
+  deleteFollowing: d => storeOps.deleteFollowing(d, occOn(itemsOf(d), rootsIn(d), GENERATED)),
   // Removes its target file by design; the property still holds for every file
   // it does not touch, which is what this case pins down.
   deleteByEntryKey: d => storeOps.deleteByEntryKey(d, keyOf('some-other-file')).data,
@@ -117,7 +122,7 @@ const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
   // NEW key, so the root half of the property is vacuous here and is asserted
   // directly in move-entry.test.ts instead; the items keep their ids, so their
   // bags are checked by the property exactly as for any other operation.
-  moveEntryKey: d => storeOps.moveEntryKey(d, [...d.roots.keys()][0]!, entryKey('other-vault', 'moved')),
+  moveEntryKey: d => storeOps.moveEntryKey(d, [...rootsIn(d).keys()][0]!, entryKey('other-vault', 'moved')),
 }
 
 /**
@@ -133,6 +138,7 @@ const EXEMPT: Record<string, string> = {
   newEntryKey: 'pure key allocation — returns a string, never touches metadata',
   freeEntryKey: 'pure key allocation — returns a string, never touches metadata',
   moveLinkBreakage: 'read-only count of what a move would break — returns keys and refs',
+  groupIntoEntries: 'pure regrouping — carries the same root and item objects into one map, by reference',
 }
 
 describe('unknown keys survive every store operation', () => {
@@ -144,7 +150,7 @@ describe('unknown keys survive every store operation', () => {
 
   // Same operations against a CONTAINER-rooted file, where the unknown keys are
   // owned by FileMetadata rather than by an item — a different code path
-  // (updateRoot) with its own way to drop them. The fixture's first series is
+  // (editedEntry) with its own way to drop them. The fixture's first series is
   // weekly-Monday from 2026-04-01, so it has occurrences on the same dates.
   it.each(Object.keys(OPERATIONS))('%s preserves a container root\'s extras', (name) => {
     const before = fixtureData('unknown-keys-container')
@@ -153,7 +159,7 @@ describe('unknown keys survive every store operation', () => {
 
   it('occFromAppMeta carries the bag through the AppMetadata → OccurrenceMetadata conversion', () => {
     const data = fixtureData('unknown-keys-series')
-    const occ = occOn(data.items, data.roots, '2026-04-20')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     expect(storeOps.occFromAppMeta(occ.metadata).extra).toEqual(occ.metadata.extra)
   })
 

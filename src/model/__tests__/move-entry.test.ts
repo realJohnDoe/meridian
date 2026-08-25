@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'
 import { freeEntryKey, moveEntryKey, moveLinkBreakage } from '@/model/storeOps'
 import type { StoreData } from '@/model/storeOps'
+import { dataOf, itemsOf, rootsIn } from './helpers'
 import { entryKey, keySlug } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import type { Roots, StoreItem } from '@/types'
@@ -23,12 +24,12 @@ const k = (vaultId: string, slug: string): EntryKey => entryKey(vaultId, slug)
 /** Parse `yaml` into `vaultId` under `slug`, appending to a growing snapshot. */
 function add(data: StoreData, vaultId: string, slug: string, yaml: string): StoreData {
   const parsed = parseToStoreItems(`${slug}.md`, yaml, vaultId)
-  const roots: Roots = new Map(data.roots)
+  const roots: Roots = new Map(rootsIn(data))
   roots.set(k(vaultId, slug), parsed.root)
-  return { items: [...data.items, ...parsed.items], roots }
+  return dataOf([...itemsOf(data), ...parsed.items], roots)
 }
 
-const EMPTY: StoreData = { items: [], roots: new Map() }
+const EMPTY: StoreData = dataOf([])
 
 const MEETING_YAML = `---
 title: Meeting notes
@@ -115,19 +116,19 @@ describe('moveEntryKey', () => {
     const before = snapshot()
     const after  = moveEntryKey(before, from, to)
 
-    expect(after.items.filter(i => i.entryKey === from)).toHaveLength(0)
-    expect(after.items.filter(i => i.entryKey === to))
-      .toHaveLength(before.items.filter((i: StoreItem) => i.entryKey === from).length)
+    expect(itemsOf(after).filter(i => i.entryKey === from)).toHaveLength(0)
+    expect(itemsOf(after).filter(i => i.entryKey === to))
+      .toHaveLength(itemsOf(before).filter((i: StoreItem) => i.entryKey === from).length)
     // Every other file's items keep their keys.
-    expect(after.items.filter(i => i.entryKey === k(WORK, 'weekly-review'))).toHaveLength(
-      before.items.filter(i => i.entryKey === k(WORK, 'weekly-review')).length,
+    expect(itemsOf(after).filter(i => i.entryKey === k(WORK, 'weekly-review'))).toHaveLength(
+      itemsOf(before).filter(i => i.entryKey === k(WORK, 'weekly-review')).length,
     )
   })
 
   it('moves the root to the new key and re-derives its provenance', () => {
     const after = moveEntryKey(snapshot(), from, to)
-    expect(after.roots.has(from)).toBe(false)
-    const root = after.roots.get(to)
+    expect(rootsIn(after).has(from)).toBe(false)
+    const root = rootsIn(after).get(to)
     expect(root?.vaultId).toBe(HOME)
     expect(root?.fileSlug).toBe('meeting-notes')
   })
@@ -135,8 +136,8 @@ describe('moveEntryKey', () => {
   it('carries the root\'s body, title and items over verbatim', () => {
     const before = snapshot()
     const after  = moveEntryKey(before, from, to)
-    const prev   = before.roots.get(from)
-    const next   = after.roots.get(to)
+    const prev   = rootsIn(before).get(from)
+    const next   = rootsIn(after).get(to)
     expect(next?.body).toBe(prev?.body)
     expect(next?.title).toBe('Meeting notes')
     expect(next?.items).toEqual(prev?.items)
@@ -148,8 +149,8 @@ describe('moveEntryKey', () => {
   it('carries a container root\'s unknown keys over', () => {
     const d      = add(EMPTY, WORK, 'trip', CONTAINER_YAML)
     const after  = moveEntryKey(d, k(WORK, 'trip'), k(HOME, 'trip'))
-    expect(after.roots.get(k(HOME, 'trip'))?.extra).toEqual(d.roots.get(k(WORK, 'trip'))?.extra)
-    expect(after.roots.get(k(HOME, 'trip'))?.extra?.owner).toBe('alice')
+    expect(rootsIn(after).get(k(HOME, 'trip'))?.extra).toEqual(rootsIn(d).get(k(WORK, 'trip'))?.extra)
+    expect(rootsIn(after).get(k(HOME, 'trip'))?.extra?.owner).toBe('alice')
   })
 
   it('lands on the allocated slug when the target vault already owns the old one', () => {
@@ -157,20 +158,20 @@ describe('moveEntryKey', () => {
     const toKey  = freeEntryKey(d, HOME, 'meeting-notes')
     const after  = moveEntryKey(d, from, toKey)
     // The target vault's own file is untouched — the move sat down beside it.
-    expect(after.roots.get(k(HOME, 'meeting-notes'))?.title).toBe('Project Alpha')
-    expect(after.roots.get(k(HOME, 'meeting-notes-2'))?.title).toBe('Meeting notes')
+    expect(rootsIn(after).get(k(HOME, 'meeting-notes'))?.title).toBe('Project Alpha')
+    expect(rootsIn(after).get(k(HOME, 'meeting-notes-2'))?.title).toBe('Meeting notes')
   })
 
   it('leaves the entries that linked to it alone — the links break, they are not rewritten', () => {
     const after = moveEntryKey(snapshot(), from, to)
-    expect(after.roots.get(k(WORK, 'weekly-review'))?.items).toEqual(['[[meeting-notes]]'])
+    expect(rootsIn(after).get(k(WORK, 'weekly-review'))?.items).toEqual(['[[meeting-notes]]'])
   })
 
   it('is a no-op on items and roots for an entry that is not there', () => {
     const before = snapshot()
     const after  = moveEntryKey(before, k(WORK, 'nothing-here'), k(HOME, 'nothing-here'))
-    expect(after.roots.size).toBe(before.roots.size)
-    expect(after.items).toHaveLength(before.items.length)
+    expect(rootsIn(after).size).toBe(rootsIn(before).size)
+    expect(itemsOf(after)).toHaveLength(itemsOf(before).length)
   })
 
   it('keeps series items intact apart from their key', () => {
@@ -183,9 +184,9 @@ repeat:
 ---
 `)
     const after = moveEntryKey(d, k(WORK, 'standup'), k(HOME, 'standup'))
-    const series = after.items.find(isSeries)
+    const series = itemsOf(after).find(isSeries)
     expect(series?.entryKey).toBe(k(HOME, 'standup'))
-    expect(series?.repeat).toEqual(d.items.find(isSeries)?.repeat)
+    expect(series?.repeat).toEqual(itemsOf(d).find(isSeries)?.repeat)
   })
 })
 

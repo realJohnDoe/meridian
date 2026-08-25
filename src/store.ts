@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { StoreItem, Roots } from './types'
+import type { StoreItem, Roots, Entries } from './types'
 import type { LocalePrefs } from '@/model'
 import type { VaultRef } from './vaultRef'
 import { warmFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
@@ -71,57 +71,138 @@ function writeJSON(key: string, value: unknown): void {
 
 // ── LAYERS ──────────────────────────────────────────────────────────────────
 
-/** One registered vault's parsed content. */
-export interface VaultLayer {
+/** One vault's slice of the store — the shape `getVaultLayer`/`setVaultLayer` trade in. */
+export type VaultLayer = Entries
+
+const EMPTY_LAYER: VaultLayer = new Map()
+
+/**
+ * Replace `vaultId`'s entries with `next`, leaving every other vault's entries
+ * at their existing position in the map.
+ *
+ * `next` lands where that vault's own entries currently start, not appended
+ * after everyone else's — otherwise the vault being written would migrate to
+ * the tail on every single write to it, which is the common case (an edit, a
+ * reconcile). A vault with no entries yet — new, or currently empty — gets
+ * `next` appended, same as where a newly-registered vault would land.
+ * Positional stability matters because `hasSameStructure`
+ * (model/expansionCache.ts) compares the derived `items` array by index: a
+ * merge that reorders unrelated vaults on every write makes every entry look
+ * changed, silently degrading the incremental expansion cache to a full
+ * re-expansion.
+ */
+function spliceVaultEntries(entries: Entries, vaultId: string, next: Entries): Entries {
+  const result: Entries = new Map()
+  let inserted = false
+  const insert = (): void => { for (const [k, e] of next) result.set(k, e) }
+  for (const [key, entry] of entries) {
+    if (keyVaultId(key) !== vaultId) { result.set(key, entry); continue }
+    if (!inserted) { insert(); inserted = true }
+  }
+  if (!inserted) insert()
+  return result
+}
+
+/** Partition the store's entries by vault. Every entry carries its vault in its `EntryKey`, so this is exact. */
+function partitionByVault(entries: Entries): Map<string, VaultLayer> {
+  const byVault = new Map<string, VaultLayer>()
+  for (const [key, entry] of entries) {
+    const vaultId = keyVaultId(key)
+    let layer = byVault.get(vaultId)
+    if (!layer) { layer = new Map(); byVault.set(vaultId, layer) }
+    layer.set(key, entry)
+  }
+  return byVault
+}
+
+interface LayerPartitionMemo { entries: Entries; byVault: Map<string, VaultLayer> }
+// A one-entry Map, matching fileOccurrenceMap's memo (fileOccurrence.ts) —
+// `vaultLayer` is called from `getVaultLayer` (storeBridge.ts), which render
+// paths may call, so it stays pure: same `entries` in, same partition out, by
+// reference.
+const LAYER_PARTITION_KEY = 'partition'
+const layerPartitionMemo = new Map<typeof LAYER_PARTITION_KEY, LayerPartitionMemo>()
+
+/**
+ * A vault's slice of the store, memoized on `entries` identity.
+ * Empty for a vault with no entries — including one that isn't registered at
+ * all; nothing downstream needs to tell those two apart (see
+ * `mergeChangedIntoStore`, storage/sync.ts, the one production reader).
+ */
+export function vaultLayer(entries: Entries, vaultId: string): VaultLayer {
+  const prev = layerPartitionMemo.get(LAYER_PARTITION_KEY)
+  const byVault = prev && prev.entries === entries
+    ? prev.byVault
+    : partitionByVault(entries)
+  if (byVault !== prev?.byVault) layerPartitionMemo.set(LAYER_PARTITION_KEY, { entries, byVault })
+  return byVault.get(vaultId) ?? EMPTY_LAYER
+}
+
+// ── DERIVED FLAT VIEWS ──────────────────────────────────────────────────────
+
+/**
+ * `entries` is the store's single stored form; `items` and `roots` are derived
+ * from it — the flat shapes `expandRange`, the calendar and every view still
+ * take, so reshaping the store changed none of their signatures.
+ *
+ * Derived **once per commit and stored**, not recomputed per read. A zustand
+ * selector that rebuilt a fresh array on every call would return a new
+ * reference to every `useStore(s => s.items)` subscriber on every unrelated
+ * store write, which is both a render storm and a lie to the four caches below.
+ *
+ * Reference identity is load-bearing in four independent places, and value
+ * equality is not enough for any of them:
+ *
+ * - `setData` reuses the backlink index when `roots === prevRoots`;
+ * - `fileOccurrenceMap` memoizes on `entries`/`roots` identity, and its
+ *   incremental path on `prevEntries.get(key) === entries.get(key)`;
+ * - `computeExpansionCache` overlays only items failing `item === prev.items[i]`;
+ * - `useAgendaSections` caches on top of that.
+ *
+ * Per-element identity comes for free: an untouched `Entry` hands back the very
+ * same `root` object and the very same `StoreItem` objects it always held. The
+ * *containers* are what need care, which is what `sameItems`/`sameRoots` below
+ * are for — without them an occurrence-only edit would hand out a fresh `roots`
+ * Map and rebuild the backlink index on every keystroke.
+ */
+export interface DerivedViews {
   items: StoreItem[]
   roots: Roots
 }
 
-const EMPTY_LAYER: VaultLayer = { items: [], roots: new Map() }
+/** Element-wise reference comparison — `next` was just built, so this is the only way to tell it apart from `prev`. */
+function sameItems(prev: StoreItem[], next: StoreItem[]): boolean {
+  if (prev.length !== next.length) return false
+  return prev.every((item, i) => item === next[i])
+}
 
-/**
- * Flatten every registered vault's layer into the single `items`/`roots` view
- * every existing consumer already reads. Layer insertion order decides the
- * merged order, and `Map` preserves it, so the merge is stable across writes
- * to any one layer.
- */
-function flattenLayers(layers: Map<string, VaultLayer>): { items: StoreItem[]; roots: Roots } {
-  const items: StoreItem[] = []
-  const roots: Roots = new Map()
-  for (const layer of layers.values()) {
-    items.push(...layer.items)
-    for (const [key, meta] of layer.roots) roots.set(key, meta)
+function sameRoots(prev: Roots, next: Roots): boolean {
+  if (prev.size !== next.size) return false
+  for (const [key, root] of next) {
+    if (prev.get(key) !== root) return false
   }
-  return { items, roots }
+  return true
 }
 
 /**
- * Split a merged `items`/`roots` pair back out into per-vault layers.
+ * Flatten `entries` into the two derived views, reusing `prev`'s containers
+ * whenever the flattening came out reference-identical.
  *
- * Needed because the domain layer commits *merged* data: `commitNext` hands
- * `setData` the whole store after an edit computed against the merged
- * snapshot, and the layers have to follow or the next `setVaultLayer` (a
- * reconcile landing for some other vault) would re-flatten stale content over
- * that edit. Every entry carries its vault in its `EntryKey`, so this is an
- * exact re-partition, not a heuristic.
- *
- * `seedIds` keeps registered-but-empty vaults present as empty layers — a
- * vault with no entries must still be a key here, or `getVaultLayer` would
- * report it as missing.
+ * The reuse is the point, not an optimization detail: `toggleDone` and
+ * `excludeOccurrence` change an occurrence and nothing file-level, and the
+ * caches downstream are entitled to notice that `roots` did not move.
  */
-function partitionLayers(
-  items: StoreItem[], roots: Roots, seedIds: Iterable<string>,
-): Map<string, VaultLayer> {
-  const layers = new Map<string, VaultLayer>()
-  const bucket = (vaultId: string): VaultLayer => {
-    let layer = layers.get(vaultId)
-    if (!layer) { layer = { items: [], roots: new Map() }; layers.set(vaultId, layer) }
-    return layer
+export function deriveViews(entries: Entries, prev: DerivedViews | null): DerivedViews {
+  const items: StoreItem[] = []
+  const roots: Roots = new Map()
+  for (const [key, entry] of entries) {
+    for (const item of entry.items) items.push(item)
+    roots.set(key, entry.root)
   }
-  for (const id of seedIds) bucket(id)
-  for (const item of items) bucket(keyVaultId(item.entryKey)).items.push(item)
-  for (const [key, meta] of roots) bucket(keyVaultId(key)).roots.set(key, meta)
-  return layers
+  return {
+    items: prev && sameItems(prev.items, items) ? prev.items : items,
+    roots: prev && sameRoots(prev.roots, roots) ? prev.roots : roots,
+  }
 }
 
 // ── PER-VAULT SYNC STATUS ───────────────────────────────────────────────────
@@ -165,11 +246,20 @@ export const emptySyncStatus = (): VaultSyncStatus => ({
 
 interface MeridianStore {
   // ── Data ────────────────────────────────────────────────────────
-  /** The flattened merge of every registered vault's layer. */
+  /**
+   * The store's single stored form: every entry of every registered vault,
+   * each one a `{ key, root, items }` object rather than two halves in two
+   * unrelated collections. `vaultLayer` derives one vault's slice on demand.
+   */
+  entries: Entries
+  /**
+   * Derived from `entries`, recomputed once per commit — see `deriveViews`.
+   * These are the flat shapes `expandRange`, the calendar and every view take;
+   * they are stored rather than selected so their reference identity survives
+   * unrelated writes.
+   */
   items: StoreItem[]
   roots: Roots
-  /** Parsed content per registered vault. `items`/`roots` above are its merge. */
-  layers: Map<string, VaultLayer>
   /**
    * Derived: target EntryKey → the EntryKeys that link to it. Recomputed on
    * every setData, which is affordable (~1 ms on a 300-file vault) and
@@ -181,12 +271,9 @@ interface MeridianStore {
    * the `useFileOccurrenceMap` hook.
    */
   backlinks: Map<EntryKey, EntryKey[]>
-  /**
-   * Set the merged items and roots together atomically, re-partitioning them
-   * back into per-vault layers. The domain layer's commit path.
-   */
-  setData: (data: { items: StoreItem[]; roots: Roots }) => void
-  /** Replace one registered vault's content and re-merge. The storage layer's path. */
+  /** Replace every entry atomically. The domain layer's commit path. */
+  setData: (entries: Entries) => void
+  /** Replace one registered vault's slice of the merge. The storage layer's path. */
   setVaultLayer: (vaultId: string, data: VaultLayer) => void
   /** Drop a vault's content entirely (unregistering it). */
   removeVaultLayer: (vaultId: string) => void
@@ -378,45 +465,42 @@ function migrateParticipantFilter(
 }
 
 export const useStore = create<MeridianStore>((set, get) => {
-  /** Commit a layer map: store it, re-flatten, and refresh the derived indexes. */
-  function applyLayers(layers: Map<string, VaultLayer>): void {
-    const { items, roots } = flattenLayers(layers)
-    set({ layers, items, roots, backlinks: buildBacklinkIndex(roots) })
-    warmFileOccurrenceMap(items, roots)
+  /**
+   * Store `entries`, refresh the views derived from it, and refresh the derived
+   * indexes. The single write path — every setter below goes through it, so the
+   * derived views can never be stale with respect to `entries`.
+   */
+  function commitMerged(entries: Entries): void {
+    const { items: prevItems, roots: prevRoots, backlinks: prevBacklinks } = get()
+    const { items, roots } = deriveViews(entries, { items: prevItems, roots: prevRoots })
+    // backlinks depend only on roots; reuse the prior index when roots is reference-stable.
+    const backlinks = roots === prevRoots ? prevBacklinks : buildBacklinkIndex(roots)
+    set({ entries, items, roots, backlinks })
+    // Off the critical path on purpose — this is the expensive derived index,
+    // and nothing painted at cold start reads it. Warming it during idle keeps
+    // the editor/search consumers from paying for it on open either.
+    warmFileOccurrenceMap(entries, roots)
   }
 
   return {
+    entries: new Map(),
     items:  [],
     roots:  new Map(),
-    layers: new Map(),
     backlinks: new Map(),
 
-    setData: ({ items, roots }) => {
-      const { roots: prevRoots, backlinks: prevBacklinks, layers: prevLayers } = get()
-      // backlinks depend only on roots; reuse the prior index when roots is reference-stable.
-      const backlinks = roots === prevRoots ? prevBacklinks : buildBacklinkIndex(roots)
-      // The merged arrays are stored exactly as handed over (callers rely on
-      // that reference identity for their own memo deps); only the layer
-      // partition is re-derived.
-      set({ items, roots, backlinks, layers: partitionLayers(items, roots, prevLayers.keys()) })
-      // Off the critical path on purpose — this is the expensive derived index,
-      // and nothing painted at cold start reads it. Warming it during idle keeps
-      // the editor/search consumers from paying for it on open either.
-      warmFileOccurrenceMap(items, roots)
-    },
+    setData: (entries) => { commitMerged(entries) },
 
     setVaultLayer: (vaultId, data) => {
-      const layers = new Map(get().layers)
-      layers.set(vaultId, data)
-      applyLayers(layers)
-      const migrated = migrateParticipantFilter(vaultId, data.items, get().hiddenParticipants)
+      commitMerged(spliceVaultEntries(get().entries, vaultId, data))
+      const layerItems = [...data.values()].flatMap(entry => entry.items)
+      const migrated = migrateParticipantFilter(vaultId, layerItems, get().hiddenParticipants)
       if (migrated) set({ hiddenParticipants: migrated })
     },
 
     removeVaultLayer: (vaultId) => {
-      const layers = new Map(get().layers)
-      if (!layers.delete(vaultId)) return
-      applyLayers(layers)
+      const { entries } = get()
+      if (![...entries.keys()].some(key => keyVaultId(key) === vaultId)) return
+      commitMerged(new Map([...entries].filter(([key]) => keyVaultId(key) !== vaultId)))
     },
 
     unreadableFiles: new Map(),
@@ -556,8 +640,3 @@ export const useStore = create<MeridianStore>((set, get) => {
     },
   }
 })
-
-/** A vault's layer, or an empty one when it isn't registered. */
-export function vaultLayer(layers: Map<string, VaultLayer>, vaultId: string): VaultLayer {
-  return layers.get(vaultId) ?? EMPTY_LAYER
-}
