@@ -3,7 +3,6 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/cn"
-import { useVisualViewportHeight, useVisualViewportOffsetTop } from "@/hooks"
 
 const Dialog = DialogPrimitive.Root
 
@@ -31,28 +30,21 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
-  style,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   // An open iOS/iPadOS keyboard shrinks the visual viewport but not the layout
-  // viewport this dialog's `top-[50%]` centers against, so without this it stays
-  // centered on the full (partly keyboard-covered) screen. Override `top` in real
-  // pixels to center within what's actually visible, and cap height to match.
-  const viewportHeight = useVisualViewportHeight()
-  const viewportOffsetTop = useVisualViewportOffsetTop()
+  // viewport a plain `top-50%` centers against, so a dialog would stay centred on
+  // the full (partly keyboard-covered) screen. --vv-top/--vv-height track what is
+  // actually visible (published by useVisibleViewportCssVars at the app root), so
+  // centring against them needs no JS here — keeping this file a straight shadcn
+  // registry mirror apart from these two utilities.
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
-        style={{
-          ...(viewportHeight != null ? { maxHeight: `calc(${viewportHeight}px - 2rem)` } : {}),
-          ...(viewportHeight != null && viewportOffsetTop != null
-            ? { top: viewportOffsetTop + viewportHeight / 2 }
-            : {}),
-          ...style,
-        }}
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overflow-x-hidden border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+          "max-h-[calc(var(--vv-height,100svh)-2rem)] top-[calc(var(--vv-top,0px)+var(--vv-height,100svh)/2)]",
+          "fixed left-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overflow-x-hidden border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
           className
         )}
         {...props}

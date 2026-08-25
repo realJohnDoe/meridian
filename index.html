@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- interactive-widget=resizes-content makes an on-screen keyboard shrink the
+         *layout* viewport, not just the visual one — so `svh` units, `position:
+         fixed` and Radix's collision detection all account for it with no JS.
+         Chrome 108+ and Firefox 132+ honour it; Safari/iOS ignores the unknown
+         keyword entirely (WebKit standards-position #65 is still open), which is
+         why the visualViewport corrections in hooks/use-visual-viewport.ts have
+         to stay regardless. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- Status bar colour, as the sRGB hex of the Meridian/Meridian Light

@@ -906,6 +906,12 @@
 /* Element resets in @layer base so Tailwind utilities can override them */
 @layer base {
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  /* Two shell modes, selected by data-shell on <html> (see useShellMode).
+     Default — the calendar routes — is a fixed shell: exactly one screen tall,
+     never scrolling as a document, each pane owning its own scroller. That is
+     what the three virtualizers need, since useVirtualizer is element-scoped
+     (getScrollElement) and its scroll-restore machinery banks offsets off that
+     element's own scroll events. */
   html{height:100svh;overflow:hidden;background:var(--backdrop)}
   body{height:100%;overflow:hidden;background:var(--backdrop)}
   body{color:var(--foreground);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
@@ -916,6 +922,36 @@
 
 #root{height:100%}
 #app{display:flex;height:100%;margin:0 auto;background:var(--background);position:relative}
+
+/* ── FLOW SHELL (entry routes) ──────────────────────────────────────────────
+   The entry editor is the only place in the app where a text input sits inside
+   a scrolling pane, and it contains no virtualizer — so it can afford to put
+   the document itself in flow. That hands keyboard avoidance back to the
+   browser: with a real scrolling document, focusing an input scrolls it above
+   the on-screen keyboard natively, on every platform, with no visualViewport
+   arithmetic. The fixed shell defeats that, because a document that cannot
+   scroll gives the browser nothing to scroll.
+
+   Height becomes min-height throughout so content taller than the screen
+   extends the document rather than being clipped by it. */
+html[data-shell="flow"],
+html[data-shell="flow"] body{height:auto;min-height:100svh;overflow:visible}
+html[data-shell="flow"] #root{height:auto;min-height:100svh}
+html[data-shell="flow"] #app{height:auto;min-height:100svh}
+
+/* The chain between #app and the entry pane: four nested flex wrappers that all
+   clip and cap in the fixed shell (marked data-shell-pane in _app.tsx and the
+   entry panes). Released together — releasing only some leaves the document
+   still unable to overflow, and deleting overflow:hidden from html alone does
+   nothing at all while any of them still holds. Attribute selectors outrank the
+   Tailwind utilities they override, which is why this lives here rather than as
+   a conditional className threaded through three components. */
+html[data-shell="flow"] [data-shell-pane]{overflow:visible;min-height:0;height:auto;flex:1 0 auto}
+
+/* Sticky, not fixed: the topbar is a flex child of the scrolling column, and
+   `fixed` would take it out of flow and collapse the space it occupies. It
+   keeps its own safe-area padding either way. */
+html[data-shell="flow"] [data-shell-topbar]{position:sticky;top:0}
 
 /* ── SEARCH BAR — brand identity widget ─────────────────────────────────────────────────────── */
 /* .search-bar-wrap kept: :focus-within selector + multi-layer shadow can't be Tailwind utilities */

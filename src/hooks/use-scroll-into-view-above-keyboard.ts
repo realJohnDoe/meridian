@@ -1,5 +1,6 @@
 import { useEffect, type RefObject } from 'react'
 import { findScrollParent } from '@/lib/scrollParent'
+import { readVisibleViewport } from './use-visual-viewport'
 
 const MARGIN = 16
 
@@ -10,11 +11,9 @@ const MARGIN = 16
 // can end up hidden once the keyboard settles. Re-checking on resize catches
 // that case (mirrors useFloatingCombobox's keyboard-aware nudge).
 //
-// Reads `window.visualViewport` directly inside the handler rather than via
-// the useVisualViewportHeight/OffsetTop hooks, and always also listens to
-// plain `resize` — Firefox for Android has no visualViewport support at all,
-// and there its keyboard genuinely shrinks window.innerHeight and fires a
-// real `resize` event, so that's the only signal available there.
+// Measures through readVisibleViewport() rather than reading
+// window.visualViewport here, so the cross-browser fallbacks (notably Firefox
+// for Android, which has no visualViewport at all) live in one place.
 export function useScrollIntoViewAboveKeyboard(active: boolean, ref: RefObject<HTMLElement | null>) {
   useEffect(() => {
     if (!active) return
@@ -23,9 +22,8 @@ export function useScrollIntoViewAboveKeyboard(active: boolean, ref: RefObject<H
       const el = ref.current
       if (!el) return
       const rect = el.getBoundingClientRect()
-      const vv = window.visualViewport
-      const visibleTop    = vv?.offsetTop ?? 0
-      const visibleBottom = visibleTop + (vv?.height ?? window.innerHeight)
+      const { top: visibleTop, height } = readVisibleViewport()
+      const visibleBottom = visibleTop + height
 
       let delta = 0
       if (rect.bottom > visibleBottom - MARGIN) delta = rect.bottom - (visibleBottom - MARGIN)
