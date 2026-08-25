@@ -11,7 +11,15 @@ function DimmableCard({ dimmed, className, children, ...props }: DimmableCardPro
   return (
     <Card
       className={cn(
-        'relative bg-card border border-input rounded-lg transition-colors hover:bg-accent',
+        // `isolate` is load-bearing, not cosmetic. The card's children use a
+        // local z-scale — z-0 for the full-bleed click target, z-10 for the
+        // dim scrim, z-20 for the content above both — and those numbers only
+        // ever meant "within this card". Without a stacking context to contain
+        // them they resolve against the page, where z-20 outranks the topbar's
+        // z-10: under the flow shell the card's *background* slides behind the
+        // topbar correctly while its bar and title paint straight over it.
+        // Isolating makes the whole card participate in the page at one level.
+        'relative isolate bg-card border border-input rounded-lg transition-colors hover:bg-accent',
         // Card's own base className always sets shadow-sm (see ui/card.tsx),
         // so removing the shadow when dimmed needs an explicit shadow-none —
         // tailwind-merge only overrides a utility that's actually present in
