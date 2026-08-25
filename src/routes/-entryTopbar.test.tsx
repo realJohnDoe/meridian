@@ -31,7 +31,7 @@ describe('EntryTopbar', () => {
     const { container } = renderTopbar()
     const header = container.querySelector('header')
     expect(header).toBeInTheDocument()
-    expect(header).toHaveAttribute('data-shell-topbar')
+    expect(header).toHaveAttribute('data-topbar')
     expect(header?.querySelector('[data-testid="sync-button"]')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })

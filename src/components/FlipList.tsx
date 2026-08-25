@@ -199,10 +199,10 @@ function useFlipTransition(
  * Deliberately doesn't require the pane to *currently* overflow, for the same
  * reason — whether it does is a property of this commit, not of the element.
  *
- * Falls back to the document scroller rather than null. Under the flow shell
- * (hooks/use-shell-mode.ts) the entry route's panes are `overflow: visible` and
- * the *document* is what scrolls, so the walk above finds nothing — and a null
- * scroller silently turns both halves of the scroll hold below into no-ops.
+ * Falls back to the document scroller rather than null. The entry routes have
+ * no pane of their own — the *document* is what scrolls — so the walk above
+ * finds nothing there, and a null scroller silently turns both halves of the
+ * scroll hold below into no-ops.
  * The fold then loses its pin, the offset clamps in the one layout that reads
  * the natural height, and the list snaps to its new size instead of shrinking
  * in step with the animation.

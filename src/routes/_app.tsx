@@ -3,7 +3,7 @@ import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-
 import { Menu, CalendarCheck2 } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth, weekStartsOn } from '@/model'
-import { useToday, useShellMode } from '@/hooks'
+import { useToday } from '@/hooks'
 import { useStore } from '@/store'
 import {
   useMonthPreview, useDayPreview, useWeekPreview,
@@ -27,8 +27,7 @@ export const Route = createFileRoute('/_app')({
 function AppLayout() {
   return (
     <SidebarProvider
-      className="flex-1 min-h-0 overflow-hidden"
-      data-shell-pane="row"
+      className="h-svh flex-1 min-h-0 overflow-hidden"
       style={{ '--sidebar-width': '260px' } as React.CSSProperties}
     >
       <AppSidebar />
@@ -58,10 +57,6 @@ function AppMain() {
   const weekPreview   = useWeekPreview()
   const ws            = weekStartsOn(useStore(s => s.localePrefs))
 
-  // The calendar routes' lists are virtualized, so they need the fixed shell —
-  // see hooks/use-shell-mode.ts. The entry routes get the flow shell from
-  // their own `_entry` layout instead.
-  useShellMode('fixed')
   const isDayView    = !!dayMatch
   const isWeekView   = !!weekMatch
   const isMonthView  = !!monthMatch
@@ -110,11 +105,11 @@ function AppMain() {
 
   return (
     <>
-      <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden" data-shell-pane="row">
+      <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden">
         <header
           id="mainTop"
           className="h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background z-10 shadow-md"
-          data-shell-topbar
+          data-topbar
         >
           <TopbarShell
             leftHasButton={isMobile}
@@ -189,7 +184,7 @@ function AppMain() {
           />
         </header>
 
-        <section className="flex flex-1 flex-col overflow-hidden min-h-0" data-shell-pane="col">
+        <section className="flex flex-1 flex-col overflow-hidden min-h-0">
           <Outlet />
         </section>
 

@@ -315,14 +315,6 @@ The strip of the layout viewport not covered by an on-screen keyboard — `top`,
 keyboard-aware surface reads, reconciling three incompatible platform APIs.
 → `hooks/use-visual-viewport.ts` · `useVisibleViewport`, `useKeyboardInset`, `readVisibleViewport`
 
-### fixed shell vs flow shell
-The two whole-app layout modes, selected by `data-shell` on `<html>`. **Fixed**
-(default) caps the document at one screen and gives each pane its own scroller —
-what the virtualized calendar routes require. **Flow** lets the document scroll,
-so the browser itself lifts a focused input above the keyboard; entry routes
-only, since they mount no virtualizer.
-→ `hooks/use-shell-mode.ts` · `useShellMode`, `ShellMode`
-
 ## Retired names
 
 Renamed or removed. Listed so a stale doc, an old commit message, or a
@@ -342,3 +334,4 @@ asserts none of these have come back.
 | `updateRoot` | `editedEntry` (takes the entry's occurrences too, so a root can't be updated alone) |
 | `rootOnlyOccurrence` | removed — `Entry['items']` is non-empty, so `fileOccurrenceMap` is total by construction |
 | `useVisualViewportHeight` / `useVisualViewportOffsetTop` | `useVisibleViewport` (one snapshot, with the Firefox-Android fallback) |
+| `useShellMode` / `ShellMode` | removed — `_app` and `_entry` each own their own layout chain, so nothing needs to release a shared one |
