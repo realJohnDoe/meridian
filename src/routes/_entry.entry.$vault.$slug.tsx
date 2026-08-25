@@ -16,7 +16,7 @@ import type { VaultRef } from '@/vaultRef'
 const EntryEditor = lazy(() => import('@/editor').then(m => ({ default: m.EntryEditor })))
 const EntryViewOnly = lazy(() => import('@/editor').then(m => ({ default: m.EntryViewOnly })))
 
-export const Route = createFileRoute('/_app/entry/$vault/$slug')({
+export const Route = createFileRoute('/_entry/entry/$vault/$slug')({
   component: EntrySlugPage,
   validateSearch: (s: Record<string, unknown>): { date?: string; scope?: EditScope; id?: string } => ({
     date:  typeof s.date  === 'string' ? s.date  : undefined,

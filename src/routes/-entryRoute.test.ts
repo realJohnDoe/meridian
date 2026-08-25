@@ -7,7 +7,7 @@ import { newEntryRoute, entryRoute, keyRoute } from './-entryRoute'
 // passes to TanStack Router. The `?? undefined` normalisation matters: a search
 // key set to undefined is dropped from the URL, whereas null or '' would be
 // serialised and then fail validateSearch's typeof checks on the way back in
-// (see _app.entry.new.tsx / _app.entry.$slug.tsx).
+// (see _entry.entry.new.tsx / _entry.entry.$slug.tsx).
 describe('newEntryRoute', () => {
   it('targets the new-entry route with every search key absent by default', () => {
     expect(newEntryRoute()).toEqual({
@@ -73,14 +73,14 @@ describe('entryRoute', () => {
   })
 
   // The date pins which occurrence of a series is being opened;
-  // _app.entry.$vault.$slug.tsx uses it to expandRange before falling back to the file.
+  // _entry.entry.$vault.$slug.tsx uses it to expandRange before falling back to the file.
   it('passes the occurrence date so a series opens on the right instance', () => {
     expect(entryRoute(makeOcc({ date: '2026-07-01' })).search.date).toBe('2026-07-01')
   })
 
   // Date alone doesn't disambiguate two override instances of the same file on
   // the same date (e.g. neither has a time) — `id` is what
-  // _app.entry.$vault.$slug.tsx matches on to land on the exact one clicked.
+  // _entry.entry.$vault.$slug.tsx matches on to land on the exact one clicked.
   it('passes the occurrence id so same-date siblings resolve to the right one', () => {
     expect(entryRoute(makeOcc({ id: 'occ-2' })).search.id).toBe('occ-2')
   })
@@ -95,7 +95,7 @@ describe('keyRoute', () => {
     })
   })
 
-  // The distinction from entryRoute: no date means _app.entry.$vault.$slug.tsx
+  // The distinction from entryRoute: no date means _entry.entry.$vault.$slug.tsx
   // skips the expandRange lookup and resolves straight from the file-occurrence map.
   it('omits date and scope entirely, unlike entryRoute', () => {
     expect(keyRoute(testKey('weekly-review.md')).search).not.toHaveProperty('date')

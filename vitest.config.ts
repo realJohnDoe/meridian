@@ -30,13 +30,14 @@ export default defineConfig({
         // feature-owned ones in their feature dir), where they ARE counted.
         // Don't hand-write first-party files in here.
         'src/components/ui/**',
-        // Route registration: the `_app*` files wire a component to a path and
-        // little else. Deliberately NOT all of src/routes/ — `-` prefixed
-        // files aren't routes at all (TanStack ignores them; see
+        // Route registration: the `_app*`/`_entry*` files wire a component to a
+        // path and little else. Deliberately NOT all of src/routes/ — `-`
+        // prefixed files aren't routes at all (TanStack ignores them; see
         // routeFileIgnorePrefix), they're ordinary modules that live here
         // because their callers do, and __root.tsx / auth.callback.tsx carry
         // real logic. All of those are counted and tested.
         'src/routes/_app*.tsx',
+        'src/routes/_entry*.tsx',
         'src/routeTree.gen.ts',
         'src/main.tsx',
       ],

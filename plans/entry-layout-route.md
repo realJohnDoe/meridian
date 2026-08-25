@@ -4,12 +4,13 @@ Implementation plan for removing the two-mode app shell introduced by
 [#808](https://github.com/realJohnDoe/meridian/pull/808), by making the entry
 routes a sibling layout instead of children of `_app`.
 
-**Status: PR 1 shipped.** Prerequisites
+**Status: PR 1 and PR 2 shipped.** Prerequisites
 [#808](https://github.com/realJohnDoe/meridian/pull/808) and
-[#811](https://github.com/realJohnDoe/meridian/pull/811) shipped; the two
-remaining flow-shell fixes ride along in PR 2 (`src/lib/topChrome.ts`
-and `src/lib/floatingPlacement.test.ts` are added there), so everything named
-below exists on `main` once this merges.
+[#811](https://github.com/realJohnDoe/meridian/pull/811) shipped as part of
+PR 1; PR 2 gave the entry routes their own `_entry` layout route and deleted
+the topbar portal. What's left is PR 3 (delete the two-mode shell) and PR 4
+(unify `findScrollParent`), so everything named below exists on `main` once
+those merge.
 
 ---
 
@@ -52,8 +53,8 @@ content in roughly six.
 **Sonnet 5 for all four PRs.**
 
 Nothing here decides semantics. The target shape is fully specified below, the
-URLs are provably unchanged (see PR 2), and the deletions are mechanical. What
-the work needs is care with *sequencing* — PR 1 exists solely to make PR 2 safe —
+URLs are provably unchanged, and the deletions are mechanical. What the work
+needs is care with *sequencing* — PR 1 existed solely to make PR 2 safe —
 and that sequencing is pinned here rather than left to judgement.
 
 The one thing to slow down on is PR 1's hazard, which is called out inline and
@@ -70,108 +71,14 @@ git history.
 ## Ordering
 
 ```
-PR2 ──► PR3
-        PR4 ─ (independent, any time)
+PR3
+PR4 ─ (independent, any time)
 ```
 
 | # | Title | Model | Est. | Deletes |
 |---|---|---|---|---|
-| 2 | `_entry` layout route; entry routes move under it | Sonnet 5 | 1–1.5d | the topbar portal |
 | 3 | Delete the two-mode shell | Sonnet 5 | 0.5–1d | `useShellMode`, `data-shell*`, `shellPanes.test.ts` |
 | 4 | One `findScrollParent` | Sonnet 5 | 0.5d | a duplicate implementation |
-
----
-
-### PR 2 — `_entry` layout route; entry routes move under it
-
-**Model: Sonnet 5** · 1–1.5d · deletes the topbar portal
-
-**URLs do not change.** `_app` is a *pathless* layout route (leading
-underscore), so it contributes no path segment: `_app.entry.$vault.$slug.tsx`
-serves `/entry/$vault/$slug`. A new pathless `_entry` serves the same paths.
-Confirm after the move by grepping `src/routeTree.gen.ts` for
-`fullPath: '/entry/$vault/$slug'` — it must still be there, unchanged.
-
-This is why **no navigation code needs touching**: `src/routes/-entryRoute.ts`
-and every `navigate({ to: ... })` call site use *paths* (`to: '/entry/$vault/$slug'`),
-not route ids. Only the three `createFileRoute(...)` ids change.
-
-**Steps**
-
-1. **Create `src/routes/_entry.tsx`** — a pathless layout route rendering the
-   flow shell directly, with no `SidebarProvider`, no `SearchBar`, and no
-   header:
-
-   ```tsx
-   export const Route = createFileRoute('/_entry')({ component: EntryLayout })
-
-   function EntryLayout() {
-     return (
-       <div className="mx-auto w-full bg-background">
-         <Outlet />
-       </div>
-     )
-   }
-   ```
-
-   Deliberately no `h-*`, no `min-h-0`, no `overflow-hidden` anywhere in this
-   subtree — that absence *is* the flow shell. Do not reintroduce
-   `data-shell-pane` markers; PR 3 removes them.
-
-2. **Rename the three route files**, changing only the layout prefix:
-
-   | from | to |
-   |---|---|
-   | `_app.entry.$vault.$slug.tsx` | `_entry.entry.$vault.$slug.tsx` |
-   | `_app.entry.$slug.tsx` | `_entry.entry.$slug.tsx` |
-   | `_app.entry.new.tsx` | `_entry.entry.new.tsx` |
-
-   and the matching `createFileRoute('/_app/entry/...')` → `createFileRoute('/_entry/entry/...')`.
-
-3. **Render the topbar directly instead of portalling it.** In a flow document
-   a `sticky top-0` element at the top of the content sticks with no portal at
-   all. Change `-entryTopbar.tsx` to drop `createPortal` and render its own
-   `<header className="sticky top-0 z-20 h-topbar pt-[env(safe-area-inset-top)] …">`,
-   reusing the classes currently on `_app.tsx`'s header.
-
-   Keep the header's existing `z-10` — do not invent a new value. #811 put
-   `isolate` on the card root, which contains the card-local `z-0/10/20` scale
-   so it can no longer outrank the chrome; `z-10` is sufficient *because of*
-   that, and changing it would silently alter stacking relationships this plan
-   has no reason to touch.
-
-4. **Delete `src/routes/-topbarSlot.ts`** and its two imports.
-
-5. **Strip `_app.tsx`.** Remove `isEntryView`, the three `useMatch` calls that
-   feed it (`'/_app/entry/$vault/$slug'`, `'/_app/entry/$slug'`,
-   `'/_app/entry/new'`), the `TopbarSlotContext` wrapper, the `slotEl` state and
-   callback ref, the conditional in the `<header>`, and the `{!isEntryView &&}`
-   guard on `<SearchBar />`. `_app`'s header becomes unconditionally
-   `<TopbarShell …>`.
-
-6. **Leave `useShellMode` alone in this PR.** `_app` keeps
-   `useShellMode('fixed')` and `_entry` sets `'flow'`; PR 3 removes both. Doing
-   it here would mean one PR that both moves routes and changes global CSS, and
-   a device regression could not be bisected between them.
-
-**Gotchas**
-
-- `-entryTopbar.test.tsx` renders through the portal today; it will need the
-  portal expectation removed.
-- The TanStack Router plugin regenerates `src/routeTree.gen.ts` on build. It is
-  gitignored — do not hand-edit it, and run `pnpm run build` before `pnpm run lint`
-  (per the root `CLAUDE.md`, type-aware lint rules resolve types from it).
-- `src/routes/_app*.tsx` is coverage-excluded but `_entry*.tsx` is not matched
-  by that glob. Either extend the exclusion in `vitest.config.ts` to
-  `src/routes/_entry*.tsx` (consistent — these are route registration files) or
-  add tests. Prefer extending the exclusion, and say so in the PR body.
-
-**Verify**
-
-- `pnpm run build && pnpm run lint && pnpm run knip && pnpm run test`
-- `grep "fullPath: '/entry" src/routeTree.gen.ts` — all three paths unchanged.
-- Manually: `/meridian/entry/example/01-start-here` loads, back arrow returns to
-  the agenda, and the agenda's sidebar and search bar still work.
 
 ---
 

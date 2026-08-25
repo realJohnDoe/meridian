@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { TopbarSlotContext } from './-topbarSlot'
 import { EntryTopbar } from './-entryTopbar'
 
 // A collaborator, not the subject: SyncButton drags in the whole sync/store stack.
@@ -10,42 +9,30 @@ vi.mock('@/components', () => ({ SyncButton: () => <div data-testid="sync-button
 interface Opts {
   isFavorited?: boolean
   favoritable?: boolean
-  slot?: HTMLElement | null
 }
 
-function renderTopbar({ isFavorited = false, favoritable = true, slot }: Opts = {}) {
+function renderTopbar({ isFavorited = false, favoritable = true }: Opts = {}) {
   const onToggleFavorite = vi.fn()
   const onDelete = vi.fn()
   const onBack = vi.fn()
-  const slotEl = slot === undefined ? document.createElement('div') : slot
-  if (slotEl) document.body.appendChild(slotEl)
   const view = render(
-    <TopbarSlotContext value={slotEl as HTMLDivElement | null}>
-      <EntryTopbar
-        isFavorited={isFavorited}
-        onToggleFavorite={favoritable ? onToggleFavorite : null}
-        onDelete={onDelete}
-        onBack={onBack}
-      />
-    </TopbarSlotContext>,
+    <EntryTopbar
+      isFavorited={isFavorited}
+      onToggleFavorite={favoritable ? onToggleFavorite : null}
+      onDelete={onDelete}
+      onBack={onBack}
+    />,
   )
-  return { ...view, slotEl, onToggleFavorite, onDelete, onBack }
+  return { ...view, onToggleFavorite, onDelete, onBack }
 }
 
 describe('EntryTopbar', () => {
-  // _app.tsx sets the slot with a callback ref, so the first render of an
-  // entry route happens before the target exists. Rendering the portal then
-  // would throw on a null container.
-  it('renders nothing until the topbar slot exists', () => {
-    const { container } = renderTopbar({ slot: null })
-    expect(container).toBeEmptyDOMElement()
-    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
-  })
-
-  it('portals its controls into the slot rather than rendering in place', () => {
-    const { container, slotEl } = renderTopbar()
-    expect(container).toBeEmptyDOMElement()
-    expect(slotEl!.querySelector('[data-testid="sync-button"]')).toBeInTheDocument()
+  it('renders its own sticky header rather than portaling', () => {
+    const { container } = renderTopbar()
+    const header = container.querySelector('header')
+    expect(header).toBeInTheDocument()
+    expect(header).toHaveAttribute('data-shell-topbar')
+    expect(header?.querySelector('[data-testid="sync-button"]')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
   })
 
@@ -63,12 +50,8 @@ describe('EntryTopbar', () => {
 
   // view-only (an iCal subscription): no source to delete from.
   it('hides the delete button when hideDelete is set', () => {
-    const slotEl = document.createElement('div')
-    document.body.appendChild(slotEl)
     render(
-      <TopbarSlotContext value={slotEl}>
-        <EntryTopbar isFavorited={false} onToggleFavorite={vi.fn()} onBack={vi.fn()} hideDelete />
-      </TopbarSlotContext>,
+      <EntryTopbar isFavorited={false} onToggleFavorite={vi.fn()} onBack={vi.fn()} hideDelete />,
     )
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
   })
@@ -114,12 +97,14 @@ describe('EntryTopbar — edge padding', () => {
   // The back button leads the left edge on every screen size now, so both
   // edges always get the tighter icon-button padding.
   it('tightens the left edge, which leads with the back button', () => {
-    const { slotEl } = renderTopbar()
-    expect(slotEl!.firstElementChild?.className).toContain('pl-1.75')
+    const { container } = renderTopbar()
+    const shell = container.querySelector('header')?.firstElementChild
+    expect(shell?.className).toContain('pl-1.75')
   })
 
   it('always tightens the right edge, which leads with an icon button in both layouts', () => {
-    const { slotEl } = renderTopbar()
-    expect(slotEl!.firstElementChild?.className).toContain('pr-1.75')
+    const { container } = renderTopbar()
+    const shell = container.querySelector('header')?.firstElementChild
+    expect(shell?.className).toContain('pr-1.75')
   })
 })

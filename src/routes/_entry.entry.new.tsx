@@ -21,7 +21,7 @@ interface NewEntrySearch {
   vault?: string
 }
 
-export const Route = createFileRoute('/_app/entry/new')({
+export const Route = createFileRoute('/_entry/entry/new')({
   component: NewEntryPage,
   validateSearch: (s: Record<string, unknown>): NewEntrySearch => ({
     title: typeof s.title === 'string' ? s.title : undefined,

@@ -19,7 +19,7 @@ import type { EditScope } from '@/types'
  * entry rather than pushing, so Back still leaves the app instead of bouncing
  * through here.
  */
-export const Route = createFileRoute('/_app/entry/$slug')({
+export const Route = createFileRoute('/_entry/entry/$slug')({
   component: LegacyEntryRedirect,
   validateSearch: (s: Record<string, unknown>): { date?: string; scope?: EditScope } => ({
     date:  typeof s.date  === 'string' ? s.date  : undefined,
