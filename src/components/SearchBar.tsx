@@ -112,10 +112,11 @@ export default function SearchBar() {
       )}
 
       <div className={cn(
-        'relative z-search-bar px-3.5 pb-[max(14px,env(safe-area-inset-bottom))] flex flex-col gap-2',
+        'relative z-search-bar px-3.5 pb-[var(--search-bottom-inset)] flex flex-col gap-2',
         // Docked: clear the OS chrome from the true top edge, same as the
-        // mobile overlay's own row. Undocked: plain fixed spacing under
-        // whatever sits above it (the app topbar handles its own inset).
+        // mobile overlay's own row, and symmetric with the bottom padding
+        // below. Undocked: plain fixed spacing under whatever sits above
+        // it (the app topbar handles its own inset).
         dockTop ? 'pt-[var(--search-top-inset)]' : 'pt-3.5',
         searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm',
       )}>

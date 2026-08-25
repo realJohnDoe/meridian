@@ -232,14 +232,22 @@
      (main topbar, sidebar header, Sonner offset, search overlay max-height)
      grows to clear the notch/rounded corners together */
   --th: calc(54px + env(safe-area-inset-top, 0px));
-  /* Clearance from the physical top edge for top-pinned search UI that
-     replaces rather than stacks below the main topbar (the mobile overlay's
-     own input row, and the desktop-width docked search bar). Deliberately
-     just the safe-area inset — same as the main topbar's own --th — and no
-     extra synthetic minimum, so search lines up with the distance every
-     other view already keeps from the OS chrome instead of inventing its
-     own, different spacing. */
-  --search-top-inset: env(safe-area-inset-top, 0px);
+  /* Clearance from the physical top/bottom edges for top-pinned search UI
+     that replaces rather than stacks below the main topbar (the mobile
+     overlay's own input row, and the desktop-width docked search bar).
+     The safe-area inset alone isn't enough — it's genuinely 0 in a plain
+     browser tab (no notch/status-bar overlay to account for there) and on
+     Android, which reserves an opaque status-bar strip outside the page
+     rather than overlaying it — so content would sit flush against that
+     hard OS edge with no breathing room at all. Pairing it with a 16px
+     fixed baseline (a standard content-margin token — Material's 16dp,
+     iOS HIG's 16pt) is the common native/PWA pattern: always some margin,
+     growing only where a real overlay (notch, Dynamic Island, standalone
+     status bar) demands more. Symmetric top/bottom baseline so the pill
+     gets equal breathing room on both sides once it's replacing a topbar
+     rather than sitting at the screen's bottom edge. */
+  --search-top-inset: max(16px, env(safe-area-inset-top, 0px));
+  --search-bottom-inset: max(16px, env(safe-area-inset-bottom, 0px));
 }
 
 /* ── MERIDIAN LIGHT THEME ───────────────────────────────────────── */
