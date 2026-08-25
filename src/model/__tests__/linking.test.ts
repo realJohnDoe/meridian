@@ -436,6 +436,28 @@ instances:
     expect(occ!.metadata.done).toBe(false)
   })
 
+  it('prefers an undone scheduled (dated) task over an undone unscheduled (undated) one', () => {
+    // Regression: the priority order is future events -> undone scheduled
+    // tasks -> undone unscheduled tasks -> past events -> done tasks, but the
+    // undated open task was being resolved ahead of the dated open one.
+    const DATED_PLUS_UNDATED_OPEN = `---
+title: Undated Priority Bug
+instances:
+  - date: "2026-08-25"
+    done: false
+    priority: low
+  - done: false
+    priority: low
+---
+`
+    const data = makeStore([{ slug: 'undated-priority-bug', yaml: DATED_PLUS_UNDATED_OPEN }])
+    const map = buildFom(data.entries, rootsIn(data))
+    const occ = map.get(keyOf('undated-priority-bug'))
+    expect(occ).toBeDefined()
+    expect(occ!.date).toBe('2026-08-25')
+    expect(occ!.metadata.done).toBe(false)
+  })
+
   it('is total over the store, including an entry whose only occurrence is undated', () => {
     // The reported bug: an entry whose root survived with zero occurrences had
     // no place in the map, so the search results list reserved a row for it and
