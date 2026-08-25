@@ -44,7 +44,7 @@ export function VaultSettings({ vault }: Props) {
   const lastRefreshed          = useStore(s => s.syncByVault.get(vault.id)?.lastSyncedAt ?? null)
   const needsAttention         = useStore(s => s.syncByVault.get(vault.id)?.needsAttention ?? null)
 
-  const allParticipants = useAllParticipants(items)
+  const allParticipants = useAllParticipants(items, vault.id)
 
   function handleParticipantsChange(next: string[]) {
     setParticipants(next)

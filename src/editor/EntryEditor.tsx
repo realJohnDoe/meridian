@@ -143,7 +143,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
     handleScopeChange?.(scope)
   }
 
-  const allParticipants = useAllParticipants(items)
+  const allParticipants = useAllParticipants(items, vaultId)
 
   const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
 
