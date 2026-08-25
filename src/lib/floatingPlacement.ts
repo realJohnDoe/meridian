@@ -25,6 +25,20 @@ const MARGIN = 8
 const MIN_LIST = 160
 
 /**
+ * Space a panel may occupy on one side of its anchor.
+ *
+ * Clamped to what is actually there, never floored up to a preferred size: a
+ * floor larger than the gap makes the panel overrun the band, and on the flipped
+ * side that overrun is upward, straight into the topbar — visible even while the
+ * anchor itself is still perfectly in view. The flip below already picks the
+ * roomier side, and the panel scrolls its own contents, so a short panel is the
+ * honest answer when the room is short.
+ */
+function fit(space: number): number {
+  return Math.max(0, space - GAP - MARGIN)
+}
+
+/**
  * Flips a floating panel above/below an anchor rect based on available
  * space, and clamps its width/height to the viewport. Shared by
  * useFloatingCombobox (anchored to a real element's rect) and WikilinkPopup
@@ -61,7 +75,7 @@ export function computeFloatingPlacement(
       left: anchor.left,
       maxWidth,
       top: anchor.bottom + GAP,
-      maxHeight: Math.max(120, spaceBelow - GAP - MARGIN),
+      maxHeight: fit(spaceBelow),
     }
   }
 
@@ -70,6 +84,6 @@ export function computeFloatingPlacement(
     left: anchor.left,
     maxWidth,
     bottom: viewport.innerHeight - anchor.top + GAP,
-    maxHeight: Math.max(120, spaceAbove - GAP - MARGIN),
+    maxHeight: fit(spaceAbove),
   }
 }
