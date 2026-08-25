@@ -14,6 +14,7 @@ export {
 } from './vaultRegistry'
 
 export { previewIcalFeed } from './icalBackend'
+export { entriesToIcs } from './ical/entriesToIcs'
 
 export { isFolderPickerSupported } from './fs'
 

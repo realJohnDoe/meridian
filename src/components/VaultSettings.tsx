@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { Trash2, TriangleAlert, AlertCircle } from 'lucide-react'
+import { Trash2, TriangleAlert, AlertCircle, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -16,12 +16,17 @@ import { Input } from '@/components/ui/input'
 import { readVaultStringArray } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
-import { syncToBackend, removeVault, renameVault, cacheDirtyCount, startGitHubSignIn, GITHUB_APP_INSTALL_URL } from '@/vaultActions'
+import { syncToBackend, removeVault, renameVault, cacheDirtyCount, startGitHubSignIn, GITHUB_APP_INSTALL_URL, exportVaultIcs } from '@/vaultActions'
 import { ParticipantsRow } from '@/editor'
 import type { VaultRef } from '@/vaultActions'
 
 interface Props {
   vault: VaultRef
+}
+
+/** A vault name, made safe as a bare filename — no path separators or reserved characters. */
+function sanitizeFilename(name: string): string {
+  return name.trim().replace(/[\\/:*?"<>|]/g, '-') || 'calendar'
 }
 
 export function VaultSettings({ vault }: Props) {
@@ -66,6 +71,16 @@ export function VaultSettings({ vault }: Props) {
   async function handleRemoveClick() {
     setDirtyCount(await cacheDirtyCount(vault.id).catch(() => 0))
     setConfirmOpen(true)
+  }
+
+  function handleExport() {
+    const ics = exportVaultIcs(vault.id)
+    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${sanitizeFilename(vault.name)}.ics`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -182,6 +197,19 @@ export function VaultSettings({ vault }: Props) {
         />
       </div>
       )}
+
+      <div className="flex items-center justify-between gap-2 py-3 border-t border-border first:border-t-0">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="text-xs font-medium text-foreground">Export calendar</span>
+          <p className="text-xs text-muted-foreground">
+            Download every entry in this vault as a single .ics file.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExport} className="shrink-0 gap-1.5">
+          <Download className="size-3.5 stroke-[1.7]" />
+          Export .ics
+        </Button>
+      </div>
 
       <div className="flex justify-end py-3 border-t border-border first:border-t-0">
         <Button

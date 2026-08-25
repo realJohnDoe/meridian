@@ -3,10 +3,11 @@
 Investigation of "ideally Meridian would support a superset of the iCal / RRule
 standard — where are the gaps?" (2026-08-16).
 
-**Status: investigation only.** Nothing here is fixed yet. The work is broken
-into PRs in [ical-rrule-implementation.md](./ical-rrule-implementation.md). Every claim marked
-_observed_ was run against the current engine; every claim marked _read_ comes
-from the code with the line cited.
+**Status:** most of tranches 1–3 and ICS export (tranche 5) have since shipped;
+`WKST` (tranche 4 / gap G below) is the one item still outstanding, and is
+recommended to stay deferred — see that gap's own entry for why. Every claim
+marked _observed_ was run against the current engine; every claim marked
+_read_ comes from the code with the line cited.
 
 ---
 
@@ -28,9 +29,14 @@ Everything else is either already representable, correctly declined and routed
 to the ICS importer's bounded-expansion fallback, or genuinely not worth
 building (sub-daily recurrence).
 
-There is also no ICS **export** path — the `ical` backend is read-only
-(`src/storage/icalBackend.ts:65`). "Superset" is currently an unverifiable
-claim because nothing can emit an RRULE back out.
+ICS **export** now exists (`storage/ical/entriesToIcs.ts`, reached from
+Settings per vault): `Repeat` → `RRULE` via `repeatToRrule.ts`, with
+`instances:` overrides round-tripping to `EXDATE`/`RECURRENCE-ID`. It covers
+one vault at a time, always emits floating times (no `TZID`), and omits
+`after_completion` series outright — none of RFC 5545's vocabulary means what
+that repeat type means. The `ical` backend itself (`src/storage/icalBackend.ts:65`)
+is still read-only; export is a separate, one-shot download rather than a
+writable subscription.
 
 ## Where the gaps live
 
@@ -243,15 +249,6 @@ from import for a while. Lowest value in the list — it only affects
 `INTERVAL >= 2 + BYDAY`, and that case is already correct-by-fallback on
 import.
 
-### Tranche 5 — ICS export · **2–4 days**
-
-Not a gap-closer, but the thing that makes "superset" checkable. A minimal
-exporter over the representable subset is ~1 day; the value is the property
-test it unlocks — for every rule `tryRepresent` claims, export it and re-import
-it and assert the same dates come back. That test is what would have caught D,
-F and B. Emitting `RDATE`/`EXDATE` for the parts that stay unrepresentable
-turns it into a full round-trip.
-
 ### Not recommended
 
 Sub-daily (I) and `BYYEARDAY`/`BYWEEKNO`/`BYEASTER` (H). The bounded-expansion
@@ -263,7 +260,7 @@ fallback is the right answer for both and already exists.
 |---|---|
 | No more silently-wrong dates | **0.5–1 day** (T1) |
 | Superset of what mainstream exporters actually emit | **3–5 days** (T1+T2+T3) |
-| …plus `WKST` and a verifiable round-trip | **6–10 days** (+T4+T5) |
+| …plus `WKST` | **4–7 days** (+T4) |
 | Literal full RFC 5545 including sub-daily | **3+ weeks**, needs a model change; not worth it |
 
 The middle row is the one to aim at. After T1–T3, the rules that still fall
