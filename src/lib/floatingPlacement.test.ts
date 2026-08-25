@@ -28,6 +28,31 @@ describe('computeFloatingPlacement', () => {
     expect(p!.maxHeight).toBeLessThanOrEqual(400 - 54)
   })
 
+  // The reported case, and the one a preferred-minimum height breaks: the
+  // anchor is plainly visible, but the room above it is smaller than the size
+  // the panel would like, so flooring up to that size overruns the band.
+  it('fits a flipped panel into a gap smaller than its preferred height', () => {
+    const anchor = { top: 150, bottom: 190, left: 16 }        // visible: 150 > 54
+    const p = computeFloatingPlacement(anchor, { ...band, visibleBottom: 240 })
+    expect(p!.side).toBe('top')
+    expect(p!.maxHeight).toBeLessThanOrEqual(anchor.top - band.visibleTop)
+    // Top edge of the panel at full height must clear the topbar.
+    expect(anchor.top - 6 - p!.maxHeight).toBeGreaterThanOrEqual(band.visibleTop)
+  })
+
+  it('fits a below-placed panel into a gap smaller than its preferred height', () => {
+    const anchor = { top: 100, bottom: 140, left: 16 }
+    const p = computeFloatingPlacement(anchor, { ...band, visibleBottom: 220 })
+    expect(p!.side).toBe('bottom')
+    expect(p!.maxHeight).toBeLessThanOrEqual(220 - anchor.bottom)
+    expect(anchor.bottom + 6 + p!.maxHeight).toBeLessThanOrEqual(220)
+  })
+
+  it('never reports a negative height when there is no room at all', () => {
+    const p = computeFloatingPlacement({ top: 56, bottom: 58, left: 16 }, { ...band, visibleBottom: 60 })
+    expect(p!.maxHeight).toBeGreaterThanOrEqual(0)
+  })
+
   describe('when the anchor has left the usable band', () => {
     // The reported bug: scrolling with a combobox open walked the panel up
     // through the topbar, because a panel positioned from its anchor follows
