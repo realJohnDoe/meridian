@@ -20,7 +20,7 @@ export default function SearchResults({ query, onOpen, onCreate, scrollRef }: Pr
   return (
     <div className="lg:max-w-3xl lg:mx-auto">
       {query && (
-        <div className="px-3.5 pt-2">
+        <div className="sticky top-0 z-10 bg-background px-3.5 pt-2 pb-1">
           <button
             type="button"
             className="flex w-full items-center gap-2 pl-2 pr-2.5 py-2 rounded-lg border border-dashed border-input bg-card/50 shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
