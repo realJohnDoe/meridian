@@ -20,14 +20,14 @@ export default function SearchResults({ query, onOpen, onCreate, scrollRef }: Pr
   return (
     <div className="lg:max-w-3xl lg:mx-auto">
       {query && (
-        <div className="sticky top-0 z-10 bg-background px-3.5 pt-2 pb-1">
+        <div className="px-3.5 pt-2">
           <button
             type="button"
-            className="flex w-full items-center gap-2 pl-2 pr-2.5 py-2 rounded-lg border border-dashed border-input bg-card/50 shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
+            className="flex w-full items-center gap-2.5 pl-3 pr-3.5 py-3.5 rounded-lg border border-dashed border-input bg-card/50 shadow-none cursor-pointer hover:bg-accent transition-colors text-muted-foreground"
             onClick={() => onCreate(query)}
             aria-label={`Create "${query}"`}
           >
-            <Plus size={13} className="shrink-0" />
+            <Plus size={16} className="shrink-0" />
             <span className="text-sm">Create "<strong>{query}</strong>"</span>
           </button>
         </div>
