@@ -34,6 +34,7 @@ export type SyncEventKind =
   // ── local queue ───────────────────────────────────────────────
   | 'edit'                 // an edit was recorded in the cache (the write queue)
   | 'delete'               // a delete was staged (tombstone)
+  | 'write-refused'        // a write/delete targeted a vault that is no longer registered
   // ── push ──────────────────────────────────────────────────────
   | 'push'                 // a CAS write went out
   | 'push-ok'              // …and was accepted

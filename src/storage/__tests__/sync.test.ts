@@ -157,6 +157,7 @@ vi.mock('@/storeBridge', () => ({
   getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
   setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
   setStoreState: vi.fn((partial: Partial<typeof storeState>) => { Object.assign(storeState, partial) }),
+  getVaults: vi.fn(() => [] as { id: string; name: string }[]),
 }))
 
 vi.mock('@/storage/notifications', () => notifyFns)
@@ -168,7 +169,7 @@ vi.mock('@/model', async (importActual) => ({
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { syncToBackend, autoSyncTick, resetSyncBackoff, dropAllSyncState, flushPendingPush, syncOnActivate, writeEntityToCache, reconcileWithBackend, parseFiles, reportParseFailures, scheduleAutoPush } from '@/storage/sync'
+import { syncToBackend, autoSyncTick, resetSyncBackoff, dropAllSyncState, flushPendingPush, syncOnActivate, writeEntityToCache, deleteFromBackend, reconcileWithBackend, parseFiles, reportParseFailures, scheduleAutoPush } from '@/storage/sync'
 import { mountBackend, unmountAllBackends } from '@/storage/backends'
 import { syncJournalEvents, clearSyncJournal, syncJournalDump } from '@/storage/syncJournal'
 
@@ -1846,7 +1847,7 @@ describe('multi-vault sync', () => {
     expect(b.get('b.md')?.content).toBe('b content')
   })
 
-  it('writeEntityToCache refuses an unregistered vault', async () => {
+  it('writeEntityToCache refuses an unregistered vault, and surfaces it', async () => {
     const a = new FakeBackend()
     mountBackend(a)
     seedLayer('ghost-vault', [{ entryKey: 'ghost-vault::note' }],
@@ -1855,9 +1856,24 @@ describe('multi-vault sync', () => {
     await writeEntityToCache('ghost-vault::note' as EntryKey, 'content')
 
     expect(cacheStore.get(vp('ghost-vault', 'note.md'))).toBeUndefined()
+    expect(notifyFns.warn).toHaveBeenCalledTimes(1)
+    expect(notifyFns.warn.mock.calls[0]![0]).toContain('ghost-vault')
+    expect(syncJournalEvents({ vaultId: 'ghost-vault' }).map(e => e.kind)).toEqual(['write-refused'])
   })
 
-  it('writeEntityToCache refuses a read-only vault', async () => {
+  it('deleteFromBackend refuses an unregistered vault, and surfaces it', async () => {
+    const a = new FakeBackend()
+    mountBackend(a)
+
+    await deleteFromBackend('ghost-vault::note' as EntryKey)
+
+    expect(cacheStore.get(vp('ghost-vault', 'note.md'))).toBeUndefined()
+    expect(notifyFns.warn).toHaveBeenCalledTimes(1)
+    expect(notifyFns.warn.mock.calls[0]![0]).toContain('ghost-vault')
+    expect(syncJournalEvents({ vaultId: 'ghost-vault' }).map(e => e.kind)).toEqual(['write-refused'])
+  })
+
+  it('writeEntityToCache refuses a read-only vault, silently', async () => {
     const ro = otherBackend('vault-ro')
     Object.defineProperty(ro, 'readOnly', { value: true })
     mountBackend(ro)
@@ -1867,6 +1883,8 @@ describe('multi-vault sync', () => {
     await writeEntityToCache('vault-ro::note' as EntryKey, 'content')
 
     expect(cacheStore.get(vp('vault-ro', 'note.md'))).toBeUndefined()
+    expect(notifyFns.warn).not.toHaveBeenCalled()
+    expect(syncJournalEvents({ vaultId: 'vault-ro' })).toEqual([])
   })
 
   // ── read-only vs. no-remote ───────────────────────────────────────────────

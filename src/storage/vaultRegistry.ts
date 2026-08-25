@@ -166,8 +166,8 @@ async function removeExampleVault(): Promise<void> {
  *
  * Called after anything that changes the registered set. The default is where
  * new entries go, so it must never dangle at a removed vault (saves would be
- * refused by `writeEntityToCache`, silently) nor at a read-only one. `prefer`
- * is consulted first — the legacy `activeVaultId` on the restore path, the
+ * refused by `writeEntityToCache`) nor at a read-only one. `prefer` is
+ * consulted first — the legacy `activeVaultId` on the restore path, the
  * freshly added vault on the add path.
  */
 function reconcileDefaultVault(refs: VaultRef[], prefer?: string | null): void {

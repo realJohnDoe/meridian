@@ -1110,6 +1110,21 @@ function backendFor(key: EntryKey): StorageBackend | undefined {
 }
 
 /**
+ * The vault for `key` was removed (or never mounted) between the store commit
+ * and this write reaching the backend — e.g. deleted in Settings while an
+ * editor was open on it, or a deferred commit landing after the vault
+ * unmounted. Unlike `readOnly` (expected, e.g. an iCal subscription), this is
+ * an anomaly: the store already shows the change as saved, so silence here
+ * would let it vanish on reload with no trace.
+ */
+function reportUnregisteredVault(key: EntryKey, path: string): void {
+  const vaultId = keyVaultId(key)
+  journal('write-refused', vaultId, path, { note: 'unregistered' })
+  const name = getVaults().find(v => v.id === vaultId)?.name ?? vaultId
+  warn(`"${name}" is no longer connected — this change was not saved.`)
+}
+
+/**
  * Make one entry's file durable in the cache, and queue it for push.
  *
  * `content` is handed in by the committing layer rather than resolved from the
@@ -1125,7 +1140,8 @@ export async function writeEntityToCache(entryKey: EntryKey, content: string): P
   markInFlight(entryKey)
   try {
     const backend = backendFor(entryKey)
-    if (!backend || backend.readOnly) return
+    if (!backend) { reportUnregisteredVault(entryKey, path); return }
+    if (backend.readOnly) return
     await recordLocalEdit(backend.id, path, content)
     // The first link in every chain a conflict investigation has to walk: when
     // the store handed this content to the write queue, and what it was.
@@ -1145,7 +1161,8 @@ export async function deleteFromBackend(entryKey: EntryKey): Promise<void> {
   markInFlight(entryKey)
   try {
     const backend = backendFor(entryKey)
-    if (!backend || backend.readOnly) return
+    if (!backend) { reportUnregisteredVault(entryKey, path); return }
+    if (backend.readOnly) return
     await recordLocalDelete(backend.id, path)
     journal('delete', backend.id, path, undefined, backend.kind)
     updateSyncUI(backend)

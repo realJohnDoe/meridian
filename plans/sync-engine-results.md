@@ -68,7 +68,7 @@ started. Each finding states its own confidence separately.
 |---|---|---|
 | 1 | Conflict detection & resolution | no open findings |
 | 2 | Sync scheduling & cadence | **findings: #7** |
-| 3 | Write-path durability | **findings: #4, #5** |
+| 3 | Write-path durability | **findings: #5** |
 | 4 | Observability | **findings: #6** |
 | 5 | Cache transitions (`cache/files.ts`) | no open findings — six transitions, each with its precondition inside one Dexie transaction; covered at 95%+ by `storage/__tests__/cache.test.ts` against real Dexie |
 | 6 | Reconcile planning (`planReconcile`) | no open findings — pure, unit-tested, and its eventual-consistency guards (`skipPaths`, `RECONCILE_DELETE_GRACE_MS`, in-flight union) are each justified in-place |
@@ -82,62 +82,12 @@ started. Each finding states its own confidence separately.
 
 | # | Title | Category | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 4 | A save into an unregistered vault vanishes silently | `durability` | 6 | 1 file (2 sites) | **Haiku 4.5** |
 | 5 | A cross-vault move is two writes with no transaction | `durability` | 7 | 1 file | **Opus 5** |
 | 6 | The sync journal does not survive a reload | `observability` | 5 | 1 file | **Sonnet 5** |
 | 7 | `flushPendingPush` bursts every vault at once | `cadence` | 3 | 1 file | **Sonnet 5** |
 
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
 and breadth reported separately so the list can be re-sorted.
-
----
-
-### Finding #4 — A save into an unregistered vault vanishes silently
-
-- **Category:** `durability`
-- **Impact:** 6. Same shape as the data-integrity survey's finding #1 — the UI
-  reports the entry saved while nothing is durable — but at a different gate.
-- **Breadth:** 1 file, 2 sites (`writeEntityToCache`, `deleteFromBackend`).
-- **Recommended model:** **Haiku 4.5.** The one piece of judgment, which must be
-  stated in the task: **the two conditions in that guard are not equally
-  anomalous.** `backend.readOnly` is *normal* — an iCal subscription is
-  read-only by design and the editor already refuses to write to one, so
-  toasting there would spam users with an expected non-event. `!backend` (the
-  vault is not registered) is the anomaly worth surfacing. Treat them
-  separately. With that named, Haiku 4.5; the rest is a journal call and a
-  toast.
-
-**Evidence** — `storage/sync.ts:1088-1093`:
-
-```ts
-export async function writeEntityToCache(entryKey: EntryKey, content: string): Promise<void> {
-  const path = keyToPath(entryKey)
-  markInFlight(entryKey)
-  try {
-    const backend = backendFor(entryKey)
-    if (!backend || backend.readOnly) return
-```
-
-and identically at `storage/sync.ts:1108-1113` for `deleteFromBackend`.
-
-**Problem.** The store has already committed the edit by the time this runs
-(`storeCommit.ts` · `commitNext` calls `setData` first, then `persistEntries`),
-so the entry is on screen and looks saved. This returns without recording
-anything: no cache row, no journal event, no toast. On the next reload the edit
-is gone with no trace of why. `vaultRegistry.ts:169` acknowledges the behaviour
-in passing — "refused by `writeEntityToCache`, silently" — but nothing surfaces
-it.
-
-The `!backend` case is reachable: `backendFor` resolves through
-`getBackend(keyVaultId(key))`, and a vault can be removed in Settings while an
-editor is open on one of its entries, or a commit can land from a toast callback
-(`occurrenceActions.ts` arms deferred commits) after the vault unmounted.
-
-**Fix.** Split the guard. For `readOnly`, return as now (optionally a `debug`-
-level journal line). For `!backend`, add a `SyncEventKind` — e.g.
-`'write-refused'` (`storage/syncJournal.ts:33-56`) — journal it with the vault
-id from the key, and `notifyError`/`warn` the user that the entry could not be
-saved because its vault is no longer connected.
 
 ---
 
