@@ -36,6 +36,8 @@ import type * as DbModule from '@/storage/cache/db'
 import type * as FilesModule from '@/storage/cache/files'
 import type * as CredentialsModule from '@/storage/cache/credentials'
 import type * as RegistryModule from '@/storage/cache/registry'
+import type * as PendingMovesModule from '@/storage/cache/pendingMoves'
+import { entryKey } from '@/fileIO'
 
 // ── Fixtures and helpers ───────────────────────────────────────
 
@@ -64,6 +66,7 @@ type CacheModules = {
   files: typeof FilesModule
   creds: typeof CredentialsModule
   reg:   typeof RegistryModule
+  moves: typeof PendingMovesModule
 }
 
 let m!: CacheModules
@@ -95,6 +98,7 @@ async function freshCache(): Promise<CacheModules> {
     files: await import('@/storage/cache/files'),
     creds: await import('@/storage/cache/credentials'),
     reg:   await import('@/storage/cache/registry'),
+    moves: await import('@/storage/cache/pendingMoves'),
   }
 }
 
@@ -385,6 +389,18 @@ describe('cache/files — queries', () => {
     await m.files.recordLocalEdit(OTHER, 'other.md', 'body')
   })
 
+  it('returns one record by key, and undefined for a path the cache never held', async () => {
+    // The single-record read `settlePendingMoves` uses to ask whether one
+    // entry has reached its remote yet, without scanning the whole vault.
+    expect(await m.files.cacheGetRecord(V, 'clean.md')).toMatchObject({
+      path: 'clean.md', status: 'clean', content: 'body', version: 'sha1',
+    })
+    expect(await m.files.cacheGetRecord(V, 'never.md')).toBeUndefined()
+    // Keyed by vault as well as path — the same slug in another vault is a
+    // different record, which is exactly what a cross-vault move produces.
+    expect(await m.files.cacheGetRecord(OTHER, 'clean.md')).toBeUndefined()
+  })
+
   it('scopes cacheLoadAll to one vault', async () => {
     expect((await m.files.cacheLoadAll(V)).map(r => r.path).sort())
       .toEqual(['clean.md', 'dirty.md', 'gone.md'])
@@ -438,6 +454,66 @@ describe('cache/files — cacheDirtyCount degrades to 0 rather than throwing', (
 })
 
 // ── credentials.ts ─────────────────────────────────────────────
+
+describe('cache/pendingMoves', () => {
+  const FROM = entryKey(V, 'meeting-notes')
+  const TO   = entryKey(OTHER, 'meeting-notes')
+
+  it('has no held moves before one is staged', async () => {
+    expect(await m.moves.pendingMovesLoad()).toEqual([])
+    expect(await m.moves.heldDeletePaths(V)).toEqual(new Set())
+  })
+
+  it('round-trips a staged move and holds its source path', async () => {
+    const move = await m.moves.pendingMoveAdd(FROM, TO)
+
+    expect(await m.moves.pendingMovesLoad()).toEqual([move])
+    // Held in the *source* vault only: the target's own writes are ordinary.
+    expect(await m.moves.heldDeletePaths(V)).toEqual(new Set(['meeting-notes.md']))
+    expect(await m.moves.heldDeletePaths(OTHER)).toEqual(new Set())
+  })
+
+  it('keeps both when two moves are staged, and drops only the named one', async () => {
+    const first  = await m.moves.pendingMoveAdd(FROM, TO)
+    const second = await m.moves.pendingMoveAdd(entryKey(V, 'other-note'), entryKey(OTHER, 'other-note'))
+
+    expect((await m.moves.pendingMovesLoad()).map(mv => mv.id)).toEqual([first.id, second.id])
+
+    await m.moves.pendingMoveDrop(first.id)
+
+    expect((await m.moves.pendingMovesLoad()).map(mv => mv.id)).toEqual([second.id])
+    expect(await m.moves.heldDeletePaths(V)).toEqual(new Set(['other-note.md']))
+  })
+
+  it('drops malformed rows rather than holding a delete against a key nothing resolves', async () => {
+    const good = await m.moves.pendingMoveAdd(FROM, TO)
+    const d = await open()
+    const record = await d.meta.get('pendingMoves')
+    await d.meta.put({
+      key: 'pendingMoves',
+      value: [
+        ...(record?.value as PendingMovesModule.PendingMove[]),
+        null,
+        'a string',
+        { id: 'x' },
+        { id: 'x', fromKey: 'no-separator', toKey: TO, startedAt: 1 },
+        { id: 'x', fromKey: FROM, toKey: TO },
+      ] as unknown as PendingMovesModule.PendingMove[],
+    })
+
+    expect(await m.moves.pendingMovesLoad()).toEqual([good])
+  })
+
+  it('returns an empty list when the stored value is not an array', async () => {
+    const d = await open()
+    await d.meta.put({ key: 'pendingMoves', value: 'nonsense' })
+
+    expect(await m.moves.pendingMovesLoad()).toEqual([])
+    // A drop against that value must still leave a well-formed list behind.
+    await m.moves.pendingMoveDrop('mv-nothing')
+    expect(await m.moves.pendingMovesLoad()).toEqual([])
+  })
+})
 
 describe('cache/credentials — tokens', () => {
   it('round-trips an access token and clears it', async () => {

@@ -68,7 +68,7 @@ started. Each finding states its own confidence separately.
 |---|---|---|
 | 1 | Conflict detection & resolution | no open findings |
 | 2 | Sync scheduling & cadence | **findings: #7** |
-| 3 | Write-path durability | **findings: #5** |
+| 3 | Write-path durability | no open findings |
 | 4 | Observability | **findings: #6** |
 | 5 | Cache transitions (`cache/files.ts`) | no open findings — six transitions, each with its precondition inside one Dexie transaction; covered at 95%+ by `storage/__tests__/cache.test.ts` against real Dexie |
 | 6 | Reconcile planning (`planReconcile`) | no open findings — pure, unit-tested, and its eventual-consistency guards (`skipPaths`, `RECONCILE_DELETE_GRACE_MS`, in-flight union) are each justified in-place |
@@ -82,69 +82,11 @@ started. Each finding states its own confidence separately.
 
 | # | Title | Category | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 5 | A cross-vault move is two writes with no transaction | `durability` | 7 | 1 file | **Opus 5** |
 | 6 | The sync journal does not survive a reload | `observability` | 5 | 1 file | **Sonnet 5** |
 | 7 | `flushPendingPush` bursts every vault at once | `cadence` | 3 | 1 file | **Sonnet 5** |
 
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
 and breadth reported separately so the list can be re-sorted.
-
----
-
-### Finding #5 — A cross-vault move is two writes with no transaction
-
-- **Category:** `durability`
-- **Impact:** 7. The failure produces a **duplicate**, which is worse than a
-  failed move: the user believes the note moved, and now two vaults each hold a
-  copy that will diverge independently.
-- **Breadth:** 1 file (`storage/moveEntry.ts`), but it is the only cross-vault
-  write path in the app.
-- **Recommended model:** **Opus 5.** Not because the code is hard but because
-  **there is no correct fix without a product decision**: two Dexie vault
-  layers and two independent remote backends cannot be made atomic, so the
-  options are (a) accept non-atomicity and add detection + a repair action,
-  (b) stage the move so the source delete only fires after the target push is
-  confirmed, which means persisting move intent across reloads, or (c) refuse
-  cross-vault moves while either vault is offline. Each has a different UX. Pick
-  with the user. The named hazard for any of them: `commitMove`
-  (`storeCommit.ts`) has **already re-keyed the store** before this runs, so a
-  fix that aborts here leaves the store and the cache disagreeing about which
-  vault owns the entry.
-
-**Evidence** — `storage/moveEntry.ts:61-68`:
-
-```ts
-    await recordLocalEdit(to.id, keyToPath(toKey), content)
-    await recordLocalDelete(from.id, keyToPath(fromKey))
-
-    updateSyncUI(to)
-    updateSyncUI(from)
-    scheduleAutoPush(to)
-    scheduleAutoPush(from)
-```
-
-**Problem.** Three ways this leaves a duplicate:
-
-1. The process dies between the two `await`s — the target has the entry, the
-   source has no tombstone.
-2. Both cache writes land, but the two pushes are independent: `scheduleAutoPush`
-   is per backend, each with its own `VaultSyncState`, its own
-   `consecutiveFailures`, and its own `nextRetryAt`. The
-   target vault can push immediately while the source vault sits in a 30-minute
-   backoff, or is offline, or needs re-auth.
-3. The source delete conflicts (someone edited the note in the source vault
-   after the move was staged). `pushDirty`'s tombstone branch correctly keeps
-   the remote version and drops the tombstone — which is
-   the right call in isolation but here means the move silently became a copy,
-   and nothing reconciles that against the target vault.
-
-There is no compensation, no journal event tying the two halves together, and no
-way for either half to discover the other's outcome.
-
-**Fix.** Decide the policy with the user first. Whichever is chosen, a
-prerequisite is cheap and worth doing regardless: **journal both halves with a
-shared correlation id** so the duplicate is at least diagnosable
-(`SyncEventDetail.note` already exists for free-form values).
 
 ---
 

@@ -206,6 +206,18 @@ export async function applyRemoteBatch(
   return written
 }
 
+/**
+ * One record, or undefined when the cache has never held that path. The
+ * whole-vault `cacheLoadAll` is the wrong tool for a caller that wants a
+ * single file's status (`settlePendingMoves` asking whether one entry has
+ * reached its remote yet) — this is a primary-key lookup instead of a scan.
+ */
+export async function cacheGetRecord(vaultId: string, path: string): Promise<CacheRecord | undefined> {
+  const d = await cacheInit()
+  const row = await d.files.get(vp(vaultId, path))
+  return row ? toCacheRecord(row) : undefined
+}
+
 export async function cacheLoadAll(vaultId: string): Promise<CacheRecord[]> {
   const d = await cacheInit()
   const rows = await d.files.where('vaultId').equals(vaultId).toArray()
