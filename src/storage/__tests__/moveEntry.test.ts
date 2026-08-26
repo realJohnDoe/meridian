@@ -1,11 +1,16 @@
 /**
  * The durability half of a cross-vault move.
  *
- * The one invariant worth a real-Dexie test: the target vault's content is
- * durable *before* the source vault's tombstone is staged. Get that backwards
- * and a crash — or simply a tab closing — between the two writes loses the
- * entry from both vaults. Get it right and the worst case is the entry
- * existing in both, which is visible and recoverable.
+ * Two invariants worth a real-Dexie test, both about ordering:
+ *
+ *  1. The target vault's content is durable *before* the source vault's
+ *     tombstone is staged. Get that backwards and a crash — or simply a tab
+ *     closing — between the two writes loses the entry from both vaults.
+ *  2. The hold on the source's delete is durable before that tombstone too. A
+ *     tombstone that exists before its hold does is free to go out on the very
+ *     next push, which is the race the hold exists to close; the release
+ *     itself, and what happens when it never comes, are `sync.ts`'s half and
+ *     are tested in sync.test.ts.
  *
  * `@/storage/cache/files` is the real module here, running against
  * `fake-indexeddb`, wrapped only to record when each call *starts* and when it
@@ -63,6 +68,8 @@ vi.mock('@/storage/notifications', () => notifyFns)
 import { moveEntityInCache } from '@/storage/moveEntry'
 import { mountBackend, unmountAllBackends } from '@/storage/backends'
 import { cacheLoadAll, recordLocalEdit } from '@/storage/cache/files'
+import { pendingMovesLoad, pendingMoveDrop, heldDeletePaths } from '@/storage/cache/pendingMoves'
+import { syncJournalEvents, clearSyncJournal } from '@/storage/syncJournal'
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -142,9 +149,11 @@ describe('moveEntityInCache', () => {
     unmountAllBackends()
     mountBackend(new FakeBackend(WORK))
     mountBackend(new FakeBackend(HOME))
+    clearSyncJournal()
     const { cacheDeleteAll } = await import('@/storage/cache/files')
     await cacheDeleteAll(WORK)
     await cacheDeleteAll(HOME)
+    for (const move of await pendingMovesLoad()) await pendingMoveDrop(move.id)
   })
 
   afterEach(() => { unmountAllBackends() })
@@ -234,6 +243,58 @@ describe('moveEntityInCache', () => {
 
     expect(order).toEqual([])
     expect(await rowsOf(HOME)).toEqual([])
+  })
+
+  it('holds the source tombstone until the target push confirms', async () => {
+    await seedMoved()
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
+
+    // The tombstone hides the entry from the source vault immediately, but the
+    // *remote* delete waits: `pushDirty` subtracts held paths from what it
+    // sends, so the source's remote copy survives until the target vault's own
+    // remote has one. Until then the entry is in exactly one remote.
+    expect(await pendingMovesLoad()).toEqual([
+      expect.objectContaining({ fromKey: k(WORK, 'meeting-notes'), toKey: k(HOME, 'meeting-notes') }),
+    ])
+    expect(await heldDeletePaths(WORK)).toEqual(new Set(['meeting-notes.md']))
+    expect(await heldDeletePaths(HOME)).toEqual(new Set())
+  })
+
+  it('stages the hold before the tombstone, never after', async () => {
+    await seedMoved()
+    // A tombstone that exists before its hold does is free to go out on the
+    // very next push — the two-write race this whole mechanism replaces.
+    const seen: string[] = []
+    const { recordLocalDelete } = await import('@/storage/cache/files')
+    vi.mocked(recordLocalDelete).mockImplementationOnce(async () => {
+      seen.push(...(await pendingMovesLoad()).map(m => m.id))
+    })
+
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
+
+    expect(seen).toHaveLength(1)
+  })
+
+  it('journals both halves under one correlation id', async () => {
+    await seedMoved()
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
+
+    // Two independent writes in two vaults used to leave no way for either
+    // half to discover the other's outcome. The id is that thread.
+    const staged = syncJournalEvents().filter(e => e.kind === 'move-staged')
+    expect(staged.map(e => e.vaultId)).toEqual([HOME, WORK])
+    const [id] = new Set(staged.map(e => e.detail?.note))
+    expect(id).toBeDefined()
+    expect(new Set(staged.map(e => e.detail?.note)).size).toBe(1)
+    expect((await pendingMovesLoad())[0]?.id).toBe(id)
+  })
+
+  it('stages no hold when the target write fails', async () => {
+    await seedMoved()
+    editError.next = new Error('quota exceeded')
+    await moveEntityInCache(k(WORK, 'meeting-notes'), k(HOME, 'meeting-notes'), movedContent())
+
+    expect(await pendingMovesLoad()).toEqual([])
   })
 
   // "the store has no content under the target key" is no longer reachable

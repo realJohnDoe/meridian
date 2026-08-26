@@ -23,7 +23,8 @@ import type { EntryKey } from '@/fileIO'
 // ── Hoisted shared fakes (referenced by the vi.mock factories below, which
 // run before the rest of this file's top-level code) ──────────────────────
 
-const { cacheStore, storeState, notifyFns, roundTripLossMock } = vi.hoisted(() => ({
+const { cacheStore, pendingMoves, storeState, notifyFns, roundTripLossMock } = vi.hoisted(() => ({
+  pendingMoves: [] as Array<{ id: string; fromKey: EntryKey; toKey: EntryKey; startedAt: number }>,
   cacheStore: new Map<string, {
     vaultPath: string; vaultId: string; path: string; content: string
     status: 'clean' | 'dirty' | 'deleted'; updatedAt: number; version?: string
@@ -117,6 +118,7 @@ vi.mock('@/storage/cache/files', () => {
     cacheLoadAll: vi.fn(async (vaultId: string) => {
       return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId)
     }),
+    cacheGetRecord: vi.fn(async (vaultId: string, path: string) => cacheStore.get(vp(vaultId, path))),
     confirmDeleted: vi.fn(async (vaultId: string, path: string) => {
       cacheStore.delete(vp(vaultId, path))
     }),
@@ -134,6 +136,28 @@ vi.mock('@/storage/cache/files', () => {
     cacheDirtyCount: vi.fn(async (vaultId: string) => {
       return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId && (r.status === 'dirty' || r.status === 'deleted')).length
     }),
+  }
+})
+
+// The held-delete registry. Real in shape, in-memory in substance: these tests
+// are about what pushDirty and settlePendingMoves *do* with a hold, and the
+// Dexie round trip behind it has its own real-Dexie tests in cache.test.ts.
+vi.mock('@/storage/cache/pendingMoves', async () => {
+  const { keyToPath, keyVaultId } = await import('@/fileIO')
+  return {
+    pendingMovesLoad: vi.fn(async () => [...pendingMoves]),
+    pendingMoveAdd: vi.fn(async (fromKey: EntryKey, toKey: EntryKey) => {
+      const move = { id: `mv${pendingMoves.length}`, fromKey, toKey, startedAt: Date.now() }
+      pendingMoves.push(move)
+      return move
+    }),
+    pendingMoveDrop: vi.fn(async (id: string) => {
+      const i = pendingMoves.findIndex(mv => mv.id === id)
+      if (i >= 0) pendingMoves.splice(i, 1)
+    }),
+    heldDeletePaths: vi.fn(async (vaultId: string) => new Set(
+      pendingMoves.filter(mv => keyVaultId(mv.fromKey) === vaultId).map(mv => keyToPath(mv.fromKey)),
+    )),
   }
 })
 
@@ -370,6 +394,15 @@ function seedDirtyWithBase(vaultId: string, path: string, content: string, versi
   cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content, status: 'dirty', updatedAt: Date.now(), version, baseContent })
 }
 
+/** A second FakeBackend under a different vault id. */
+function otherBackend(id: string, kind: VaultKind = 'local'): FakeBackend {
+  const backend = new FakeBackend()
+  Object.defineProperty(backend, 'id',   { value: id })
+  Object.defineProperty(backend, 'name', { value: id })
+  Object.defineProperty(backend, 'kind', { value: kind })
+  return backend
+}
+
 function seedTombstone(vaultId: string, path: string, version: string | undefined): void {
   cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content: '', status: 'deleted', updatedAt: Date.now(), version })
 }
@@ -387,6 +420,7 @@ async function flush(): Promise<void> {
 
 beforeEach(() => {
   cacheStore.clear()
+  pendingMoves.length = 0
   storeState.items = []
   storeState.roots = new Map()
   storeState.unreadableFiles = new Map()
@@ -858,6 +892,144 @@ describe('pushDirty — delete-conflict tombstone handling', () => {
     expect(cacheStore.has(vp('fake-vault', 'gone.md'))).toBe(false)
     expect(notifyFns.warn).not.toHaveBeenCalled()
     expect(syncOf().error).toBeNull()
+  })
+})
+
+// ── Cross-vault move: the source delete waits for the target push ───────
+//
+// A move cannot be one transaction across two vaults and two remotes, so it is
+// staged: the target's copy goes in first, the source's tombstone is staged but
+// *held*, and only the target's own confirmed push releases it. What these pin
+// is the property that buys — the entry is in exactly one remote at every
+// point, never both (a duplicate that then diverges) and never neither.
+
+describe('pushDirty — a held cross-vault delete', () => {
+  const SOURCE = 'fake-vault'
+  const TARGET = 'vault-b'
+  const NOTE   = '---\ntitle: Note\n---\n'
+
+  /** Both vaults mounted, the entry live in the source's remote, and a move staged. */
+  function stageMove(): { source: FakeBackend; target: FakeBackend } {
+    const source = new FakeBackend()
+    const target = otherBackend(TARGET)
+    source.seed('note.md', NOTE, 'sha1')
+    mountBackend(source)
+    mountBackend(target)
+    // What moveEntityInCache leaves behind: the copy dirty in the target, the
+    // tombstone staged in the source, and a hold tying the two together.
+    seedDirty(TARGET, 'note.md', NOTE, undefined)
+    seedTombstone(SOURCE, 'note.md', 'sha1')
+    pendingMoves.push({ id: 'mv1', fromKey: entryKey(SOURCE, 'note'), toKey: entryKey(TARGET, 'note'), startedAt: Date.now() })
+    return { source, target }
+  }
+
+  it('is not sent while the target vault still holds the copy only locally', async () => {
+    const { source } = stageMove()
+
+    await syncToBackend(SOURCE)
+
+    // The one thing that must not happen: the source's remote copy deleted
+    // while the only other copy is a dirty cache record on this device.
+    expect(source.deleteCallCount).toBe(0)
+    expect(source.get('note.md')?.content).toBe(NOTE)
+    // Still staged locally, so the entry stays out of the source vault's UI,
+    // and still held, so the next cycle asks the same question again.
+    expect(cacheStore.get(vp(SOURCE, 'note.md'))?.status).toBe('deleted')
+    expect(pendingMoves).toHaveLength(1)
+  })
+
+  it('goes out once the target vault\'s own push confirms the copy', async () => {
+    const { source, target } = stageMove()
+
+    await syncToBackend(TARGET)
+
+    // The target's remote now has it, so the hold is released…
+    expect(target.get('note.md')?.content).toBe(NOTE)
+    expect(pendingMoves).toEqual([])
+    expect(source.deleteCallCount).toBe(0)
+
+    // …and the source's next cycle sends the delete it was sitting on.
+    await syncToBackend(SOURCE)
+
+    expect(source.listPaths()).not.toContain('note.md')
+    expect(cacheStore.has(vp(SOURCE, 'note.md'))).toBe(false)
+  })
+
+  it('is released by any vault\'s cycle when the confirming push landed before a reload', async () => {
+    // The tab went away between markPushed and the release. The target's
+    // record is clean, so no future push will ever confirm it again — the
+    // question has to be asked of the record, not of a push result.
+    const { source, target } = stageMove()
+    seedClean(TARGET, 'note.md', NOTE, 'sha1', Date.now())
+    target.seed('note.md', NOTE, 'sha1')
+
+    await syncToBackend(SOURCE)
+
+    expect(pendingMoves).toEqual([])
+    // Released mid-cycle, after this vault's own push had already run, so the
+    // delete goes out on the next one rather than this one.
+    await syncToBackend(SOURCE)
+    expect(source.listPaths()).not.toContain('note.md')
+  })
+
+  it('counts a delete at the target as confirmation, not as a reason to restore', async () => {
+    // The user deleted the moved entry at its new home before the move
+    // settled. Abandoning here would resurrect it in the source vault —
+    // undoing a deliberate delete.
+    stageMove()
+    seedTombstone(TARGET, 'note.md', 'sha-b')
+
+    await syncToBackend(SOURCE)
+
+    expect(pendingMoves).toEqual([])
+    expect(notifyFns.warn).not.toHaveBeenCalled()
+  })
+
+  it('abandons the move and puts the entry back when nothing reached the target', async () => {
+    const { source } = stageMove()
+    // The target's copy never became durable (its cache row is gone — e.g. the
+    // vault was removed, or the write never landed).
+    cacheStore.delete(vp(TARGET, 'note.md'))
+
+    await syncToBackend(SOURCE)
+
+    // The source's remote copy is untouched and the tombstone is gone entirely
+    // — not pushed, not left behind. Removing the row is what lets the next
+    // reconcile see the file as new and pull it back into the store, which the
+    // move had already re-keyed into the target vault.
+    expect(source.deleteCallCount).toBe(0)
+    expect(source.get('note.md')?.content).toBe(NOTE)
+    expect(cacheStore.has(vp(SOURCE, 'note.md'))).toBe(false)
+    expect(pendingMoves).toEqual([])
+    expect(notifyFns.warn).toHaveBeenCalledTimes(1)
+    expect(notifyFns.warn.mock.calls[0]![0]).toContain('note')
+
+    await syncToBackend(SOURCE)
+
+    expect(cacheStore.get(vp(SOURCE, 'note.md'))).toMatchObject({ status: 'clean', content: NOTE })
+  })
+
+  it('leaves an unheld tombstone in the same vault alone', async () => {
+    // The hold is per path, not per vault: an ordinary delete staged next to a
+    // held one must not be delayed by it.
+    const { source } = stageMove()
+    source.seed('unrelated.md', NOTE, 'sha2')
+    seedTombstone(SOURCE, 'unrelated.md', 'sha2')
+
+    await syncToBackend(SOURCE)
+
+    expect(source.listPaths()).not.toContain('unrelated.md')
+    expect(source.get('note.md')?.content).toBe(NOTE)
+  })
+
+  it('journals both outcomes under the move\'s correlation id', async () => {
+    stageMove()
+
+    await syncToBackend(TARGET)
+
+    const released = syncJournalEvents().filter(e => e.kind === 'move-released')
+    expect(released).toHaveLength(1)
+    expect(released[0]).toMatchObject({ vaultId: SOURCE, path: 'note.md', detail: { note: 'mv1' } })
   })
 })
 
@@ -1705,15 +1877,6 @@ describe('reportParseFailures', () => {
 // timing, not for its error, and not for its content.
 
 describe('multi-vault sync', () => {
-  /** A second FakeBackend under a different vault id. */
-  function otherBackend(id: string, kind: VaultKind = 'local'): FakeBackend {
-    const backend = new FakeBackend()
-    Object.defineProperty(backend, 'id',   { value: id })
-    Object.defineProperty(backend, 'name', { value: id })
-    Object.defineProperty(backend, 'kind', { value: kind })
-    return backend
-  }
-
   it('keeps dirty counts and errors independent per vault', async () => {
     const a = new FakeBackend()          // 'fake-vault'
     const b = otherBackend('vault-b')

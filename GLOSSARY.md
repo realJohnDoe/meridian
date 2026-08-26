@@ -275,6 +275,17 @@ A save writes only these, leaving the rest at whatever the store holds by then
 that moved underneath it. Same three-way rule as `merge`, one layer up.
 → `model/merge.ts` · `mergeEditFields`
 
+### staged move / held delete
+A cross-vault move, which cannot be one transaction across two vault layers and
+two remotes, so it is ordered instead. The target's copy is made durable first;
+the source's tombstone is staged — hiding the entry there immediately — but its
+**held delete** is kept out of `pushDirty`'s outgoing set until the target's own
+remote confirms the copy. The entry is therefore in exactly one remote
+throughout, never both and never neither. If the target's copy turns out never
+to have become durable, the move is abandoned and the held delete dropped.
+→ `storage/cache/pendingMoves.ts` · `PendingMove`, `heldDeletePaths`
+→ `storage/moveEntry.ts` · `moveEntityInCache`
+
 ### persistence port
 The indirection core edit code calls instead of `@/storage`, so `storeCommit`
 and `occurrenceActions` don't depend on the storage layer. The adapter

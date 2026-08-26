@@ -1,5 +1,6 @@
 import Dexie from 'dexie'
 import type { VaultRef } from '@/vaultRef'
+import type { PendingMove } from './pendingMoves'
 
 // The single Dexie seam. Every other file in this directory reaches IndexedDB
 // through `cacheInit()` — this is the only module allowed to import dexie
@@ -34,10 +35,11 @@ export interface DexieFileRow {
 }
 
 /** Row shape stored in Dexie's `meta` table — the key/value store behind
- * cache/credentials.ts (handles, tokens) and cache/registry.ts (vault list). */
+ * cache/credentials.ts (handles, tokens), cache/registry.ts (vault list) and
+ * cache/pendingMoves.ts (held cross-vault deletes). */
 interface MetaRecord {
   key:   string
-  value: FileSystemDirectoryHandle | string | number | boolean | VaultRef[]
+  value: FileSystemDirectoryHandle | string | number | boolean | VaultRef[] | PendingMove[]
 }
 
 export class MeridianDB extends Dexie {

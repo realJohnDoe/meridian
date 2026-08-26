@@ -1,16 +1,18 @@
 import {
   recordLocalEdit, applyRemoteBatch, confirmDeleted, cacheGetDirty,
-  setResolvedClean, markPushed, cacheDirtyCount, cacheLoadAll,
+  setResolvedClean, markPushed, cacheDirtyCount, cacheLoadAll, cacheGetRecord,
   recordLocalDelete, cacheGetTombstones, markMerged,
 } from '@/storage/cache/files'
 import type { CacheRecord } from '@/storage/cache/files'
+import { pendingMovesLoad, pendingMoveDrop, heldDeletePaths } from '@/storage/cache/pendingMoves'
+import type { PendingMove } from '@/storage/cache/pendingMoves'
 import { markInFlight, clearInFlight, getInFlightPaths } from '@/storage/inFlight'
 import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
 import type { VaultKind } from '@/vaultRef'
 import { parseToStoreItems, roundTripLoss, mergeFileContent, type ParseResult } from '@/model'
-import { pathToKey, keyToPath, keyVaultId } from '@/fileIO'
+import { pathToKey, keyToPath, keySlug, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { runInIdleBatches } from '@/lib/idle'
 import type { Entries } from '@/types'
@@ -694,9 +696,15 @@ async function pushDirty(
   vaultId: string,
 ): Promise<{ hadCollision: boolean; pushed: Set<string> }> {
   const dirty      = await cacheGetDirty(vaultId)
-  const tombstones = await cacheGetTombstones(vaultId)
+  const staged     = await cacheGetTombstones(vaultId)
   const pushed     = new Set<string>()
-  if (!dirty.length && !tombstones.length) return { hadCollision: false, pushed }
+  if (!dirty.length && !staged.length) return { hadCollision: false, pushed }
+
+  // A tombstone staged by a cross-vault move is held back until the target
+  // vault's copy is confirmed on its own remote — see settlePendingMoves. The
+  // held record still hides the entry locally; only the remote delete waits.
+  const held = staged.length > 0 ? await heldDeletePaths(vaultId) : new Set<string>()
+  const tombstones = held.size > 0 ? staged.filter(f => !held.has(f.path)) : staged
 
   let hadCollision = false
   // Path+content pairs resolveCollision produced this cycle — merged into the
@@ -779,6 +787,96 @@ async function pushDirty(
   return { hadCollision, pushed }
 }
 
+// ── CROSS-VAULT MOVES ─────────────────────────────────────────────────
+
+/**
+ * Decide the fate of every staged cross-vault move whose outcome is now known.
+ *
+ * A move (see `moveEntry.ts`) leaves the source's tombstone staged but held:
+ * `pushDirty` won't send it, so the entry survives in the source's remote
+ * while the target's copy is still only local. This is what un-holds it — or,
+ * when the target's copy turns out never to have become durable, what puts the
+ * entry back.
+ *
+ * The question is asked of the *target's cache record*, not of a push result,
+ * so it answers the same way after a reload as it does in the cycle that
+ * pushed: `dirty` means still waiting, anything else means the target's remote
+ * has it. A move whose confirming push landed seconds before the tab closed
+ * would otherwise be held forever — the record it was waiting on is clean, and
+ * a clean record is never pushed again.
+ *
+ * Never throws: a move that cannot be settled stays staged, which is the safe
+ * state, and must not take the surrounding sync cycle down with it.
+ */
+async function settlePendingMoves(): Promise<void> {
+  let moves: PendingMove[]
+  try {
+    moves = await pendingMovesLoad()
+  } catch (e) {
+    console.error('[vault] could not read staged moves:', e)
+    return
+  }
+  for (const move of moves) {
+    try {
+      await settleMove(move)
+    } catch (e) {
+      console.error('[vault] could not settle move', move.id, e)
+    }
+  }
+}
+
+async function settleMove(move: PendingMove): Promise<void> {
+  const toVault = keyVaultId(move.toKey)
+  // The target vault being gone is the same verdict as its record being gone:
+  // removing a vault clears its cache, so either way nothing durable is left
+  // holding the entry at the target end.
+  const target = getBackend(toVault)
+    ? await cacheGetRecord(toVault, keyToPath(move.toKey))
+    : undefined
+  if (!target) { await abandonMove(move); return }
+  // Still local-only at the target — keep holding.
+  if (target.status === 'dirty') return
+  // `clean` is the ordinary confirmation. `deleted` counts too: the user
+  // deleted the moved entry at its new home, so resurrecting the source copy
+  // by abandoning here would undo a deliberate delete.
+  await releaseMove(move)
+}
+
+/** The target's remote has the entry — let the source's delete go out. */
+async function releaseMove(move: PendingMove): Promise<void> {
+  await pendingMoveDrop(move.id)
+  const fromVault = keyVaultId(move.fromKey)
+  journal('move-released', fromVault, keyToPath(move.fromKey), { note: move.id })
+  const from = getBackend(fromVault)
+  if (!from || from.readOnly) return
+  updateSyncUI(from)
+  scheduleAutoPush(from)
+}
+
+/**
+ * Nothing durable ever reached the target — undo the source half instead.
+ *
+ * The tombstone is *removed*, not pushed and not rewritten: with no copy at
+ * the target, deleting the source's remote file is the one outcome this whole
+ * mechanism exists to prevent. Removing the record entirely (rather than, say,
+ * marking it dirty) is also what brings the entry back into view — the store
+ * was re-keyed into the target vault when the move committed, and the next
+ * reconcile of the source vault treats a path the cache has never seen as new
+ * and pulls it in, root and items.
+ */
+async function abandonMove(move: PendingMove): Promise<void> {
+  await pendingMoveDrop(move.id)
+  const fromVault = keyVaultId(move.fromKey)
+  const fromPath  = keyToPath(move.fromKey)
+  journal('move-abandoned', fromVault, fromPath, { note: move.id })
+  const record = await cacheGetRecord(fromVault, fromPath)
+  if (record?.status === 'deleted') await confirmDeleted(fromVault, fromPath)
+  const from = getBackend(fromVault)
+  if (!from) return
+  updateSyncUI(from)
+  warn(`Couldn't finish moving "${keySlug(move.fromKey)}" — it's still in "${from.name}".`)
+}
+
 /**
  * Run one sync cycle for one vault.
  *
@@ -843,6 +941,12 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
       }
     }
     // ── SUCCESS ──────────────────────────────────────────────────
+    // Any vault's successful cycle re-decides every staged move, not just the
+    // ones this vault is half of: the question a move waits on — has the
+    // target's copy reached its remote? — is answered by the target's cache
+    // record, which any cycle can read. That way a move still settles when the
+    // vault that would have noticed is the one sitting in backoff.
+    await settlePendingMoves()
     setVaultSync(vaultId, { error: null, offline: false, lastSyncedAt: Date.now(), needsAttention: null })
     syncState.consecutiveFailures = 0
     syncState.nextRetryAt         = 0

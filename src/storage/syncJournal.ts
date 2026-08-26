@@ -43,6 +43,10 @@ export type SyncEventKind =
   | 'delete-reread'        // no base version to CAS a delete against; re-read the current sha first
   | 'delete-ok'
   | 'delete-conflict'
+  // ── cross-vault move (both halves share one correlation id in `note`) ──
+  | 'move-staged'          // the target copy is durable; the source delete is staged but held
+  | 'move-released'        // the target's remote confirmed the copy — the source delete may go out
+  | 'move-abandoned'       // nothing durable at the target — the source's held delete was dropped
   // ── collision resolution (why a push-conflict resolved the way it did) ──
   | 'collision-already-landed'  // the backend already holds exactly our content
   | 'collision-retried'         // nothing had diverged — the CAS was retried and took
@@ -81,7 +85,12 @@ export interface SyncEventDetail {
   reason?:        string
   /** Milliseconds since the last event for this same path, if any. */
   sincePrevMs?:   number
-  /** Free-form one-word note where the fields above don't fit. */
+  /**
+   * Free-form one-word note where the fields above don't fit — the conflict
+   * copy's path, and the correlation id tying a cross-vault move's two halves
+   * together (`move-staged` appears once per vault; the later `move-released`
+   * or `move-abandoned` carries the same id).
+   */
   note?:          string
 }
 
