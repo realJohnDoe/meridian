@@ -44,7 +44,7 @@ export abstract class ReactWidget extends WidgetType {
     return el
   }
 
-  destroy(dom: HTMLElement): void {
+  override destroy(dom: HTMLElement): void {
     const root = roots.get(dom)
     if (root) {
       // Defer to avoid "Can't perform a React state update on an unmounted component"
@@ -58,5 +58,5 @@ export abstract class ReactWidget extends WidgetType {
   // handlers (navigate, toggle, promote, edit-dispatch) own all interactions.
   // Without this, CM6's mousedown handler places the cursor and the widget
   // disappears before React's handlers can fire (observed on desktop).
-  ignoreEvent(): boolean { return true }
+  override ignoreEvent(): boolean { return true }
 }

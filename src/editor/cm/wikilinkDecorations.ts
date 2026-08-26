@@ -57,7 +57,7 @@ class ChipWidget extends ReactWidget {
     private readonly onClick: () => void,
   ) { super() }
 
-  protected get inline() { return true }
+  protected override get inline() { return true }
 
   renderReact() {
     const chip = this.resolved
@@ -87,7 +87,7 @@ class ChipWidget extends ReactWidget {
     )
   }
 
-  eq(other: ChipWidget): boolean {
+  override eq(other: ChipWidget): boolean {
     return other.label === this.label && other.resolved === this.resolved && other.ref === this.ref
   }
 }

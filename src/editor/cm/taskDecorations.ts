@@ -20,7 +20,7 @@ class CheckboxWidget extends ReactWidget {
     private readonly onToggle: () => void,
   ) { super() }
 
-  protected get inline() { return true }
+  protected override get inline() { return true }
 
   renderReact() {
     // inline-flex (not the component's default block-level `flex`) so the
@@ -33,7 +33,7 @@ class CheckboxWidget extends ReactWidget {
     })
   }
 
-  eq(other: CheckboxWidget): boolean {
+  override eq(other: CheckboxWidget): boolean {
     return other.done === this.done && other.lineFrom === this.lineFrom
   }
 }

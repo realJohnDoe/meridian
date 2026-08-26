@@ -104,7 +104,7 @@ in that band and likely deserves its own look.
 6. **Code Health & DRY** — findings: #8. A 6-line-window duplicate scan
    across all non-test, non-`components/ui` source found no cross-file
    duplication other than import lists and #8.
-7. **Toolchain & Developer Feedback Loops** — findings: #1, #3
+7. **Toolchain & Developer Feedback Loops** — findings: #3
 8. **Dependencies & Library Fit** — clean; three keep-verdicts stated below.
 9. **Styling & UX** — findings: #2. Zero `<div onClick>`/`<span onClick>` in
    non-test source; `jsx-a11y` recommended is enabled with Radix/Badge/Card
@@ -153,18 +153,17 @@ detailed sections below stay in `#` order so they're findable.
 
 | Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
-| 1 | 1 | `noImplicitOverride` off — 12 silent-override sites in `editor/cm/` | toolchain, types | 5 | 6 | Haiku 4.5 |
-| 2 | 2 | `BADGE_CLASS` is a design token exported from a view, with its pixel math hand-copied into two files | layout, styling | 4 | 4 | Haiku 4.5 |
-| 3 | 3 | `worker/` has no coverage measurement at all | toolchain, testing | 6 | 5 | Sonnet 5 |
-| 4 | 4 | `store.ts` at 38.99%, with three irreversible migrations untested | testing | 7 | 3 | Sonnet 5 |
-| 5 | 6 | Half of `EntryEditorHooks` is optional for a dev-only page | overengineering, types | 5 | 4 | **Sonnet 5** |
-| 6 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
-| 7 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
-| 8 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
-| 9 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
+| 1 | 2 | `BADGE_CLASS` is a design token exported from a view, with its pixel math hand-copied into two files | layout, styling | 4 | 4 | Haiku 4.5 |
+| 2 | 3 | `worker/` has no coverage measurement at all | toolchain, testing | 6 | 5 | Sonnet 5 |
+| 3 | 4 | `store.ts` at 38.99%, with three irreversible migrations untested | testing | 7 | 3 | Sonnet 5 |
+| 4 | 6 | Half of `EntryEditorHooks` is optional for a dev-only page | overengineering, types | 5 | 4 | **Sonnet 5** |
+| 5 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
+| 6 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
+| 7 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
+| 8 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
 
-> **The order above is `(impact × breadth) ÷ effort`, not raw impact.** Two
-> cheap, wide toolchain fixes (#1, #2) outrank the highest-impact finding in
+> **The order above is `(impact × breadth) ÷ effort`, not raw impact.** A
+> cheap, wide layout fix (#2) outranks the highest-impact finding in
 > the report. A reader sorting by what actually matters most should start at
 > **#4** (`store.ts` — impact 7, and the only finding where the failure mode
 > is silent user-data loss), then **#3**.
@@ -181,51 +180,6 @@ contract — do #6 first, since making the optionals required narrows what #9's
 split has to preserve. Everything else is independent.
 
 ---
-
-### 1. `noImplicitOverride` is off, and every CodeMirror widget override is unguarded
-
-- **Category** — `toolchain`, `types`
-- **Impact** — 5
-- **Breadth** — 6 files (5 sources + `tsconfig.app.json`). Measured by a dry
-  run, not estimated: a temporary tsconfig extending `tsconfig.app.json` with
-  `noImplicitOverride: true` produced exactly **12 `TS4114` errors**, all in
-  `src/editor/cm/` — `ReactWidget.ts` (2), `markdownFormatting.ts` (6),
-  `taskDecorations.ts` (2), `wikilinkDecorations.ts` (2).
-- **Recommended model** — **Haiku 4.5.** The fix is adding the `override`
-  keyword at 12 sites; a wrong edit is a compile error, so it cannot fail
-  silently. Hazard to name in the task: fix by *adding `override`*, never by
-  renaming a method to dodge the error — a rename is the exact bug the flag
-  exists to catch.
-- **Evidence** — `tsconfig.app.json` enables `strict`, `noUnusedLocals`,
-  `noUnusedParameters`, `noFallthroughCasesInSwitch` and
-  `noUncheckedIndexedAccess`, but not `noImplicitOverride`. The unguarded
-  sites are CodeMirror `WidgetType` subclasses, e.g.
-  `src/editor/cm/markdownFormatting.ts:75`:
-  ```
-  ignoreEvent(): boolean { return false }
-  ```
-  against `src/editor/cm/ReactWidget.ts:61`:
-  ```
-  ignoreEvent(): boolean { return true }
-  ```
-- **Problem** — CodeMirror's `WidgetType` supplies defaults for `eq()`
-  (`false`) and `ignoreEvent()` (`true`), so a typo'd or renamed override
-  compiles cleanly and the base default silently takes over — `eq` returning
-  the default means the widget re-renders on every update, and `ignoreEvent`
-  means clicks stop reaching React handlers, both of which present as vague
-  editor jank rather than an error, in the repo's second-highest-churn
-  directory (`editor/` 117 commits in 60 days, `editor/cm/` 49 of them).
-- **Fix** — Add `"noImplicitOverride": true` to `tsconfig.app.json` and the
-  `override` keyword at the 12 reported sites; confirm with `pnpm run build`
-  in the repo root.
-- **Task context** — The 12 sites, from the dry run (add `override` before
-  each member; do not rename anything):
-  `src/editor/cm/ReactWidget.ts` lines 47, 61 · `markdownFormatting.ts` lines
-  71, 75, 87, 88, 102, 103 · `taskDecorations.ts` lines 23, 36 ·
-  `wikilinkDecorations.ts` lines 60, 90. All are members of classes extending
-  CodeMirror's `WidgetType` or the local `ReactWidget`. Reproduce the list
-  before and after with a throwaway tsconfig extending `tsconfig.app.json`
-  with `noImplicitOverride: true` — the count must go 12 → 0.
 
 ### 2. `BADGE_CLASS` is a design token exported from a view component, and its pixel height is hand-copied into two other files
 
