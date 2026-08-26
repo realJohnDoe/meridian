@@ -1022,15 +1022,22 @@ export function scheduleAutoPush(backend: StorageBackend): void {
 }
 
 /**
- * Push anything still dirty right now, in **every** registered vault —
- * bypassing the 1s debounce and without waiting for the next autoSyncTick.
- * Used to rescue writes stranded by a prior session (vault registration) or
- * about to be stranded by the page going away (tab hidden/backgrounded).
+ * Push anything still dirty right now, in **every** registered vault at
+ * once — bypassing the 1s debounce and without waiting for the next
+ * autoSyncTick. Both call sites (`routes/__root.tsx`'s `visibilitychange`
+ * going hidden, and `pagehide`) fire when the page is about to be
+ * backgrounded or torn down, so there is no time left to be polite: unlike
+ * `autoSyncTick`, which serializes vaults deliberately (see its doc comment)
+ * because nothing else coordinates bursts across vaults' Octokit clients,
+ * here a vault skipped or delayed behind another keeps its edit stranded in
+ * Dexie until the next launch, which is strictly worse than a burst. If a
+ * future caller reaches this from a non-teardown context, it should get its
+ * own serial helper instead of reusing this one.
  *
- * Every vault, not just one: `pagehide` is the last moment anything runs, and
- * a vault skipped here keeps its edit stranded in Dexie until the next launch.
- * A no-op per vault when nothing is dirty — pushDirty returns immediately if
- * the cache has no dirty/tombstoned records — so this stays cheap.
+ * Every vault, not just one, for the same reason: `pagehide` is the last
+ * moment anything runs. A no-op per vault when nothing is dirty — pushDirty
+ * returns immediately if the cache has no dirty/tombstoned records — so this
+ * stays cheap.
  */
 export function flushPendingPush(): void {
   for (const backend of getMountedBackends()) {
