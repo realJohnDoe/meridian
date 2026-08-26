@@ -87,7 +87,7 @@ in that band and likely deserves its own look.
 
 1. **Architecture & Domain Separation** — findings: #10 (part A is ready to fix; part B is deferred by design — see the finding)
 2. **Simplicity & Overengineering** — clean.
-3. **Directory & File Layout** — findings: #7
+3. **Directory & File Layout** — clean.
 4. **Security** — clean. Threat model: a client-side PWA over user-owned
    Markdown, parsing untrusted `.ics` feeds and untrusted vault files, with
    GitHub OAuth tokens in IndexedDB and the client secret held server-side in
@@ -153,14 +153,11 @@ detailed sections below stay in `#` order so they're findable.
 
 | Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
-| 4 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
 | 5 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
 | 6 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
 | 7 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
 
-> **The order above is `(impact × breadth) ÷ effort`, not raw impact.** A
-> reader sorting by what actually matters most should start at **#7**
-> (`exampleBackend.ts` — the top of the table above).
+> **The order above is `(impact × breadth) ÷ effort`, not raw impact.**
 >
 > **Two findings moved down a tier** once their Task context was written out
 > — #9 from Opus 5 to Sonnet 5 outright, and #10 partially. One thing
@@ -170,61 +167,6 @@ detailed sections below stay in `#` order so they're findable.
 > report, and it is genuinely Opus-tier — see #10 for why.
 
 ---
-
-### 7. `exampleBackend.ts` is 79% Tutorial content wrapped around a 32-line adapter
-
-- **Category** — `layout`, `srp`
-- **Impact** — 4
-- **Breadth** — 3 files (`storage/exampleBackend.ts`, the new content module,
-  `storage/devFixtures/testVaultGen.ts` as the established sibling).
-- **Recommended model** — **Sonnet 5.** Hazard: the tutorial's slugs are
-  load-bearing beyond this file — `CLAUDE.md` documents `01-start-here` …
-  `05-make-it-yours` for agent navigation, and `const VERSION = 'example-v4'`
-  gates cache invalidation for every existing user's Tutorial vault. The move
-  must preserve both; bumping or dropping `VERSION` by accident silently
-  re-seeds or fails to re-seed people's sandbox.
-- **Evidence** — `src/storage/exampleBackend.ts` is 496 lines, of which lines
-  59–450 are one function, `src/storage/exampleBackend.ts:59`:
-  ```
-  function buildEntries(): Array<{ id: string; content: string }> {
-  ```
-  The actual backend is lines 465–496. A sibling directory already exists for
-  exactly this kind of content — `src/storage/devFixtures/testVaultGen.ts`,
-  described in its own header as producing "a deterministic vault in the same
-  markdown+frontmatter format the ExampleBackend uses".
-- **Problem** — Editing user-facing onboarding copy means editing a
-  `StorageBackend` implementation, and the 32 lines that actually implement
-  the interface are buried under 392 lines of Markdown fixtures — so the file
-  reads as neither one thing nor the other, and the directory's own
-  established home for vault content (`devFixtures/`) is bypassed.
-- **Fix** — Move `buildEntries` and its date helpers into
-  `src/storage/devFixtures/tutorialVault.ts`, leaving `exampleBackend.ts` as
-  the adapter plus `loadEntries`/`VERSION`; confirm with `pnpm run build &&
-  pnpm run test` in the repo root.
-- **Task context** — Move lines 59–450 of `src/storage/exampleBackend.ts`
-  (`buildEntries`) plus the four helpers it depends on — `d` (line 14),
-  `lastWeekdayDate` (19), `weekdaysBeforeToday` (25), `doneInstances` (46) —
-  and the `const MON = 1, WED = 3, FRI = 5` line (57) into
-  `src/storage/devFixtures/tutorialVault.ts`. What stays in
-  `exampleBackend.ts`: `loadEntries()` (451), `const ENTRIES` (461),
-  `const VERSION = 'example-v4'` (463) and the `ExampleBackend` class
-  (465–496).
-
-  Two things must not change value:
-  - `VERSION` gates cache invalidation for every existing user's Tutorial
-    vault. Leave the string exactly `'example-v4'` — bumping it re-seeds
-    everyone's sandbox, and it is not a version of the file's location.
-  - The entry ids `01-start-here`, `02-your-first-task`, `03-plan-your-week`,
-    `04-link-your-notes`, `05-make-it-yours` are referenced by `CLAUDE.md`
-    (the agent-navigation notes) and by the onboarding tour. Grep for them
-    after the move.
-
-  `devFixtures/testVaultGen.ts` is the sibling precedent and already imports
-  `fmtISO` from `@/model` and `addDays` from `@/format`, exactly as
-  `buildEntries` does — so the new file's imports mirror one that already
-  passes lint in that directory. `exampleBackend.ts` currently imports
-  `generateBigVault` from `./devFixtures/testVaultGen`; it will gain a second
-  import from the same directory.
 
 ### 8. Three list views hand-copy the same virtualized-row scaffold
 
