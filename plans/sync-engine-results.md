@@ -69,7 +69,7 @@ started. Each finding states its own confidence separately.
 | 1 | Conflict detection & resolution | no open findings |
 | 2 | Sync scheduling & cadence | **findings: #7** |
 | 3 | Write-path durability | no open findings |
-| 4 | Observability | **findings: #6** |
+| 4 | Observability | no open findings |
 | 5 | Cache transitions (`cache/files.ts`) | no open findings — six transitions, each with its precondition inside one Dexie transaction; covered at 95%+ by `storage/__tests__/cache.test.ts` against real Dexie |
 | 6 | Reconcile planning (`planReconcile`) | no open findings — pure, unit-tested, and its eventual-consistency guards (`skipPaths`, `RECONCILE_DELETE_GRACE_MS`, in-flight union) are each justified in-place |
 | 7 | Store-layer merge (`mergeChangedIntoStore`) | no open findings — writes one vault layer, evict-then-re-add whole entries |
@@ -82,65 +82,10 @@ started. Each finding states its own confidence separately.
 
 | # | Title | Category | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 6 | The sync journal does not survive a reload | `observability` | 5 | 1 file | **Sonnet 5** |
 | 7 | `flushPendingPush` bursts every vault at once | `cadence` | 3 | 1 file | **Sonnet 5** |
 
 Ranked by `(impact × breadth) ÷ effort` per the shared convention, with impact
 and breadth reported separately so the list can be re-sorted.
-
----
-
-### Finding #6 — The sync journal does not survive a reload
-
-- **Category:** `observability`
-- **Impact:** 5. Not a defect in behaviour — a limit on the ability to diagnose
-  the other findings. Worth stating that this is a **deliberate trade** with a
-  real justification, not an oversight.
-- **Breadth:** 1 file.
-- **Recommended model:** **Sonnet 5.** The named hazard is the reason the
-  current design exists — `storage/syncJournal.ts:19`: *"**Deliberately not
-  persisted.** Dexie is part of what this instruments"*. A journal written
-  through Dexie cannot be trusted to record a Dexie failure, so **the fix must
-  not use Dexie**. `localStorage` is the natural second sink (that file already
-  touches it for the debug flag at `syncJournal.ts:112`), and the write must be
-  wrapped in try/catch — Safari private mode throws on access, which the
-  existing code already handles. Second hazard: keep `syncJournalDump`'s output
-  format byte-identical, since it is what users paste into bug reports and what
-  `storage/__tests__/syncJournal.test.ts` asserts on.
-
-**Evidence** — `storage/syncJournal.ts:96-105`:
-
-```ts
-/**
- * How many events are kept. A busy editing session produces roughly one event
- * per file per push cycle (~2.5s while typing), so this is on the order of ten
- * minutes of history — comfortably longer than the gap between the writes that
- * cause a conflict and the conflict itself, and small enough to be pasteable.
- */
-const CAPACITY = 400
-
-const _events: SyncEvent[] = []
-```
-
-**Problem.** The stated reasoning — "comfortably longer than the gap between the
-writes that cause a conflict and the conflict itself" — held in the real
-incident only because the user opened the toast's details **while the events
-were still in the ring**. The gap that mattered was 244 seconds, well inside ten
-minutes; but the ring is capacity-bounded, not time-bounded, so a busier session
-evicts faster. And a reload clears it outright.
-
-For a bug class that is rare, cross-device, and hard to reproduce, the diagnosis
-window being "since this tab loaded, up to 400 events" is the wrong durability.
-A conflict noticed an hour later, or after the PWA was restarted, has no trace at
-all — and the *other* device's journal, which is often the one that explains the
-sequence, is a separate ring on separate hardware.
-
-**Fix.** Add a coarser second sink that does not share the instrumented
-dependency: append to a bounded `localStorage` ring (a few hundred events;
-`SyncEvent` is flat and JSON-safe by design, per its doc comment) on a debounce,
-and have `syncJournalDump` read the persisted ring plus the in-memory one.
-Consider including the vault id and a device label so two devices' dumps can be
-interleaved by hand.
 
 ---
 
