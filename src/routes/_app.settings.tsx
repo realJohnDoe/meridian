@@ -15,7 +15,9 @@ export const Route = createFileRoute('/_app/settings')({
  */
 function SettingsLayout() {
   return (
-    <div className="flex-1 overflow-y-auto overscroll-contain">
+    // `data-settings-screen` is what scripts/layout-smoke.mjs waits on to know
+    // this route has painted — these screens have no entry cards to wait for.
+    <div data-settings-screen className="flex-1 overflow-y-auto overscroll-contain">
       <div className="mx-auto flex w-full max-w-2xl flex-col px-4 pt-5 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6">
         <Outlet />
       </div>
