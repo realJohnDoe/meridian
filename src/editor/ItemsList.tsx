@@ -4,7 +4,7 @@ import type { Occurrence, Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
 import { occKind } from '@/occView'
 import { parseItemEntry, serializeTaskEntry } from './items'
-import { fileEntries } from '@/fileOccurrence'
+import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
 import { OccurrenceCard, MarkdownTaskCard, TagChip, FlipList, captureFlipLeaveRect, type FlipLeaveRect } from '@/components'
@@ -191,8 +191,18 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
                 listedOn={listedOn}
                 onOpen={() => onOpenWikilink?.(occ.metadata.fileSlug)}
                 onToggleDone={() => {
-                  beginExit(row)
                   onToggleDone?.(occ)
+                  // A wikilink row represents a *file*, not one occurrence — for
+                  // a recurring series, checking off today's occurrence doesn't
+                  // empty the row, it re-resolves to the series' next open one
+                  // (see fileOccurrenceMap's resolveOneKey). Animating an exit
+                  // in that case would fade a stale copy over a row that's
+                  // still there, just showing a different date. Only animate
+                  // when the file's representative occurrence actually became
+                  // dimmed — read post-toggle via the store directly, since the
+                  // occBySlug this render closed over is the pre-toggle value.
+                  const fresh = fileOccurrenceMap(useStore.getState().entries, roots).get(occ.entryKey)
+                  if (!fresh || isDimmed(fresh)) beginExit(row)
                 }}
                 animate={false}
               />
