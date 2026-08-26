@@ -16,9 +16,8 @@ import { useNow } from './useNow'
 import { computeColumns } from './computeColumns'
 import { computeMultidayLanes, compactRowLanes } from './computeMultidayLanes'
 import { TimedBlock } from './TimedBlock'
-import { BADGE_CLASS } from './MonthGrid'
 import { weekDays, weekContains, weekNumberFor } from './weekRange'
-import { GUTTER, COL_RIGHT_PAD } from './timelineGeometry'
+import { GUTTER, COL_RIGHT_PAD, BADGE_CLASS, BADGE_H } from './timelineGeometry'
 import { TimelineScroller, HourCells, NowLine } from './timelineScaffold'
 
 // Fixed row height for the all-day strip's bars/pills — unlike MonthGrid's
@@ -26,7 +25,7 @@ import { TimelineScroller, HourCells, NowLine } from './timelineScaffold'
 // changes), the strip here doesn't need to line up with anything else on the
 // page, so a literal pixel height keeps the marginTop reservation below
 // trivially correct with no measurement machinery.
-const ALLDAY_ROW_H = 20 // matches BADGE_CLASS's h-5
+const ALLDAY_ROW_H = BADGE_H // same height as the day-number badge
 
 // ── WeekPane ──────────────────────────────────────────────────
 // One pane of the week carousel — self-contained so React can key panes by

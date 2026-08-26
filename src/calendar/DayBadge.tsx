@@ -1,5 +1,5 @@
 import { cn } from '@/lib/cn'
-import { BADGE_CLASS } from './MonthGrid'
+import { BADGE_CLASS } from './timelineGeometry'
 
 interface Props {
   date: Date

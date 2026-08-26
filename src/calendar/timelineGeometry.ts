@@ -1,10 +1,34 @@
-// Layout constants for the day/week timeline. Plain numbers, not Tailwind
-// classes/vars, because they feed JS pixel math (scrollTo, pointer-offset
-// calcs for click-to-create) that must run synchronously. Each is still
-// snapped to a Tailwind step for consistency with the rest of the app (see
-// index.css §4). Shared by DayPane and the week view's per-day columns —
-// both timelines are the same scale, just diced into a different number of
-// columns.
+import { occRadius } from '@/components/primitives/occurrence-variants'
+
+// Layout constants shared across the calendar views, in two clusters: the
+// day-cell chrome below and the day/week timeline scale after it. Each lives
+// here rather than inside one of its consumers because a value four sibling
+// views read shouldn't be owned by whichever one happened to define it first.
+
+// ── CELL CHROME ──────────────────────────────────
+// Cell-chrome class strings, shared between MonthGrid's CalCell and
+// MonthView's invisible chrome sentinel so the bar overlay's top offset can
+// be MEASURED from a real replica rather than hand-computed — the day-number
+// badge, cell padding, or the flex gap can change without silently breaking
+// bar↔row alignment (see `barTop`, hoisted and measured once in MonthView
+// since it's month-independent). BADGE_CLASS is reused beyond the month grid,
+// by WeekPane's week/day-number badges and by DayBadge.
+export const CELL_CLASS = `flex-col items-stretch p-[3px_2px_2px] ${occRadius} bg-muted/40 transition-colors overflow-hidden min-h-0 w-full`
+export const BADGE_CLASS = 'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
+export const OCC_LIST_CLASS = 'flex flex-col gap-0.5 flex-1 overflow-hidden'
+// BADGE_CLASS's `h-5` as a number, for the callers that need the badge height
+// in JS pixel math rather than as a class (WeekPane's all-day row height,
+// MonthView's pre-measurement bar offset). Tailwind's `5` step is 1.25rem =
+// 20px — keep the two in step if `h-5` above ever changes.
+export const BADGE_H = 20
+
+// ── DAY/WEEK TIMELINE ────────────────────────────
+// Plain numbers, not Tailwind classes/vars, because they feed JS pixel math
+// (scrollTo, pointer-offset calcs for click-to-create) that must run
+// synchronously. Each is still snapped to a Tailwind step for consistency
+// with the rest of the app (see index.css §4). Shared by DayPane and the week
+// view's per-day columns — both timelines are the same scale, just diced into
+// a different number of columns.
 export const HOURS = 24               // hours shown on the timeline
 export const HP = 56                  // px per hour (timeline scale, not a spacing gap)
 export const GUTTER = 64              // px reserved for the left hour-label column — Tailwind `16` step
