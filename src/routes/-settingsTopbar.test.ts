@@ -15,7 +15,7 @@ describe('settingsTopbar', () => {
     expect(settingsTopbar('/settingsfoo', vaultName)).toBeNull()
   })
 
-  it('has no back target at the settings root', () => {
+  it('has no in-settings parent at the root, so back leaves Settings', () => {
     expect(settingsTopbar('/settings', vaultName)).toEqual({ title: 'Settings', backTo: null })
   })
 
@@ -23,7 +23,7 @@ describe('settingsTopbar', () => {
     expect(settingsTopbar('/settings/', vaultName)).toEqual({ title: 'Settings', backTo: null })
   })
 
-  it('titles the appearance screen and sends back to the root', () => {
+  it('titles the appearance screen and sends up to the root', () => {
     expect(settingsTopbar('/settings/appearance', vaultName)).toEqual({ title: 'Appearance', backTo: '/settings' })
   })
 

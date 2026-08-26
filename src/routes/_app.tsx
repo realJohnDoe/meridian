@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
-import { createFileRoute, Outlet, useNavigate, useMatch, useRouterState } from '@tanstack/react-router'
-import { Menu, CalendarCheck2, ArrowLeft } from 'lucide-react'
+import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
+import { Menu, CalendarCheck2 } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth, weekStartsOn } from '@/model'
 import { useToday } from '@/hooks'
@@ -16,7 +16,6 @@ import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import { TopbarShell } from './-topbarShell'
 import { PagedTopbar } from './-pagedTopbar'
 import { TopbarLabel } from './-topbarLabel'
-import { settingsTopbar } from './-settingsTopbar'
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
@@ -81,15 +80,6 @@ function AppMain() {
   const backlogMatch   = useMatch({ from: '/_app/backlog', shouldThrow: false })
   const notesMatch     = useMatch({ from: '/_app/notes', shouldThrow: false })
 
-  // Settings is a destination inside this shell, like Backlog and Notes, so the
-  // shell's own topbar names it. Keyed off the pathname rather than a route
-  // match because one branch has to cover four settings routes, including the
-  // dynamic per-vault one.
-  const pathname = useRouterState({ select: st => st.location.pathname })
-  const vaults   = useStore(st => st.vaults)
-  const settings = settingsTopbar(pathname, id => vaults.find(v => v.id === id)?.name)
-  // Hoisted to a const so it still narrows inside the click handler below.
-  const settingsBackTo = settings?.backTo ?? null
 
   const today         = useToday()
   const agendaTopDate = useAgendaTopDate()
@@ -153,30 +143,9 @@ function AppMain() {
           data-topbar
         >
           <TopbarShell
-            leftHasButton={isMobile || !!settingsBackTo}
+            leftHasButton={isMobile}
             left={
-              settings ? (
-                <div className="flex flex-1 items-center gap-2 min-w-0">
-                  {settingsBackTo
-                    ? (
-                      <IconButton
-                        variant="ghost"
-                        className="text-dim"
-                        onClick={() => void navigate({ to: settingsBackTo })}
-                        title="Back to settings"
-                        label="Back to settings"
-                      >
-                        <ArrowLeft size={18} />
-                      </IconButton>
-                    )
-                    : isMobile && (
-                      <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu">
-                        <Menu size={18} />
-                      </IconButton>
-                    )}
-                  <TopbarLabel long={settings.title} short={settings.title} className="flex-1 text-base text-foreground" />
-                </div>
-              ) : isDayView && dvDate && dvDisplayDate ? (
+              isDayView && dvDate && dvDisplayDate ? (
                 // replace: true on nav — mirrors the day carousel's swipe-to-page
                 // semantics (see DayView) so chevron taps and swipes leave the
                 // same, single history entry per visit instead of chevron taps
@@ -236,12 +205,9 @@ function AppMain() {
             }
             right={
               <div className="flex items-center gap-0.5 shrink-0">
-                {/* Settings is where the filter and the per-vault sync status are
-                    configured — repeating their controls in the topbar above them
-                    would offer two places to change one thing. */}
-                {!settings && <ViewFilterButton />}
-                {!settings && <SyncButton />}
-                {!isListView && !settings && (
+                <ViewFilterButton />
+                <SyncButton />
+                {!isListView && (
                   <IconButton variant="ghost" className="text-dim" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>
                 )}
               </div>

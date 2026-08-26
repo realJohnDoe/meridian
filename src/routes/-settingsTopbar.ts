@@ -1,15 +1,20 @@
 /**
- * What the app topbar shows while a settings screen is open.
+ * What the settings topbar shows for a given settings screen.
  *
- * Settings lives inside the `_app` shell — it is a destination like Backlog
- * and Notes, not a surface floating over one — so the shell's single topbar
- * has to speak for it. Derived from the pathname here, as a pure function, so
- * the mapping is testable without mounting the router, and so the screens
- * themselves don't need a channel back up to the shell to name themselves.
+ * The settings shell owns one topbar for four routes, so the title and the
+ * back target are derived from the pathname here, as a pure function — the
+ * mapping stays testable without mounting the router, and the screens don't
+ * need a channel back up to the shell to name themselves.
  */
 export interface SettingsTopbar {
   title: string
-  /** Where the back control goes, or `null` on the settings root. */
+  /**
+   * Where "up" goes: the settings list from any sub-screen, or `null` at the
+   * root — which means there is no parent left *inside* Settings, so back
+   * leaves it entirely. It never means "render no back button": the settings
+   * shell has no sidebar docked beside it, so the back control is the only
+   * way out at every depth.
+   */
   backTo: '/settings' | null
 }
 

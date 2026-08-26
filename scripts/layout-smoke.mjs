@@ -50,12 +50,15 @@ const VIEWPORTS = [
  * the settings screens are `_app` routes with no entries in them, and the shell
  * invariants below are exactly as load-bearing there.
  */
-const APP_ROUTES = [
-  { path: '/',         ready: '[data-testid="entry-card"]' },
-  { path: '/backlog',  ready: '[data-testid="entry-card"]' },
-  { path: '/notes',    ready: '[data-testid="entry-card"]' },
-  { path: '/settings', ready: '[data-settings-screen]' },
-]
+const APP_ROUTES = ['/', '/backlog', '/notes']
+
+/**
+ * Routes on the document-flow chain, which hold the opposite invariant. Both
+ * mount text inputs and no virtualizer, so they live outside `_app` precisely
+ * so the browser can lift a focused input above the on-screen keyboard.
+ * `ready` is the selector that means the route has painted.
+ */
+const FLOW_ROUTES = ['/entry/example/01-start-here', '/settings']
 
 const failures = []
 function check(scope, label, ok, detail) {
@@ -149,7 +152,7 @@ function readAgenda() {
 }
 
 /**
- * The entry routes are the opposite invariant: the document must be *able* to
+ * The flow routes are the opposite invariant: the document must be *able* to
  * grow past the viewport, which is what lets the browser lift a focused input
  * above the on-screen keyboard without any visualViewport arithmetic. Tested
  * as a capability rather than by reading CSS back — append something tall and
@@ -159,8 +162,8 @@ function readAgenda() {
  * NOT on document.body. body carries only `min-height` (see index.css); the
  * one-screen cap lives on `_app`'s own wrapper, several levels below it. A
  * probe appended to body is therefore a sibling of that cap and grows the
- * document on *every* route — pointed at `/backlog`, the body-anchored version
- * of this check passed, which is to say it was asserting nothing at all.
+ * document on *every* route — this check passed on `/backlog` before it was
+ * anchored here, which is to say it was asserting nothing at all.
  */
 function probeFlow() {
   const se = document.scrollingElement
@@ -187,10 +190,10 @@ try {
     const page = await context.newPage()
     page.on('pageerror', e => failures.push(`${name} — uncaught page error: ${e.message}`))
 
-    for (const { path: route, ready } of APP_ROUTES) {
+    for (const route of APP_ROUTES) {
       const scope = `${name} ${route}`
       await page.goto(`${BASE}${route}`, { waitUntil: 'load' })
-      await page.waitForSelector(ready, { timeout: 30_000 })
+      await page.waitForSelector('[data-testid="entry-card"]', { timeout: 30_000 })
       await page.waitForTimeout(1500) // let the virtualizer measure and settle
 
       const m = await page.evaluate(readAppShell)
@@ -209,17 +212,25 @@ try {
       check(scope, 'agenda rows must be visible', a.onScreenRows > 0, `${a.mountedRows} mounted, none on screen`)
     }
 
-    // One entry route, for the invariant that runs the other way.
-    const scope = `${name} /entry`
-    await page.goto(`${BASE}/entry/example/01-start-here`, { waitUntil: 'load' })
-    await page.waitForSelector('[data-flow-screen]', { timeout: 30_000 })
-    await page.waitForTimeout(1500)
-    const f = await page.evaluate(probeFlow)
-    check(scope, 'the route content must be able to grow the document past the viewport',
-      !f.missing && f.after > f.clientH,
-      f.missing
-        ? 'no [data-flow-screen] element found'
-        : `scrollHeight stayed at ${f.after} with a 3000px probe appended (viewport ${f.clientH})`)
+    // The routes whose invariant runs the other way.
+    for (const route of FLOW_ROUTES) {
+      const scope = `${name} ${route}`
+      await page.goto(`${BASE}${route}`, { waitUntil: 'load' })
+      await page.waitForSelector('[data-flow-screen]', { timeout: 30_000 })
+      await page.waitForTimeout(1500)
+
+      const f = await page.evaluate(probeFlow)
+      check(scope, 'the route content must be able to grow the document past the viewport',
+        !f.missing && f.after > f.clientH,
+        f.missing
+          ? 'no [data-flow-screen] element found'
+          : `scrollHeight stayed at ${f.after} with a 3000px probe appended (viewport ${f.clientH})`)
+
+      // The search bar is `_app` furniture — it searches and creates entries.
+      // A flow route is outside that shell and must not carry it.
+      const bar = await page.evaluate(() => document.querySelector('.search-bar-wrap') !== null)
+      check(scope, 'the app search bar must not render here', bar === false)
+    }
 
     await context.close()
   }
