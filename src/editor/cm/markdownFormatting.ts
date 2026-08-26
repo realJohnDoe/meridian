@@ -68,11 +68,11 @@ class LinkWidget extends WidgetType {
     return span
   }
 
-  eq(other: LinkWidget): boolean {
+  override eq(other: LinkWidget): boolean {
     return other.label === this.label && other.url === this.url
   }
 
-  ignoreEvent(): boolean { return false }
+  override ignoreEvent(): boolean { return false }
 }
 
 // ── Marker widgets ────────────────────────────────────────────────
@@ -84,8 +84,8 @@ class BulletWidget extends WidgetType {
     span.setAttribute('aria-hidden', 'true')
     return span
   }
-  eq(): boolean { return true }
-  ignoreEvent(): boolean { return false }
+  override eq(): boolean { return true }
+  override ignoreEvent(): boolean { return false }
 }
 
 class OrderedMarkerWidget extends WidgetType {
@@ -99,8 +99,8 @@ class OrderedMarkerWidget extends WidgetType {
     span.style.width = olIndent(markDigits(this.label))
     return span
   }
-  eq(other: OrderedMarkerWidget): boolean { return other.label === this.label }
-  ignoreEvent(): boolean { return false }
+  override eq(other: OrderedMarkerWidget): boolean { return other.label === this.label }
+  override ignoreEvent(): boolean { return false }
 }
 
 const bulletDeco = Decoration.replace({ widget: new BulletWidget() })
