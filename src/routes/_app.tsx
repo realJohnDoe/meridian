@@ -26,8 +26,28 @@ export const Route = createFileRoute('/_app')({
 
 function AppLayout() {
   return (
+    // `_app` is the one shell that stays exactly one screen tall and clips
+    // itself, so every scroller below it (the agenda's virtualizer above all)
+    // scrolls its own element instead of the document — see index.css, where
+    // html/body/#root/#app deliberately only carry `min-height`.
+    //
+    // `flex-none` is load-bearing, not tidying. This is a flex item of
+    // `#app` (`display:flex; flex-direction:column`), so its *height* is the
+    // main size, and a flex item's main size comes from `flex-basis`, not from
+    // `height`. `flex-1` sets `flex-basis: 0%` — a percentage, resolved
+    // against the container's inner main size — and #app's height is now
+    // `auto` with only a `min-height`, i.e. indefinite. A percentage basis
+    // that can't resolve is treated as `content`, so the wrapper sized to the
+    // agenda's full virtualized spacer (~11000px measured on a Pixel 7
+    // viewport), `h-svh` never applied, and the *document* scrolled instead:
+    // the topbar scrolled away, rows started ~2500px down the page, and
+    // scroll-to-today did nothing because the agenda's own scroll element had
+    // scrollHeight === clientHeight and could not scroll at all.
+    //
+    // `flex-none` (`flex: 0 0 auto`) leaves the basis at `auto`, which means
+    // "use the main size property" — `h-svh` — and the cap holds again.
     <SidebarProvider
-      className="h-svh flex-1 min-h-0 overflow-hidden"
+      className="h-svh flex-none min-h-0 overflow-hidden"
       style={{ '--sidebar-width': '260px' } as React.CSSProperties}
     >
       <AppSidebar />
