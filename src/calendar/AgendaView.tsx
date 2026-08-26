@@ -11,6 +11,7 @@ import AgendaRow from './AgendaRow'
 import { computeAgendaScrollRestore, useSaveAgendaScroll, useAnchoredAgendaScroll } from './computeAgendaScrollRestore'
 import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
+import { useScrollabilityWarning } from './agendaScrollability'
 import { useToday } from '@/hooks'
 import { useNow } from './useNow'
 import { useAgendaAnchor, useAgendaScrollTarget, setAgendaTopDate, markAgendaScrolled, toggleOverdueCollapsed } from './viewState'
@@ -101,6 +102,13 @@ export default function AgendaView({ onOpen }: Props) {
   // completed, deleted, re-sorted). Keyed on `rows` identity, so scrolling
   // — which shifts `start` as unmeasured rows get measured — doesn't animate.
   useVirtualFlip(scRef, virtualItems, rows, virtualizer.isScrolling)
+
+  // Everything below — scrollToIndex, the seeded initial offset, the saved
+  // offset, the scroll anchor — assumes scRef's element is the thing that
+  // scrolls. When it isn't, all of them no-op silently against meaningless
+  // numbers; see agendaScrollability.ts for why that assumption is stated here
+  // rather than left implicit.
+  useScrollabilityWarning(scRef, virtualizer.getTotalSize())
 
   // Feed the top-bar label: the date of the topmost visible row.
   // Derived from the virtualizer's range (platform-agnostic — works on mobile
