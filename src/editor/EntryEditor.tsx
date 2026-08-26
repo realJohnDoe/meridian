@@ -62,8 +62,9 @@ const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
  * Declared as its own interface rather than `ReturnType<typeof useEntryEditor>`
  * so `debug/NodeInheritanceDebugger` can drive the same component from a
  * hand-built object: it edits a scratch snapshot, never the vault, so it has no
- * autosave, no wikilink navigation and no backlink toggling. Everything optional
- * here is a capability that caller legitimately doesn't have.
+ * autosave and no backlink toggling — the debugger supplies no-ops for those.
+ * `handleOpenWikilink` is the one field the debugger genuinely lacks (it has
+ * nowhere to navigate to), so it stays nullable rather than a no-op.
  */
 export interface EntryEditorHooks {
   entry: EntryState
@@ -79,9 +80,9 @@ export interface EntryEditorHooks {
    */
   onVaultChange: ((vaultId: string) => void) | null
   /** A move the user picked but hasn't confirmed. Rendered by `MoveVaultDialog`. */
-  pendingMove?: PendingMove | null
-  onMoveConfirm?: () => void
-  onMoveCancel?: () => void
+  pendingMove: PendingMove | null
+  onMoveConfirm: () => void
+  onMoveCancel: () => void
   pendingLinks: PendingLinks
   dialogHandlers: DialogHandlers
   setEntry: (updater: (prev: EntryState) => EntryState) => void
@@ -89,15 +90,16 @@ export interface EntryEditorHooks {
   handleOpenDlg: (id: string) => void
   handleOpenRepeatDlg: (itemType: ItemType) => void
   handlePromoteTask: (title: string, done: boolean) => string | null
-  scheduleAutoSave?: (body: string) => void
-  saveMeta?: (next: EntryState) => void
-  handleScopeChange?: (scope: EditScope) => void
-  handleTypeChange?: (t: ItemType) => void
-  handleDoneToggle?: () => void
-  handleOpenWikilink?: (ref: string) => void
-  handleToggleDoneBacklink?: (occ: Occurrence) => void
-  titleMissing?: boolean
-  focusTitleTick?: number
+  scheduleAutoSave: (body: string) => void
+  saveMeta: (next: EntryState) => void
+  handleScopeChange: (scope: EditScope) => void
+  handleTypeChange: (t: ItemType) => void
+  handleDoneToggle: () => void
+  /** Null when the caller has nowhere to navigate a wikilink to (the debug page's scratch entry isn't part of a real vault). */
+  handleOpenWikilink: ((ref: string) => void) | null
+  handleToggleDoneBacklink: (occ: Occurrence) => void
+  titleMissing: boolean
+  focusTitleTick: number
 }
 
 interface Props {
@@ -119,6 +121,8 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
     scheduleAutoSave, saveMeta, handleScopeChange, handleTypeChange, handleDoneToggle,
     handleOpenWikilink, handleToggleDoneBacklink, titleMissing, focusTitleTick,
   } = hooks
+  // ListedOnRow/EntryBody/ItemsList props are `?:`, not `| null` — coalesce once here.
+  const openWikilink = handleOpenWikilink ?? undefined
   const hour12             = useStore(s => s.localePrefs.hour12)
   const backlinks          = useStore(s => s.backlinks)
   // Per vault, and named: with several vaults registered, "changes aren't
@@ -140,7 +144,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
 
   function changeScope(scope: EditScope) {
     setEntry(prev => ({ ...prev, editScope: scope }))
-    handleScopeChange?.(scope)
+    handleScopeChange(scope)
   }
 
   const allParticipants = useAllParticipants(items, vaultId)
@@ -181,7 +185,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
           {tracked && (
             <Checkbox
               checked={done}
-              onCheckedChange={() => handleDoneToggle?.()}
+              onCheckedChange={() => handleDoneToggle()}
               className="mt-1"
               visualClassName="size-6"
             />
@@ -199,7 +203,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
               onChange={e => {
                 setEntry(prev => ({ ...prev, title: e.target.value }))
                 autoResize(e.target)
-                if (editScope !== 'add') scheduleAutoSave?.(viewRef.current?.state.doc.toString().trimEnd() ?? '')
+                if (editScope !== 'add') scheduleAutoSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
               }}
             />
             <div className="flex items-center gap-2 mt-0.5 min-w-0">
@@ -221,7 +225,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
           entryKey={effectiveKey}
           vaultId={vaultId}
           roots={roots}
-          onOpenWikilink={handleOpenWikilink}
+          onOpenWikilink={openWikilink}
           onAdd={handleAdd}
           onRemove={handleRemove}
         />
@@ -252,7 +256,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
             <ToggleGroup
               type="single"
               value={itemType}
-              onValueChange={(v) => { if (v) handleTypeChange?.(v as ItemType) }}
+              onValueChange={(v) => { if (v) handleTypeChange(v as ItemType) }}
               className={cn(segmentedGroupVariants(), 'mb-4')}
             >
               {(['task', 'event', 'note'] as ItemType[]).map(t => (
@@ -298,7 +302,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
             <ParticipantsRow participants={participants} onChange={ps => {
               const next = { ...entry, participants: ps }
               setEntry(() => next)
-              saveMeta?.(next)
+              saveMeta(next)
             }} allParticipants={allParticipants} />
 
             {editScope === 'add' && (
@@ -311,20 +315,20 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
           </CardContent>
         </Card>
 
-        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} vaultId={vaultId} items={items} onOpenWikilink={handleOpenWikilink} onChange={editScope !== 'add' ? scheduleAutoSave : undefined} />
+        <EntryBody key={bodyKey} body={body} viewRef={viewRef} roots={roots} vaultId={vaultId} items={items} onOpenWikilink={openWikilink} onChange={editScope !== 'add' ? scheduleAutoSave : undefined} />
 
         <ItemsList
           items={listItems}
           onChange={its => {
             const next = { ...entry, items: its }
             setEntry(() => next)
-            saveMeta?.(next)
+            saveMeta(next)
           }}
           roots={roots}
           currentKey={effectiveKey ?? null}
           vaultId={vaultId}
           onPromote={handlePromoteTask}
-          onOpenWikilink={handleOpenWikilink}
+          onOpenWikilink={openWikilink}
           onToggleDone={handleToggleDoneBacklink}
         />
 
@@ -338,8 +342,8 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
           entry-fields stack: a move edits no field, it relocates the file. */}
       <MoveVaultDialog
         move={pendingMove ?? null}
-        onConfirm={() => onMoveConfirm?.()}
-        onClose={() => onMoveCancel?.()}
+        onConfirm={() => onMoveConfirm()}
+        onClose={() => onMoveCancel()}
       />
     </section>
   )
