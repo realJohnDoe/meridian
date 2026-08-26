@@ -154,13 +154,22 @@ function readAgenda() {
  * above the on-screen keyboard without any visualViewport arithmetic. Tested
  * as a capability rather than by reading CSS back — append something tall and
  * see whether the document actually grew.
+ *
+ * The probe goes inside the route's own content, marked `data-flow-screen`,
+ * NOT on document.body. body carries only `min-height` (see index.css); the
+ * one-screen cap lives on `_app`'s own wrapper, several levels below it. A
+ * probe appended to body is therefore a sibling of that cap and grows the
+ * document on *every* route — pointed at `/backlog`, the body-anchored version
+ * of this check passed, which is to say it was asserting nothing at all.
  */
 function probeFlow() {
   const se = document.scrollingElement
+  const host = document.querySelector('[data-flow-screen]')
+  if (!host) return { missing: true, clientH: se.clientHeight }
   const before = se.scrollHeight
   const probe = document.createElement('div')
   probe.style.cssText = 'height:3000px;width:1px'
-  document.body.appendChild(probe)
+  host.appendChild(probe)
   const after = se.scrollHeight
   probe.remove()
   return { before, after, clientH: se.clientHeight }
@@ -203,10 +212,14 @@ try {
     // One entry route, for the invariant that runs the other way.
     const scope = `${name} /entry`
     await page.goto(`${BASE}/entry/example/01-start-here`, { waitUntil: 'load' })
+    await page.waitForSelector('[data-flow-screen]', { timeout: 30_000 })
     await page.waitForTimeout(1500)
     const f = await page.evaluate(probeFlow)
-    check(scope, 'the document must be able to grow past the viewport', f.after > f.clientH,
-      `scrollHeight stayed at ${f.after} with a 3000px probe appended (viewport ${f.clientH})`)
+    check(scope, 'the route content must be able to grow the document past the viewport',
+      !f.missing && f.after > f.clientH,
+      f.missing
+        ? 'no [data-flow-screen] element found'
+        : `scrollHeight stayed at ${f.after} with a 3000px probe appended (viewport ${f.clientH})`)
 
     await context.close()
   }
