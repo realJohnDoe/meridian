@@ -9,6 +9,7 @@ import { sortOccs } from './occSort'
 import { occState } from '@/occView'
 import { computeMultidayLanes, compactRowLanes, visibleLaneCount } from './computeMultidayLanes'
 import { maxVisibleFor, ROW_GAP } from './snapCarousel'
+import { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS } from './timelineGeometry'
 
 const EMPTY: Occurrence[] = []
 import { useExpandWithMultiday } from './useExpandWithMultiday'
@@ -17,17 +18,8 @@ import { useToday } from '@/hooks'
 import { useCalendarFilter } from './useCalendarFilter'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
-import { occRadius } from '@/components/primitives/occurrence-variants'
 import { OccurrencePill } from './OccurrencePill'
 
-// Cell-chrome class strings, shared between CalCell and the invisible chrome
-// sentinel so the bar overlay's top offset can be MEASURED from a real replica
-// rather than hand-computed — the day-number badge, cell padding, or the flex
-// gap can change without silently breaking bar↔row alignment (see `barTop`,
-// hoisted and measured once in MonthView since it's month-independent).
-export const CELL_CLASS = `flex-col items-stretch p-[3px_2px_2px] ${occRadius} bg-muted/40 transition-colors overflow-hidden min-h-0 w-full`
-export const BADGE_CLASS = 'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
-export const OCC_LIST_CLASS = 'flex flex-col gap-0.5 flex-1 overflow-hidden'
 
 // ── CalCell ───────────────────────────────────────────────────
 interface CalCellProps {

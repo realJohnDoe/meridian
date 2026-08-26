@@ -47,7 +47,8 @@ export const occBarVariants = cva(
  * Shared corner radius for every surface in the day/week/month grid views —
  * month-view day-cell chips/bars, day/week all-day pills, day/week
  * TimedBlocks, and the neutral bg-muted background rects behind them
- * (DayPane/WeekPane hour cells, MonthGrid's CELL_CLASS). Kept tight (4px) at
+ * (DayPane/WeekPane hour cells, the month grid's CELL_CLASS in
+ * timelineGeometry). Kept tight (4px) at
  * every width — including large screens — rather than growing to match the
  * agenda view's OccurrenceCard radius (rounded-lg). The agenda view itself
  * is deliberately excluded — OccurrenceCard/AgendaRow is a separate, more

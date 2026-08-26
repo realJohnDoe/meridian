@@ -87,7 +87,7 @@ in that band and likely deserves its own look.
 
 1. **Architecture & Domain Separation** — findings: #10 (part A is ready to fix; part B is deferred by design — see the finding)
 2. **Simplicity & Overengineering** — findings: #6
-3. **Directory & File Layout** — findings: #2, #7
+3. **Directory & File Layout** — findings: #7
 4. **Security** — clean. Threat model: a client-side PWA over user-owned
    Markdown, parsing untrusted `.ics` feeds and untrusted vault files, with
    GitHub OAuth tokens in IndexedDB and the client secret held server-side in
@@ -106,7 +106,7 @@ in that band and likely deserves its own look.
    duplication other than import lists and #8.
 7. **Toolchain & Developer Feedback Loops** — findings: #3
 8. **Dependencies & Library Fit** — clean; three keep-verdicts stated below.
-9. **Styling & UX** — findings: #2. Zero `<div onClick>`/`<span onClick>` in
+9. **Styling & UX** — clean. Zero `<div onClick>`/`<span onClick>` in
    non-test source; `jsx-a11y` recommended is enabled with Radix/Badge/Card
    indirection taught to it.
 10. **Performance** — clean. Code-splitting is real (`model` 155 kB,
@@ -143,8 +143,8 @@ in that band and likely deserves its own look.
 
 Every finding below carries a **Task context** block: the specific file, line,
 value list or hazard a fixer needs in order to work at the named tier without
-re-deriving it. Nine of the ten are Haiku- or Sonnet-tier as written *because*
-of those blocks — drop the context and most revert to Opus 5.
+re-deriving it. All but one are Sonnet-tier as written *because* of those
+blocks — drop the context and most revert to Opus 5.
 
 **`#` is a stable identity, not a priority** (the category verdicts above
 reference these numbers, and they don't move as findings get closed out). The
@@ -153,20 +153,18 @@ detailed sections below stay in `#` order so they're findable.
 
 | Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
-| 1 | 2 | `BADGE_CLASS` is a design token exported from a view, with its pixel math hand-copied into two files | layout, styling | 4 | 4 | Haiku 4.5 |
-| 2 | 3 | `worker/` has no coverage measurement at all | toolchain, testing | 6 | 5 | Sonnet 5 |
-| 3 | 4 | `store.ts` at 38.99%, with three irreversible migrations untested | testing | 7 | 3 | Sonnet 5 |
-| 4 | 6 | Half of `EntryEditorHooks` is optional for a dev-only page | overengineering, types | 5 | 4 | **Sonnet 5** |
-| 5 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
-| 6 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
-| 7 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
-| 8 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
+| 1 | 3 | `worker/` has no coverage measurement at all | toolchain, testing | 6 | 5 | Sonnet 5 |
+| 2 | 4 | `store.ts` at 38.99%, with three irreversible migrations untested | testing | 7 | 3 | Sonnet 5 |
+| 3 | 6 | Half of `EntryEditorHooks` is optional for a dev-only page | overengineering, types | 5 | 4 | **Sonnet 5** |
+| 4 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
+| 5 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
+| 6 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
+| 7 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
 
 > **The order above is `(impact × breadth) ÷ effort`, not raw impact.** A
-> cheap, wide layout fix (#2) outranks the highest-impact finding in
-> the report. A reader sorting by what actually matters most should start at
-> **#4** (`store.ts` — impact 7, and the only finding where the failure mode
-> is silent user-data loss), then **#3**.
+> reader sorting by what actually matters most should start at **#4**
+> (`store.ts` — impact 7, and the only finding where the failure mode is
+> silent user-data loss), then **#3**.
 >
 > **Three findings moved down a tier** once their Task context was written out
 > — #6 and #9 from Opus 5 to Sonnet 5 outright, and #10 partially. One thing
@@ -180,50 +178,6 @@ contract — do #6 first, since making the optionals required narrows what #9's
 split has to preserve. Everything else is independent.
 
 ---
-
-### 2. `BADGE_CLASS` is a design token exported from a view component, and its pixel height is hand-copied into two other files
-
-- **Category** — `layout`, `styling`
-- **Impact** — 4
-- **Breadth** — 4 files (`grep -rn "BADGE_CLASS" src`): defined in
-  `MonthGrid.tsx`, imported by `WeekPane.tsx`, `DayBadge.tsx`, `MonthView.tsx`.
-- **Recommended model** — **Haiku 4.5 if the task names the destination
-  module** (`calendar/` already has `timelineGeometry.ts` for exactly this
-  kind of shared constant); **else Sonnet 5.** Hazard: moving the constant is
-  mechanical, but the real defect is the derived `20`, and it must end up
-  derived from one source rather than re-copied. `MonthGrid.tsx` and
-  `MonthView.tsx` sit at 4.25% and 3.7% coverage, so nothing will catch a
-  regression.
-- **Evidence** — `src/calendar/MonthGrid.tsx:29`:
-  ```
-  export const BADGE_CLASS = 'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
-  ```
-  and `src/calendar/WeekPane.tsx:29`:
-  ```
-  const ALLDAY_ROW_H = 20 // matches BADGE_CLASS's h-5
-  ```
-  with `src/calendar/MonthView.tsx:13` independently re-deriving the same
-  number: `3px + badge h-5 20px + badge mb-px 1px + the 8px flex gap`.
-- **Problem** — A token used by four sibling views lives inside one of them
-  (violating the depth rule: broadly-used code belongs above its consumers,
-  not inside one), and two separate files hand-compute pixel arithmetic from a
-  Tailwind class string in a third — change `h-5` to `h-6` in `MonthGrid.tsx`
-  and both silently produce wrong layout, with no type error and no test.
-- **Fix** — Move `BADGE_CLASS` (and `CELL_CLASS`/`OCC_LIST_CLASS`, which have
-  the same shape) into `calendar/timelineGeometry.ts` beside the other shared
-  geometry constants, and export a `BADGE_H = 20` from there that
-  `ALLDAY_ROW_H` and `MonthView`'s comment both reference; confirm with
-  `pnpm run build && pnpm run lint` in the repo root.
-- **Task context** — Destination is `src/calendar/timelineGeometry.ts`, which
-  already holds the shared geometry constants `GUTTER` and `COL_RIGHT_PAD`
-  that `WeekPane` imports. Move all three class constants out of
-  `MonthGrid.tsx` and update the four importers: `MonthGrid.tsx` itself,
-  `MonthView.tsx:4`, `WeekPane.tsx:19`, `DayBadge.tsx:2`. Then export
-  `export const BADGE_H = 20` alongside them, replace `WeekPane.tsx`'s
-  `const ALLDAY_ROW_H = 20` with an import of it, and update the arithmetic
-  comment at `MonthView.tsx:13` to reference `BADGE_H` rather than restating
-  `20`. `MonthGrid.tsx` has no default-export change — it keeps
-  `export default MonthGrid`, only the named class constants move.
 
 ### 3. The `worker/` package's tests run in CI but its coverage is never measured
 

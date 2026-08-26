@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '@/store'
 import { fmtMonth, parseMonth, weekStartsOn } from '@/model'
-import MonthGrid, { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS } from './MonthGrid'
+import MonthGrid from './MonthGrid'
+import { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS, BADGE_H } from './timelineGeometry'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import { useCarousel } from './useCarousel'
@@ -9,9 +10,10 @@ import { PANE_COUNT } from './snapCarousel'
 import { occRadius } from '@/components/primitives/occurrence-variants'
 import { calendarView, setMonthPreview } from './viewState'
 
-// Fallback for the occurrence-list start offset until it's measured (cell top padding
-// 3px + badge h-5 20px + badge mb-px 1px + the 8px flex gap inherited from Button).
-const BAR_TOP_FALLBACK = 32
+// Fallback for the occurrence-list start offset until it's measured: cell top
+// padding 3px + the badge's own height + badge mb-px 1px + the 8px flex gap
+// inherited from Button.
+const BAR_TOP_FALLBACK = 3 + BADGE_H + 1 + 8
 const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 
 // ── MonthView ─────────────────────────────────────────────────
