@@ -4,6 +4,7 @@ import type * as ReactRouter from '@tanstack/react-router'
 import { render, act } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { THEMES } from '@/settings'
 
 const {
   restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, requestScrollToToday, setCurrentDate,
@@ -449,5 +450,27 @@ describe('THEME_CLASS', () => {
     expect(THEME_IDS).toContain('meridian')
     expect(THEME_IDS).toContain('meridian-light')
     expect(THEME_IDS).toHaveLength(Object.keys(THEME_CLASS).length - 2)
+  })
+
+  // The settings picker writes its own list — ids, labels and preview classes —
+  // rather than deriving it from THEME_CLASS, because importing the root route
+  // into the settings chunk would pull the entire app shell with it. These two
+  // assertions are what keeps writing it twice honest: a theme added to one
+  // side and not the other is either unreachable from the picker or a card
+  // that selects an id next-themes will not resolve.
+  it('offers exactly the selectable themes in the settings picker, plus System', () => {
+    const offered = THEMES.map(t => t.id).filter(id => id !== 'system')
+    expect([...offered].sort()).toEqual([...THEME_IDS].sort())
+  })
+
+  it('previews each theme with the same class the root route applies for it', () => {
+    for (const { id, className } of THEMES) {
+      if (id === 'system') {
+        // No class of its own — it previews whichever branded theme the OS resolves to.
+        expect(className).toBeUndefined()
+        continue
+      }
+      expect(className).toBe(THEME_CLASS[id])
+    }
   })
 })
