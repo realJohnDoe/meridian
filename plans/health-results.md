@@ -86,7 +86,7 @@ in that band and likely deserves its own look.
 ## 3. Category verdicts
 
 1. **Architecture & Domain Separation** — findings: #10 (part A is ready to fix; part B is deferred by design — see the finding)
-2. **Simplicity & Overengineering** — findings: #6
+2. **Simplicity & Overengineering** — clean.
 3. **Directory & File Layout** — findings: #7
 4. **Security** — clean. Threat model: a client-side PWA over user-owned
    Markdown, parsing untrusted `.ics` feeds and untrusted vault files, with
@@ -153,107 +153,23 @@ detailed sections below stay in `#` order so they're findable.
 
 | Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
-| 3 | 6 | Half of `EntryEditorHooks` is optional for a dev-only page | overengineering, types | 5 | 4 | **Sonnet 5** |
 | 4 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
 | 5 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
 | 6 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
 | 7 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
 
 > **The order above is `(impact × breadth) ÷ effort`, not raw impact.** A
-> reader sorting by what actually matters most should start at **#6**
-> (`EntryEditorHooks` — the top of the table above, and the one where the
-> debug page's 0% coverage makes a wrong no-op fail silently).
+> reader sorting by what actually matters most should start at **#7**
+> (`exampleBackend.ts` — the top of the table above).
 >
-> **Three findings moved down a tier** once their Task context was written out
-> — #6 and #9 from Opus 5 to Sonnet 5 outright, and #10 partially. One thing
+> **Two findings moved down a tier** once their Task context was written out
+> — #9 from Opus 5 to Sonnet 5 outright, and #10 partially. One thing
 > did **not** move: `sync.ts`'s scheduler/backoff half (#10 part B) shares the
 > `_syncStates` map with sync core, so splitting it needs a design decision
 > rather than a specified edit. It is the only Opus-tier work left in the
 > report, and it is genuinely Opus-tier — see #10 for why.
 
-**Sequencing:** #9 and #6 both touch the editor's hook/prop
-contract — do #6 first, since making the optionals required narrows what #9's
-split has to preserve. Everything else is independent.
-
 ---
-
-### 6. Half of `EntryEditorHooks` is optional solely to accommodate a dev-only debug page
-
-- **Category** — `overengineering`, `types`
-- **Impact** — 5
-- **Breadth** — 4 files (`editor/EntryEditor.tsx`,
-  `debug/NodeInheritanceDebugger.tsx`, `routes/_entry.entry.new.tsx`,
-  `routes/_entry.entry.$vault.$slug.tsx`).
-- **Recommended model** — **Sonnet 5**, given the Task context below. (It was
-  Opus 5 until the decision was made here: take the no-op route, not the
-  separate-prop-type route.) The one hazard that survives is named and located
-  — `ListedOnRow.tsx:57` branches on `onOpenWikilink` being `undefined`, so a
-  no-op there is *not* behaviour-preserving. Everything else coalesces
-  internally. Without that pointer this is Opus 5, because the debug page has
-  **0% coverage and no test at all**, so a wrong no-op fails silently.
-- **Evidence** — `src/editor/EntryEditor.tsx:62-66` states the reason
-  outright:
-  ```
-   * Declared as its own interface rather than `ReturnType<typeof useEntryEditor>`
-   * so `debug/NodeInheritanceDebugger` can drive the same component from a
-   * hand-built object: it edits a scratch snapshot, never the vault, so it has no
-   * autosave, no wikilink navigation and no backlink toggling. Everything optional
-   * here is a capability that caller legitimately doesn't have.
-  ```
-  12 of the interface's fields carry `?:` as a result (`pendingMove`,
-  `onMoveConfirm`, `onMoveCancel`, `scheduleAutoSave`, `saveMeta`,
-  `handleScopeChange`, `handleTypeChange`, `handleDoneToggle`,
-  `handleOpenWikilink`, `handleToggleDoneBacklink`, `titleMissing`,
-  `focusTitleTick`), producing guarded call sites throughout the component —
-  `src/editor/EntryEditor.tsx:143`:
-  ```
-      handleScopeChange?.(scope)
-  ```
-- **Problem** — Both production call sites pass `useEntryEditor`'s return
-  value, which supplies all 12 fields, so the optionality exists only for a
-  page that is not in the production bundle (`vite.config.ts` builds
-  `index.html` alone). The cost is paid in production: TypeScript can no
-  longer distinguish "the debugger legitimately lacks this" from "a route
-  forgot to wire this up", and a forgotten handler becomes a silently
-  swallowed no-op instead of a compile error, on the app's primary editing
-  surface.
-- **Fix** — Make the 12 fields required on `EntryEditorHooks` and have
-  `NodeInheritanceDebugger` pass explicit no-ops; confirm with `pnpm run
-  build` in the repo root, which type-checks `src/debug/` too.
-- **Task context** — Drop the `?` from all 12 fields at
-  `src/editor/EntryEditor.tsx:82-100`, then extend the object literal at
-  `src/debug/NodeInheritanceDebugger.tsx:762-779`. It already supplies
-  `entry`, `series`, `vaultId`, `onVaultChange: null`, `pendingLinks`,
-  `dialogHandlers`, `setEntry`, `handleSave`, `handleOpenDlg`,
-  `handleOpenRepeatDlg`, `handleScopeChange` and `handlePromoteTask`. The 11
-  to add, with the values that preserve current behaviour:
-
-  ```
-  pendingMove: null,               onMoveConfirm: () => {},
-  onMoveCancel: () => {},          scheduleAutoSave: () => {},
-  saveMeta: () => {},              handleTypeChange: () => {},
-  handleDoneToggle: () => {},      handleToggleDoneBacklink: () => {},
-  titleMissing: false,             focusTitleTick: 0,
-  handleOpenWikilink: () => {},    // ← see the trap below
-  ```
-
-  **The trap.** Two of these are passed straight through to children, and only
-  one of the children treats `undefined` as meaningful:
-  - `EntryBody.tsx:104-107` coalesces both `onOpenWikilink` and `onChange` to
-    `() => {}` internally, so a no-op is exactly equivalent — safe.
-  - `ItemsList.tsx:192` calls `onOpenWikilink?.(…)` — safe.
-  - **`ListedOnRow.tsx:57` is not safe**:
-    `onNavigate={onOpenWikilink && meta ? () => onOpenWikilink(meta.fileSlug) : undefined}`.
-    A no-op makes `onNavigate` truthy, so the row renders as navigable and
-    then does nothing when clicked. Handle it by keeping the debugger's
-    `handleOpenWikilink` genuinely absent at *that* call site — thread the
-    debugger's own "no navigation" state down, or have `EntryEditor` pass
-    `undefined` to `ListedOnRow` when navigation is unavailable — rather than
-    by reverting the field to optional.
-
-  `EntryEditor` destructures all 12 at lines 115-121; no call-site changes are
-  needed there beyond the `?.` operators becoming unnecessary (leaving them is
-  harmless, so don't churn them unless lint asks).
 
 ### 7. `exampleBackend.ts` is 79% Tutorial content wrapped around a 32-line adapter
 

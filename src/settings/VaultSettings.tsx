@@ -1,0 +1,297 @@
+import { useState } from 'react'
+import { formatDistanceToNow } from 'date-fns'
+import { Trash2, TriangleAlert, AlertCircle, Download, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Input } from '@/components/ui/input'
+import { readVaultStringArray } from '@/lib/vaultStorage'
+import { useStore } from '@/store'
+import { useAllParticipants } from '@/hooks'
+import {
+  syncToBackend, removeVault, renameVault, cacheDirtyCount, startGitHubSignIn,
+  GITHUB_APP_INSTALL_URL, exportVaultIcs,
+} from '@/vaultActions'
+import { ParticipantsRow } from '@/editor'
+import type { VaultRef } from '@/vaultActions'
+import { SettingsSection, SettingsRow } from './SettingsSection'
+import { vaultSummary } from './vaultSummary'
+
+interface Props {
+  vault: VaultRef
+}
+
+/** A vault name, made safe as a bare filename — no path separators or reserved characters. */
+function sanitizeFilename(name: string): string {
+  return name.trim().replace(/[\\/:*?"<>|]/g, '-') || 'calendar'
+}
+
+/**
+ * One vault's own settings screen.
+ *
+ * Scope is answered by *being here* — the screen is the vault — rather than by
+ * a dropdown acting as the lid of a card. That is what let the sections below
+ * become flat rows instead of a container nested inside a container inside a
+ * bottom sheet.
+ */
+export function VaultSettings({ vault }: Props) {
+  const [syncing,     setSyncing]     = useState(false)
+  const [name,        setName]        = useState(vault.name)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [dirtyCount,  setDirtyCount]  = useState(0)
+  const [participants, setParticipants] = useState<string[]>(
+    () => readVaultStringArray('meridian_default_participants', vault.id),
+  )
+
+  const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
+  const items                  = useStore(s => s.items)
+  const lastRefreshed          = useStore(s => s.syncByVault.get(vault.id)?.lastSyncedAt ?? null)
+  const needsAttention         = useStore(s => s.syncByVault.get(vault.id)?.needsAttention ?? null)
+
+  const allParticipants = useAllParticipants(items, vault.id)
+
+  function handleNameBlur() {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== vault.name) void renameVault(vault.id, trimmed)
+    else setName(vault.name)
+  }
+
+  function handleParticipantsChange(next: string[]) {
+    setParticipants(next)
+    // The store action owns both the write and the "is this the vault whose
+    // values are currently loaded?" check, so Settings can edit any vault's
+    // defaults without disturbing the one a new entry would target.
+    setDefaultParticipants(vault.id, next)
+  }
+
+  async function handleSyncNow() {
+    setSyncing(true)
+    try {
+      await syncToBackend(vault.id)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  async function handleRemoveClick() {
+    setDirtyCount(await cacheDirtyCount(vault.id).catch(() => 0))
+    setConfirmOpen(true)
+  }
+
+  function handleExport() {
+    const ics = exportVaultIcs(vault.id)
+    const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${sanitizeFilename(vault.name)}.ics`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      <SettingsSection title="Source" description={vaultSummary(vault)}>
+        {vault.kind !== 'example' && (
+          <SettingsRow
+            label="Name"
+            description="Renaming doesn’t change this vault’s URL — bookmarks and links keep working."
+          >
+            <Input value={name} onChange={e => { setName(e.target.value) }} onBlur={handleNameBlur} />
+          </SettingsRow>
+        )}
+
+        {vault.kind === 'local' && (
+          <SettingsRow
+            label="Folder"
+            description={<span className="font-mono break-all">{vault.name}</span>}
+            control={
+              <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="gap-1.5">
+                <RefreshCw className="size-3.5 stroke-[1.7]" />
+                {syncing ? 'Syncing…' : 'Sync now'}
+              </Button>
+            }
+          />
+        )}
+
+        {vault.kind === 'github' && (
+          <SettingsRow
+            label="Repository"
+            description={
+              <span className="font-mono break-all">
+                {vault.github.owner}/{vault.github.repo} ({vault.github.branch})
+              </span>
+            }
+            control={
+              <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="gap-1.5">
+                <RefreshCw className="size-3.5 stroke-[1.7]" />
+                {syncing ? 'Syncing…' : 'Sync now'}
+              </Button>
+            }
+          />
+        )}
+
+        {vault.kind === 'ical' && (
+          <SettingsRow
+            label="Calendar address"
+            // Deliberately not truncated to a hostname: this is a secret
+            // address the user may need to copy out again, and hiding most of
+            // it would make it unusable for that.
+            description={<span className="font-mono break-all">{vault.ical.url}</span>}
+            control={
+              <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={syncing} className="gap-1.5">
+                <RefreshCw className="size-3.5 stroke-[1.7]" />
+                {syncing ? 'Refreshing…' : 'Refresh now'}
+              </Button>
+            }
+          />
+        )}
+
+        {/* Mirrors SyncButton's popover rows for the attention kinds that can
+            apply to this vault — `fs-permission` never applies to a GitHub one. */}
+        {needsAttention && (
+          <div className="flex flex-col gap-2 px-4 py-3.5">
+            {needsAttention.kind === 'reauth' && (
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-left text-xs text-note hover:underline"
+                onClick={() => void startGitHubSignIn({ reconnectVaultId: vault.id })}
+              >
+                <AlertCircle className="size-3.5 shrink-0" />
+                Signed out of GitHub — sign in again
+              </button>
+            )}
+            {needsAttention.kind === 'access' && vault.kind === 'github' && (
+              <a
+                href={GITHUB_APP_INSTALL_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 text-xs text-note hover:underline"
+              >
+                <AlertCircle className="size-3.5 shrink-0" />
+                Meridian no longer has access to {vault.github.owner}/{vault.github.repo}
+              </a>
+            )}
+            {needsAttention.kind === 'config' && (
+              <p className="flex items-center gap-1.5 text-xs text-note">
+                <AlertCircle className="size-3.5 shrink-0" />
+                {vault.kind === 'github'
+                  ? `${vault.github.owner}/${vault.github.repo} (${vault.github.branch})`
+                  : vault.name} isn&rsquo;t reachable — it may have been renamed or deleted
+              </p>
+            )}
+            {needsAttention.kind === 'fs-permission' && (
+              <p className="flex items-center gap-1.5 text-xs text-note">
+                <AlertCircle className="size-3.5 shrink-0" />
+                {needsAttention.message}
+              </p>
+            )}
+          </div>
+        )}
+
+        {vault.kind !== 'example' && (
+          <SettingsRow
+            label="Last synced"
+            description={
+              // The 15-minute cadence is stated only for a subscription, which
+              // is the one kind that is polled on a fixed timer rather than
+              // pushed to on save.
+              [
+                lastRefreshed ? formatDistanceToNow(lastRefreshed, { addSuffix: true }) : 'Not yet',
+                vault.kind === 'ical' ? 'Checked automatically every 15 minutes.' : null,
+              ].filter(Boolean).join('. ')
+            }
+          />
+        )}
+      </SettingsSection>
+
+      {/* A subscription has no writable side, so there is nothing for default
+          participants to seed — new entries can never land there. */}
+      {vault.kind !== 'ical' && (
+        <SettingsSection title="New entries" description="Applies to entries created in this vault.">
+          <SettingsRow
+            label="Default participants"
+            description="Added to new entries in this vault automatically. Stored on this device only, so each device (and each person sharing the vault) can set its own."
+          >
+            <ParticipantsRow
+              participants={participants}
+              onChange={handleParticipantsChange}
+              allParticipants={allParticipants}
+            />
+          </SettingsRow>
+        </SettingsSection>
+      )}
+
+      <SettingsSection title="Data">
+        <SettingsRow
+          label="Export calendar"
+          description="Download every entry in this vault as a single .ics file."
+          control={
+            <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5">
+              <Download className="size-3.5 stroke-[1.7]" />
+              Export .ics
+            </Button>
+          }
+        />
+        <SettingsRow
+          label="Remove vault"
+          description={
+            vault.kind === 'example'
+              ? 'Removes the Tutorial vault from this device. You can add it back anytime.'
+              : 'Removes this vault from this device. The original files are not affected.'
+          }
+          control={
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={handleRemoveClick}
+            >
+              <Trash2 className="size-3.5 stroke-[1.7]" />
+              Remove
+            </Button>
+          }
+        />
+      </SettingsSection>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove vault</AlertDialogTitle>
+            <AlertDialogDescription>
+              Remove &ldquo;{vault.name}&rdquo;? This deletes it from this device.
+              {vault.kind === 'github' && ' The GitHub repository itself is not affected.'}
+              {vault.kind === 'ical' && ' The calendar itself is not affected — only this subscription to it.'}
+              {vault.kind === 'example' && ' You can add it back anytime from here.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {dirtyCount > 0 && (
+            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+              <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+              <span>
+                {dirtyCount} unsynced {dirtyCount === 1 ? 'change has' : 'changes have'} not been backed up and will be lost.
+              </span>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { setConfirmOpen(false); void removeVault(vault.id) }}
+            >
+              <Trash2 size={13} />
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}

@@ -92,6 +92,7 @@ It is an **index, not an encyclopedia** — each entry is one sentence plus a po
 | `storage/` | Backend abstraction (local FS, GitHub, example), IndexedDB cache, sync, vault registry, toast notifications. |
 | `editor/` | CodeMirror editor, entry UI, dialogs, save logic. |
 | `calendar/` | Day/month/agenda views and occurrence rendering. |
+| `settings/` | The settings screens — general preferences, the theme picker, the vault list and each vault's own screen, and the add-vault wizard. Reached by route (`/settings/…`), not as a modal. |
 | `components/` | Shared React components. Two primitive layers below it: `components/ui/` is a faithful mirror of the **shadcn registry** — only files the shadcn CLI wrote go there, never hand-written ones — and `components/primitives/` holds **our own** shared primitives (`IconButton`, `ResponsiveModal`, `SurfaceButton`, …). This split is load-bearing: `vitest.config.ts` excludes `components/ui/**` from coverage as boilerplate, `knip.json` ignores its unused exports/types, and `shadcn diff` compares that directory against upstream. `components/primitives/` is deliberately covered by none of those exemptions — do not add it to them. A first-party primitive used by only one feature dir belongs in that feature dir, not here — see the placement rule above. |
 | `hooks/` | Shared React hooks. |
 | `routes/` | TanStack Router route definitions. |

@@ -8,7 +8,7 @@ import { Button } from './ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
 import { VaultIcon } from './vaultIcon'
 import { keyVaultId } from '@/fileIO'
-import { requestVaultSettings } from './vaultSettingsRequest'
+import { Link } from '@tanstack/react-router'
 
 /**
  * How "bad" a vault's status is, for the aggregate icon colour. Worst wins:
@@ -99,15 +99,18 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
         </a>
       )}
 
+      {/* A real link now that each vault has its own URL — which is what
+          replaced `vaultSettingsRequest`'s module-scoped listener, the only
+          way this row could previously reach a dialog owned by the sidebar. */}
       {status.needsAttention?.kind === 'config' && vault.kind === 'github' && (
-        <button
-          type="button"
+        <Link
+          to="/settings/vault/$vaultId"
+          params={{ vaultId: vault.id }}
           className="flex items-center gap-1 pl-5 text-2xs text-note hover:underline text-left"
-          onClick={() => requestVaultSettings(vault.id)}
         >
           <AlertCircle className="size-3 shrink-0" />
           {vault.github.owner}/{vault.github.repo} ({vault.github.branch}) isn&rsquo;t reachable — it may have been renamed or deleted
-        </button>
+        </Link>
       )}
     </div>
   )

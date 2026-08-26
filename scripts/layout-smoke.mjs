@@ -42,8 +42,20 @@ const VIEWPORTS = [
   { name: 'desktop', viewport: { width: 1440, height: 900 } },
 ]
 
-/** `_app` routes — the fixed shell. Static paths only, so no date arithmetic here. */
-const APP_ROUTES = ['/', '/backlog', '/notes']
+/**
+ * `_app` routes — the fixed shell. Static paths only, so no date arithmetic here.
+ *
+ * Each carries the selector that means "this route has painted". It used to be
+ * one hardcoded entry-card wait, which only works for routes that list entries;
+ * the settings screens are `_app` routes with no entries in them, and the shell
+ * invariants below are exactly as load-bearing there.
+ */
+const APP_ROUTES = [
+  { path: '/',         ready: '[data-testid="entry-card"]' },
+  { path: '/backlog',  ready: '[data-testid="entry-card"]' },
+  { path: '/notes',    ready: '[data-testid="entry-card"]' },
+  { path: '/settings', ready: '[data-settings-screen]' },
+]
 
 const failures = []
 function check(scope, label, ok, detail) {
@@ -166,10 +178,10 @@ try {
     const page = await context.newPage()
     page.on('pageerror', e => failures.push(`${name} — uncaught page error: ${e.message}`))
 
-    for (const route of APP_ROUTES) {
+    for (const { path: route, ready } of APP_ROUTES) {
       const scope = `${name} ${route}`
       await page.goto(`${BASE}${route}`, { waitUntil: 'load' })
-      await page.waitForSelector('[data-testid="entry-card"]', { timeout: 30_000 })
+      await page.waitForSelector(ready, { timeout: 30_000 })
       await page.waitForTimeout(1500) // let the virtualizer measure and settle
 
       const m = await page.evaluate(readAppShell)

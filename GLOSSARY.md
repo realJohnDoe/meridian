@@ -299,7 +299,7 @@ registers the implementation at startup.
 Only the view names that are *not* self-explanatory: where two components look
 like alternatives but aren't, or where the relationship between them is
 invisible from the names. A component whose name already answers the question
-(`SearchBar`, `SettingsDialog`) is deliberately absent, and one whose subtlety
+(`SearchBar`, `VaultList`) is deliberately absent, and one whose subtlety
 is already explained in its own header comment (`DayView`'s carousel seam,
 `TimedBlock`'s badge gating) stays explained there.
 
@@ -373,3 +373,5 @@ asserts none of these have come back.
 | `rootOnlyOccurrence` | removed — `Entry['items']` is non-empty, so `fileOccurrenceMap` is total by construction |
 | `useVisualViewportHeight` / `useVisualViewportOffsetTop` | `useVisibleViewport` (one snapshot, with the Firefox-Android fallback) |
 | `useShellMode` / `ShellMode` | removed — `_app` and `_entry` each own their own layout chain, so nothing needs to release a shared one |
+| `SettingsDialog` | removed — Settings is a route (`routes/_app.settings.*`), not a modal |
+| `requestVaultSettings` / `onVaultSettingsRequested` | removed — a vault's settings screen has a URL, so callers link to it |
