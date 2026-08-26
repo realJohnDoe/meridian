@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src worker/src --max-warnings=0",
+    "test:layout": "node scripts/layout-smoke.mjs",
     "knip": "knip"
   },
   "dependencies": {
@@ -81,6 +82,7 @@
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^30.0.1",
     "knip": "^6.29.0",
+    "playwright-core": "^1.62.1",
     "sharp": "^0.35.3",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",

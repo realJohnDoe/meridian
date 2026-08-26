@@ -35,6 +35,16 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run test:coverage
       - run: pnpm run knip
+      # Layout regressions are invisible to every other gate here: all of src/
+      # tests under jsdom, which has no layout engine and therefore no opinion
+      # about heights, scrolling, or where anything lands on screen. This is the
+      # only step that can see them — see scripts/layout-smoke.mjs. It serves the
+      # dist/ that `pnpm run build` produced above.
+      #
+      # The chromium build has to match the installed playwright-core exactly, so
+      # the version is read from it rather than installed bare.
+      - run: pnpm dlx playwright@$(node -p "require('playwright-core/package.json').version") install --with-deps chromium
+      - run: pnpm run test:layout
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
