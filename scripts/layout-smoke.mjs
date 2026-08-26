@@ -28,8 +28,13 @@ import { chromium } from 'playwright-core'
  * point at an already-installed binary instead.
  */
 
+// 127.0.0.1 rather than localhost, on both sides: a CI runner with IPv6
+// enabled resolves `localhost` to ::1 first, which a server bound to the IPv4
+// loopback never answers.
+const HOST = '127.0.0.1'
 const PORT = 4183
-const BASE = `http://localhost:${PORT}/meridian`
+const BASE = `http://${HOST}:${PORT}/meridian`
+const STARTUP_TIMEOUT_MS = 60_000
 
 /** Viewports: a phone (where every one of these bugs was reported) and a laptop. */
 const VIEWPORTS = [
@@ -46,21 +51,52 @@ function check(scope, label, ok, detail) {
   failures.push(`${scope} — ${label}${detail === undefined ? '' : `: ${detail}`}`)
 }
 
-function startPreview() {
-  const child = spawn('pnpm', ['exec', 'vite', 'preview', '--port', String(PORT), '--strictPort'], {
+/**
+ * Starts `vite preview` over the built `dist/`, and resolves once it actually
+ * answers a request.
+ *
+ * Readiness is an HTTP poll rather than a match against the server's banner on
+ * stdout. Scraping that was the first version and it was wrong twice over: it
+ * couples the check to Vite's console format, and when it failed — as it did on
+ * the first CI run — the only thing it could report was that 30 seconds had
+ * passed, with the server's own output thrown away. Asking the server whether
+ * it is up tests the thing that matters and keeps the output to say why not.
+ */
+async function startPreview() {
+  const child = spawn('pnpm', ['exec', 'vite', 'preview', '--host', HOST, '--port', String(PORT), '--strictPort'], {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('vite preview did not start within 30s')), 30_000)
-    const onData = d => {
-      if (!d.toString().includes(`:${PORT}`)) return
-      clearTimeout(timer)
-      resolve(child)
+
+  // Kept whole, for the failure paths below — this is the only account of what
+  // went wrong when the server never comes up in CI.
+  let log = ''
+  child.stdout.on('data', d => { log += d })
+  child.stderr.on('data', d => { log += d })
+  let exit = null
+  child.on('exit', (code, signal) => { exit = signal ?? `code ${code}` })
+
+  const died = () => new Error(
+    `vite preview exited (${exit}) before serving ${BASE}. Did \`pnpm run build\` run first?\n` +
+    `--- vite preview output ---\n${log || '(nothing)'}`,
+  )
+
+  const deadline = Date.now() + STARTUP_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    if (exit !== null) throw died()
+    try {
+      // Any HTTP answer means the server is listening; the status is the app's
+      // business, not the server's readiness.
+      await fetch(`${BASE}/`)
+      return child
+    } catch {
+      await new Promise(r => setTimeout(r, 250))
     }
-    child.stdout.on('data', onData)
-    child.stderr.on('data', onData)
-    child.on('exit', code => reject(new Error(`vite preview exited with code ${code} — did you run pnpm run build?`)))
-  })
+  }
+  child.kill()
+  throw new Error(
+    `vite preview never answered ${BASE} within ${STARTUP_TIMEOUT_MS / 1000}s.\n` +
+    `--- vite preview output ---\n${log || '(nothing)'}`,
+  )
 }
 
 /**
