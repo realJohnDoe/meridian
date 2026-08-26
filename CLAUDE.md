@@ -111,6 +111,35 @@ It is an **index, not an encyclopedia** — each entry is one sentence plus a po
 
 All feature directories already have `index.ts` barrels enforced by the import-boundary lint rules — do not propose adding them.
 
+## Route shells
+
+There are two layout chains under `routes/`, and which one a route belongs to
+is decided by **what the route contains**, not by whether it feels like a
+"destination".
+
+| Shell | Routes | For |
+|---|---|---|
+| `_app` — one screen tall, clips itself | `_app.*` (agenda, day/week/month, backlog, notes) | Routes with **virtualized lists**. `useVirtualizer` is element-scoped via `getScrollElement`, so the scroller must be an element, not the document. |
+| Document flow | `_entry.*`, `settings.*`, `auth.*` | Routes with **text inputs and no virtualizer**. The document can grow, so the browser lifts a focused input above the on-screen keyboard natively, on every platform. |
+
+Put a route with text inputs under `_app` and it gets neither: `_app` caps its
+height so the document can never scroll, so there is no native keyboard
+avoidance *and* nothing for the browser to scroll the field into view within —
+it sits behind the keyboard. The failure is silent, mobile-only, and invisible
+to every test in `src/`, since jsdom has no layout engine.
+
+This has been got wrong twice. The entry routes started on the app chain,
+which is why keyboard avoidance was hand-rolled across six surfaces before
+`3de767a` addressed the cause rather than the symptom; `/settings` then
+repeated it (PR #840, fixed in #844).
+
+Nothing enforces the placement — the filename is the whole declaration
+(`_app.foo.tsx` vs `foo.tsx`). Two partial guards exist: `routes/-appShell.test.ts`
+pins how `_app`'s cap is expressed, and `scripts/layout-smoke.mjs` checks the
+resulting geometry in a real browser — but only for the routes listed in its
+`APP_ROUTES`/`FLOW_ROUTES`. A new route is covered by neither until someone
+adds it.
+
 ## Architecture invariants
 
 These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
