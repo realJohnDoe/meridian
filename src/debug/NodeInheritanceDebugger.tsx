@@ -766,16 +766,30 @@ export default function NodeInheritanceDebugger() {
                 // The debugger pins one synthetic vault, so there is nowhere to
                 // retarget or move to.
                 onVaultChange: null,
+                pendingMove: null,
+                onMoveConfirm: () => {},
+                onMoveCancel: () => {},
                 pendingLinks: debugPendingLinks,
                 dialogHandlers,
                 setEntry: (updater) => setDebugEntry(prev => prev ? updater(prev) : prev),
                 handleSave: handleDebugSave,
                 handleOpenDlg: openDialog,
                 handleOpenRepeatDlg: openRepeatDialog,
-                handleScopeChange: handleDebugScopeChange,
                 // Promoting a checklist line creates a real vault file and navigates to
                 // it — out of scope for the debugger, which edits a scratch snapshot.
                 handlePromoteTask: () => null,
+                scheduleAutoSave: () => {},
+                saveMeta: () => {},
+                handleScopeChange: handleDebugScopeChange,
+                handleTypeChange: () => {},
+                handleDoneToggle: () => {},
+                // The debugger edits a scratch snapshot outside any real vault, so
+                // there is nowhere for a wikilink to navigate to — genuinely absent,
+                // not a no-op (see ListedOnRow's onNavigate truthiness check).
+                handleOpenWikilink: null,
+                handleToggleDoneBacklink: () => {},
+                titleMissing: false,
+                focusTitleTick: 0,
               } satisfies EntryEditorHooks}
               items={items}
               roots={debugRoots}
