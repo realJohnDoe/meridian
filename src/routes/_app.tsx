@@ -32,28 +32,38 @@ function AppLayout() {
     // scrolls its own element instead of the document — see index.css, where
     // html/body/#root/#app deliberately only carry `min-height`.
     //
-    // `flex-none` is load-bearing, not tidying. This is a flex item of
-    // `#app` (`display:flex; flex-direction:column`), so its *height* is the
-    // main size, and a flex item's main size comes from `flex-basis`, not from
-    // `height`. `flex-1` sets `flex-basis: 0%` — a percentage, resolved
-    // against the container's inner main size — and #app's height is now
-    // `auto` with only a `min-height`, i.e. indefinite. A percentage basis
-    // that can't resolve is treated as `content`, so the wrapper sized to the
-    // agenda's full virtualized spacer (~11000px measured on a Pixel 7
-    // viewport), `h-svh` never applied, and the *document* scrolled instead:
-    // the topbar scrolled away, rows started ~2500px down the page, and
-    // scroll-to-today did nothing because the agenda's own scroll element had
-    // scrollHeight === clientHeight and could not scroll at all.
+    // The cap lives on this app-owned element rather than on SidebarProvider,
+    // which is a shadcn registry mirror (see CLAUDE.md — only files the shadcn
+    // CLI wrote belong in components/ui). Overriding a vendored component's
+    // base classes made the app's most load-bearing layout invariant depend on
+    // upstream's own `flex min-h-svh w-full` and on which Tailwind utilities
+    // tailwind-merge treats as colliding: `min-h-svh`/`min-h-0` collide and
+    // merge, `h-svh`/`flex-1` do not — which is exactly how the shell silently
+    // lost its cap once before. A `shadcn diff` can now change that component
+    // without reaching this.
     //
-    // `flex-none` (`flex: 0 0 auto`) leaves the basis at `auto`, which means
-    // "use the main size property" — `h-svh` — and the cap holds again.
-    <SidebarProvider
-      className="h-svh flex-none min-h-0 overflow-hidden"
-      style={{ '--sidebar-width': '260px' } as React.CSSProperties}
-    >
-      <AppSidebar />
-      <AppMain />
-    </SidebarProvider>
+    // `max-h-svh` is the cap that cannot be argued with. This is a flex item
+    // of `#app` (`display:flex; flex-direction:column`), so its *height* is
+    // the main size — and a flex item's main size comes from `flex-basis`,
+    // not from `height`. `flex-1` sets `flex-basis: 0%`, a percentage resolved
+    // against the container's inner main size, and #app's height is `auto`
+    // with only a `min-height`, i.e. indefinite; a percentage basis that can't
+    // resolve degrades to `content`, and the shell then sizes to the agenda's
+    // full virtualized spacer with `h-svh` never applying. A max-height is
+    // immune to that: it clamps the used main size *after* flex resolution,
+    // whatever the basis did and however indefinite the ancestor is.
+    <div data-app-shell className="flex w-full h-svh max-h-svh overflow-hidden">
+      {/* min-h-0 only neutralizes upstream's `min-h-svh`, so this element
+          stretches to the shell rather than insisting on a screen of its own.
+          Nothing here caps anything — that is the shell's job, above. */}
+      <SidebarProvider
+        className="h-full min-h-0"
+        style={{ '--sidebar-width': '260px' } as React.CSSProperties}
+      >
+        <AppSidebar />
+        <AppMain />
+      </SidebarProvider>
+    </div>
   )
 }
 
