@@ -10,9 +10,11 @@
     "deploy": "wrangler deploy",
     "pretypecheck": "wrangler types",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.10",
     "typescript": "~6.0.3",
     "vitest": "^4.1.10",
     "wrangler": "4.113.0"

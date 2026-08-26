@@ -68,7 +68,7 @@ grepped. Both `worker/` source files read in full.
 | build / typecheck | `pnpm run build` | ✅ | ✅ (fans out via `--filter … typecheck`) | **pass** |
 | lint | `pnpm run lint` | ✅ | ✅ (`eslint src worker/src`) | **pass** |
 | test | `pnpm run test` | ✅ | ✅ (fans out via `--filter … test`) | **pass** — 122 files, 2996 tests |
-| **coverage** | `pnpm run test:coverage` | ✅ 74.47% stmt, thresholds enforced | ❌ **not measured** — no fan-out, no `coverage` block in `worker/vitest.config.ts` | pass, but see finding #3 |
+| **coverage** | `pnpm run test:coverage` | ✅ 74.47% stmt, thresholds enforced | ❌ **not measured** — no fan-out, no `coverage` block in `worker/vitest.config.ts` | pass |
 | dead code | `pnpm run knip` | ✅ | ✅ (declared workspace) | **pass** |
 | audit | `pnpm audit --audit-level=low` | ✅ | ✅ (run from `worker/`) | **pass** — no known vulnerabilities in either, at `low`, below CI's `high` |
 
@@ -98,13 +98,13 @@ in that band and likely deserves its own look.
    `script-src 'self'`; the Worker's `/ical` proxy validates hosts on the
    original URL *and* every redirect hop, including IPv6-embedded IPv4;
    `pnpm audit --audit-level=low` clean in both workspaces.
-5. **Testing & Error Handling** — findings: #3, #4. Error handling
+5. **Testing & Error Handling** — findings: #4. Error handling
    itself is clean: exactly two `.catch(() => {})` in non-test source, both
    deliberate and documented.
 6. **Code Health & DRY** — findings: #8. A 6-line-window duplicate scan
    across all non-test, non-`components/ui` source found no cross-file
    duplication other than import lists and #8.
-7. **Toolchain & Developer Feedback Loops** — findings: #3
+7. **Toolchain & Developer Feedback Loops** — clean.
 8. **Dependencies & Library Fit** — clean; three keep-verdicts stated below.
 9. **Styling & UX** — clean. Zero `<div onClick>`/`<span onClick>` in
    non-test source; `jsx-a11y` recommended is enabled with Radix/Badge/Card
@@ -153,7 +153,6 @@ detailed sections below stay in `#` order so they're findable.
 
 | Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
-| 1 | 3 | `worker/` has no coverage measurement at all | toolchain, testing | 6 | 5 | Sonnet 5 |
 | 2 | 4 | `store.ts` at 38.99%, with three irreversible migrations untested | testing | 7 | 3 | Sonnet 5 |
 | 3 | 6 | Half of `EntryEditorHooks` is optional for a dev-only page | overengineering, types | 5 | 4 | **Sonnet 5** |
 | 4 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
@@ -164,7 +163,7 @@ detailed sections below stay in `#` order so they're findable.
 > **The order above is `(impact × breadth) ÷ effort`, not raw impact.** A
 > reader sorting by what actually matters most should start at **#4**
 > (`store.ts` — impact 7, and the only finding where the failure mode is
-> silent user-data loss), then **#3**.
+> silent user-data loss).
 >
 > **Three findings moved down a tier** once their Task context was written out
 > — #6 and #9 from Opus 5 to Sonnet 5 outright, and #10 partially. One thing
@@ -178,62 +177,6 @@ contract — do #6 first, since making the optionals required narrows what #9's
 split has to preserve. Everything else is independent.
 
 ---
-
-### 3. The `worker/` package's tests run in CI but its coverage is never measured
-
-- **Category** — `toolchain`, `testing`
-- **Impact** — 6
-- **Breadth** — 5 files (4 worker sources left unmeasured +
-  `worker/vitest.config.ts`).
-- **Recommended model** — **Sonnet 5.** Hazard: adding a `coverage` block is
-  trivial, but picking the *initial thresholds* is not — set them from a
-  measured run, and set them a few points under measured, matching the root
-  config's stated convention. Setting a floor above measured coverage fails
-  CI loudly (safe); the silent failure is adding coverage with no thresholds
-  at all, which reports numbers nothing gates — exactly the state the root
-  config avoided.
-- **Evidence** — `worker/vitest.config.ts` in full has no `coverage` key:
-  ```
-  export default defineConfig({
-    test: {
-      environment: 'node',
-      include: ['src/**/*.test.ts'],
-    },
-  })
-  ```
-  Meanwhile root `package.json` fans `test` out but not `test:coverage`:
-  ```
-  "test": "vitest run && pnpm --filter meridian-oauth-worker run test",
-  "test:coverage": "vitest run --coverage",
-  ```
-  and root `vitest.config.ts` scopes coverage to `include: ['src/**/*.{ts,tsx}']`.
-- **Problem** — The unmeasured package holds the repo's two most
-  security-sensitive files — `worker/src/icalFetch.ts` (286 lines), whose
-  `validateFeedUrl` is the SSRF guard on an open fetcher including IPv6-embedded
-  IPv4 handling, and `worker/src/oauthToken.ts`, which handles the GitHub
-  client secret — and `eslint.config.js` itself calls this package "the most
-  security-sensitive code in the repo". Every gate reports green, so the gap
-  is invisible from a passing pipeline: an untested branch added to the SSRF
-  validator would not move any number anyone looks at.
-- **Fix** — Add a `coverage` block with `provider: 'v8'` and per-file
-  thresholds to `worker/vitest.config.ts`, add a `test:coverage` script to
-  `worker/package.json`, and fan the root `test:coverage` out to it the way
-  `test` already does; confirm with `pnpm --filter meridian-oauth-worker run
-  test:coverage`, then `pnpm run test:coverage` from the root.
-- **Task context** — `worker/` has four sources to threshold:
-  `src/icalFetch.ts` (286 lines), `src/oauthToken.ts` (88), `src/index.ts`
-  (36), `src/cors.ts` (24), against three test files
-  (`icalFetch.test.ts` 224, `oauthToken.test.ts` 152, `index.test.ts` 51).
-  Run `pnpm --filter meridian-oauth-worker exec vitest run --coverage` once to
-  get the measured baseline, then set each floor a few points under it — the
-  convention `vitest.config.ts` states at the root ("Set a few points below
-  measured coverage to leave headroom"). `@vitest/coverage-v8` is already in
-  the root workspace but **not** in `worker/package.json`; add it there.
-  Finally add `&& pnpm --filter meridian-oauth-worker run test:coverage` to
-  the root `test:coverage` script so it fans out the way `test` already does.
-  Note CI already runs the worker's tests in a separate `worker-checks` job in
-  `.github/workflows/ci.yml` — that job is where coverage will start being
-  enforced, so no workflow edit is needed if the root script fans out.
 
 ### 4. `src/store.ts` is the repo's worst-covered core module, and its three irreversible migrations are untested
 
