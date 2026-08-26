@@ -16,11 +16,20 @@
  * moment something goes wrong (the conflict toast's "Copy details" action, or
  * `__meridianSync.dump()` from a remote-debugging console).
  *
- * **Deliberately not persisted.** Dexie is part of what this instruments; a
- * journal that writes to the same store it is auditing adds a failure mode
- * (and an unbounded table) to the path it is supposed to explain. The window
- * that matters is the current session — a conflict is always resolved within
- * seconds of the writes that caused it.
+ * **Two sinks, deliberately not Dexie.** Dexie is part of what this
+ * instruments; a journal that writes to the same store it is auditing adds a
+ * failure mode (and an unbounded table) to the path it is supposed to
+ * explain. The in-memory ring above is the primary sink and covers the
+ * common case — a conflict resolved within seconds, in the tab that saw it.
+ * But a conflict noticed later, after a reload, or on a *different* device
+ * has nothing to read: the ring is capacity-bounded, not time-bounded, and a
+ * reload clears it outright. A bounded `localStorage` ring is the second
+ * sink — coarser, but it survives both. It is appended to on a debounce (a
+ * reconcile pass can journal many files in one synchronous burst; a
+ * millisecond-granularity debounce coalesces that into one write) and merged
+ * into the in-memory events by `syncJournalDump`, so a dump taken any time
+ * this session — even long after a reload — still carries what history
+ * `localStorage` has room for.
  *
  * **No file content, ever.** Entries carry a 32-bit content *hash* and a byte
  * length, never the bytes. The dump is meant to be pasteable into a bug report
@@ -117,6 +126,42 @@ const _events: SyncEvent[] = []
 /** Last event time per `vaultId::path`, for the `sincePrevMs` field. */
 const _lastSeen = new Map<string, number>()
 
+/** localStorage key for the cross-reload ring. Same capacity as the in-memory one. */
+const PERSIST_KEY = 'meridian_sync_journal'
+/** How long to coalesce a burst of `journal()` calls before writing them out together. */
+const PERSIST_DEBOUNCE_MS = 250
+
+/** Events recorded since the last flush to `localStorage`. */
+let _pending: SyncEvent[] = []
+let _flushTimer: ReturnType<typeof setTimeout> | undefined
+
+function readPersisted(): SyncEvent[] {
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed) ? (parsed as SyncEvent[]) : []
+  } catch { return [] }  // missing storage, private-mode throw, or corrupt JSON
+}
+
+function flushPending(): void {
+  const events = _pending
+  _pending = []
+  if (events.length === 0) return
+  try {
+    const merged = [...readPersisted(), ...events]
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(merged.slice(-CAPACITY)))
+  } catch { /* quota exceeded, private mode, or storage unavailable — the in-memory ring still has it */ }
+}
+
+function schedulePersist(event: SyncEvent): void {
+  _pending.push(event)
+  if (_flushTimer !== undefined) return
+  try {
+    _flushTimer = setTimeout(() => { _flushTimer = undefined; flushPending() }, PERSIST_DEBOUNCE_MS)
+  } catch { /* setTimeout unavailable — best-effort sink only */ }
+}
+
 /** True when the user has opted into live console mirroring (see `setSyncDebug`). */
 function debugEnabled(): boolean {
   try {
@@ -171,6 +216,7 @@ export function journal(
   const event: SyncEvent = { t, vaultId, kind, ...(backend ? { backend } : {}), ...(path ? { path } : {}), ...(full ? { detail: full } : {}) }
   _events.push(event)
   if (_events.length > CAPACITY) _events.splice(0, _events.length - CAPACITY)
+  schedulePersist(event)
   if (debugEnabled()) console.warn('[sync]', kind, path ?? vaultId, full ?? '')
 }
 
@@ -183,13 +229,29 @@ export function syncJournalEvents(filter?: { path?: string; vaultId?: string }):
 }
 
 /**
+ * The in-memory events plus whatever older history survives in the
+ * `localStorage` ring — the part of it that predates the oldest in-memory
+ * event, so a live session's own events (already flushed there by the same
+ * debounce) are never double-counted.
+ */
+function mergedEvents(filter?: { path?: string; vaultId?: string }): SyncEvent[] {
+  const inMemory = syncJournalEvents(filter)
+  const oldestInMemoryT = inMemory[0]?.t ?? Infinity
+  const persisted = readPersisted().filter(e =>
+    e.t < oldestInMemoryT &&
+    (filter?.path === undefined || e.path === filter.path) &&
+    (filter?.vaultId === undefined || e.vaultId === filter.vaultId))
+  return [...persisted, ...inMemory]
+}
+
+/**
  * A pasteable report: the events, newest last, with times rendered relative to
  * "now" so the reader sees *spacing* (the thing that matters when diagnosing a
  * race) instead of doing arithmetic on epoch millis.
  */
 export function syncJournalDump(filter?: { path?: string; vaultId?: string }): string {
   const now = Date.now()
-  const lines = syncJournalEvents(filter).map(e => {
+  const lines = mergedEvents(filter).map(e => {
     const ago = ((now - e.t) / 1000).toFixed(2).padStart(8)
     const where = [e.backend, e.path ?? e.vaultId].filter(Boolean).join(' ')
     const detail = e.detail
@@ -208,6 +270,9 @@ export function syncJournalDump(filter?: { path?: string; vaultId?: string }): s
 export function clearSyncJournal(): void {
   _events.length = 0
   _lastSeen.clear()
+  _pending = []
+  if (_flushTimer !== undefined) { clearTimeout(_flushTimer); _flushTimer = undefined }
+  try { localStorage.removeItem(PERSIST_KEY) } catch { /* storage unavailable */ }
 }
 
 // Reachable from any attached console — including a remote-debugged phone,
