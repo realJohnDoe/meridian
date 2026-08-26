@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState } from 'react'
 import { AlignLeft, CalendarDays, CalendarRange, CalendarClock, Settings2, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
@@ -20,18 +20,9 @@ import {
   useSidebar,
 } from './ui/sidebar'
 import { keyRoute } from '@/routes'
-import { onVaultSettingsRequested } from './vaultSettingsRequest'
-
-// Lazy: pulls in the settings UI plus the add-vault wizard, which isn't
-// needed on the agenda's cold-start critical path — deferred until Settings
-// is actually opened.
-const SettingsDialog = lazy(() => import('./SettingsDialog'))
 
 export default function AppSidebar() {
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [hasOpenedSettings, setHasOpenedSettings] = useState(false)
   const [editingFavorites, setEditingFavorites] = useState(false)
-  const [requestedVaultId, setRequestedVaultId] = useState<string | null>(null)
 
   const navigate    = useNavigate()
   const pathname    = useRouterState({ select: s => s.location.pathname })
@@ -47,15 +38,6 @@ export default function AppSidebar() {
   const toggleShowTasks         = useStore(s => s.toggleShowTasks)
 
   useResetOnChange([defaultVaultId], () => setEditingFavorites(false))
-
-  // SyncButton's attention rows request Settings scoped to a specific vault
-  // (e.g. a `config` row's "isn't reachable" fix) — Settings itself lives
-  // here, so this is the one place that can honor the request.
-  useEffect(() => onVaultSettingsRequested(vaultId => {
-    setRequestedVaultId(vaultId)
-    setSettingsOpen(true)
-    setHasOpenedSettings(true)
-  }), [])
 
   const isDayView = pathname.startsWith('/day/')
 
@@ -214,13 +196,15 @@ export default function AppSidebar() {
               Settings owns registration and the default vault, the topbar
               filter owns visibility, and SyncButton's popover owns per-vault
               status — including the "needs reconnect" affordance that used to
-              live on these rows. */}
+              live on these rows. Settings is a route now, so this row is an
+              ordinary navigation item rather than the owner of a dialog. */}
           <SidebarGroup className="p-0">
             <SidebarSeparator className="mb-2" />
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  onClick={() => { close(); setRequestedVaultId(null); setSettingsOpen(true); setHasOpenedSettings(true) }}
+                  isActive={pathname.startsWith('/settings')}
+                  onClick={() => { close(); void navigate({ to: '/settings' }) }}
                   className="gap-3.5 px-5 h-auto py-3 text-sm font-medium rounded-none"
                 >
                   <Settings2 className="size-4.5 stroke-[1.7] shrink-0" />
@@ -231,16 +215,6 @@ export default function AppSidebar() {
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
-
-      {hasOpenedSettings && (
-        <Suspense fallback={null}>
-          <SettingsDialog
-            open={settingsOpen}
-            onOpenChange={v => { setSettingsOpen(v); if (!v) setRequestedVaultId(null) }}
-            initialVaultId={requestedVaultId}
-          />
-        </Suspense>
-      )}
     </>
   )
 }

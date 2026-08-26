@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
+import type { ReactNode, AnchorHTMLAttributes } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useStore, emptySyncStatus } from '@/store'
 import { setupStore } from '@/test-utils'
 import type { VaultRef } from '@/vaultRef'
 import SyncButton from './SyncButton'
 
-const { reconnectVault, requestVaultSettings, startGitHubSignIn } = vi.hoisted(() => ({
+const { reconnectVault, startGitHubSignIn } = vi.hoisted(() => ({
   reconnectVault: vi.fn(),
-  requestVaultSettings: vi.fn(),
   startGitHubSignIn: vi.fn(),
 }))
 
@@ -19,7 +19,23 @@ vi.mock('@/vaultActions', () => ({
   GITHUB_APP_INSTALL_URL: 'https://github.com/apps/test-app/installations/new',
 }))
 
-vi.mock('./vaultSettingsRequest', () => ({ requestVaultSettings }))
+// These tests render components bare, with no router mounted, so `Link` is
+// stubbed as the anchor it ultimately renders — with `to`/`params` resolved
+// into an href, which is exactly what the assertions care about.
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ to, params, children, ...rest }: {
+    to: string
+    params?: Record<string, string>
+    children: ReactNode
+  } & AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a
+      href={Object.entries(params ?? {}).reduce((path, [k, v]) => path.replace(`$${k}`, v), to)}
+      {...rest}
+    >
+      {children}
+    </a>
+  ),
+}))
 
 setupStore()
 
@@ -79,7 +95,7 @@ describe('SyncButton — attention rows', () => {
     expect(link).toHaveAttribute('href', 'https://github.com/apps/test-app/installations/new')
   })
 
-  it('renders the config row and requests Settings for that vault on click', () => {
+  it('renders the config row as a link to that vault\u2019s settings screen', () => {
     useStore.setState({
       vaults: [GITHUB_VAULT],
       syncByVault: new Map([[GITHUB_VAULT.id, {
@@ -90,7 +106,7 @@ describe('SyncButton — attention rows', () => {
     render(<SyncButton />)
     openPopover()
 
-    fireEvent.click(screen.getByRole('button', { name: /acme\/notes \(main\) isn.t reachable/ }))
-    expect(requestVaultSettings).toHaveBeenCalledWith(GITHUB_VAULT.id)
+    const link = screen.getByRole('link', { name: /acme\/notes \(main\) isn.t reachable/ })
+    expect(link).toHaveAttribute('href', `/settings/vault/${GITHUB_VAULT.id}`)
   })
 })
