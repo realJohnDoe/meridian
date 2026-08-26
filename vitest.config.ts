@@ -92,6 +92,11 @@ export default defineConfig({
         'src/editor/dialogs/RepeatDialog.tsx': { statements: 75, branches: 60, functions: 65, lines: 75 },
         'src/occurrenceActions.ts': { statements: 85, branches: 75, functions: 80, lines: 88 },
         'src/editor/useEntryEditor.ts': { statements: 68, branches: 55, functions: 55, lines: 70 },
+        // The three one-way localStorage migrations (favorites, participant
+        // filter, show-tasks) are now covered by store.migrations.test.ts;
+        // this floor guards that from regressing without pinning the rest of
+        // this cross-cutting file's many untested setters to the same bar.
+        'src/store.ts': { statements: 68, branches: 55, functions: 58, lines: 68 },
         'src/storeCommit.ts': { statements: 30, branches: 95, functions: 45, lines: 35 },
         'src/storage/sync.ts': { statements: 68, branches: 55, functions: 55, lines: 72 },
         // First-party primitives lifted out of components/ui/, where the

@@ -98,7 +98,7 @@ in that band and likely deserves its own look.
    `script-src 'self'`; the Worker's `/ical` proxy validates hosts on the
    original URL *and* every redirect hop, including IPv6-embedded IPv4;
    `pnpm audit --audit-level=low` clean in both workspaces.
-5. **Testing & Error Handling** — findings: #4. Error handling
+5. **Testing & Error Handling** — clean. Error handling
    itself is clean: exactly two `.catch(() => {})` in non-test source, both
    deliberate and documented.
 6. **Code Health & DRY** — findings: #8. A 6-line-window duplicate scan
@@ -153,16 +153,14 @@ detailed sections below stay in `#` order so they're findable.
 
 | Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
-| 2 | 4 | `store.ts` at 38.99%, with three irreversible migrations untested | testing | 7 | 3 | Sonnet 5 |
 | 4 | 7 | `exampleBackend.ts` — 392 of 497 lines are Tutorial content | layout, srp | 4 | 3 | Sonnet 5 |
 | 5 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
 | 6 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
 | 7 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
 
 > **The order above is `(impact × breadth) ÷ effort`, not raw impact.** A
-> reader sorting by what actually matters most should start at **#4**
-> (`store.ts` — impact 7, and the only finding where the failure mode is
-> silent user-data loss).
+> reader sorting by what actually matters most should start at **#7**
+> (`exampleBackend.ts` — the top of the table above).
 >
 > **Two findings moved down a tier** once their Task context was written out
 > — #9 from Opus 5 to Sonnet 5 outright, and #10 partially. One thing
@@ -172,67 +170,6 @@ detailed sections below stay in `#` order so they're findable.
 > report, and it is genuinely Opus-tier — see #10 for why.
 
 ---
-
-### 4. `src/store.ts` is the repo's worst-covered core module, and its three irreversible migrations are untested
-
-- **Category** — `testing`
-- **Impact** — 7
-- **Breadth** — 3 files (`src/store.ts`, `src/store.test.ts`, and
-  `src/lib/vaultStorage.ts` at 35.71% — the helper all three migrations call).
-- **Recommended model** — **Sonnet 5.** Hazard to name in the task: each
-  migration is idempotent *by deleting its own legacy key*, and
-  `migrateParticipantFilter` additionally guards on a module-level
-  `_filterMigrationChecked` Set that persists across tests in the same file.
-  A test suite that doesn't reset both `localStorage` and the module (via
-  `vi.resetModules()`) will pass while never exercising the second-run path —
-  which is the path that matters. With that named, Sonnet 5 is enough;
-  without it, **Opus 5**.
-- **Evidence** — measured coverage for `src/store.ts` (643 lines) is
-  **38.99% statements / 42.93% lines / 29.9% branches**, the worst of any
-  non-view file in the repo. `src/store.test.ts` is 102 lines containing two
-  tests, both under a single `describe('deriveViews', …)`. The untested
-  destructive step, `src/store.ts:451`:
-  ```
-  clearVaultKey(LEGACY_PARTICIPANT_FILTER_PREFIX, vaultId)
-  ```
-  with the same pattern at lines 411/418 (`LEGACY_FAVORITES_PREFIX`) and 625
-  (`LEGACY_SHOW_TASKS_PREFIX` — inside the coverage report's explicitly
-  uncovered `609-627` range).
-- **Problem** — `store.ts` is a documented cross-cutting root resident
-  holding durable state for every feature, it saw 7 commits in the last 60
-  days, and it performs three one-way `localStorage` migrations that delete
-  the old value as they go. A regression in any of them silently discards a
-  user's favourites, participant filters or show-tasks preference with the
-  legacy key already gone — unrecoverable, and invisible because no test and
-  no coverage floor watches this file.
-- **Fix** — Add a `src/store.test.ts` suite covering the three migrations —
-  populated legacy key, absent legacy key, empty legacy value, and a second
-  run after the key was cleared — and add a per-file coverage floor for
-  `src/store.ts` once it is up; confirm with `pnpm run test:coverage` in the
-  repo root.
-- **Task context** — The three migrations, all in `src/store.ts`:
-  1. `readFavorites(vaultIds)` (line ~401) — reads `meridian_favorites`
-     (`FAVORITES_KEY`), folds in per-vault `meridian_favorites_<id>`
-     (`LEGACY_FAVORITES_PREFIX`), clears each legacy key at lines 411 and 418,
-     writes back if `changed || flat === null`.
-  2. `migrateParticipantFilter(vaultId, items, current)` (line ~440) — reads
-     `meridian_participant_filter_<id>`, clears it at line 451, converts the
-     old *inclusive* filter to the new *hidden* semantics as
-     `hidden = allParticipants − oldFilter`, writes `HIDDEN_PARTICIPANTS_KEY`.
-     Called from `setVaultLayer`.
-  3. The show-tasks fold at lines ~622–625 — reads
-     `meridian_show_tasks_<id>` (`LEGACY_SHOW_TASKS_PREFIX`), clears every
-     vault's copy. This is the one sitting in the coverage report's uncovered
-     `609-627` range.
-
-  All three read/write through `src/lib/vaultStorage.ts`
-  (`readVaultStringArray`, `readVaultJSON`, `writeVaultJSON`, `clearVaultKey`),
-  which is itself at 35.71% — testing the migrations lifts it too.
-  `src/test-utils/setup.ts` is already the global setup file; check whether it
-  resets `localStorage` between tests before adding your own teardown.
-  The four cases per migration: populated legacy key, absent legacy key, empty
-  legacy value, and a second run after the key was cleared. The fourth is the
-  one that needs `vi.resetModules()` — see the hazard above.
 
 ### 7. `exampleBackend.ts` is 79% Tutorial content wrapped around a 32-line adapter
 
