@@ -378,14 +378,6 @@ detailed sections below stay in `#` order so they're findable.
 
 ---
 
-**Near-miss, not in the top 10:** `multidayCoversDate` in
-`src/model/expansion.ts:97` has no production caller — only its own test and
-two comments — and its doc comment ("Used by calendar views to show the event
-on every covered day without expanding it into multiple occurrences")
-describes the design `expandWithMultiday` replaced, which does the opposite
-("adds days 2..N"). knip can't see it because a test keeps it alive. Cheap to
-close out alongside any other `model/` work; it scored just below #10.
-
 **Survey files updated:** `plans/surveys/health.md` was edited in a separate
 commit with three process learnings from this run — pinning down what
 "largest files" means, splitting coverage from test on the gate×workspace
