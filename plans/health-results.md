@@ -101,9 +101,9 @@ in that band and likely deserves its own look.
 5. **Testing & Error Handling** — clean. Error handling
    itself is clean: exactly two `.catch(() => {})` in non-test source, both
    deliberate and documented.
-6. **Code Health & DRY** — findings: #8. A 6-line-window duplicate scan
-   across all non-test, non-`components/ui` source found no cross-file
-   duplication other than import lists and #8.
+6. **Code Health & DRY** — clean. A 6-line-window duplicate scan across all
+   non-test, non-`components/ui` source found no cross-file duplication other
+   than import lists.
 7. **Toolchain & Developer Feedback Loops** — clean.
 8. **Dependencies & Library Fit** — clean; three keep-verdicts stated below.
 9. **Styling & UX** — clean. Zero `<div onClick>`/`<span onClick>` in
@@ -153,7 +153,6 @@ detailed sections below stay in `#` order so they're findable.
 
 | Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
-| 5 | 8 | Virtualized-row scaffold duplicated across three list views | dry | 4 | 3 | Sonnet 5 |
 | 6 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
 | 7 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
 
@@ -167,71 +166,6 @@ detailed sections below stay in `#` order so they're findable.
 > report, and it is genuinely Opus-tier — see #10 for why.
 
 ---
-
-### 8. Three list views hand-copy the same virtualized-row scaffold
-
-- **Category** — `dry`
-- **Impact** — 4
-- **Breadth** — 3 files (`calendar/AgendaView.tsx`,
-  `calendar/OccurrenceList.tsx`, `search/FileResultsList.tsx` — found by
-  grepping `FLIP_KEY_ATTR` and the positioning style literal).
-- **Recommended model** — **Sonnet 5.** Hazard: the inner FLIP div must stay
-  the animated element. The comment duplicated in both files explains why —
-  a WAAPI animation outranks inline style, so animating the outer positioned
-  div overrides the virtualizer's `translateY` and stacks every row at the top
-  of the list. Collapsing the two divs during extraction reintroduces that,
-  and no test catches it. `FileResultsList` needs its extra style keys
-  (`--stagger`, `paddingBottom`) threaded through rather than dropped.
-- **Evidence** — `diff` of `AgendaView.tsx:184-207` against
-  `OccurrenceList.tsx:118-141` shows 19 of 24 lines byte-identical, differing
-  only in one Tailwind class, two comment lines and the row-renderer switch.
-  Both carry `style={{ position: 'absolute', top: 0, left: 0, width: '100%',
-  transform: `translateY(${vi.start}px)` }}` verbatim
-  (`AgendaView.tsx:198`, `OccurrenceList.tsx:131`), and both carry this
-  comment word-for-word:
-  ```
-  {/* useVirtualFlip animates this inner element, never the
-      positioned one above: a WAAPI animation outranks inline
-      style, so gliding the outer div would override the
-      virtualizer's own translateY and stack every row at the
-      top of the list. */}
-  ```
-- **Problem** — The scaffold that makes virtualization and FLIP animation
-  cooperate is subtle enough to need a five-line explanatory comment, and it
-  exists in three copies — so a fix to scroll restoration, measurement or the
-  animation interaction has to be made three times, in the repo's
-  highest-churn directory (`calendar/`, 189 file-touches in 60 days).
-- **Fix** — Extract a `VirtualRows` component taking the virtualizer, the
-  rows and a render callback, exactly as `calendar/timelineScaffold.tsx` was
-  extracted from `DayPane`/`WeekPane` in `cb05ea1`; confirm with `pnpm run
-  test` in the repo root (`AgendaView.test.tsx`, `OccurrenceList.test.tsx`
-  and `FileResultsList.test.tsx` all exist).
-- **Task context** — `src/calendar/timelineScaffold.tsx` is the precedent to
-  copy — read it and commit `cb05ea1` first; it solved the identical problem
-  for `DayPane`/`WeekPane` and its commit message explains the arity-not-flag
-  split principle. The three call sites:
-  - `AgendaView.tsx:184-207` — outer `pb-24 lg:max-w-3xl lg:mx-auto`
-  - `OccurrenceList.tsx:118-141` — outer `pt-2 pb-24 lg:max-w-3xl lg:mx-auto`
-    (the `pt-2` is the only class that differs; make it a prop, don't
-    normalise it away)
-  - `FileResultsList.tsx` — same shape, but its style object adds two extra
-    keys (a `--stagger` custom property set from `vi.index * 0.025` seconds,
-    and `paddingBottom: 6`) and casts the object to `React.CSSProperties` so
-    the custom property type-checks. Thread extra style keys through rather
-    than dropping them.
-
-  The invariant to preserve: **two nested divs, not one.** The outer div
-  carries `data-index`, `ref={virtualizer.measureElement}` and the
-  `translateY` transform; the inner div carries only `{[FLIP_KEY_ATTR]: vi.key}`
-  and is what `useVirtualFlip` animates. The five-line comment duplicated in
-  both files explains why merging them breaks the list — carry that comment
-  into the extracted component so it doesn't get lost.
-
-  `AgendaView` additionally calls `useVirtualFlip(scRef, virtualItems, rows,
-  virtualizer.isScrolling)` and drives scroll restore through `anchorAt` /
-  `markAgendaScrolled`; leave all of that in the call sites and extract only
-  the render scaffold. Tests exist for all three
-  (`AgendaView.test.tsx`, `OccurrenceList.test.tsx`, `FileResultsList.test.tsx`).
 
 ### 9. `useEntryEditor` is a 366-line hook returning 26 keys across eight concerns
 
