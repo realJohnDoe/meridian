@@ -3,7 +3,7 @@
  *
  * Public surface:
  *   - Predicates:   hasRepeat, treeHasOccurrences
- *   - Multiday:     multidayDisplayTitle, multidayCoversDate
+ *   - Multiday:     multidayDisplayTitle
  *   - Main-app API: expandRange, expandWithMultiday, joinFileMeta, stableOccId
  *
  * Date helpers live in ./dateUtils; duration helpers in ./duration.
@@ -87,22 +87,6 @@ export function multidayDisplayTitle(
   if (!startD) return undefined
   const dayIdx = differenceInCalendarDays(viewDate, startD) + 1
   return `${occ.metadata.title} (Day ${dayIdx}/${days})`
-}
-
-/**
- * Returns true when `occ` is a multi-day event (duration ≥ 2d) whose span
- * includes `date`. Used by calendar views to show the event on every covered
- * day without expanding it into multiple occurrences.
- */
-export function multidayCoversDate(occ: OccurrenceEntry<AppMetadata>, date: Date): boolean {
-  const days = parseDurationDays(occ.metadata.duration)
-  if (!days || days < 2) return false
-  const start = parseDateString(occ.date)
-  if (!start) return false
-  const s = startOfDay(start)
-  const e = addDays(s, days - 1); e.setHours(23, 59, 59)
-  const d = startOfDay(date)
-  return d >= s && d <= e
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -846,7 +830,7 @@ export function expandRange(
   // ── Emit standalone occurrences ───────────────────────────────────────────
   // Multi-day events emit a single occurrence on their start date, identical to
   // any other event. The span is inferred from `duration` by callers via
-  // parseDurationDays / multidayCoversDate — nothing is stored in the model.
+  // parseDurationDays — nothing is stored in the model.
   for (const occ of standalones) {
     const jsTime = nodeDateTime({ date: occ.date, time: occ.time })
       ?? parseDateString(occ.date)

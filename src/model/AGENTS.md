@@ -81,7 +81,7 @@ live in `expansion.ts` and are only used there.
 
 *Predicates*: `hasRepeat`, `treeHasOccurrences` (used by debug view).
 
-*Multiday helpers*: `multidayDisplayTitle`, `multidayCoversDate`.
+*Multiday helpers*: `multidayDisplayTitle`.
 
 *Internal engine*:
 - `ExpandNode<M>` — structural fields the engine actually reads: `date`, `time`,
