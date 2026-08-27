@@ -87,16 +87,27 @@ function useFlipTransition(
     // Read while the box is still held open, so this is the offset from before
     // the row left rather than a clamped one.
     //
-    // requireOverflow: false — resolved per commit rather than cached on
-    // mount, a list that doesn't overflow its pane yet still grows into one
-    // later, and what's being asked here is which ancestor's *scroll
-    // position* to pin, not whether it currently has anything to scroll. The
-    // default (true) would find nothing yet, the scroller would cache as
-    // null, and both halves of the scroll hold below would stay no-ops for
-    // good: the fold would lose its pin, the offset would clamp in the one
-    // layout that reads the natural height, and the list would snap to its
-    // new size instead of shrinking in step with the animation.
-    const scroller       = animateHeight ? findScrollParent(container, { requireOverflow: false }) : null
+    // requireOverflow (the default) is load-bearing: what has to be pinned is
+    // the ancestor whose scroll offset the browser will actually clamp, and an
+    // ancestor that merely *declares* `overflow-y: auto` is not necessarily
+    // that element. Under the entry routes the app column is not height-capped,
+    // so `.flex-1.overflow-y-auto` between this list and the document sits at
+    // scrollHeight === clientHeight and never scrolls — the document does.
+    // Matching on the declaration alone (the old `requireOverflow: false`)
+    // therefore pinned that inert div: both halves of the hold below wrote to
+    // an element with nothing to scroll, and the real scroller was left to
+    // clamp on its own during the one un-held layout that reads the natural
+    // height — the instant jump this whole dance exists to prevent, on any
+    // engine that applies that clamp synchronously rather than deferring it to
+    // the end of the frame. Requiring live overflow walks past the inert div to
+    // the element that does scroll, falling back to the document scroller.
+    //
+    // Resolved per commit, so a list that only grows into an overflowing pane
+    // later still picks it up; and measured here, while the box is still held
+    // at its pre-change height, i.e. at the moment overflow is at its greatest.
+    // A pane that isn't overflowing is skipped harmlessly — its scroll offset
+    // is pinned at 0, so there is no clamp to protect against.
+    const scroller       = animateHeight ? findScrollParent(container) : null
     const savedScrollTop = scroller ? scroller.scrollTop : 0
 
     const rows  = [...container.querySelectorAll<HTMLElement>(`[${attr}]`)]
