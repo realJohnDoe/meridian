@@ -88,4 +88,51 @@ describe('PagedTopbar', () => {
     )
     expect(screen.getByText('August')).toBeInTheDocument()
   })
+
+  // The label is plain, non-interactive text until a caller opts into the
+  // quick-nav disclosure by passing both expanded and onToggle.
+  it('does not turn the label into a button when onToggle is omitted', () => {
+    renderTopbar()
+    expect(screen.queryByRole('button', { expanded: false })).not.toBeInTheDocument()
+  })
+
+  it('turns the label into a disclosure button when onToggle is provided', () => {
+    const onToggle = vi.fn()
+    render(
+      <PagedTopbar
+        isMobile={false}
+        openSidebar={vi.fn()}
+        label="June 2026"
+        shortLabel="Jun 2026"
+        prevLabel="Previous month"
+        nextLabel="Next month"
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+        expanded={false}
+        onToggle={onToggle}
+      />,
+    )
+    const toggle = screen.getByRole('button', { expanded: false })
+    expect(toggle).toHaveAttribute('aria-controls', 'quickNavPanel')
+    fireEvent.click(toggle)
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('reflects an open panel via aria-expanded', () => {
+    render(
+      <PagedTopbar
+        isMobile={false}
+        openSidebar={vi.fn()}
+        label="June 2026"
+        shortLabel="Jun 2026"
+        prevLabel="Previous month"
+        nextLabel="Next month"
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+        expanded={true}
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
+  })
 })

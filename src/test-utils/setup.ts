@@ -30,6 +30,9 @@ if (typeof window !== 'undefined') {
   // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-unnecessary-condition -- polyfill assignment; DOM lib types claim this is always defined, but jsdom 29 doesn't implement it, so the guard is load-bearing at runtime
   Element.prototype.scrollIntoView ??= () => {}
 
+  // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-unnecessary-condition -- polyfill assignment; DOM lib types claim this is always defined, but jsdom 29 doesn't implement it, so the guard is load-bearing at runtime
+  Element.prototype.scrollTo ??= () => {}
+
   const { cleanup } = await import('@testing-library/react')
   afterEach(cleanup) // vitest globals are off, so RTL's auto-cleanup never registers
 

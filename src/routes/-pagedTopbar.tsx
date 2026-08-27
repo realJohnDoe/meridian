@@ -1,6 +1,7 @@
-import { Menu, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Menu, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { IconButton } from '@/components/primitives/icon-button'
 import { TopbarLabel } from './-topbarLabel'
+import { cn } from '@/lib/cn'
 
 // Shared by the day and month topbar variants — both are a mobile menu
 // button, an ellipsized label, and prev/next chevrons, differing only in
@@ -17,6 +18,8 @@ export function PagedTopbar({
   nextLabel,
   onPrev,
   onNext,
+  expanded,
+  onToggle,
 }: {
   isMobile: boolean
   openSidebar: () => void
@@ -28,13 +31,39 @@ export function PagedTopbar({
   nextLabel: string
   onPrev: () => void
   onNext: () => void
+  /**
+   * When provided together, the label becomes a disclosure button that opens
+   * the topbar's quick-nav panel (see _app.tsx) instead of being static text.
+   * The day/week variants don't pass these yet — they have no panel to open.
+   */
+  expanded?: boolean
+  onToggle?: () => void
 }) {
+  // flex-1 min-w-0 here is load-bearing, not cosmetic: TopbarLabel's own
+  // @container needs a definite width handed down by flex distribution, and a
+  // shrink-to-fit ancestor (flex-basis: auto) collapses it to zero instead —
+  // see the matching comment on the default (non-paged) label in _app.tsx.
+  // Wrapping the label in the disclosure <button> below must preserve this
+  // chain rather than breaking it with a plain, non-flex wrapper.
+  const labelNode = shortLabel
+    ? <TopbarLabel long={label} short={shortLabel} className="flex-1 text-base text-foreground" />
+    : <span className="flex-1 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{label}</span>
+
   return (
     <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
       {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
-      {shortLabel
-        ? <TopbarLabel long={label} short={shortLabel} className="flex-1 text-base text-foreground" />
-        : <span className="flex-1 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{label}</span>}
+      {onToggle ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-controls="quickNavPanel"
+          className="flex flex-1 items-center gap-1 min-w-0 text-left"
+        >
+          {labelNode}
+          <ChevronDown size={16} className={cn('shrink-0 text-dim transition-transform', expanded && 'rotate-180')} aria-hidden />
+        </button>
+      ) : labelNode}
       {!isMobile && (
         <>
           <IconButton variant="ghost" className="text-dim" label={prevLabel} onClick={onPrev}><ChevronLeft size={18} /></IconButton>
