@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import { Menu, CalendarCheck2 } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
@@ -8,6 +8,7 @@ import { useStore } from '@/store'
 import {
   useMonthPreview, useDayPreview, useWeekPreview,
   useAgendaTopDate, requestScrollToToday, weekStartFor,
+  useQuickNavOpen, toggleQuickNav, closeQuickNav, MonthStrip,
 } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ViewFilterButton } from '@/components'
@@ -87,6 +88,7 @@ function AppMain() {
   const dayPreview    = useDayPreview()
   const weekPreview   = useWeekPreview()
   const ws            = weekStartsOn(useStore(s => s.localePrefs))
+  const quickNavOpen  = useQuickNavOpen()
 
   const isDayView    = !!dayMatch
   const isWeekView   = !!weekMatch
@@ -97,6 +99,12 @@ function AppMain() {
   // The route param need not already be week-start-normalized (see WeekView),
   // so it's normalized here before anything reads it.
   const weekStartDate = weekMatch ? weekStartFor(new Date(weekMatch.params.date + 'T00:00:00'), ws) : null
+
+  // Closes the quick-nav panel on a view switch — paging within the same view
+  // (chevron taps, swipes) must leave it open, which is why this keys off the
+  // view kind rather than the route params those carry.
+  const viewKind = isDayView ? 'day' : isWeekView ? 'week' : isMonthView ? 'month' : isListView ? 'list' : 'agenda'
+  useEffect(() => { closeQuickNav() }, [viewKind])
 
   // monthPreview/dayPreview/weekPreview (set by the swipe carousel on touchend
   // / crossing the halfway point) show the label the gesture is heading
@@ -133,6 +141,13 @@ function AppMain() {
 
   const navigateHome   = useCallback(() => void navigate({ to: '/' }), [navigate])
   const openSidebar    = () => setSidebarOpen(true)
+
+  // Shared by the month strip's chip taps — same replace: true paging
+  // semantics as the chevrons and the swipe carousel just above.
+  const navigateToMonth = useCallback(
+    (d: Date) => navigate({ to: '/calendar/$month', params: { month: fmtMonth(d) }, replace: true }),
+    [navigate],
+  )
 
   return (
     <>
@@ -190,6 +205,8 @@ function AppMain() {
                   nextLabel="Next month"
                   onPrev={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}
                   onNext={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}
+                  expanded={quickNavOpen}
+                  onToggle={toggleQuickNav}
                 />
               ) : (
                 <div className="flex flex-1 items-center gap-2 min-w-0" id="tbDefault">
@@ -214,6 +231,15 @@ function AppMain() {
             }
           />
         </header>
+
+        {/* A shrink-0 sibling, not an overlay: opening this shortens the
+            views below rather than covering them, so PagedTopbar's own
+            aria-controls target actually exists only while it's open. */}
+        {isMonthView && quickNavOpen && monthViewDate && monthDisplayDate && (
+          <div id="quickNavPanel" className="shrink-0 border-b border-border bg-background">
+            <MonthStrip activeMonth={monthDisplayDate} onNavigateMonth={navigateToMonth} />
+          </div>
+        )}
 
         <section className="flex flex-1 flex-col overflow-hidden min-h-0">
           <Outlet />

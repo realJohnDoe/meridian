@@ -88,6 +88,14 @@ interface CalendarViewState {
    * this day instead of resetting to today.
    */
   currentDate: string
+  /**
+   * Whether the topbar's quick-nav panel (the month strip on month view, a
+   * dotted mini month grid on day/week/agenda) is open. One flag for every
+   * view rather than one per view: only one calendar view is ever mounted at
+   * a time, and `_app.tsx` closes this on a view change so a panel opened on
+   * one view never reappears already-open on another.
+   */
+  quickNavOpen: boolean
 }
 
 /** Calendar-view-local ephemeral state — scroll position, carousel previews.
@@ -104,6 +112,7 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   agendaTopDate: null,
   overdueCollapsed: false,
   currentDate: fmtISO(startOfToday()),
+  quickNavOpen: false,
 }))
 
 export function resetCalendarViewState(): void {
@@ -186,6 +195,19 @@ export function useOverdueCollapsed(): boolean {
 
 export function toggleOverdueCollapsed(): void {
   calendarView.setState(s => ({ overdueCollapsed: !s.overdueCollapsed }))
+}
+
+export function useQuickNavOpen(): boolean {
+  return useZustandStore(calendarView, s => s.quickNavOpen)
+}
+
+export function toggleQuickNav(): void {
+  calendarView.setState(s => ({ quickNavOpen: !s.quickNavOpen }))
+}
+
+/** Idempotent — safe to call on every view change whether or not the panel is open. */
+export function closeQuickNav(): void {
+  calendarView.setState({ quickNavOpen: false })
 }
 
 /**

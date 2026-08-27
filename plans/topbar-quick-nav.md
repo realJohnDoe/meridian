@@ -5,11 +5,13 @@ the shape Google Calendar uses: tapping it drops a horizontally scrolling month
 strip into the month view, and a mini month grid with per-day category dots into
 the day, week and agenda views (2026-08-27).
 
-**Estimate: four PRs, each sized for a Sonnet 5 session.** PR 1 and PR 2 are
-independent and can run in parallel; PR 3 needs both merged; PR 4 closes out.
-Folding 1+2 and 3+4 together gives two Opus 5 PRs instead. One PR is not
-advisable — it would put two different panel UIs, a shared disclosure shell, a
-new data derivation and a change to `_app`'s height geometry in a single diff.
+**Estimate: four PRs, each sized for a Sonnet 5 session.** PR 1 has shipped
+(the month view's disclosure button and month strip). PR 2 is independent of
+it and can still run on its own; PR 3 needs both merged; PR 4 closes out.
+Folding 3+4 together gives one further Opus 5 PR instead of two. One PR for
+everything was never advisable — it would have put two different panel UIs, a
+shared disclosure shell, a new data derivation and a change to `_app`'s height
+geometry in a single diff.
 
 Per `plans/CLAUDE.md`, delete each PR's section from this file in the PR that
 implements it, rather than leaving shipped work here to go stale.
@@ -52,60 +54,6 @@ The one thing with nothing to reuse is the month strip itself, and it does not
 want a library either: native `overflow-x`, scroll snap, and an explicit
 `scrollLeft` write to center the active chip. **Do not reach for Embla** — Embla
 drives the paged carousels (`useCarousel`), and the strip is free-scrolling.
-
----
-
-## PR 1 — Label becomes a disclosure button, with the month strip behind it
-
-~250 lines plus tests. Ships a working feature on the month view by itself; day,
-week and agenda stay untouched.
-
-1. Add `quickNavOpen: boolean` to `calendarView` with `useQuickNavOpen()`,
-   `toggleQuickNav()` and `closeQuickNav()`, exported through the `@/calendar`
-   barrel.
-2. Give `PagedTopbar` optional `expanded` and `onToggle` props. When present,
-   wrap the existing label in a `<button aria-expanded aria-controls>` with a
-   lucide `ChevronUp`/`ChevronDown`. When absent, render exactly what it renders
-   today — the day/week branches opt in later, in PR 3.
-3. In `_app.tsx`, render the panel as a `shrink-0` sibling **between**
-   `<header>` and the `<section>` holding the `<Outlet />`. Not an overlay, not
-   a portal: the views below simply get a shorter viewport, which is what both
-   reference screenshots do.
-4. Build `MonthStrip` — a horizontally scrolling row of month chips with year
-   chips as separators, `snap-x snap-mandatory`, the active chip filled with the
-   primary color.
-5. Center the active chip by computing the target offset from the chip's and the
-   container's own geometry and writing `container.scrollTo({ left, behavior })`
-   — **not `scrollIntoView`**, which also scrolls every ancestor scroller and
-   can shift the whole clipped `_app` shell sideways. Instant on mount, smooth
-   on change. `editor/dialogs/TimeWheels.test.tsx` is the in-repo precedent for
-   testing this under jsdom: spy on `scrollTo` and assert its argument, and use
-   `Object.defineProperty` for `scrollTop`/`scrollLeft`, since jsdom has no
-   layout and the accessors otherwise always read 0. Without that pattern the
-   centering test passes vacuously.
-6. Drive the active chip from `useMonthPreview()` when a preview is set, falling
-   back to the route's `month`. The preview is what the swipe carousel sets on
-   touchend, ahead of the route committing (see `viewState.ts`), and it is
-   already what the topbar label reads — a strip keyed on the route param alone
-   lags the gesture by its whole duration.
-7. Tapping a chip navigates to `/calendar/$month` with `replace: true`, matching
-   the paging semantics the chevrons and the swipe carousel already use (see the
-   comment in `_app.calendar.$month.tsx`).
-8. Close the panel on view change and on Escape; keep it open while paging
-   within the same view.
-
-Files: new `calendar/MonthStrip.tsx` + test; edits to `calendar/viewState.ts`,
-`calendar/index.ts`, `routes/-pagedTopbar.tsx` + test, `routes/_app.tsx`,
-`GLOSSARY.md`.
-
-**Trap.** The `flex-1 min-w-0` chain down to `TopbarLabel` is load-bearing, not
-cosmetic — its `@container` needs a width from flex distribution, and a
-shrink-to-fit wrapper collapses it to zero. There is a comment saying so in
-`_app.tsx`. Wrap the button *around* that chain; do not insert a plain `<button>`
-into the middle of it.
-
-**Done when** the month view's label opens a strip that scrolls, centers on the
-current month, navigates on tap, and follows a swipe of the grid below it.
 
 ---
 
@@ -196,13 +144,16 @@ it in every view.
 
 ## Decide before starting
 
-Three product calls that change code in more than one PR.
+One product call still open, for whoever picks up PR 2.
 
 | Question | Suggestion | Touches |
 |---|---|---|
 | Does a completed task still dot its day? | **Yes**, colored by its priority — the dot answers "was anything on this day", and a day whose only task got done still had something on it. | one branch in `dayDots.ts` |
-| Does the panel stay open across a view switch? | **Yes**, as Google does. Costs nothing: `quickNavOpen` already lives with the rest of the per-session calendar ephemera. | PR 1 |
-| How far does the month strip run? | **Two years back, three forward**, rebuilt from the shown month, with year chips as separators. An unbounded strip would need virtualization it does not deserve. | PR 1 |
+
+(PR 1 settled its own two calls: the panel stays open across a view switch —
+`quickNavOpen` lives with the rest of the per-session calendar ephemera and
+costs nothing to persist — and the month strip runs two years back, three
+forward, rebuilt from the shown month.)
 
 ---
 
@@ -220,8 +171,8 @@ breaks.
   included. The permanent exceptions are `components/ui/**` and
   `components/primitives/**`.
 - **New names go in `GLOSSARY.md`**, one sentence and a pointer at the code.
-  `src/glossary.test.ts` enforces it. `MonthStrip`, `MiniMonth`, `DotCategory`
-  and `quickNavOpen` each need an entry.
+  `src/glossary.test.ts` enforces it. `MiniMonth` and `DotCategory` each need
+  an entry (`MonthStrip` and `quickNavOpen` already have one, added in PR 1).
 - **Do not edit `components/ui/calendar.tsx`.** It mirrors the shadcn registry
   and `shadcn diff` compares it against upstream. Dots go in a wrapper under
   `calendar/`, passed down as a `DayButton` override.

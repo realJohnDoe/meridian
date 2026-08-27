@@ -332,6 +332,15 @@ between them.
 → `calendar/DayPane.tsx` · `DayPane`
 → `calendar/MonthGrid.tsx` · `MonthGrid`
 
+### MonthStrip
+Not a fourth term in the View/Pane/Grid family above, despite sitting beside
+`MonthView`/`MonthGrid` in the same directory: it's the topbar's quick-nav
+panel — a horizontally scrolling row of month chips, opened by tapping the
+topbar label (`quickNavOpen`) and closed automatically on a view switch.
+Day/week/agenda get their own panel later; this one is month view's.
+→ `calendar/MonthStrip.tsx` · `MonthStrip`
+→ `calendar/viewState.ts` · `useQuickNavOpen`, `toggleQuickNav`, `closeQuickNav`
+
 ### AgendaRow (disambiguation)
 Two things in one directory, kept apart only by TypeScript's separate type and
 value namespaces. The **type** is a row descriptor in the agenda's flat
