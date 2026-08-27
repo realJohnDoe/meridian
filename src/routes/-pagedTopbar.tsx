@@ -60,8 +60,11 @@ export function PagedTopbar({
           aria-controls="quickNavPanel"
           className="flex flex-1 items-center gap-1 min-w-0 text-left"
         >
-          {labelNode}
+          {/* Leads the label, not trails it — a fixed gap-1 from the label's
+              first character regardless of how much space labelNode's own
+              flex-1 claims, rather than drifting to the far edge of it. */}
           <ChevronDown size={16} className={cn('shrink-0 text-dim transition-transform', expanded && 'rotate-180')} aria-hidden />
+          {labelNode}
         </button>
       ) : labelNode}
       {!isMobile && (
