@@ -10,6 +10,19 @@ import type { Occurrence, Roots } from '@/types'
 
 setupStore()
 
+// jsdom implements no Web Animations API. FlipList calls it unconditionally
+// (both the row-glide/height-fold animations and the row-enter fade a row
+// reappearing from the Done section gets), so a harmless stub is needed for
+// any test that re-renders ItemsList — the content of the calls isn't what
+// these tests are checking; see FlipList.test.tsx for that. Installed once,
+// module-wide, rather than per-test with cleanup: `afterEach` hooks run in
+// reverse registration order, so a stub torn down in this file's own
+// `afterEach` would already be gone by the time RTL's global `afterEach(cleanup)`
+// (registered earlier, in test-utils/setup.ts) unmounts the tree and flushes
+// any animation the unmount itself triggers.
+// eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-unnecessary-condition -- polyfill assignment; DOM lib types claim this is always defined, but jsdom doesn't implement it, so the guard is load-bearing at runtime
+Element.prototype.animate ??= (() => ({ finished: new Promise(() => {/* never settles */}), cancel: vi.fn() })) as unknown as typeof Element.prototype.animate
+
 type Row = Parameters<typeof rowSortKey>[0]
 
 function linkRow(idx: number, occ: Occurrence | undefined, ref = 'note.md'): Row {
