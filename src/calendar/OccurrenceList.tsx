@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronDown } from 'lucide-react'
 import type { Occurrence, EditScope } from '@/types'
 import { cn } from '@/lib/cn'
+import { VirtualRows } from '@/components/primitives/virtual-rows'
 import AgendaRow from './AgendaRow'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 
@@ -117,46 +118,34 @@ export default function OccurrenceList({ occs, onOpen, onToggleDone, onSwipeDele
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" ref={scRef}>
-      <div className="pt-2 pb-24 lg:max-w-3xl lg:mx-auto">
-        <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-          {virtualItems.map(vi => {
-            // Same-render read: virtualItems came from this render's `rows`
-            // (count === rows.length), so vi.index is in range.
-            const row = rows[vi.index]!
-            return (
-              <div
-                key={vi.key}
-                data-index={vi.index}
-                ref={virtualizer.measureElement}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)` }}
-              >
-                {/* useVirtualFlip animates this inner element, never the
-                    positioned one above: a WAAPI animation outranks inline
-                    style, so gliding the outer div would override the
-                    virtualizer's own translateY and stack every row at the
-                    top of the list. */}
-                <div {...{ [FLIP_KEY_ATTR]: vi.key }}>
-                  {row.kind === 'done-header' ? (
-                    <DoneHeaderRow
-                      count={row.count}
-                      open={doneOpen}
-                      onToggle={() => setDoneOpen(o => !o)}
-                    />
-                  ) : (
-                    <AgendaRow
-                      occ={row.occ}
-                      badge={{ kind: 'none' }}
-                      onOpen={onOpen}
-                      onToggleDone={onToggleDone}
-                      onSwipeDelete={onSwipeDelete}
-                    />
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <VirtualRows
+        className="pt-2 pb-24 lg:max-w-3xl lg:mx-auto"
+        virtualizer={virtualizer}
+        rows={rows}
+        renderRow={row => (
+          // useVirtualFlip animates this inner element, never the positioned
+          // one VirtualRows renders above: a WAAPI animation outranks inline
+          // style, so gliding the outer div would override the virtualizer's
+          // own translateY and stack every row at the top of the list.
+          <div {...{ [FLIP_KEY_ATTR]: row.key }}>
+            {row.kind === 'done-header' ? (
+              <DoneHeaderRow
+                count={row.count}
+                open={doneOpen}
+                onToggle={() => setDoneOpen(o => !o)}
+              />
+            ) : (
+              <AgendaRow
+                occ={row.occ}
+                badge={{ kind: 'none' }}
+                onOpen={onOpen}
+                onToggleDone={onToggleDone}
+                onSwipeDelete={onSwipeDelete}
+              />
+            )}
+          </div>
+        )}
+      />
     </div>
   )
 }

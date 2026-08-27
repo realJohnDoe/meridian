@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Occurrence } from '@/types'
 import { fileEntries } from '@/fileOccurrence'
 import { OccurrenceCard } from '@/components'
+import { VirtualRows } from '@/components/primitives/virtual-rows'
 import { useStore } from '@/store'
 import { useFileOccurrenceMap } from '@/hooks'
 import { rankByQuery } from '@/lib/matching'
@@ -87,8 +88,6 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
 
   if (!results.length) return null
 
-  const virtualItems = virtualizer.getVirtualItems()
-
   return (
     // The padding sits on a wrapper, never on the positioned spacer below: the
     // rows are absolutely positioned, so their containing block is the spacer's
@@ -96,38 +95,22 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
     // width and cancel the inset entirely, leaving the cards flush against the
     // overlay (and, on mobile, the screen) edge. px-3.5 matches AgendaRow's
     // mx-3.5, so results sit on the same screen edge as every other list.
-    <div className="px-3.5 pt-2">
-      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-        {virtualItems.map(vi => {
-          const { occ, listedOn } = results[vi.index]!
-          return (
-            <div
-              key={vi.key}
-              data-index={vi.index}
-              ref={virtualizer.measureElement}
-              style={{
-                '--stagger': `${vi.index * 0.025}s`,
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${vi.start}px)`,
-                paddingBottom: 6,
-              } as React.CSSProperties}
-            >
-              <OccurrenceCard
-                occ={occ}
-                leadingIcon="kind"
-                showTime="badge"
-                showDate
-                listedOn={listedOn}
-                onOpen={() => onOpen(occ)}
-                onToggleDone={() => {}}
-              />
-            </div>
-          )
-        })}
-      </div>
-    </div>
+    <VirtualRows
+      className="px-3.5 pt-2"
+      virtualizer={virtualizer}
+      rows={results}
+      rowStyle={(_, vi) => ({ '--stagger': `${vi.index * 0.025}s`, paddingBottom: 6 }) as React.CSSProperties}
+      renderRow={({ occ, listedOn }) => (
+        <OccurrenceCard
+          occ={occ}
+          leadingIcon="kind"
+          showTime="badge"
+          showDate
+          listedOn={listedOn}
+          onOpen={() => onOpen(occ)}
+          onToggleDone={() => {}}
+        />
+      )}
+    />
   )
 }
