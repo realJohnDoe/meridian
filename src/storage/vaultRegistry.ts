@@ -26,7 +26,8 @@ import {
 } from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
 import { mountBackend, unmountBackend } from './backends'
-import { syncOnActivate, parseFiles, reportParseFailures, updateSyncUI, dropSyncState } from './sync'
+import { syncOnActivate, updateSyncUI, dropSyncState } from './sync'
+import { parseFiles, reportParseFailures } from './parseReport'
 
 // ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
 

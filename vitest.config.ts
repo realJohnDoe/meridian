@@ -99,7 +99,11 @@ export default defineConfig({
         // this cross-cutting file's many untested setters to the same bar.
         'src/store.ts': { statements: 68, branches: 55, functions: 58, lines: 68 },
         'src/storeCommit.ts': { statements: 30, branches: 95, functions: 45, lines: 35 },
-        'src/storage/sync.ts': { statements: 68, branches: 55, functions: 55, lines: 72 },
+        'src/storage/sync.ts': { statements: 85, branches: 78, functions: 88, lines: 88 },
+        // The parse/round-trip reporting cluster split out of sync.ts (health
+        // survey finding #10, part A) — guarded on its own rather than
+        // inheriting only the global floor.
+        'src/storage/parseReport.ts': { statements: 92, branches: 78, functions: 85, lines: 94 },
         // First-party primitives lifted out of components/ui/, where the
         // coverage exclusion had kept them invisible.
         'src/components/primitives/responsive-modal.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },

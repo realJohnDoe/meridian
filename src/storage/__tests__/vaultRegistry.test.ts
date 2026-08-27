@@ -252,6 +252,11 @@ vi.mock('@/storage/notifications', () => notifyFns)
 
 vi.mock('@/storage/sync', () => syncFns)
 
+vi.mock('@/storage/parseReport', () => ({
+  parseFiles: syncFns.parseFiles,
+  reportParseFailures: syncFns.reportParseFailures,
+}))
+
 // Imports of the module under test (and its non-mocked collaborators — the
 // trivial in-memory backend registry) must come after the vi.mock calls.
 import {

@@ -85,7 +85,7 @@ in that band and likely deserves its own look.
 
 ## 3. Category verdicts
 
-1. **Architecture & Domain Separation** — findings: #10 (part A is ready to fix; part B is deferred by design — see the finding)
+1. **Architecture & Domain Separation** — findings: #10 (deferred by design — see the finding)
 2. **Simplicity & Overengineering** — clean.
 3. **Directory & File Layout** — clean.
 4. **Security** — clean. Threat model: a client-side PWA over user-owned
@@ -153,7 +153,7 @@ detailed sections below stay in `#` order so they're findable.
 
 | Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
-| 6 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
+| 6 | 10 | `sync.ts` — remaining banner-delimited concerns (backoff/scheduler) | architecture, layout | 4 | 2 | Opus 5 |
 | 7 | 9 | `useEntryEditor` still bundles vault-targeting (`useVaultTarget` not yet extracted) | srp, architecture | 3 | 2 | Opus 5 |
 
 > **The order above is `(impact × breadth) ÷ effort`, not raw impact.**
@@ -191,81 +191,32 @@ detailed sections below stay in `#` order so they're findable.
   `vitest.config.ts` holds under `pnpm run test:coverage` (add a floor for the
   new file too, following the precedent set by `useAutoSave.ts`'s).
 
-### 10. `sync.ts` carries seven concerns behind banner comments instead of module boundaries
+### 10. `sync.ts` carries remaining concerns behind banner comments instead of module boundaries
+
+> Part A (the parse/round-trip reporting cluster) has been extracted into
+> `src/storage/parseReport.ts`. What remains is part B, deferred by design.
 
 - **Category** — `architecture`, `layout`
 - **Impact** — 4
-- **Breadth** — 3 files (`storage/sync.ts`, `storage/index.ts`,
-  `vitest.config.ts` — whose per-file floor is keyed to the current path).
-- **Recommended model** — **split by half.** **Part A (parse/report) is
-  Sonnet 5** — verified one-way seam, specified below. **Part B
-  (scheduler/backoff) stays Opus 5**, and this is the one place in the report
+- **Breadth** — 2 files (`storage/sync.ts`, `vitest.config.ts` — whose
+  per-file floor is keyed to the current path).
+- **Recommended model** — **Opus 5**, and this is the one place in the report
   where more context does not lower the tier: `resetSyncBackoff` iterates
   `_syncStates.values()` and mutates `consecutiveFailures`/`nextRetryAt` on
   entries that SYNC CORE owns and writes, so the scheduler and the sync core
   share one mutable map. Separating them means either exporting `_syncStates`
   (which dissolves the singleton the file is built around) or lifting
   `VaultSyncState` into a third module that both import — a design decision,
-  not a specified edit. Do part A now; leave part B until someone wants to
-  make that call.
-- **Evidence** — `src/storage/sync.ts` is 1159 lines divided by seven of its
-  own section banners:
-  ```
-  // ── HELPERS ────────────────────────────────────────────────────
-  // ── COLLISION RESOLUTION ───────────────────────────────────────────
-  // ── RECONCILE ─────────────────────────────────────────────────
-  // ── SYNC CORE ─────────────────────────────────────────────────────────
-  // ── BACKOFF STATE ─────────────────────────────────────────────────────
-  // ── SCHEDULER ─────────────────────────────────────────────────────────
-  // ── CACHE WRITE / DELETE ──────────────────────────────────────
-  ```
-- **Problem** — The file is the largest in the repo and the second-most-changed
-  (11 commits in 60 days), and the banners are doing the job module boundaries
-  should: parse-failure reporting, three-way collision resolution, and a timer
+  not a specified edit.
+- **Problem** — The file is still the largest in the repo and the
+  second-most-changed (11 commits in 60 days), and the banners are doing the
+  job module boundaries should: a three-way collision resolution and a timer
   scheduler are separately testable concerns that share a file only by
-  history. The cost is concentrated where changes actually land — its
-  1931-line test file is the largest test in the repo, because every concern
-  must be set up through the same module.
-- **Fix (part A)** — Move the parse/round-trip reporting cluster into
-  `src/storage/parseReport.ts`, leaving collision/reconcile/sync-core and the
-  scheduler in `sync.ts`; confirm with `pnpm run build && pnpm run lint &&
-  pnpm run test:coverage` in the repo root (lint enforces the module-barrel
-  boundary, coverage confirms the re-keyed threshold).
-- **Task context (part A)** — Lines 40–157 of `src/storage/sync.ts` move as a
-  block: the `ParseFailure` and `RoundTripLoss` interfaces, `auditRoundTrip`,
-  `parseFiles`, `reportParseFailures`, the `_reportedLossy` module-level Set
-  (line 130) and `reportRoundTripLosses`. The seam was verified in both
-  directions:
-  - **Outbound** — the cluster's only imports are `warn`/`warnWithDetails`
-    from `./notifications`, `runInIdleBatches` from `@/lib/idle`,
-    `parseToStoreItems`/`roundTripLoss` from `@/model`, and `pathToKey` from
-    `@/fileIO`. It touches no sync state — not `_syncStates`, not the backoff
-    constants, not `getBackend`.
-  - **Inbound** — exactly one caller inside `sync.ts` remains:
-    `mergeChangedIntoStore` at lines 496–505 (`parseFiles`,
-    `reportParseFailures`, `auditRoundTrip`), which becomes an ordinary
-    import. External callers are `storage/vaultRegistry.ts` and
-    `editor/save.ts`; both import from `@/storage/sync` today and must be
-    re-pointed.
-
-  `_reportedLossy` must exist in exactly one module — it is the
-  "already warned about this path" dedupe, so a duplicated copy silently
-  re-toasts the user on every reconcile. Note `parseFiles` and
-  `reportParseFailures` are **not** re-exported from `src/storage/index.ts`,
-  so the barrel needs no change; the importers are inside `storage/` and in
-  `editor/save.ts`, which reaches them by deep path today — check
-  `pnpm run lint` after, since the import-boundary zones will judge the new
-  file the same way.
-
-  `vitest.config.ts` pins
-  `'src/storage/sync.ts': { statements: 68, branches: 55, functions: 55, lines: 72 }`.
-  After the move that key guards a smaller file; re-measure and add a floor
-  for `parseReport.ts` too, or the extracted code ends up guarded by nothing
-  but the global floor.
-- **Fix (part B, deferred)** — Lifting BACKOFF STATE + SCHEDULER (lines
-  673–691 and 966–1072, ~130 lines) into `storage/syncScheduler.ts` requires
-  first deciding where `VaultSyncState` and the `_syncStates` map should live.
-  Worth doing, but as its own change with that decision made explicitly.
+  history.
+- **Fix (deferred)** — Lifting BACKOFF STATE + SCHEDULER into
+  `storage/syncScheduler.ts` requires first deciding where `VaultSyncState`
+  and the `_syncStates` map should live. Worth doing, but as its own change
+  with that decision made explicitly.
 
 ---
 
