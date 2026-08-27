@@ -4,10 +4,24 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import ItemsList, { rowSortKey } from './ItemsList'
 import { parseItemEntry } from './items'
-import { setupStore, seedStore, makeOcc, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
+import { setupStore, seedStore, makeOcc, makeSeries, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
+import { toggleOccDone } from '@/occurrenceActions'
 import type { Occurrence, Roots } from '@/types'
 
 setupStore()
+
+// jsdom implements no Web Animations API. FlipList calls it unconditionally
+// (both the row-glide/height-fold animations and the row-enter fade a row
+// reappearing from the Done section gets), so a harmless stub is needed for
+// any test that re-renders ItemsList — the content of the calls isn't what
+// these tests are checking; see FlipList.test.tsx for that. Installed once,
+// module-wide, rather than per-test with cleanup: `afterEach` hooks run in
+// reverse registration order, so a stub torn down in this file's own
+// `afterEach` would already be gone by the time RTL's global `afterEach(cleanup)`
+// (registered earlier, in test-utils/setup.ts) unmounts the tree and flushes
+// any animation the unmount itself triggers.
+// eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-unnecessary-condition -- polyfill assignment; DOM lib types claim this is always defined, but jsdom doesn't implement it, so the guard is load-bearing at runtime
+Element.prototype.animate ??= (() => ({ finished: new Promise(() => {/* never settles */}), cancel: vi.fn() })) as unknown as typeof Element.prototype.animate
 
 type Row = Parameters<typeof rowSortKey>[0]
 
@@ -178,9 +192,14 @@ describe('ItemsList exit animation', () => {
 })
 
 describe('ItemsList wikilink rows', () => {
-  it('calls onToggleDone and begins an exit animation when a linked occurrence is checked off', () => {
+  // onToggleDone wraps the real production action (rather than a bare
+  // vi.fn()) so these exercise the actual store mutation the exit-animation
+  // decision reads back — a mock that never touches the store can't tell
+  // this fixed logic apart from the bug it fixes (see the recurring-series
+  // case below).
+  it('calls onToggleDone and begins an exit animation when a standalone linked task is checked off', () => {
     const occ = makeOcc({ entryKey: testKey('linked.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'linked.md', participants: [], title: 'Linked Task', tags: [], items: [], done: false } })
-    const onToggleDone = vi.fn()
+    const onToggleDone = vi.fn(toggleOccDone)
     const roots = makeRoots('current.md')
     roots.set(testKey('linked.md'), makeRootMeta('linked.md', { title: 'Linked Task', tags: [], items: [] }))
     seedStore([occ], roots)
@@ -208,6 +227,50 @@ describe('ItemsList wikilink rows', () => {
     // `fom` map (joined + expanded), not the raw seeded object — it carries
     // extra computed fields (jsTime, excluded), so match on identity, not equality.
     expect(onToggleDone).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('linked.md') }))
+    // Checking off the file's only occurrence leaves nothing else to
+    // represent it, so it truly leaves the active list — exit animation.
     expect(document.querySelector('.flip-leave')).not.toBeNull()
+  })
+
+  it('does not begin an exit animation when checking off one occurrence of a recurring linked series', () => {
+    // A wikilink row represents a *file*, not a single occurrence: for a daily
+    // series with no end, checking off today's occurrence just makes
+    // fileOccurrenceMap's resolveOneKey re-resolve to tomorrow's — still open —
+    // occurrence. The row never leaves the active list, so there's nothing to
+    // fade: an exit animation here would show a stale ghost over a row that's
+    // still there, just displaying a different date.
+    const series = makeSeries({
+      entryKey: testKey('linked.md'),
+      date: '2026-01-01',
+      time: null,
+      repeat: { type: 'schedule', freq: 'daily' },
+      metadata: { participants: [], done: false },
+    })
+    const onToggleDone = vi.fn(toggleOccDone)
+    const roots = makeRoots('current.md')
+    roots.set(testKey('linked.md'), makeRootMeta('linked.md', { title: 'Linked Task', tags: [], items: [] }))
+    seedStore([series], roots)
+
+    function LinkHarness() {
+      const [items, setItems] = useState(['[[linked.md]]'])
+      return (
+        <ItemsList
+          items={items}
+          onChange={setItems}
+          roots={roots}
+          currentKey={testKey('current.md')}
+          vaultId={TEST_VAULT}
+          onPromote={() => null}
+          onToggleDone={onToggleDone}
+        />
+      )
+    }
+
+    render(<LinkHarness />)
+
+    fireEvent.click(screen.getByRole('checkbox'))
+
+    expect(onToggleDone).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('linked.md') }))
+    expect(document.querySelector('.flip-leave')).toBeNull()
   })
 })

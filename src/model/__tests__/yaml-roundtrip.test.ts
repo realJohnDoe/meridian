@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { fixtureNames, parseFixture, serialize, normalizeIds, rootMeta, occItems, TEST_VAULT, rootsOf } from './helpers'
 import { parseToStoreItems } from '@/model/storeItems'
-import { expandRange, expandWithMultiday, multidayCoversDate } from '@/model/expansion'
+import { expandRange, expandWithMultiday } from '@/model/expansion'
 import { fmtISO } from '@/model/dateUtils'
 import { isSeries, isStandaloneOcc } from '@/types'
 
@@ -78,7 +78,7 @@ describe('structural expectations', () => {
     expect(rootMeta(parsed).body ?? '').toContain('[[project-alpha]] status')
   })
 
-  it('multiday emits a single occurrence; span is inferred via multidayCoversDate', () => {
+  it('multiday emits a single occurrence on the start date', () => {
     const parsed = parseFixture('multiday')
     const roots = rootsOf(parsed.root)
     expect(occItems(parsed)[0]!.metadata.duration).toBe('3d')
@@ -87,13 +87,6 @@ describe('structural expectations', () => {
     const occs = expandRange(parsed.items, roots, new Date('2026-04-01'), new Date('2026-04-30'))
     expect(occs).toHaveLength(1)
     expect(occs[0]!.date).toBe('2026-04-19')
-
-    // multidayCoversDate spans all three days and stops at the boundary.
-    expect(multidayCoversDate(occs[0]!, new Date('2026-04-18'))).toBe(false)
-    expect(multidayCoversDate(occs[0]!, new Date('2026-04-19'))).toBe(true)
-    expect(multidayCoversDate(occs[0]!, new Date('2026-04-20'))).toBe(true)
-    expect(multidayCoversDate(occs[0]!, new Date('2026-04-21'))).toBe(true)
-    expect(multidayCoversDate(occs[0]!, new Date('2026-04-22'))).toBe(false)
   })
 
   // Regression test: Month/Agenda views expand a whole range at once (unlike

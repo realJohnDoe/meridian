@@ -4,6 +4,7 @@ import type { Occurrence, EditScope } from '@/types'
 
 import { parseDateString } from '@/model'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
+import { VirtualRows } from '@/components/primitives/virtual-rows'
 import AgendaHeaderRow from './AgendaHeaderRow'
 import AgendaDividerRow from './AgendaDividerRow'
 import AgendaEmptyDayRow from './AgendaEmptyDayRow'
@@ -191,58 +192,45 @@ export default function AgendaView({ onOpen }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" ref={scRef}>
-      <div className="pb-24 lg:max-w-3xl lg:mx-auto">
-        <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-          {virtualItems.map(vi => {
-            // Same-render read: virtualItems came from this render's `rows`
-            // (count === rows.length), so vi.index is in range. The scroll
-            // listener above can't assume that — it reads a captured `rows`.
-            const row = rows[vi.index]!
-            return (
-              <div
-                key={vi.key}
-                data-index={vi.index}
-                ref={virtualizer.measureElement}
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)` }}
-              >
-                {/* useVirtualFlip animates this inner element, never the
-                    positioned one above: a WAAPI animation outranks inline
-                    style, so gliding the outer div would override the
-                    virtualizer's own translateY and stack every row at the
-                    top of the list. */}
-                <div {...{ [FLIP_KEY_ATTR]: vi.key }}>
-                  {row.kind === 'header' ? (
-                    <AgendaHeaderRow
-                      label={row.label}
-                      collapsed={row.collapsed}
-                      count={row.count}
-                      onToggle={toggleOverdueCollapsed}
-                    />
-                  ) : row.kind === 'month' || row.kind === 'week' ? (
-                    <AgendaDividerRow variant={row.kind} label={row.label} />
-                  ) : row.kind === 'day-empty' ? (
-                    <AgendaEmptyDayRow date={row.date} isToday={row.isToday} />
-                  ) : (
-                    <AgendaRow
-                      occ={row.occ}
-                      // Only today's rows track the clock; every other row's
-                      // event-past/event-future state can't change from the
-                      // clock alone, and passing `now` would re-render them all
-                      // once a minute for nothing.
-                      now={row.isToday ? now : undefined}
-                      showDate={row.showDate}
-                      badge={row.badge ? { kind: 'day', ...row.badge } : { kind: 'spacer' }}
-                      onOpen={onOpen}
-                      onToggleDone={handleToggleDone}
-                      onSwipeDelete={handleSwipeDelete}
-                    />
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+      <VirtualRows
+        className="pb-24 lg:max-w-3xl lg:mx-auto"
+        virtualizer={virtualizer}
+        rows={rows}
+        renderRow={row => (
+          // useVirtualFlip animates this inner element, never the positioned
+          // one VirtualRows renders above: a WAAPI animation outranks inline
+          // style, so gliding the outer div would override the virtualizer's
+          // own translateY and stack every row at the top of the list.
+          <div {...{ [FLIP_KEY_ATTR]: row.key }}>
+            {row.kind === 'header' ? (
+              <AgendaHeaderRow
+                label={row.label}
+                collapsed={row.collapsed}
+                count={row.count}
+                onToggle={toggleOverdueCollapsed}
+              />
+            ) : row.kind === 'month' || row.kind === 'week' ? (
+              <AgendaDividerRow variant={row.kind} label={row.label} />
+            ) : row.kind === 'day-empty' ? (
+              <AgendaEmptyDayRow date={row.date} isToday={row.isToday} />
+            ) : (
+              <AgendaRow
+                occ={row.occ}
+                // Only today's rows track the clock; every other row's
+                // event-past/event-future state can't change from the
+                // clock alone, and passing `now` would re-render them all
+                // once a minute for nothing.
+                now={row.isToday ? now : undefined}
+                showDate={row.showDate}
+                badge={row.badge ? { kind: 'day', ...row.badge } : { kind: 'spacer' }}
+                onOpen={onOpen}
+                onToggleDone={handleToggleDone}
+                onSwipeDelete={handleSwipeDelete}
+              />
+            )}
+          </div>
+        )}
+      />
     </div>
   )
 }
