@@ -138,6 +138,23 @@ function useFlipTransition(
     for (const a of rowAnimsRef.current) a.cancel()
     rowAnimsRef.current = []
     for (const { row, key, layout, ty } of measured) {
+      // A row with no prior top either just mounted the whole list (prev is
+      // null — every key is "new" and none of them should animate) or is one
+      // row genuinely entering an already-mounted list (a redo/reopen). The
+      // latter has nothing to glide from: it lands at its full final layout
+      // position the instant React commits it, in the same frame a sibling
+      // that has to make room for it is still transform-held at its *old*
+      // spot — which is exactly where the entrant now sits. Left alone, the
+      // two render solidly on top of each other until the sibling's glide
+      // catches up. Fading the entrant in (rather than leaving it opaque
+      // with no animation at all) means that overlap is never opaque-on-opaque.
+      if (prev !== null && prev[key] === undefined) {
+        rowAnimsRef.current.push(row.animate(
+          [{ opacity: 0, transform: 'translateY(-10px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: DURATION, easing: EASING },
+        ))
+        continue
+      }
       const from = prev?.[key] === undefined ? 0 : prev[key] - layout + ty
       if (Math.abs(from) <= 1) continue
       rowAnimsRef.current.push(row.animate(

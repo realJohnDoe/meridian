@@ -1,11 +1,27 @@
 // @vitest-environment jsdom
 import { createRef } from 'react'
 import type React from 'react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { FlipList, captureFlipLeaveRect } from './FlipList'
 
 describe('FlipList', () => {
+  // jsdom implements no Web Animations API. These tests only care that a
+  // re-render doesn't throw, not what the (unmeasurable, in jsdom) animation
+  // looks like — a harmless stub is enough; the animation content itself is
+  // covered by the more targeted describe blocks below.
+  beforeEach(() => {
+    Object.defineProperty(Element.prototype, 'animate', {
+      value: () => ({ finished: new Promise(() => {/* never settles */}), cancel: vi.fn() }) as unknown as Animation,
+      configurable: true,
+      writable: true,
+    })
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+    delete (Element.prototype as Partial<Element>).animate
+  })
+
   it('renders its children inside a wrapping container', () => {
     render(
       <FlipList items={['a', 'b']} itemAttr="data-key">
@@ -153,6 +169,70 @@ describe('FlipList animateHeight scroll preservation', () => {
     rerender(<Harness keys={['a']} scrollerRef={scrollerRef} containerRef={containerRef} />)
 
     expect(container.style.height).toBe('')
+  })
+})
+
+// A row that enters an already-mounted list (e.g. a redo/reopen bringing a
+// row back into the active section) has no prior position to glide from — it
+// lands at its full final layout position the instant React commits it, in
+// the same frame a sibling that must make room for it is still transform-held
+// at its *old* spot, which is exactly where the entrant now sits. Left with no
+// animation at all (the pre-fix behavior), the two rendered solidly on top of
+// each other until the sibling's glide caught up.
+describe('FlipList row enter animation', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    // jsdom implements no Web Animations API, so the stub below is an added
+    // property rather than a spy — restoreAllMocks doesn't know about it.
+    delete (Element.prototype as Partial<Element>).animate
+  })
+
+  function stubAnimate() {
+    const calls: { el: Element; keyframes: Keyframe[] }[] = []
+    Object.defineProperty(Element.prototype, 'animate', {
+      value: function (this: Element, keyframes: Keyframe[]) {
+        calls.push({ el: this, keyframes })
+        return { finished: new Promise(() => {/* never settles */}), cancel: vi.fn() } as unknown as Animation
+      },
+      configurable: true,
+      writable: true,
+    })
+    return calls
+  }
+
+  it('fades a row in, rather than leaving it un-animated, when it enters an already-mounted list', () => {
+    const { rerender } = render(
+      <FlipList items={['a']} itemAttr="data-key">
+        <div data-key="a">Row A</div>
+      </FlipList>,
+    )
+
+    const calls = stubAnimate()
+
+    rerender(
+      <FlipList items={['a', 'b']} itemAttr="data-key">
+        <div data-key="a">Row A</div>
+        <div data-key="b">Row B</div>
+      </FlipList>,
+    )
+
+    const rowBCalls = calls.filter(c => (c.el as HTMLElement).getAttribute('data-key') === 'b')
+    expect(rowBCalls).toHaveLength(1)
+    expect(rowBCalls[0]!.keyframes).toEqual([
+      { opacity: 0, transform: 'translateY(-10px)' },
+      { opacity: 1, transform: 'translateY(0)' },
+    ])
+  })
+
+  it('does not animate any row on initial mount', () => {
+    const calls = stubAnimate()
+    render(
+      <FlipList items={['a', 'b']} itemAttr="data-key">
+        <div data-key="a">Row A</div>
+        <div data-key="b">Row B</div>
+      </FlipList>,
+    )
+    expect(calls).toHaveLength(0)
   })
 })
 
