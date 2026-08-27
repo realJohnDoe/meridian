@@ -18,6 +18,7 @@ import { readVaultStringArray } from '@/lib/vaultStorage'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
 import { usePendingLinks } from './usePendingLinks'
+import { useAutoSave } from './useAutoSave'
 
 export type { DialogHandlers } from './useEntryDialogs'
 
@@ -71,13 +72,6 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
 
   const [titleMissing, setTitleMissing] = useState(false)
   const [focusTitleTick, setFocusTitleTick] = useState(0)
-
-  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Always holds the latest body: initialized from entry.body, then kept current by
-  // every scheduleAutoSave call (which fires synchronously on each CM6 doc change,
-  // independent of the debounced commit). Read by saveMeta/flushAutoSave so a
-  // meta-only save can capture the current body without reaching into CodeMirror.
-  const bodyRef = useRef(entry.body)
 
   // The key a brand-new entry actually landed on, once its first save created the
   // file. Not necessarily `titleToSlug(entry.title)`: a title that slugifies onto a
@@ -160,36 +154,12 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     createdItemRef.current = getFom().get(key) ?? null
   }
 
+  const { scheduleAutoSave, flushAutoSave, cancelAutoSave, bodyRef } = useAutoSave(commitEntry, entryRef, entry.body)
+
   const saveMeta = (next: EntryState) => {
     if (next.editScope === 'add') return
     commitEntry({ ...next, body: bodyRef.current })
   }
-
-  // Commits a still-pending debounced autosave immediately instead of letting it
-  // fire late (or never — the cleanup below would otherwise just clearTimeout it).
-  const flushAutoSave = () => {
-    if (!autosaveTimerRef.current) return
-    clearTimeout(autosaveTimerRef.current)
-    autosaveTimerRef.current = null
-    commitEntry({ ...entryRef.current, body: bodyRef.current })
-  }
-
-  // Drops a still-pending autosave without committing it — used right before a
-  // delete so goBack's flushAutoSave (called from deleteNode's navigateBack
-  // callback) can't resurrect the item that's about to be removed via a stale
-  // commitEntry.
-  const cancelAutoSave = () => {
-    if (autosaveTimerRef.current) { clearTimeout(autosaveTimerRef.current); autosaveTimerRef.current = null }
-  }
-
-  // The unmount flush must run the *latest* flushAutoSave, not the one from
-  // mount — it commits whatever edit is pending at teardown. Standard
-  // latest-ref: a depless effect refreshes it after every commit, and the
-  // cleanup below reads it. Replaces an exhaustive-deps suppression, which
-  // would have opted this hook out of React Compiler optimization entirely.
-  const flushAutoSaveRef = useRef(flushAutoSave)
-  useEffect(() => { flushAutoSaveRef.current = flushAutoSave })
-  useEffect(() => () => { flushAutoSaveRef.current() }, [])
 
   // A new item opened with an initial title (e.g. "Add <query>" from search, or a
   // wikilink to a not-yet-existing note) already has everything needed to create the
@@ -205,16 +175,6 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const updateEntry = (next: EntryState) => {
     setEntry(next)
     saveMeta(next)
-  }
-
-  const scheduleAutoSave = (body: string) => {
-    if (entryRef.current.editScope === 'add') return
-    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
-    bodyRef.current = body
-    autosaveTimerRef.current = setTimeout(() => {
-      commitEntry({ ...entryRef.current, body })
-      autosaveTimerRef.current = null
-    }, 1500)
   }
 
   const handleOpenWikilink = (ref: string) => {

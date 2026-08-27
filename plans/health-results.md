@@ -154,85 +154,42 @@ detailed sections below stay in `#` order so they're findable.
 | Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
 | 6 | 10 | `sync.ts` — 1159 lines across seven banner-delimited concerns | architecture, layout | 4 | 3 | **Sonnet 5** (part A) / Opus 5 (part B) |
-| 7 | 9 | `useEntryEditor` — 366-line hook, 26-key return, 8 concerns | srp, architecture | 5 | 2 | **Sonnet 5** |
+| 7 | 9 | `useEntryEditor` still bundles vault-targeting (`useVaultTarget` not yet extracted) | srp, architecture | 3 | 2 | Opus 5 |
 
 > **The order above is `(impact × breadth) ÷ effort`, not raw impact.**
 >
 > **Two findings moved down a tier** once their Task context was written out
-> — #9 from Opus 5 to Sonnet 5 outright, and #10 partially. One thing
+> — #9's `useAutoSave` half moved from Opus 5 to Sonnet 5 outright (now
+> extracted into `src/editor/useAutoSave.ts`), and #10 partially. Two things
 > did **not** move: `sync.ts`'s scheduler/backoff half (#10 part B) shares the
 > `_syncStates` map with sync core, so splitting it needs a design decision
-> rather than a specified edit. It is the only Opus-tier work left in the
-> report, and it is genuinely Opus-tier — see #10 for why.
+> rather than a specified edit; and #9's remaining `useVaultTarget` half,
+> which was never given a written signature/member list. Both stay
+> Opus-tier — see #9 and #10 for why.
 
 ---
 
-### 9. `useEntryEditor` is a 366-line hook returning 26 keys across eight concerns
+### 9. `useEntryEditor` still bundles vault-targeting alongside its core concerns
 
 - **Category** — `srp`, `architecture`
-- **Impact** — 5
-- **Breadth** — 2 files (`editor/useEntryEditor.ts`, its 411-line test).
-- **Recommended model** — **Sonnet 5**, scoped to the `useAutoSave`
-  extraction with the member list below. (Opus 5 without it: the trap is that
-  `commitEntry` *looks* like part of the autosave cluster and is not — it
-  reaches `baseRef`, `flushLinksRef`, `createdItemRef`, `setCreatedKey`,
-  `setTitleMissing`, `draftId` and `targetVaultId`, so moving it into the new
-  hook drags half the file along and changes when the first save creates the
-  file.) Pass `commitEntry` **in** as a parameter and the seam is clean.
-- **Evidence** — `src/editor/useEntryEditor.ts:48`:
-  ```
-  export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string, seed?: NewEntrySeed) {
-  ```
-  The body holds 6 `useState`, 8 `useRef` and 5 `useEffect`, and returns 26
-  keys spanning: autosave timing, vault targeting and cross-vault move,
-  wikilink navigation, scope changes, item-type changes, done-toggling, task
-  promotion, delete, and route navigation.
-- **Problem** — One hook owns eight unrelated jobs in the repo's
-  second-highest-churn directory, so any editor change starts by reading 366
-  lines to find the three that matter. The file already shows the intended
-  seam — it delegates to `useEntryDialogs` and `usePendingLinks` — but the
-  extraction stopped there.
-- **Fix** — Continue the established pattern by extracting `useAutoSave`
-  (timer, `bodyRef`, flush-on-unmount) and `useVaultTarget` (target vault,
-  pending move, confirm/cancel) as sibling hooks; confirm with `pnpm run
-  test` in the repo root, and check the `src/editor/useEntryEditor.ts`
-  coverage floor in `vitest.config.ts` still holds under
-  `pnpm run test:coverage`.
-- **Task context** — Do the `useAutoSave` half first; it is the larger win and
-  the better-defined seam. Signature:
-
-  ```
-  useAutoSave(commitEntry: (next: EntryState) => void, entryRef: RefObject<EntryState>)
-    → { scheduleAutoSave, flushAutoSave, cancelAutoSave, bodyRef }
-  ```
-
-  Moves into the new hook (all currently in `src/editor/useEntryEditor.ts`):
-  `autosaveTimerRef` (line 75), `bodyRef` (line 80), `flushAutoSave`
-  (line 170), `cancelAutoSave` (line 181), the `flushAutoSaveRef` latest-ref
-  pair and its unmount effect (lines 190-192), and `scheduleAutoSave`
-  (line 210).
-
-  **Stays behind** in `useEntryEditor`: `commitEntry` (line 141), `saveMeta`
-  (line 163), `updateEntry`, `entryRef`, `baseRef`, `createdItemRef`, `flushLinksRef`,
-  `initialCommitRef` and its mount effect. `saveMeta` reads `bodyRef`, so
-  return `bodyRef` from the hook rather than duplicating it.
-
-  Three specifics that are easy to get wrong:
-  - The debounce is **1500 ms** and `scheduleAutoSave` returns early when
-    `entryRef.current.editScope === 'add'` — preserve both.
-  - `handleDelete` (line 300) calls `cancelAutoSave()` *before* `deleteNode`,
-    deliberately, so `goBack`'s flush can't resurrect the item being deleted.
-    That ordering must survive the move.
-  - The unmount effect is written as a latest-ref pair specifically to avoid
-    an `exhaustive-deps` suppression, which the file's comment notes "would
-    have opted this hook out of React Compiler optimization entirely". Keep
-    the same shape; do not replace it with a dependency array.
-
-  `src/editor/useEntryEditor.test.tsx` (411 lines) already exercises autosave
-  and is the regression net. `vitest.config.ts` pins
-  `'src/editor/useEntryEditor.ts': { statements: 68, branches: 55, functions: 55, lines: 70 }`
-  — after the split that key covers a smaller file, so re-check it holds and
-  add a floor for the new hook file.
+- **Impact** — 3
+- **Breadth** — 2 files (`editor/useEntryEditor.ts`, its test).
+- **Recommended model** — **Opus 5.** The `useAutoSave` half of this finding
+  (timer, `bodyRef`, flush-on-unmount) has been extracted into
+  `src/editor/useAutoSave.ts`, following the established
+  `useEntryDialogs`/`usePendingLinks` sibling-hook pattern. What remains —
+  `targetVaultId`, `pendingMove`, `requestMove`, `confirmMove` as a
+  `useVaultTarget` sibling hook — was never given a written signature or
+  member list, so it stays at the tier it would naturally sit at without that
+  groundwork.
+- **Problem** — `useEntryEditor` still interleaves vault-targeting/move-staging
+  state with its remaining concerns (wikilink navigation, scope/type changes,
+  done-toggling, task promotion, delete, route navigation).
+- **Fix** — Extract `useVaultTarget` as a sibling hook (target vault, pending
+  move, confirm/cancel); confirm with `pnpm run test` in the repo root, and
+  recheck the `src/editor/useEntryEditor.ts` coverage floor in
+  `vitest.config.ts` holds under `pnpm run test:coverage` (add a floor for the
+  new file too, following the precedent set by `useAutoSave.ts`'s).
 
 ### 10. `sync.ts` carries seven concerns behind banner comments instead of module boundaries
 

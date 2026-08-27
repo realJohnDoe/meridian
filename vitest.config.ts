@@ -92,6 +92,7 @@ export default defineConfig({
         'src/editor/dialogs/RepeatDialog.tsx': { statements: 75, branches: 60, functions: 65, lines: 75 },
         'src/occurrenceActions.ts': { statements: 85, branches: 75, functions: 80, lines: 88 },
         'src/editor/useEntryEditor.ts': { statements: 68, branches: 55, functions: 55, lines: 70 },
+        'src/editor/useAutoSave.ts': { statements: 85, branches: 70, functions: 80, lines: 90 },
         // The three one-way localStorage migrations (favorites, participant
         // filter, show-tasks) are now covered by store.migrations.test.ts;
         // this floor guards that from regressing without pinning the rest of
