@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { AlignLeft, CalendarDays, CalendarRange, CalendarClock, Settings2, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
-import { useResetOnChange } from '@/hooks'
+import { useResetOnChange, useLeavingRows } from '@/hooks'
 import { useCurrentDate, requestScrollToDate } from '@/calendar'
 import { FlipList } from './FlipList'
 import { Checkbox } from './ui/checkbox'
 import { IconButton } from './primitives/icon-button'
+import { CollapseRow } from './primitives/collapse-row'
+
 import {
   Sidebar,
   SidebarContent,
@@ -21,6 +23,10 @@ import {
 } from './ui/sidebar'
 import { keyRoute } from '@/routes'
 
+/** Mirrors SidebarMenu's own `gap-1`, so a collapsing row can cancel exactly
+ *  that much trailing space on its way out (see CollapseRow). */
+const FAV_GAP = '0.25rem'
+
 export default function AppSidebar() {
   const [editingFavorites, setEditingFavorites] = useState(false)
 
@@ -34,6 +40,9 @@ export default function AppSidebar() {
   const roots                   = useStore(s => s.roots)
   const toggleFavorite          = useStore(s => s.toggleFavorite)
   const reorderFavorites        = useStore(s => s.reorderFavorites)
+  // Unfavouriting drops the key from the store at once, so the row is held
+  // back here long enough to collapse (see CollapseRow).
+  const { rows: favRows, beginLeave, endLeave, anyLeaving } = useLeavingRows(favorites, key => key)
   const showTasks               = useStore(s => s.showTasks)
   const toggleShowTasks         = useStore(s => s.toggleShowTasks)
 
@@ -136,21 +145,37 @@ export default function AppSidebar() {
                   {editingFavorites ? <Check size={13} /> : <Pencil size={13} />}
                 </IconButton>
               </SidebarGroupLabel>
-              {/* The rows are <li>s, so the box that folds has to sit outside
-                  the <ul> rather than wrap its contents. */}
-              <FlipList items={favorites} itemAttr="data-fav-key" animateHeight>
+              {/* A removed favourite squeezes shut in place rather than
+                  vanishing, so the list shrinks by layout and the rows below it
+                  are carried along; the FlipList stands down for the duration
+                  (see its `suspended`). The rows are <li>s, so the collapsing
+                  box has to *be* the <li> — a wrapper between <ul> and <li>
+                  would not be a list item. */}
+              <FlipList items={favRows} itemAttr="data-fav-key" suspended={anyLeaving}>
                 <SidebarMenu>
-                  {favorites.map((key, idx) => {
+                  {favRows.map(({ item: key, leaving }) => {
                     const meta = roots.get(key)
                     const title = meta?.title ?? meta?.fileSlug ?? key
+                    // Position in the stored order, not in the rendered one — a
+                    // row still collapsing is spliced into the latter and would
+                    // otherwise shift every index past it.
+                    const at = favorites.indexOf(key)
                     return (
-                      <SidebarMenuItem key={key} data-fav-key={key}>
+                      <CollapseRow
+                        as="li"
+                        key={key}
+                        {...(leaving ? {} : { 'data-fav-key': key })}
+                        collapsed={leaving}
+                        onCollapsed={() => endLeave(key)}
+                        gap={FAV_GAP}
+                        className="group/menu-item relative"
+                      >
                         {editingFavorites ? (
                           <div className="flex items-center gap-1 px-5 py-3 text-sm font-medium text-sidebar-foreground/60">
                             <span className="flex-1 truncate">{title}</span>
-                            <IconButton hit="pad" label="Move up" title="Move up" disabled={idx === 0} onClick={() => reorderFavorites(idx, idx - 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronUp size={13} /></IconButton>
-                            <IconButton hit="pad" label="Move down" title="Move down" disabled={idx === favorites.length - 1} onClick={() => reorderFavorites(idx, idx + 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronDown size={13} /></IconButton>
-                            <IconButton hit="pad" label="Remove from favorites" title="Remove from favorites" onClick={() => toggleFavorite(key)} className="hover:text-destructive"><X size={13} /></IconButton>
+                            <IconButton hit="pad" label="Move up" title="Move up" disabled={at === 0} onClick={() => reorderFavorites(at, at - 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronUp size={13} /></IconButton>
+                            <IconButton hit="pad" label="Move down" title="Move down" disabled={at === favorites.length - 1} onClick={() => reorderFavorites(at, at + 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronDown size={13} /></IconButton>
+                            <IconButton hit="pad" label="Remove from favorites" title="Remove from favorites" onClick={() => { beginLeave(key); toggleFavorite(key) }} className="hover:text-destructive"><X size={13} /></IconButton>
                           </div>
                         ) : (
                           <SidebarMenuButton
@@ -160,7 +185,7 @@ export default function AppSidebar() {
                             <span className="truncate">{title}</span>
                           </SidebarMenuButton>
                         )}
-                      </SidebarMenuItem>
+                      </CollapseRow>
                     )
                   })}
                 </SidebarMenu>

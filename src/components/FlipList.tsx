@@ -1,9 +1,6 @@
 import { useRef, useLayoutEffect } from 'react'
 import type React from 'react'
-import { findScrollParent } from '@/lib/scrollParent'
-
-const DURATION = 350
-const EASING   = 'cubic-bezier(.4,0,.2,1)'
+import { MOTION_MS, MOTION_EASE } from './primitives/motion'
 
 interface Props {
   /** The rows currently in the list — a new value is what triggers a re-measure. */
@@ -11,14 +8,15 @@ interface Props {
   /** Attribute identifying each row, e.g. `data-occ-key`. Values must be stable per row. */
   itemAttr: string
   /**
-   * Fold the list to its new height, on the same clock as the rows, whenever
-   * one enters or leaves — otherwise the rows glide but the list snaps.
-   * Don't turn this on inside a virtualizer: it measures the list itself and
-   * would fight an animated height, one resize notification per frame.
+   * Hand the list's layout over to CSS for as long as a row is collapsing on
+   * its way out (see CollapseRow). A collapse moves every later row
+   * continuously, without a re-render per frame, so any commit landing
+   * mid-collapse would measure rows in transit and glide them a second time —
+   * from wherever the transition had got to, towards a target it is still
+   * moving. Positions are still recorded while suspended, so the glide that
+   * comes after starts from where CSS actually left things.
    */
-  animateHeight?: boolean
-  /** Only when the caller needs to measure against the box — see captureFlipLeaveRect. */
-  containerRef?: React.RefObject<HTMLDivElement | null>
+  suspended?: boolean
   children: React.ReactNode
 }
 
@@ -28,23 +26,20 @@ interface Props {
  * from wherever it was to wherever this render put it — whether it moved
  * within the list or a sibling entered or left around it.
  *
- * Renders a plain block box and deliberately does not lay the rows out
- * itself: whatever arranges them (a flex column, a `<ul>`, …) goes inside as
- * a child. That split is what `animateHeight` rests on — pinning a *flex*
- * container to a height below its content makes the flex algorithm squash the
- * rows, where a block box clips them, which is the fold we're after.
- *
- * `animateHeight` takes its default via `??` in the body rather than as a
- * destructured-parameter default — that shape makes
- * babel-plugin-react-compiler silently skip memoizing this component. See
- * OccurrenceCard.tsx for the full rationale.
+ * Scope note: this handles rows that *move* — a reorder, or a neighbour
+ * entering or leaving. It deliberately does not animate the list box itself.
+ * A row on its way out collapses in flow instead (CollapseRow), which shrinks
+ * the box as a plain consequence of layout; see that file for why measuring
+ * and animating the box's height directly was worth removing.
  */
 export function FlipList(props: Props) {
-  const { items, itemAttr, containerRef, children } = props
-  const animateHeight = props.animateHeight ?? false
-  const ownRef = useRef<HTMLDivElement>(null)
-  const ref = containerRef ?? ownRef
-  useFlipTransition(ref, items, itemAttr, animateHeight)
+  const { items, itemAttr, children } = props
+  // Default via `??` in the body rather than as a destructured-parameter
+  // default — that shape makes babel-plugin-react-compiler silently skip
+  // memoizing this component. See OccurrenceCard.tsx for the full rationale.
+  const suspended = props.suspended ?? false
+  const ref = useRef<HTMLDivElement>(null)
+  useFlipTransition(ref, items, itemAttr, suspended)
   return <div ref={ref} className="relative">{children}</div>
 }
 
@@ -59,56 +54,15 @@ function useFlipTransition(
   containerRef: React.RefObject<HTMLElement | null>,
   items: readonly unknown[],
   attr: string,
-  animateHeight: boolean,
+  suspended: boolean,
 ) {
-  const prevTopsRef   = useRef<Record<string, number> | null>(null)
-  const prevHeightRef = useRef<number | null>(null)
-  const rowAnimsRef   = useRef<Animation[]>([])
-  const heightAnimRef = useRef<Animation | null>(null)
+  const prevTopsRef  = useRef<Record<string, number> | null>(null)
+  const rowAnimsRef  = useRef<Animation[]>([])
+  const wasSuspendedRef = useRef(false)
 
   useLayoutEffect(() => {
     const container = containerRef.current
     if (!container) return
-
-    // WRITE BEFORE READ, deliberately — this one has to come before the
-    // measuring pass below. React has already pulled the leaving row out of
-    // the DOM, so the very first geometry read forces a layout in which the
-    // scroll container is shorter; one sitting at its bottom edge has its
-    // scrollTop clamped down right there, a whole frame before the fold gets
-    // to animate anything. Re-pinning after the fact can't help — the jump is
-    // already in the committed layout. Holding the box at the height it had
-    // last commit means that layout never shrinks in the first place, so the
-    // clamp never fires and the fold below owns the shrink from start to end.
-    // (A fold already in flight holds the box open by itself; see the inline
-    // height it parks there.)
-    const heldForRead = animateHeight && !heightAnimRef.current && prevHeightRef.current !== null
-    if (heldForRead) container.style.height = `${prevHeightRef.current}px`
-
-    // Read while the box is still held open, so this is the offset from before
-    // the row left rather than a clamped one.
-    //
-    // requireOverflow (the default) is load-bearing: what has to be pinned is
-    // the ancestor whose scroll offset the browser will actually clamp, and an
-    // ancestor that merely *declares* `overflow-y: auto` is not necessarily
-    // that element. Under the entry routes the app column is not height-capped,
-    // so `.flex-1.overflow-y-auto` between this list and the document sits at
-    // scrollHeight === clientHeight and never scrolls — the document does.
-    // Matching on the declaration alone (the old `requireOverflow: false`)
-    // therefore pinned that inert div: both halves of the hold below wrote to
-    // an element with nothing to scroll, and the real scroller was left to
-    // clamp on its own during the one un-held layout that reads the natural
-    // height — the instant jump this whole dance exists to prevent, on any
-    // engine that applies that clamp synchronously rather than deferring it to
-    // the end of the frame. Requiring live overflow walks past the inert div to
-    // the element that does scroll, falling back to the document scroller.
-    //
-    // Resolved per commit, so a list that only grows into an overflowing pane
-    // later still picks it up; and measured here, while the box is still held
-    // at its pre-change height, i.e. at the moment overflow is at its greatest.
-    // A pane that isn't overflowing is skipped harmlessly — its scroll offset
-    // is pinned at 0, so there is no clamp to protect against.
-    const scroller       = animateHeight ? findScrollParent(container) : null
-    const savedScrollTop = scroller ? scroller.scrollTop : 0
 
     const rows  = [...container.querySelectorAll<HTMLElement>(`[${attr}]`)]
     const cRect = container.getBoundingClientRect()
@@ -131,6 +85,18 @@ function useFlipTransition(
     const tops: Record<string, number> = {}
     for (const m of measured) tops[m.key] = m.layout
 
+    // The commit that *ends* a suspension is settled CSS layout too, not a jump
+    // to animate: it is the one where the collapsed row finally unmounts, and
+    // every position it reports was put there by the transition that just
+    // finished. Animating from the pre-collapse baseline here would replay the
+    // whole collapse as a glide.
+    const cssOwnsLayout = suspended || wasSuspendedRef.current
+    wasSuspendedRef.current = suspended
+    if (cssOwnsLayout) {
+      prevTopsRef.current = tops
+      return
+    }
+
     const prev        = prevTopsRef.current
     const keysChanged = prev === null || !sameKeys(prev, tops)
     const anyMoved    = prev !== null && measured.some(m => {
@@ -140,11 +106,8 @@ function useFlipTransition(
 
     // An unrelated re-render (a keystroke in a row, a store tick) commits the
     // same layout. Leave any in-flight animation alone rather than restarting
-    // it from scratch, which would stretch a 350ms fold out indefinitely.
-    if (!keysChanged && !anyMoved) {
-      if (heldForRead) container.style.height = ''
-      return
-    }
+    // it from scratch, which would stretch a 350ms glide out indefinitely.
+    if (!keysChanged && !anyMoved) return
 
     for (const a of rowAnimsRef.current) a.cancel()
     rowAnimsRef.current = []
@@ -162,7 +125,7 @@ function useFlipTransition(
       if (prev !== null && prev[key] === undefined) {
         rowAnimsRef.current.push(row.animate(
           [{ opacity: 0, transform: 'translateY(-10px)' }, { opacity: 1, transform: 'translateY(0)' }],
-          { duration: DURATION, easing: EASING },
+          { duration: MOTION_MS, easing: MOTION_EASE },
         ))
         continue
       }
@@ -170,65 +133,12 @@ function useFlipTransition(
       if (Math.abs(from) <= 1) continue
       rowAnimsRef.current.push(row.animate(
         [{ transform: `translateY(${from}px)` }, { transform: 'translateY(0)' }],
-        { duration: DURATION, easing: EASING },
+        { duration: MOTION_MS, easing: MOTION_EASE },
       ))
     }
 
-    if (animateHeight) {
-      // A running height animation pins the container, so its measured height
-      // is the animated value: that's where the fold has to resume from, but
-      // the natural target can only be read back once it's cancelled.
-      const running = heightAnimRef.current
-      const from    = running ? cRect.height : prevHeightRef.current
-      running?.cancel()
-      heightAnimRef.current = null
-      // Drop every hold — this run's pre-read one and any a previous fold
-      // parked — so what we measure is the natural height, not one of ours.
-      container.style.height = ''
-      const target = container.getBoundingClientRect().height
-
-      if ((keysChanged || running) && from !== null && Math.abs(from - target) > 1) {
-        // Rows glide on the same duration and easing, so the bottom-most one
-        // tracks the closing edge exactly and never gets cut off; clipping is
-        // what turns a leaving row's fade into a fold.
-        container.style.overflow = 'hidden'
-        // Re-hold at `from` in the author origin as well. The fold's own first
-        // frame does this from the animation origin (which outranks inline
-        // style, so it still drives the visual), but only once styles are
-        // recalculated — and the scroll restore below needs a layout that
-        // already has the old height, this same tick.
-        container.style.height = `${from}px`
-        const anim = container.animate(
-          [{ height: `${from}px` }, { height: `${target}px` }],
-          { duration: DURATION, easing: EASING },
-        )
-        heightAnimRef.current = anim
-
-        // Reading `target` above unheld the box for one layout, which is
-        // enough for a bottom-pinned scroller to clamp. Put the offset back
-        // now that the box is held open again; from here the browser's own
-        // per-frame clamping walks it down in step with the fold.
-        if (scroller) scroller.scrollTop = savedScrollTop
-
-        void anim.finished.then(
-          () => {
-            if (heightAnimRef.current !== anim) return
-            heightAnimRef.current = null
-            container.style.overflow = ''
-            container.style.height = ''
-          },
-          () => {/* cancelled — whichever run cancelled it owns the cleanup */},
-        )
-      } else {
-        container.style.overflow = ''
-      }
-      prevHeightRef.current = target
-    } else if (heldForRead) {
-      container.style.height = ''
-    }
-
     prevTopsRef.current = tops
-  }, [items, containerRef, attr, animateHeight])
+  }, [items, containerRef, attr, suspended])
 }
 
 function translateY(el: HTMLElement): number {
@@ -239,29 +149,4 @@ function translateY(el: HTMLElement): number {
 function sameKeys(a: Record<string, number>, b: Record<string, number>): boolean {
   const ak = Object.keys(a)
   return ak.length === Object.keys(b).length && ak.every(k => k in b)
-}
-
-export interface FlipLeaveRect {
-  top: number
-  left: number
-  width: number
-}
-
-/**
- * Measures `rowEl` relative to a FlipList's box, for rendering a row that's
- * about to leave as an absolutely-positioned overlay among the list's
- * children. Pulling the leaving row out of flow this way — instead of
- * shrinking it in place — means the layout settles immediately, so the
- * FlipList sees one clean before/after diff and glides the surviving rows
- * into place while the overlay fades out on top.
- */
-export function captureFlipLeaveRect(
-  containerRef: React.RefObject<HTMLElement | null>,
-  rowEl: HTMLElement,
-): FlipLeaveRect | null {
-  const container = containerRef.current
-  if (!container) return null
-  const c = container.getBoundingClientRect()
-  const r = rowEl.getBoundingClientRect()
-  return { top: r.top - c.top, left: r.left - c.left, width: r.width }
 }

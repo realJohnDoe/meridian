@@ -33,24 +33,16 @@ describe('findScrollParent', () => {
     expect(findScrollParent(child)).toBe(scroller)
   })
 
-  it('by default, skips a scrollable ancestor that is not currently overflowing', () => {
+  // #850: the entry routes' `.flex-1.overflow-y-auto` declares overflow but
+  // never scrolls, and handing it back made every read and write against the
+  // returned element a silent no-op.
+  it('skips a scrollable ancestor that is not currently overflowing', () => {
     const scroller = makeScroller('auto', false)
     const child = document.createElement('div')
     scroller.appendChild(child)
     document.body.appendChild(scroller)
 
     expect(findScrollParent(child)).toBe(document.scrollingElement)
-  })
-
-  it('with requireOverflow: false, matches a scrollable ancestor even when it is not currently overflowing', () => {
-    // FlipList's contract: it needs the ancestor whose scroll position to
-    // pin, not whether it presently has anything to scroll.
-    const scroller = makeScroller('auto', false)
-    const child = document.createElement('div')
-    scroller.appendChild(child)
-    document.body.appendChild(scroller)
-
-    expect(findScrollParent(child, { requireOverflow: false })).toBe(scroller)
   })
 
   it('ignores an ancestor that is not scrollable, however tall its content', () => {
@@ -60,7 +52,6 @@ describe('findScrollParent', () => {
     document.body.appendChild(notScrollable)
 
     expect(findScrollParent(child)).toBe(document.scrollingElement)
-    expect(findScrollParent(child, { requireOverflow: false })).toBe(document.scrollingElement)
   })
 
   // The case that regressed in #811: a pane released to `overflow: visible`
@@ -71,7 +62,6 @@ describe('findScrollParent', () => {
     document.body.appendChild(child)
 
     expect(findScrollParent(child)).toBe(document.scrollingElement)
-    expect(findScrollParent(child, { requireOverflow: false })).toBe(document.scrollingElement)
     expect(document.scrollingElement).not.toBeNull()
   })
 })
