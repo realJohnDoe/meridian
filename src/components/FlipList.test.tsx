@@ -108,6 +108,17 @@ describe('FlipList animateHeight scroll preservation', () => {
     )
   }
 
+  /**
+   * jsdom does no layout, so every element reports scrollHeight === clientHeight
+   * === 0 — i.e. "declares overflow but has nothing to scroll", which is exactly
+   * the case FlipList must now walk past. Give a scroller real overflow so it
+   * is the element the hold is expected to pin.
+   */
+  function stubOverflow(el: HTMLElement, { scrollHeight = 500, clientHeight = 200 } = {}) {
+    Object.defineProperty(el, 'scrollHeight', { value: scrollHeight, configurable: true })
+    Object.defineProperty(el, 'clientHeight', { value: clientHeight, configurable: true })
+  }
+
   /** Drives the container's measured height, since jsdom does no layout. */
   function stubHeight(el: HTMLElement, read: () => number) {
     vi.spyOn(el, 'getBoundingClientRect').mockImplementation(
@@ -134,6 +145,7 @@ describe('FlipList animateHeight scroll preservation', () => {
     )
     container = containerRef.current!
     const scroller = scrollerRef.current!
+    stubOverflow(scroller)
 
     // The browser clamps a bottom-pinned scroller the moment layout shrinks;
     // stand in for that at the point the fold starts, to prove the restore
@@ -153,6 +165,59 @@ describe('FlipList animateHeight scroll preservation', () => {
     expect(fold).toEqual([{ height: '100px' }, { height: '60px' }])
     expect(container.style.height).toBe('100px')
     expect(scroller.scrollTop).toBe(164)
+  })
+
+  // The entry routes put a `.flex-1.overflow-y-auto` between the Items list and
+  // the document, but never cap the app column's height — so that div sits at
+  // scrollHeight === clientHeight and the *document* is what scrolls. Pinning
+  // the nearest element that merely declares overflow wrote the offset to that
+  // inert div, leaving the real scroller to clamp during the one un-held layout
+  // that reads the natural height: the instant jump the hold exists to prevent.
+  it('pins the ancestor that actually scrolls, not the nearest one declaring overflow', () => {
+    const outerRef     = createRef<HTMLDivElement>()
+    const inertRef     = createRef<HTMLDivElement>()
+    const containerRef = createRef<HTMLDivElement>()
+    let height = 100
+    let container: HTMLElement | null = null
+
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({ top: 0, left: 0, width: 0, height }) as DOMRect,
+    )
+
+    function Nested({ keys }: { keys: string[] }) {
+      return (
+        <div ref={outerRef} style={{ overflowY: 'auto' }}>
+          <div ref={inertRef} style={{ overflowY: 'auto' }}>
+            <FlipList items={keys} itemAttr="data-key" animateHeight containerRef={containerRef}>
+              {keys.map(k => <div key={k} data-key={k}>Row {k}</div>)}
+            </FlipList>
+          </div>
+        </div>
+      )
+    }
+
+    const { rerender } = render(<Nested keys={['a', 'b']} />)
+    container = containerRef.current!
+    const outer = outerRef.current!
+    const inert = inertRef.current!
+
+    // The inner pane declares overflow but has nothing to scroll; the outer one
+    // is the real scroller, sitting at its bottom edge.
+    stubOverflow(inert, { scrollHeight: 200, clientHeight: 200 })
+    stubOverflow(outer, { scrollHeight: 500, clientHeight: 200 })
+    outer.scrollTop = 300
+
+    // Stand in for the browser clamping the real scroller during the un-held
+    // measuring layout — the restore has to undo exactly this.
+    stubAnimate(() => { outer.scrollTop = 240 })
+
+    height = 60
+    rerender(<Nested keys={['a']} />)
+
+    expect(outer.scrollTop).toBe(300)
+    // The inert pane is never written to: it has no offset worth preserving.
+    expect(inert.scrollTop).toBe(0)
+    void container
   })
 
   it('leaves no inline height behind when the commit changes nothing', () => {
