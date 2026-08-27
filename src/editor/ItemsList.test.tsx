@@ -10,11 +10,10 @@ import type { Occurrence, Roots } from '@/types'
 
 setupStore()
 
-// jsdom implements no Web Animations API. FlipList calls it unconditionally
-// (both the row-glide/height-fold animations and the row-enter fade a row
-// reappearing from the Done section gets), so a harmless stub is needed for
-// any test that re-renders ItemsList — the content of the calls isn't what
-// these tests are checking; see FlipList.test.tsx for that. Installed once,
+// jsdom implements no Web Animations API. FlipList reaches for it whenever a
+// row moves or enters, so a harmless stub is needed for any test that
+// re-renders ItemsList — the content of the calls isn't what these tests are
+// checking; see FlipList.test.tsx for that. Installed once,
 // module-wide, rather than per-test with cleanup: `afterEach` hooks run in
 // reverse registration order, so a stub torn down in this file's own
 // `afterEach` would already be gone by the time RTL's global `afterEach(cleanup)`
@@ -164,6 +163,15 @@ describe('ItemsList active/done split', () => {
   })
 })
 
+/**
+ * A row on its way out stays mounted and squeezes shut in flow — so what marks
+ * it is a grid row driven to `0fr`, not a separate overlay element.
+ */
+function collapsingRows(): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>('[inert]')]
+    .filter(el => el.style.gridTemplateRows === '0fr')
+}
+
 describe('ItemsList exit animation', () => {
   it('renders an exiting overlay when a task is marked done', () => {
     render(<Harness initialItems={['[ ] Buy milk']} roots={makeRoots('current.md')} />)
@@ -171,14 +179,9 @@ describe('ItemsList exit animation', () => {
     fireEvent.click(screen.getByRole('checkbox'))
 
     // The task moved to the (collapsed, invisible) done group, so the only
-    // surviving on-screen copy is the exit overlay rendered by beginExit().
-    // Note: the overlay's own removal (onAnimationEnd) isn't exercised here —
-    // React 19 does not dispatch onAnimationEnd from a simulated 'animationend'
-    // event in this jsdom setup (verified even with a real AnimationEvent
-    // constructor polyfilled in), so that half of the flow can't be driven
-    // from a test in this environment.
+    // surviving on-screen copy is the row being held back mid-collapse.
     expect(screen.getByText('Buy milk')).toBeInTheDocument()
-    expect(document.querySelector('.flip-leave')).not.toBeNull()
+    expect(collapsingRows()).toHaveLength(1)
   })
 
   it('does not begin an exit animation when un-checking an already-done task', () => {
@@ -187,7 +190,7 @@ describe('ItemsList exit animation', () => {
     fireEvent.click(screen.getByText('Done · 1'))
     fireEvent.click(screen.getByRole('checkbox'))
 
-    expect(document.querySelector('.flip-leave')).toBeNull()
+    expect(collapsingRows()).toHaveLength(0)
   })
 })
 
@@ -229,7 +232,7 @@ describe('ItemsList wikilink rows', () => {
     expect(onToggleDone).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('linked.md') }))
     // Checking off the file's only occurrence leaves nothing else to
     // represent it, so it truly leaves the active list — exit animation.
-    expect(document.querySelector('.flip-leave')).not.toBeNull()
+    expect(collapsingRows()).toHaveLength(1)
   })
 
   it('does not begin an exit animation when checking off one occurrence of a recurring linked series', () => {
@@ -271,6 +274,6 @@ describe('ItemsList wikilink rows', () => {
     fireEvent.click(screen.getByRole('checkbox'))
 
     expect(onToggleDone).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('linked.md') }))
-    expect(document.querySelector('.flip-leave')).toBeNull()
+    expect(collapsingRows()).toHaveLength(0)
   })
 })

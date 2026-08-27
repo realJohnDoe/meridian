@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
 import type { Occurrence, Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
@@ -7,7 +7,7 @@ import { parseItemEntry, serializeTaskEntry } from './items'
 import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
-import { OccurrenceCard, MarkdownTaskCard, TagChip, FlipList, captureFlipLeaveRect, type FlipLeaveRect } from '@/components'
+import { OccurrenceCard, MarkdownTaskCard, TagChip, FlipList } from '@/components'
 import { isDimmed, priorityRank, doneKindOrder } from '@/calendar'
 import { IconButton } from '@/components/primitives/icon-button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -15,7 +15,8 @@ import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandE
 import { FloatingComboboxList } from './FloatingComboboxList'
 import { reopenOcc } from '@/occurrenceActions'
 import { rankByQuery } from '@/lib/matching'
-import { useFloatingCombobox, useFileOccurrenceMap } from '@/hooks'
+import { useFloatingCombobox, useFileOccurrenceMap, useLeavingRows } from '@/hooks'
+import { CollapseRow } from '@/components/primitives/collapse-row'
 
 interface Props {
   items:           string[]
@@ -28,6 +29,14 @@ interface Props {
   onOpenWikilink?: (ref: string) => void
   onToggleDone?:   (occ: Occurrence) => void
 }
+
+/**
+ * The gap between item rows. A plain `gap-1.5` class would do for layout, but
+ * a collapsing row has to cancel exactly this much bottom margin on its way out
+ * (see CollapseRow), so the value is named once and passed to both rather than
+ * written as a utility class here and a matching number there.
+ */
+const ROW_GAP = '0.375rem'
 
 type ParsedEntry = ReturnType<typeof parseItemEntry> & { idx: number }
 type Row = { entry: ParsedEntry; occ: Occurrence | undefined }
@@ -56,8 +65,6 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   const [pickerQuery, setPickerQuery] = useState('')
   const [editingIdx,  setEditingIdx]  = useState<number | null>(null)
   const [editText,    setEditText]    = useState('')
-  const [exitingEntries, setExitingEntries] = useState<{ row: Row; rect: FlipLeaveRect }[]>([])
-  const activeRef = useRef<HTMLDivElement>(null)
   const { anchorRef, listRef, placement } = useFloatingCombobox(pickerOpen, setPickerOpen)
 
   const occBySlug = useFileOccurrenceMap()
@@ -82,15 +89,9 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
     })
   })()
 
-  const beginExit = (row: Row) => {
-    const rowEl = activeRef.current?.querySelector<HTMLElement>(`[data-item-key="${row.entry.idx}"]`)
-    const rect = rowEl && captureFlipLeaveRect(activeRef, rowEl)
-    if (rect) setExitingEntries(prev => [...prev, { row, rect }])
-  }
-
   const toggleTask = (idx: number, text: string, done: boolean, row?: Row) => {
     // Animate out when marking done; commit immediately (optimistic)
-    if (!done && row != null) beginExit(row)
+    if (!done && row != null) beginLeave(row)
     const next = [...items]
     next[idx] = serializeTaskEntry(text, !done)
     onChange(next)
@@ -148,6 +149,12 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   const activeRows = sortedRows.filter(r => !isDoneRow(r))
   const doneRows   = sortedRows.filter(r => isDoneRow(r))
 
+  // A row ticked done drops straight out of `activeRows`, so it has to be held
+  // back here to have anything left to animate. `rows` is `activeRows` with the
+  // held ones spliced back where they were, each flagged `leaving`.
+  const { rows: activeRenderRows, beginLeave, endLeave, anyLeaving } =
+    useLeavingRows(activeRows, row => row.entry.idx)
+
   const donePickerRows = (() => {
     const q = pickerQuery.toLowerCase()
     return doneRows.filter(({ entry, occ }) => {
@@ -202,7 +209,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
                   // dimmed — read post-toggle via the store directly, since the
                   // occBySlug this render closed over is the pre-toggle value.
                   const fresh = fileOccurrenceMap(useStore.getState().entries, roots).get(occ.entryKey)
-                  if (!fresh || isDimmed(fresh)) beginExit(row)
+                  if (!fresh || isDimmed(fresh)) beginLeave(row)
                 }}
                 animate={false}
               />
@@ -249,29 +256,24 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
     )
   }
 
-  function renderRow(row: Row) {
+  // `leaving` rows keep their key and their place, so React reuses the element
+  // already on screen and the collapse has a height to transition *from*.
+  // A leaving row also drops its `data-item-key`, which takes it out of the
+  // FlipList's diff: it is being animated by CSS, not glided.
+  function renderRow(row: Row, leaving = false) {
     const idx = row.entry.idx
     return (
-      <div key={idx} data-item-key={idx} className="flex items-start gap-1">
-        {renderRowContent(row)}
-      </div>
-    )
-  }
-
-  // Rendered as an absolutely-positioned overlay pinned to the row's last
-  // measured spot, so it fades out independently while the FlipList below
-  // glides the surviving rows up to fill the gap.
-  function renderExitingRow(row: Row, rect: FlipLeaveRect) {
-    const idx = row.entry.idx
-    return (
-      <div
-        key={`exit-${idx}`}
-        className="absolute flex items-start gap-1 flip-leave"
-        style={{ top: rect.top, left: rect.left, width: rect.width }}
-        onAnimationEnd={() => setExitingEntries(prev => prev.filter(e => e.row.entry.idx !== idx))}
+      <CollapseRow
+        key={idx}
+        {...(leaving ? {} : { 'data-item-key': idx })}
+        collapsed={leaving}
+        onCollapsed={() => endLeave(idx)}
+        gap={ROW_GAP}
       >
-        {renderRowContent(row)}
-      </div>
+        <div className="flex items-start gap-1">
+          {renderRowContent(row)}
+        </div>
+      </CollapseRow>
     )
   }
 
@@ -279,14 +281,14 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
     <div className="mt-6 pt-5 border-t border-border">
       <div className="text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase mb-2.5">Items</div>
       <div className="flex flex-col gap-1.5">
-        {/* Siblings glide into place as a row leaves and the section folds to
-            its new height on the same clock; the leaving row is an overlay
-            (renderExitingRow), out of flow and out of the FlipList's diff. */}
-        <FlipList items={activeRows} itemAttr="data-item-key" animateHeight containerRef={activeRef}>
-          <div className="flex flex-col gap-1.5">
-            {activeRows.map(row => renderRow(row))}
+        {/* A leaving row squeezes shut in flow (CollapseRow), which is what
+            shrinks the section — no height is measured or pinned. The FlipList
+            only glides rows that *move*, and stands down while a collapse is
+            running so the two never animate the same rows at once. */}
+        <FlipList items={activeRenderRows} itemAttr="data-item-key" suspended={anyLeaving}>
+          <div className="flex flex-col" style={{ gap: ROW_GAP }}>
+            {activeRenderRows.map(({ item, leaving }) => renderRow(item, leaving))}
           </div>
-          {exitingEntries.map(({ row, rect }) => renderExitingRow(row, rect))}
         </FlipList>
 
         {/* Add item — half-card affordance, same dimensions as item cards.

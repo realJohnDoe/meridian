@@ -1,5 +1,4 @@
-export { FlipList, captureFlipLeaveRect } from './FlipList'
-export type { FlipLeaveRect } from './FlipList'
+export { FlipList } from './FlipList'
 export { default as OccurrenceCard } from './OccurrenceCard'
 export { default as MarkdownTaskCard } from './MarkdownTaskCard'
 export { default as TagChip, AddChip } from './TagChip'
