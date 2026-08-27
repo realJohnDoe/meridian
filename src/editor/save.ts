@@ -237,7 +237,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   // unreadableKeys makes newEntryKey/applyNew treat a file that failed to
   // parse as occupied even though it has no root: without this, a new entry
   // whose title slugifies onto that slug would look free and silently
-  // overwrite the file on write — see reportParseFailures in storage/sync.ts.
+  // overwrite the file on write — see reportParseFailures in storage/parseReport.ts.
   const snapshot = { ...getSnapshot(), unreadableKeys: new Set(getUnreadableFiles().keys()) }
   const edited = editFieldsOf(fields)
   const nextData = applyEdit(

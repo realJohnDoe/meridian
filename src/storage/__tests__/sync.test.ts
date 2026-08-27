@@ -193,7 +193,8 @@ vi.mock('@/model', async (importActual) => ({
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { syncToBackend, autoSyncTick, resetSyncBackoff, dropAllSyncState, flushPendingPush, syncOnActivate, writeEntityToCache, deleteFromBackend, reconcileWithBackend, parseFiles, reportParseFailures, scheduleAutoPush } from '@/storage/sync'
+import { syncToBackend, autoSyncTick, resetSyncBackoff, dropAllSyncState, flushPendingPush, syncOnActivate, writeEntityToCache, deleteFromBackend, reconcileWithBackend, scheduleAutoPush } from '@/storage/sync'
+import { parseFiles, reportParseFailures } from '@/storage/parseReport'
 import { mountBackend, unmountAllBackends } from '@/storage/backends'
 import { syncJournalEvents, clearSyncJournal, syncJournalDump } from '@/storage/syncJournal'
 
