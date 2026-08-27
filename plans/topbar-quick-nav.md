@@ -49,8 +49,8 @@ carousel previews, `currentDate`, and `requestScrollToDate` — the last of whic
 is how the agenda's mini grid will jump to a day outside the loaded window.
 
 The one thing with nothing to reuse is the month strip itself, and it does not
-want a library either: native `overflow-x` plus scroll snap plus
-`scrollIntoView({ inline: 'center' })`. **Do not reach for Embla** — Embla
+want a library either: native `overflow-x`, scroll snap, and an explicit
+`scrollLeft` write to center the active chip. **Do not reach for Embla** — Embla
 drives the paged carousels (`useCarousel`), and the strip is free-scrolling.
 
 ---
@@ -73,13 +73,25 @@ week and agenda stay untouched.
    reference screenshots do.
 4. Build `MonthStrip` — a horizontally scrolling row of month chips with year
    chips as separators, `snap-x snap-mandatory`, the active chip filled with the
-   primary color. Center the active chip with `scrollIntoView({ inline:
-   'center' })` on mount and whenever `month` changes, so a swipe of the grid
-   below moves the strip too.
-5. Tapping a chip navigates to `/calendar/$month` with `replace: true`, matching
+   primary color.
+5. Center the active chip by computing the target offset from the chip's and the
+   container's own geometry and writing `container.scrollTo({ left, behavior })`
+   — **not `scrollIntoView`**, which also scrolls every ancestor scroller and
+   can shift the whole clipped `_app` shell sideways. Instant on mount, smooth
+   on change. `editor/dialogs/TimeWheels.test.tsx` is the in-repo precedent for
+   testing this under jsdom: spy on `scrollTo` and assert its argument, and use
+   `Object.defineProperty` for `scrollTop`/`scrollLeft`, since jsdom has no
+   layout and the accessors otherwise always read 0. Without that pattern the
+   centering test passes vacuously.
+6. Drive the active chip from `useMonthPreview()` when a preview is set, falling
+   back to the route's `month`. The preview is what the swipe carousel sets on
+   touchend, ahead of the route committing (see `viewState.ts`), and it is
+   already what the topbar label reads — a strip keyed on the route param alone
+   lags the gesture by its whole duration.
+7. Tapping a chip navigates to `/calendar/$month` with `replace: true`, matching
    the paging semantics the chevrons and the swipe carousel already use (see the
    comment in `_app.calendar.$month.tsx`).
-6. Close the panel on view change and on Escape; keep it open while paging
+8. Close the panel on view change and on Escape; keep it open while paging
    within the same view.
 
 Files: new `calendar/MonthStrip.tsx` + test; edits to `calendar/viewState.ts`,
