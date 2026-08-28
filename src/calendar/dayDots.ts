@@ -14,6 +14,20 @@ const CATEGORY_ORDER: DotCategory[] = ['event', 'p1', 'p2', 'p3', 'task']
 const MAX_DOTS_PER_DAY = 4
 
 /**
+ * Dot fill color per category — the same solid tokens `occurrence-variants.ts`
+ * uses for the full-size event/task colouring (`bg-event`, `bg-priority-1/2/3`,
+ * `bg-task`), so a mini-calendar dot always agrees with what its day's own
+ * occurrence chip looks like everywhere else.
+ */
+export const DOT_COLOR: Record<DotCategory, string> = {
+  event: 'bg-event',
+  p1:    'bg-priority-1',
+  p2:    'bg-priority-2',
+  p3:    'bg-priority-3',
+  task:  'bg-task',
+}
+
+/**
  * Derives the dot category straight from `occKind` + priority, not from
  * `occState()` — `occState` collapses every completed task to `'done'`, which
  * would lose the priority color a completed task's dot still needs (a day

@@ -13,4 +13,6 @@ export {
   useQuickNavOpen, toggleQuickNav, closeQuickNav,
 } from './viewState'
 export { default as MonthStrip } from './MonthStrip'
+export { default as MiniMonth } from './MiniMonth'
 export { dayDotsFor, dotCategory, type DotCategory } from './dayDots'
+export { CALENDAR_FORMATTERS, useCalendarWeekStartsOn } from './calendarLocale'
