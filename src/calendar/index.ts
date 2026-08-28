@@ -13,3 +13,4 @@ export {
   useQuickNavOpen, toggleQuickNav, closeQuickNav,
 } from './viewState'
 export { default as MonthStrip } from './MonthStrip'
+export { dayDotsFor, dotCategory, type DotCategory } from './dayDots'
