@@ -210,6 +210,31 @@ try {
       check(scope, 'the agenda must own a scrollable element', a.scroller !== null && a.scroller.scrollH > a.scroller.clientH,
         a.scroller ? `scrollHeight=${a.scroller.scrollH} clientHeight=${a.scroller.clientH}` : 'no scroll container found')
       check(scope, 'agenda rows must be visible', a.onScreenRows > 0, `${a.mountedRows} mounted, none on screen`)
+
+      // The quick-nav panel (CLAUDE.md's month-label disclosure) grows the
+      // topbar chrome block in place via a grid-template-rows transition —
+      // exactly the kind of height change that cracked _app's one-screen cap
+      // open twice before. Open it here and re-check the same shell geometry,
+      // plus the panel's own focus contract (focus moves in on open, Escape
+      // returns it to the toggle button).
+      await page.click('[aria-controls="quickNavPanel"]')
+      await page.waitForTimeout(400) // past the 200ms open transition
+      const withPanel = await page.evaluate(readAppShell)
+      check(scope, 'document must not scroll vertically with the quick-nav panel open',
+        withPanel.docScrollH <= withPanel.docClientH, `${withPanel.docScrollH} > ${withPanel.docClientH}`)
+      check(scope, 'document must not scroll horizontally with the quick-nav panel open',
+        withPanel.docScrollW <= withPanel.docClientW, `${withPanel.docScrollW} > ${withPanel.docClientW}`)
+
+      const focusedInPanel = await page.evaluate(() => {
+        const panel = document.getElementById('quickNavPanel')
+        return !!panel && panel.contains(document.activeElement)
+      })
+      check(scope, 'focus moves into the quick-nav panel on open', focusedInPanel)
+
+      await page.keyboard.press('Escape')
+      const focusedBackOnToggle = await page.evaluate(() =>
+        document.activeElement === document.querySelector('[aria-controls="quickNavPanel"]'))
+      check(scope, 'Escape returns focus to the quick-nav toggle button', focusedBackOnToggle)
     }
 
     // The routes whose invariant runs the other way.
