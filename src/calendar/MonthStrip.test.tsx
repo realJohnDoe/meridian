@@ -3,17 +3,6 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import MonthStrip from './MonthStrip'
 
-// jsdom has no layout, so offsetLeft/offsetWidth/clientWidth/scrollWidth all
-// read 0 by default — mirrors the scrollTop-shadowing pattern in
-// TimeWheels.test.tsx (setScrollTop). Values are set directly on the element
-// instance, which is safe here because React reuses the same DOM node for a
-// given month's chip across rerenders (each is keyed by its "YYYY-MM" key).
-function defineGeometry(el: HTMLElement, props: Record<string, number>) {
-  for (const [k, v] of Object.entries(props)) {
-    Object.defineProperty(el, k, { value: v, writable: true, configurable: true })
-  }
-}
-
 function renderStrip(activeMonth = new Date(2026, 7, 1) /* Aug 2026 */) {
   const onNavigateMonth = vi.fn()
   render(<MonthStrip activeMonth={activeMonth} onNavigateMonth={onNavigateMonth} />)
@@ -71,25 +60,34 @@ describe('MonthStrip', () => {
     }
   })
 
-  it('recenters smoothly on the new active chip when activeMonth changes after mount', () => {
+  // Google Calendar's own month-jump strip doesn't auto-scroll to follow the
+  // month you're currently viewing either — only the initial mount call
+  // (tested above) ever positions the strip.
+  it('moves the aria-current highlight, but does not scroll, when activeMonth changes after mount', () => {
     function Host({ month }: { month: Date }) {
       return <MonthStrip activeMonth={month} onNavigateMonth={vi.fn()} />
     }
     const { rerender } = render(<Host month={new Date(2026, 7, 1)} />)
 
+    // Reinstalled after the mount-time call above, so only calls made by the
+    // rerender below are observed.
     const container = screen.getByRole('group', { name: 'Jump to month' })
-    defineGeometry(container, { clientWidth: 300, scrollWidth: 4000 })
-    // September's chip is already in the strip (just not yet active) — same
-    // DOM node React will keep mounted once it becomes the active month.
-    const septChip = screen.getByRole('button', { name: 'September 2026' })
-    defineGeometry(septChip, { offsetLeft: 1240, offsetWidth: 60 })
-
     const scrollTo = vi.fn()
     container.scrollTo = scrollTo
 
     rerender(<Host month={new Date(2026, 8, 1)} />)
 
-    // 1240 - 300/2 + 60/2 = 1120, within [0, 4000-300].
-    expect(scrollTo).toHaveBeenCalledWith({ left: 1120, behavior: 'smooth' })
+    expect(screen.getByRole('button', { name: 'September 2026' })).toHaveAttribute('aria-current', 'date')
+    expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveAttribute('aria-current')
+    expect(scrollTo).not.toHaveBeenCalled()
+  })
+
+  it('keeps its window fixed at the month it mounted with — paging past the edge leaves nothing current', () => {
+    function Host({ month }: { month: Date }) {
+      return <MonthStrip activeMonth={month} onNavigateMonth={vi.fn()} />
+    }
+    const { rerender } = render(<Host month={new Date(2026, 7, 1)} />)
+    rerender(<Host month={new Date(2030, 7, 1)} />) // 48 months forward — past MONTHS_FORWARD (36)
+    expect(screen.queryByRole('button', { current: 'date' })).not.toBeInTheDocument()
   })
 })

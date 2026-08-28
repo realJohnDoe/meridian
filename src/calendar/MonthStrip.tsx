@@ -1,12 +1,16 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { fmtMonth } from '@/model'
 import { cn } from '@/lib/cn'
 
 // Deliberately not virtualized — a few dozen chips is cheap to render
 // outright, and a virtualizer would fight the browser's own scroll-snap and
-// momentum instead of riding it. The window is rebuilt around `activeMonth`
-// on every change (see useMemo below), so paging far enough eventually
-// re-centers it rather than growing it without bound.
+// momentum instead of riding it. The window is built once, anchored to
+// whichever month is active when the strip first mounts, and never rebuilt
+// or rescrolled as `activeMonth` changes afterward — matching Google
+// Calendar's own month-jump strip, which doesn't auto-scroll to follow the
+// month you're currently viewing either. Paging far enough to carry the
+// active month outside this window just means no chip reads as active;
+// given the size of the window that takes years of paging in one sitting.
 const MONTHS_BACK = 24
 const MONTHS_FORWARD = 36
 
@@ -30,9 +34,10 @@ interface Props {
   /**
    * The month currently shown — pass the same value the topbar label itself
    * shows (route month, or the swipe carousel's preview once one is set; see
-   * `monthDisplayDate` in _app.tsx), so the strip's active chip and center
-   * point track a swipe of the grid below it rather than lagging until the
-   * gesture commits.
+   * `monthDisplayDate` in _app.tsx), so the active chip tracks a swipe of the
+   * grid below it rather than lagging until the gesture commits. Only its
+   * value at mount time seeds the strip's window and initial scroll position
+   * — see the module comment above.
    */
   activeMonth: Date
   onNavigateMonth: (d: Date) => void
@@ -45,15 +50,19 @@ interface Props {
  */
 export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
   const activeKey = fmtMonth(activeMonth)
-  const months = useMemo(() => buildMonths(activeMonth), [activeKey]) // eslint-disable-line react-hooks/exhaustive-deps -- activeKey fully determines the window; activeMonth's identity is not otherwise significant
+  const [months] = useState(() => buildMonths(activeMonth))
 
   const containerRef = useRef<HTMLDivElement>(null)
   const chipElsRef = useRef<Record<string, HTMLButtonElement | null>>({})
-  const hasCenteredRef = useRef(false)
 
-  // Center the active chip: computed from measured geometry rather than
-  // scrollIntoView, which would also scroll any ancestor scroller (here,
-  // potentially the whole clipped _app shell) rather than just this strip.
+  // Scrolls the active chip into view exactly once, so opening the strip
+  // doesn't strand the user MONTHS_BACK months in the past — computed from
+  // measured geometry rather than scrollIntoView, which would also scroll
+  // any ancestor scroller (here, potentially the whole clipped _app shell)
+  // rather than just this strip. Empty deps: unlike the window above, this
+  // genuinely only runs once — a later activeMonth change (paging while the
+  // panel stays open) moves the highlight but must not also drag the strip
+  // along with it.
   useLayoutEffect(() => {
     const container = containerRef.current
     const chip = chipElsRef.current[activeKey]
@@ -61,9 +70,9 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
     const target = chip.offsetLeft - container.clientWidth / 2 + chip.offsetWidth / 2
     const max = Math.max(0, container.scrollWidth - container.clientWidth)
     const left = Math.min(Math.max(target, 0), max)
-    container.scrollTo({ left, behavior: hasCenteredRef.current ? 'smooth' : 'auto' })
-    hasCenteredRef.current = true
-  }, [activeKey])
+    container.scrollTo({ left, behavior: 'auto' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately mount-only, see comment above
+  }, [])
 
   return (
     <div
