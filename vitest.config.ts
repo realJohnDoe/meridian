@@ -100,11 +100,21 @@ export default defineConfig({
         // this cross-cutting file's many untested setters to the same bar.
         'src/store.ts': { statements: 68, branches: 55, functions: 58, lines: 68 },
         'src/storeCommit.ts': { statements: 30, branches: 95, functions: 45, lines: 35 },
-        'src/storage/sync.ts': { statements: 85, branches: 78, functions: 88, lines: 88 },
-        // The parse/round-trip reporting cluster split out of sync.ts (health
-        // survey finding #10, part A) — guarded on its own rather than
-        // inheriting only the global floor.
+        'src/storage/sync.ts': { statements: 88, branches: 82, functions: 90, lines: 90 },
+        // The three clusters split out of sync.ts (health survey finding #10):
+        // the parse/round-trip reporting (part A), and the per-vault sync
+        // state, the scheduler and the persistence-port write side (part B).
+        // Each is guarded on its own rather than inheriting only the global
+        // floor — before the split they were covered under sync.ts's, and
+        // nothing else would hold them there.
         'src/storage/parseReport.ts': { statements: 92, branches: 78, functions: 85, lines: 94 },
+        'src/storage/syncState.ts': { statements: 92, branches: 90, functions: 95, lines: 95 },
+        'src/storage/syncScheduler.ts': { statements: 80, branches: 60, functions: 88, lines: 85 },
+        // entityWrites sits lower than its old home because the split made its
+        // two `catch` arms (a Dexie write failing outright) visible as their
+        // own file rather than diluted across sync.ts. Still floored: a save
+        // that vanishes silently is the worst bug this codebase can have.
+        'src/storage/entityWrites.ts': { statements: 72, branches: 62, functions: 75, lines: 72 },
         // First-party primitives lifted out of components/ui/, where the
         // coverage exclusion had kept them invisible.
         'src/components/primitives/responsive-modal.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },

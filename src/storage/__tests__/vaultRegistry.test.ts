@@ -250,7 +250,9 @@ vi.mock('@/storeBridge', () => ({
 
 vi.mock('@/storage/notifications', () => notifyFns)
 
-vi.mock('@/storage/sync', () => syncFns)
+vi.mock('@/storage/sync', () => ({ updateSyncUI: syncFns.updateSyncUI }))
+vi.mock('@/storage/syncScheduler', () => ({ syncOnActivate: syncFns.syncOnActivate }))
+vi.mock('@/storage/syncState', () => ({ dropSyncState: syncFns.dropSyncState }))
 
 vi.mock('@/storage/parseReport', () => ({
   parseFiles: syncFns.parseFiles,

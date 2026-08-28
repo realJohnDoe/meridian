@@ -1,16 +1,15 @@
 import {
-  recordLocalEdit, applyRemoteBatch, confirmDeleted, cacheGetDirty,
+  applyRemoteBatch, confirmDeleted, cacheGetDirty,
   setResolvedClean, markPushed, cacheDirtyCount, cacheLoadAll, cacheGetRecord,
-  recordLocalDelete, cacheGetTombstones, markMerged,
+  cacheGetTombstones, markMerged,
 } from '@/storage/cache/files'
 import type { CacheRecord } from '@/storage/cache/files'
 import { pendingMovesLoad, pendingMoveDrop, heldDeletePaths } from '@/storage/cache/pendingMoves'
 import type { PendingMove } from '@/storage/cache/pendingMoves'
-import { markInFlight, clearInFlight, getInFlightPaths } from '@/storage/inFlight'
+import { getInFlightPaths } from '@/storage/inFlight'
 import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
-import type { VaultKind } from '@/vaultRef'
 import { mergeFileContent } from '@/model'
 import { pathToKey, keyToPath, keySlug, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
@@ -19,13 +18,19 @@ import {
   getVaultLayer, setVaultLayer,
   setVaultSync,
   getUnreadableFiles, setUnreadableFiles,
-  getVaults,
 } from '@/storeBridge'
 import type { AttentionKind } from '@/store'
 import { notify, warn, warnWithDetails, notifyError } from './notifications'
-import { getBackend, getMountedBackends } from './backends'
+import { getBackend } from './backends'
 import { journal, hashContent, syncJournalDump } from './syncJournal'
 import { parseFiles, reportParseFailures } from './parseReport'
+import { syncStateFor, noteSyncSuccess, noteSyncFailure } from './syncState'
+// The one edge back to the scheduler, and deliberately the only one:
+// releasing a held cross-vault delete has to ask for that vault's push, and
+// "ask for a push" is the scheduler's word. Everything else here is reached
+// from the scheduler, never the other way round. Safe as a cycle — both sides
+// are function declarations touched only at call time, never at module init.
+import { scheduleAutoPush } from './syncScheduler'
 
 // ── HELPERS ────────────────────────────────────────────────────
 
@@ -481,89 +486,9 @@ export async function reconcileWithBackend(
 }
 
 // ── SYNC CORE ─────────────────────────────────────────────────────────
-
-/**
- * All of sync.ts's mutable state for **one** vault. PR 0 collected six
- * module-level singletons into this record; now there is one instance per
- * registered vault, so two vaults keep independent backoff, independent
- * debounce timers and independent error dedupe — a GitHub vault whose token
- * expired must not stall a local folder that is syncing fine.
- */
-interface VaultSyncState {
-  syncing: boolean
-  pushTimer: ReturnType<typeof setTimeout> | null
-  /**
-   * Set when a push was requested (scheduleAutoPush's timer firing, or an
-   * explicit flushPendingPush()) while a sync was already in flight. runSync's
-   * early `if (syncing) return` would otherwise silently drop that request —
-   * there's no rescheduling on that path today — stranding the write until the
-   * next autoSyncTick. Re-armed from runSync's `finally` once the in-flight
-   * sync settles.
-   */
-  pushQueued: boolean
-  consecutiveFailures: number
-  nextRetryAt: number
-  /** Dedupe toasts for actionable (non-transient) errors across silent ticks. */
-  lastErrorSig: string | null
-  /**
-   * When a cycle was last *attempted* for this vault — success or failure.
-   * Used only to order `autoSyncTick`'s walk (oldest-attempted first) — the
-   * pull interval itself is paced from `lastPullAt` below, not from this.
-   */
-  lastAttemptAt: number
-  /**
-   * When a cycle last actually **pulled** — i.e. `reconcileWithBackend` ran,
-   * whether because the cycle asked for a pull or a collision forced one.
-   * `isDue` measures the per-vault pull interval from here rather than from
-   * `lastAttemptAt`, so a push-only cycle (the debounced auto-push from
-   * typing) advancing `lastAttemptAt` on every keystroke can no longer make a
-   * vault look "recently synced" when it has not actually pulled in minutes —
-   * see finding #1, "every push defers the next pull by a full interval".
-   * Deliberately a separate field from `lastAttemptAt`, which the retry
-   * backoff and the scheduler's ordering still need untouched.
-   */
-  lastPullAt: number
-}
-
-function createVaultSyncState(): VaultSyncState {
-  return {
-    syncing: false, pushTimer: null, pushQueued: false,
-    consecutiveFailures: 0, nextRetryAt: 0, lastErrorSig: null,
-    lastAttemptAt: 0, lastPullAt: 0,
-  }
-}
-
-const _syncStates = new Map<string, VaultSyncState>()
-
-function syncStateFor(vaultId: string): VaultSyncState {
-  let state = _syncStates.get(vaultId)
-  if (!state) { state = createVaultSyncState(); _syncStates.set(vaultId, state) }
-  return state
-}
-
-/** Forget a vault's sync state and cancel its pending debounce. Called on unmount. */
-export function dropSyncState(vaultId: string): void {
-  const state = _syncStates.get(vaultId)
-  if (state?.pushTimer) clearTimeout(state.pushTimer)
-  _syncStates.delete(vaultId)
-}
-
-/** Drop every vault's sync state. Tests only — production unmounts one at a time. */
-export function dropAllSyncState(): void {
-  for (const vaultId of [..._syncStates.keys()]) dropSyncState(vaultId)
-}
-
-// ── BACKOFF STATE ─────────────────────────────────────────────────────
-const BACKOFF_BASE_MS  = 60_000
-const BACKOFF_MAX_MS   = 30 * 60_000
-
-/** Clear the retry backoff for every registered vault (e.g. the `online` event). */
-export function resetSyncBackoff(): void {
-  for (const state of _syncStates.values()) {
-    state.consecutiveFailures = 0
-    state.nextRetryAt         = 0
-  }
-}
+//
+// What one cycle does. When a cycle runs is `syncScheduler.ts`; the per-vault
+// state both of them advance is `syncState.ts`.
 
 /**
  * Push pending local changes to the backend. Returns whether a collision
@@ -771,8 +696,15 @@ async function abandonMove(move: PendingMove): Promise<void> {
  * them that way. The scheduler deliberately does not (see `autoSyncTick`), but
  * a manual "Sync now" on one vault must not be swallowed just because another
  * vault happens to be reconciling.
+ *
+ * Resolves to whether a cycle actually ran — false when this vault has no
+ * remote, or when one was already in flight and this call bounced off the
+ * guard. `syncScheduler.ts` needs that distinction to know whether a push
+ * queued mid-cycle is now its to re-arm or the running cycle's to finish; only
+ * the call that owned the vault may drain it. Never rejects: every failure is
+ * classified and reported below, so callers can fire-and-forget.
  */
-async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: boolean }): Promise<void> {
+export async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: boolean }): Promise<boolean> {
   const vaultId    = backend.id
   const syncState  = syncStateFor(vaultId)
 
@@ -784,9 +716,9 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
   if (!backend.hasRemote) {
     if (!opts.silent) notify(`"${backend.name}" is read-only — there is nothing to sync.`)
     updateSyncUI(backend)
-    return
+    return false
   }
-  if (syncState.syncing) return
+  if (syncState.syncing) return false
   syncState.syncing       = true
   syncState.lastAttemptAt = Date.now()
   setVaultSync(vaultId, { inProgress: true })
@@ -829,9 +761,7 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
     // vault that would have noticed is the one sitting in backoff.
     await settlePendingMoves()
     setVaultSync(vaultId, { error: null, offline: false, lastSyncedAt: Date.now(), needsAttention: null })
-    syncState.consecutiveFailures = 0
-    syncState.nextRetryAt         = 0
-    syncState.lastErrorSig        = null
+    noteSyncSuccess(syncState)
     if (pulled) syncState.lastPullAt = Date.now()
     updateSyncUI(backend)
   } catch (e) {
@@ -840,11 +770,7 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
     if (isTransientSyncError(e)) {
       // ── TRANSIENT (offline / network drop) ───────────────────
       setVaultSync(vaultId, { offline: true })
-      syncState.consecutiveFailures++
-      syncState.nextRetryAt = Date.now() + Math.min(
-        BACKOFF_BASE_MS * Math.pow(2, syncState.consecutiveFailures - 1),
-        BACKOFF_MAX_MS,
-      )
+      noteSyncFailure(syncState)
       if (!opts.silent) {
         notify("You're offline — changes are saved locally and will sync when you reconnect.")
       }
@@ -871,298 +797,9 @@ async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: b
   } finally {
     syncState.syncing = false
     setVaultSync(vaultId, { inProgress: false })
-    // A push that arrived mid-sync was queued (see attemptPush) instead of
-    // dropped — re-arm the debounced push now that this sync has settled.
-    if (syncState.pushQueued) { syncState.pushQueued = false; scheduleAutoPush(backend) }
   }
-}
-
-/**
- * Push one vault's pending local changes, or queue the request if its sync is
- * already running.
- *
- * Piggybacks a pull when the vault is already overdue for one (`isDue`) —
- * it's the same round trip the write already pays for. Without this, a vault
- * edited more often than its pull interval (the common case: autosave debounces
- * to a 1s push, well under any pull interval) never reaches the `autoSyncTick`
- * that would otherwise pull it, because every push-only cycle used to advance
- * the same clock the pull interval was paced from. See finding #1.
- */
-function attemptPush(backend: StorageBackend): void {
-  const syncState = syncStateFor(backend.id)
-  if (syncState.syncing) { syncState.pushQueued = true; return }
-  void runSync(backend, { silent: true, pull: isDue(backend, Date.now()) })
-}
-
-/** Debounced push for one vault. Exported for `moveEntry.ts`, which writes two vaults at once. */
-export function scheduleAutoPush(backend: StorageBackend): void {
-  if (backend.readOnly) return
-  const syncState = syncStateFor(backend.id)
-  if (syncState.pushTimer) clearTimeout(syncState.pushTimer)
-  syncState.pushTimer = setTimeout(() => { syncState.pushTimer = null; attemptPush(backend) }, 1000)
-}
-
-/**
- * Push anything still dirty right now, in **every** registered vault at
- * once — bypassing the 1s debounce and without waiting for the next
- * autoSyncTick. Both call sites (`routes/__root.tsx`'s `visibilitychange`
- * going hidden, and `pagehide`) fire when the page is about to be
- * backgrounded or torn down, so there is no time left to be polite: unlike
- * `autoSyncTick`, which serializes vaults deliberately (see its doc comment)
- * because nothing else coordinates bursts across vaults' Octokit clients,
- * here a vault skipped or delayed behind another keeps its edit stranded in
- * Dexie until the next launch, which is strictly worse than a burst. If a
- * future caller reaches this from a non-teardown context, it should get its
- * own serial helper instead of reusing this one.
- *
- * Every vault, not just one, for the same reason: `pagehide` is the last
- * moment anything runs. A no-op per vault when nothing is dirty — pushDirty
- * returns immediately if the cache has no dirty/tombstoned records — so this
- * stays cheap.
- */
-export function flushPendingPush(): void {
-  for (const backend of getMountedBackends()) {
-    if (!backend.readOnly) attemptPush(backend)
-  }
-}
-
-/**
- * The first sync after a vault activates. Replaces the old
- * `reconcileWithBackend(...)` + `flushPendingPush()` pair at the activation
- * site, and is deliberately routed through runSync rather than calling
- * reconcile directly, because runSync is where all four of these live:
- *
- *  - pushDirty runs *before* reconcile and feeds its `pushed` set into
- *    planReconcile's skipPaths — the two used to be independent cycles racing
- *    each other over an eventually-consistent listing;
- *  - transient-vs-actionable classification (isTransientSyncError) and the
- *    retry backoff, so an offline activation degrades instead of throwing;
- *  - setLastSyncedAt — reconcileWithBackend never set it, which is why
- *    SyncButton read "Not synced yet" for 60s after every startup;
- *  - the retry-after-401 forced token refresh.
- *
- * `silent: true`: an offline start must not toast. The backoff is reset
- * first — a fresh activation is a deliberate user-visible moment and deserves
- * an attempt regardless of the previous session's failures.
- *
- * Never rejects (runSync swallows everything in its own catch), so callers can
- * fire-and-forget without risking an unhandled rejection.
- */
-export async function syncOnActivate(backend: StorageBackend): Promise<void> {
-  const state = syncStateFor(backend.id)
-  state.consecutiveFailures = 0
-  state.nextRetryAt         = 0
-  await runSync(backend, { silent: true, pull: true })
-}
-
-// ── SCHEDULER ─────────────────────────────────────────────────────────
-
-/**
- * How long a vault of each kind waits between automatic cycles.
- *
- * Per kind because the cost of a cycle is not the same for all of them: a
- * local folder's `statAll` is a cheap filesystem walk, a GitHub vault's is a
- * network round trip against a rate-limited API. Unknown kinds (the iCal one
- * lands next) get the conservative default rather than the aggressive one.
- */
-const MIN_SYNC_INTERVAL_MS: Partial<Record<VaultKind, number>> = {
-  local:  30_000,
-  // GitHub's git-trees listing now goes out as a conditional request (see
-  // GitHubBackend.statAll's ETag/If-None-Match handling) — an unchanged tree
-  // answers 304 and doesn't count against the rate limit, so this can afford
-  // to be much closer to the local-folder interval than the old 60s budget
-  // that assumed every poll was a full, metered request.
-  github: 20_000,
-  // A subscription is somebody else's calendar: it changes rarely, the fetch
-  // crosses two networks (Meridian's Worker, then the provider), and a
-  // conditional request makes most of these cycles a 304 with no body anyway.
-  ical:   15 * 60_000,
-}
-const DEFAULT_MIN_SYNC_INTERVAL_MS = 15 * 60_000
-
-/**
- * The base tick is 60s, so an interval of exactly 60s would be skipped roughly
- * every other tick on timer drift alone. Treat a vault as due slightly early
- * rather than letting it slip to 120s.
- */
-const DUE_TOLERANCE_MS = 5_000
-
-/**
- * Whether `backend` is due for a **pull** — measured from `lastPullAt`, not
- * `lastAttemptAt` (see that field's doc comment). Two callers: `autoSyncTick`,
- * to decide whether a vault's periodic full cycle runs at all, and
- * `attemptPush`, to decide whether a debounced push should piggyback a pull
- * it would otherwise have to wait a full interval for.
- */
-function isDue(backend: StorageBackend, now: number): boolean {
-  const state = syncStateFor(backend.id)
-  if (now < state.nextRetryAt) return false
-  const elapsed = now - state.lastPullAt
-  // A wall clock that jumped backwards (a device correcting its time, a
-  // timezone-less NTP step) would otherwise park `lastPullAt` in the future
-  // and starve this vault until the clock caught up. Treat it as due instead:
-  // one extra cycle costs nothing, a stranded vault costs the user their sync.
-  if (elapsed < 0) return true
-  const interval = MIN_SYNC_INTERVAL_MS[backend.kind] ?? DEFAULT_MIN_SYNC_INTERVAL_MS
-  return elapsed + DUE_TOLERANCE_MS >= interval
-}
-
-/** True while a scheduler pass is walking the vaults, so passes never overlap. */
-let _tickRunning = false
-
-/**
- * One scheduler pass over every registered vault.
- *
- * **Oldest-synced first, one at a time.** Serial rather than parallel on
- * purpose: each `GitHubBackend` owns its own throttled Octokit client, so
- * nothing coordinates bursts across vaults — the same secondary-rate-limit
- * concern that already makes `reconcileWithBackend` switch to `readAll()`
- * above 50 changed paths. It also keeps mobile wake cost flat as vaults are
- * added: N vaults cost N cycles spread over time, not N simultaneous bursts.
- *
- * Ordering by last attempt means a vault that has been waiting longest goes
- * first, so no vault can be starved by a chattier one ahead of it. Vaults
- * whose own minimum interval hasn't elapsed, and vaults inside their retry
- * backoff, are skipped rather than queued.
- *
- * Re-entrancy: a tick that is still walking (a slow vault mid-cycle when the
- * next 60s interval fires, or a `visibilitychange` landing on top of the
- * timer) returns immediately instead of starting a second interleaved walk.
- */
-export function autoSyncTick(): void {
-  if (_tickRunning) return
-  _tickRunning = true
-  void (async () => {
-    try {
-      const due = getMountedBackends()
-        .filter(b => b.hasRemote)
-        .sort((a, b) => syncStateFor(a.id).lastAttemptAt - syncStateFor(b.id).lastAttemptAt)
-      for (const backend of due) {
-        // Re-checked per vault rather than filtered up front: an earlier
-        // vault's cycle can take long enough for a later one to fall due, and
-        // for the registry to change underneath us.
-        if (!getBackend(backend.id)) continue
-        if (!isDue(backend, Date.now())) continue
-        await runSync(backend, { silent: true, pull: true })
-      }
-    } finally {
-      _tickRunning = false
-    }
-  })()
-}
-
-/**
- * Manual "Sync now". With a vault id, that vault; without, every registered
- * vault that has a remote — the topbar button speaks for the whole app, the
- * per-vault rows in its popover speak for one.
- *
- * Read-only vaults with a remote are included: "Sync now" on a subscription is
- * "refresh this calendar", which is exactly what the user means by it.
- *
- * Always bypasses the backoff gate: an explicit user gesture is a deliberate
- * "try again now".
- */
-export async function syncToBackend(vaultId?: string): Promise<void> {
-  const targets = vaultId
-    ? [getBackend(vaultId)].filter((b): b is StorageBackend => !!b)
-    : getMountedBackends().filter(b => b.hasRemote)
-
-  if (targets.length === 0) {
-    if (vaultId) {
-      const name = getVaults().find(v => v.id === vaultId)?.name ?? vaultId
-      notify(`"${name}" isn't connected — it may still be restoring, or failed to mount.`)
-    } else {
-      notify('No writable vault connected. Add a local folder first.')
-    }
-    return
-  }
-  for (const backend of targets) {
-    syncStateFor(backend.id).nextRetryAt = 0
-    await runSync(backend, { silent: false, pull: true })
-  }
-}
-
-// ── CACHE WRITE / DELETE ──────────────────────────────────────
-//
-// The in-flight write registry (markInFlight/clearInFlight/getInFlightPaths)
-// lives in inFlight.ts — pure in-memory bookkeeping overlaying the persisted
-// status; see its doc comment there for why marking is refcounted.
-
-/**
- * The backend that owns `key`'s vault, or undefined if that vault isn't
- * registered.
- *
- * The vault half of the key is what routes this at all: a write addressed to
- * an unregistered vault is refused rather than silently applied to whichever
- * vault happens to be at hand — which is precisely what a stale closure or a
- * late-landing commit would have done before the key carried a vault.
- */
-function backendFor(key: EntryKey): StorageBackend | undefined {
-  return getBackend(keyVaultId(key))
-}
-
-/**
- * The vault for `key` was removed (or never mounted) between the store commit
- * and this write reaching the backend — e.g. deleted in Settings while an
- * editor was open on it, or a deferred commit landing after the vault
- * unmounted. Unlike `readOnly` (expected, e.g. an iCal subscription), this is
- * an anomaly: the store already shows the change as saved, so silence here
- * would let it vanish on reload with no trace.
- */
-function reportUnregisteredVault(key: EntryKey, path: string): void {
-  const vaultId = keyVaultId(key)
-  journal('write-refused', vaultId, path, { note: 'unregistered' })
-  const name = getVaults().find(v => v.id === vaultId)?.name ?? vaultId
-  warn(`"${name}" is no longer connected — this change was not saved.`)
-}
-
-/**
- * Make one entry's file durable in the cache, and queue it for push.
- *
- * `content` is handed in by the committing layer rather than resolved from the
- * store here — see `EntityPersistence`. That is what makes this function a
- * straight line: there is no lookup that could miss, no way for this side to
- * disagree with the caller about what the entry holds, and so no "it looks
- * incomplete, skip it" branch to silently drop a write. Whether a key is a
- * write or a delete is likewise the caller's call (`persistEntries`), made
- * against the data it is committing.
- */
-export async function writeEntityToCache(entryKey: EntryKey, content: string): Promise<void> {
-  const path = keyToPath(entryKey)
-  markInFlight(entryKey)
-  try {
-    const backend = backendFor(entryKey)
-    if (!backend) { reportUnregisteredVault(entryKey, path); return }
-    if (backend.readOnly) return
-    await recordLocalEdit(backend.id, path, content)
-    // The first link in every chain a conflict investigation has to walk: when
-    // the store handed this content to the write queue, and what it was.
-    journal('edit', backend.id, path, { localHash: hashContent(content), bytes: content.length }, backend.kind)
-    updateSyncUI(backend)
-    scheduleAutoPush(backend)
-  } catch (e) {
-    console.error('[vault] writeEntityToCache failed:', e)
-    notifyError('Save failed', e)
-  } finally {
-    clearInFlight(entryKey)
-  }
-}
-
-export async function deleteFromBackend(entryKey: EntryKey): Promise<void> {
-  const path = keyToPath(entryKey)
-  markInFlight(entryKey)
-  try {
-    const backend = backendFor(entryKey)
-    if (!backend) { reportUnregisteredVault(entryKey, path); return }
-    if (backend.readOnly) return
-    await recordLocalDelete(backend.id, path)
-    journal('delete', backend.id, path, undefined, backend.kind)
-    updateSyncUI(backend)
-    scheduleAutoPush(backend)
-  } catch (e) {
-    console.error('[vault] deleteFromBackend failed:', e)
-    notifyError('Delete failed', e)
-  } finally {
-    clearInFlight(entryKey)
-  }
+  // A push that arrived mid-sync was queued (see attemptPush) rather than
+  // dropped; draining it is the scheduler's job, and this is what tells it
+  // this call is the one that may.
+  return true
 }

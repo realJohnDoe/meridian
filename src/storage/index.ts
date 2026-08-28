@@ -1,6 +1,6 @@
 // Register the storage adapter for the core persistence port once on first import.
 import { setEntityPersistence } from '../persistencePort'
-import { writeEntityToCache, deleteFromBackend } from './sync'
+import { writeEntityToCache, deleteFromBackend } from './entityWrites'
 import { moveEntityInCache } from './moveEntry'
 setEntityPersistence({
   writeEntity: (key, content) => { void writeEntityToCache(key, content) },
@@ -18,7 +18,8 @@ export { entriesToIcs } from './ical/entriesToIcs'
 
 export { isFolderPickerSupported } from './fs'
 
-export { syncToBackend, autoSyncTick, resetSyncBackoff, flushPendingPush } from './sync'
+export { syncToBackend, autoSyncTick, flushPendingPush } from './syncScheduler'
+export { resetSyncBackoff } from './syncState'
 
 export { cacheDirtyCount } from './cache/files'
 

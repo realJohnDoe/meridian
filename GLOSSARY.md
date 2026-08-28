@@ -236,7 +236,8 @@ Surfaced in the UI as "listed on".
 ### reconcile
 Comparing a backend's current state against the cache and folding the
 differences into the store.
-→ `storage/sync.ts` · `syncToBackend`, `autoSyncTick`
+→ `storage/sync.ts` · `reconcileWithBackend`, `planReconcile`
+→ `storage/syncScheduler.ts` · `syncToBackend`, `autoSyncTick`
 
 ### dirty
 A cached entry with local edits not yet pushed. Counted per vault for the sync
