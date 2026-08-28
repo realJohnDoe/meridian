@@ -154,42 +154,15 @@ detailed sections below stay in `#` order so they're findable.
 | Rank | # | Finding | Cat | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
 | 6 | 10 | `sync.ts` — remaining banner-delimited concerns (backoff/scheduler) | architecture, layout | 4 | 2 | Opus 5 |
-| 7 | 9 | `useEntryEditor` still bundles vault-targeting (`useVaultTarget` not yet extracted) | srp, architecture | 3 | 2 | Opus 5 |
 
 > **The order above is `(impact × breadth) ÷ effort`, not raw impact.**
 >
-> **Two findings moved down a tier** once their Task context was written out
-> — #9's `useAutoSave` half moved from Opus 5 to Sonnet 5 outright (now
-> extracted into `src/editor/useAutoSave.ts`), and #10 partially. Two things
-> did **not** move: `sync.ts`'s scheduler/backoff half (#10 part B) shares the
+> #10 moved down a tier in part once its Task context was written out, but not
+> all the way: `sync.ts`'s scheduler/backoff half (part B) shares the
 > `_syncStates` map with sync core, so splitting it needs a design decision
-> rather than a specified edit; and #9's remaining `useVaultTarget` half,
-> which was never given a written signature/member list. Both stay
-> Opus-tier — see #9 and #10 for why.
+> rather than a specified edit. It stays Opus-tier — see #10 for why.
 
 ---
-
-### 9. `useEntryEditor` still bundles vault-targeting alongside its core concerns
-
-- **Category** — `srp`, `architecture`
-- **Impact** — 3
-- **Breadth** — 2 files (`editor/useEntryEditor.ts`, its test).
-- **Recommended model** — **Opus 5.** The `useAutoSave` half of this finding
-  (timer, `bodyRef`, flush-on-unmount) has been extracted into
-  `src/editor/useAutoSave.ts`, following the established
-  `useEntryDialogs`/`usePendingLinks` sibling-hook pattern. What remains —
-  `targetVaultId`, `pendingMove`, `requestMove`, `confirmMove` as a
-  `useVaultTarget` sibling hook — was never given a written signature or
-  member list, so it stays at the tier it would naturally sit at without that
-  groundwork.
-- **Problem** — `useEntryEditor` still interleaves vault-targeting/move-staging
-  state with its remaining concerns (wikilink navigation, scope/type changes,
-  done-toggling, task promotion, delete, route navigation).
-- **Fix** — Extract `useVaultTarget` as a sibling hook (target vault, pending
-  move, confirm/cancel); confirm with `pnpm run test` in the repo root, and
-  recheck the `src/editor/useEntryEditor.ts` coverage floor in
-  `vitest.config.ts` holds under `pnpm run test:coverage` (add a floor for the
-  new file too, following the precedent set by `useAutoSave.ts`'s).
 
 ### 10. `sync.ts` carries remaining concerns behind banner comments instead of module boundaries
 

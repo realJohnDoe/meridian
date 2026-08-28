@@ -93,6 +93,7 @@ export default defineConfig({
         'src/occurrenceActions.ts': { statements: 85, branches: 75, functions: 80, lines: 88 },
         'src/editor/useEntryEditor.ts': { statements: 68, branches: 55, functions: 55, lines: 70 },
         'src/editor/useAutoSave.ts': { statements: 85, branches: 70, functions: 80, lines: 90 },
+        'src/editor/useVaultTarget.ts': { statements: 88, branches: 72, functions: 90, lines: 95 },
         // The three one-way localStorage migrations (favorites, participant
         // filter, show-tasks) are now covered by store.migrations.test.ts;
         // this floor guards that from regressing without pinning the rest of
