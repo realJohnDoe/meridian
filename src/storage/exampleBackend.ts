@@ -1,20 +1,28 @@
 import type { StorageBackend, RawFile } from './backend'
 import type { VaultKind } from '@/vaultRef'
-import { generateBigVault } from './devFixtures/testVaultGen'
+import { generateBigVault, type BigVaultOptions } from './devFixtures/testVaultGen'
 import { buildEntries } from './devFixtures/tutorialVault'
 
 /**
  * Dev-only escape hatch for performance testing: serves a generated
  * large vault instead of the tutorial when `localStorage.meridian_bigvault`
- * is set to a file count. Gated on `import.meta.env.DEV` so the generator
- * (and this branch) are dead-code-eliminated from production builds.
+ * is set to a file count — either a bare number (`'3000'`) or a JSON object
+ * carrying the generator's options (`'{"count":3000,"recurringShare":0}'`).
+ * Gated on `import.meta.env.DEV` so the generator (and this branch) are
+ * dead-code-eliminated from production builds.
  * See devFixtures/testVaultGen.ts for how to use it.
  */
 function loadEntries(): Array<{ id: string; content: string }> {
   if (import.meta.env.DEV) {
     try {
-      const n = Number(localStorage.getItem('meridian_bigvault'))
-      if (n && n > 0) return generateBigVault(n)
+      const raw = localStorage.getItem('meridian_bigvault')
+      if (raw) {
+        const spec = raw.trim().startsWith('{')
+          ? (JSON.parse(raw) as BigVaultOptions & { count?: number })
+          : { count: Number(raw) }
+        const count = Number(spec.count)
+        if (count > 0) return generateBigVault(count, spec)
+      }
     } catch { /* ignore */ }
   }
   return buildEntries()

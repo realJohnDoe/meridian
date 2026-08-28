@@ -1,0 +1,847 @@
+[
+  {
+    "shape": "flat",
+    "count": 300,
+    "spec": {
+      "count": 300,
+      "recurringShare": 0
+    },
+    "pipeline": {
+      "crashes": [],
+      "result": {
+        "bytes": 75676,
+        "parse": {
+          "cold": 20.8,
+          "median": 20.2
+        },
+        "deriveViews": {
+          "cold": 0.3,
+          "median": 0.2
+        },
+        "files": 300,
+        "storeItems": 300,
+        "backlinks": {
+          "cold": 0.7,
+          "median": 0.7
+        },
+        "expandAgendaWindow": {
+          "cold": 0.7,
+          "median": 0.8
+        },
+        "occurrencesInAgendaWindow": 225,
+        "agendaRows": 240,
+        "agendaSections": {
+          "cold": 10.1,
+          "median": 9.6
+        },
+        "searchHits": 71,
+        "rankByQuery": {
+          "cold": 1,
+          "median": 0.4
+        },
+        "toggleRecompute": {
+          "cold": 0.6,
+          "median": 0.3
+        },
+        "fomSize": 300,
+        "fileOccurrenceMap": {
+          "cold": 0.8,
+          "median": 0.8
+        }
+      },
+      "heap": {
+        "heapUsedMB": 39.5,
+        "heapTotalMB": 49.8,
+        "nodes": 1319,
+        "listeners": 476
+      }
+    },
+    "ui": {
+      "crashes": [],
+      "coldStart": {
+        "firstAgendaRowMs": 12858,
+        "domContentLoadedMs": 12582,
+        "vaultPaintMs": 276,
+        "blockingMs": 169,
+        "worstTaskMs": 169
+      },
+      "wallClockLoadMs": 12994,
+      "afterLoad": {
+        "heapUsedMB": 35.2,
+        "heapTotalMB": 55.4,
+        "nodes": 1232,
+        "listeners": 396
+      },
+      "mountedRows": 27,
+      "toggle": {
+        "ms": 42.1,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        },
+        "rowReplaced": true
+      },
+      "scroll": {
+        "frames": 30,
+        "p50": 16.7,
+        "p95": 50,
+        "worst": 50.1,
+        "janky": 1
+      },
+      "toMonth": {
+        "ms": 398.4,
+        "long": {
+          "count": 1,
+          "total": 60,
+          "max": 60
+        }
+      },
+      "toDay": {
+        "error": "Error: page.evaluate: Error: waitFor timed out"
+      },
+      "toAgenda": {
+        "ms": 102.3,
+        "long": {
+          "count": 1,
+          "total": 91,
+          "max": 91
+        }
+      },
+      "search": {
+        "ms": 283.5,
+        "timedOut": false,
+        "debounceMs": 150,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        },
+        "resultRows": 71,
+        "rowsRendered": 0,
+        "diag": {
+          "keystrokes": 1,
+          "query": "review",
+          "url": "/meridian/?sq=review",
+          "overlay": true
+        }
+      },
+      "openEntry": {
+        "ms": 579.3,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        }
+      },
+      "typing": {
+        "p50": 16.7,
+        "p95": 16.9
+      },
+      "afterFlows": {
+        "heapUsedMB": 41.5,
+        "heapTotalMB": 47.4,
+        "nodes": 1403,
+        "listeners": 1142
+      }
+    },
+    "dexie": {
+      "crashes": [],
+      "result": {
+        "bytes": 75676,
+        "writeMs": 45,
+        "written": 300,
+        "readAllMs": 12,
+        "rows": 300,
+        "dirtyScanMs": 32,
+        "quotaMB": 1044,
+        "usageMB": 0.3
+      },
+      "heap": {
+        "heapUsedMB": 36.5,
+        "heapTotalMB": 48.3,
+        "nodes": 1319,
+        "listeners": 1397
+      }
+    }
+  },
+  {
+    "shape": "flat",
+    "count": 1000,
+    "spec": {
+      "count": 1000,
+      "recurringShare": 0
+    },
+    "pipeline": {
+      "crashes": [],
+      "result": {
+        "bytes": 258678,
+        "parse": {
+          "cold": 76.8,
+          "median": 55.5
+        },
+        "deriveViews": {
+          "cold": 0.4,
+          "median": 0.3
+        },
+        "files": 1000,
+        "storeItems": 1000,
+        "backlinks": {
+          "cold": 2.5,
+          "median": 1.7
+        },
+        "expandAgendaWindow": {
+          "cold": 2.3,
+          "median": 2.3
+        },
+        "occurrencesInAgendaWindow": 765,
+        "agendaRows": 625,
+        "agendaSections": {
+          "cold": 11.8,
+          "median": 10.8
+        },
+        "searchHits": 278,
+        "rankByQuery": {
+          "cold": 2.3,
+          "median": 1.7
+        },
+        "toggleRecompute": {
+          "cold": 1.3,
+          "median": 0.7
+        },
+        "fomSize": 1000,
+        "fileOccurrenceMap": {
+          "cold": 2.7,
+          "median": 2.7
+        }
+      },
+      "heap": {
+        "heapUsedMB": 36.9,
+        "heapTotalMB": 71.3,
+        "nodes": 1242,
+        "listeners": 400
+      }
+    },
+    "ui": {
+      "crashes": [],
+      "coldStart": {
+        "firstAgendaRowMs": 12889,
+        "domContentLoadedMs": 12563,
+        "vaultPaintMs": 327,
+        "blockingMs": 227,
+        "worstTaskMs": 227
+      },
+      "wallClockLoadMs": 12956,
+      "afterLoad": {
+        "heapUsedMB": 39.9,
+        "heapTotalMB": 62.4,
+        "nodes": 2461,
+        "listeners": 458
+      },
+      "mountedRows": 27,
+      "toggle": {
+        "ms": 37.3,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        },
+        "rowReplaced": true
+      },
+      "scroll": {
+        "frames": 30,
+        "p50": 33.4,
+        "p95": 50.1,
+        "worst": 66.8,
+        "janky": 3
+      },
+      "toMonth": {
+        "ms": 427.5,
+        "long": {
+          "count": 1,
+          "total": 52,
+          "max": 52
+        }
+      },
+      "toDay": {
+        "error": "Error: page.evaluate: Error: waitFor timed out"
+      },
+      "toAgenda": {
+        "ms": 106.5,
+        "long": {
+          "count": 1,
+          "total": 99,
+          "max": 99
+        }
+      },
+      "search": {
+        "ms": 292,
+        "timedOut": false,
+        "debounceMs": 150,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        },
+        "resultRows": 278,
+        "rowsRendered": 0,
+        "diag": {
+          "keystrokes": 1,
+          "query": "review",
+          "url": "/meridian/?sq=review",
+          "overlay": true
+        }
+      },
+      "openEntry": {
+        "ms": 553.3,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        }
+      },
+      "typing": {
+        "p50": 16.6,
+        "p95": 16.9
+      },
+      "afterFlows": {
+        "heapUsedMB": 44.3,
+        "heapTotalMB": 49.8,
+        "nodes": 1807,
+        "listeners": 1175
+      }
+    },
+    "dexie": {
+      "crashes": [],
+      "result": {
+        "bytes": 258678,
+        "writeMs": 144,
+        "written": 1000,
+        "readAllMs": 45,
+        "rows": 1000,
+        "dirtyScanMs": 21,
+        "quotaMB": 1095,
+        "usageMB": 0.6
+      },
+      "heap": {
+        "heapUsedMB": 34.9,
+        "heapTotalMB": 69.5,
+        "nodes": 1260,
+        "listeners": 3425
+      }
+    }
+  },
+  {
+    "shape": "flat",
+    "count": 3000,
+    "spec": {
+      "count": 3000,
+      "recurringShare": 0
+    },
+    "pipeline": {
+      "crashes": [],
+      "result": {
+        "bytes": 785735,
+        "parse": {
+          "cold": 178.1,
+          "median": 153.8
+        },
+        "deriveViews": {
+          "cold": 0.3,
+          "median": 0.2
+        },
+        "files": 3000,
+        "storeItems": 3000,
+        "backlinks": {
+          "cold": 9.6,
+          "median": 5.7
+        },
+        "expandAgendaWindow": {
+          "cold": 8.5,
+          "median": 8.5
+        },
+        "occurrencesInAgendaWindow": 2303,
+        "agendaRows": 1733,
+        "agendaSections": {
+          "cold": 16,
+          "median": 16.9
+        },
+        "searchHits": 774,
+        "rankByQuery": {
+          "cold": 4.9,
+          "median": 4
+        },
+        "toggleRecompute": {
+          "cold": 3.4,
+          "median": 1.9
+        },
+        "fomSize": 3000,
+        "fileOccurrenceMap": {
+          "cold": 7.7,
+          "median": 7.7
+        }
+      },
+      "heap": {
+        "heapUsedMB": 86.7,
+        "heapTotalMB": 128.2,
+        "nodes": 1369,
+        "listeners": 504
+      }
+    },
+    "ui": {
+      "crashes": [],
+      "coldStart": {
+        "firstAgendaRowMs": 13015,
+        "domContentLoadedMs": 12523,
+        "vaultPaintMs": 493,
+        "blockingMs": 393,
+        "worstTaskMs": 393
+      },
+      "wallClockLoadMs": 13067,
+      "afterLoad": {
+        "heapUsedMB": 86.9,
+        "heapTotalMB": 135.3,
+        "nodes": 2578,
+        "listeners": 544
+      },
+      "mountedRows": 27,
+      "toggle": {
+        "ms": 42.5,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        },
+        "rowReplaced": true
+      },
+      "scroll": {
+        "frames": 30,
+        "p50": 33.4,
+        "p95": 50,
+        "worst": 50.1,
+        "janky": 1
+      },
+      "toMonth": {
+        "ms": 429.1,
+        "long": {
+          "count": 1,
+          "total": 66,
+          "max": 66
+        }
+      },
+      "toDay": {
+        "ms": 334.2,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        }
+      },
+      "toAgenda": {
+        "ms": 104.3,
+        "long": {
+          "count": 1,
+          "total": 91,
+          "max": 91
+        }
+      },
+      "search": {
+        "ms": 294.1,
+        "timedOut": false,
+        "debounceMs": 150,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        },
+        "resultRows": 774,
+        "rowsRendered": 0,
+        "diag": {
+          "keystrokes": 1,
+          "query": "review",
+          "url": "/meridian/?sq=review",
+          "overlay": true
+        }
+      },
+      "openEntry": {
+        "ms": 573.9,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        }
+      },
+      "typing": {
+        "p50": 16.7,
+        "p95": 17.3
+      },
+      "afterFlows": {
+        "heapUsedMB": 82.9,
+        "heapTotalMB": 157.5,
+        "nodes": 6523,
+        "listeners": 2168
+      }
+    },
+    "dexie": {
+      "crashes": [],
+      "result": {
+        "bytes": 785735,
+        "writeMs": 396,
+        "written": 3000,
+        "readAllMs": 107,
+        "rows": 3000,
+        "dirtyScanMs": 142,
+        "quotaMB": 875,
+        "usageMB": 3.1
+      },
+      "heap": {
+        "heapUsedMB": 42.9,
+        "heapTotalMB": 109.1,
+        "nodes": 1240,
+        "listeners": 9431
+      }
+    }
+  },
+  {
+    "shape": "flat",
+    "count": 10000,
+    "spec": {
+      "count": 10000,
+      "recurringShare": 0
+    },
+    "pipeline": {
+      "crashes": [],
+      "result": {
+        "bytes": 2641136,
+        "parse": {
+          "cold": 464.5,
+          "median": 464.5
+        },
+        "deriveViews": {
+          "cold": 1.2,
+          "median": 1.2
+        },
+        "files": 10000,
+        "storeItems": 10000,
+        "backlinks": {
+          "cold": 27.7,
+          "median": 27.7
+        },
+        "expandAgendaWindow": {
+          "cold": 20.1,
+          "median": 20.1
+        },
+        "occurrencesInAgendaWindow": 7696,
+        "agendaRows": 5623,
+        "agendaSections": {
+          "cold": 32.9,
+          "median": 32.9
+        },
+        "searchHits": 2773,
+        "rankByQuery": {
+          "cold": 12.2,
+          "median": 12.2
+        },
+        "toggleRecompute": {
+          "cold": 6.3,
+          "median": 6.3
+        },
+        "fomSize": 10000,
+        "fileOccurrenceMap": {
+          "cold": 19.3,
+          "median": 19.3
+        }
+      },
+      "heap": {
+        "heapUsedMB": 102.9,
+        "heapTotalMB": 160.7,
+        "nodes": 1326,
+        "listeners": 468
+      }
+    },
+    "ui": {
+      "crashes": [],
+      "coldStart": {
+        "firstAgendaRowMs": 13517,
+        "domContentLoadedMs": 12627,
+        "vaultPaintMs": 890,
+        "blockingMs": 850,
+        "worstTaskMs": 777
+      },
+      "wallClockLoadMs": 13647,
+      "afterLoad": {
+        "heapUsedMB": 112.7,
+        "heapTotalMB": 163.3,
+        "nodes": 2533,
+        "listeners": 529
+      },
+      "mountedRows": 26,
+      "toggle": {
+        "ms": 68.3,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        },
+        "rowReplaced": true
+      },
+      "scroll": {
+        "frames": 30,
+        "p50": 33.3,
+        "p95": 50.1,
+        "worst": 66.6,
+        "janky": 3
+      },
+      "toMonth": {
+        "ms": 508.1,
+        "long": {
+          "count": 1,
+          "total": 146,
+          "max": 146
+        }
+      },
+      "toDay": {
+        "ms": 354.8,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        }
+      },
+      "toAgenda": {
+        "ms": 120.6,
+        "long": {
+          "count": 1,
+          "total": 104,
+          "max": 104
+        }
+      },
+      "search": {
+        "ms": 264.2,
+        "timedOut": false,
+        "debounceMs": 150,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        },
+        "resultRows": 2773,
+        "rowsRendered": 0,
+        "diag": {
+          "keystrokes": 1,
+          "query": "review",
+          "url": "/meridian/?sq=review",
+          "overlay": true
+        }
+      },
+      "openEntry": {
+        "ms": 627.6,
+        "long": {
+          "count": 1,
+          "total": 51,
+          "max": 51
+        }
+      },
+      "typing": {
+        "p50": 16.6,
+        "p95": 17
+      },
+      "afterFlows": {
+        "heapUsedMB": 154.9,
+        "heapTotalMB": 212.6,
+        "nodes": 21904,
+        "listeners": 6885
+      }
+    },
+    "dexie": {
+      "crashes": [],
+      "result": {
+        "bytes": 2641136,
+        "writeMs": 2765,
+        "written": 10000,
+        "readAllMs": 184,
+        "rows": 10000,
+        "dirtyScanMs": 219,
+        "quotaMB": 1055,
+        "usageMB": 9.6
+      },
+      "heap": {
+        "heapUsedMB": 76.8,
+        "heapTotalMB": 138.3,
+        "nodes": 1230,
+        "listeners": 30424
+      }
+    }
+  },
+  {
+    "shape": "flat",
+    "count": 30000,
+    "spec": {
+      "count": 30000,
+      "recurringShare": 0
+    },
+    "pipeline": {
+      "crashes": [],
+      "result": {
+        "bytes": 8079364,
+        "parse": {
+          "cold": 1466.8,
+          "median": 1466.8
+        },
+        "deriveViews": {
+          "cold": 6.3,
+          "median": 6.3
+        },
+        "files": 30000,
+        "storeItems": 30000,
+        "backlinks": {
+          "cold": 120.5,
+          "median": 120.5
+        },
+        "expandAgendaWindow": {
+          "cold": 72.2,
+          "median": 72.2
+        },
+        "occurrencesInAgendaWindow": 23075,
+        "agendaRows": 16626,
+        "agendaSections": {
+          "cold": 87.2,
+          "median": 87.2
+        },
+        "searchHits": 8543,
+        "rankByQuery": {
+          "cold": 40.4,
+          "median": 40.4
+        },
+        "toggleRecompute": {
+          "cold": 23.5,
+          "median": 23.5
+        },
+        "fomSize": 30000,
+        "fileOccurrenceMap": {
+          "cold": 65,
+          "median": 65
+        }
+      },
+      "heap": {
+        "heapUsedMB": 195.8,
+        "heapTotalMB": 270.2,
+        "nodes": 1255,
+        "listeners": 440
+      }
+    },
+    "ui": {
+      "crashes": [],
+      "coldStart": {
+        "firstAgendaRowMs": 14588,
+        "domContentLoadedMs": 12711,
+        "vaultPaintMs": 1877,
+        "blockingMs": 1954,
+        "worstTaskMs": 1774
+      },
+      "wallClockLoadMs": 14630,
+      "afterLoad": {
+        "heapUsedMB": 140.4,
+        "heapTotalMB": 191.5,
+        "nodes": 1340,
+        "listeners": 522
+      },
+      "mountedRows": 27,
+      "toggle": {
+        "ms": 167.4,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        },
+        "rowReplaced": true
+      },
+      "scroll": {
+        "frames": 30,
+        "p50": 49.9,
+        "p95": 83.2,
+        "worst": 150,
+        "janky": 6
+      },
+      "toMonth": {
+        "ms": 508.9,
+        "long": {
+          "count": 1,
+          "total": 145,
+          "max": 145
+        }
+      },
+      "toDay": {
+        "ms": 354.1,
+        "long": {
+          "count": 0,
+          "total": 0,
+          "max": 0
+        }
+      },
+      "toAgenda": {
+        "ms": 165.4,
+        "long": {
+          "count": 1,
+          "total": 155,
+          "max": 155
+        }
+      },
+      "search": {
+        "ms": 295.3,
+        "timedOut": false,
+        "debounceMs": 150,
+        "long": {
+          "count": 1,
+          "total": 65,
+          "max": 65
+        },
+        "resultRows": 8543,
+        "rowsRendered": 0,
+        "diag": {
+          "keystrokes": 1,
+          "query": "review",
+          "url": "/meridian/?sq=review",
+          "overlay": true
+        }
+      },
+      "openEntry": {
+        "ms": 657.2,
+        "long": {
+          "count": 2,
+          "total": 124,
+          "max": 64
+        }
+      },
+      "typing": {
+        "p50": 16.6,
+        "p95": 17.5
+      },
+      "afterFlows": {
+        "heapUsedMB": 156.4,
+        "heapTotalMB": 223.7,
+        "nodes": 21738,
+        "listeners": 7156
+      }
+    },
+    "dexie": {
+      "crashes": [],
+      "result": {
+        "bytes": 8079364,
+        "writeMs": 15863,
+        "written": 30000,
+        "readAllMs": 516,
+        "rows": 30000,
+        "dirtyScanMs": 649,
+        "quotaMB": 846,
+        "usageMB": 29.1
+      },
+      "heap": {
+        "heapUsedMB": 105.3,
+        "heapTotalMB": 135.7,
+        "nodes": 1255,
+        "listeners": 445
+      }
+    }
+  }
+]
