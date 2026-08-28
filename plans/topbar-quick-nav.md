@@ -5,9 +5,9 @@ the shape Google Calendar uses: tapping it drops a horizontally scrolling month
 strip into the month view, and a mini month grid with per-day category dots into
 the day, week and agenda views (2026-08-27).
 
-**Estimate: four PRs, each sized for a Sonnet 5 session.** PR 1 has shipped
-(the month view's disclosure button and month strip). PR 2 is independent of
-it and can still run on its own; PR 3 needs both merged; PR 4 closes out.
+**Estimate: four PRs, each sized for a Sonnet 5 session.** PR 1 (the month
+view's disclosure button and month strip) and PR 2 (the day-dot derivation)
+have shipped. PR 3 needs both merged; PR 4 closes out.
 Folding 3+4 together gives one further Opus 5 PR instead of two. One PR for
 everything was never advisable — it would have put two different panel UIs, a
 shared disclosure shell, a new data derivation and a change to `_app`'s height
@@ -54,33 +54,6 @@ The one thing with nothing to reuse is the month strip itself, and it does not
 want a library either: native `overflow-x`, scroll snap, and an explicit
 `scrollLeft` write to center the active chip. **Do not reach for Embla** — Embla
 drives the paged carousels (`useCarousel`), and the strip is free-scrolling.
-
----
-
-## PR 2 — Day-dot derivation, as a pure module
-
-~90 lines plus tests. No React, no jsdom — independent of PR 1.
-
-1. New `src/calendar/dayDots.ts` exporting
-   `type DotCategory = 'event' | 'p1' | 'p2' | 'p3' | 'task'`.
-2. `dotCategory(occ)` derives from `occKind(occ)` plus `occ.metadata.priority` —
-   deliberately **not** from `occState()`, which collapses every completed task
-   to `'done'` and loses the priority the dot needs to be colored by.
-3. `dayDotsFor(occs)` returns `Map<isoDate, DotCategory[]>`, ordered event → p1
-   → p2 → p3 → task, deduped per day, capped at four.
-4. Bucket by `metadata.jsTime`'s local day. **Multiday events must dot every day
-   they cover**, which `expandWithMultiday` already emits as one virtual
-   occurrence per covered day — so do *not* dedupe by `o.id` the way
-   `MonthGrid` does when building its multiday lanes.
-5. Table-driven unit tests: each priority, an untyped task, a timed event, an
-   all-day event, a three-day event, an empty day, an over-cap day.
-
-Files: new `calendar/dayDots.ts` + test; edits to `calendar/index.ts`,
-`GLOSSARY.md`.
-
-**Done when** `dayDotsFor` is covered by unit tests and exported from the
-barrel. Nothing renders it yet — that is the point, and it is why this can run
-alongside PR 1.
 
 ---
 
@@ -139,21 +112,6 @@ it in every view.
 
 **Done when** `pnpm run build`, `pnpm run lint`, `pnpm run test` and
 `pnpm run test:layout` all pass with the panel open on every calendar route.
-
----
-
-## Decide before starting
-
-One product call still open, for whoever picks up PR 2.
-
-| Question | Suggestion | Touches |
-|---|---|---|
-| Does a completed task still dot its day? | **Yes**, colored by its priority — the dot answers "was anything on this day", and a day whose only task got done still had something on it. | one branch in `dayDots.ts` |
-
-(PR 1 settled its own two calls: the panel stays open across a view switch —
-`quickNavOpen` lives with the rest of the per-session calendar ephemera and
-costs nothing to persist — and the month strip runs two years back, three
-forward, rebuilt from the shown month.)
 
 ---
 

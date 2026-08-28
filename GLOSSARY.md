@@ -190,6 +190,13 @@ The display-styling vocabulary (`task-p1`, `event-past`, `done`, …) — one
 domain word per visual variant, derived from occurrence data.
 → `occView.ts` · `OccState`, `occState`, `occKind`
 
+### DotCategory
+The mini-calendar's per-day dot vocabulary — `event`/`p1`/`p2`/`p3`/`task`.
+Deliberately not derived from `OccState`: `occState()` collapses every
+completed task to `'done'`, which would lose the priority a completed task's
+dot still needs.
+→ `calendar/dayDots.ts` · `DotCategory`, `dotCategory`, `dayDotsFor`
+
 ---
 
 ## Domain operations
