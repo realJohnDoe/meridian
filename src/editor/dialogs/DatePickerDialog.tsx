@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { addDays, startOfToday } from 'date-fns'
-import { fmtISO, parseDateString, weekStartsOn } from '@/model'
-import { useStore } from '@/store'
+import { fmtISO, parseDateString } from '@/model'
+import { CALENDAR_FORMATTERS, useCalendarWeekStartsOn } from '@/calendar'
 import { useResetOnChange } from '@/hooks'
 import {
   ResponsiveModal,
@@ -26,7 +26,7 @@ interface Props {
 }
 
 export default function DatePickerDialog({ open, initialDate, onConfirm, onRemove, onClose, forceDialog }: Props) {
-  const localePrefs = useStore(s => s.localePrefs)
+  const ws       = useCalendarWeekStartsOn()
   const today    = startOfToday()
   const tomorrow = addDays(today, 1)
 
@@ -75,18 +75,12 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           <Calendar
             mode="single"
             fixedWeeks
-            weekStartsOn={weekStartsOn(localePrefs)}
+            weekStartsOn={ws}
             selected={selected}
             onSelect={setSelected}
             month={month}
             onMonthChange={setMonth}
-            // react-day-picker formats weekday/caption text via date-fns with an
-            // enUS default locale — these override it to match the localized
-            // `toLocaleDateString` formatting used everywhere else in the app.
-            formatters={{
-              formatWeekdayName: (date) => date.toLocaleDateString(undefined, { weekday: 'short' }),
-              formatCaption: (date) => date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-            }}
+            formatters={CALENDAR_FORMATTERS}
             className="w-full [--cell-size:2.25rem] p-0"
           />
 

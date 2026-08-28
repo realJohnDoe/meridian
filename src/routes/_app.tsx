@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
-import { Menu, CalendarCheck2 } from 'lucide-react'
+import { Menu, CalendarCheck2, ChevronDown } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth, weekStartsOn } from '@/model'
 import { useToday } from '@/hooks'
@@ -8,8 +8,8 @@ import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
 import {
   useMonthPreview, useDayPreview, useWeekPreview,
-  useAgendaTopDate, requestScrollToToday, weekStartFor,
-  useQuickNavOpen, toggleQuickNav, closeQuickNav, MonthStrip,
+  useAgendaTopDate, requestScrollToToday, requestScrollToDate, weekStartFor,
+  useQuickNavOpen, toggleQuickNav, closeQuickNav, MonthStrip, MiniMonth,
 } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ViewFilterButton } from '@/components'
@@ -25,6 +25,11 @@ export const Route = createFileRoute('/_app')({
     sq: typeof search.sq === 'string' ? search.sq : undefined,
   }),
 })
+
+/** The seven dates of the week starting at `start` — week view's MiniMonth highlight. */
+function weekDates(start: Date): Date[] {
+  return Array.from({ length: 7 }, (_, i) => addDays(start, i))
+}
 
 function AppLayout() {
   return (
@@ -185,6 +190,8 @@ function AppMain() {
                     nextLabel="Next day"
                     onPrev={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}
                     onNext={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}
+                    expanded={quickNavOpen}
+                    onToggle={toggleQuickNav}
                   />
                 ) : isWeekView && weekStartDate && weekDisplayStart && weekDisplayEnd ? (
                   // replace: true on nav — mirrors the day/month carousels' swipe-to-page
@@ -201,6 +208,8 @@ function AppMain() {
                     nextLabel="Next week"
                     onPrev={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true })}
                     onNext={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true })}
+                    expanded={quickNavOpen}
+                    onToggle={toggleQuickNav}
                   />
                 ) : isMonthView && monthViewDate && monthDisplayDate ? (
                   // replace: true on nav — mirrors the month carousel's swipe-to-page
@@ -221,12 +230,31 @@ function AppMain() {
                 ) : (
                   <div className="flex flex-1 items-center gap-2 min-w-0" id="tbDefault">
                     {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
-                    {/* flex-1 here (and on the row above) is load-bearing, not cosmetic: TopbarLabel's
-                        @container needs a size that comes from the flex algorithm's available-space
-                        distribution. A shrink-to-fit width (flex-basis: auto, sized from content) would
-                        collapse to 0 instead, because container-type: inline-size makes the browser
-                        disregard the label's own content when computing that shrink-to-fit size. */}
-                    <TopbarLabel long={topBarLabel} short={topBarLabelShort} className="flex-1 text-base text-foreground" />
+                    {isListView ? (
+                      // flex-1 here (and on the row above) is load-bearing, not cosmetic: TopbarLabel's
+                      // @container needs a size that comes from the flex algorithm's available-space
+                      // distribution. A shrink-to-fit width (flex-basis: auto, sized from content) would
+                      // collapse to 0 instead, because container-type: inline-size makes the browser
+                      // disregard the label's own content when computing that shrink-to-fit size.
+                      <TopbarLabel long={topBarLabel} short={topBarLabelShort} className="flex-1 text-base text-foreground" />
+                    ) : (
+                      // Agenda's own disclosure button — unlike PagedTopbar's (month/day/week),
+                      // this one has to keep TopbarLabel's short/long @container behavior, so it
+                      // can't reuse that component (see the comment on its `onToggle` prop). The
+                      // button itself is the flex container here instead of being shrink-to-fit:
+                      // there are no prev/next chevrons on this row to make room for, so TopbarLabel's
+                      // own flex-1 can keep doing its job one level down.
+                      <button
+                        type="button"
+                        onClick={toggleQuickNav}
+                        aria-expanded={quickNavOpen}
+                        aria-controls="quickNavPanel"
+                        className="flex flex-1 items-center gap-1 min-w-0 text-left"
+                      >
+                        <TopbarLabel long={topBarLabel} short={topBarLabelShort} className="flex-1 text-base text-foreground" />
+                        <ChevronDown size={16} className={cn('shrink-0 text-dim transition-transform', quickNavOpen && 'rotate-180')} aria-hidden />
+                      </button>
+                    )}
                   </div>
                 )
               }
@@ -242,15 +270,15 @@ function AppMain() {
             />
           </header>
 
-          {/* Kept mounted for as long as month view is, panel open or not:
-              the grid-rows fr trick below animates a real "auto" height by
+          {/* Kept mounted for as long as its view is, panel open or not: the
+              grid-rows fr trick below animates a real "auto" height by
               interpolating against the row's own content, so that content has
               to still be there through a close transition, not just an open
               one. Staying mounted also means MonthStrip's centering effect has
               already settled by the time the panel first opens, instead of
               popping in mis-centered. `inert` drops it from focus and a11y
               while collapsed, matching MonthGrid's off-screen carousel panes. */}
-          {isMonthView && monthViewDate && monthDisplayDate && (
+          {!isListView && (
             <div
               id="quickNavPanel"
               inert={quickNavOpen ? undefined : true}
@@ -260,7 +288,39 @@ function AppMain() {
               )}
             >
               <div className="overflow-hidden">
-                <MonthStrip activeMonth={monthDisplayDate} onNavigateMonth={navigateToMonth} />
+                {isMonthView && monthViewDate && monthDisplayDate ? (
+                  <MonthStrip activeMonth={monthDisplayDate} onNavigateMonth={navigateToMonth} />
+                ) : isDayView && dvDate && dvDisplayDate ? (
+                  <MiniMonth
+                    open={quickNavOpen}
+                    anchorMonth={dvDisplayDate}
+                    highlightDates={[dvDate]}
+                    onSelectDay={iso => {
+                      void navigate({ to: '/day/$date', params: { date: iso } })
+                      closeQuickNav()
+                    }}
+                  />
+                ) : isWeekView && weekStartDate && weekDisplayStart ? (
+                  <MiniMonth
+                    open={quickNavOpen}
+                    anchorMonth={weekDisplayStart}
+                    highlightDates={weekDates(weekDisplayStart)}
+                    onSelectDay={iso => {
+                      void navigate({ to: '/week/$date', params: { date: iso } })
+                      closeQuickNav()
+                    }}
+                  />
+                ) : !isDayView && !isWeekView && !isMonthView ? (
+                  <MiniMonth
+                    open={quickNavOpen}
+                    anchorMonth={parseDateString(agendaTopDate) ?? today}
+                    highlightDates={agendaTopDate ? [parseDateString(agendaTopDate) ?? today] : []}
+                    onSelectDay={iso => {
+                      requestScrollToDate(iso)
+                      closeQuickNav()
+                    }}
+                  />
+                ) : null}
               </div>
             </div>
           )}
