@@ -39,12 +39,14 @@ export function PagedTopbar({
   expanded?: boolean
   onToggle?: () => void
 }) {
-  // flex-1 min-w-0 here is load-bearing, not cosmetic: TopbarLabel's own
-  // @container needs a definite width handed down by flex distribution, and a
-  // shrink-to-fit ancestor (flex-basis: auto) collapses it to zero instead —
-  // see the matching comment on the default (non-paged) label in _app.tsx.
-  // Wrapping the label in the disclosure <button> below must preserve this
-  // chain rather than breaking it with a plain, non-flex wrapper.
+  // flex-1 min-w-0 here is load-bearing for the plain (non-toggle) rendering
+  // path below, not cosmetic: TopbarLabel's own @container needs a definite
+  // width handed down by flex distribution, and a shrink-to-fit ancestor
+  // (flex-basis: auto) collapses it to zero instead — see the matching
+  // comment on the default (non-paged) label in _app.tsx. The disclosure
+  // <button> branch deliberately does NOT preserve this chain (see its own
+  // comment) — it needs the opposite property, a label sized to its own
+  // content rather than stretched to fill the row.
   const labelNode = shortLabel
     ? <TopbarLabel long={label} short={shortLabel} className="flex-1 text-base text-foreground" />
     : <span className="flex-1 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{label}</span>
@@ -58,7 +60,24 @@ export function PagedTopbar({
           onClick={onToggle}
           aria-expanded={expanded}
           aria-controls="quickNavPanel"
-          className="flex flex-1 items-center gap-1 min-w-0 text-left"
+          // Not flex-1: shrink-to-fit, so the button (and the chevron inside
+          // it) sizes to the label's actual text plus gap-1, not to however
+          // much of the row flex-1 would otherwise claim — which is what let
+          // the chevron drift toward the prev/next chevrons. mr-auto pushes
+          // those chevrons to the row's right edge in its place.
+          //
+          // labelNode keeps its own flex-1 className unchanged (see above);
+          // inside this shrink-to-fit button that degrades to content-based
+          // sizing rather than collapsing, per how a percentage flex-basis
+          // resolves against an indefinite container — but only for the
+          // plain <span> branch. TopbarLabel's own @container hits the
+          // zero-collapse case regardless of its flex-1, because that's a
+          // property of container-type: inline-size on an indefinite
+          // ancestor, not of the flex-basis value — so this button only
+          // supports the plain-label case today (month view, the one
+          // current caller). Combining shortLabel with onToggle will need a
+          // different layout if a future view (day/week) wires both.
+          className="flex items-center gap-1 min-w-0 mr-auto text-left"
         >
           {labelNode}
           <ChevronDown size={16} className={cn('shrink-0 text-dim transition-transform', expanded && 'rotate-180')} aria-hidden />
