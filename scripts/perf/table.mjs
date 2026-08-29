@@ -37,13 +37,12 @@ table('Pipeline stages (ms, median)', ['vault', 'parse', 'deriveViews', 'backlin
   runs.map(r => [label(r), n(ms(pl(r).parse)), n(ms(pl(r).deriveViews)), n(ms(pl(r).backlinks)), n(ms(pl(r).expandAgendaWindow)),
     n(ms(pl(r).agendaSections)), n(ms(pl(r).rankByQuery)), n(ms(pl(r).toggleRecompute)), n(ms(pl(r).fileOccurrenceMap))]))
 
-table('UI flows (ms to painted effect)', ['vault', 'vault paint', 'blocking (load)', 'toggle', 'scroll p95 frame', 'janky frames /30', '→ month', '→ day', '→ agenda', 'search', 'open entry', 'keystroke p50'],
+table('UI flows (ms to painted effect)', ['vault', 'vault paint', 'blocking (load)', 'toggle', 'scroll p50 frame', 'scroll p95 frame', 'janky frames /30', 'mounted rows'],
   runs.map(r => {
     const u = ui(r)
     const f = k => (u[k]?.ms ?? u[k]?.error ?? u[k]?.skipped ?? null)
     return [label(r), n(u.coldStart?.vaultPaintMs), n(u.coldStart?.blockingMs), n(f('toggle')),
-      n(u.scroll?.p95), n(u.scroll?.janky), n(f('toMonth')), n(f('toDay')), n(f('toAgenda')),
-      n(f('search')), n(f('openEntry')), n(u.typing?.p50)]
+      n(u.scroll?.p50), n(u.scroll?.p95), n(u.scroll?.janky), n(u.mountedRows)]
   }))
 
 table('Memory (MB of JS heap) and Dexie', ['vault', 'heap after load', 'heap after flows', 'DOM nodes', 'dexie write', 'dexie readAll', 'dirty scan', 'IDB usage', 'quota'],

@@ -115,6 +115,27 @@ async function heapMB(page) {
 
 // ── the UI flows ────────────────────────────────────────────────────────────
 
+/**
+ * The three UI flows worth their coupling: cold start, toggling a task, and
+ * scrolling the agenda.
+ *
+ * Deliberately not measured here any more: the view switches, search, and
+ * opening an entry (with the CodeMirror keystroke measurement that hung off
+ * it). Between them they carried nine of this file's eleven DOM selectors,
+ * including the two that already broke mid-run — `.now-line` and the results
+ * virtualizer's internal spacer — and every one of them is a Tailwind or
+ * library-internal class rather than a semantic marker. What they bought was
+ * thin: search measured flat at every size (232–586 ms, of which 150 ms is
+ * FileResultsList's own debounce) and CodeMirror keystrokes were 16.6–16.7 ms
+ * at every size from 300 to 100 000 files. The three below use `[data-index]`,
+ * a `data-testid` and `button[role="checkbox"]` — markers the app owns — plus
+ * `.overflow-y-auto`, which `scripts/layout-smoke.mjs` already depends on, so
+ * CI breaks with it rather than after it.
+ *
+ * The numbers those flows did produce are recorded in
+ * `plans/surveys/vault-scaling.md`; that section of the report cannot be
+ * reproduced by re-running this harness.
+ */
 async function measureUI(browser, spec) {
   const { context, page, crashes } = await freshPage(browser, spec)
   const r = { crashes }
@@ -176,124 +197,6 @@ async function measureUI(browser, spec) {
           await window.__perf.raf()
         }
       })
-    }))
-
-    // 3. View switches through the real sidebar buttons (router nav, not a
-    //    reload — a reload would just re-measure cold start).
-    //    Readiness is a marker unique to the destination: the agenda's rows
-    //    are still mounted while the next view renders, so "[data-index]
-    //    exists" would resolve instantly and measure nothing.
-    const switchTo = (label, ready) => page.evaluate(async ({ label, ready }) => {
-      const btn = [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === label)
-      if (!btn) return { skipped: `no ${label} button` }
-      // eslint-disable-next-line no-new-func
-      const pred = new Function(`return (${ready})`)()
-      return window.__perf.interaction(() => btn.click(), pred)
-    }, { label, ready })
-
-    await flow('toMonth', () => switchTo('Month',
-      `() => location.pathname.includes('/calendar/') && !!document.querySelector('.grid-cols-7')`))
-    await flow('toDay', () => switchTo('Day',
-      `() => location.pathname.includes('/day/') && !!document.querySelector('.now-line')`))
-    await flow('toAgenda', () => switchTo('Agenda',
-      `() => !location.pathname.includes('/day/') && !!document.querySelector('[data-index]')`))
-
-    // 4. Search. Typed with real key events — a synthetic `input` dispatch
-    //    lands in the same task as the overlay's own mount and the results
-    //    virtualizer then never measures its scroller, which is a harness
-    //    artefact, not something a user can produce. Both ends of the
-    //    measurement are stamped in-page (last keystroke → first result card
-    //    painted), so the Node round-trip that drives the keyboard is outside
-    //    the number. FileResultsList's own 150 ms debounce is inside it, by
-    //    design: it is time the user waits.
-    await flow('search', async () => {
-      await page.evaluate(() => {
-        window.__searchMarks = { lastInput: 0, firstResult: 0, inputs: 0 }
-        document.querySelector('#filterInput')
-          ?.addEventListener('input', () => {
-            window.__searchMarks.lastInput = performance.now()
-            window.__searchMarks.inputs++
-            window.__searchMarks.firstResult = 0   // this keystroke's results are still pending
-          })
-        // "Results are up" is the results virtualizer sizing itself, not a
-        // card node appearing: the ranked list is what scales with the vault,
-        // and how many cards the virtualizer then paints depends on the
-        // scroller's measured height (which is 0 in some overlay-mount
-        // orderings). A card counts too, whichever lands first.
-        window.__resultSpacer = () =>
-          [...document.querySelectorAll('#filterOverlay div[style*="height"], .mobile-search-overlay div[style*="height"]')].pop()
-        // Held on window on purpose: an observer with no strong reference is
-        // collectable, and after the scroll/view-switch flows there is enough
-        // GC pressure that it actually gets collected mid-run — which reads
-        // as "search never came up".
-        window.__searchMO = new MutationObserver(() => {
-          if (window.__searchMarks.firstResult) return
-          const spacer = window.__resultSpacer()
-          const sized = !!spacer && parseInt(spacer.style.height, 10) > 0
-          const card = !!document.querySelector('#filterOverlay [data-testid="entry-card"], .mobile-search-overlay [data-testid="entry-card"]')
-          if (sized || card) window.__searchMarks.firstResult = performance.now()
-        })
-        window.__searchMO.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] })
-      })
-      // Opening search is a router navigation that rewrites the controlled
-      // input's value; typing into it before that lands loses the query
-      // entirely. Wait for the overlay's own search param, then type.
-      await page.click('#filterInput')
-      await page.waitForFunction(() => location.search.includes('sq='), null, { timeout: 30_000 }).catch(() => {})
-      await page.evaluate(() => { window.__searchMarks.lastInput = 0; window.__searchMarks.firstResult = 0 })
-      // insertText, not type(): each keyboard.type() key is its own CDP
-      // round-trip, and the gaps between them exceed FileResultsList's 150 ms
-      // debounce often enough that an earlier prefix's results land first and
-      // the number comes out shorter than the debounce. insertText fires one
-      // input event for the whole query, so there is exactly one debounce and
-      // one result render, and it belongs to the query we asked about.
-      await page.keyboard.insertText('review')
-      return page.evaluate(async () => {
-        const m = window.__searchMarks
-        // Never throw here: a search that does not come up is a result, and
-        // the state that explains why is worth more than a stack trace.
-        const timedOut = await window.__perf.waitFor(() => m.firstResult > 0, 45_000).then(() => false, () => true)
-        const spacer = window.__resultSpacer()
-        return {
-          ms: timedOut ? null : +(m.firstResult - m.lastInput).toFixed(1),
-          timedOut,
-          debounceMs: 150,
-          long: timedOut ? null : window.__perf.tasksIn(m.lastInput, m.firstResult),
-          resultRows: spacer ? Math.round(parseInt(spacer.style.height, 10) / 68) : null,
-          rowsRendered: document.querySelectorAll('#filterOverlay [data-testid="entry-card"]').length,
-          diag: {
-            keystrokes: m.inputs ?? null,
-            query: document.querySelector('#filterInput')?.value ?? null,
-            url: location.pathname + location.search,
-            overlay: !!document.querySelector('#filterOverlay'),
-          },
-        }
-      })
-    })
-
-    // 5. Open an entry → editor mounted.
-    await flow('openEntry', () => page.evaluate(async () => {
-      const card = document.querySelector('#filterOverlay [data-testid="entry-card"] button[aria-label]')
-        ?? document.querySelector('[data-testid="entry-card"] button[aria-label]')
-      if (!card) return { skipped: 'no entry card' }
-      return window.__perf.interaction(() => card.click(), () => !!document.querySelector('.cm-content'))
-    }))
-
-    // 6. Keystroke latency in CodeMirror, over 20 keys.
-    await flow('typing', () => page.evaluate(async () => {
-      const cm = document.querySelector('.cm-content')
-      if (!cm) return { skipped: 'no editor' }
-      const view = cm.cmTile?.view ?? cm.cmView?.view
-      if (!view) return { skipped: 'no EditorView handle' }
-      const times = []
-      for (let i = 0; i < 20; i++) {
-        const t0 = performance.now()
-        view.dispatch({ changes: { from: view.state.doc.length, insert: 'x' } })
-        await window.__perf.raf()
-        times.push(performance.now() - t0)
-      }
-      times.sort((a, b) => a - b)
-      return { p50: +times[10].toFixed(2), p95: +times[19].toFixed(2) }
     }))
 
     r.afterFlows = await heapMB(page)

@@ -29,7 +29,7 @@ numbers worth keeping live in `plans/surveys/vault-scaling.md`.
 | Phase | What runs | Why separately |
 |---|---|---|
 | `pipeline` | The real modules (`parseToStoreItems`, `deriveViews`, `buildBacklinkIndex`, `computeExpansionCache`, `computeAgendaSections`, `rankByQuery`, `updateFileOccurrenceMap`), imported into the page over the dev server | Attributes cost to a stage instead of lumping it into "cold start" |
-| `ui` | Cold start, toggle, agenda scroll, view switches, search, opening an entry, CodeMirror keystrokes — driven through the real DOM | The user-visible half, including render and paint |
+| `ui` | Cold start, toggling a task, agenda scroll — driven through the real DOM | The user-visible half, including render and paint |
 | `dexie` | `applyRemoteBatch` → `cacheLoadAll` → `cacheGetDirty` over the same vault, plus `navigator.storage.estimate()` | The Tutorial backend is cache-free by design, so the app's own cold start never touches Dexie; every real backend does |
 
 Each size gets a fresh browser context, so one size's IndexedDB, localStorage
@@ -46,10 +46,23 @@ and heap can never leak into the next one's numbers.
   its own request and a context pays ~12 s of them whatever the vault holds.
   `vaultPaintMs` (DOMContentLoaded → first agenda row) is the vault-dependent
   half.
-- **`search.ms` contains FileResultsList's own 150 ms debounce**, by design —
-  it is time the user waits. Subtract it for the compute half.
 - `long` on an interaction is the long-task total/max inside it: the part that
-  blocked the main thread rather than merely elapsed.
+  blocked the main thread rather than merely elapsed. Best-effort: React 19's
+  concurrent renderer yields every few ms, so a multi-second interaction can
+  legitimately contain no single >50 ms task.
+
+## Scope
+
+Three UI flows, deliberately: cold start, toggling a task, and scrolling the
+agenda. The view switches, search, opening an entry and the CodeMirror
+keystroke measurement were removed — the reasoning is on `measureUI` in
+`stress.mjs`. The `pipeline` and `dexie` phases are untouched and are what
+verify five of the six findings in `plans/vault-scaling-results.md`.
+
+**This directory has an expiry.** It exists to verify those findings by
+re-measurement; nothing in CI runs it, so once the last finding closes it
+would rot unnoticed. `plans/vault-scaling-results.md` says to delete it in the
+same PR that deletes that file.
 
 ## Two things `knip.json` carries for this directory
 
@@ -77,8 +90,10 @@ already recorded. Two traps this cost a day each:
 - **Hold your MutationObserver.** An observer nothing references is
   collectable, and under the GC pressure of a scrolled 10k-row agenda it does
   get collected — which reads as "the flow never happened".
-- **`keyboard.insertText`, not `keyboard.type`, for the search query.** Each
-  `type()` key is its own CDP round-trip and the gaps exceed the 150 ms
-  debounce, so an earlier prefix's results land first and the measured latency
-  comes out *shorter* than the debounce.
+- **Anchor an interaction on a marker the app owns.** Readiness selectors that
+  reach for a Tailwind utility (`.grid-cols-7`, `.now-line`) or a library's
+  internals (the results virtualizer's spacer `div[style*="height"]`) are the
+  ones that broke; `[data-index]`, a `data-testid` and `button[role="checkbox"]`
+  are the ones that held. This is why the view-switch, search and open-entry
+  flows are no longer measured here — see the comment on `measureUI`.
 

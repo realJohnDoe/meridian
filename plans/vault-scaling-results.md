@@ -8,6 +8,13 @@ there. This file is the to-do half: remove a finding's entry, and its row in
 the table, in the PR that fixes it, and delete this file entirely once the
 last one closes — see `plans/CLAUDE.md`.
 
+**`scripts/perf/` retires with this file.** The harness exists to verify these
+fixes by re-measurement; once the last finding closes it has no remaining
+caller, and nothing in CI runs it, so it would rot silently. Delete
+`scripts/perf/`, its two `knip.json` allowances and the
+`scripts/perf/results/` line in `.gitignore` in the same PR that deletes this
+file. The report stays: it is a record of what was measured, not a tool.
+
 Every finding carries the baseline that measures it and the exact command that
 produced that baseline, so a fix is verified by re-running the same command and
 comparing. `scripts/perf/README.md` explains the harness and its caveats; the

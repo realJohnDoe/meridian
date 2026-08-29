@@ -85,6 +85,16 @@ no conclusion depends on the two missing cells), and `search.resultRows` read
 long-task columns are best-effort: React 19's concurrent renderer yields every
 few ms, so a 7-second interaction can legitimately contain no >50 ms task.
 
+**Four columns below are no longer reproducible.** Those two gaps were the
+visible half of a fragility the whole UI phase shared, so the view switches
+(`→ month`, `→ day`, `→ agenda`), search, opening an entry and the CodeMirror
+keystroke measurement were removed from the harness after this run — they
+carried nine of its eleven DOM selectors and measured, between them, one
+finding that is corroborated elsewhere and three flows that came out flat. The
+numbers in those columns were measured and stand as a record; re-running the
+harness reproduces everything else. See the comment on `measureUI` in
+`scripts/perf/stress.mjs`.
+
 ## The measured curves
 
 Occurrence counts are for the agenda's own window (`-PAST_WINDOW_DAYS` /
@@ -256,6 +266,9 @@ against it.
 node scripts/perf/stress.mjs --shapes mixed,flat --sizes 300,1000,3000,10000,30000
 node scripts/perf/table.mjs scripts/perf/results/<file>.json
 ```
+
+This reproduces every column except the four noted above. The harness retires
+when the last finding closes — see `plans/vault-scaling-results.md`.
 
 `scripts/perf/README.md` documents the phases, the dev-server caveats, and two
 timing traps that cost a day each (a garbage-collected `MutationObserver`, and
