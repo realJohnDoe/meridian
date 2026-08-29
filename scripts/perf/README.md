@@ -15,12 +15,14 @@ questions the unit tests cannot:
 ```bash
 node scripts/perf/stress.mjs                              # 300 … 30 000, default mix
 node scripts/perf/stress.mjs --sizes 300,1000             # a subset
-node scripts/perf/stress.mjs --flat                       # also recurringShare=0
+node scripts/perf/stress.mjs --shapes mixed,flat          # both vault shapes
 node scripts/perf/stress.mjs --skip-ui                    # pipeline + Dexie only
 node scripts/perf/stress.mjs --skip-pipeline --skip-dexie # UI flows only
 ```
 
-Results are printed per size and written to `scripts/perf/results/<iso>.json`.
+Results are printed per size and written to `scripts/perf/results/<iso>.json`,
+which is gitignored: a run is a point-in-time artefact of one machine, and the
+numbers worth keeping live in `plans/surveys/vault-scaling.md`.
 
 ## What it measures
 
@@ -64,11 +66,3 @@ already recorded. Two traps this cost a day each:
   debounce, so an earlier prefix's results land first and the measured latency
   comes out *shorter* than the debounce.
 
-## The runs behind `plans/vault-scaling-results.md`
-
-| file | what it is |
-|---|---|
-| `results/2026-08-28T21-38-47-822Z.json` | `mixed`, 300 → 30 000, all three phases |
-| `results/2026-08-28T21-56-59-712Z.json` | `flat`, 300 → 30 000, all three phases |
-| `results/2026-08-28T22-11-44-164Z.json` | both shapes, 3 000 → 30 000, pipeline only — the per-stage heap marks |
-| `results/2026-08-28T22-47-57-161Z.json` | `mixed`, 60 000 and 100 000 — the ceiling probe |

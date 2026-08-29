@@ -7,8 +7,7 @@
  *
  *   node scripts/perf/stress.mjs                     # default sizes
  *   node scripts/perf/stress.mjs --sizes 300,1000    # a subset
- *   node scripts/perf/stress.mjs --flat              # also run recurringShare=0
- *   node scripts/perf/stress.mjs --shapes flat       # only recurringShare=0
+ *   node scripts/perf/stress.mjs --shapes mixed,flat # both vault shapes
  *   node scripts/perf/stress.mjs --skip-ui           # pipeline + Dexie only
  *
  * Results land in scripts/perf/results/<timestamp>.json and are printed as a
@@ -43,7 +42,7 @@ const SHAPE_BY_LABEL = {
   mixed: { label: 'mixed', recurringShare: 0.15 },
   flat:  { label: 'flat',  recurringShare: 0 },
 }
-const SHAPES = (has('flat') ? 'mixed,flat' : arg('shapes', 'mixed'))
+const SHAPES = arg('shapes', 'mixed')
   .split(',')
   .map(l => SHAPE_BY_LABEL[l.trim()] ?? (() => { throw new Error(`unknown shape: ${l}`) })())
 const SKIP_UI = has('skip-ui')
