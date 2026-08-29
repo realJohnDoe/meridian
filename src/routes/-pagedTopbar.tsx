@@ -20,6 +20,7 @@ export function PagedTopbar({
   onNext,
   expanded,
   onToggle,
+  toggleRef,
 }: {
   isMobile: boolean
   openSidebar: () => void
@@ -34,10 +35,11 @@ export function PagedTopbar({
   /**
    * When provided together, the label becomes a disclosure button that opens
    * the topbar's quick-nav panel (see _app.tsx) instead of being static text.
-   * The day/week variants don't pass these yet — they have no panel to open.
    */
   expanded?: boolean
   onToggle?: () => void
+  /** Ref onto the disclosure button, so _app.tsx can return focus to it when the panel closes via Escape. Only meaningful alongside onToggle. */
+  toggleRef?: React.Ref<HTMLButtonElement>
 }) {
   // flex-1 min-w-0 here is load-bearing for the plain (non-toggle) rendering
   // path below, not cosmetic: TopbarLabel's own @container needs a definite
@@ -56,6 +58,7 @@ export function PagedTopbar({
       {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
       {onToggle ? (
         <button
+          ref={toggleRef}
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}

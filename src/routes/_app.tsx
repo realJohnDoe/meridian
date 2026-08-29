@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import { Menu, CalendarCheck2, ChevronDown } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
@@ -96,6 +96,35 @@ function AppMain() {
   const ws            = weekStartsOn(useStore(s => s.localePrefs))
   const quickNavOpen  = useQuickNavOpen()
 
+  // The one disclosure button currently rendered — PagedTopbar's (day/week/
+  // month) or the agenda's own — so Escape can return focus to it on close.
+  // Shared across all four call sites below since only one is ever mounted
+  // at a time.
+  const toggleButtonRef = useRef<HTMLButtonElement>(null)
+  // tabIndex={-1} on the panel itself makes it a valid focus target despite
+  // holding no text content of its own; see the effect below.
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // Focus moves into the panel the moment it opens (and is no longer
+  // `inert`), so a keyboard/screen-reader user lands directly on its
+  // content instead of it opening silently behind the still-focused label
+  // button.
+  // Escape closes the panel and returns focus to whichever button opened it.
+  // A document-level listener rather than a JSX onKeyDown on the (necessarily
+  // non-interactive) panel div — jsx-a11y flags keyboard handlers on a
+  // non-interactive role, and the panel itself isn't a control.
+  useEffect(() => {
+    if (quickNavOpen) panelRef.current?.focus()
+    if (!quickNavOpen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      closeQuickNav()
+      toggleButtonRef.current?.focus()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [quickNavOpen])
+
   const isDayView    = !!dayMatch
   const isWeekView   = !!weekMatch
   const isMonthView  = !!monthMatch
@@ -192,6 +221,7 @@ function AppMain() {
                     onNext={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}
                     expanded={quickNavOpen}
                     onToggle={toggleQuickNav}
+                    toggleRef={toggleButtonRef}
                   />
                 ) : isWeekView && weekStartDate && weekDisplayStart && weekDisplayEnd ? (
                   // replace: true on nav — mirrors the day/month carousels' swipe-to-page
@@ -210,6 +240,7 @@ function AppMain() {
                     onNext={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true })}
                     expanded={quickNavOpen}
                     onToggle={toggleQuickNav}
+                    toggleRef={toggleButtonRef}
                   />
                 ) : isMonthView && monthViewDate && monthDisplayDate ? (
                   // replace: true on nav — mirrors the month carousel's swipe-to-page
@@ -226,6 +257,7 @@ function AppMain() {
                     onNext={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}
                     expanded={quickNavOpen}
                     onToggle={toggleQuickNav}
+                    toggleRef={toggleButtonRef}
                   />
                 ) : (
                   <div className="flex flex-1 items-center gap-2 min-w-0" id="tbDefault">
@@ -245,6 +277,7 @@ function AppMain() {
                       // there are no prev/next chevrons on this row to make room for, so TopbarLabel's
                       // own flex-1 can keep doing its job one level down.
                       <button
+                        ref={toggleButtonRef}
                         type="button"
                         onClick={toggleQuickNav}
                         aria-expanded={quickNavOpen}
@@ -277,14 +310,30 @@ function AppMain() {
               one. Staying mounted also means MonthStrip's centering effect has
               already settled by the time the panel first opens, instead of
               popping in mis-centered. `inert` drops it from focus and a11y
-              while collapsed, matching MonthGrid's off-screen carousel panes. */}
+              while collapsed, matching MonthGrid's off-screen carousel panes.
+
+              `sm:max-w-md` is the desktop form: the same inline panel as
+              mobile, just capped rather than stretched edge-to-edge — the
+              label/chevron row above it already only occupies part of the
+              topbar's width on wide screens, so a full-bleed panel below it
+              would look unanchored.
+
+              tabIndex={-1} plus the mount-on-open effect above make this the
+              focus target when the panel opens; Escape is handled by a
+              document-level listener (see that same effect) rather than a
+              JSX handler here, since jsx-a11y flags keyboard handlers on a
+              non-interactive role. */}
           {!isListView && (
             <div
               id="quickNavPanel"
+              ref={panelRef}
+              tabIndex={-1}
+              role="region"
+              aria-label="Quick date navigation"
               inert={quickNavOpen ? undefined : true}
               className={cn(
-                'grid transition-[grid-template-rows] duration-200 ease-linear motion-reduce:transition-none',
-                quickNavOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                'grid sm:max-w-md transition-[grid-template-rows,opacity] duration-200 ease-linear motion-reduce:transition-none',
+                quickNavOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
               )}
             >
               <div className="overflow-hidden">
