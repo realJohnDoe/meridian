@@ -3,11 +3,12 @@
   "ignoreIssues": {
     "src/components/ui/!(sidebar).{ts,tsx}": ["exports", "types"]
   },
+  "ignoreUnresolved": ["^/meridian/src/"],
   "workspaces": {
     ".": {
       "entry": [
         "src/debug/main.tsx",
-        "scripts/*.mjs",
+        "scripts/**/*.mjs",
         "src/routes/**/*.tsx"
       ],
       "project": ["src/**/*.{ts,tsx,css}", "scripts/**/*.mjs"]

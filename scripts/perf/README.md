@@ -51,9 +51,25 @@ and heap can never leak into the next one's numbers.
 - `long` on an interaction is the long-task total/max inside it: the part that
   blocked the main thread rather than merely elapsed.
 
+## Two things `knip.json` carries for this directory
+
+`knip` runs in CI and sees `scripts/` as project code, so the harness needs two
+allowances there — both narrow, and neither weakens the check over `src/`:
+
+- **`entry` is `scripts/**/*.mjs`, not `scripts/*.mjs`.** The old glob was
+  non-recursive, so anything one directory down was in `project` but reachable
+  from no entry, which knip reports as an unused file. That is also why
+  `probe.mjs` carries the repo's `.mjs` extension rather than `.js`.
+- **`ignoreUnresolved: ["^/meridian/src/"]`.** `stress.mjs` imports the app's
+  own modules by their *dev-server URL* (`/meridian/src/model/index.ts`) so
+  they run inside the page against the real Vite graph. Those are browser
+  paths, not filesystem paths, and knip cannot resolve them. The pattern is
+  anchored to that leading `/meridian/src/`, which no real source import uses —
+  app code imports via `@/…` or a relative path.
+
 ## Timing conventions
 
-Everything timed precisely runs inside the page (`scripts/perf/probe.js`); a
+Everything timed precisely runs inside the page (`scripts/perf/probe.mjs`); a
 Playwright round-trip costs 1–5 ms, which is the whole budget of the
 interactions being measured. Node only ever reads back a number the page
 already recorded. Two traps this cost a day each:

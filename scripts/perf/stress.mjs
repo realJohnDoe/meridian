@@ -19,7 +19,7 @@
 import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { chromium } from 'playwright-core'
-import { PROBE } from './probe.js'
+import { PROBE } from './probe.mjs'
 
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.PERF_PORT || 5291)
