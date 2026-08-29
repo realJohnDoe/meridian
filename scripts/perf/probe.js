@@ -8,9 +8,15 @@
 export const PROBE = String.raw`
 window.__perf = (() => {
   const longTasks = []
+  let longTaskObserver = null
   try {
-    new PerformanceObserver(list => { for (const e of list.getEntries()) longTasks.push({ start: e.startTime, dur: e.duration }) })
-      .observe({ entryTypes: ['longtask'] })
+    // Held, not fire-and-forget: same hazard as the MutationObserver below —
+    // an observer nothing references can be collected, and then the long-task
+    // record silently stops growing partway through a run.
+    longTaskObserver = new PerformanceObserver(list => {
+      for (const e of list.getEntries()) longTasks.push({ start: e.startTime, dur: e.duration })
+    })
+    longTaskObserver.observe({ entryTypes: ['longtask'] })
   } catch { /* no longtask support */ }
 
   // First agenda row painted — the cold-start number. Recorded by observer so
@@ -96,6 +102,6 @@ window.__perf = (() => {
   // mo is returned so the probe holds a strong reference to it: an observer
   // nothing points at is collectable, and under GC pressure that shows up as
   // a mark that silently never lands.
-  return { longTasks, firstRow: () => firstRowAt, waitFor, tasksIn, interaction, frames, bench, raf, mo }
+  return { longTasks, firstRow: () => firstRowAt, waitFor, tasksIn, interaction, frames, bench, raf, mo, longTaskObserver }
 })()
 `

@@ -63,3 +63,12 @@ already recorded. Two traps this cost a day each:
   `type()` key is its own CDP round-trip and the gaps exceed the 150 ms
   debounce, so an earlier prefix's results land first and the measured latency
   comes out *shorter* than the debounce.
+
+## The runs behind `plans/vault-scaling-results.md`
+
+| file | what it is |
+|---|---|
+| `results/2026-08-28T21-38-47-822Z.json` | `mixed`, 300 → 30 000, all three phases |
+| `results/2026-08-28T21-56-59-712Z.json` | `flat`, 300 → 30 000, all three phases |
+| `results/2026-08-28T22-11-44-164Z.json` | both shapes, 3 000 → 30 000, pipeline only — the per-stage heap marks |
+| `results/2026-08-28T22-47-57-161Z.json` | `mixed`, 60 000 and 100 000 — the ceiling probe |
