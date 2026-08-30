@@ -12,9 +12,15 @@ import { useCalendarFilter } from './useCalendarFilter'
 import { dayDotsFor, DOT_COLOR, type DotCategory } from './dayDots'
 import { CALENDAR_FORMATTERS, useCalendarWeekStartsOn } from './calendarLocale'
 import { useCarousel } from './useCarousel'
-import { PANE_COUNT } from './snapCarousel'
 import MonthStrip from './MonthStrip'
 
+// Deliberately not the day/week/month views' own PANE_COUNT (5): each pane
+// here mounts a full Calendar plus its own occurrence-expansion computation,
+// and this carousel exists for a lower-stakes, local browsing gesture that
+// doesn't need to absorb a rapid multi-month fling — one buffer pane either
+// side of center is enough to keep a single swipe smooth. Must stay odd (a
+// well-defined center pane), same requirement as PANE_COUNT.
+const PANE_COUNT = 3
 const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 
 /**
