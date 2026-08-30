@@ -143,6 +143,7 @@ function SidebarProvider({
             "group/sidebar-wrapper flex min-h-svh w-full has-[[data-variant=inset]]:bg-sidebar",
             className
           )}
+          data-slot="sidebar-wrapper"
           ref={ref}
           {...props}
         >
@@ -171,6 +172,7 @@ function Sidebar({
   if (collapsible === "none") {
     return (
       <div
+        data-slot="sidebar"
         className={cn(
           "flex h-full w-[var(--sidebar-width)] flex-col bg-sidebar text-sidebar-foreground",
           className
@@ -188,6 +190,7 @@ function Sidebar({
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
         <SheetContent
           data-sidebar="sidebar"
+          data-slot="sidebar"
           data-mobile="true"
           className="w-[var(--sidebar-width)] bg-sidebar p-0 text-sidebar-foreground border-sidebar-border [&>button]:hidden"
           style={
@@ -215,9 +218,11 @@ function Sidebar({
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
       data-side={side}
+      data-slot="sidebar"
     >
       {/* This is what handles the sidebar gap on desktop */}
       <div
+        data-slot="sidebar-gap"
         className={cn(
           "relative w-[var(--sidebar-width)] bg-transparent transition-[width] duration-200 ease-linear",
           "group-data-[collapsible=offcanvas]:w-0",
@@ -228,6 +233,7 @@ function Sidebar({
         )}
       />
       <div
+        data-slot="sidebar-container"
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-[var(--sidebar-width)] transition-[left,right,width] duration-200 ease-linear lg:flex",
           side === "left"
@@ -243,6 +249,7 @@ function Sidebar({
       >
         <div
           data-sidebar="sidebar"
+          data-slot="sidebar-inner"
           className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
         >
           {children}
@@ -256,6 +263,7 @@ function SidebarHeader({ className, ref, ...props }: React.ComponentProps<"div">
   return (
     <div
       ref={ref}
+      data-slot="sidebar-header"
       data-sidebar="header"
       className={cn("flex flex-col gap-2 p-2", className)}
       {...props}
@@ -271,6 +279,7 @@ function SidebarSeparator({
   return (
     <Separator
       ref={ref}
+      data-slot="sidebar-separator"
       data-sidebar="separator"
       className={cn("mx-2 w-auto bg-sidebar-border", className)}
       {...props}
@@ -282,6 +291,7 @@ function SidebarContent({ className, ref, ...props }: React.ComponentProps<"div"
   return (
     <div
       ref={ref}
+      data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
         "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
@@ -296,6 +306,7 @@ function SidebarGroup({ className, ref, ...props }: React.ComponentProps<"div">)
   return (
     <div
       ref={ref}
+      data-slot="sidebar-group"
       data-sidebar="group"
       className={cn("relative flex w-full min-w-0 flex-col p-2", className)}
       {...props}
@@ -314,6 +325,7 @@ function SidebarGroupLabel({
   return (
     <Comp
       ref={ref}
+      data-slot="sidebar-group-label"
       data-sidebar="group-label"
       className={cn(
         "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-[margin,opacity] duration-200 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
@@ -329,6 +341,7 @@ function SidebarMenu({ className, ref, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
       ref={ref}
+      data-slot="sidebar-menu"
       data-sidebar="menu"
       className={cn("flex w-full min-w-0 flex-col gap-1", className)}
       {...props}
@@ -340,6 +353,7 @@ function SidebarMenuItem({ className, ref, ...props }: React.ComponentProps<"li"
   return (
     <li
       ref={ref}
+      data-slot="sidebar-menu-item"
       data-sidebar="menu-item"
       className={cn("group/menu-item relative", className)}
       {...props}
@@ -392,6 +406,7 @@ function SidebarMenuButton({
   const button = (
     <Comp
       ref={ref}
+      data-slot="sidebar-menu-button"
       data-sidebar="menu-button"
       data-size={size}
       data-active={isActive}
