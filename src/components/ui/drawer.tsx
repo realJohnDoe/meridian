@@ -5,10 +5,18 @@ import { cn } from '@/lib/cn'
 import { Button } from './button'
 import { Separator } from './separator'
 
-const Drawer = DrawerPrimitive.Root
-const DrawerTrigger = DrawerPrimitive.Trigger
-const DrawerPortal = DrawerPrimitive.Portal
-const DrawerClose = DrawerPrimitive.Close
+function Drawer({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
+  return <DrawerPrimitive.Root data-slot="drawer" {...props} />
+}
+function DrawerTrigger({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Trigger>) {
+  return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />
+}
+function DrawerPortal({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Portal>) {
+  return <DrawerPrimitive.Portal data-slot="drawer-portal" {...props} />
+}
+function DrawerClose({ ...props }: React.ComponentProps<typeof DrawerPrimitive.Close>) {
+  return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />
+}
 
 // ── Overlay ─────────────────────────────────────────────────────
 function DrawerOverlay({
@@ -17,6 +25,7 @@ function DrawerOverlay({
 }: React.ComponentProps<typeof DrawerPrimitive.Overlay>) {
   return (
     <DrawerPrimitive.Overlay
+      data-slot="drawer-overlay"
       className={cn('fixed inset-0 z-50 bg-black/70', className)}
       {...props}
     />
@@ -42,6 +51,7 @@ function DrawerContent({
     <DrawerPortal>
       <DrawerOverlay />
       <DrawerPrimitive.Content
+        data-slot="drawer-content"
         className={cn(
           'fixed bottom-0 left-1/2 z-50 -translate-x-1/2',
           'w-full max-w-md lg:max-w-lg max-h-[85dvh] flex flex-col',
@@ -62,12 +72,13 @@ function DrawerContent({
 
 // ── Layout helpers ───────────────────────────────────────────────
 const DrawerHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col', className)} {...props} />
+  <div data-slot="drawer-header" className={cn('flex flex-col', className)} {...props} />
 )
 DrawerHeader.displayName = 'DrawerHeader'
 
 const DrawerFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
+    data-slot="drawer-footer"
     className={cn('flex items-center justify-between px-4 pt-4', className)}
     {...props}
   />
@@ -81,6 +92,7 @@ function DrawerTitle({
 }: React.ComponentProps<typeof DrawerPrimitive.Title>) {
   return (
     <DrawerPrimitive.Title
+      data-slot="drawer-title"
       className={cn(
         'text-2xs font-bold tracking-[.07em] uppercase text-muted-foreground',
         'px-4.5 pt-1 pb-2',
@@ -98,6 +110,7 @@ function DrawerDescription({
 }: React.ComponentProps<typeof DrawerPrimitive.Description>) {
   return (
     <DrawerPrimitive.Description
+      data-slot="drawer-description"
       className={cn('sr-only', className)}
       {...props}
     />

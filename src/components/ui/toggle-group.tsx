@@ -25,6 +25,7 @@ function ToggleGroup({
 
   return (
     <ToggleGroupPrimitive.Root
+      data-slot="toggle-group"
       className={cn("flex items-center justify-center gap-1", className)}
       {...props}
     >
@@ -46,6 +47,7 @@ function ToggleGroupItem({
 
   return (
     <ToggleGroupPrimitive.Item
+      data-slot="toggle-group-item"
       className={cn(
         toggleVariants({
           variant: context.variant || variant,

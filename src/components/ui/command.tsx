@@ -9,6 +9,7 @@ function Command({
 }: React.ComponentProps<typeof CommandPrimitive>) {
   return (
     <CommandPrimitive
+      data-slot="command"
       className={cn(
         'flex h-full w-full flex-col overflow-hidden rounded-lg bg-background text-foreground',
         className,
@@ -24,9 +25,10 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input> & { wrapperClassName?: string }) {
   return (
-    <div className={cn('flex items-center border-b border-input px-3', wrapperClassName)} cmdk-input-wrapper="">
+    <div data-slot="command-input-wrapper" className={cn('flex items-center border-b border-input px-3', wrapperClassName)} cmdk-input-wrapper="">
       <Search className="mr-2 size-4 shrink-0 opacity-50" />
       <CommandPrimitive.Input
+        data-slot="command-input"
         className={cn(
           // text-base below sm: iOS Safari auto-zooms on focus of inputs under 16px
           'flex h-10 w-full rounded-md bg-transparent py-3 text-base sm:text-sm outline-none',
@@ -45,6 +47,7 @@ function CommandList({
 }: React.ComponentProps<typeof CommandPrimitive.List>) {
   return (
     <CommandPrimitive.List
+      data-slot="command-list"
       className={cn('max-h-64 overflow-y-auto overflow-x-hidden', className)}
       {...props}
     />
@@ -53,7 +56,7 @@ function CommandList({
 
 function CommandEmpty(props: React.ComponentProps<typeof CommandPrimitive.Empty>) {
   return (
-    <CommandPrimitive.Empty className="py-6 text-center text-sm text-muted-foreground" {...props} />
+    <CommandPrimitive.Empty data-slot="command-empty" className="py-6 text-center text-sm text-muted-foreground" {...props} />
   )
 }
 
@@ -63,6 +66,7 @@ function CommandGroup({
 }: React.ComponentProps<typeof CommandPrimitive.Group>) {
   return (
     <CommandPrimitive.Group
+      data-slot="command-group"
       className={cn(
         'overflow-hidden p-1 text-foreground',
         '[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5',
@@ -80,6 +84,7 @@ function CommandItem({
 }: React.ComponentProps<typeof CommandPrimitive.Item>) {
   return (
     <CommandPrimitive.Item
+      data-slot="command-item"
       className={cn(
         'relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-2 text-sm outline-none',
         'data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50',
@@ -97,6 +102,7 @@ function CommandSeparator({
 }: React.ComponentProps<typeof CommandPrimitive.Separator>) {
   return (
     <CommandPrimitive.Separator
+      data-slot="command-separator"
       className={cn('-mx-1 h-px bg-input', className)}
       {...props}
     />

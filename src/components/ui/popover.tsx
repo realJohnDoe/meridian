@@ -3,9 +3,15 @@ import * as PopoverPrimitive from '@radix-ui/react-popover'
 import { cn } from '@/lib/cn'
 import { useKeyboardInset } from '@/hooks'
 
-const Popover = PopoverPrimitive.Root
-const PopoverTrigger = PopoverPrimitive.Trigger
-const PopoverAnchor = PopoverPrimitive.Anchor
+function Popover({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
+  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+}
+function PopoverTrigger({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
+  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
+}
+function PopoverAnchor({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Anchor>) {
+  return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />
+}
 
 function PopoverContent({
   className,
@@ -35,6 +41,7 @@ function PopoverContent({
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
+        data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}
         collisionPadding={resolvedCollisionPadding}
