@@ -12,11 +12,7 @@ function renderTopbar(isMobile = false) {
       isMobile={isMobile}
       openSidebar={openSidebar}
       label="June 2026"
-      shortLabel="Jun 2026"
-      prevLabel="Previous month"
-      nextLabel="Next month"
-      onPrev={onPrev}
-      onNext={onNext}
+      paging={{ prevLabel: 'Previous month', nextLabel: 'Next month', onPrev, onNext }}
     />,
   )
   return { onPrev, onNext, openSidebar }
@@ -72,21 +68,12 @@ describe('PagedTopbar', () => {
     expect(screen.queryByRole('button', { name: 'Next month' })).not.toBeInTheDocument()
   })
 
-  // Month view passes no shortLabel because it never wants to abbreviate —
-  // it should fall back to a plain label, not render a short-text node too.
-  it('renders only the label when shortLabel is omitted', () => {
-    render(
-      <PagedTopbar
-        isMobile={false}
-        openSidebar={vi.fn()}
-        label="August"
-        prevLabel="Previous month"
-        nextLabel="Next month"
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
-      />,
-    )
-    expect(screen.getByText('August')).toBeInTheDocument()
+  // Agenda/backlog/notes have no paging — omitting `paging` must drop the
+  // chevrons entirely rather than rendering them disabled or unnamed.
+  it('omits the chevrons entirely when paging is not given', () => {
+    render(<PagedTopbar isMobile={false} openSidebar={vi.fn()} label="Backlog" />)
+    expect(screen.queryByRole('button', { name: 'Previous month' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next month' })).not.toBeInTheDocument()
   })
 
   // The label is plain, non-interactive text until a caller opts into the
@@ -103,11 +90,7 @@ describe('PagedTopbar', () => {
         isMobile={false}
         openSidebar={vi.fn()}
         label="June 2026"
-        shortLabel="Jun 2026"
-        prevLabel="Previous month"
-        nextLabel="Next month"
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
+        paging={{ prevLabel: 'Previous month', nextLabel: 'Next month', onPrev: vi.fn(), onNext: vi.fn() }}
         expanded={false}
         onToggle={onToggle}
       />,
@@ -124,15 +107,31 @@ describe('PagedTopbar', () => {
         isMobile={false}
         openSidebar={vi.fn()}
         label="June 2026"
-        shortLabel="Jun 2026"
-        prevLabel="Previous month"
-        nextLabel="Next month"
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
+        paging={{ prevLabel: 'Previous month', nextLabel: 'Next month', onPrev: vi.fn(), onNext: vi.fn() }}
         expanded={true}
         onToggle={vi.fn()}
       />,
     )
     expect(screen.getByRole('button', { expanded: true })).toBeInTheDocument()
+  })
+
+  // Agenda's disclosure button has no paging chevrons to make room for, so
+  // it becomes a disclosure button with no chevrons at all — mirrors how the
+  // agenda topbar calls PagedTopbar (see _app.tsx).
+  it('supports a disclosure button with no paging chevrons', () => {
+    const onToggle = vi.fn()
+    render(
+      <PagedTopbar
+        isMobile={false}
+        openSidebar={vi.fn()}
+        label="August"
+        expanded={false}
+        onToggle={onToggle}
+      />,
+    )
+    const toggle = screen.getByRole('button', { expanded: false })
+    expect(toggle).toHaveTextContent('August')
+    fireEvent.click(toggle)
+    expect(onToggle).toHaveBeenCalledTimes(1)
   })
 })

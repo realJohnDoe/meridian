@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
-import { Menu, CalendarCheck2, ChevronDown } from 'lucide-react'
+import { CalendarCheck2 } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth, weekStartsOn } from '@/model'
 import { useToday } from '@/hooks'
@@ -17,7 +17,6 @@ import { IconButton } from '@/components/primitives/icon-button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
 import { TopbarShell } from './-topbarShell'
 import { PagedTopbar } from './-pagedTopbar'
-import { TopbarLabel } from './-topbarLabel'
 
 export const Route = createFileRoute('/_app')({
   component: AppLayout,
@@ -151,14 +150,12 @@ function AppMain() {
   const weekDisplayEnd   = weekDisplayStart && addDays(weekDisplayStart, 6)
 
   // Backlog/Notes are fixed strings; the agenda default view shows just the
-  // month of its topmost visible row, matching Day/Month/Week's own topbar —
-  // it never abbreviates, so long and short are the same string.
-  const [topBarLabel, topBarLabelShort] = (() => {
-    if (backlogMatch) return ['Backlog', 'Backlog']
-    if (notesMatch)   return ['Notes', 'Notes']
+  // month of its topmost visible row, matching Day/Month/Week's own topbar.
+  const topBarLabel = (() => {
+    if (backlogMatch) return 'Backlog'
+    if (notesMatch)   return 'Notes'
     const d = agendaTopDate ? new Date(agendaTopDate + 'T00:00:00') : today
-    const label = fmtTopBarMonth(d, today)
-    return [label, label]
+    return fmtTopBarMonth(d, today)
   })()
 
   const handleToday = () => {
@@ -215,10 +212,12 @@ function AppMain() {
                     isMobile={isMobile}
                     openSidebar={openSidebar}
                     label={fmtTopBarMonth(dvDisplayDate, today)}
-                    prevLabel="Previous day"
-                    nextLabel="Next day"
-                    onPrev={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}
-                    onNext={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}
+                    paging={{
+                      prevLabel: 'Previous day',
+                      nextLabel: 'Next day',
+                      onPrev: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true }),
+                      onNext: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true }),
+                    }}
                     expanded={quickNavOpen}
                     onToggle={toggleQuickNav}
                     toggleRef={toggleButtonRef}
@@ -234,10 +233,12 @@ function AppMain() {
                     isMobile={isMobile}
                     openSidebar={openSidebar}
                     label={fmtTopBarMonth(weekDisplayStart, today)}
-                    prevLabel="Previous week"
-                    nextLabel="Next week"
-                    onPrev={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true })}
-                    onNext={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true })}
+                    paging={{
+                      prevLabel: 'Previous week',
+                      nextLabel: 'Next week',
+                      onPrev: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true }),
+                      onNext: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true }),
+                    }}
                     expanded={quickNavOpen}
                     onToggle={toggleQuickNav}
                     toggleRef={toggleButtonRef}
@@ -251,44 +252,34 @@ function AppMain() {
                     isMobile={isMobile}
                     openSidebar={openSidebar}
                     label={fmtTopBarMonth(monthDisplayDate, today)}
-                    prevLabel="Previous month"
-                    nextLabel="Next month"
-                    onPrev={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}
-                    onNext={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}
+                    paging={{
+                      prevLabel: 'Previous month',
+                      nextLabel: 'Next month',
+                      onPrev: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true }),
+                      onNext: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true }),
+                    }}
                     expanded={quickNavOpen}
                     onToggle={toggleQuickNav}
                     toggleRef={toggleButtonRef}
                   />
+                ) : isListView ? (
+                  // Backlog/Notes: a plain label, no paging and no quick-nav panel.
+                  <PagedTopbar
+                    isMobile={isMobile}
+                    openSidebar={openSidebar}
+                    label={topBarLabel}
+                  />
                 ) : (
-                  <div className="flex flex-1 items-center gap-2 min-w-0" id="tbDefault">
-                    {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
-                    {isListView ? (
-                      // flex-1 here (and on the row above) is load-bearing, not cosmetic: TopbarLabel's
-                      // @container needs a size that comes from the flex algorithm's available-space
-                      // distribution. A shrink-to-fit width (flex-basis: auto, sized from content) would
-                      // collapse to 0 instead, because container-type: inline-size makes the browser
-                      // disregard the label's own content when computing that shrink-to-fit size.
-                      <TopbarLabel long={topBarLabel} short={topBarLabelShort} className="flex-1 text-base text-foreground" />
-                    ) : (
-                      // Agenda's own disclosure button — unlike PagedTopbar's (month/day/week),
-                      // this one has to keep TopbarLabel's short/long @container behavior, so it
-                      // can't reuse that component (see the comment on its `onToggle` prop). The
-                      // button itself is the flex container here instead of being shrink-to-fit:
-                      // there are no prev/next chevrons on this row to make room for, so TopbarLabel's
-                      // own flex-1 can keep doing its job one level down.
-                      <button
-                        ref={toggleButtonRef}
-                        type="button"
-                        onClick={toggleQuickNav}
-                        aria-expanded={quickNavOpen}
-                        aria-controls="quickNavPanel"
-                        className="flex flex-1 items-center gap-1 min-w-0 text-left"
-                      >
-                        <TopbarLabel long={topBarLabel} short={topBarLabelShort} className="flex-1 text-base text-foreground" />
-                        <ChevronDown size={16} className={cn('shrink-0 text-dim transition-transform', quickNavOpen && 'rotate-180')} aria-hidden />
-                      </button>
-                    )}
-                  </div>
+                  // Agenda: same disclosure-button shape as day/week/month, just
+                  // with no prev/next paging — scrolling the list is how agenda pages.
+                  <PagedTopbar
+                    isMobile={isMobile}
+                    openSidebar={openSidebar}
+                    label={topBarLabel}
+                    expanded={quickNavOpen}
+                    onToggle={toggleQuickNav}
+                    toggleRef={toggleButtonRef}
+                  />
                 )
               }
               right={

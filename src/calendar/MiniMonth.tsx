@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { type DayButton } from 'react-day-picker'
 import { endOfMonth, startOfMonth } from 'date-fns'
+import type { StoreItem, Roots, Occurrence } from '@/types'
 import { useStore } from '@/store'
-import { fmtISO, fmtMonth } from '@/model'
+import { fmtISO, fmtMonth, parseMonth } from '@/model'
 import { useResetOnChange } from '@/hooks'
 import { cn } from '@/lib/cn'
 import { Calendar, CalendarDayButton } from '@/components/ui/calendar'
@@ -10,6 +11,17 @@ import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useCalendarFilter } from './useCalendarFilter'
 import { dayDotsFor, DOT_COLOR, type DotCategory } from './dayDots'
 import { CALENDAR_FORMATTERS, useCalendarWeekStartsOn } from './calendarLocale'
+import { useCarousel } from './useCarousel'
+import MonthStrip from './MonthStrip'
+
+// Deliberately not the day/week/month views' own PANE_COUNT (5): each pane
+// here mounts a full Calendar plus its own occurrence-expansion computation,
+// and this carousel exists for a lower-stakes, local browsing gesture that
+// doesn't need to absorb a rapid multi-month fling — one buffer pane either
+// side of center is enough to keep a single swipe smooth. Must stay odd (a
+// well-defined center pane), same requirement as PANE_COUNT.
+const PANE_COUNT = 3
+const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 
 /**
  * Builds the `DayButton` override once per `dotsByDay` change — a plain
@@ -48,16 +60,60 @@ function makeDayButton(dotsByDay: Map<string, DotCategory[]>) {
   }
 }
 
+interface PaneProps {
+  monthKey: string
+  highlightDates: Date[]
+  onSelectDay: (iso: string) => void
+  onMonthChange: (d: Date) => void
+  items: StoreItem[]
+  roots: Roots
+  filterOccs: (occs: Occurrence[]) => Occurrence[]
+  ws: 0 | 1 | 6
+}
+
+/** One month's day grid — kept as its own component so React can key panes by
+ * month string (see MonthView/DayView's identical pattern) and so each pane's
+ * occurrence-dot computation only reruns for its own month. */
+function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, items, roots, filterOccs, ws }: PaneProps) {
+  const month = parseMonth(monthKey)
+  const allOccs = useExpandWithMultiday(items, roots, startOfMonth(month), endOfMonth(month))
+  const dotsByDay = useMemo(() => dayDotsFor(filterOccs(allOccs)), [allOccs, filterOccs])
+  const DayButtonWithDots = useMemo(() => makeDayButton(dotsByDay), [dotsByDay])
+
+  return (
+    <Calendar
+      month={month}
+      onMonthChange={onMonthChange}
+      weekStartsOn={ws}
+      fixedWeeks
+      formatters={CALENDAR_FORMATTERS}
+      // Highlight styling reads modifiers.highlight directly inside
+      // MiniMonthDayButton rather than via modifiersClassNames — react-day-picker
+      // only applies modifiersClassNames to the day *cell* (the <td>), not to
+      // the DayButton inside it, so it can't fill the button's background.
+      modifiers={{ highlight: highlightDates }}
+      onDayClick={date => onSelectDay(fmtISO(date))}
+      components={{ DayButton: DayButtonWithDots }}
+      // The grid's own month/year caption and prev/next arrows are hidden —
+      // MonthStrip (rendered below the carousel, see MiniMonth below) is the
+      // one month-paging control now, so the two would otherwise duplicate
+      // each other.
+      classNames={{ nav: 'hidden', month_caption: 'hidden' }}
+      className="w-full [--cell-size:2.25rem] p-3 pb-1"
+    />
+  )
+}
+
 interface Props {
   /**
    * Whether the panel this grid lives in is currently open. The grid's own
    * browsed month re-syncs to `anchorMonth` each time this flips to true —
    * see the mount-only `month` state below — and stays put otherwise, so a
-   * parent re-render while the panel is open can't yank a caption-arrow page
+   * parent re-render while the panel is open can't yank a paged-to month
    * back out from under the user.
    */
   open: boolean
-  /** The month to show when the panel opens — the main view's own month, not wherever the grid's own caption arrows have since paged it to (see the component's own `month` state below). */
+  /** The month to show when the panel opens — the main view's own month, not wherever the grid's own paging has since moved it to (see the component's own `month` state below). */
   anchorMonth: Date
   /** Day(s) to visually mark as the calling view's current focus — one date for day/agenda, the seven dates of the active week for week view. */
   highlightDates: Date[]
@@ -66,14 +122,16 @@ interface Props {
 
 /**
  * The topbar's quick-nav panel for day, week and agenda views: a dotted mini
- * month grid, opened by the same disclosure button month view's MonthStrip
- * uses (see `_app.tsx`). Wraps `@/components/ui/calendar` with a `DayButton`
- * override that draws each day's occurrence dots underneath its number.
+ * month grid above a month-chip row (MonthStrip, the same one month view's
+ * own quick-nav panel uses), opened by the same disclosure button month
+ * view's MonthStrip uses (see `_app.tsx`). Tapping a day jumps the calendar
+ * there; tapping a chip or swiping the grid itself just pages which month the
+ * grid is browsing, mirroring month view's own chip-driven navigation.
  *
- * **Trap.** The grid's own caption arrows page a *local* month — they must
- * never navigate the main view or relabel the topbar, which is why `month`
- * is local state here rather than a prop, and only ever reset from
- * `anchorMonth` on open (see `useResetOnChange` below).
+ * **Trap.** The grid's own paging — chips and swipes alike — moves a *local*
+ * month; it must never navigate the main view or relabel the topbar, which is
+ * why `month` is local state here rather than a prop, and only ever reset
+ * from `anchorMonth` on open (see `useResetOnChange` below).
  */
 export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectDay }: Props) {
   const [month, setMonth] = useState(anchorMonth)
@@ -87,28 +145,39 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
   const { filterOccs } = useCalendarFilter()
   const ws = useCalendarWeekStartsOn()
 
-  // Same cached-window hook the grid views use (see useExpandWithMultiday) —
-  // one more (from, to) window in the shared LRU, keyed by whatever month
-  // the mini grid is currently browsing rather than the main view's month.
-  const allOccs = useExpandWithMultiday(items, roots, startOfMonth(month), endOfMonth(month))
-  const dotsByDay = useMemo(() => dayDotsFor(filterOccs(allOccs)), [allOccs, filterOccs])
-  const DayButtonWithDots = useMemo(() => makeDayButton(dotsByDay), [dotsByDay])
+  const { emblaRef, paneKeys } = useCarousel({
+    unitKey: fmtMonth(month),
+    paneCount: PANE_COUNT,
+    unitAt: offset => fmtMonth(new Date(month.getFullYear(), month.getMonth() + offset, 1)),
+    onCommit: key => setMonth(parseMonth(key)),
+    onPreview: () => {},
+  })
 
   return (
-    <Calendar
-      month={month}
-      onMonthChange={setMonth}
-      weekStartsOn={ws}
-      fixedWeeks
-      formatters={CALENDAR_FORMATTERS}
-      // Highlight styling reads modifiers.highlight directly inside
-      // MiniMonthDayButton rather than via modifiersClassNames — react-day-picker
-      // only applies modifiersClassNames to the day *cell* (the <td>), not to
-      // the DayButton inside it, so it can't fill the button's background.
-      modifiers={{ highlight: highlightDates }}
-      onDayClick={date => onSelectDay(fmtISO(date))}
-      components={{ DayButton: DayButtonWithDots }}
-      className="w-full [--cell-size:2.25rem] p-3"
-    />
+    <div>
+      {/* Embla viewport → container → panes, same shape as DayView/MonthView's
+          own carousels (see useCarousel). touch-pan-y hands vertical drags to
+          the browser (there's nothing to scroll vertically here, but this
+          keeps the axis-locking behavior consistent with the other two). */}
+      <div ref={emblaRef} className="overflow-hidden touch-pan-y">
+        <div className="flex">
+          {paneKeys.map((key, i) => (
+            <div key={key} className="flex-[0_0_100%] min-w-0" inert={i === CENTER_PANE ? undefined : true}>
+              <MiniMonthPane
+                monthKey={key}
+                highlightDates={highlightDates}
+                onSelectDay={onSelectDay}
+                onMonthChange={setMonth}
+                items={items}
+                roots={roots}
+                filterOccs={filterOccs}
+                ws={ws}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+      <MonthStrip activeMonth={month} onNavigateMonth={setMonth} />
+    </div>
   )
 }

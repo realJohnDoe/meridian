@@ -27,6 +27,19 @@ if (typeof window !== 'undefined') {
     disconnect() {}
   }
 
+  // jsdom 30 still doesn't implement this either — embla-carousel-react (the
+  // day/week/month/mini-month swipe carousels) reads it on mount to track
+  // which slides are in view, and throws without a stub. Cast through
+  // unknown, like the matchMedia stub above — a full IntersectionObserver
+  // shape isn't worth chasing for a polyfill nothing here inspects.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- lib types claim this is always defined, but jsdom doesn't implement it, so the guard is load-bearing at runtime
+  globalThis.IntersectionObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords(): IntersectionObserverEntry[] { return [] }
+  } as unknown as typeof IntersectionObserver
+
   // eslint-disable-next-line @typescript-eslint/unbound-method, @typescript-eslint/no-unnecessary-condition -- polyfill assignment; DOM lib types claim this is always defined, but jsdom 29 doesn't implement it, so the guard is load-bearing at runtime
   Element.prototype.scrollIntoView ??= () => {}
 
