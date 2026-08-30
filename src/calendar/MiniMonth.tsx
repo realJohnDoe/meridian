@@ -89,11 +89,11 @@ function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, i
       onDayClick={date => onSelectDay(fmtISO(date))}
       components={{ DayButton: DayButtonWithDots }}
       // The grid's own month/year caption and prev/next arrows are hidden —
-      // MonthStrip (rendered above the carousel, see MiniMonth below) is the
+      // MonthStrip (rendered below the carousel, see MiniMonth below) is the
       // one month-paging control now, so the two would otherwise duplicate
       // each other.
       classNames={{ nav: 'hidden', month_caption: 'hidden' }}
-      className="w-full [--cell-size:2.25rem] p-3 pt-1"
+      className="w-full [--cell-size:2.25rem] p-3 pb-1"
     />
   )
 }
@@ -115,9 +115,9 @@ interface Props {
 }
 
 /**
- * The topbar's quick-nav panel for day, week and agenda views: a month-chip
- * row (MonthStrip, the same one month view's own quick-nav panel uses) above
- * a dotted mini month grid, opened by the same disclosure button month
+ * The topbar's quick-nav panel for day, week and agenda views: a dotted mini
+ * month grid above a month-chip row (MonthStrip, the same one month view's
+ * own quick-nav panel uses), opened by the same disclosure button month
  * view's MonthStrip uses (see `_app.tsx`). Tapping a day jumps the calendar
  * there; tapping a chip or swiping the grid itself just pages which month the
  * grid is browsing, mirroring month view's own chip-driven navigation.
@@ -149,7 +149,6 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
 
   return (
     <div>
-      <MonthStrip activeMonth={month} onNavigateMonth={setMonth} />
       {/* Embla viewport → container → panes, same shape as DayView/MonthView's
           own carousels (see useCarousel). touch-pan-y hands vertical drags to
           the browser (there's nothing to scroll vertically here, but this
@@ -172,6 +171,7 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
           ))}
         </div>
       </div>
+      <MonthStrip activeMonth={month} onNavigateMonth={setMonth} />
     </div>
   )
 }
