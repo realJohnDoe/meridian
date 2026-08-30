@@ -68,11 +68,14 @@ describe('MiniMonth', () => {
     expect(onSelectDay).toHaveBeenCalledExactlyOnceWith('2026-08-20')
   })
 
-  it("pages the grid's own month via the caption arrows without calling onSelectDay", () => {
+  // Month paging now lives entirely in the MonthStrip row above the grid —
+  // the grid's own caption/arrows are hidden (see MiniMonth's classNames)
+  // precisely so the two controls can't duplicate each other.
+  it("pages the grid's own month via the month-chip row without calling onSelectDay", () => {
     const { onSelectDay } = renderMini([])
-    expect(screen.getByText('August 2026')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Go to the Next Month' }))
-    expect(screen.getByText('September 2026')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'August 2026' })).toHaveAttribute('aria-current', 'date')
+    fireEvent.click(screen.getByRole('button', { name: 'September 2026' }))
+    expect(screen.getByRole('button', { name: 'September 2026' })).toHaveAttribute('aria-current', 'date')
     expect(onSelectDay).not.toHaveBeenCalled()
   })
 
@@ -82,15 +85,15 @@ describe('MiniMonth', () => {
     }
     seedStore([], makeRoots('note.md'))
     const { rerender } = render(<Host open />)
-    fireEvent.click(screen.getByRole('button', { name: 'Go to the Next Month' }))
-    expect(screen.getByText('September 2026')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'September 2026' }))
+    expect(screen.getByRole('button', { name: 'September 2026' })).toHaveAttribute('aria-current', 'date')
 
     // Closing (panel collapses, still mounted) must not itself snap the
     // browsed month back — only a fresh *open* does.
     rerender(<Host open={false} />)
-    expect(screen.getByText('September 2026')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'September 2026' })).toHaveAttribute('aria-current', 'date')
 
     rerender(<Host open />)
-    expect(screen.getByText('August 2026')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'August 2026' })).toHaveAttribute('aria-current', 'date')
   })
 })
