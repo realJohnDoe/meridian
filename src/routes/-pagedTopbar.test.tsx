@@ -12,10 +12,7 @@ function renderTopbar(isMobile = false) {
       isMobile={isMobile}
       openSidebar={openSidebar}
       label="June 2026"
-      prevLabel="Previous month"
-      nextLabel="Next month"
-      onPrev={onPrev}
-      onNext={onNext}
+      paging={{ prevLabel: 'Previous month', nextLabel: 'Next month', onPrev, onNext }}
     />,
   )
   return { onPrev, onNext, openSidebar }
@@ -71,9 +68,9 @@ describe('PagedTopbar', () => {
     expect(screen.queryByRole('button', { name: 'Next month' })).not.toBeInTheDocument()
   })
 
-  // Agenda/backlog/notes have no paging — omitting onPrev/onNext must drop
-  // the chevrons entirely rather than rendering them disabled or unnamed.
-  it('omits the chevrons entirely when onPrev/onNext are not given', () => {
+  // Agenda/backlog/notes have no paging — omitting `paging` must drop the
+  // chevrons entirely rather than rendering them disabled or unnamed.
+  it('omits the chevrons entirely when paging is not given', () => {
     render(<PagedTopbar isMobile={false} openSidebar={vi.fn()} label="Backlog" />)
     expect(screen.queryByRole('button', { name: 'Previous month' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Next month' })).not.toBeInTheDocument()
@@ -93,10 +90,7 @@ describe('PagedTopbar', () => {
         isMobile={false}
         openSidebar={vi.fn()}
         label="June 2026"
-        prevLabel="Previous month"
-        nextLabel="Next month"
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
+        paging={{ prevLabel: 'Previous month', nextLabel: 'Next month', onPrev: vi.fn(), onNext: vi.fn() }}
         expanded={false}
         onToggle={onToggle}
       />,
@@ -113,10 +107,7 @@ describe('PagedTopbar', () => {
         isMobile={false}
         openSidebar={vi.fn()}
         label="June 2026"
-        prevLabel="Previous month"
-        nextLabel="Next month"
-        onPrev={vi.fn()}
-        onNext={vi.fn()}
+        paging={{ prevLabel: 'Previous month', nextLabel: 'Next month', onPrev: vi.fn(), onNext: vi.fn() }}
         expanded={true}
         onToggle={vi.fn()}
       />,

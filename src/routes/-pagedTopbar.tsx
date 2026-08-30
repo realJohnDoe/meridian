@@ -13,10 +13,7 @@ export function PagedTopbar({
   isMobile,
   openSidebar,
   label,
-  prevLabel,
-  nextLabel,
-  onPrev,
-  onNext,
+  paging,
   expanded,
   onToggle,
   toggleRef,
@@ -24,11 +21,10 @@ export function PagedTopbar({
   isMobile: boolean
   openSidebar: () => void
   label: string
-  /** Prev/next chevrons render only when both a label and a handler are given for each direction. Omit both pairs for a view with no paging (agenda, backlog, notes). */
-  prevLabel?: string
-  nextLabel?: string
-  onPrev?: () => void
-  onNext?: () => void
+  /** Prev/next chevrons render only when this is given — bundled as one object rather than four
+   * separate optional props so a caller can't supply a label without its handler (or vice versa).
+   * Omit for a view with no paging (agenda, backlog, notes). */
+  paging?: { prevLabel: string; nextLabel: string; onPrev: () => void; onNext: () => void }
   /**
    * When provided together, the label becomes a disclosure button that opens
    * the topbar's quick-nav panel (see _app.tsx) instead of being static text.
@@ -38,7 +34,6 @@ export function PagedTopbar({
   /** Ref onto the disclosure button, so _app.tsx can return focus to it when the panel closes via Escape. Only meaningful alongside onToggle. */
   toggleRef?: React.Ref<HTMLButtonElement>
 }) {
-  const hasPaging = !!(onPrev || onNext)
 
   // flex-1 min-w-0 here is load-bearing for the plain (non-toggle) rendering
   // path below, not cosmetic: it needs a definite width handed down by flex
@@ -67,17 +62,17 @@ export function PagedTopbar({
             // chevrons (agenda, backlog, notes) there's nothing to push away
             // from, so flex-1 instead extends the button — and its tap
             // target — across the whole row, matching a plain label's reach.
-            hasPaging ? 'mr-auto' : 'flex-1',
+            paging ? 'mr-auto' : 'flex-1',
           )}
         >
           {labelNode}
           <ChevronDown size={16} className={cn('shrink-0 text-dim transition-transform', expanded && 'rotate-180')} aria-hidden />
         </button>
       ) : labelNode}
-      {!isMobile && hasPaging && (
+      {!isMobile && paging && (
         <>
-          <IconButton variant="ghost" className="text-dim" label={prevLabel ?? ''} onClick={onPrev}><ChevronLeft size={18} /></IconButton>
-          <IconButton variant="ghost" className="text-dim" label={nextLabel ?? ''} onClick={onNext}><ChevronRight size={18} /></IconButton>
+          <IconButton variant="ghost" className="text-dim" label={paging.prevLabel} onClick={paging.onPrev}><ChevronLeft size={18} /></IconButton>
+          <IconButton variant="ghost" className="text-dim" label={paging.nextLabel} onClick={paging.onNext}><ChevronRight size={18} /></IconButton>
         </>
       )}
     </div>

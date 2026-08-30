@@ -212,10 +212,12 @@ function AppMain() {
                     isMobile={isMobile}
                     openSidebar={openSidebar}
                     label={fmtTopBarMonth(dvDisplayDate, today)}
-                    prevLabel="Previous day"
-                    nextLabel="Next day"
-                    onPrev={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true })}
-                    onNext={() => navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true })}
+                    paging={{
+                      prevLabel: 'Previous day',
+                      nextLabel: 'Next day',
+                      onPrev: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true }),
+                      onNext: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true }),
+                    }}
                     expanded={quickNavOpen}
                     onToggle={toggleQuickNav}
                     toggleRef={toggleButtonRef}
@@ -231,10 +233,12 @@ function AppMain() {
                     isMobile={isMobile}
                     openSidebar={openSidebar}
                     label={fmtTopBarMonth(weekDisplayStart, today)}
-                    prevLabel="Previous week"
-                    nextLabel="Next week"
-                    onPrev={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true })}
-                    onNext={() => navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true })}
+                    paging={{
+                      prevLabel: 'Previous week',
+                      nextLabel: 'Next week',
+                      onPrev: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true }),
+                      onNext: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true }),
+                    }}
                     expanded={quickNavOpen}
                     onToggle={toggleQuickNav}
                     toggleRef={toggleButtonRef}
@@ -248,10 +252,12 @@ function AppMain() {
                     isMobile={isMobile}
                     openSidebar={openSidebar}
                     label={fmtTopBarMonth(monthDisplayDate, today)}
-                    prevLabel="Previous month"
-                    nextLabel="Next month"
-                    onPrev={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true })}
-                    onNext={() => navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true })}
+                    paging={{
+                      prevLabel: 'Previous month',
+                      nextLabel: 'Next month',
+                      onPrev: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true }),
+                      onNext: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true }),
+                    }}
                     expanded={quickNavOpen}
                     onToggle={toggleQuickNav}
                     toggleRef={toggleButtonRef}
