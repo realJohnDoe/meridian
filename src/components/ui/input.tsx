@@ -26,6 +26,7 @@ export interface InputProps
 function Input({ className, type, variant, ...props }: InputProps) {
   return (
     <input
+      data-slot="input"
       type={type}
       className={cn(inputVariants({ variant }), className)}
       {...props}

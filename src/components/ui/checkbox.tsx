@@ -10,6 +10,7 @@ function Checkbox({
 }: React.ComponentProps<typeof CheckboxPrimitive.Root> & { visualClassName?: string }) {
   return (
     <CheckboxPrimitive.Root
+      data-slot="checkbox"
       className={cn(
         'group relative shrink-0 touch-manipulation',
         // Expand touch target to 44px without affecting layout or visual size
@@ -32,7 +33,7 @@ function Checkbox({
         'group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-1',
         visualClassName,
       )}>
-        <CheckboxPrimitive.Indicator className="flex w-full h-full items-center justify-center">
+        <CheckboxPrimitive.Indicator data-slot="checkbox-indicator" className="flex w-full h-full items-center justify-center">
           {props.checked === 'indeterminate'
             ? <Minus className="size-[55%] stroke-white fill-none" strokeWidth={3} />
             : <Check className="size-[55%] stroke-white fill-none" strokeWidth={2.5} />}
