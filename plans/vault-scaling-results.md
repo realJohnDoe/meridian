@@ -25,6 +25,13 @@ before/after comparison, not as shipped latency.
 
 ## The planned move to infinite scroll
 
+**The implementation plan is `plans/agenda-infinite-scroll.md`** — it splits the
+work into four PRs, names a model per PR, and adds the four design decisions
+this section does not settle (an absolute rather than anchor-relative chunk
+grid, chunked sectioning, overdue as its own filtered expansion pass, and no
+auto-prepend in v1). The constraints below stay here, since they are findings;
+the plan references them rather than restating them.
+
 A move to a standard infinite-scroll agenda is planned. It changes what to do
 about two of these findings and nothing about the other four — and it inherits
 one constraint from finding #1 that is worth knowing before the design is
@@ -204,7 +211,9 @@ it is not lower-value, it is not separately actionable.
   in `computeExpansionCache`, `changedIndices` returning `null` on any length
   change, and the overdue section's need for the whole past window — the last
   of which is settled by the grouped-overdue decision recorded there, and
-  which carries its own paired change to `buildBucket`'s hoist. Treat this finding's expected
+  which carries its own paired change to `buildBucket`'s hoist. The sequenced
+  plan for all of it is `plans/agenda-infinite-scroll.md`; this finding closes
+  with that plan's PR 4. Treat this finding's expected
   effect (`vaultPaintMs` at mixed/30 000 from ~13 000 ms to under 1 000 ms) as
   the acceptance target for that work, measured with the recipe above.
 
