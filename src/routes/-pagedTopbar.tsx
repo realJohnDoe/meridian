@@ -42,6 +42,12 @@ export function PagedTopbar({
   // label in _app.tsx.
   const labelNode = <span className="flex-1 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{label}</span>
 
+  // Whether the prev/next chevron buttons are actually rendered below — not
+  // merely whether this view has paging semantics. On mobile those buttons
+  // are dropped for every view (see comment above), so day/week/month get no
+  // more chevrons to make room for there than agenda does.
+  const showsPagingButtons = !isMobile && paging
+
   return (
     <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
       {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
@@ -54,22 +60,28 @@ export function PagedTopbar({
           aria-controls="quickNavPanel"
           className={cn(
             'flex items-center gap-1 min-w-0 text-left',
-            // With paging chevrons present, the button must shrink to fit its
+            // With paging chevrons rendered, the button must shrink to fit its
             // own content (label + chevron) rather than claim flex-1 — mr-auto
             // then pushes the chevrons to the row's right edge in its place;
             // claiming flex-1 here too would fight that margin and let the
             // toggle chevron drift away from the label toward them. With no
-            // chevrons (agenda, backlog, notes) there's nothing to push away
+            // chevrons rendered (agenda always; day/week/month on mobile, where
+            // the chevrons below are dropped) there's nothing to push away
             // from, so flex-1 instead extends the button — and its tap
             // target — across the whole row, matching a plain label's reach.
-            paging ? 'mr-auto' : 'flex-1',
+            showsPagingButtons ? 'mr-auto' : 'flex-1',
           )}
         >
-          {labelNode}
+          {/* min-w-0 (not flex-1) here: the label must shrink-to-fit around
+              the chevron so the chevron hugs it — flex-1 would grow the label
+              across whatever width the button above claims (the full row, in
+              the no-paging case), dragging the chevron away to the row's far
+              edge instead of sitting next to the text. */}
+          <span className="min-w-0 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{label}</span>
           <ChevronDown size={16} className={cn('shrink-0 text-dim transition-transform', expanded && 'rotate-180')} aria-hidden />
         </button>
       ) : labelNode}
-      {!isMobile && paging && (
+      {showsPagingButtons && (
         <>
           <IconButton variant="ghost" className="text-dim" label={paging.prevLabel} onClick={paging.onPrev}><ChevronLeft size={18} /></IconButton>
           <IconButton variant="ghost" className="text-dim" label={paging.nextLabel} onClick={paging.onNext}><ChevronRight size={18} /></IconButton>
