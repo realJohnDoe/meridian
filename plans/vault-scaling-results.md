@@ -25,21 +25,21 @@ before/after comparison, not as shipped latency.
 
 ## The planned move to infinite scroll
 
-**The implementation plan is `plans/agenda-infinite-scroll.md`** — it splits the
-remaining work into three PRs, names a model per PR, and adds the design
-decisions this section does not settle (an absolute rather than anchor-relative
-chunk grid, chunked sectioning, and no auto-prepend in v1). The constraints
-below stay here, since they are findings; the plan references them rather than
-restating them.
+**The implementation plan is `plans/agenda-infinite-scroll.md`** — what is left
+of it is one PR, and it carries the one design decision this section does not
+settle (no auto-prepend in v1).
 
 A move to a standard infinite-scroll agenda is planned. It changes what to do
 about two of these findings and nothing about the other four.
 
-The overdue half of the work has already landed: the section comes off the
+Most of the groundwork has already landed. The overdue section came off the
 agenda window entirely (`calendar/overduePool.ts` expands a filtered item set
 over its own lookback) and renders one row per series rather than one per
 occurrence, so the constraint that used to hold the past window at 365 days is
-gone.
+gone. Both the expansion and the sectioning are now chunked on one absolute
+28-day grid (`calendar/agendaChunks.ts`), so growing or shrinking the loaded
+run costs the chunks that changed rather than all of them — which is what makes
+narrowing the initial run a small change rather than a rewrite.
 
 | # | Under infinite scroll |
 |---|---|
@@ -47,36 +47,6 @@ gone.
 | 4 | **Defer and re-measure after.** Row count at first paint drops from 185 882 to whatever one screen plus a chunk needs, so the symptom may go with it; profiling the current architecture measures code about to be replaced. |
 | 2, 5, 6 | Unaffected — none of them touches the agenda window. |
 | 3 | Still valid, but its character changes: the array it re-allocates starts smaller and **grows as the user scrolls**, so the cost arrives later in the session rather than at first paint. |
-
-### Two things in the current code that a naive implementation will hit
-
-Each is a fact about code as it stands today, not a prediction:
-
-1. **Widening one window re-expands all of it.** `computeExpansionCache` takes
-   its fast path only when the window matches exactly:
-   ```ts
-   if (prev && prev.fromMs === fromMs && prev.toMs === toMs && hasSameStructure(prev.items, items)) {
-   ```
-   and `useExpandWithMultiday` keys its cache by `` `${fromMs}:${toMs}` ``. So a
-   "load more" that grows one window is a cache miss that re-expands the whole
-   widened range from scratch. Scrolling back a year in 30-day steps that way is
-   twelve full re-expansions of a growing window — quadratic in the occurrence
-   count, against a stage already measured at 7 110 ms for a single pass at
-   mixed/30 000.
-   **Do instead:** expand fixed, disjoint chunks — each its own stable
-   `(from, to)` key that is expanded once and stays eligible for the
-   metadata-overlay fast path — and concatenate. Note `MAX_CACHED_WINDOWS = 16`
-   in `useExpandWithMultiday`; chunked scrolling will evict live chunks well
-   before then and that cap needs revisiting with the chunk size.
-
-2. **Any length change drops the whole section cache.** `changedIndices`
-   (`calendar/agendaSections.ts`) returns `null` — meaning "rebuild every
-   section" — the moment `prev.length !== next.length`. Appending a chunk is a
-   length change, so each load-more currently costs a full regroup
-   (3 631 ms at mixed/30 000, though far less on a chunked window). Appending at
-   the end keeps existing indices valid; **prepending past days shifts every
-   index** and is the case to design around, since `keyByIndex` and
-   `changedIndices` both assume positional alignment.
 
 ## Findings
 
@@ -114,16 +84,20 @@ it is not lower-value, it is not separately actionable.
   `node scripts/perf/stress.mjs --shapes mixed,flat --sizes 3000,30000 --skip-ui --skip-dexie`;
   read `pipeline.result.expandAgendaWindow.median` and
   `pipeline.result.occurrencesInAgendaWindow`.
-- **Breadth** — `calendar/useAgendaSections.ts`, `calendar/agendaSections.ts`,
+- **Breadth** — `calendar/agendaChunks.ts`, `calendar/useAgendaChunks.ts`,
   `model/expansionCache.ts` (plus month/day, which have their own windows).
-- **Evidence** — `src/calendar/useAgendaSections.ts`:
+- **Evidence** — `src/calendar/agendaChunks.ts`:
   ```ts
   export const EXPAND_PAST_DAYS = 365
   export const EXPAND_FUTURE_DAYS = 90
   ...
-  const { from, to } = dayRange(addDays(anchor, -EXPAND_PAST_DAYS), addDays(anchor, EXPAND_FUTURE_DAYS))
-  const allOccs = useExpandWithMultiday(items, roots, from, to)
+  export function agendaChunkRun(anchor: Date, ws: 0 | 1 | 6): number[] {
+    return chunkIndicesFor(addDays(anchor, -EXPAND_PAST_DAYS), addDays(anchor, EXPAND_FUTURE_DAYS), ws)
+  }
   ```
+  Expansion and sectioning are both chunked now, so a load-more costs one
+  chunk — but the *run* is still seeded at the full ±455 days on the first
+  render, so first paint pays for all of it.
 - **Problem** — the window is a constant, so the work to reach first paint is
   proportional to every occurrence in 455 days regardless of how many the user
   can see; the virtualizer then mounts ~26 rows out of 185 882. The user waits

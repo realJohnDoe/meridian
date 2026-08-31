@@ -3,9 +3,10 @@ import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { setupStore, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { fmtISO } from '@/model'
-import { useAgendaSections, EXPAND_PAST_DAYS, EXPAND_FUTURE_DAYS } from './useAgendaSections'
+import { addDays } from '@/format'
+import { useAgendaSections } from './useAgendaSections'
 import type { AgendaRow } from './useAgendaSections'
-import { WALK_PAST_DAYS, WALK_FUTURE_DAYS } from './agendaSections'
+import { agendaChunkRun, chunkRange, CHUNK_DAYS, EXPAND_PAST_DAYS, EXPAND_FUTURE_DAYS } from './agendaChunks'
 import { OVERDUE_LOOKBACK_DAYS } from './overduePool'
 import { calendarView } from './viewState'
 
@@ -30,15 +31,26 @@ const overdueGroups = (rows: AgendaRow[]) =>
  * ~15 month rows the [today-365, today+90] window always carries. */
 const content = (rows: AgendaRow[]) => rows.filter(r => r.kind !== 'month' && r.kind !== 'week')
 
-describe('the agenda\'s three window constants', () => {
-  // One number used to mean all three of these. They are separate now because
-  // they have separate reasons to change; the only relationship that must hold
-  // is that the expansion covers the walk, and nothing in the types enforces
-  // it — a day the walk visits but the expansion never reached renders empty
-  // instead of showing its content, silently.
-  it('expands at least as far as the day-by-day walk covers', () => {
-    expect(EXPAND_PAST_DAYS).toBeGreaterThanOrEqual(WALK_PAST_DAYS)
-    expect(EXPAND_FUTURE_DAYS).toBeGreaterThanOrEqual(WALK_FUTURE_DAYS)
+describe('the agenda\'s window constants', () => {
+  // One number used to mean three different things: the expansion window, the
+  // day-by-day render walk's span, and the overdue lookback. The walk's own
+  // pair is gone — the walk covers exactly the chunks that were expanded (see
+  // agendaChunks.ts), so "a day the walk visits but the expansion never
+  // reached renders empty, silently" can no longer be expressed. What is left
+  // is the run's chunk alignment, which that guarantee now rests on.
+  it('covers the requested window with whole chunks, reaching at least as far in each direction', () => {
+    const run = agendaChunkRun(TODAY, 1)
+    const from = chunkRange(run[0]!, 1).from
+    const to = chunkRange(run[run.length - 1]!, 1).to
+
+    expect(run).toHaveLength(new Set(run).size)
+    expect(run[run.length - 1]! - run[0]! + 1).toBe(run.length) // contiguous
+    expect(from.getTime()).toBeLessThanOrEqual(addDays(TODAY, -EXPAND_PAST_DAYS).getTime())
+    expect(to.getTime()).toBeGreaterThanOrEqual(addDays(TODAY, EXPAND_FUTURE_DAYS).getTime())
+    // Every chunk boundary is a week start, which is what makes a chunk's
+    // month/week dividers a pure function of its own index.
+    for (const index of run) expect(chunkRange(index, 1).from.getDay()).toBe(1)
+    expect(CHUNK_DAYS % 7).toBe(0)
   })
 
   it('looks back for overdue work independently of the agenda window', () => {

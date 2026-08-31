@@ -1,19 +1,20 @@
 import { useEffect } from 'react'
-import type { StoreItem, Roots, Occurrence } from '@/types'
+import type { StoreItem, Roots } from '@/types'
 import { computeExpansionCache, type ExpansionCache } from '@/model'
-import { chunkIndicesFor, chunkRange } from './agendaChunks'
+import { chunkRange } from './agendaChunks'
+import type { AgendaChunkOccs } from './agendaSections'
 import { agendaChunkCache } from './expansionCaches'
 
-interface ConcatMemo {
+interface RunMemo {
   indices: number[]
   chunks: ExpansionCache[]
-  allOccs: Occurrence[]
+  run: AgendaChunkOccs[]
 }
 
 // Single-slot, same reasoning as useAgendaSections' own cache slots: the
-// agenda is a singleton view, so one memoized concatenation is enough.
-const CONCAT_KEY = 'agenda'
-const concatSlot = new Map<typeof CONCAT_KEY, ConcatMemo>()
+// agenda is a singleton view, so one memoized run is enough.
+const RUN_KEY = 'agenda'
+const runSlot = new Map<typeof RUN_KEY, RunMemo>()
 
 function sameIndices(a: number[], b: number[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i])
@@ -30,20 +31,21 @@ function sameChunks(a: ExpansionCache[], b: ExpansionCache[]): boolean {
 }
 
 /**
- * The agenda's own chunked expansion: `[from, to]` is covered by a run of
- * fixed, disjoint 28-day chunks (agendaChunks.ts), each expanded and cached
- * independently — so widening the window (a jump in from Month/Day view, or a
- * future "load more") reuses every chunk that still overlaps instead of
- * re-expanding the whole span the way a single `(fromMs, toMs)`-keyed cache
- * would. See plans/agenda-infinite-scroll.md's PR 2.
+ * The agenda's own chunked expansion: the loaded run (agendaChunks.ts's
+ * `agendaChunkRun`) is a list of fixed, disjoint 28-day chunks, each expanded
+ * and cached independently — so widening the run (a jump in from Month/Day
+ * view, or a future "load more") reuses every chunk it already holds instead
+ * of re-expanding the whole span the way a single `(fromMs, toMs)`-keyed cache
+ * would.
  *
  * Deliberately not `useExpandWithMultiday`: that hook's `cacheByWindow` is an
  * LRU sized for Month/Day/Week's several concurrent panes
  * (`MAX_CACHED_WINDOWS`), and chunked scrolling would evict live chunks well
  * before that cap. `agendaChunkCache` (expansionCaches.ts) is this hook's own
- * map instead, with a genuinely different eviction policy. For now (PR 2) that
- * policy is simply "keep every chunk in the requested range, drop the rest" —
- * retention across loads is PR 4's problem.
+ * map instead, with a genuinely different eviction policy. For now that policy
+ * is simply "keep every chunk in the requested run, drop the rest" — retention
+ * across loads is the incremental-loading PR's problem
+ * (plans/agenda-infinite-scroll.md).
  *
  * Every chunk's own `ExpansionCache` already carries the `(fromMs, toMs)` it
  * was built for (model/expansionCache.ts). A lookup that finds an entry whose
@@ -53,21 +55,19 @@ function sameChunks(a: ExpansionCache[], b: ExpansionCache[]): boolean {
  * recomputed rather than silently reused, and logged loudly in dev: reusing it
  * would resolve to a wrong chunk's occurrences with no other symptom.
  *
- * The concatenated result is itself memoized on the chunk list's identity, not
- * rebuilt fresh every render: `computeAgendaSections` short-circuits entirely
- * when its `allOccs` argument is reference-identical to last time, and a fresh
- * array here on every call (even when every chunk hit cache) would silently
- * lose that fast path.
+ * The result is one occurrence array *per chunk*, not one concatenated array,
+ * because sectioning is chunked too (agendaSections.ts): the per-chunk arrays
+ * are what let a rebuild stay proportional to the chunks that actually
+ * changed. The run itself is memoized on the chunk list's identity rather than
+ * rebuilt fresh every render, since `computeAgendaSections` short-circuits
+ * entirely when its `chunkOccs` argument is reference-identical to last time.
  */
 export function useAgendaChunks(
   items: StoreItem[],
   roots: Roots,
-  from: Date,
-  to: Date,
+  indices: number[],
   ws: 0 | 1 | 6,
-): Occurrence[] {
-  const indices = chunkIndicesFor(from, to, ws)
-
+): AgendaChunkOccs[] {
   // Value writes, render phase. Safe here for the same reason
   // useExpandWithMultiday's own render-phase write is: computeExpansionCache
   // returns `reusable` by reference when nothing changed, so repeating this
@@ -90,7 +90,7 @@ export function useAgendaChunks(
 
   // Eviction, commit phase — housekeeping, not a value the render depends on,
   // so it belongs after commit like useExpandWithMultiday's own recency touch.
-  // Drops every cached chunk outside the requested range; see the eviction
+  // Drops every cached chunk outside the requested run; see the eviction
   // policy note above.
   useEffect(() => {
     const requested = new Set(indices)
@@ -99,16 +99,14 @@ export function useAgendaChunks(
     }
   })
 
-  const memo = concatSlot.get(CONCAT_KEY)
+  const memo = runSlot.get(RUN_KEY)
   if (memo && sameIndices(memo.indices, indices) && sameChunks(memo.chunks, chunks)) {
-    return memo.allOccs
+    return memo.run
   }
 
-  // Chunks are disjoint, ascending, and each already sorted by dedupeAndSort
-  // (model/expansion.ts), so this concatenation is globally sorted with no
-  // extra pass needed. Kept in ascending order regardless of that
-  // belt-and-braces fact — PR 3's chunk-local sectioning relies on it.
-  const allOccs = chunks.flatMap(c => c.allOccs)
-  concatSlot.set(CONCAT_KEY, { indices, chunks, allOccs })
-  return allOccs
+  // Ascending and disjoint, which is what lets the sectioning stage
+  // concatenate one chunk's rows after another's with no merge pass.
+  const run = chunks.map((c, i) => ({ index: indices[i]!, occs: c.allOccs }))
+  runSlot.set(RUN_KEY, { indices, chunks, run })
+  return run
 }
