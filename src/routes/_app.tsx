@@ -10,7 +10,7 @@ import {
   useMonthPreview, useDayPreview, useWeekPreview,
   useAgendaTopDate, requestScrollToToday, requestScrollToDate, weekStartFor,
   useQuickNavOpen, toggleQuickNav, closeQuickNav, MonthStrip, MiniMonth,
-  useCurrentDate, setCurrentDate,
+  useCurrentDate, setCurrentDate, useQuickNavSwipe,
 } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ViewFilterButton } from '@/components'
@@ -125,6 +125,10 @@ function AppMain() {
   const isWeekView   = !!weekMatch
   const isMonthView  = !!monthMatch
   const isListView   = !!backlogMatch || !!notesMatch
+  // Vertical swipe on the topbar chrome as an alternate gesture for the quick-nav
+  // panel's own disclosure button — see useQuickNavSwipe. Disabled on Backlog/Notes,
+  // which render no panel to toggle.
+  const quickNavSwipeRef = useQuickNavSwipe<HTMLDivElement>(!isListView)
   const dvDate       = dayMatch ? new Date(dayMatch.params.date + 'T00:00:00') : null
   const monthViewDate = monthMatch ? parseMonth(monthMatch.params.month) : null
   // The route param need not already be week-start-normalized (see WeekView),
@@ -197,7 +201,7 @@ function AppMain() {
             is currently visible — the header alone while the panel is closed
             or absent, both together once it opens — with no divider between
             the two. */}
-        <div className="shrink-0 z-10 bg-background border-b border-border shadow-md">
+        <div ref={quickNavSwipeRef} className="shrink-0 z-10 bg-background border-b border-border shadow-md">
           <header
             id="mainTop"
             className="h-topbar pt-[env(safe-area-inset-top)] flex items-center"
