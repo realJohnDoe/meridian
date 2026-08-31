@@ -123,6 +123,15 @@ interface Props {
   /** Day(s) to visually mark as the calling view's current focus — one date for day/agenda, and the active week's start date for week view. */
   highlightDates: Date[]
   onSelectDay: (iso: string) => void
+  /**
+   * Called with the 1st of the month whenever the grid's own browsed month
+   * changes — a settled swipe, a day-picker keyboard month change, or a
+   * MonthStrip chip tap. The caller navigates the underlying view there
+   * (without closing the panel, unlike `onSelectDay`), so browsing months
+   * here keeps the main view, its highlighted day, and this grid's own
+   * highlight all in step, without requiring an explicit day tap.
+   */
+  onBrowseMonth: (d: Date) => void
 }
 
 /**
@@ -130,19 +139,31 @@ interface Props {
  * month grid above a month-chip row (MonthStrip, the same one month view's
  * own quick-nav panel uses), opened by the same disclosure button month
  * view's MonthStrip uses (see `_app.tsx`). Tapping a day jumps the calendar
- * there; tapping a chip or swiping the grid itself just pages which month the
- * grid is browsing, mirroring month view's own chip-driven navigation.
+ * there; tapping a chip or swiping the grid itself pages which month the grid
+ * is browsing *and* reports it via `onBrowseMonth`, mirroring month view's
+ * own chip-driven navigation.
  *
- * **Trap.** The grid's own paging — chips and swipes alike — moves a *local*
- * month; it must never navigate the main view or relabel the topbar, which is
- * why `month` is local state here rather than a prop, and only ever reset
- * from `anchorMonth` on open (see `useResetOnChange` below).
+ * Browsing is still locally tracked (`month` below) rather than driven
+ * straight off `anchorMonth`, so a parent re-render mid-browse (e.g. the
+ * `onBrowseMonth` navigation itself echoing back as a new `anchorMonth`)
+ * can't yank the grid back to some earlier month — see `useResetOnChange`
+ * below, which only ever resyncs `month` from `anchorMonth` on a fresh open.
  */
-export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectDay }: Props) {
-  const [month, setMonth] = useState(anchorMonth)
+export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectDay, onBrowseMonth }: Props) {
+  const [month, setMonthState] = useState(anchorMonth)
+
+  // Reports every genuine browse (swipe commit, day-picker keyboard nav,
+  // chip tap — see the three setMonth call sites below) to the caller.
+  // useResetOnChange's own re-sync below uses setMonthState directly instead,
+  // so reopening the panel (or the echo of our own onBrowseMonth navigation
+  // landing back in anchorMonth) never re-fires onBrowseMonth.
+  const setMonth = (d: Date) => {
+    setMonthState(d)
+    onBrowseMonth(startOfMonth(d))
+  }
 
   useResetOnChange([open, fmtMonth(anchorMonth)], () => {
-    if (open) setMonth(anchorMonth)
+    if (open) setMonthState(anchorMonth)
   })
 
   const items = useStore(s => s.items)

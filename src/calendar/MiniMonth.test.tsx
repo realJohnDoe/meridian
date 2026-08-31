@@ -30,10 +30,11 @@ function dayButton(container: HTMLElement, date: Date): HTMLButtonElement {
 function renderMini(items: StoreOcc[], overrides: Partial<React.ComponentProps<typeof MiniMonth>> = {}) {
   seedStore(items, makeRoots('note.md'))
   const onSelectDay = vi.fn()
+  const onBrowseMonth = vi.fn()
   const utils = render(
-    <MiniMonth open anchorMonth={ANCHOR} highlightDates={[]} onSelectDay={onSelectDay} {...overrides} />,
+    <MiniMonth open anchorMonth={ANCHOR} highlightDates={[]} onSelectDay={onSelectDay} onBrowseMonth={onBrowseMonth} {...overrides} />,
   )
-  return { ...utils, onSelectDay }
+  return { ...utils, onSelectDay, onBrowseMonth }
 }
 
 describe('MiniMonth', () => {
@@ -94,17 +95,18 @@ describe('MiniMonth', () => {
   // expansion computation (see MiniMonth's carousel) — which routinely takes
   // over a second even outside CI; the default 5s timeout is too tight under
   // CI contention, so these two get explicit headroom rather than a flaky retry.
-  it("pages the grid's own month via the month-chip row without calling onSelectDay", () => {
-    const { onSelectDay } = renderMini([])
+  it("pages the grid's own month via the month-chip row, reporting it via onBrowseMonth rather than onSelectDay", () => {
+    const { onSelectDay, onBrowseMonth } = renderMini([])
     expect(screen.getByRole('button', { name: 'August 2026' })).toHaveAttribute('aria-current', 'date')
     fireEvent.click(screen.getByRole('button', { name: 'September 2026' }))
     expect(screen.getByRole('button', { name: 'September 2026' })).toHaveAttribute('aria-current', 'date')
     expect(onSelectDay).not.toHaveBeenCalled()
+    expect(onBrowseMonth).toHaveBeenCalledExactlyOnceWith(new Date(2026, 8, 1))
   }, 20000)
 
   it('re-syncs the browsed month to anchorMonth when the panel re-opens, not while it stays open', () => {
     function Host({ open }: { open: boolean }) {
-      return <MiniMonth open={open} anchorMonth={ANCHOR} highlightDates={[]} onSelectDay={() => {}} />
+      return <MiniMonth open={open} anchorMonth={ANCHOR} highlightDates={[]} onSelectDay={() => {}} onBrowseMonth={() => {}} />
     }
     seedStore([], makeRoots('note.md'))
     const { rerender } = render(<Host open />)

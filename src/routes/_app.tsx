@@ -344,6 +344,12 @@ function AppMain() {
                       void navigate({ to: '/day/$date', params: { date: iso } })
                       closeQuickNav()
                     }}
+                    onBrowseMonth={d => {
+                      // replace: true — browsing months here is view state,
+                      // not a navigation event, matching the carousels'
+                      // own commit navigations (see e.g. MonthView).
+                      void navigate({ to: '/day/$date', params: { date: fmtISO(d) }, replace: true })
+                    }}
                   />
                 ) : isWeekView && weekStartDate && weekDisplayStart ? (
                   <MiniMonth
@@ -359,6 +365,11 @@ function AppMain() {
                       void navigate({ to: '/week/$date', params: { date: iso } })
                       closeQuickNav()
                     }}
+                    onBrowseMonth={d => {
+                      const iso = fmtISO(d)
+                      setCurrentDate(iso)
+                      void navigate({ to: '/week/$date', params: { date: iso }, replace: true })
+                    }}
                   />
                 ) : !isDayView && !isWeekView && !isMonthView ? (
                   <MiniMonth
@@ -369,6 +380,7 @@ function AppMain() {
                       requestScrollToDate(iso)
                       closeQuickNav()
                     }}
+                    onBrowseMonth={d => requestScrollToDate(fmtISO(d))}
                   />
                 ) : null}
               </div>
