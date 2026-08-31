@@ -15,7 +15,7 @@ function Checkbox({
         'group relative shrink-0 touch-manipulation',
         // Expand touch target to 44px without affecting layout or visual size
         "before:absolute before:-inset-3 before:content-['']",
-        'focus-visible:outline-none',
+        'focus-visible:outline-hidden',
         'disabled:cursor-not-allowed',
         className,
       )}

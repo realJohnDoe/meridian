@@ -56,7 +56,7 @@ function DrawerContent({
           'fixed bottom-0 left-1/2 z-50 -translate-x-1/2',
           'w-full max-w-md lg:max-w-lg max-h-[85dvh] flex flex-col',
           'bg-background border-t border-border rounded-t-3xl',
-          'pb-6 focus:outline-none',
+          'pb-6 focus:outline-hidden',
           className,
         )}
         {...props}

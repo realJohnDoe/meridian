@@ -12,6 +12,11 @@
  * 5. Kept signatures            → documented @layer components block at bottom of this file.
  *    Current kept set: .swipe-hint/.swipe-row, .now-line/.now-dot, .search-bar-wrap (brand CTA glow), .save-btn.
  * 6. @theme + :root tokens below are the design system — extend here, not in components.
+ * 7. Tailwind's `dark:` variant is a no-op here — next-themes applies one of ten named
+ *    theme classes to <html> (meridian, tokyo-night, catppuccin-latte, …), never the literal
+ *    `.dark` class the variant matches, and there is no `@custom-variant dark` override below.
+ *    A `dark:` utility copied from shadcn's upstream registry silently does nothing; a
+ *    theme-specific adjustment belongs in that theme's own custom-property block instead.
  */
 
 /* ── THEME TOKENS → Tailwind utilities ──────────────────────── */

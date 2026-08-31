@@ -48,7 +48,7 @@ function PopoverContent({
         className={cn(
           'max-h-[calc(var(--vv-height,100svh)-2rem)]',
           'z-50 w-72 rounded-lg border border-input bg-popover p-0 shadow-lg overflow-y-auto',
-          'outline-none data-[state=open]:animate-in data-[state=closed]:animate-out',
+          'outline-hidden data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
           'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
           'data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2',
