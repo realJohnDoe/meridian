@@ -26,6 +26,7 @@ function SelectTrigger({
         'px-3 text-xs font-semibold text-primary whitespace-nowrap',
         'transition-colors focus:outline-none focus:border-primary',
         'disabled:cursor-not-allowed disabled:text-muted-foreground/70',
+        'aria-invalid:border-destructive',
         '[&>span]:truncate',
         className,
       )}
