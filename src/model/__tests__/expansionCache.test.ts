@@ -212,4 +212,30 @@ describe('computeExpansionCache', () => {
     expect(second.allOccs.find(o => o.id === 'override-1')?.metadata.participants).toEqual(['carol'])
     expect(second.allOccs.find(o => o.date === '2026-06-08')?.metadata.participants).toEqual(['alice', 'bob'])
   })
+
+  it('overlays a changed file title onto every one of its occurrences when they land at several positions in allOccs', () => {
+    // Regression test for the reverse index used by the overlay fast path:
+    // note-a has occurrences interleaved with note-b's throughout allOccs, so
+    // a naive single-index (id/entryKey -> one position) would miss all but
+    // the last one.
+    const a1 = occ({ id: 'a1', entryKey: keyOf('note-a.md'), date: '2026-05-26' })
+    const b1 = occ({ id: 'b1', entryKey: keyOf('note-b.md'), date: '2026-05-27' })
+    const a2 = occ({ id: 'a2', entryKey: keyOf('note-a.md'), date: '2026-05-28' })
+    const b2 = occ({ id: 'b2', entryKey: keyOf('note-b.md'), date: '2026-05-29' })
+    const a3 = occ({ id: 'a3', entryKey: keyOf('note-a.md'), date: '2026-05-30' })
+    const items = [a1, b1, a2, b2, a3]
+    const roots1 = rootsOf([
+      ['note-a.md', { title: 'Old Title', tags: [], items: [] }],
+      ['note-b.md', { title: 'Note B', tags: [], items: [] }],
+    ])
+
+    const first = computeExpansionCache(null, items, roots1, from, to)
+
+    const roots2 = new Map(roots1)
+    roots2.set(keyOf('note-a.md'), { title: 'New Title', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'note-a.md' })
+    const second = computeExpansionCache(first, items, roots2, from, to)
+
+    expect(second.allOccs.filter(o => o.entryKey === keyOf('note-a.md')).map(o => o.metadata.title)).toEqual(['New Title', 'New Title', 'New Title'])
+    expect(second.allOccs.filter(o => o.entryKey === keyOf('note-b.md')).every(o => o.metadata.title === 'Note B')).toBe(true)
+  })
 })
