@@ -31,7 +31,7 @@ function CommandInput({
         data-slot="command-input"
         className={cn(
           // text-base below sm: iOS Safari auto-zooms on focus of inputs under 16px
-          'flex h-10 w-full rounded-md bg-transparent py-3 text-base sm:text-sm outline-none',
+          'flex h-10 w-full rounded-md bg-transparent py-3 text-base sm:text-sm outline-hidden',
           'placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
@@ -86,7 +86,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        'relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-2 text-sm outline-none',
+        'relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-2 text-sm outline-hidden',
         'data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50',
         'data-[selected=true]:bg-accent data-[selected=true]:text-foreground',
         className,
