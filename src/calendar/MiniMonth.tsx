@@ -44,7 +44,13 @@ function makeDayButton(dotsByDay: Map<string, DotCategory[]>) {
           // hair off --background (see index.css), so the selected day was
           // easy to lose in a grid of 35 cells. The tint/outline split still
           // keeps it plainly distinct from today's solid fill.
-          today && 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
+          // The ring-2/ring-inset/ring-primary/font-semibold below are
+          // CalendarDayButton's own base "today" treatment (the same tint/ring
+          // style, reused for the editor's date picker) — cancelled here since
+          // this grid's today cell is the solid fill, not the ring, and none of
+          // those utilities share a bg/text conflict group with the overrides
+          // above so twMerge won't drop them on its own.
+          today && 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground ring-0 ring-transparent font-normal',
           highlight && !today && 'bg-primary/15 text-foreground font-semibold ring-2 ring-inset ring-primary hover:bg-primary/25',
           className,
         )}
