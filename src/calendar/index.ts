@@ -12,6 +12,7 @@ export {
   requestScrollToDate, useCurrentDate, setCurrentDate, setCurrentMonthKeepingDay, setCurrentWeekKeepingWeekday,
   useQuickNavOpen, toggleQuickNav, closeQuickNav,
 } from './viewState'
+export { useQuickNavSwipe } from './useQuickNavSwipe'
 export { default as MonthStrip } from './MonthStrip'
 export { default as MiniMonth } from './MiniMonth'
 export { dayDotsFor, dotCategory, type DotCategory } from './dayDots'
