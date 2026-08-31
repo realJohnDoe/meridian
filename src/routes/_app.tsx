@@ -10,6 +10,7 @@ import {
   useMonthPreview, useDayPreview, useWeekPreview,
   useAgendaTopDate, requestScrollToToday, requestScrollToDate, weekStartFor,
   useQuickNavOpen, toggleQuickNav, closeQuickNav, MonthStrip, MiniMonth,
+  useCurrentDate, setCurrentDate,
 } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ViewFilterButton } from '@/components'
@@ -87,6 +88,7 @@ function AppMain() {
   const monthPreview  = useMonthPreview()
   const dayPreview    = useDayPreview()
   const weekPreview   = useWeekPreview()
+  const currentDate   = useCurrentDate()
   const ws            = weekStartsOn(useStore(s => s.localePrefs))
   const quickNavOpen  = useQuickNavOpen()
 
@@ -157,6 +159,14 @@ function AppMain() {
     if (isDayView) {
       void navigate({ to: '/day/$date', params: { date: fmtISO(today) } })
     } else if (isWeekView) {
+      // WeekPage's own effect always runs the route date through
+      // setCurrentWeekKeepingWeekday, which preserves the *previously*
+      // selected weekday rather than adopting the target date's own — see
+      // its own doc comment. Setting currentDate here first means that
+      // effect reads it back as already-today and no-ops, so "Today"
+      // actually lands currentDate (and the quick-nav highlight) on today
+      // instead of on today's week with the old weekday kept.
+      setCurrentDate(fmtISO(today))
       void navigate({ to: '/week/$date', params: { date: fmtISO(today) } })
     } else if (isMonthView) {
       void navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } })
@@ -334,15 +344,31 @@ function AppMain() {
                       void navigate({ to: '/day/$date', params: { date: iso } })
                       closeQuickNav()
                     }}
+                    onBrowseMonth={d => {
+                      // replace: true — browsing months here is view state,
+                      // not a navigation event, matching the carousels'
+                      // own commit navigations (see e.g. MonthView).
+                      void navigate({ to: '/day/$date', params: { date: fmtISO(d) }, replace: true })
+                    }}
                   />
                 ) : isWeekView && weekStartDate && weekDisplayStart ? (
                   <MiniMonth
                     open={quickNavOpen}
                     anchorMonth={weekDisplayStart}
-                    highlightDates={[weekDisplayStart]}
+                    highlightDates={[parseDateString(currentDate) ?? weekDisplayStart]}
                     onSelectDay={iso => {
+                      // See the "Today" handler's comment above: set
+                      // currentDate directly so the picked day — not the
+                      // previously selected weekday — is what ends up
+                      // highlighted and current.
+                      setCurrentDate(iso)
                       void navigate({ to: '/week/$date', params: { date: iso } })
                       closeQuickNav()
+                    }}
+                    onBrowseMonth={d => {
+                      const iso = fmtISO(d)
+                      setCurrentDate(iso)
+                      void navigate({ to: '/week/$date', params: { date: iso }, replace: true })
                     }}
                   />
                 ) : !isDayView && !isWeekView && !isMonthView ? (
@@ -354,6 +380,7 @@ function AppMain() {
                       requestScrollToDate(iso)
                       closeQuickNav()
                     }}
+                    onBrowseMonth={d => requestScrollToDate(fmtISO(d))}
                   />
                 ) : null}
               </div>
