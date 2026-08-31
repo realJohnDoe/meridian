@@ -6,6 +6,7 @@ import { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS, BADGE_H } from './timelineGeom
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import { useCarousel } from './useCarousel'
+import { useCarouselPreview } from './useCarouselPreview'
 import { PANE_COUNT } from './snapCarousel'
 import { occRadius } from '@/components/primitives/occurrence-variants'
 import { calendarView, setMonthPreview } from './viewState'
@@ -45,25 +46,19 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
     return d.toLocaleDateString(undefined, { weekday: 'short' })
   })
 
+  const { onPreview, onRecentered } = useCarouselPreview({
+    get: () => calendarView.getState().monthPreview,
+    set: setMonthPreview,
+  })
+
   const { emblaRef, paneKeys } = useCarousel({
     unitKey: fmtMonth(month),
     paneCount: PANE_COUNT,
     unitAt: offset => fmtMonth(new Date(month.getFullYear(), month.getMonth() + offset, 1)),
     onCommit: key => onNavigateMonth(parseMonth(key)),
-    onPreview: key => setMonthPreview(key),
-    // The route is authoritative again once `month` has actually committed,
-    // so clear any preview here — otherwise a stale preview could linger past
-    // a commit that resolved to a different month than predicted.
-    onRecentered: () => {
-      if (calendarView.getState().monthPreview !== null) setMonthPreview(null)
-    },
+    onPreview,
+    onRecentered,
   })
-
-  // If a swipe is left in flight (e.g. the user navigates away via the
-  // sidebar before the gesture settles and onRecentered fires), the preview
-  // would otherwise survive in the shared store and briefly mislabel the
-  // topbar on the next visit to this route.
-  useEffect(() => () => setMonthPreview(null), [])
 
   // The Embla viewport also serves as the gridH measurement target, so its node
   // is captured alongside Embla's own ref via this merged callback.

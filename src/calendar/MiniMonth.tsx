@@ -12,6 +12,7 @@ import { useCalendarFilter } from './useCalendarFilter'
 import { dayDotsFor, DOT_COLOR, type DotCategory } from './dayDots'
 import { CALENDAR_FORMATTERS, useCalendarWeekStartsOn } from './calendarLocale'
 import { useCarousel } from './useCarousel'
+import { useCarouselPreview } from './useCarouselPreview'
 import MonthStrip from './MonthStrip'
 
 // Deliberately not the day/week/month views' own PANE_COUNT (5): each pane
@@ -158,17 +159,24 @@ interface Props {
  * `onBrowseMonth` navigation itself echoing back as a new `anchorMonth`)
  * can't yank the grid back to some earlier month — see `useResetOnChange`
  * below, which only ever resyncs `month` from `anchorMonth` on a fresh open
- * (or, for a swipe still in flight, once it settles — see monthPreview).
+ * (or, for a swipe still in flight, once it settles — see browsePreview).
  */
 export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectDay, onBrowseMonth }: Props) {
   const [month, setMonthState] = useState(anchorMonth)
   // `YYYY-MM` the swipe carousel is settling toward, set on touchend so
   // MonthStrip's highlight below tracks the gesture immediately instead of
   // waiting for it to fully settle and `month` to commit — mirrors
-  // MonthView's monthPreview, just kept as local state rather than in the
-  // shared calendarView store, since MonthStrip is mounted right here as a
-  // child rather than in a separate topbar component.
-  const [monthPreview, setMonthPreview] = useState<string | null>(null)
+  // MonthView's own monthPreview, just kept as local state (via
+  // useCarouselPreview below) rather than in the shared calendarView store,
+  // since MonthStrip is mounted right here as a child rather than in a
+  // separate topbar component. Named distinctly from calendarView's own
+  // monthPreview field — a different, unrelated piece of state — to avoid
+  // conflating the two.
+  const [browsePreview, setBrowsePreview] = useState<string | null>(null)
+  const { onPreview: onBrowsePreview, onRecentered } = useCarouselPreview({
+    get: () => browsePreview,
+    set: setBrowsePreview,
+  })
 
   // Reports every genuine browse (swipe commit, day-picker keyboard nav,
   // chip tap — see the three setMonth call sites below) to the caller.
@@ -181,14 +189,14 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
   }
 
   useResetOnChange([open, fmtMonth(anchorMonth)], () => {
-    // Also gated on monthPreview being clear: onPreview below already
+    // Also gated on browsePreview being clear: onPreview below already
     // reports a live swipe to the caller, whose navigation can echo straight
     // back here as a new anchorMonth before the swipe has actually settled.
     // `month` (driving this carousel's own pane recentering) must stay put
     // until it does — see onPreview's own comment — so skip the resync
     // while a preview is still in flight; it'll match by the time this
     // fires again anyway, since onCommit sets `month` to the same value.
-    if (open && monthPreview === null) setMonthState(anchorMonth)
+    if (open && browsePreview === null) setMonthState(anchorMonth)
   })
 
   const items = useStore(s => s.items)
@@ -211,12 +219,10 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
     // see the useResetOnChange guard above, which keeps anchorMonth's own
     // echo of this navigation from doing that early either.
     onPreview: key => {
-      setMonthPreview(key)
+      onBrowsePreview(key)
       onBrowseMonth(startOfMonth(parseMonth(key)))
     },
-    // `month` is authoritative again once it has actually committed, so
-    // clear the preview here — mirrors MonthView's own onRecentered.
-    onRecentered: () => setMonthPreview(null),
+    onRecentered,
   })
 
   return (
@@ -243,7 +249,7 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
           ))}
         </div>
       </div>
-      <MonthStrip activeMonth={monthPreview ? parseMonth(monthPreview) : month} onNavigateMonth={setMonth} />
+      <MonthStrip activeMonth={browsePreview ? parseMonth(browsePreview) : month} onNavigateMonth={setMonth} />
     </div>
   )
 }
