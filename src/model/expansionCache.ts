@@ -8,6 +8,34 @@ export interface ExpansionCache {
   fromMs: number
   toMs: number
   allOccs: Occurrence[]
+  /**
+   * Reverse indices from occurrence identity to positions in `allOccs`, built
+   * once per full expansion and carried forward unchanged across overlay
+   * passes (positions stay stable — see `hasSameStructure`). These are what
+   * let the metadata-overlay fast path in `computeExpansionCache` touch only
+   * the affected occurrences instead of walking all of them.
+   */
+  indexById: Map<string, number[]>
+  indexByEntryKey: Map<string, number[]>
+  indexByOwnerId: Map<string, number[]>
+}
+
+function buildReverseIndex(allOccs: Occurrence[]): Pick<ExpansionCache, 'indexById' | 'indexByEntryKey' | 'indexByOwnerId'> {
+  const indexById = new Map<string, number[]>()
+  const indexByEntryKey = new Map<string, number[]>()
+  const indexByOwnerId = new Map<string, number[]>()
+  const push = (map: Map<string, number[]>, key: string, i: number) => {
+    const existing = map.get(key)
+    if (existing) existing.push(i)
+    else map.set(key, [i])
+  }
+  for (let i = 0; i < allOccs.length; i++) {
+    const occ = allOccs[i]!
+    push(indexById, occ.id, i)
+    push(indexByEntryKey, occ.entryKey, i)
+    if (occ.ownerId) push(indexByOwnerId, occ.ownerId, i)
+  }
+  return { indexById, indexByEntryKey, indexByOwnerId }
 }
 
 /**
@@ -131,13 +159,29 @@ export function computeExpansionCache(
       }
     }
 
-    const allOccs = prev.allOccs.map(occ => {
+    // Only the occurrences actually touched by a changed item/file/series need
+    // to move — everything else stays the same reference. The reverse indices
+    // (built once per full expansion, see buildReverseIndex) resolve exactly
+    // which positions those are without walking prev.allOccs.
+    const affectedIndices = new Set<number>()
+    for (const id of changedById.keys()) {
+      for (const i of prev.indexById.get(id) ?? []) affectedIndices.add(i)
+    }
+    for (const entryKey of changedFileMeta.keys()) {
+      for (const i of prev.indexByEntryKey.get(entryKey) ?? []) affectedIndices.add(i)
+    }
+    for (const ownerId of changedSeriesById.keys()) {
+      for (const i of prev.indexByOwnerId.get(ownerId) ?? []) affectedIndices.add(i)
+    }
+
+    const allOccs = prev.allOccs.slice()
+    for (const i of affectedIndices) {
+      const occ = allOccs[i]!
       const changedItem = changedById.get(occ.id)
       const changedFile = changedFileMeta.get(occ.entryKey)
       const changedSeries = occ.ownerId ? changedSeriesById.get(occ.ownerId) : undefined
-      if (!changedItem && !changedFile && !changedSeries) return occ
       const override = changedSeries ? overrideById.get(occ.id) : undefined
-      return {
+      allOccs[i] = {
         ...occ,
         metadata: {
           ...occ.metadata,
@@ -154,10 +198,13 @@ export function computeExpansionCache(
           } : null),
         },
       }
-    })
-    return { items, roots, fromMs, toMs, allOccs }
+    }
+    // Positions are unchanged (hasSameStructure guarantees alignment) and the
+    // occurrences' id/entryKey/ownerId never change here — only metadata does
+    // — so the reverse indices themselves stay valid and carry forward as-is.
+    return { items, roots, fromMs, toMs, allOccs, indexById: prev.indexById, indexByEntryKey: prev.indexByEntryKey, indexByOwnerId: prev.indexByOwnerId }
   }
 
   const allOccs = expandWithMultiday(items, roots, from, to)
-  return { items, roots, fromMs, toMs, allOccs }
+  return { items, roots, fromMs, toMs, allOccs, ...buildReverseIndex(allOccs) }
 }

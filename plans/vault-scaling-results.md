@@ -141,7 +141,6 @@ priority — the numbers do not move as findings get closed out.
 
 | Rank | # | Finding | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 1 | 3 | One toggle re-allocates every occurrence in the window | 8 | 2 | **Sonnet 5** |
 | 2 | 2 | `fileOccurrenceMap` expands ±3 years to pick one occurrence per file | 8 | 2 | **Sonnet 5** (window narrowing); Opus 5 for the lazy variant |
 | 3 | 6 | `applyRemoteBatch` writes 30 000 rows in one transaction (21 s) | 6 | 1 | **Sonnet 5** |
 | 4 | 5 | `parseFiles` is a synchronous loop on the first-paint path | 5 | 2 | **Sonnet 5** |
@@ -273,63 +272,6 @@ it is not lower-value, it is not separately actionable.
   `src/search/FileResultsList.test.tsx`, `src/editor/ItemsList.test.tsx`.
   Add a case for a series whose only occurrences fall between 1 and 3 years
   out — that is exactly the band this change moves from rule 1 to rule 6.
-
----
-
-### 3. One toggle re-allocates every occurrence in the window
-
-- **Flows** — toggling a task (agenda and editor), every metadata edit.
-- **Category** — `render-amplification`, `critical-path-work`
-- **Impact** — 8
-- **Baseline** — the incremental recompute (`deriveViews` +
-  `computeExpansionCache` fast path) costs 1.0 ms at 300 files, 7.2 ms at
-  3 000, 226.7 ms at 10 000, 744.8 ms at 30 000 — against 23.5 ms at
-  flat/30 000. End to end the toggle takes 63 / 426 / 2 021 / 7 310 ms at
-  300 / 3 000 / 10 000 / 30 000; the remaining ~6.5 s at 30 000 is React
-  re-render and the store's own commit passes, which this harness does not
-  break down further (**unverified**).
-- **Measurement recipe** — `node scripts/perf/stress.mjs --sizes 3000,30000`;
-  read `pipeline.result.toggleRecompute.median` and `ui.toggle.ms`.
-- **Breadth** — `src/model/expansionCache.ts`, `src/store.ts` (`deriveViews`).
-- **Evidence** — `src/model/expansionCache.ts`, on the "nothing structural
-  changed" fast path:
-  ```ts
-  const allOccs = prev.allOccs.map(occ => {
-    const changedItem = changedById.get(occ.id)
-    const changedFile = changedFileMeta.get(occ.entryKey)
-    const changedSeries = occ.ownerId ? changedSeriesById.get(occ.ownerId) : undefined
-    if (!changedItem && !changedFile && !changedSeries) return occ
-  ```
-- **Problem** — the fast path is correct and returns untouched occurrences by
-  reference, but `.map()` still walks and re-allocates an array of all 836 028
-  of them (plus three Map lookups each) to change one. `deriveViews`'
-  `sameItems` walk and `changedIndices` in `computeAgendaSections` each add
-  another full pass. The user checks a box and the checkmark appears 7 s later.
-- **Fix** — copy the array and overwrite only the affected indices, using an
-  id→index map built once per expansion, instead of `.map()` over everything;
-  when the change set is empty the existing `{ ...prev, items, roots }`
-  shortcut already avoids the walk, so this is the same idea extended to the
-  non-empty case. Expected effect: `toggleRecompute` at mixed/30 000 from
-  ~745 ms to single-digit ms, and `ui.toggle.ms` down by at least that much.
-- **Recommended model** — **Sonnet 5**, given the context block below. The
-  hazard is that a wrong reverse index produces stale metadata on screen
-  rather than a failing build: `expansionCache.test.ts` covers the overlay
-  path, so run it and add a case where one changed file has occurrences at
-  several positions in `allOccs`.
-- **Task context** — the three lookup maps (`changedById`, `changedSeriesById`,
-  `changedFileMeta`) are already built before the `.map()`; what is missing is
-  a reverse index from those keys to positions in `prev.allOccs`. Note that
-  `changedFileMeta` is keyed by `EntryKey` and can match many occurrences,
-  so the reverse index needs both an id→index and an entryKey→indices side.
-  `hasSameStructure` guarantees positional alignment between `prev.allOccs` and
-  the new expansion, which is what makes index-wise overwriting sound;
-  `computeAgendaSections`' `changedIndices` relies on that same alignment.
-  Build the reverse index once per expansion and carry it on `ExpansionCache`
-  beside `allOccs`, so it is rebuilt only when a full `expandWithMultiday`
-  runs — rebuilding it per toggle would reintroduce the O(occurrences) walk
-  this finding is about. Tests: `src/model/__tests__/expansionCache.test.ts`
-  (the overlay cases), plus `src/calendar/agendaSections.test.ts` to confirm
-  the alignment `changedIndices` depends on still holds.
 
 ---
 
