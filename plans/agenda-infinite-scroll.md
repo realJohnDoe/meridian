@@ -6,9 +6,9 @@ a standard incrementally-loaded list. This is the work
 finding **#4** waits behind.
 
 **Read `plans/vault-scaling-results.md` first** — its "The planned move to
-infinite scroll" section carries the three constraints in full, with the exact
-code they refer to, plus the grouped-overdue decision. This file does not
-restate them; it names them (C1/C2/C3 below) and says what to build.
+infinite scroll" section carries the remaining constraints in full, with the
+exact code they refer to. This file does not restate them; it names them
+(C1/C2 below) and says what to build.
 
 Acceptance for the whole sequence is finding #1's own target: `vaultPaintMs` at
 mixed/30 000 from ~13 000 ms to **under 1 000 ms**, measured with
@@ -22,7 +22,7 @@ reading `pipeline.result.expandAgendaWindow.median` and
 
 ---
 
-## The three constraints, in one line each
+## The two remaining constraints, in one line each
 
 Full text and code references in `plans/vault-scaling-results.md`.
 
@@ -36,12 +36,10 @@ Full text and code references in `plans/vault-scaling-results.md`.
   every load-more costs a full regroup. Prepending is worse than appending:
   it shifts every index, and `keyByIndex`/`changedIndices` both assume
   positional alignment.
-- **C3 — the overdue section needs the whole past window.**
-  `computeAgendaSections` pools every past day and renders an exact count.
 
 ## What this plan adds on top of that section
 
-Four decisions the results file does not settle:
+Three decisions the results file does not settle:
 
 1. **The chunk grid is absolute, not anchor-relative.** Chunks are keyed by an
    index derived from the epoch, aligned to week starts — not by an offset from
@@ -52,20 +50,21 @@ Four decisions the results file does not settle:
    than patched: build `AgendaRow[]` per chunk and concatenate. Teaching
    `changedIndices` an index offset would make appends cheap and leave prepends
    expensive — the opposite of what is needed.
-3. **Overdue comes off the agenda window entirely** (see PR 1). The results
-   file uses grouping to make the overdue count computable without the past
-   window. Grouping is right for UX, but it does not by itself produce a
-   per-group count or oldest-date — those are still window-dependent. Instead
-   the overdue pool gets its own expansion pass over a *filtered item set*
-   (undone tracked items and their overrides), full past window, independent of
-   the chunk grid. That set is a small fraction of the vault, so the pass is
-   cheap, exact, and needs no closed-form occurrence counter. Grouping then
-   becomes a UI decision rather than a performance necessity.
-4. **The agenda does not auto-prepend in v1.** Backwards growth is an explicit
+3. **The agenda does not auto-prepend in v1.** Backwards growth is an explicit
    "Load earlier" affordance. See PR 4's hazard section for why
    auto-prepending is the one genuinely dangerous piece here.
 
-**Landed ahead of this sequence:** `expandRange`/`expandWithMultiday` now
+**Landed ahead of this sequence:** the overdue section is off the agenda
+window entirely — `calendar/overduePool.ts` runs its own expansion over a
+filtered item set (undone tracked items plus every child of a kept series),
+groups it one row per series, and is cached and invalidated independently of
+the agenda's window. `PAST_WINDOW_DAYS`/`FUTURE_WINDOW_DAYS` split into
+`WALK_PAST_DAYS`/`WALK_FUTURE_DAYS` (`agendaSections.ts`),
+`EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` (`useAgendaSections.ts`) and
+`OVERDUE_LOOKBACK_DAYS` (`overduePool.ts`) at the same time, so PR 4 moves the
+expansion window without silently moving the other two.
+
+Also landed ahead of the sequence: `expandRange`/`expandWithMultiday` now
 accept an optional pre-built `ItemIndex` (`model/itemIndex.ts`) instead of
 re-filtering `items` into series/standalones/children on every call, and
 `model/dateUtils.ts`'s `dayRange(firstDay, lastDay)` is the one place that
@@ -93,142 +92,24 @@ screenful" iteration.** Stated here because nothing in the code says it.
 
 | PR | Title | Model | Closes |
 |---|---|---|---|
-| 1 | Overdue off the agenda window, grouped by series | **Opus 5** | C3 |
 | 2 | Absolute chunk grid for agenda expansion | **Sonnet 5** | C1 |
 | 3 | Chunk-local sectioning | **Opus 5** | C2 |
 | 4 | Incremental loading + "Load earlier" | **Sonnet 5** | finding #1 |
 
 Each PR is shippable on its own and leaves the agenda working. The order is
-forced: PR 1 must land before the past window can be chunked (overdue pools
-from all of it today), and PR 4 is only safe once appends are cheap in both the
-expansion (PR 2) and the sectioning (PR 3).
+forced: PR 4 is only safe once appends are cheap in both the expansion (PR 2)
+and the sectioning (PR 3).
 
-Four smaller architectural fixes are **folded into** the PRs that already touch
-that code rather than given PRs of their own — the window-constant split into
-PR 1, the cache registry and chunk-scoped index assertions into PR 2, the
-filter-state cache key into PR 3. Each is called out in its PR's design section.
+Three smaller architectural fixes are **folded into** the PRs that already touch
+that code rather than given PRs of their own — the cache registry and
+chunk-scoped index assertions into PR 2, the filter-state cache key into PR 3.
+Each is called out in its PR's design section.
 
 **Per `plans/CLAUDE.md`, each PR deletes its own section from this file.** When
 PR 4 lands, this file goes away entirely and finding #1's entry (plus its
 summary-table row) is removed from `plans/vault-scaling-results.md` in the same
 commit; finding #4's "deferred until after infinite scroll" note is rewritten
 around a fresh measurement instead.
-
----
-
-## PR 1 — Overdue off the agenda window, grouped by series
-
-**Model: Opus 5.** Two coupled semantic changes (the de-hoist and the grouping)
-where getting the item filter subtly wrong shows up as a task that silently
-stops being overdue, not as a failing type check.
-
-### Goal
-
-The overdue section stops being derived from the agenda's expanded window and
-becomes its own pass over a filtered item set. Its rows become one per series
-rather than one per occurrence.
-
-### Why it is meaningful alone
-
-It is the UX fix on its own: a single `weekly / [mo,we,fr]` task left unfinished
-for a year contributes 156 rows today, and the measured "Overdue 6789" chip is
-mostly made of that. It also removes the largest reason the past window has to
-be expanded at all, which is what makes PR 2 possible.
-
-### Design
-
-**A separate overdue pass.** New module, `src/calendar/overduePool.ts`:
-
-```
-computeOverduePool(prev, items, roots, today, filterOccs) -> OverdueGroup[]
-```
-
-- Filter `items` down to the overdue candidate set (see hazard below), expand
-  that set over `[today - PAST_WINDOW_DAYS, today)` with the existing
-  `expandWithMultiday`, keep occurrences matching the current `isOverdue`
-  predicate, apply `filterOccs`, then group.
-- Cache it the same way `useAgendaSections` caches its sections: a module-level
-  one-entry `Map` slot, invalidated on `items`/`roots`/`today`/`filterOccs`
-  identity. Reset it alongside `resetAgendaSectionsCache`.
-- Group key is **`occ.ownerId ?? occ.id`** (`types.ts:133` — every generated
-  occurrence of one series shares `ownerId`; a standalone dated task groups
-  alone, no special case). A file holding two series stays two groups.
-- Each group carries a representative occurrence (the **oldest**), the count,
-  and the oldest date. The header chip's count becomes the number of *groups*.
-
-**The paired de-hoist.** `buildBucket`'s past branch currently hoists undone
-tasks out of their day, so a past day holding nothing else gets `section: null`
-and drops out of the agenda entirely. Once the grouped row is the only overdue
-row, those occurrences must still be individually reachable, so a past day's
-items become `sortOccs(filtered, ctx.now)` with no `isOverdue` split, and
-`DayBucket.overdue` goes away. Knock-on, and it is expected: past days that
-currently vanish start rendering, adding rows going backwards. Under PR 4 that
-is only paid as far back as the user scrolls.
-
-**Folded-in fix: split the window constants.** `PAST_WINDOW_DAYS` /
-`FUTURE_WINDOW_DAYS` currently mean three things at once — the expansion window,
-the day-by-day render walk span (`agendaSections.ts`'s own comment: "Also
-doubles as the span the day-by-day walk below covers"), and the overdue
-lookback. This PR separates the third; separate the first two at the same time,
-so PR 4 is not changing one meaning while silently changing the others.
-
-**A new `AgendaRow` variant.** The union is
-`header | month | week | occ | day-empty`; `overdueRows` maps 1:1 into
-`kind: 'occ'` today. Add `kind: 'overdue-group'` carrying the representative
-occurrence, `count`, and `oldest`. Closest precedent is `header`, which already
-carries a `count`. Add its height constant next to `HEADER_H`/`ROW_H_META` and a
-branch in `estimateRow`, plus a `AgendaOverdueGroupRow.tsx` component and a
-branch in `AgendaView`'s `renderRow`. Tapping the row should open the
-representative occurrence's entry — the individual occurrences are reachable by
-scrolling to their days.
-
-### Hazards
-
-- **The item filter is not just "undone tracked items".** `isTracked(item)`
-  (`types.ts`) works on `StoreItem` as well as `Occurrence`, so the base filter
-  is `isTracked(i) && !i.metadata.done`. But dropping an item from the set
-  changes what expansion *generates*: a series' override children carry
-  `excluded` (suppressing an occurrence) and their own `done` (merged over the
-  series' metadata by `expandRange`). Filter out a `done: true` override and its
-  parent series will happily generate a plain, undone-looking occurrence on that
-  date — a completed task reappearing as overdue. **So the set is: every item
-  passing the base filter, plus every non-series item whose `ownerId` names a
-  kept series, regardless of its own `done`/`excluded`.** Pass `roots` through
-  whole; it is a map lookup, not a cost.
-- `after_completion` series are kept by the base filter anyway (their `done` is
-  what determines the next occurrence), so no extra case.
-- `AgendaHeaderRow`'s doc comment says the section "starts collapsed" —
-  `viewState.ts` says expanded, and `viewState.ts` is right. Fix the stale
-  comment while in there.
-- `GLOSSARY.md` — if a new term lands (`OverdueGroup`), it needs an entry, and
-  `src/glossary.test.ts` enforces that referenced symbols exist.
-
-### Tests
-
-Extend `src/calendar/agendaSections.test.ts` and add
-`src/calendar/overduePool.test.ts`:
-
-- a `weekly` undone task a year old produces **one** group with the right count
-  and oldest date;
-- a done override inside an otherwise-undone series does **not** resurrect as
-  overdue (the hazard above, as a direct test);
-- an excluded date inside an undone series produces no occurrence;
-- a past day whose only content was an undone task now renders as a day section
-  (the de-hoist), and that occurrence can still be toggled done there;
-- two series in one file stay two groups;
-- the calendar filter (`hideVaults`/`hideParticipants`) still applies.
-
-Also run `src/calendar/AgendaView.test.tsx`,
-`src/calendar/useAgendaSections.test.ts`,
-`src/calendar/computeAgendaScrollRestore.test.ts`.
-
-### Acceptance
-
-`pipeline.result.expandAgendaWindow.median` is unchanged (the agenda window is
-untouched in this PR), but the overdue section's own cost is now proportional to
-undone tasks. Row count at mixed/30 000 drops by whatever the overdue pool was
-contributing. Confirm no visual regression in the "scroll to today lands on
-overdue" behaviour (`preferOverdue` in `agendaSections.ts`).
 
 ---
 
@@ -266,7 +147,7 @@ chunk against its **own** module-level cache map (`Map<number, ExpansionCache>`,
 keyed by chunk index) and concatenates the results.
 
 `useAgendaSections` then asks for the chunk range covering
-`[anchor - PAST_WINDOW_DAYS, anchor + FUTURE_WINDOW_DAYS]` and passes the
+`[anchor - EXPAND_PAST_DAYS, anchor + EXPAND_FUTURE_DAYS]` and passes the
 concatenated array where `useExpandWithMultiday`'s result goes today. Nothing
 downstream changes.
 
@@ -304,7 +185,7 @@ downstream changes.
   needed — just do not "optimize" that filter away.
 
 **Folded-in fix: one owner for the module-level caches.** `sectionsCacheSlot`,
-`cacheByWindow`, PR 1's overdue slot and this PR's chunk map are four
+`cacheByWindow`, `overduePoolSlot` and this PR's chunk map are four
 render-phase-written singletons, each with its own `reset*` wired by hand into
 `resetCalendarOnVaultChange`. Miss one and the agenda shows another vault's
 rows; `AgendaView.test.tsx`'s `beforeEach(resetCalendarOnVaultChange)` already
@@ -384,8 +265,8 @@ single-pass row list for the same span, dividers included and not duplicated at
 boundaries.
 
 **Overdue and `goToRowIndex` stay global** — they are assembled, not chunked.
-After PR 1 the overdue block is already independent of the window, so it splices
-into the assembly at the today boundary exactly as the current walk does
+The overdue block is already independent of the window (`overduePool.ts`), so it
+splices into the assembly at the today boundary exactly as the current walk does
 (including the `overdueAtMs` clamp for a far-away anchor). `goToRowIndex` is
 computed over the assembled list.
 
@@ -494,10 +375,12 @@ months) and drop from the far end only when the cap is exceeded.
   is seeded smaller than the range that produced the offset, the offset can
   exceed the list. Clamp it, or re-seed the loaded range from the saved
   `agendaTopDate`.
-- `PAST_WINDOW_DAYS`/`FUTURE_WINDOW_DAYS` stop being the agenda's expansion
-  window and become only the overdue pass's window (PR 1) and the bound on how
-  far the user may load. Rename or re-comment them so the next reader is not
-  misled — `agendaSections.ts`'s comment on them describes the old role.
+- `EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` stop being the agenda's expansion
+  window and become only the bound on how far the user may load, and
+  `WALK_PAST_DAYS`/`WALK_FUTURE_DAYS` stop being a fixed span at all — the walk
+  covers the loaded chunk run instead. Re-comment both pairs (and the
+  expansion-covers-the-walk test in `useAgendaSections.test.ts`, which is
+  written against today's fixed spans) so the next reader is not misled.
 
 ### Tests
 
@@ -538,8 +421,8 @@ shows, and remove finding #1 and this file per `plans/CLAUDE.md`.
 ## Deliberately not doing
 
 - **Lazy k-way merge for overdue** — considered and rejected in
-  `plans/vault-scaling-results.md`; PR 1's filtered-item pass gets the same
-  result without a second implementation of "which dates does this rule
+  `plans/vault-scaling-results.md`; `overduePool.ts`'s filtered-item pass gets
+  the same result without a second implementation of "which dates does this rule
   produce".
 - **Closed-form occurrence counting** — same reason: a counter that drifts from
   `expansion.ts` shows a wrong number beside a right list, silently.

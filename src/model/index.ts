@@ -1,6 +1,6 @@
 export { weekStartsOn, fmtISO, fmtMonth, parseMonth, fmtT, formatHHMM, parseDateString, parseDateTime, dayBefore, dayRange } from './dateUtils'
 export type { LocalePrefs } from './dateUtils'
-export { multidayDisplayTitle, treeHasOccurrences, stableOccId, expandRange, joinFileMeta } from './expansion'
+export { multidayDisplayTitle, treeHasOccurrences, stableOccId, expandRange, expandWithMultiday, joinFileMeta } from './expansion'
 export { buildItemIndex } from './itemIndex'
 export type { ItemIndex } from './itemIndex'
 export type { StoreData, EditorFields, EditFields, SeriesContext, NewEntryTarget, LinkBreakage } from './storeOps'

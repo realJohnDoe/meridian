@@ -26,26 +26,29 @@ before/after comparison, not as shipped latency.
 ## The planned move to infinite scroll
 
 **The implementation plan is `plans/agenda-infinite-scroll.md`** — it splits the
-work into four PRs, names a model per PR, and adds the four design decisions
-this section does not settle (an absolute rather than anchor-relative chunk
-grid, chunked sectioning, overdue as its own filtered expansion pass, and no
-auto-prepend in v1). The constraints below stay here, since they are findings;
-the plan references them rather than restating them.
+remaining work into three PRs, names a model per PR, and adds the design
+decisions this section does not settle (an absolute rather than anchor-relative
+chunk grid, chunked sectioning, and no auto-prepend in v1). The constraints
+below stay here, since they are findings; the plan references them rather than
+restating them.
 
 A move to a standard infinite-scroll agenda is planned. It changes what to do
-about two of these findings and nothing about the other four — and it inherits
-one constraint from finding #1 that is worth knowing before the design is
-settled.
+about two of these findings and nothing about the other four.
+
+The overdue half of the work has already landed: the section comes off the
+agenda window entirely (`calendar/overduePool.ts` expands a filtered item set
+over its own lookback) and renders one row per series rather than one per
+occurrence, so the constraint that used to hold the past window at 365 days is
+gone.
 
 | # | Under infinite scroll |
 |---|---|
 | 1 | **Fold into that work, do not fix separately.** #1's fix *is* incremental expansion, and the product decision it was blocked on is now made. |
 | 4 | **Defer and re-measure after.** Row count at first paint drops from 185 882 to whatever one screen plus a chunk needs, so the symptom may go with it; profiling the current architecture measures code about to be replaced. |
 | 2, 5, 6 | Unaffected — none of them touches the agenda window. |
-| — | The overdue section is being **grouped** (one row per series) as part of this work; see constraint 3 below. |
 | 3 | Still valid, but its character changes: the array it re-allocates starts smaller and **grows as the user scrolls**, so the cost arrives later in the session rather than at first paint. |
 
-### Three things in the current code that a naive implementation will hit
+### Two things in the current code that a naive implementation will hit
 
 Each is a fact about code as it stands today, not a prediction:
 
@@ -74,72 +77,6 @@ Each is a fact about code as it stands today, not a prediction:
    the end keeps existing indices valid; **prepending past days shifts every
    index** and is the case to design around, since `keyByIndex` and
    `changedIndices` both assume positional alignment.
-
-3. **The overdue section needs the whole past window — and the product
-   decision here has been made: group it.** `computeAgendaSections` pools every
-   past day, and `overdueHeaderRow(todayKey, collapsed, items.length)` renders
-   an exact count — the "Overdue 6789" chip. Neither the pool nor the count can
-   be known without expanding all 365 past days, which is most of the
-   occurrences at any size. **Decision: the overdue section shows one row per
-   series rather than one per occurrence.** See "Grouped overdue" below.
-
-### Grouped overdue — the decision, and what it takes
-
-**What makes this the collision.** `agendaSections.ts:8` defines overdue as
-```ts
-const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
-```
-so the pool is every past-dated undone *task occurrence*. A single
-`weekly / [mo,we,fr]` task left unfinished for a year contributes **156 rows on
-its own** (365 ÷ 7 × 3), and that is what the measured "Overdue 6789" chip is
-mostly made of. Grouping to one row per series turns the pool from
-O(past occurrences) into O(undone task items) and makes the count the number of
-groups — cheap, exact, and needing no past-window expansion. Constraint #3 then
-stops existing rather than being worked around.
-
-**Group key: `occ.ownerId ?? occ.id`.** `Occurrence.ownerId` is "UUID of parent
-RepeatPattern (undefined for standalone)" (`types.ts:133`), so every generated
-occurrence of one series shares it and a standalone dated task groups alone —
-no special case needed. A file holding two series stays two groups, which is
-right.
-
-**The part that is not yet true, and must change with it.** The plan is that
-individual occurrences stay reachable by scrolling up to their day sections.
-They are not there today — `buildBucket` *hoists them out*:
-```ts
-if (b.isPast) {
-    const overdue = filtered.filter(isOverdue)
-    const items = sortOccs(filtered.filter(o => !isOverdue(o)), ctx.now)
-```
-An undone past task appears **only** in the overdue block, and a past day
-holding nothing else gets `section: null` and drops out of the agenda
-entirely. So grouping the overdue section must be paired with dropping that
-hoist — a past day's `items` becomes `sortOccs(filtered, ctx.now)` — or the
-grouped row becomes the only place those occurrences exist and they can no
-longer be checked or deleted individually. Note the knock-on: past days that
-currently vanish will start rendering, which adds rows going backwards. Under
-infinite scroll that is paid only as far back as the user scrolls.
-
-**`AgendaRow` needs a new variant.** The union (`agendaSections.ts`) has
-`header | month | week | occ | day-empty`; `overdueRows` maps occurrences 1:1
-into `kind: 'occ'`. A grouped row carries a representative occurrence plus a
-count and an oldest-date — closest existing precedent is the `header` variant,
-which already carries `count`.
-
-**Alternatives considered, and why not.** A lazy k-way merge — take the most
-recent N occurrences per source, merge date-descending, page more when a
-source's buffer runs low — is correct for rendering any prefix and would cut
-the pool cost to O(sources × N). It was not chosen because it makes 156 copies
-of one task cheap to render rather than making them not exist, and it still
-cannot produce the total (a prefix does not know it). Pairing it with a
-closed-form count per series (the dates a `schedule` rule yields between anchor
-and today is arithmetic, corrected by *stored* exclusions and done-overrides,
-which are few) does produce an exact total in O(items) — but it puts "which
-dates does this rule produce" in a second place that must agree with
-`expansion.ts` forever, and that file is 889 lines because `bysetpos` ×
-`bymonthday` × `bymonth` × `interval` is genuinely fiddly. A counter that
-drifts from the generator shows a wrong number beside a right list, silently.
-Grouping avoids both.
 
 ## Findings
 
@@ -179,15 +116,12 @@ it is not lower-value, it is not separately actionable.
   `pipeline.result.occurrencesInAgendaWindow`.
 - **Breadth** — `calendar/useAgendaSections.ts`, `calendar/agendaSections.ts`,
   `model/expansionCache.ts` (plus month/day, which have their own windows).
-- **Evidence** — `src/calendar/agendaSections.ts`:
+- **Evidence** — `src/calendar/useAgendaSections.ts`:
   ```ts
-  export const PAST_WINDOW_DAYS = 365
-  export const FUTURE_WINDOW_DAYS = 90
-  ```
-  and `src/calendar/useAgendaSections.ts`:
-  ```ts
-  const from = addDays(anchor, -PAST_WINDOW_DAYS)
-  const to = addDays(anchor, FUTURE_WINDOW_DAYS)
+  export const EXPAND_PAST_DAYS = 365
+  export const EXPAND_FUTURE_DAYS = 90
+  ...
+  const { from, to } = dayRange(addDays(anchor, -EXPAND_PAST_DAYS), addDays(anchor, EXPAND_FUTURE_DAYS))
   const allOccs = useExpandWithMultiday(items, roots, from, to)
   ```
 - **Problem** — the window is a constant, so the work to reach first paint is
@@ -195,8 +129,10 @@ it is not lower-value, it is not separately actionable.
   can see; the virtualizer then mounts ~26 rows out of 185 882. The user waits
   13 s to look at one screenful.
 - **Fix** — expand a window around the anchor (say ±30 days) for first paint
-  and widen it incrementally as the virtualizer approaches an edge, keeping the
-  full window only for the overdue pool that genuinely needs it. Expected
+  and widen it incrementally as the virtualizer approaches an edge. (The
+  overdue pool, which was the one thing genuinely needing the full past window,
+  no longer draws on this window at all — see `calendar/overduePool.ts`.)
+  Expected
   effect: `vaultPaintMs` at mixed/30 000 from ~13 000 ms to under 1 000 ms,
   with `expandAgendaWindow` dropping roughly in proportion to the narrower
   window (455 days → 60 days ≈ 7.5×).
@@ -206,13 +142,14 @@ it is not lower-value, it is not separately actionable.
   infinite-scroll change then replaces. What was blocking it — whether the
   agenda stays scroll-anywhere or gains a load-more edge — is a product
   decision that the move to infinite scroll settles.
-- **Task context** — the three constraints that shape the design are written
-  up under "The planned move to infinite scroll" above: the exact-window gate
-  in `computeExpansionCache`, `changedIndices` returning `null` on any length
-  change, and the overdue section's need for the whole past window — the last
-  of which is settled by the grouped-overdue decision recorded there, and
-  which carries its own paired change to `buildBucket`'s hoist. The sequenced
-  plan for all of it is `plans/agenda-infinite-scroll.md`; this finding closes
+- **Task context** — the two constraints that still shape the design are
+  written up under "The planned move to infinite scroll" above: the
+  exact-window gate in `computeExpansionCache`, and `changedIndices` returning
+  `null` on any length change. The third — the overdue section's need for the
+  whole past window — is closed: the section is grouped one row per series and
+  expands its own filtered item set, and `buildBucket` no longer hoists undone
+  tasks out of their day. The sequenced plan for the rest is
+  `plans/agenda-infinite-scroll.md`; this finding closes
   with that plan's PR 4. Treat this finding's expected
   effect (`vaultPaintMs` at mixed/30 000 from ~13 000 ms to under 1 000 ms) as
   the acceptance target for that work, measured with the recipe above.

@@ -5,11 +5,28 @@ import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useCalendarFilter } from './useCalendarFilter'
 import { useOverdueCollapsed } from './viewState'
 import {
-  computeAgendaSections, PAST_WINDOW_DAYS, FUTURE_WINDOW_DAYS,
+  computeAgendaSections,
   type AgendaSectionCache, type AgendaRow,
 } from './agendaSections'
+import { computeOverduePool, type OverduePoolCache } from './overduePool'
 
 export { estimateRow, type AgendaRow } from './agendaSections'
+
+/**
+ * The agenda's expansion window, `[anchor - EXPAND_PAST_DAYS, anchor +
+ * EXPAND_FUTURE_DAYS]`.
+ *
+ * Separate from the day-by-day render walk's own span
+ * (`WALK_PAST_DAYS`/`WALK_FUTURE_DAYS` in agendaSections.ts) and from the
+ * overdue lookback (`OVERDUE_LOOKBACK_DAYS` in overduePool.ts), which the same
+ * two constants used to mean all at once. The three have genuinely different
+ * reasons to change — incremental loading narrows this one and leaves the other
+ * two alone — so they are three names now, with the one relationship that has
+ * to hold (this window must cover the walk) asserted in the tests rather than
+ * enforced by sharing a literal.
+ */
+export const EXPAND_PAST_DAYS = 365
+export const EXPAND_FUTURE_DAYS = 90
 
 // The agenda is a singleton view (only one instance mounted at a time), so a
 // single cache slot — unlike useExpandWithMultiday's per-window map, which
@@ -22,10 +39,15 @@ export { estimateRow, type AgendaRow } from './agendaSections'
 // useExpandWithMultiday's cacheByWindow already uses, and passes.
 const SECTIONS_CACHE_KEY = 'agenda'
 const sectionsCacheSlot = new Map<typeof SECTIONS_CACHE_KEY, AgendaSectionCache>()
+// The overdue pass's own slot, same shape and same reasoning — a separate one
+// because it is invalidated by different inputs (raw `items`/`roots`, not the
+// expanded window) and survives changes that rebuild every section.
+const overduePoolSlot = new Map<typeof SECTIONS_CACHE_KEY, OverduePoolCache>()
 
-/** Drops the cached grouped/sorted sections. Call on vault change (see resetExpansionCache). */
+/** Drops the cached grouped/sorted sections and the overdue pool. Call on vault change (see resetExpansionCache). */
 export function resetAgendaSectionsCache(): void {
   sectionsCacheSlot.clear()
+  overduePoolSlot.clear()
 }
 
 /**
@@ -62,9 +84,14 @@ export function resetAgendaSectionsCache(): void {
  * live-repaint logic too — one ticking source shared by both, not two.
  *
  * `anchor` defaults to `today` and centers the expansion window
- * (`[anchor - PAST_WINDOW_DAYS, anchor + FUTURE_WINDOW_DAYS]`) — see
+ * (`[anchor - EXPAND_PAST_DAYS, anchor + EXPAND_FUTURE_DAYS]`) — see
  * calendar/viewState.ts's agendaAnchor for why AgendaView passes something
  * else after a jump from Month/Day.
+ *
+ * The overdue block is *not* derived from that window: it runs its own
+ * expansion over a filtered item set and the full overdue lookback (see
+ * overduePool.ts), so the two are invalidated independently and the agenda's
+ * window no longer has to reach a year back on the overdue section's behalf.
  */
 export function useAgendaSections(
   today: Date,
@@ -75,14 +102,20 @@ export function useAgendaSections(
   const roots = useStore(s => s.roots)
   const ws = weekStartsOn(useStore(s => s.localePrefs))
 
-  // dayRange, not a bare addDays(anchor, FUTURE_WINDOW_DAYS): the latter lands
+  // dayRange, not a bare addDays(anchor, EXPAND_FUTURE_DAYS): the latter lands
   // on midnight of the window's last day, and expandRange's inclusive [from,
   // to] filter would then silently drop any *timed* occurrence on that day.
   // See dayRange's own doc comment.
-  const { from, to } = dayRange(addDays(anchor, -PAST_WINDOW_DAYS), addDays(anchor, FUTURE_WINDOW_DAYS))
+  const { from, to } = dayRange(addDays(anchor, -EXPAND_PAST_DAYS), addDays(anchor, EXPAND_FUTURE_DAYS))
   const allOccs = useExpandWithMultiday(items, roots, from, to)
   const { filterOccs } = useCalendarFilter()
   const overdueCollapsed = useOverdueCollapsed()
+
+  const cachedPool = overduePoolSlot.get(SECTIONS_CACHE_KEY) ?? null
+  const pool = computeOverduePool(cachedPool, items, roots, today, filterOccs)
+  if (pool !== cachedPool) {
+    overduePoolSlot.set(SECTIONS_CACHE_KEY, pool)
+  }
 
   // now ticks once a minute (see useNow), but a remounted AgendaView
   // allocates a fresh Date even within the same tick — bucket to that same
@@ -92,7 +125,7 @@ export function useAgendaSections(
   const nowBucket = new Date(Math.floor(now.getTime() / 60_000) * 60_000)
 
   const cached = sectionsCacheSlot.get(SECTIONS_CACHE_KEY) ?? null
-  const next = computeAgendaSections(cached, allOccs, today, nowBucket, filterOccs, anchor, overdueCollapsed, ws)
+  const next = computeAgendaSections(cached, allOccs, pool.groups, today, nowBucket, filterOccs, anchor, overdueCollapsed, ws)
   if (next !== cached) {
     sectionsCacheSlot.set(SECTIONS_CACHE_KEY, next)
   }

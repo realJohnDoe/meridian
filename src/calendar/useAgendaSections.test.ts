@@ -3,8 +3,10 @@ import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { setupStore, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { fmtISO } from '@/model'
-import { useAgendaSections } from './useAgendaSections'
+import { useAgendaSections, EXPAND_PAST_DAYS, EXPAND_FUTURE_DAYS } from './useAgendaSections'
 import type { AgendaRow } from './useAgendaSections'
+import { WALK_PAST_DAYS, WALK_FUTURE_DAYS } from './agendaSections'
+import { OVERDUE_LOOKBACK_DAYS } from './overduePool'
 import { calendarView } from './viewState'
 
 /** The overdue section starts expanded (viewState.ts); collapse it for the test about that. */
@@ -19,10 +21,32 @@ const NOW = new Date(2026, 5, 15, 9, 0)
 const occIdsFor = (rows: AgendaRow[], dateKey: string) =>
   rows.filter(r => r.kind === 'occ' && r.dateKey === dateKey).map(r => r.kind === 'occ' && r.occ.id)
 
+/** The overdue block's grouped rows, as `id ×count`. */
+const overdueGroups = (rows: AgendaRow[]) =>
+  rows.filter(r => r.kind === 'overdue-group').map(r => `${r.occ.id} ×${r.count}`)
+
 /** Content rows only — strips the always-present month/week dividers so tests
  * can assert on the day/overdue structure without hardcoding the ~65 week and
  * ~15 month rows the [today-365, today+90] window always carries. */
 const content = (rows: AgendaRow[]) => rows.filter(r => r.kind !== 'month' && r.kind !== 'week')
+
+describe('the agenda\'s three window constants', () => {
+  // One number used to mean all three of these. They are separate now because
+  // they have separate reasons to change; the only relationship that must hold
+  // is that the expansion covers the walk, and nothing in the types enforces
+  // it — a day the walk visits but the expansion never reached renders empty
+  // instead of showing its content, silently.
+  it('expands at least as far as the day-by-day walk covers', () => {
+    expect(EXPAND_PAST_DAYS).toBeGreaterThanOrEqual(WALK_PAST_DAYS)
+    expect(EXPAND_FUTURE_DAYS).toBeGreaterThanOrEqual(WALK_FUTURE_DAYS)
+  })
+
+  it('looks back for overdue work independently of the agenda window', () => {
+    // No relationship required in either direction — the overdue pass runs its
+    // own expansion (overduePool.ts), which is the point of the split.
+    expect(OVERDUE_LOOKBACK_DAYS).toBeGreaterThan(0)
+  })
+})
 
 describe('useAgendaSections', () => {
   it('always seeds a badged, empty today row, even with no occurrences', () => {
@@ -42,7 +66,7 @@ describe('useAgendaSections', () => {
     expect(occIdsFor(result.current.rows, '2026-06-15')).toEqual(['today-1'])
   })
 
-  it('splits an undone past task into overdue rows, ahead of the forced empty today row', () => {
+  it('summarises an undone past task in overdue while leaving it on its own day', () => {
     const overdueTask = makeOcc({
       id: 'overdue-1',
       date: '2026-06-10',
@@ -60,12 +84,12 @@ describe('useAgendaSections', () => {
     const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
     const { rows, goToRowIndex } = result.current
 
-    // The past day keeps its event; the undone task is hoisted into overdue,
-    // whose rows carry todayKey rather than their own past day.
-    expect(occIdsFor(rows, '2026-06-10')).toEqual(['past-event-1'])
-    expect(occIdsFor(rows, '2026-06-15')).toEqual(['overdue-1'])
-    // past-event-1 (badged) → overdue header → overdue-1 → today's forced-empty row.
-    expect(content(rows).map(r => r.kind)).toEqual(['occ', 'header', 'occ', 'day-empty'])
+    // The past day keeps *both* occurrences — undone tasks are no longer hoisted
+    // out of their day — and the overdue block summarises the task above today.
+    expect(occIdsFor(rows, '2026-06-10')).toEqual(['overdue-1', 'past-event-1'])
+    expect(overdueGroups(rows)).toEqual(['overdue-1 ×1'])
+    // the past day's two rows → overdue header → its group row → today's forced-empty row.
+    expect(content(rows).map(r => r.kind)).toEqual(['occ', 'occ', 'header', 'overdue-group', 'day-empty'])
 
     // goToRowIndex prefers the overdue header over today's when both exist.
     expect(rows[goToRowIndex]?.kind).toBe('header')
@@ -86,9 +110,10 @@ describe('useAgendaSections', () => {
     const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
     const { rows, goToRowIndex } = result.current
 
-    expect(content(rows).map(r => r.kind)).toEqual(['header', 'occ', 'day-empty'])
+    // the task on its own past day → overdue header → its group row → today.
+    expect(content(rows).map(r => r.kind)).toEqual(['occ', 'header', 'overdue-group', 'day-empty'])
     // Overdue rows carry todayKey, not their own past day — see agendaSections.
-    expect(occIdsFor(rows, '2026-06-15')).toEqual(['overdue-1'])
+    expect(rows.find(r => r.kind === 'overdue-group')?.dateKey).toBe('2026-06-15')
     const target = rows[goToRowIndex]
     expect(target?.kind).toBe('header')
     expect(target?.kind === 'header' && target.count).toBe(1)
@@ -109,8 +134,8 @@ describe('useAgendaSections', () => {
 
     // The divider stays — and stays where scroll-to-today lands — but it is the
     // whole section now, so the agenda shows a one-line bar above today.
-    expect(content(rows).map(r => r.kind)).toEqual(['header', 'day-empty'])
-    expect(occIdsFor(rows, '2026-06-15')).toEqual([])
+    expect(content(rows).map(r => r.kind)).toEqual(['occ', 'header', 'day-empty'])
+    expect(overdueGroups(rows)).toEqual([])
     const target = rows[goToRowIndex]
     expect(target?.kind).toBe('header')
     expect(target?.kind === 'header' && target.count).toBe(1)
