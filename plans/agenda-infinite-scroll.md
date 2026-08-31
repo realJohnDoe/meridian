@@ -6,9 +6,8 @@ a standard incrementally-loaded list. This is the work
 finding **#4** waits behind.
 
 **Read `plans/vault-scaling-results.md` first** — its "The planned move to
-infinite scroll" section carries the remaining constraint in full, with the
-exact code it refers to. This file does not restate it; it names it (C2
-below) and says what to build.
+infinite scroll" section says what has already landed and what #1 and #4 are
+still waiting on.
 
 Acceptance for the whole sequence is finding #1's own target: `vaultPaintMs` at
 mixed/30 000 from ~13 000 ms to **under 1 000 ms**, measured with
@@ -22,42 +21,20 @@ reading `pipeline.result.expandAgendaWindow.median` and
 
 ---
 
-## The remaining constraint
+## What this plan adds
 
-Full text and code references in `plans/vault-scaling-results.md`. (C1 — the
-"widening a window re-expands all of it" constraint that section also
-named — is closed: PR 2 replaced the single `(fromMs, toMs)`-keyed cache with
-fixed, disjoint, absolute chunks. See `calendar/agendaChunks.ts`,
-`calendar/useAgendaChunks.ts`, and `calendar/expansionCaches.ts` for the
-result.)
-
-- **C2 — any length change drops the whole section cache.**
-  `changedIndices` returns `null` the moment `prev.length !== next.length`, so
-  every load-more costs a full regroup. Prepending is worse than appending:
-  it shifts every index, and `keyByIndex`/`changedIndices` both assume
-  positional alignment.
-
-## What this plan adds on top of that section
-
-Two decisions the results file does not settle:
-
-1. **Sectioning is chunked too, not just expansion.** C2 is dissolved rather
-   than patched: build `AgendaRow[]` per chunk and concatenate. Teaching
-   `changedIndices` an index offset would make appends cheap and leave prepends
-   expensive — the opposite of what is needed.
-2. **The agenda does not auto-prepend in v1.** Backwards growth is an explicit
-   "Load earlier" affordance. See PR 4's hazard section for why
-   auto-prepending is the one genuinely dangerous piece here.
+One decision the results file does not settle: **the agenda does not
+auto-prepend in v1.** Backwards growth is an explicit "Load earlier"
+affordance. See PR 4's hazard section for why auto-prepending is the one
+genuinely dangerous piece here.
 
 **Landed ahead of this sequence:** the overdue section is off the agenda
 window entirely — `calendar/overduePool.ts` runs its own expansion over a
 filtered item set (undone tracked items plus every child of a kept series),
 groups it one row per series, and is cached and invalidated independently of
-the agenda's window. `PAST_WINDOW_DAYS`/`FUTURE_WINDOW_DAYS` split into
-`WALK_PAST_DAYS`/`WALK_FUTURE_DAYS` (`agendaSections.ts`),
-`EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` (`useAgendaSections.ts`) and
-`OVERDUE_LOOKBACK_DAYS` (`overduePool.ts`) at the same time, so PR 4 moves the
-expansion window without silently moving the other two.
+the agenda's window. `OVERDUE_LOOKBACK_DAYS` (`overduePool.ts`) split off from
+the agenda's own `EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` at the same time, so
+PR 4 moves the agenda's window without silently moving the overdue lookback.
 
 Also landed ahead of the sequence: `expandRange`/`expandWithMultiday` now
 accept an optional pre-built `ItemIndex` (`model/itemIndex.ts`) instead of
@@ -65,9 +42,7 @@ re-filtering `items` into series/standalones/children on every call, and
 `model/dateUtils.ts`'s `dayRange(firstDay, lastDay)` is the one place that
 turns a first/last day into the inclusive `{ from, to }` bound `expandRange`
 wants — migrated onto by all four existing call sites (Month, Day, Week, and
-the agenda, which was the one passing a bare midnight `to`). Both were
-prerequisites the rest of this plan would otherwise have had to work around
-case by case; see PR 3 below for where they still matter.
+the agenda, which was the one passing a bare midnight `to`).
 
 ### One property that is now load-bearing
 
@@ -87,19 +62,17 @@ screenful" iteration.** Stated here because nothing in the code says it.
 
 | PR | Title | Model | Closes |
 |---|---|---|---|
-| 3 | Chunk-local sectioning | **Opus 5** | C2 |
 | 4 | Incremental loading + "Load earlier" | **Sonnet 5** | finding #1 |
 
-PR 2 (absolute chunk grid for agenda expansion) has landed — see
-`calendar/agendaChunks.ts`, `calendar/useAgendaChunks.ts`, and
-`calendar/expansionCaches.ts` (the cache-registry fold-in and the chunk-scoped
-index-mismatch guard both landed with it). Each remaining PR is shippable on
-its own and leaves the agenda working; PR 4 is only safe once appends are
-cheap in the sectioning too (PR 3) — the expansion side is already done.
-
-One smaller architectural fix is still **folded into** the PR that already
-touches that code rather than given a PR of its own — the filter-state cache
-key into PR 3. It's called out in that PR's design section.
+PRs 2 and 3 have landed. Both the expansion and the sectioning are chunked on
+one absolute 28-day grid — see `calendar/agendaChunks.ts` (the grid, the
+window constants and `agendaChunkRun`), `calendar/useAgendaChunks.ts` (one
+`ExpansionCache` per chunk index), `calendar/agendaSections.ts`
+(`computeChunkRows` builds one chunk's day sections and divider rows,
+`assembleAgendaRows` concatenates them and splices in overdue), and
+`calendar/expansionCaches.ts`. Growing or shrinking the loaded run at either
+end therefore costs one chunk, in both stages — which is the whole
+precondition PR 4 needed.
 
 **Per `plans/CLAUDE.md`, each PR deletes its own section from this file.** When
 PR 4 lands, this file goes away entirely and finding #1's entry (plus its
@@ -109,103 +82,12 @@ around a fresh measurement instead.
 
 ---
 
-## PR 3 — Chunk-local sectioning
-
-**Model: Opus 5.** The divider/overdue/goToRowIndex interactions in
-`computeAgendaSections` are the subtlest code in `calendar/`, and the cache
-identity rules there are what keep `AgendaRow`'s memo from re-rendering the
-world.
-
-### Goal
-
-`AgendaRow[]` is built per chunk and concatenated, so adding a chunk at either
-end rebuilds nothing in the chunks already loaded. This is what makes PR 4's
-loads O(one chunk) instead of O(everything loaded).
-
-### Why it is meaningful alone
-
-C2 measured a full regroup at 3 631 ms at mixed/30 000. Even with the window
-unchanged, chunked sectioning turns a done-toggle or filter change into work
-proportional to the affected chunks rather than the whole window.
-
-### Design
-
-Split `computeAgendaSections` into:
-
-- `computeChunkRows(prevChunkCache, chunkOccs, chunkIndex, ctx)` — the day walk,
-  dividers, day sections and their `AgendaRow`s for **one** chunk, cached per
-  chunk index (`Map<number, ChunkSectionCache>`). Keeps the existing
-  `changedIndices`/`keyByIndex` machinery, now scoped to one chunk's own array,
-  where a length change is rare and cheap.
-- `assembleAgendaRows(chunkRows[], overdueGroups, ...)` — concatenates, splices
-  the overdue block in at the today boundary, and computes `goToRowIndex`.
-
-**Divider placement must be chunk-local.** Today `lastMonthKey`/`lastWeekKey`
-carry across the whole walk. Because the grid is absolute and week-aligned
-(PR 2), whether a chunk's first day opens a new week or a new month is a pure
-function of the chunk index — no data, no neighbouring chunk. Compute it from
-the grid, and **assert it in a test**: concatenated chunk rows must equal the
-single-pass row list for the same span, dividers included and not duplicated at
-boundaries.
-
-**Overdue and `goToRowIndex` stay global** — they are assembled, not chunked.
-The overdue block is already independent of the window (`overduePool.ts`), so it
-splices into the assembly at the today boundary exactly as the current walk does
-(including the `overdueAtMs` clamp for a far-away anchor). `goToRowIndex` is
-computed over the assembled list.
-
-### Hazards
-
-- **Row identity must survive assembly.** `AgendaRow.key` is
-  `` `${dateKey}|${id}|${instant}` `` and is what `getItemKey`,
-  `useVirtualFlip`, and `computeAgendaScrollRestore`'s key-matched measurement
-  snapshot all rely on. Keys stay chunk-independent — do not add a chunk index
-  to them.
-- **Return unchanged chunks' row arrays by reference.** The whole point of the
-  existing cache is that untouched days contribute the same `rows` array
-  identity, which is what keeps `AgendaRow`'s memo quiet. A concatenation that
-  allocates fresh row objects per assembly throws that away.
-- `estimateRow` and the height constants are unchanged; do not re-tune them
-  here.
-- **Folded-in fix (optional, only if it stays cheap): key the section cache on
-  filter *state*, not on `filterOccs` identity.** `useCalendarFilter.ts` carries
-  a ⚠️ about this: every piece of filter state must be in its `useCallback`
-  deps, complete and referentially stable, or the agenda cache thrashes on every
-  render. Chunking does not make it worse — N slots with the same fragility —
-  but this PR rewrites that cache anyway, so a small serializable descriptor
-  removes the class. Do not let it grow the diff; drop it if it does.
-- `useAnchoredAgendaScroll` compares `prevRows === rows` to skip work. Assembly
-  allocates a new outer array each time even when every chunk is unchanged —
-  memoize the assembled array on the chunk-rows identities so the once-a-minute
-  `now` tick does not start looking like a rebuild.
-
-### Tests
-
-`src/calendar/agendaSections.test.ts` — extend with the equivalence property
-(chunked assembly === single-pass, for several spans and anchors, including one
-where the anchor is far outside the window so the overdue clamp fires). Add
-cases for a done-toggle touching exactly one chunk, and for `goToRowIndex`
-landing on overdue vs. on an explicit anchor day.
-
-Run `src/calendar/useAgendaSections.test.ts`,
-`src/calendar/computeAgendaScrollRestore.test.ts`,
-`src/calendar/useVirtualFlip.test.tsx`, `src/calendar/AgendaView.test.tsx`,
-`src/calendar/agendaScrollability.test.ts`.
-
-### Acceptance
-
-A done-toggle at mixed/30 000 rebuilds one chunk's rows, not 455 days'. Verify
-by instrumenting `computeChunkRows` call counts in a test rather than by
-timing.
-
----
-
 ## PR 4 — Incremental loading + "Load earlier"
 
-**Model: Sonnet 5**, given PRs 1–3. What is left is view state, a range-watching
-effect, and a button; the hard parts have been removed by the earlier PRs. If
-auto-prepend is attempted after all (it should not be — see below), that part is
-Opus 5.
+**Model: Sonnet 5**, given PRs 2–3. What is left is view state, a
+range-watching effect, and a button; the hard parts have been removed by the
+earlier PRs. If auto-prepend is attempted after all (it should not be — see
+below), that part is Opus 5.
 
 ### Goal
 
@@ -220,7 +102,9 @@ exactly the kind of state that store lives for): `agendaLoadedChunks:
 { first: number; last: number }`, seeded to the chunk containing `agendaAnchor`
 plus one on each side (≈ ±28 days at first paint, against 455 today). Reset in
 `resetCalendarViewState`, and re-seeded on an explicit jump
-(`requestScrollToDate`) since the anchor moves.
+(`requestScrollToDate`) since the anchor moves. `agendaChunkRun` in
+`calendar/agendaChunks.ts` is the one place that decides today's fixed run, so
+it is the one place that has to start reading this state.
 
 **Forward growth.** In `AgendaView`, watch the virtualizer's range: when
 `range.endIndex` comes within ~1 viewport of `rows.length`, bump `last` by one.
@@ -236,7 +120,10 @@ below it do not move, no scroll compensation is needed at all.
 
 **Retention.** Do not evict chunks the user has scrolled past — evicting costs a
 re-expansion *and* a scrollbar jump. Cap the loaded run (say 24 chunks ≈ 21
-months) and drop from the far end only when the cap is exceeded.
+months) and drop from the far end only when the cap is exceeded. Both cache
+layers already evict to the requested run (`useAgendaChunks`'s effect, and
+`computeAgendaSections` rebuilding its chunk map each call), so capping the run
+is the only place the policy needs to live.
 
 ### Hazards
 
@@ -259,12 +146,14 @@ months) and drop from the far end only when the cap is exceeded.
   is seeded smaller than the range that produced the offset, the offset can
   exceed the list. Clamp it, or re-seed the loaded range from the saved
   `agendaTopDate`.
-- `EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` stop being the agenda's expansion
-  window and become only the bound on how far the user may load, and
-  `WALK_PAST_DAYS`/`WALK_FUTURE_DAYS` stop being a fixed span at all — the walk
-  covers the loaded chunk run instead. Re-comment both pairs (and the
-  expansion-covers-the-walk test in `useAgendaSections.test.ts`, which is
-  written against today's fixed spans) so the next reader is not misled.
+- `EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` stop being the agenda's window and
+  become only the bound on how far the user may load. Re-comment them (and
+  `agendaChunkRun`'s own doc comment, which still describes a fixed run) so the
+  next reader is not misled.
+- Prepending a chunk shifts every row index, but no row *key* — keys are
+  chunk-independent by construction (`agendaSections.ts`'s `occRowKey`). Keep
+  it that way: `getItemKey`, `useVirtualFlip` and the scroll-restore snapshot
+  all identify rows across a load by that string.
 
 ### Tests
 
@@ -289,6 +178,11 @@ rather than pretending the unit tests cover it.
 - the cap evicts from the far end and never from the visible run;
 - an explicit jump (Today, a sidebar jump) re-seeds the range around the new
   anchor.
+
+`src/calendar/agendaSections.test.ts` already asserts the property a load-more
+must not break — chunked assembly equals a single continuous walk over the same
+run, dividers included and none duplicated at a boundary. Extend its `spans`
+table with the new runs rather than writing a second equivalence test.
 
 ### Acceptance
 

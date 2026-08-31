@@ -365,6 +365,16 @@ virtualized list (`header` / `month` / `week` / `occ` / `day-empty` /
 → `calendar/agendaSections.ts` · `AgendaRow`
 → `calendar/AgendaRow.tsx` · `AgendaRow`
 
+### agenda chunk
+A fixed 28-day span of the agenda, indexed off the epoch and aligned to week
+starts, disjoint from its neighbours. The unit *both* of the agenda's
+expansion and of its sectioning: a chunk's occurrences, day sections and
+month/week divider rows are cached under its index, so a change costs the
+chunks it touched rather than the whole window. Absolute, not
+`agendaAnchor`-relative — a jump reuses every chunk still in range. Say
+"chunk" only of the agenda; Month/Day/Week key their caches by *window*.
+→ `calendar/agendaChunks.ts` · `CHUNK_DAYS`, `chunkIndexFor`, `chunkRange`, `agendaChunkRun`
+
 ### OverdueGroup
 Every overdue occurrence of one series (or one standalone task) as a single
 agenda row, keyed `ownerId ?? id` and carrying a representative occurrence, a
@@ -406,5 +416,6 @@ asserts none of these have come back.
 | `useVisualViewportHeight` / `useVisualViewportOffsetTop` | `useVisibleViewport` (one snapshot, with the Firefox-Android fallback) |
 | `useShellMode` / `ShellMode` | removed — `_app` and `_entry` each own their own layout chain, so nothing needs to release a shared one |
 | `SettingsDialog` | removed — Settings is a route (`routes/_app.settings.*`), not a modal |
-| `PAST_WINDOW_DAYS` / `FUTURE_WINDOW_DAYS` | split into three: `WALK_PAST_DAYS`/`WALK_FUTURE_DAYS` (the render walk), `EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` (the expansion window), `OVERDUE_LOOKBACK_DAYS` (the overdue pass) |
+| `PAST_WINDOW_DAYS` / `FUTURE_WINDOW_DAYS` | split into `EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` (the agenda's window, `calendar/agendaChunks.ts`) and `OVERDUE_LOOKBACK_DAYS` (the overdue pass) |
+| `WALK_PAST_DAYS` / `WALK_FUTURE_DAYS` | removed — the render walk covers exactly the chunks that were expanded (`agendaChunkRun`), so it is no longer a span of its own |
 | `requestVaultSettings` / `onVaultSettingsRequested` | removed — a vault's settings screen has a URL, so callers link to it |

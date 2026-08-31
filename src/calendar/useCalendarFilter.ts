@@ -41,17 +41,42 @@ export function hideVaults(occs: Occurrence[], hiddenVaultIds: string[]): Occurr
 }
 
 /**
+ * A serializable description of the filter's *state* — equal strings mean two
+ * `filterOccs` callbacks filter identically, whatever their identities.
+ *
+ * This is what `calendar/agendaSections.ts` keys its per-chunk section caches
+ * on. Keying on the callback's identity instead made every cached chunk
+ * hostage to the `useCallback` below having a dep list that was both complete
+ * and referentially stable: miss a dep and the cache serves stale rows, add an
+ * unstable one and it thrashes on every render. A descriptor built from the
+ * same three values removes the class — it can only ever be *too* specific,
+ * which costs a rebuild, never a wrong one.
+ *
+ * Order-independent (both the vault list and each vault's hidden names are
+ * sorted) so a store update that rebuilds the same state in a different order
+ * doesn't read as a change.
+ */
+export function describeFilter(
+  hiddenVaultIds: string[], hiddenParticipants: Record<string, string[]>, showTasks: boolean,
+): string {
+  const people = Object.keys(hiddenParticipants).sort()
+    .map(vaultId => [vaultId, [...(hiddenParticipants[vaultId] ?? [])].sort()])
+  return JSON.stringify([[...hiddenVaultIds].sort(), people, showTasks])
+}
+
+/**
  * The single choke point all five view call sites funnel through, so the vault
  * leg composes here ahead of the existing two:
  *
  *     filterOccs = hideVaults ∘ hideTasks ∘ hideParticipants
  *
- * ⚠️ `calendar/agendaSections.ts` keys its per-day reuse cache on `filterOccs`
- * **by reference**, so every piece of filter state must be in the `useCallback`
- * deps — complete *and* referentially stable — or the agenda cache thrashes on
- * every render. `hiddenParticipants` is a `Record`, which makes this sharper
- * than it was for the old string array: the store replaces it on every toggle
- * and never mutates it in place (see `toggleParticipantHidden`).
+ * ⚠️ `filterOccs`'s `useCallback` deps must stay complete: `filterKey` beside
+ * it is built from the same three values, and the agenda's section caches key
+ * on that string rather than on this callback's identity — so a piece of
+ * filter state left out of *both* would be invisible to the cache, not merely
+ * to the memo. (`overduePool.ts` still keys on the callback by reference; its
+ * pass runs over a filtered item set, so a thrash there costs one cheap
+ * re-expansion rather than the agenda's rows.)
  */
 export function useCalendarFilter() {
   const hiddenVaultIds     = useStore(s => s.hiddenVaultIds)
@@ -64,7 +89,12 @@ export function useCalendarFilter() {
     return hideParticipants(byKind, hiddenParticipants)
   }, [hiddenVaultIds, hiddenParticipants, showTasks])
 
-  return { hiddenVaultIds, hiddenParticipants, showTasks, filterOccs }
+  const filterKey = useMemo(
+    () => describeFilter(hiddenVaultIds, hiddenParticipants, showTasks),
+    [hiddenVaultIds, hiddenParticipants, showTasks],
+  )
+
+  return { hiddenVaultIds, hiddenParticipants, showTasks, filterOccs, filterKey }
 }
 
 /**

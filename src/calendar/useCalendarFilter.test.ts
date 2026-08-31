@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useStore } from '@/store'
 import { setupStore, makeOcc, TEST_VAULT } from '@/test-utils'
-import { useFilteredOccs, useParticipantFilteredOccs, NO_PARTICIPANT } from './useCalendarFilter'
+import { useCalendarFilter, useFilteredOccs, useParticipantFilteredOccs, describeFilter, NO_PARTICIPANT } from './useCalendarFilter'
 
 setupStore()
 
@@ -104,8 +104,8 @@ describe('useFilteredOccs', () => {
     expect(result.current.map(o => o.id)).toEqual(['other-loose'])
   })
 
-  // Guards `agendaSections`'s per-day reuse cache, which keys on filterOccs by
-  // reference: an incomplete or unstable dep list would thrash it every render.
+  // filterOccs no longer keys the agenda's caches (describeFilter does), but it
+  // still feeds useMemo deps here and in the other views.
   it('keeps filterOccs referentially stable when no filter state changed', () => {
     useStore.setState({ hiddenVaultIds: [OTHER_VAULT], hiddenParticipants: { [TEST_VAULT]: ['bob'] } })
     const occs = [occIn(TEST_VAULT, 'a', ['alice'])]
@@ -162,5 +162,39 @@ describe('useParticipantFilteredOccs', () => {
     const { result } = renderHook(() => useParticipantFilteredOccs([mine, theirs]))
 
     expect(result.current.map(o => o.id)).toEqual(['a'])
+  })
+})
+
+describe('describeFilter', () => {
+  it('describes equal filter state identically however the state was assembled', () => {
+    expect(describeFilter(['b', 'a'], { [TEST_VAULT]: ['bob', 'alice'] }, true))
+      .toBe(describeFilter(['a', 'b'], { [TEST_VAULT]: ['alice', 'bob'] }, true))
+  })
+
+  it('separates every axis it stands in for', () => {
+    const base = describeFilter([], {}, true)
+    expect(describeFilter([OTHER_VAULT], {}, true)).not.toBe(base)
+    expect(describeFilter([], { [TEST_VAULT]: ['bob'] }, true)).not.toBe(base)
+    expect(describeFilter([], {}, false)).not.toBe(base)
+    // Two vaults can each hide a different "Bob" — the vault the name is
+    // hidden in is part of the state, not just the name.
+    expect(describeFilter([], { [TEST_VAULT]: ['bob'] }, true))
+      .not.toBe(describeFilter([], { [OTHER_VAULT]: ['bob'] }, true))
+  })
+
+  // This is what the agenda's per-chunk section caches key on, so a filter
+  // change that left the key equal would serve stale rows.
+  it('changes with the filter it describes, and only with it', () => {
+    useStore.setState({ hiddenVaultIds: [], hiddenParticipants: {}, showTasks: true })
+    const { result, rerender } = renderHook(() => useCalendarFilter().filterKey)
+    const before = result.current
+
+    useStore.setState({ vaultLoading: false })
+    rerender()
+    expect(result.current).toBe(before)
+
+    useStore.setState({ showTasks: false })
+    rerender()
+    expect(result.current).not.toBe(before)
   })
 })
