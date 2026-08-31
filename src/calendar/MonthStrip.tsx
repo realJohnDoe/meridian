@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { fmtMonth } from '@/model'
+import { useToday } from '@/hooks'
 import { cn } from '@/lib/cn'
 
 // Deliberately not virtualized — a few dozen chips is cheap to render
@@ -50,6 +51,7 @@ interface Props {
  */
 export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
   const activeKey = fmtMonth(activeMonth)
+  const todayKey = fmtMonth(useToday())
   const [months] = useState(() => buildMonths(activeMonth))
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -81,30 +83,40 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
       aria-label="Jump to month"
       className="flex items-center gap-1 overflow-x-auto snap-x snap-mandatory px-3 py-2"
     >
-      {months.map(m => (
-        <div key={m.key} className="flex shrink-0 items-center gap-1">
-          {m.isYearStart && (
-            <span className="shrink-0 px-1.5 text-xs font-medium text-muted-foreground" aria-hidden>
-              {m.year}
-            </span>
-          )}
-          <button
-            ref={el => { chipElsRef.current[m.key] = el }}
-            type="button"
-            onClick={() => onNavigateMonth(m.date)}
-            aria-current={m.key === activeKey ? 'date' : undefined}
-            aria-label={m.date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
-            className={cn(
-              'shrink-0 snap-center rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
-              m.key === activeKey
-                ? 'bg-primary text-primary-foreground'
-                : 'text-foreground hover:bg-muted',
+      {months.map(m => {
+        const isToday = m.key === todayKey
+        return (
+          <div key={m.key} className="flex shrink-0 items-center gap-1">
+            {m.isYearStart && (
+              <span className="shrink-0 px-1.5 text-xs font-medium text-muted-foreground" aria-hidden>
+                {m.year}
+              </span>
             )}
-          >
-            {m.date.toLocaleDateString(undefined, { month: 'short' })}
-          </button>
-        </div>
-      ))}
+            <button
+              ref={el => { chipElsRef.current[m.key] = el }}
+              type="button"
+              onClick={() => onNavigateMonth(m.date)}
+              aria-current={m.key === activeKey ? 'date' : undefined}
+              aria-label={m.date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+              className={cn(
+                'shrink-0 snap-center rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
+                // The current real month always reads as primary, even when
+                // it isn't the one being viewed; a viewed month that isn't
+                // today's gets the more muted accent treatment instead, so
+                // the two stay visually distinct (see MiniMonth's matching
+                // today/highlight split).
+                isToday
+                  ? 'bg-primary text-primary-foreground'
+                  : m.key === activeKey
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-foreground hover:bg-muted',
+              )}
+            >
+              {m.date.toLocaleDateString(undefined, { month: 'short' })}
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }

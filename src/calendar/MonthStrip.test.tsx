@@ -25,6 +25,42 @@ describe('MonthStrip', () => {
     expect(screen.getByRole('button', { name: 'September 2026' })).not.toHaveAttribute('aria-current')
   })
 
+  it('gives the active month the muted accent treatment when it is not the current real month', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 8, 10)) // September 2026 — not the active August chip
+    try {
+      renderStrip()
+      expect(screen.getByRole('button', { name: 'August 2026' })).toHaveClass('bg-accent')
+      expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveClass('bg-primary')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('gives the current real month primary even when it is not the active chip', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 8, 10)) // September 2026, while August is active
+    try {
+      renderStrip()
+      expect(screen.getByRole('button', { name: 'September 2026' })).toHaveClass('bg-primary')
+      expect(screen.getByRole('button', { name: 'September 2026' })).not.toHaveClass('bg-accent')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('gives the active month primary, not the muted accent, when it is also the current real month', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 7, 10)) // August 2026 — matches the active chip
+    try {
+      renderStrip()
+      expect(screen.getByRole('button', { name: 'August 2026' })).toHaveClass('bg-primary')
+      expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveClass('bg-accent')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('renders a year separator at January of each covered year', () => {
     renderStrip()
     const group = screen.getByRole('group', { name: 'Jump to month' })

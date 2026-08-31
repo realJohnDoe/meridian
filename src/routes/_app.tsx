@@ -25,11 +25,6 @@ export const Route = createFileRoute('/_app')({
   }),
 })
 
-/** The seven dates of the week starting at `start` — week view's MiniMonth highlight. */
-function weekDates(start: Date): Date[] {
-  return Array.from({ length: 7 }, (_, i) => addDays(start, i))
-}
-
 function AppLayout() {
   return (
     // `_app` is the one shell that stays exactly one screen tall and clips
@@ -344,7 +339,7 @@ function AppMain() {
                   <MiniMonth
                     open={quickNavOpen}
                     anchorMonth={weekDisplayStart}
-                    highlightDates={weekDates(weekDisplayStart)}
+                    highlightDates={[weekDisplayStart]}
                     onSelectDay={iso => {
                       void navigate({ to: '/week/$date', params: { date: iso } })
                       closeQuickNav()

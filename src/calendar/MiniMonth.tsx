@@ -32,12 +32,17 @@ const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 function makeDayButton(dotsByDay: Map<string, DotCategory[]>) {
   return function MiniMonthDayButton({ className, children, ...rest }: React.ComponentProps<typeof DayButton>) {
     const dots = dotsByDay.get(fmtISO(rest.day.date)) ?? []
+    const { today, highlight } = rest.modifiers
     return (
       <CalendarDayButton
         {...rest}
         className={cn(
-          rest.modifiers.highlight &&
-            'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
+          // Today always reads as primary, even when it's also the
+          // highlighted/selected day — a highlighted day that isn't today
+          // gets the more muted accent treatment instead, so the two stay
+          // visually distinct.
+          today && 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
+          highlight && !today && 'bg-accent text-accent-foreground hover:bg-accent/90',
           className,
         )}
       >
@@ -115,7 +120,7 @@ interface Props {
   open: boolean
   /** The month to show when the panel opens — the main view's own month, not wherever the grid's own paging has since moved it to (see the component's own `month` state below). */
   anchorMonth: Date
-  /** Day(s) to visually mark as the calling view's current focus — one date for day/agenda, the seven dates of the active week for week view. */
+  /** Day(s) to visually mark as the calling view's current focus — one date for day/agenda, and the active week's start date for week view. */
   highlightDates: Date[]
   onSelectDay: (iso: string) => void
 }
