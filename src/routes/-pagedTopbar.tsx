@@ -65,7 +65,12 @@ export function PagedTopbar({
             paging ? 'mr-auto' : 'flex-1',
           )}
         >
-          {labelNode}
+          {/* min-w-0 (not flex-1) here: the label must shrink-to-fit around
+              the chevron so the chevron hugs it — flex-1 would grow the label
+              across whatever width the button above claims (the full row, in
+              the no-paging case), dragging the chevron away to the row's far
+              edge instead of sitting next to the text. */}
+          <span className="min-w-0 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{label}</span>
           <ChevronDown size={16} className={cn('shrink-0 text-dim transition-transform', expanded && 'rotate-180')} aria-hidden />
         </button>
       ) : labelNode}
