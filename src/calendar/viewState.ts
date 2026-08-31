@@ -248,26 +248,37 @@ export function setCurrentMonthKeepingDay(monthKey: string): void {
 }
 
 /**
- * Updates currentDate when the week carousel pages to a new week, keeping
- * the same weekday instead of jumping to the week's first day — e.g. paging
- * from Wed Aug 12 to the next week lands on Wed Aug 19. Mirrors
- * setCurrentMonthKeepingDay's day-of-month preservation.
+ * Pure calculation behind setCurrentWeekKeepingWeekday: the date, within the
+ * week containing `dateKey`, that falls on the same weekday as `reference`.
+ * Exported separately (not folded into the setter below) so a week the swipe
+ * carousel is still previewing — not yet committed to `currentDate` — can be
+ * given the same weekday-preserving treatment for display purposes without
+ * writing to the store; see `weekPreview`'s consumer in `_app.tsx`.
  *
  * `dateKey` is any date within the target week, not necessarily its start —
  * the route param itself isn't guaranteed to be week-start-normalized on
  * first mount (see WeekView), so normalization happens here via `ws` rather
  * than being required of the caller.
  */
-export function setCurrentWeekKeepingWeekday(dateKey: string, ws: 0 | 1 | 6): void {
+export function weekdayKeptDate(dateKey: string, reference: string, ws: 0 | 1 | 6): string {
   const [ny = NaN, nm = NaN, nd = NaN] = dateKey.split('-').map(Number)
   const newWeekStart = weekStartFor(new Date(ny, nm - 1, nd), ws)
 
-  const current = calendarView.getState().currentDate
-  const [cy = NaN, cm = NaN, cd = NaN] = current.split('-').map(Number)
-  const currentDateObj = new Date(cy, cm - 1, cd)
-  const offsetDays = differenceInCalendarDays(currentDateObj, weekStartFor(currentDateObj, ws))
+  const [cy = NaN, cm = NaN, cd = NaN] = reference.split('-').map(Number)
+  const referenceDateObj = new Date(cy, cm - 1, cd)
+  const offsetDays = differenceInCalendarDays(referenceDateObj, weekStartFor(referenceDateObj, ws))
 
-  calendarView.setState({ currentDate: fmtISO(addDays(newWeekStart, offsetDays)) })
+  return fmtISO(addDays(newWeekStart, offsetDays))
+}
+
+/**
+ * Updates currentDate when the week carousel pages to a new week, keeping
+ * the same weekday instead of jumping to the week's first day — e.g. paging
+ * from Wed Aug 12 to the next week lands on Wed Aug 19. Mirrors
+ * setCurrentMonthKeepingDay's day-of-month preservation.
+ */
+export function setCurrentWeekKeepingWeekday(dateKey: string, ws: 0 | 1 | 6): void {
+  calendarView.setState({ currentDate: weekdayKeptDate(dateKey, calendarView.getState().currentDate, ws) })
 }
 
 /** Clears the pending scroll target and records the date scrolled to, in one

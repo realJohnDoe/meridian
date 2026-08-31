@@ -134,8 +134,9 @@ interface Props {
   onSelectDay: (iso: string) => void
   /**
    * Called with the 1st of the month whenever the grid's own browsed month
-   * changes — a settled swipe, a day-picker keyboard month change, or a
-   * MonthStrip chip tap. The caller navigates the underlying view there
+   * changes — a day-picker keyboard month change, a MonthStrip chip tap, or
+   * a swipe (reported as soon as its target locks in, not once it settles —
+   * see onPreview below). The caller navigates the underlying view there
    * (without closing the panel, unlike `onSelectDay`), so browsing months
    * here keeps the main view, its highlighted day, and this grid's own
    * highlight all in step, without requiring an explicit day tap.
@@ -156,7 +157,8 @@ interface Props {
  * straight off `anchorMonth`, so a parent re-render mid-browse (e.g. the
  * `onBrowseMonth` navigation itself echoing back as a new `anchorMonth`)
  * can't yank the grid back to some earlier month — see `useResetOnChange`
- * below, which only ever resyncs `month` from `anchorMonth` on a fresh open.
+ * below, which only ever resyncs `month` from `anchorMonth` on a fresh open
+ * (or, for a swipe still in flight, once it settles — see monthPreview).
  */
 export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectDay, onBrowseMonth }: Props) {
   const [month, setMonthState] = useState(anchorMonth)
@@ -179,7 +181,14 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
   }
 
   useResetOnChange([open, fmtMonth(anchorMonth)], () => {
-    if (open) setMonthState(anchorMonth)
+    // Also gated on monthPreview being clear: onPreview below already
+    // reports a live swipe to the caller, whose navigation can echo straight
+    // back here as a new anchorMonth before the swipe has actually settled.
+    // `month` (driving this carousel's own pane recentering) must stay put
+    // until it does — see onPreview's own comment — so skip the resync
+    // while a preview is still in flight; it'll match by the time this
+    // fires again anyway, since onCommit sets `month` to the same value.
+    if (open && monthPreview === null) setMonthState(anchorMonth)
   })
 
   const items = useStore(s => s.items)
@@ -192,7 +201,19 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
     paneCount: PANE_COUNT,
     unitAt: offset => fmtMonth(new Date(month.getFullYear(), month.getMonth() + offset, 1)),
     onCommit: key => setMonth(parseMonth(key)),
-    onPreview: key => setMonthPreview(key),
+    // Reports the browsed month to the caller here too (not just on commit
+    // below), so the main view it navigates — DayPane/WeekPane/Agenda,
+    // sitting behind this panel — moves as soon as the swipe's target locks
+    // in instead of only once the mini-grid's own snap animation settles.
+    // Deliberately does *not* also update `month` yet: `month` drives this
+    // carousel's own pane recentering (see useCarousel), which has to wait
+    // for the real commit below or the recenter would fire mid-animation —
+    // see the useResetOnChange guard above, which keeps anchorMonth's own
+    // echo of this navigation from doing that early either.
+    onPreview: key => {
+      setMonthPreview(key)
+      onBrowseMonth(startOfMonth(parseMonth(key)))
+    },
     // `month` is authoritative again once it has actually committed, so
     // clear the preview here — mirrors MonthView's own onRecentered.
     onRecentered: () => setMonthPreview(null),
