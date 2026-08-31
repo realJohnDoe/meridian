@@ -19,8 +19,14 @@ function sameIndices(a: number[], b: number[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i])
 }
 
+// Compares each chunk's `allOccs` rather than the ExpansionCache object
+// itself: computeExpansionCache's own no-op fast path returns a *new* wrapper
+// (`{ ...prev, items, roots }`) even when nothing changed, so the wrapper
+// reference always differs between renders — only `allOccs` (and the reverse
+// indices) are carried over unchanged. Comparing wrappers here would make this
+// memo permanently miss.
 function sameChunks(a: ExpansionCache[], b: ExpansionCache[]): boolean {
-  return a.length === b.length && a.every((v, i) => v === b[i])
+  return a.length === b.length && a.every((v, i) => v.allOccs === b[i]?.allOccs)
 }
 
 /**
