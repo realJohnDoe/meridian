@@ -38,11 +38,14 @@ function makeDayButton(dotsByDay: Map<string, DotCategory[]>) {
         {...rest}
         className={cn(
           // Today always reads as primary, even when it's also the
-          // highlighted/selected day — a highlighted day that isn't today
-          // gets the more muted accent treatment instead, so the two stay
-          // visually distinct.
+          // highlighted/selected day. A highlighted day that isn't today gets
+          // a primary tint ringed in primary instead: the old flat `bg-accent`
+          // fill was near-invisible on the light themes, where --accent sits a
+          // hair off --background (see index.css), so the selected day was
+          // easy to lose in a grid of 35 cells. The tint/outline split still
+          // keeps it plainly distinct from today's solid fill.
           today && 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground',
-          highlight && !today && 'bg-accent text-accent-foreground hover:bg-accent/90',
+          highlight && !today && 'bg-primary/15 text-foreground font-semibold ring-2 ring-inset ring-primary hover:bg-primary/25',
           className,
         )}
       >

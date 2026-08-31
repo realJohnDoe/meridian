@@ -25,37 +25,38 @@ describe('MonthStrip', () => {
     expect(screen.getByRole('button', { name: 'September 2026' })).not.toHaveAttribute('aria-current')
   })
 
-  it('gives the active month the muted accent treatment when it is not the current real month', () => {
+  it('gives the active month a primary tint ringed in primary when it is not the current real month', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 8, 10)) // September 2026 — not the active August chip
     try {
       renderStrip()
-      expect(screen.getByRole('button', { name: 'August 2026' })).toHaveClass('bg-accent')
+      expect(screen.getByRole('button', { name: 'August 2026' })).toHaveClass('bg-primary/15', 'ring-2', 'ring-primary')
       expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveClass('bg-primary')
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('gives the current real month primary even when it is not the active chip', () => {
+  it('gives the current real month the solid primary fill even when it is not the active chip', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 8, 10)) // September 2026, while August is active
     try {
       renderStrip()
       expect(screen.getByRole('button', { name: 'September 2026' })).toHaveClass('bg-primary')
-      expect(screen.getByRole('button', { name: 'September 2026' })).not.toHaveClass('bg-accent')
+      expect(screen.getByRole('button', { name: 'September 2026' })).not.toHaveClass('bg-primary/15')
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('gives the active month primary, not the muted accent, when it is also the current real month', () => {
+  it('gives the active month the solid primary fill, not the tint, when it is also the current real month', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 7, 10)) // August 2026 — matches the active chip
     try {
       renderStrip()
       expect(screen.getByRole('button', { name: 'August 2026' })).toHaveClass('bg-primary')
-      expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveClass('bg-accent')
+      expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveClass('bg-primary/15')
+      expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveClass('ring-primary')
     } finally {
       vi.useRealTimers()
     }

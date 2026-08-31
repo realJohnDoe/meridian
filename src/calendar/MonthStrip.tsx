@@ -102,13 +102,15 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
                 'shrink-0 snap-center rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
                 // The current real month always reads as primary, even when
                 // it isn't the one being viewed; a viewed month that isn't
-                // today's gets the more muted accent treatment instead, so
-                // the two stay visually distinct (see MiniMonth's matching
-                // today/highlight split).
+                // today's gets a primary tint ringed in primary instead, so
+                // the two stay visually distinct while the active chip is
+                // still easy to pick out of the row (see MiniMonth's matching
+                // today/highlight split — the flat `bg-accent` both used to
+                // carry all but disappears on the light themes).
                 isToday
                   ? 'bg-primary text-primary-foreground'
                   : m.key === activeKey
-                    ? 'bg-accent text-accent-foreground'
+                    ? 'bg-primary/15 text-foreground ring-2 ring-inset ring-primary'
                     : 'text-foreground hover:bg-muted',
               )}
             >

@@ -57,26 +57,28 @@ describe('MiniMonth', () => {
     expect(dayButton(container, new Date(2026, 7, 16)).querySelector('[data-dot]')).toBeNull()
   })
 
-  it('highlights the day(s) in highlightDates with the muted accent treatment', () => {
+  it('highlights the day(s) in highlightDates with a primary tint ringed in primary', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 7, 10)) // not the highlighted day, so it can't also read as today
     try {
       const { container } = renderMini([], { highlightDates: [new Date(2026, 7, 15)] })
-      expect(dayButton(container, new Date(2026, 7, 15))).toHaveClass('bg-accent')
+      expect(dayButton(container, new Date(2026, 7, 15))).toHaveClass('bg-primary/15', 'ring-2', 'ring-primary')
+      // The tint, not today's solid fill — the two must stay distinguishable.
       expect(dayButton(container, new Date(2026, 7, 15))).not.toHaveClass('bg-primary')
-      expect(dayButton(container, new Date(2026, 7, 16))).not.toHaveClass('bg-accent')
+      expect(dayButton(container, new Date(2026, 7, 16))).not.toHaveClass('ring-primary')
     } finally {
       vi.useRealTimers()
     }
   })
 
-  it('marks today primary even when it is also the highlighted day, not the muted accent', () => {
+  it('marks today with the solid primary fill even when it is also the highlighted day', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 7, 15))
     try {
       const { container } = renderMini([], { highlightDates: [new Date(2026, 7, 15)] })
       expect(dayButton(container, new Date(2026, 7, 15))).toHaveClass('bg-primary')
-      expect(dayButton(container, new Date(2026, 7, 15))).not.toHaveClass('bg-accent')
+      expect(dayButton(container, new Date(2026, 7, 15))).not.toHaveClass('bg-primary/15')
+      expect(dayButton(container, new Date(2026, 7, 15))).not.toHaveClass('ring-primary')
     } finally {
       vi.useRealTimers()
     }
