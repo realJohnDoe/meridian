@@ -10,7 +10,7 @@ export { weekStartFor } from './weekRange'
 export {
   resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useWeekPreview, useAgendaTopDate, requestScrollToToday,
   requestScrollToDate, useCurrentDate, setCurrentDate, setCurrentMonthKeepingDay, setCurrentWeekKeepingWeekday,
-  useQuickNavOpen, toggleQuickNav, closeQuickNav,
+  weekdayKeptDate, useQuickNavOpen, toggleQuickNav, closeQuickNav,
 } from './viewState'
 export { useQuickNavSwipe } from './useQuickNavSwipe'
 export { default as MonthStrip } from './MonthStrip'

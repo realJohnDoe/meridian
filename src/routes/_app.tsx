@@ -10,7 +10,7 @@ import {
   useMonthPreview, useDayPreview, useWeekPreview,
   useAgendaTopDate, requestScrollToToday, requestScrollToDate, weekStartFor,
   useQuickNavOpen, toggleQuickNav, closeQuickNav, MonthStrip, MiniMonth,
-  useCurrentDate, setCurrentDate, useQuickNavSwipe,
+  useCurrentDate, setCurrentDate, weekdayKeptDate, useQuickNavSwipe,
 } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ViewFilterButton } from '@/components'
@@ -149,6 +149,11 @@ function AppMain() {
   const dvDisplayDate    = dvDate && (dayPreview ? (parseDateString(dayPreview) ?? dvDate) : dvDate)
   const weekDisplayStart = weekStartDate && (weekPreview ? (parseDateString(weekPreview) ?? weekStartDate) : weekStartDate)
   const weekDisplayEnd   = weekDisplayStart && addDays(weekDisplayStart, 6)
+  // currentDate carried forward into the previewed week, same weekday kept —
+  // the week-view quick-nav panel's anchor month and highlighted day both key
+  // off this (see below) rather than currentDate directly, so they track a
+  // swipe in progress instead of only jumping once it commits.
+  const currentDisplayDate = weekPreview && isWeekView ? weekdayKeptDate(weekPreview, currentDate, ws) : currentDate
 
   // Backlog/Notes are fixed strings; the agenda default view shows just the
   // month of its topmost visible row, matching Day/Month/Week's own topbar.
@@ -343,7 +348,7 @@ function AppMain() {
                   <MiniMonth
                     open={quickNavOpen}
                     anchorMonth={dvDisplayDate}
-                    highlightDates={[dvDate]}
+                    highlightDates={[dvDisplayDate]}
                     onSelectDay={iso => {
                       void navigate({ to: '/day/$date', params: { date: iso } })
                       closeQuickNav()
@@ -358,15 +363,17 @@ function AppMain() {
                 ) : isWeekView && weekStartDate && weekDisplayStart ? (
                   <MiniMonth
                     open={quickNavOpen}
-                    // Same source as highlightDates below (currentDate), not
-                    // weekDisplayStart — the week's first day and the actually
-                    // selected day routinely fall in different months (any
-                    // week straddling a month boundary), and anchoring to
-                    // weekDisplayStart while highlighting currentDate opened
-                    // the panel on a month that didn't contain its own
-                    // highlighted day.
-                    anchorMonth={parseDateString(currentDate) ?? weekDisplayStart}
-                    highlightDates={[parseDateString(currentDate) ?? weekDisplayStart]}
+                    // Same source as highlightDates below (currentDisplayDate),
+                    // not weekDisplayStart — the week's first day and the
+                    // actually selected day routinely fall in different months
+                    // (any week straddling a month boundary), and anchoring to
+                    // weekDisplayStart while highlighting currentDisplayDate
+                    // opened the panel on a month that didn't contain its own
+                    // highlighted day. currentDisplayDate rather than plain
+                    // currentDate so both track an in-progress swipe (see its
+                    // own comment above) instead of only jumping once it commits.
+                    anchorMonth={parseDateString(currentDisplayDate) ?? weekDisplayStart}
+                    highlightDates={[parseDateString(currentDisplayDate) ?? weekDisplayStart]}
                     onSelectDay={iso => {
                       // See the "Today" handler's comment above: set
                       // currentDate directly so the picked day — not the
