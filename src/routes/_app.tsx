@@ -354,7 +354,14 @@ function AppMain() {
                 ) : isWeekView && weekStartDate && weekDisplayStart ? (
                   <MiniMonth
                     open={quickNavOpen}
-                    anchorMonth={weekDisplayStart}
+                    // Same source as highlightDates below (currentDate), not
+                    // weekDisplayStart — the week's first day and the actually
+                    // selected day routinely fall in different months (any
+                    // week straddling a month boundary), and anchoring to
+                    // weekDisplayStart while highlighting currentDate opened
+                    // the panel on a month that didn't contain its own
+                    // highlighted day.
+                    anchorMonth={parseDateString(currentDate) ?? weekDisplayStart}
                     highlightDates={[parseDateString(currentDate) ?? weekDisplayStart]}
                     onSelectDay={iso => {
                       // See the "Today" handler's comment above: set
