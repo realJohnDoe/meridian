@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { startTransition, useMemo, useState } from 'react'
 import { type DayButton } from 'react-day-picker'
 import { endOfMonth, startOfMonth } from 'date-fns'
 import type { StoreItem, Roots, Occurrence } from '@/types'
@@ -219,8 +219,19 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
     // see the useResetOnChange guard above, which keeps anchorMonth's own
     // echo of this navigation from doing that early either.
     onPreview: key => {
+      // browsePreview is a cheap local update (MonthStrip's own highlight) —
+      // let it land immediately. onBrowseMonth is the expensive part: it
+      // navigates the main view behind this panel, which for Day/Week means
+      // mounting a fresh pane (occurrence expansion included) and for
+      // Agenda means re-centering the virtualizer's window — real work that,
+      // fired synchronously right at touchend, visibly stalled this
+      // mini-grid's own snap animation before it could even start (the
+      // freeze reported after this was first wired up). Wrapping it in a
+      // transition tells React the resulting render is interruptible and
+      // lower priority than keeping the swipe smooth, instead of blocking
+      // on it in the same tick.
       onBrowsePreview(key)
-      onBrowseMonth(startOfMonth(parseMonth(key)))
+      startTransition(() => onBrowseMonth(startOfMonth(parseMonth(key))))
     },
     onRecentered,
   })
