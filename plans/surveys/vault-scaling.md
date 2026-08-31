@@ -274,6 +274,17 @@ when the last finding closes — see `plans/vault-scaling-results.md`.
 timing traps that cost a day each (a garbage-collected `MutationObserver`, and
 `keyboard.type` outrunning the search debounce).
 
+## Note on the planned infinite-scroll change
+
+A move to a standard infinite-scroll agenda is planned. It does not change any
+measurement here — the curves describe the architecture as measured on
+2026-08-28 — but it does change which findings are separately actionable, and
+three properties of the current code constrain how it can be built (the
+exact-window gate on the expansion cache, the section cache's positional
+alignment, and the overdue header's exact count). Those are written up in
+`plans/vault-scaling-results.md`. Once that change lands, the cold-start,
+toggle and scroll rows here are the ones to re-measure first.
+
 ## Where the findings went
 
 Six findings came out of this run, ranked, each with the baseline and the
