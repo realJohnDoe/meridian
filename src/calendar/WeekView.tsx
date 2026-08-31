@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
 import { useStore } from '@/store'
 import type { Occurrence, EditScope } from '@/types'
 import { fmtISO, weekStartsOn } from '@/model'
 import { addDays } from '@/format'
 import WeekPane from './WeekPane'
 import { useCarousel } from './useCarousel'
+import { useCarouselPreview } from './useCarouselPreview'
 import { PANE_COUNT } from './snapCarousel'
 import { calendarView, setWeekPreview } from './viewState'
 import { useTimelineScrollSync } from './useTimelineScrollSync'
@@ -36,24 +36,19 @@ export default function WeekView({ date, onOpen, onNavigateWeek, onDayClick, onC
   const ws = weekStartsOn(localePrefs)
   const weekStart = weekStartFor(date, ws)
 
+  const { onPreview, onRecentered } = useCarouselPreview({
+    get: () => calendarView.getState().weekPreview,
+    set: setWeekPreview,
+  })
+
   const { emblaRef, paneKeys } = useCarousel({
     unitKey: fmtISO(weekStart),
     paneCount: PANE_COUNT,
     unitAt: offset => fmtISO(addDays(weekStart, offset * 7)),
     onCommit: key => onNavigateWeek?.(parseDateKey(key)),
-    onPreview: key => setWeekPreview(key),
-    // The route is authoritative again once the week has actually committed,
-    // so clear any preview here — mirrors MonthView/DayView's own preview.
-    onRecentered: () => {
-      if (calendarView.getState().weekPreview !== null) setWeekPreview(null)
-    },
+    onPreview,
+    onRecentered,
   })
-
-  // If a swipe is left in flight (e.g. the user navigates away via the
-  // sidebar before the gesture settles and onRecentered fires), the preview
-  // would otherwise survive in the shared store and briefly mislabel the
-  // topbar on the next visit to this route.
-  useEffect(() => () => setWeekPreview(null), [])
 
   // Vertical scroll position syncs across weeks (scroll to 6pm, swipe, still
   // at 6pm) — see useTimelineScrollSync.

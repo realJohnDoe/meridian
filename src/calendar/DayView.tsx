@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
 import type { Occurrence, EditScope } from '@/types'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 import DayPane from './DayPane'
 import { useCarousel } from './useCarousel'
+import { useCarouselPreview } from './useCarouselPreview'
 import { PANE_COUNT } from './snapCarousel'
 import { calendarView, setDayPreview } from './viewState'
 import { useTimelineScrollSync } from './useTimelineScrollSync'
@@ -28,24 +28,19 @@ interface Props {
 }
 
 export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate }: Props) {
+  const { onPreview, onRecentered } = useCarouselPreview({
+    get: () => calendarView.getState().dayPreview,
+    set: setDayPreview,
+  })
+
   const { emblaRef, paneKeys } = useCarousel({
     unitKey: fmtISO(dvDate),
     paneCount: PANE_COUNT,
     unitAt: offset => fmtISO(addDays(dvDate, offset)),
     onCommit: key => onNavigateDate?.(parseDateKey(key)),
-    onPreview: key => setDayPreview(key),
-    // The route is authoritative again once the date has actually committed,
-    // so clear any preview here — mirrors MonthView's monthPreview.
-    onRecentered: () => {
-      if (calendarView.getState().dayPreview !== null) setDayPreview(null)
-    },
+    onPreview,
+    onRecentered,
   })
-
-  // If a swipe is left in flight (e.g. the user navigates away via the
-  // sidebar before the gesture settles and onRecentered fires), the preview
-  // would otherwise survive in the shared store and briefly mislabel the
-  // topbar on the next visit to this route.
-  useEffect(() => () => setDayPreview(null), [])
 
   // Vertical scroll position syncs across days (scroll to 6pm, swipe, still
   // at 6pm) — see useTimelineScrollSync.

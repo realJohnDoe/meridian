@@ -26,6 +26,21 @@ export const Route = createFileRoute('/_app')({
   }),
 })
 
+/**
+ * Derives a "preview-aware" display value from a route value and its
+ * optional preview key (monthPreview/dayPreview/weekPreview, set by a swipe
+ * carousel on touchend, ahead of the route committing — see viewState.ts) —
+ * the pattern repeated below for each of Month/Day/Week's own topbar label
+ * and quick-nav panel props. Falls back to `raw` when there's no preview, or
+ * `parse` can't make sense of one (a malformed key should never happen, but
+ * the parse functions return null/undefined on invalid input, and a
+ * fallback beats blowing up on it).
+ */
+function previewAware<T>(raw: T, previewKey: string | null, parse: (key: string) => T | null | undefined): T {
+  if (!previewKey) return raw
+  return parse(previewKey) ?? raw
+}
+
 function AppLayout() {
   return (
     // `_app` is the one shell that stays exactly one screen tall and clips
@@ -145,15 +160,17 @@ function AppMain() {
   // / crossing the halfway point) show the label the gesture is heading
   // toward immediately, ahead of the route committing — chevron navigation
   // and Today still key off the route's own monthViewDate/dvDate/weekStartDate.
-  const monthDisplayDate = monthViewDate && (monthPreview ? parseMonth(monthPreview) : monthViewDate)
-  const dvDisplayDate    = dvDate && (dayPreview ? (parseDateString(dayPreview) ?? dvDate) : dvDate)
-  const weekDisplayStart = weekStartDate && (weekPreview ? (parseDateString(weekPreview) ?? weekStartDate) : weekStartDate)
+  const monthDisplayDate = monthViewDate && previewAware(monthViewDate, monthPreview, parseMonth)
+  const dvDisplayDate    = dvDate && previewAware(dvDate, dayPreview, parseDateString)
+  const weekDisplayStart = weekStartDate && previewAware(weekStartDate, weekPreview, parseDateString)
   const weekDisplayEnd   = weekDisplayStart && addDays(weekDisplayStart, 6)
   // currentDate carried forward into the previewed week, same weekday kept —
   // the week-view quick-nav panel's anchor month and highlighted day both key
   // off this (see below) rather than currentDate directly, so they track a
   // swipe in progress instead of only jumping once it commits.
-  const currentDisplayDate = weekPreview && isWeekView ? weekdayKeptDate(weekPreview, currentDate, ws) : currentDate
+  const currentDisplayDate = isWeekView
+    ? previewAware(currentDate, weekPreview, key => weekdayKeptDate(key, currentDate, ws))
+    : currentDate
 
   // Backlog/Notes are fixed strings; the agenda default view shows just the
   // month of its topmost visible row, matching Day/Month/Week's own topbar.
