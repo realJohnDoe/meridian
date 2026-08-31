@@ -287,7 +287,7 @@ async function measurePipeline(browser, spec) {
 
       // grouping/sorting/filtering into virtualizable rows
       r.agendaSections = await b(() => {
-        const res = sections.computeAgendaSections(null, occs, today, new Date(), o => o, today, true, 1)
+        const res = sections.computeAgendaSections(null, occs, [], today, new Date(), o => o, today, true, 1)
         r.agendaRows = res.rows.length
       }, 3)
 
