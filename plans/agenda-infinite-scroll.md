@@ -65,9 +65,15 @@ Four decisions the results file does not settle:
    "Load earlier" affordance. See PR 4's hazard section for why
    auto-prepending is the one genuinely dangerous piece here.
 
-Plus a prep PR (PR 0) for two architectural facts that would otherwise have to
-be worked around in every later PR: expansion rescans every item on every call,
-and what a window's `to` bound means is decided per call site.
+**Landed ahead of this sequence:** `expandRange`/`expandWithMultiday` now
+accept an optional pre-built `ItemIndex` (`model/itemIndex.ts`) instead of
+re-filtering `items` into series/standalones/children on every call, and
+`model/dateUtils.ts`'s `dayRange(firstDay, lastDay)` is the one place that
+turns a first/last day into the inclusive `{ from, to }` bound `expandRange`
+wants — migrated onto by all four existing call sites (Month, Day, Week, and
+the agenda, which was the one passing a bare midnight `to`). Both were
+prerequisites the rest of this plan would otherwise have had to work around
+case by case; see PR 2 and PR 3 below for where they matter next.
 
 ### One property that is now load-bearing
 
@@ -87,17 +93,15 @@ screenful" iteration.** Stated here because nothing in the code says it.
 
 | PR | Title | Model | Closes |
 |---|---|---|---|
-| 0 | Expansion item index + an explicit day-range convention | **Sonnet 5** | prep |
 | 1 | Overdue off the agenda window, grouped by series | **Opus 5** | C3 |
 | 2 | Absolute chunk grid for agenda expansion | **Sonnet 5** | C1 |
 | 3 | Chunk-local sectioning | **Opus 5** | C2 |
 | 4 | Incremental loading + "Load earlier" | **Sonnet 5** | finding #1 |
 
 Each PR is shippable on its own and leaves the agenda working. The order is
-forced: PR 0 removes two hazards the rest would otherwise have to work around,
-PR 1 must land before the past window can be chunked (overdue pools from all of
-it today), and PR 4 is only safe once appends are cheap in both the expansion
-(PR 2) and the sectioning (PR 3).
+forced: PR 1 must land before the past window can be chunked (overdue pools
+from all of it today), and PR 4 is only safe once appends are cheap in both the
+expansion (PR 2) and the sectioning (PR 3).
 
 Four smaller architectural fixes are **folded into** the PRs that already touch
 that code rather than given PRs of their own — the window-constant split into
@@ -109,103 +113,6 @@ PR 4 lands, this file goes away entirely and finding #1's entry (plus its
 summary-table row) is removed from `plans/vault-scaling-results.md` in the same
 commit; finding #4's "deferred until after infinite scroll" note is rewritten
 around a fresh measurement instead.
-
----
-
-## PR 0 — Expansion item index + an explicit day-range convention
-
-**Model: Sonnet 5.** Two mechanical, pure changes in `model/`, both with strong
-existing test coverage and both independently measurable.
-
-### Goal
-
-Two prerequisites that make everything after them cheaper and safer, neither of
-which changes any behaviour.
-
-### Why it is meaningful alone
-
-The item index is not only about this feature: the same rescan is a large part
-of finding **#2** (`fileOccurrenceMap`, the single largest heap consumer at
-+504 MB at mixed/30 000) and of the entry route's own `expandRange` call. It is
-worth landing whether or not the rest of this plan proceeds.
-
-### Design
-
-**(a) `ItemIndex` — stop rescanning every item on every call.** `expandRange`
-re-derives its working sets on each call, over `items`, which `deriveViews`
-builds as **every item across every vault**:
-
-```ts
-const seriesList = items.filter(isSeries)          // expansion.ts:775
-const standalones = items.filter(isStandaloneOcc)  // :777
-for (const series of seriesList) {
-  const children = items.filter(i => !isSeries(i) && i.ownerId === series.id)  // :781
-```
-
-That last filter is *inside* the series loop — **O(series × items)** per call.
-One window per view hides it; PR 2 multiplies it by the chunk count and PR 1
-adds another full-window pass on top.
-
-Build it once instead: `buildItemIndex(items) -> { series, standalones,
-childrenByOwnerId: Map<string, StoreOcc[]> }`, memoized on `items` identity, and
-have `expandRange`/`expandWithMultiday` accept an optional index (deriving one
-when absent, so existing call sites keep working unchanged). Then thread it
-through the hot callers: `computeExpansionCache`, `fileOccurrence.ts`.
-
-**(b) `dayRange` — make the window end-bound a rule, not folklore.**
-`expandRange` filters `jsTime >= from && jsTime <= to` inclusively
-(`expansion.ts:837`, and the multiday pass at `:877`), so what `to` means is
-decided per call site. Three views pass end-of-day:
-
-- `MonthGrid.tsx:130` — `new Date(y, m + 1, 0, 23, 59, 59)`
-- `DayPane.tsx:86` — `dvTo.setHours(23, 59, 59)`
-- `WeekPane.tsx:70` — same
-
-and the agenda passes `addDays(anchor, FUTURE_WINDOW_DAYS)`, i.e. **midnight**.
-The agenda is the outlier, and the consequence is real if minor: the last day of
-its window is already timed-occurrence-free. Harmless at one outer edge —
-catastrophic once replicated at every internal chunk boundary in PR 2.
-
-Add `dayRange(firstDay, lastDay)` to `model/` returning the `{ from, to }` pair
-`expandRange` wants, and migrate all four call sites onto it. That turns PR 2's
-sharpest hazard from a comment someone has to read into something the type
-system hands you.
-
-### Hazards
-
-- The index must be invalidated on `items` **identity**, matching how
-  `computeExpansionCache` already gates. Do not try to be cleverer than that.
-- Keep the index parameter optional. `debug/NodeInheritanceDebugger.tsx:437` and
-  `routes/_entry.entry.$vault.$slug.tsx:110` call `expandRange` directly and
-  should not have to change.
-- `model/` may not import from `calendar/` or `store` (invariant 1). Both
-  changes stay inside `model/`; only the call sites move.
-- Migrating the agenda onto `dayRange` shifts its window end from midnight to
-  end-of-day, so a timed occurrence on the window's last day starts appearing.
-  That is a fix, but it is a behaviour change — expect a test to need updating,
-  and do not quietly widen anything else while in there.
-
-### Tests
-
-`src/model/__tests__/` in full — the expansion suites are the guard here, and
-the index must be a pure refactor against them. Add:
-
-- an equivalence test: `expandRange` with and without a supplied index returns
-  identical results for a fixture containing a series with several overrides,
-  an excluded date, and two series in one file;
-- a `dayRange` test pinning that a 23:59 occurrence on the last day is included
-  and one at 00:00 the following day is not.
-
-Also run `src/store.test.ts`, `src/search/FileResultsList.test.tsx`,
-`src/editor/ItemsList.test.tsx` (the `fileOccurrence` consumers).
-
-### Acceptance
-
-`node scripts/perf/stress.mjs --shapes mixed,flat --sizes 3000,30000 --skip-ui --skip-dexie`:
-`pipeline.result.expandAgendaWindow.median` and
-`pipeline.result.fileOccurrenceMap.cold` should both improve at mixed/30 000,
-the latter materially. Record the numbers in the PR — finding #2 is still open
-and this moves it.
 
 ---
 
@@ -365,24 +272,28 @@ downstream changes.
 
 ### Hazards
 
-- **Chunk boundary times — use PR 0's `dayRange`, do not hand-roll it.**
-  `expandRange` filters inclusively at both ends, so a chunk whose `to` is
-  midnight of its last day silently drops every *timed* occurrence on that day.
-  Harmless once at the very end of the window; catastrophic repeated at every
-  internal boundary. `chunkRange` must build its bounds with `dayRange`, and
-  chunk *i*'s last day is the day before chunk *i+1*'s first. No overlap, no
-  gap. Assert adjacency in the grid test.
+- **Chunk boundary times — use `model/dateUtils.ts`'s `dayRange`, do not
+  hand-roll it.** `expandRange` filters inclusively at both ends, so a chunk
+  whose `to` is midnight of its last day silently drops every *timed*
+  occurrence on that day. Harmless once at the very end of the window;
+  catastrophic repeated at every internal boundary. `chunkRange` must build its
+  bounds with `dayRange`, and chunk *i*'s last day is the day before chunk
+  *i+1*'s first. No overlap, no gap. Assert adjacency in the grid test.
 - **Do not reuse `useExpandWithMultiday`'s `cacheByWindow`.** Its
   `MAX_CACHED_WINDOWS = 16` is shared with Month's three panes and Day/Week's
   five each; chunked scrolling would evict live chunks well before the cap, and
   the two eviction policies genuinely differ (LRU for panes, range retention for
   chunks). Give the agenda its own map. Retention is PR 4's problem; in this PR
   simply keep every chunk in the requested range and drop the rest.
-- **Pass PR 0's `ItemIndex` through to every chunk's expansion.** Without it
-  each chunk pays the O(series × items) rescan (`expansion.ts:781`) that PR 0
-  removed, and this PR multiplies that by the chunk count — the exact regression
-  PR 0 exists to prevent. The remaining per-call linear passes are why chunks
-  are 28 days rather than 7.
+- **Pass an `ItemIndex` (`model/itemIndex.ts`) through to every chunk's
+  expansion.** Without it each chunk pays the O(series × items) rescan
+  (`expansion.ts`'s `childrenByOwnerId` lookup exists precisely to avoid this)
+  and this PR multiplies that by the chunk count — the exact regression
+  `buildItemIndex` exists to prevent. Build one index per `items` identity
+  (reuse `expansionCache.ts`'s `itemIndexFor`, or lift it to a shared spot if
+  the chunk grid needs its own) and pass it to every chunk's `expandRange`
+  call rather than letting each one build its own. The remaining per-call
+  linear passes are why chunks are 28 days rather than 7.
 - Concatenation order: chunks are disjoint and ascending and each is internally
   sorted by `dedupeAndSort`, so the concatenation is globally sorted. Sectioning
   buckets by day and sorts within a day anyway, so this is belt-and-braces —
@@ -428,7 +339,8 @@ Run `src/calendar/useAgendaSections.test.ts`, `src/calendar/agendaSections.test.
 same measurement after navigating Month → Agenda should now be near zero rather
 than a full re-expansion. Note `model/` may not import from `calendar/`
 (invariant 1) — the grid math lives entirely in `calendar/`, and this PR should
-need no `model/` change at all now that PR 0 has landed.
+need no `model/` change at all, since `ItemIndex`/`dayRange` already exist
+there.
 
 ---
 

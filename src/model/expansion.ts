@@ -6,7 +6,9 @@
  *   - Multiday:     multidayDisplayTitle
  *   - Main-app API: expandRange, expandWithMultiday, joinFileMeta, stableOccId
  *
- * Date helpers live in ./dateUtils; duration helpers in ./duration.
+ * Date helpers live in ./dateUtils; duration helpers in ./duration; the
+ * optional `ItemIndex`/`buildItemIndex` both functions above accept lives in
+ * ./itemIndex.
  */
 
 import {
@@ -14,8 +16,7 @@ import {
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes, startOfDay, endOfDay,
   differenceInCalendarDays,
 } from 'date-fns'
-import type { Repeat, StoreItem, StoreOcc, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
-import { isSeries, isStandaloneOcc } from '@/types'
+import type { Repeat, StoreItem, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
 import { scalarToString } from './fieldRegistry'
 import type { EffectiveNode } from './inheritance'
 import { fmtISO, fmtT, parseDateString, parseDateTime } from './dateUtils'
@@ -23,6 +24,7 @@ import { parseDurationDays } from './duration'
 import { parseInterval } from './repeat'
 import { parseEntryKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
+import { buildItemIndex, type ItemIndex } from './itemIndex'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL DATE HELPERS  (not exported — no consumers outside this file)
@@ -763,24 +765,26 @@ function dedupeAndSort(occs: OccurrenceEntry<AppMetadata>[]): OccurrenceEntry<Ap
  * Each output occurrence carries ownerId = series.id so the editor can detect
  * recurring items and look up the parent series.
  * File-level fields (title/tags/topics/body) are joined from `roots`.
+ *
+ * `index` is an optional pre-built `ItemIndex` (see `model/itemIndex.ts`),
+ * for callers that already have one — typically because they're calling this
+ * (or `expandWithMultiday`) more than once against the same `items`. Omit it
+ * and one is built internally, exactly as before.
  */
 export function expandRange(
   items: StoreItem[],
   roots: Roots,
   from: Date,
   to: Date,
+  index?: ItemIndex,
 ): OccurrenceEntry<AppMetadata>[] {
   const result: OccurrenceEntry<AppMetadata>[] = []
 
-  const seriesList = items.filter(isSeries)
-  // Standalone = non-series items with no ownerId
-  const standalones = items.filter(isStandaloneOcc)
+  const { series: seriesList, standalones, childrenByOwnerId } = index ?? buildItemIndex(items)
 
   // ── Expand each series ────────────────────────────────────────────────────
   for (const series of seriesList) {
-    const children = items.filter(
-      i => !isSeries(i) && i.ownerId === series.id,
-    ) as StoreOcc[]
+    const children = childrenByOwnerId.get(series.id) ?? []
 
     const expandable: ExpandNode<OccurrenceMetadata> = {
       date:     series.date,
@@ -855,17 +859,20 @@ export function expandRange(
  * The start-date occurrence is already produced by expandRange; this helper
  * adds days 2..N so callers don't need to scatter that logic across views.
  * Result is deduplicated by (entryKey, jsTime) and sorted by jsTime.
+ *
+ * `index` — see expandRange's own doc comment; passed through unchanged.
  */
 export function expandWithMultiday(
   items: StoreItem[],
   roots: Roots,
   from: Date,
   to: Date,
+  index?: ItemIndex,
 ): OccurrenceEntry<AppMetadata>[] {
-  const occs = expandRange(items, roots, from, to)
+  const resolvedIndex = index ?? buildItemIndex(items)
+  const occs = expandRange(items, roots, from, to, resolvedIndex)
 
-  const extraMultiday = items
-    .filter(isStandaloneOcc)
+  const extraMultiday = resolvedIndex.standalones
     .flatMap(i => {
       const days = parseDurationDays(i.metadata.duration)
       if (!days || days < 2) return []

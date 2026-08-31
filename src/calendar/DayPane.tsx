@@ -3,7 +3,7 @@ import { startOfDay } from 'date-fns'
 import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
-import { multidayDisplayTitle, fmtT, parseDateString, parseDurationDays } from '@/model'
+import { multidayDisplayTitle, fmtT, parseDateString, parseDurationDays, dayRange } from '@/model'
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
@@ -82,8 +82,7 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
   const roots  = useStore(s => s.roots)
   const hour12 = useStore(s => s.localePrefs.hour12)
 
-  const dvFrom = startOfDay(dvDate)
-  const dvTo   = new Date(dvDate); dvTo.setHours(23, 59, 59)
+  const { from: dvFrom, to: dvTo } = dayRange(dvDate, dvDate)
   const dvOccs = useFilteredOccs(useExpandWithMultiday(items, roots, dvFrom, dvTo))
 
   // Only ticks for the pane showing today — other panes don't need a live
