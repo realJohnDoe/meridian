@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import AgendaView from './AgendaView'
-import { setupStore, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
+import { setupStore, seedStore, makeOcc, makeSeries, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 import { useStore } from '@/store'
@@ -67,16 +67,18 @@ const isScrollContainer = (el: HTMLElement) => el.classList.contains('overflow-y
 /**
  * What `estimateRow` predicts for the row this wrapper holds, keyed off the
  * flip key's prefix (see agendaSections.ts's row keys). Every occurrence row
- * these tests build carries a meta row — an overdue row has `showDate`, and
- * today's has a `time` — so they all take the ROW_H_META branch.
+ * these tests build carries a meta row — an overdue group row has `showDate`,
+ * and every fixture occurrence carries a `time` — so they all take the
+ * meta-height branch (ROW_H_META and OVERDUE_GROUP_H are the same 68).
  */
 function estimatedRowHeight(el: HTMLElement): number {
   const key = el.querySelector('[data-flip-key]')?.getAttribute('data-flip-key') ?? ''
-  if (key.startsWith('m|')) return 60  // MONTH_H
-  if (key.startsWith('w|')) return 36  // WEEK_H
-  if (key.startsWith('h|')) return 40  // HEADER_H
-  if (key.startsWith('e|')) return 56  // EMPTY_H
-  return 68                            // ROW_H_META
+  if (key.startsWith('m|'))  return 60  // MONTH_H
+  if (key.startsWith('w|'))  return 36  // WEEK_H
+  if (key.startsWith('h|'))  return 40  // HEADER_H
+  if (key.startsWith('e|'))  return 56  // EMPTY_H
+  if (key.startsWith('og|')) return 68  // OVERDUE_GROUP_H
+  return 68                             // ROW_H_META
 }
 
 /**
@@ -188,13 +190,20 @@ afterEach(() => {
 
 const today = new Date()
 
-/** An undone task N days in the past — i.e. one that lands in the overdue section. */
+/**
+ * An undone task N days in the past. It contributes two kinds of row now: one
+ * on its own past day, and one grouped row in the overdue block (see
+ * overduePool.ts) — before grouping, the day row did not exist at all.
+ *
+ * Timed so its day row takes the same meta-height branch the harness above
+ * measures; an untimed one estimates 50 and would measure 68.
+ */
 function overdueTask(i: number): Occurrence {
   const date = fmtISO(addDays(today, -(1 + (i % 300))))
   return makeOcc({
     id: `overdue-${i}`,
     date,
-    time: null,
+    time: '09:00',
     entryKey: testKey('note.md'),
     metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Overdue task ${i}`, tags: [], items: [], done: false },
   })
@@ -202,6 +211,14 @@ function overdueTask(i: number): Occurrence {
 
 /** Every rendered occurrence card — SurfaceButton carries aria-label={title}. */
 const renderedCards = () => screen.getAllByRole('button').filter(el => el.getAttribute('aria-label'))
+
+/**
+ * The overdue block's grouped rows. Their flat-list keys are the only ones
+ * prefixed `og|` (see overdueGroupRows in agendaSections.ts), and AgendaView
+ * puts that key on each row's flip wrapper — so this distinguishes them from
+ * the same task's row on its own past day, which renders an identical card.
+ */
+const overdueGroupRows = () => [...document.querySelectorAll<HTMLElement>('[data-flip-key^="og|"]')]
 
 describe('AgendaView', () => {
   it('mounts only a viewport-sized window of rows, not the whole overdue section', () => {
@@ -221,11 +238,11 @@ describe('AgendaView', () => {
     expect(mounted).toBeLessThan(40)
   })
 
-  it('renders the overdue header and its task titles', () => {
+  it('renders the overdue header and its grouped task, and leaves the task on its own day', () => {
     const task = makeOcc({
       id: 'overdue-1',
       date: fmtISO(addDays(today, -3)),
-      time: null,
+      time: '09:00',
       metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
     })
     seedStore([task], makeRoots('note.md'))
@@ -233,7 +250,43 @@ describe('AgendaView', () => {
     render(<AgendaView onOpen={vi.fn()} />)
 
     expect(screen.getByText('Overdue')).toBeInTheDocument()
-    expect(screen.getByText('Pay the invoice')).toBeInTheDocument()
+    // Twice: once summarised in the overdue block, once on 3 days ago — which
+    // is where it can still be checked off or deleted individually.
+    expect(screen.getAllByText('Pay the invoice')).toHaveLength(2)
+    expect(overdueGroupRows()).toHaveLength(1)
+    expect(within(overdueGroupRows()[0]!).getByText('Pay the invoice')).toBeInTheDocument()
+  })
+
+  it('shows a count on a group standing for more than one occurrence, and none on a single', () => {
+    // Weekly from a fortnight ago: two overdue slots (-14, -7) plus today's,
+    // which is not overdue. One series, one row, ×2.
+    const weekly = makeSeries({
+      id: 'series-a',
+      date: fmtISO(addDays(today, -14)),
+      time: '09:00',
+      entryKey: testKey('plants.md'),
+      repeat: { type: 'schedule', freq: 'weekly' },
+      metadata: { participants: [], done: false },
+    })
+    const once = makeOcc({
+      id: 'once-1',
+      date: fmtISO(addDays(today, -2)),
+      time: '09:00',
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
+    })
+    seedStore([weekly, once], new Map([
+      ...makeRoots('note.md'),
+      ...makeRoots('plants.md', { title: 'Water the plants' }),
+    ]))
+
+    render(<AgendaView onOpen={vi.fn()} />)
+
+    // One row per series; the standalone is its own group and carries no count.
+    expect(overdueGroupRows()).toHaveLength(2)
+    expect(screen.getByText('×2')).toBeInTheDocument()
+    expect(screen.queryByText('×1')).not.toBeInTheDocument()
+    // The header counts groups, not the three occurrences behind them.
+    expect(screen.getByText('2')).toBeInTheDocument()
   })
 
   it('expands the overdue section by default, mounting its rows', () => {
@@ -248,10 +301,11 @@ describe('AgendaView', () => {
     expect(screen.getByText('20')).toBeInTheDocument()
     expect(renderedCards().length).toBeGreaterThan(0)
 
-    // …and one tap folds it away to just the bar.
+    // …and one tap folds it away to just the bar. The tasks' own past-day rows
+    // are untouched by that — only the summary block collapses.
     fireEvent.click(screen.getByRole('button', { expanded: true }))
 
-    expect(renderedCards()).toHaveLength(0)
+    expect(overdueGroupRows()).toHaveLength(0)
   })
 
   it('renders only the header once the user collapses the overdue section', () => {
@@ -263,14 +317,14 @@ describe('AgendaView', () => {
 
     expect(screen.getByText('Overdue')).toBeInTheDocument()
     expect(screen.getByText('20')).toBeInTheDocument()
-    expect(renderedCards()).toHaveLength(0)
+    expect(overdueGroupRows()).toHaveLength(0)
   })
 
-  it('calls onOpen with the occurrence when a row is clicked', () => {
+  it('calls onOpen with the representative occurrence when an overdue group row is clicked', () => {
     const task = makeOcc({
       id: 'overdue-1',
       date: fmtISO(addDays(today, -3)),
-      time: null,
+      time: '09:00',
       metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
     })
     seedStore([task], makeRoots('note.md'))
@@ -278,7 +332,7 @@ describe('AgendaView', () => {
     const onOpen = vi.fn()
     render(<AgendaView onOpen={onOpen} />)
 
-    fireEvent.click(screen.getByLabelText('Pay the invoice'))
+    fireEvent.click(within(overdueGroupRows()[0]!).getByLabelText('Pay the invoice'))
 
     expect(onOpen).toHaveBeenCalledTimes(1)
     expect(onOpen.mock.calls[0]![0]).toMatchObject({ id: 'overdue-1' })

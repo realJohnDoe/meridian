@@ -24,9 +24,9 @@ const baseCls = cn(
  * overdue pools many different days into one bucket that has no single day
  * badge to show.
  *
- * It starts collapsed (calendar/viewState.ts), which is what lets
- * scroll-to-today keep preferring the overdue section without landing the
- * user on an unbounded backlog: the section is one bar until they ask for it.
+ * It starts **expanded** (calendar/viewState.ts, whose own comment explains
+ * why), and `count` is the number of overdue *groups* — one per unfinished
+ * series — not the number of occurrences behind them. See overduePool.ts.
  */
 function AgendaHeaderRow({ label, collapsed, count, onToggle }: Props) {
   return (

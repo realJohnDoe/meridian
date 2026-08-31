@@ -9,6 +9,7 @@ import AgendaHeaderRow from './AgendaHeaderRow'
 import AgendaDividerRow from './AgendaDividerRow'
 import AgendaEmptyDayRow from './AgendaEmptyDayRow'
 import AgendaRow from './AgendaRow'
+import AgendaOverdueGroupRow from './AgendaOverdueGroupRow'
 import { computeAgendaScrollRestore, useSaveAgendaScroll, useAnchoredAgendaScroll } from './computeAgendaScrollRestore'
 import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
@@ -213,6 +214,16 @@ export default function AgendaView({ onOpen }: Props) {
               <AgendaDividerRow variant={row.kind} label={row.label} />
             ) : row.kind === 'day-empty' ? (
               <AgendaEmptyDayRow date={row.date} isToday={row.isToday} />
+            ) : row.kind === 'overdue-group' ? (
+              // No `now`: an overdue group's representative is an undone task,
+              // whose styling can't change from the clock alone.
+              <AgendaOverdueGroupRow
+                occ={row.occ}
+                count={row.count}
+                oldest={row.oldest}
+                onOpen={onOpen}
+                onToggleDone={handleToggleDone}
+              />
             ) : (
               <AgendaRow
                 occ={row.occ}

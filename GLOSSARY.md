@@ -360,10 +360,17 @@ page its display only, never the main view.
 ### AgendaRow (disambiguation)
 Two things in one directory, kept apart only by TypeScript's separate type and
 value namespaces. The **type** is a row descriptor in the agenda's flat
-virtualized list (`header` / `month` / `week` / `occ` / `day-empty`); the
-**component** renders just the `occ` case.
+virtualized list (`header` / `month` / `week` / `occ` / `day-empty` /
+`overdue-group`); the **component** renders just the `occ` case.
 → `calendar/agendaSections.ts` · `AgendaRow`
 → `calendar/AgendaRow.tsx` · `AgendaRow`
+
+### OverdueGroup
+Every overdue occurrence of one series (or one standalone task) as a single
+agenda row, keyed `ownerId ?? id` and carrying a representative occurrence, a
+count and the oldest date. Built by its own expansion pass over the undone-task
+items, independent of the agenda's window.
+→ `calendar/overduePool.ts` · `OverdueGroup`, `computeOverduePool`
 
 ### ui/ vs primitives/
 `components/ui/` mirrors the **shadcn registry** — only CLI-written files;
@@ -399,4 +406,5 @@ asserts none of these have come back.
 | `useVisualViewportHeight` / `useVisualViewportOffsetTop` | `useVisibleViewport` (one snapshot, with the Firefox-Android fallback) |
 | `useShellMode` / `ShellMode` | removed — `_app` and `_entry` each own their own layout chain, so nothing needs to release a shared one |
 | `SettingsDialog` | removed — Settings is a route (`routes/_app.settings.*`), not a modal |
+| `PAST_WINDOW_DAYS` / `FUTURE_WINDOW_DAYS` | split into three: `WALK_PAST_DAYS`/`WALK_FUTURE_DAYS` (the render walk), `EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` (the expansion window), `OVERDUE_LOOKBACK_DAYS` (the overdue pass) |
 | `requestVaultSettings` / `onVaultSettingsRequested` | removed — a vault's settings screen has a URL, so callers link to it |
