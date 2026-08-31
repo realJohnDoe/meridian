@@ -160,6 +160,13 @@ interface Props {
  */
 export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectDay, onBrowseMonth }: Props) {
   const [month, setMonthState] = useState(anchorMonth)
+  // `YYYY-MM` the swipe carousel is settling toward, set on touchend so
+  // MonthStrip's highlight below tracks the gesture immediately instead of
+  // waiting for it to fully settle and `month` to commit — mirrors
+  // MonthView's monthPreview, just kept as local state rather than in the
+  // shared calendarView store, since MonthStrip is mounted right here as a
+  // child rather than in a separate topbar component.
+  const [monthPreview, setMonthPreview] = useState<string | null>(null)
 
   // Reports every genuine browse (swipe commit, day-picker keyboard nav,
   // chip tap — see the three setMonth call sites below) to the caller.
@@ -185,7 +192,10 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
     paneCount: PANE_COUNT,
     unitAt: offset => fmtMonth(new Date(month.getFullYear(), month.getMonth() + offset, 1)),
     onCommit: key => setMonth(parseMonth(key)),
-    onPreview: () => {},
+    onPreview: key => setMonthPreview(key),
+    // `month` is authoritative again once it has actually committed, so
+    // clear the preview here — mirrors MonthView's own onRecentered.
+    onRecentered: () => setMonthPreview(null),
   })
 
   return (
@@ -212,7 +222,7 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
           ))}
         </div>
       </div>
-      <MonthStrip activeMonth={month} onNavigateMonth={setMonth} />
+      <MonthStrip activeMonth={monthPreview ? parseMonth(monthPreview) : month} onNavigateMonth={setMonth} />
     </div>
   )
 }
