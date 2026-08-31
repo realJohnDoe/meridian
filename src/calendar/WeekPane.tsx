@@ -3,7 +3,7 @@ import { differenceInCalendarDays } from 'date-fns'
 import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
-import { fmtT, fmtISO, parseDurationDays } from '@/model'
+import { fmtT, fmtISO, parseDurationDays, dayRange } from '@/model'
 import { sameDay, fmtShort } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
@@ -66,8 +66,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
   const roots  = useStore(s => s.roots)
   const hour12 = useStore(s => s.localePrefs.hour12)
 
-  const wFrom = weekStart
-  const wTo   = new Date(days[6]!); wTo.setHours(23, 59, 59)
+  const { from: wFrom, to: wTo } = dayRange(weekStart, days[6]!)
   const wOccs = useFilteredOccs(useExpandWithMultiday(items, roots, wFrom, wTo))
 
   // Only ticks for the pane showing today — other panes don't need a live

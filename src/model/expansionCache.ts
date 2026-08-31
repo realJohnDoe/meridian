@@ -1,6 +1,33 @@
 import type { StoreItem, StoreOcc, StoreSeries, Roots, Occurrence, FileMetadata } from '@/types'
 import { isSeries } from '@/types'
 import { expandWithMultiday } from './expansion'
+import { buildItemIndex, type ItemIndex } from './itemIndex'
+
+// One-slot memo for buildItemIndex(items), keyed by `items` reference.
+//
+// computeExpansionCache is called once per (fromMs, toMs) window — one
+// ExpansionCache per window, in useExpandWithMultiday's own cacheByWindow map
+// — so without this, a commit that expands the same `items` over several
+// windows (MonthGrid's three panes, DayPane/WeekPane's five each) rebuilds
+// the series/standalone/override classification once per window instead of
+// once per items identity. A single slot is enough: every such caller shares
+// one `items` array per commit, so they all hit the same slot; a genuinely
+// different `items` array (a store write) is a different reference and simply
+// overwrites it on the next call — no explicit reset needed, unlike
+// useExpandWithMultiday's own cacheByWindow, whose invalidation exists to
+// stop a *structural* (shape) collision across vaults, which a reference
+// check can't produce.
+interface ItemIndexMemo { items: StoreItem[]; index: ItemIndex }
+const ITEM_INDEX_KEY = 'index'
+const itemIndexSlot = new Map<typeof ITEM_INDEX_KEY, ItemIndexMemo>()
+
+function itemIndexFor(items: StoreItem[]): ItemIndex {
+  const cached = itemIndexSlot.get(ITEM_INDEX_KEY)
+  if (cached && cached.items === items) return cached.index
+  const index = buildItemIndex(items)
+  itemIndexSlot.set(ITEM_INDEX_KEY, { items, index })
+  return index
+}
 
 export interface ExpansionCache {
   items: StoreItem[]
@@ -205,6 +232,6 @@ export function computeExpansionCache(
     return { items, roots, fromMs, toMs, allOccs, indexById: prev.indexById, indexByEntryKey: prev.indexByEntryKey, indexByOwnerId: prev.indexByOwnerId }
   }
 
-  const allOccs = expandWithMultiday(items, roots, from, to)
+  const allOccs = expandWithMultiday(items, roots, from, to, itemIndexFor(items))
   return { items, roots, fromMs, toMs, allOccs, ...buildReverseIndex(allOccs) }
 }

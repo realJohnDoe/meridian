@@ -1,4 +1,4 @@
-import { format, isValid, parseISO, addDays } from 'date-fns'
+import { format, isValid, parseISO, addDays, startOfDay, endOfDay } from 'date-fns'
 
 import { scalarToString } from './fieldRegistry'
 
@@ -89,4 +89,20 @@ export function parseDateTime(date: string, time: string | null): Date | null {
 export function dayBefore(dateStr: string): string {
   const d = parseDateString(dateStr)
   return fmtISO(addDays(d ?? new Date(dateStr), -1))
+}
+
+/**
+ * The `{ from, to }` bound `expandRange`/`expandWithMultiday` want to cover
+ * every occurrence from the start of `firstDay` through the end of `lastDay`,
+ * inclusive of both.
+ *
+ * `expandRange` filters with `jsTime >= from && jsTime <= to` — inclusive at
+ * both ends — so a `to` that isn't pushed to the end of its day silently
+ * excludes any *timed* occurrence on that day. Passing a bare midnight Date as
+ * `to` (as opposed to `new Date(y, m, d, 23, 59, 59)`) is exactly that bug;
+ * `dayRange` exists so callers reach for this instead of re-deriving the
+ * end-of-day bound (or forgetting it) at each call site.
+ */
+export function dayRange(firstDay: Date, lastDay: Date): { from: Date; to: Date } {
+  return { from: startOfDay(firstDay), to: endOfDay(lastDay) }
 }

@@ -1,6 +1,6 @@
 import { useStore } from '@/store'
 import { addDays } from '@/format'
-import { weekStartsOn } from '@/model'
+import { weekStartsOn, dayRange } from '@/model'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useCalendarFilter } from './useCalendarFilter'
 import { useOverdueCollapsed } from './viewState'
@@ -75,8 +75,11 @@ export function useAgendaSections(
   const roots = useStore(s => s.roots)
   const ws = weekStartsOn(useStore(s => s.localePrefs))
 
-  const from = addDays(anchor, -PAST_WINDOW_DAYS)
-  const to = addDays(anchor, FUTURE_WINDOW_DAYS)
+  // dayRange, not a bare addDays(anchor, FUTURE_WINDOW_DAYS): the latter lands
+  // on midnight of the window's last day, and expandRange's inclusive [from,
+  // to] filter would then silently drop any *timed* occurrence on that day.
+  // See dayRange's own doc comment.
+  const { from, to } = dayRange(addDays(anchor, -PAST_WINDOW_DAYS), addDays(anchor, FUTURE_WINDOW_DAYS))
   const allOccs = useExpandWithMultiday(items, roots, from, to)
   const { filterOccs } = useCalendarFilter()
   const overdueCollapsed = useOverdueCollapsed()

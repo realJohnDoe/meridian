@@ -3,7 +3,7 @@ import { differenceInCalendarDays } from 'date-fns'
 import { useStore } from '@/store'
 import type { Occurrence } from '@/types'
 
-import { parseDurationDays, parseMonth } from '@/model'
+import { parseDurationDays, parseMonth, dayRange } from '@/model'
 import { sameDay } from '@/format'
 import { sortOccs } from './occSort'
 import { occState } from '@/occView'
@@ -127,7 +127,8 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
   // occurrence (start day) and one virtual occurrence per subsequent covered
   // day (see expandWithMultiday) — we partition those below rather than
   // switching data sources, since the shared cache already has everything we need.
-  const allOccs = useExpandWithMultiday(items, roots, new Date(y, m, 1), new Date(y, m + 1, 0, 23, 59, 59))
+  const { from: monthFrom, to: monthTo } = dayRange(new Date(y, m, 1), new Date(y, m + 1, 0))
+  const allOccs = useExpandWithMultiday(items, roots, monthFrom, monthTo)
 
   // Cell grid depends only on month shape and locale week-start — independent of occurrences.
   const cells = (() => {
