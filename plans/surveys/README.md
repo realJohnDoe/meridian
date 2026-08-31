@@ -5,8 +5,8 @@ directory (`health.md`, `performance.md`, `health-ui.md`,
 `data-integrity.md`, `product-niche.md`). Each survey states only what's
 specific to it — its categories, its findings cap, its target
 invariants/flows/niches — and points back here for the rest.
-`storage-backend.md` is a finished research report, not a runnable survey
-template, so none of this applies to it.
+`storage-backend.md` and `vault-scaling.md` are finished research reports, not
+runnable survey templates, so none of this applies to them.
 
 Read this once before running (or editing) any survey.
 

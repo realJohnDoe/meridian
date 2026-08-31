@@ -6,7 +6,18 @@
 //
 //   localStorage.setItem('meridian_bigvault', '300')
 //
-// then (re)loading the Tutorial vault — see ExampleBackend.loadEntries().
+// The value may also be a JSON object, which is how the two scaling units are
+// told apart — file count and occurrence count move together in the default
+// mix (every recurring series expands to ~200 occurrences over the agenda
+// window), so holding one fixed while the other varies is the only way to
+// attribute a cost to one of them:
+//
+//   localStorage.setItem('meridian_bigvault', '{"count":1000,"recurringShare":0}')
+//
+// `recurringShare` is the fraction of files that get a weekly repeat rule
+// (default 0.15 — the historical mix, which every earlier measurement used).
+// At 0 the vault has exactly as many occurrences as it has files.
+//
 // Only wired up when import.meta.env.DEV is true, so this — and its call
 // site — are dead-code-eliminated from production builds.
 import { startOfToday } from 'date-fns'
@@ -34,13 +45,35 @@ const WORDS = ['project', 'review', 'meeting', 'notes', 'plan', 'budget', 'desig
 const PARTICIPANTS = ['Alice', 'Bob', 'Carol', 'Dave', 'Erin', 'Frank', 'Grace', 'Heidi']
 const PRIORITIES = ['high', 'medium', 'low']
 
+/** Fraction of generated files carrying a weekly repeat rule. */
+const DEFAULT_RECURRING_SHARE = 0.15
+
+export interface BigVaultOptions {
+  /**
+   * Fraction of files that become a recurring series (0–1). Lower it to grow
+   * the vault in files without growing it in occurrences; see the header.
+   */
+  recurringShare?: number
+}
+
 /**
  * Generate `count` files at plausible heavy-use scale: a mix of recurring
  * series, dated tasks, one-off events, undated backlog tasks, and plain
  * notes, cross-linked with wikilinks so backlink resolution is exercised too.
  */
-export function generateBigVault(count: number): Array<{ id: string; content: string }> {
+export function generateBigVault(
+  count: number,
+  { recurringShare = DEFAULT_RECURRING_SHARE }: BigVaultOptions = {},
+): Array<{ id: string; content: string }> {
   const rng = makeRng(20240711)
+  // Branch thresholds, with the recurring slice sized by `recurringShare` and
+  // the remaining kinds keeping their relative proportions, so lowering the
+  // share changes the occurrence count without also changing the mix of
+  // tasks/events/notes underneath it.
+  const rest = 1 - recurringShare
+  const tDated   = recurringShare + rest * (0.40 / 0.85)
+  const tEvent   = recurringShare + rest * (0.65 / 0.85)
+  const tBacklog = recurringShare + rest * (0.75 / 0.85)
   const slugs: string[] = []
   for (let i = 0; i < count; i++) {
     const w1 = WORDS[Math.floor(rng() * WORDS.length)]
@@ -64,7 +97,7 @@ export function generateBigVault(count: number): Array<{ id: string; content: st
     const itemsBlock = links.length ? `items:\n${links.join('\n')}\n` : ''
     const body = `\nBody text for ${title}. See [[${slugs[(i + 1) % count]}]] and [[${slugs[(i + 7) % count]}]].\n`
 
-    if (r < 0.15) {
+    if (r < recurringShare) {
       // Recurring weekly event/task series → many expanded occurrences.
       const anchor = d(-350 + Math.floor(rng() * 20))
       const isTask = rng() < 0.5
@@ -75,21 +108,21 @@ export function generateBigVault(count: number): Array<{ id: string; content: st
         id: slug,
         content: `---\ntitle: ${title}\n${itemsBlock}date: "${anchor}"\n${extra}repeat:\n  type: schedule\n  freq: weekly\n  byweekday: [mo, we, fr]\ndefaults:\n  done: false\n---\n${body}`,
       })
-    } else if (r < 0.55) {
+    } else if (r < tDated) {
       // Dated task spread across the window.
       const off = -300 + Math.floor(rng() * 390)
       entries.push({
         id: slug,
         content: `---\ntitle: ${title}\n${itemsBlock}date: "${d(off)}"\ndone: ${rng() < 0.4}\npriority: ${PRIORITIES[Math.floor(rng() * 3)]}\n---\n${body}`,
       })
-    } else if (r < 0.8) {
+    } else if (r < tEvent) {
       // One-off dated event.
       const off = -200 + Math.floor(rng() * 290)
       entries.push({
         id: slug,
         content: `---\ntitle: ${title}\n${itemsBlock}date: "${d(off)}"\ntime: "${8 + Math.floor(rng() * 9)}:00"\nduration: ${rng() < 0.5 ? '1h' : '30m'}\nparticipants: [${PARTICIPANTS[Math.floor(rng() * PARTICIPANTS.length)]}, ${PARTICIPANTS[Math.floor(rng() * PARTICIPANTS.length)]}]\n---\n${body}`,
       })
-    } else if (r < 0.9) {
+    } else if (r < tBacklog) {
       // Undated backlog task.
       entries.push({
         id: slug,
