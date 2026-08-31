@@ -3,8 +3,7 @@ import { useStore as useZustandStore } from 'zustand/react'
 import { startOfToday, addDays, differenceInCalendarDays } from 'date-fns'
 import type { VirtualItem } from '@tanstack/react-virtual'
 import { fmtISO } from '@/model'
-import { resetExpansionCache } from './useExpandWithMultiday'
-import { resetAgendaSectionsCache } from './useAgendaSections'
+import { resetAll as resetExpansionCaches } from './expansionCaches'
 import { weekStartFor } from './weekRange'
 
 interface CalendarViewState {
@@ -144,8 +143,7 @@ export function resetCalendarViewState(): void {
  * is exactly what a vault change wants.
  */
 export function resetCalendarOnVaultChange(): void {
-  resetExpansionCache()
-  resetAgendaSectionsCache()
+  resetExpansionCaches()
   resetCalendarViewState()
 }
 
