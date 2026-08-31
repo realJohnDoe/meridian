@@ -29,12 +29,12 @@ export function setupStore(): void {
   })
   afterEach(() => {
     useStore.setState(initialStoreState, true)
-    // The expansion and agenda-sections caches (src/calendar/useExpandWithMultiday.ts,
-    // src/calendar/useAgendaSections.ts) and the calendar view-state store
-    // (src/calendar/viewState.ts) are module-level singletons shared across
-    // renders, so they survive past a single test unless cleared — without
-    // this, one test's cached window/sections/scroll snapshot could leak into
-    // the next when both use structurally-identical items.
+    // The expansion, chunk, and agenda-sections caches (src/calendar/expansionCaches.ts)
+    // and the calendar view-state store (src/calendar/viewState.ts) are
+    // module-level singletons shared across renders, so they survive past a
+    // single test unless cleared — without this, one test's cached
+    // window/chunk/sections/scroll snapshot could leak into the next when
+    // both use structurally-identical items.
     resetCalendarOnVaultChange()
   })
 }

@@ -1,14 +1,15 @@
 import { useStore } from '@/store'
 import { addDays } from '@/format'
 import { weekStartsOn, dayRange } from '@/model'
-import { useExpandWithMultiday } from './useExpandWithMultiday'
+import { useAgendaChunks } from './useAgendaChunks'
 import { useCalendarFilter } from './useCalendarFilter'
 import { useOverdueCollapsed } from './viewState'
 import {
   computeAgendaSections,
-  type AgendaSectionCache, type AgendaRow,
+  type AgendaRow,
 } from './agendaSections'
-import { computeOverduePool, type OverduePoolCache } from './overduePool'
+import { computeOverduePool } from './overduePool'
+import { SECTIONS_CACHE_KEY, sectionsCacheSlot, overduePoolSlot } from './expansionCaches'
 
 export { estimateRow, type AgendaRow } from './agendaSections'
 
@@ -29,27 +30,13 @@ export const EXPAND_PAST_DAYS = 365
 export const EXPAND_FUTURE_DAYS = 90
 
 // The agenda is a singleton view (only one instance mounted at a time), so a
-// single cache slot — unlike useExpandWithMultiday's per-window map, which
-// has to serve several concurrent callers (month's three panes, day's
-// carousel) — is enough here. Stored as a one-entry Map, not a `let` or a
-// plain object's `.current` field: the React Compiler's purity check
-// (react-hooks/immutability / react-hooks/globals) flags both reassigning a
-// module binding during render and writing a property on one, but a method
-// call like Map.set() on a const-bound object is the same pattern
-// useExpandWithMultiday's cacheByWindow already uses, and passes.
-const SECTIONS_CACHE_KEY = 'agenda'
-const sectionsCacheSlot = new Map<typeof SECTIONS_CACHE_KEY, AgendaSectionCache>()
-// The overdue pass's own slot, same shape and same reasoning — a separate one
-// because it is invalidated by different inputs (raw `items`/`roots`, not the
-// expanded window) and survives changes that rebuild every section.
-const overduePoolSlot = new Map<typeof SECTIONS_CACHE_KEY, OverduePoolCache>()
-
-/** Drops the cached grouped/sorted sections and the overdue pool. Call on vault change (see resetExpansionCache). */
-export function resetAgendaSectionsCache(): void {
-  sectionsCacheSlot.clear()
-  overduePoolSlot.clear()
-}
-
+// single cache slot each for the grouped/sorted sections and the overdue pool
+// — unlike useExpandWithMultiday's per-window map, which has to serve several
+// concurrent callers (month's three panes, day's carousel) — is enough here.
+// Both slots now live in expansionCaches.ts, alongside every other
+// module-level cache in calendar/, so vault-change reset is one call
+// (resetAll) instead of one hand-wired reset per cache — see that file's own
+// doc comment.
 /**
  * The agenda's data pipeline: expand occurrences over the agenda window, then
  * group by day, filter, sort, and flatten into one ordered list of
@@ -107,7 +94,7 @@ export function useAgendaSections(
   // to] filter would then silently drop any *timed* occurrence on that day.
   // See dayRange's own doc comment.
   const { from, to } = dayRange(addDays(anchor, -EXPAND_PAST_DAYS), addDays(anchor, EXPAND_FUTURE_DAYS))
-  const allOccs = useExpandWithMultiday(items, roots, from, to)
+  const allOccs = useAgendaChunks(items, roots, from, to, ws)
   const { filterOccs } = useCalendarFilter()
   const overdueCollapsed = useOverdueCollapsed()
 

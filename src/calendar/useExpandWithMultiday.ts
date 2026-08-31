@@ -1,31 +1,20 @@
 import { useEffect } from 'react'
 import type { StoreItem, Roots, Occurrence } from '@/types'
-import { computeExpansionCache, type ExpansionCache } from '@/model'
+import { computeExpansionCache } from '@/model'
+import { cacheByWindow, MAX_CACHED_WINDOWS } from './expansionCaches'
 
 // MonthGrid keeps three panes (prev/current/next month) alive at once, and
 // DayPane/WeekPane's carousels do the same for days/weeks (5 panes each, see
 // PANE_COUNT), so several distinct (from, to) windows are live simultaneously
-// alongside the agenda's own window — a single shared slot would thrash
+// alongside the agenda's own chunk cache — a single shared slot would thrash
 // between them. Keying by window lets every caller share one cache without
-// evicting each other's entries every render. Capped so months/days/weeks
-// scrolled past and forgotten don't accumulate forever.
-const MAX_CACHED_WINDOWS = 16
-
-const cacheByWindow = new Map<string, ExpansionCache>()
-
+// evicting each other's entries every render. Capped (MAX_CACHED_WINDOWS, see
+// expansionCaches.ts) so months/days/weeks scrolled past and forgotten don't
+// accumulate forever. Resetting this cache is expansionCaches.ts's `resetAll`
+// — every module-level cache in calendar/ shares one reset, wired once into
+// resetCalendarOnVaultChange.
 function windowKey(fromMs: number, toMs: number): string {
   return `${fromMs}:${toMs}`
-}
-
-/**
- * Drops every cached window's expansion. Call when `items`/`roots` are about
- * to mean something entirely different — notably on vault change, where
- * structural comparison against the old vault's cached entries is pointless
- * (and, if items happen to collide in shape, could otherwise reuse stale
- * occurrences from the vault that just deactivated).
- */
-export function resetExpansionCache(): void {
-  cacheByWindow.clear()
 }
 
 /**
