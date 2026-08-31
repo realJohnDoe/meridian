@@ -35,6 +35,7 @@ settled.
 | 1 | **Fold into that work, do not fix separately.** #1's fix *is* incremental expansion, and the product decision it was blocked on is now made. |
 | 4 | **Defer and re-measure after.** Row count at first paint drops from 185 882 to whatever one screen plus a chunk needs, so the symptom may go with it; profiling the current architecture measures code about to be replaced. |
 | 2, 5, 6 | Unaffected — none of them touches the agenda window. |
+| — | The overdue section is being **grouped** (one row per series) as part of this work; see constraint 3 below. |
 | 3 | Still valid, but its character changes: the array it re-allocates starts smaller and **grows as the user scrolls**, so the cost arrives later in the session rather than at first paint. |
 
 ### Three things in the current code that a naive implementation will hit
@@ -67,14 +68,71 @@ Each is a fact about code as it stands today, not a prediction:
    index** and is the case to design around, since `keyByIndex` and
    `changedIndices` both assume positional alignment.
 
-3. **The overdue header needs the whole past window.** `computeAgendaSections`
-   pools every past day, and `overdueHeaderRow(todayKey, collapsed, items.length)`
-   renders an exact count — the "Overdue 6789" chip. That count cannot be known
-   without expanding all 365 past days, which is most of the occurrences at any
-   size. This is the one place where infinite scroll and the current product
-   behaviour genuinely collide, and it is a product question, not a code one:
-   an exact overdue count, a capped one ("99+"), or a count derived from
-   undone-task *items* without expanding their occurrences.
+3. **The overdue section needs the whole past window — and the product
+   decision here has been made: group it.** `computeAgendaSections` pools every
+   past day, and `overdueHeaderRow(todayKey, collapsed, items.length)` renders
+   an exact count — the "Overdue 6789" chip. Neither the pool nor the count can
+   be known without expanding all 365 past days, which is most of the
+   occurrences at any size. **Decision: the overdue section shows one row per
+   series rather than one per occurrence.** See "Grouped overdue" below.
+
+### Grouped overdue — the decision, and what it takes
+
+**What makes this the collision.** `agendaSections.ts:8` defines overdue as
+```ts
+const isOverdue = (o: Occurrence) => occKind(o) === 'task' && !o.metadata.done
+```
+so the pool is every past-dated undone *task occurrence*. A single
+`weekly / [mo,we,fr]` task left unfinished for a year contributes **156 rows on
+its own** (365 ÷ 7 × 3), and that is what the measured "Overdue 6789" chip is
+mostly made of. Grouping to one row per series turns the pool from
+O(past occurrences) into O(undone task items) and makes the count the number of
+groups — cheap, exact, and needing no past-window expansion. Constraint #3 then
+stops existing rather than being worked around.
+
+**Group key: `occ.ownerId ?? occ.id`.** `Occurrence.ownerId` is "UUID of parent
+RepeatPattern (undefined for standalone)" (`types.ts:133`), so every generated
+occurrence of one series shares it and a standalone dated task groups alone —
+no special case needed. A file holding two series stays two groups, which is
+right.
+
+**The part that is not yet true, and must change with it.** The plan is that
+individual occurrences stay reachable by scrolling up to their day sections.
+They are not there today — `buildBucket` *hoists them out*:
+```ts
+if (b.isPast) {
+    const overdue = filtered.filter(isOverdue)
+    const items = sortOccs(filtered.filter(o => !isOverdue(o)), ctx.now)
+```
+An undone past task appears **only** in the overdue block, and a past day
+holding nothing else gets `section: null` and drops out of the agenda
+entirely. So grouping the overdue section must be paired with dropping that
+hoist — a past day's `items` becomes `sortOccs(filtered, ctx.now)` — or the
+grouped row becomes the only place those occurrences exist and they can no
+longer be checked or deleted individually. Note the knock-on: past days that
+currently vanish will start rendering, which adds rows going backwards. Under
+infinite scroll that is paid only as far back as the user scrolls.
+
+**`AgendaRow` needs a new variant.** The union (`agendaSections.ts`) has
+`header | month | week | occ | day-empty`; `overdueRows` maps occurrences 1:1
+into `kind: 'occ'`. A grouped row carries a representative occurrence plus a
+count and an oldest-date — closest existing precedent is the `header` variant,
+which already carries `count`.
+
+**Alternatives considered, and why not.** A lazy k-way merge — take the most
+recent N occurrences per source, merge date-descending, page more when a
+source's buffer runs low — is correct for rendering any prefix and would cut
+the pool cost to O(sources × N). It was not chosen because it makes 156 copies
+of one task cheap to render rather than making them not exist, and it still
+cannot produce the total (a prefix does not know it). Pairing it with a
+closed-form count per series (the dates a `schedule` rule yields between anchor
+and today is arithmetic, corrected by *stored* exclusions and done-overrides,
+which are few) does produce an exact total in O(items) — but it puts "which
+dates does this rule produce" in a second place that must agree with
+`expansion.ts` forever, and that file is 889 lines because `bysetpos` ×
+`bymonthday` × `bymonth` × `interval` is genuinely fiddly. A counter that
+drifts from the generator shows a wrong number beside a right list, silently.
+Grouping avoids both.
 
 ## Findings
 
@@ -145,7 +203,9 @@ it is not lower-value, it is not separately actionable.
 - **Task context** — the three constraints that shape the design are written
   up under "The planned move to infinite scroll" above: the exact-window gate
   in `computeExpansionCache`, `changedIndices` returning `null` on any length
-  change, and the overdue header's exact count. Treat this finding's expected
+  change, and the overdue section's need for the whole past window — the last
+  of which is settled by the grouped-overdue decision recorded there, and
+  which carries its own paired change to `buildBucket`'s hoist. Treat this finding's expected
   effect (`vaultPaintMs` at mixed/30 000 from ~13 000 ms to under 1 000 ms) as
   the acceptance target for that work, measured with the recipe above.
 
