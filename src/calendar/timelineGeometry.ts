@@ -47,11 +47,38 @@ export const DEFAULT_SCROLL_HOUR = 7  // hour scrolled into view on mount
 const CREATE_SNAP_MIN = 15            // minutes new events snap to when created via click
 export const DEFAULT_CREATE_DURATION = '1h'
 
-/** Localized hour-boundary label (0:00…24:00), matching the Intl formatting fmtT uses for event times. */
-export function formatHourBoundary(h: number, hour12: boolean): string {
+// Memo table for formatHourBoundary, one entry per (hour12, h) — the whole
+// domain is 2 × (HOURS + 1) strings, so it is built once per clock format and
+// then never again for the life of the tab.
+//
+// Load-bearing, not a micro-optimization: the 12h branch below builds a Date
+// and runs Intl formatting, and every hour cell asks for its own label (see
+// HourCells in timelineScaffold.tsx). A week pane is 7 columns × HOURS cells,
+// and the carousel keeps PANE_COUNT of them mounted, so one pane-window change
+// used to run ~965 Intl formats in a single synchronous commit — profiled at
+// ~750ms of the ~1.2s frame that froze a swipe mid-animation. The unit tests
+// never caught it because they pin hour12 to false (see test-utils), which
+// takes the cheap branch; the expensive one is what every en-US user gets.
+const hourLabelCache = new Map<boolean, readonly string[]>()
+
+function computeHourBoundary(h: number, hour12: boolean): string {
   if (!hour12) return h === HOURS ? '24:00' : `${String(h).padStart(2, '0')}:00`
   const d = new Date(); d.setHours(h % HOURS, 0, 0, 0)
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
+/** Localized hour-boundary label (0:00…24:00), matching the Intl formatting fmtT uses for event times. */
+export function formatHourBoundary(h: number, hour12: boolean): string {
+  // Only 0…HOURS is tabulated — that is the whole domain the timeline asks
+  // for. Anything outside it falls through to the uncached computation rather
+  // than reading past the table.
+  if (h < 0 || h > HOURS || !Number.isInteger(h)) return computeHourBoundary(h, hour12)
+  let labels = hourLabelCache.get(hour12)
+  if (!labels) {
+    labels = Array.from({ length: HOURS + 1 }, (_, i) => computeHourBoundary(i, hour12))
+    hourLabelCache.set(hour12, labels)
+  }
+  return labels[h]!
 }
 
 /**

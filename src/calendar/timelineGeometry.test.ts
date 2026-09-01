@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { formatHourBoundary, blockGeometry, snapCreateTime } from './timelineGeometry'
 
 describe('formatHourBoundary', () => {
@@ -14,6 +14,23 @@ describe('formatHourBoundary', () => {
     expect(formatHourBoundary(13, true)).toMatch(/1.*PM/i)
     // 24 wraps to 0 (midnight) under 12h formatting, same wall-clock instant as 0:00.
     expect(formatHourBoundary(24, true)).toBe(formatHourBoundary(0, true))
+  })
+
+  // The 12h branch runs Intl formatting, and every hour cell on a timeline
+  // asks for its own label — a week pane is 7 columns × HOURS of them, times
+  // the carousel's mounted panes. Formatting them per call cost ~750ms of a
+  // single swipe frame before the labels were tabulated; this pins that the
+  // table is actually consulted, since the observable output is identical
+  // either way and nothing else would notice the regression.
+  it('formats each (hour, clock) label at most once', () => {
+    formatHourBoundary(9, true)  // ensure the 12h table exists
+    const spy = vi.spyOn(Date.prototype, 'toLocaleTimeString')
+    try {
+      for (let h = 0; h <= 24; h++) formatHourBoundary(h, true)
+      expect(spy).not.toHaveBeenCalled()
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
 
