@@ -18,6 +18,8 @@ import { TimedBlock } from './TimedBlock'
 import { DayBadge } from './DayBadge'
 import { GUTTER, RIGHT_PAD } from './timelineGeometry'
 import { TimelineScroller, HourCells, NowLine } from './timelineScaffold'
+import { EMPTY_EXPANSION_WINDOW } from './deferredExpansionWindow'
+import { useReadyAfterMount } from './useReadyAfterMount'
 
 // Google Calendar's day view always keeps 2 all-day rows visible (even when
 // empty) and only switches to a "+N" label once a 3rd item shows up — a
@@ -82,7 +84,18 @@ export default function DayPane({ dateKey, onOpen, onCreate, registerScroller, o
   const roots  = useStore(s => s.roots)
   const hour12 = useStore(s => s.localePrefs.hour12)
 
-  const { from: dvFrom, to: dvTo } = dayRange(dvDate, dvDate)
+  // Every pane here is a fresh mount (keyed by dateKey at DayView's own
+  // wrapping div — see useCarousel), so this is `false` for exactly the
+  // pane's first commit. While it is, the occurrence expansion below
+  // requests a cheap, reliably-empty window instead of this pane's real one
+  // — real occurrence data (and the layout work it drives) fills in on a
+  // follow-up low-priority render instead of landing in the same commit that
+  // mounts this pane, which is what stalls whatever brought it on screen (a
+  // swipe settling, a big external jump like the mini-calendar's own
+  // quick-nav, or a burst of swipes landing faster than the carousel's
+  // PANE_COUNT buffer can keep pre-rendered). See useReadyAfterMount.
+  const ready = useReadyAfterMount()
+  const { from: dvFrom, to: dvTo } = ready ? dayRange(dvDate, dvDate) : EMPTY_EXPANSION_WINDOW
   const dvOccs = useFilteredOccs(useExpandWithMultiday(items, roots, dvFrom, dvTo))
 
   // Only ticks for the pane showing today — other panes don't need a live

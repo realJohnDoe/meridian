@@ -139,11 +139,11 @@ interface Props {
   /**
    * Called with the 1st of the month whenever the grid's own browsed month
    * changes — a day-picker keyboard month change, a MonthStrip chip tap, or
-   * a swipe (reported once the swipe settles, wrapped in a transition — see
-   * setMonth below). The caller navigates the underlying view there (without
-   * closing the panel, unlike `onSelectDay`), so browsing months here keeps
-   * the main view, its highlighted day, and this grid's own highlight all in
-   * step, without requiring an explicit day tap.
+   * a swipe (reported as soon as its target locks in, not once it settles —
+   * see onPreview below). The caller navigates the underlying view there
+   * (without closing the panel, unlike `onSelectDay`), so browsing months
+   * here keeps the main view, its highlighted day, and this grid's own
+   * highlight all in step, without requiring an explicit day tap.
    */
   onBrowseMonth: (d: Date) => void
   /**
@@ -199,26 +199,23 @@ export default function MiniMonth(props: Props) {
   // landing back in anchorMonth) never re-fires onBrowseMonth.
   const setMonth = (d: Date) => {
     setMonthState(d)
-    // Deferred: onBrowseMonth navigates the main view behind this panel,
-    // which for Day/Week means mounting a fresh pane (occurrence expansion
-    // included) — real work that can take a while for a busy week. Wrapping
-    // it in a transition keeps that from blocking whatever comes right
-    // after (the recenter effect below, or the start of another gesture)
-    // without delaying setMonthState itself, which the carousel's own
-    // recenter depends on landing promptly (see useCarousel).
+    // Wrapped in a transition so this can't block setMonthState itself
+    // landing promptly, which the carousel's own recenter depends on (see
+    // useCarousel) — onBrowseMonth is usually redundant with the transition
+    // already fired from onPreview below by the time a swipe reaches commit,
+    // but this is also the only path for a chip tap or keyboard month
+    // change, neither of which goes through onPreview at all.
     startTransition(() => onBrowseMonth(startOfMonth(d)))
   }
 
   useResetOnChange([open, fmtMonth(anchorMonth)], () => {
-    // Also gated on browsePreview being clear: a swipe still in flight (past
-    // 'select', short of 'settle') has already moved MonthStrip's highlight
-    // ahead of `month`, which still must stay put — recentering the carousel
-    // off some *other* anchorMonth change mid-gesture (unrelated to this
-    // swipe; onBrowseMonth itself no longer echoes back until after settle,
-    // by which point browsePreview is already clear — see setMonth) would
-    // yank the grid out from under the user's finger. Skip the resync while
-    // a preview is still in flight; it'll match by the time this fires again
-    // anyway, since onCommit sets `month` to the same value.
+    // Also gated on browsePreview being clear: onPreview above already
+    // reports a live swipe to the caller, whose navigation can echo straight
+    // back here as a new anchorMonth before the swipe has actually settled.
+    // `month` (driving this carousel's own pane recentering) must stay put
+    // until it does — see onPreview's own comment — so skip the resync
+    // while a preview is still in flight; it'll match by the time this
+    // fires again anyway, since onCommit sets `month` to the same value.
     if (open && browsePreview === null) setMonthState(anchorMonth)
   })
 
@@ -232,18 +229,28 @@ export default function MiniMonth(props: Props) {
     paneCount: PANE_COUNT,
     unitAt: offset => fmtMonth(new Date(month.getFullYear(), month.getMonth() + offset, 1)),
     onCommit: key => setMonth(parseMonth(key)),
-    // Only the cheap part — MonthStrip's own highlight — lands here,
-    // immediately, so it tracks the gesture the instant its target locks in
-    // rather than waiting for the snap to settle. onBrowseMonth (the
-    // expensive part — see setMonth) used to also fire from here, wrapped in
-    // a transition, so the main view behind this panel started moving that
-    // much sooner. But even deprioritized via the transition, mounting a
-    // fresh Day/Week pane (occurrence expansion included) was still enough
-    // work to visibly stall this mini-grid's own snap animation — worse the
-    // busier the target week — so it now fires only from the real commit
-    // below, once the swipe has actually settled, leaving nothing left to
-    // stall.
-    onPreview: onBrowsePreview,
+    // Reports the browsed month to the caller here too (not just on commit
+    // below), so the main view it navigates — DayPane/WeekPane/Agenda,
+    // sitting behind this panel — moves as soon as the swipe's target locks
+    // in instead of only once the mini-grid's own snap animation settles.
+    // Deliberately does *not* also update `month` yet: `month` drives this
+    // carousel's own pane recentering (see useCarousel), which has to wait
+    // for the real commit below or the recenter would fire mid-animation —
+    // see the useResetOnChange guard above, which keeps anchorMonth's own
+    // echo of this navigation from doing that early either.
+    //
+    // Firing this early used to stall this mini-grid's own snap animation —
+    // even wrapped in a transition, mounting a fresh Day/Week pane (full
+    // occurrence expansion included) was enough synchronous commit work to
+    // block the frame, worse the busier the target week. That's fixed at the
+    // source now: DayPane/WeekPane/MonthGrid each defer their own expensive
+    // content to a follow-up render behind a cheap first paint (see
+    // useReadyAfterMount/DeferredOccurrences), so mounting one is cheap
+    // regardless of when this fires.
+    onPreview: key => {
+      onBrowsePreview(key)
+      startTransition(() => onBrowseMonth(startOfMonth(parseMonth(key))))
+    },
     onRecentered,
   })
 
