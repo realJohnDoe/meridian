@@ -21,8 +21,14 @@ import { weekStartFor } from './weekRange'
 export const CHUNK_DAYS = 28
 
 /**
- * The agenda's window, `[anchor - EXPAND_PAST_DAYS, anchor +
- * EXPAND_FUTURE_DAYS]`, rounded out to whole chunks by `agendaChunkRun`.
+ * The bound on how far the agenda's *loaded run* may grow from
+ * `agendaAnchor` — no longer the window itself. First paint seeds only three
+ * chunks (the one containing the anchor, plus one on each side; see
+ * `calendar/viewState.ts`'s `agendaLoadedChunks`), and the run then grows
+ * incrementally: forward as the user scrolls, backward on the explicit "Load
+ * earlier" action. These two constants are the ceiling on each direction of
+ * that growth (see `minLoadableChunk`/`maxLoadableChunk` below), not a span
+ * that gets expanded up front.
  *
  * Asymmetric on purpose: the agenda is a near-term view, and planning further
  * ahead than a season belongs in month view rather than in an endlessly
@@ -68,18 +74,30 @@ export function chunkRange(index: number, ws: 0 | 1 | 6): { from: Date; to: Date
 }
 
 /**
- * The run of chunks the agenda expands *and* walks for `anchor` — the window
- * above, rounded out to whole chunks.
+ * Every chunk index in `[first, last]` inclusive — turns the agenda's loaded
+ * run (`calendar/viewState.ts`'s `agendaLoadedChunks`) into the index list
+ * `useAgendaChunks` expands and `computeAgendaSections` walks.
  *
- * Rounding out rather than clipping the first/last chunk is what keeps a
- * chunk's rows a pure function of its own index: a partially-walked chunk's
- * dividers and day rows would depend on where the window happened to start,
- * so the two chunks at the run's edges would be rebuilt on every anchor move.
- * The cost is up to 27 extra days of ruler at each end, which the agenda
- * renders as it renders any other empty stretch.
+ * Deliberately pure: the loaded run itself is session-scoped state (it grows
+ * with what the user has scrolled or asked for), so it can't be recomputed
+ * from `anchor`/`ws` alone the way the old fixed ±window was. Callers read
+ * the *current* run from `calendar/viewState.ts` (`useAgendaLoadedRun`, which
+ * also seeds it around a fresh anchor) and pass it here.
  */
-export function agendaChunkRun(anchor: Date, ws: 0 | 1 | 6): number[] {
-  return chunkIndicesFor(addDays(anchor, -EXPAND_PAST_DAYS), addDays(anchor, EXPAND_FUTURE_DAYS), ws)
+export function agendaChunkRun(range: { first: number; last: number }): number[] {
+  const out: number[] = []
+  for (let i = range.first; i <= range.last; i++) out.push(i)
+  return out
+}
+
+/** How far back the loaded run may grow via "Load earlier" — see EXPAND_PAST_DAYS. */
+export function minLoadableChunk(anchor: Date, ws: 0 | 1 | 6): number {
+  return chunkIndexFor(addDays(anchor, -EXPAND_PAST_DAYS), ws)
+}
+
+/** How far forward the loaded run may grow as the user scrolls — see EXPAND_FUTURE_DAYS. */
+export function maxLoadableChunk(anchor: Date, ws: 0 | 1 | 6): number {
+  return chunkIndexFor(addDays(anchor, EXPAND_FUTURE_DAYS), ws)
 }
 
 /** Every chunk index whose range overlaps `[from, to]`, ascending. */

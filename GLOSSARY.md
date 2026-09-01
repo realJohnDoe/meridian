@@ -375,6 +375,14 @@ chunks it touched rather than the whole window. Absolute, not
 "chunk" only of the agenda; Month/Day/Week key their caches by *window*.
 → `calendar/agendaChunks.ts` · `CHUNK_DAYS`, `chunkIndexFor`, `chunkRange`, `agendaChunkRun`
 
+### loaded run
+The agenda chunk-index range actually expanded and rendered, as opposed to
+how far it is *allowed* to grow (`EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS`).
+Session-scoped: seeds to three chunks around `agendaAnchor` on mount, widens a
+chunk at a time as the user scrolls or presses "Load earlier", and is capped
+so a long session doesn't accumulate it without bound.
+→ `calendar/viewState.ts` · `useAgendaLoadedRun`, `growAgendaLoadedChunksForward`, `growAgendaLoadedChunksBackward`, `MAX_LOADED_CHUNKS`
+
 ### OverdueGroup
 Every overdue occurrence of one series (or one standalone task) as a single
 agenda row, keyed `ownerId ?? id` and carrying a representative occurrence, a

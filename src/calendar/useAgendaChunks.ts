@@ -42,10 +42,10 @@ function sameChunks(a: ExpansionCache[], b: ExpansionCache[]): boolean {
  * LRU sized for Month/Day/Week's several concurrent panes
  * (`MAX_CACHED_WINDOWS`), and chunked scrolling would evict live chunks well
  * before that cap. `agendaChunkCache` (expansionCaches.ts) is this hook's own
- * map instead, with a genuinely different eviction policy. For now that policy
- * is simply "keep every chunk in the requested run, drop the rest" — retention
- * across loads is the incremental-loading PR's problem
- * (plans/agenda-infinite-scroll.md).
+ * map instead, with a genuinely different eviction policy: keep every chunk in
+ * the requested run, drop the rest. What caps the *requested run* itself as
+ * the user keeps loading — the retention policy — lives one layer up, in
+ * viewState.ts's `MAX_LOADED_CHUNKS`.
  *
  * Every chunk's own `ExpansionCache` already carries the `(fromMs, toMs)` it
  * was built for (model/expansionCache.ts). A lookup that finds an entry whose

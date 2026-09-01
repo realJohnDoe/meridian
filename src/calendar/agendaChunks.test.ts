@@ -3,7 +3,10 @@ import { addDays, startOfDay } from 'date-fns'
 import { fmtISO, expandWithMultiday } from '@/model'
 import type { Roots } from '@/types'
 import { makeOcc, makeSeries, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
-import { CHUNK_DAYS, chunkIndexFor, chunkRange, chunkIndicesFor } from './agendaChunks'
+import {
+  CHUNK_DAYS, chunkIndexFor, chunkRange, chunkIndicesFor, agendaChunkRun,
+  minLoadableChunk, maxLoadableChunk, EXPAND_PAST_DAYS, EXPAND_FUTURE_DAYS,
+} from './agendaChunks'
 import { weekStartFor } from './weekRange'
 
 const WS_VALUES = [0, 1, 6] as const
@@ -116,5 +119,24 @@ describe('concatenated chunk expansion === single-window expansion', () => {
     const shape = (occs: typeof single) => occs.map(o => `${o.id}@${o.metadata.jsTime?.toISOString() ?? ''}`)
     expect(shape(chunked)).toEqual(shape(single))
     expect(single.length).toBeGreaterThan(10) // the weekly series alone generates one occurrence per chunk
+  })
+})
+
+describe('agendaChunkRun', () => {
+  it('expands a {first, last} range into the inclusive, ascending index list', () => {
+    expect(agendaChunkRun({ first: 5, last: 8 })).toEqual([5, 6, 7, 8])
+  })
+
+  it('handles a single-chunk range', () => {
+    expect(agendaChunkRun({ first: 3, last: 3 })).toEqual([3])
+  })
+})
+
+describe('minLoadableChunk / maxLoadableChunk', () => {
+  it.each(WS_VALUES)('bound the loaded run to [anchor - EXPAND_PAST_DAYS, anchor + EXPAND_FUTURE_DAYS] (ws=%i)', (ws) => {
+    const anchor = new Date(2026, 5, 15)
+
+    expect(minLoadableChunk(anchor, ws)).toBe(chunkIndexFor(addDays(anchor, -EXPAND_PAST_DAYS), ws))
+    expect(maxLoadableChunk(anchor, ws)).toBe(chunkIndexFor(addDays(anchor, EXPAND_FUTURE_DAYS), ws))
   })
 })

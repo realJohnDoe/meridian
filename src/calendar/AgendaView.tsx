@@ -10,13 +10,25 @@ import AgendaDividerRow from './AgendaDividerRow'
 import AgendaEmptyDayRow from './AgendaEmptyDayRow'
 import AgendaRow from './AgendaRow'
 import AgendaOverdueGroupRow from './AgendaOverdueGroupRow'
+import AgendaLoadEarlierRow from './AgendaLoadEarlierRow'
 import { computeAgendaScrollRestore, useSaveAgendaScroll, useAnchoredAgendaScroll } from './computeAgendaScrollRestore'
 import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useScrollabilityWarning } from './agendaScrollability'
 import { useToday } from '@/hooks'
 import { useNow } from './useNow'
-import { useAgendaAnchor, useAgendaScrollTarget, setAgendaTopDate, markAgendaScrolled, toggleOverdueCollapsed } from './viewState'
+import { minLoadableChunk, maxLoadableChunk } from './agendaChunks'
+import { useCalendarWeekStartsOn } from './calendarLocale'
+import {
+  useAgendaAnchor, useAgendaScrollTarget, setAgendaTopDate, markAgendaScrolled, toggleOverdueCollapsed,
+  useAgendaLoadedChunks, growAgendaLoadedChunksForward, growAgendaLoadedChunksBackward,
+} from './viewState'
+
+// How close to the end of the loaded rows a scroll must come before it bumps
+// the run forward by a chunk — "~1 viewport" in row-count terms, generous
+// enough that overscan (8) and the newly-appended chunk's own rows land ahead
+// of the user reaching the true end.
+const GROW_FORWARD_ROWS = 12
 
 interface Props {
   onOpen: (occ: Occurrence, scope?: EditScope) => void
@@ -37,12 +49,13 @@ export default function AgendaView({ onOpen }: Props) {
   // against that auto-detection changing. The eslint warning itself is
   // silenced at its source below (see the disable comment on useVirtualizer).
   const today = useToday()
-  // agendaAnchor centers the expansion window (see viewState.ts) — normally
-  // today, but re-centered by a jump from Month/Day via the sidebar (a day
-  // outside the default ±window otherwise wouldn't have a row at all).
+  // agendaAnchor centers the loaded run (see viewState.ts) — normally today,
+  // but re-centered by a jump from Month/Day via the sidebar (a day outside
+  // the loaded run otherwise wouldn't have a row at all).
   const anchorKey = useAgendaAnchor()
   const anchor = useMemo(() => parseDateString(anchorKey) ?? today, [anchorKey, today])
   const scrollTarget = useAgendaScrollTarget()
+  const ws = useCalendarWeekStartsOn()
 
   // Today's occurrences (and any occurrence whose event-past/event-future
   // state is instant-sensitive, e.g. a cross-midnight timed duration) can
@@ -53,6 +66,16 @@ export default function AgendaView({ onOpen }: Props) {
   const now = useNow(60_000)
 
   const { rows, goToRowIndex } = useAgendaSections(today, now, anchor)
+
+  // The loaded run's current bounds (seeded by useAgendaSections' own call to
+  // useAgendaLoadedRun above, so this is never null once rows exist) and how
+  // far growth may still take it in each direction — see agendaChunks.ts's
+  // minLoadableChunk/maxLoadableChunk.
+  const loadedChunks = useAgendaLoadedChunks()
+  const minFirst = useMemo(() => minLoadableChunk(anchor, ws), [anchor, ws])
+  const maxLast = useMemo(() => maxLoadableChunk(anchor, ws), [anchor, ws])
+  const canLoadEarlier = loadedChunks !== null && loadedChunks.first > minFirst
+  const handleLoadEarlier = useCallback(() => growAgendaLoadedChunksBackward(minFirst), [minFirst])
 
   // AgendaRow is memoized with React's default shallow compare, so these
   // handlers are genuinely part of its props comparison: an unstable reference
@@ -142,6 +165,26 @@ export default function AgendaView({ onOpen }: Props) {
     setAgendaTopDate(key)
   }, [rows, anchorKey, virtualizer])
 
+  // Forward growth: once the virtualizer's range comes within about a
+  // viewport of the end of `rows`, widen the loaded run by one chunk. Reads
+  // getVirtualItems() fresh rather than closing over `virtualItems`, same
+  // reasoning as updateTopDate above.
+  //
+  // lastForwardGrowRef guards against asking twice for the same `rows` — the
+  // scroll listener and the mount/refresh effect below both call this, and
+  // once a request has been made (granted or not, see growAgendaLoadedChunksForward's
+  // own maxLast bound) there is nothing more this row list can ask for.
+  const lastForwardGrowRef = useRef<number>(-1)
+  const maybeGrowForward = useCallback(() => {
+    if (lastForwardGrowRef.current === rows.length) return
+    const items = virtualizer.getVirtualItems()
+    if (!items.length) return
+    const endIndex = items[items.length - 1]!.index
+    if (endIndex < rows.length - GROW_FORWARD_ROWS) return
+    lastForwardGrowRef.current = rows.length
+    growAgendaLoadedChunksForward(maxLast)
+  }, [rows.length, maxLast, virtualizer])
+
   // A real scroll event is the authoritative moment to record where the
   // viewport is resting: virtualizer.scrollOffset is only current once the
   // browser has dispatched one, so capturing from a passive effect (which can
@@ -151,7 +194,8 @@ export default function AgendaView({ onOpen }: Props) {
   const onScroll = useCallback(() => {
     updateTopDate()
     captureAnchor()
-  }, [updateTopDate, captureAnchor])
+    maybeGrowForward()
+  }, [updateTopDate, captureAnchor, maybeGrowForward])
 
   useEffect(() => {
     const el = scRef.current
@@ -162,10 +206,16 @@ export default function AgendaView({ onOpen }: Props) {
 
   // Covers what the scroll listener can't: the initial label on mount, and
   // keeping it correct if `today` flips at midnight (a PWA left open
-  // overnight) or the top row shifts without a scroll (content edited).
+  // overnight) or the top row shifts without a scroll (content edited). Also
+  // covers forward growth for a loaded run that doesn't fill the viewport in
+  // the first place (a sparse vault) — this re-runs whenever `rows` changes,
+  // including the rows change growth itself causes, so a still-too-short run
+  // keeps widening until maybeGrowForward's own range check is satisfied or
+  // growAgendaLoadedChunksForward's maxLast bound is reached.
   useEffect(() => {
     updateTopDate()
-  }, [updateTopDate])
+    maybeGrowForward()
+  }, [updateTopDate, maybeGrowForward])
 
   // Layout, not passive: a passive effect runs *after* the browser has painted
   // the committed frame, so the scroll was a visible correction — the agenda
@@ -192,56 +242,59 @@ export default function AgendaView({ onOpen }: Props) {
   }, [scrollTarget, goToRowIndex, virtualizer, anchorAt])
 
   return (
-    <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]" ref={scRef}>
-      <VirtualRows
-        className="pb-24 lg:max-w-3xl lg:mx-auto"
-        virtualizer={virtualizer}
-        rows={rows}
-        renderRow={row => (
-          // useVirtualFlip animates this inner element, never the positioned
-          // one VirtualRows renders above: a WAAPI animation outranks inline
-          // style, so gliding the outer div would override the virtualizer's
-          // own translateY and stack every row at the top of the list.
-          <div {...{ [FLIP_KEY_ATTR]: row.key }}>
-            {row.kind === 'header' ? (
-              <AgendaHeaderRow
-                label={row.label}
-                collapsed={row.collapsed}
-                count={row.count}
-                onToggle={toggleOverdueCollapsed}
-              />
-            ) : row.kind === 'month' || row.kind === 'week' ? (
-              <AgendaDividerRow variant={row.kind} label={row.label} />
-            ) : row.kind === 'day-empty' ? (
-              <AgendaEmptyDayRow date={row.date} isToday={row.isToday} />
-            ) : row.kind === 'overdue-group' ? (
-              // No `now`: an overdue group's representative is an undone task,
-              // whose styling can't change from the clock alone.
-              <AgendaOverdueGroupRow
-                occ={row.occ}
-                count={row.count}
-                oldest={row.oldest}
-                onOpen={onOpen}
-                onToggleDone={handleToggleDone}
-              />
-            ) : (
-              <AgendaRow
-                occ={row.occ}
-                // Only today's rows track the clock; every other row's
-                // event-past/event-future state can't change from the
-                // clock alone, and passing `now` would re-render them all
-                // once a minute for nothing.
-                now={row.isToday ? now : undefined}
-                showDate={row.showDate}
-                badge={row.badge ? { kind: 'day', ...row.badge } : { kind: 'spacer' }}
-                onOpen={onOpen}
-                onToggleDone={handleToggleDone}
-                onSwipeDelete={handleSwipeDelete}
-              />
-            )}
-          </div>
-        )}
-      />
+    <div className="flex flex-1 min-h-0 flex-col">
+      {canLoadEarlier && <AgendaLoadEarlierRow onClick={handleLoadEarlier} />}
+      <div className="flex-1 min-h-0 overflow-y-auto [-webkit-overflow-scrolling:touch]" ref={scRef}>
+        <VirtualRows
+          className="pb-24 lg:max-w-3xl lg:mx-auto"
+          virtualizer={virtualizer}
+          rows={rows}
+          renderRow={row => (
+            // useVirtualFlip animates this inner element, never the positioned
+            // one VirtualRows renders above: a WAAPI animation outranks inline
+            // style, so gliding the outer div would override the virtualizer's
+            // own translateY and stack every row at the top of the list.
+            <div {...{ [FLIP_KEY_ATTR]: row.key }}>
+              {row.kind === 'header' ? (
+                <AgendaHeaderRow
+                  label={row.label}
+                  collapsed={row.collapsed}
+                  count={row.count}
+                  onToggle={toggleOverdueCollapsed}
+                />
+              ) : row.kind === 'month' || row.kind === 'week' ? (
+                <AgendaDividerRow variant={row.kind} label={row.label} />
+              ) : row.kind === 'day-empty' ? (
+                <AgendaEmptyDayRow date={row.date} isToday={row.isToday} />
+              ) : row.kind === 'overdue-group' ? (
+                // No `now`: an overdue group's representative is an undone task,
+                // whose styling can't change from the clock alone.
+                <AgendaOverdueGroupRow
+                  occ={row.occ}
+                  count={row.count}
+                  oldest={row.oldest}
+                  onOpen={onOpen}
+                  onToggleDone={handleToggleDone}
+                />
+              ) : (
+                <AgendaRow
+                  occ={row.occ}
+                  // Only today's rows track the clock; every other row's
+                  // event-past/event-future state can't change from the
+                  // clock alone, and passing `now` would re-render them all
+                  // once a minute for nothing.
+                  now={row.isToday ? now : undefined}
+                  showDate={row.showDate}
+                  badge={row.badge ? { kind: 'day', ...row.badge } : { kind: 'spacer' }}
+                  onOpen={onOpen}
+                  onToggleDone={handleToggleDone}
+                  onSwipeDelete={handleSwipeDelete}
+                />
+              )}
+            </div>
+          )}
+        />
+      </div>
     </div>
   )
 }

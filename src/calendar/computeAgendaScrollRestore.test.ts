@@ -124,6 +124,24 @@ describe('computeAgendaScrollRestore', () => {
     expect(result.current.initialOffset).toBe(1234)
   })
 
+  // A remount can, in principle, restore against a loaded run smaller than
+  // the one that produced the saved offset — an unclamped offset would seed
+  // the virtualizer past the end of what actually exists.
+  it('clamps the restored offset to what the measurement snapshot actually covers', () => {
+    const { rows, goToRowIndex } = agenda()
+    calendarView.setState({
+      agendaScrollOffset: 5000,
+      agendaScrollMeasurements: [
+        { index: 0, start: 0, end: 30, size: 30, key: rows[0]!.key, lane: 0 },
+        { index: 1, start: 30, end: 85, size: 55, key: rows[1]!.key, lane: 0 },
+      ],
+    })
+
+    const { result } = renderHook(() => computeAgendaScrollRestore(false, rows, goToRowIndex))
+
+    expect(result.current.initialOffset).toBe(85)
+  })
+
   it('starts at the top when the target is the first row or missing', () => {
     const { rows } = agenda()
 

@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { setupStore, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 import { useAgendaSections } from './useAgendaSections'
 import type { AgendaRow } from './useAgendaSections'
-import { agendaChunkRun, chunkRange, CHUNK_DAYS, EXPAND_PAST_DAYS, EXPAND_FUTURE_DAYS } from './agendaChunks'
 import { OVERDUE_LOOKBACK_DAYS } from './overduePool'
 import { calendarView } from './viewState'
 
@@ -18,6 +17,16 @@ setupStore()
 const TODAY = new Date(2026, 5, 15)
 const NOW = new Date(2026, 5, 15, 9, 0)
 
+// The loaded run is now session-scoped state (calendar/viewState.ts's
+// agendaLoadedChunks), not a pure function of (anchor, ws) — so, unlike
+// before, it does not automatically re-center on a different `anchor` passed
+// to useAgendaSections unless something clears it first (in production,
+// requestScrollToDate does this alongside moving the anchor). Reset it before
+// every test so each one seeds fresh around whatever anchor it actually uses.
+beforeEach(() => {
+  calendarView.setState({ agendaLoadedChunks: null })
+})
+
 /** Occurrence rows belonging to a given day, in order. */
 const occIdsFor = (rows: AgendaRow[], dateKey: string) =>
   rows.filter(r => r.kind === 'occ' && r.dateKey === dateKey).map(r => r.kind === 'occ' && r.occ.id)
@@ -27,30 +36,27 @@ const overdueGroups = (rows: AgendaRow[]) =>
   rows.filter(r => r.kind === 'overdue-group').map(r => `${r.occ.id} ×${r.count}`)
 
 /** Content rows only — strips the always-present month/week dividers so tests
- * can assert on the day/overdue structure without hardcoding the ~65 week and
- * ~15 month rows the [today-365, today+90] window always carries. */
+ * can assert on the day/overdue structure without hardcoding however many
+ * divider rows the loaded run happens to carry. */
 const content = (rows: AgendaRow[]) => rows.filter(r => r.kind !== 'month' && r.kind !== 'week')
 
-describe('the agenda\'s window constants', () => {
-  // One number used to mean three different things: the expansion window, the
-  // day-by-day render walk's span, and the overdue lookback. The walk's own
-  // pair is gone — the walk covers exactly the chunks that were expanded (see
-  // agendaChunks.ts), so "a day the walk visits but the expansion never
-  // reached renders empty, silently" can no longer be expressed. What is left
-  // is the run's chunk alignment, which that guarantee now rests on.
-  it('covers the requested window with whole chunks, reaching at least as far in each direction', () => {
-    const run = agendaChunkRun(TODAY, 1)
-    const from = chunkRange(run[0]!, 1).from
-    const to = chunkRange(run[run.length - 1]!, 1).to
+describe('the agenda\'s loaded run', () => {
+  // First paint used to expand the whole ±455-day window regardless of what
+  // the user could see. Under incremental loading the default is three
+  // chunks around the anchor — see viewState.ts's useAgendaLoadedRun — and it
+  // only widens as the user scrolls or asks for more.
+  it('starts with just the anchor chunk and one on each side, not the old ±year/season window', () => {
+    // Within the old ±365-day past window, but well outside the new
+    // three-chunk (~84-day) seed.
+    const wayBack = addDays(TODAY, -200)
+    seedStore(
+      [makeOcc({ id: 'way-back', date: fmtISO(wayBack), time: '09:00', entryKey: testKey('note.md') })],
+      makeRoots('note.md'),
+    )
 
-    expect(run).toHaveLength(new Set(run).size)
-    expect(run[run.length - 1]! - run[0]! + 1).toBe(run.length) // contiguous
-    expect(from.getTime()).toBeLessThanOrEqual(addDays(TODAY, -EXPAND_PAST_DAYS).getTime())
-    expect(to.getTime()).toBeGreaterThanOrEqual(addDays(TODAY, EXPAND_FUTURE_DAYS).getTime())
-    // Every chunk boundary is a week start, which is what makes a chunk's
-    // month/week dividers a pure function of its own index.
-    for (const index of run) expect(chunkRange(index, 1).from.getDay()).toBe(1)
-    expect(CHUNK_DAYS % 7).toBe(0)
+    const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
+
+    expect(occIdsFor(result.current.rows, fmtISO(wayBack))).toEqual([])
   })
 
   it('looks back for overdue work independently of the agenda window', () => {

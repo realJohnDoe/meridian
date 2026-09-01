@@ -1,0 +1,29 @@
+import { memo } from 'react'
+import { Button } from '@/components/ui/button'
+
+interface Props {
+  onClick: () => void
+}
+
+/**
+ * The agenda's backward-growth affordance — a plain control above the
+ * scroller, not a virtualized row. Backward growth is deliberately a button
+ * rather than a scroll trigger: auto-loading earlier content while the user
+ * is dragging toward the top of the list would look like a teleport (see
+ * useAnchoredAgendaScroll's touchingRef guard).
+ *
+ * Prepending a chunk changes `rows`' identity, which useAnchoredAgendaScroll
+ * already reacts to — this component only has to trigger the growth, not hold
+ * the scroll position steady while it happens.
+ */
+function AgendaLoadEarlierRow({ onClick }: Props) {
+  return (
+    <div className="flex shrink-0 justify-center border-b bg-background py-1.5">
+      <Button type="button" variant="outline" size="sm" onClick={onClick}>
+        Load earlier
+      </Button>
+    </div>
+  )
+}
+
+export default memo(AgendaLoadEarlierRow)

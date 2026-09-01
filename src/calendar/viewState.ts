@@ -5,6 +5,7 @@ import type { VirtualItem } from '@tanstack/react-virtual'
 import { fmtISO } from '@/model'
 import { resetAll as resetExpansionCaches } from './expansionCaches'
 import { weekStartFor } from './weekRange'
+import { chunkIndexFor } from './agendaChunks'
 
 interface CalendarViewState {
   /**
@@ -63,6 +64,21 @@ interface CalendarViewState {
   /** ISO date string of the topmost visible day in the agenda view. */
   agendaTopDate: string | null
   /**
+   * The agenda's currently loaded chunk-index range (see
+   * `calendar/agendaChunks.ts`'s `CHUNK_DAYS`/`chunkIndexFor`) — first paint
+   * loads only three chunks around `agendaAnchor`, and the run then grows
+   * incrementally: forward as the user scrolls near the end of the loaded
+   * rows, backward on the explicit "Load earlier" action. See
+   * `useAgendaLoadedRun`, `growAgendaLoadedChunksForward/Backward` below.
+   *
+   * `null` means "not yet seeded" — the state a fresh session starts in and
+   * the state `requestScrollToDate` resets it back to (the anchor moved, so
+   * the old run is centered on the wrong day). `useAgendaLoadedRun` is the
+   * only thing that turns a null back into a real range, seeding it around
+   * whatever anchor it is next called with.
+   */
+  agendaLoadedChunks: { first: number; last: number } | null
+  /**
    * Whether the agenda's overdue section is collapsed to just its header row.
    *
    * **Starts expanded.** Scroll-to-today already targets the overdue section
@@ -109,6 +125,7 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   agendaAnchor: fmtISO(startOfToday()),
   agendaScrollTarget: fmtISO(startOfToday()),
   agendaTopDate: null,
+  agendaLoadedChunks: null,
   overdueCollapsed: false,
   currentDate: fmtISO(startOfToday()),
   quickNavOpen: false,
@@ -183,6 +200,81 @@ export function useAgendaTopDate(): string | null {
   return useZustandStore(calendarView, s => s.agendaTopDate)
 }
 
+/** The cap on the agenda's loaded run, ≈ 21 months of chunks. Chunks scrolled
+ * past are kept (re-expanding and the scrollbar jump that would follow are
+ * both worse than holding them), so this is what keeps a very long session
+ * from accumulating an unbounded number of them — grow past it and the
+ * opposite end is trimmed by the same amount. See
+ * growAgendaLoadedChunksForward/Backward below. */
+export const MAX_LOADED_CHUNKS = 24
+
+export function useAgendaLoadedChunks(): { first: number; last: number } | null {
+  return useZustandStore(calendarView, s => s.agendaLoadedChunks)
+}
+
+/**
+ * The agenda's loaded chunk-index range, seeding it around `anchor` the first
+ * time this is called after it was reset to null (a fresh session, or the
+ * reseed `requestScrollToDate`/`resetCalendarViewState` trigger) — the chunk
+ * containing `anchor` plus one on each side, three chunks in all.
+ *
+ * A render-phase read+write, same reasoning as useAgendaChunks.ts's own
+ * render-phase cache writes: `calendarView`'s state only ever transitions
+ * null → a range once per reseed, so repeating this call (StrictMode's double
+ * render) or skipping a redundant one (memoization) can't produce a wrong
+ * value. Must run before `agendaChunkRun` — see useAgendaSections.ts.
+ */
+export function useAgendaLoadedRun(anchor: Date, ws: 0 | 1 | 6): { first: number; last: number } {
+  const current = useZustandStore(calendarView, s => s.agendaLoadedChunks)
+  if (current) return current
+  const anchorChunk = chunkIndexFor(anchor, ws)
+  const seeded = { first: anchorChunk - 1, last: anchorChunk + 1 }
+  calendarView.setState({ agendaLoadedChunks: seeded })
+  return seeded
+}
+
+/**
+ * Bumps the loaded run's forward edge by one chunk — AgendaView calls this as
+ * the virtualizer's range nears the end of `rows`. No-ops once `last` reaches
+ * `maxLast` (see agendaChunks.ts's `maxLoadableChunk`) or before the run has
+ * been seeded at all.
+ *
+ * Growing past MAX_LOADED_CHUNKS trims the *opposite* (past) edge by the same
+ * amount — never the edge that just grew, which is the one the user is
+ * scrolled toward.
+ */
+export function growAgendaLoadedChunksForward(maxLast: number): void {
+  const current = calendarView.getState().agendaLoadedChunks
+  if (!current || current.last >= maxLast) return
+  let { first, last } = current
+  last += 1
+  const span = last - first + 1
+  if (span > MAX_LOADED_CHUNKS) first += span - MAX_LOADED_CHUNKS
+  calendarView.setState({ agendaLoadedChunks: { first, last } })
+}
+
+/**
+ * Bumps the loaded run's backward edge by one chunk — the "Load earlier"
+ * control's click handler. No-ops once `first` reaches `minFirst` (see
+ * agendaChunks.ts's `minLoadableChunk`) or before the run has been seeded.
+ * Mirrors growAgendaLoadedChunksForward, trimming the future edge instead
+ * when the cap is exceeded.
+ *
+ * Needs no scroll compensation of its own: prepending a chunk changes
+ * `rows`' identity, which useAnchoredAgendaScroll (computeAgendaScrollRestore.ts)
+ * already reacts to for the same reason a background sync landing rows above
+ * the viewport does — nothing here has to know that.
+ */
+export function growAgendaLoadedChunksBackward(minFirst: number): void {
+  const current = calendarView.getState().agendaLoadedChunks
+  if (!current || current.first <= minFirst) return
+  let { first, last } = current
+  first -= 1
+  const span = last - first + 1
+  if (span > MAX_LOADED_CHUNKS) last -= span - MAX_LOADED_CHUNKS
+  calendarView.setState({ agendaLoadedChunks: { first, last } })
+}
+
 export function useCurrentDate(): string {
   return useZustandStore(calendarView, s => s.currentDate)
 }
@@ -213,9 +305,13 @@ export function closeQuickNav(): void {
  * its next render, then clear the pending target — used for jumps to a day
  * that may fall outside the default window (e.g. arriving from a Month/Day
  * view that had paged far from today; see Sidebar's Agenda nav item).
+ *
+ * Clears `agendaLoadedChunks` back to null along with the anchor: the loaded
+ * run is centered on the *old* anchor, and a jump needs it reseeded around
+ * the new one rather than widened to cover both — see `useAgendaLoadedRun`.
  */
 export function requestScrollToDate(dateKey: string): void {
-  calendarView.setState({ agendaAnchor: dateKey, agendaScrollTarget: dateKey })
+  calendarView.setState({ agendaAnchor: dateKey, agendaScrollTarget: dateKey, agendaLoadedChunks: null })
 }
 
 /** Flags AgendaView to scroll to today on its next render. */

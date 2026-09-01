@@ -229,6 +229,7 @@ async function measurePipeline(browser, spec) {
       const fom = await import('/meridian/src/fileOccurrence.ts')
       const store = await import('/meridian/src/store.ts')
       const sections = await import('/meridian/src/calendar/agendaSections.ts')
+      const chunks = await import('/meridian/src/calendar/agendaChunks.ts')
       const matching = await import('/meridian/src/lib/matching.ts')
       // Repeat cheap sizes for a median; at the top end one run each, since a
       // single pass already takes seconds and the extra copies are what push
@@ -273,21 +274,29 @@ async function measurePipeline(browser, spec) {
       r.backlinks = await b(() => { fom.buildBacklinkIndex(views.roots) }, 3)
       mark('derivedViews')
 
-      // expansion over the agenda window (-365 / +90) — the occurrence unit
+      // expansion over the agenda's *loaded run* — three chunks around today
+      // (calendar/viewState.ts's agendaLoadedChunks default seed), not the old
+      // fixed ±365/+90 window: that's what AgendaView actually expands at
+      // first paint under incremental loading, and this stage exists to
+      // measure exactly that cost.
       const today = new Date(); today.setHours(0, 0, 0, 0)
-      const day = 86400000
-      const from = new Date(today.getTime() - 365 * day)
-      const to = new Date(today.getTime() + 90 * day)
-      let occs
+      const ws = 1
+      const anchorChunk = chunks.chunkIndexFor(today, ws)
+      const loadedChunkIndices = chunks.agendaChunkRun({ first: anchorChunk - 1, last: anchorChunk + 1 })
+      const anchorChunkRange = chunks.chunkRange(anchorChunk, ws)
+      let chunkOccs
       r.expandAgendaWindow = await b(() => {
-        occs = model.computeExpansionCache(null, views.items, views.roots, from, to).allOccs
+        chunkOccs = loadedChunkIndices.map(index => {
+          const { from, to } = chunks.chunkRange(index, ws)
+          return { index, occs: model.computeExpansionCache(null, views.items, views.roots, from, to).allOccs }
+        })
       }, 3)
-      r.occurrencesInAgendaWindow = occs.length
+      r.occurrencesInAgendaWindow = chunkOccs.reduce((a, c) => a + c.occs.length, 0)
       mark('agendaExpansion')
 
       // grouping/sorting/filtering into virtualizable rows
       r.agendaSections = await b(() => {
-        const res = sections.computeAgendaSections(null, occs, [], today, new Date(), o => o, today, true, 1)
+        const res = sections.computeAgendaSections(null, chunkOccs, [], today, new Date(), o => o, 'no-filter', today, true, ws)
         r.agendaRows = res.rows.length
       }, 3)
 
@@ -300,9 +309,11 @@ async function measurePipeline(browser, spec) {
       }, 5)
 
       // the incremental toggle path: one item changes, everything downstream
-      // is asked to notice only that
+      // is asked to notice only that. Scoped to the anchor chunk alone, since
+      // that is the unit a real toggle recomputes now (useAgendaChunks.ts) —
+      // the other loaded chunks keep their cache untouched.
       const firstKey = [...entries.keys()][0]
-      let cache = model.computeExpansionCache(null, views.items, views.roots, from, to)
+      let cache = model.computeExpansionCache(null, views.items, views.roots, anchorChunkRange.from, anchorChunkRange.to)
       r.toggleRecompute = await b(() => {
         const entry = entries.get(firstKey)
         const item = entry.items[0]
@@ -310,7 +321,7 @@ async function measurePipeline(browser, spec) {
         const nextEntry = { ...entry, items: [nextItem, ...entry.items.slice(1)] }
         const nextEntries = new Map(entries); nextEntries.set(firstKey, nextEntry)
         const nextViews = store.deriveViews(nextEntries, views)
-        cache = model.computeExpansionCache(cache, nextViews.items, nextViews.roots, from, to)
+        cache = model.computeExpansionCache(cache, nextViews.items, nextViews.roots, anchorChunkRange.from, anchorChunkRange.to)
       }, 3)
 
       // Last on purpose: this is the heaviest stage by a wide margin (a +/-3
