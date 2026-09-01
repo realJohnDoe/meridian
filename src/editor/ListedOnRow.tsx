@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Plus } from 'lucide-react'
 import type { Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
 import { fileEntries } from '@/fileOccurrence'
@@ -19,9 +20,15 @@ interface Props {
   onOpenWikilink?: (ref: string) => void
   onAdd?:          (target: EntryKey) => void
   onRemove?:       (target: EntryKey) => void
+  /**
+   * Create a list by this name and add this entry to it. Omitted where there
+   * is no vault to create a file in — the picker then just says no file
+   * matched, as it always did.
+   */
+  onCreate?:       (title: string) => void
 }
 
-export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOpenWikilink, onAdd, onRemove }: Props) {
+export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOpenWikilink, onAdd, onRemove, onCreate }: Props) {
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const { anchorRef, listRef, placement } = useFloatingCombobox(pickerOpen, open => { setPickerOpen(open); if (!open) setPickerQuery('') })
@@ -31,11 +38,29 @@ export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOp
   const candidates = allFiles.filter(e => e.entryKey !== entryKey && !alreadyLinked.has(e.entryKey))
   const filtered = rankByQuery(pickerQuery, candidates, e => e.title)
 
+  const newListTitle = pickerQuery.trim()
+  // Nothing to offer creating when the vault already holds a file by that
+  // name. Matched against every file, not just the candidates: one already
+  // holding this entry is filtered out of the list, and offering to "create" it
+  // again would put a second file by the same name in the vault.
+  const canCreate = !!onCreate && !!newListTitle
+    && !allFiles.some(e => e.title.toLowerCase() === newListTitle.toLowerCase())
+
+  function closePicker() {
+    setPickerQuery('')
+    setPickerOpen(false)
+  }
+
   function handleSelect(target: EntryKey) {
     if (!entryKey) return
     onAdd?.(target)
-    setPickerQuery('')
-    setPickerOpen(false)
+    closePicker()
+  }
+
+  function handleCreate() {
+    if (!entryKey || !canCreate) return
+    onCreate(newListTitle)
+    closePicker()
   }
 
   if (!linkedKeys.length && !entryKey) return null
@@ -69,6 +94,9 @@ export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOp
                   placeholder="Search files…"
                   value={pickerQuery}
                   onValueChange={setPickerQuery}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && canCreate && filtered.length === 0) handleCreate()
+                  }}
                 />
               </div>
             ) : (
@@ -76,7 +104,13 @@ export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOp
             )}
             <FloatingComboboxList placement={placement} listRef={listRef} className="w-64">
               <CommandList>
-                <CommandEmpty>No files found</CommandEmpty>
+                {canCreate && (
+                  <CommandItem value={`__create__${newListTitle}`} onSelect={handleCreate}>
+                    <Plus size={13} className="shrink-0 opacity-60" />
+                    <span className="truncate">Create &quot;<strong>{newListTitle}</strong>&quot;</span>
+                  </CommandItem>
+                )}
+                {!canCreate && <CommandEmpty>No files found</CommandEmpty>}
                 <CommandGroup>
                   {filtered.slice(0, 8).map(e => (
                     <CommandItem

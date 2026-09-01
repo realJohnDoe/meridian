@@ -4,7 +4,7 @@ export { multidayDisplayTitle, treeHasOccurrences, stableOccId, expandRange, exp
 export { buildItemIndex } from './itemIndex'
 export type { ItemIndex } from './itemIndex'
 export type { StoreData, EditorFields, EditFields, SeriesContext, NewEntryTarget, LinkBreakage } from './storeOps'
-export { entryKeyItems, findSeries, seriesContext, upsertOverride, applyEdit, newEntryKey, freeEntryKey, moveEntryKey, moveLinkBreakage, toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, occFromAppMeta } from './storeOps'
+export { entryKeyItems, findSeries, seriesContext, upsertOverride, applyEdit, newEntryKey, draftEntryKey, freeEntryKey, moveEntryKey, moveLinkBreakage, toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, occFromAppMeta } from './storeOps'
 export { parseToStoreItems } from './storeItems'
 export type { ParseResult } from './storeItems'
 export { collapseToYaml, serializeEntry } from './collapse'

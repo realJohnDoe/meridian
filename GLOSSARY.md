@@ -226,6 +226,13 @@ Which occurrences an editor save applies to: `single`, `future`, `all`, or
 `add`.
 → `types.ts` · `EditScope`, `isEditScope`
 
+### draft
+An editor session for an entry that has no file yet. Its `draftId` is stamped
+on the item its first save creates, so a later save — or a later visit to the
+same `/entry/new` history entry — upserts onto that file instead of creating a
+second one beside it.
+→ `model/storeOps.ts` · `draftEntryKey`, `newEntryKey`
+
 ### wikilink
 A `[[slug]]` reference. Resolution is **per vault** — files store a bare slug,
 so resolving one needs the linking file's `vaultId`.

@@ -84,6 +84,13 @@ export interface EntryEditorHooks {
   onMoveConfirm: () => void
   onMoveCancel: () => void
   pendingLinks: PendingLinks
+  /**
+   * Create a list by name from the "listed on" picker and put this entry on
+   * it. Null where creating a real vault file is out of scope — the debug
+   * page edits a scratch snapshot, so its picker offers no "Create" row (same
+   * reasoning as `handleOpenWikilink`).
+   */
+  handleCreateList: ((title: string) => void) | null
   dialogHandlers: DialogHandlers
   setEntry: (updater: (prev: EntryState) => EntryState) => void
   handleSave: (body: string) => void
@@ -116,7 +123,7 @@ function autoResize(el: HTMLTextAreaElement) {
 export default function EntryEditor({ hooks, items, roots }: Props) {
   const {
     entry, series, vaultId, onVaultChange, pendingMove, onMoveConfirm, onMoveCancel,
-    pendingLinks, dialogHandlers,
+    pendingLinks, handleCreateList, dialogHandlers,
     setEntry, handleSave, handleOpenDlg, handleOpenRepeatDlg, handlePromoteTask,
     scheduleAutoSave, saveMeta, handleScopeChange, handleTypeChange, handleDoneToggle,
     handleOpenWikilink, handleToggleDoneBacklink, titleMissing, focusTitleTick,
@@ -228,6 +235,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
           onOpenWikilink={openWikilink}
           onAdd={handleAdd}
           onRemove={handleRemove}
+          onCreate={handleCreateList ?? undefined}
         />
 
         {/* ── OCCURRENCE-LEVEL: scope caption → type → metadata → participants ── */}
