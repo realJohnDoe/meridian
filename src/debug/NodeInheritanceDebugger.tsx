@@ -770,6 +770,9 @@ export default function NodeInheritanceDebugger() {
                 onMoveConfirm: () => {},
                 onMoveCancel: () => {},
                 pendingLinks: debugPendingLinks,
+                // Creating a list writes a real vault file — same reason
+                // handlePromoteTask below stands down.
+                handleCreateList: null,
                 dialogHandlers,
                 setEntry: (updater) => setDebugEntry(prev => prev ? updater(prev) : prev),
                 handleSave: handleDebugSave,

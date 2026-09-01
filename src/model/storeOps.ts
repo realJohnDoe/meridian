@@ -448,6 +448,20 @@ function findDraft(entries: Entries, draftId: string | undefined): Entry | undef
 }
 
 /**
+ * The key of the file this draft has already created, or undefined if its
+ * first save hasn't landed yet.
+ *
+ * The read side of the stamp `applyNew` leaves on the item it creates. A
+ * new-entry route that finds one is *resuming* a draft whose file already
+ * exists — starting a second editor session on top of it (coming back to
+ * `/entry/new` in history, or reloading it) is what used to leave a second
+ * file beside the first.
+ */
+export function draftEntryKey(entries: Entries, draftId: string | undefined): EntryKey | undefined {
+  return findDraft(entries, draftId)?.key
+}
+
+/**
  * The key a brand-new entry will occupy in `vaultId`.
  *
  * A draft that already created its file keeps that file — and its vault —

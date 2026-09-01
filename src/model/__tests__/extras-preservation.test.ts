@@ -136,6 +136,7 @@ const EXEMPT: Record<string, string> = {
   deletionEndsAfterCompletionSeries: 'predicate — returns a boolean',
   occFromAppMeta: 'metadata constructor, covered by its own test below',
   newEntryKey: 'pure key allocation — returns a string, never touches metadata',
+  draftEntryKey: 'pure lookup — returns an existing entry\'s key, never touches metadata',
   freeEntryKey: 'pure key allocation — returns a string, never touches metadata',
   moveLinkBreakage: 'read-only count of what a move would break — returns keys and refs',
   groupIntoEntries: 'pure regrouping — carries the same root and item objects into one map, by reference',

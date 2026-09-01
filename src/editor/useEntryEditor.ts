@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
-import { applyScope, entryFromOccurrence, saveNode, deleteNode } from './save'
+import { applyScope, entryFromOccurrence, saveNode, deleteNode, addItemLink, removeItemLink } from './save'
 import type { Occurrence, EditScope } from '@/types'
 import { fmtISO, seriesContext } from '@/model'
 import { useToday } from '@/hooks'
@@ -45,7 +45,18 @@ function entryFromItem(item: Occurrence | null, editScope: EditScope, seed?: New
   return entryFromOccurrence(item, editScope)
 }
 
-export function useEntryEditor(initialOcc: Occurrence | null, initialScope: EditScope = 'single', initialTitle?: string, seed?: NewEntrySeed) {
+export function useEntryEditor(
+  initialOcc: Occurrence | null,
+  initialScope: EditScope = 'single',
+  initialTitle?: string,
+  seed?: NewEntrySeed,
+  /**
+   * The identity of the draft this editor is a session of, supplied by the
+   * new-entry route so it survives a remount of the same history entry — see
+   * `draftId` below. Omitted (and so freshly minted) by every other caller.
+   */
+  sessionDraftId?: string,
+) {
   const today = useToday()
 
   // Read from the *target* vault, not from whatever `loadDefaultParticipants`
@@ -114,7 +125,11 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // from a different entry landing on a taken slug (allocate a free slug) — the
   // createdItemRef adoption below covers the same ground, but only once the fom
   // lookup has succeeded, and handleSave/dialog paths can commit before then.
-  const [draftId] = useState(() => crypto.randomUUID())
+  //
+  // Supplied by the new-entry route, which derives it from the history entry:
+  // coming *back* to /entry/new must resume this draft rather than start a
+  // second one that lands beside it on a `-2` slug.
+  const [draftId] = useState(() => sessionDraftId ?? crypto.randomUUID())
 
   const storeRoots = useStore(s => s.roots)
   const storeItems = useStore(s => s.items)
@@ -127,7 +142,11 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   // session — a late debounced autosave, a dialog confirmed right after — also
   // upserts instead of re-running applyNew (which would otherwise append a
   // second item under the same fileSlug).
-  const commitEntry = (next: EntryState) => {
+  //
+  // Returns the key it wrote, or null when nothing was written (an empty
+  // title) — the link handlers below need a slug of their own to write
+  // `[[this-entry]]` into another file, and only a commit can produce one.
+  const commitEntry = (next: EntryState): EntryKey | null => {
     const item = next.item ?? createdItemRef.current
     if (item) {
       const key = saveNode(item, next.editScope, next, { base: baseRef.current })
@@ -137,16 +156,17 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
       // createdItemRef, entry.item is still null, so pending "listed on" links
       // added after creation would otherwise never get flushed again.
       if (key) { baseRef.current = next; flushLinksRef.current(keySlug(key)) }
-      return
+      return key
     }
-    if (!next.title) return
+    if (!next.title) return null
     const key = saveNode(null, next.editScope, next, { draftId, targetVaultId })
-    if (key === null) { setTitleMissing(true); return }
+    if (key === null) { setTitleMissing(true); return null }
     setTitleMissing(false)
     baseRef.current = next
     flushLinksRef.current(keySlug(key))
     setCreatedKey(key)
     createdItemRef.current = getFom().get(key) ?? null
+    return key
   }
 
   const { scheduleAutoSave, flushAutoSave, cancelAutoSave, bodyRef } = useAutoSave(commitEntry, entryRef, entry.body)
@@ -155,6 +175,58 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
   const saveMeta = (next: EntryState) => {
     if (next.editScope === 'add') return
     commitEntry({ ...next, body: bodyRef.current })
+  }
+
+  /**
+   * Put this entry on `target`'s list — the "add to list" picker's action.
+   *
+   * The link is `[[this-entry]]` written into the *other* file, so this entry
+   * needs a slug of its own before there is anything to write. For an existing
+   * one `usePendingLinks` writes it on the spot; a brand-new one is committed
+   * first (creating its file, exactly as any other field edit would) and the
+   * link written against the key that commit reports.
+   *
+   * The pick used to only land in `pendingKeys`, to be written by whatever
+   * commit happened next — but Save and Back both flush nothing when no
+   * autosave is pending, so a pick made last, with nothing typed after it,
+   * was dropped without a trace.
+   */
+  const handleAddLink = (target: EntryKey) => {
+    handleAdd(target)
+    if (entry.item) return
+    const key = commitEntry({ ...entryRef.current, body: bodyRef.current })
+    if (key) addItemLink(target, keySlug(key))
+  }
+
+  /** The same, in reverse: `pendingKeys` alone can't unwrite a link a commit already flushed. */
+  const handleRemoveLink = (target: EntryKey) => {
+    handleRemove(target)
+    if (entry.item) return
+    const key = createdItemRef.current?.entryKey ?? createdKey
+    if (key) removeItemLink(target, keySlug(key))
+  }
+
+  /**
+   * Create the list the user just named in the picker, and put this entry on
+   * it. A list is a plain note — nothing to schedule, nothing to tick.
+   *
+   * No draft id: each of these is a genuinely new file, so a name that
+   * slugifies onto a taken slug lands on a free one rather than upserting onto
+   * whatever is sitting there (same reasoning as `handlePromoteTask`). Lands in
+   * `vaultId`, since the `[[link]]` about to be written resolves in that vault.
+   */
+  const handleCreateList = (title: string) => {
+    const listTitle = title.trim()
+    if (!listTitle) return
+    const target = saveNode(null, 'all', {
+      item: null, title: listTitle, tracked: false, itemType: 'note', done: false,
+      body: '', tags: [], items: [],
+      participants: vaultId ? readVaultStringArray('meridian_default_participants', vaultId) : [],
+      priority: null, scheduled: null, duration: '', repeat: null,
+      editScope: 'all',
+    }, { targetVaultId: vaultId })
+    if (!target) return
+    handleAddLink(target)
   }
 
   // A new item opened with an initial title (e.g. "Add <query>" from search, or a
@@ -289,7 +361,8 @@ export function useEntryEditor(initialOcc: Occurrence | null, initialScope: Edit
     onMoveConfirm: vaultTarget.onMoveConfirm,
     onMoveCancel:  vaultTarget.onMoveCancel,
     series,
-    pendingLinks: { effectiveKey, pendingKeys, handleAdd, handleRemove },
+    pendingLinks: { effectiveKey, pendingKeys, handleAdd: handleAddLink, handleRemove: handleRemoveLink },
+    handleCreateList,
     saveMeta,
     handleOpenWikilink,
     handleSave,

@@ -167,6 +167,107 @@ describe('useEntryEditor', () => {
     expect(navigateMock).not.toHaveBeenCalled()
   })
 
+  it('resumes the file its own draft already created instead of opening a second one', () => {
+    // Reproduces the reported bug: the task is created from /entry/new, gets a
+    // priority, and the user leaves to make the list it should go on. Coming
+    // *back* to that same /entry/new history entry remounts the editor — with a
+    // fresh draft id it no longer recognised the file its first visit made, so
+    // it created `buy-milk-2` beside it, carrying the title but none of the
+    // edits. The route now derives the draft id from the history entry (see
+    // `__TSR_key` in _entry.entry.new.tsx), which is what this passes.
+    const draftId = 'history-entry-1'
+    const key = testKey(titleToSlug('Buy milk'))
+
+    const first = renderHook(() => useEntryEditor(null, 'all', 'Buy milk', undefined, draftId))
+    act(() => { first.result.current.saveMeta({ ...first.result.current.entry, priority: 'high' }) })
+    act(() => { first.unmount() })
+
+    renderHook(() => useEntryEditor(null, 'all', 'Buy milk', undefined, draftId))
+
+    expect([...useStore.getState().roots.keys()]).toEqual([key])
+    expect(useStore.getState().items.filter(i => i.entryKey === key)).toHaveLength(1)
+    // What the resumed session then *shows* is the route's job, not the hook's:
+    // it redirects to the file this lookup found rather than mounting a blank
+    // editor over it — see NewEntryDraft in _entry.entry.new.tsx.
+  })
+
+  it('still creates a second file for a genuinely new draft with the same title', () => {
+    // The other half of the draft-id rule: a *different* history entry means a
+    // different entry, so it gets a free slug rather than upserting onto the
+    // file some earlier draft is sitting on.
+    renderHook(() => useEntryEditor(null, 'all', 'Buy milk', undefined, 'history-entry-1'))
+    renderHook(() => useEntryEditor(null, 'all', 'Buy milk', undefined, 'history-entry-2'))
+
+    expect([...useStore.getState().roots.keys()].sort())
+      .toEqual([testKey('buy-milk'), testKey('buy-milk-2')])
+  })
+
+  describe('the "listed on" picker on a brand-new draft', () => {
+    const listKey = testKey('groceries')
+
+    function seedList() {
+      const list = makeOcc({ id: 'list-1', entryKey: listKey, date: '', metadata: { vaultId: TEST_VAULT, fileSlug: 'groceries', participants: [], title: 'Groceries', tags: [], items: [] } })
+      seedStore([list], makeRoots('groceries', { title: 'Groceries' }))
+    }
+
+    it('writes the link on the pick, without waiting for another edit to save', () => {
+      // Reproduces the reported bug: the pick only landed in `pendingKeys`,
+      // to be flushed by whatever commit came next — and both Save and Back
+      // flush nothing when no autosave is pending, so a pick made last was
+      // dropped without a trace.
+      seedList()
+      const { result } = renderHook(() => useEntryEditor(null, 'all', 'Buy milk'))
+
+      act(() => { result.current.pendingLinks.handleAdd(listKey) })
+
+      expect(useStore.getState().roots.get(listKey)?.items).toEqual(['[[buy-milk]]'])
+    })
+
+    it('survives Save', () => {
+      seedList()
+      const { result } = renderHook(() => useEntryEditor(null, 'all', 'Buy milk'))
+
+      act(() => { result.current.pendingLinks.handleAdd(listKey) })
+      act(() => { result.current.handleSave('') })
+
+      expect(useStore.getState().roots.get(listKey)?.items).toEqual(['[[buy-milk]]'])
+    })
+
+    it('unwrites a link the pick already committed when it is removed again', () => {
+      seedList()
+      const { result } = renderHook(() => useEntryEditor(null, 'all', 'Buy milk'))
+
+      act(() => { result.current.pendingLinks.handleAdd(listKey) })
+      act(() => { result.current.pendingLinks.handleRemove(listKey) })
+
+      expect(useStore.getState().roots.get(listKey)?.items).toEqual([])
+    })
+
+    it('creates the list the picker was asked for and puts this entry on it', () => {
+      const { result } = renderHook(() => useEntryEditor(null, 'all', 'Buy milk'))
+
+      act(() => { result.current.handleCreateList('Shopping') })
+
+      const roots = useStore.getState().roots
+      expect(roots.get(testKey('shopping'))?.title).toBe('Shopping')
+      expect(roots.get(testKey('shopping'))?.items).toEqual(['[[buy-milk]]'])
+      // A list is a note: nothing to schedule, nothing to tick.
+      const list = useStore.getState().items.find(i => i.entryKey === testKey('shopping'))
+      expect(list?.date).toBe('')
+      expect((list?.metadata as { done?: boolean }).done).toBeUndefined()
+    })
+
+    it('links an existing entry to a list it creates, same as it links an existing one', () => {
+      const occ = makeOcc({ id: 'occ-1', entryKey: testKey('buy-milk'), metadata: { vaultId: TEST_VAULT, fileSlug: 'buy-milk', participants: [], title: 'Buy milk', tags: [], items: [] } })
+      seedStore([occ], makeRoots('buy-milk', { title: 'Buy milk' }))
+      const { result } = renderHook(() => useEntryEditor(occ))
+
+      act(() => { result.current.handleCreateList('Shopping') })
+
+      expect(useStore.getState().roots.get(testKey('shopping'))?.items).toEqual(['[[buy-milk]]'])
+    })
+  })
+
   it('a new entry whose title slugifies onto an existing file leaves that file alone', () => {
     // Reproduces the reported bug: "Buy groceries!" slugifies to `buy-groceries`,
     // the slug an unrelated entry already owns. A write is a whole-file replace,
