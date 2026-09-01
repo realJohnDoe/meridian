@@ -238,7 +238,13 @@ try {
       if (await loadEarlier.count()) {
         const before = await page.evaluate(readTopRow)
         await loadEarlier.click()
-        await page.waitForTimeout(300) // past scrollToIndex's rAF reconciliation
+        // Past both scrollToIndex's rAF reconciliation and useVirtualFlip's own
+        // 350ms glide (see calendar/useVirtualFlip.ts's DURATION): prepending a
+        // chunk changes `rows`' identity, which is exactly what that hook glides
+        // on, so the anchor row itself can still be mid-animation at 300ms — the
+        // wait this replaced, timed only against the former and not the latter.
+        // 2x the glide duration, matching the panel-transition wait below.
+        await page.waitForTimeout(700)
         const after = await page.evaluate(readTopRow)
         check(scope, '"Load earlier" must not move the row already on screen',
           before !== null && after !== null && after.key === before.key && Math.abs(after.top - before.top) <= 2,
