@@ -309,8 +309,16 @@ function monthKeyOf(day: Date): string {
   return `${day.getFullYear()}-${day.getMonth()}`
 }
 
-function monthDividerRow(day: Date, today: Date): AgendaRow {
-  return { kind: 'month', key: `m|${monthKeyOf(day)}`, dateKey: fmtISO(day), label: fmtTopBarMonth(day, today) }
+/**
+ * `keySuffix` disambiguates assembleAgendaRows' synthetic leading divider
+ * (below) from the plain in-chunk one this same function also builds for a
+ * genuine month transition. Without it the two collide on key whenever the
+ * run's mid-month start and a real transition land in the same month — see
+ * the leading-divider call site for why that collision is a real bug, not
+ * just a naming nicety.
+ */
+function monthDividerRow(day: Date, today: Date, keySuffix = ''): AgendaRow {
+  return { kind: 'month', key: `m|${monthKeyOf(day)}${keySuffix}`, dateKey: fmtISO(day), label: fmtTopBarMonth(day, today) }
 }
 
 /**
@@ -544,11 +552,21 @@ function assembleAgendaRows(
   // a week start and so essentially never a month start. The week divider
   // needs no such case: a chunk boundary *is* a week start, so the first chunk
   // emits it on its own first day.
+  //
+  // Keyed off the chunk index it opens (`|lead${first.index}`), not just the
+  // month: growing the run backward can prepend a chunk whose own walk hits
+  // this same month's true 1st-of-month boundary (see monthDividerRow's own
+  // note), at which point this placeholder is gone from the row list, not
+  // just re-dated. A bare `m|${monthKey}` key here used to collide with that
+  // later, differently-dated divider — same key, so useAnchoredAgendaScroll's
+  // exact-key match re-pinned the viewport to it believing it was the same
+  // row, and "Load earlier" clicked from the very top silently relabelled the
+  // topbar to a different month.
   const first = chunks[0]
   if (first) {
     const firstDay = chunkRange(first.index, ctx.ws).from
     if (monthKeyOf(firstDay) === monthKeyOf(addDays(firstDay, -1))) {
-      rows.push(monthDividerRow(firstDay, ctx.today))
+      rows.push(monthDividerRow(firstDay, ctx.today, `|lead${first.index}`))
     }
   }
 

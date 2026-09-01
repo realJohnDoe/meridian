@@ -241,9 +241,18 @@ export default function AgendaView({ onOpen }: Props) {
     markAgendaScrolled(scrollTarget)
   }, [scrollTarget, goToRowIndex, virtualizer, anchorAt])
 
+  // Only while the scroller sits at its very top does "Load earlier" belong
+  // on screen — otherwise, sitting above the scroll container (see
+  // AgendaLoadEarlierRow's own note), it would stay pinned in view no matter
+  // how far down the list the user has scrolled. virtualizer.scrollOffset is
+  // read directly rather than cached in state: this component already
+  // re-renders on every scroll (virtualItems above reads it fresh each time),
+  // so there's nothing to gain from a second copy.
+  const atTop = (virtualizer.scrollOffset ?? 0) <= 0
+
   return (
     <div className="flex flex-1 min-h-0 flex-col">
-      {canLoadEarlier && <AgendaLoadEarlierRow onClick={handleLoadEarlier} />}
+      {canLoadEarlier && atTop && <AgendaLoadEarlierRow onClick={handleLoadEarlier} />}
       <div className="flex-1 min-h-0 overflow-y-auto [-webkit-overflow-scrolling:touch]" ref={scRef}>
         <VirtualRows
           className="pb-24 lg:max-w-3xl lg:mx-auto"
