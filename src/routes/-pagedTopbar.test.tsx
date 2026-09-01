@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { PagedTopbar } from './-pagedTopbar'
+import { Popover } from '@/components/ui/popover'
 
 function renderTopbar(isMobile = false) {
   const onPrev = vi.fn()
@@ -131,6 +132,29 @@ describe('PagedTopbar', () => {
     )
     const toggle = screen.getByRole('button', { expanded: false })
     expect(toggle).toHaveTextContent('August')
+    fireEvent.click(toggle)
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  // popoverAnchor registers the toggle button as the desktop quick-nav
+  // Popover's positioning reference (see _app.tsx) — it must not add or
+  // replace the button's own click handling, since PopoverAnchor (unlike
+  // PopoverTrigger) carries none of its own to conflict with it.
+  it('still toggles via its own onClick when popoverAnchor wraps it in a Popover', () => {
+    const onToggle = vi.fn()
+    render(
+      <Popover>
+        <PagedTopbar
+          isMobile={false}
+          openSidebar={vi.fn()}
+          label="June 2026"
+          expanded={false}
+          onToggle={onToggle}
+          popoverAnchor
+        />
+      </Popover>,
+    )
+    const toggle = screen.getByRole('button', { expanded: false })
     fireEvent.click(toggle)
     expect(onToggle).toHaveBeenCalledTimes(1)
   })
