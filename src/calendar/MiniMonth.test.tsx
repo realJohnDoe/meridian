@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, within, fireEvent } from '@testing-library/react'
 import MiniMonth from './MiniMonth'
 import { setupStore, seedStore, makeRoots, testKey } from '@/test-utils'
 import type { StoreOcc } from '@/types'
@@ -122,5 +122,22 @@ describe('MiniMonth', () => {
 
     rerender(<Host open />)
     expect(screen.getByRole('button', { name: 'August 2026' })).toHaveAttribute('aria-current', 'date')
+  }, 20000)
+
+  // monthNav='buttons' (the desktop popover's own shape — see _app.tsx) swaps
+  // MonthStrip's chip row for the grid's own normally-hidden caption/chevrons
+  // instead — the inverse of the 'strip' default above, never both at once.
+  it("pages via the grid's own prev/next chevrons under monthNav='buttons', with no month-chip row rendered", () => {
+    const { container, onSelectDay, onBrowseMonth } = renderMini([], { monthNav: 'buttons' })
+    expect(screen.queryByRole('group', { name: 'Jump to month' })).not.toBeInTheDocument()
+    // Three panes are mounted (see PANE_COUNT), each with its own nav — only
+    // the center one (index CENTER_PANE) is interactive, so the click must
+    // target that one specifically rather than whichever "Go to the Next
+    // Month" button a plain getByRole happens to find first.
+    const centerCalendar = container.querySelectorAll<HTMLElement>('[data-slot="calendar"]')[1]
+    if (!centerCalendar) throw new Error('center pane not rendered')
+    fireEvent.click(within(centerCalendar).getByRole('button', { name: 'Go to the Next Month' }))
+    expect(onSelectDay).not.toHaveBeenCalled()
+    expect(onBrowseMonth).toHaveBeenCalledExactlyOnceWith(new Date(2026, 8, 1))
   }, 20000)
 })
