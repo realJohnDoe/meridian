@@ -15,10 +15,14 @@ interface Props {
  * Prepending a chunk changes `rows`' identity, which useAnchoredAgendaScroll
  * already reacts to — this component only has to trigger the growth, not hold
  * the scroll position steady while it happens.
+ *
+ * AgendaView only mounts this while the scroller sits at offset 0, so it
+ * reads as the top of the list rather than a bar pinned above it regardless
+ * of scroll position — no border of its own separating it from the row below.
  */
 function AgendaLoadEarlierRow({ onClick }: Props) {
   return (
-    <div className="flex shrink-0 justify-center border-b bg-background py-1.5">
+    <div className="flex shrink-0 justify-center bg-background py-1.5">
       <Button type="button" variant="outline" size="sm" onClick={onClick}>
         Load earlier
       </Button>
