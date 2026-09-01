@@ -6,7 +6,7 @@ export { default as BacklogView } from './BacklogView'
 export { default as NotesView } from './NotesView'
 export { sortOccs, isDimmed, priorityRank, doneKindOrder } from './occSort'
 export { NO_PARTICIPANT, hideParticipants, hideVaults } from './useCalendarFilter'
-export { weekStartFor } from './weekRange'
+export { weekStartFor, firstWeekStartInMonth } from './weekRange'
 export {
   resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useWeekPreview, useAgendaTopDate, requestScrollToToday,
   requestScrollToDate, useCurrentDate, setCurrentDate, setCurrentMonthKeepingDay, setCurrentWeekKeepingWeekday,
