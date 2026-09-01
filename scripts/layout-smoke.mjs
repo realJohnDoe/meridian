@@ -152,6 +152,22 @@ function readAgenda() {
 }
 
 /**
+ * Incremental loading: the topmost on-screen row's identity and position,
+ * keyed by the same `data-flip-key` useVirtualFlip/getItemKey use — what a
+ * prepend teleport would move. jsdom has no layout engine, so this is the one
+ * place that can actually see it.
+ */
+function readTopRow() {
+  const rows = [...document.querySelectorAll('[data-flip-key]')]
+  const onScreen = rows
+    .map(r => ({ el: r, rect: r.getBoundingClientRect() }))
+    .filter(({ rect }) => rect.bottom > 0 && rect.top < window.innerHeight)
+    .sort((a, b) => a.rect.top - b.rect.top)
+  const top = onScreen[0]
+  return top ? { key: top.el.getAttribute('data-flip-key'), top: Math.round(top.rect.top) } : null
+}
+
+/**
  * The flow routes are the opposite invariant: the document must be *able* to
  * grow past the viewport, which is what lets the browser lift a focused input
  * above the on-screen keyboard without any visualViewport arithmetic. Tested
@@ -210,6 +226,24 @@ try {
       check(scope, 'the agenda must own a scrollable element', a.scroller !== null && a.scroller.scrollH > a.scroller.clientH,
         a.scroller ? `scrollHeight=${a.scroller.scrollH} clientHeight=${a.scroller.clientH}` : 'no scroll container found')
       check(scope, 'agenda rows must be visible', a.onScreenRows > 0, `${a.mountedRows} mounted, none on screen`)
+
+      // Incremental loading: pressing "Load earlier" prepends a chunk above
+      // whatever is on screen. The existing scroll-anchoring machinery is
+      // supposed to hold the same row in place with no visible jump — src/
+      // unit tests cover the mechanism (computeAgendaScrollRestore.test.ts,
+      // AgendaView.test.tsx) against jsdom's estimated row heights, but jsdom
+      // has no layout engine, so whether it actually looks stable in a real
+      // browser is checked here.
+      const loadEarlier = page.getByText('Load earlier', { exact: true })
+      if (await loadEarlier.count()) {
+        const before = await page.evaluate(readTopRow)
+        await loadEarlier.click()
+        await page.waitForTimeout(300) // past scrollToIndex's rAF reconciliation
+        const after = await page.evaluate(readTopRow)
+        check(scope, '"Load earlier" must not move the row already on screen',
+          before !== null && after !== null && after.key === before.key && Math.abs(after.top - before.top) <= 2,
+          `before=${JSON.stringify(before)} after=${JSON.stringify(after)}`)
+      }
 
       // The quick-nav panel (CLAUDE.md's month-label disclosure) grows the
       // topbar chrome block in place via a grid-template-rows transition —

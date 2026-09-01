@@ -4,7 +4,7 @@ import { addDays } from 'date-fns'
 import { renderHook } from '@testing-library/react'
 import type { Occurrence } from '@/types'
 import { makeOcc, makeRoots, setupStore, testKey, TEST_VAULT } from '@/test-utils'
-import { agendaChunkRun } from './agendaChunks'
+import { agendaChunkRun, chunkIndexFor } from './agendaChunks'
 import { useAgendaChunks } from './useAgendaChunks'
 import type { AgendaChunkOccs } from './agendaSections'
 
@@ -12,6 +12,16 @@ setupStore()
 
 /** Every occurrence in the run, ignoring which chunk it came out of. */
 const flatten = (run: AgendaChunkOccs[]): Occurrence[] => run.flatMap(c => c.occs)
+
+/** The run of chunk indices `radius` chunks out on each side of `anchor` — a
+ * stand-in for whatever `calendar/viewState.ts`'s loaded-run state hands
+ * `agendaChunkRun` in production; these tests only care that `useAgendaChunks`
+ * reuses/evicts chunks correctly for a given index list, not how that list
+ * was arrived at. */
+function runAround(anchor: Date, ws: 0 | 1 | 6, radius = 2): number[] {
+  const c = chunkIndexFor(anchor, ws)
+  return agendaChunkRun({ first: c - radius, last: c + radius })
+}
 
 describe('useAgendaChunks', () => {
   it('reuses every chunk that still overlaps after the window shifts, e.g. a jump in from Month/Day view', () => {
@@ -27,7 +37,7 @@ describe('useAgendaChunks', () => {
 
     const { result, rerender } = renderHook(
       ({ indices }: { indices: number[] }) => useAgendaChunks(items, roots, indices, ws),
-      { initialProps: { indices: agendaChunkRun(anchor1, ws) } },
+      { initialProps: { indices: runAround(anchor1, ws) } },
     )
     const occBefore = flatten(result.current).find(o => o.id === 'stays-in-both-windows')
     expect(occBefore).toBeDefined()
@@ -37,7 +47,7 @@ describe('useAgendaChunks', () => {
     // cache (useExpandWithMultiday) would treat this as a full miss and
     // re-expand the whole span from scratch.
     const anchor2 = addDays(anchor1, 28)
-    rerender({ indices: agendaChunkRun(anchor2, ws) })
+    rerender({ indices: runAround(anchor2, ws) })
     const occAfter = flatten(result.current).find(o => o.id === 'stays-in-both-windows')
 
     // Reference-identical, not just value-equal: this occurrence's chunk was
@@ -54,12 +64,12 @@ describe('useAgendaChunks', () => {
 
     const { result, rerender } = renderHook(
       ({ indices }: { indices: number[] }) => useAgendaChunks(items, roots, indices, ws),
-      { initialProps: { indices: agendaChunkRun(anchor, ws) } },
+      { initialProps: { indices: runAround(anchor, ws) } },
     )
     const first = result.current
     // Same items/roots identity, same chunk indices in a fresh array — an
     // unrelated re-render, not a data change.
-    rerender({ indices: agendaChunkRun(anchor, ws) })
+    rerender({ indices: runAround(anchor, ws) })
 
     expect(result.current).toBe(first)
   })
@@ -73,7 +83,9 @@ describe('useAgendaChunks', () => {
       makeOcc({ id: 'late', date: '2026-06-15', time: '09:00', entryKey: testKey('note.md') }),
     ]
 
-    const { result } = renderHook(() => useAgendaChunks(items, roots, agendaChunkRun(anchor, ws), ws))
+    // 2026-01-05 is ~160 days before the anchor — well past the default
+    // radius, so widen the run to cover both occurrences' chunks.
+    const { result } = renderHook(() => useAgendaChunks(items, roots, runAround(anchor, ws, 7), ws))
 
     const holders = result.current.filter(c => c.occs.length > 0)
     expect(holders.map(c => c.occs.map(o => o.id))).toEqual([['early'], ['late']])

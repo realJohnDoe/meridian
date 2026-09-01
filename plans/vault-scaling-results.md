@@ -23,31 +23,6 @@ generator is dev-only), so the pipeline numbers are close to production but the
 UI numbers carry dev-React overhead — read them as a curve and as a
 before/after comparison, not as shipped latency.
 
-## The planned move to infinite scroll
-
-**The implementation plan is `plans/agenda-infinite-scroll.md`** — what is left
-of it is one PR, and it carries the one design decision this section does not
-settle (no auto-prepend in v1).
-
-A move to a standard infinite-scroll agenda is planned. It changes what to do
-about two of these findings and nothing about the other four.
-
-Most of the groundwork has already landed. The overdue section came off the
-agenda window entirely (`calendar/overduePool.ts` expands a filtered item set
-over its own lookback) and renders one row per series rather than one per
-occurrence, so the constraint that used to hold the past window at 365 days is
-gone. Both the expansion and the sectioning are now chunked on one absolute
-28-day grid (`calendar/agendaChunks.ts`), so growing or shrinking the loaded
-run costs the chunks that changed rather than all of them — which is what makes
-narrowing the initial run a small change rather than a rewrite.
-
-| # | Under infinite scroll |
-|---|---|
-| 1 | **Fold into that work, do not fix separately.** #1's fix *is* incremental expansion, and the product decision it was blocked on is now made. |
-| 4 | **Defer and re-measure after.** Row count at first paint drops from 185 882 to whatever one screen plus a chunk needs, so the symptom may go with it; profiling the current architecture measures code about to be replaced. |
-| 2, 5, 6 | Unaffected — none of them touches the agenda window. |
-| 3 | Still valid, but its character changes: the array it re-allocates starts smaller and **grows as the user scrolls**, so the cost arrives later in the session rather than at first paint. |
-
 ## Findings
 
 Ranked by `(impact × breadth) ÷ effort`. `#` is a stable identity, not a
@@ -58,75 +33,12 @@ priority — the numbers do not move as findings get closed out.
 | 2 | 2 | `fileOccurrenceMap` expands ±3 years to pick one occurrence per file | 8 | 2 | **Sonnet 5** (window narrowing); Opus 5 for the lazy variant |
 | 3 | 6 | `applyRemoteBatch` writes 30 000 rows in one transaction (21 s) | 6 | 1 | **Sonnet 5** |
 | 4 | 5 | `parseFiles` is a synchronous loop on the first-paint path | 5 | 2 | **Sonnet 5** |
-| 5 | 1 | The agenda expands its whole ±455-day window before first paint | 9 | 3 | **Opus 5**, folded into the infinite-scroll work |
-| 6 | 4 | Scroll cost grows with row count although mounted rows stay constant | 7 | 2 | **Opus 5**, deferred until after infinite scroll |
+| 6 | 4 | Scroll cost grows with vault size although mounted rows stay constant | 7 | 2 | Unverified; needs a fresh profile — see below |
 
-Four of the six are Sonnet-5 work as written — each carries a **Task context**
-block naming the constant to change, the invariant that must survive, and the
-tests that guard it. Strip those blocks and most revert to Opus 5. The two
-Opus rows are the ones the infinite-scroll change owns; see the section above.
-#1 outranks everything on impact and is listed fifth for that reason alone —
-it is not lower-value, it is not separately actionable.
-
----
-
-### 1. The agenda expands its whole ±455-day window before first paint
-
-- **Flows** — cold start (every launch), every agenda↔month↔day switch.
-- **Category** — `critical-path-work`, `data-and-persistence`
-- **Impact** — 9
-- **Baseline** — `computeExpansionCache` over the agenda window: 47 ms at
-  300 files, 389 ms at 3 000, 1 721 ms at 10 000, 7 110 ms at 30 000,
-  34 750 ms at 100 000 (mixed). The same call on flat/30 000 is 72 ms, so this
-  is occurrence-bound, not file-bound. It is the largest single contributor to
-  `vaultPaintMs` (13 007 ms at mixed/30 000).
-- **Measurement recipe** —
-  `node scripts/perf/stress.mjs --shapes mixed,flat --sizes 3000,30000 --skip-ui --skip-dexie`;
-  read `pipeline.result.expandAgendaWindow.median` and
-  `pipeline.result.occurrencesInAgendaWindow`.
-- **Breadth** — `calendar/agendaChunks.ts`, `calendar/useAgendaChunks.ts`,
-  `model/expansionCache.ts` (plus month/day, which have their own windows).
-- **Evidence** — `src/calendar/agendaChunks.ts`:
-  ```ts
-  export const EXPAND_PAST_DAYS = 365
-  export const EXPAND_FUTURE_DAYS = 90
-  ...
-  export function agendaChunkRun(anchor: Date, ws: 0 | 1 | 6): number[] {
-    return chunkIndicesFor(addDays(anchor, -EXPAND_PAST_DAYS), addDays(anchor, EXPAND_FUTURE_DAYS), ws)
-  }
-  ```
-  Expansion and sectioning are both chunked now, so a load-more costs one
-  chunk — but the *run* is still seeded at the full ±455 days on the first
-  render, so first paint pays for all of it.
-- **Problem** — the window is a constant, so the work to reach first paint is
-  proportional to every occurrence in 455 days regardless of how many the user
-  can see; the virtualizer then mounts ~26 rows out of 185 882. The user waits
-  13 s to look at one screenful.
-- **Fix** — expand a window around the anchor (say ±30 days) for first paint
-  and widen it incrementally as the virtualizer approaches an edge. (The
-  overdue pool, which was the one thing genuinely needing the full past window,
-  no longer draws on this window at all — see `calendar/overduePool.ts`.)
-  Expected
-  effect: `vaultPaintMs` at mixed/30 000 from ~13 000 ms to under 1 000 ms,
-  with `expandAgendaWindow` dropping roughly in proportion to the narrower
-  window (455 days → 60 days ≈ 7.5×).
-- **Recommended model** — **Opus 5, as part of the infinite-scroll work, not
-  as a standalone fix.** This finding *is* the case for incremental expansion,
-  so implementing it separately would build a windowing scheme that the
-  infinite-scroll change then replaces. What was blocking it — whether the
-  agenda stays scroll-anywhere or gains a load-more edge — is a product
-  decision that the move to infinite scroll settles.
-- **Task context** — the two constraints that still shape the design are
-  written up under "The planned move to infinite scroll" above: the
-  exact-window gate in `computeExpansionCache`, and `changedIndices` returning
-  `null` on any length change. The third — the overdue section's need for the
-  whole past window — is closed: the section is grouped one row per series and
-  expands its own filtered item set, and `buildBucket` no longer hoists undone
-  tasks out of their day. The sequenced plan for the rest is
-  `plans/agenda-infinite-scroll.md`; this finding closes
-  with that plan's PR 4. Treat this finding's expected
-  effect (`vaultPaintMs` at mixed/30 000 from ~13 000 ms to under 1 000 ms) as
-  the acceptance target for that work, measured with the recipe above.
+Three of the four are Sonnet-5 work as written — each carries a **Task
+context** block naming the constant to change, the invariant that must
+survive, and the tests that guard it. Strip those blocks and most revert to
+Opus 5.
 
 ---
 
@@ -140,8 +52,9 @@ it is not lower-value, it is not separately actionable.
   10 448 ms at 30 000, 62 701 ms at 100 000 (mixed); 65 ms at flat/30 000. It
   is the single largest heap consumer: +504 MB over baseline at mixed/30 000,
   where the agenda's own expansion accounts for +269 MB.
-- **Measurement recipe** — as #1; read
-  `pipeline.result.fileOccurrenceMap.cold` and `pipeline.result.heapMB`.
+- **Measurement recipe** —
+  `node scripts/perf/stress.mjs --shapes mixed,flat --sizes 3000,30000 --skip-ui --skip-dexie`;
+  read `pipeline.result.fileOccurrenceMap.cold` and `pipeline.result.heapMB`.
 - **Breadth** — `src/fileOccurrence.ts` and its two consumers
   (`hooks/useFileOccurrenceMap.ts`, `search/FileResultsList.tsx`).
 - **Evidence** — `src/fileOccurrence.ts`:
@@ -195,38 +108,39 @@ it is not lower-value, it is not separately actionable.
 
 ---
 
-### 4. Scroll cost grows with row count although mounted rows stay constant
+### 4. Scroll cost grows with vault size although mounted rows stay constant
 
 - **Flows** — scrolling the agenda (continuous).
 - **Category** — `render-amplification`, `perceived-latency`
 - **Impact** — 7
-- **Baseline** — p50 frame interval while scrolling 30 × 900 px: 33.4 ms at
-  300 files, 33.3 ms at 3 000, 83.3 ms at 10 000, 200 ms at 30 000, 466.7 ms at
-  60 000; janky frames (>50 ms) 2 → 8 → 27 → 30 → 30 out of 30. Mounted rows
-  stay at ~26 and DOM node count between 1 400 and 2 900 with no trend in
-  vault size, so this is not row mounting. flat/30 000 holds 83.2 ms p95 with 6 janky frames.
+- **Baseline (remeasured after the agenda moved to incremental loading)** —
+  p50 frame interval while scrolling 30 × 900 px: 49.9 ms at mixed/3 000,
+  133.3 ms at mixed/30 000 (worst 66.7 / 183.3 ms; janky frames 10/30 →
+  30/30). Both smaller in absolute terms and a flatter curve than the old
+  fixed-window baseline (33.4 → 200 ms, a 6× jump for the same 10× file-count
+  move; now 2.7×) — but not gone. Mounted rows hold at 26 for both sizes,
+  confirming (again, on the new architecture) that this is not row mounting.
 - **Measurement recipe** — `node scripts/perf/stress.mjs --sizes 3000,30000`;
   read `ui.scroll` and `ui.mountedRows`.
 - **Breadth** — `calendar/AgendaView.tsx`, `calendar/useVirtualFlip.ts`,
   `calendar/computeAgendaScrollRestore.ts` (candidates, not confirmed).
-- **Problem** — something per-scroll-event is proportional to the 185 882-row
-  list rather than to the ~26 rows on screen. The user drags and the list moves
-  at ~5 fps.
-- **Fix** — **unverified; needs a profile before a fix.** The prime suspects
-  are TanStack Virtual's measurement array over the full row count and
-  `AgendaView`'s own scroll listener (the component carries `'use no memo'`, so
-  the compiler is not memoizing around it). Attach a Chrome performance profile
-  during the harness's scroll flow at mixed/30 000 and attribute the frame time
-  before proposing anything.
-- **Recommended model** — **Opus 5, but not yet.** Hold this until the
-  infinite-scroll change lands, then re-run the recipe above. Row count at
-  first paint drops from 185 882 to one chunk's worth, so the symptom may go
-  with it; and profiling now attributes frame time in code that is about to be
-  replaced. If it survives the change, the profile is the first step and the
-  finding gets rewritten around what it shows — at which point a named cause
-  may well be Sonnet-able.
-- **Why it is listed anyway** — it is the second-worst measured flow, and
-  ruling out the virtualizer is itself worth the finding.
+- **Problem** — the *loaded* row list is now a handful of chunks, not the old
+  185 882-row window, and the 30-scroll flow only ever widens it by a few more
+  — so it is no longer plausible that something is proportional to the full
+  window the way it was. Something per-scroll-event is still proportional to
+  vault size regardless, just at a smaller constant. `items`/`roots` — the
+  whole vault's flat arrays, read by every store-subscribed component on every
+  render, agenda or not — are the prime remaining suspect now that the
+  agenda's own row list is bounded.
+- **Fix** — **unverified; needs a profile before a fix.** Attach a Chrome
+  performance profile during the harness's scroll flow at mixed/30 000 and
+  attribute the frame time before proposing anything — the suspects above are
+  candidates, not a diagnosis.
+- **Recommended model** — **Opus 5.** The profile is the first step; if it
+  points at a single named cause the fix itself may well be Sonnet-able.
+- **Why it is listed anyway** — it is still a measurably bad flow at scale
+  (133 ms p50, every frame janky), and ruling out the virtualizer a second
+  time — on the architecture that actually ships — is itself worth doing.
 
 ---
 
@@ -238,7 +152,9 @@ it is not lower-value, it is not separately actionable.
 - **Baseline** — 23.5 ms at 300 files, 155.8 ms at 3 000, 609.5 ms at 10 000,
   1 987 ms at 30 000, 5 061 ms at 100 000. Essentially identical in both shapes
   (1 467 ms at flat/30 000), confirming it as the one large *file*-linear cost.
-- **Measurement recipe** — as #1; read `pipeline.result.parse.median`.
+- **Measurement recipe** —
+  `node scripts/perf/stress.mjs --shapes mixed,flat --sizes 3000,30000 --skip-ui --skip-dexie`;
+  read `pipeline.result.parse.median`.
 - **Breadth** — `src/storage/parseReport.ts`, `src/storage/vaultRegistry.ts`.
 - **Evidence** — `src/storage/parseReport.ts`:
   ```ts
@@ -253,8 +169,7 @@ it is not lower-value, it is not separately actionable.
 - **Fix** — parse in idle batches like the audit already does, writing the
   layer incrementally (or once, after the first batch, then again at the end)
   so the agenda paints against a partial vault and fills in. Expected effect:
-  removes ~2 s from `vaultPaintMs` at 30 000 files; on its own it does not fix
-  #1, which is the larger half.
+  removes ~2 s from `vaultPaintMs` at 30 000 files.
 - **Recommended model** — **Sonnet 5**, given the context block below and the
   constraint that only the parse is batched.
 - **Hazard that sets the tier** — a partially-populated layer is visible to

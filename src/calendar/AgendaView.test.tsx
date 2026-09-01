@@ -7,6 +7,7 @@ import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 import { useStore } from '@/store'
 import { calendarView, resetCalendarOnVaultChange, requestScrollToToday } from './viewState'
+import { chunkIndexFor } from './agendaChunks'
 import type { Occurrence } from '@/types'
 
 setupStore()
@@ -17,16 +18,41 @@ setupStore()
  */
 const collapseOverdue = () => { calendarView.setState({ overdueCollapsed: true }) }
 
+/**
+ * A loaded-run seed wide enough to cover every fixture in this file (the
+ * 500-occurrence overdue stress test back to -300 days, upcoming() out to
+ * +79, pastEvents()/overdue() back to -121) regardless of the runtime's
+ * locale week-start — most of these tests are about virtualization and
+ * scroll-anchoring, predating incremental loading, and would otherwise need
+ * to reason about exactly which chunks the small real first-paint seed
+ * loads. Tests about the loaded run itself reset `agendaLoadedChunks` back to
+ * null before rendering, to get the real seed.
+ */
+function wideLoadedRange(anchor: Date): { first: number; last: number } {
+  const past = addDays(anchor, -400)
+  const future = addDays(anchor, 300)
+  const wsValues = [0, 1, 6] as const
+  return {
+    first: Math.min(...wsValues.map(ws => chunkIndexFor(past, ws))) - 1,
+    last: Math.max(...wsValues.map(ws => chunkIndexFor(future, ws))) + 1,
+  }
+}
+
 // The agenda's scroll offset/target and its cached row grouping are
 // module-level state (see viewState.ts, useAgendaSections.ts), not reset by
 // render() alone. Without clearing them, a later test can inherit an earlier
 // test's post-scroll agendaScrollOffset (scrollTarget cleared to null on the
 // first scroll) instead of getting its own fresh scroll-to-today — harmless
-// with the old, tiny per-test row lists, but the agenda's row list always
-// spans the full ~455-day window now, so landing on a carried-over offset
-// lands nowhere near the row this test actually seeded.
+// with the old, tiny per-test row lists, but the agenda's row list used to
+// span the full ~455-day window regardless, so landing on a carried-over
+// offset would land nowhere near the row this test actually seeded. Now that
+// first paint only loads three chunks (see viewState.ts's
+// agendaLoadedChunks), this file also seeds a wide loaded run by default —
+// see wideLoadedRange above — so the rest of it can keep reasoning about a
+// single, full row list the way it did before PR 4.
 beforeEach(() => {
   resetCalendarOnVaultChange()
+  calendarView.setState({ agendaLoadedChunks: wideLoadedRange(new Date()) })
 })
 
 // @tanstack/react-virtual measures the scroll element once via offsetWidth/
@@ -545,6 +571,7 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     await scrollDownBy(1200)
     expect(calendarView.getState().agendaScrollTarget).toBeNull()
 
+    const loadedBefore = calendarView.getState().agendaLoadedChunks
     // The Today button, pressed while the agenda is already mounted.
     await act(async () => { requestScrollToToday(); await Promise.resolve() })
     await settle()
@@ -553,5 +580,115 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     // hold the old position against an explicit request.
     expect(calendarView.getState().agendaScrollTarget).toBeNull()
     expect(calendarView.getState().agendaTopDate).toBe(fmtISO(today))
+    // The loaded run re-seeds around the new anchor rather than keeping the
+    // wide run this file's beforeEach primed it with (requestScrollToDate
+    // clears agendaLoadedChunks back to null; see viewState.ts).
+    expect(calendarView.getState().agendaLoadedChunks).not.toEqual(loadedBefore)
+  })
+})
+
+/**
+ * Incremental loading: first paint seeds only three chunks around the
+ * anchor, forward scrolling widens the run a chunk at a time, and
+ * "Load earlier" widens it backward on demand. Unlike every test above,
+ * these reset `agendaLoadedChunks` back to null before rendering — this
+ * file's beforeEach otherwise primes a wide run (see wideLoadedRange)
+ * precisely so those tests don't have to reason about it.
+ */
+describe('AgendaView — incremental loading', () => {
+  const todayTask = () => makeOcc({ id: 'today-1', date: fmtISO(today), time: '09:00' })
+  // Dense enough (about a occurrence every other day, both directions) that
+  // the initial three-chunk seed already fills more than a screenful — so the
+  // mount effect's own "keep loading until full" pass (see AgendaView's
+  // maybeGrowForward) has nothing to do, and the chunk count stays exactly
+  // three. A sparser fixture would make this test assert against that pass
+  // instead of against first paint.
+  const upcoming = () => Array.from({ length: 40 }, (_, i) => makeOcc({
+    id: `up-${i}`, date: fmtISO(addDays(today, 1 + i * 2)), time: '14:00', entryKey: testKey('note.md'),
+    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Upcoming ${i}`, tags: [], items: [] },
+  }))
+  const pastEvents = (n: number) => Array.from({ length: n }, (_, i) => makeOcc({
+    id: `past-${i}`, date: fmtISO(addDays(today, -(1 + i * 2))), time: '10:00', entryKey: testKey('note.md'),
+    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Past ${i}`, tags: [], items: [] },
+  }))
+
+  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) })
+  afterEach(() => { vi.useRealTimers() })
+
+  const settle = async () => {
+    await act(async () => { vi.advanceTimersByTime(300); await Promise.resolve() })
+  }
+  const scrollDownBy = async (px: number) => {
+    await act(async () => { scrollContainer().scrollTop += px; await Promise.resolve() })
+    await settle()
+  }
+  const flush = async () => {
+    await act(async () => { await Promise.resolve() })
+  }
+
+  it('loads just three chunks at first paint, not the whole loadable span', async () => {
+    calendarView.setState({ agendaLoadedChunks: null })
+    seedStore([todayTask(), ...upcoming(), ...pastEvents(200)], makeRoots('note.md'))
+
+    render(<AgendaView onOpen={vi.fn()} />)
+    await flush()
+
+    const loaded = calendarView.getState().agendaLoadedChunks
+    expect(loaded).not.toBeNull()
+    expect(loaded!.last - loaded!.first + 1).toBe(3)
+    // Well outside the three-chunk seed (-399 days) — never loaded, so it can
+    // never appear no matter how far the test scrolled, which it hasn't.
+    expect(screen.queryByText('Past 199')).not.toBeInTheDocument()
+  })
+
+  it('widens the loaded run forward as the user scrolls near the end, with no extra scroll jump from the growth itself', async () => {
+    calendarView.setState({ agendaLoadedChunks: null })
+    seedStore([todayTask(), ...upcoming()], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await flush()
+
+    const before = calendarView.getState().agendaLoadedChunks!
+    expect(before).not.toBeNull()
+
+    await scrollDownBy(2000)
+    const settledOffset = scrollContainer().scrollTop
+
+    const after = calendarView.getState().agendaLoadedChunks!
+    expect(after.last).toBeGreaterThan(before.last)
+    expect(after.first).toBe(before.first)
+
+    // One more settle pass with no further user action: if appending the new
+    // chunk's rows had disturbed the scroll position, useAnchoredAgendaScroll
+    // would correct it here, moving scrollTop again on its own. It doesn't —
+    // appending below the viewport leaves the anchor's index unchanged (see
+    // computeAgendaScrollRestore.ts's own note on this).
+    await settle()
+    expect(scrollContainer().scrollTop).toBe(settledOffset)
+  })
+
+  it('"Load earlier" widens the loaded run backward and holds the visible day, needing no scroll-compensation code of its own', async () => {
+    calendarView.setState({ agendaLoadedChunks: null })
+    seedStore([todayTask(), ...upcoming()], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await flush()
+
+    const before = calendarView.getState().agendaLoadedChunks!
+    const topBefore = calendarView.getState().agendaTopDate
+    const offsetBefore = scrollContainer().scrollTop
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Load earlier'))
+      await Promise.resolve()
+    })
+    await settle()
+
+    const after = calendarView.getState().agendaLoadedChunks!
+    expect(after.first).toBe(before.first - 1)
+    expect(after.last).toBe(before.last)
+    // The same day is still on screen — the existing anchoring machinery
+    // (built for a sync landing rows above the viewport) holds it, adjusting
+    // the offset to compensate for what was just prepended.
+    expect(calendarView.getState().agendaTopDate).toBe(topBefore)
+    expect(scrollContainer().scrollTop).toBeGreaterThan(offsetBefore)
   })
 })

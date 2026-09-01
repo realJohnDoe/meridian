@@ -3,7 +3,7 @@ import { weekStartsOn } from '@/model'
 import { agendaChunkRun } from './agendaChunks'
 import { useAgendaChunks } from './useAgendaChunks'
 import { useCalendarFilter } from './useCalendarFilter'
-import { useOverdueCollapsed } from './viewState'
+import { useOverdueCollapsed, useAgendaLoadedRun } from './viewState'
 import {
   computeAgendaSections,
   type AgendaRow,
@@ -31,7 +31,9 @@ export { estimateRow, type AgendaRow } from './agendaSections'
  *
  * Both stages are chunked on the same absolute grid, which is what makes a
  * change cost work proportional to the chunks it touched rather than to the
- * whole window — and what will make an incremental load-more O(one chunk).
+ * whole loaded run — including the incremental load-more itself (AgendaView's
+ * scroll-driven growth and its "Load earlier" control, see viewState.ts's
+ * useAgendaLoadedRun), which costs exactly the one chunk it adds.
  *
  * Sections remain the *cache* unit inside a chunk — that's what makes a single
  * toggle rebuild one day instead of one chunk — but they aren't what
@@ -79,10 +81,14 @@ export function useAgendaSections(
   const roots = useStore(s => s.roots)
   const ws = weekStartsOn(useStore(s => s.localePrefs))
 
-  // One run of chunk indices, expanded and walked: the sectioning stage walks
-  // exactly the chunks handed to it, so the old "the expansion window must
-  // cover the render walk" relationship can't be got wrong any more.
-  const chunkOccs = useAgendaChunks(items, roots, agendaChunkRun(anchor, ws), ws)
+  // The loaded run: a small seed around `anchor` at first, then whatever
+  // AgendaView's scroll/"Load earlier" growth has widened it to (see
+  // viewState.ts's useAgendaLoadedRun). One run of chunk indices, expanded and
+  // walked: the sectioning stage walks exactly the chunks handed to it, so
+  // the old "the expansion window must cover the render walk" relationship
+  // can't be got wrong any more.
+  const loadedRun = useAgendaLoadedRun(anchor, ws)
+  const chunkOccs = useAgendaChunks(items, roots, agendaChunkRun(loadedRun), ws)
   const { filterOccs, filterKey } = useCalendarFilter()
   const overdueCollapsed = useOverdueCollapsed()
 

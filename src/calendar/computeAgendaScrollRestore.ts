@@ -70,9 +70,24 @@ export function computeAgendaScrollRestore(scrollToToday: boolean, rows: AgendaR
   return {
     initialOffset: scrollToToday
       ? offsetOfRow(rows, goToRowIndex, agendaScrollMeasurements)
-      : agendaScrollOffset,
+      // Clamped to what the measurement snapshot itself covers: the loaded
+      // run agendaScrollOffset was saved against can, in principle, no longer
+      // be the one restoring — an offset past the end of what was ever
+      // measured would seed the virtualizer beyond the list. Cheap because it
+      // reads the snapshot the caller already has rather than summing `rows`,
+      // which under incremental loading can be far larger than what was ever
+      // actually rendered.
+      : Math.min(agendaScrollOffset, measuredExtent(agendaScrollMeasurements)),
     initialMeasurementsCache: agendaScrollMeasurements,
   }
+}
+
+/** The furthest `end` any row in the snapshot reached, or `Infinity` when
+ * nothing was ever measured (nothing to clamp against). */
+function measuredExtent(snapshot: VirtualItem[]): number {
+  let max = 0
+  for (const m of snapshot) if (m.end > max) max = m.end
+  return snapshot.length > 0 ? max : Infinity
 }
 
 /**

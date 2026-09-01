@@ -6,7 +6,7 @@ import {
   computeAgendaSections, estimateRow,
   type AgendaChunkOccs, type AgendaSectionCache, type Section, type FilterOccs, type AgendaRow,
 } from './agendaSections'
-import { agendaChunkRun, chunkIndexFor, chunkRange } from './agendaChunks'
+import { agendaChunkRun, chunkIndexFor, chunkRange, chunkIndicesFor, EXPAND_PAST_DAYS, EXPAND_FUTURE_DAYS } from './agendaChunks'
 import { weekStartFor } from './weekRange'
 import { sortOccs } from './occSort'
 import type { OverdueGroup } from './overduePool'
@@ -16,6 +16,20 @@ const TODAY = new Date(2026, 5, 15) // a Monday
 const NOW = new Date(2026, 5, 15, 9, 0)
 
 const noFilter: FilterOccs = occs => occs
+
+/**
+ * The run these tests default to when a span doesn't specify its own — the
+ * old fixed [anchor-EXPAND_PAST_DAYS, anchor+EXPAND_FUTURE_DAYS] window,
+ * reproduced locally rather than via `agendaChunkRun` (which now just turns
+ * an already-decided `{first, last}` range into an index list; the loaded
+ * run itself is session-scoped state owned by `calendar/viewState.ts`). What
+ * this file actually tests, `computeAgendaSections`, takes `chunkOccs`
+ * directly and has never cared how the run was decided — a wide run is simply
+ * the one that best exercises the chunk-boundary invariants below.
+ */
+function testRun(anchor: Date, ws: 0 | 1 | 6): number[] {
+  return chunkIndicesFor(addDays(anchor, -EXPAND_PAST_DAYS), addDays(anchor, EXPAND_FUTURE_DAYS), ws)
+}
 
 // The overdue block is no longer derived from the agenda's occurrences — it
 // arrives as a ready-made group list from overduePool.ts (tested in
@@ -49,14 +63,15 @@ function keyOf(filter: FilterOccs): string {
  * if an unchanged input arrives as an unchanged array.
  */
 const chunkMemo = new WeakMap<Occurrence[], Map<string, AgendaChunkOccs[]>>()
-function chunksOf(occs: Occurrence[], anchor: Date, ws: 0 | 1 | 6 = 1): AgendaChunkOccs[] {
+function chunksOf(occs: Occurrence[], anchor: Date, ws: 0 | 1 | 6 = 1, range?: number[]): AgendaChunkOccs[] {
   let byWindow = chunkMemo.get(occs)
   if (!byWindow) { byWindow = new Map(); chunkMemo.set(occs, byWindow) }
-  const memoKey = `${anchor.getTime()}|${ws}`
+  const indices = range ?? testRun(anchor, ws)
+  const memoKey = `${anchor.getTime()}|${ws}|${indices.join(',')}`
   const cached = byWindow.get(memoKey)
   if (cached) return cached
 
-  const run = agendaChunkRun(anchor, ws).map(index => {
+  const run = indices.map(index => {
     const { from, to } = chunkRange(index, ws)
     return {
       index,
@@ -70,7 +85,8 @@ function chunksOf(occs: Occurrence[], anchor: Date, ws: 0 | 1 | 6 = 1): AgendaCh
   return run
 }
 
-/** computeAgendaSections with the chunking plumbing filled in from a flat list. */
+/** computeAgendaSections with the chunking plumbing filled in from a flat list.
+ * `range` overrides the default (old, full-window-sized) run — see spans below. */
 function compute(
   prev: AgendaSectionCache | null,
   occs: Occurrence[],
@@ -81,15 +97,16 @@ function compute(
   anchor: Date = today,
   overdueCollapsed = false,
   ws: 0 | 1 | 6 = 1,
+  range?: number[],
 ): AgendaSectionCache {
   return computeAgendaSections(
-    prev, chunksOf(occs, anchor, ws), groups, today, now, filter, keyOf(filter), anchor, overdueCollapsed, ws,
+    prev, chunksOf(occs, anchor, ws, range), groups, today, now, filter, keyOf(filter), anchor, overdueCollapsed, ws,
   )
 }
 
 /** The inclusive first/last day of the run `compute` walks for `anchor`. */
-function runDays(anchor: Date, ws: 0 | 1 | 6 = 1): Date[] {
-  const indices = agendaChunkRun(anchor, ws)
+function runDays(anchor: Date, ws: 0 | 1 | 6 = 1, range?: number[]): Date[] {
+  const indices = range ?? testRun(anchor, ws)
   const from = chunkRange(indices[0]!, ws).from
   const days: Date[] = []
   for (let i = 0; i < indices.length * 28; i++) days.push(addDays(from, i))
@@ -115,8 +132,9 @@ function singlePassRowKeys(
   anchor: Date = today,
   overdueCollapsed = false,
   ws: 0 | 1 | 6 = 1,
+  range?: number[],
 ): string[] {
-  const days = runDays(anchor, ws)
+  const days = runDays(anchor, ws, range)
   const from = days[0]!, to = days[days.length - 1]!
   const todayKey = fmtISO(today)
   const anchorKey = fmtISO(anchor)
@@ -461,7 +479,7 @@ describe('computeAgendaSections — chunk-local sectioning', () => {
   // — a divider emitted twice, a divider not emitted at all because the chunk
   // couldn't see its predecessor, a day's rows landing in the wrong order
   // around the overdue splice — shows up here as a diverging key list.
-  const spans: [string, { anchor: Date; occs: Occurrence[]; groups: OverdueGroup[] }][] = [
+  const spans: [string, { anchor: Date; occs: Occurrence[]; groups: OverdueGroup[]; range?: number[] }][] = [
     ['the default anchor, with overdue', { anchor: TODAY, occs: baseOccs(), groups: baseGroups() }],
     ['the default anchor, no overdue', { anchor: TODAY, occs: baseOccs(), groups: noGroups }],
     ['an empty vault', { anchor: TODAY, occs: [], groups: noGroups }],
@@ -470,12 +488,25 @@ describe('computeAgendaSections — chunk-local sectioning', () => {
     // Far enough ahead that today is outside the run entirely, so the overdue
     // block clamps to the run's first day instead of splicing at today's.
     ['an anchor far enough out that overdue clamps', { anchor: addDays(TODAY, 500), occs: baseOccs(), groups: baseGroups() }],
+    // The runs incremental loading actually produces (see viewState.ts's
+    // agendaLoadedChunks): a bare three-chunk first-paint seed, and a run
+    // grown asymmetrically further back than forward — the shape "Load
+    // earlier" leaves behind. Both are far narrower than every span above,
+    // which is exactly what the boundary invariants here need to hold for too.
+    ['a bare three-chunk first-paint seed', {
+      anchor: TODAY, occs: baseOccs(), groups: baseGroups(),
+      range: agendaChunkRun({ first: chunkIndexFor(TODAY, 1) - 1, last: chunkIndexFor(TODAY, 1) + 1 }),
+    }],
+    ['a run grown backward twice and forward not at all', {
+      anchor: TODAY, occs: baseOccs(), groups: baseGroups(),
+      range: agendaChunkRun({ first: chunkIndexFor(TODAY, 1) - 3, last: chunkIndexFor(TODAY, 1) }),
+    }],
   ]
 
-  for (const [name, { anchor, occs, groups }] of spans) {
+  for (const [name, { anchor, occs, groups, range }] of spans) {
     it(`assembles the same rows a single continuous walk would — ${name}`, () => {
-      const { rows } = compute(null, occs, groups, TODAY, NOW, noFilter, anchor)
-      expect(rows.map(r => r.key)).toEqual(singlePassRowKeys(occs, groups, TODAY, NOW, noFilter, anchor))
+      const { rows } = compute(null, occs, groups, TODAY, NOW, noFilter, anchor, false, 1, range)
+      expect(rows.map(r => r.key)).toEqual(singlePassRowKeys(occs, groups, TODAY, NOW, noFilter, anchor, false, 1, range))
     })
   }
 
@@ -487,7 +518,7 @@ describe('computeAgendaSections — chunk-local sectioning', () => {
     // Every chunk boundary is a week start (the grid is 28 = 4 × 7 days
     // anchored on one), so each contributes exactly one week divider — never
     // two, and never none because the chunk couldn't see its predecessor.
-    for (const index of agendaChunkRun(TODAY, 1)) {
+    for (const index of testRun(TODAY, 1)) {
       const firstDay = fmtISO(chunkRange(index, 1).from)
       expect(dividers.filter(k => k === `w|${firstDay}`)).toHaveLength(1)
     }
@@ -495,7 +526,7 @@ describe('computeAgendaSections — chunk-local sectioning', () => {
 
   it('opens the run with a month divider even though the run starts mid-month', () => {
     const { rows } = compute(null, [], noGroups)
-    const firstDay = chunkRange(agendaChunkRun(TODAY, 1)[0]!, 1).from
+    const firstDay = chunkRange(testRun(TODAY, 1)[0]!, 1).from
 
     // A chunk emits a month divider only where the month turns over, so this
     // one is the assembly's own leading row — the agenda's top row has always
@@ -516,7 +547,7 @@ describe('computeAgendaSections — chunk-local sectioning', () => {
     expect(rebuilt.map(([i]) => i)).toEqual([touched])
     // Every other chunk keeps its whole row array — that is what makes a
     // toggle O(one chunk) rather than O(the loaded run).
-    expect(second.chunks.size).toBe(agendaChunkRun(TODAY, 1).length)
+    expect(second.chunks.size).toBe(testRun(TODAY, 1).length)
   })
 
   it('rebuilds only the affected chunk when an occurrence is added, instead of dropping the whole cache', () => {
@@ -538,7 +569,7 @@ describe('computeAgendaSections — chunk-local sectioning', () => {
     // the anchor keep their rows, so only the grid's edges pay for the move.
     const jumped = compute(first, all, noGroups, TODAY, NOW, noFilter, new Date(2026, 6, 20))
 
-    const shared = agendaChunkRun(TODAY, 1).filter(i => jumped.chunks.has(i))
+    const shared = testRun(TODAY, 1).filter(i => jumped.chunks.has(i))
     const reused = shared.filter(i => jumped.chunks.get(i)!.rows === first.chunks.get(i)!.rows)
     expect(reused.length).toBeGreaterThan(shared.length - 4)
   })
