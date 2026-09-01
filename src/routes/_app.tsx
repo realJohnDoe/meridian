@@ -3,9 +3,10 @@ import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-
 import { CalendarCheck2 } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth, weekStartsOn } from '@/model'
-import { useToday } from '@/hooks'
+import { useToday, useMediaQuery } from '@/hooks'
 import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
+import { Popover, PopoverContent } from '@/components/ui/popover'
 import {
   useMonthPreview, useDayPreview, useWeekPreview,
   useAgendaTopDate, requestScrollToToday, requestScrollToDate, weekStartFor, firstWeekStartInMonth,
@@ -106,6 +107,13 @@ function AppMain() {
   const currentDate   = useCurrentDate()
   const ws            = weekStartsOn(useStore(s => s.localePrefs))
   const quickNavOpen  = useQuickNavOpen()
+  // Same breakpoint ResponsiveModal uses for its dialog/drawer split (md,
+  // 768px) — deliberately not useSidebar's own `isMobile` (lg, 1024px),
+  // which answers a different question (does the sidebar collapse behind a
+  // hamburger). Below it the quick-nav panel stays the inline slide-down
+  // card it's always been; at or above it, the panel opens as a Popover
+  // anchored to the toggle button instead (see the two render sites below).
+  const isDesktopQuickNav = useMediaQuery('(min-width: 768px)')
 
   // The one disclosure button currently rendered — PagedTopbar's (day/week/
   // month) or the agenda's own — so Escape can return focus to it on close.
@@ -212,6 +220,90 @@ function AppMain() {
     [navigate],
   )
 
+  // The quick-nav panel's own content, per view — rendered twice below (the
+  // mobile inline panel and the desktop Popover), which is why this is a
+  // plain function rather than being inlined at either call site. `monthNav`
+  // is the one thing that differs between the two: the mobile panel still
+  // pages by MonthStrip's scrollable chip row, but that reads as too much
+  // chrome inside a popover's tighter width, so the desktop popover instead
+  // leaves each grid's own (normally hidden) caption + prev/next chevrons as
+  // the paging control — see MiniMonth's own monthNav doc comment. Month
+  // view has no day grid here to begin with (just the MonthStrip itself, its
+  // own quick-nav content), so monthNav doesn't apply to it either way.
+  const renderQuickNavPanel = (monthNav: 'strip' | 'buttons') => (
+    isMonthView && monthViewDate && monthDisplayDate ? (
+      <MonthStrip activeMonth={monthDisplayDate} onNavigateMonth={navigateToMonth} />
+    ) : isDayView && dvDate && dvDisplayDate ? (
+      <MiniMonth
+        open={quickNavOpen}
+        anchorMonth={dvDisplayDate}
+        highlightDates={[dvDisplayDate]}
+        monthNav={monthNav}
+        onSelectDay={iso => {
+          void navigate({ to: '/day/$date', params: { date: iso } })
+          closeQuickNav()
+        }}
+        onBrowseMonth={d => {
+          // replace: true — browsing months here is view state,
+          // not a navigation event, matching the carousels'
+          // own commit navigations (see e.g. MonthView).
+          void navigate({ to: '/day/$date', params: { date: fmtISO(d) }, replace: true })
+        }}
+      />
+    ) : isWeekView && weekStartDate && weekDisplayStart ? (
+      <MiniMonth
+        open={quickNavOpen}
+        // Same source as highlightDates below (currentDisplayDate),
+        // not weekDisplayStart — the week's first day and the
+        // actually selected day routinely fall in different months
+        // (any week straddling a month boundary), and anchoring to
+        // weekDisplayStart while highlighting currentDisplayDate
+        // opened the panel on a month that didn't contain its own
+        // highlighted day. currentDisplayDate rather than plain
+        // currentDate so both track an in-progress swipe (see its
+        // own comment above) instead of only jumping once it commits.
+        anchorMonth={parseDateString(currentDisplayDate) ?? weekDisplayStart}
+        highlightDates={[parseDateString(currentDisplayDate) ?? weekDisplayStart]}
+        monthNav={monthNav}
+        onSelectDay={iso => {
+          // See the "Today" handler's comment above: set
+          // currentDate directly so the picked day — not the
+          // previously selected weekday — is what ends up
+          // highlighted and current.
+          setCurrentDate(iso)
+          void navigate({ to: '/week/$date', params: { date: iso } })
+          closeQuickNav()
+        }}
+        onBrowseMonth={d => {
+          // `d` is the 1st of the browsed month, which routinely
+          // isn't itself the locale's week-start weekday — landing
+          // there literally would show (and label, via
+          // weekDisplayStart above) whichever week contains it,
+          // which can round backward into the *previous* month
+          // (see firstWeekStartInMonth) and desync the topbar
+          // label from the month strip highlighting the month
+          // just tapped. Land on that month's first proper week
+          // instead, so both agree.
+          const iso = fmtISO(firstWeekStartInMonth(d, ws))
+          setCurrentDate(iso)
+          void navigate({ to: '/week/$date', params: { date: iso }, replace: true })
+        }}
+      />
+    ) : !isDayView && !isWeekView && !isMonthView ? (
+      <MiniMonth
+        open={quickNavOpen}
+        anchorMonth={parseDateString(agendaTopDate) ?? today}
+        highlightDates={agendaTopDate ? [parseDateString(agendaTopDate) ?? today] : []}
+        monthNav={monthNav}
+        onSelectDay={iso => {
+          requestScrollToDate(iso)
+          closeQuickNav()
+        }}
+        onBrowseMonth={d => requestScrollToDate(fmtISO(d))}
+      />
+    ) : null
+  )
+
   return (
     <>
       <div className="relative flex flex-1 flex-col min-w-0 overflow-hidden">
@@ -224,212 +316,167 @@ function AppMain() {
             or absent, both together once it opens — with no divider between
             the two. */}
         <div ref={quickNavSwipeRef} className="shrink-0 z-10 bg-background border-b border-border shadow-md">
-          <header
-            id="mainTop"
-            className="h-topbar pt-[env(safe-area-inset-top)] flex items-center"
-            data-topbar
-          >
-            <TopbarShell
-              leftHasButton={isMobile}
-              left={
-                isDayView && dvDate && dvDisplayDate ? (
-                  // replace: true on nav — mirrors the day carousel's swipe-to-page
-                  // semantics (see DayView) so chevron taps and swipes leave the
-                  // same, single history entry per visit instead of chevron taps
-                  // alone stacking up a back-press-per-day trail. Label is just the
-                  // month (like month view's own PagedTopbar below) — the weekday
-                  // and day-of-month already show in DayPane's own corner badge.
-                  <PagedTopbar
-                    isMobile={isMobile}
-                    openSidebar={openSidebar}
-                    label={fmtTopBarMonth(dvDisplayDate, today)}
-                    paging={{
-                      prevLabel: 'Previous day',
-                      nextLabel: 'Next day',
-                      onPrev: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true }),
-                      onNext: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true }),
-                    }}
-                    expanded={quickNavOpen}
-                    onToggle={toggleQuickNav}
-                    toggleRef={toggleButtonRef}
-                  />
-                ) : isWeekView && weekStartDate && weekDisplayStart && weekDisplayEnd ? (
-                  // replace: true on nav — mirrors the day/month carousels' swipe-to-page
-                  // semantics (see WeekView) so chevron taps and swipes leave the
-                  // same, single history entry per visit instead of chevron taps
-                  // alone stacking up a back-press-per-week trail. Label is just the
-                  // month of the week's first day, like Day/Month's own topbar —
-                  // the day-of-month range shows in WeekPane's own column badges.
-                  <PagedTopbar
-                    isMobile={isMobile}
-                    openSidebar={openSidebar}
-                    label={fmtTopBarMonth(weekDisplayStart, today)}
-                    paging={{
-                      prevLabel: 'Previous week',
-                      nextLabel: 'Next week',
-                      onPrev: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true }),
-                      onNext: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true }),
-                    }}
-                    expanded={quickNavOpen}
-                    onToggle={toggleQuickNav}
-                    toggleRef={toggleButtonRef}
-                  />
-                ) : isMonthView && monthViewDate && monthDisplayDate ? (
-                  // replace: true on nav — mirrors the month carousel's swipe-to-page
-                  // semantics (see MonthView) so chevron taps and swipes leave
-                  // the same, single history entry per visit instead of chevron
-                  // taps alone stacking up a back-press-per-month trail.
-                  <PagedTopbar
-                    isMobile={isMobile}
-                    openSidebar={openSidebar}
-                    label={fmtTopBarMonth(monthDisplayDate, today)}
-                    paging={{
-                      prevLabel: 'Previous month',
-                      nextLabel: 'Next month',
-                      onPrev: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true }),
-                      onNext: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true }),
-                    }}
-                    expanded={quickNavOpen}
-                    onToggle={toggleQuickNav}
-                    toggleRef={toggleButtonRef}
-                  />
-                ) : isListView ? (
-                  // Backlog/Notes: a plain label, no paging and no quick-nav panel.
-                  <PagedTopbar
-                    isMobile={isMobile}
-                    openSidebar={openSidebar}
-                    label={topBarLabel}
-                  />
-                ) : (
-                  // Agenda: same disclosure-button shape as day/week/month, just
-                  // with no prev/next paging — scrolling the list is how agenda pages.
-                  <PagedTopbar
-                    isMobile={isMobile}
-                    openSidebar={openSidebar}
-                    label={topBarLabel}
-                    expanded={quickNavOpen}
-                    onToggle={toggleQuickNav}
-                    toggleRef={toggleButtonRef}
-                  />
-                )
-              }
-              right={
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <ViewFilterButton />
-                  <SyncButton />
-                  {!isListView && (
-                    <IconButton variant="ghost" className="text-dim" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>
-                  )}
-                </div>
-              }
-            />
-          </header>
-
-          {/* Kept mounted for as long as its view is, panel open or not: the
-              grid-rows fr trick below animates a real "auto" height by
-              interpolating against the row's own content, so that content has
-              to still be there through a close transition, not just an open
-              one. Staying mounted also means MonthStrip's centering effect has
-              already settled by the time the panel first opens, instead of
-              popping in mis-centered. `inert` drops it from focus and a11y
-              while collapsed, matching MonthGrid's off-screen carousel panes.
-
-              `sm:max-w-md` is the desktop form: the same inline panel as
-              mobile, just capped rather than stretched edge-to-edge — the
-              label/chevron row above it already only occupies part of the
-              topbar's width on wide screens, so a full-bleed panel below it
-              would look unanchored.
-
-              tabIndex={-1} plus the mount-on-open effect above make this the
-              focus target when the panel opens; Escape is handled by a
-              document-level listener (see that same effect) rather than a
-              JSX handler here, since jsx-a11y flags keyboard handlers on a
-              non-interactive role. */}
-          {!isListView && (
-            <div
-              id="quickNavPanel"
-              ref={panelRef}
-              tabIndex={-1}
-              role="region"
-              aria-label="Quick date navigation"
-              inert={quickNavOpen ? undefined : true}
-              className={cn(
-                'grid sm:max-w-md transition-[grid-template-rows,opacity] duration-200 ease-linear motion-reduce:transition-none',
-                quickNavOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
-              )}
+          {/* Wraps the header (holding whichever view's PagedTopbar — and,
+              via its popoverAnchor prop, the disclosure button that anchors
+              this) together with the desktop PopoverContent below, so both
+              sit inside the same Popover context regardless of which view's
+              branch is currently mounted. `open` only ever goes true from
+              our own toggle button's onClick (PopoverAnchor carries no click
+              handling of its own — see PagedTopbar); onOpenChange only ever
+              runs the other direction, from Radix's own outside-click/Escape
+              handling closing it — so the two can never race each other. */}
+          <Popover open={quickNavOpen && isDesktopQuickNav} onOpenChange={o => { if (!o) closeQuickNav() }}>
+            <header
+              id="mainTop"
+              className="h-topbar pt-[env(safe-area-inset-top)] flex items-center"
+              data-topbar
             >
-              <div className="overflow-hidden">
-                {isMonthView && monthViewDate && monthDisplayDate ? (
-                  <MonthStrip activeMonth={monthDisplayDate} onNavigateMonth={navigateToMonth} />
-                ) : isDayView && dvDate && dvDisplayDate ? (
-                  <MiniMonth
-                    open={quickNavOpen}
-                    anchorMonth={dvDisplayDate}
-                    highlightDates={[dvDisplayDate]}
-                    onSelectDay={iso => {
-                      void navigate({ to: '/day/$date', params: { date: iso } })
-                      closeQuickNav()
-                    }}
-                    onBrowseMonth={d => {
-                      // replace: true — browsing months here is view state,
-                      // not a navigation event, matching the carousels'
-                      // own commit navigations (see e.g. MonthView).
-                      void navigate({ to: '/day/$date', params: { date: fmtISO(d) }, replace: true })
-                    }}
-                  />
-                ) : isWeekView && weekStartDate && weekDisplayStart ? (
-                  <MiniMonth
-                    open={quickNavOpen}
-                    // Same source as highlightDates below (currentDisplayDate),
-                    // not weekDisplayStart — the week's first day and the
-                    // actually selected day routinely fall in different months
-                    // (any week straddling a month boundary), and anchoring to
-                    // weekDisplayStart while highlighting currentDisplayDate
-                    // opened the panel on a month that didn't contain its own
-                    // highlighted day. currentDisplayDate rather than plain
-                    // currentDate so both track an in-progress swipe (see its
-                    // own comment above) instead of only jumping once it commits.
-                    anchorMonth={parseDateString(currentDisplayDate) ?? weekDisplayStart}
-                    highlightDates={[parseDateString(currentDisplayDate) ?? weekDisplayStart]}
-                    onSelectDay={iso => {
-                      // See the "Today" handler's comment above: set
-                      // currentDate directly so the picked day — not the
-                      // previously selected weekday — is what ends up
-                      // highlighted and current.
-                      setCurrentDate(iso)
-                      void navigate({ to: '/week/$date', params: { date: iso } })
-                      closeQuickNav()
-                    }}
-                    onBrowseMonth={d => {
-                      // `d` is the 1st of the browsed month, which routinely
-                      // isn't itself the locale's week-start weekday — landing
-                      // there literally would show (and label, via
-                      // weekDisplayStart above) whichever week contains it,
-                      // which can round backward into the *previous* month
-                      // (see firstWeekStartInMonth) and desync the topbar
-                      // label from the month strip highlighting the month
-                      // just tapped. Land on that month's first proper week
-                      // instead, so both agree.
-                      const iso = fmtISO(firstWeekStartInMonth(d, ws))
-                      setCurrentDate(iso)
-                      void navigate({ to: '/week/$date', params: { date: iso }, replace: true })
-                    }}
-                  />
-                ) : !isDayView && !isWeekView && !isMonthView ? (
-                  <MiniMonth
-                    open={quickNavOpen}
-                    anchorMonth={parseDateString(agendaTopDate) ?? today}
-                    highlightDates={agendaTopDate ? [parseDateString(agendaTopDate) ?? today] : []}
-                    onSelectDay={iso => {
-                      requestScrollToDate(iso)
-                      closeQuickNav()
-                    }}
-                    onBrowseMonth={d => requestScrollToDate(fmtISO(d))}
-                  />
-                ) : null}
+              <TopbarShell
+                leftHasButton={isMobile}
+                left={
+                  isDayView && dvDate && dvDisplayDate ? (
+                    // replace: true on nav — mirrors the day carousel's swipe-to-page
+                    // semantics (see DayView) so chevron taps and swipes leave the
+                    // same, single history entry per visit instead of chevron taps
+                    // alone stacking up a back-press-per-day trail. Label is just the
+                    // month (like month view's own PagedTopbar below) — the weekday
+                    // and day-of-month already show in DayPane's own corner badge.
+                    <PagedTopbar
+                      isMobile={isMobile}
+                      openSidebar={openSidebar}
+                      label={fmtTopBarMonth(dvDisplayDate, today)}
+                      paging={{
+                        prevLabel: 'Previous day',
+                        nextLabel: 'Next day',
+                        onPrev: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true }),
+                        onNext: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true }),
+                      }}
+                      expanded={quickNavOpen}
+                      onToggle={toggleQuickNav}
+                      toggleRef={toggleButtonRef}
+                      popoverAnchor
+                    />
+                  ) : isWeekView && weekStartDate && weekDisplayStart && weekDisplayEnd ? (
+                    // replace: true on nav — mirrors the day/month carousels' swipe-to-page
+                    // semantics (see WeekView) so chevron taps and swipes leave the
+                    // same, single history entry per visit instead of chevron taps
+                    // alone stacking up a back-press-per-week trail. Label is just the
+                    // month of the week's first day, like Day/Month's own topbar —
+                    // the day-of-month range shows in WeekPane's own column badges.
+                    <PagedTopbar
+                      isMobile={isMobile}
+                      openSidebar={openSidebar}
+                      label={fmtTopBarMonth(weekDisplayStart, today)}
+                      paging={{
+                        prevLabel: 'Previous week',
+                        nextLabel: 'Next week',
+                        onPrev: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true }),
+                        onNext: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true }),
+                      }}
+                      expanded={quickNavOpen}
+                      onToggle={toggleQuickNav}
+                      toggleRef={toggleButtonRef}
+                      popoverAnchor
+                    />
+                  ) : isMonthView && monthViewDate && monthDisplayDate ? (
+                    // replace: true on nav — mirrors the month carousel's swipe-to-page
+                    // semantics (see MonthView) so chevron taps and swipes leave
+                    // the same, single history entry per visit instead of chevron
+                    // taps alone stacking up a back-press-per-month trail.
+                    <PagedTopbar
+                      isMobile={isMobile}
+                      openSidebar={openSidebar}
+                      label={fmtTopBarMonth(monthDisplayDate, today)}
+                      paging={{
+                        prevLabel: 'Previous month',
+                        nextLabel: 'Next month',
+                        onPrev: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true }),
+                        onNext: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true }),
+                      }}
+                      expanded={quickNavOpen}
+                      onToggle={toggleQuickNav}
+                      toggleRef={toggleButtonRef}
+                      popoverAnchor
+                    />
+                  ) : isListView ? (
+                    // Backlog/Notes: a plain label, no paging and no quick-nav panel.
+                    <PagedTopbar
+                      isMobile={isMobile}
+                      openSidebar={openSidebar}
+                      label={topBarLabel}
+                    />
+                  ) : (
+                    // Agenda: same disclosure-button shape as day/week/month, just
+                    // with no prev/next paging — scrolling the list is how agenda pages.
+                    <PagedTopbar
+                      isMobile={isMobile}
+                      openSidebar={openSidebar}
+                      label={topBarLabel}
+                      expanded={quickNavOpen}
+                      onToggle={toggleQuickNav}
+                      toggleRef={toggleButtonRef}
+                      popoverAnchor
+                    />
+                  )
+                }
+                right={
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <ViewFilterButton />
+                    <SyncButton />
+                    {!isListView && (
+                      <IconButton variant="ghost" className="text-dim" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>
+                    )}
+                  </div>
+                }
+              />
+            </header>
+
+            {/* Kept mounted for as long as its view is, panel open or not: the
+                grid-rows fr trick below animates a real "auto" height by
+                interpolating against the row's own content, so that content has
+                to still be there through a close transition, not just an open
+                one. Staying mounted also means MonthStrip's centering effect has
+                already settled by the time the panel first opens, instead of
+                popping in mis-centered. `inert` drops it from focus and a11y
+                while collapsed, matching MonthGrid's off-screen carousel panes.
+
+                Below the `isDesktopQuickNav` breakpoint this is the only form
+                the panel takes, stretched edge-to-edge. At or above it, the
+                PopoverContent below takes over as the actual panel, so this
+                stays collapsed instead (`quickNavOpen && !isDesktopQuickNav`)
+                — see isDesktopQuickNav's own comment above for why a floating
+                popover reads better once the topbar has room to spare instead
+                of stretching a full-width card under the label.
+
+                tabIndex={-1} plus the mount-on-open effect above make this the
+                focus target when the panel opens; Escape is handled by a
+                document-level listener (see that same effect) rather than a
+                JSX handler here, since jsx-a11y flags keyboard handlers on a
+                non-interactive role. */}
+            {!isListView && (
+              <div
+                id="quickNavPanel"
+                ref={panelRef}
+                tabIndex={-1}
+                role="region"
+                aria-label="Quick date navigation"
+                inert={quickNavOpen && !isDesktopQuickNav ? undefined : true}
+                className={cn(
+                  'grid transition-[grid-template-rows,opacity] duration-200 ease-linear motion-reduce:transition-none',
+                  quickNavOpen && !isDesktopQuickNav ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+                )}
+              >
+                <div className="overflow-hidden">
+                  {renderQuickNavPanel('strip')}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            {!isListView && (
+              <PopoverContent align="start">
+                {renderQuickNavPanel('buttons')}
+              </PopoverContent>
+            )}
+          </Popover>
         </div>
 
         <section className="flex flex-1 flex-col overflow-hidden min-h-0">

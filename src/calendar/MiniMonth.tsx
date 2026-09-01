@@ -84,12 +84,13 @@ interface PaneProps {
   roots: Roots
   filterOccs: (occs: Occurrence[]) => Occurrence[]
   ws: 0 | 1 | 6
+  monthNav: 'strip' | 'buttons'
 }
 
 /** One month's day grid — kept as its own component so React can key panes by
  * month string (see MonthView/DayView's identical pattern) and so each pane's
  * occurrence-dot computation only reruns for its own month. */
-function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, items, roots, filterOccs, ws }: PaneProps) {
+function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, items, roots, filterOccs, ws, monthNav }: PaneProps) {
   const month = parseMonth(monthKey)
   const allOccs = useExpandWithMultiday(items, roots, startOfMonth(month), endOfMonth(month))
   const dotsByDay = useMemo(() => dayDotsFor(filterOccs(allOccs)), [allOccs, filterOccs])
@@ -109,11 +110,13 @@ function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, i
       modifiers={{ highlight: highlightDates }}
       onDayClick={date => onSelectDay(fmtISO(date))}
       components={{ DayButton: DayButtonWithDots }}
-      // The grid's own month/year caption and prev/next arrows are hidden —
-      // MonthStrip (rendered below the carousel, see MiniMonth below) is the
-      // one month-paging control now, so the two would otherwise duplicate
-      // each other.
-      classNames={{ nav: 'hidden', month_caption: 'hidden' }}
+      // 'strip': the grid's own month/year caption and prev/next arrows are
+      // hidden — MonthStrip (rendered below the carousel, see MiniMonth
+      // below) is the one month-paging control, so the two would otherwise
+      // duplicate each other. 'buttons': no MonthStrip is rendered at all
+      // (see MiniMonth below), so the grid's own default caption+chevron row
+      // is left alone instead, becoming the only paging control.
+      classNames={monthNav === 'strip' ? { nav: 'hidden', month_caption: 'hidden' } : undefined}
       className="w-full [--cell-size:2.25rem] p-3 pb-1"
     />
   )
@@ -143,6 +146,15 @@ interface Props {
    * highlight all in step, without requiring an explicit day tap.
    */
   onBrowseMonth: (d: Date) => void
+  /**
+   * How the browsed month is paged. 'strip' (default) shows MonthStrip's
+   * scrollable month-chip row below the grid — the mobile/inline panel's
+   * shape. 'buttons' drops MonthStrip entirely and leaves each pane's own
+   * caption + prev/next chevrons (normally hidden, see MiniMonthPane) as the
+   * one paging control instead — a plain jump-by-one control that reads
+   * better inside a popover's tighter width than a full chip strip does.
+   */
+  monthNav?: 'strip' | 'buttons'
 }
 
 /**
@@ -161,7 +173,9 @@ interface Props {
  * below, which only ever resyncs `month` from `anchorMonth` on a fresh open
  * (or, for a swipe still in flight, once it settles — see browsePreview).
  */
-export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectDay, onBrowseMonth }: Props) {
+export default function MiniMonth(props: Props) {
+  const { open, anchorMonth, highlightDates, onSelectDay, onBrowseMonth } = props
+  const monthNav = props.monthNav ?? 'strip'
   const [month, setMonthState] = useState(anchorMonth)
   // `YYYY-MM` the swipe carousel is settling toward, set on touchend so
   // MonthStrip's highlight below tracks the gesture immediately instead of
@@ -255,12 +269,15 @@ export default function MiniMonth({ open, anchorMonth, highlightDates, onSelectD
                 roots={roots}
                 filterOccs={filterOccs}
                 ws={ws}
+                monthNav={monthNav}
               />
             </div>
           ))}
         </div>
       </div>
-      <MonthStrip activeMonth={browsePreview ? parseMonth(browsePreview) : month} onNavigateMonth={setMonth} />
+      {monthNav === 'strip' && (
+        <MonthStrip activeMonth={browsePreview ? parseMonth(browsePreview) : month} onNavigateMonth={setMonth} />
+      )}
     </div>
   )
 }
