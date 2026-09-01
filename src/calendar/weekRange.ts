@@ -30,3 +30,23 @@ export function weekContains(weekStart: Date, date: Date): boolean {
   const end = startOfDay(addDays(weekStart, 6)).getTime()
   return d >= start && d <= end
 }
+
+/**
+ * The start of the first week that belongs to `monthStart` (the 1st of a
+ * month) rather than trailing in from the previous one — i.e. `weekStartFor`
+ * with the backward-rounding case pushed forward by a week instead. Whenever
+ * the 1st doesn't itself fall on the locale's week-start weekday,
+ * `weekStartFor(monthStart, ws)` rounds *backward* into the previous month
+ * (e.g. Aug 1 2026 is a Saturday, so a Monday-start week rounds back to Jul
+ * 27) — fine for "which week contains this day", wrong for "land me on this
+ * month": the resulting week's own month no longer matches the one just
+ * browsed to, which is exactly what desynced the week view's topbar label
+ * from its quick-nav month strip (both read off this same computed week
+ * start elsewhere). Always lands within `monthStart`'s month: the pushed-
+ * forward week start is at most 6 days after the 1st, and every month has at
+ * least 28 days.
+ */
+export function firstWeekStartInMonth(monthStart: Date, ws: 0 | 1 | 6): Date {
+  const start = weekStartFor(monthStart, ws)
+  return start < monthStart ? addDays(start, 7) : start
+}
